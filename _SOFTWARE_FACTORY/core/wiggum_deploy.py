@@ -1874,7 +1874,7 @@ class WiggumDeployDaemon(Daemon):
                         type=feedback.get("type", "fix"),
                         domain=feedback.get("domain", task.domain),
                         description=feedback.get("description", "Fix deploy issue"),
-                        status=TaskStatus.PENDING,
+                        status="pending",
                         files=feedback.get("files", []),
                         context=feedback,
                         created_at=datetime.now().isoformat(),

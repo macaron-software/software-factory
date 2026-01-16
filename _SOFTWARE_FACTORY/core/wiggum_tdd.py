@@ -134,16 +134,21 @@ class WiggumWorker:
                         return result
                     else:
                         # Standard: Create subtasks in store for pool workers
+                        import uuid
                         for st in subtasks:
-                            self.task_store.create_task(
+                            subtask = Task(
+                                id=f"subtask-{task.domain}-{uuid.uuid4().hex[:8]}",
                                 project_id=self.project.id,
-                                task_type=st.get("type", task.type),
+                                parent_id=task.id,
+                                type=st.get("type", task.type),
                                 domain=st.get("domain", task.domain),
                                 description=st.get("description", ""),
+                                status="pending",
                                 files=st.get("files", []),
                                 context=st,
-                                parent_id=task.id,
+                                depth=task.depth + 1,
                             )
+                            self.task_store.create_task(subtask)
                         # Mark parent as decomposed
                         self.task_store.transition(task.id, TaskStatus.DECOMPOSED)
                         result.success = True
@@ -400,22 +405,26 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
         result = TDDResult(success=False, task_id=parent_task.id)
         
         self.log(f"🔀 Launching {len(subtasks)} parallel sub-agents...")
-        
+
         # Create subtasks in store first
+        import uuid
         subtask_ids = []
         for st in subtasks:
-            created = self.task_store.create_task(
+            subtask = Task(
+                id=f"subtask-{parent_task.domain}-{uuid.uuid4().hex[:8]}",
                 project_id=self.project.id,
-                task_type=st.get("type", parent_task.type),
+                parent_id=parent_task.id,
+                type=st.get("type", parent_task.type),
                 domain=st.get("domain", parent_task.domain),
                 description=st.get("description", ""),
+                status="pending",
                 files=st.get("files", []),
                 context=st,
-                parent_id=parent_task.id,
+                depth=parent_task.depth + 1,
             )
-            if created:
-                subtask_ids.append(created.id)
-                self.log(f"  Created subtask: {created.id} ({st.get('aspect', 'sub')})")
+            self.task_store.create_task(subtask)
+            subtask_ids.append(subtask.id)
+            self.log(f"  Created subtask: {subtask.id} ({st.get('aspect', 'sub')})")
         
         if not subtask_ids:
             self.log("Failed to create subtasks", "ERROR")
@@ -720,17 +729,21 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
                         continue
 
                 # Create the task
-                new_task_id = self.task_store.create_task(
+                import uuid
+                feedback_task = Task(
+                    id=f"feedback-{source_task.domain}-{uuid.uuid4().hex[:8]}",
                     project_id=self.project.id,
-                    task_type=task_dict.get("type", "fix"),
+                    type=task_dict.get("type", "fix"),
                     domain=task_dict.get("domain", source_task.domain),
                     description=task_dict.get("description", "Fix captured error"),
+                    status="pending",
                     files=task_dict.get("files", []),
                     context=task_dict.get("context", {}),
                     wsjf_score=task_dict.get("wsjf_score", 5.0),
                 )
+                self.task_store.create_task(feedback_task)
 
-                self.log(f"Created feedback task: {new_task_id} ({task_dict.get('description', '')[:40]}...)")
+                self.log(f"Created feedback task: {feedback_task.id} ({task_dict.get('description', '')[:40]}...)")
                 created_count += 1
 
             except Exception as e:

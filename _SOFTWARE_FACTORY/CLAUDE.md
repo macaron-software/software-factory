@@ -2,28 +2,50 @@
 
 ## ARCH
 ```
-BRAIN (Opus4.5) → scan → backlog enrichi
-    ↓
-WIGGUM TDD (MiniMax×N) → RED/GREEN/VERIFY → commit
+BRAIN (Opus4.5 RLM) → deep recursive → backlog enrichi
+    ↓ llm_query() → MiniMax sub-agents
+WIGGUM TDD (MiniMax×N) → FRACTAL L1 forced → 3 sub-agents // → commit
     ↓
 WIGGUM DEPLOY → staging → E2E → prod → rollback
     ↓
 FEEDBACK → errs → new tasks
+    ↓
+XP AGENT → learn → SELF-MODIFY FACTORY
 ```
 
 ## CORE
 
-### Brain (`core/brain.py`)
-- scan codebase/domain (rust/ts/swift/kotlin/e2e/proto)
-- tasks enrichies (ctx, imports, conventions)
-- WSJF score
-- LLM: Opus4.5 `claude` CLI / opencode
+### Brain RLM (`core/brain_rlm.py`)
+**Deep Recursive Analysis Engine** per MIT CSAIL arXiv:2512.24601:
+- max_depth=3: 3 levels recursive llm_query()
+- sub_model: MiniMax M2.1 via **opencode** (MCP tools, git, fs)
+- 5-phase analysis:
+  1. Structure decomposition (project→modules→files)
+  2. Deep recursive llm_query() per module
+  3. Parallel llm_query_batched() for files
+  4. Cross-cutting (security, perf, arch, testing)
+  5. Synthesis → WSJF scored backlog
+- LLM: Opus4.5 root + MiniMax M2.1 opencode sub-calls
 
 ### Wiggum TDD (`core/wiggum_tdd.py`)
 - pool workers // (daemon)
+- **FRACTAL L1 FORCED**: ALL depth=0 tasks → 3 sub-agents //
+  - impl (core logic), test (validation), integ (edge cases)
+  - `asyncio.gather()` parallel execution
+  - parent DONE ssi ALL sub-agents succeed
 - cycle: lock → TDD (test fail→code→pass) → adversarial → commit
-- FRACTAL: big task → subtasks (max 3 depth)
 - LLM: MiniMax M2.1 `opencode`
+
+### FRACTAL (`core/fractal.py`)
+```yaml
+fractal:
+  force_level1: true      # FORCED for depth=0
+  min_subtasks: 3         # 3 parallel sub-agents
+  parallel_subagents: true
+  max_depth: 3
+  max_files: 5
+  max_loc: 400
+```
 
 ### Wiggum Deploy (`core/wiggum_deploy.py`)
 - pipeline: build→staging→E2E→prod→verify
@@ -34,17 +56,18 @@ FEEDBACK → errs → new tasks
 - reject: test.skip, @ts-ignore, TODO>2, .unwrap()>3, panic!
 - score>=5 → REJECT → retry (max 10)
 - deep: Qwen semantic (SLOP, BYPASS, SECURITY)
+- **XP-learned patterns**: auto-injected from factory failures
 
 ### XP Agent (`core/experience_agent.py`)
-- meta-brain auto-improve (GenAI Divide: 5% success)
+Meta-brain that **SELF-MODIFIES THE FACTORY**:
 - learning memory: `learnings` table
 - pattern evolution: `pattern_evolutions` table
-- ROI tracking
+- ROI tracking (GenAI Divide: 5% success)
 - **chaos**: resilience tests (retry, circuit breaker, timeout)
-- **security**: CVE fetch, OWASP Top10, pentest staging/prod
+- **security**: CVE fetch NVD, OWASP Top10, pentest staging/prod
 - **journeys**: Playwright E2E w/ RBAC personas, real data
 - **logs**: prod log analysis → backlog tasks
-- auto-fix: reset stuck, apply patterns, create tasks
+- **improve**: patches adversarial.py, fractal.py, brain prompts
 
 ### TaskStore (`core/task_store.py`)
 - SQLite `data/factory.db`
@@ -60,35 +83,36 @@ FEEDBACK → errs → new tasks
 ## CLI
 
 ```bash
-# Brain
-factory <p> brain run              # full
-factory <p> brain run --legacy     # opencode
-factory <p> brain run -q "mobile"  # focus
+# Brain (Deep Recursive RLM)
+factory <p> brain run              # full RLM 5-phase
+factory <p> brain run --legacy     # opencode fallback
+factory <p> brain run -q "iOS security"  # focus
 
-# Wiggum TDD
+# Wiggum TDD (FRACTAL L1 forced)
 factory <p> wiggum start           # daemon bg
 factory <p> wiggum start -w 10     # 10 workers
 factory <p> wiggum start -f        # fg debug
 factory <p> wiggum stop
 factory <p> wiggum restart
 factory <p> wiggum status
-factory <p> wiggum once            # 1 task
+factory <p> wiggum once            # 1 task → 3 sub-agents
 
 # Deploy
 factory <p> deploy start/stop/status/once
 
-# XP Agent
+# XP Agent (Self-Modifying Factory)
 factory xp analyze                 # no LLM
 factory xp analyze --apply         # +auto-fix
 factory xp report                  # Opus report
 factory xp fix                     # reset stuck
-factory xp impact                  # ROI
+factory xp impact                  # ROI metrics
 factory xp learn                   # full cycle
 factory xp chaos -p ppz            # resilience tests
 factory xp security -p ppz         # CVE/OWASP/pentest
 factory xp journeys -p ppz         # E2E personas RBAC
 factory xp logs -p ppz             # prod log analysis
-factory xp full -p ppz --apply     # ALL + create tasks
+factory xp improve                 # SELF-MODIFY factory code
+factory xp full -p ppz --apply     # ALL + improve + create tasks
 
 # Status
 factory status --all
@@ -118,9 +142,12 @@ domains:
     test_cmd: cargo test
   swift:
     paths: [ios/]
-    build_cmd: xcodebuild -scheme App -destination 'platform=iOS Simulator,name=iPhone 15' build
+    build_cmd: xcodebuild -scheme App build
 
 fractal:
+  force_level1: true      # NEW: force 3 sub-agents
+  min_subtasks: 3
+  parallel_subagents: true
   max_files: 5
   max_loc: 400
   max_depth: 3
@@ -149,8 +176,9 @@ providers:
       qwen: qwen3-30b-a3b
 
 defaults:
-  brain: anthropic/opus
-  wiggum: minimax/m2.1
+  brain: anthropic/opus        # root RLM
+  brain_sub: opencode/minimax  # llm_query() via opencode + MCP
+  wiggum: opencode/minimax     # TDD workers via opencode
 ```
 
 ## MONITOR
@@ -175,18 +203,21 @@ MiniMax timeout w/ too many workers:
 _SOFTWARE_FACTORY/
 ├── cli/factory.py
 ├── core/
-│   ├── brain.py
-│   ├── wiggum_tdd.py
+│   ├── brain_rlm.py       # Deep Recursive RLM
+│   ├── brain.py           # Legacy brain
+│   ├── wiggum_tdd.py      # FRACTAL L1 + 3 sub-agents
 │   ├── wiggum_deploy.py
-│   ├── adversarial.py
-│   ├── experience_agent.py
-│   ├── fractal.py
+│   ├── adversarial.py     # XP-learned patterns
+│   ├── experience_agent.py # Self-modifying XP
+│   ├── fractal.py         # force_level1, parallel_subagents
 │   ├── task_store.py
 │   ├── daemon.py
 │   └── llm_client.py
+├── _rlm/                  # MIT CSAIL RLM lib
 ├── projects/*.yaml
 ├── data/
 │   ├── factory.db
+│   ├── rlm_logs/          # RLM execution logs
 │   └── logs/
 └── /tmp/factory/*.pid
 ```
@@ -194,9 +225,19 @@ _SOFTWARE_FACTORY/
 ## WORKFLOW
 
 ```bash
-factory psy brain run --legacy   # 1. analyse
-factory psy wiggum start -w 10   # 2. workers
-tail -f data/logs/wiggum-tdd-psy.log  # 3. monitor
+# 1. Deep recursive analysis
+factory psy brain run -q "iOS security RBAC"
+
+# 2. Start workers (FRACTAL L1 → 3 sub-agents per task)
+factory psy wiggum start -w 10
+
+# 3. Monitor
+tail -f data/logs/wiggum-tdd-psy.log
 factory status --all
-factory psy wiggum stop          # 4. stop
+
+# 4. XP Agent self-improve
+factory xp full -p psy --apply
+
+# 5. Stop
+factory psy wiggum stop
 ```

@@ -158,13 +158,17 @@ class RLMBrain:
         # Initialize RLM with Anthropic backend (Claude Opus 4.5)
         # Per MIT CSAIL arXiv:2512.24601 - RLM should be truly RECURSIVE:
         # - max_depth=3: Allow 3 levels of recursive self-calls
-        # - other_backends: Use MiniMax for sub-agent tasks (cheaper/faster)
+        # - other_backends: Use MiniMax M2.1 via opencode for sub-agent tasks
         # 
-        # Architecture:
-        #   Brain (Opus) depth=0
-        #     └── llm_query() → Sub-Brain (Opus) depth=1
-        #           └── llm_query() → Sub-Sub (Opus) depth=2
+        # Architecture (TRUE RLM with heterogeneous models):
+        #   Brain (Opus 4.5) depth=0 - Strategic analysis
+        #     └── llm_query() → MiniMax M2.1 via opencode depth=1
+        #           └── llm_query() → MiniMax M2.1 via opencode depth=2
         #                 └── At depth=3: fallback to direct LM call
+        #
+        # This mirrors the Wiggum architecture:
+        #   Brain (Opus) orchestrates, MiniMax (via opencode) executes
+        #   opencode has MCP tools access (filesystem, git, etc.)
         #
         self.rlm = RLM(
             backend="anthropic",
@@ -178,18 +182,22 @@ class RLMBrain:
             logger=RLMLogger(
                 log_dir=str(Path(__file__).parent.parent / "data" / "rlm_logs")
             ),
-            # Sub-agent backend for llm_query() calls inside code
-            # Uses same Opus model for consistency (could use MiniMax for speed)
-            other_backends=["anthropic"],
+            # Sub-agent backend: MiniMax M2.1 via opencode CLI
+            # opencode provides: MCP tools, filesystem, git, project context
+            # Same setup as Wiggum TDD workers
+            other_backends=["opencode"],
             other_backend_kwargs=[{
-                "model_name": "claude-sonnet-4-20250514",  # Sonnet for sub-calls (faster)
+                "model_name": "minimax/MiniMax-M2.1",
+                "cwd": str(self.project.root_path),
+                "timeout": 300,
+                "project": self.project.name,
             }],
         )
 
         log(f"RLM Brain initialized for project: {self.project.name}")
         log(f"Root: {self.project.root_path}")
         log(f"Domains: {list(self.project.domains.keys())}")
-        log(f"RLM Config: max_depth=3, max_iterations=50, sub_model=claude-sonnet-4")
+        log(f"RLM Config: max_depth=3, max_iterations=50, sub_model=MiniMax-M2.1 via opencode")
 
     async def run(
         self,
