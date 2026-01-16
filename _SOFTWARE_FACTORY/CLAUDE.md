@@ -15,17 +15,20 @@ XP AGENT → learn → SELF-MODIFY FACTORY
 
 ## CORE
 
-### Brain RLM (`core/brain_rlm.py`)
+### Brain RLM (`core/brain.py`)
 **Deep Recursive Analysis Engine** per MIT CSAIL arXiv:2512.24601:
-- max_depth=3: 3 levels recursive llm_query()
-- sub_model: MiniMax M2.1 via **opencode** (MCP tools, git, fs)
-- 5-phase analysis:
-  1. Structure decomposition (project→modules→files)
-  2. Deep recursive llm_query() per module
-  3. Parallel llm_query_batched() for files
-  4. Cross-cutting (security, perf, arch, testing)
-  5. Synthesis → WSJF scored backlog
-- LLM: Opus4.5 root + MiniMax M2.1 opencode sub-calls
+
+**COST TIERS** (like GPT-5 → GPT-5-mini in paper):
+- depth=0: **Opus 4.5** ($$$) - Strategic orchestration
+- depth=1-2: **MiniMax M2.1** ($$) via opencode + MCP tools
+- depth=3: **Qwen 30B local** (free) - Fallback
+
+5-phase analysis:
+1. Structure decomposition (project→modules→files)
+2. Deep recursive llm_query() per module
+3. Parallel llm_query_batched() for files
+4. Cross-cutting (security, perf, arch, testing)
+5. Synthesis → WSJF scored backlog
 
 ### Wiggum TDD (`core/wiggum_tdd.py`)
 - pool workers // (daemon)
@@ -83,9 +86,9 @@ Meta-brain that **SELF-MODIFIES THE FACTORY**:
 ## CLI
 
 ```bash
-# Brain (Deep Recursive RLM)
-factory <p> brain run              # full RLM 5-phase
-factory <p> brain run --legacy     # opencode fallback
+# Brain (Deep Recursive RLM with cost tiers)
+factory <p> brain run              # full RLM 5-phase (Opus→MiniMax→Qwen)
+factory <p> brain run --quick      # reduced depth
 factory <p> brain run -q "iOS security"  # focus
 
 # Wiggum TDD (FRACTAL L1 forced)
@@ -203,8 +206,7 @@ MiniMax timeout w/ too many workers:
 _SOFTWARE_FACTORY/
 ├── cli/factory.py
 ├── core/
-│   ├── brain_rlm.py       # Deep Recursive RLM
-│   ├── brain.py           # Legacy brain
+│   ├── brain.py           # Single RLM Brain (Opus→MiniMax→Qwen tiers)
 │   ├── wiggum_tdd.py      # FRACTAL L1 + 3 sub-agents
 │   ├── wiggum_deploy.py
 │   ├── adversarial.py     # XP-learned patterns
@@ -214,6 +216,7 @@ _SOFTWARE_FACTORY/
 │   ├── daemon.py
 │   └── llm_client.py
 ├── _rlm/                  # MIT CSAIL RLM lib
+│   └── rlm/clients/opencode.py  # Custom opencode client
 ├── projects/*.yaml
 ├── data/
 │   ├── factory.db

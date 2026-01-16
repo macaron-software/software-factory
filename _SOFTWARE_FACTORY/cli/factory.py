@@ -97,23 +97,23 @@ if CLICK_AVAILABLE:
     @brain.command("run")
     @click.option("--question", "-q", help="Focus question for analysis")
     @click.option("--domain", "-d", help="Specific domain to analyze")
-    @click.option("--legacy", is_flag=True, help="Use legacy Brain (regex-based)")
+    @click.option("--quick", is_flag=True, help="Quick mode (less depth)")
     @click.pass_context
-    def brain_run(ctx, question, domain, legacy):
-        """Run Brain analysis using MCP LRM tools (MIT CSAIL RLM adaptation)"""
+    def brain_run(ctx, question, domain, quick):
+        """Run Deep Recursive RLM Brain analysis (MIT CSAIL arXiv:2512.24601)
+        
+        Cost tiers: Opus(d0) → MiniMax(d1-2) → fallback(d3)
+        """
         project = ctx.obj.get("project")
         domains = [domain] if domain else None
 
-        if legacy:
-            # Legacy mode (regex-based, not using MCP)
-            from core.brain import RLMBrain
-            brain = RLMBrain(project)
-            tasks = asyncio.run(brain.run(question=question, domains=domains))
-        else:
-            # MCP mode (Claude + MCP LRM tools)
-            from core.brain_mcp import MCPBrain
-            brain = MCPBrain(project)
-            tasks = asyncio.run(brain.run(focus=question, domains=domains))
+        from core.brain import RLMBrain
+        brain = RLMBrain(project)
+        tasks = asyncio.run(brain.run(
+            vision_prompt=question, 
+            domains=domains,
+            deep_analysis=not quick,
+        ))
 
         click.echo(f"\n✅ Created {len(tasks)} tasks")
         for task in tasks[:5]:

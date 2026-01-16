@@ -457,7 +457,7 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
             )
             
             try:
-                sub_result = await sub_worker.run_cycle(subtask)
+                sub_result = await sub_worker.run_single(subtask)
                 return (subtask_id, sub_result.success, sub_result.error)
             except Exception as e:
                 return (subtask_id, False, str(e))

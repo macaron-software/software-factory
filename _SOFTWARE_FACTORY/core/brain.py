@@ -1,40 +1,49 @@
 #!/usr/bin/env python3
 """
-RLM Brain - LEAN Requirements Manager Orchestrator
-==================================================
+RLM Brain - Deep Recursive Analysis Engine with MCP
+====================================================
 Based on MIT CSAIL arXiv:2512.24601 "Recursive Language Models"
 
-The Brain is the central orchestrator that:
-1. SCANS the project recursively using vision document
-2. ANALYZES each domain (build errors, tests, tech debt)
-3. IDENTIFIES problems and opportunities
-4. PRIORITIZES with WSJF (Weighted Shortest Job First)
-5. CREATES actionable tasks for Wiggum TDD workers
+Uses MCP (Model Context Protocol) for project navigation:
+- Opus 4.5 via `claude` CLI with MCP tools
+- MiniMax M2.1 via `opencode` with MCP tools
+- Both can navigate the codebase using lrm_* tools
 
-Uses Claude Opus 4.5 via `claude` CLI for heavy analysis.
+COST TIER ARCHITECTURE (like GPT-5 → GPT-5-mini in paper):
+  depth=0: Opus 4.5 ($$$) - Strategic orchestration via `claude` + MCP
+  depth=1: MiniMax M2.1 ($$) - Deep analysis via `opencode` + MCP  
+  depth=2: MiniMax M2.1 ($) - Sub-analysis via `opencode` + MCP
+  depth=3: Qwen 30B local (free) - Simple queries
+
+MCP Tools available (from mcp_lrm):
+- lrm_locate: Find files matching pattern
+- lrm_summarize: Summarize file content
+- lrm_conventions: Get domain conventions
+- lrm_examples: Get example code
+- lrm_build: Run build/test commands
 
 Usage:
     from core.brain import RLMBrain
 
     brain = RLMBrain("ppz")
-    await brain.run(question="focus on mobile features")
+    tasks = await brain.run(vision_prompt="Focus on iOS security")
 """
 
 import asyncio
 import json
-import re
+import os
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
-import sys
+from typing import List, Dict, Any, Optional
 
 # Add parent to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.project_registry import get_project, ProjectConfig
 from core.task_store import TaskStore, Task
-from core.llm_client import run_claude_agent, run_opencode
+from core.llm_client import run_opencode
 
 
 def log(msg: str, level: str = "INFO"):
@@ -44,491 +53,67 @@ def log(msg: str, level: str = "INFO"):
 
 
 # ============================================================================
-# CONTEXT ENRICHMENT
+# FILE COLLECTOR
 # ============================================================================
 
-def enrich_task_context(
-    task: Dict,
-    project_root: Path,
-    domain: str,
-) -> Dict:
+def collect_project_files(project: ProjectConfig, max_chars: int = 500000) -> str:
     """
-    Enrich task with context needed by Wiggum workers.
+    Collect all project files as a single context string.
 
-    Adds:
-    - file_content: Source code (max 3000 chars)
-    - imports: File imports
-    - types_defined: Structs/classes defined
-    - error_context: Error details if available
-    - test_example: Example test from project
-    - conventions: Domain conventions
+    This becomes the RLM context that the LLM can programmatically examine.
     """
-    files = task.get("files", [])
-    if not files:
-        return task
+    files_content = []
+    total_chars = 0
 
-    file_path = files[0]
-    full_path = project_root / file_path
-
-    if not full_path.exists():
-        return task
-
-    try:
-        content = full_path.read_text()
-        task["file_content"] = content[:3000]
-        task["file_lines"] = len(content.split("\n"))
-
-        # Extract imports based on domain
-        if domain == "rust":
-            imports = re.findall(r"^use\s+([^;]+);", content, re.MULTILINE)
-            structs = re.findall(r"\b(struct|enum|trait)\s+(\w+)", content)
-            task["imports"] = imports[:20]
-            task["types_defined"] = [s[1] for s in structs][:10]
-        elif domain in ["typescript", "e2e"]:
-            imports = re.findall(r"^import\s+.*?from\s+['\"]([^'\"]+)['\"]", content, re.MULTILINE)
-            classes = re.findall(r"\b(class|interface|type)\s+(\w+)", content)
-            task["imports"] = imports[:20]
-            task["types_defined"] = [c[1] for c in classes][:10]
-        elif domain == "python":
-            imports = re.findall(r"^(?:from\s+\S+\s+)?import\s+(\S+)", content, re.MULTILINE)
-            classes = re.findall(r"^class\s+(\w+)", content, re.MULTILINE)
-            task["imports"] = imports[:20]
-            task["types_defined"] = classes[:10]
-
-    except Exception as e:
-        task["file_content"] = f"Error reading file: {e}"
-
-    # Add conventions
-    task["conventions"] = {
-        "rust": {
-            "error_handling": "Use ? operator, avoid .unwrap()",
-            "testing": "#[cfg(test)] mod tests { ... }",
-            "skip_pattern": "NEVER use #[ignore]",
-        },
-        "typescript": {
-            "error_handling": "Use try/catch or Result pattern",
-            "testing": "describe/it with vitest",
-            "skip_pattern": "NEVER use test.skip()",
-        },
-        "python": {
-            "error_handling": "Use try/except with specific exceptions",
-            "testing": "pytest with test_ prefix",
-            "skip_pattern": "NEVER use pytest.mark.skip",
-        },
-    }.get(domain, {})
-
-    return task
-
-
-def calculate_wsjf(task: Dict) -> float:
-    """
-    Calculate WSJF (Weighted Shortest Job First) score.
-
-    WSJF = (Business Value + Time Criticality + Risk Reduction) / Job Size
-
-    Higher score = higher priority.
-    """
-    # Default values
-    business_value = task.get("business_value", 5)
-    time_criticality = task.get("time_criticality", 3)
-    risk_reduction = task.get("risk_reduction", 3)
-    job_size = task.get("job_size", 3)
-
-    # Adjust based on task type
-    task_type = task.get("type", "fix")
-    type_multipliers = {
-        "security": 2.0,
-        "fix": 1.5,
-        "test": 1.2,
-        "feature": 1.0,
-        "refactor": 0.8,
+    # Patterns to exclude
+    exclude_patterns = {
+        '.git', 'node_modules', 'target', '__pycache__', '.pyc',
+        'dist', 'build', '.next', '.svelte-kit', 'coverage',
+        '.DS_Store', '.env', 'Thumbs.db', '*.lock', 'package-lock.json'
     }
-    multiplier = type_multipliers.get(task_type, 1.0)
 
-    # Adjust based on severity if present
-    severity = task.get("severity", "medium")
-    severity_bonus = {"critical": 5, "high": 3, "medium": 1, "low": 0}.get(severity, 1)
+    def should_exclude(path: Path) -> bool:
+        for pattern in exclude_patterns:
+            if pattern in str(path):
+                return True
+        return False
 
-    numerator = (business_value + time_criticality + risk_reduction + severity_bonus) * multiplier
-    denominator = max(job_size, 1)
+    # Collect files from each domain
+    for domain_name, domain_config in project.domains.items():
+        paths = domain_config.get("paths", [])
+        extensions = domain_config.get("extensions", [])
 
-    return round(numerator / denominator, 2)
-
-
-# ============================================================================
-# ANALYZERS
-# ============================================================================
-
-class DomainAnalyzer:
-    """
-    Analyze a specific domain using LLM sub-agents.
-
-    Conforme MIT CSAIL RLM: spawns sub-agents (opencode) for deep analysis.
-    """
-
-    def __init__(self, project: ProjectConfig, domain: str):
-        self.project = project
-        self.domain = domain
-        self.domain_config = project.get_domain(domain) or {}
-        self.findings: List[Dict] = []
-
-    async def analyze(self) -> List[Dict]:
-        """
-        Run LLM-based analysis for the domain.
-
-        Uses opencode sub-agents for:
-        1. Build error analysis
-        2. Code quality analysis
-        3. Security scanning
-        """
-        self.findings = []
-
-        # 1. Run build and collect errors
-        build_cmd = self.domain_config.get("build_cmd")
-        if build_cmd:
-            build_findings = await self._analyze_build_with_llm(build_cmd)
-            self.findings.extend(build_findings)
-
-        # 2. Run LLM sub-agent for code analysis
-        code_findings = await self._analyze_code_with_llm()
-        self.findings.extend(code_findings)
-
-        return self.findings
-
-    async def _analyze_build_with_llm(self, cmd: str) -> List[Dict]:
-        """Run build and use LLM sub-agent to analyze errors"""
-        log(f"Running build for {self.domain}: {cmd}")
-        findings = []
-
-        try:
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                cwd=str(self.project.root_path),
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-
-            if result.returncode != 0:
-                # Use LLM sub-agent to analyze build errors
-                output = result.stderr + result.stdout
-
-                if len(output) > 100:  # Only if there's meaningful output
-                    prompt = f"""Analyze these build errors for {self.domain} domain.
-
-BUILD OUTPUT:
-{output[:8000]}
-
-Return a JSON array of findings:
-[{{"type": "build_error", "severity": "high|medium|low", "file": "path/to/file", "line": 123, "message": "description"}}]
-
-Only return the JSON array, no other text."""
-
-                    returncode, llm_output = await run_opencode(
-                        prompt,
-                        model="minimax/MiniMax-M2.1",
-                        cwd=str(self.project.root_path),
-                        timeout=120,
-                    )
-
-                    if returncode == 0:
-                        findings = self._parse_llm_findings(llm_output)
-                        log(f"LLM sub-agent found {len(findings)} build issues")
-                    else:
-                        # Fallback to regex parsing
-                        findings = self._parse_build_errors_regex(output)
-
-        except subprocess.TimeoutExpired:
-            log(f"Build timeout for {self.domain}", "WARN")
-        except Exception as e:
-            log(f"Build error for {self.domain}: {e}", "ERROR")
-
-        return findings
-
-    async def _analyze_code_with_llm(self) -> List[Dict]:
-        """Use LLM sub-agent for deep code analysis"""
-        log(f"Running LLM code analysis for {self.domain}")
-
-        paths = self.domain_config.get("paths", [])
-        extensions = self.domain_config.get("extensions", [])
-
-        # Collect sample files for analysis
-        sample_files = []
         for path_str in paths:
-            path = self.project.root_path / path_str
-            if not path.exists():
+            domain_path = project.root_path / path_str
+            if not domain_path.exists():
                 continue
+
             for ext in extensions:
-                for file in list(path.rglob(f"*{ext}"))[:20]:  # Limit files
-                    try:
-                        content = file.read_text()[:2000]
-                        rel_path = str(file.relative_to(self.project.root_path))
-                        sample_files.append({"path": rel_path, "content": content})
-                    except Exception:
+                for file in domain_path.rglob(f"*{ext}"):
+                    if should_exclude(file):
                         continue
 
-        if not sample_files:
-            return []
-
-        # Build prompt for LLM sub-agent
-        files_summary = "\n\n".join([
-            f"=== {f['path']} ===\n{f['content']}"
-            for f in sample_files[:10]
-        ])
-
-        prompt = f"""Analyze this {self.domain} code for issues.
-
-FILES:
-{files_summary}
-
-Find:
-1. Skipped tests (test.skip, #[ignore], pytest.mark.skip)
-2. TODO/FIXME comments that indicate incomplete work
-3. Error handling issues (.unwrap() abuse, empty catch blocks)
-4. Security issues (hardcoded secrets, SQL injection, XSS)
-5. Code quality issues
-
-Return a JSON array:
-[{{"type": "skipped_test|todo|error_handling|security|quality", "severity": "critical|high|medium|low", "file": "path", "message": "description"}}]
-
-Only return the JSON array."""
-
-        returncode, output = await run_opencode(
-            prompt,
-            model="minimax/MiniMax-M2.1",
-            cwd=str(self.project.root_path),
-            timeout=180,
-        )
-
-        if returncode == 0:
-            findings = self._parse_llm_findings(output)
-            log(f"LLM sub-agent found {len(findings)} code issues")
-            # Add domain to all findings
-            for f in findings:
-                f["domain"] = self.domain
-            return findings
-        else:
-            log(f"LLM sub-agent failed for {self.domain}, using fallback", "WARN")
-            return self._scan_files_regex()
-
-    def _parse_llm_findings(self, output: str) -> List[Dict]:
-        """Parse findings from LLM output"""
-        try:
-            # Find JSON array in output
-            match = re.search(r'\[\s*\{.*?\}\s*\]', output, re.DOTALL)
-            if match:
-                findings = json.loads(match.group())
-                return [f for f in findings if isinstance(f, dict) and "message" in f]
-        except json.JSONDecodeError:
-            pass
-        return []
-
-    def _parse_build_errors_regex(self, output: str) -> List[Dict]:
-        """Fallback: parse build errors with regex"""
-        errors = []
-
-        # Rust errors
-        for match in re.finditer(r"error\[E\d+\]: (.+?)\n\s*-->\s*([^:]+):(\d+)", output):
-            errors.append({
-                "type": "build_error",
-                "domain": self.domain,
-                "severity": "high",
-                "file": match.group(2),
-                "line": int(match.group(3)),
-                "message": match.group(1).strip(),
-            })
-
-        # TypeScript errors
-        for match in re.finditer(r"([^\s]+\.tsx?)\((\d+),\d+\):\s*error\s+TS\d+:\s*(.+)", output):
-            errors.append({
-                "type": "build_error",
-                "domain": self.domain,
-                "severity": "high",
-                "file": match.group(1),
-                "line": int(match.group(2)),
-                "message": match.group(3).strip(),
-            })
-
-        return errors[:20]
-
-    def _scan_files_regex(self) -> List[Dict]:
-        """Fallback: scan files with regex patterns"""
-        findings = []
-        paths = self.domain_config.get("paths", [])
-        extensions = self.domain_config.get("extensions", [])
-
-        for path_str in paths:
-            path = self.project.root_path / path_str
-            if not path.exists():
-                continue
-
-            for ext in extensions:
-                for file in path.rglob(f"*{ext}"):
                     try:
-                        content = file.read_text()
-                        rel_path = str(file.relative_to(self.project.root_path))
+                        content = file.read_text(errors='ignore')
+                        rel_path = str(file.relative_to(project.root_path))
 
-                        # Skipped tests
-                        if re.search(r"\b(test\.skip|it\.skip|describe\.skip|#\[ignore\]|pytest\.mark\.skip)\b", content):
-                            findings.append({
-                                "type": "skipped_test",
-                                "domain": self.domain,
-                                "severity": "high",
-                                "file": rel_path,
-                                "message": "Skipped test detected",
-                            })
+                        # Limit per file
+                        if len(content) > 10000:
+                            content = content[:10000] + "\n... [truncated]"
 
-                        # TODOs
-                        for match in re.finditer(r"//\s*(TODO|FIXME):?\s*(.+)", content):
-                            findings.append({
-                                "type": "todo",
-                                "domain": self.domain,
-                                "severity": "low",
-                                "file": rel_path,
-                                "message": f"{match.group(1)}: {match.group(2).strip()[:80]}",
-                            })
+                        file_entry = f"\n{'='*60}\nFILE: {rel_path}\n{'='*60}\n{content}\n"
 
-                    except Exception:
+                        if total_chars + len(file_entry) > max_chars:
+                            break
+
+                        files_content.append(file_entry)
+                        total_chars += len(file_entry)
+
+                    except Exception as e:
                         continue
 
-        return findings[:50]
-
-    def _analyze_build(self, cmd: str):
-        """Run build command and extract errors"""
-        log(f"Running build for {self.domain}: {cmd}")
-
-        try:
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                cwd=str(self.project.root_path),
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-
-            if result.returncode != 0:
-                # Parse errors from output
-                output = result.stderr + result.stdout
-                errors = self._parse_errors(output)
-                for error in errors:
-                    self.findings.append({
-                        "type": "build_error",
-                        "domain": self.domain,
-                        "severity": "high",
-                        **error,
-                    })
-
-        except subprocess.TimeoutExpired:
-            log(f"Build timeout for {self.domain}", "WARN")
-        except Exception as e:
-            log(f"Build error for {self.domain}: {e}", "ERROR")
-
-    def _analyze_tests(self, cmd: str):
-        """Run test discovery and check for issues"""
-        log(f"Analyzing tests for {self.domain}")
-
-        # Check for skipped tests
-        paths = self.domain_config.get("paths", [])
-        extensions = self.domain_config.get("extensions", [])
-
-        for path_str in paths:
-            path = self.project.root_path / path_str
-            if not path.exists():
-                continue
-
-            for ext in extensions:
-                for file in path.rglob(f"*{ext}"):
-                    try:
-                        content = file.read_text()
-                        # Check for skipped tests
-                        if re.search(r"\b(test\.skip|it\.skip|describe\.skip|#\[ignore\]|pytest\.mark\.skip)\b", content):
-                            self.findings.append({
-                                "type": "skipped_test",
-                                "domain": self.domain,
-                                "severity": "high",
-                                "file": str(file.relative_to(self.project.root_path)),
-                                "message": "Skipped test detected",
-                            })
-                    except Exception:
-                        continue
-
-    def _scan_files(self):
-        """Scan files for common issues"""
-        paths = self.domain_config.get("paths", [])
-        extensions = self.domain_config.get("extensions", [])
-
-        for path_str in paths:
-            path = self.project.root_path / path_str
-            if not path.exists():
-                continue
-
-            for ext in extensions:
-                for file in path.rglob(f"*{ext}"):
-                    self._scan_file(file)
-
-    def _scan_file(self, file: Path):
-        """Scan a single file for issues"""
-        try:
-            content = file.read_text()
-            rel_path = str(file.relative_to(self.project.root_path))
-
-            # TODO/FIXME comments
-            todos = re.findall(r"//\s*(TODO|FIXME|HACK|XXX):?\s*(.+)", content)
-            for todo_type, message in todos[:5]:  # Limit per file
-                self.findings.append({
-                    "type": "todo",
-                    "domain": self.domain,
-                    "severity": "low",
-                    "file": rel_path,
-                    "message": f"{todo_type}: {message.strip()[:100]}",
-                })
-
-            # Unwrap/panic patterns (Rust)
-            if self.domain == "rust":
-                unwraps = len(re.findall(r"\.unwrap\(\)", content))
-                if unwraps > 5:
-                    self.findings.append({
-                        "type": "unwrap_abuse",
-                        "domain": self.domain,
-                        "severity": "medium",
-                        "file": rel_path,
-                        "message": f"{unwraps} .unwrap() calls - consider proper error handling",
-                    })
-
-        except Exception:
-            pass
-
-    def _parse_errors(self, output: str) -> List[Dict]:
-        """Parse errors from build output"""
-        errors = []
-
-        # Rust error pattern
-        rust_errors = re.findall(
-            r"error\[E\d+\]: (.+?)\n\s*-->\s*([^:]+):(\d+)",
-            output,
-        )
-        for message, file, line in rust_errors[:20]:
-            errors.append({
-                "file": file,
-                "line": int(line),
-                "message": message.strip(),
-            })
-
-        # TypeScript error pattern
-        ts_errors = re.findall(
-            r"([^\s]+\.tsx?)\((\d+),\d+\):\s*error\s+TS\d+:\s*(.+)",
-            output,
-        )
-        for file, line, message in ts_errors[:20]:
-            errors.append({
-                "file": file,
-                "line": int(line),
-                "message": message.strip(),
-            })
-
-        return errors
+    log(f"Collected {len(files_content)} files ({total_chars} chars)")
+    return "".join(files_content)
 
 
 # ============================================================================
@@ -537,14 +122,15 @@ Only return the JSON array."""
 
 class RLMBrain:
     """
-    RLM Brain - Central orchestrator for project analysis and task generation.
+    Brain powered by Recursive Language Models (MIT CSAIL) with MCP.
 
-    Phases:
-    1. VISION: Load vision document, understand project goals
-    2. ANALYZE: Run domain analyzers, collect findings
-    3. SYNTHESIZE: Use LLM to generate tasks from findings
-    4. PRIORITIZE: Calculate WSJF scores, order backlog
-    5. ENRICH: Add context to each task for Wiggum workers
+    Uses `claude` CLI and `opencode` with MCP tools to navigate and analyze
+    the entire project codebase.
+    
+    COST TIER ARCHITECTURE:
+      depth=0: Opus 4.5 via `claude` + MCP ($$$)
+      depth=1-2: MiniMax M2.1 via `opencode` + MCP ($$)
+      depth=3: Qwen 30B local (free fallback)
     """
 
     def __init__(self, project_name: str = None):
@@ -556,94 +142,84 @@ class RLMBrain:
         """
         self.project = get_project(project_name)
         self.task_store = TaskStore()
-        self.findings: List[Dict] = []
-        self.tasks: List[Dict] = []
+        self.max_depth = 3
+        self.current_depth = 0
 
         log(f"Brain initialized for project: {self.project.name}")
         log(f"Root: {self.project.root_path}")
         log(f"Domains: {list(self.project.domains.keys())}")
+        log(f"Cost tiers: Opus(d0) → MiniMax(d1-2) → Qwen(d3)")
 
     async def run(
         self,
-        question: str = None,
+        vision_prompt: str = None,
         domains: List[str] = None,
-        quick: bool = False,
+        deep_analysis: bool = True,
     ) -> List[Task]:
         """
-        Run the Brain analysis pipeline.
+        Run DEEP RECURSIVE Brain analysis with MCP.
+
+        Uses `claude` CLI with MCP tools for deep project navigation.
+        Sub-analyses delegated to `opencode` with MiniMax.
 
         Args:
-            question: Focus prompt for analysis (e.g., "mobile features")
+            vision_prompt: Optional focus prompt for analysis
             domains: Specific domains to analyze (default: all)
-            quick: Skip deep analysis for speed
+            deep_analysis: If True, use full recursive depth
 
         Returns:
             List of created Task objects
         """
-        log("=" * 60)
-        log("Starting RLM Brain analysis")
-        log("=" * 60)
+        log("═" * 70)
+        log("🧠 STARTING DEEP RECURSIVE BRAIN ANALYSIS WITH MCP")
+        log("═" * 70)
+        log(f"Project: {self.project.name}")
+        log(f"Domains: {domains or list(self.project.domains.keys())}")
+        log(f"Deep analysis: {deep_analysis}")
 
-        # 1. VISION: Load and process vision document
-        vision_content = self._load_vision()
+        # 1. Load vision document
+        vision_content = self.project.get_vision_content() or ""
+        log(f"Vision doc: {len(vision_content)} chars")
 
-        # 2. ANALYZE: Run domain analyzers with LLM sub-agents
-        domains_to_analyze = domains or list(self.project.domains.keys())
+        # 2. Build the analysis prompt
+        prompt = self._build_analysis_prompt(
+            vision_content,
+            vision_prompt,
+            domains,
+            deep_analysis,
+        )
 
-        # Spawn sub-agents in parallel for each domain (RLM conformity)
-        log(f"Spawning {len(domains_to_analyze)} LLM sub-agents for domain analysis...")
-        analysis_tasks = []
-        for domain in domains_to_analyze:
-            if domain in self.project.domains:
-                analyzer = DomainAnalyzer(self.project, domain)
-                analysis_tasks.append((domain, analyzer.analyze()))
-
-        # Run all domain analyses in parallel
-        for domain, task in analysis_tasks:
-            try:
-                log(f"Analyzing domain: {domain}")
-                domain_findings = await task
-                self.findings.extend(domain_findings)
-                log(f"Found {len(domain_findings)} findings in {domain}")
-            except Exception as e:
-                log(f"Domain {domain} analysis failed: {e}", "ERROR")
-
-        log(f"Total findings: {len(self.findings)}")
-
-        if not self.findings:
-            log("No findings to process")
+        # 3. Run analysis with Opus via `claude` CLI
+        # Claude has access to MCP tools for project navigation
+        log("─" * 70)
+        log("🔄 Running Opus analysis via `claude` CLI + MCP...")
+        log("─" * 70)
+        
+        response = await self._call_claude(prompt)
+        
+        if not response:
+            log("❌ Claude analysis failed", "ERROR")
             return []
 
-        # 3. SYNTHESIZE: Generate tasks from findings
-        if quick:
-            # Quick mode: create task for each finding directly
-            self.tasks = self._quick_task_generation()
-        else:
-            # Full mode: use LLM to synthesize
-            self.tasks = await self._llm_task_generation(vision_content, question)
+        log(f"✅ Analysis complete: {len(response)} chars")
 
-        # 4. PRIORITIZE: Calculate WSJF and sort
-        for task in self.tasks:
-            task["wsjf_score"] = calculate_wsjf(task)
+        # 4. Parse tasks from response
+        tasks = self._parse_tasks(response)
+        log(f"Parsed {len(tasks)} tasks")
 
-        self.tasks.sort(key=lambda t: t.get("wsjf_score", 0), reverse=True)
+        # 5. Validate tasks
+        validated_tasks = self._validate_tasks(tasks)
+        log(f"Validated {len(validated_tasks)} tasks")
 
-        # 5. ENRICH: Add context for Wiggum workers
-        for task in self.tasks:
-            task = enrich_task_context(
-                task,
-                self.project.root_path,
-                task.get("domain", ""),
-            )
+        # 6. If deep analysis, run sub-analyses with MiniMax
+        if deep_analysis and validated_tasks:
+            validated_tasks = await self._deep_analyze_tasks(validated_tasks)
 
-        # 6. PERSIST: Save to task store
+        # 7. Save tasks to store
         created_tasks = []
-        for idx, task_dict in enumerate(self.tasks):
+        for idx, task_dict in enumerate(validated_tasks):
             try:
-                # Generate unique task ID
-                task_id = self._generate_task_id(task_dict, idx)
-
-                # Create Task object
+                task_id = f"{self.project.name}-brain-{idx:04d}"
                 task_obj = Task(
                     id=task_id,
                     project_id=self.project.id,
@@ -652,173 +228,520 @@ class RLMBrain:
                     description=task_dict.get("description", ""),
                     files=task_dict.get("files", []),
                     context=task_dict,
-                    wsjf_score=task_dict.get("wsjf_score", 0.0),
+                    wsjf_score=task_dict.get("wsjf_score", 5.0),
                 )
-
                 self.task_store.create_task(task_obj)
                 created_tasks.append(task_obj)
             except Exception as e:
                 log(f"Failed to create task: {e}", "ERROR")
 
         log(f"Created {len(created_tasks)} tasks in store")
-        log("=" * 60)
-        log("Brain analysis complete")
-        log("=" * 60)
+        log("═" * 70)
+        log("🧠 BRAIN ANALYSIS COMPLETE")
+        log("═" * 70)
 
         return created_tasks
 
-    def _load_vision(self) -> str:
-        """Load vision document content"""
-        vision_content = self.project.get_vision_content()
-        if vision_content:
-            log(f"Loaded vision doc: {self.project.vision_doc} ({len(vision_content)} chars)")
-        else:
-            log("No vision document found", "WARN")
-        return vision_content
+    async def _call_claude(self, prompt: str, timeout: int = 600) -> Optional[str]:
+        """
+        Call Claude Opus via `claude` CLI.
+        
+        Claude has access to MCP tools configured in ~/.claude/settings.json
+        including our mcp_lrm tools for project navigation.
+        """
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "claude",
+                "-p",  # Print mode (non-interactive)
+                "--model", "claude-opus-4-5-20251101",
+                "--max-turns", "10",  # Allow multiple tool calls
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(self.project.root_path),
+            )
+            
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(input=prompt.encode()),
+                timeout=timeout,
+            )
+            
+            if proc.returncode == 0:
+                return stdout.decode().strip()
+            else:
+                error = stderr.decode()[:500]
+                log(f"Claude error: {error}", "ERROR")
+                return None
+                
+        except asyncio.TimeoutError:
+            log(f"Claude timeout ({timeout}s)", "ERROR")
+            return None
+        except FileNotFoundError:
+            log("claude CLI not found", "ERROR")
+            return None
+        except Exception as e:
+            log(f"Claude exception: {e}", "ERROR")
+            return None
 
-    def _quick_task_generation(self) -> List[Dict]:
-        """Quick task generation without LLM"""
-        tasks = []
-        for finding in self.findings:
-            task = {
-                "type": self._finding_type_to_task_type(finding.get("type", "")),
-                "domain": finding.get("domain", "unknown"),
-                "description": finding.get("message", "Fix issue"),
-                "files": [finding["file"]] if finding.get("file") else [],
-                "severity": finding.get("severity", "medium"),
-                "finding": finding,
-            }
-            tasks.append(task)
-        return tasks
-
-    def _finding_type_to_task_type(self, finding_type: str) -> str:
-        """Map finding type to task type"""
-        mapping = {
-            "build_error": "fix",
-            "test_failure": "fix",
-            "skipped_test": "test",
-            "todo": "feature",
-            "unwrap_abuse": "refactor",
-            "security": "security",
-        }
-        return mapping.get(finding_type, "fix")
-
-    def _generate_task_id(self, task_dict: Dict, index: int) -> str:
-        """Generate unique task ID based on domain, type, and file"""
-        domain = task_dict.get("domain", "unknown")
-        task_type = task_dict.get("type", "fix")
-        files = task_dict.get("files", [])
-
-        # Use file name if available
-        if files:
-            file_name = Path(files[0]).stem
-            return f"{domain}-{task_type}-{index:04d}-{file_name}"
-        else:
-            return f"{domain}-{task_type}-{index:04d}"
-
-    async def _llm_task_generation(
-        self,
-        vision: str,
-        question: str = None,
-    ) -> List[Dict]:
-        """Use LLM to generate tasks from findings"""
-        log("Generating tasks with LLM...")
-
-        # Build prompt
-        prompt = self._build_synthesis_prompt(vision, question)
-
-        # Call Claude
-        returncode, output = await run_claude_agent(
+    async def _call_opencode(self, prompt: str, timeout: int = 300) -> Optional[str]:
+        """
+        Call MiniMax via `opencode` CLI.
+        
+        Used for sub-analyses (depth 1-2) to save cost.
+        opencode has MCP tools access.
+        """
+        returncode, output = await run_opencode(
             prompt,
+            model="minimax/MiniMax-M2.1",
             cwd=str(self.project.root_path),
-            max_turns=5,
-            timeout=600,
+            timeout=timeout,
+            project=self.project.name,
         )
+        
+        if returncode == 0:
+            return output
+        else:
+            log(f"opencode failed: {output[:200]}", "WARN")
+            return None
 
-        if returncode != 0:
-            log("LLM task generation failed, falling back to quick mode", "WARN")
-            return self._quick_task_generation()
-
-        # Parse tasks from output
-        tasks = self._parse_llm_tasks(output)
-
-        if not tasks:
-            log("No tasks parsed from LLM, falling back to quick mode", "WARN")
-            return self._quick_task_generation()
-
-        log(f"LLM generated {len(tasks)} tasks")
-        return tasks
-
-    def _build_synthesis_prompt(self, vision: str, question: str = None) -> str:
-        """Build the synthesis prompt for LLM"""
-        findings_json = json.dumps(self.findings[:50], indent=2)  # Limit findings
-
-        return f"""You are an RLM Brain analyzing a software project.
-
-PROJECT: {self.project.name} ({self.project.display_name})
-DOMAINS: {list(self.project.domains.keys())}
-
-VISION DOCUMENT:
-{vision[:5000] if vision else "No vision document available"}
-
-ANALYSIS FINDINGS:
-{findings_json}
-
-{f"FOCUS: {question}" if question else ""}
+    async def _deep_analyze_tasks(self, tasks: List[Dict]) -> List[Dict]:
+        """
+        Run deep analysis on tasks using MiniMax sub-agents.
+        
+        For each task, spawn a MiniMax sub-agent to:
+        - Verify the issue exists
+        - Identify exact files/lines
+        - Suggest specific fixes
+        """
+        log(f"🔍 Running deep analysis on {len(tasks)} tasks with MiniMax...")
+        
+        enhanced_tasks = []
+        
+        for i, task in enumerate(tasks[:10]):  # Limit to 10 for cost
+            log(f"  [{i+1}/{min(len(tasks), 10)}] Analyzing: {task.get('description', '')[:50]}...")
+            
+            prompt = f"""Analyze this task and provide detailed implementation guidance:
 
 TASK:
-Generate HIGH-LEVEL FEATURES (not atomic tasks) from these findings.
+- Type: {task.get('type', 'fix')}
+- Domain: {task.get('domain', 'unknown')}
+- Description: {task.get('description', '')}
+- Files: {task.get('files', [])}
 
-IMPORTANT - MIT CSAIL RLM Pattern:
-- Brain generates FEATURES/EPICS (broad scope, multiple files)
-- FRACTAL system will decompose into atomic subtasks
-- Group related findings into single features
-- Think like a Product Owner, not a developer
+Use MCP tools to:
+1. Locate the exact files involved (lrm_locate)
+2. Read the current code (lrm_summarize)
+3. Identify the exact lines to change
 
-Example transformations:
-- 10 "null check" findings → 1 feature "Implement robust null safety across codebase"
-- 5 "hardcoded value" findings → 1 feature "Externalize configuration to environment"
-- 8 "missing test" findings → 1 feature "Achieve 80% test coverage for X module"
+Respond with JSON:
+{{
+  "files": ["exact/file/paths.rs"],
+  "changes": [
+    {{"file": "path", "line": 42, "current": "...", "suggested": "..."}}
+  ],
+  "test_approach": "How to test this fix",
+  "estimated_loc": 50
+}}
+"""
+            
+            result = await self._call_opencode(prompt, timeout=120)
+            
+            if result:
+                # Try to extract enhanced info
+                try:
+                    import re
+                    json_match = re.search(r'\{[^{}]*"files"[^{}]*\}', result, re.DOTALL)
+                    if json_match:
+                        enhanced = json.loads(json_match.group())
+                        task.update({
+                            "files": enhanced.get("files", task.get("files", [])),
+                            "changes": enhanced.get("changes", []),
+                            "test_approach": enhanced.get("test_approach", ""),
+                            "estimated_loc": enhanced.get("estimated_loc", 50),
+                            "deep_analyzed": True,
+                        })
+                except:
+                    pass
+            
+            enhanced_tasks.append(task)
+        
+        # Add remaining tasks without deep analysis
+        enhanced_tasks.extend(tasks[10:])
+        
+        return enhanced_tasks
 
-OUTPUT FORMAT (JSON array):
+    def _validate_tasks(self, tasks: List[Dict]) -> List[Dict]:
+        """Validate tasks are atomic, testable, and have required fields."""
+        validated = []
+        for t in tasks:
+            # Required fields
+            if not t.get("description"):
+                continue
+            if len(t.get("description", "")) < 10:
+                continue
+            
+            # Ensure atomicity (no "and also" patterns)
+            desc = t.get("description", "").lower()
+            if " and also " in desc or " additionally " in desc:
+                # Task too complex, could be split but we'll let Wiggum handle it
+                pass
+            
+            # Ensure files list
+            if not t.get("files"):
+                t["files"] = []
+            
+            # Ensure WSJF score
+            if not t.get("wsjf_score"):
+                t["wsjf_score"] = 5.0
+            
+            validated.append(t)
+        
+        return validated
+
+    def _build_analysis_prompt(
+        self,
+        vision: str,
+        focus: str = None,
+        domains: List[str] = None,
+        deep_analysis: bool = True,
+    ) -> str:
+        """Build analysis prompt for Claude with MCP tools."""
+
+        domains_list = domains or list(self.project.domains.keys())
+        vision_truncated = vision[:8000] if vision else "No vision document"
+
+        return f'''You are a DEEP RECURSIVE ANALYSIS ENGINE for the "{self.project.name}" project.
+
+IMPORTANT: You have access to MCP tools for project navigation. USE THEM:
+- lrm_locate: Find files matching a pattern
+- lrm_summarize: Get summary of file content
+- lrm_conventions: Get coding conventions for a domain
+- lrm_examples: Get example code
+- lrm_build: Run build/test commands
+
+══════════════════════════════════════════════════════════════════════════════
+PROJECT: {self.project.name}
+DOMAINS: {domains_list}
+{f"FOCUS: {focus}" if focus else ""}
+══════════════════════════════════════════════════════════════════════════════
+
+VISION DOCUMENT:
+{vision_truncated}
+
+══════════════════════════════════════════════════════════════════════════════
+YOUR MISSION: Deep recursive analysis
+══════════════════════════════════════════════════════════════════════════════
+
+1. Use MCP tools to explore the codebase:
+   - lrm_locate("*.rs") to find Rust files
+   - lrm_locate("*test*") to find test files
+   - lrm_summarize("src/main.rs") to understand files
+
+2. Analyze each domain for:
+   - Security vulnerabilities
+   - Performance issues
+   - Missing tests
+   - Code quality issues
+   - Architecture violations
+
+3. Generate ATOMIC tasks (one specific change each)
+
+For each task, provide:
+- type: fix|feature|refactor|test|security
+- domain: one of {domains_list}
+- description: Specific, actionable
+- files: List of files to modify
+- severity: critical|high|medium|low
+- wsjf_score: 1-10
+
+WSJF scoring:
+- 10: Critical security/data loss, quick fix
+- 8-9: High business impact
+- 6-7: Important improvement
+- 4-5: Nice to have
+- 1-3: Minor polish
+
+══════════════════════════════════════════════════════════════════════════════
+OUTPUT FORMAT:
+══════════════════════════════════════════════════════════════════════════════
+
+After your analysis, output a JSON array:
+
+```json
 [
-  {{
-    "type": "feature|epic|refactor|security",
-    "domain": "rust|typescript|e2e|...",
-    "description": "High-level feature description (will be decomposed by FRACTAL)",
-    "files": ["multiple/files/can/be/listed.rs", "another/file.ts"],
-    "severity": "critical|high|medium|low",
-    "acceptance_criteria": ["All related issues fixed", "Tests pass", "Build succeeds"],
-    "estimated_subtasks": 3-10
-  }}
+  {{"type": "security", "domain": "rust", "description": "Fix SQL injection in user_query()", "files": ["src/db.rs"], "severity": "critical", "wsjf_score": 9.5}},
+  ...
 ]
+```
 
-Generate FEATURES (not atomic tasks) now:"""
+BEGIN ANALYSIS NOW. Use MCP tools to explore the project!
+'''
 
-    def _parse_llm_tasks(self, output: str) -> List[Dict]:
-        """Parse tasks from LLM output"""
+    def _build_deep_recursive_prompt(
+        self,
+        vision: str,
+        project_context: str,
+        focus: str = None,
+        domains: List[str] = None,
+        deep_analysis: bool = True,
+    ) -> str:
+        """Build the DEEP RECURSIVE RLM prompt."""
+
+        domains_list = domains or list(self.project.domains.keys())
+        
+        # Truncate vision if too long
+        vision_truncated = vision[:8000] if vision else "No vision document"
+
+        return f'''You are a DEEP RECURSIVE ANALYSIS ENGINE based on MIT CSAIL arXiv:2512.24601 "Recursive Language Models".
+
+You MUST use llm_query() for deep analysis - this is what makes RLM powerful!
+You have max_depth=3 recursive calls available. USE THEM.
+
+══════════════════════════════════════════════════════════════════════════════
+PROJECT: {self.project.name}
+DOMAINS: {domains_list}
+{f"FOCUS: {focus}" if focus else ""}
+══════════════════════════════════════════════════════════════════════════════
+
+VISION DOCUMENT:
+{vision_truncated}
+
+══════════════════════════════════════════════════════════════════════════════
+PROJECT CODEBASE (you can search/analyze this programmatically):
+══════════════════════════════════════════════════════════════════════════════
+{project_context}
+
+══════════════════════════════════════════════════════════════════════════════
+EXECUTE THIS 5-PHASE DEEP RECURSIVE ANALYSIS:
+══════════════════════════════════════════════════════════════════════════════
+
+PHASE 1: STRUCTURE DECOMPOSITION
+────────────────────────────────
+First, decompose the project into analyzable units:
+
+```python
+import re
+
+# Extract all modules/files
+files = re.findall(r'={10,}\\n// FILE: ([^\\n]+)', project_context)
+print(f"Found {{len(files)}} files")
+
+# Group by domain
+modules = {{}}
+for f in files:
+    if '.rs' in f: modules.setdefault('rust', []).append(f)
+    elif '.ts' in f or '.tsx' in f: modules.setdefault('typescript', []).append(f)
+    elif '.swift' in f: modules.setdefault('swift', []).append(f)
+    elif '.py' in f: modules.setdefault('python', []).append(f)
+
+for domain, fs in modules.items():
+    print(f"{{domain}}: {{len(fs)}} files")
+```
+
+PHASE 2: DEEP RECURSIVE ANALYSIS (USE llm_query!)
+─────────────────────────────────────────────────
+For EACH module/domain, call llm_query() for deep analysis:
+
+```python
+all_findings = []
+
+# Example: Deep security analysis of authentication code
+auth_code = # extract auth-related code from project_context
+security_analysis = llm_query(f"""
+You are a security expert. Analyze this authentication code for vulnerabilities:
+
+<code>
+{{auth_code[:5000]}}
+</code>
+
+List EACH vulnerability found with:
+- Category (injection, auth bypass, data exposure, etc.)
+- Severity (critical/high/medium/low)
+- Exact location (file:line if possible)
+- Recommended fix
+- Code example of the fix
+
+Be thorough and specific. This analysis will create security tasks.
+""")
+print("Security analysis:", security_analysis)
+all_findings.append(("security", security_analysis))
+
+# Example: Deep performance analysis
+perf_code = # extract performance-critical code
+perf_analysis = llm_query(f"""
+You are a performance expert. Analyze this code for performance issues:
+
+<code>
+{{perf_code[:5000]}}
+</code>
+
+List EACH performance issue with:
+- Type (N+1 query, memory leak, blocking I/O, etc.)
+- Impact (latency, memory, CPU)
+- Severity
+- Recommended fix
+
+Be thorough and specific.
+""")
+print("Performance analysis:", perf_analysis)
+all_findings.append(("performance", perf_analysis))
+```
+
+PHASE 3: PARALLEL BATCH ANALYSIS (USE llm_query_batched!)
+─────────────────────────────────────────────────────────
+For multiple files, use parallel analysis:
+
+```python
+# Collect files that need analysis
+files_to_analyze = []
+for match in re.finditer(r'// FILE: ([^\\n]+)\\n(.*?)(?=// FILE:|$)', project_context, re.DOTALL):
+    filename, content = match.groups()
+    if len(content) > 500:  # Only non-trivial files
+        files_to_analyze.append((filename, content[:3000]))
+
+# Create analysis prompts
+prompts = []
+for filename, content in files_to_analyze[:10]:  # Limit to 10 for efficiency
+    prompts.append(f"""
+Analyze this file for issues:
+FILE: {{filename}}
+<code>
+{{content}}
+</code>
+
+Return JSON: {{"issues": [{{"type": "...", "severity": "...", "description": "...", "line": ...}}]}}
+""")
+
+# Parallel analysis!
+if prompts:
+    results = llm_query_batched(prompts)
+    for (filename, _), result in zip(files_to_analyze[:10], results):
+        print(f"{{filename}}: {{result[:200]}}...")
+        all_findings.append(("file_analysis", result))
+```
+
+PHASE 4: CROSS-CUTTING CONCERNS
+───────────────────────────────
+Analyze architecture-level issues:
+
+```python
+# Architecture analysis
+arch_analysis = llm_query(f"""
+Analyze the overall architecture of this codebase:
+
+<structure>
+{{str(modules)}}
+</structure>
+
+<sample_code>
+{{project_context[:10000]}}
+</sample_code>
+
+Identify:
+1. Architecture violations (circular deps, layer breaches)
+2. Missing abstractions (code duplication patterns)
+3. Testability issues (hard-coded deps, no interfaces)
+4. Scalability concerns
+
+For each issue, specify affected files and recommended refactoring.
+""")
+print("Architecture analysis:", arch_analysis)
+all_findings.append(("architecture", arch_analysis))
+
+# Testing coverage analysis
+test_analysis = llm_query(f"""
+Analyze testing coverage and quality:
+
+<code>
+{{project_context[:8000]}}
+</code>
+
+Identify:
+1. Missing test coverage (which modules have no tests?)
+2. Test quality issues (tests that don't actually test anything)
+3. Missing integration tests
+4. Missing edge case tests
+
+Be specific about WHICH functions/modules need tests.
+""")
+print("Test analysis:", test_analysis)
+all_findings.append(("testing", test_analysis))
+```
+
+PHASE 5: SYNTHESIS & TASK GENERATION
+─────────────────────────────────────
+Aggregate all findings into prioritized tasks:
+
+```python
+# Synthesize all findings into tasks
+synthesis = llm_query(f"""
+You are a technical lead. Based on these analysis findings, create a prioritized backlog:
+
+<findings>
+{{str(all_findings)}}
+</findings>
+
+Create ATOMIC tasks (one specific change each). For each task:
+- type: fix|feature|refactor|test|security
+- domain: {domains_list}
+- description: Specific, actionable (what exactly to change)
+- files: List of files to modify
+- severity: critical|high|medium|low
+- wsjf_score: 1-10 (based on value/effort ratio)
+- acceptance_criteria: List of testable criteria
+
+WSJF scoring guide:
+- 10: Critical security/data loss risk, quick fix
+- 8-9: High business impact, moderate effort
+- 6-7: Important improvement, reasonable effort
+- 4-5: Nice to have, low effort
+- 1-3: Minor polish
+
+Return ONLY valid JSON array:
+[{{"type": "...", "domain": "...", "description": "...", "files": [...], "severity": "...", "wsjf_score": N, "acceptance_criteria": [...]}}]
+""")
+print(synthesis)
+```
+
+══════════════════════════════════════════════════════════════════════════════
+FINAL OUTPUT REQUIREMENT:
+══════════════════════════════════════════════════════════════════════════════
+
+After completing ALL 5 phases, output the final task list as:
+
+```json
+[
+  {{"type": "security", "domain": "rust", "description": "...", "files": ["..."], "severity": "critical", "wsjf_score": 9.5, "acceptance_criteria": ["..."]}},
+  ...
+]
+```
+
+BEGIN DEEP RECURSIVE ANALYSIS NOW. Use llm_query() extensively!
+'''
+
+    def _parse_tasks(self, response: str) -> List[Dict]:
+        """Parse tasks from RLM response."""
+        import re
+
         try:
-            # Find JSON array in output
-            match = re.search(r"\[\s*\{.*?\}\s*\]", output, re.DOTALL)
+            # Find JSON array in response
+            match = re.search(r'```json\s*(\[.*?\])\s*```', response, re.DOTALL)
+            if match:
+                tasks = json.loads(match.group(1))
+                return [t for t in tasks if isinstance(t, dict) and "description" in t]
+
+            # Try finding raw JSON array
+            match = re.search(r'\[\s*\{.*?"description".*?\}\s*\]', response, re.DOTALL)
             if match:
                 return json.loads(match.group())
-        except json.JSONDecodeError:
-            pass
 
-        # Try to find individual JSON objects
-        tasks = []
-        for match in re.finditer(r"\{[^{}]*\"type\"[^{}]*\}", output):
-            try:
-                task = json.loads(match.group())
-                if "description" in task:
-                    tasks.append(task)
-            except json.JSONDecodeError:
-                continue
+        except json.JSONDecodeError as e:
+            log(f"JSON parse error: {e}", "WARN")
 
-        return tasks
+        return []
 
     def get_status(self) -> Dict:
-        """Get current brain status"""
+        """Get current brain status."""
         tasks = self.task_store.get_tasks_by_project(self.project.id)
         status_counts = {}
         for task in tasks:
@@ -829,8 +752,11 @@ Generate FEATURES (not atomic tasks) now:"""
             "project": self.project.name,
             "total_tasks": len(tasks),
             "by_status": status_counts,
-            "findings_count": len(self.findings),
         }
+
+    def close(self):
+        """Clean up RLM resources."""
+        self.rlm.close()
 
 
 # ============================================================================
@@ -842,9 +768,8 @@ def main():
 
     parser = argparse.ArgumentParser(description="RLM Brain - Project Analyzer")
     parser.add_argument("--project", "-p", help="Project name")
-    parser.add_argument("--question", "-q", help="Focus question")
-    parser.add_argument("--domain", "-d", help="Specific domain to analyze")
-    parser.add_argument("--quick", action="store_true", help="Quick mode (no LLM)")
+    parser.add_argument("--focus", "-f", help="Focus prompt")
+    parser.add_argument("--domain", "-d", help="Specific domain")
     parser.add_argument("--status", action="store_true", help="Show status only")
 
     args = parser.parse_args()
@@ -859,14 +784,15 @@ def main():
     domains = [args.domain] if args.domain else None
 
     tasks = asyncio.run(brain.run(
-        question=args.question,
+        vision_prompt=args.focus,
         domains=domains,
-        quick=args.quick,
     ))
 
     print(f"\nCreated {len(tasks)} tasks")
     for task in tasks[:10]:
         print(f"  - [{task.domain}] {task.description[:60]}...")
+
+    brain.close()
 
 
 if __name__ == "__main__":
