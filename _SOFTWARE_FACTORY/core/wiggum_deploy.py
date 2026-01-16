@@ -1025,6 +1025,14 @@ class DeployWorker:
         deploy_config = self.project.deploy
         strategy = deploy_config.get("strategy", "validation-only")
 
+        # 📱 MOBILE DOMAINS: Always use validation-only (no staging/prod deployment)
+        # Mobile apps (iOS/Android) are built and validated locally, not deployed to web servers
+        MOBILE_DOMAINS = {"swift", "kotlin"}
+        if task.domain in MOBILE_DOMAINS:
+            original_strategy = strategy
+            strategy = "validation-only"
+            self.log(f"📱 Mobile domain '{task.domain}': forcing validation-only (was: {original_strategy})")
+
         for iteration in range(self.MAX_ITERATIONS):
             result.iterations = iteration + 1
             self.log(f"Deploy iteration {iteration + 1}/{self.MAX_ITERATIONS}")
@@ -1857,14 +1865,23 @@ class WiggumDeployDaemon(Daemon):
         if result.feedback_tasks and self.pool:
             for feedback in result.feedback_tasks:
                 try:
-                    self.pool.task_store.create_task(
+                    # Create a proper Task object for the feedback
+                    import uuid
+                    from datetime import datetime
+                    feedback_task = Task(
+                        id=f"feedback-{task.domain}-{uuid.uuid4().hex[:8]}",
                         project_id=self.pool.project.id,
-                        task_type=feedback.get("type", "fix"),
-                        domain=feedback.get("domain", "e2e"),
+                        type=feedback.get("type", "fix"),
+                        domain=feedback.get("domain", task.domain),
                         description=feedback.get("description", "Fix deploy issue"),
-                        files=[],
+                        status=TaskStatus.PENDING,
+                        files=feedback.get("files", []),
                         context=feedback,
+                        created_at=datetime.now().isoformat(),
+                        updated_at=datetime.now().isoformat(),
                     )
+                    self.pool.task_store.create_task(feedback_task)
+                    self.log(f"📝 Created feedback task: {feedback_task.id}")
                 except Exception as e:
                     self.log(f"Failed to create feedback task: {e}", "ERROR")
 

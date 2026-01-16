@@ -633,10 +633,15 @@ if CLICK_AVAILABLE:
             click.echo(f"📝 Creating backlog tasks...")
             created = asyncio.run(agent.create_backlog_tasks(project, all_backlog))
 
+            click.echo(f"\n🏭 SELF-MODIFYING FACTORY...")
+            mods = asyncio.run(agent.improve_factory())
+
             click.echo(f"\n✅ Applied:")
             click.echo(f"   - {fixed} auto-fixes")
             click.echo(f"   - {created} new tasks in Wiggum backlog")
-            click.echo(f"   - {len(agent.improvements)} factory improvements")
+            click.echo(f"   - {mods.get('patterns_added', 0)} adversarial patterns added")
+            click.echo(f"   - {mods.get('code_patches', 0)} code patches applied")
+            click.echo(f"   - Files modified: {', '.join(mods.get('files_modified', [])) or 'none'}")
 
             # Show top priority tasks
             if all_backlog:
@@ -644,6 +649,33 @@ if CLICK_AVAILABLE:
                 sorted_tasks = sorted(all_backlog, key=lambda t: t.get('priority', 0), reverse=True)
                 for t in sorted_tasks[:5]:
                     click.echo(f"   [{t.get('domain', '?')}] {t.get('description', '')[:60]}...")
+
+    @xp.command("improve")
+    @click.pass_context
+    def xp_improve(ctx):
+        """Self-modify factory based on learned insights"""
+        from core.experience_agent import ExperienceAgent
+
+        agent = ExperienceAgent()
+        
+        click.echo("🔍 Analyzing factory experience...")
+        asyncio.run(agent.analyze(use_llm=True))
+        
+        click.echo(f"\n🏭 SELF-MODIFYING FACTORY...")
+        click.echo(f"   Insights: {len(agent.insights)}")
+        click.echo(f"   Improvements queued: {len(agent.improvements)}")
+        
+        mods = asyncio.run(agent.improve_factory())
+        
+        click.echo(f"\n✅ Factory modified:")
+        click.echo(f"   - Patterns added: {mods.get('patterns_added', 0)}")
+        click.echo(f"   - Code patches: {mods.get('code_patches', 0)}")
+        click.echo(f"   - Configs updated: {mods.get('configs_updated', 0)}")
+        
+        if mods.get('files_modified'):
+            click.echo(f"\n📝 Files modified:")
+            for f in mods['files_modified']:
+                click.echo(f"   - {f}")
 
     # --- STATUS ---
     @cli.command()

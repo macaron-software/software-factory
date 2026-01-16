@@ -121,6 +121,11 @@ CORE_WARNING_PATTERNS = {
 
 # Security patterns
 SECURITY_PATTERNS = {
+    r'if\s*\(!\w+\)\s*{\s*}': ("empty_null_check", 3, "Null checks must have handling logic, not empty blocks"),
+    r'try\s*{[^}]*}\s*catch\s*\([^)]*\)\s*{\s*}': ("empty_catch_block", 4, "Error handling tasks need proper catch blocks, not silent fa"),
+    r'process\.env\.\w+\s*\|\|\s*["'][^"']+["']': ("fallback_credentials", 5, "Security tasks are failing - ensure no fallback values for c"),
+    r'expect\(.*\)\.toBe\(.*\)\s*;?\s*}\s*\);?\s*$': ("test_without_assertion_context", 3, "Tests need meaningful assertions with context, not just sing"),
+    r'describe\.skip|it\.skip|test\.skip|xit\(|xdescribe\(': ("no_skipped_tests", 5, "High number of test generation tasks failing adversarial che"),
     r'password\s*=\s*["\'][^"\']{3,}["\']': ("hardcoded_password", 5, "Hardcoded password detected"),
     r'api_key\s*=\s*["\'][^"\']{10,}["\']': ("hardcoded_api_key", 5, "Hardcoded API key detected"),
     r'secret\s*=\s*["\'][^"\']{10,}["\']': ("hardcoded_secret", 5, "Hardcoded secret detected"),

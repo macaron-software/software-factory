@@ -1130,6 +1130,283 @@ test.describe('{persona.get("name", "User")} - {journey.get("name", "Journey")}'
         return created
     
     # ========================================================================
+    # FACTORY SELF-MODIFICATION
+    # ========================================================================
+    
+    async def improve_factory(self) -> Dict[str, Any]:
+        """
+        Modify factory code based on insights.
+        Uses Claude to generate patches for factory files.
+        
+        Returns dict with modifications applied.
+        """
+        log("Starting factory self-modification...")
+        
+        factory_root = Path(__file__).parent.parent
+        modifications = {
+            "files_modified": [],
+            "patterns_added": 0,
+            "configs_updated": 0,
+            "code_patches": 0,
+        }
+        
+        # Group improvements by target
+        adversarial_improvements = [i for i in self.improvements if i.target == "adversarial"]
+        fractal_improvements = [i for i in self.improvements if i.target == "fractal"]
+        brain_improvements = [i for i in self.improvements if i.target == "brain"]
+        
+        # 1. Add new adversarial patterns to adversarial.py
+        if adversarial_improvements:
+            count = await self._patch_adversarial(factory_root, adversarial_improvements)
+            modifications["patterns_added"] = count
+            if count > 0:
+                modifications["files_modified"].append("core/adversarial.py")
+        
+        # 2. Update fractal config based on insights
+        if fractal_improvements:
+            count = await self._patch_fractal(factory_root, fractal_improvements)
+            modifications["configs_updated"] += count
+        
+        # 3. Improve brain prompts based on repeated failures
+        if brain_improvements:
+            count = await self._patch_brain(factory_root, brain_improvements)
+            modifications["code_patches"] += count
+            if count > 0:
+                modifications["files_modified"].append("core/brain.py")
+        
+        # 4. Use Claude to analyze insights and generate deeper patches
+        if self.insights:
+            patches = await self._generate_factory_patches(factory_root)
+            for patch in patches:
+                applied = await self._apply_patch(factory_root, patch)
+                if applied:
+                    modifications["code_patches"] += 1
+                    if patch.get('file') not in modifications["files_modified"]:
+                        modifications["files_modified"].append(patch.get('file'))
+        
+        log(f"Factory modified: {len(modifications['files_modified'])} files, {modifications['patterns_added']} patterns, {modifications['code_patches']} patches")
+        return modifications
+    
+    async def _patch_adversarial(self, factory_root: Path, improvements: List[Improvement]) -> int:
+        """Add new patterns to adversarial.py"""
+        adversarial_file = factory_root / "core" / "adversarial.py"
+        
+        if not adversarial_file.exists():
+            return 0
+        
+        content = adversarial_file.read_text()
+        added = 0
+        
+        for imp in improvements:
+            if imp.action != "add_pattern":
+                continue
+            
+            payload = imp.payload
+            pattern = payload.get('pattern', '')
+            rule = payload.get('rule', '')
+            points = payload.get('points', 2)
+            msg = payload.get('reason', imp.reason)[:60]
+            
+            if not pattern or not rule:
+                continue
+            
+            # Check if pattern already exists
+            if pattern in content or rule in content:
+                continue
+            
+            # Find insertion point (after SECURITY_PATTERNS = {)
+            insert_marker = "SECURITY_PATTERNS = {"
+            if insert_marker in content:
+                # Add to SECURITY_PATTERNS
+                new_pattern = f'\n    r\'{pattern}\': ("{rule}", {points}, "{msg}"),'
+                content = content.replace(
+                    insert_marker,
+                    insert_marker + new_pattern
+                )
+                added += 1
+                log(f"Added adversarial pattern: {rule}")
+        
+        if added > 0:
+            adversarial_file.write_text(content)
+        
+        return added
+    
+    async def _patch_fractal(self, factory_root: Path, improvements: List[Improvement]) -> int:
+        """Update fractal thresholds in project configs"""
+        updated = 0
+        
+        for imp in improvements:
+            if imp.action != "adjust_config":
+                continue
+            
+            payload = imp.payload
+            key = payload.get('key', '')
+            value = payload.get('suggested_value', '')
+            
+            # Update default in fractal.py
+            fractal_file = factory_root / "core" / "fractal.py"
+            if fractal_file.exists() and key and value:
+                content = fractal_file.read_text()
+                
+                # Simple pattern: max_files = 5 → max_files = new_value
+                pattern = rf'({key}\s*=\s*)\d+'
+                if re.search(pattern, content):
+                    content = re.sub(pattern, rf'\g<1>{value}', content)
+                    fractal_file.write_text(content)
+                    updated += 1
+                    log(f"Updated fractal.{key} = {value}")
+        
+        return updated
+    
+    async def _patch_brain(self, factory_root: Path, improvements: List[Improvement]) -> int:
+        """Improve brain prompts based on failures"""
+        brain_file = factory_root / "core" / "brain.py"
+        
+        if not brain_file.exists():
+            return 0
+        
+        content = brain_file.read_text()
+        patched = 0
+        
+        for imp in improvements:
+            payload = imp.payload
+            issue = payload.get('current_issue', '')
+            fix = payload.get('suggested_value', '')
+            
+            if not issue or not fix:
+                continue
+            
+            # Add guidance to prompts
+            # Find DOMAIN_PROMPTS or similar
+            if "DOMAIN_PROMPTS" in content and issue:
+                # Add issue-specific guidance
+                guidance = f'\n    # XP-Agent learned: {issue[:50]}\n    # Fix: {fix[:50]}'
+                content = content.replace("DOMAIN_PROMPTS", f"{guidance}\nDOMAIN_PROMPTS")
+                patched += 1
+        
+        if patched > 0:
+            brain_file.write_text(content)
+        
+        return patched
+    
+    async def _generate_factory_patches(self, factory_root: Path) -> List[Dict]:
+        """Use Claude to generate patches based on insights"""
+        patches = []
+        
+        # Only process critical/high insights
+        critical_insights = [i for i in self.insights if i.severity in ["critical", "high"]]
+        
+        if not critical_insights:
+            return patches
+        
+        # Read current factory files
+        factory_files = {}
+        for f in ["core/adversarial.py", "core/brain.py", "core/wiggum_tdd.py", "core/fractal.py"]:
+            path = factory_root / f
+            if path.exists():
+                factory_files[f] = path.read_text()[:3000]  # First 3000 chars
+        
+        insights_summary = "\n".join([
+            f"- [{i.severity}] {i.type.value}: {i.title}"
+            for i in critical_insights[:10]
+        ])
+        
+        prompt = f"""You are the Factory Self-Improvement Agent.
+
+Analyze these insights from factory operation and generate CODE PATCHES to fix the factory itself.
+
+INSIGHTS:
+{insights_summary}
+
+FACTORY FILES (partial):
+{json.dumps({k: v[:1500] for k, v in factory_files.items()}, indent=2)}
+
+Generate patches to improve the factory. Return JSON:
+{{
+  "patches": [
+    {{
+      "file": "core/adversarial.py",
+      "action": "insert_after",
+      "marker": "SECURITY_PATTERNS = {{",
+      "code": "    r'pattern': (\\"rule\\", 5, \\"message\\"),"
+    }},
+    {{
+      "file": "core/brain.py", 
+      "action": "replace",
+      "old": "max_retries = 3",
+      "new": "max_retries = 5  # XP-Agent: increased due to frequent failures"
+    }}
+  ]
+}}
+
+Only generate patches that directly address the insights.
+Keep patches minimal and surgical.
+"""
+        
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "claude", "-p", "--model", "claude-sonnet-4-20250514", "--max-turns", "1",
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(input=prompt.encode()), timeout=90)
+            output = stdout.decode()
+            
+            json_match = re.search(r'\{[\s\S]*"patches"[\s\S]*\}', output)
+            if json_match:
+                result = json.loads(json_match.group())
+                patches = result.get('patches', [])
+                log(f"Claude generated {len(patches)} factory patches")
+                
+        except Exception as e:
+            log(f"Patch generation failed: {e}", "WARN")
+        
+        return patches
+    
+    async def _apply_patch(self, factory_root: Path, patch: Dict) -> bool:
+        """Apply a single patch to factory file"""
+        file_path = factory_root / patch.get('file', '')
+        
+        if not file_path.exists():
+            return False
+        
+        content = file_path.read_text()
+        action = patch.get('action', '')
+        
+        try:
+            if action == "insert_after":
+                marker = patch.get('marker', '')
+                code = patch.get('code', '')
+                if marker and code and marker in content:
+                    content = content.replace(marker, f"{marker}\n{code}")
+                    file_path.write_text(content)
+                    log(f"Patched {patch.get('file')}: insert_after {marker[:30]}")
+                    return True
+                    
+            elif action == "replace":
+                old = patch.get('old', '')
+                new = patch.get('new', '')
+                if old and new and old in content:
+                    content = content.replace(old, new)
+                    file_path.write_text(content)
+                    log(f"Patched {patch.get('file')}: replace")
+                    return True
+                    
+            elif action == "append":
+                code = patch.get('code', '')
+                if code:
+                    content += f"\n\n# XP-Agent auto-generated\n{code}"
+                    file_path.write_text(content)
+                    log(f"Patched {patch.get('file')}: append")
+                    return True
+                    
+        except Exception as e:
+            log(f"Patch failed: {e}", "ERROR")
+        
+        return False
+    
+    # ========================================================================
     # ANALYSIS
     # ========================================================================
     
