@@ -114,28 +114,41 @@ class WiggumWorker:
         self.log(f"Description: {task.description[:80]}...")
 
         try:
-            # 1. Check FRACTAL - decompose if needed
+            # 1. Check FRACTAL - decompose if needed (FORCED at depth 0)
             task_dict = task.to_dict()
-            if should_decompose(task_dict, self.project):
-                self.log("Task exceeds thresholds, decomposing...")
-                subtasks = await self.decomposer.decompose(task_dict)
+            current_depth = task_dict.get("fractal_depth", 0)
+            
+            should_split, analysis = self.decomposer.should_decompose(task_dict, current_depth)
+            
+            if should_split:
+                force_l1 = getattr(analysis, 'force_level1', False)
+                self.log(f"Decomposing task (force_L1={force_l1}, {analysis.reason})...")
+                
+                subtasks = await self.decomposer.decompose(task_dict, current_depth)
+                
                 if len(subtasks) > 1:
-                    # Create subtasks in store
-                    for st in subtasks:
-                        self.task_store.create_task(
-                            project_id=self.project.id,
-                            task_type=st.get("type", task.type),
-                            domain=st.get("domain", task.domain),
-                            description=st.get("description", ""),
-                            files=st.get("files", []),
-                            context=st,
-                            parent_id=task.id,
-                        )
-                    # Mark parent as decomposed
-                    self.task_store.transition(task.id, TaskStatus.DECOMPOSED)
-                    result.success = True
-                    result.error = f"Decomposed into {len(subtasks)} subtasks"
-                    return result
+                    # Check if we should run subtasks in parallel (L1 with parallel_subagents)
+                    if force_l1 and self.decomposer.config.parallel_subagents:
+                        self.log(f"🔀 Running {len(subtasks)} sub-agents in PARALLEL...")
+                        result = await self._run_parallel_subtasks(task, subtasks)
+                        return result
+                    else:
+                        # Standard: Create subtasks in store for pool workers
+                        for st in subtasks:
+                            self.task_store.create_task(
+                                project_id=self.project.id,
+                                task_type=st.get("type", task.type),
+                                domain=st.get("domain", task.domain),
+                                description=st.get("description", ""),
+                                files=st.get("files", []),
+                                context=st,
+                                parent_id=task.id,
+                            )
+                        # Mark parent as decomposed
+                        self.task_store.transition(task.id, TaskStatus.DECOMPOSED)
+                        result.success = True
+                        result.error = f"Decomposed into {len(subtasks)} subtasks"
+                        return result
 
             # 2. Lock task and transition to TDD in progress
             # PENDING → LOCKED → TDD_IN_PROGRESS (per VALID_TRANSITIONS)
@@ -369,6 +382,113 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
             pass
 
         return changes
+
+    async def _run_parallel_subtasks(self, parent_task: Task, subtasks: List[Dict]) -> TDDResult:
+        """
+        Run subtasks in parallel using sub-agents.
+        
+        Each subtask is executed concurrently. Parent task is marked DONE
+        only if ALL subtasks succeed.
+        
+        Args:
+            parent_task: The parent task being decomposed
+            subtasks: List of subtask dicts from FRACTAL decomposition
+            
+        Returns:
+            TDDResult with success=True if all subtasks passed
+        """
+        result = TDDResult(success=False, task_id=parent_task.id)
+        
+        self.log(f"🔀 Launching {len(subtasks)} parallel sub-agents...")
+        
+        # Create subtasks in store first
+        subtask_ids = []
+        for st in subtasks:
+            created = self.task_store.create_task(
+                project_id=self.project.id,
+                task_type=st.get("type", parent_task.type),
+                domain=st.get("domain", parent_task.domain),
+                description=st.get("description", ""),
+                files=st.get("files", []),
+                context=st,
+                parent_id=parent_task.id,
+            )
+            if created:
+                subtask_ids.append(created.id)
+                self.log(f"  Created subtask: {created.id} ({st.get('aspect', 'sub')})")
+        
+        if not subtask_ids:
+            self.log("Failed to create subtasks", "ERROR")
+            result.error = "Failed to create subtasks"
+            return result
+        
+        # Mark parent as decomposed and in progress
+        self.task_store.transition(parent_task.id, TaskStatus.DECOMPOSED, changed_by=self.worker_id)
+        
+        # Run all subtasks in parallel
+        async def run_subtask(subtask_id: str, index: int) -> Tuple[str, bool, str]:
+            """Run a single subtask and return (id, success, error)"""
+            subtask = self.task_store.get_task(subtask_id)
+            if not subtask:
+                return (subtask_id, False, "Task not found")
+            
+            self.log(f"  🚀 Sub-agent {index+1}: {subtask_id}")
+            
+            # Create a mini-worker for this subtask
+            from core.fractal import FractalDecomposer
+            sub_decomposer = FractalDecomposer(self.project)
+            sub_decomposer.config.force_level1 = False  # Don't force L1 for subtasks
+            
+            sub_worker = WiggumWorker(
+                worker_id=self.worker_id * 100 + index,  # Unique sub-worker ID
+                project=self.project,
+                task_store=self.task_store,
+                adversarial=self.adversarial,
+                decomposer=sub_decomposer,
+            )
+            
+            try:
+                sub_result = await sub_worker.run_cycle(subtask)
+                return (subtask_id, sub_result.success, sub_result.error)
+            except Exception as e:
+                return (subtask_id, False, str(e))
+        
+        # Execute all subtasks concurrently
+        tasks = [
+            run_subtask(sid, i) 
+            for i, sid in enumerate(subtask_ids)
+        ]
+        
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Aggregate results
+        successes = 0
+        failures = []
+        
+        for res in results:
+            if isinstance(res, Exception):
+                failures.append(f"Exception: {res}")
+            else:
+                sid, success, error = res
+                if success:
+                    successes += 1
+                    self.log(f"  ✅ {sid}: PASSED")
+                else:
+                    failures.append(f"{sid}: {error}")
+                    self.log(f"  ❌ {sid}: {error[:50]}")
+        
+        # Parent succeeds only if ALL subtasks succeed
+        if successes == len(subtask_ids):
+            result.success = True
+            result.error = f"All {len(subtask_ids)} sub-agents completed successfully"
+            self.task_store.transition(parent_task.id, TaskStatus.DONE, changed_by=self.worker_id)
+            self.log(f"✅ Parent {parent_task.id}: ALL sub-agents passed")
+        else:
+            result.success = False
+            result.error = f"{len(failures)}/{len(subtask_ids)} sub-agents failed: {'; '.join(failures[:3])}"
+            self.log(f"❌ Parent {parent_task.id}: {len(failures)} sub-agents failed")
+        
+        return result
 
     def _extract_code_changes(self, output: str) -> Dict[str, str]:
         """Extract code changes from opencode output (fallback for non-git)"""

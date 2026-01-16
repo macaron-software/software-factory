@@ -48,6 +48,10 @@ class FractalConfig:
     max_items: int = 10       # Max acceptance criteria/items
     max_depth: int = 3        # Max recursion depth
     enabled: bool = True
+    # NEW: Force level 1 decomposition for all root tasks
+    force_level1: bool = True      # Always decompose depth=0 tasks
+    min_subtasks: int = 3          # Minimum subtasks when forcing L1
+    parallel_subagents: bool = True  # Run subtasks in parallel
 
 
 def load_fractal_config(project_config: Any = None) -> FractalConfig:
@@ -70,6 +74,9 @@ def load_fractal_config(project_config: Any = None) -> FractalConfig:
             max_items=fc.get("max_items", 10),
             max_depth=fc.get("max_depth", 3),
             enabled=fc.get("enabled", True),
+            force_level1=fc.get("force_level1", True),
+            min_subtasks=fc.get("min_subtasks", 3),
+            parallel_subagents=fc.get("parallel_subagents", True),
         )
 
     return FractalConfig()
@@ -90,19 +97,22 @@ class ComplexityAnalysis:
     exceeds_loc: bool = False
     exceeds_items: bool = False
     exceeds_depth: bool = False
+    force_level1: bool = False  # NEW: Forced L1 decomposition
 
     @property
     def should_decompose(self) -> bool:
-        """Returns True if any threshold is exceeded"""
+        """Returns True if any threshold is exceeded or force_level1"""
         return (
+            self.force_level1 or
             (self.exceeds_files or self.exceeds_loc or self.exceeds_items)
-            and not self.exceeds_depth
-        )
+        ) and not self.exceeds_depth
 
     @property
     def reason(self) -> str:
         """Human-readable reason for decomposition"""
         reasons = []
+        if self.force_level1:
+            reasons.append("force_level1")
         if self.exceeds_files:
             reasons.append(f"files={self.files_count}")
         if self.exceeds_loc:
@@ -247,6 +257,12 @@ class FractalDecomposer:
         if not self.config.enabled:
             return False, ComplexityAnalysis()
 
+        # NEW: Force level 1 decomposition for root tasks (depth=0)
+        if self.config.force_level1 and current_depth == 0:
+            analysis = analyze_complexity(task, self.config, current_depth)
+            analysis.force_level1 = True
+            return True, analysis
+
         analysis = analyze_complexity(task, self.config, current_depth)
         return analysis.should_decompose, analysis
 
@@ -254,6 +270,7 @@ class FractalDecomposer:
         self,
         task: Dict[str, Any],
         current_depth: int = 0,
+        force_count: int = None,
     ) -> List[Dict[str, Any]]:
         """
         Decompose a task into atomic sub-tasks.
@@ -264,40 +281,45 @@ class FractalDecomposer:
         Args:
             task: Task dict with description, files, etc.
             current_depth: Current recursion depth
+            force_count: Force minimum number of subtasks (for L1 forcing)
 
         Returns:
             List of sub-task dicts
         """
         should_decompose, analysis = self.should_decompose(task, current_depth)
+        
+        # Determine minimum subtask count
+        min_subtasks = force_count or (self.config.min_subtasks if getattr(analysis, 'force_level1', False) else 1)
 
         if not should_decompose:
             log(f"Task within limits ({analysis.reason}), no decomposition needed")
             return [task]
 
-        log(f"Decomposing task (depth={current_depth}, {analysis.reason})")
+        log(f"Decomposing task (depth={current_depth}, {analysis.reason}, min={min_subtasks})")
 
         # Try LLM decomposition first
         if self.llm_client:
-            subtasks = await self._llm_decompose(task, analysis)
-            if subtasks:
+            subtasks = await self._llm_decompose(task, analysis, min_subtasks)
+            if subtasks and len(subtasks) >= min_subtasks:
                 return subtasks
 
         # Fallback to rule-based decomposition
-        return self._rule_based_decompose(task, analysis)
+        return self._rule_based_decompose(task, analysis, min_subtasks)
 
     async def _llm_decompose(
         self,
         task: Dict[str, Any],
         analysis: ComplexityAnalysis,
+        min_subtasks: int = 2,
     ) -> Optional[List[Dict[str, Any]]]:
         """Decompose using LLM for intelligent splitting"""
         try:
-            prompt = self._build_decomposition_prompt(task, analysis)
+            prompt = self._build_decomposition_prompt(task, analysis, min_subtasks)
             response = await self.llm_client.query(prompt, role="sub")
 
             # Parse subtasks from response
             subtasks = self._parse_subtasks(response, task)
-            if subtasks and len(subtasks) > 1:
+            if subtasks and len(subtasks) >= min_subtasks:
                 log(f"LLM decomposed into {len(subtasks)} sub-tasks")
                 return subtasks
 
@@ -310,9 +332,15 @@ class FractalDecomposer:
         self,
         task: Dict[str, Any],
         analysis: ComplexityAnalysis,
+        min_subtasks: int = 2,
     ) -> str:
         """Build prompt for LLM decomposition"""
-        return f"""You are a task decomposition expert. Break down this large task into 2-4 smaller, atomic sub-tasks.
+        force_msg = ""
+        if analysis.force_level1:
+            force_msg = f"\n⚠️ FORCED LEVEL 1: You MUST create exactly {min_subtasks} sub-tasks (parallel sub-agents)."
+        
+        return f"""You are a task decomposition expert. Break down this task into {min_subtasks}-{min_subtasks + 2} smaller, atomic sub-tasks.
+{force_msg}
 
 ORIGINAL TASK:
 - Description: {task.get('description', '')}
@@ -320,17 +348,19 @@ ORIGINAL TASK:
 - Type: {task.get('type', 'fix')}
 - Domain: {task.get('domain', 'unknown')}
 
-COMPLEXITY (exceeds thresholds):
+COMPLEXITY:
 - Files: {analysis.files_count} (max {self.config.max_files})
 - Estimated LOC: {analysis.loc_estimate} (max {self.config.max_loc})
 - Items: {analysis.items_count} (max {self.config.max_items})
+- Reason: {analysis.reason}
 
 RULES for sub-tasks:
-1. Each sub-task must be ATOMIC (one logical change)
-2. Each sub-task should touch max {self.config.max_files} files
-3. Each sub-task should be ~{self.config.max_loc // 2} LOC or less
-4. Sub-tasks must be INDEPENDENT (can be done in parallel)
-5. No overlapping file modifications
+1. Create EXACTLY {min_subtasks} to {min_subtasks + 2} sub-tasks
+2. Each sub-task must be ATOMIC (one logical change)
+3. Each sub-task should touch max {self.config.max_files} files
+4. Each sub-task should be ~{self.config.max_loc // 2} LOC or less
+5. Sub-tasks must be INDEPENDENT (can be done in parallel by separate agents)
+6. No overlapping file modifications
 
 RESPOND IN JSON:
 {{
@@ -384,14 +414,16 @@ RESPOND IN JSON:
         self,
         task: Dict[str, Any],
         analysis: ComplexityAnalysis,
+        min_subtasks: int = 2,
     ) -> List[Dict[str, Any]]:
         """
         Rule-based decomposition fallback.
 
         Strategies:
-        1. Split by files (if exceeds_files)
-        2. Split by acceptance criteria (if exceeds_items)
-        3. Split description by conjunctions (if exceeds_loc)
+        1. Force L1: Split into min_subtasks parts by aspect
+        2. Split by files (if exceeds_files)
+        3. Split by acceptance criteria (if exceeds_items)
+        4. Split description by conjunctions (if exceeds_loc)
         """
         subtasks = []
         parent_id = task.get("id", "task")
@@ -402,6 +434,34 @@ RESPOND IN JSON:
             "parent_id": parent_id,
             "fractal_depth": task.get("fractal_depth", 0) + 1,
         }
+
+        # Strategy 0: Force L1 - Create min_subtasks by splitting into aspects
+        if analysis.force_level1:
+            description = task.get("description", "")
+            files = task.get("files", [])
+            
+            # Define aspect-based splitting for 3 parallel sub-agents
+            aspects = [
+                ("impl", "Implement core logic", 0.5),
+                ("test", "Write tests and validations", 0.3),
+                ("integ", "Integration and edge cases", 0.2),
+            ]
+            
+            # Distribute files proportionally
+            file_chunks = self._distribute_files(files, [a[2] for a in aspects])
+            
+            for i, (suffix, aspect_desc, _) in enumerate(aspects[:min_subtasks]):
+                subtask_files = file_chunks[i] if i < len(file_chunks) else []
+                subtasks.append({
+                    **base_task,
+                    "id": f"{parent_id}_{suffix}",
+                    "description": f"{description} - {aspect_desc}",
+                    "files": subtask_files or files,  # Fallback to all files
+                    "aspect": suffix,
+                })
+            
+            log(f"Force L1: Split into {len(subtasks)} parallel sub-agents")
+            return subtasks
 
         # Strategy 1: Split by files
         if analysis.exceeds_files:
@@ -451,6 +511,27 @@ RESPOND IN JSON:
 
         # No decomposition possible, return original (will be at depth limit)
         log("No decomposition strategy applicable, returning original", "WARN")
+        return [task]
+
+    def _distribute_files(self, files: List[str], ratios: List[float]) -> List[List[str]]:
+        """Distribute files across chunks based on ratios"""
+        if not files:
+            return [[] for _ in ratios]
+        
+        result = []
+        start = 0
+        n = len(files)
+        
+        for i, ratio in enumerate(ratios):
+            if i == len(ratios) - 1:
+                # Last chunk gets remaining files
+                result.append(files[start:])
+            else:
+                chunk_size = max(1, int(n * ratio))
+                result.append(files[start:start + chunk_size])
+                start += chunk_size
+        
+        return result
         return [task]
 
     async def decompose_recursive(
