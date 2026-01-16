@@ -2,8 +2,8 @@
 
 ## ARCH
 ```
-BRAIN (Opus4.5 RLM) → deep recursive → backlog enrichi
-    ↓ llm_query() → MiniMax sub-agents
+BRAIN (Opus4.5) + MCP → deep recursive → backlog enrichi
+    ↓ opencode (MiniMax) + MCP → sub-analyses
 WIGGUM TDD (MiniMax×N) → FRACTAL L1 forced → 3 sub-agents // → commit
     ↓
 WIGGUM DEPLOY → staging → E2E → prod → rollback
@@ -15,20 +15,25 @@ XP AGENT → learn → SELF-MODIFY FACTORY
 
 ## CORE
 
-### Brain RLM (`core/brain.py`)
-**Deep Recursive Analysis Engine** per MIT CSAIL arXiv:2512.24601:
+### Brain (`core/brain.py`)
+**Deep Recursive Analysis Engine** with MCP tools:
 
-**COST TIERS** (like GPT-5 → GPT-5-mini in paper):
-- depth=0: **Opus 4.5** ($$$) - Strategic orchestration
-- depth=1-2: **MiniMax M2.1** ($$) via opencode + MCP tools
-- depth=3: **Qwen 30B local** (free) - Fallback
+**TOOLS** (claude CLI + MCP server `mcp_lrm`):
+- `lrm_locate`: find files matching pattern
+- `lrm_summarize`: get file content summary
+- `lrm_conventions`: domain conventions
+- `lrm_examples`: example code
+- `lrm_build`: run build/test
 
-5-phase analysis:
-1. Structure decomposition (project→modules→files)
-2. Deep recursive llm_query() per module
-3. Parallel llm_query_batched() for files
-4. Cross-cutting (security, perf, arch, testing)
-5. Synthesis → WSJF scored backlog
+**COST TIERS**:
+- depth=0: **Opus 4.5** via `claude` CLI + MCP ($$$)
+- depth=1-2: **MiniMax M2.1** via `opencode` + MCP ($$)
+- depth=3: **Qwen 30B local** (free)
+
+Flow:
+1. Claude Opus explores via MCP tools
+2. Deep sub-analyses delegated to MiniMax
+3. JSON task list with WSJF scores
 
 ### Wiggum TDD (`core/wiggum_tdd.py`)
 - pool workers // (daemon)
@@ -179,9 +184,9 @@ providers:
       qwen: qwen3-30b-a3b
 
 defaults:
-  brain: anthropic/opus        # root RLM
-  brain_sub: opencode/minimax  # llm_query() via opencode + MCP
-  wiggum: opencode/minimax     # TDD workers via opencode
+  brain: claude-cli/opus     # uses `claude` CLI + MCP
+  brain_sub: opencode/minimax # sub-analyses via `opencode`
+  wiggum: opencode/minimax   # TDD workers via opencode
 ```
 
 ## MONITOR
