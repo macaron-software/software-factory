@@ -1,0 +1,483 @@
+#!/usr/bin/env python3
+"""
+Daemon utilities for Software Factory
+=====================================
+Provides daemonization for Wiggum TDD and Deploy pools.
+
+Features:
+- Double-fork for proper daemonization
+- PID file management
+- Signal handlers for graceful shutdown
+- Log file rotation
+- Status checking
+
+Usage:
+    from core.daemon import Daemon
+
+    class MyWorker(Daemon):
+        def run(self):
+            while self.running:
+                # do work
+                pass
+
+    worker = MyWorker(name="wiggum-tdd", project="ppz")
+    worker.start()  # Daemonize and run
+    worker.stop()   # Send SIGTERM
+    worker.restart()
+    worker.status()
+"""
+
+import os
+import sys
+import time
+import signal
+import atexit
+import asyncio
+from pathlib import Path
+from datetime import datetime
+from typing import Optional, Callable
+import logging
+from logging.handlers import RotatingFileHandler
+
+
+class Daemon:
+    """
+    Base daemon class with proper Unix daemonization.
+
+    Subclass and override run() to implement your daemon logic.
+    """
+
+    # Class-level paths
+    BASE_DIR = Path(__file__).parent.parent
+    PID_DIR = Path("/tmp/factory")
+    LOG_DIR = BASE_DIR / "data" / "logs"
+
+    def __init__(
+        self,
+        name: str,
+        project: str = None,
+        log_level: int = logging.INFO,
+    ):
+        """
+        Initialize daemon.
+
+        Args:
+            name: Daemon name (e.g., "wiggum-tdd", "wiggum-deploy")
+            project: Project name for isolation
+            log_level: Logging level
+        """
+        self.name = name
+        self.project = project or "default"
+        self.daemon_name = f"{name}-{self.project}"
+
+        # Ensure directories exist
+        self.PID_DIR.mkdir(parents=True, exist_ok=True)
+        self.LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Paths
+        self.pidfile = self.PID_DIR / f"{self.daemon_name}.pid"
+        self.logfile = self.LOG_DIR / f"{self.daemon_name}.log"
+
+        # State
+        self.running = False
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+        # Setup logging
+        self.logger = self._setup_logging(log_level)
+
+    def _setup_logging(self, level: int) -> logging.Logger:
+        """Setup rotating file logger"""
+        logger = logging.getLogger(self.daemon_name)
+        logger.setLevel(level)
+
+        # Remove existing handlers
+        logger.handlers = []
+
+        # Rotating file handler (10MB, 5 backups)
+        handler = RotatingFileHandler(
+            self.logfile,
+            maxBytes=10 * 1024 * 1024,
+            backupCount=5,
+        )
+        formatter = logging.Formatter(
+            "[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+        return logger
+
+    def log(self, msg: str, level: str = "INFO"):
+        """Log message"""
+        ts = datetime.now().strftime("%H:%M:%S")
+        print(f"[{ts}] [{self.daemon_name}] [{level}] {msg}", flush=True)
+
+        if level == "ERROR":
+            self.logger.error(msg)
+        elif level == "WARN":
+            self.logger.warning(msg)
+        elif level == "DEBUG":
+            self.logger.debug(msg)
+        else:
+            self.logger.info(msg)
+
+    def daemonize(self):
+        """
+        Double-fork to daemonize the process.
+
+        This is the standard Unix daemonization pattern:
+        1. Fork #1: Parent exits, child continues
+        2. setsid(): Create new session, become session leader
+        3. Fork #2: Exit session leader, grandchild can't acquire terminal
+        4. Redirect stdin/stdout/stderr to /dev/null
+        5. Write PID file
+        """
+        # First fork
+        try:
+            pid = os.fork()
+            if pid > 0:
+                # Parent exits
+                sys.exit(0)
+        except OSError as e:
+            self.logger.error(f"Fork #1 failed: {e}")
+            sys.exit(1)
+
+        # Decouple from parent environment
+        os.chdir("/")
+        os.setsid()
+        os.umask(0)
+
+        # Second fork
+        try:
+            pid = os.fork()
+            if pid > 0:
+                # First child exits
+                sys.exit(0)
+        except OSError as e:
+            self.logger.error(f"Fork #2 failed: {e}")
+            sys.exit(1)
+
+        # Redirect standard file descriptors
+        sys.stdout.flush()
+        sys.stderr.flush()
+
+        # Redirect to /dev/null
+        with open("/dev/null", "r") as devnull:
+            os.dup2(devnull.fileno(), sys.stdin.fileno())
+        with open(str(self.logfile), "a+") as log:
+            os.dup2(log.fileno(), sys.stdout.fileno())
+            os.dup2(log.fileno(), sys.stderr.fileno())
+
+        # Write PID file
+        atexit.register(self._cleanup)
+        pid = str(os.getpid())
+        self.pidfile.write_text(pid + "\n")
+
+        self.logger.info(f"Daemon started with PID {pid}")
+
+    def _cleanup(self):
+        """Cleanup PID file on exit"""
+        if self.pidfile.exists():
+            self.pidfile.unlink()
+
+    def _get_pid(self) -> Optional[int]:
+        """Get PID from pidfile"""
+        try:
+            if self.pidfile.exists():
+                return int(self.pidfile.read_text().strip())
+        except (ValueError, FileNotFoundError):
+            pass
+        return None
+
+    def _is_running(self, pid: int = None) -> bool:
+        """Check if process is running"""
+        pid = pid or self._get_pid()
+        if pid is None:
+            return False
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+
+    def start(self, foreground: bool = False):
+        """
+        Start the daemon.
+
+        Args:
+            foreground: Run in foreground (don't daemonize)
+        """
+        # Check if already running
+        pid = self._get_pid()
+        if pid and self._is_running(pid):
+            print(f"{self.daemon_name} is already running (PID: {pid})")
+            sys.exit(1)
+
+        # Clean up stale PID file
+        if self.pidfile.exists():
+            self.pidfile.unlink()
+
+        if foreground:
+            # Run in foreground (for debugging)
+            print(f"Starting {self.daemon_name} in foreground...")
+            self.pidfile.write_text(str(os.getpid()) + "\n")
+            atexit.register(self._cleanup)
+            self._setup_signals()
+            self._run_loop()
+        else:
+            # Daemonize
+            print(f"Starting {self.daemon_name} daemon...")
+            self.daemonize()
+            self._setup_signals()
+            self._run_loop()
+
+    def stop(self, timeout: int = 30):
+        """
+        Stop the daemon gracefully.
+
+        Args:
+            timeout: Seconds to wait for graceful shutdown
+        """
+        pid = self._get_pid()
+        if not pid:
+            print(f"{self.daemon_name} is not running (no PID file)")
+            return
+
+        if not self._is_running(pid):
+            print(f"{self.daemon_name} is not running (stale PID file)")
+            self.pidfile.unlink()
+            return
+
+        print(f"Stopping {self.daemon_name} (PID: {pid})...")
+
+        # Send SIGTERM for graceful shutdown
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError as e:
+            print(f"Error sending SIGTERM: {e}")
+            return
+
+        # Wait for process to exit
+        for _ in range(timeout):
+            if not self._is_running(pid):
+                print(f"{self.daemon_name} stopped")
+                return
+            time.sleep(1)
+
+        # Force kill if still running
+        print(f"Forcing kill of {self.daemon_name}...")
+        try:
+            os.kill(pid, signal.SIGKILL)
+            time.sleep(1)
+            if self.pidfile.exists():
+                self.pidfile.unlink()
+            print(f"{self.daemon_name} killed")
+        except OSError as e:
+            print(f"Error killing process: {e}")
+
+    def restart(self):
+        """Restart the daemon"""
+        self.stop()
+        time.sleep(2)
+        self.start()
+
+    def status(self) -> dict:
+        """
+        Get daemon status.
+
+        Returns:
+            Status dict with running state, PID, uptime, etc.
+        """
+        pid = self._get_pid()
+        running = pid and self._is_running(pid)
+
+        status = {
+            "name": self.daemon_name,
+            "project": self.project,
+            "running": running,
+            "pid": pid if running else None,
+            "pidfile": str(self.pidfile),
+            "logfile": str(self.logfile),
+        }
+
+        if running and pid:
+            # Get process info
+            try:
+                import subprocess
+
+                result = subprocess.run(
+                    ["ps", "-p", str(pid), "-o", "etime="],
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode == 0:
+                    status["uptime"] = result.stdout.strip()
+            except Exception:
+                pass
+
+        return status
+
+    def _setup_signals(self):
+        """Setup signal handlers for graceful shutdown"""
+
+        def handle_signal(signum, frame):
+            self.logger.info(f"Received signal {signum}, shutting down...")
+            self.running = False
+            if self._loop:
+                self._loop.stop()
+
+        signal.signal(signal.SIGTERM, handle_signal)
+        signal.signal(signal.SIGINT, handle_signal)
+
+    def _run_loop(self):
+        """Run the async event loop"""
+        self.running = True
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
+
+        try:
+            self._loop.run_until_complete(self.run())
+        except Exception as e:
+            self.logger.error(f"Daemon error: {e}")
+        finally:
+            self._loop.close()
+            self.running = False
+            self.logger.info("Daemon stopped")
+
+    async def run(self):
+        """
+        Main daemon loop - override in subclass.
+
+        This method should contain your daemon logic.
+        Check self.running periodically and exit when False.
+        """
+        raise NotImplementedError("Subclass must implement run()")
+
+
+# ============================================================================
+# DAEMON MANAGER
+# ============================================================================
+
+class DaemonManager:
+    """
+    Manages multiple daemons for the Software Factory.
+
+    Provides unified interface to start/stop/status all daemons.
+    """
+
+    def __init__(self, project: str = None):
+        self.project = project or "default"
+
+    def list_daemons(self) -> list:
+        """List all registered daemon PIDs for this project"""
+        pid_dir = Daemon.PID_DIR
+        daemons = []
+
+        if not pid_dir.exists():
+            return daemons
+
+        for pidfile in pid_dir.glob(f"*-{self.project}.pid"):
+            daemon_name = pidfile.stem.rsplit(f"-{self.project}", 1)[0]
+            pid = None
+            running = False
+
+            try:
+                pid = int(pidfile.read_text().strip())
+                running = self._is_running(pid)
+            except (ValueError, FileNotFoundError):
+                pass
+
+            daemons.append({
+                "name": daemon_name,
+                "pid": pid,
+                "running": running,
+                "pidfile": str(pidfile),
+            })
+
+        return daemons
+
+    def _is_running(self, pid: int) -> bool:
+        """Check if PID is running"""
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+
+    def status_all(self) -> dict:
+        """Get status of all daemons"""
+        daemons = self.list_daemons()
+        return {
+            "project": self.project,
+            "daemons": daemons,
+            "total": len(daemons),
+            "running": sum(1 for d in daemons if d["running"]),
+        }
+
+    def stop_all(self, timeout: int = 30):
+        """Stop all daemons for this project"""
+        for daemon in self.list_daemons():
+            if daemon["running"] and daemon["pid"]:
+                print(f"Stopping {daemon['name']}...")
+                try:
+                    os.kill(daemon["pid"], signal.SIGTERM)
+                except OSError:
+                    pass
+
+        # Wait for all to stop
+        for _ in range(timeout):
+            running = [d for d in self.list_daemons() if d["running"]]
+            if not running:
+                print("All daemons stopped")
+                return
+            time.sleep(1)
+
+        # Force kill remaining
+        for daemon in self.list_daemons():
+            if daemon["running"] and daemon["pid"]:
+                print(f"Force killing {daemon['name']}...")
+                try:
+                    os.kill(daemon["pid"], signal.SIGKILL)
+                except OSError:
+                    pass
+
+
+# ============================================================================
+# CLI HELPERS
+# ============================================================================
+
+def print_daemon_status(status: dict):
+    """Pretty print daemon status"""
+    if status.get("running"):
+        icon = "🟢"
+        state = "RUNNING"
+    else:
+        icon = "🔴"
+        state = "STOPPED"
+
+    print(f"{icon} {status['name']}: {state}")
+    if status.get("pid"):
+        print(f"   PID: {status['pid']}")
+    if status.get("uptime"):
+        print(f"   Uptime: {status['uptime']}")
+    print(f"   Log: {status['logfile']}")
+
+
+def print_all_status(manager_status: dict):
+    """Pretty print all daemons status"""
+    print(f"\n{'=' * 50}")
+    print(f"Software Factory Daemons - {manager_status['project']}")
+    print(f"{'=' * 50}")
+
+    if not manager_status["daemons"]:
+        print("No daemons registered")
+        return
+
+    for d in manager_status["daemons"]:
+        icon = "🟢" if d["running"] else "🔴"
+        state = "RUNNING" if d["running"] else "STOPPED"
+        pid_str = f"PID {d['pid']}" if d["pid"] else "no PID"
+        print(f"{icon} {d['name']}: {state} ({pid_str})")
+
+    print(f"\nTotal: {manager_status['running']}/{manager_status['total']} running")

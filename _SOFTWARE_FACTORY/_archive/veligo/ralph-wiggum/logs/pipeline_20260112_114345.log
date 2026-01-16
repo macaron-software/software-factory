@@ -1,0 +1,67 @@
+[0;34m[11:43:45][0m Pipeline started at Mon Jan 12 11:43:45 CET 2026
+[0;34m[11:43:45][0m Log file: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/logs/pipeline_20260112_114345.log
+
+═══════════════════════════════════════════════════════════════════
+  PHASE 0: Checking LLM Backends
+═══════════════════════════════════════════════════════════════════
+[0;34m[11:43:45][0m Skipping meta-orchestrator (--skip-meta or --deploy-only)
+
+═══════════════════════════════════════════════════════════════════
+  PHASE 2: TDD Queue (Red/Green Cycle)
+═══════════════════════════════════════════════════════════════════
+[0;34m[11:43:45][0m Starting TDD queue...
+
+[1;36m═══════════════════════════════════════════════════════════[0m
+[1;36m  🎯 Ralph Wiggum - Veligo Platform[0m
+[1;36m═══════════════════════════════════════════════════════════[0m
+[0;34mℹ[0m [11:43:45] Mode: tdd
+[0;34mℹ[0m [11:43:45] Project: /Users/sylvain/_LAPOSTE/_VELIGO2
+[0;34mℹ[0m [11:43:45] Log: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/logs/ralph_wiggum_20260112_114345.log
+[0;34mℹ[0m Checking LLM backends...
+[0;32m✓[0m llama-server :8001 (DeepSeek)
+[0;32m✓[0m opencode CLI (GLM-4.7, Minimax)
+[0;32m✓[0m claude CLI (Opus 4.5)
+[0;34mℹ[0m Active backend: llama:8001
+
+[1;36m═══════════════════════════════════════════════════════════[0m
+[1;36m  🧪 QUEUE 1: TDD Red/Green[0m
+[1;36m═══════════════════════════════════════════════════════════[0m
+[0;34mℹ[0m [11:43:45] Processing 14 TDD tasks...
+[0;34mℹ[0m [11:43:45] [1/14] Processing T001
+[0;34mℹ[0m [11:43:45] Executing T001: Docker dev environment setup...
+[0;32m✓[0m [11:43:46] Docker is running
+[0;34mℹ[0m [11:43:46] Starting Docker services...
+ Container veligo-dev  Starting
+ Container veligo-dev  Started
+[0;32m✓[0m [11:43:47] Docker compose started
+[0;34mℹ[0m [11:43:47] Waiting 15s for services to start...
+[0;34mℹ[0m [11:44:02] Checking service health...
+[1;33m⚠[0m [11:44:02] PostgreSQL: not ready
+[1;33m⚠[0m [11:44:02] Redis: not ready
+[1;33m⚠[0m [11:44:02] Backend API: not responding (may need manual start)
+[1;33m⚠[0m [11:44:02] Frontend: not responding (may need manual start)
+[0;34mℹ[0m [11:44:02] [2/14] Processing T002
+
+[1;33m┌─────────────────────────────────────────────────────────┐[0m
+[1;33m│  📋 Task: T002[0m
+[1;33m└─────────────────────────────────────────────────────────┘[0m
+
+[0;34mℹ[0m [11:44:02] 🔄 Iteration 1 / 15
+[0;34mℹ[0m [11:44:02] Getting patch from LLM...
+[1;33m⚠[0m [11:44:02] No patch available - waiting before retry...
+
+[0;34mℹ[0m [11:44:12] 🔄 Iteration 2 / 15
+[0;34mℹ[0m [11:44:12] Getting patch from LLM...
+[1;33m⚠[0m [11:44:13] No patch available - waiting before retry...
+
+[0;34mℹ[0m [11:44:23] 🔄 Iteration 3 / 15
+[0;34mℹ[0m [11:44:23] Getting patch from LLM...
+[1;33m⚠[0m [11:44:23] No patch available - waiting before retry...
+
+[0;34mℹ[0m [11:44:33] 🔄 Iteration 4 / 15
+[0;34mℹ[0m [11:44:33] Getting patch from LLM...
+[1;33m⚠[0m [11:44:33] No patch available - waiting before retry...
+
+[0;34mℹ[0m [11:44:43] 🔄 Iteration 5 / 15
+[0;34mℹ[0m [11:44:44] Getting patch from LLM...
+[1;33m⚠[0m [11:44:44] No patch available - waiting before retry...

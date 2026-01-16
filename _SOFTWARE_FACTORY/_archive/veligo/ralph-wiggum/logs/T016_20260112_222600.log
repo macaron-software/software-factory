@@ -1,0 +1,6 @@
+Je vais résoudre les 3 tests skippés Chaos Resilience en suivant la méthodologie TDD.
+
+**PHASE RED**: Lecture des tests
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/tests/chaos-resilience.spec.ts
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/chaos/scenarios.rs
+[91m[1mError: [0mNotFoundError: NotFoundError

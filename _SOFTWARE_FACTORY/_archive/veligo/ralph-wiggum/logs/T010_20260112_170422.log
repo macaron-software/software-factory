@@ -1,0 +1,508 @@
+[96m[1m| [0m[90m Read     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/referral-program/**"}
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/referral*"}
+[94m[1m| [0m[90m Grep     [0mreferral
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/routes/referral/+page.svelte
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/lib/api/referral.ts
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/api/referral_api.rs
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/services/referral/referral_service.rs
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/routes/referral/**"}
+[91m[1m| [0m[90m Bash     [0mList frontend routes
+
+total 40
+drwxr-xr-x  15 sylvain  staff   480 Jan  7 06:24 (admin)
+drwxr-xr-x  23 sylvain  staff   736 Jan  9 08:21 (app)
+drwxr-xr-x   6 sylvain  staff   192 Jan  5 11:40 (landing)
+drwxr-xr-x   5 sylvain  staff   160 Dec 27 12:12 (tenant)
+-rw-r--r--   1 sylvain  staff  5064 Jan  5 11:40 +layout.svelte
+-rw-------   1 sylvain  staff   169 Dec 30 17:01 +layout.ts
+-rw-r--r--   1 sylvain  staff     0 Dec 15 08:16 +page-platform.svelte.tmp
+-rw-r--r--   1 sylvain  staff  6790 Jan  5 11:40 +page.svelte
+drwxr-xr-x  31 sylvain  staff   992 Jan 12 16:54 .
+drwxr-xr-x   9 sylvain  staff   288 Jan  5 10:17 ..
+drwxr-xr-x   3 sylvain  staff    96 Dec 13 16:06 \(app\)
+drwxr-xr-x   3 sylvain  staff    96 Jan  1 21:59 api
+drwxr-xr-x   6 sylvain  staff   192 Dec 30 13:10 auth
+drwxr-xr-x   3 sylvain  staff    96 Jan  5 11:40 catalog
+drwx------   3 sylvain  staff    96 Dec 30 15:09 forgot-password
+drwxr-xr-x   3 sylvain  staff    96 Jan  7 09:37 invoices
+drwxr-xr-x   4 sylvain  staff   128 Jan  1 17:02 legal
+drwxr-xr-x   4 sylvain  staff   128 Jan  7 09:36 login
+drwxr-xr-x   3 sylvain  staff    96 Jan  5 11:40 maintenance
+drwxr-xr-x   4 sylvain  staff   128 Dec 11 14:13 mock
+drwxr-xr-x  14 sylvain  staff   448 Jan  7 09:37 owner
+drwxr-xr-x   3 sylvain  staff    96 Jan  7 09:37 privacy
+drwxr-xr-x   3 sylvain  staff    96 Jan 12 16:55 referral
+drwxr-xr-x   3 sylvain  staff    96 Jan  7 09:37 register
+drwxr-xr-x   3 sylvain  staff    96 Jan  5 11:40 reset-password
+drwxr-xr-x   4 sylvain  staff   128 Jan  7 09:37 signup
+drwxr-xr-x   4 sylvain  staff   128 Jan  5 11:40 store
+drwxr-xr-x   3 sylvain  staff    96 Jan  1 17:02 subscriptions
+drwxr-xr-x   4 sylvain  staff   128 Jan  7 09:37 support
+drwxr-xr-x   3 sylvain  staff    96 Jan  7 09:37 terms
+drwx------   3 sylvain  staff    96 Jan  7 09:37 verify-email
+
+[91m[1m| [0m[90m Bash     [0mRun referral tests
+
+
+> veligo-platform@2.0.0 test:e2e
+> playwright test --config playwright.config.ts --grep Referral
+
+
+=== E2E Global Setup ===
+
+Waiting for Frontend at http://localhost:8040...
+Frontend is ready (status: 200)
+Waiting for Mailpit at http://localhost:8045/api/v1/messages...
+Mailpit is ready (status: 200)
+Seeding test database...
+Database seeded successfully
+Clearing Mailpit emails...
+Mailpit cleared
+Auth state directory ready: /Users/sylvain/_LAPOSTE/_VELIGO2/.auth
+
+=== Global Setup Complete (0.3s) ===
+
+Error: Requiring @playwright/test second time, 
+First:
+Error: 
+
+   at ../../playwright.config.ts:1
+
+> 1 | import { defineConfig, devices } from '@playwright/test';
+    | ^
+  2 |
+  3 | /**
+  4 |  * Playwright E2E Configuration for Veligo Platform
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/index.js:61:33)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .js] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/test.js:17:13)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .js] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/@playwright/test/index.js:17:18)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .js] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/playwright.config.ts:1:1)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Module.newCompile2 (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:46:29)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .ts] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at requireOrImport (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/transform/transform.js:218:18)
+    at loadUserConfig (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/common/configLoader.js:107:89)
+    at loadConfig (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/common/configLoader.js:119:28)
+    at loadConfigFromFile (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/common/configLoader.js:331:10)
+    at runTests (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/program.js:206:18)
+    at i.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/program.js:71:7)
+
+Second: 
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/@playwright/test/index.js:17:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/playwright.config.ts:1:1)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/playwright/lib/index.js:56:11)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/playwright/test.js:17:13)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/@playwright/test/index.js:17:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/ao-compliance/idfm/franceconnect-sso.spec.ts:8:1)
+Error: Requiring @playwright/test second time, 
+First:
+Error: 
+
+   at ../../playwright.config.ts:1
+
+> 1 | import { defineConfig, devices } from '@playwright/test';
+    | ^
+  2 |
+  3 | /**
+  4 |  * Playwright E2E Configuration for Veligo Platform
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/index.js:61:33)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .js] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/test.js:17:13)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .js] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+
+[91m[1m| [0m[90m Bash     [0mRun referral tests with unified config
+
+Error: /Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/playwright.unified.config.ts does not exist
+    at resolveConfigFile (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/playwright/lib/common/configLoader.js:321:11)
+    at resolveConfigLocation (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/playwright/lib/common/configLoader.js:302:30)
+    at loadConfigFromFile (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/playwright/lib/common/configLoader.js:331:27)
+    at runTests (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/playwright/lib/program.js:197:67)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async r.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/playwright/lib/program.js:70:7)
+
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/playwright*.config.*"}
+[91m[1m| [0m[90m Bash     [0mRun referral tests from e2e directory
+
+🚴 Veligo E2E Tests - Global Setup
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RÈGLES ABSOLUES:
+  ❌ AUCUNE erreur console tolérée (sync ou async)
+  ❌ AUCUN warning critique toléré
+  ❌ AUCUN test.skip() autorisé
+  ❌ AUCUN retry - Si ça échoue, on corrige
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 Base URL: https://idfm.veligo.app
+🔧 Workers: 5
+🔄 Retries: 0
+
+🔍 Checking HTTP server availability...
+✅ HTTP server is running
+🔧 PR-005: Starting gRPC-Web proxy server...
+⚠️  Port 8080 already in use, assuming proxy is already running
+🌱 PR-010: Seeding test data...
+🌱 Seeding test data...
+  ✓ User marie.dupont@test-idfm.fr already exists (skipping)
+  ✓ User jean.martin@test-nantes.fr already exists (skipping)
+  ✓ User pierre.bernard@test-lyon.fr already exists (skipping)
+  ✓ User admin@idfm.fr already exists (skipping)
+  ✓ User admin@idfm.fr already exists (skipping)
+  ⚠️  User owner@veligo.app registration failed with database error (might already exist): Database error: error returned from database: record "new" has no field "user_id"
+  ⚠️  User test@veligo.app registration failed with database error (might already exist): Database error: error returned from database: record "new" has no field "user_id"
+✅ Users seeded
+  📊 Attempting to seed 13 stations from fixtures
+  ⚠️  Check endpoint returned 404: 
+⚠️  Test API seed endpoint not available (404).
+   Checking if stations already exist in database...
+❌ ERROR: Test API seed endpoint not available (404) and no stations found.
+   Set ENABLE_TEST_API=1 on the backend to enable automatic seeding.
+   Without stations seeded, E2E tests will fail.
+❌ Station seeding failed: Station seeding failed: Test API endpoint disabled (404). Set ENABLE_TEST_API=1.
+
+❌ CRITICAL: Station seeding failed!
+   Station gRPC tests require stations to be seeded.
+   SOLUTION: Set ENABLE_TEST_API=1 on the backend.
+
+  📊 Attempting to seed 53 bikes from fixtures
+⚠️  Test API seed endpoint not available (404).
+   Checking if bikes already exist in database...
+❌ ERROR: Test API seed endpoint not available (404) and no bikes found.
+   Set ENABLE_TEST_API=1 on the backend to enable automatic seeding.
+   Without bikes seeded, E2E tests will fail.
+❌ Bike seeding failed: Bike seeding failed: Test API endpoint disabled (404). Set ENABLE_TEST_API=1.
+
+❌ CRITICAL: Bike seeding failed!
+   Bike gRPC tests require bikes to be seeded.
+   SOLUTION: Set ENABLE_TEST_API=1 on the backend.
+
+Bookings will be created during test execution
+✅ Bookings seeded
+🌱 Test data seeding complete
+
+❌ CRITICAL: Test data seeding failed!
+   Tests require stations and bikes to be seeded.
+   SOLUTION: Set ENABLE_TEST_API=1 on the backend.
+   Example: export ENABLE_TEST_API=1 && systemctl restart veligo-http-server
+
+
+❌ CRITICAL: Test data seeding failed!
+   Error: Critical test data seeding failed. Set ENABLE_TEST_API=1 on the backend to enable seeding.
+
+   SOLUTION: Enable test API on backend:
+   1. SSH to production server (4.251.107.141)
+   2. Set ENABLE_TEST_API=1 environment variable
+   3. Restart HTTP server: sudo systemctl restart veligo-http-server
+   4. Re-run tests
+
+Error: Critical test data seeding failed. Set ENABLE_TEST_API=1 on the backend to enable seeding.
+
+   at helpers/seed.ts:110
+
+  108 |       console.error('   Example: export ENABLE_TEST_API=1 && systemctl restart veligo-http-server');
+  109 |       console.error('');
+> 110 |       throw new Error('Critical test data seeding failed. Set ENABLE_TEST_API=1 on the backend to enable seeding.');
+      |             ^
+  111 |     }
+  112 |   } catch (error) {
+  113 |     // If it's already our error, rethrow it
+    at seedAllTestData (/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/helpers/seed.ts:110:13)
+    at globalSetup (/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/global-setup.ts:88:7)
+🧹 Cleaning up test infrastructure...
+✅ gRPC-Web proxy server stopped
+✅ Global teardown complete
+
+
+[96m[1m| [0m[90m Read     [0mveligo-platform/tests/e2e/global-setup.ts
+[91m[1m| [0m[90m Bash     [0mRun referral tests skipping seeding
+
+
+=== E2E Global Setup ===
+
+Waiting for Frontend at http://localhost:8040...
+Frontend is ready (status: 200)
+Waiting for Mailpit at http://localhost:8045/api/v1/messages...
+Mailpit is ready (status: 200)
+Seeding test database...
+Database seeded successfully
+Clearing Mailpit emails...
+Mailpit cleared
+Auth state directory ready: /Users/sylvain/_LAPOSTE/_VELIGO2/.auth
+
+=== Global Setup Complete (0.2s) ===
+
+Error: Requiring @playwright/test second time, 
+First:
+Error: 
+
+   at ../../playwright.config.ts:1
+
+> 1 | import { defineConfig, devices } from '@playwright/test';
+    | ^
+  2 |
+  3 | /**
+  4 |  * Playwright E2E Configuration for Veligo Platform
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/index.js:61:33)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .js] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/test.js:17:13)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .js] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/@playwright/test/index.js:17:18)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .js] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/playwright.config.ts:1:1)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Module.newCompile2 (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:46:29)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .ts] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at requireOrImport (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/transform/transform.js:218:18)
+    at loadUserConfig (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/common/configLoader.js:107:89)
+    at loadConfig (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/common/configLoader.js:119:28)
+    at loadConfigFromFile (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/common/configLoader.js:331:10)
+    at runTests (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/program.js:206:18)
+    at i.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/program.js:71:7)
+
+Second: 
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/@playwright/test/index.js:17:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/playwright.config.ts:1:1)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/playwright/lib/index.js:56:11)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/playwright/test.js:17:13)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/@playwright/test/index.js:17:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/ao-compliance/idfm/franceconnect-sso.spec.ts:8:1)
+Error: Requiring @playwright/test second time, 
+First:
+Error: 
+
+   at ../../playwright.config.ts:1
+
+> 1 | import { defineConfig, devices } from '@playwright/test';
+    | ^
+  2 |
+  3 | /**
+  4 |  * Playwright E2E Configuration for Veligo Platform
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/index.js:61:33)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .js] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/test.js:17:13)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .js] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/@playwright/test/index.js:17:18)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .js] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/playwright.config.ts:1:1)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Module.newCompile2 (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:46:29)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .ts] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at requireOrImport (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/transform/transform.js:218:18)
+    at loadUserConfig (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/common/configLoader.js:107:89)
+    at loadConfig (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/common/configLoader.js:119:28)
+    at loadConfigFromFile (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/common/configLoader.js:331:10)
+    at runTests (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/program.js:206:18)
+    at i.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/program.js:71:7)
+
+Second: 
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/@playwright/test/index.js:17:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/playwright.config.ts:1:1)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/playwright/lib/index.js:56:11)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/playwright/test.js:17:13)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/@playwright/test/index.js:17:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/ao-specific/idfm/idfm-anssi-password-policy.spec.ts:10:1)
+Error: Requiring @playwright/test second time, 
+First:
+Error: 
+
+   at ../../playwright.config.ts:1
+
+> 1 | import { defineConfig, devices } from '@playwright/test';
+    | ^
+  2 |
+  3 | /**
+  4 |  * Playwright E2E Configuration for Veligo Platform
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/index.js:61:33)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .js] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/test.js:17:13)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .js] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/@playwright/test/index.js:17:18)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .js] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/playwright.config.ts:1:1)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Module.newCompile2 (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:46:29)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Object.newLoader2 [as .ts] (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/third_party/pirates.js:52:22)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:1091:12)
+    at Module.require (node:internal/modules/cjs/loader:1289:19)
+    at require (node:internal/modules/helpers:182:18)
+    at requireOrImport (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/transform/transform.js:218:18)
+    at loadUserConfig (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/common/configLoader.js:107:89)
+    at loadConfig (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/common/configLoader.js:119:28)
+    at loadConfigFromFile (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/common/configLoader.js:331:10)
+    at runTests (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/program.js:206:18)
+    at i.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/program.js:71:7)
+
+Second: 
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/@playwright/test/index.js:17:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/playwright.config.ts:1:1)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/playwright/lib/index.js:56:11)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/playwright/test.js:17:13)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/node_modules/@playwright/test/index.js:17:18)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/ao-specific/idfm/idfm-fleet-availability-95.spec.ts:10:1)
+Error: Requiring @playwright/test second time, 
+First:
+Error: 
+
+   at ../../playwright.config.ts:1
+
+> 1 | import { defineConfig, devices } from '@playwright/test';
+    | ^
+  2 |
+  3 | /**
+  4 |  * Playwright E2E Configuration for Veligo Platform
+
+[94m[1m| [0m[90m webfetch  [0mhttps://idfm.veligo.app/referral (text/html)
+[91m[1m| [0m[90m Bash     [0mTest referral API endpoint
+[91m[1m| [0m[90m Bash     [0mTest referral API with token
+[96m[1m| [0m[90m Read     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+Je vois le problème. Les tests utilisent des assertions conditionnelles et certains ont `test.skip()`. Analysons ce qui doit être corrigé:
+
+1. **Test REF.07** a `test.skip()` qui doit être retiré
+2. Les tests utilisent des conditions `if` au lieu de vraies assertions
+3. Les tests doivent vérifier que les éléments sont **vraiment** visibles
+
+Mettons à jour les tests pour qu'ils soient de vrais tests TDD:
+[92m[1m| [0m[90m Edit     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[96m[1m| [0m[90m Read     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[92m[1m| [0m[90m Edit     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[92m[1m| [0m[90m Edit     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[92m[1m| [0m[90m Edit     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[92m[1m| [0m[90m Edit     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[96m[1m| [0m[90m Read     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[92m[1m| [0m[90m Edit     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[92m[1m| [0m[90m Edit     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[91m[1m| [0m[90m Bash     [0mType check referral test file
+
+../node_modules/@types/node/buffer.d.ts(128,19): error TS1005: ',' expected.
+../node_modules/@types/node/buffer.d.ts(128,51): error TS1005: ',' expected.
+../node_modules/@types/node/crypto.d.ts(4130,17): error TS1110: Type expected.
+../node_modules/@types/node/events.d.ts(72,28): error TS1005: ',' expected.
+../node_modules/@types/node/http.d.ts(241,47): error TS1005: ',' expected.
+../node_modules/@types/node/http.d.ts(241,71): error TS1109: Expression expected.
+../node_modules/@types/node/http.d.ts(242,5): error TS1109: Expression expected.
+../node_modules/@types/node/http.d.ts(246,46): error TS1005: ',' expected.
+../node_modules/@types/node/http.d.ts(250,46): error TS1005: ',' expected.
+../node_modules/@types/node/http.d.ts(257,44): error TS1005: ',' expected.
+../node_modules/@types/node/http.d.ts(263,51): error TS1005: ',' expected.
+../node_modules/@types/node/http.d.ts(271,46): error TS1005: ',' expected.
+../node_modules/@types/node/http.d.ts(278,52): error TS1005: ',' expected.
+../node_modules/@types/node/http.d.ts(283,57): error TS1005: ',' expected.
+../node_modules/@types/node/http.d.ts(290,44): error TS1005: ',' expected.
+../node_modules/@types/node/http.d.ts(297,43): error TS1005: ',' expected.
+../node_modules/@types/node/http.d.ts(304,49): error TS1005: ',' expected.
+../node_modules/@types/node/http.d.ts(311,43): error TS1005: ',' expected.
+../node_modules/@types/node/http.d.ts(317,38): error TS1005: ',' expected.
+../node_modules/@types/node/http.d.ts(324,48): error TS1005: ',' expected.
+
+[96m[1m| [0m[90m Read     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+Les tests sont maintenant corrigés. Vérifions si l'API backend et l'UI sont opérationnels:
+[91m[1m| [0m[90m Bash     [0mTest referral API with auth
+[91m[1m| [0m[90m Bash     [0mTest auth API
+[91m[1m| [0m[90m Bash     [0mCheck referral page data-testid
+[91m[1m| [0m[90m Bash     [0mCheck referral content
+[91m[1m| [0m[90m Bash     [0mCheck referral page size
+
+      48
+
+[91m[1m| [0m[90m Bash     [0mCheck referral build output
+
+Path not found

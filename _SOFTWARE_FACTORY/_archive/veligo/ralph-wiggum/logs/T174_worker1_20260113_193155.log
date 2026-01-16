@@ -1,0 +1,26 @@
+[0;34m[19:31:55][0m Starting Wiggum-TDD daemon...
+[0;34m[19:31:55][0m Queue: tdd
+[0;34m[19:31:55][0m Tasks dir: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks
+[0;34m[19:31:55][0m Poll interval: 10s
+[0;34m[19:31:56][0m [Wiggum-TDD] Found task: T164
+[0;34m[19:31:56][0m [T164] Processing with REAL agent...
+[0;34m[19:31:56][0m [T164] Using Real Agent (actual execution, not simulation)...
+[0;33m[19:32:29] ⚠[0m [T164] Agent returned FAILED or needs more work
+[0;33m[19:32:29] ⚠[0m [T164] Exit code: 1
+[0;33m[19:32:29] ⚠[0m [T164] Check log: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/logs/T164_20260113_193156.log
+[0;33m[19:32:29] ⚠[0m [T164] Retry 1/3
+[0;34m[19:32:34][0m [T164] Processing with REAL agent...
+[0;34m[19:32:34][0m [T164] Using Real Agent (actual execution, not simulation)...
+[0;33m[19:33:02] ⚠[0m [T164] Agent returned FAILED or needs more work
+[0;33m[19:33:02] ⚠[0m [T164] Exit code: 1
+[0;33m[19:33:02] ⚠[0m [T164] Check log: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/logs/T164_20260113_193234.log
+[0;33m[19:33:02] ⚠[0m [T164] Retry 2/3
+[0;34m[19:33:07][0m [T164] Processing with REAL agent...
+[0;34m[19:33:07][0m [T164] Using Real Agent (actual execution, not simulation)...
+[0;33m[19:34:26] ⚠[0m [T164] Agent returned FAILED or needs more work
+[0;33m[19:34:26] ⚠[0m [T164] Exit code: 1
+[0;33m[19:34:26] ⚠[0m [T164] Check log: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/logs/T164_20260113_193307.log
+[0;33m[19:34:26] ⚠[0m [T164] Retry 3/3
+[0;31m[19:34:31] ✗[0m [T164] Failed after 3 retries
+[0;34m[19:34:31][0m [Wiggum-TDD] --once mode, exiting
+[0;34m[19:34:31][0m [Wiggum-TDD] Daemon stopped

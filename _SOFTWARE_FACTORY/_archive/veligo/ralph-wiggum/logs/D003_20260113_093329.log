@@ -1,0 +1,446 @@
+[91m[1m| [0m[90m Bash     [0mCheck migrations directory
+
+total 1504
+drwxr-xr-x  73 sylvain  staff   2336 Jan 13 00:23 .
+drwxr-xr-x  26 sylvain  staff    832 Jan 13 01:29 ..
+-rw-------   1 sylvain  staff   2319 Jan  3 17:58 000_bootstrap.sql
+-rw-------   1 sylvain  staff  16682 Jan  3 17:58 001_init.sql
+-rw-------   1 sylvain  staff   5929 Jan  3 17:58 002_mfa_admin.sql
+-rw-------   1 sylvain  staff  15176 Jan  3 17:58 003_tracking_abeeway.sql
+-rw-r--r--   1 sylvain  staff  28689 Jan  3 17:58 004_gdpr_compliance.sql
+-rw-r--r--   1 sylvain  staff  12879 Dec 16 09:37 004_modules_catalog.sql.disabled
+-rw-------   1 sylvain  staff   5355 Jan  3 17:58 006_subscription_plans.sql
+-rw-r--r--   1 sylvain  staff  13850 Dec 16 09:37 007_modules_complete.sql.disabled
+-rw-------   1 sylvain  staff   1555 Jan  3 17:58 007_subscriptions_plan_fk.sql
+-rw-r--r--   1 sylvain  staff  15434 Dec 16 16:20 008_granular_modules.sql.disabled
+-rw-r--r--   1 sylvain  staff  11992 Dec 16 14:10 008_hooks_system.sql.disabled
+-rw-------   1 sylvain  staff   4401 Jan  3 17:58 009_audit_logs.sql
+-rw-------   1 sylvain  staff   4102 Jan  3 17:58 010_performance_indexes.sql
+-rw-------   1 sylvain  staff   5046 Jan  3 17:58 012_carbon_tracking.sql
+-rw-r--r--   1 sylvain  staff    203 Dec 24 15:51 012_refactor_subscriptions_jsonb.down.sql.disabled
+-rw-r--r--   1 sylvain  staff   3440 Dec 24 15:51 012_refactor_subscriptions_jsonb.up.sql.disabled
+-rw-------   1 sylvain  staff   5613 Jan  3 17:58 013_document_signatures.sql
+-rw-------   1 sylvain  staff  11392 Jan  3 17:58 014_stations.sql
+-rw-------   1 sylvain  staff  25271 Jan  3 17:58 015_fixes_and_missing_tables.sql
+-rw-r--r--   1 sylvain  staff   2389 Jan  3 17:58 016_invoice_fixes.sql
+-rw-------   1 sylvain  staff   2265 Jan  3 17:58 017_invoice_columns_fix.sql
+-rw-------   1 sylvain  staff    534 Jan  3 17:58 018_invoice_issued_at.sql
+-rw-------   1 sylvain  staff    530 Jan  3 17:58 019_invoice_due_at.sql
+-rw-------   1 sylvain  staff    558 Jan  3 17:58 020_invoice_buyer_name.sql
+-rw-------   1 sylvain  staff   2136 Jan  3 17:58 021_invoice_all_columns.sql
+-rw-r--r--   1 sylvain  staff  12459 Jan  3 17:58 022_partner_rewards.sql
+-rw-------   1 sylvain  staff   9200 Jan  3 17:58 023_consent_history.sql
+-rw-------   1 sylvain  staff   8279 Jan  3 17:58 024_aom_subsidy_rules.sql
+-rw-------   1 sylvain  staff  18364 Jan  3 18:03 025_aom_reporting.sql
+-rw-------   1 sylvain  staff   2877 Jan  3 17:58 030_domain_events.sql
+-rw-------   1 sylvain  staff   2926 Jan  3 17:58 031_fix_rls_null_bypass.sql
+-rw-------   1 sylvain  staff   8217 Jan  3 17:58 032_force_rls_remaining.sql
+-rw-r--r--   1 sylvain  staff  22926 Jan  3 17:58 033_ensure_missing_tables.sql
+-rw-------   1 sylvain  staff  11571 Jan  3 17:58 034_activate_modules.sql
+-rw-------   1 sylvain  staff  12395 Jan  3 17:58 035_fix_remaining_rls.sql
+-rw-------   1 sylvain  staff  19796 Jan  3 17:58 036_complete_rls_coverage.sql
+-rw-------   1 sylvain  staff  18387 Jan  3 18:08 037_enable_postgis.sql
+-rw-------   1 sylvain  staff  35826 Jan  3 18:10 050_enable_rls.sql
+-rw-r--r--   1 sylvain  staff   2833 Jan  3 17:58 051_create_bikes_table.sql
+-rw-r--r--   1 sylvain  staff   2027 Jan  3 20:27 052_create_stations_table.sql
+-rw-r--r--   1 sylvain  staff   2224 Jan  3 17:58 053_create_station_slots_table.sql
+-rw-r--r--   1 sylvain  staff   2417 Jan  3 17:58 054_create_bookings_table.sql
+-rw-r--r--   1 sylvain  staff   2941 Jan  3 17:58 055_fix_audit_users_trigger.sql
+-rw-r--r--   1 sylvain  staff   5197 Jan  3 18:48 056_test_api_bypass_rls.sql
+-rw-r--r--   1 sylvain  staff   5903 Jan  3 17:58 057_add_bookings_pickup_dropoff_columns.sql
+-rw-r--r--   1 sylvain  staff   1708 Jan  3 17:58 058_login_bypass_rls.sql
+-rw-r--r--   1 sylvain  staff  16336 Jan  3 17:58 059_fix_pr001_schema_validation.sql
+-rw-r--r--   1 sylvain  staff  12952 Jan  3 18:14 060_ensure_pr001_schema.sql
+-rw-r--r--   1 sylvain  staff   5452 Jan  3 17:58 061_ensure_bookings_nullable_columns.sql
+-rw-r--r--   1 sylvain  staff   3796 Jan  3 17:58 062_fix_users_audit_trigger.sql
+-rw-r--r--   1 sylvain  staff   9201 Jan  3 17:58 063_fix_all_schema_issues.sql
+-rw-r--r--   1 sylvain  staff   2099 Jan  3 17:58 064_fix_pickup_at_nullable.sql
+-rw-r--r--   1 sylvain  staff  13550 Jan  3 17:58 065_fix_all_schema_validation_issues.sql
+-rw-r--r--   1 sylvain  staff   9904 Jan  3 18:10 066_fix_primary_key_detection.sql
+-rw-r--r--   1 sylvain  staff   7783 Jan  3 17:58 067_fix_audit_trigger_user_seeding.sql
+-rw-------   1 sylvain  staff   2895 Jan  3 18:54 068_fix_seed_station_function.sql
+-rw-------   1 sylvain  staff   5077 Jan  3 20:27 069_add_stations_e2e_columns.sql
+-rw-r--r--   1 sylvain  staff  15783 Jan  3 20:36 070_ensure_all_pr001_tables_exist.sql
+-rw-------   1 sylvain  staff   1904 Jan  3 20:43 071_fix_sessions_token_type.sql
+-rw-r--r--   1 sylvain  staff    618 Jan  3 21:02 072_add_bookings_unlock_code.sql
+-rw-------   1 sylvain  staff   8320 Jan  3 17:58 100_kpi_reporting_indexes.sql
+-rw-r--r--   1 sylvain  staff   1993 Jan  3 21:12 101_add_bikes_gps_columns.sql
+-rw-r--r--   1 sylvain  staff  20154 Jan 13 00:19 102_add_e2e_fixture_columns.sql
+-rw-r--r--   1 sylvain  staff   3982 Jan 12 17:06 102_referral_program.sql
+-rw-r--r--   1 sylvain  staff  24507 Jan 13 00:22 103_fix_fixture_ids.sql
+-rw-r--r--   1 sylvain  staff  10215 Jan 13 00:23 104_fix_station_ids.sql
+-rw-r--r--   1 sylvain  staff  13788 Dec 16 09:37 20251215_modules_catalog.sql.disabled
+-rw-r--r--   1 sylvain  staff  20138 Jan 12 22:04 999_ensure_pr001_tables_prod.sql
+-rw-r--r--   1 sylvain  staff   3091 Jan 13 00:23 deploy_d003.sh
+drwxr-xr-x  16 sylvain  staff    512 Dec 27 23:12 disabled
+drwxr-xr-x   3 sylvain  staff     96 Dec 30 19:49 fixtures
+
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/migrations/*.sql"}
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/migrations/deploy_d003.sh
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/migrations/051_create_bikes_table.sql
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/migrations/052_create_stations_table.sql
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/migrations/054_create_bookings_table.sql
+Le script `deploy_d003.sh` existe déjà. Vérifions l'état actuel de la base de données de production et déployons les migrations si nécessaire.
+[91m[1m| [0m[90m Bash     [0mCheck for veligo credentials
+
+total 8
+drwxr-xr-x    3 sylvain  staff    96 Dec 12 11:03 .
+drwxr-x---+ 224 sylvain  staff  7168 Jan 13 08:22 ..
+-rw-r--r--    1 sylvain  staff    22 Dec 12 11:03 token
+
+[94m[1m| [0m[90m Grep     [0mDATABASE_URL|DATABASE_PASSWORD
+[91m[1m| [0m[90m Bash     [0mCheck current tables in prod DB
+
+psql: error: could not translate host name "postgres" to address: nodename nor servname provided, or not known
+Connection failed
+
+[91m[1m| [0m[90m Bash     [0mCheck database connection config
+
+POSTGRES_USER=veligo
+POSTGRES_PASSWORD=3FuDzpH5wJCFpxDZp2nSJtl4J8jhPCbI
+POSTGRES_DB=veligo_db
+POSTGRES_PORT=5432
+
+[91m[1m| [0m[90m Bash     [0mCheck veligo CLI availability
+
+/Users/sylvain/.cargo/bin/veligo
+Veligo Platform CLI
+
+Usage: veligo <COMMAND>
+
+Commands:
+  cicd     
+  dns      
+  test     
+  deploy   
+  module   
+  tenant   
+  dev      
+  theme    
+  staging  
+  analyze  Architecture analysis and health checks
+  git      Git operations for submodules and main repo
+  build    Incremental build system (only changed components)
+  proto    Generate gRPC proto clients
+  nginx    Nginx configuration management
+  verify   Verification agents (Verifier + Adversary via Qwen3)
+  chaos    Chaos Engineering (Netflix-style resilience testing)
+  docker   Docker container management (dev/test environments)
+  ralph    Ralph TDD automation (cursor-agents integration)
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+
+[91m[1m| [0m[90m Bash     [0mCheck veligo deploy options
+
+Usage: veligo deploy <COMMAND>
+
+Commands:
+  azure         Deploy to Azure VM with Blue/Green strategy
+  local         Deploy locally with Docker Compose
+  rsync         Deploy to production VM using rsync (recommended)
+  blue-green    Blue/Green deployment (zero-downtime)
+  switch        Switch traffic between blue and green slots
+  status        Show deployment status (including blue/green slots)
+  rollback      Rollback to previous version
+  build-remote  Build gRPC backend remotely on VM (for GREEN slot)
+  store         Deploy store marketplace with Blue/Green
+  help          Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+
+[91m[1m| [0m[90m Bash     [0mCheck cicd pipeline options
+
+Usage: veligo cicd <COMMAND>
+
+Commands:
+  pipeline     Run complete CI/CD pipeline (test → build → deploy)
+  setup-dns    Configure DNS for all tenants
+  deploy       Deploy to Azure with blue/green strategy
+  rollback     Rollback to previous version
+  health       Health check all services
+  morning      Run morning routine (smoke tests + E2E + validations)
+  preflight    Pre-flight checks (architecture + tests + blockers)
+  arch-report  Generate architecture report
+  full         Full pipeline with module verification
+  help         Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+
+[94m[1m| [0m[90m Grep     [0mmigrate|DATABASE
+[91m[1m| [0m[90m Bash     [0mCheck deployment status
+
+╔══════════════════════════════════════════╗
+║      🚴 Veligo Platform CLI v0.1.0      ║
+╚══════════════════════════════════════════╝
+
+📊 Deployment Status
+
+Azure VM (RG-POC-CURSOR/veligo-poc-vm):
+Name           PowerState    PublicIP
+-------------  ------------  -------------
+veligo-poc-vm  VM running    4.251.107.141
+   ✓ VM Status Retrieved
+
+DNS Records & Health:
+   ✓ veligo.app - Landing Page
+   ✓ idfm.veligo.app - IDFM Tenant
+   ✓ nantes.veligo.app - Nantes Tenant
+   ✓ toulouse.veligo.app - Toulouse Tenant
+   ✓ admin.veligo.app - Admin Console
+
+[91m[1m| [0m[90m Bash     [0mCheck SSH config
+
+/Users/sylvain/.ssh/aws_git_popinz_from_server:-----BEGIN OPENSSH PRIVATE KEY-----
+/Users/sylvain/.ssh/aws_git_popinz_from_server:-----END OPENSSH PRIVATE KEY-----
+/Users/sylvain/.ssh/digitalocean_popinz:-----BEGIN OPENSSH PRIVATE KEY-----
+/Users/sylvain/.ssh/digitalocean_popinz:-----END OPENSSH PRIVATE KEY-----
+/Users/sylvain/.ssh/known_hosts.bak:62.210.131.40 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCsuygZ3WN8lsUog+Ui4SkDHbSMuAyTcRVjbca9uFVc8hiitpWyaEXvJ6nl4ao2yQzijLGZryNhE5wsCW5TtPf9Ma+0JU8ZO3wDQD6mDGdxzf/q10ooQ9/tW4lFaBrVvVBZaHcbu/uvibeWZHv/vg/34LTV99ZGwiMsDOhOakorVC40JDp6UFtJugeOdOVjU3dwbjaskowBYKW0pakVJDlkxiZagUOtbgAIG6isvkfdXs0SxsZPLeOPZ55bX+LaQ7fc1eJm8vTiZAy5IOvrywnuY3RKn2+xMHVEjKOSE9aiElfH8cP5u9U2ESwgmgbRVZf1pasRQbwNbsEMzYoAENWj
+/Users/sylvain/.ssh/known_hosts.bak:62.210.142.47 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCqkKdHzOPGspZlpH2K09r0T1RZ4mhqAEioeFi5mSE0CXEq41cO7QokOCgsUu89JXDu9rX2FdCTVulKauzd2Dz1PH5US/gPorf8aRP0ItKZJfxmyB29C0ShrTqcoX3uO3jtqUXWKvvaRWmKVodHv0dXjgEnsDpDw439NNYNw6otyBxFtxja6Zswx6Njjlz+b57ViaOc8eNIi66+OkqGgKZabSBFzVFL3NAealvAgg5Uly987/EzOwIEkycShPVlMAaLUDeboPEEzpqNMHLguhv+j/UeMrmyL9N8LCqLYoKgwRIT5KLH2D/ioa88Uk0RyOjeD8joGwt0WvHnyPwPXtND
+/Users/sylvain/.ssh/known_hosts.bak:|1|Ju9AFaeRoBpIYOLflhmz2z+XXoE=|Wsptb3n3jRuQqNv26m/XQ+omwrk= ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAtFYpyN9dw9HKGkuWd6bYp4GoAIuuRQMu/rnQESd8r1H+ZmImcVtwzvlf4okpZY9n0fMMfok9j1CB9iQiwgH+Wu16TOnvDHqUDJbMH9LaLchd+h2xWMgv6X+yOiYV0dgzZFOafH5sqd4JI5v09WpmjoHmzIL2uPfGc69/kV92X1HvoFaux2hoBBONDXSUn56hHnH4gKF3hQyMk9mJvaq/96SWkDL0RuKAtuFFHtuwfrWF5bhX2o0uyy2AESwMa5w4iHzhZNAKRcy32PcBZlqWVkNnRLK/Ekkj8YDM5AW5Vk07mAUeQ/tSZ17qJ3xWuJ+OAu/F72Yxz0Gm/rdHKZVqxQ==
+/Users/sylvain/.ssh/known_hosts.bak:192.168.1.100 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC/24mM1/pHSfExYrwNC1GXcyADMKrXiKhB2iaYsmFsyATgiqmWpdi/Bt83YeGgADdljUlMeyLrN8QyTdPOJ+RowKVgPNltVz2K51haCGmxSXFxvs4aRwg3rLEqDAJ/fCGrttH3wYquyuf5j8ZcxoAQBPyf4UJZmcElKgPRZDdRWToZB6/8pMAJoM47CuXv1D2bd6SsD6vUgh0B9cKRyIwrUvAknQlpKUXQL39r581j/uIEUP23Bdji85uJatNrHcC8QWyoSSO5Edvf+hgzZwylM2hXyGfPNrLY93xeVMZBiGjPr9+oqgXd3AnfEajmAWNt2tSzjlpg5XEHJoqN0W5Z
+/Users/sylvain/.ssh/known_hosts.bak:macaronsoftware.synology.me,176.188.224.247 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC/24mM1/pHSfExYrwNC1GXcyADMKrXiKhB2iaYsmFsyATgiqmWpdi/Bt83YeGgADdljUlMeyLrN8QyTdPOJ+RowKVgPNltVz2K51haCGmxSXFxvs4aRwg3rLEqDAJ/fCGrttH3wYquyuf5j8ZcxoAQBPyf4UJZmcElKgPRZDdRWToZB6/8pMAJoM47CuXv1D2bd6SsD6vUgh0B9cKRyIwrUvAknQlpKUXQL39r581j/uIEUP23Bdji85uJatNrHcC8QWyoSSO5Edvf+hgzZwylM2hXyGfPNrLY93xeVMZBiGjPr9+oqgXd3AnfEajmAWNt2tSzjlpg5XEHJoqN0W5Z
+/Users/sylvain/.ssh/known_hosts.bak:192.30.252.129 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.bak:[192.168.2.3]:222 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC/24mM1/pHSfExYrwNC1GXcyADMKrXiKhB2iaYsmFsyATgiqmWpdi/Bt83YeGgADdljUlMeyLrN8QyTdPOJ+RowKVgPNltVz2K51haCGmxSXFxvs4aRwg3rLEqDAJ/fCGrttH3wYquyuf5j8ZcxoAQBPyf4UJZmcElKgPRZDdRWToZB6/8pMAJoM47CuXv1D2bd6SsD6vUgh0B9cKRyIwrUvAknQlpKUXQL39r581j/uIEUP23Bdji85uJatNrHcC8QWyoSSO5Edvf+hgzZwylM2hXyGfPNrLY93xeVMZBiGjPr9+oqgXd3AnfEajmAWNt2tSzjlpg5XEHJoqN0W5Z
+/Users/sylvain/.ssh/known_hosts.bak:[192.168.3.4]:222 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC/24mM1/pHSfExYrwNC1GXcyADMKrXiKhB2iaYsmFsyATgiqmWpdi/Bt83YeGgADdljUlMeyLrN8QyTdPOJ+RowKVgPNltVz2K51haCGmxSXFxvs4aRwg3rLEqDAJ/fCGrttH3wYquyuf5j8ZcxoAQBPyf4UJZmcElKgPRZDdRWToZB6/8pMAJoM47CuXv1D2bd6SsD6vUgh0B9cKRyIwrUvAknQlpKUXQL39r581j/uIEUP23Bdji85uJatNrHcC8QWyoSSO5Edvf+hgzZwylM2hXyGfPNrLY93xeVMZBiGjPr9+oqgXd3AnfEajmAWNt2tSzjlpg5XEHJoqN0W5Z
+/Users/sylvain/.ssh/known_hosts.bak:192.30.252.131 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.bak:[192.168.5.1]:222 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC/24mM1/pHSfExYrwNC1GXcyADMKrXiKhB2iaYsmFsyATgiqmWpdi/Bt83YeGgADdljUlMeyLrN8QyTdPOJ+RowKVgPNltVz2K51haCGmxSXFxvs4aRwg3rLEqDAJ/fCGrttH3wYquyuf5j8ZcxoAQBPyf4UJZmcElKgPRZDdRWToZB6/8pMAJoM47CuXv1D2bd6SsD6vUgh0B9cKRyIwrUvAknQlpKUXQL39r581j/uIEUP23Bdji85uJatNrHcC8QWyoSSO5Edvf+hgzZwylM2hXyGfPNrLY93xeVMZBiGjPr9+oqgXd3AnfEajmAWNt2tSzjlpg5XEHJoqN0W5Z
+/Users/sylvain/.ssh/known_hosts.bak:[192.168.8.105]:222 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC/24mM1/pHSfExYrwNC1GXcyADMKrXiKhB2iaYsmFsyATgiqmWpdi/Bt83YeGgADdljUlMeyLrN8QyTdPOJ+RowKVgPNltVz2K51haCGmxSXFxvs4aRwg3rLEqDAJ/fCGrttH3wYquyuf5j8ZcxoAQBPyf4UJZmcElKgPRZDdRWToZB6/8pMAJoM47CuXv1D2bd6SsD6vUgh0B9cKRyIwrUvAknQlpKUXQL39r581j/uIEUP23Bdji85uJatNrHcC8QWyoSSO5Edvf+hgzZwylM2hXyGfPNrLY93xeVMZBiGjPr9+oqgXd3AnfEajmAWNt2tSzjlpg5XEHJoqN0W5Z
+/Users/sylvain/.ssh/known_hosts.bak:|1|ltemuDdwZp0Mvpw6/P1enYqFJdA=|0KKOCwESAtNUPr1C3COEsuLnZRQ= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCU/MptsI1SI9NoJ9GmBCub4TAEgJkKwlFVPz5RuVEYpe8aj2G67erAOMMTZoeaEbrdOCO7zHecF1kTN4O0MbYgFGkSqGuwgBq45sAv974KOYRFUwFAvS3vWKX8LiLeJRpujtcwLnLiKX8T83izzNEccvuofyH71fuEWpbyepq5O/Y6Jt0yh4gEI0rCvIUBsGz2/4pAZHqgi+B16wl2gYzEhHQfu5Oy8bnL54zXRVSl+TGaooHZCNCve0ajSKxQnWmJ5juABgHVyNApnVRVVCQm9Eo/grrxe3/rMBByH+5bxBwL+s9dMqC1EAjjrh98gKIRSBPRIJU+LQ1uh1G2pcWL
+/Users/sylvain/.ssh/known_hosts.bak:[192.168.8.102]:222 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC/24mM1/pHSfExYrwNC1GXcyADMKrXiKhB2iaYsmFsyATgiqmWpdi/Bt83YeGgADdljUlMeyLrN8QyTdPOJ+RowKVgPNltVz2K51haCGmxSXFxvs4aRwg3rLEqDAJ/fCGrttH3wYquyuf5j8ZcxoAQBPyf4UJZmcElKgPRZDdRWToZB6/8pMAJoM47CuXv1D2bd6SsD6vUgh0B9cKRyIwrUvAknQlpKUXQL39r581j/uIEUP23Bdji85uJatNrHcC8QWyoSSO5Edvf+hgzZwylM2hXyGfPNrLY93xeVMZBiGjPr9+oqgXd3AnfEajmAWNt2tSzjlpg5XEHJoqN0W5Z
+/Users/sylvain/.ssh/known_hosts.bak:sd-59259.dedibox.fr ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCqkKdHzOPGspZlpH2K09r0T1RZ4mhqAEioeFi5mSE0CXEq41cO7QokOCgsUu89JXDu9rX2FdCTVulKauzd2Dz1PH5US/gPorf8aRP0ItKZJfxmyB29C0ShrTqcoX3uO3jtqUXWKvvaRWmKVodHv0dXjgEnsDpDw439NNYNw6otyBxFtxja6Zswx6Njjlz+b57ViaOc8eNIi66+OkqGgKZabSBFzVFL3NAealvAgg5Uly987/EzOwIEkycShPVlMAaLUDeboPEEzpqNMHLguhv+j/UeMrmyL9N8LCqLYoKgwRIT5KLH2D/ioa88Uk0RyOjeD8joGwt0WvHnyPwPXtND
+/Users/sylvain/.ssh/known_hosts.bak:macaron-software.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCqkKdHzOPGspZlpH2K09r0T1RZ4mhqAEioeFi5mSE0CXEq41cO7QokOCgsUu89JXDu9rX2FdCTVulKauzd2Dz1PH5US/gPorf8aRP0ItKZJfxmyB29C0ShrTqcoX3uO3jtqUXWKvvaRWmKVodHv0dXjgEnsDpDw439NNYNw6otyBxFtxja6Zswx6Njjlz+b57ViaOc8eNIi66+OkqGgKZabSBFzVFL3NAealvAgg5Uly987/EzOwIEkycShPVlMAaLUDeboPEEzpqNMHLguhv+j/UeMrmyL9N8LCqLYoKgwRIT5KLH2D/ioa88Uk0RyOjeD8joGwt0WvHnyPwPXtND
+/Users/sylvain/.ssh/known_hosts.bak:192.30.252.122 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.bak:192.30.252.123 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.bak:192.30.252.120 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.bak:192.30.252.130 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.bak:192.30.253.113 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.bak:192.30.253.112 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.bak:git-codecommit.us-east-2.amazonaws.com,52.95.17.51 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCNbmnXfe621xtVMkrwOqf6QNIlnOKkQ01KoM6gKC4nv5T08hbGcGp6iYplGLKMLlki+auO1J3JTA3qAKDobZR1wDqtW9LC2k46GHV4YigUpd6D+YdranJqbxpGOuNd6c1EP50vQnlW9MxZYExyrZKT0UfOJAydQLoWPuSioyHk3zAltSIrCxczP3jxAhuoq++eUrdC5uF6UMNJC10eBA9XglAe2oRLzApoStyCAiKVnoBndU2NpJWqNw0K5qfEUx2vyQFfHNRAwNNRDFtkdE9ho255YECTO07Zg37QCZ+hV5VAoFRu5CHSXqVZc5YN1YXkZ8SVHyBX7krO80QaaDor
+/Users/sylvain/.ssh/known_hosts.bak:52.95.19.19 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCNbmnXfe621xtVMkrwOqf6QNIlnOKkQ01KoM6gKC4nv5T08hbGcGp6iYplGLKMLlki+auO1J3JTA3qAKDobZR1wDqtW9LC2k46GHV4YigUpd6D+YdranJqbxpGOuNd6c1EP50vQnlW9MxZYExyrZKT0UfOJAydQLoWPuSioyHk3zAltSIrCxczP3jxAhuoq++eUrdC5uF6UMNJC10eBA9XglAe2oRLzApoStyCAiKVnoBndU2NpJWqNw0K5qfEUx2vyQFfHNRAwNNRDFtkdE9ho255YECTO07Zg37QCZ+hV5VAoFRu5CHSXqVZc5YN1YXkZ8SVHyBX7krO80QaaDor
+/Users/sylvain/.ssh/known_hosts.bak:52.95.20.253 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCNbmnXfe621xtVMkrwOqf6QNIlnOKkQ01KoM6gKC4nv5T08hbGcGp6iYplGLKMLlki+auO1J3JTA3qAKDobZR1wDqtW9LC2k46GHV4YigUpd6D+YdranJqbxpGOuNd6c1EP50vQnlW9MxZYExyrZKT0UfOJAydQLoWPuSioyHk3zAltSIrCxczP3jxAhuoq++eUrdC5uF6UMNJC10eBA9XglAe2oRLzApoStyCAiKVnoBndU2NpJWqNw0K5qfEUx2vyQFfHNRAwNNRDFtkdE9ho255YECTO07Zg37QCZ+hV5VAoFRu5CHSXqVZc5YN1YXkZ8SVHyBX7krO80QaaDor
+/Users/sylvain/.ssh/known_hosts.bak:140.82.118.4 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.bak:git-codecommit.eu-west-3.amazonaws.com,52.46.72.25 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCsjwNVTN7+O/spjgxjsKIiFqALqw3NrXVHPFEgsmSfy5XdAUx+AR9HKOy/YBnwnxQFTSY+zQfF6LA+9HNMhk3c/N7zdBAhSQv4LFTeMFHDqUJO4wrjptLkDEGbPvdfgKeht4nYkuAOALmiO8G8asVgy1KZ6N+nWnWWe6t/gipVdA0iTGCsvt86o2vvl2wzisObvVdGDP2bApyLjSfPIaCd244MTHK4MFN+fs1WuD20N8flHtI8n22OkpYkGC8SuupVTKuqbQ5VGoBo6wxHyINuI1w1UFcKM4MZsJhxiVHXnU16oaTJpZ7vfjhSKNETp11IvILT36Jgr8tzCH1nz12Z
+/Users/sylvain/.ssh/known_hosts.bak:52.46.65.40 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCsjwNVTN7+O/spjgxjsKIiFqALqw3NrXVHPFEgsmSfy5XdAUx+AR9HKOy/YBnwnxQFTSY+zQfF6LA+9HNMhk3c/N7zdBAhSQv4LFTeMFHDqUJO4wrjptLkDEGbPvdfgKeht4nYkuAOALmiO8G8asVgy1KZ6N+nWnWWe6t/gipVdA0iTGCsvt86o2vvl2wzisObvVdGDP2bApyLjSfPIaCd244MTHK4MFN+fs1WuD20N8flHtI8n22OkpYkGC8SuupVTKuqbQ5VGoBo6wxHyINuI1w1UFcKM4MZsJhxiVHXnU16oaTJpZ7vfjhSKNETp11IvILT36Jgr8tzCH1nz12Z
+/Users/sylvain/.ssh/known_hosts.bak:52.46.68.26 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCsjwNVTN7+O/spjgxjsKIiFqALqw3NrXVHPFEgsmSfy5XdAUx+AR9HKOy/YBnwnxQFTSY+zQfF6LA+9HNMhk3c/N7zdBAhSQv4LFTeMFHDqUJO4wrjptLkDEGbPvdfgKeht4nYkuAOALmiO8G8asVgy1KZ6N+nWnWWe6t/gipVdA0iTGCsvt86o2vvl2wzisObvVdGDP2bApyLjSfPIaCd244MTHK4MFN+fs1WuD20N8flHtI8n22OkpYkGC8SuupVTKuqbQ5VGoBo6wxHyINuI1w1UFcKM4MZsJhxiVHXnU16oaTJpZ7vfjhSKNETp11IvILT36Jgr8tzCH1nz12Z
+/Users/sylvain/.ssh/known_hosts.bak:[192.168.8.11]:222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIu+z9nwzAsDKgZ6dc4NFGWqilNJnfJPgHtYtKKyEl8y
+/Users/sylvain/.ssh/known_hosts.bak:64:ff9b::345f:1133 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCNbmnXfe621xtVMkrwOqf6QNIlnOKkQ01KoM6gKC4nv5T08hbGcGp6iYplGLKMLlki+auO1J3JTA3qAKDobZR1wDqtW9LC2k46GHV4YigUpd6D+YdranJqbxpGOuNd6c1EP50vQnlW9MxZYExyrZKT0UfOJAydQLoWPuSioyHk3zAltSIrCxczP3jxAhuoq++eUrdC5uF6UMNJC10eBA9XglAe2oRLzApoStyCAiKVnoBndU2NpJWqNw0K5qfEUx2vyQFfHNRAwNNRDFtkdE9ho255YECTO07Zg37QCZ+hV5VAoFRu5CHSXqVZc5YN1YXkZ8SVHyBX7krO80QaaDor
+/Users/sylvain/.ssh/known_hosts.bak:165.22.21.21 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCfJd2GDf4LnXkQ/JcMpRzp+rbfvPGEZsarFKGRmWj0HSElDEBshreIa6auSoce3HQWSDOwuLR9HMUw1Ug7+bEuuuPgwlDq0b4ErlSlXFRBHq6kajcO566GmehQRg6ndv5XmlgNKfJZyQjOQDj9DdZqe53whJKFZinjnOZyrb/2UIj4koQfq4kftY8J5H9z+7w4XVJLJ8Xr0Qqlr7akYclWe1SJsCmK1g+zGVMSwnOZdXOiobbylzJVyOcD+/ZJ1D3T7gnKkAtQjlUEQwJdEYLphEkDJ2NT8wk1YbdQCsLvqz2Ki7vUZNOMHaR7u79t2jqzJH5D2XnM+j/yFCIlCZpH
+/Users/sylvain/.ssh/known_hosts.bak:140.82.118.3 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.bak:digitalocean ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOixkpIQ+kKOvJyE7EfhmhuTmxWkvndIZRuwuahNtsHe
+/Users/sylvain/.ssh/known_hosts.bak:165.22.21.21 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOixkpIQ+kKOvJyE7EfhmhuTmxWkvndIZRuwuahNtsHe
+/Users/sylvain/.ssh/known_hosts.bak:avogel-ecommerce-prod1.codein.fr ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFsZiaQZU3AcqknBhjftgtVDRSHXgMBnoKnd/3jyqZT9
+/Users/sylvain/.ssh/known_hosts.bak:avogel-ecommerce-prod1.codein.fr ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCz4G7xur4ISiAF1NpZ3SMjr/tXSX93i4wzMNMcICTOIjwZOvq2Z29oKUYTbRR4Q4NhBURhBJcmSeKpIzcSsoc/DviSFedhXR7vvgK0Eq8eJf3MUO3FAkAbZIgoXEqq8+uCTbGn8sKEyX8pW0f2jFcXUM0y5F0I91ckWSNEwScn+oZ9Eiu46Q/ntjqkdl89C3fuyLX6sGapR3JjzK2TZaVXtZYN/LgW5ba5MpqBLDqsCxXc0bV9mmMBcsXWOHvrOtkOxCCN/M8cT4mZ26KZPioVMwOu6edRdc568c/LzhuSFUbyLqU+n+MVA1a/e1boKN4aDcFO2wkWdRTMgHlc3vjd
+/Users/sylvain/.ssh/known_hosts.bak:gitlab.macaron-software.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOixkpIQ+kKOvJyE7EfhmhuTmxWkvndIZRuwuahNtsHe
+/Users/sylvain/.ssh/known_hosts.bak:avogel-ecommerce-preprod1.codein.fr ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMeN/Jem3dyHVhn3WeqL9XzyFgMGBXVAjoV7f4CHqN65
+/Users/sylvain/.ssh/known_hosts.bak:164.92.174.253 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC35LjBp7GMlx+SvbRmdaOxzM1OyRPobGnppq3QYHbSI
+/Users/sylvain/.ssh/known_hosts.bak:161.35.193.159 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH/V91gmc4LXqQjhT059kEMFsBXGCy5dIAPaGdAcDrcA
+/Users/sylvain/.ssh/known_hosts.bak:104.248.32.93 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBlNQ5+6EirOzdFGfDtT9Wx4JfhUYy51ztMuJfJdTYyL
+/Users/sylvain/.ssh/known_hosts.bak:104.248.32.93 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID9F+o00wYx1bd2aTntawM0bwF3kN0+AwZ+biYRS3MuO
+/Users/sylvain/.ssh/known_hosts.bak:192.168.1.77 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJexdX97NFMxTHHq+Kzw0YGJa5llhJaChT9ZgEUZoRYF
+/Users/sylvain/.ssh/known_hosts.bak:192.168.1.198 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIGo4EYUDxTZj7m2AonXAATOReatfcTG4fv5h/+aW4hs
+/Users/sylvain/.ssh/known_hosts.bak:pi4.local ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJuEqzUBsYnL71xHxNXyJD4k6qbN+edwY7D9s1PMoKNE
+/Users/sylvain/.ssh/known_hosts.bak:pi4.local ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC1AYQcLbbugXTBXx/zXN5G0rhF/a1jFyGnw+krGspPzPwjqC204IC1Eni/XEVDkPWBFUvjwNoGVuDNDDUZpllc/bSAApRJ6llzqjnAZ0mR1ScHfvG83cRDOecx2cS4FBArsyUPLk7wEwVWQoUqDnuLaF7Asb/p72dsKCMSQO4F0FQzy7TKpMooYtnY5hz8dMzUFH/c3cCc/m/jtFbRUT4qiDiAWBRxOvpY3hOvu0axMTvom7T1Lj0+5IVm0DtpiJWk4eF8LafU5XaWJSSvHDtTX/suLYfVO5X3ngnVzWf0Wm/RVH6Zjd3clgFWttFRzpiF6kmom7soCc0sjZXp+hAkd+lmTukt8Wtmq2hIAGUj4fFpuFByyKLkfuUphQ5fch923LIfZ9bDavP8nYzvrHoz0j6ou8CDe9hxmRdrE493CBAL+9f063bWw7c3kJl+PBESxpahMcQ8I6rpqzCnys+LD2oT9f4utjpzDH8rpw4rUHDqXPNF0K9KmRtFnCnt1ik=
+/Users/sylvain/.ssh/known_hosts.bak:192.168.1.9 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJuEqzUBsYnL71xHxNXyJD4k6qbN+edwY7D9s1PMoKNE
+/Users/sylvain/.ssh/known_hosts.bak:homeassistant.macaron-software.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJuEqzUBsYnL71xHxNXyJD4k6qbN+edwY7D9s1PMoKNE
+/Users/sylvain/.ssh/known_hosts.bak:192.168.1.8 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJuEqzUBsYnL71xHxNXyJD4k6qbN+edwY7D9s1PMoKNE
+/Users/sylvain/.ssh/known_hosts.bak:github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+/Users/sylvain/.ssh/known_hosts.bak:github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+/Users/sylvain/.ssh/known_hosts.bak:192.168.1.111 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJuEqzUBsYnL71xHxNXyJD4k6qbN+edwY7D9s1PMoKNE
+/Users/sylvain/.ssh/known_hosts.bak:165.232.117.159 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDaXLilJ1vxXcaPP8fYlxViVvv9G330S7gEnUPs3Qb3B
+/Users/sylvain/.ssh/known_hosts.bak:www.avogel-ecommerce-prod1.codein.fr ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFsZiaQZU3AcqknBhjftgtVDRSHXgMBnoKnd/3jyqZT9
+/Users/sylvain/.ssh/known_hosts.bak:209.38.236.206 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC5woAiexYEaHAccTpiodogW6PDEm6GrH6F9X4SC999H
+/Users/sylvain/.ssh/known_hosts.bak:209.38.236.206 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCiicg9bMTfsrlsw4GeWiz9GESVFo0KecSjNuGUYSo68a0VIkRXq1SLS42gQ5zDiftBG6rFw3xU+FjiR4RDYzR4R80HOqIUAM5Z3FublB6QhTjzouLaEGybjbImIr8Tpvr47if+2usTW+qsZu0CVqHL2SO3Rok7SB6VAh4MDOsvmJH1Bn6MSMn4soaE0ZkHrxeN/VPfKMyJqUFu/eRkaOEyMa/3dw3g+fMeQAXc/cQkC/LqbqWbnvz+rpBwDQONeSSB/EAjdVotUweRwwkXkMy72tbqe/JqsdFrgYdhIMz5mZzRqlGExUHw7QEZCiS4Y6/SUdQprWlPWaY6f13l3eUdu4p4/HlIpzFpfs2lO0q16/8g/wAdVwt6Unl9xC9XOla4aVFpuFTR0H3p9EeW+rMKNu3FyV9IFrkVfim1udtjFvwcLNjE5vbYuVsBWUcgiLI1VPEYh4StRbJUbVosG5l4PLqebY8TAegKaYoxRWBM/umR82Hu4ZYk237MMerjJ9k=
+/Users/sylvain/.ssh/known_hosts.bak:# popi.nz:22 SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u7
+/Users/sylvain/.ssh/known_hosts.bak:# popi.nz:22 SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u7
+/Users/sylvain/.ssh/known_hosts.bak:# popi.nz:22 SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u7
+/Users/sylvain/.ssh/known_hosts.bak:# popi.nz:22 SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u7
+/Users/sylvain/.ssh/known_hosts.bak:# popi.nz:22 SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u7
+/Users/sylvain/.ssh/known_hosts.bak:# 188.166.21.111:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+/Users/sylvain/.ssh/known_hosts.bak:# 188.166.21.111:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+/Users/sylvain/.ssh/known_hosts.bak:|1|oShdDRiQM46mCkiCh68bjLKegec=|MyLVJMpvEX4BkJIQX56koW8DM7U= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDdja79sHH4kuNRWT1RM/Ib2yeD5DOb6RsOnXYBApL1+A5qi5NPYOCejvUjwByX6pArAQuuAXt1LcvW0aaNR2tSZbHyxaKs//6rUFcSA+rYfIymKSDrt6QO2WhAG+t4zaP2mKUdipufsKSPg01epEcQlpGHN8XgFdIN3kvivcBkXjmuYVVhicxhyNU1JI0hKxK9kHO3Ab2SaJ6OK6CI7IbHMdYDDh/Caw3JYmfqIBm84wpY6NdE/WU2iQ8olZ09khxxmb/3XVd9r5CK6YVhRu5IRBMQtzL8QJZ1lAecDjVWicmwtHPyzDIvAE01+7nc49UqxSzy+ZKa+RFFpot1B/+tZwE41wEM9PDRvL2OxFkvECuoWt4Ouu5hvh27bB9XmSFt0JQcFyvNHFR9+izHo2DTt+boDovM4c31GTWlOZnZ2wKksHW+y0U4EGxHpzC2hKKpZ55wTURmZ8Hc7r9Pk8ta2qrIDG2fd7ivdYVjp7bSt5zjNnMZ6KlfpT37gNi/q6M=
+/Users/sylvain/.ssh/known_hosts.bak:# 188.166.21.111:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+/Users/sylvain/.ssh/known_hosts.bak:|1|ODvxbkfc/bbcxJPVIMPBVnVG7Nk=|uhptu2GTTd7mU5N7vSgtG3cihhc= ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKQeKS+3zUNgYrpJa2MC0bZ+AacxcttWL84o73+8lUpY
+/Users/sylvain/.ssh/known_hosts.bak:# 188.166.21.111:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+/Users/sylvain/.ssh/known_hosts.bak:# 188.166.21.111:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+/Users/sylvain/.ssh/known_hosts.bak:162.19.254.51 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINvh9R+DHRfd8zNZ1PCJkA0Ulxl5X5hyDs5cT5IYqowv
+/Users/sylvain/.ssh/known_hosts.bak:51.38.224.228 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIILsYgJcyk91dDDsncTdcwVw+NNaU9GNPK7E4sI/WOOJ
+/Users/sylvain/.ssh/known_hosts.bak:51.38.224.228 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDkDpgkPEfDcyhgovkyANeVECtaAPfE4FW0Oiok6E/HDyQeYrjzOY0TLGSCs4XIMkb80ikFGIZXu7Iczq/cvWvBJMHkYZg/cFXhP+f7MIplKVU0tqzugGUNfAb8vOKoDY0e2CraQC6C5YZ9PVXM3meKWeX0J92iSSerEm+QTmeyNbSCFUZlPH4JiMpfynrzk4VzKcD78P/k3rvY/xqRs/kai0t56pqmt7oV/w4KwVVNqFvjKEeD7y3TKWXYQBXoEN1x4Hi1JiUCrSBOFJ8KQSQouMSFwOs9WnZ6zMmHXuxNbtEMa+s3FpBETQClq7h+T10MR5/XKvH4RLVEJFTCsVR5T2XG8LLBQOwpSIx/7jmhG7AbClAUEU5WnHhfyM0TUShmL6S4bMk2j549yeFGHFQV6eCdGqIs04ag+gQMEJcgwT34vF4WDwZwRzct3j/DtfBs320f0eNsehN0khenjEgAGLdcoHwU+jdEr0RWcz/vvdFsjzmh0WEs2RdE0U/uwpU=
+/Users/sylvain/.ssh/known_hosts.bak:167.99.80.175 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMTy/DBdP3ZQbRbOMCuEBo34rvCNtu4L0X3Zb91sW6Qg
+/Users/sylvain/.ssh/known_hosts.bak:popi.nz ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIILsYgJcyk91dDDsncTdcwVw+NNaU9GNPK7E4sI/WOOJ
+/Users/sylvain/.ssh/known_hosts.bak:# 51.210.97.182:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.14
+/Users/sylvain/.ssh/known_hosts.bak:|1|52txhrci9fTtk1BEAC/70j7CV6g=|lVIS/YyBKTjWIEZT3l3nd5Jlb00= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDOGayGbdXmTBlgP8+iabC5kmNsXc83hMoFYOMt9rMCIeMWOJf+OOH/pMqJK4k+7rBV9B3zY5TbRUkLA+RbbzKr3LuMINWedCGD9NPVBhegGQ6el0HIjG9cFfH3BKVCoNDkZLXe3r98k3KK5KUs3rLZbvc8LbvFoaBptCuA8ymj5u8bQrH9cWUFWGMRD/JuHJWPfoCOO/nBqJu5BSDNSOuN0qdkjzmcnSZlzG5omgYGko3pedq4sfugIZcp7lle89F+STvnCs2svLLfUgOWpoW6JACT7f4D0jhpv5D7sZOkXhgkHjpyhNk62sVjGLbjUpVDdlMr/WMgA5Q7MaKkRTO97dUyblpIKgvlJhf+LzwYcnTHrl7c0S2uBSGLNlsCL08e7kkIpnqBhuGmDeOkrtPLa8uOTAchEdHRKle4I5ggOVlkFIRR89sH9A7gpiU+C77mX4pNEoY6SzoL8yEz49zzanLRbqWMjhi3G0mq4fw7qdDAT5gsR9s9g4b/7lXGimU=
+/Users/sylvain/.ssh/known_hosts.bak:# 51.210.97.182:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.14
+/Users/sylvain/.ssh/known_hosts.bak:# 51.210.97.182:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.14
+/Users/sylvain/.ssh/known_hosts.bak:|1|WP0EtkpTN5/UA3lXj47NKnIGqtA=|Mbt5VEfvJFQ0tgjaj3opx3HCLQg= ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO3OoAwbDTsb7oALwbNKl0fvZ7UFMhHGI1xQ4aLL9vYb
+/Users/sylvain/.ssh/known_hosts.bak:# 51.210.97.182:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.14
+/Users/sylvain/.ssh/known_hosts.bak:# 51.210.97.182:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.14
+/Users/sylvain/.ssh/known_hosts.bak:4.251.107.141 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINhsBifaViHC3HsWqRjDT6S5TS62kxAgocwzYiuNzYqj
+/Users/sylvain/.ssh/known_hosts.bak:4.251.107.141 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDQTiRotDZa/jsl7TM6GXQJ39FAb5SCK3h92qp58kjlp5LinmhlcmOTsjlPy2VxyyM5h2pKzZTgWqafdQhqQMZfuj0Ozm8VN4ozdbQ6k+oMfpbeI/VnMwNNm3589aw1qCxppAHeoyCW1c0l9vkkqRXaIypgHu+NhNJLBm9Y7+RavUdVjuc8e+lEm0gmw9S78oHeDj813a1Em9eiPpKLmoZjUHB3uABgpm6+JG8bwss8BLf1CKUEXEIaJkNaxLcgCP1BiO0ZP8oIEwEt4EH3LnhNPNPCkeabMT5fT+UMHDpNpLHY304SkXzjpl3A2uA6z5bKh93mgl/jhHxW1KkydCzFdkzfMbIstdoUTUE+FnwrTTrkpA5qQag5XDEuSCH2d/2Qu0cOBQQhBGP+Kctk0mBik5g8BYmMQFJmQBPIdh8guqYqWnR/JCMhx9BXVJyELQlgGS3UOntW0oqeLipzRWDeF0lQqP1r0rJh+umX1iGbr3Raqz4Q75tWW8jCegRb1ok=
+/Users/sylvain/.ssh/known_hosts.bak:4.251.107.141 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBFOtrDwrFL5znT73mgtyohwX+cq9LbfhGLKY05QNeJQdznKBGujXlMEJpTCnOaa9Ui93YlRXBrNgRAXgh9x/nL0=
+/Users/sylvain/.ssh/id_ed25519:-----BEGIN OPENSSH PRIVATE KEY-----
+/Users/sylvain/.ssh/id_ed25519:-----END OPENSSH PRIVATE KEY-----
+/Users/sylvain/.ssh/config.backup:    IdentityFile ~/.ssh/id_ed25519_ovh_ab_testing
+/Users/sylvain/.ssh/config.backup:  IdentityFile ~/.ssh/aws_codecommit_popinz
+/Users/sylvain/.ssh/known_hosts.old:62.210.131.40 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCsuygZ3WN8lsUog+Ui4SkDHbSMuAyTcRVjbca9uFVc8hiitpWyaEXvJ6nl4ao2yQzijLGZryNhE5wsCW5TtPf9Ma+0JU8ZO3wDQD6mDGdxzf/q10ooQ9/tW4lFaBrVvVBZaHcbu/uvibeWZHv/vg/34LTV99ZGwiMsDOhOakorVC40JDp6UFtJugeOdOVjU3dwbjaskowBYKW0pakVJDlkxiZagUOtbgAIG6isvkfdXs0SxsZPLeOPZ55bX+LaQ7fc1eJm8vTiZAy5IOvrywnuY3RKn2+xMHVEjKOSE9aiElfH8cP5u9U2ESwgmgbRVZf1pasRQbwNbsEMzYoAENWj
+/Users/sylvain/.ssh/known_hosts.old:62.210.142.47 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCqkKdHzOPGspZlpH2K09r0T1RZ4mhqAEioeFi5mSE0CXEq41cO7QokOCgsUu89JXDu9rX2FdCTVulKauzd2Dz1PH5US/gPorf8aRP0ItKZJfxmyB29C0ShrTqcoX3uO3jtqUXWKvvaRWmKVodHv0dXjgEnsDpDw439NNYNw6otyBxFtxja6Zswx6Njjlz+b57ViaOc8eNIi66+OkqGgKZabSBFzVFL3NAealvAgg5Uly987/EzOwIEkycShPVlMAaLUDeboPEEzpqNMHLguhv+j/UeMrmyL9N8LCqLYoKgwRIT5KLH2D/ioa88Uk0RyOjeD8joGwt0WvHnyPwPXtND
+/Users/sylvain/.ssh/known_hosts.old:|1|Ju9AFaeRoBpIYOLflhmz2z+XXoE=|Wsptb3n3jRuQqNv26m/XQ+omwrk= ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAtFYpyN9dw9HKGkuWd6bYp4GoAIuuRQMu/rnQESd8r1H+ZmImcVtwzvlf4okpZY9n0fMMfok9j1CB9iQiwgH+Wu16TOnvDHqUDJbMH9LaLchd+h2xWMgv6X+yOiYV0dgzZFOafH5sqd4JI5v09WpmjoHmzIL2uPfGc69/kV92X1HvoFaux2hoBBONDXSUn56hHnH4gKF3hQyMk9mJvaq/96SWkDL0RuKAtuFFHtuwfrWF5bhX2o0uyy2AESwMa5w4iHzhZNAKRcy32PcBZlqWVkNnRLK/Ekkj8YDM5AW5Vk07mAUeQ/tSZ17qJ3xWuJ+OAu/F72Yxz0Gm/rdHKZVqxQ==
+/Users/sylvain/.ssh/known_hosts.old:192.168.1.100 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC/24mM1/pHSfExYrwNC1GXcyADMKrXiKhB2iaYsmFsyATgiqmWpdi/Bt83YeGgADdljUlMeyLrN8QyTdPOJ+RowKVgPNltVz2K51haCGmxSXFxvs4aRwg3rLEqDAJ/fCGrttH3wYquyuf5j8ZcxoAQBPyf4UJZmcElKgPRZDdRWToZB6/8pMAJoM47CuXv1D2bd6SsD6vUgh0B9cKRyIwrUvAknQlpKUXQL39r581j/uIEUP23Bdji85uJatNrHcC8QWyoSSO5Edvf+hgzZwylM2hXyGfPNrLY93xeVMZBiGjPr9+oqgXd3AnfEajmAWNt2tSzjlpg5XEHJoqN0W5Z
+/Users/sylvain/.ssh/known_hosts.old:macaronsoftware.synology.me,176.188.224.247 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC/24mM1/pHSfExYrwNC1GXcyADMKrXiKhB2iaYsmFsyATgiqmWpdi/Bt83YeGgADdljUlMeyLrN8QyTdPOJ+RowKVgPNltVz2K51haCGmxSXFxvs4aRwg3rLEqDAJ/fCGrttH3wYquyuf5j8ZcxoAQBPyf4UJZmcElKgPRZDdRWToZB6/8pMAJoM47CuXv1D2bd6SsD6vUgh0B9cKRyIwrUvAknQlpKUXQL39r581j/uIEUP23Bdji85uJatNrHcC8QWyoSSO5Edvf+hgzZwylM2hXyGfPNrLY93xeVMZBiGjPr9+oqgXd3AnfEajmAWNt2tSzjlpg5XEHJoqN0W5Z
+/Users/sylvain/.ssh/known_hosts.old:192.30.252.129 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.old:[192.168.2.3]:222 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC/24mM1/pHSfExYrwNC1GXcyADMKrXiKhB2iaYsmFsyATgiqmWpdi/Bt83YeGgADdljUlMeyLrN8QyTdPOJ+RowKVgPNltVz2K51haCGmxSXFxvs4aRwg3rLEqDAJ/fCGrttH3wYquyuf5j8ZcxoAQBPyf4UJZmcElKgPRZDdRWToZB6/8pMAJoM47CuXv1D2bd6SsD6vUgh0B9cKRyIwrUvAknQlpKUXQL39r581j/uIEUP23Bdji85uJatNrHcC8QWyoSSO5Edvf+hgzZwylM2hXyGfPNrLY93xeVMZBiGjPr9+oqgXd3AnfEajmAWNt2tSzjlpg5XEHJoqN0W5Z
+/Users/sylvain/.ssh/known_hosts.old:[192.168.3.4]:222 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC/24mM1/pHSfExYrwNC1GXcyADMKrXiKhB2iaYsmFsyATgiqmWpdi/Bt83YeGgADdljUlMeyLrN8QyTdPOJ+RowKVgPNltVz2K51haCGmxSXFxvs4aRwg3rLEqDAJ/fCGrttH3wYquyuf5j8ZcxoAQBPyf4UJZmcElKgPRZDdRWToZB6/8pMAJoM47CuXv1D2bd6SsD6vUgh0B9cKRyIwrUvAknQlpKUXQL39r581j/uIEUP23Bdji85uJatNrHcC8QWyoSSO5Edvf+hgzZwylM2hXyGfPNrLY93xeVMZBiGjPr9+oqgXd3AnfEajmAWNt2tSzjlpg5XEHJoqN0W5Z
+/Users/sylvain/.ssh/known_hosts.old:192.30.252.131 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.old:[192.168.5.1]:222 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC/24mM1/pHSfExYrwNC1GXcyADMKrXiKhB2iaYsmFsyATgiqmWpdi/Bt83YeGgADdljUlMeyLrN8QyTdPOJ+RowKVgPNltVz2K51haCGmxSXFxvs4aRwg3rLEqDAJ/fCGrttH3wYquyuf5j8ZcxoAQBPyf4UJZmcElKgPRZDdRWToZB6/8pMAJoM47CuXv1D2bd6SsD6vUgh0B9cKRyIwrUvAknQlpKUXQL39r581j/uIEUP23Bdji85uJatNrHcC8QWyoSSO5Edvf+hgzZwylM2hXyGfPNrLY93xeVMZBiGjPr9+oqgXd3AnfEajmAWNt2tSzjlpg5XEHJoqN0W5Z
+/Users/sylvain/.ssh/known_hosts.old:[192.168.8.105]:222 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC/24mM1/pHSfExYrwNC1GXcyADMKrXiKhB2iaYsmFsyATgiqmWpdi/Bt83YeGgADdljUlMeyLrN8QyTdPOJ+RowKVgPNltVz2K51haCGmxSXFxvs4aRwg3rLEqDAJ/fCGrttH3wYquyuf5j8ZcxoAQBPyf4UJZmcElKgPRZDdRWToZB6/8pMAJoM47CuXv1D2bd6SsD6vUgh0B9cKRyIwrUvAknQlpKUXQL39r581j/uIEUP23Bdji85uJatNrHcC8QWyoSSO5Edvf+hgzZwylM2hXyGfPNrLY93xeVMZBiGjPr9+oqgXd3AnfEajmAWNt2tSzjlpg5XEHJoqN0W5Z
+/Users/sylvain/.ssh/known_hosts.old:|1|ltemuDdwZp0Mvpw6/P1enYqFJdA=|0KKOCwESAtNUPr1C3COEsuLnZRQ= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCU/MptsI1SI9NoJ9GmBCub4TAEgJkKwlFVPz5RuVEYpe8aj2G67erAOMMTZoeaEbrdOCO7zHecF1kTN4O0MbYgFGkSqGuwgBq45sAv974KOYRFUwFAvS3vWKX8LiLeJRpujtcwLnLiKX8T83izzNEccvuofyH71fuEWpbyepq5O/Y6Jt0yh4gEI0rCvIUBsGz2/4pAZHqgi+B16wl2gYzEhHQfu5Oy8bnL54zXRVSl+TGaooHZCNCve0ajSKxQnWmJ5juABgHVyNApnVRVVCQm9Eo/grrxe3/rMBByH+5bxBwL+s9dMqC1EAjjrh98gKIRSBPRIJU+LQ1uh1G2pcWL
+/Users/sylvain/.ssh/known_hosts.old:[192.168.8.102]:222 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC/24mM1/pHSfExYrwNC1GXcyADMKrXiKhB2iaYsmFsyATgiqmWpdi/Bt83YeGgADdljUlMeyLrN8QyTdPOJ+RowKVgPNltVz2K51haCGmxSXFxvs4aRwg3rLEqDAJ/fCGrttH3wYquyuf5j8ZcxoAQBPyf4UJZmcElKgPRZDdRWToZB6/8pMAJoM47CuXv1D2bd6SsD6vUgh0B9cKRyIwrUvAknQlpKUXQL39r581j/uIEUP23Bdji85uJatNrHcC8QWyoSSO5Edvf+hgzZwylM2hXyGfPNrLY93xeVMZBiGjPr9+oqgXd3AnfEajmAWNt2tSzjlpg5XEHJoqN0W5Z
+/Users/sylvain/.ssh/known_hosts.old:sd-59259.dedibox.fr ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCqkKdHzOPGspZlpH2K09r0T1RZ4mhqAEioeFi5mSE0CXEq41cO7QokOCgsUu89JXDu9rX2FdCTVulKauzd2Dz1PH5US/gPorf8aRP0ItKZJfxmyB29C0ShrTqcoX3uO3jtqUXWKvvaRWmKVodHv0dXjgEnsDpDw439NNYNw6otyBxFtxja6Zswx6Njjlz+b57ViaOc8eNIi66+OkqGgKZabSBFzVFL3NAealvAgg5Uly987/EzOwIEkycShPVlMAaLUDeboPEEzpqNMHLguhv+j/UeMrmyL9N8LCqLYoKgwRIT5KLH2D/ioa88Uk0RyOjeD8joGwt0WvHnyPwPXtND
+/Users/sylvain/.ssh/known_hosts.old:macaron-software.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCqkKdHzOPGspZlpH2K09r0T1RZ4mhqAEioeFi5mSE0CXEq41cO7QokOCgsUu89JXDu9rX2FdCTVulKauzd2Dz1PH5US/gPorf8aRP0ItKZJfxmyB29C0ShrTqcoX3uO3jtqUXWKvvaRWmKVodHv0dXjgEnsDpDw439NNYNw6otyBxFtxja6Zswx6Njjlz+b57ViaOc8eNIi66+OkqGgKZabSBFzVFL3NAealvAgg5Uly987/EzOwIEkycShPVlMAaLUDeboPEEzpqNMHLguhv+j/UeMrmyL9N8LCqLYoKgwRIT5KLH2D/ioa88Uk0RyOjeD8joGwt0WvHnyPwPXtND
+/Users/sylvain/.ssh/known_hosts.old:192.30.252.122 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.old:192.30.252.123 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.old:192.30.252.120 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.old:192.30.252.130 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.old:192.30.253.113 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.old:192.30.253.112 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.old:git-codecommit.us-east-2.amazonaws.com,52.95.17.51 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCNbmnXfe621xtVMkrwOqf6QNIlnOKkQ01KoM6gKC4nv5T08hbGcGp6iYplGLKMLlki+auO1J3JTA3qAKDobZR1wDqtW9LC2k46GHV4YigUpd6D+YdranJqbxpGOuNd6c1EP50vQnlW9MxZYExyrZKT0UfOJAydQLoWPuSioyHk3zAltSIrCxczP3jxAhuoq++eUrdC5uF6UMNJC10eBA9XglAe2oRLzApoStyCAiKVnoBndU2NpJWqNw0K5qfEUx2vyQFfHNRAwNNRDFtkdE9ho255YECTO07Zg37QCZ+hV5VAoFRu5CHSXqVZc5YN1YXkZ8SVHyBX7krO80QaaDor
+/Users/sylvain/.ssh/known_hosts.old:52.95.19.19 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCNbmnXfe621xtVMkrwOqf6QNIlnOKkQ01KoM6gKC4nv5T08hbGcGp6iYplGLKMLlki+auO1J3JTA3qAKDobZR1wDqtW9LC2k46GHV4YigUpd6D+YdranJqbxpGOuNd6c1EP50vQnlW9MxZYExyrZKT0UfOJAydQLoWPuSioyHk3zAltSIrCxczP3jxAhuoq++eUrdC5uF6UMNJC10eBA9XglAe2oRLzApoStyCAiKVnoBndU2NpJWqNw0K5qfEUx2vyQFfHNRAwNNRDFtkdE9ho255YECTO07Zg37QCZ+hV5VAoFRu5CHSXqVZc5YN1YXkZ8SVHyBX7krO80QaaDor
+/Users/sylvain/.ssh/known_hosts.old:52.95.20.253 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCNbmnXfe621xtVMkrwOqf6QNIlnOKkQ01KoM6gKC4nv5T08hbGcGp6iYplGLKMLlki+auO1J3JTA3qAKDobZR1wDqtW9LC2k46GHV4YigUpd6D+YdranJqbxpGOuNd6c1EP50vQnlW9MxZYExyrZKT0UfOJAydQLoWPuSioyHk3zAltSIrCxczP3jxAhuoq++eUrdC5uF6UMNJC10eBA9XglAe2oRLzApoStyCAiKVnoBndU2NpJWqNw0K5qfEUx2vyQFfHNRAwNNRDFtkdE9ho255YECTO07Zg37QCZ+hV5VAoFRu5CHSXqVZc5YN1YXkZ8SVHyBX7krO80QaaDor
+/Users/sylvain/.ssh/known_hosts.old:140.82.118.4 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.old:git-codecommit.eu-west-3.amazonaws.com,52.46.72.25 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCsjwNVTN7+O/spjgxjsKIiFqALqw3NrXVHPFEgsmSfy5XdAUx+AR9HKOy/YBnwnxQFTSY+zQfF6LA+9HNMhk3c/N7zdBAhSQv4LFTeMFHDqUJO4wrjptLkDEGbPvdfgKeht4nYkuAOALmiO8G8asVgy1KZ6N+nWnWWe6t/gipVdA0iTGCsvt86o2vvl2wzisObvVdGDP2bApyLjSfPIaCd244MTHK4MFN+fs1WuD20N8flHtI8n22OkpYkGC8SuupVTKuqbQ5VGoBo6wxHyINuI1w1UFcKM4MZsJhxiVHXnU16oaTJpZ7vfjhSKNETp11IvILT36Jgr8tzCH1nz12Z
+/Users/sylvain/.ssh/known_hosts.old:52.46.65.40 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCsjwNVTN7+O/spjgxjsKIiFqALqw3NrXVHPFEgsmSfy5XdAUx+AR9HKOy/YBnwnxQFTSY+zQfF6LA+9HNMhk3c/N7zdBAhSQv4LFTeMFHDqUJO4wrjptLkDEGbPvdfgKeht4nYkuAOALmiO8G8asVgy1KZ6N+nWnWWe6t/gipVdA0iTGCsvt86o2vvl2wzisObvVdGDP2bApyLjSfPIaCd244MTHK4MFN+fs1WuD20N8flHtI8n22OkpYkGC8SuupVTKuqbQ5VGoBo6wxHyINuI1w1UFcKM4MZsJhxiVHXnU16oaTJpZ7vfjhSKNETp11IvILT36Jgr8tzCH1nz12Z
+/Users/sylvain/.ssh/known_hosts.old:52.46.68.26 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCsjwNVTN7+O/spjgxjsKIiFqALqw3NrXVHPFEgsmSfy5XdAUx+AR9HKOy/YBnwnxQFTSY+zQfF6LA+9HNMhk3c/N7zdBAhSQv4LFTeMFHDqUJO4wrjptLkDEGbPvdfgKeht4nYkuAOALmiO8G8asVgy1KZ6N+nWnWWe6t/gipVdA0iTGCsvt86o2vvl2wzisObvVdGDP2bApyLjSfPIaCd244MTHK4MFN+fs1WuD20N8flHtI8n22OkpYkGC8SuupVTKuqbQ5VGoBo6wxHyINuI1w1UFcKM4MZsJhxiVHXnU16oaTJpZ7vfjhSKNETp11IvILT36Jgr8tzCH1nz12Z
+/Users/sylvain/.ssh/known_hosts.old:[192.168.8.11]:222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIu+z9nwzAsDKgZ6dc4NFGWqilNJnfJPgHtYtKKyEl8y
+/Users/sylvain/.ssh/known_hosts.old:64:ff9b::345f:1133 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCNbmnXfe621xtVMkrwOqf6QNIlnOKkQ01KoM6gKC4nv5T08hbGcGp6iYplGLKMLlki+auO1J3JTA3qAKDobZR1wDqtW9LC2k46GHV4YigUpd6D+YdranJqbxpGOuNd6c1EP50vQnlW9MxZYExyrZKT0UfOJAydQLoWPuSioyHk3zAltSIrCxczP3jxAhuoq++eUrdC5uF6UMNJC10eBA9XglAe2oRLzApoStyCAiKVnoBndU2NpJWqNw0K5qfEUx2vyQFfHNRAwNNRDFtkdE9ho255YECTO07Zg37QCZ+hV5VAoFRu5CHSXqVZc5YN1YXkZ8SVHyBX7krO80QaaDor
+/Users/sylvain/.ssh/known_hosts.old:165.22.21.21 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCfJd2GDf4LnXkQ/JcMpRzp+rbfvPGEZsarFKGRmWj0HSElDEBshreIa6auSoce3HQWSDOwuLR9HMUw1Ug7+bEuuuPgwlDq0b4ErlSlXFRBHq6kajcO566GmehQRg6ndv5XmlgNKfJZyQjOQDj9DdZqe53whJKFZinjnOZyrb/2UIj4koQfq4kftY8J5H9z+7w4XVJLJ8Xr0Qqlr7akYclWe1SJsCmK1g+zGVMSwnOZdXOiobbylzJVyOcD+/ZJ1D3T7gnKkAtQjlUEQwJdEYLphEkDJ2NT8wk1YbdQCsLvqz2Ki7vUZNOMHaR7u79t2jqzJH5D2XnM+j/yFCIlCZpH
+/Users/sylvain/.ssh/known_hosts.old:140.82.118.3 ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+/Users/sylvain/.ssh/known_hosts.old:165.22.21.21 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOixkpIQ+kKOvJyE7EfhmhuTmxWkvndIZRuwuahNtsHe
+/Users/sylvain/.ssh/known_hosts.old:avogel-ecommerce-prod1.codein.fr ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFsZiaQZU3AcqknBhjftgtVDRSHXgMBnoKnd/3jyqZT9
+/Users/sylvain/.ssh/known_hosts.old:avogel-ecommerce-prod1.codein.fr ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCz4G7xur4ISiAF1NpZ3SMjr/tXSX93i4wzMNMcICTOIjwZOvq2Z29oKUYTbRR4Q4NhBURhBJcmSeKpIzcSsoc/DviSFedhXR7vvgK0Eq8eJf3MUO3FAkAbZIgoXEqq8+uCTbGn8sKEyX8pW0f2jFcXUM0y5F0I91ckWSNEwScn+oZ9Eiu46Q/ntjqkdl89C3fuyLX6sGapR3JjzK2TZaVXtZYN/LgW5ba5MpqBLDqsCxXc0bV9mmMBcsXWOHvrOtkOxCCN/M8cT4mZ26KZPioVMwOu6edRdc568c/LzhuSFUbyLqU+n+MVA1a/e1boKN4aDcFO2wkWdRTMgHlc3vjd
+/Users/sylvain/.ssh/known_hosts.old:gitlab.macaron-software.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOixkpIQ+kKOvJyE7EfhmhuTmxWkvndIZRuwuahNtsHe
+/Users/sylvain/.ssh/known_hosts.old:avogel-ecommerce-preprod1.codein.fr ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMeN/Jem3dyHVhn3WeqL9XzyFgMGBXVAjoV7f4CHqN65
+/Users/sylvain/.ssh/known_hosts.old:164.92.174.253 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC35LjBp7GMlx+SvbRmdaOxzM1OyRPobGnppq3QYHbSI
+/Users/sylvain/.ssh/known_hosts.old:161.35.193.159 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH/V91gmc4LXqQjhT059kEMFsBXGCy5dIAPaGdAcDrcA
+/Users/sylvain/.ssh/known_hosts.old:104.248.32.93 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBlNQ5+6EirOzdFGfDtT9Wx4JfhUYy51ztMuJfJdTYyL
+/Users/sylvain/.ssh/known_hosts.old:104.248.32.93 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID9F+o00wYx1bd2aTntawM0bwF3kN0+AwZ+biYRS3MuO
+/Users/sylvain/.ssh/known_hosts.old:192.168.1.77 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJexdX97NFMxTHHq+Kzw0YGJa5llhJaChT9ZgEUZoRYF
+/Users/sylvain/.ssh/known_hosts.old:192.168.1.198 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIGo4EYUDxTZj7m2AonXAATOReatfcTG4fv5h/+aW4hs
+/Users/sylvain/.ssh/known_hosts.old:pi4.local ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJuEqzUBsYnL71xHxNXyJD4k6qbN+edwY7D9s1PMoKNE
+/Users/sylvain/.ssh/known_hosts.old:pi4.local ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC1AYQcLbbugXTBXx/zXN5G0rhF/a1jFyGnw+krGspPzPwjqC204IC1Eni/XEVDkPWBFUvjwNoGVuDNDDUZpllc/bSAApRJ6llzqjnAZ0mR1ScHfvG83cRDOecx2cS4FBArsyUPLk7wEwVWQoUqDnuLaF7Asb/p72dsKCMSQO4F0FQzy7TKpMooYtnY5hz8dMzUFH/c3cCc/m/jtFbRUT4qiDiAWBRxOvpY3hOvu0axMTvom7T1Lj0+5IVm0DtpiJWk4eF8LafU5XaWJSSvHDtTX/suLYfVO5X3ngnVzWf0Wm/RVH6Zjd3clgFWttFRzpiF6kmom7soCc0sjZXp+hAkd+lmTukt8Wtmq2hIAGUj4fFpuFByyKLkfuUphQ5fch923LIfZ9bDavP8nYzvrHoz0j6ou8CDe9hxmRdrE493CBAL+9f063bWw7c3kJl+PBESxpahMcQ8I6rpqzCnys+LD2oT9f4utjpzDH8rpw4rUHDqXPNF0K9KmRtFnCnt1ik=
+/Users/sylvain/.ssh/known_hosts.old:192.168.1.9 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJuEqzUBsYnL71xHxNXyJD4k6qbN+edwY7D9s1PMoKNE
+/Users/sylvain/.ssh/known_hosts.old:homeassistant.macaron-software.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJuEqzUBsYnL71xHxNXyJD4k6qbN+edwY7D9s1PMoKNE
+/Users/sylvain/.ssh/known_hosts.old:192.168.1.8 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJuEqzUBsYnL71xHxNXyJD4k6qbN+edwY7D9s1PMoKNE
+/Users/sylvain/.ssh/known_hosts.old:github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+/Users/sylvain/.ssh/known_hosts.old:github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+/Users/sylvain/.ssh/known_hosts.old:192.168.1.111 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJuEqzUBsYnL71xHxNXyJD4k6qbN+edwY7D9s1PMoKNE
+/Users/sylvain/.ssh/known_hosts.old:165.232.117.159 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDaXLilJ1vxXcaPP8fYlxViVvv9G330S7gEnUPs3Qb3B
+/Users/sylvain/.ssh/known_hosts.old:www.avogel-ecommerce-prod1.codein.fr ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFsZiaQZU3AcqknBhjftgtVDRSHXgMBnoKnd/3jyqZT9
+/Users/sylvain/.ssh/known_hosts.old:209.38.236.206 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC5woAiexYEaHAccTpiodogW6PDEm6GrH6F9X4SC999H
+/Users/sylvain/.ssh/known_hosts.old:209.38.236.206 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCiicg9bMTfsrlsw4GeWiz9GESVFo0KecSjNuGUYSo68a0VIkRXq1SLS42gQ5zDiftBG6rFw3xU+FjiR4RDYzR4R80HOqIUAM5Z3FublB6QhTjzouLaEGybjbImIr8Tpvr47if+2usTW+qsZu0CVqHL2SO3Rok7SB6VAh4MDOsvmJH1Bn6MSMn4soaE0ZkHrxeN/VPfKMyJqUFu/eRkaOEyMa/3dw3g+fMeQAXc/cQkC/LqbqWbnvz+rpBwDQONeSSB/EAjdVotUweRwwkXkMy72tbqe/JqsdFrgYdhIMz5mZzRqlGExUHw7QEZCiS4Y6/SUdQprWlPWaY6f13l3eUdu4p4/HlIpzFpfs2lO0q16/8g/wAdVwt6Unl9xC9XOla4aVFpuFTR0H3p9EeW+rMKNu3FyV9IFrkVfim1udtjFvwcLNjE5vbYuVsBWUcgiLI1VPEYh4StRbJUbVosG5l4PLqebY8TAegKaYoxRWBM/umR82Hu4ZYk237MMerjJ9k=
+/Users/sylvain/.ssh/known_hosts.old:# popi.nz:22 SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u7
+/Users/sylvain/.ssh/known_hosts.old:# popi.nz:22 SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u7
+/Users/sylvain/.ssh/known_hosts.old:# popi.nz:22 SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u7
+/Users/sylvain/.ssh/known_hosts.old:# popi.nz:22 SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u7
+/Users/sylvain/.ssh/known_hosts.old:# popi.nz:22 SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u7
+/Users/sylvain/.ssh/known_hosts.old:# 188.166.21.111:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+/Users/sylvain/.ssh/known_hosts.old:# 188.166.21.111:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+/Users/sylvain/.ssh/known_hosts.old:|1|oShdDRiQM46mCkiCh68bjLKegec=|MyLVJMpvEX4BkJIQX56koW8DM7U= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDdja79sHH4kuNRWT1RM/Ib2yeD5DOb6RsOnXYBApL1+A5qi5NPYOCejvUjwByX6pArAQuuAXt1LcvW0aaNR2tSZbHyxaKs//6rUFcSA+rYfIymKSDrt6QO2WhAG+t4zaP2mKUdipufsKSPg01epEcQlpGHN8XgFdIN3kvivcBkXjmuYVVhicxhyNU1JI0hKxK9kHO3Ab2SaJ6OK6CI7IbHMdYDDh/Caw3JYmfqIBm84wpY6NdE/WU2iQ8olZ09khxxmb/3XVd9r5CK6YVhRu5IRBMQtzL8QJZ1lAecDjVWicmwtHPyzDIvAE01+7nc49UqxSzy+ZKa+RFFpot1B/+tZwE41wEM9PDRvL2OxFkvECuoWt4Ouu5hvh27bB9XmSFt0JQcFyvNHFR9+izHo2DTt+boDovM4c31GTWlOZnZ2wKksHW+y0U4EGxHpzC2hKKpZ55wTURmZ8Hc7r9Pk8ta2qrIDG2fd7ivdYVjp7bSt5zjNnMZ6KlfpT37gNi/q6M=
+/Users/sylvain/.ssh/known_hosts.old:# 188.166.21.111:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+/Users/sylvain/.ssh/known_hosts.old:|1|ODvxbkfc/bbcxJPVIMPBVnVG7Nk=|uhptu2GTTd7mU5N7vSgtG3cihhc= ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKQeKS+3zUNgYrpJa2MC0bZ+AacxcttWL84o73+8lUpY
+/Users/sylvain/.ssh/known_hosts.old:# 188.166.21.111:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+/Users/sylvain/.ssh/known_hosts.old:# 188.166.21.111:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+/Users/sylvain/.ssh/known_hosts.old:162.19.254.51 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINvh9R+DHRfd8zNZ1PCJkA0Ulxl5X5hyDs5cT5IYqowv
+/Users/sylvain/.ssh/known_hosts.old:167.99.80.175 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMTy/DBdP3ZQbRbOMCuEBo34rvCNtu4L0X3Zb91sW6Qg
+/Users/sylvain/.ssh/known_hosts.old:popi.nz ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIILsYgJcyk91dDDsncTdcwVw+NNaU9GNPK7E4sI/WOOJ
+/Users/sylvain/.ssh/known_hosts.old:# 51.210.97.182:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.14
+/Users/sylvain/.ssh/known_hosts.old:|1|52txhrci9fTtk1BEAC/70j7CV6g=|lVIS/YyBKTjWIEZT3l3nd5Jlb00= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDOGayGbdXmTBlgP8+iabC5kmNsXc83hMoFYOMt9rMCIeMWOJf+OOH/pMqJK4k+7rBV9B3zY5TbRUkLA+RbbzKr3LuMINWedCGD9NPVBhegGQ6el0HIjG9cFfH3BKVCoNDkZLXe3r98k3KK5KUs3rLZbvc8LbvFoaBptCuA8ymj5u8bQrH9cWUFWGMRD/JuHJWPfoCOO/nBqJu5BSDNSOuN0qdkjzmcnSZlzG5omgYGko3pedq4sfugIZcp7lle89F+STvnCs2svLLfUgOWpoW6JACT7f4D0jhpv5D7sZOkXhgkHjpyhNk62sVjGLbjUpVDdlMr/WMgA5Q7MaKkRTO97dUyblpIKgvlJhf+LzwYcnTHrl7c0S2uBSGLNlsCL08e7kkIpnqBhuGmDeOkrtPLa8uOTAchEdHRKle4I5ggOVlkFIRR89sH9A7gpiU+C77mX4pNEoY6SzoL8yEz49zzanLRbqWMjhi3G0mq4fw7qdDAT5gsR9s9g4b/7lXGimU=
+/Users/sylvain/.ssh/known_hosts.old:# 51.210.97.182:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.14
+/Users/sylvain/.ssh/known_hosts.old:# 51.210.97.182:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.14
+/Users/sylvain/.ssh/known_hosts.old:|1|WP0EtkpTN5/UA3lXj47NKnIGqtA=|Mbt5VEfvJFQ0tgjaj3opx3HCLQg= ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO3OoAwbDTsb7oALwbNKl0fvZ7UFMhHGI1xQ4aLL9vYb
+/Users/sylvain/.ssh/known_hosts.old:# 51.210.97.182:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.14
+/Users/sylvain/.ssh/known_hosts.old:# 51.210.97.182:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.14
+/Users/sylvain/.ssh/known_hosts.old:4.251.107.141 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINhsBifaViHC3HsWqRjDT6S5TS62kxAgocwzYiuNzYqj
+/Users/sylvain/.ssh/known_hosts.old:4.251.107.141 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDQTiRotDZa/jsl7TM6GXQJ39FAb5SCK3h92qp58kjlp5LinmhlcmOTsjlPy2VxyyM5h2pKzZTgWqafdQhqQMZfuj0Ozm8VN4ozdbQ6k+oMfpbeI/VnMwNNm3589aw1qCxppAHeoyCW1c0l9vkkqRXaIypgHu+NhNJLBm9Y7+RavUdVjuc8e+lEm0gmw9S78oHeDj813a1Em9eiPpKLmoZjUHB3uABgpm6+JG8bwss8BLf1CKUEXEIaJkNaxLcgCP1BiO0ZP8oIEwEt4EH3LnhNPNPCkeabMT5fT+UMHDpNpLHY304SkXzjpl3A2uA6z5bKh93mgl/jhHxW1KkydCzFdkzfMbIstdoUTUE+FnwrTTrkpA5qQag5XDEuSCH2d/2Qu0cOBQQhBGP+Kctk0mBik5g8BYmMQFJmQBPIdh8guqYqWnR/JCMhx9BXVJyELQlgGS3UOntW0oqeLipzRWDeF0lQqP1r0rJh+umX1iGbr3Raqz4Q75tWW8jCegRb1ok=
+/Users/sylvain/.ssh/known_hosts.old:4.251.107.141 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBFOtrDwrFL5znT73mgtyohwX+cq9LbfhGLKY05QNeJQdznKBGujXlMEJpTCnOaa9Ui93YlRXBrNgRAXgh9x/nL0=
+/Users/sylvain/.ssh/known_hosts.old:digitalocean ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEShNdNXJpvjyTqaqDUYmdWL/mWRVGCfgWabqEXgY36O
+/Users/sylvain/.ssh/known_hosts.old:# 188.245.37.55:22 SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u7
+/Users/sylvain/.ssh/known_hosts.old:|1|Z1/Zj77jOB1wLBxz8i3WeYIYuG4=|TCqgaVtJIb6sSBOyos2RGUEAZCc= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCnSoFo1QXdtVptJM+DyB4eq2tM+4pRCn3PD7Dsn8pt/3LY1sTLLyzL8yoHI1HTxHrfzdblXJAA8EqwDL7Kskxr+tTsM5XbO4bw4jnS9o9/xdsYNNDtcmIewDaT5BmPmIdXGXMcvq6+9pzzkpNqvCNWPwffyU9F2GDhSFNOIUO2hjKh324MZdgRMppggJvybunR3GI5JsE9qJOznDtiichQh1YvE8tiZ4mBRkbbZ797LLHWqKl09OalNMQntLIsF3mOBD9apzaq7XKKgukyO31wfr+oywazkJlbBjaMERg+PiXvWHoiuEWKaM2YvhLyIAyjTa28qEXGaGGsOY40e5ZhDoTRY0JG56+i6+ME+sNXCV0aL8jC9GilAoDqFXhbZk0rXSuCXtkDw7TTTwPGHMOcDQE4qE/MZLzghL659J/sOtS72zVGXDoygGg0v0EgVfhg4WOOmKD/KGK5NDvCk6gvlxYDBGdi4myXfpQSRxhsZj+OErRNAL7Ynn3KRoOHRQ0=
+/Users/sylvain/.ssh/known_hosts.old:# 188.245.37.55:22 SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u7
+/Users/sylvain/.ssh/known_hosts.old:# 188.245.37.55:22 SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u7
+/Users/sylvain/.ssh/known_hosts.old:|1|bx6iL1+k+KNHhzGWBQ1MpiIltHY=|GfYTrKBTFwKE9MTWU6sd8JRrPao= ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDbx5F/RUubVlG/w+tfzW0R2Trmbmv2IvsgHhqB12Z7r
+/Users/sylvain/.ssh/known_hosts.old:# 188.245.37.55:22 SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u7
+/Users/sylvain/.ssh/known_hosts.old:# 188.245.37.55:22 SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u7
+/Users/sylvain/.ssh/known_hosts.old:admin.liact.app ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILpaxOdQUDiREX+pjLckkaogYxEyQmLOq8qvSETE3iyL
+/Users/sylvain/.ssh/known_hosts.old:164.92.215.30 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIXCnArvZtRDUF794gsLx/psoqxP0+EqAU3dTWwYSZpS
+/Users/sylvain/.ssh/known_hosts.old:localhost ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILxhPgoyulwUhrtlwsM+sXbuIrBqh63N4m2o+yEkp95F
+/Users/sylvain/.ssh/known_hosts.old:localhost ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDZYq+zICnUPfF8TxPEkTQSnZTwuz6ABLoPGBfZK805M7tbEyPgGnEAZQ0YrZcFpKa2XRXevKV/GwHvYK0D8+SxhS6EOOBxiZso9Vrl+wE0l3RbycJr1dJ7soKc1lUARvEU6tTP0JT3fmfjvXVOagGq2oSgUtxjmdwpn7zeBrQDK4qCgRi/+T/8vfssVkVrYAf5Yw9SvrqEqW6llKS56SWGdlh/dectPIShQ0CX7wMfskMMvbtAABxrdMsQOG2dxFDPGrRS2kR6yLOVIofaZk7ARqG/eYrjgoJGVd9oO5L+umM2+UZTf6t4fjCKWvF8uJ6lvgpKgqe8QlM8Zs0cyYXfyOdkja/x2pp8aaXd/0jU7j1LHEBPYPlLVffh86ba3TdvP2t1S7+uFUKXU2KdDp7+wvjDwYExi+99YYFNI98qn/OCc9gBsrDQBHJJYAm2l1Khoda8jIcbMdis7WqefMcmKv3JBmUK5FBARqRTc7vY5Aya0xS9LT7r61l9XWt1iPE=
+/Users/sylvain/.ssh/known_hosts.old:51.159.110.180 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMDRqX6VRGFG9EGmXXtNsI8yod97FXzm5FlyTIh3TXGJ
+/Users/sylvain/.ssh/known_hosts.old:# staging.popi.nz:22 SSH-2.0-OpenSSH_10.0p2 Debian-7
+/Users/sylvain/.ssh/known_hosts.old:|1|XcDnWMllUTXFG5ofmrasiRUoqak=|tKZeRnGrZiypP8c4jwUwJW2fx4w= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDkDpgkPEfDcyhgovkyANeVECtaAPfE4FW0Oiok6E/HDyQeYrjzOY0TLGSCs4XIMkb80ikFGIZXu7Iczq/cvWvBJMHkYZg/cFXhP+f7MIplKVU0tqzugGUNfAb8vOKoDY0e2CraQC6C5YZ9PVXM3meKWeX0J92iSSerEm+QTmeyNbSCFUZlPH4JiMpfynrzk4VzKcD78P/k3rvY/xqRs/kai0t56pqmt7oV/w4KwVVNqFvjKEeD7y3TKWXYQBXoEN1x4Hi1JiUCrSBOFJ8KQSQouMSFwOs9WnZ6zMmHXuxNbtEMa+s3FpBETQClq7h+T10MR5/XKvH4RLVEJFTCsVR5T2XG8LLBQOwpSIx/7jmhG7AbClAUEU5WnHhfyM0TUShmL6S4bMk2j549yeFGHFQV6eCdGqIs04ag+gQMEJcgwT34vF4WDwZwRzct3j/DtfBs320f0eNsehN0khenjEgAGLdcoHwU+jdEr0RWcz/vvdFsjzmh0WEs2RdE0U/uwpU=
+/Users/sylvain/.ssh/known_hosts.old:# staging.popi.nz:22 SSH-2.0-OpenSSH_10.0p2 Debian-7
+/Users/sylvain/.ssh/known_hosts.old:# staging.popi.nz:22 SSH-2.0-OpenSSH_10.0p2 Debian-7
+/Users/sylvain/.ssh/known_hosts.old:|1|ZJJuBaI0eerQoKRLIwQFWlTvTOU=|JDvBgWxotCQcAuZntnaHhBttXhI= ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIILsYgJcyk91dDDsncTdcwVw+NNaU9GNPK7E4sI/WOOJ
+/Users/sylvain/.ssh/known_hosts.old:# staging.popi.nz:22 SSH-2.0-OpenSSH_10.0p2 Debian-7
+
+...55091 bytes truncated...
+
+The tool call succeeded but the output was truncated. Full output saved to: /Users/sylvain/.local/share/opencode/tool-output/tool_bb64cb0b0001ELV6KyfUapiQt7
+Use the Task tool to have a subagent process this file with Grep and Read (with offset/limit). Do NOT read the full file yourself - delegate to save context.
+[91m[1m| [0m[90m Bash     [0mList SSH directory
+
+total 600
+drwx------   40 sylvain  staff   1280 Jan  6 11:19 .
+drwxr-x---+ 224 sylvain  staff   7168 Jan 13 08:22 ..
+-rw-r--r--@   1 sylvain  staff   8196 Dec 18 17:08 .DS_Store
+-rw-r--r--    1 sylvain  staff   2713 Dec 25 13:49 .env.aws
+drwxr-xr-x   12 sylvain  staff    384 Dec 25 13:19 .git
+-rw-r--r--    1 sylvain  staff  66821 Dec 18 16:58 Archive.zip
+-rw-r--r--@   1 sylvain  staff    403 Aug  3  2021 authorized_keys
+-r--------@   1 sylvain  staff   1675 Jan 19  2018 aws_codecommit_popinz
+-r--------@   1 sylvain  staff    410 Jan 19  2018 aws_codecommit_popinz.pub
+-rw-------    1 sylvain  staff   1831 Dec 20 12:21 aws_git_popinz_from_server
+-rw-------@   1 sylvain  staff   1831 Oct 18 12:54 aws_git_popinz_ovh
+-rw-r--r--@   1 sylvain  staff    404 Oct 18 12:54 aws_git_popinz_ovh.pub
+drwxr-xr-x    6 sylvain  staff    192 Dec 30 20:35 az_ssh_config
+-rw-------    1 sylvain  staff    411 Nov 16 11:37 azure_veligo
+-rw-r--r--    1 sylvain  staff     99 Nov 16 11:37 azure_veligo.pub
+-r--------    1 sylvain  staff   1921 Nov  1  2022 codein
+-rw-------    1 sylvain  staff   1164 Jan  6 11:19 config
+-rw-------@   1 sylvain  staff    312 Oct 18 12:54 config.backup
+-rw-------@   1 sylvain  staff    312 Dec 20 12:10 config.new
+-rw-r--r--@   1 sylvain  staff    132 Oct 18 12:54 config_codecommit
+-rw-------    1 sylvain  staff   2655 Mar 30  2020 digitalocean_popinz
+-rw-r--r--    1 sylvain  staff    575 Mar 30  2020 digitalocean_popinz.pub
+-rw-------    1 sylvain  staff   1811 May 13  2022 gitlab_laposte
+-rw-r--r--    1 sylvain  staff    391 May 13  2022 gitlab_laposte.pub
+-rw-------    1 sylvain  staff    411 Aug 20  2024 id_ed25519
+-rw-r--r--    1 sylvain  staff    103 Aug 20  2024 id_ed25519.pub
+-rw-------@   1 sylvain  staff    411 Oct 13 20:12 id_ed25519_ovh_ab_testing
+-rw-r--r--@   1 sylvain  staff    103 Oct 13 20:12 id_ed25519_ovh_ab_testing.pub
+-rw-------    1 sylvain  staff   2610 Feb  1  2024 id_rsa
+-rw-r--r--    1 sylvain  staff    575 Feb  1  2024 id_rsa.pub
+-r--------    1 sylvain  staff   1679 May 28  2018 jenkins-popinz-aws-codecommit
+-r--------    1 sylvain  staff    410 May 28  2018 jenkins-popinz-aws-codecommit.pub
+drwxr-xr-x    5 sylvain  staff    160 Dec 15  2014 key_backup
+-rw-------    1 sylvain  staff  35316 Jan  8 10:02 known_hosts
+-rw-------@   1 sylvain  staff  28429 Nov  7 12:30 known_hosts.bak
+-rw-------@   1 sylvain  staff  33941 Dec 11 20:39 known_hosts.old
+-r--------@   1 sylvain  staff   4905 Dec 26  2017 outputfile.txt
+-r--------    1 sylvain  staff   1675 Aug 21  2015 rsa_for_git
+-r--------    1 sylvain  staff    425 Aug 21  2015 rsa_for_git.pub
+drwxr-xr-x    2 sylvain  staff     64 Dec 30 23:00 sockets
+
+[91m[1m| [0m[90m Bash     [0mTest SSH connection to VM
+
+veligo@4.251.107.141: Permission denied (publickey).
+
+[?25l│
+◆  Permission required: external_directory (/Users/sylvain/.ssh)
+│  ● Allow once
+│  ○ Always allow: /Users/sylvain/.ssh/*
+│  ○ Reject
+└

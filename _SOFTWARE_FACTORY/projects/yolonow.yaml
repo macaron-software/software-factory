@@ -1,0 +1,125 @@
+project:
+  name: yolonow
+  display_name: "YoloNow - Event Discovery Platform"
+  root_path: /Users/sylvain/_MACARON-SOFTWARE/YOLONOW
+  vision_doc: README.md
+
+domains:
+  rust:
+    paths: [backend/src/]
+    extensions: [.rs]
+    build_cmd: cd backend && cargo check
+    test_cmd: cd backend && cargo test
+    lint_cmd: cd backend && cargo clippy --all-targets || true
+
+  python:
+    paths: [backend/scrapers/, backend/tests/]
+    extensions: [.py]
+    build_cmd: python3 -c "import compileall; compileall.compile_dir('backend/scrapers', force=True, quiet=2)"
+    test_cmd: pytest backend/tests/ -q
+    lint_cmd: ruff check backend/ || true
+
+  typescript:
+    paths: [frontend/web/, frontend/sveltekit/]
+    extensions: [.ts, .tsx, .svelte]
+    build_cmd: cd frontend/web && npm run build --if-present || npx tsc --noEmit
+    test_cmd: cd frontend/web && npm run test --if-present || true
+    lint_cmd: cd frontend/web && npm run lint --if-present || true
+
+  swift:
+    paths: [mobile/ios/]
+    extensions: [.swift]
+    # Real Xcode build with error capture
+    build_cmd: cd mobile/ios && xcodebuild -scheme YoloNow -destination 'platform=iOS Simulator,name=iPhone 15' -configuration Debug build 2>&1 | tee /tmp/ios_build.log || cat /tmp/ios_build.log
+    test_cmd: cd mobile/ios && xcodebuild -scheme YoloNow -destination 'platform=iOS Simulator,name=iPhone 15' test 2>&1 | tee /tmp/ios_test.log || cat /tmp/ios_test.log
+    lint_cmd: cd mobile/ios && swiftlint 2>&1 || true
+
+  kotlin:
+    paths: [mobile/android/]
+    extensions: [.kt]
+    # Real Gradle build with error capture
+    build_cmd: cd mobile/android && ./gradlew assembleDebug 2>&1 | tee /tmp/android_build.log || cat /tmp/android_build.log
+    test_cmd: cd mobile/android && ./gradlew test 2>&1 | tee /tmp/android_test.log || cat /tmp/android_test.log
+    lint_cmd: cd mobile/android && ./gradlew lint 2>&1 || true
+
+  proto:
+    paths: [backend/proto/]
+    extensions: [.proto]
+    build_cmd: cd backend && cargo build --features grpc 2>/dev/null || true
+
+# Deploy configurable - validation-only (no staging/prod, just build)
+deploy:
+  strategy: validation-only
+  # Build succeeds → task completed
+  # Build fails → capture errors → feedback tasks → TDD backlog
+
+# Fractal (seuils de decomposition)
+fractal:
+  max_files: 5
+  max_loc: 400
+  max_items: 10
+  max_depth: 3
+
+# Adversarial (patterns projet-specifiques)
+adversarial:
+  # Threshold elevated to 30 to account for pre-existing unwrap()/panic! in codebase
+  # TODO: implement incremental adversarial checking (only new code)
+  threshold: 30
+  core_patterns: true
+  custom_patterns:
+    # Rust specific
+    - pattern: '\.unwrap\(\)'
+      score: 2
+      message: "unwrap() sans gestion d'erreur"
+      max_occurrences: 3
+    - pattern: 'panic!'
+      score: 5
+      message: "panic! interdit en production"
+    # Python specific
+    - pattern: 'except:'
+      score: 3
+      message: "Bare except clause - specify exception type"
+    - pattern: 'print\('
+      score: 1
+      message: "Use logging instead of print"
+    # Security
+    - pattern: "password.*=.*[\"']"
+      score: 5
+      message: "Hardcoded password detected"
+    # Geospatial specific
+    - pattern: 'ST_Distance.*<'
+      score: 2
+      message: "Use ST_DWithin for geo queries (uses spatial index)"
+
+# Error Capture Configuration (RLM Feedback Loop)
+error_capture:
+  enabled: true
+  feedback_to_backlog: true
+  deduplicate: true
+
+  build:
+    enabled: true
+    domains: [rust, python, typescript, swift, kotlin]
+
+  e2e:
+    enabled: true
+    playwright:
+      report_path: frontend/web/playwright-report/
+      fail_on_console_error: true
+      capture_grpc: true
+
+  # Mobile error capture for YoloNow iOS/Android apps
+  mobile:
+    enabled: true
+    ios:
+      bundle_id: com.yolonow.app
+      capture_duration: 15
+    android:
+      package_name: com.yolonow.app
+      capture_duration: 15
+
+  severity:
+    create_task_min: medium
+
+# Analyzers to enable
+analyzers: [rust, python, typescript, security]

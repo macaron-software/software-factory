@@ -1,0 +1,84 @@
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/module-injection.spec.ts"}
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/tests/module-injection.spec.ts
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/registry.rs"}
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/infrastructure/plugins/registry.rs
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/infrastructure/modules/**/*.rs"}
+[94m[1m| [0m[90m Grep     [0mTODO.*module
+[94m[1m| [0m[90m Grep     [0mTODO
+[94m[1m| [0m[90m Grep     [0mtest\.skip\(\)
+J'ai trouvé les 7 tests skippés dans `module-injection.spec.ts`. Analysons chaque test et vérifions l'infrastructure backend.
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/infrastructure/http/module_routes.rs
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/infrastructure/modules*.rs"}
+[94m[1m| [0m[90m Grep     [0mstruct ModuleRegistry
+[91m[1m| [0m[90m Bash     [0mList infrastructure directory
+
+total 32
+drwxr-xr-x  29 sylvain  staff   928 Jan  9 06:55 .
+drwxr-xr-x  20 sylvain  staff   640 Jan  9 08:55 ..
+drwxr-xr-x   7 sylvain  staff   224 Dec 27 12:07 actions
+drwxr-xr-x   5 sylvain  staff   160 Dec 12 10:51 adapters
+drwxr-xr-x@  3 sylvain  staff    96 Jan  9 06:55 audit
+drwxr-xr-x   7 sylvain  staff   224 Dec 31 09:27 auth
+drwxr-xr-x   5 sylvain  staff   160 Dec 26 22:48 cache
+drwxr-xr-x   4 sylvain  staff   128 Dec 10 14:53 database
+drwxr-xr-x   9 sylvain  staff   288 Dec 31 21:19 email
+drwxr-xr-x   8 sylvain  staff   256 Dec 30 19:06 erp
+drwxr-xr-x   6 sylvain  staff   192 Dec 27 22:05 events
+drwxr-xr-x   5 sylvain  staff   160 Dec 10 16:53 grpc
+drwxr-xr-x  22 sylvain  staff   704 Jan  3 20:24 http
+drwx------   4 sylvain  staff   128 Dec 26 18:40 middleware
+-rw-r--r--   1 sylvain  staff  1613 Dec 31 21:24 mod.rs
+-rw-r--r--   1 sylvain  staff  9734 Dec 26 15:29 module_loader.rs
+drwxr-xr-x   6 sylvain  staff   192 Dec 28 02:03 modules
+drwxr-xr-x   8 sylvain  staff   256 Jan  7 09:37 monitoring
+drwxr-xr-x   9 sylvain  staff   288 Dec 28 13:26 multimodal
+drwxr-xr-x   4 sylvain  staff   128 Dec 27 11:24 naolib
+drwxr-xr-x   9 sylvain  staff   288 Dec 28 02:18 notifications
+drwxr-xr-x   6 sylvain  staff   192 Dec 11 19:39 plugins
+drwxr-xr-x   4 sylvain  staff   128 Dec 28 11:04 repositories
+drwxr-xr-x   8 sylvain  staff   256 Dec 29 22:04 sms
+drwxr-xr-x   7 sylvain  staff   224 Dec 31 21:24 storage
+drwxr-xr-x   4 sylvain  staff   128 Jan  7 09:37 tracing
+drwxr-xr-x   9 sylvain  staff   288 Dec 29 22:05 tracking
+drwxr-xr-x   6 sylvain  staff   192 Dec 29 22:06 webhooks
+drwx------   5 sylvain  staff   160 Dec 31 22:11 websocket
+
+[91m[1m| [0m[90m Bash     [0mList modules directory
+
+total 48
+drwxr-xr-x   6 sylvain  staff    192 Dec 28 02:03 .
+drwxr-xr-x  29 sylvain  staff    928 Jan  9 06:55 ..
+-rw-r--r--   1 sylvain  staff   3691 Dec 26 15:29 interface.rs
+-rw-r--r--   1 sylvain  staff    499 Dec 26 15:29 mod.rs
+-rw-r--r--   1 sylvain  staff  11382 Dec 28 02:03 registry.rs
+-rw-r--r--   1 sylvain  staff   1995 Dec 28 01:55 registry_persistence.rs
+
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/infrastructure/modules/mod.rs
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/infrastructure/modules/registry.rs
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/infrastructure/modules/registry_persistence.rs
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/infrastructure/modules/interface.rs
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/infrastructure/mod.rs
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/backend/**/main.rs"}
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/tonic-server/src/main.rs
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/Cargo.toml
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/backend/src/bin/*.rs"}
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/bin/http-server.rs
+[94m[1m| [0m[90m Grep     [0mtenant_routes|module_management
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/api/tenants.rs
+[94m[1m| [0m[90m Grep     [0mtoggle_tenant_module
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/api/tenants.rs
+[94m[1m| [0m[90m Grep     [0mModuleToggleRequest
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/api/tenants.rs
+[94m[1m| [0m[90m Grep     [0mchaosMonkey|circuitBreakers|killswitch
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/lib/modules/killswitch/KillswitchService.ts
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/lib/modules/chaos/ChaosMonkey.ts
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/playwright.config.ts
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/admin/**/killswitch/**"}
+[92m[1m| [0m[90m Edit     [0mtenant/frontend-user/src/lib/modules/chaos/ChaosMonkey.ts
+[92m[1m| [0m[90m Edit     [0mtenant/frontend-user/src/lib/modules/killswitch/KillswitchService.ts
+[92m[1m| [0m[90m Edit     [0mtenant/frontend-user/src/lib/modules/killswitch/KillswitchService.ts
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/lib/modules/killswitch/KillswitchService.ts
+[94m[1m| [0m[90m Glob     [0mtenant/frontend-user/src/routes
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/routes/(app)/admin/+layout.svelte
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/routes/(app)/admin/modules/+page.svelte
+[91m[1m| [0m[90m Bash     [0mCreate killswitch admin directory

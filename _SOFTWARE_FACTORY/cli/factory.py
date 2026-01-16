@@ -438,6 +438,213 @@ if CLICK_AVAILABLE:
         click.echo(f"   - {patterns_saved} new patterns learned")
         click.echo(f"   - {fixed} auto-fixes applied")
 
+    @xp.command("chaos")
+    @click.option("--project", "-p", required=True, help="Project to test")
+    @click.option("--env", "-e", default="staging", help="Environment (staging/prod)")
+    @click.pass_context
+    def xp_chaos(ctx, project, env):
+        """Run chaos monkey resilience tests"""
+        from core.experience_agent import ExperienceAgent
+
+        agent = ExperienceAgent()
+        click.echo(f"🐒 Running chaos tests on {project}/{env}...")
+        
+        insights = asyncio.run(agent.run_chaos_tests(project, env))
+        agent.insights.extend(insights)
+        agent.persist_insights()
+
+        click.echo(f"\n🔍 Resilience Analysis:")
+        for i in insights:
+            icon = {"critical": "🔴", "high": "🟠", "medium": "🟡"}[i.severity]
+            click.echo(f"  {icon} {i.title}")
+            if i.recommendation:
+                click.echo(f"     → {i.recommendation}")
+
+        if not insights:
+            click.echo("  ✅ No resilience gaps found")
+
+    @xp.command("security")
+    @click.option("--project", "-p", required=True, help="Project to audit")
+    @click.option("--fetch-cves", is_flag=True, help="Fetch latest CVEs from NVD")
+    @click.pass_context
+    def xp_security(ctx, project, fetch_cves):
+        """Run security audit (CVE, OWASP, pentest)"""
+        from core.experience_agent import ExperienceAgent
+
+        agent = ExperienceAgent()
+        
+        if fetch_cves:
+            click.echo("📡 Fetching latest CVEs from NVD...")
+            cves = asyncio.run(agent.fetch_latest_cves())
+            for cve in cves[:10]:
+                sev = cve.get('severity', 'UNKNOWN')
+                icon = {"CRITICAL": "🔴", "HIGH": "🟠", "MEDIUM": "🟡"}.get(sev, "🔵")
+                click.echo(f"  {icon} {cve['id']}: {cve['description'][:80]}...")
+
+        click.echo(f"\n🔐 Running security audit on {project}...")
+        insights = asyncio.run(agent.run_security_audit(project))
+        agent.insights.extend(insights)
+        agent.persist_insights()
+
+        # Group by type
+        cves = [i for i in insights if i.type.value == "cve_vulnerability"]
+        owasp = [i for i in insights if i.type.value == "owasp_violation"]
+        pentest = [i for i in insights if i.type.value == "pentest_finding"]
+
+        if cves:
+            click.echo(f"\n🛡️ CVE Vulnerabilities ({len(cves)}):")
+            for i in cves:
+                click.echo(f"  🔴 {i.title}")
+
+        if owasp:
+            click.echo(f"\n📋 OWASP Violations ({len(owasp)}):")
+            for i in owasp:
+                click.echo(f"  🟠 {i.title}")
+
+        if pentest:
+            click.echo(f"\n🔓 Pentest Findings ({len(pentest)}):")
+            for i in pentest:
+                click.echo(f"  🟡 {i.title}")
+
+        if not insights:
+            click.echo("  ✅ No security issues found")
+
+        click.echo(f"\n📊 Total: {len(insights)} security findings")
+
+    @xp.command("journeys")
+    @click.option("--project", "-p", required=True, help="Project to test")
+    @click.option("--env", "-e", default="staging", help="Environment (staging/prod)")
+    @click.option("--create-tasks", is_flag=True, help="Create backlog tasks from findings")
+    @click.pass_context
+    def xp_journeys(ctx, project, env, create_tasks):
+        """Run E2E user journey simulations with RBAC personas"""
+        from core.experience_agent import ExperienceAgent
+
+        agent = ExperienceAgent()
+        click.echo(f"🚶 Running user journeys on {project}/{env}...")
+        
+        insights, backlog = asyncio.run(agent.run_user_journeys(project, env))
+        agent.insights.extend(insights)
+        agent.persist_insights()
+
+        click.echo(f"\n📊 Journey Results:")
+        click.echo(f"   Issues found: {len(insights)}")
+        click.echo(f"   Backlog tasks: {len(backlog)}")
+
+        if insights:
+            click.echo(f"\n❌ Journey Failures:")
+            for i in insights[:10]:
+                icon = {"critical": "🔴", "high": "🟠", "medium": "🟡"}.get(i.severity, "🔵")
+                click.echo(f"  {icon} {i.title}")
+
+        if create_tasks and backlog:
+            created = asyncio.run(agent.create_backlog_tasks(project, backlog))
+            click.echo(f"\n✅ Created {created} tasks in Wiggum backlog")
+
+    @xp.command("logs")
+    @click.option("--project", "-p", required=True, help="Project to analyze")
+    @click.option("--hours", "-h", default=24, help="Hours of logs to analyze")
+    @click.option("--create-tasks", is_flag=True, help="Create backlog tasks from errors")
+    @click.pass_context
+    def xp_logs(ctx, project, hours, create_tasks):
+        """Analyze production logs and create fix tasks"""
+        from core.experience_agent import ExperienceAgent
+
+        agent = ExperienceAgent()
+        click.echo(f"📋 Analyzing prod logs for {project} (last {hours}h)...")
+        
+        insights, backlog = asyncio.run(agent.analyze_prod_logs(project, hours))
+        agent.insights.extend(insights)
+        agent.persist_insights()
+
+        click.echo(f"\n📊 Log Analysis:")
+        click.echo(f"   Errors found: {len(insights)}")
+        click.echo(f"   Backlog tasks: {len(backlog)}")
+
+        if insights:
+            click.echo(f"\n🔴 Production Errors:")
+            for i in insights[:15]:
+                icon = {"critical": "🔴", "high": "🟠", "medium": "🟡"}.get(i.severity, "🔵")
+                click.echo(f"  {icon} {i.title}")
+
+        if create_tasks and backlog:
+            created = asyncio.run(agent.create_backlog_tasks(project, backlog))
+            click.echo(f"\n✅ Created {created} tasks in Wiggum backlog")
+
+    @xp.command("full")
+    @click.option("--project", "-p", required=True, help="Project to analyze")
+    @click.option("--env", "-e", default="staging", help="Environment")
+    @click.option("--apply", "-a", is_flag=True, help="Apply all fixes and create tasks")
+    @click.pass_context
+    def xp_full(ctx, project, env, apply):
+        """Full XP cycle: analyze → chaos → security → journeys → logs → improve factory"""
+        from core.experience_agent import ExperienceAgent
+
+        agent = ExperienceAgent()
+        all_backlog = []
+
+        # 1. Experience analysis
+        click.echo("🔍 [1/5] Analyzing factory experience...")
+        asyncio.run(agent.analyze(use_llm=True))
+        click.echo(f"   Found {len(agent.insights)} insights")
+
+        # 2. Chaos/Resilience
+        click.echo(f"\n🐒 [2/5] Running chaos tests on {project}/{env}...")
+        chaos_insights = asyncio.run(agent.run_chaos_tests(project, env))
+        agent.insights.extend(chaos_insights)
+        click.echo(f"   Found {len(chaos_insights)} resilience gaps")
+
+        # 3. Security audit
+        click.echo(f"\n🔐 [3/5] Running security audit on {project}...")
+        security_insights = asyncio.run(agent.run_security_audit(project))
+        agent.insights.extend(security_insights)
+        click.echo(f"   Found {len(security_insights)} security issues")
+
+        # 4. User journeys
+        click.echo(f"\n🚶 [4/5] Running user journeys on {project}/{env}...")
+        journey_insights, journey_tasks = asyncio.run(agent.run_user_journeys(project, env))
+        agent.insights.extend(journey_insights)
+        all_backlog.extend(journey_tasks)
+        click.echo(f"   Found {len(journey_insights)} journey failures")
+
+        # 5. Prod logs
+        click.echo(f"\n📋 [5/5] Analyzing production logs...")
+        log_insights, log_tasks = asyncio.run(agent.analyze_prod_logs(project, 24))
+        agent.insights.extend(log_insights)
+        all_backlog.extend(log_tasks)
+        click.echo(f"   Found {len(log_insights)} prod errors")
+
+        # Summary
+        click.echo(f"\n{'='*50}")
+        click.echo(f"📊 FULL XP ANALYSIS COMPLETE")
+        click.echo(f"{'='*50}")
+        click.echo(f"   Total insights: {len(agent.insights)}")
+        click.echo(f"   Backlog tasks: {len(all_backlog)}")
+        click.echo(f"   Improvements: {len(agent.improvements)}")
+
+        if apply:
+            click.echo(f"\n💾 Persisting insights...")
+            agent.persist_insights()
+            agent.persist_patterns()
+
+            click.echo(f"🔧 Applying auto-fixes...")
+            fixed = asyncio.run(agent.apply_auto_fixes())
+
+            click.echo(f"📝 Creating backlog tasks...")
+            created = asyncio.run(agent.create_backlog_tasks(project, all_backlog))
+
+            click.echo(f"\n✅ Applied:")
+            click.echo(f"   - {fixed} auto-fixes")
+            click.echo(f"   - {created} new tasks in Wiggum backlog")
+            click.echo(f"   - {len(agent.improvements)} factory improvements")
+
+            # Show top priority tasks
+            if all_backlog:
+                click.echo(f"\n🎯 Top priority tasks created:")
+                sorted_tasks = sorted(all_backlog, key=lambda t: t.get('priority', 0), reverse=True)
+                for t in sorted_tasks[:5]:
+                    click.echo(f"   [{t.get('domain', '?')}] {t.get('description', '')[:60]}...")
+
     # --- STATUS ---
     @cli.command()
     @click.option("--all", "-a", "show_all", is_flag=True, help="Show all projects")

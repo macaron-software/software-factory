@@ -1,0 +1,148 @@
+[0;32m[AGENT] Real Agent starting[0m
+[0;34m[AGENT] Task: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks/T629.md[0m
+[0;34m[AGENT] Queue: tdd[0m
+[0;34m[AGENT] Backend: auto[0m
+[0;32m[AGENT] Starting task: T629[0m
+[0;34m[AGENT] Iteration 1/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'find veligo-platform/backend/src -type f -name "*.rs" | head -50'}[0m
+[0;34m$ find veligo-platform/backend/src -type f -name "*.rs" | head -50[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'ls -la veligo-platform/backend/'}[0m
+[0;34m$ ls -la veligo-platform/backend/[0m
+[0;34m[AGENT] Iteration 2/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'ls -la veligo-platform/backend/src/'}[0m
+[0;34m$ ls -la veligo-platform/backend/src/[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'find veligo-platform/backend/src -type f -name "*.rs" | xargs grep -l "[0m
+[0;34m$ find veligo-platform/backend/src -type f -name "*.rs" | xargs grep -l "payment\|Payment\|PaymentAdapter" 2>/dev/null[0m
+[0;34m[AGENT] Iteration 3/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'ls -la veligo-platform/backend/src/domain/'}[0m
+[0;34m$ ls -la veligo-platform/backend/src/domain/[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/generated/payment.v1.rs | head -100'}[0m
+[0;34m$ cat veligo-platform/backend/src/generated/payment.v1.rs | head -100[0m
+[0;34m[AGENT] Iteration 4/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'ls -la veligo-platform/backend/src/domain/payment/'}[0m
+[0;34m$ ls -la veligo-platform/backend/src/domain/payment/[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/domain/payment/mod.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/domain/payment/mod.rs[0m
+[0;34m[AGENT] Iteration 5/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/domain/payment/port.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/domain/payment/port.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/domain/payment/types.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/domain/payment/types.rs[0m
+[0;34m[AGENT] Iteration 6/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/domain/payment/payment_port.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/domain/payment/payment_port.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/domain/payment/repository.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/domain/payment/repository.rs[0m
+[0;34m[AGENT] Iteration 7/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'ls -la veligo-platform/backend/src/application/'}[0m
+[0;34m$ ls -la veligo-platform/backend/src/application/[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'find veligo-platform/backend/src -type d -name "*adapter*" -o -type d -[0m
+[0;34m$ find veligo-platform/backend/src -type d -name "*adapter*" -o -type d -name "*paynum*" -o -type d -name "*stripe*" 2>/dev/null[0m
+[0;34m[AGENT] Iteration 8/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'ls -la veligo-platform/backend/src/infrastructure/adapters/'}[0m
+[0;34m$ ls -la veligo-platform/backend/src/infrastructure/adapters/[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'ls -la veligo-platform/backend/src/infrastructure/'}[0m
+[0;34m$ ls -la veligo-platform/backend/src/infrastructure/[0m
+[0;34m[AGENT] Iteration 9/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'ls -la veligo-platform/backend/src/infrastructure/adapters/payment/'}[0m
+[0;34m$ ls -la veligo-platform/backend/src/infrastructure/adapters/payment/[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/infrastructure/adapters/payment/mod.rs'[0m
+[0;34m$ cat veligo-platform/backend/src/infrastructure/adapters/payment/mod.rs[0m
+[0;34m[AGENT] Iteration 10/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/infrastructure/adapters/payment/factory[0m
+[0;34m$ cat veligo-platform/backend/src/infrastructure/adapters/payment/factory.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/infrastructure/adapters/payment/paynum.[0m
+[0;34m$ cat veligo-platform/backend/src/infrastructure/adapters/payment/paynum.rs | head -100[0m
+
+============================================================
+RESULT: FAILED
+============================================================
+51 adapters
+drwxr-xr-x@  3 sylvain  staff    96 Jan  9 06:55 audit
+drwxr-xr-x   7 sylvain  staff   224 Dec 31 09:27 auth
+drwxr-xr-x   5 sylvain  staff   160 Dec 26 22:48 cache
+drwxr-xr-x   4 sylvain  staff   128 Dec 10 14:53 database
+drwxr-xr-x   9 sylvain  staff   288 Dec 31 21:19 em
+
+=== LLM Response ===
+<think>
+Let me explore the payment adapters directory to understand what's already there.
+</think>
+
+<bash>
+ls -la veligo-platform/backend/src/infrastructure/adapters/payment/</bash>
+<bash>
+cat veligo-platform/backend/src/infrastructure/adapters/payment/mod.rs</bash>
+
+=== Action Results ===
+bash: OK
+total 192
+drwxr-xr-x  8 sylvain  staff    256 Jan 14 17:45 .
+drwxr-xr-x  5 sylvain  staff    160 Dec 12 10:51 ..
+-rw-r--r--  1 sylvain  staff   5154 Dec 28 02:25 factory.rs
+-rw-r--r--  1 sylvain  staff   9287 Dec 28 02:25 mock_adapter.rs
+-rw-r--r--  1 sylvain  staff   3804 Dec 27 20:32 mod.rs
+-rw-------  1 sylvain  staff  15876 Dec 28 01:55 paynum.rs
+-rw-------  1 sylvain  staff  53452 Dec 31 11:30 stripe_adapter.rs
+drwxr-xr-x  3 sylvain  staff     96 Jan 14 17:45 tests
+
+---
+bash: OK
+//! # Payment Adapters Module
+//!
+//! Production-ready payment adapters for Veligo Platform.
+//!
+//! ## Available Adapters
+//!
+//! | Adapter | Use Case | Environment Variables |
+//! |---------|----------|----------------------|
+//! | [`StripeAdapter`] | Standard payment processing | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` |
+//! | [`PaynumAdapter`] | French public services (IDFM) | `PAYNUM_API_KEY`, `PAYNUM_WEBHOOK_SECRET`, `PAYNUM_MERCHANT_ID` |
+//! | [`MockPaymentAdapter`] | Testing only (
+
+=== LLM Response ===
+<think>
+Now let me look at the existing factory.rs file to understand what's already there, and the existing adapter implementations.
+</think>
+
+<bash>
+cat veligo-platform/backend/src/infrastructure/adapters/payment/factory.rs</bash>
+<bash>
+cat veligo-platform/backend/src/infrastructure/adapters/payment/paynum.rs | head -100</bash>
+
+=== Action Results ===
+bash: OK
+// Trace: Sprint 004 - 2025-12-11T12:46:10Z - Payment Adapter Factory
+// Updated: 2025-12-27 - Production-ready: Stripe + Paynum adapters
+
+#[allow(deprecated)]
+use super::mock_adapter::MockPaymentAdapter;
+use super::paynum::{PaynumAdapter, PaynumConfig};
+use super::stripe_adapter::StripeAdapter;
+use crate::domain::payment::{PaymentError, PaymentPort, PaymentProvider};
+use std::sync::Arc;
+
+/// Payment Adapter Factory
+///
+/// Selects the appropriate payment provider based on tenant configuration.
+
+---
+bash: OK
+// Trace: 2025-12-27 - Paynum Payment Adapter (IDFM)
+
+use async_trait::async_trait;
+use chrono::Utc;
+use hmac::{Hmac, Mac};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use sha2::Sha256;
+use uuid::Uuid;
+
+use crate::domain::payment::{
+    PaymentError, PaymentPort, PaymentStatus, RefundResult, StripeSubscription, WebhookEvent,
+};
+
+/// Paynum API adapter for IDFM (Île-de-France Mobilités)
+///
+/// Paynum is La Poste's payment gateway used for French public services.
+/// This adapter im

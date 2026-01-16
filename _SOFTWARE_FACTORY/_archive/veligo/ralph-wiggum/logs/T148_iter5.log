@@ -1,0 +1,12 @@
+[0;32m[AGENT] Real Agent starting[0m
+[0;34m[AGENT] Task: tasks/T148.md[0m
+[0;34m[AGENT] Queue: tdd[0m
+[0;34m[AGENT] Backend: auto[0m
+[0;32m[AGENT] Starting task: T148[0m
+[0;34m[AGENT] Iteration 1/10[0m
+[0;31m[AGENT] Local LLM failed: HTTPConnectionPool(host='127.0.0.1', port=8002): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10700c590>: Failed to establish a new connection: [Errno 61] Connection refused'))[0m
+
+============================================================
+RESULT: FAILED
+============================================================
+ERROR: LLM call failed

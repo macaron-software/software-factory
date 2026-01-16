@@ -1,0 +1,16 @@
+[0;34m[13:37:31][0m Starting Wiggum-TDD daemon...
+[0;34m[13:37:31][0m Queue: tdd
+[0;34m[13:37:31][0m Tasks dir: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks
+[0;34m[13:37:31][0m Poll interval: 10s
+[0;34m[13:37:34][0m [Wiggum-TDD] Found task: T429
+[0;34m[13:37:34][0m [T429] Processing with REAL agent...
+[0;34m[13:37:34][0m [T429] Using Real Agent (actual execution, not simulation)...
+[0;33m[13:38:31] ⚠[0m [T429] Agent returned FAILED or needs more work
+[0;33m[13:38:31] ⚠[0m [T429] Exit code: 1
+[0;33m[13:38:31] ⚠[0m [T429] Check log: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/logs/T429_20260114_133734.log
+[0;33m[13:38:31] ⚠[0m [T429] Retry 1/3
+[0;34m[13:38:36][0m [T429] Processing with REAL agent...
+[0;34m[13:38:36][0m [T429] Using Real Agent (actual execution, not simulation)...
+[0;34m[13:38:37][0m [T429] Task was decomposed into sub-tasks (fractal)
+[0;34m[13:38:37][0m [Wiggum-TDD] --once mode, exiting
+[0;34m[13:38:37][0m [Wiggum-TDD] Daemon stopped

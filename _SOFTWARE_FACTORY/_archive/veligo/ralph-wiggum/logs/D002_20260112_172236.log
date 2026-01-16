@@ -1,0 +1,52 @@
+Je vais vérifier l'état du Rate Limiting pour Veligo.
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/middleware/rate_limiter.rs
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/bin/tonic-server.rs
+Je dois continuer la lecture de tonic-server.rs pour voir la configuration du serveur:
+[94m[1m| [0m[90m Grep     [0mrate_limit|RateLimiter
+[94m[1m| [0m[90m Grep     [0mRedisUrl|redis://
+Je vois que `http-server.rs` utilise le rate limiter. Vérifions la configuration complète:
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/bin/http-server.rs
+Vérifions la configuration Redis et si le rate limiting fonctionne en testant la connexion:
+[91m[1m| [0m[90m Bash     [0mTest health endpoint for rate limit headers
+
+{"status":"healthy","version":"0.1.0","uptime_seconds":780587,"timestamp":"2026-01-12T16:21:56.036172270+00:00","database":{"status":"healthy","latency_ms":0,"pool_size":5,"pool_idle":4,"pool_active":1,"version":"PostgreSQL 14.20","error":null},"redis":null,"iot":{"status":"healthy","trackers_online":0,"trackers_total":0,"last_update_seconds_ago":null,"error":null}}
+[91m[1m| [0m[90m Bash     [0mCheck for RateLimit headers on health endpoint
+Je vois que Redis est `null` - pas de connexion Redis active. Vérifions les headers:
+[91m[1m| [0m[90m Bash     [0mCheck rate limit headers on auth endpoint
+
+strict-transport-security: max-age=63072000; includeSubDomains; preload
+content-security-policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' wss: https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests
+
+[91m[1m| [0m[90m Bash     [0mCheck rate limit headers on /api/auth endpoint
+Les headers RateLimit ne sont PAS présents. Vérifions comment Nginx route les requêtes API:
+[91m[1m| [0m[90m Bash     [0mList nginx sites config
+
+Nginx config not accessible locally
+
+[91m[1m| [0m[90m Bash     [0mTest local server rate limit headers
+Analysons la situation complète:
+[93m[1m| [0m[90m Todo     [0m2 todos
+## BILAN - Task D002 Rate Limiting
+
+### État Actuel
+
+| Composant | Status | Notes |
+|-----------|--------|-------|
+| `rate_limiter.rs` | ✅ Existe | Config: /auth: 5/min, /api: 30/min |
+| Middleware dans `http-server.rs` | ✅ Activé | Lignes 319-322 |
+| Redis en production | ❌ Pas connecté | `"redis": null` dans health |
+| Headers RateLimit | ❌ Absents | X-RateLimit-* non présents |
+| Rate limiting gRPC | ❌ Non implémenté | Tonic n'utilise pas le middleware Axum |
+
+### Problème Identifié
+
+**Redis n'est pas configuré en production** - Le rate limiter est en fail-open (désactivé silencieusement).
+
+### Actions Requises
+
+1. **Configurer REDIS_URL** en production (variable d'environnement)
+2. **Tester rate limiter** sur backend local (port 8888)
+3. **Ajouter rate limiter gRPC** via interceptor Tonic (separate task)
+
+---
+**NEEDS_MORE_WORK** - Redis production non configuré, rate limiting effectif désactivé.

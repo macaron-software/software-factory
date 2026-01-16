@@ -1,0 +1,19 @@
+[0;34m[10:07:18][0m Starting Wiggum-TDD daemon...
+[0;34m[10:07:18][0m Queue: tdd
+[0;34m[10:07:18][0m Tasks dir: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks
+[0;34m[10:07:18][0m Poll interval: 10s
+[0;34m[10:07:18][0m [Wiggum-TDD] Found task: T325
+[0;34m[10:07:18][0m [T325] Processing with REAL agent...
+[0;34m[10:07:18][0m [T325] Using Real Agent (actual execution, not simulation)...
+[0;33m[10:07:46] ⚠[0m [T325] Agent returned FAILED or needs more work
+[0;33m[10:07:46] ⚠[0m [T325] Exit code: 1
+[0;33m[10:07:46] ⚠[0m [T325] Check log: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/logs/T325_20260114_100718.log
+[0;33m[10:07:46] ⚠[0m [T325] Retry 1/3
+[0;34m[10:07:51][0m [T325] Processing with REAL agent...
+[0;34m[10:07:51][0m [T325] Using Real Agent (actual execution, not simulation)...
+[0;32m[10:09:54] ✓[0m [T325] COMPLETE (real execution verified)
+[0;34m[10:09:54][0m [T325] Creating deploy task for committed changes
+[0;34m[10:09:55][0m [T325] Created deploy task: D038
+/Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks/D038.md
+[0;34m[10:09:55][0m [Wiggum-TDD] --once mode, exiting
+[0;34m[10:09:55][0m [Wiggum-TDD] Daemon stopped

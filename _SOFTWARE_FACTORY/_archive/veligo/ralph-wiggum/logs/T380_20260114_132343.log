@@ -1,0 +1,13 @@
+[0;32m[AGENT] Real Agent starting[0m
+[0;34m[AGENT] Task: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks/T380.md[0m
+[0;34m[AGENT] Queue: tdd[0m
+[0;34m[AGENT] Backend: auto[0m
+[0;32m[AGENT] Starting task: T380[0m
+[0;33m[AGENT] Task T380 decomposed into 3 sub-tasks: T502, T502, T502[0m
+[FRACTAL] Task T380 needs decomposition: items=11 > 10
+[FRACTAL] Created 3 sub-tasks: T502, T502, T502
+
+============================================================
+RESULT: SUCCESS
+============================================================
+DECOMPOSED: T380 -> T502, T502, T502

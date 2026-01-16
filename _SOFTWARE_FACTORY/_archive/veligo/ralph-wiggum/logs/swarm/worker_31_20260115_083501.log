@@ -1,0 +1,27 @@
+[08:35:01] Worker 31 starting (queue: tdd)
+[08:35:14] Worker 31: Processing T1314
+[0;32m[AGENT] Real Agent starting[0m
+[0;34m[AGENT] Task: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks/T1314.md[0m
+[0;34m[AGENT] Queue: tdd[0m
+Traceback (most recent call last):
+  File "/Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/real_agent.py", line 876, in <module>
+    main()
+    ~~~~^^
+  File "/Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/real_agent.py", line 864, in main
+    log(f"Backend: {LLM_BACKEND}", BLUE)
+                    ^^^^^^^^^^^
+NameError: name 'LLM_BACKEND' is not defined
+[08:35:15] Worker 31: T1314 FAILED (exit 1)
+[08:35:39] Worker 31: Processing T1447
+[0;32m[AGENT] Real Agent starting[0m
+[0;34m[AGENT] Task: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks/T1447.md[0m
+[0;34m[AGENT] Queue: tdd[0m
+Traceback (most recent call last):
+  File "/Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/real_agent.py", line 876, in <module>
+    main()
+    ~~~~^^
+  File "/Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/real_agent.py", line 864, in main
+    log(f"Backend: {LLM_BACKEND}", BLUE)
+                    ^^^^^^^^^^^
+NameError: name 'LLM_BACKEND' is not defined
+[08:35:39] Worker 31: T1447 FAILED (exit 1)

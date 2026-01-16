@@ -1,0 +1,54 @@
+#!/usr/bin/expect -f
+# claude_agent_runner.expect - Run Claude in agentic mode with expect
+# Usage: ./claude_agent_runner.expect <prompt_file> <max_seconds>
+
+set timeout [lindex $argv 1]
+if {$timeout == ""} {set timeout 300}
+
+set prompt_file [lindex $argv 0]
+if {$prompt_file == ""} {
+    puts "Usage: $argv0 <prompt_file> \[max_seconds\]"
+    exit 1
+}
+
+# Read prompt from file
+set fp [open $prompt_file r]
+set prompt [read $fp]
+close $fp
+
+# Start Claude with permissions bypass
+spawn claude --dangerously-skip-permissions
+
+# Wait for Claude prompt
+expect {
+    ">" {
+        # Send the prompt
+        send "$prompt\r"
+    }
+    timeout {
+        puts "Timeout waiting for Claude prompt"
+        exit 1
+    }
+}
+
+# Wait for Claude to complete the task
+# Look for signs of completion or timeout
+expect {
+    -re "tests? passed|COMPLETE|SUCCESS|All.*green" {
+        puts "\n=== Task appears complete ==="
+        send "/exit\r"
+    }
+    -re "Error:|FAILED|error:" {
+        # Let Claude continue to fix errors
+        exp_continue
+    }
+    timeout {
+        puts "\n=== Timeout reached ==="
+        send "/exit\r"
+    }
+    eof {
+        puts "\n=== Claude exited ==="
+    }
+}
+
+expect eof

@@ -1,0 +1,35 @@
+[0;34m[16:06:09][0m Starting Wiggum-DEPLOY daemon...
+[0;34m[16:06:09][0m Queue: deploy
+[0;34m[16:06:09][0m Tasks dir: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks
+[0;34m[16:06:09][0m Poll interval: 10s
+[0;34m[16:06:09][0m [Wiggum-DEPLOY] Found task: D002
+[0;34m[16:06:09][0m [D002] Processing...
+[0;34m[16:06:10][0m [D002] Using RLM Light Client (2k tokens vs 40-60k opencode)...
+[0;34m[16:16:37][0m [D002] Running adversarial check...
+[0;33m[16:17:09] ⚠[0m [D002] REJECTED by adversarial: [0;34m[16:16:40][0m [D002] Adversarial check: SECURITY
+[0;34m[16:16:40][0m [D002] Adversarial check: TESTS
+[0;34m[16:17:08][0m [D002] Adversarial check: STUBS
+[0;34m[16:17:09][0m [D002] Adversarial check: CHAOS
+🚨 DEPLOY BLOCKED: 
+🔴 STUBS: veligo-platform/backend/src/api/google_oauth.rs:                panic!("COOKIE_SECRET must be valid hex: {}", e);
+veligo-platform/backend/src/application/queries/get_bike.rs:            _ => panic!("Expected Found result"),
+veligo-platform/backend/src/application/queries/get_bike.rs:            _ => panic!("Expected Found result"),
+veligo-platform/backend/src/application/queries/get_incident.rs:            _ => panic!("Expected Found result"),
+veligo-platform/backend/src/application/queries/get_incident.rs:            _ => panic!("Expected Found result"),
+[0;33m[16:17:09] ⚠[0m [D002] Retry 1/3
+[0;34m[16:17:14][0m [D002] Processing...
+[0;34m[16:17:14][0m [D002] Using RLM Light Client (2k tokens vs 40-60k opencode)...
+[0;34m[16:19:11][0m [D002] Running adversarial check...
+[0;33m[16:19:32] ⚠[0m [D002] REJECTED by adversarial: [0;34m[16:19:12][0m [D002] Adversarial check: SECURITY
+[0;34m[16:19:12][0m [D002] Adversarial check: TESTS
+[0;34m[16:19:31][0m [D002] Adversarial check: STUBS
+[0;34m[16:19:31][0m [D002] Adversarial check: CHAOS
+🚨 DEPLOY BLOCKED: 
+🔴 STUBS: veligo-platform/backend/src/api/google_oauth.rs:                panic!("COOKIE_SECRET must be valid hex: {}", e);
+veligo-platform/backend/src/application/queries/get_bike.rs:            _ => panic!("Expected Found result"),
+veligo-platform/backend/src/application/queries/get_bike.rs:            _ => panic!("Expected Found result"),
+veligo-platform/backend/src/application/queries/get_incident.rs:            _ => panic!("Expected Found result"),
+veligo-platform/backend/src/application/queries/get_incident.rs:            _ => panic!("Expected Found result"),
+[0;33m[16:19:32] ⚠[0m [D002] Retry 2/3
+[0;34m[16:19:37][0m [D002] Processing...
+[0;34m[16:19:37][0m [D002] Using RLM Light Client (2k tokens vs 40-60k opencode)...

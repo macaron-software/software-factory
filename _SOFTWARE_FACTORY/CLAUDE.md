@@ -40,9 +40,11 @@ FEEDBACK → errs → new tasks
 - learning memory: `learnings` table
 - pattern evolution: `pattern_evolutions` table
 - ROI tracking
-- analyse: failures, stuck, fractal depth, KISS
-- Opus4.5 deep analysis
-- auto-fix: reset stuck, apply patterns
+- **chaos**: resilience tests (retry, circuit breaker, timeout)
+- **security**: CVE fetch, OWASP Top10, pentest staging/prod
+- **journeys**: Playwright E2E w/ RBAC personas, real data
+- **logs**: prod log analysis → backlog tasks
+- auto-fix: reset stuck, apply patterns, create tasks
 
 ### TaskStore (`core/task_store.py`)
 - SQLite `data/factory.db`
@@ -82,6 +84,11 @@ factory xp report                  # Opus report
 factory xp fix                     # reset stuck
 factory xp impact                  # ROI
 factory xp learn                   # full cycle
+factory xp chaos -p ppz            # resilience tests
+factory xp security -p ppz         # CVE/OWASP/pentest
+factory xp journeys -p ppz         # E2E personas RBAC
+factory xp logs -p ppz             # prod log analysis
+factory xp full -p ppz --apply     # ALL + create tasks
 
 # Status
 factory status --all

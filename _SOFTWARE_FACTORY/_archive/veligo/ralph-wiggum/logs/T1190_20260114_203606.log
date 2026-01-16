@@ -1,0 +1,664 @@
+[0;32m[AGENT] Real Agent starting[0m
+[0;34m[AGENT] Task: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks/T1190.md[0m
+[0;34m[AGENT] Queue: tdd[0m
+[0;34m[AGENT] Backend: auto[0m
+[0;32m[AGENT] Starting task: T1190[0m
+[0;34m[AGENT] Iteration 1/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'find veligo-platform/backend/src -type f -name "*.rs" | xargs grep -l -[0m
+[0;34m$ find veligo-platform/backend/src -type f -name "*.rs" | xargs grep -l -E "StripeProcessor|PaymentAdapter|mockall" 2>/dev/null | head -20[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'ls -la veligo-platform/backend/src/payment/'}[0m
+[0;34m$ ls -la veligo-platform/backend/src/payment/[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/mod.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/payment/mod.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/stripe.rs 2>/dev/null || echo "[0m
+[0;34m$ cat veligo-platform/backend/src/payment/stripe.rs 2>/dev/null || echo "File not found"[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/paypal.rs 2>/dev/null || echo "[0m
+[0;34m$ cat veligo-platform/backend/src/payment/paypal.rs 2>/dev/null || echo "File not found"[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'find veligo-platform/backend -name "*test*.rs" -path "*/payment/*" 2>/d[0m
+[0;34m$ find veligo-platform/backend -name "*test*.rs" -path "*/payment/*" 2>/dev/null[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/adapter.rs 2>/dev/null || echo [0m
+[0;34m$ cat veligo-platform/backend/src/payment/adapter.rs 2>/dev/null || echo "File not found"[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/Cargo.toml'}[0m
+[0;34m$ cat veligo-platform/backend/Cargo.toml[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/test.rs 2>/dev/null || echo "Fi[0m
+[0;34m$ cat veligo-platform/backend/src/payment/test.rs 2>/dev/null || echo "File not found"[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'ls -la veligo-platform/backend/src/payment/'}[0m
+[0;34m$ ls -la veligo-platform/backend/src/payment/[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/lib.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/lib.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/factory.rs 2>/dev/null || echo [0m
+[0;34m$ cat veligo-platform/backend/src/payment/factory.rs 2>/dev/null || echo "File not found"[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/adapter.rs 2>/dev/null'}[0m
+[0;34m$ cat veligo-platform/backend/src/payment/adapter.rs 2>/dev/null[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'grep -r "mockall" veligo-platform/backend/Cargo.toml veligo-platform/ba[0m
+[0;34m$ grep -r "mockall" veligo-platform/backend/Cargo.toml veligo-platform/backend/Cargo.lock 2>/dev/null || echo "mockall not found in Cargo files"[0m
+[0;34m[AGENT] Executing: edit - {'type': 'edit', 'file': 'veligo-platform/backend/Cargo.toml', 'old': '[dependencies]\nasync-trait =[0m
+[0;31m[AGENT] String not found in veligo-platform/backend/Cargo.toml[0m
+[0;34m[AGENT] Iteration 2/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/Cargo.toml'}[0m
+[0;34m$ cat veligo-platform/backend/Cargo.toml[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/lib.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/payment/lib.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/adapter.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/payment/adapter.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'ls -la veligo-platform/backend/src/payment/adapter/'}[0m
+[0;34m$ ls -la veligo-platform/backend/src/payment/adapter/[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/adapter/mod.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/payment/adapter/mod.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/adapter/stripe.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/payment/adapter/stripe.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/errors.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/payment/errors.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'find veligo-platform/backend/src -name "*.rs" -exec grep -l "trait Paym[0m
+[0;34m$ find veligo-platform/backend/src -name "*.rs" -exec grep -l "trait PaymentAdapter" {} \;[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/adapters/mod.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/payment/adapters/mod.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/adapters/stripe.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/payment/adapters/stripe.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/adapters/paypal.rs 2>/dev/null [0m
+[0;34m$ cat veligo-platform/backend/src/payment/adapters/paypal.rs 2>/dev/null || cat veligo-platform/backend/src/payment/paypal_adapter.rs 2>/dev/null || echo "File not found"[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/mocks/mod.rs 2>/dev/null || echo "File [0m
+[0;34m$ cat veligo-platform/backend/src/mocks/mod.rs 2>/dev/null || echo "File not found"[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/mocks.rs 2>/dev/null || echo "File not [0m
+[0;34m$ cat veligo-platform/backend/src/mocks.rs 2>/dev/null || echo "File not found"[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/tests/factory_test.rs 2>/dev/nu[0m
+[0;34m$ cat veligo-platform/backend/src/payment/tests/factory_test.rs 2>/dev/null || echo "File not found"[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': '<write file="veligo-platform/backend/src/payment/mock.rs">\n//! Mock im[0m
+[0;34m$ <write file="veligo-platform/backend/src/payment/mock.rs">
+//! Mock implementations for payment processors for testing
+//!
+//! This module provides mock implementations of payment processors
+//! using `mockall` for test isolation.
+
+use async_trait::async_trait;
+use mockall::{mock, predicate::*};
+
+use crate::payment::{
+    adapter::PaymentAdapter as PaymentAdapterTrait,
+    errors::PaymentError,
+    types::{PaymentRequest, PaymentResponse, PaymentStatus, PaymentProvider, RefundRequest, RefundResponse},
+};
+
+use super::StripeProcessor;
+
+/// Creates a mock StripeProcessor for testing
+#[macro_export]
+macro_rules! mock_stripe_processor {
+    () => {{
+        use $crate::payment::mock::MockStripeProcessor;
+        MockStripeProcessor::new()
+    }};
+}
+
+/// Creates a mock PaymentAdapter for testing
+#[macro_export]
+macro_rules! mock_payment_adapter {
+    () => {{
+        use $crate::payment::mock::MockPaymentAdapter;
+        MockPaymentAdapter::new()
+    }};
+}
+
+/// Mock StripeProcessor for testing
+///
+/// This mock allows setting expectations on all Stripe processor operations
+/// for isolated unit tests.
+mock! {
+    pub StripeProcessor {
+        /// Create a new customer in Stripe
+        async fn create_customer(
+            &self,
+            email: &str,
+            name: &str,
+        ) -> Result<String, PaymentError>;
+
+        /// Retrieve a customer from Stripe
+        async fn get_customer(&self, customer_id: &str) -> Result<serde_json::Value, PaymentError>;
+
+        /// Create a payment intent
+        async fn create_payment_intent(
+            &self,
+            amount: i64,
+            currency: &str,
+            customer_id: Option<&str>,
+            metadata: Option<std::collections::HashMap<String, String>>,
+        ) -> Result<PaymentResponse, PaymentError>;
+
+        /// Capture a previously created payment intent
+        async fn capture_payment_intent(
+            &self,
+            payment_intent_id: &str,
+        ) -> Result<PaymentResponse, PaymentError>;
+
+        /// Create a refund for a payment
+        async fn refund_payment(
+            &self,
+            payment_intent_id: &str,
+            amount: Option<i64>,
+            reason: Option<&str>,
+        ) -> Result<RefundResponse, PaymentError>;
+
+        /// Create a subscription
+        async fn create_subscription(
+            &self,
+            customer_id: &str,
+            price_id: &str,
+            metadata: Option<std::collections::HashMap<String, String>>,
+        ) -> Result<PaymentResponse, PaymentError>;
+
+        /// Cancel a subscription
+        async fn cancel_subscription(
+            &self,
+            subscription_id: &str,
+        ) -> Result<PaymentResponse, PaymentError>;
+
+        /// Retrieve a payment intent
+        async fn get_payment_intent(
+            &self,
+            payment_intent_id: &str,
+        ) -> Result<PaymentResponse, PaymentError>;
+    }
+}
+
+#[async_trait]
+impl StripeProcessor for MockStripeProcessor {
+    /// Create a new customer in Stripe
+    async fn create_customer(
+        &self,
+        email: &str,
+        name: &str,
+    ) -> Result<String, PaymentError> {
+        let ctx = self
+            .create_customer_context
+            .lock()
+            .expect("mutex poisoned");
+        let f: fn(_, _) -> _ = ctx.r#fn.take().unwrap_or(Box::new(|_, _| unreachable!()));
+        f(self, (&ctx.email, &ctx.name)).await
+    }
+
+    /// Retrieve a customer from Stripe
+    async fn get_customer(&self, customer_id: &str) -> Result<serde_json::Value, PaymentError> {
+        let ctx = self
+            .get_customer_context
+            .lock()
+            .expect("mutex poisoned");
+        let f: fn(_, _) -> _ = ctx.r#fn.take().unwrap_or(Box::new(|_, _| unreachable!()));
+        f(self, customer_id).await
+    }
+
+    /// Create a payment intent
+    async fn create_payment_intent(
+        &self,
+        amount: i64,
+        currency: &str,
+        customer_id: Option<&str>,
+        metadata: Option<std::collections::HashMap<String, String>>,
+    ) -> Result<PaymentResponse, PaymentError> {
+        let ctx = self
+            .create_payment_intent_context
+            .lock()
+            .expect("mutex poisoned");
+        let f: fn(_, _, _, _) -> _ = ctx.r#fn.take().unwrap_or(Box::new(|_, _, _, _| unreachable!()));
+        f(self, amount, currency, customer_id, metadata).await
+    }
+
+    /// Capture a previously created payment intent
+    async fn capture_payment_intent(
+        &self,
+        payment_intent_id: &str,
+    ) -> Result<PaymentResponse, PaymentError> {
+        let ctx = self
+            .capture_payment_intent_context
+            .lock()
+            .expect("mutex poisoned");
+        let f: fn(_, _) -> _ = ctx.r#fn.take().unwrap_or(Box::new(|_, _| unreachable!()));
+        f(self, payment_intent_id).await
+    }
+
+    /// Create a refund for a payment
+    async fn refund_payment(
+        &self,
+        payment_intent_id: &str,
+        amount: Option<i64>,
+        reason: Option<&str>,
+    ) -> Result<RefundResponse, PaymentError> {
+        let ctx = self
+            .refund_payment_context
+            .lock()
+            .expect("mutex poisoned");
+        let f: fn(_, _, _, _) -> _ = ctx.r#fn.take().unwrap_or(Box::new(|_, _, _, _| unreachable!()));
+        f(self, payment_intent_id, amount, reason).await
+    }
+
+    /// Create a subscription
+    async fn create_subscription(
+        &self,
+        customer_id: &str,
+        price_id: &str,
+        metadata: Option<std::collections::HashMap<String, String>>,
+    ) -> Result<PaymentResponse, PaymentError> {
+        let ctx = self
+            .create_subscription_context
+            .lock()
+            .expect("mutex poisoned");
+        let f: fn(_, _, _, _) -> _ = ctx.r#fn.take().unwrap_or(Box::new(|_, _, _, _| unreachable!()));
+        f(self, customer_id, price_id, metadata).await
+    }
+
+    /// Cancel a subscription
+    async fn cancel_subscription(
+        &self,
+        subscription_id: &str,
+    ) -> Result<PaymentResponse, PaymentError> {
+        let ctx = self
+            .cancel_subscription_context
+            .lock()
+            .expect("mutex poisoned");
+        let f: fn(_, _) -> _ = ctx.r#fn.take().unwrap_or(Box::new(|_, _| unreachable!()));
+        f(self, subscription_id).await
+    }
+
+    /// Retrieve a payment intent
+    async fn get_payment_intent(
+        &self,
+        payment_intent_id: &str,
+    ) -> Result<PaymentResponse, PaymentError> {
+        let ctx = self
+            .get_payment_intent_context
+            .lock()
+            .expect("mutex poisoned");
+        let f: fn(_, _) -> _ = ctx.r#fn.take().unwrap_or(Box::new(|_, _| unreachable!()));
+        f(self, payment_intent_id).await
+    }
+}
+
+/// Mock PaymentAdapter for testing
+///
+/// This mock allows setting expectations on PaymentAdapter operations
+/// for isolated unit tests.
+mock! {
+    pub PaymentAdapter {
+        /// Process a payment
+        async fn process_payment(
+            &self,
+            request: PaymentRequest,
+        ) -> Result<PaymentResponse, PaymentError>;
+
+        /// Process a refund
+        async fn process_refund(
+            &self,
+            request: RefundRequest,
+        ) -> Result<RefundResponse, PaymentError>;
+
+        /// Get the payment status
+        async fn get_payment_status(
+            &self,
+            transaction_id: &str,
+        ) -> Result<PaymentStatus, PaymentError>;
+
+        /// Create a customer
+        async fn create_customer(
+            &self,
+            email: &str,
+            name: &str,
+        ) -> Result<String, PaymentError>;
+
+        /// Get a customer
+        async fn get_customer(
+            &self,
+            customer_id: &str,
+        ) -> Result<serde_json::Value, PaymentError>;
+
+        /// Create a subscription
+        async fn create_subscription(
+            &self,
+            customer_id: &str,
+            price_id: &str,
+            metadata: Option<std::collections::HashMap<String, String>>,
+        ) -> Result<PaymentResponse, PaymentError>;
+
+        /// Cancel a subscription
+        async fn cancel_subscription(
+            &self,
+            subscription_id: &str,
+        ) -> Result<PaymentResponse, PaymentError>;
+    }
+}
+
+#[async_trait]
+impl PaymentAdapterTrait for MockPaymentAdapter {
+    async fn process_payment(
+        &self,
+        request: PaymentRequest,
+    ) -> Result<PaymentResponse, PaymentError> {
+        let ctx = self
+            .process_payment_context
+            .lock()
+            .expect("mutex poisoned");
+        let f: fn(_) -> _ = ctx.r#fn.take().unwrap_or(Box::new(|_| unreachable!()));
+        f(request).await
+    }
+
+    async fn process_refund(
+        &self,
+        request: RefundRequest,
+    ) -> Result<RefundResponse, PaymentError> {
+        let ctx = self
+            .process_refund_context
+            .lock()
+            .expect("mutex poisoned");
+        let f: fn(_) -> _ = ctx.r#fn.take().unwrap_or(Box::new(|_| unreachable!()));
+        f(request).await
+    }
+
+    async fn get_payment_status(
+        &self,
+        transaction_id: &str,
+    ) -> Result<PaymentStatus, PaymentError> {
+        let ctx = self
+            .get_payment_status_context
+            .lock()
+            .expect("mutex poisoned");
+        let f: fn(_) -> _ = ctx.r#fn.take().unwrap_or(Box::new(|_| unreachable!()));
+        f(transaction_id).await
+    }
+
+    async fn create_customer(
+        &self,
+        email: &str,
+        name: &str,
+    ) -> Result<String, PaymentError> {
+        let ctx = self
+            .create_customer_context
+            .lock()
+            .expect("mutex poisoned");
+        let f: fn(_, _) -> _ = ctx.r#fn.take().unwrap_or(Box::new(|_, _| unreachable!()));
+        f(email, name).await
+    }
+
+    async fn get_customer(
+        &self,
+        customer_id: &str,
+    ) -> Result<serde_json::Value, PaymentError> {
+        let ctx = self
+            .get_customer_context
+            .lock()
+            .expect("mutex poisoned");
+        let f: fn(_) -> _ = ctx.r#fn.take().unwrap_or(Box::new(|_| unreachable!()));
+        f(customer_id).await
+    }
+
+    async fn create_subscription(
+        &self,
+        customer_id: &str,
+        price_id: &str,
+        metadata: Option<std::collections::HashMap<String, String>>,
+    ) -> Result<PaymentResponse, PaymentError> {
+        let ctx = self
+            .create_subscription_context
+            .lock()
+            .expect("mutex poisoned");
+        let f: fn(_, _, _) -> _ = ctx.r#fn.take().unwrap_or(Box::new(|_, _, _| unreachable!()));
+        f(customer_id, price_id, metadata).await
+    }
+
+    async fn cancel_subscription(
+        &self,
+        subscription_id: &str,
+    ) -> Result<PaymentResponse, PaymentError> {
+        let ctx = self
+            .cancel_subscription_context
+            .lock()
+            .expect("mutex poisoned");
+        let f: fn(_) -> _ = ctx.r#fn.take().unwrap_or(Box::new(|_| unreachable!()));
+        f(subscription_id).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::test as async_test;
+
+    #[async_test]
+    async fn test_mock_stripe_processor_create_payment_intent() {
+        let mut mock = MockStripeProcessor::new();
+        
+        mock.expect_create_payment_intent()
+            .returning(|_, _, _, _| {
+                Ok(PaymentResponse {
+                    transaction_id: "pi_test_123".to_string(),
+                    status: PaymentStatus::Pending,
+                    amount: 1000,
+                    currency: "usd".to_string(),
+                    provider: PaymentProvider::Stripe,
+                    metadata: Default::default(),
+                })
+            });
+
+        let result = mock.create_payment_intent(1000, "usd", None, None).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().transaction_id, "pi_test_123");
+    }
+
+    #[async_test]
+    async fn test_mock_payment_adapter_process_payment() {
+        let mut mock = MockPaymentAdapter::new();
+        
+        mock.expect_process_payment()
+            .returning(|request| {
+                Ok(PaymentResponse {
+                    transaction_id: "tx_test_456".to_string(),
+                    status: PaymentStatus::Succeeded,
+                    amount: request.amount,
+                    currency: request.currency.clone(),
+                    provider: PaymentProvider::Stripe,
+                    metadata: Default::default(),
+                })
+            });
+
+        let request = PaymentRequest {
+            amount: 2000,
+            currency: "eur".to_string(),
+            description: "Test payment".to_string(),
+            metadata: Default::default(),
+        };
+
+        let result = mock.process_payment(request).await;
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert_eq!(response.transaction_id, "tx_test_456");
+        assert_eq!(response.amount, 2000);
+        assert_eq!(response.status, PaymentStatus::Succeeded);
+    }
+
+    #[async_test]
+    async fn test_mock_stripe_processor_refund() {
+        let mut mock = MockStripeProcessor::new();
+        
+        mock.expect_refund_payment()
+            .returning(|_, _, _| {
+                Ok(RefundResponse {
+                    refund_id: "re_test_789".to_string(),
+                    status: PaymentStatus::Succeeded,
+                    amount: 500,
+                })
+            });
+
+        let result = mock.refund_payment("pi_test_123", Some(500), Some("requested_by_customer")).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().refund_id, "re_test_789");
+    }
+
+    #[async_test]
+    async fn test_mock_payment_adapter_get_payment_status() {
+        let mut mock = MockPaymentAdapter::new();
+        
+        mock.expect_get_payment_status()
+            .returning(|_| {
+                Ok(PaymentStatus::Succeeded)
+            });
+
+        let result = mock.get_payment_status("tx_test_456").await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), PaymentStatus::Succeeded);
+    }
+}[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': '<write file="veligo-platform/backend/src/payment/mod.rs">\n//! Payment [0m
+[0;34m$ <write file="veligo-platform/backend/src/payment/mod.rs">
+//! Payment processing module
+//!
+//! This module provides payment processing capabilities with support for
+//! multiple payment providers (Stripe, PayPal) and test isolation through mocks.
+
+pub mod adapter;
+pub mod adapters;
+pub mod errors;
+pub mod types;
+
+#[cfg(feature = &quot;test-mocks&quot;)]
+pub mod mock;
+
+// Re-exports
+pub use adapter::PaymentAdapter;
+pub use errors::PaymentError;
+pub use types::{
+    PaymentRequest, PaymentResponse, PaymentResult, PaymentStatus, PaymentProvider,
+    RefundRequest, RefundResponse,
+};[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'find veligo-platform/backend/src/payment -name "*.rs" -exec grep -l "st[0m
+[0;34m$ find veligo-platform/backend/src/payment -name "*.rs" -exec grep -l "struct PaymentRequest\|struct PaymentResponse" {} \;[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/adapter/mod.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/payment/adapter/mod.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/adapter/mod.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/payment/adapter/mod.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/adapters/stripe.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/payment/adapters/stripe.rs[0m
+[0;34m[AGENT] Executing: edit - {'type': 'edit', 'file': 'veligo-platform/backend/Cargo.toml', 'old': 'mockall = &quot;0.12&quot;\nt[0m
+[0;31m[AGENT] String not found in veligo-platform/backend/Cargo.toml[0m
+[0;34m[AGENT] Iteration 3/10[0m
+
+============================================================
+RESULT: FAILED
+============================================================
+cat veligo-platform/backend/src/payment/errors.rs
+```
+
+Now let me look at the PaymentAdapter trait and types:
+
+```bash
+find veligo-platform/backend/src -name "*.rs" -exec grep -l "trait PaymentAdapter" {} \;
+```
+
+Let me check the adapters module:
+
+```bash
+cat veligo-platform/backend/src/payment/adapters/mod.rs
+```
+
+```bash
+cat veligo-platform/backend/src/payment/adapters/stripe.rs
+```
+
+Now I understand the structure better. Let me check the PayPal adapter too:
+
+```bash
+cat veligo-platform/backend/src/payment/adapters/paypal.rs 2>/dev/null || cat veligo-platform/backend/src/payment/paypal_adapter.rs 2>/dev/null || echo "File not found"
+```
+
+Let me check the mocks directory that already exists:
+
+```bash
+cat veligo-platform/backend/src/mocks/mod.rs 2>/dev/null || echo "File not found"
+```
+
+Let me check the mocks.rs:
+
+```bash
+cat veligo-platform/backend/src/mocks.rs 2>/dev/null || echo "File not found"
+```
+
+Now let me look at existing test f
+
+=== Action Results ===
+bash: OK
+[package]
+name = "veligo-backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sqlx = { version = "0.7", features = ["postgres", "runtime-tokio"] }
+async-trait = "0.1"
+mockall = "0.12"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+uuid = { version = "1.0", features = ["v4"] }
+
+[dev-dependencies]
+reqwest = { version = "0.11", features = ["json"] }
+mockall = "
+---
+bash: OK
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
+use dyn_clone::DynClone;
+
+// Re-export types
+pub use self::{
+    adapter::{PaymentAdapter, PaymentAdapterFactory},
+    adapter::PaymentService,
+    errors::PaymentError,
+    types::{PaymentProvider, PaymentRequest, PaymentResponse, PaymentResult, PaymentStatus, RefundRequest, RefundResponse},
+};
+
+mod adapter;
+pub mod errors;
+pub mod paypal;
+pub mod stripe;
+pub mod types;
+
+#[cfg(test)]
+mod tests;
+---
+bash: OK
+use async_trait::async_trait;
+use std::collections::HashMap;
+use crate::payment::{
+    PaymentAdapter as PaymentAdapterTrait, PaymentError, PaymentProvider, PaymentRequest,
+    PaymentResponse, PaymentResult, PaymentStatus, RefundRequest, RefundResponse,
+};
+use super::{PayPalProcessor, PayPalProcessorConfig, StripeProcessor, StripeProcessorConfig};
+
+/// Trait for payment processors - allows for dynamic dispatch and mocking
+#[async_trait]
+pub trait PaymentAdapter: Send + Sync + Clone + 'static {
+
+---
+bash: OK
+total 8
+drwxr-xr-x   3 sylvain  staff   96 Jan 14 20:35 .
+drwxr-xr-x  21 sylvain  staff  672 Jan 14 20:37 ..
+-rw-r--r--   1 sylvain  staff  182 Jan 14 20:35 mod.rs
+
+---
+bash: OK
+//! Payment adapter module
+//!
+//! This module provides payment adapter implementations for different providers.
+
+pub mod adapter_trait;
+pub mod adapter_trait_async;
+pub mod factory;
+---
+bash: FAIL
+cat: veligo-platform/backend/src/payment/adapter/stripe.rs: No such file or directory
+
+
+
+ERROR: LLM call failed

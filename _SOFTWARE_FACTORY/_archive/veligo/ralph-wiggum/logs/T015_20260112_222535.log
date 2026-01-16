@@ -1,0 +1,279 @@
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/tracking.api.spec.ts"}
+[96m[1m| [0m[90m Read     [0mveligo-platform/tests/e2e/api/tracking.api.spec.ts
+Je vois 5 tests actifs. Cherchons s'il y a des tests skippés ailleurs:
+[94m[1m| [0m[90m Grep     [0mtest\.skip.*tracking
+Les tests sont actifs mais attendent un endpoint REST `/api/tracking/bike/{id}`. Vérifions si l'API existe:
+[94m[1m| [0m[90m veligo-rag_veligo_grep  [0m{"file_type":"rs","pattern":"tracking"}
+[94m[1m| [0m[90m Grep     [0mtracking
+L'infrastructure de tracking existe. Vérifions les routes:
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/infrastructure/tracking/routes.rs
+L'endpoint existe déjà. Vérifions si le repository a la méthode `get_device_by_bike_id`:
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/infrastructure/tracking/repository.rs
+Le code backend existe. Lançons les tests pour voir l'état actuel:
+[91m[1m| [0m[90m Bash     [0mRun tracking API tests
+
+Error: Playwright Test did not expect test.describe() to be called here.
+Most common reasons include:
+- You are calling test.describe() in a configuration file.
+- You are calling test.describe() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+
+   at tests/e2e/api/tracking.api.spec.ts:14
+
+  12 | const API_URL = process.env.API_URL || 'https://api.veligo.app';
+  13 |
+> 14 | test.describe('Tracking API', () => {
+     |      ^
+  15 |   let authToken: string;
+  16 |
+  17 |   test.beforeAll(async ({ request }) => {
+    at TestTypeImpl._currentSuite (/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/node_modules/playwright/lib/common/testType.js:75:13)
+    at TestTypeImpl._describe (/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/node_modules/playwright/lib/common/testType.js:115:24)
+    at Function.describe (/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/node_modules/playwright/lib/transform/transform.js:275:12)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/api/tracking.api.spec.ts:14:6)
+Error: No tests found.
+Make sure that arguments are regular expressions matching test files.
+You may need to escape symbols like "$" or "*" and quote the arguments.
+
+
+[96m[1m| [0m[90m Read     [0mveligo-platform/tests/e2e/playwright.config.ts
+[91m[1m| [0m[90m Bash     [0mRun API tests with project config
+
+🚴 Veligo E2E Tests - Global Setup
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RÈGLES ABSOLUES:
+  ❌ AUCUNE erreur console tolérée (sync ou async)
+  ❌ AUCUN warning critique toléré
+  ❌ AUCUN test.skip() autorisé
+  ❌ AUCUN retry - Si ça échoue, on corrige
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 Base URL: https://idfm.veligo.app
+🔧 Workers: 5
+🔄 Retries: 0
+
+🔍 Checking HTTP server availability...
+✅ HTTP server is running
+🔧 PR-005: Starting gRPC-Web proxy server...
+⚠️  Port 8080 already in use, assuming proxy is already running
+🌱 PR-010: Seeding test data...
+🌱 Seeding test data...
+  ✓ User marie.dupont@test-idfm.fr already exists (skipping)
+  ✓ User jean.martin@test-nantes.fr already exists (skipping)
+  ✓ User pierre.bernard@test-lyon.fr already exists (skipping)
+  ✓ User admin@idfm.fr already exists (skipping)
+  ✓ User admin@idfm.fr already exists (skipping)
+  ⚠️  User owner@veligo.app registration failed with database error (might already exist): Database error: error returned from database: record "new" has no field "user_id"
+  ⚠️  User test@veligo.app registration failed with database error (might already exist): Database error: error returned from database: record "new" has no field "user_id"
+✅ Users seeded
+  📊 Attempting to seed 13 stations from fixtures
+  ⚠️  Check endpoint returned 404: 
+⚠️  Test API seed endpoint not available (404).
+   Checking if stations already exist in database...
+❌ ERROR: Test API seed endpoint not available (404) and no stations found.
+   Set ENABLE_TEST_API=1 on the backend to enable automatic seeding.
+   Without stations seeded, E2E tests will fail.
+❌ Station seeding failed: Error: Station seeding failed: Test API endpoint disabled (404). Set ENABLE_TEST_API=1.
+⚠️  Station seeding failed (not critical for all tests)
+  📊 Attempting to seed 53 bikes from fixtures
+⚠️  Test API seed endpoint not available (404).
+   Checking if bikes already exist in database...
+❌ ERROR: Test API seed endpoint not available (404) and no bikes found.
+   Set ENABLE_TEST_API=1 on the backend to enable automatic seeding.
+   Without bikes seeded, E2E tests will fail.
+❌ Bike seeding failed: Error: Bike seeding failed: Test API endpoint disabled (404). Set ENABLE_TEST_API=1.
+⚠️  Bike seeding failed (not critical for all tests)
+Bookings will be created during test execution
+✅ Bookings seeded
+🌱 Test data seeding complete
+⚠️  Could not verify users: HTTP 404
+⚠️  Could not verify stations via test API: HTTP 404 - 
+   Attempting gRPC verification as fallback...
+⚠️  Could not verify bikes via test API: HTTP 404 
+   Attempting gRPC verification as fallback...
+   ❌ ListBikes method is UNIMPLEMENTED on server
+✅ Seeded data verification:
+   - Users: 0
+   - Stations: 0
+   - Bikes: 0
+⚠️  No stations found - station tests will fail, but other tests can continue
+⚠️  No bikes found - bike tests will fail, but other tests can continue
+✅ Test data seeding complete
+
+Running 228 tests using 5 workers
+
+[Admin API Tests] Using API base URL: https://idfm.veligo.app
+[Admin API Tests] Using API base URL: https://idfm.veligo.app
+[Admin API Tests] Using API base URL: https://idfm.veligo.app
+[Admin API Tests] Using API base URL: https://idfm.veligo.app
+[Admin API Tests] Using API base URL: https://idfm.veligo.app
+[Admin API Tests] Logging in as admin: admin@idfm.fr
+[Admin API Tests] Logging in as admin: admin@idfm.fr
+[Admin API Tests] Logging in as admin: admin@idfm.fr
+[Admin API Tests] Logging in as admin: admin@idfm.fr
+[Admin API Tests] Logging in as admin: admin@idfm.fr
+[Admin API Tests] Admin login failed with status: 500
+[Admin API Tests] Error response: 
+[Admin API Tests] Logging in as regular user: marie.dupont@test-idfm.fr
+[Admin API Tests] Admin login failed with status: 500
+[Admin API Tests] Error response: 
+[Admin API Tests] Logging in as regular user: marie.dupont@test-idfm.fr
+[Admin API Tests] Admin login failed with status: 500
+[Admin API Tests] Admin login failed with status: 500
+[Admin API Tests] Admin login failed with status: 500
+[Admin API Tests] Error response: 
+[Admin API Tests] Logging in as regular user: marie.dupont@test-idfm.fr
+[Admin API Tests] Error response: 
+[Admin API Tests] Logging in as regular user: marie.dupont@test-idfm.fr
+[Admin API Tests] Error response: 
+[Admin API Tests] Logging in as regular user: marie.dupont@test-idfm.fr
+[Admin API Tests] User login failed with status: 500
+[Admin API Tests] Error response: 
+[Admin API Tests] User login failed with status: 500
+[Admin API Tests] Error response: 
+[Admin API Tests] User login failed with status: 500
+[Admin API Tests] Error response: 
+[Admin API Tests] User login failed with status: 500
+[Admin API Tests] Error response: 
+[Admin API Tests] User login failed with status: 500
+[Admin API Tests] Error response: 
+  ✘    3 [api] › api/admin.api.spec.ts:207:9 › @api Admin API › Admin Users Management › ADMIN.05 - Regular user cannot list users (70ms)
+  ✘    4 [api] › api/admin.api.spec.ts:141:9 › @api Admin API › Admin Dashboard Metrics › ADMIN.01 - Admin can get dashboard metrics (72ms)
+  ✘    5 [api] › api/admin.api.spec.ts:395:9 › @api Admin API › Admin RGPD Operations › ADMIN.17 - Admin can list consents (79ms)
+
+Les tests API échouent à cause du login. Vérifions si le backend tourne et si l'endpoint tracking est accessible:
+[91m[1m| [0m[90m Bash     [0mCheck tracking API endpoint
+
+404
+[91m[1m| [0m[90m Bash     [0mGet tracking response body
+[91m[1m| [0m[90m Bash     [0mGet tracking API verbose response
+
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0* Host api.veligo.app:443 was resolved.
+* IPv6: (none)
+* IPv4: 4.251.107.141
+*   Trying 4.251.107.141:443...
+* Connected to api.veligo.app (4.251.107.141) port 443
+* ALPN: curl offers h2,http/1.1
+* (304) (OUT), TLS handshake, Client hello (1):
+} [319 bytes data]
+*  CAfile: /etc/ssl/cert.pem
+*  CApath: none
+* (304) (IN), TLS handshake, Server hello (2):
+{ [122 bytes data]
+* (304) (IN), TLS handshake, Unknown (8):
+{ [19 bytes data]
+* (304) (IN), TLS handshake, Certificate (11):
+{ [2720 bytes data]
+* (304) (IN), TLS handshake, CERT verify (15):
+{ [264 bytes data]
+* (304) (IN), TLS handshake, Finished (20):
+{ [52 bytes data]
+* (304) (OUT), TLS handshake, Finished (20):
+} [52 bytes data]
+* SSL connection using TLSv1.3 / AEAD-AES256-GCM-SHA384 / [blank] / UNDEF
+* ALPN: server accepted h2
+* Server certificate:
+*  subject: CN=veligo.app
+*  start date: Dec 13 15:26:08 2025 GMT
+*  expire date: Mar 13 15:26:07 2026 GMT
+
+[91m[1m| [0m[90m Bash     [0mGet tracking API with HTTP code
+
+
+HTTP_CODE:404
+[91m[1m| [0m[90m Bash     [0mGet tracking API with trailing slash
+[91m[1m| [0m[90m Bash     [0mTest tracking devices endpoint
+[91m[1m| [0m[90m Bash     [0mCheck API health
+
+{"status":"ok","timestamp":"2026-01-12T21:21:23.838635595+00:00"}
+[91m[1m| [0m[90m Bash     [0mList API root
+[94m[1m| [0m[90m Grep     [0mtracking
+[91m[1m| [0m[90m Bash     [0mBuild backend with tracking
+
+help: there is an associated function `from` with a similar name
+     |
+1139 -                                         let lat_bd = sqlx::types::BigDecimal::from_str("48.8566")
+1139 +                                         let lat_bd = sqlx::types::BigDecimal::from("48.8566")
+     |
+
+error[E0599]: no function or associated item named `from_str` found for struct `BigDecimal` in the current scope
+    --> backend/src/api/test_api.rs:1141:79
+     |
+1141 | ...                   let lng_bd = sqlx::types::BigDecimal::from_str("2.3522")
+     |                                                             ^^^^^^^^ function or associated item not found in `BigDecimal`
+     |
+note: if you're trying to build a new `BigDecimal` consider using one of the following associated functions:
+      BigDecimal::new
+      BigDecimal::from_bigint
+      BigDecimal::from_biguint
+      BigDecimal::parse_bytes
+    --> /Users/sylvain/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bigdecimal-0.4.10/src/lib.rs:224:5
+     |
+ 224 |     pub fn new(digits: BigInt, scale: i64) -> BigDecimal {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 229 |     pub fn from_bigint(digits: BigInt, scale: i64) -> BigDecimal {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 237 |     pub fn from_biguint(digits: BigUint, scale: i64) -> BigDecimal {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 309 |     pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<BigDecimal> {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: items from traits can only be used if the trait is in scope
+help: trait `FromStr` which provides `from_str` is implemented but not in scope; perhaps you want to import it
+     |
+   6 + use std::str::FromStr;
+     |
+help: there is an associated function `from` with a similar name
+     |
+1141 -                                         let lng_bd = sqlx::types::BigDecimal::from_str("2.3522")
+1141 +                                         let lng_bd = sqlx::types::BigDecimal::from("2.3522")
+     |
+
+error[E0599]: no method named `uri` found for struct `tonic::Request<T>` in the current scope
+   --> backend/src/middleware/rate_limiter_grpc.rs:239:36
+    |
+239 |                 let path = request.uri().path().to_string();
+    |                                    ^^^ method not found in `tonic::Request<()>`
+
+For more information about this error, try `rustc --explain E0599`.
+warning: `veligo-api` (lib) generated 6 warnings
+error: could not compile `veligo-api` (lib) due to 3 previous errors; 6 warnings emitted
+
+Le backend ne compile pas. Corrigeons les erreurs de compilation:
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/api/test_api.rs
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/api/test_api.rs
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/middleware/rate_limiter_grpc.rs
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/middleware/rate_limiter_grpc.rs
+[91m[1m| [0m[90m Bash     [0mCheck tonic version
+
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/Cargo.toml:opentelemetry-otlp = { version = "0.13", features = ["tonic"] }
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/Cargo.toml:tonic = "0.12"
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/Cargo.toml:tonic-web = "0.12"  # gRPC-Web support (NO Envoy needed!)
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/Cargo.toml:tonic-build = "0.12"
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/Cargo.toml:name = "tonic-server"
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/Cargo.toml:path = "src/bin/tonic-server.rs"
+
+[94m[1m| [0m[90m Grep     [0mrequest\.uri\(\)
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/middleware/rate_limiter_grpc.rs
+Vérifions si ces erreurs de compilation sont récentes ou anciennes:
+[91m[1m| [0m[90m Bash     [0mCheck compilation errors
+
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+error[E0432]: unresolved import `http`
+warning: unused import: `Method`
+warning: unused import: `error`
+warning: unused import: `error`
+warning: unused import: `error`
+warning: unused import: `async_trait::async_trait`
+warning: unused import: `error`
+error[E0599]: no function or associated item named `from_str` found for struct `BigDecimal` in the current scope
+error[E0599]: no function or associated item named `from_str` found for struct `BigDecimal` in the current scope
+error[E0599]: no method named `uri` found for struct `tonic::Request<T>` in the current scope
+warning: `veligo-api` (lib) generated 6 warnings
+error: could not compile `veligo-api` (lib) due to 4 previous errors; 6 warnings emitted
+
+[91m[1mError: [0mNotFoundError: NotFoundError

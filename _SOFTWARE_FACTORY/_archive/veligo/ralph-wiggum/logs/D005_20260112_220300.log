@@ -1,0 +1,29 @@
+[96m[1m| [0m[90m Read     [0mCLAUDE.md
+Je vois que CLAUDE.md montre déjà tous les contrôles de sécurité comme ✅ OK. Vérifions si D001 a déjà été appliqué:
+[91m[1m| [0m[90m Bash     [0mCheck git history for D001
+
+1ae5fd957 fix(tenant): Complete tenant detection fix across all files
+3c0c1e342 fix(tenant): Fix tenant detection to check subdomain first
+43add69d7 fix(dark-mode): Unify dark mode to use .dark class selector
+821289310 fix(a11y): WCAG AA color contrast compliance for landing pages
+c46c31c50 feat(pr-n07): User Dashboard with Booking History
+1b0d1730c feat(pr-n05): Station Map Interactive Features
+bdbf6412e feat(pr-n01): Fix Test Discovery Configuration
+56dee2390 feat(pr-n03): Complete Booking gRPC Service
+c160ba65f feat(pr-n01): Fix Test Discovery Configuration
+e2fcbbc9f feat(pr-n04): Frontend gRPC-Web Error Handling
+
+CLAUDE.md montre déjà tous les contrôles de sécurité comme ✅ OK. Vérifions s'il y a un 🔴 quelque part qui devrait être ✅:
+[94m[1m| [0m[90m Grep     [0m🔴.*HSTS|🔴.*CSP|🔴.*Security
+Je vois que la ligne 467 dans l'historique montre l'état passé (🔴), ce qui est correct pour un enregistrement historique. Les sections principales de sécurité (lignes 361-373) montrent déjà tous les contrôles comme ✅ OK.
+
+Vérifions s'il y a d'autres occurrences 🔴 dans la section sécurité active:
+[96m[1m| [0m[90m Read     [0mCLAUDE.md
+La section sécurité est déjà à jour avec tous les contrôles ✅ OK (HSTS, CSP, X-Frame-Options, etc.). L'entrée 🔴 à la ligne 467 est un enregistrement historique de l'état passé (2026-01-01), ce qui est correct.
+
+CLAUDE.md reflète déjà l'état réel après D001:
+- ✅ Section sécurité: Tous contrôles OK
+- ✅ Date validation: 2026-01-12 (ligne 3-5, 465)
+- ✅ Status 🔴 → ✅: Déjà fait dans les sections actives
+
+NEEDS_MORE_WORK - La documentation est déjà à jour. D005 semble avoir été complété lors de l'implémentation de T004 (2026-01-12).

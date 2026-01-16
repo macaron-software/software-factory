@@ -1,0 +1,527 @@
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/stations*.rs"}
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/api/**/mod.rs"}
+[91m[1m| [0m[90m Bash     [0mLister fichiers stations dans api/
+
+-rw-------   1 sylvain  staff  19647 Jan 12 17:10 station_grpc_web.rs
+-rw-------   1 sylvain  staff  57924 Jan 12 17:10 stations.rs
+
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/api/mod.rs
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/tests/integration/stations_tests.rs
+[91m[1m| [0m[90m Bash     [0mTrouver tous les fichiers station
+
+/Users/sylvain/_LAPOSTE/_VELIGO2/Documentation/Documentation/02 - Réponse AO Nantes/4. Rédaction/3. Services Naolib vélo/Lisa-OK-3.2 Le stationnement vélo.docx
+/Users/sylvain/_LAPOSTE/_VELIGO2/Documentation/Documentation/02 - Réponse AO Nantes/4. Rédaction/3. Services Naolib vélo/Lisa-3.2 Le stationnement vélo.pdf
+/Users/sylvain/_LAPOSTE/_VELIGO2/Documentation/Documentation/02 - Réponse AO Nantes/4. Rédaction/4. Moyens matériels et humains/Annexe 4.1-Matériel Stationnement/4231057_A_4231060_ft-station-deluxe.pdf
+/Users/sylvain/_LAPOSTE/_VELIGO2/Documentation/Documentation/02 - Réponse AO Nantes/6. Questions/Répartition des missions véloparcs et parc de stationnement.xlsx
+/Users/sylvain/_LAPOSTE/_VELIGO2/Documentation/Documentation/02 - Réponse AO Nantes/1. DCE/DCE1_0616/Annexes_CCTP/Annexe_CCTP_2_contrats_donnees_en_cours/Annexe_2b_veloparc/Recensement_operation_entretien_stationnement_espace_public.xlsx
+/Users/sylvain/_LAPOSTE/_VELIGO2/Documentation/Documentation/02 - Réponse AO Nantes/1. DCE/DCE1_0616/Annexes_CCTP/Annexe_CCTP_9_exigences_materiels/Annexe_9_Guide_stationnement_velo_ouvrage.pdf
+/Users/sylvain/_LAPOSTE/_VELIGO2/Documentation/Documentation/02 - Réponse AO Nantes/1. DCE/DCE1_0616/Annexes_CCTP/Annexe_CCTP_10_liste_stationnement_velo
+/Users/sylvain/_LAPOSTE/_VELIGO2/Documentation/Documentation/02 - Réponse AO Nantes/2. Projet/Offre/Stationnement/MÉMOIRE Technique reprise exploitation parc stationnement _ exploitation.docx
+/Users/sylvain/_LAPOSTE/_VELIGO2/Documentation/Documentation/02 - Réponse AO Nantes/2. Projet/Communication/Infographie/Links/Bike-N-Tour--visiter-Nantes-a-velo-avec-pause-degustation-vins-locaux.jpg
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tenant/backend-api/src/modules/station_management_module.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tenant/backend-api/src/modules/station_adapter.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/migrations/0005_create_station_slots_table.sql
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/migrations/0004_create_stations_table.sql
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/tests/api/stations
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/tests/api/stations/full-stations.spec.ts
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/tests/api/stations.api.spec.ts
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/tests/fixtures/stations.json
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/tests/journeys/14-station-search.spec.ts
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/tests/e2e/fixtures/sql/full/03-stations.sql
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/static/tenants/lyon/icons/station.svg
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/build-static/tenants/lyon/icons/station.svg.br
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/build-static/tenants/lyon/icons/station.svg.gz
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/build-static/tenants/lyon/icons/station.svg
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/build/client/tenants/lyon/icons/station.svg.br
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/build/client/tenants/lyon/icons/station.svg.gz
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/build/client/tenants/lyon/icons/station.svg
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/src/lib/grpc/station.ts
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/src/lib/grpc/station
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/src/lib/grpc/station/v1/station.ts
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/src/lib/grpc/station/v1/station.client.ts
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/src/lib/components/stations
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/src/routes/(app)/stations
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/src/routes/(app)/idfm/attestation
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/src/routes/(app)/booking/station
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/src/routes/(app)/admin/stations
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/owner/backend/src/modules/station_management_module.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/owner/backend/src/modules/station_adapter.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/proto/station
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/proto/station/v1/station.proto
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/target/release/build/veligo-api-4052aaf4485292fc/out/veligo.station.v1.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/target/release/build/veligo-api-26307b976dbaaa6d/out/veligo.station.v1.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/target/release/build/veligo-api-4de206c12425c44b/out/veligo.station.v1.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/target/release/build/veligo-api-7e3a356ee619df0a/out/veligo.station.v1.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/target/debug/build/veligo-api-d0bda03dea4c51df/out/veligo.station.v1.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/target/debug/build/veligo-api-d8bf12bcacb15cb7/out/veligo.station.v1.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/target/debug/build/veligo-api-456f39b949af9075/out/veligo.station.v1.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/target/debug/build/veligo-api-ba9a4ef9a236d54a/out/veligo.station.v1.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/target/debug/build/veligo-api-8a24f79635c5841b/out/veligo.station.v1.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/target/debug/build/veligo-api-59a9c7eff7e49452/out/veligo.station.v1.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/target/debug/build/veligo-api-415b5790b26efe49/out/veligo.station.v1.rs
+
+[91m[1m| [0m[90m Bash     [0mExécuter tests stations
+
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/Cargo.toml
+workspace: /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/Cargo.toml
+warning: unused import: `std::collections::HashMap`
+    --> backend/src/api/payment_api.rs:1364:13
+     |
+1364 |         use std::collections::HashMap;
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `super::*`
+    --> backend/src/api/payment_api.rs:1604:13
+     |
+1604 |         use super::*;
+     |             ^^^^^^^^
+
+warning: unused import: `Method`
+ --> backend/src/api/test_api.rs:8:12
+  |
+8 |     http::{Method, StatusCode},
+  |            ^^^^^^
+
+warning: unused import: `SubscriptionStatus`
+   --> backend/src/application/commands/create_subscription.rs:167:63
+    |
+167 |     use crate::domain::subscription::{PlanType, Subscription, SubscriptionStatus};
+    |                                                               ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `super::*`
+   --> backend/src/domain/rgpd/consent_service.rs:400:9
+    |
+400 |     use super::*;
+    |         ^^^^^^^^
+
+warning: unused import: `PaymentStatus`
+    --> backend/src/infrastructure/adapters/payment/stripe_adapter.rs:1327:47
+     |
+1327 |     use crate::domain::payment::{PaymentPort, PaymentStatus};
+     |                                               ^^^^^^^^^^^^^
+
+warning: unused import: `error`
+ --> backend/src/infrastructure/email/queue.rs:9:22
+  |
+9 | use tracing::{debug, error, info, warn};
+  |                      ^^^^^
+
+warning: unused import: `error`
+  --> backend/src/infrastructure/email/mod.rs:23:15
+   |
+23 | use tracing::{error, info, warn};
+   |               ^^^^^
+
+warning: unused import: `error`
+  --> backend/src/infrastructure/erp/erp_client.rs:12:22
+   |
+12 | use tracing::{debug, error, info};
+   |                      ^^^^^
+
+warning: unused import: `Currency`
+   --> backend/src/infrastructure/erp/payment_sync.rs:762:41
+    |
+762 |     use crate::domain::payment::types::{Currency, Money, PaymentMetadata, PaymentMethod, PaymentProvider};
+    |                                         ^^^^^^^^
+
+warning: unused import: `uuid::Uuid`
+   --> backend/src/infrastructure/erp/payment_sync.rs:764:9
+    |
+764 |     use uuid::Uuid;
+    |         ^^^^^^^^^^
+
+warning: unused import: `super::*`
+   --> backend/src/infrastructure/http/module_routes.rs:221:9
+    |
+221 |     use super::*;
+    |         ^^^^^^^^
+
+warning: unused import: `error`
+  --> backend/src/infrastructure/multimodal/tcl_client.rs:18:22
+   |
+18 | use tracing::{debug, error, info, warn};
+   |                      ^^^^^
+
+warning: unused import: `uuid::Uuid`
+ --> backend/src/services/auth_service.rs:6:5
+  |
+6 | use uuid::Uuid;
+  |     ^^^^^^^^^^
+
+warning: unused import: `super::*`
+   --> backend/src/services/auth_service.rs:249:13
+    |
+249 |         use super::*;
+    |             ^^^^^^^^
+
+warning: unused import: `super::*`
+   --> backend/src/services/auth_service.rs:310:13
+    |
+310 |         use super::*;
+    |             ^^^^^^^^
+
+[91m[1m| [0m[90m Bash     [0mVoir fin des tests stations
+
+warning: unused variable: `config`
+   --> backend/src/application/actions/dispatcher.rs:105:13
+    |
+105 |             config: &ActionConfig,
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `context`
+   --> backend/src/application/actions/dispatcher.rs:106:13
+    |
+106 |             context: &ActionContext,
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_context`
+
+warning: unused variable: `key`
+   --> backend/src/infrastructure/auth/mfa.rs:799:13
+    |
+799 |         let key = [0u8; 32];
+    |             ^^^ help: if this is intentional, prefix it with an underscore: `_key`
+
+warning: unused variable: `db_url`
+   --> backend/src/infrastructure/auth/mfa.rs:800:13
+    |
+800 |         let db_url = "postgresql://test:test@localhost/test";
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_db_url`
+
+warning: variable does not need to be mutable
+   --> backend/src/infrastructure/erp/payment_sync.rs:847:21
+    |
+847 |                 let mut p = create_test_payment("tenant-1", 40.0 + i as f64);
+    |                     ----^
+    |                     |
+    |                     help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `client`
+   --> backend/src/infrastructure/erp/mod.rs:273:14
+    |
+273 |         let (client, user_sync, _, _, queue) = create_mock_erp_sync_stack(ErpSystem::Sage);
+    |              ^^^^^^ help: if this is intentional, prefix it with an underscore: `_client`
+
+warning: unused variable: `router`
+   --> backend/src/infrastructure/http/tenant_config_routes.rs:459:13
+    |
+459 |         let router = tenant_config_routes(repo);
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_router`
+
+warning: unused variable: `builder`
+   --> backend/src/infrastructure/sms/templates.rs:434:13
+    |
+434 |         let builder = SmsTemplateBuilder::new();
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_builder`
+
+warning: unused variable: `layer`
+   --> backend/src/middleware/cors.rs:236:13
+    |
+236 |         let layer = builder.build();
+    |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_layer`
+
+warning: variable does not need to be mutable
+   --> backend/src/middleware/rate_limiter.rs:796:13
+    |
+796 |         let mut config = RateLimitConfig::default();
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `prev_start`
+   --> backend/src/services/reporting/kpi_service.rs:733:14
+    |
+733 |         let (prev_start, prev_end) = query.previous_period();
+    |              ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_prev_start`
+
+warning: `veligo-api` (lib test) generated 27 warnings (run `cargo fix --lib -p veligo-api --tests` to apply 27 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.03s
+warning: the following packages contain code that will be rejected by a future version of Rust: redis v0.24.0
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 3`
+     Running unittests src/lib.rs (/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/target/debug/deps/veligo_api-c4bcaf03ffe2b692)
+
+running 16 tests
+test domain::stations::entities::tests::test_geolocation_distance ... ok
+test domain::stations::entities::tests::test_geolocation_validation ... ok
+test api::booking_api_tdd::tests::test_stations_fixture_data ... ok
+test domain::stations::entities::tests::test_operating_hours ... ok
+test application::queries::list_stations::tests::test_query_builder ... ok
+test domain::stations::entities::tests::test_slot_reservation ... ok
+test infrastructure::database::repositories::stations::postgres_station_repository::tests::test_slot_status_parsing ... ok
+test infrastructure::database::repositories::stations::postgres_station_repository::tests::test_station_type_parsing ... ok
+test application::queries::list_stations::tests::test_list_stations_empty ... ok
+test application::queries::list_stations::tests::test_list_stations_found ... ok
+test application::queries::list_stations::tests::test_find_stations_nearby_helper ... ok
+test application::queries::list_stations::tests::test_list_stations_filter_by_status ... ok
+test application::queries::list_stations::tests::test_list_stations_tenant_isolation ... ok
+test application::queries::list_stations::tests::test_list_active_stations_helper ... ok
+test application::queries::list_stations::tests::test_list_stations_with_limit ... ok
+test domain::stations::service::tests::test_reservation_code_generation ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 1326 filtered out; finished in 0.00s
+
+
+[91m[1m| [0m[90m Bash     [0mLister fichiers station dans backend
+
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/api/station_grpc_web.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/api/stations.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/application/commands/create_station.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/application/queries/list_stations.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/grpc/services/station.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/infrastructure/database/repositories/stations/postgres_station_repository.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/infrastructure/http/station_routes.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/infrastructure/repositories/station_repository.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/infrastructure/websocket/station_ws.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/modules/station_adapter.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/modules/station_management_module.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/services/documents/attestation_generator.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/services/documents/attestation_numbering.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/services/documents/attestation_routes.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/services/documents/attestation_templates.rs
+
+[94m[1m| [0m[90m Grep     [0mstations_hexagonal|stations_v2
+[91m[1m| [0m[90m Bash     [0mTests integration stations
+
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/Cargo.toml
+workspace: /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/Cargo.toml
+error: no test target named `integration` in default-run packages
+help: available test targets:
+    api_tests
+    e2e_tests
+    integration_tests
+    plugin_integration_test
+    workflow_unit_tests
+
+[91m[1m| [0m[90m Bash     [0mTests integration_tests stations
+
+error: no test target named `integration_tests` in default-run packages
+
+[91m[1m| [0m[90m Bash     [0mTests integration_tests
+
+error: no test target named `integration_tests` in default-run packages
+
+[91m[1m| [0m[90m Bash     [0mLister tests stations
+
+Execute all unit and integration tests and build examples of a local package
+
+Usage: cargo test [OPTIONS] [TESTNAME] [-- [ARGS]...]
+
+Arguments:
+  [TESTNAME]  If specified, only run tests containing this string in their names
+  [ARGS]...   Arguments for the test binary
+
+Options:
+      --no-run                   Compile, but don't run tests
+      --no-fail-fast             Run all tests regardless of failure
+      --future-incompat-report   Outputs a future incompatibility report at the end of the build
+      --message-format <FMT>     Error format [possible values: human, short, json,
+                                 json-diagnostic-short, json-diagnostic-rendered-ansi,
+                                 json-render-diagnostics]
+  -q, --quiet                    Display one character per test instead of one line
+  -v, --verbose...               Use verbose output (-vv very verbose/build.rs output)
+      --color <WHEN>             Coloring [possible values: auto, always, never]
+      --config <KEY=VALUE|PATH>  Override a configuration value
+  -Z <FLAG>                      Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for
+
+[91m[1m| [0m[90m Bash     [0mLister tests stations workspace
+[91m[1m| [0m[90m Bash     [0mRésultats tests stations lib
+[91m[1m| [0m[90m Bash     [0mRésultats tests stations
+
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+[91m[1m| [0m[90m Bash     [0mDétails tests stations
+
+warning: unused variable: `changed2`
+   --> veligo-cli/src/commands/build_cache.rs:147:13
+    |
+147 |         let changed2 = cache2.check_component("test", Path::new("."))?;
+    |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_changed2`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `veligo` (bin "veligo" test) generated 1 warning (run `cargo fix --bin "veligo" -p veligo --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running unittests src/main.rs (target/debug/deps/veligo-9b98dee798ccb335)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/Cargo.toml
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/Cargo.toml
+[96m[1m| [0m[90m Read     [0mveligo-platform/Cargo.toml
+[91m[1m| [0m[90m Bash     [0mLister tests backend
+
+total 112
+drwxr-xr-x  15 sylvain  staff   480 Dec 27 11:29 .
+drwxr-xr-x  24 sylvain  staff   768 Jan  9 12:17 ..
+-rw-r--r--   1 sylvain  staff  5980 Dec 11 20:32 DELIVERY-REPORT-100-TESTS.md
+-rw-r--r--   1 sylvain  staff  6563 Dec 12 08:06 E2E-TEST-SUMMARY.md
+-rw-r--r--   1 sylvain  staff  8462 Dec 11 20:28 WORKFLOW-TESTS-COMPLETE.md
+-rw-r--r--   1 sylvain  staff  7541 Dec 11 20:27 WORKFLOW-TESTS-README.md
+drwxr-xr-x   6 sylvain  staff   192 Dec 30 18:55 api
+-rw-------   1 sylvain  staff   161 Dec 27 12:15 api_tests.rs
+drwxr-xr-x  13 sylvain  staff   416 Dec 30 18:59 e2e
+-rw-r--r--   1 sylvain  staff   157 Dec 27 12:15 e2e_tests.rs
+drwxr-xr-x  13 sylvain  staff   416 Dec 29 22:21 integration
+-rw-r--r--   1 sylvain  staff   546 Dec 27 12:15 integration_tests.rs
+-rw-r--r--   1 sylvain  staff  3681 Dec 27 12:15 plugin_integration_test.rs
+drwxr-xr-x   8 sylvain  staff   256 Dec 18 18:02 unit
+-rw-r--r--   1 sylvain  staff   308 Dec 27 12:15 workflow_unit_tests.rs
+
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/tests/integration_tests.rs
+[91m[1m| [0m[90m Bash     [0mTests integration stations
+
+error: no test target named `integration_tests` in default-run packages
+
+[91m[1m| [0m[90m Bash     [0mTests integration stations package
+
+error: package ID specification `veligo-api` did not match any packages
+
+[91m[1m| [0m[90m Bash     [0mLister packages cargo
+
+veligo
+
+[91m[1m| [0m[90m Bash     [0mTests stations depuis veligo-platform
+
+    |
+547 |     let has_billing_retention = retained.iter().any(|r| {
+    |         ^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_has_billing_retention`
+
+warning: unused variable: `tenant_a`
+  --> backend/tests/integration/test_multi_tenant.rs:27:9
+   |
+27 |     let tenant_a = TestTenant::new("Tenant A");
+   |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_tenant_a`
+
+warning: unused variable: `tenant_b`
+  --> backend/tests/integration/test_multi_tenant.rs:28:9
+   |
+28 |     let tenant_b = TestTenant::new("Tenant B");
+   |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_tenant_b`
+
+warning: methods `put_with_auth` and `delete_with_auth` are never used
+   --> backend/tests/integration/mod.rs:191:18
+    |
+107 | impl TestClient {
+    | --------------- methods in this implementation
+...
+191 |     pub async fn put_with_auth<T: Serialize>(
+    |                  ^^^^^^^^^^^^^
+...
+225 |     pub async fn delete_with_auth(&self, uri: &str, token: &str) -> TestResponse {
+    |                  ^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `get_test_pool` is never used
+   --> backend/tests/integration/mod.rs:310:14
+    |
+310 | pub async fn get_test_pool() -> PgPool {
+    |              ^^^^^^^^^^^^^
+
+warning: function `cleanup_test_data` is never used
+   --> backend/tests/integration/mod.rs:321:14
+    |
+321 | pub async fn cleanup_test_data(pool: &PgPool, table: &str, ids: &[Uuid]) {
+    |              ^^^^^^^^^^^^^^^^^
+
+warning: function `create_test_tenant` is never used
+   --> backend/tests/integration/mod.rs:347:14
+    |
+347 | pub async fn create_test_tenant(pool: &PgPool, name: &str) -> Uuid {
+    |              ^^^^^^^^^^^^^^^^^^
+
+warning: function `create_test_user` is never used
+   --> backend/tests/integration/mod.rs:371:14
+    |
+371 | pub async fn create_test_user(pool: &PgPool, email: &str, password_hash: &str) -> Uuid {
+    |              ^^^^^^^^^^^^^^^^
+
+warning: function `create_test_user_with_role` is never used
+   --> backend/tests/integration/mod.rs:391:14
+    |
+391 | pub async fn create_test_user_with_role(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `error` is never read
+  --> backend/tests/integration/test_subscription_flow.rs:41:5
+   |
+38 | struct SubscriptionResponse {
+   |        -------------------- field in this struct
+...
+41 |     error: Option<String>,
+   |     ^^^^^
+   |
+   = note: `SubscriptionResponse` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `user_id`, `tenant_id`, and `stripe_subscription_id` are never read
+  --> backend/tests/integration/test_subscription_flow.rs:47:5
+   |
+45 | struct SubscriptionData {
+   |        ---------------- fields in this struct
+46 |     id: Uuid,
+47 |     user_id: Uuid,
+   |     ^^^^^^^
+48 |     tenant_id: Uuid,
+   |     ^^^^^^^^^
+...
+51 |     stripe_subscription_id: Option<String>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `SubscriptionData` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `error` is never read
+  --> backend/tests/integration/test_subscription_flow.rs:59:5
+   |
+56 | struct SubscriptionListResponse {
+   |        ------------------------ field in this struct
+...
+59 |     error: Option<String>,
+   |     ^^^^^
+   |
+   = note: `SubscriptionListResponse` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: `veligo-api` (test "api_tests") generated 6 warnings
+warning: `veligo-api` (test "integration_tests") generated 15 warnings (run `cargo fix --test "integration_tests" -p veligo-api` to apply 6 suggestions)
+
+[91m[1m| [0m[90m Bash     [0mRésumé tests stations
+
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+[91m[1m| [0m[90m Bash     [0mLister tests integration
+
+total 496
+drwxr-xr-x  13 sylvain  staff    416 Dec 29 22:21 .
+drwxr-xr-x  15 sylvain  staff    480 Dec 27 11:29 ..
+-rw-------   1 sylvain  staff  13195 Dec 26 18:13 auth_tests.rs
+-rw-------   1 sylvain  staff  15638 Dec 26 18:13 fixtures.rs
+-rw-------   1 sylvain  staff  17609 Dec 26 18:13 gdpr_tests.rs
+-rw-------   1 sylvain  staff  13125 Dec 29 22:21 mod.rs
+-rw-------   1 sylvain  staff  13250 Dec 26 18:13 payment_tests.rs
+-rw-------   1 sylvain  staff  22230 Dec 26 18:13 stations_tests.rs
+-rw-------   1 sylvain  staff  21282 Dec 26 18:13 test_auth_flow.rs
+-rw-------   1 sylvain  staff  30363 Dec 26 18:13 test_gdpr.rs
+-rw-------   1 sylvain  staff  29220 Dec 26 18:13 test_multi_tenant.rs
+-rw-------   1 sylvain  staff  32545 Dec 26 18:13 test_subscription_flow.rs
+-rw-------   1 sylvain  staff  20462 Dec 26 18:13 ticketing_tests.rs
+
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/tests/integration/mod.rs
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/api/stations.rs
+[94m[1m| [0m[90m Grep     [0mpub fn station_routes
+[91m[1m| [0m[90m Bash     [0mTests integration_tests
+[91m[1m| [0m[90m Bash     [0mRésultats tests integration
+[91m[1m| [0m[90m Bash     [0mTests integration suite
+
+error: no test target named `integration_tests` in default-run packages
+
+[91m[1m| [0m[90m Bash     [0mLister tests workspace stations

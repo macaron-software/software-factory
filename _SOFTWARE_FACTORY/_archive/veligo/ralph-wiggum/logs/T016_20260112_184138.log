@@ -1,0 +1,28 @@
+Je commence par lire le fichier de test pour comprendre les 3 tests skippés.
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/chaos-resilience.spec.ts"}
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/tests/chaos-resilience.spec.ts
+[96m[1m| [0m[90m Read     [0mtests/e2e/chaos/chaos-resilience.spec.ts
+Je vois que le fichier `tenant/frontend-user/tests/chaos-resilience.spec.ts` contient des tests qui sont skippés si `enableChaosMonkey` retourne `false`. Vérifions le code backend chaos et l'implémentation frontend.
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/chaos/**/*.rs"}
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/chaos*.ts"}
+[94m[1m| [0m[90m Grep     [0mchaosMonkey
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/lib/chaos/ResilientApiClient.ts
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/ChaosMonkey.ts"}
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/lib/chaos/ChaosMonkey.ts
+[96m[1m| [0m[90m Read     [0mlaunch-resilience-agents.sh
+Je vois le problème. L'implémentation ChaosMonkey utilise une interface différente de celle attendue par les tests. Le test s'attend à avoir `enable(config)` avec `targetModules`, `failureRate`, etc., mais l'implémentation a une interface `ChaosConfig` différente. Vérifions aussi le backend chaos scenarios.
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/chaos/scenarios.rs
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/chaos/mod.rs
+Maintenant je comprends le problème. Le frontend ChaosMonkey a une interface différente de celle attendue par les tests. Les 3 tests sont skippés car `window.chaosMonkey.enable` n'existe pas ou ne fonctionne pas comme attendu. 
+
+Je vais modifier le fichier `ChaosMonkey.ts` pour qu'il expose l'interface attendue par les tests E2E.
+[92m[1m| [0m[90m Edit     [0mveligo-platform/frontend/src/lib/chaos/ChaosMonkey.ts
+Maintenant je dois modifier l'endroit où `chaosMonkey` est exposé sur `window`. Cherchons où cela se fait.
+[94m[1m| [0m[90m Grep     [0mwindow\.chaosMonkey
+[94m[1m| [0m[90m Grep     [0mchaosMonkey
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/frontend/**/chaos/*.ts"}
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/tenant/**/chaos/*.ts"}
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/routes/(admin)/chaos/+page.svelte
+[94m[1m| [0m[90m Grep     [0m\$lib/modules/chaos
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/svelte.config.js
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/tenant/**/lib/**/*.ts"}

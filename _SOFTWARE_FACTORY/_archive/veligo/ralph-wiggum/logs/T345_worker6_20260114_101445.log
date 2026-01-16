@@ -1,0 +1,25 @@
+[0;34m[10:14:45][0m Starting Wiggum-TDD daemon...
+[0;34m[10:14:45][0m Queue: tdd
+[0;34m[10:14:45][0m Tasks dir: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks
+[0;34m[10:14:45][0m Poll interval: 10s
+[0;34m[10:14:46][0m [Wiggum-TDD] Found task: T350
+[0;34m[10:14:46][0m [T350] Processing with REAL agent...
+[0;34m[10:14:46][0m [T350] Using Real Agent (actual execution, not simulation)...
+[0;33m[10:15:06] ⚠[0m [T350] Agent returned FAILED or needs more work
+[0;33m[10:15:06] ⚠[0m [T350] Exit code: 1
+[0;33m[10:15:06] ⚠[0m [T350] Check log: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/logs/T350_20260114_101446.log
+[0;33m[10:15:06] ⚠[0m [T350] Retry 1/3
+[0;34m[10:15:11][0m [T350] Processing with REAL agent...
+[0;34m[10:15:11][0m [T350] Using Real Agent (actual execution, not simulation)...
+[0;33m[10:19:35] ⚠[0m [T350] Agent returned FAILED or needs more work
+[0;33m[10:19:35] ⚠[0m [T350] Exit code: 1
+[0;33m[10:19:35] ⚠[0m [T350] Check log: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/logs/T350_20260114_101511.log
+[0;33m[10:19:35] ⚠[0m [T350] Retry 2/3
+[0;34m[10:19:40][0m [T350] Processing with REAL agent...
+[0;34m[10:19:41][0m [T350] Using Real Agent (actual execution, not simulation)...
+[0;32m[10:22:03] ✓[0m [T350] COMPLETE (real execution verified)
+[0;34m[10:22:03][0m [T350] Creating deploy task for committed changes
+[0;34m[10:22:03][0m [T350] Created deploy task: D039
+/Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks/D039.md
+[0;34m[10:22:03][0m [Wiggum-TDD] --once mode, exiting
+[0;34m[10:22:03][0m [Wiggum-TDD] Daemon stopped

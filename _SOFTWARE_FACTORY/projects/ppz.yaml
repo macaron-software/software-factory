@@ -1,0 +1,180 @@
+# PPZ (Popinz) Project Configuration
+# ====================================
+# SaaS platform with Rust backend and TypeScript frontend
+
+project:
+  name: popinz
+  display_name: "Popinz SaaS"
+  root_path: /Users/sylvain/_POPINZ/popinz-dev
+  vision_doc: CLAUDE.md
+
+# Project CLI commands
+# Uses `ppz` CLI for all operations
+cli:
+  binary: ppz
+  # Build commands per domain
+  build:
+    rust: ppz build rust
+    typescript: ppz build ts
+    all: ppz build
+  # Test commands per domain
+  test:
+    rust: ppz test rust
+    typescript: ppz test ts
+    e2e: ppz test e2e
+    all: ppz test
+  # Lint commands
+  lint:
+    rust: ppz lint rust
+    typescript: ppz lint ts
+    all: ppz lint
+  # Deploy commands
+  deploy:
+    staging: ppz deploy staging
+    prod: ppz deploy prod
+    rollback: ppz deploy rollback
+  # E2E journeys
+  e2e:
+    smoke: ppz test e2e --grep @smoke
+    journeys: ppz test e2e
+    rbac: ppz test e2e --grep @rbac
+  # Status/monitoring
+  status: ppz status
+
+# Domain configurations
+domains:
+  rust:
+    paths:
+      - popinz-v2-rust/
+    extensions:
+      - .rs
+    build_cmd: cargo check --workspace
+    test_cmd: cargo test --workspace --no-run
+    lint_cmd: cargo clippy --workspace -- -D warnings
+
+  typescript:
+    paths:
+      - popinz-saas/
+      - popinz-entities/
+      - popinz-tasks/
+    extensions:
+      - .ts
+      - .tsx
+    build_cmd: npm run build
+    test_cmd: npm run test
+    lint_cmd: npm run lint
+
+  e2e:
+    paths:
+      - popinz-tests/
+    extensions:
+      - .spec.ts
+    test_cmd: npx playwright test
+
+  proto:
+    paths:
+      - popinz-v2-rust/proto/
+    extensions:
+      - .proto
+
+  sql:
+    paths:
+      - docker/migrations/
+    extensions:
+      - .sql
+
+  swift:
+    paths:
+      - ios/popinz/
+    extensions:
+      - .swift
+    # Real Xcode build with error capture
+    build_cmd: cd ios/popinz && xcodebuild -scheme popinz -destination 'platform=iOS Simulator,name=iPhone 15' -configuration Debug build 2>&1 | tee /tmp/ppz_ios_build.log || cat /tmp/ppz_ios_build.log
+    test_cmd: cd ios/popinz && xcodebuild -scheme popinz -destination 'platform=iOS Simulator,name=iPhone 15' test 2>&1 | tee /tmp/ppz_ios_test.log || cat /tmp/ppz_ios_test.log
+    lint_cmd: cd ios/popinz && swiftlint 2>&1 || true
+
+  kotlin:
+    paths:
+      - android/
+    extensions:
+      - .kt
+    # Real Gradle build with error capture
+    build_cmd: cd android && ./gradlew assembleDebug 2>&1 | tee /tmp/ppz_android_build.log || cat /tmp/ppz_android_build.log
+    test_cmd: cd android && ./gradlew test 2>&1 | tee /tmp/ppz_android_test.log || cat /tmp/ppz_android_test.log
+    lint_cmd: cd android && ./gradlew lint 2>&1 || true
+
+# Deployment configuration
+deploy:
+  strategy: blue-green
+  auto_prod: true
+  staging:
+    url: https://test-staging.popi.nz
+    health: /health
+  prod:
+    url: https://test.popi.nz
+    health: /health
+  rollback_on_fail: true
+  validation_cmd: npx playwright test --grep @smoke
+
+# FRACTAL decomposition thresholds
+fractal:
+  max_files: 5
+  max_loc: 400
+  max_items: 10
+  max_depth: 3
+
+# Adversarial gate configuration
+adversarial:
+  threshold: 5
+  core_patterns: true
+  security_check: true
+  custom_patterns:
+    # Rust specific
+    - pattern: '\.unwrap\(\)'
+      score: 2
+      message: "unwrap() sans gestion d'erreur"
+      max_occurrences: 3
+    - pattern: 'panic!'
+      score: 5
+      message: "panic! interdit en production"
+    # Security
+    - pattern: "password\\s*=\\s*[\"'][^\"']+[\"']"
+      score: 5
+      message: "Password hardcodée détectée"
+
+# Error Capture Configuration (RLM Feedback Loop)
+error_capture:
+  enabled: true
+  feedback_to_backlog: true
+  deduplicate: true
+
+  build:
+    enabled: true
+    domains: [rust, typescript, proto, swift, kotlin]
+
+  e2e:
+    enabled: true
+    playwright:
+      report_path: popinz-tests/playwright-report/
+      fail_on_console_error: true
+      capture_grpc: true  # Capture gRPC errors
+
+  # Mobile error capture for Popinz iOS/Android apps
+  mobile:
+    enabled: true
+    ios:
+      bundle_id: com.popinz.app
+      capture_duration: 15
+    android:
+      package_name: com.popinz.app
+      capture_duration: 15
+
+  severity:
+    create_task_min: medium
+
+# Active analyzers
+analyzers:
+  - rust
+  - typescript
+  - playwright
+  - security

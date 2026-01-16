@@ -1,0 +1,425 @@
+RLM Light Agent - Task: Tu es un agent TDD autonome pour Veligo (vélos en libre-service).
+
+## TÂCHE
+Task T015: Résoudre les 4 tests skippés Tracking API
+
+## DÉTAILS
+# Task T015: Résoudre les 4 tests skippés Tracking API
+
+**Priority**: P2
+**Time Estimate**: 1.5h
+**WSJF Score**: 6.0
+**Complexity**: medium
+**Queue**: TDD
+
+## Description
+veligo-platform/tests/e2e/api/tracking.api.spec.ts a 4 tests skippés pour l'API tracking GPS.
+
+## Success Criteria
+- [ ] Tracking API fonctionnelle
+- [ ] 4 tests passent
+- [ ] Positions vélos récupérables
+
+## Actions
+1. Vérifier modules/tracking-velco, tracking-abeeway
+2. Implémenter endpoints manquants
+3. Activer tests
+
+## Files to Create/Modify
+- [ ] veligo-platform/tests/e2e/api/tracking.api.spec.ts (MODIFY)
+
+## Ralph Status Block
+---RALPH_STATUS---
+STATUS: IN_PROGRESS
+COMPLEXITY: medium
+MODEL_TIER: TIER2
+WSJF: 6.0
+---END_RALPH_STATUS---
+
+## Adversarial Feedback
+🚨 MENSONGE: Prétend 'tests pass' sans exécuter de commande de test
+🚨 HALLUCINATION: Fichier mentionné n'existe pas: /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/api/test_api.rs
+
+## Adversarial Feedback
+🚨 HALLUCINATION: Fichier mentionné n'existe pas: .../.svelte
+
+## Adversarial Feedback
+🚨 MENSONGE: Prétend 'tests pass' sans exécuter de commande de test
+🚨 HALLUCINATION: Fichier mentionné n'existe pas: /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/api/modules.api.spec.ts
+
+## 🔴 RÈGLE ABSOLUE: VÉRIFIER AVANT MODIFIER
+
+AVANT de modifier ou créer un fichier, tu DOIS:
+1. Utiliser `Read` pour VÉRIFIER que le fichier existe
+2. Utiliser `veligo_grep` pour trouver les patterns existants
+3. NE JAMAIS inventer un fichier qui n'existe pas
+
+Si un fichier n'existe pas:
+- Cherche un fichier similaire avec `Glob` ou `veligo_rag_query`
+- Adapte ton approche au code RÉEL
+
+## INSTRUCTIONS TDD (Red → Green)
+
+1. **PHASE EXPLORATION**: Comprendre le contexte
+   - `veligo_rag_query("test skip failing")` pour trouver tests problématiques
+   - `veligo_grep("TODO|FIXME", "*.rs")` pour trouver points d'attention
+   - `Read` sur les fichiers mentionnés pour VÉRIFIER qu'ils existent
+
+2. **PHASE RED**: Lis le test qui échoue
+   - Utilise `Read` pour voir le fichier test (VÉRIFIE qu'il existe!)
+   - Comprends ce que le test attend
+
+3. **PHASE CODE**: Implémente la solution
+   - Utilise `Read` AVANT d'utiliser `Edit`
+   - Modifie max 3 fichiers
+   - Fais des changements minimaux
+
+4. **PHASE GREEN**: Vérifie
+   - Rust: `cargo test --lib`
+   - Frontend: `npm run test`
+   - E2E: `npx playwright test <file>`
+
+## RÈGLES ANTI-HALLUCINATION
+- ❌ JAMAIS modifier un fichier sans l'avoir lu d'abord
+- ❌ JAMAIS inventer un chemin de fichier
+- ❌ JAMAIS prétendre "tests pass" sans exécuter la commande
+- ✅ Utilise veligo_grep pour trouver le bon fichier
+- ✅ Utilise Read pour vérifier l'existence
+
+## OUTILS MCP DISPONIBLES
+- veligo_rag_query: Recherche sémantique dans le code
+- veligo_ao_search: Recherche dans les specs AO
+- veligo_grep: Grep pattern dans fichiers
+
+Commence maintenant. Réponds avec: SUCCESS ou NEEDS_MORE_WORK
+Backend: auto
+Local: http://127.0.0.1:8002/v1/chat/completions (qwen3)
+Cloud: https://api.minimax.io/v1/chat/completions (MiniMax-M2.1)
+
+--- Iteration 1/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+L'utilisateur me demande de résoudre 4 tests skippés pour l'API tracking GPS dans le projet Veligo. 
+
+Selon les règles TDD et anti-hallucination:
+1. Je dois d'abord explorer pour comprendre le contexte
+2. Vérifier que les fichiers existent avant de les modifier
+3. Ne jamais inventer de fichiers
+
+Je dois commencer par:
+1. Chercher le fichier de tests mentionné: `veligo-platform/tests/e2e/api/tracking.api.spec.ts`
+2. Comprendre ce que font les tests skippés
+3. Implémenter la solution
+4. Vé...
+TOOL [bash]: exit_code=0
+/Users/sylvain/_LAPOSTE/_VELIGO2/tenant/frontend-user/tests/module-health.spec.ts
+/Users/sylvain/_LAPOSTE/_VELIGO2/tenant/frontend-user/tests/functional-modules.spec.ts
+/Users/sylvain/_LAP...
+
+--- Iteration 2/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Je vois la structure du projet. Je dois trouver les tests de tracking. Continuons à explorer.
+</think>
+
+
+{"tool": "bash", "command": "find /Users/sylvain/_LAPOSTE/_VELIGO2 -type f -name \"*tracking*\" 2>/dev/null | head -30"}
+{"tool": "bash", "command": "find /Users/sylvain/_LAPOSTE/_VELIGO2 -type d -name \"e2e\" 2>/dev/null | head -10"}...
+TOOL [bash]: exit_code=0
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tenant/backend-api/target/debug/build/veligo-api-5bbed9096b896166/out/tracking.v1.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tenan...
+
+--- Iteration 3/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Je vois que le fichier de test mentionné dans la tâche n'existe pas dans le chemin spécifié (`veligo-platform/tests/e2e/api/tracking.api.spec.ts`). Le projet utilise des fichiers `.spec.ts` dans `veligo-platform/frontend/tests/api/`. Je dois chercher plus loin pour trouver les tests de tracking.
+
+Regardons les modules de tracking et cherchons les tests skippés.
+</think>
+
+
+{"tool": "bash", "command": "find /Users/sylvain/_LAPOSTE/_VELIGO2 -type f \\( -name \"*spec*.ts\" -o -name \"*test*....
+TOOL [bash]: exit_code=0
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/api/tracking.api.spec.ts
+/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/journeys/28-tracking-gps-temps-reel.spec.ts
+/Users/sylvain/_L...
+
+--- Iteration 4/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+J'ai trouvé le fichier de test! Il est à:
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/api/tracking.api.spec.ts
+
+Maintenant, je dois lire ce fichier pour voir les 4 tests skippés.
+</think>
+
+J'ai trouvé le fichier. Maintenant je lis le contenu pour voir les tests skippés.
+{"tool": "read", "path": "/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/api/tracking.api.spec.ts"}
+{"tool": "read", "path": "/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tenant/backend-api/...
+TOOL [read]: /**
+ * Tracking API E2E Tests
+ * TDD Red Phase - Bike tracking and location API
+ *
+ * Tests bike tracking endpoints and real-time location updates
+ */
+
+import { test, expect } from '@playwright/test';...
+
+--- Iteration 5/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Le fichier de test ne contient pas de tests skippés (pas de `.skip()` ou `test.skip()`). Il y a 5 tests actifs. Je dois vérifier s'il y a d'autres fichiers de test de tracking ou si les tests ont déjà été activés.
+
+Regardons les autres fichiers de test mentionnés et vérifions si les tests passent.
+</think>
+
+Je vois que le fichier ne contient pas de tests skippés actuellement. Vérifions les autres fichiers de test et l'état des tests.
+{"tool": "read", "path": "/Users/sylvain/_LAPOSTE/_VEL...
+TOOL [read]: import { test, expect } from '@playwright/test';
+
+/**
+ * E2E Tests: Bike Tracking & IoT
+ * Category: premium
+ * Status: RED (TDD - Write tests first)
+ * 
+ * Module: bike-tracking
+ * Options: 3 configu...
+
+--- Iteration 6/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Je vois que les tests dans `bike-tracking.spec.ts` sont en phase RED (ils utilisent `test.fail()`), mais ils ne sont pas skippés avec `.skip()`. Le fichier `tracking.api.spec.ts` que j'ai lu n'a pas non plus de tests skippés - ils semblent tous actifs.
+
+Regardons s'il y a des tests avec `.skip()` dans les autres fichiers de tracking et vérifions l'API backend.
+</think>
+
+
+{"tool": "bash", "command": "grep -rn \"\\.skip\\(\" /Users/sylvain/_LAPOSTE/_VELIGO2 --include=\"*.spec.ts\" --includ...
+TOOL [bash]: exit_code=1
+...
+
+--- Iteration 7/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Il n'y a pas de tests skippés avec `.skip()`. Vérifions la structure du projet backend et les endpoints disponibles pour le tracking.
+</think>
+
+{"tool": "bash", "command": "grep -rn \"api/tracking\" /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform --include=\"*.rs\" 2>/dev/null | head -20"}
+{"tool": "bash", "command": "ls -la /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tenant/backend-api/src/api/ 2>/dev/null | head -20"}
+{"tool": "bash", "command": "find /Users/sylvain/_LAPOSTE/_VEL...
+TOOL [bash]: exit_code=0
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tenant/backend-api/src/modules/tracking_module.rs:37:            .route("/api/tracking/items", get(list_items).post(create_item))
+/Users/sy...
+
+--- Iteration 8/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Je vois que le fichier de test existant utilise `/api/tracking/bike/:id` mais les routes définies dans le backend utilisent `/api/tracking/bikes/:id/position` ou `/api/tracking/live/:entity_id`. 
+
+Il y a une incompatibilité entre les tests et l'implémentation. Je dois:
+1. Examiner le tracking_module.rs plus en détail pour comprendre les routes
+2. Vérifier si les tests sont skippés ou non
+3. Corriger soit les tests, soit l'implémentation
+
+Regardons le backend/src/modules/tracking_module.r...
+TOOL [read]: //! GPS Tracking Module
+//!
+//! Module générique de tracking GPS pour le suivi d'entités
+//! (vélos, utilisateurs, flotte). Inclut geofencing et alertes.
+
+use crate::domain::module::{ModuleCategory, M...
+
+--- Iteration 9/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Maintenant je comprends mieux le problème. Les tests E2E attendent des routes comme `/api/tracking/bike/:id` mais le backend implémente `/api/tracking/live/:entity_id`. Je dois:
+
+1. Vérifier si le fichier de test a des tests skippés ou s'ils échouent
+2. Adapter les routes ou les tests
+
+Regardons si le test échoue avec l'URL actuelle:
+</think>
+
+Vérifions maintenant si les tests échouent et quel est le problème exact.
+{"tool": "bash", "command": "cd /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-...
+TOOL [bash]: exit_code=0
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/journeys/28-tracking-gps-temps-reel.spec.ts:1:1)
+
+Error: Requiring @playwright/test second time, 
+First:
+Error: 
+
+   a...
+
+--- Iteration 10/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Je vois des erreurs de configuration avec Playwright. Le problème semble être une incompatibilité de configuration. Le fichier de test existe mais il y a des problèmes de configuration.
+
+Voyons le fichier de configuration Playwright et comprenons mieux la structure des tests.
+</think>
+
+Je vois qu'il y a des problèmes de configuration Playwright. Vérifions la structure des tests et la configuration.
+{"tool": "bash", "command": "cd /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform && ls -la...
+TOOL [bash]: exit_code=1
+cat: package.json: No such file or directory
+...
+
+--- Iteration 11/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Il n'y a pas de package.json dans veligo-platform. C'est un projet Rust/backend. Vérifions la structure pour comprendre où sont les tests e2e et comment les exécuter.
+</think>
+
+
+{"tool": "bash", "command": "cd /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform && ls -la"}
+{"tool": "bash", "command": "find /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform -name \"package.json\" 2>/dev/null"}
+{"tool": "bash", "command": "find /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform -name \"Cargo.toml...
+TOOL [bash]: exit_code=0
+total 848
+drwxr-xr-x   56 sylvain  staff    1792 Jan  7 09:37 .
+drwxr-xr-x  235 sylvain  staff    7520 Jan 13 16:05 ..
+-rw-------    1 sylvain  staff     433 Jan  3 19:31 .dockerignore
+-rw...
+
+--- Iteration 12/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Je vois que veligo-platform est un projet Rust (Cargo.toml). Il y a aussi des tests frontend dans `/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/tests/api/`.
+
+Regardons si les tests E2E sont dans un autre répertoire. J'ai vu que le fichier `/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/api/tracking.api.spec.ts` existe mais la configuration Playwright semble être à la racine du projet principal.
+
+Explorons plus pour comprendre la structure.
+</think>
+
+Le projet est...
+TOOL [bash]: exit_code=0
+-rw-r--r--  1 sylvain  staff  2078 Jan 13 08:43 playwright.config.ts
+...
+
+--- Iteration 13/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Il y a un playwright.config.ts à la racine du projet Veligo. Voyons ce qu'il contient et explorons la structure des tests.
+</think>
+
+
+{"tool": "read", "path": "/Users/sylvain/_LAPOSTE/_VELIGO2/playwright.config.ts"}
+{"tool": "bash", "command": "cd /Users/sylvain/_LAPOSTE/_VELIGO2 && ls -la tests/e2e/api/ 2>/dev/null"}
+{"tool": "bash", "command": "cd /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform && ls -la tests/e2e/api/ 2>/dev/null"}...
+TOOL [read]: import { defineConfig, devices } from '@playwright/test';
+
+/**
+ * Playwright E2E Configuration for Veligo Platform
+ *
+ * Environment Variables:
+ * - BASE_URL: Frontend URL (default: http://localhost:8...
+
+--- Iteration 14/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Je comprends mieux maintenant. La configuration Playwright utilise le dossier `./tests/e2e` comme répertoire de tests. Il y a deux dossiers de tests:
+1. `/Users/sylvain/_LAPOSTE/_VELIGO2/tests/e2e/` - utilisé par la config playwright
+2. `/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/` - dossier dans veligo-platform
+
+Le fichier `tracking.api.spec.ts` existe dans veligo-platform mais pas dans le dossier principal. La tâche mentionne 4 tests skippés mais je n'ai pas trouvé de t...
+TOOL [bash]: exit_code=1
+...
+
+--- Iteration 15/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Les tests skippés ne sont pas là où je les ai cherchés. La tâche mentionne `veligo-platform/tests/e2e/api/tracking.api.spec.ts` avec 4 tests skippés, mais ce fichier n'existe pas dans `veligo-platform/tests/e2e/api/`. 
+
+Regardons si le fichier existe à un autre endroit ou s'il y a des tests skippés dans le projet.
+</think>
+
+{"tool": "bash", "command": "find /Users/sylvain/_LAPOSTE/_VELIGO2 -name \"tracking.api.spec.ts\" 2>/dev/null"}
+{"tool": "bash", "command": "find /Users/sylvain/_LAPO...
+TOOL [bash]: exit_code=0
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/api/tracking.api.spec.ts
+...
+
+--- Iteration 16/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Bien, j'ai trouvé le fichier. Mais je l'ai déjà lu et il n'y avait pas de tests skippés. Peut-être que les tests skippés sont dans un autre fichier ou peut-être qu'ils utilisent une autre syntaxe. Vérifions à nouveau le fichier et cherchons les tests qui pourraient être skippés d'une autre manière.
+</think>
+
+Le fichier existe mais n'a pas de `.skip()`. Peut-être que les tests skippés sont référencés ailleurs ou utilisent une autre approche. Cherchons les tests "skipped" ou "pending" dans...
+TOOL [bash]: exit_code=0
+tests/e2e-complete-user-journeys.spec.ts:401:    await expect(page.locator('[data-testid="pending-change"]')).toContainText('Basic');
+tests/e2e/user-journeys-complete.spec.ts:382:    const...
+
+--- Iteration 17/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Je vois qu'il n'y a pas de tests skippés dans les fichiers de tracking. Le fichier `/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/api/tracking.api.spec.ts` ne contient pas de `.skip()`. 
+
+La task dit qu'il y a 4 tests skippés, mais soit:
+1. Les tests n'ont pas encore été écrits comme skippés
+2. Les tests sont dans un autre fichier
+3. La task est de créer/activer ces tests
+
+Regardons de plus près le fichier tracking.api.spec.ts - les tests semblent actifs mais ils testent des...
+TOOL [read]: //! GPS Tracking Module
+//!
+//! Module générique de tracking GPS pour le suivi d'entités
+//! (vélos, utilisateurs, flotte). Inclut geofencing et alertes.
+
+use crate::domain::module::{ModuleCategory, M...
+
+--- Iteration 18/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Je vois maintenant le problème. Le fichier tracking_module.rs a été tronqué. Les routes du module sont:
+- `/api/tracking/position` (POST)
+- `/api/tracking/history/:entity_id` (GET)
+- `/api/tracking/live/:entity_id` (GET)
+- `/api/tracking/geofence/check` (POST)
+- `/api/tracking/geofences` (GET)
+- `/api/tracking/alert` (POST)
+- `/api/tracking/alerts` (GET)
+- `/api/tracking/alerts/:id/acknowledge` (POST)
+- `/api/tracking/stats` (GET)
+
+Mais les tests E2E attendent:
+- `/api/tracking/bike/:id`...
+TOOL [read]: //! GPS Tracking Module
+//!
+//! Module générique de tracking GPS pour le suivi d'entités
+//! (vélos, utilisateurs, flotte). Inclut geofencing et alertes.
+
+use crate::domain::module::{ModuleCategory, M...
+
+--- Iteration 19/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Le fichier est tronqué. Je dois lire la partie complète du fichier pour voir toutes les routes et fonctions. Laissez-moi essayer de lire la fin du fichier pour voir les handlers.
+</think>
+
+
+{"tool": "bash", "command": "wc -l /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/modules/tracking_module.rs"}
+{"tool": "read", "path": "/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/modules/tracking_module.rs", "limit": 200, "offset": 550}
+{"tool": "read", "path": "/Users...
+TOOL [bash]: exit_code=0
+     977 /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/modules/tracking_module.rs
+...
+
+--- Iteration 20/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Le fichier fait 977 lignes. Je dois voir les handlers existants et les routes. Regardons la section des routes et des handlers.
+</think>
+
+
+{"tool": "read", "path": "/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/modules/tracking_module.rs", "limit": 200, "offset": 320}...
+TOOL [read]: //! GPS Tracking Module
+//!
+//! Module générique de tracking GPS pour le suivi d'entités
+//! (vélos, utilisateurs, flotte). Inclut geofencing et alertes.
+
+use crate::domain::module::{ModuleCategory, M...
+
+=== RESULT ===
+ERROR: Max iterations reached without completion

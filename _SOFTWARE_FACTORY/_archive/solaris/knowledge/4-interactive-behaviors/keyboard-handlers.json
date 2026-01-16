@@ -1,0 +1,211 @@
+{
+  "_meta": {
+    "description": "Keyboard interaction patterns for interactive components",
+    "wcag_reference": "WCAG 2.1 - 2.1.1 Keyboard, 2.1.2 No Keyboard Trap",
+    "version": "1.0.0",
+    "updated": "2026-01-06"
+  },
+
+  "global_keys": {
+    "Tab": {
+      "action": "Move focus to next focusable element",
+      "modifier_shift": "Move focus to previous focusable element",
+      "never_trap": true
+    },
+    "Escape": {
+      "action": "Close/cancel current context",
+      "contexts": ["modal", "dropdown", "popover", "tooltip", "menu"]
+    },
+    "Enter": {
+      "action": "Activate/submit",
+      "contexts": ["button", "link", "form", "menu-item"]
+    },
+    "Space": {
+      "action": "Activate (for buttons and toggles)",
+      "prevent_scroll": true,
+      "contexts": ["button", "checkbox", "switch", "accordion-trigger"]
+    }
+  },
+
+  "navigation_patterns": {
+    "linear": {
+      "description": "Tab through items in DOM order",
+      "keys": ["Tab", "Shift+Tab"],
+      "use_for": ["form-fields", "page-content", "toolbar-buttons"]
+    },
+    "arrow_keys": {
+      "description": "Navigate within a composite widget",
+      "horizontal": {
+        "ArrowLeft": "previous",
+        "ArrowRight": "next"
+      },
+      "vertical": {
+        "ArrowUp": "previous",
+        "ArrowDown": "next"
+      },
+      "use_for": ["tabs", "menu", "listbox", "radio-group", "slider"],
+      "wrap": "optional, usually true for menus"
+    },
+    "grid": {
+      "description": "2D navigation in tables/grids",
+      "keys": {
+        "ArrowUp": "cell above",
+        "ArrowDown": "cell below",
+        "ArrowLeft": "cell left",
+        "ArrowRight": "cell right",
+        "Home": "first cell in row",
+        "End": "last cell in row",
+        "Ctrl+Home": "first cell in grid",
+        "Ctrl+End": "last cell in grid"
+      },
+      "use_for": ["data-table", "calendar-grid", "date-picker"]
+    }
+  },
+
+  "component_handlers": {
+    "accordion": {
+      "trigger_focused": {
+        "Enter": { "action": "toggle", "target": "panel" },
+        "Space": { "action": "toggle", "target": "panel" },
+        "ArrowDown": { "action": "focus_next_trigger" },
+        "ArrowUp": { "action": "focus_previous_trigger" },
+        "Home": { "action": "focus_first_trigger" },
+        "End": { "action": "focus_last_trigger" }
+      }
+    },
+
+    "tabs": {
+      "tablist_focused": {
+        "ArrowRight": { "action": "focus_next_tab", "wrap": true },
+        "ArrowLeft": { "action": "focus_previous_tab", "wrap": true },
+        "ArrowDown": { "action": "focus_next_tab", "when": "vertical" },
+        "ArrowUp": { "action": "focus_previous_tab", "when": "vertical" },
+        "Home": { "action": "focus_first_tab" },
+        "End": { "action": "focus_last_tab" },
+        "Enter": { "action": "select_focused_tab", "when": "manual_activation" },
+        "Space": { "action": "select_focused_tab", "when": "manual_activation" }
+      }
+    },
+
+    "menu": {
+      "closed": {
+        "Enter": { "action": "open", "focus": "first_item" },
+        "Space": { "action": "open", "focus": "first_item" },
+        "ArrowDown": { "action": "open", "focus": "first_item" },
+        "ArrowUp": { "action": "open", "focus": "last_item" }
+      },
+      "open": {
+        "Escape": { "action": "close", "focus": "trigger" },
+        "ArrowDown": { "action": "focus_next", "wrap": true },
+        "ArrowUp": { "action": "focus_previous", "wrap": true },
+        "Home": { "action": "focus_first" },
+        "End": { "action": "focus_last" },
+        "Enter": { "action": "select_and_close" },
+        "Space": { "action": "select_and_close" },
+        "ArrowRight": { "action": "open_submenu", "when": "has_submenu" },
+        "ArrowLeft": { "action": "close_submenu", "when": "in_submenu" },
+        "Tab": { "action": "close", "focus": "next_focusable" },
+        "Shift+Tab": { "action": "close", "focus": "previous_focusable" }
+      },
+      "typeahead": {
+        "enabled": true,
+        "timeout": "500ms",
+        "action": "focus_matching_item"
+      }
+    },
+
+    "listbox": {
+      "single_select": {
+        "ArrowDown": { "action": "focus_next", "select": true },
+        "ArrowUp": { "action": "focus_previous", "select": true },
+        "Home": { "action": "focus_first", "select": true },
+        "End": { "action": "focus_last", "select": true }
+      },
+      "multi_select": {
+        "ArrowDown": { "action": "focus_next", "select": false },
+        "ArrowUp": { "action": "focus_previous", "select": false },
+        "Space": { "action": "toggle_selection" },
+        "Ctrl+A": { "action": "select_all" },
+        "Shift+ArrowDown": { "action": "extend_selection_next" },
+        "Shift+ArrowUp": { "action": "extend_selection_previous" }
+      }
+    },
+
+    "combobox": {
+      "closed": {
+        "ArrowDown": { "action": "open", "focus": "first_or_selected" },
+        "ArrowUp": { "action": "open", "focus": "last_or_selected" },
+        "Alt+ArrowDown": { "action": "open", "focus": "selected" },
+        "Enter": { "action": "open", "when": "editable" }
+      },
+      "open": {
+        "Escape": { "action": "close", "revert": true },
+        "ArrowDown": { "action": "focus_next" },
+        "ArrowUp": { "action": "focus_previous" },
+        "Enter": { "action": "select_and_close" },
+        "Tab": { "action": "select_and_close", "focus": "next" }
+      },
+      "autocomplete": {
+        "typing": { "action": "filter_options", "highlight": "matching_text" }
+      }
+    },
+
+    "slider": {
+      "horizontal": {
+        "ArrowRight": { "action": "increase", "by": "step" },
+        "ArrowLeft": { "action": "decrease", "by": "step" },
+        "ArrowUp": { "action": "increase", "by": "step" },
+        "ArrowDown": { "action": "decrease", "by": "step" },
+        "PageUp": { "action": "increase", "by": "large_step" },
+        "PageDown": { "action": "decrease", "by": "large_step" },
+        "Home": { "action": "set_minimum" },
+        "End": { "action": "set_maximum" }
+      }
+    },
+
+    "dialog_modal": {
+      "open": {
+        "Escape": { "action": "close", "when": "dismissable" },
+        "Tab": { "action": "focus_next_in_trap", "wrap": true },
+        "Shift+Tab": { "action": "focus_previous_in_trap", "wrap": true }
+      }
+    },
+
+    "date_picker": {
+      "calendar_grid": {
+        "ArrowRight": { "action": "next_day" },
+        "ArrowLeft": { "action": "previous_day" },
+        "ArrowDown": { "action": "next_week" },
+        "ArrowUp": { "action": "previous_week" },
+        "PageDown": { "action": "next_month" },
+        "PageUp": { "action": "previous_month" },
+        "Shift+PageDown": { "action": "next_year" },
+        "Shift+PageUp": { "action": "previous_year" },
+        "Home": { "action": "first_day_of_week" },
+        "End": { "action": "last_day_of_week" },
+        "Enter": { "action": "select_date", "close": true },
+        "Space": { "action": "select_date", "close": false }
+      }
+    },
+
+    "tree": {
+      "item_focused": {
+        "ArrowRight": { "action": "expand_or_focus_first_child" },
+        "ArrowLeft": { "action": "collapse_or_focus_parent" },
+        "ArrowDown": { "action": "focus_next_visible" },
+        "ArrowUp": { "action": "focus_previous_visible" },
+        "Home": { "action": "focus_first" },
+        "End": { "action": "focus_last_visible" },
+        "Enter": { "action": "activate" },
+        "*": { "action": "expand_all_siblings" }
+      }
+    }
+  },
+
+  "implementation_notes": {
+    "prevent_default": "Always call e.preventDefault() for handled keys",
+    "stop_propagation": "Use cautiously, may break parent handlers",
+    "key_vs_code": "Use e.key for characters, e.code for physical keys",
+    "modifier_keys": "Check e.ctrlKey, e.shiftKey, e.altKey, e.metaKey"
+  }
+}

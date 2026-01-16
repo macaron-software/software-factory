@@ -1,0 +1,161 @@
+{
+  "generated_at": "2026-01-14T19:55:00",
+  "question": "Analyse gaps Figma vs HTML vs Angular",
+  "brain_model": "analysis-script",
+  "tasks": [
+    {
+      "id": "HTML-001",
+      "type": "feature",
+      "priority": 9,
+      "description": "Générer HTML showcase pour date-picker",
+      "components": [
+        "date-picker"
+      ],
+      "acceptance_criteria": [
+        "HTML généré dans generated-pages/date-picker-*.html",
+        "Tous les variants Figma représentés",
+        "CSS linkés et fonctionnels"
+      ],
+      "sources": [
+        "design-system/figma-data/date-picker-all-depth10.json"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "HTML-002",
+      "type": "feature",
+      "priority": 9,
+      "description": "Générer HTML showcase pour file-upload",
+      "components": [
+        "file-upload"
+      ],
+      "acceptance_criteria": [
+        "HTML généré dans generated-pages/file-upload-*.html",
+        "Tous les variants Figma représentés",
+        "CSS linkés et fonctionnels"
+      ],
+      "sources": [
+        "design-system/figma-data/file-upload-all-depth10.json"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "HTML-003",
+      "type": "feature",
+      "priority": 9,
+      "description": "Générer HTML showcase pour side-panel",
+      "components": [
+        "side-panel"
+      ],
+      "acceptance_criteria": [
+        "HTML généré dans generated-pages/side-panel-*.html",
+        "Tous les variants Figma représentés",
+        "CSS linkés et fonctionnels"
+      ],
+      "sources": [
+        "design-system/figma-data/side-panel-all-depth10.json"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "ANG-001",
+      "type": "feature",
+      "priority": 8,
+      "description": "Créer composant Angular SolDatePickerComponent standalone",
+      "components": [
+        "date-picker"
+      ],
+      "acceptance_criteria": [
+        "Composant standalone dans libs/ui/src/lib/date-picker/",
+        "Inputs/Outputs pour tous les variants Figma",
+        "ControlValueAccessor si form control",
+        "Tests unitaires",
+        "WCAG conforme"
+      ],
+      "sources": [
+        "design-system/figma-data/date-picker-all-depth10.json"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "ANG-002",
+      "type": "feature",
+      "priority": 8,
+      "description": "Créer composant Angular SolFileUploadComponent standalone",
+      "components": [
+        "file-upload"
+      ],
+      "acceptance_criteria": [
+        "Composant standalone dans libs/ui/src/lib/file-upload/",
+        "Inputs/Outputs pour tous les variants Figma",
+        "ControlValueAccessor si form control",
+        "Tests unitaires",
+        "WCAG conforme"
+      ],
+      "sources": [
+        "design-system/figma-data/file-upload-all-depth10.json"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "ANG-003",
+      "type": "feature",
+      "priority": 8,
+      "description": "Créer composant Angular SolFilterComponent standalone",
+      "components": [
+        "filter"
+      ],
+      "acceptance_criteria": [
+        "Composant standalone dans libs/ui/src/lib/filter/",
+        "Inputs/Outputs pour tous les variants Figma",
+        "ControlValueAccessor si form control",
+        "Tests unitaires",
+        "WCAG conforme"
+      ],
+      "sources": [
+        "design-system/figma-data/filter-all-depth10.json"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "ANG-004",
+      "type": "feature",
+      "priority": 8,
+      "description": "Créer composant Angular SolIconsComponent standalone",
+      "components": [
+        "icons"
+      ],
+      "acceptance_criteria": [
+        "Composant standalone dans libs/ui/src/lib/icons/",
+        "Inputs/Outputs pour tous les variants Figma",
+        "ControlValueAccessor si form control",
+        "Tests unitaires",
+        "WCAG conforme"
+      ],
+      "sources": [
+        "design-system/figma-data/icons-all-depth10.json"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "ANG-005",
+      "type": "feature",
+      "priority": 8,
+      "description": "Créer composant Angular SolLinksComponent standalone",
+      "components": [
+        "links"
+      ],
+      "acceptance_criteria": [
+        "Composant standalone dans libs/ui/src/lib/links/",
+        "Inputs/Outputs pour tous les variants Figma",
+        "ControlValueAccessor si form control",
+        "Tests unitaires",
+        "WCAG conforme"
+      ],
+      "sources": [
+        "design-system/figma-data/links-all-depth10.json"
+      ],
+      "status": "completed"
+    }
+  ]
+}

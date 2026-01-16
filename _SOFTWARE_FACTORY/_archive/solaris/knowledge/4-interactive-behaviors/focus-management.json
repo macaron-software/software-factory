@@ -1,0 +1,201 @@
+{
+  "_meta": {
+    "description": "Focus management patterns for accessible interactive components",
+    "wcag_reference": "WCAG 2.1 - 2.4.3 Focus Order, 2.4.7 Focus Visible",
+    "version": "1.0.0",
+    "updated": "2026-01-06"
+  },
+
+  "patterns": {
+    "roving_tabindex": {
+      "description": "One item in group has tabindex=0, others have tabindex=-1",
+      "use_for": ["tabs", "menu", "radio-group", "toolbar", "listbox"],
+      "implementation": {
+        "initial": "First item (or selected) has tabindex=0",
+        "on_arrow": "Move tabindex=0 to new item, tabindex=-1 on previous",
+        "on_focus_out": "Keep tabindex=0 on last focused item"
+      },
+      "benefits": [
+        "Single tab stop for entire widget",
+        "Arrow keys for internal navigation",
+        "Maintains focus position on return"
+      ],
+      "code_pattern": {
+        "set_roving": "items.forEach((item, i) => item.tabIndex = i === activeIndex ? 0 : -1)",
+        "focus_item": "items[newIndex].focus(); updateTabIndexes(newIndex)"
+      }
+    },
+
+    "aria_activedescendant": {
+      "description": "Container manages focus, aria-activedescendant points to active item",
+      "use_for": ["combobox", "listbox", "grid", "tree"],
+      "implementation": {
+        "container": "tabindex=0, receives actual focus",
+        "items": "Each has unique id, no tabindex",
+        "active": "Container has aria-activedescendant={activeItemId}"
+      },
+      "benefits": [
+        "Better for virtualized lists",
+        "Focus stays on input (combobox)",
+        "Easier scroll management"
+      ],
+      "code_pattern": {
+        "container_attrs": "tabindex='0' role='listbox' aria-activedescendant='{activeId}'",
+        "item_attrs": "id='{uniqueId}' role='option' aria-selected='{isSelected}'"
+      }
+    },
+
+    "focus_trap": {
+      "description": "Focus cannot leave a container (modal dialogs)",
+      "use_for": ["modal", "dialog", "side-panel", "fullscreen-overlay"],
+      "implementation": {
+        "on_open": "Focus first focusable element inside",
+        "on_tab_last": "Focus first focusable (wrap)",
+        "on_shift_tab_first": "Focus last focusable (wrap)",
+        "on_close": "Restore focus to trigger element"
+      },
+      "sentinel_method": {
+        "description": "Invisible focusable elements at start/end",
+        "start_sentinel": "On focus, move to last focusable",
+        "end_sentinel": "On focus, move to first focusable"
+      },
+      "code_pattern": {
+        "get_focusables": "container.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex=\"-1\"])')",
+        "trap_handler": "if (e.key === 'Tab') { if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); } }"
+      }
+    },
+
+    "focus_restore": {
+      "description": "Return focus to trigger when overlay closes",
+      "use_for": ["modal", "dropdown", "popover", "tooltip-interactive"],
+      "implementation": {
+        "on_open": "Store reference to document.activeElement",
+        "on_close": "Call storedElement.focus()",
+        "edge_case": "If trigger removed, focus next logical element"
+      },
+      "code_pattern": {
+        "store": "const triggerElement = document.activeElement",
+        "restore": "triggerElement?.focus() || document.body.focus()"
+      }
+    },
+
+    "focus_visible": {
+      "description": "Show focus indicator only for keyboard navigation",
+      "use_for": ["all interactive elements"],
+      "implementation": {
+        "css_only": ":focus-visible { outline: 2px solid var(--color-focus); }",
+        "hide_mouse": ":focus:not(:focus-visible) { outline: none; }"
+      },
+      "polyfill_needed": "For older browsers, use focus-visible polyfill"
+    },
+
+    "skip_disabled": {
+      "description": "Arrow navigation skips disabled items",
+      "use_for": ["menu", "listbox", "tabs", "radio-group"],
+      "implementation": {
+        "check": "while (items[nextIndex].disabled) nextIndex = (nextIndex + 1) % items.length",
+        "aria": "aria-disabled='true' instead of disabled attribute for visibility"
+      }
+    },
+
+    "programmatic_focus": {
+      "description": "Moving focus via JavaScript",
+      "best_practices": [
+        "Always move focus after DOM update (use requestAnimationFrame)",
+        "Announce content changes with aria-live if not focused",
+        "Don't move focus on hover (jarring for keyboard users)",
+        "Move focus on click/Enter/Space, not on state change alone"
+      ],
+      "code_pattern": {
+        "safe_focus": "requestAnimationFrame(() => element.focus())",
+        "scroll_into_view": "element.scrollIntoView({ block: 'nearest' })"
+      }
+    }
+  },
+
+  "component_focus_specs": {
+    "accordion": {
+      "pattern": "roving_tabindex",
+      "focusable": "header triggers only",
+      "on_expand": "focus stays on trigger (content not auto-focused)",
+      "keyboard": "Arrow keys move between triggers"
+    },
+
+    "tabs": {
+      "pattern": "roving_tabindex",
+      "focusable": "tab buttons in tablist",
+      "on_select": "focus stays on tab, panel becomes tabbable",
+      "automatic_activation": "selection follows focus",
+      "manual_activation": "Enter/Space to select focused tab"
+    },
+
+    "menu_dropdown": {
+      "pattern": "roving_tabindex",
+      "on_open": "focus first item (or selected)",
+      "on_close": "restore focus to trigger",
+      "on_select": "close and restore focus"
+    },
+
+    "modal_dialog": {
+      "pattern": "focus_trap",
+      "on_open": "focus first focusable (or close button)",
+      "on_close": "restore focus to trigger",
+      "page_inert": "set inert attribute on siblings"
+    },
+
+    "combobox": {
+      "pattern": "aria_activedescendant",
+      "input_focused": "always (focus never leaves input)",
+      "on_open": "aria-activedescendant set to first/selected option",
+      "on_close": "focus stays on input"
+    },
+
+    "date_picker": {
+      "pattern": "roving_tabindex (calendar grid)",
+      "on_open": "focus selected date or today",
+      "grid_navigation": "arrow keys for days, page for months",
+      "on_select": "close and restore focus to trigger"
+    },
+
+    "tooltip": {
+      "pattern": "none (not focusable)",
+      "trigger_focus": "shows tooltip",
+      "trigger_blur": "hides tooltip",
+      "escape": "hides tooltip (focus stays on trigger)"
+    },
+
+    "notification_toast": {
+      "pattern": "focus_optional",
+      "auto_dismiss": "don't move focus (interrupts user)",
+      "with_action": "action button focusable, but don't auto-focus",
+      "dismissable": "close button focusable"
+    }
+  },
+
+  "inert_siblings": {
+    "description": "Hide siblings from accessibility tree when modal is open",
+    "use_for": ["modal", "dialog"],
+    "implementation": {
+      "native": "sibling.inert = true (modern browsers)",
+      "fallback": "aria-hidden='true' on siblings",
+      "restore": "Remove inert/aria-hidden on close"
+    },
+    "code_pattern": {
+      "apply_inert": "Array.from(document.body.children).filter(el => el !== dialog).forEach(el => el.inert = true)",
+      "remove_inert": "Array.from(document.body.children).forEach(el => el.inert = false)"
+    }
+  },
+
+  "scroll_management": {
+    "scroll_into_view": {
+      "when": "Focused item not visible",
+      "method": "element.scrollIntoView({ block: 'nearest', behavior: 'smooth' })",
+      "avoid": "{ block: 'center' } can be jarring"
+    },
+    "prevent_body_scroll": {
+      "when": "Modal or fullscreen overlay open",
+      "method": "document.body.style.overflow = 'hidden'",
+      "restore": "document.body.style.overflow = ''"
+    }
+  }
+}

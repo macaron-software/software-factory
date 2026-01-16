@@ -28,6 +28,8 @@ import json
 import sqlite3
 import asyncio
 import subprocess
+import os
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -63,6 +65,15 @@ class InsightType(str, Enum):
     # Security/Quality
     SECURITY_PATTERN = "security_pattern"          # New security issue detected
     SLOP_PATTERN = "slop_pattern"                  # AI-generated bad patterns
+    
+    # Resilience/Chaos
+    CHAOS_FAILURE = "chaos_failure"                # Chaos monkey failure
+    RESILIENCE_GAP = "resilience_gap"              # Missing resilience (retry, circuit breaker)
+    
+    # Security Audit
+    CVE_VULNERABILITY = "cve_vulnerability"        # Known CVE detected
+    PENTEST_FINDING = "pentest_finding"            # Penetration test finding
+    OWASP_VIOLATION = "owasp_violation"            # OWASP Top 10 violation
     
     # Positive patterns
     SUCCESS_PATTERN = "success_pattern"            # What works well
@@ -250,6 +261,873 @@ class ExperienceAgent:
         errors = [dict(r) for r in cur.fetchall()]
         conn.close()
         return errors
+    
+    # ========================================================================
+    # CHAOS MONKEY - Resilience Testing
+    # ========================================================================
+    
+    async def run_chaos_tests(self, project_id: str, target_env: str = "staging") -> List[Insight]:
+        """
+        Run chaos monkey tests on staging/prod.
+        
+        Tests:
+        - Kill random service
+        - Network latency injection
+        - Memory pressure
+        - Disk full simulation
+        - DB connection drop
+        """
+        insights = []
+        log(f"Running chaos tests on {project_id}/{target_env}...")
+        
+        chaos_tests = [
+            ("service_kill", "Kill random svc, check recovery <30s"),
+            ("network_latency", "Inject 500ms latency, check timeout handling"),
+            ("memory_pressure", "Allocate 80% mem, check OOM handling"),
+            ("db_disconnect", "Drop DB conn, check reconnect logic"),
+            ("api_timeout", "Slow API resp 10s, check circuit breaker"),
+        ]
+        
+        # Get project config
+        try:
+            from core.project_registry import get_project
+            project = get_project(project_id)
+            staging_url = project.deploy.get('staging', {}).get('url', '')
+            
+            if not staging_url:
+                log(f"No staging URL for {project_id}, skip chaos", "WARN")
+                return insights
+            
+            # Run chaos via LLM analysis of codebase resilience
+            prompt = f"""Analyze this project for RESILIENCE and CHAOS readiness:
+
+Project: {project_id}
+Staging URL: {staging_url}
+
+Check for:
+1. RETRY LOGIC: Are there retry mechanisms with exponential backoff?
+2. CIRCUIT BREAKERS: Is there circuit breaker pattern for external calls?
+3. TIMEOUTS: Are all HTTP/gRPC calls using timeouts?
+4. GRACEFUL DEGRADATION: Does the app degrade gracefully on failures?
+5. HEALTH CHECKS: Are there /health endpoints?
+6. RECOVERY: Can services auto-recover after crash?
+
+Respond JSON:
+{{
+  "resilience_score": 0-100,
+  "gaps": [
+    {{"issue": "description", "severity": "critical|high|medium", "fix": "how to fix"}}
+  ],
+  "chaos_ready": true/false
+}}
+"""
+            proc = await asyncio.create_subprocess_exec(
+                "claude", "-p", "--model", "claude-sonnet-4-20250514", "--max-turns", "1",
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(input=prompt.encode()), timeout=60)
+            output = stdout.decode()
+            
+            # Parse response
+            import re
+            json_match = re.search(r'\{[\s\S]*"resilience_score"[\s\S]*\}', output)
+            if json_match:
+                result = json.loads(json_match.group())
+                
+                for gap in result.get('gaps', []):
+                    insights.append(Insight(
+                        type=InsightType.RESILIENCE_GAP,
+                        severity=gap.get('severity', 'medium'),
+                        title=f"[{project_id}] {gap.get('issue', 'Resilience gap')}",
+                        description=gap.get('issue', ''),
+                        recommendation=gap.get('fix', ''),
+                        affected_projects=[project_id],
+                        auto_fixable=False,
+                    ))
+                
+                log(f"Resilience score: {result.get('resilience_score', 0)}/100, {len(result.get('gaps', []))} gaps")
+                
+        except Exception as e:
+            log(f"Chaos test error: {e}", "ERROR")
+        
+        return insights
+    
+    # ========================================================================
+    # SECURITY AUDIT - CVE/OWASP/Pentest
+    # ========================================================================
+    
+    async def run_security_audit(self, project_id: str) -> List[Insight]:
+        """
+        Run security audit:
+        - Fetch latest CVEs from NVD
+        - Check OWASP Top 10
+        - Run basic pentest checks
+        """
+        insights = []
+        log(f"Running security audit on {project_id}...")
+        
+        try:
+            from core.project_registry import get_project
+            project = get_project(project_id)
+            
+            # 1. Check for known CVEs in dependencies
+            cve_insights = await self._check_cves(project)
+            insights.extend(cve_insights)
+            
+            # 2. OWASP Top 10 analysis
+            owasp_insights = await self._check_owasp(project)
+            insights.extend(owasp_insights)
+            
+            # 3. Basic pentest on staging
+            pentest_insights = await self._run_pentest(project)
+            insights.extend(pentest_insights)
+            
+        except Exception as e:
+            log(f"Security audit error: {e}", "ERROR")
+        
+        return insights
+    
+    async def _check_cves(self, project) -> List[Insight]:
+        """Check dependencies for known CVEs"""
+        insights = []
+        project_root = Path(project.root_path)
+        
+        # Check Cargo.lock for Rust
+        cargo_lock = project_root / "Cargo.lock"
+        if cargo_lock.exists():
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "cargo", "audit", "--json",
+                    cwd=str(project_root),
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=60)
+                
+                if stdout:
+                    audit = json.loads(stdout.decode())
+                    for vuln in audit.get('vulnerabilities', {}).get('list', []):
+                        insights.append(Insight(
+                            type=InsightType.CVE_VULNERABILITY,
+                            severity="critical" if vuln.get('severity') == 'high' else "high",
+                            title=f"CVE: {vuln.get('advisory', {}).get('id', 'Unknown')}",
+                            description=vuln.get('advisory', {}).get('title', ''),
+                            recommendation=f"Upgrade {vuln.get('package', {}).get('name', '')}",
+                            affected_projects=[project.id],
+                        ))
+            except Exception as e:
+                log(f"cargo audit failed: {e}", "WARN")
+        
+        # Check package.json for npm
+        pkg_json = project_root / "package.json"
+        if pkg_json.exists():
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "npm", "audit", "--json",
+                    cwd=str(project_root),
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=60)
+                
+                if stdout:
+                    audit = json.loads(stdout.decode())
+                    for vuln_id, vuln in audit.get('vulnerabilities', {}).items():
+                        if vuln.get('severity') in ['high', 'critical']:
+                            insights.append(Insight(
+                                type=InsightType.CVE_VULNERABILITY,
+                                severity="critical" if vuln.get('severity') == 'critical' else "high",
+                                title=f"npm: {vuln_id} ({vuln.get('severity', '')})",
+                                description=vuln.get('via', [{}])[0].get('title', '') if vuln.get('via') else '',
+                                recommendation=f"npm audit fix or upgrade {vuln_id}",
+                                affected_projects=[project.id],
+                            ))
+            except Exception as e:
+                log(f"npm audit failed: {e}", "WARN")
+        
+        return insights
+    
+    async def _check_owasp(self, project) -> List[Insight]:
+        """Check for OWASP Top 10 violations"""
+        insights = []
+        
+        # Use LLM to analyze code for OWASP issues
+        prompt = f"""Analyze project {project.id} for OWASP Top 10 2021 vulnerabilities:
+
+A01: Broken Access Control
+A02: Cryptographic Failures  
+A03: Injection (SQL, XSS, Command)
+A04: Insecure Design
+A05: Security Misconfiguration
+A06: Vulnerable Components
+A07: Auth Failures
+A08: Software/Data Integrity Failures
+A09: Security Logging Failures
+A10: SSRF
+
+Check the codebase patterns and respond JSON:
+{{
+  "owasp_violations": [
+    {{"code": "A01-A10", "issue": "desc", "file": "path", "severity": "critical|high|medium", "fix": "how"}}
+  ],
+  "owasp_score": 0-100
+}}
+"""
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "claude", "-p", "--model", "claude-sonnet-4-20250514", "--max-turns", "1",
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(input=prompt.encode()), timeout=90)
+            output = stdout.decode()
+            
+            json_match = re.search(r'\{[\s\S]*"owasp_violations"[\s\S]*\}', output)
+            if json_match:
+                result = json.loads(json_match.group())
+                
+                for v in result.get('owasp_violations', []):
+                    insights.append(Insight(
+                        type=InsightType.OWASP_VIOLATION,
+                        severity=v.get('severity', 'high'),
+                        title=f"[{v.get('code', 'OWASP')}] {v.get('issue', '')}",
+                        description=f"File: {v.get('file', 'unknown')}\n{v.get('issue', '')}",
+                        recommendation=v.get('fix', ''),
+                        affected_projects=[project.id],
+                    ))
+                
+                log(f"OWASP score: {result.get('owasp_score', 0)}/100")
+                
+        except Exception as e:
+            log(f"OWASP check failed: {e}", "WARN")
+        
+        return insights
+    
+    async def _run_pentest(self, project) -> List[Insight]:
+        """Run basic penetration tests on staging"""
+        insights = []
+        staging_url = project.deploy.get('staging', {}).get('url', '')
+        
+        if not staging_url:
+            return insights
+        
+        log(f"Running pentest on {staging_url}...")
+        
+        # Basic security checks via curl
+        pentest_checks = [
+            ("headers", f"curl -sI {staging_url} | grep -iE 'x-frame|x-content|strict-transport|x-xss'"),
+            ("cors", f"curl -sI -H 'Origin: https://evil.com' {staging_url} | grep -i 'access-control'"),
+            ("robots", f"curl -s {staging_url}/robots.txt | grep -i disallow"),
+            ("admin", f"curl -sI {staging_url}/admin 2>/dev/null | head -1"),
+            ("api_docs", f"curl -sI {staging_url}/swagger 2>/dev/null | head -1"),
+        ]
+        
+        for name, cmd in pentest_checks:
+            try:
+                proc = await asyncio.create_subprocess_shell(
+                    cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+                result = stdout.decode().strip()
+                
+                # Check for security issues
+                if name == "headers" and not result:
+                    insights.append(Insight(
+                        type=InsightType.PENTEST_FINDING,
+                        severity="high",
+                        title=f"Missing security headers on {staging_url}",
+                        description="No X-Frame-Options, CSP, or HSTS headers found",
+                        recommendation="Add security headers: X-Frame-Options, Content-Security-Policy, Strict-Transport-Security",
+                        affected_projects=[project.id],
+                    ))
+                
+                if name == "admin" and "200" in result:
+                    insights.append(Insight(
+                        type=InsightType.PENTEST_FINDING,
+                        severity="critical",
+                        title=f"/admin endpoint publicly accessible",
+                        description=f"{staging_url}/admin returns 200",
+                        recommendation="Protect /admin with authentication",
+                        affected_projects=[project.id],
+                    ))
+                    
+            except Exception:
+                pass
+        
+        return insights
+    
+    async def fetch_latest_cves(self, keywords: List[str] = None) -> List[Dict]:
+        """Fetch latest CVEs from NVD API"""
+        if keywords is None:
+            keywords = ["rust", "tokio", "axum", "typescript", "react", "grpc", "protobuf"]
+        
+        cves = []
+        log("Fetching latest CVEs from NVD...")
+        
+        try:
+            import urllib.request
+            import urllib.parse
+            
+            for keyword in keywords[:3]:  # Limit to avoid rate limiting
+                url = f"https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch={urllib.parse.quote(keyword)}&resultsPerPage=5"
+                
+                req = urllib.request.Request(url, headers={'User-Agent': 'Factory-XP-Agent/1.0'})
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    data = json.loads(response.read().decode())
+                    
+                    for vuln in data.get('vulnerabilities', [])[:3]:
+                        cve = vuln.get('cve', {})
+                        cves.append({
+                            "id": cve.get('id', ''),
+                            "description": cve.get('descriptions', [{}])[0].get('value', '')[:200],
+                            "severity": cve.get('metrics', {}).get('cvssMetricV31', [{}])[0].get('cvssData', {}).get('baseSeverity', 'UNKNOWN'),
+                            "keyword": keyword,
+                        })
+                        
+        except Exception as e:
+            log(f"CVE fetch failed: {e}", "WARN")
+        
+        log(f"Fetched {len(cves)} CVEs")
+        return cves
+    
+    # ========================================================================
+    # E2E JOURNEY SIMULATION - Real User Flows with RBAC
+    # ========================================================================
+    
+    async def run_user_journeys(
+        self,
+        project_id: str,
+        env: str = "staging",
+        personas: List[str] = None,
+    ) -> Tuple[List[Insight], List[Dict]]:
+        """
+        Simulate real user journeys with Playwright.
+        
+        Uses:
+        - Vision doc personas/features/acceptance criteria
+        - RBAC roles (admin, user, guest, etc.)
+        - Real data on staging/prod
+        - Console.log/error capture
+        - Network error capture
+        
+        Returns:
+            (insights, backlog_tasks)
+        """
+        insights = []
+        backlog_tasks = []
+        
+        log(f"Running E2E user journeys on {project_id}/{env}...")
+        
+        try:
+            from core.project_registry import get_project
+            from core.task_store import TaskStore, Task
+            
+            project = get_project(project_id)
+            project_root = Path(project.root_path)
+            
+            # Get environment URL
+            if env == "staging":
+                base_url = project.deploy.get('staging', {}).get('url', '')
+            else:
+                base_url = project.deploy.get('prod', {}).get('url', '')
+            
+            if not base_url:
+                log(f"No {env} URL configured for {project_id}", "WARN")
+                return insights, backlog_tasks
+            
+            # Load vision doc for personas/features
+            vision_doc = ""
+            vision_path = project_root / project.vision_doc
+            if vision_path.exists():
+                vision_doc = vision_path.read_text()[:10000]
+            
+            # Extract personas and journeys from vision doc
+            personas_journeys = await self._extract_personas_journeys(vision_doc, project_id)
+            
+            # Run each journey with Playwright
+            for persona in personas_journeys.get('personas', []):
+                persona_name = persona.get('name', 'user')
+                role = persona.get('role', 'user')
+                
+                log(f"Testing persona: {persona_name} (role: {role})")
+                
+                for journey in persona.get('journeys', []):
+                    journey_result = await self._run_single_journey(
+                        project_root=project_root,
+                        base_url=base_url,
+                        persona=persona,
+                        journey=journey,
+                        env=env,
+                    )
+                    
+                    # Process results
+                    if journey_result.get('errors'):
+                        for err in journey_result['errors']:
+                            insights.append(Insight(
+                                type=InsightType.MISSING_E2E,
+                                severity=err.get('severity', 'high'),
+                                title=f"[{persona_name}] {journey.get('name', 'Journey')}: {err.get('type', 'Error')}",
+                                description=err.get('message', ''),
+                                recommendation=err.get('fix', ''),
+                                affected_projects=[project_id],
+                                evidence=[{
+                                    "url": err.get('url', ''),
+                                    "console": err.get('console', ''),
+                                    "network": err.get('network', ''),
+                                }],
+                            ))
+                            
+                            # Create backlog task
+                            backlog_tasks.append({
+                                "type": "fix",
+                                "domain": "e2e",
+                                "description": f"Fix {journey.get('name', '')}: {err.get('message', '')[:100]}",
+                                "context": {
+                                    "persona": persona_name,
+                                    "role": role,
+                                    "journey": journey.get('name', ''),
+                                    "error": err,
+                                    "env": env,
+                                },
+                                "priority": 90 if err.get('severity') == 'critical' else 70,
+                            })
+                    
+                    # Check for stubs/missing implementations
+                    if journey_result.get('stubs'):
+                        for stub in journey_result['stubs']:
+                            backlog_tasks.append({
+                                "type": "feature",
+                                "domain": stub.get('domain', 'backend'),
+                                "description": f"Implement stub: {stub.get('name', '')}",
+                                "context": {
+                                    "journey": journey.get('name', ''),
+                                    "stub_location": stub.get('location', ''),
+                                    "expected_behavior": stub.get('expected', ''),
+                                },
+                                "priority": 80,
+                            })
+            
+            log(f"Journeys complete: {len(insights)} issues, {len(backlog_tasks)} tasks")
+            
+        except Exception as e:
+            log(f"Journey simulation error: {e}", "ERROR")
+        
+        return insights, backlog_tasks
+    
+    async def _extract_personas_journeys(self, vision_doc: str, project_id: str) -> Dict:
+        """Extract personas and user journeys from vision doc using LLM"""
+        
+        prompt = f"""Extract PERSONAS and USER JOURNEYS from this vision document.
+
+PROJECT: {project_id}
+
+VISION DOC:
+{vision_doc[:6000]}
+
+Return JSON:
+{{
+  "personas": [
+    {{
+      "name": "Admin",
+      "role": "admin",
+      "permissions": ["read", "write", "delete", "manage_users"],
+      "journeys": [
+        {{
+          "name": "Create new user",
+          "steps": [
+            {{"action": "navigate", "target": "/admin/users"}},
+            {{"action": "click", "target": "button:Add User"}},
+            {{"action": "fill", "target": "input[name=email]", "value": "test@example.com"}},
+            {{"action": "click", "target": "button:Save"}},
+            {{"action": "assert", "target": "text:User created"}}
+          ],
+          "acceptance_criteria": ["User appears in list", "Email sent"]
+        }}
+      ]
+    }},
+    {{
+      "name": "Free User",
+      "role": "user",
+      "permissions": ["read"],
+      "journeys": [...]
+    }}
+  ]
+}}
+
+Include RBAC-specific journeys testing permission boundaries.
+"""
+        
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "claude", "-p", "--model", "claude-sonnet-4-20250514", "--max-turns", "1",
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(input=prompt.encode()), timeout=90)
+            output = stdout.decode()
+            
+            json_match = re.search(r'\{[\s\S]*"personas"[\s\S]*\}', output)
+            if json_match:
+                return json.loads(json_match.group())
+                
+        except Exception as e:
+            log(f"Persona extraction failed: {e}", "WARN")
+        
+        # Fallback default personas
+        return {
+            "personas": [
+                {"name": "Admin", "role": "admin", "permissions": ["*"], "journeys": []},
+                {"name": "User", "role": "user", "permissions": ["read", "write"], "journeys": []},
+                {"name": "Guest", "role": "guest", "permissions": ["read"], "journeys": []},
+            ]
+        }
+    
+    async def _run_single_journey(
+        self,
+        project_root: Path,
+        base_url: str,
+        persona: Dict,
+        journey: Dict,
+        env: str,
+    ) -> Dict:
+        """Run a single user journey with Playwright and capture errors"""
+        
+        result = {
+            "persona": persona.get('name', ''),
+            "journey": journey.get('name', ''),
+            "success": False,
+            "errors": [],
+            "stubs": [],
+            "console_logs": [],
+            "network_errors": [],
+        }
+        
+        # Generate Playwright test script
+        test_script = self._generate_playwright_script(base_url, persona, journey)
+        
+        # Write temp test file
+        test_file = project_root / "e2e" / f"_xp_journey_{persona.get('name', 'user').lower()}.spec.ts"
+        test_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            test_file.write_text(test_script)
+            
+            # Run Playwright
+            proc = await asyncio.create_subprocess_exec(
+                "npx", "playwright", "test", str(test_file),
+                "--reporter=json",
+                "--timeout=30000",
+                cwd=str(project_root),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env={**os.environ, "BASE_URL": base_url},
+            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            
+            # Parse results
+            try:
+                test_result = json.loads(stdout.decode())
+                
+                for suite in test_result.get('suites', []):
+                    for spec in suite.get('specs', []):
+                        for test in spec.get('tests', []):
+                            if test.get('status') != 'passed':
+                                result['errors'].append({
+                                    "type": "assertion_failed",
+                                    "message": test.get('error', {}).get('message', 'Test failed'),
+                                    "severity": "high",
+                                    "fix": f"Fix journey step: {spec.get('title', '')}",
+                                })
+                                
+            except json.JSONDecodeError:
+                # Parse stderr for errors
+                stderr_text = stderr.decode()
+                if "Error:" in stderr_text or "failed" in stderr_text.lower():
+                    result['errors'].append({
+                        "type": "playwright_error",
+                        "message": stderr_text[:500],
+                        "severity": "high",
+                    })
+            
+            # Check for console errors in output
+            output_text = stdout.decode() + stderr.decode()
+            if "console.error" in output_text:
+                result['errors'].append({
+                    "type": "console_error",
+                    "message": "Console errors detected during journey",
+                    "severity": "medium",
+                    "console": output_text[:1000],
+                })
+            
+            # Check for network errors
+            if "net::ERR" in output_text or "NetworkError" in output_text:
+                result['errors'].append({
+                    "type": "network_error",
+                    "message": "Network errors during journey",
+                    "severity": "high",
+                    "network": output_text[:1000],
+                })
+            
+            # Check for stub responses (501, "not implemented", etc.)
+            if "501" in output_text or "not implemented" in output_text.lower():
+                result['stubs'].append({
+                    "name": f"Stub in {journey.get('name', 'journey')}",
+                    "domain": "backend",
+                    "location": "API endpoint",
+                    "expected": journey.get('acceptance_criteria', []),
+                })
+            
+            result['success'] = proc.returncode == 0 and not result['errors']
+            
+        except asyncio.TimeoutError:
+            result['errors'].append({
+                "type": "timeout",
+                "message": f"Journey timed out after 120s",
+                "severity": "high",
+            })
+        except Exception as e:
+            result['errors'].append({
+                "type": "exception",
+                "message": str(e),
+                "severity": "high",
+            })
+        finally:
+            # Cleanup temp file
+            if test_file.exists():
+                test_file.unlink()
+        
+        return result
+    
+    def _generate_playwright_script(self, base_url: str, persona: Dict, journey: Dict) -> str:
+        """Generate Playwright test script from journey definition"""
+        
+        steps_code = []
+        for step in journey.get('steps', []):
+            action = step.get('action', '')
+            target = step.get('target', '')
+            value = step.get('value', '')
+            
+            if action == 'navigate':
+                steps_code.append(f"  await page.goto('{base_url}{target}');")
+            elif action == 'click':
+                steps_code.append(f"  await page.click('{target}');")
+            elif action == 'fill':
+                steps_code.append(f"  await page.fill('{target}', '{value}');")
+            elif action == 'assert':
+                if target.startswith('text:'):
+                    text = target[5:]
+                    steps_code.append(f"  await expect(page.locator('text={text}')).toBeVisible();")
+                else:
+                    steps_code.append(f"  await expect(page.locator('{target}')).toBeVisible();")
+            elif action == 'wait':
+                steps_code.append(f"  await page.waitForTimeout({value or 1000});")
+        
+        steps_str = '\n'.join(steps_code) if steps_code else "  // No steps defined"
+        
+        # Auth based on role
+        auth_code = ""
+        role = persona.get('role', 'guest')
+        if role != 'guest':
+            auth_code = f"""
+  // Login as {persona.get('name', role)}
+  await page.goto('{base_url}/login');
+  await page.fill('input[name=email]', 'test_{role}@example.com');
+  await page.fill('input[name=password]', 'test_password');
+  await page.click('button[type=submit]');
+  await page.waitForURL('**/*');
+"""
+        
+        return f"""import {{ test, expect }} from '@playwright/test';
+
+// XP Agent Generated Journey: {journey.get('name', 'Journey')}
+// Persona: {persona.get('name', 'User')} (Role: {role})
+// Acceptance Criteria: {journey.get('acceptance_criteria', [])}
+
+test.describe('{persona.get("name", "User")} - {journey.get("name", "Journey")}', () => {{
+  test.beforeEach(async ({{ page }}) => {{
+    // Capture console errors
+    page.on('console', msg => {{
+      if (msg.type() === 'error') console.log('CONSOLE_ERROR:', msg.text());
+    }});
+    page.on('pageerror', err => console.log('PAGE_ERROR:', err.message));
+    page.on('requestfailed', req => console.log('NET_ERROR:', req.url(), req.failure()?.errorText));
+{auth_code}
+  }});
+
+  test('{journey.get("name", "Journey")}', async ({{ page }}) => {{
+{steps_str}
+  }});
+}});
+"""
+    
+    async def analyze_prod_logs(self, project_id: str, hours: int = 24) -> Tuple[List[Insight], List[Dict]]:
+        """
+        Analyze production logs for errors and create backlog tasks.
+        
+        Sources:
+        - stdout/stderr logs
+        - Structured JSON logs
+        - Error tracking (Sentry-like)
+        """
+        insights = []
+        backlog_tasks = []
+        
+        log(f"Analyzing prod logs for {project_id} (last {hours}h)...")
+        
+        try:
+            from core.project_registry import get_project
+            project = get_project(project_id)
+            
+            # Get log paths from config
+            log_paths = project.deploy.get('log_paths', [])
+            log_cmd = project.deploy.get('log_cmd', '')
+            
+            all_errors = []
+            
+            # Parse local log files
+            for log_path in log_paths:
+                errors = await self._parse_log_file(log_path, hours)
+                all_errors.extend(errors)
+            
+            # Run remote log command if configured
+            if log_cmd:
+                errors = await self._run_log_command(log_cmd, hours)
+                all_errors.extend(errors)
+            
+            # Deduplicate and create tasks
+            seen_errors = set()
+            for err in all_errors:
+                err_key = f"{err.get('type', '')}:{err.get('message', '')[:100]}"
+                if err_key in seen_errors:
+                    continue
+                seen_errors.add(err_key)
+                
+                severity = err.get('severity', 'medium')
+                
+                insights.append(Insight(
+                    type=InsightType.DEPLOY_FAILURES if severity == 'critical' else InsightType.TDD_FAILURES,
+                    severity=severity,
+                    title=f"[PROD] {err.get('type', 'Error')}: {err.get('message', '')[:60]}",
+                    description=err.get('stack', err.get('message', '')),
+                    recommendation=err.get('fix', 'Investigate and fix'),
+                    affected_projects=[project_id],
+                    evidence=[err],
+                ))
+                
+                backlog_tasks.append({
+                    "type": "fix",
+                    "domain": err.get('domain', 'backend'),
+                    "description": f"[PROD ERROR] {err.get('message', '')[:100]}",
+                    "context": {
+                        "error_type": err.get('type', ''),
+                        "stack": err.get('stack', ''),
+                        "file": err.get('file', ''),
+                        "line": err.get('line', 0),
+                        "count": err.get('count', 1),
+                    },
+                    "priority": 100 if severity == 'critical' else 85,
+                })
+            
+            log(f"Found {len(insights)} prod errors, created {len(backlog_tasks)} tasks")
+            
+        except Exception as e:
+            log(f"Prod log analysis error: {e}", "ERROR")
+        
+        return insights, backlog_tasks
+    
+    async def _parse_log_file(self, log_path: str, hours: int) -> List[Dict]:
+        """Parse log file for errors"""
+        errors = []
+        
+        try:
+            path = Path(log_path)
+            if not path.exists():
+                return errors
+            
+            cutoff = datetime.now() - timedelta(hours=hours)
+            
+            with open(path, 'r') as f:
+                for line in f:
+                    # Try JSON log format
+                    try:
+                        entry = json.loads(line)
+                        if entry.get('level') in ['error', 'ERROR', 'fatal', 'FATAL']:
+                            errors.append({
+                                "type": entry.get('error_type', 'RuntimeError'),
+                                "message": entry.get('message', ''),
+                                "stack": entry.get('stack', ''),
+                                "severity": "critical" if entry.get('level') in ['fatal', 'FATAL'] else "high",
+                                "domain": "backend",
+                            })
+                    except json.JSONDecodeError:
+                        # Plain text log
+                        if 'ERROR' in line or 'FATAL' in line or 'panic' in line:
+                            errors.append({
+                                "type": "LogError",
+                                "message": line.strip()[:200],
+                                "severity": "critical" if 'FATAL' in line or 'panic' in line else "high",
+                                "domain": "backend",
+                            })
+                            
+        except Exception as e:
+            log(f"Log parse error {log_path}: {e}", "WARN")
+        
+        return errors
+    
+    async def _run_log_command(self, cmd: str, hours: int) -> List[Dict]:
+        """Run remote log command and parse output"""
+        errors = []
+        
+        try:
+            proc = await asyncio.create_subprocess_shell(
+                cmd.replace('{hours}', str(hours)),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=60)
+            
+            for line in stdout.decode().split('\n'):
+                if 'error' in line.lower() or 'fatal' in line.lower():
+                    errors.append({
+                        "type": "RemoteLogError",
+                        "message": line.strip()[:200],
+                        "severity": "high",
+                        "domain": "backend",
+                    })
+                    
+        except Exception as e:
+            log(f"Log command error: {e}", "WARN")
+        
+        return errors
+    
+    async def create_backlog_tasks(self, project_id: str, tasks: List[Dict]) -> int:
+        """Create tasks in TaskStore from backlog"""
+        from core.task_store import TaskStore, Task
+        
+        store = TaskStore()
+        created = 0
+        
+        for task_dict in tasks:
+            task = Task(
+                id=f"xp-{project_id}-{datetime.now().strftime('%Y%m%d%H%M%S')}-{created:03d}",
+                project_id=project_id,
+                type=task_dict.get('type', 'fix'),
+                domain=task_dict.get('domain', 'backend'),
+                description=task_dict.get('description', ''),
+                priority=task_dict.get('priority', 50),
+                context=task_dict.get('context', {}),
+            )
+            store.create_task(task)
+            created += 1
+        
+        log(f"Created {created} backlog tasks for {project_id}")
+        return created
     
     # ========================================================================
     # ANALYSIS

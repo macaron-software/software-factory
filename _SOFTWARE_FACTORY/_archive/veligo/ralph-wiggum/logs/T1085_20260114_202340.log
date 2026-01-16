@@ -1,0 +1,107 @@
+[0;32m[AGENT] Real Agent starting[0m
+[0;34m[AGENT] Task: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks/T1085.md[0m
+[0;34m[AGENT] Queue: tdd[0m
+[0;34m[AGENT] Backend: auto[0m
+[0;32m[AGENT] Starting task: T1085[0m
+[0;34m[AGENT] Iteration 1/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'find veligo-platform/backend -type f -name "*.rs" | xargs grep -l -i "p[0m
+[0;34m$ find veligo-platform/backend -type f -name "*.rs" | xargs grep -l -i "paypal\|processor" 2>/dev/null | head -20[0m
+[0;34m[AGENT] Iteration 2/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'find veligo-platform/backend/src -type f -name "*.rs" | xargs grep -l -[0m
+[0;34m$ find veligo-platform/backend/src -type f -name "*.rs" | xargs grep -l -i "paypal\|processor" 2>/dev/null[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'ls -la veligo-platform/backend/src/'}[0m
+[0;34m$ ls -la veligo-platform/backend/src/[0m
+[0;34m[AGENT] Iteration 3/10[0m
+[0;34m[AGENT] Executing: write - {'type': 'write', 'file': 'veligo-platform/backend/src/payment/adapters/paypal.rs', 'content': 'use [0m
+[0;32m[AGENT] Wrote /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/payment/adapters/paypal.rs[0m
+[0;34m[AGENT] Iteration 4/10[0m
+[0;33m[AGENT] No actions found in response[0m
+[0;34m[AGENT] Iteration 5/10[0m
+[0;33m[AGENT] No actions found in response[0m
+[0;34m[AGENT] Iteration 6/10[0m
+[0;33m[AGENT] No actions found in response[0m
+[0;34m[AGENT] Iteration 7/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/tests/unit/paypal_adapter_tests.rs'}[0m
+[0;34m$ cat veligo-platform/backend/tests/unit/paypal_adapter_tests.rs[0m
+[0;34m[AGENT] Iteration 8/10[0m
+[0;33m[AGENT] No actions found in response[0m
+[0;34m[AGENT] Iteration 9/10[0m
+[0;33m[AGENT] No actions found in response[0m
+[0;34m[AGENT] Iteration 10/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/tests/unit/payment_factory_tests.rs'}[0m
+[0;34m$ cat veligo-platform/backend/tests/unit/payment_factory_tests.rs[0m
+
+============================================================
+RESULT: FAILED
+============================================================
+=== Action Results ===
+bash: OK
+//! Unit tests for PayPalAdapter
+//! Tests edge cases: invalid credentials, API timeouts, invalid transaction data
+
+#[cfg(test)]
+mod paypal_adapter_tests {
+    use std::time::Duration;
+    use tokio::time::timeout;
+    use veligo_backend::payment::adapters::paypal::PayPalAdapter;
+    use veligo_backend::payment::{PaymentAdapter, PaymentError};
+
+    // Helper to create adapter for testing
+    fn create_test_adapter() -> PayPalAdapter {
+        PayPalAdapter
+    }
+
+    // =========================
+
+=== LLM Response ===
+<think>
+The test file exists but is incomplete. Let me check more files to understand the structure better - I need to see:
+1. The PaymentPort trait
+2. The existing test patterns
+3. How mockall is used in this codebase
+</think>
+
+
+<read>
+file="veligo-platform/backend/src/domain/payment/payment_port.rs"
+</read>
+<bash>
+cat veligo-platform/backend/tests/unit/payment_factory_tests.rs
+```
+
+=== LLM Response ===
+<think>
+Let me read the necessary files to understand the structure.
+</think>
+
+<read>
+file="veligo-platform/backend/src/domain/payment/payment_port.rs"
+</read>
+<bash>
+cat veligo-platform/backend/tests/unit/payment_factory_tests.rs
+```
+
+=== LLM Response ===
+<think>
+The user wants me to use proper bash or edit tags. Let me try again with the correct format.
+</think>
+
+```bash
+cat veligo-platform/backend/tests/unit/payment_factory_tests.rs
+```
+
+=== Action Results ===
+bash: OK
+//! Unit tests for PaymentAdapterFactory
+//! Tests factory creation logic, configuration handling, and error cases
+
+#[cfg(test)]
+mod payment_factory_tests {
+    use std::any::TypeId;
+    use std::sync::Arc;
+    use veligo_backend::infrastructure::adapters::payment::factory::PaymentAdapterFactory;
+    use veligo_backend::infrastructure::adapters::payment::{
+        PaymentProcessor, StripeAdapter, PayPalAdapter, MockAdapter,
+    };
+    use veligo_backend::config::PaymentConfig;
+    use veligo_bac

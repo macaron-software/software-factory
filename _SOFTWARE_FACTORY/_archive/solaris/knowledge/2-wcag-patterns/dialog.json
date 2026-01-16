@@ -1,0 +1,124 @@
+{
+  "_meta": {
+    "pattern": "dialog",
+    "wcag_source": "https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/",
+    "version": "1.0.0",
+    "updated": "2026-01-06"
+  },
+
+  "applies_to": ["modal", "dialog", "popup", "lightbox", "side-panel", "drawer"],
+
+  "variants": {
+    "modal": {
+      "description": "Blocks interaction with page content",
+      "aria-modal": true,
+      "focus_trap": true
+    },
+    "non-modal": {
+      "description": "Allows interaction with page content",
+      "aria-modal": false,
+      "focus_trap": false
+    }
+  },
+
+  "structure": {
+    "backdrop": {
+      "element": "div",
+      "aria": { "aria-hidden": "true" },
+      "class_pattern": "__backdrop",
+      "click_action": "close",
+      "optional": true
+    },
+    "dialog": {
+      "element": "dialog",
+      "aria": {
+        "role": "dialog",
+        "aria-modal": { "type": "boolean", "default": "true" },
+        "aria-labelledby": { "type": "idref", "points_to": "title" },
+        "aria-describedby": { "type": "idref", "points_to": "description", "optional": true }
+      }
+    },
+    "title": {
+      "element": "h2",
+      "aria": { "id": "required" },
+      "class_pattern": "__title"
+    },
+    "description": {
+      "element": "p",
+      "aria": { "id": "required" },
+      "class_pattern": "__description",
+      "optional": true
+    },
+    "close_button": {
+      "element": "button",
+      "aria": { "aria-label": "Fermer" },
+      "class_pattern": "__close"
+    },
+    "content": {
+      "element": "div",
+      "class_pattern": "__content"
+    },
+    "footer": {
+      "element": "footer",
+      "class_pattern": "__footer",
+      "optional": true
+    }
+  },
+
+  "states": {
+    "open": {
+      "dialog": { "open": true },
+      "body": { "overflow": "hidden", "aria-hidden": "true on siblings" },
+      "data_attr": "data-state=open"
+    },
+    "closed": {
+      "dialog": { "open": false },
+      "data_attr": "data-state=closed"
+    }
+  },
+
+  "keyboard": {
+    "Escape": { "action": "close" },
+    "Tab": { "action": "focus_next_in_dialog", "trap": true },
+    "Shift+Tab": { "action": "focus_previous_in_dialog", "trap": true }
+  },
+
+  "focus_management": {
+    "on_open": {
+      "strategy": "first_focusable",
+      "alternatives": ["close_button", "first_interactive", "dialog_itself"]
+    },
+    "on_close": {
+      "strategy": "restore_to_trigger"
+    },
+    "focus_trap": {
+      "enabled": true,
+      "wrap": true,
+      "include_elements": "a[href], button, input, select, textarea, [tabindex]:not([tabindex='-1'])"
+    }
+  },
+
+  "page_interaction": {
+    "when_open": {
+      "body_scroll": "disabled",
+      "inert_siblings": true,
+      "aria_hidden_siblings": true
+    }
+  },
+
+  "animation": {
+    "open": {
+      "backdrop": { "opacity": "0 -> 1", "duration": "150ms" },
+      "dialog": { "transform": "scale(0.95) -> scale(1)", "opacity": "0 -> 1", "duration": "200ms" }
+    },
+    "close": {
+      "backdrop": { "opacity": "1 -> 0", "duration": "100ms" },
+      "dialog": { "transform": "scale(1) -> scale(0.95)", "opacity": "1 -> 0", "duration": "150ms" }
+    }
+  },
+
+  "css_selectors": {
+    "open": "[open], [data-state='open']",
+    "closed": ":not([open]), [data-state='closed']"
+  }
+}

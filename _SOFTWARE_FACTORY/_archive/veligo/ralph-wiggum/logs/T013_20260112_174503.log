@@ -1,0 +1,214 @@
+Je vais résoudre les 7 tests skippés pour l'injection de modules frontend. Commençons par analyser les tests.
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/module-injection.spec.ts"}
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/registry.rs"}
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/tests/module-injection.spec.ts
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/infrastructure/plugins/registry.rs
+Je vois les 7 tests skippés. Analysons les conditions de skip:
+
+1. **Ligne 132**: API PUT pour désactiver module non disponible
+2. **Ligne 258**: `chaos monkey` non implémenté
+3. **Ligne 287**: `chaos monkey` non implémenté
+4. **Ligne 312**: Circuit breakers non exposés sur window
+5. **Ligne 363**: Page admin killswitch non existante
+6. **Ligne 397**: `killswitch` API non disponible
+7. **Ligne 415**: Page admin killswitch non existante
+
+Cherchons l'infrastructure frontend pour comprendre ce qui existe:
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/frontend/src/lib/**/*module*.{ts,js,svelte}"}
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/frontend/src/lib/**/*hook*.{ts,js,svelte}"}
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/frontend/src/lib/**/*circuit*.{ts,js,svelte}"}
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/frontend/src/lib/**/*kill*.{ts,js,svelte}"}
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/lib/api/modules.ts
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/tenant/frontend-user/src/lib/**/*.ts"}
+Excellente trouvaille! Il y a déjà des fichiers HookRegistry. Regardons-les:
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/lib/hooks/CompleteHookRegistry.ts
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/lib/hooks/HookRegistry.ts
+Le `CompleteHookRegistry` existe déjà. Cherchons le ModuleLoader et autres composants:
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/tenant/frontend-user/src/lib/**/*ModuleLoader*.{ts,svelte}"}
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/tenant/frontend-user/src/lib/**/*CircuitBreaker*.{ts,svelte}"}
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/tenant/frontend-user/src/lib/**/*Killswitch*.{ts,svelte}"}
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/tenant/frontend-user/src/lib/**/*Chaos*.{ts,svelte}"}
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/lib/components/CircuitBreakerStatus.svelte
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/tenant/frontend-user/src/**/*.ts"}
+Le CircuitBreakerStatus.svelte importe `CircuitBreaker` et `ModuleLoader`. Cherchons ces fichiers:
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/tenant/frontend-user/src/lib/**/*resilience*/**/*.{ts,svelte}"}
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/tenant/frontend-user/src/lib/modules/**/*.ts"}
+[91m[1m| [0m[90m Bash     [0mList frontend lib directory structure
+
+total 16
+drwxr-xr-x  10 sylvain  staff   320 Dec 26 08:39 .
+drwxr-xr-x   6 sylvain  staff   192 Dec 16 09:37 ..
+drwxr-xr-x   5 sylvain  staff   160 Dec 16 09:37 api
+drwxr-xr-x  11 sylvain  staff   352 Dec 26 08:47 components
+-rw-r--r--   1 sylvain  staff  5797 Dec 16 09:37 design-tokens.css
+drwxr-xr-x   4 sylvain  staff   128 Dec 16 09:37 grpc
+drwxr-xr-x   7 sylvain  staff   224 Dec 26 08:46 hooks
+drwxr-xr-x   4 sylvain  staff   128 Dec 16 09:37 i18n
+drwxr-xr-x  16 sylvain  staff   512 Dec 26 09:40 modules
+drwx------   3 sylvain  staff    96 Dec 26 08:39 utils
+
+[91m[1m| [0m[90m Bash     [0mList modules directory contents
+
+total 72
+drwxr-xr-x  16 sylvain  staff    512 Dec 26 09:40 .
+drwxr-xr-x  10 sylvain  staff    320 Dec 26 08:39 ..
+-rw-r--r--   1 sylvain  staff   4201 Dec 16 14:45 CompleteModuleLoader.ts
+-rw-r--r--   1 sylvain  staff   5586 Dec 16 07:04 ModuleHookConfig.ts
+-rw-r--r--   1 sylvain  staff  10840 Dec 26 09:40 ModuleLoader.ts
+-rw-r--r--   1 sylvain  staff   6791 Dec 16 14:33 ModuleLoaderComplete.ts
+drwxr-xr-x   2 sylvain  staff     64 Dec 16 14:28 account
+drwxr-xr-x   5 sylvain  staff    160 Dec 26 09:40 auth
+drwxr-xr-x   4 sylvain  staff    128 Dec 16 14:45 bike-booking
+drwxr-xr-x   3 sylvain  staff     96 Dec 26 08:45 chaos
+drwxr-xr-x   3 sylvain  staff     96 Dec 26 08:45 health
+drwxr-xr-x   4 sylvain  staff    128 Dec 26 08:48 killswitch
+drwxr-xr-x   4 sylvain  staff    128 Dec 16 14:45 payment
+drwxr-xr-x   3 sylvain  staff     96 Dec 26 08:45 resilience
+drwxr-xr-x   4 sylvain  staff    128 Dec 16 14:45 subscription
+drwxr-xr-x   3 sylvain  staff     96 Dec 15 21:56 user-profile
+
+Les dossiers existent. Vérifions leur contenu:
+[91m[1m| [0m[90m Bash     [0mList chaos, killswitch, resilience directories
+
+/Users/sylvain/_LAPOSTE/_VELIGO2/tenant/frontend-user/src/lib/modules/chaos/:
+total 32
+drwxr-xr-x   3 sylvain  staff     96 Dec 26 08:45 .
+drwxr-xr-x  16 sylvain  staff    512 Dec 26 09:40 ..
+-rw-------   1 sylvain  staff  14143 Dec 26 08:45 ChaosMonkey.ts
+
+/Users/sylvain/_LAPOSTE/_VELIGO2/tenant/frontend-user/src/lib/modules/killswitch/:
+total 40
+drwxr-xr-x   4 sylvain  staff    128 Dec 26 08:48 .
+drwxr-xr-x  16 sylvain  staff    512 Dec 26 09:40 ..
+-rw-------   1 sylvain  staff  12766 Dec 26 08:45 KillswitchService.ts
+-rw-------   1 sylvain  staff    250 Dec 26 08:48 index.ts
+
+/Users/sylvain/_LAPOSTE/_VELIGO2/tenant/frontend-user/src/lib/modules/resilience/:
+total 24
+drwxr-xr-x   3 sylvain  staff    96 Dec 26 08:45 .
+drwxr-xr-x  16 sylvain  staff   512 Dec 26 09:40 ..
+-rw-------   1 sylvain  staff  9631 Dec 26 08:45 CircuitBreaker.ts
+
+Tous les fichiers existent. Vérifions les exports et l'exposition sur window:
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/lib/modules/resilience/CircuitBreaker.ts
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/lib/modules/killswitch/KillswitchService.ts
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/lib/modules/chaos/ChaosMonkey.ts
+Tous les services existent. Vérifions les exports et le ModuleLoader:
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/lib/modules/killswitch/index.ts
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/lib/modules/ModuleLoader.ts
+Parfait! Tous les services existent. Maintenant je dois vérifier comment l'app s'initialise et exposer les APIs sur window pour les tests. Cherchons le point d'entrée:
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/tenant/frontend-user/src/app.html"}
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/tenant/frontend-user/src/routes/+layout.svelte"}
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/routes/+layout.svelte
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/app.html
+Maintenant je comprends le problème. Il faut exposer les APIs sur `window` pour les tests E2E. Créons un fichier d'initialisation:
+[92m[1m| [0m[90m Write    [0mtenant/frontend-user/src/lib/modules/GlobalExports.ts
+Le fichier est créé. Maintenant je dois l'intégrer dans le layout et créer la page admin killswitch:
+[92m[1m| [0m[90m Edit     [0mtenant/frontend-user/src/routes/+layout.svelte
+[92m[1m| [0m[90m Edit     [0mtenant/frontend-user/src/routes/+layout.svelte
+Maintenant créons la page admin killswitch pour les tests:
+[91m[1m| [0m[90m Bash     [0mCreate admin killswitch route directory
+[92m[1m| [0m[90m Write    [0mtenant/frontend-user/src/routes/admin/modules/killswitch/+page.svelte
+Maintenant vérifions que tout fonctionne en exécutant les tests. D'abord, vérifions la structure du projet de test:
+[91m[1m| [0m[90m Bash     [0mCheck frontend-user project structure
+
+total 184
+drwxr-xr-x  15 sylvain  staff    480 Jan 12 17:41 .
+drwxr-xr-x   5 sylvain  staff    160 Dec 17 10:35 ..
+-rw-------   1 sylvain  staff     60 Dec 26 09:30 .env.production
+drwxr-xr-x   8 sylvain  staff    256 Dec 26 09:42 .svelte-kit
+drwxr-xr-x  92 sylvain  staff   2944 Jan 12 17:40 node_modules
+-rw-r--r--   1 sylvain  staff  67415 Dec 26 09:30 package-lock.json
+-rw-r--r--   1 sylvain  staff   1016 Dec 26 09:42 package.json
+drwxr-xr-x   3 sylvain  staff     96 Dec 26 09:49 playwright-report
+-rw-------   1 sylvain  staff   2604 Dec 26 09:41 playwright.config.ts
+drwxr-xr-x   6 sylvain  staff    192 Dec 16 09:37 src
+-rw-------   1 sylvain  staff    346 Dec 26 08:41 svelte.config.js
+drwxr-xr-x   4 sylvain  staff    128 Dec 26 09:49 test-results
+drwxr-xr-x   6 sylvain  staff    192 Dec 26 09:42 tests
+-rw-------   1 sylvain  staff    326 Dec 26 09:41 tsconfig.json
+-rw-------   1 sylvain  staff    338 Dec 26 09:30 vite.config.ts
+{
+  "name": "veligo-tenant-user",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev --port 5175 --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test": "playwright test",
+    "test:modules": "playwright test module-injection.spec.ts",
+    "test:health": "playwright test module-health.spec.ts",
+    "test:resilience": "playwright test chaos-resilience.spec.ts",
+    "test:e2e:functional": "playwright test functional-modules.spec.ts",
+    "test:all": "playwright test --reporter=html",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug"
+  },
+  "dependencies": {
+    "svelte": "^4.2.0"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-auto": "^3.0.0",
+    "@sveltejs/kit": "^2.0.0",
+    "@sveltejs/vite-plugin-svelte": "^3.0.0",
+    "@playwright/test": "^1.40.0",
+    "svelte-check": "^3.6.0",
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0"
+  }
+}
+
+Exécutons les tests pour vérifier si les 7 tests skippés passent maintenant:
+[91m[1m| [0m[90m Bash     [0mRun module injection tests
+
+npm error Missing script: "test:modules"
+npm error
+npm error To see a list of scripts, run:
+npm error   npm run
+npm error A complete log of this run can be found in: /Users/sylvain/.npm/_logs/2026-01-12T16_44_14_991Z-debug-0.log
+
+[91m[1m| [0m[90m Bash     [0mRun module injection tests with playwright
+
+
+=== E2E Global Setup ===
+
+Waiting for Frontend at http://localhost:8040...
+Frontend is ready (status: 200)
+Waiting for Mailpit at http://localhost:8045/api/v1/messages...
+Mailpit is ready (status: 200)
+Seeding test database...
+Database seeded successfully
+Clearing Mailpit emails...
+Mailpit cleared
+Auth state directory ready: /Users/sylvain/_LAPOSTE/_VELIGO2/.auth
+
+=== Global Setup Complete (0.1s) ===
+
+Error: No tests found.
+Make sure that arguments are regular expressions matching test files.
+You may need to escape symbols like "$" or "*" and quote the arguments.
+
+
+=== E2E Global Teardown ===
+
+No test results file found
+Skipping test data cleanup (data retained for debugging)
+=== Teardown Complete ===
+
+[1A[2K
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/playwright.config.ts
+[91m[1m| [0m[90m Bash     [0mRun module injection tests with correct project
+
+Error: Project(s) "module-injection" not found. Available projects: "idfm", "nantes", "lyon", "chromium"
+    at filterProjects (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/runner/projectUtils.js:80:11)
+    at runTests (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/program.js:217:42)
+    at i.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/program.js:71:7)
+
+[91m[1m| [0m[90m Bash     [0mRun module injection tests from frontend-user directory
+
+Error: Project(s) "module-injection" not found. Available projects: "idfm", "nantes", "lyon", "chromium"
+    at filterProjects (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/runner/projectUtils.js:80:11)
+    at runTests (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/program.js:217:42)
+    at i.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/program.js:71:7)

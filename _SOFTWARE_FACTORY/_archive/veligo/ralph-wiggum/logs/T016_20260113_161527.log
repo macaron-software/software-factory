@@ -1,0 +1,410 @@
+RLM Light Agent - Task: Tu es un agent TDD autonome pour Veligo (vélos en libre-service).
+
+## TÂCHE
+Task T016: Résoudre les 3 tests skippés Chaos Resilience
+
+## DÉTAILS
+# Task T016: Résoudre les 3 tests skippés Chaos Resilience
+
+**Priority**: P2
+**Time Estimate**: 3.0h
+**WSJF Score**: 5.5
+**Complexity**: complex
+**Queue**: TDD
+
+## Description
+tenant/frontend-user/tests/chaos-resilience.spec.ts a 3 tests skippés pour les tests chaos engineering.
+
+## Success Criteria
+- [ ] Chaos scenarios implémentés
+- [ ] 3 tests passent avec CHAOS_ENABLED=true
+- [ ] Résilience validée
+
+## Actions
+1. Vérifier veligo-platform/backend/src/chaos/scenarios.rs
+2. Implémenter chaos scenarios manquants
+3. Activer tests avec env var
+
+## Files to Create/Modify
+- [ ] tenant/frontend-user/tests/chaos-resilience.spec.ts (MODIFY)
+- [ ] veligo-platform/backend/src/chaos/scenarios.rs (MODIFY)
+
+## Ralph Status Block
+---RALPH_STATUS---
+STATUS: IN_PROGRESS
+COMPLEXITY: complex
+MODEL_TIER: TIER3
+WSJF: 5.5
+---END_RALPH_STATUS---
+
+## Adversarial Feedback
+🚨 HALLUCINATION: Fichier mentionné n'existe pas: /Users/sylvain/_LAPOSTE/_VELIGO2/tenant/frontend-user/tests/chaos-resilience.spec.ts
+
+## 🔴 RÈGLE ABSOLUE: VÉRIFIER AVANT MODIFIER
+
+AVANT de modifier ou créer un fichier, tu DOIS:
+1. Utiliser `Read` pour VÉRIFIER que le fichier existe
+2. Utiliser `veligo_grep` pour trouver les patterns existants
+3. NE JAMAIS inventer un fichier qui n'existe pas
+
+Si un fichier n'existe pas:
+- Cherche un fichier similaire avec `Glob` ou `veligo_rag_query`
+- Adapte ton approche au code RÉEL
+
+## INSTRUCTIONS TDD (Red → Green)
+
+1. **PHASE EXPLORATION**: Comprendre le contexte
+   - `veligo_rag_query("test skip failing")` pour trouver tests problématiques
+   - `veligo_grep("TODO|FIXME", "*.rs")` pour trouver points d'attention
+   - `Read` sur les fichiers mentionnés pour VÉRIFIER qu'ils existent
+
+2. **PHASE RED**: Lis le test qui échoue
+   - Utilise `Read` pour voir le fichier test (VÉRIFIE qu'il existe!)
+   - Comprends ce que le test attend
+
+3. **PHASE CODE**: Implémente la solution
+   - Utilise `Read` AVANT d'utiliser `Edit`
+   - Modifie max 3 fichiers
+   - Fais des changements minimaux
+
+4. **PHASE GREEN**: Vérifie
+   - Rust: `cargo test --lib`
+   - Frontend: `npm run test`
+   - E2E: `npx playwright test <file>`
+
+## RÈGLES ANTI-HALLUCINATION
+- ❌ JAMAIS modifier un fichier sans l'avoir lu d'abord
+- ❌ JAMAIS inventer un chemin de fichier
+- ❌ JAMAIS prétendre "tests pass" sans exécuter la commande
+- ✅ Utilise veligo_grep pour trouver le bon fichier
+- ✅ Utilise Read pour vérifier l'existence
+
+## OUTILS MCP DISPONIBLES
+- veligo_rag_query: Recherche sémantique dans le code
+- veligo_ao_search: Recherche dans les specs AO
+- veligo_grep: Grep pattern dans fichiers
+
+Commence maintenant. Réponds avec: SUCCESS ou NEEDS_MORE_WORK
+Backend: auto
+Local: http://127.0.0.1:8002/v1/chat/completions (qwen3)
+Cloud: https://api.minimax.io/v1/chat/completions (MiniMax-M2.1)
+
+--- Iteration 1/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+L'utilisateur me demande de résoudre 3 tests skippés pour la résilience chaos. Il y a un avertissement important : le fichier mentionné dans le feedback adversarial n'existe pas.
+
+Je dois d'abord:
+1. Vérifier si le fichier test existe réellement
+2. Trouver les fichiers pertinents en utilisant les outils disponibles
+3. Comprendre le contexte avant de modifier quoi que ce soit
+
+Commençons par explorer l'environnement pour trouver les fichiers existants.
+</think>
+
+Je vais commencer par expl...
+TOOL [bash]: exit_code=0
+/Users/sylvain/_LAPOSTE/_VELIGO2/tenant/frontend-user/tests/module-health.spec.ts
+/Users/sylvain/_LAPOSTE/_VELIGO2/tenant/frontend-user/tests/functional-modules.spec.ts
+/Users/sylvain/_LAP...
+
+--- Iteration 2/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Bien, j'ai trouvé le fichier `chaos-resilience.spec.ts` à l'emplacement prévu. Maintenant je dois lire ce fichier pour comprendre les tests skippés. Je dois aussi trouver le fichier scenarios.rs.
+</think>
+
+Le fichier test existe. Maintenant je vais lire les fichiers concernés:
+{"tool": "read", "path": "/Users/sylvain/_LAPOSTE/_VELIGO2/tenant/frontend-user/tests/chaos-resilience.spec.ts"}
+{"tool": "bash", "command": "find /Users/sylvain/_LAPOSTE/_VELIGO2 -path \"*/chaos/scenarios.rs\" 2>/...
+TOOL [read]: /**
+ * Chaos Resilience Tests
+ * Tests for chaos engineering and system resilience under failure conditions
+ */
+import { test, expect, type Page } from '@playwright/test';
+
+// Test configuration - Use...
+
+--- Iteration 3/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Le fichier de test existe et contient des tests. Je vois qu'il y a plusieurs tests, mais il y a des tests skippés. Je dois voir les tests skippés. Continuons à lire le fichier et cherchons les tests skippés.
+</think>
+
+Je vois le fichier test. Je dois voir la suite pour trouver les tests skippés:
+{"tool": "read", "path": "/Users/sylvain/_LAPOSTE/_VELIGO2/tenant/frontend-user/tests/chaos-resilience.spec.ts", "offset": 250}
+{"tool": "bash", "command": "find /Users/sylvain/_LAPOSTE/_VELIGO2 ...
+TOOL [read]: /**
+ * Chaos Resilience Tests
+ * Tests for chaos engineering and system resilience under failure conditions
+ */
+import { test, expect, type Page } from '@playwright/test';
+
+// Test configuration - Use...
+
+--- Iteration 4/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Je dois voir la suite complète du fichier pour identifier les tests skippés. Le fichier semble être tronqué. Je vais utiliser grep pour chercher les tests skippés (skip ou .skip).
+</think>
+
+Je dois trouver les tests skippés dans le fichier. Cherchons avec grep:
+{"tool": "bash", "command": "grep -n \"skip\\|test\\.skip\" \"/Users/sylvain/_LAPOSTE/_VELIGO2/tenant/frontend-user/tests/chaos-resilience.spec.ts\""}
+{"tool": "bash", "command": "wc -l \"/Users/sylvain/_LAPOSTE/_VELIGO2/tenant/fr...
+TOOL [bash]: exit_code=1
+...
+
+--- Iteration 5/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+No skipped tests found with that grep. Let me read more of the file to see all the tests.
+</think>
+
+
+{"tool": "bash", "command": "cat \"/Users/sylvain/_LAPOSTE/_VELIGO2/tenant/frontend-user/tests/chaos-resilience.spec.ts\" | tail -200"}
+{"tool": "bash", "command": "find /Users/sylvain/_LAPOSTE/_VELIGO2 -type d -name \"chaos\" 2>/dev/null | xargs -I {} ls -la {} 2>/dev/null"}...
+TOOL [bash]: exit_code=0
+  test('system stabilizes after chaos ends', async ({ page }) => {
+    await page.goto(BASE_URL);
+
+    // Create chaos
+    await enableChaosMonkey(page, {
+      enabled: true,
+      target...
+
+--- Iteration 6/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Je vois que le fichier contient plusieurs tests. Je dois trouver les tests skippés. Le grep n'a rien trouvé pour "skip", donc je dois regarder plus attentivement le fichier ou chercher ailleurs.
+
+Regardons le fichier plus en détail pour voir s'il y a des annotations .skip() ou des tests commentés. Le fichier semble être complet mais tronqué. Laissez-moi chercher les tests skippés d'une autre manière.
+</think>
+
+Je dois voir le fichier complet pour trouver les tests skippés:
+{"tool": "bash...
+TOOL [bash]: exit_code=0
+...
+
+--- Iteration 7/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Le grep ne montre pas de tests skippés visibles. Peut-être qu'il y a des tests commented out ou des tests avec .skip() qui ne sont pas détectés par grep. Je dois chercher dans la structure du backend Rust pour comprendre ce qui doit être implémenté.
+</think>
+
+Je ne vois pas de tests skippés visibles. Cherchons la structure backend Rust et les patterns de chaos:
+{"tool": "bash", "command": "find /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend -name \"*.rs\" 2>/dev/null | xargs gr...
+TOOL [bash]: exit_code=0
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/bin/http-server.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/lib.rs
+/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-...
+
+--- Iteration 8/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Le fichier chaos/scenarios.rs existe. Maintenant je dois:
+1. Lire le fichier backend chaos/scenarios.rs pour comprendre l'implémentation actuelle
+2. Lire le fichier frontend test pour identifier les tests skippés
+3. Comparer les deux et implémenter ce qui manque
+
+Cherchons les tests skippés dans le fichier frontend:
+</think>
+
+Excellent! Le fichier existe. Maintenant lisons les fichiers backend et frontend pour comprendre ce qui manque:
+{"tool": "read", "path": "/Users/sylvain/_LAPOSTE/_V...
+TOOL [read]: // 🐒 CHAOS ENGINEERING - 23 Netflix-style Failure Scenarios
+// Complete implementation of all chaos testing scenarios
+
+use super::circuit_breaker::{CircuitBreaker, CircuitBreakerError};
+use anyhow::Re...
+
+--- Iteration 9/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Je vois que le fichier scenarios.rs existe et contient des scénarios de chaos. Le fichier semble tronqué. Je dois voir les scénarios restants et comprendre ce qui manque. Je dois aussi vérifier le fichier frontend pour voir les tests skippés.
+
+Regardons le fichier complet et cherchons les tests skippés dans le frontend.
+</think>
+
+Le fichier scenarios.rs existe mais semble incomplet (il retourne des `ChaosTestResult::default()` pour plusieurs scénarios). Cherchons les tests skippés et voy...
+TOOL [read]: // 🐒 CHAOS ENGINEERING - 23 Netflix-style Failure Scenarios
+// Complete implementation of all chaos testing scenarios
+
+use super::circuit_breaker::{CircuitBreaker, CircuitBreakerError};
+use anyhow::Re...
+
+--- Iteration 10/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Le fichier scenarios.rs semble incomplet - il a des méthodes qui retournent `ChaosTestResult::default()` au lieu d'une implémentation complète. 
+
+Je dois voir le fichier complet et chercher les tests skippés dans le fichier frontend. Voyons le fichier frontend pour chercher les tests skippés et comprendre ce qu'il manque.
+</think>
+
+Je vois que les scénarios Rust sont partiellement implémentés. Voyons le fichier frontend pour trouver les tests skippés:
+{"tool": "bash", "command": "cat \"/...
+TOOL [bash]: exit_code=0
+...
+
+--- Iteration 11/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Il n'y a pas de tests skippés visibles dans le fichier frontend. Peut-être que les tests sont skippés conditionnellement avec `test.skip` ou sont dans un autre fichier. Vérifions les tests dans le fichier frontend.
+
+D'après ce que je vois dans le fichier, tous les tests sont définis avec `test(` et non `test.skip(`. Peut-être que les tests sont skippés via une condition dans le `beforeEach` ou une configuration.
+
+Regardons le fichier test plus attentivement pour voir comment les tests so...
+TOOL [bash]: exit_code=0
+8:const USE_LOCAL_FILE = process.env.CHAOS_ENABLED === 'true';
+11:const CHAOS_ENABLED = process.env.CHAOS_ENABLED === 'true';
+48:          window.__CHAOS_ENABLED__ = true;
+55:          win...
+
+--- Iteration 12/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Je vois que les tests sont conditionnés par `CHAOS_ENABLED`. Ils utilisent le mock HTML quand `CHAOS_ENABLED=true`. Les tests skippés pourraient être ceux qui sont dans des blocs conditionnels ou qui nécessitent l'activation de l'environnement.
+
+Regardons le fichier test complet pour comprendre la structure et identifier les tests qui pourraient être skippés. Le fichier semble être tronqué dans mes lectures précédentes.
+
+Lisons la fin du fichier et cherchons les patterns de test.
+</think...
+TOOL [bash]: exit_code=0
+6
+...
+
+--- Iteration 13/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Je dois trouver les 3 tests skippés mentionnés dans la tâche. Le problème est que je ne vois pas de tests skippés avec `.skip()`. Peut-être que les tests sont désactivés par une condition ou qu'il y a des tests qui échouent ?
+
+Voyons la structure du fichier test plus en détail et cherchons les patterns qui pourraient indiquer des tests non implémentés ou skippés.
+</think>
+
+Examinons le fichier test complet et cherchons les patterns d'erreurs:
+{"tool": "bash", "command": "cat \"/Users/syl...
+TOOL [bash]: exit_code=0
+     827
+...
+
+--- Iteration 14/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Le fichier a 827 lignes. Je dois voir tout le fichier pour comprendre les tests skippés. Utilisons une approche différente pour lire le fichier.
+</think>
+
+Voyons tout le fichier avec head/tail:
+{"tool": "bash", "command": "head -100 \"/Users/sylvain/_LAPOSTE/_VELIGO2/tenant/frontend-user/tests/chaos-resilience.spec.ts\""}
+{"tool": "bash", "command": "tail -100 \"/Users/sylvain/_LAPOSTE/_VELIGO2/tenant/frontend-user/tests/chaos-resilience.spec.ts\""}...
+TOOL [bash]: exit_code=0
+/**
+ * Chaos Resilience Tests
+ * Tests for chaos engineering and system resilience under failure conditions
+ */
+import { test, expect, type Page } from '@playwright/test';
+
+// Test configu...
+
+--- Iteration 15/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Le fichier de test est assez long (827 lignes). Je dois chercher les tests skippés. Il semble que les tests utilisent `CHAOS_ENABLED` pour contrôler si les tests utilisent le mock HTML ou non.
+
+Regardons le reste du fichier pour voir tous les tests:
+</think>
+
+Voyons les sections de test:
+{"tool": "bash", "command": "sed -n '200,300p' \"/Users/sylvain/_LAPOSTE/_VELIGO2/tenant/frontend-user/tests/chaos-resilience.spec.ts\""}
+{"tool": "bash", "command": "sed -n '400,500p' \"/Users/sylvain/_...
+TOOL [bash]: exit_code=0
+  await page.evaluate(() => {
+    (window as any).chaosMonkey?.disable?.();
+  });
+}
+
+// Helper: Get resilience metrics
+async function getResilienceMetrics(page: Page): Promise<ResilienceMe...
+
+--- Iteration 16/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Le fichier frontend test ne semble pas avoir de tests skippés visibles. Peut-être que les tests sont skippés dynamiquement via une condition ou les tests skippés sont dans un autre fichier. 
+
+Regardons le fichier backend scenarios.rs complet et cherchons les scénarios qui ne sont pas implémentés (qui retournent ChaosTestResult::default()).
+</think>
+
+Je dois voir le fichier backend scenarios.rs complet pour identifier les scénarios non implémentés:
+{"tool": "bash", "command": "wc -l \"/Us...
+TOOL [bash]: exit_code=0
+     647 /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/chaos/scenarios.rs
+    async fn test_bandwidth_limit(
+        _circuit: &CircuitBreaker,
+        limit: u32,
+    ) -> ...
+
+--- Iteration 17/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Je vois maintenant le problème. Le fichier backend `scenarios.rs` a des scénarios qui sont définis mais retournent juste `ChaosTestResult::default()` au lieu d'implémentations réelles.
+
+Regardons les scénarios Rust qui ne sont pas implémentés correctement:
+- Scenario 3: test_memory_leak
+- Scenario 4: test_cpu_spike
+- Scenario 5: test_deadlock
+- Scenario 6: test_network_latency (pas vu encore)
+- Scenario 7: test_packet_loss
+- Scenario 8: test_network_partition
+- Scenario 9: test_bandwidth...
+TOOL [bash]: exit_code=0
+No skipped tests found with grep
+...
+
+--- Iteration 18/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Interesting - there are no explicitly skipped tests with `.skip()`. Let me re-read the task description.
+
+The task says:
+- "tenant/frontend-user/tests/chaos-resilience.spec.ts a 3 tests skippés pour les tests chaos engineering"
+
+But I can't find any skipped tests. Maybe the tests are failing or not properly implemented? Let me run the tests to see what happens.
+
+Let me also look more carefully at what might be considered "skipped" - perhaps the tests are conditionally skipped based on CH...
+TOOL [bash]: ERROR: Command timed out (300s)...
+
+--- Iteration 19/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Le test a timeout. C'est peut-être le problème - les tests ne fonctionnent pas correctement. Regardons les scénarios Rust qui ne sont pas implémentés et voyons ce qui doit être fait.
+
+Les scénarios 3 à 23 retournent tous `ChaosTestResult::default()` ce qui signifie qu'ils ne font rien de réel. Peut-être que les 3 tests skippés sont liés à ces scénarios non implémentés.
+
+Je dois:
+1. Identifier les tests frontend qui dépendent des scénarios backend
+2. Implémenter les scénarios Rust manquan...
+TOOL [read]: // Chaos Engineering HTTP Routes
+// Provides API endpoints for chaos monkey control and experiments
+
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::Json,
+    routing::{del...
+
+--- Iteration 20/20 ---
+CLOUD: Calling https://api.minimax.io/v1/chat/completions with model MiniMax-M2.1
+LLM: <think>
+Maintenant je comprends mieux la situation. Les tests frontend essaient de se connecter à un API backend qui n'est peut-être pas en cours d'exécution. Les tests sont conçus pour être exécutés avec `CHAOS_ENABLED=true` ce qui utilise un mock HTML local au lieu d'essayer de se connecter au vrai serveur.
+
+Le problème principal semble être que les tests skippés mentionnés dans la task ne sont pas littéralement skippés avec `.skip()`, mais plutôt que les tests API échouent parce que le serveu...
+TOOL [bash]: exit_code=0
+
+test.describe('Application Resilience Under Chaos', () => {
+
+  test.afterEach(async ({ page }) => {
+    await disableChaosMonkey(page);
+  });
+
+  test('application remains functional with ...
+
+=== RESULT ===
+ERROR: Max iterations reached without completion

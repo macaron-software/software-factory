@@ -1,0 +1,52 @@
+{
+  "_meta": {
+    "pattern": "listbox",
+    "wcag_source": "https://www.w3.org/WAI/ARIA/apg/patterns/listbox/",
+    "version": "1.0.0",
+    "updated": "2026-01-08"
+  },
+
+  "applies_to": ["listbox", "list-select", "option-list"],
+
+  "structure": {
+    "listbox": {
+      "element": "div",
+      "role": "listbox",
+      "aria": ["aria-label", "aria-activedescendant", "aria-multiselectable"]
+    },
+    "option": {
+      "element": "div",
+      "role": "option",
+      "aria": ["aria-selected"]
+    }
+  },
+
+  "states": {
+    "default": { "css": "" },
+    "hover": { "css": ":hover", "background": "var(--color-neutral-bg)" },
+    "focus": { "css": "[aria-activedescendant]" },
+    "selected": { "aria-selected": "true", "background": "var(--color-primary-light)" },
+    "disabled": { "aria-disabled": "true" }
+  },
+
+  "keyboard": {
+    "ArrowDown": { "action": "focus_next_option" },
+    "ArrowUp": { "action": "focus_previous_option" },
+    "Home": { "action": "focus_first_option" },
+    "End": { "action": "focus_last_option" },
+    "Enter": { "action": "select_focused_option" },
+    "Space": { "action": "select_focused_option" },
+    "Type-ahead": { "action": "focus_matching_option" }
+  },
+
+  "focus_management": {
+    "type": "aria-activedescendant",
+    "note": "Focus stays on listbox container, visual focus moves between options"
+  },
+
+  "css_implementation": {
+    "option_hover": "background: var(--color-neutral-bg);",
+    "option_selected": "background: var(--color-primary-light); font-weight: 600;",
+    "option_focus": "outline: 2px solid var(--color-callout-border-info); outline-offset: -2px;"
+  }
+}

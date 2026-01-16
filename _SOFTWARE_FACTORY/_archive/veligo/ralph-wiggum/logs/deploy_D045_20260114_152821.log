@@ -1,0 +1,232 @@
+[15:28:24] STAGING DEPLOY: code=0
+╔══════════════════════════════════════════╗
+║      🚴 Veligo Platform CLI v0.1.0      ║
+╚══════════════════════════════════════════╝
+
+📡 REAL Rsync Deployment to Azure VM
+
+📡 Step 1/4: Rsync sources to VM...
+Transfer starting: 11168 files
+cannot delete non-empty directory: modules/tracking
+deleting veligo-platform/.veligo/verification/VERIFICATION-REPORT.md
+deleting veligo-platform/.veligo/verification/FINAL-TRUTH-REPORT.md
+deleting veligo-platform/.veligo/verification/ADVERSARY-REPORT.md
+deleting veligo-platform/.veligo/verification/
+deleting veligo-platform/.veligo/agents/agent-3-adversary.sh
+deleting veligo-platform/.veligo/agents/agent-2-verifier.sh
+deleting veligo-platform/.veligo/agents/
+deleting veligo-platform/.veligo/
+deleting veligo-platform/fix-veligo-test.sh
+deleting veligo-platform/INFRA-FIX-SUMMARY.md
+deleting veligo-platform/BUILD-MANIFEST.md
+cannot delete non-empty directory: veligo-platform/backend/tonic-standalone
+cannot delete non-empty directory: veligo-platform/backend/.cargo
+deleting veligo-platform/backend/migrations/106_pr_n08_seed_test_users.sql
+deleting veligo-platform/backend/migrations/105_pr_n08_seed_test_data.sql
+deleting veligo-platform/backend/migrations/104_pr_n08_final_schema_fixes.sql
+deleting veligo-platform/backend/migrations/103_pr_n08_bike_station_index.sql
+deleting veligo-platform/backend/migrations/102_pr_n08_schema_validation_fixes.sql
+deleting veligo-platform/backend/migrations/073_add_bookings_cancelled_at.sql
+deleting veligo-platform/backend/src/api/stations_v2.rs
+deleting veligo-platform/backend/src/api/stations_hexagonal.rs
+deleting veligo-platform/backend/src/api/bike_grpc_web.rs
+deleting veligo-platform/backend/src/domain/aom_reporting/kpi_calculator.rs
+deleting veligo-platform/backend/src/handlers/admin_owner.rs.bak2
+deleting veligo-platform/backend/src/infrastructure/database/repositories/subscription_repository_stub.rs
+deleting veligo-platform/backend/src/modules/reporting_analytics_module.rs
+deleting veligo-platform/docker/supervisor.conf
+deleting veligo-platform/docker/entrypoint.sh
+deleting veligo-platform/docker/FIXES-APPLIED.md
+deleting veligo-platform/docker/FIX-VELIGO-TEST.md
+deleting veligo-platform/docker/Dockerfile.base
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/tenantAssets.DB9u9065.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/tenantAssets.DB9u9065.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/tenantAssets.DB9u9065.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/NantesFooter.D_W0jrAT.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/NantesFooter.D_W0jrAT.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/NantesFooter.D_W0jrAT.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/NantesEcoMeter.uQUp6axk.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/NantesEcoMeter.uQUp6axk.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/NantesEcoMeter.uQUp6axk.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/MFASetup.Ba3OB2Oy.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/MFASetup.Ba3OB2Oy.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/MFASetup.Ba3OB2Oy.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/LyonCard.D1_0z-NX.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/LyonCard.D1_0z-NX.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/LyonCard.D1_0z-NX.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/IdfmFooter.BvuY-F32.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/IdfmFooter.BvuY-F32.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/IdfmFooter.BvuY-F32.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/99.BQN7tyL5.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/99.BQN7tyL5.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/99.BQN7tyL5.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/98.DTa0SPib.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/98.DTa0SPib.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/98.DTa0SPib.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/97.BdF0gmAl.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/97.BdF0gmAl.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/97.BdF0gmAl.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/96.DY1VLkpm.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/96.DY1VLkpm.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/96.DY1VLkpm.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/95.BUFpuyM_.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/95.BUFpuyM_.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/95.BUFpuyM_.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/94.5pbNlGGB.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/94.5pbNlGGB.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/94.5pbNlGGB.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/93.C2aJCWMX.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/93.C2aJCWMX.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/93.C2aJCWMX.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/92.DWq8ynW1.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/92.DWq8ynW1.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/92.DWq8ynW1.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/91.B0UlsZiy.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/91.B0UlsZiy.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/91.B0UlsZiy.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/90.is2foyji.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/90.is2foyji.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/90.is2foyji.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/89.DEDcyYbf.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/89.DEDcyYbf.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/89.DEDcyYbf.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/88.BoWjw4is.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/88.BoWjw4is.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/88.BoWjw4is.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/87.DXBpleac.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/87.DXBpleac.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/87.DXBpleac.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/86.C0E2KqQj.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/86.C0E2KqQj.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/86.C0E2KqQj.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/85.BEgkfHhX.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/85.BEgkfHhX.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/85.BEgkfHhX.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/84.Cm-oNUQX.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/84.Cm-oNUQX.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/84.Cm-oNUQX.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/83.CZvABSCu.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/83.CZvABSCu.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/83.CZvABSCu.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/82.CBTy6igL.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/82.CBTy6igL.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/82.CBTy6igL.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/81.ai5Uc4ah.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/81.ai5Uc4ah.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/81.ai5Uc4ah.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/80.hBeZgA-9.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/80.hBeZgA-9.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/80.hBeZgA-9.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/8.D1iC2c0r.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/8.D1iC2c0r.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/8.D1iC2c0r.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/79.KglTiwlb.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/79.KglTiwlb.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/79.KglTiwlb.css
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/78.Bf_bJ05D.css.gz
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/78.Bf_bJ05D.css.br
+deleting veligo-platform/frontend/build-static/_app/immutable/assets/78.Bf_bJ05D.css
+deleting veligo-platform/frontend/build-static/_app/immutabl
+[15:29:02] E2E SMOKE (staging): code=1, retries=3
+🚴 Veligo E2E Tests - Global Setup
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RÈGLES ABSOLUES:
+  ❌ AUCUNE erreur console tolérée (sync ou async)
+  ❌ AUCUN warning critique toléré
+  ❌ AUCUN test.skip() autorisé
+  ❌ AUCUN retry - Si ça échoue, on corrige
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 Base URL: https://idfm.veligo.app
+🔧 Workers: 5
+🔄 Retries: 0
+
+🔍 Checking HTTP server availability...
+✅ HTTP server is running
+🔧 PR-005: Starting gRPC-Web proxy server...
+✅ gRPC-Web proxy server started on http://localhost:8080
+   Backend: https://api.veligo.app
+🌱 PR-010: Seeding test data...
+🌱 Seeding test data...
+  ✓ User marie.dupont@test-idfm.fr already exists (skipping)
+  ✓ User jean.martin@test-nantes.fr already exists (skipping)
+  ✓ User pierre.bernard@test-lyon.fr already exists (skipping)
+  ✓ User admin@idfm.fr already exists (skipping)
+  ✓ User admin@idfm.fr already exists (skipping)
+  ⚠️  User owner@veligo.app registration failed with database error (might already exist): Database error: error returned from database: record "new" has no field "user_id"
+  ⚠️  User test@veligo.app registration failed with database error (might already exist): Database error: error returned from database: record "new" has no field "user_id"
+✅ Users seeded
+  📊 Attempting to seed 13 stations from fixtures
+  ⚠️  Check endpoint returned 404: 
+⚠️  Test API seed endpoint not available (404).
+   Checking if stations already exist in database...
+❌ ERROR: Test API seed endpoint not available (404) and no stations found.
+   Set ENABLE_TEST_API=1 on the backend to enable automatic seeding.
+   Without stations seeded, E2E tests will fail.
+❌ Station seeding failed: Error: Station seeding failed: Test API endpoint disabled (404). Set ENABLE_TEST_API=1.
+⚠️  Station seeding failed (not critical for all tests)
+  📊 Attempting to seed 53 bikes from fixtures
+⚠️  Test API seed endpoint not available (404).
+   Checking if bikes already exist in database...
+❌ ERROR: Test API seed endpoint not available (404) and no bikes found.
+   Set ENABLE_TEST_API=1 on the backend to enable automatic seeding.
+   Without bikes seeded, E2E tests will fail.
+❌ Bike seeding failed: Error: Bike seeding failed: Test API endpoint disabled (404). Set ENABLE_TEST_API=1.
+⚠️  Bike seeding failed (not critical for all tests)
+Bookings will be created during test execution
+✅ Bookings seeded
+🌱 Test data seeding complete
+⚠️  Could not verify users: HTTP 404
+⚠️  Could not verify stations via test API: HTTP 404 - 
+   Attempting gRPC verification as fallback...
+⚠️  Could not verify bikes via test API: HTTP 404 
+   Attempting gRPC verification as fallback...
+   ❌ ListBikes method is UNIMPLEMENTED on server
+✅ Seeded data verification:
+   - Users: 0
+   - Stations: 0
+   - Bikes: 0
+⚠️  No stations found - station tests will fail, but other tests can continue
+⚠️  No bikes found - bike tests will fail, but other tests can continue
+✅ Test data seeding complete
+
+Running 6 tests using 5 workers
+
+  ✓  5 [idfm-chromium] › smoke-check/critical-pages.spec.ts:91:7 › @smoke Critical Pages › gRPC-Web endpoints respond correctly @smoke (468ms)
+  ✓  6 [idfm-chromium] › smoke-check/critical-pages.spec.ts:121:7 › @smoke Critical Pages › REST API endpoints respond with JSON @smoke (239ms)
+Blocking errors found: [ [32m`Unexpected token '<', "<!doctype html>" is not valid JSON`[39m ]
+  ✘  1 [idfm-chromium] › smoke-check/critical-pages.spec.ts:54:9 › @smoke Critical Pages › Signup (/signup) renders content @smoke (2.2s)
+  ✓  4 [idfm-chromium] › smoke-check/critical-pages.spec.ts:54:9 › @smoke Critical Pages › Catalog (/catalog) renders content @smoke (2.2s)
+  ✓  3 [idfm-chromium] › smoke-check/critical-pages.spec.ts:54:9 › @smoke Critical Pages › Homepage (/) renders content @smoke (2.5s)
+  ✓  2 [idfm-chromium] › smoke-check/critical-pages.spec.ts:54:9 › @smoke Critical Pages › Login (/login) renders content @smoke (2.5s)
+🧹 Cleaning up test infrastructure...
+✅ gRPC-Web proxy server stopped
+✅ Global teardown complete
+
+
+  1) [idfm-chromium] › smoke-check/critical-pages.spec.ts:54:9 › @smoke Critical Pages › Signup (/signup) renders content @smoke 
+
+    Error: Page /signup has blocking JS errors
+
+    [2mexpect([22m[31mreceived[39m[2m).[22mtoHaveLength[2m([22m[32mexpected[39m[2m)[22m
+
+    Expected length: [32m0[39m
+    Received length: [31m1[39m
+    Received array:  [31m["Unexpected token '<', \"<!doctype html>\" is not valid JSON"][39m
+
+      68 |       }
+      69 |
+    > 70 |       expect(blockingErrors, `Page ${pageConfig.path} has blocking JS errors`).toHaveLength(0);
+         |                                                                                ^
+      71 |
+      72 |       // Get page content
+      73 |       const bodyContent = await page.locator('body').textContent();
+        at /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/smoke-check/critical-pages.spec.ts:70:80
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/smoke-check-critical-pages-10e9e-ignup-renders-content-smoke-idfm-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [idfm-chromium] › smoke-check/critical-pages.spec.ts:54:9 › @smoke Critical Pages › Signup (/signup) renders content @smoke 
+  5 passed (6.1s)
+

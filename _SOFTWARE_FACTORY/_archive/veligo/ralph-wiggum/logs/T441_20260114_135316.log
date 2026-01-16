@@ -1,0 +1,22 @@
+[0;32m[AGENT] Real Agent starting[0m
+[0;34m[AGENT] Task: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks/T441.md[0m
+[0;34m[AGENT] Queue: tdd[0m
+[0;34m[AGENT] Backend: auto[0m
+[0;32m[AGENT] Starting task: T441[0m
+[0;33m[AGENT] Task T441 FRACTAL: decomposed into 3 sub-tasks[0m
+[0;33m[AGENT] Sub-tasks: T544, T545, T546[0m
+[0;34m[AGENT] Spawning sub-agent for T544...[0m
+[0;34m[AGENT] Spawning sub-agent for T545...[0m
+[0;34m[AGENT] Spawning sub-agent for T546...[0m
+[0;33m[AGENT] Waiting for 3 sub-agents to complete...[0m
+[0;31m[AGENT] Sub-agent T544: FAILED (code=1)[0m
+[0;31m[AGENT] Sub-agent T545: FAILED (code=1)[0m
+[0;31m[AGENT] Sub-agent T546: FAILED (code=1)[0m
+[0;33m[AGENT] FRACTAL PARTIAL: 3/3 sub-tasks failed[0m
+[FRACTAL] Task T441 needs decomposition: items=13 > 10
+[FRACTAL] Created 3 sub-tasks: T544, T545, T546
+
+============================================================
+RESULT: FAILED
+============================================================
+FRACTAL_PARTIAL: T441 -> 3 failures

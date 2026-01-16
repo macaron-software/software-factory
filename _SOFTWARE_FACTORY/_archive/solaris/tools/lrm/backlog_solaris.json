@@ -1,0 +1,84 @@
+{
+  "generated_at": "2026-01-15T08:37:04.062311",
+  "question": "Analyse gaps tests + composants manquants",
+  "brain_model": "manual-analysis",
+  "tasks": [
+    {
+      "id": "TEST-001",
+      "type": "test",
+      "priority": 8,
+      "description": "Ajouter tests unitaires pour filter",
+      "components": [
+        "filter"
+      ],
+      "acceptance_criteria": [
+        "Fichier filter.component.spec.ts cr\u00e9\u00e9",
+        "Couverture > 80%",
+        "Tests des inputs/outputs",
+        "Tests des \u00e9tats (disabled, error, etc.)"
+      ],
+      "sources": [
+        "design-system/libs/ui/src/lib/filter/"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "TEST-002",
+      "type": "test",
+      "priority": 8,
+      "description": "Ajouter tests unitaires pour icons",
+      "components": [
+        "icons"
+      ],
+      "acceptance_criteria": [
+        "Fichier icons.component.spec.ts cr\u00e9\u00e9",
+        "Couverture > 80%",
+        "Tests des inputs/outputs",
+        "Tests des \u00e9tats (disabled, error, etc.)"
+      ],
+      "sources": [
+        "design-system/libs/ui/src/lib/icons/"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "TEST-003",
+      "type": "test",
+      "priority": 8,
+      "description": "Ajouter tests unitaires pour links",
+      "components": [
+        "links"
+      ],
+      "acceptance_criteria": [
+        "Fichier links.component.spec.ts cr\u00e9\u00e9",
+        "Couverture > 80%",
+        "Tests des inputs/outputs",
+        "Tests des \u00e9tats (disabled, error, etc.)"
+      ],
+      "sources": [
+        "design-system/libs/ui/src/lib/links/"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "COMP-004",
+      "type": "feature",
+      "priority": 7,
+      "description": "Cr\u00e9er composant Angular SolFileuploadComponent",
+      "components": [
+        "fileupload"
+      ],
+      "acceptance_criteria": [
+        "Composant standalone dans libs/ui/src/lib/fileupload/",
+        "Tous les variants Figma support\u00e9s",
+        "ControlValueAccessor si form control",
+        "Tests unitaires",
+        "WCAG conforme"
+      ],
+      "sources": [
+        "design-system/figma-data/fileupload-all-depth10.json"
+      ],
+      "status": "completed"
+    }
+  ]
+}

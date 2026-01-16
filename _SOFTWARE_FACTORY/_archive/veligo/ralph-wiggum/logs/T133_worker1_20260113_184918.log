@@ -1,0 +1,13 @@
+[0;34m[18:49:18][0m Starting Wiggum-TDD daemon...
+[0;34m[18:49:18][0m Queue: tdd
+[0;34m[18:49:18][0m Tasks dir: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks
+[0;34m[18:49:18][0m Poll interval: 10s
+[0;34m[18:49:18][0m [Wiggum-TDD] Found task: T122
+[0;34m[18:49:18][0m [T122] Processing with REAL agent...
+[0;34m[18:49:18][0m [T122] Using Real Agent (actual execution, not simulation)...
+[0;32m[18:51:37] ✓[0m [T122] COMPLETE (real execution verified)
+[0;34m[18:51:37][0m [T122] Creating deploy task for committed changes
+[0;34m[18:51:38][0m [T122] Created deploy task: D016
+/Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks/D016.md
+[0;34m[18:51:38][0m [Wiggum-TDD] --once mode, exiting
+[0;34m[18:51:38][0m [Wiggum-TDD] Daemon stopped

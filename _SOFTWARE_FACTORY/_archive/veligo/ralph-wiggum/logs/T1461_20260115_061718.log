@@ -1,0 +1,13 @@
+[0;32m[AGENT] Real Agent starting[0m
+[0;34m[AGENT] Task: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks/T1461.md[0m
+[0;34m[AGENT] Queue: tdd[0m
+[0;34m[AGENT] Backend: opencode[0m
+[0;32m[AGENT] Starting task: T1461[0m
+[0;34m[AGENT] Iteration 1/10[0m
+[0m[AGENT] Calling opencode with model: minimax/MiniMax-M2.1[0m
+[0;33m[AGENT] opencode timeout after 600s[0m
+
+============================================================
+RESULT: FAILED
+============================================================
+ERROR: LLM call failed

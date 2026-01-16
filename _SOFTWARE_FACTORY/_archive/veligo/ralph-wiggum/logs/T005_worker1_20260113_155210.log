@@ -1,0 +1,14 @@
+[0;34m[15:52:10][0m Starting Wiggum-TDD daemon...
+[0;34m[15:52:10][0m Queue: tdd
+[0;34m[15:52:10][0m Tasks dir: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks
+[0;34m[15:52:10][0m Poll interval: 10s
+[0;34m[15:52:10][0m [Wiggum-TDD] Found task: T009
+[0;34m[15:52:10][0m [T009] Processing...
+[0;34m[15:52:10][0m [T009] Using RLM Light Client (2k tokens vs 40-60k opencode)...
+[0;34m[16:13:28][0m [T009] Running adversarial check...
+[0;32m[16:13:38] ✓[0m [T009] COMPLETE (adversarial: APPROVED)
+[0;34m[16:13:46][0m [T009] No changes to commit
+[0;34m[16:13:53][0m [T009] Created deploy task: D011
+/Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks/D011.md
+[0;34m[16:13:53][0m [Wiggum-TDD] --once mode, exiting
+[0;34m[16:13:53][0m [Wiggum-TDD] Daemon stopped

@@ -1,0 +1,121 @@
+[0;32m[AGENT] Real Agent starting[0m
+[0;34m[AGENT] Task: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks/T1027.md[0m
+[0;34m[AGENT] Queue: tdd[0m
+[0;34m[AGENT] Backend: auto[0m
+[0;32m[AGENT] Starting task: T1027[0m
+[0;34m[AGENT] Iteration 1/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'find veligo-platform/backend -type f -name "*.rs" | grep -E "(payment|a[0m
+[0;34m$ find veligo-platform/backend -type f -name "*.rs" | grep -E "(payment|adapter)" | head -30[0m
+[0;34m[AGENT] Iteration 2/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'find veligo-platform/backend/src -type f -name "*.rs" | xargs grep -l -[0m
+[0;34m$ find veligo-platform/backend/src -type f -name "*.rs" | xargs grep -l -E "(PaymentAdapterFactory|payment_adapter)" 2>/dev/null | head -20[0m
+[0;34m[AGENT] Iteration 3/10[0m
+[0;33m[AGENT] No actions found in response[0m
+[0;34m[AGENT] Iteration 4/10[0m
+[0;33m[AGENT] No actions found in response[0m
+[0;34m[AGENT] Iteration 5/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'ls -la veligo-platform/backend/tests/unit/'}[0m
+[0;34m$ ls -la veligo-platform/backend/tests/unit/[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/tests/unit/paypal_adapter_tests.rs'}[0m
+[0;34m$ cat veligo-platform/backend/tests/unit/paypal_adapter_tests.rs[0m
+[0;34m[AGENT] Iteration 6/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'ls -la veligo-platform/backend/src/infrastructure/adapters/payment/'}[0m
+[0;34m$ ls -la veligo-platform/backend/src/infrastructure/adapters/payment/[0m
+[0;34m[AGENT] Iteration 7/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'find veligo-platform/backend/tests -name "*factory*" -o -name "*stripe*[0m
+[0;34m$ find veligo-platform/backend/tests -name "*factory*" -o -name "*stripe*" 2>/dev/null[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/tests/unit/paypal_adapter_tests.rs'}[0m
+[0;34m$ cat veligo-platform/backend/tests/unit/paypal_adapter_tests.rs[0m
+[0;34m[AGENT] Iteration 8/10[0m
+[0;33m[AGENT] No actions found in response[0m
+[0;34m[AGENT] Iteration 9/10[0m
+[0;34m[AGENT] Executing: write - {'type': 'write', 'file': 'veligo-platform/backend/tests/unit/payment_factory_tests.rs', 'content': [0m
+[0;32m[AGENT] Wrote /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/tests/unit/payment_factory_tests.rs[0m
+[0;34m[AGENT] Iteration 10/10[0m
+[0;34m[AGENT] Executing: edit - {'type': 'edit', 'file': 'veligo-platform/backend/tests/unit/payment_factory_tests.rs', 'old': '//! [0m
+[0;32m[AGENT] Wrote /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/tests/unit/payment_factory_tests.rs[0m
+
+============================================================
+RESULT: FAILED
+============================================================
+figuration handling, and error cases
+
+#[cfg(test)]
+mod payment_factory_tests {
+    use std::sync::Arc;
+    use veligo_backend::infrastructure::adapters::payment::factory::PaymentAdapterFactory;
+    use veligo_backend::infrastructure::adapters::payment::{
+        PaymentProcessor, StripeAdapter, PayPalAdapter, MockAdapter,
+    };
+    use veligo_backend::config::PaymentConfig;
+    use veligo_backend::payment::PaymentError;
+
+    // =========================
+    // Factory Creation Tests
+    // =========================
+
+    #[test]
+    fn test_factory_creation_with_stripe_config() {
+        let config = PaymentConfig {
+            stripe_secret_key: Some("sk_test_123".to_string()),
+            stripe_publishable_key: Some("pk_test_123".to_string()),
+            stripe_webhook_secret: Some("whsec_123".to_string()),
+            paypal_client_id: None,
+            paypal_client_secret: None,
+            paypal_mode: None,
+            processor: PaymentProcessor::Stripe,
+        };
+
+        let factory = PaymentAdapterFactory::new(Arc::new(config));
+        assert!(factory.stripe_adapter.is_some());
+        assert!(factory.paypal_adapter.is_none());
+    }
+
+    #[test]
+    fn test_factory_creation_with_paypal_config() {
+        let config = PaymentConfig {
+            stripe_secret_key: None,
+            stripe_publishable_key: None,
+            stripe_webhook_secret: None,
+            paypal_client_id: Some("client_id_123".to_string()),
+            paypal_client_secret: Some("secret_123".to_string()),
+            pay
+
+=== Action Results ===
+write: OK
+File written
+
+=== LLM Response ===
+<think>
+Now I need to add the TypeId import since I'm using it in the tests. Let me also register the module in mod.rs. First, let me add the import.
+</think>
+
+Now I need to add the missing `TypeId` import to the test file:
+<edit file="veligo-platform/backend/tests/unit/payment_factory_tests.rs" old="//! Unit tests for PaymentAdapterFactory
+//! Tests factory creation logic, configuration handling, and error cases
+
+#[cfg(test)]
+mod payment_factory_tests {
+    use std::sync::Arc;
+    use veligo_backend::infrastructure::adapters::payment::factory::PaymentAdapterFactory;
+    use veligo_backend::infrastructure::adapters::payment::{
+        PaymentProcessor, StripeAdapter, PayPalAdapter, MockAdapter,
+    };
+    use veligo_backend::config::PaymentConfig;
+    use veligo_backend::payment::PaymentError;" new="//! Unit tests for PaymentAdapterFactory
+//! Tests factory creation logic, configuration handling, and error cases
+
+#[cfg(test)]
+mod payment_factory_tests {
+    use std::any::TypeId;
+    use std::sync::Arc;
+    use veligo_backend::infrastructure::adapters::payment::factory::PaymentAdapterFactory;
+    use veligo_backend::infrastructure::adapters::payment::{
+        PaymentProcessor, StripeAdapter, PayPalAdapter, MockAdapter,
+    };
+    use veligo_backend::config::PaymentConfig;
+    use veligo_backend::payment::PaymentError;"/></edit>
+
+=== Action Results ===
+edit: OK
+Edit applied

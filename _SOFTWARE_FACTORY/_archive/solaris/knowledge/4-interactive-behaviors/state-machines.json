@@ -1,0 +1,395 @@
+{
+  "_meta": {
+    "description": "State machine definitions for interactive components",
+    "purpose": "Predictable state transitions for complex UI widgets",
+    "version": "1.0.0",
+    "updated": "2026-01-06"
+  },
+
+  "components": {
+    "accordion_item": {
+      "initial": "collapsed",
+      "states": {
+        "collapsed": {
+          "entry": ["set_aria_expanded_false", "hide_content"],
+          "on": {
+            "TOGGLE": "expanded",
+            "EXPAND": "expanded",
+            "ENTER": "expanded",
+            "SPACE": "expanded"
+          }
+        },
+        "expanded": {
+          "entry": ["set_aria_expanded_true", "show_content", "animate_open"],
+          "on": {
+            "TOGGLE": "collapsed",
+            "COLLAPSE": "collapsed",
+            "ENTER": "collapsed",
+            "SPACE": "collapsed",
+            "ESCAPE": "collapsed"
+          }
+        }
+      },
+      "context": {
+        "contentHeight": "auto",
+        "animationDuration": 300
+      }
+    },
+
+    "accordion_group": {
+      "initial": "idle",
+      "context": {
+        "openItems": [],
+        "exclusive": true
+      },
+      "states": {
+        "idle": {
+          "on": {
+            "ITEM_TOGGLE": {
+              "actions": ["toggle_item"],
+              "cond": "exclusive ? close_others : keep_others"
+            }
+          }
+        }
+      },
+      "actions": {
+        "toggle_item": "if (ctx.openItems.includes(itemId)) { ctx.openItems = ctx.openItems.filter(i => i !== itemId) } else { ctx.openItems = ctx.exclusive ? [itemId] : [...ctx.openItems, itemId] }"
+      }
+    },
+
+    "select_combobox": {
+      "initial": "closed",
+      "context": {
+        "selectedValue": null,
+        "highlightedIndex": -1,
+        "options": [],
+        "inputValue": ""
+      },
+      "states": {
+        "closed": {
+          "entry": ["reset_highlight", "blur_listbox"],
+          "on": {
+            "CLICK": "open",
+            "FOCUS": "focused",
+            "ARROW_DOWN": { "target": "open", "actions": ["highlight_first"] },
+            "ARROW_UP": { "target": "open", "actions": ["highlight_last"] },
+            "ENTER": "open",
+            "SPACE": "open"
+          }
+        },
+        "focused": {
+          "on": {
+            "ARROW_DOWN": { "target": "open", "actions": ["highlight_first_or_selected"] },
+            "ARROW_UP": { "target": "open", "actions": ["highlight_last_or_selected"] },
+            "ENTER": "open",
+            "SPACE": "open",
+            "BLUR": "closed",
+            "TYPE": { "actions": ["update_input", "filter_options"], "target": "open" }
+          }
+        },
+        "open": {
+          "entry": ["show_listbox", "scroll_to_highlighted"],
+          "on": {
+            "ARROW_DOWN": { "actions": ["highlight_next"] },
+            "ARROW_UP": { "actions": ["highlight_previous"] },
+            "HOME": { "actions": ["highlight_first"] },
+            "END": { "actions": ["highlight_last"] },
+            "ENTER": { "actions": ["select_highlighted"], "target": "closed" },
+            "SPACE": { "actions": ["select_highlighted"], "target": "closed" },
+            "ESCAPE": { "actions": ["revert_selection"], "target": "closed" },
+            "TAB": { "actions": ["select_highlighted"], "target": "closed" },
+            "CLICK_OPTION": { "actions": ["select_clicked"], "target": "closed" },
+            "CLICK_OUTSIDE": "closed",
+            "TYPE": { "actions": ["update_input", "filter_options", "highlight_first_match"] }
+          }
+        }
+      },
+      "actions": {
+        "highlight_next": "ctx.highlightedIndex = Math.min(ctx.highlightedIndex + 1, ctx.options.length - 1)",
+        "highlight_previous": "ctx.highlightedIndex = Math.max(ctx.highlightedIndex - 1, 0)",
+        "highlight_first": "ctx.highlightedIndex = 0",
+        "highlight_last": "ctx.highlightedIndex = ctx.options.length - 1",
+        "select_highlighted": "ctx.selectedValue = ctx.options[ctx.highlightedIndex]",
+        "scroll_to_highlighted": "scrollOptionIntoView(ctx.highlightedIndex)"
+      }
+    },
+
+    "tabs": {
+      "initial": "idle",
+      "context": {
+        "selectedTab": 0,
+        "focusedTab": 0,
+        "tabCount": 0,
+        "activationMode": "automatic"
+      },
+      "states": {
+        "idle": {
+          "on": {
+            "TAB_CLICK": { "actions": ["select_tab", "focus_tab"] },
+            "TAB_FOCUS": { "actions": ["focus_tab"], "target": "navigating" }
+          }
+        },
+        "navigating": {
+          "on": {
+            "ARROW_RIGHT": { "actions": ["focus_next_tab", "maybe_select_tab"] },
+            "ARROW_LEFT": { "actions": ["focus_previous_tab", "maybe_select_tab"] },
+            "HOME": { "actions": ["focus_first_tab", "maybe_select_tab"] },
+            "END": { "actions": ["focus_last_tab", "maybe_select_tab"] },
+            "ENTER": { "actions": ["select_focused_tab"], "cond": "manual_activation" },
+            "SPACE": { "actions": ["select_focused_tab"], "cond": "manual_activation" },
+            "TAB_BLUR": "idle"
+          }
+        }
+      },
+      "actions": {
+        "focus_next_tab": "ctx.focusedTab = (ctx.focusedTab + 1) % ctx.tabCount",
+        "focus_previous_tab": "ctx.focusedTab = (ctx.focusedTab - 1 + ctx.tabCount) % ctx.tabCount",
+        "maybe_select_tab": "if (ctx.activationMode === 'automatic') { ctx.selectedTab = ctx.focusedTab }"
+      }
+    },
+
+    "modal_dialog": {
+      "initial": "closed",
+      "context": {
+        "triggerElement": null,
+        "previouslyFocused": null,
+        "dismissable": true
+      },
+      "states": {
+        "closed": {
+          "on": {
+            "OPEN": { "actions": ["store_trigger", "apply_inert"], "target": "opening" }
+          }
+        },
+        "opening": {
+          "entry": ["show_backdrop", "show_dialog", "animate_in"],
+          "after": {
+            "300": { "target": "open", "actions": ["focus_first_element"] }
+          }
+        },
+        "open": {
+          "on": {
+            "CLOSE": { "target": "closing" },
+            "ESCAPE": { "target": "closing", "cond": "dismissable" },
+            "CLICK_BACKDROP": { "target": "closing", "cond": "dismissable" },
+            "TAB": { "actions": ["trap_focus"] },
+            "SHIFT_TAB": { "actions": ["trap_focus_reverse"] }
+          }
+        },
+        "closing": {
+          "entry": ["animate_out"],
+          "after": {
+            "200": { "target": "closed", "actions": ["hide_dialog", "hide_backdrop", "remove_inert", "restore_focus"] }
+          }
+        }
+      },
+      "actions": {
+        "store_trigger": "ctx.previouslyFocused = document.activeElement",
+        "restore_focus": "ctx.previouslyFocused?.focus()",
+        "apply_inert": "Array.from(document.body.children).filter(el => el !== dialog).forEach(el => el.inert = true)",
+        "remove_inert": "Array.from(document.body.children).forEach(el => el.inert = false)"
+      }
+    },
+
+    "checkbox": {
+      "initial": "unchecked",
+      "context": {
+        "indeterminate": false
+      },
+      "states": {
+        "unchecked": {
+          "entry": ["set_aria_checked_false"],
+          "on": {
+            "TOGGLE": "checked",
+            "CLICK": "checked",
+            "SPACE": "checked",
+            "SET_INDETERMINATE": { "target": "indeterminate" }
+          }
+        },
+        "checked": {
+          "entry": ["set_aria_checked_true"],
+          "on": {
+            "TOGGLE": [
+              { "target": "indeterminate", "cond": "supports_indeterminate" },
+              { "target": "unchecked" }
+            ],
+            "CLICK": "unchecked",
+            "SPACE": "unchecked"
+          }
+        },
+        "indeterminate": {
+          "entry": ["set_aria_checked_mixed"],
+          "on": {
+            "TOGGLE": "checked",
+            "CLICK": "checked",
+            "SPACE": "checked"
+          }
+        }
+      }
+    },
+
+    "switch": {
+      "initial": "off",
+      "states": {
+        "off": {
+          "entry": ["set_aria_checked_false"],
+          "on": {
+            "TOGGLE": "on",
+            "CLICK": "on",
+            "ENTER": "on",
+            "SPACE": "on"
+          }
+        },
+        "on": {
+          "entry": ["set_aria_checked_true"],
+          "on": {
+            "TOGGLE": "off",
+            "CLICK": "off",
+            "ENTER": "off",
+            "SPACE": "off"
+          }
+        }
+      }
+    },
+
+    "tooltip": {
+      "initial": "hidden",
+      "context": {
+        "showDelay": 300,
+        "hideDelay": 100
+      },
+      "states": {
+        "hidden": {
+          "on": {
+            "POINTER_ENTER": { "target": "waiting_to_show" },
+            "FOCUS": { "target": "visible", "actions": ["show_immediately"] }
+          }
+        },
+        "waiting_to_show": {
+          "after": {
+            "showDelay": "visible"
+          },
+          "on": {
+            "POINTER_LEAVE": "hidden",
+            "FOCUS": { "target": "visible", "actions": ["show_immediately"] }
+          }
+        },
+        "visible": {
+          "entry": ["show_tooltip", "position_tooltip"],
+          "on": {
+            "POINTER_LEAVE": "waiting_to_hide",
+            "BLUR": "waiting_to_hide",
+            "ESCAPE": { "target": "hidden", "actions": ["hide_immediately"] },
+            "SCROLL": { "actions": ["reposition_tooltip"] }
+          }
+        },
+        "waiting_to_hide": {
+          "after": {
+            "hideDelay": { "target": "hidden", "actions": ["hide_tooltip"] }
+          },
+          "on": {
+            "POINTER_ENTER": "visible"
+          }
+        }
+      }
+    },
+
+    "notification_toast": {
+      "initial": "hidden",
+      "context": {
+        "autoDismissDelay": 5000,
+        "pauseOnHover": true
+      },
+      "states": {
+        "hidden": {
+          "on": {
+            "SHOW": { "target": "entering" }
+          }
+        },
+        "entering": {
+          "entry": ["animate_in"],
+          "after": {
+            "300": "visible"
+          }
+        },
+        "visible": {
+          "entry": ["start_auto_dismiss_timer"],
+          "on": {
+            "DISMISS": "exiting",
+            "POINTER_ENTER": { "actions": ["pause_timer"], "cond": "pauseOnHover" },
+            "POINTER_LEAVE": { "actions": ["resume_timer"], "cond": "pauseOnHover" },
+            "AUTO_DISMISS_TIMEOUT": "exiting"
+          }
+        },
+        "exiting": {
+          "entry": ["animate_out"],
+          "after": {
+            "200": { "target": "hidden", "actions": ["remove_from_dom"] }
+          }
+        }
+      }
+    },
+
+    "menu_dropdown": {
+      "initial": "closed",
+      "context": {
+        "highlightedIndex": -1,
+        "items": [],
+        "typeaheadBuffer": "",
+        "typeaheadTimeout": null
+      },
+      "states": {
+        "closed": {
+          "entry": ["reset_highlight", "clear_typeahead"],
+          "on": {
+            "CLICK_TRIGGER": { "target": "open", "actions": ["highlight_first"] },
+            "ARROW_DOWN": { "target": "open", "actions": ["highlight_first"] },
+            "ARROW_UP": { "target": "open", "actions": ["highlight_last"] },
+            "ENTER": { "target": "open", "actions": ["highlight_first"] },
+            "SPACE": { "target": "open", "actions": ["highlight_first"] }
+          }
+        },
+        "open": {
+          "entry": ["show_menu", "focus_menu", "position_menu"],
+          "on": {
+            "ARROW_DOWN": { "actions": ["highlight_next_enabled"] },
+            "ARROW_UP": { "actions": ["highlight_previous_enabled"] },
+            "HOME": { "actions": ["highlight_first_enabled"] },
+            "END": { "actions": ["highlight_last_enabled"] },
+            "ENTER": { "actions": ["select_and_close"], "target": "closed" },
+            "SPACE": { "actions": ["select_and_close"], "target": "closed" },
+            "ESCAPE": { "target": "closed", "actions": ["restore_focus"] },
+            "TAB": { "target": "closed" },
+            "CLICK_OUTSIDE": { "target": "closed" },
+            "CLICK_ITEM": { "actions": ["select_and_close"], "target": "closed" },
+            "TYPE_CHAR": { "actions": ["typeahead_search"] },
+            "ARROW_RIGHT": { "target": "submenu_open", "cond": "item_has_submenu" }
+          }
+        },
+        "submenu_open": {
+          "on": {
+            "ARROW_LEFT": { "target": "open", "actions": ["close_submenu"] },
+            "ESCAPE": { "target": "open", "actions": ["close_submenu"] }
+          }
+        }
+      },
+      "actions": {
+        "highlight_next_enabled": "do { ctx.highlightedIndex = (ctx.highlightedIndex + 1) % ctx.items.length } while (ctx.items[ctx.highlightedIndex].disabled)",
+        "typeahead_search": "ctx.typeaheadBuffer += char; highlightMatchingItem(ctx.typeaheadBuffer); resetTypeaheadTimeout()"
+      }
+    }
+  },
+
+  "implementation_guide": {
+    "library_recommendation": "XState or custom reducer",
+    "react_pattern": "useReducer with state machine config",
+    "vanilla_pattern": "Class with state property and transition method",
+    "key_principles": [
+      "All state changes through explicit events",
+      "No direct state mutation",
+      "Entry/exit actions for side effects",
+      "Guards (cond) for conditional transitions",
+      "Context for extended state data"
+    ]
+  }
+}

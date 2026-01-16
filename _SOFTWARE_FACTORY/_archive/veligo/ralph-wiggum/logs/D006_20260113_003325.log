@@ -1,0 +1,17 @@
+[91m[1m| [0m[90m Bash     [0mTest health endpoint
+
+{"status":"ok","timestamp":"2026-01-12T23:33:11.485056346+00:00"}HEALTH OK
+
+[91m[1m| [0m[90m Bash     [0mTest homepage
+
+200 - HOMEPAGE OK
+
+[91m[1m| [0m[90m Bash     [0mTest login page
+
+200 - LOGIN OK
+
+[91m[1m| [0m[90m Bash     [0mTest stations page
+
+200 - STATIONS OK
+
+SUCCESS

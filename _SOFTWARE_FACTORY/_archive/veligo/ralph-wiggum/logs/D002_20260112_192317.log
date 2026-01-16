@@ -1,0 +1,25 @@
+
+Je vais vérifier l'état actuel du Rate Limiting et le configurer si nécessaire.
+[93m[1m| [0m[90m Todo     [0m5 todos
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/middleware/rate_limiter.rs
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/bin/tonic-server.rs
+Je vois que `rate_limiter.rs` existe avec la config correcte (auth: 5/min, api: 30/min). Cependant, `tonic-server.rs` est un serveur gRPC pur (Tonic), pas un serveur HTTP Axum. Le middleware rate_limiter.rs est conçu pour Axum, pas pour Tonic/gRPC.
+
+Vérifions s'il y a un serveur HTTP Axum qui utilise ce middleware:
+[94m[1m| [0m[90m Grep     [0mrate_limit_middleware
+[94m[1m| [0m[90m Glob     [0mveligo-platform/backend
+Il existe un `http-server.rs` qui utilise le rate limiter. Vérifions sa configuration:
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/bin/http-server.rs
+Excellent! Le `http-server.rs` a le rate limiter correctement configuré:
+- Lignes 166-190: Initialisation du rate limiter avec Redis
+- Lignes 316-322: Middleware appliqué au routeur
+- Config: /auth: 5/min, /api: 30/min
+
+Maintenant vérifions la configuration Redis et testons:
+[93m[1m| [0m[90m Todo     [0m4 todos
+[?25l│
+◆  Permission required: external_directory (/etc/nginx/sites-available)
+│  ● Allow once
+│  ○ Always allow: /etc/nginx/sites-available/*
+│  ○ Reject
+└

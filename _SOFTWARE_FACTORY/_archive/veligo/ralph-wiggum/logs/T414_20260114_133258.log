@@ -1,0 +1,13 @@
+[0;32m[AGENT] Real Agent starting[0m
+[0;34m[AGENT] Task: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks/T414.md[0m
+[0;34m[AGENT] Queue: tdd[0m
+[0;34m[AGENT] Backend: auto[0m
+[0;32m[AGENT] Starting task: T414[0m
+[0;33m[AGENT] Task T414 decomposed into 3 sub-tasks: T514, T514, T514[0m
+[FRACTAL] Task T414 needs decomposition: files=10 > 5, LOC=540 > 400, items=12 > 10
+[FRACTAL] Created 3 sub-tasks: T514, T514, T514
+
+============================================================
+RESULT: SUCCESS
+============================================================
+DECOMPOSED: T414 -> T514, T514, T514

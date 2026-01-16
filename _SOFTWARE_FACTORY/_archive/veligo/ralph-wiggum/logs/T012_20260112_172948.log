@@ -1,0 +1,366 @@
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/lib/components/MfaSetup.svelte
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/lib/components/auth/MFASetup.svelte
+[94m[1m| [0m[90m Grep     [0mMfaSetup|MFASetup
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/routes/(app)/profile/security/+page.svelte
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/routes/(app)/settings/mfa/+page.svelte
+Maintenant je comprends la situation. Le fichier `MfaSetup.svelte` (1125 LOC) n'est pas utilisé - seul `auth/MFASetup.svelte` (1493 LOC) l'est dans `/profile/security`. La page `/settings/mfa/+page.svelte` a son propre code MFA intégré.
+
+Ma stratégie:
+1. Consolider dans `auth/MFASetup.svelte` avec une prop `showInfoCard` 
+2. Supprimer le fichier `MfaSetup.svelte` non utilisé
+3. Remplacer le code dans `/settings/mfa/+page.svelte` par le composant
+[92m[1m| [0m[90m Edit     [0mveligo-platform/frontend/src/lib/components/auth/MFASetup.svelte
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/lib/components/auth/MFASetup.svelte
+Le fichier a déjà été modifié avec `showInfoCard`. Vérifions si c'est utilisé dans le template:
+[94m[1m| [0m[90m Grep     [0mshowInfoCard
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/lib/components/auth/MFASetup.svelte
+Je dois ajouter l'info-card au composant MFASetup. Regardons d'abord la structure exacte de l'info-card dans la page mfa:
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/routes/(app)/settings/mfa/+page.svelte
+Ma stratégie:
+1. Supprimer le fichier `MfaSetup.svelte` non utilisé
+2. Modifier `/settings/mfa/+page.svelte` pour utiliser le composant `MFASetup` 
+3. Le composant MFASetup reste tel quel (avec showInfoCard qui peut être utilisé)
+
+Commençons par supprimer le fichier non utilisé:
+[91m[1m| [0m[90m Bash     [0mDelete unused MfaSetup.svelte file
+Maintenant, modifions `/settings/mfa/+page.svelte` pour utiliser le composant MFASetup. Je vais remplacer la section MFA card par le composant:
+[92m[1m| [0m[90m Edit     [0mveligo-platform/frontend/src/routes/(app)/settings/mfa/+page.svelte
+Je dois réécrire tout le fichier. Le fichier est trop long, je vais le remplacer complètement:
+[92m[1m| [0m[90m Write    [0mveligo-platform/frontend/src/routes/(app)/settings/mfa/+page.svelte
+Le fichier a été modifié. L'erreur de diagnostic est un problème de routing existant (dashboard conflicts), pas lié à mes changements. Vérifions que tout compile:
+[91m[1m| [0m[90m Bash     [0mType check frontend
+
+npm error Missing script: "type-check"
+npm error
+npm error To see a list of scripts, run:
+npm error   npm run
+npm error A complete log of this run can be found in: /Users/sylvain/.npm/_logs/2026-01-12T16_27_40_522Z-debug-0.log
+
+[91m[1m| [0m[90m Bash     [0mList available npm scripts
+
+Lifecycle scripts included in veligo-frontend@0.0.1:
+  start
+    node build/index.js
+  test
+    playwright test
+available via `npm run-script`:
+  dev
+    vite dev --port 5173
+  build
+    vite build
+  preview
+    vite preview
+  test:e2e
+    playwright test --project=e2e
+  test:auth
+    playwright test --project=auth
+  test:a11y
+    playwright test --project=accessibility
+  test:mobile
+    playwright test --project=mobile-chrome --project=mobile-safari
+  test:ci
+    playwright test --project=ci-quick
+  test:ui
+    playwright test --ui
+  test:debug
+    playwright test --debug
+  test:report
+    playwright show-report
+  test:journeys
+    playwright test --project=journeys
+
+[91m[1m| [0m[90m Bash     [0mBuild frontend
+
+npm error Missing script: "build"
+npm error
+npm error To see a list of scripts, run:
+npm error   npm run
+npm error A complete log of this run can be found in: /Users/sylvain/.npm/_logs/2026-01-12T16_27_50_551Z-debug-0.log
+
+[91m[1m| [0m[90m Bash     [0mBuild frontend from correct directory
+
+npm error Missing script: "build"
+npm error
+npm error To see a list of scripts, run:
+npm error   npm run
+npm error A complete log of this run can be found in: /Users/sylvain/.npm/_logs/2026-01-12T16_27_55_249Z-debug-0.log
+
+[91m[1m| [0m[90m Bash     [0mBuild frontend
+
+
+> veligo-frontend@0.0.1 build
+> vite build
+
+error during build:
+Error: The "/(admin)/dashboard" and "/(app)/dashboard" routes conflict with each other
+    at prevent_conflicts (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:569:11)
+    at create_routes_and_nodes (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:385:2)
+    at create_manifest_data (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:29:28)
+    at create (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/sync.js:26:24)
+    at Module.all (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/sync.js:58:9)
+    at config (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/exports/vite/index.js:372:27)
+    at runConfigHook (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:49479:23)
+    at async resolveConfig (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:48785:12)
+    at async createBuilder (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:46736:18)
+    at async CAC.<anonymous> (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/cli.js:862:23)
+
+Le build échoue à cause d'un conflit de routes dashboard préexistant (non lié à mes modifications). Vérifions les tests MFA:
+[91m[1m| [0m[90m Bash     [0mRun MFA journey tests
+
+
+=== E2E Global Setup ===
+
+Waiting for Frontend at http://localhost:8040...
+Frontend is ready (status: 200)
+Waiting for Mailpit at http://localhost:8045/api/v1/messages...
+Mailpit is ready (status: 200)
+Seeding test database...
+Database seeded successfully
+Clearing Mailpit emails...
+Mailpit cleared
+Auth state directory ready: /Users/sylvain/_LAPOSTE/_VELIGO2/.auth
+
+=== Global Setup Complete (0.1s) ===
+
+Error: No tests found.
+Make sure that arguments are regular expressions matching test files.
+You may need to escape symbols like "$" or "*" and quote the arguments.
+
+=== E2E Global Teardown ===
+
+No test results file found
+Skipping test data cleanup (data retained for debugging)
+=== Teardown Complete ===
+
+
+
+[94m[1m| [0m[90m Glob     [0mveligo-platform
+[91m[1m| [0m[90m Bash     [0mRun MFA enforcement tests
+
+Error: Playwright Test did not expect test.describe() to be called here.
+Most common reasons include:
+- You are calling test.describe() in a configuration file.
+- You are calling test.describe() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+
+   at tests/e2e/security/mfa-enforcement.spec.ts:8
+
+   6 | };
+   7 |
+>  8 | test.describe('mfa-enforcement module', () => {
+     |      ^
+   9 |   const testAdmin = { email: 'admin-idfm@example.com', password: 'admin123' };
+  10 |   const testUser = { email: 'user-idfm@example.com', password: 'user123' };
+  11 |
+    at TestTypeImpl._currentSuite (/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/node_modules/playwright/lib/common/testType.js:75:13)
+    at TestTypeImpl._describe (/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/node_modules/playwright/lib/common/testType.js:115:24)
+    at Function.describe (/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/node_modules/playwright/lib/transform/transform.js:275:12)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/security/mfa-enforcement.spec.ts:8:6)
+Error: No tests found.
+Make sure that arguments are regular expressions matching test files.
+You may need to escape symbols like "$" or "*" and quote the arguments.
+
+
+[91m[1m| [0m[90m Bash     [0mRun all E2E tests
+
+🚴 Veligo E2E Tests - Global Setup
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RÈGLES ABSOLUES:
+  ❌ AUCUNE erreur console tolérée (sync ou async)
+  ❌ AUCUN warning critique toléré
+  ❌ AUCUN test.skip() autorisé
+  ❌ AUCUN retry - Si ça échoue, on corrige
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 Base URL: https://idfm.veligo.app
+🔧 Workers: 5
+🔄 Retries: 0
+
+🔍 Checking HTTP server availability...
+✅ HTTP server is running
+🔧 PR-005: Starting gRPC-Web proxy server...
+⚠️  Port 8080 already in use, assuming proxy is already running
+🌱 PR-010: Seeding test data...
+🌱 Seeding test data...
+  ✓ User marie.dupont@test-idfm.fr already exists (skipping)
+  ✓ User jean.martin@test-nantes.fr already exists (skipping)
+  ✓ User pierre.bernard@test-lyon.fr already exists (skipping)
+  ✓ User admin@idfm.fr already exists (skipping)
+  ✓ User admin@idfm.fr already exists (skipping)
+  ⚠️  User owner@veligo.app registration failed with database error (might already exist): Database error: error returned from database: record "new" has no field "user_id"
+  ⚠️  User test@veligo.app registration failed with database error (might already exist): Database error: error returned from database: record "new" has no field "user_id"
+✅ Users seeded
+  📊 Attempting to seed 13 stations from fixtures
+  ⚠️  Check endpoint returned 404: 
+⚠️  Test API seed endpoint not available (404).
+   Checking if stations already exist in database...
+❌ ERROR: Test API seed endpoint not available (404) and no stations found.
+   Set ENABLE_TEST_API=1 on the backend to enable automatic seeding.
+   Without stations seeded, E2E tests will fail.
+❌ Station seeding failed: Station seeding failed: Test API endpoint disabled (404). Set ENABLE_TEST_API=1.
+
+❌ CRITICAL: Station seeding failed!
+   Station gRPC tests require stations to be seeded.
+   SOLUTION: Set ENABLE_TEST_API=1 on the backend.
+
+  📊 Attempting to seed 53 bikes from fixtures
+⚠️  Test API seed endpoint not available (404).
+   Checking if bikes already exist in database...
+❌ ERROR: Test API seed endpoint not available (404) and no bikes found.
+   Set ENABLE_TEST_API=1 on the backend to enable automatic seeding.
+   Without bikes seeded, E2E tests will fail.
+❌ Bike seeding failed: Bike seeding failed: Test API endpoint disabled (404). Set ENABLE_TEST_API=1.
+
+❌ CRITICAL: Bike seeding failed!
+   Bike gRPC tests require bikes to be seeded.
+   SOLUTION: Set ENABLE_TEST_API=1 on the backend.
+
+Bookings will be created during test execution
+✅ Bookings seeded
+🌱 Test data seeding complete
+
+❌ CRITICAL: Test data seeding failed!
+   Tests require stations and bikes to be seeded.
+   SOLUTION: Set ENABLE_TEST_API=1 on the backend.
+   Example: export ENABLE_TEST_API=1 && systemctl restart veligo-http-server
+
+
+❌ CRITICAL: Test data seeding failed!
+   Error: Critical test data seeding failed. Set ENABLE_TEST_API=1 on the backend to enable seeding.
+
+   SOLUTION: Enable test API on backend:
+   1. SSH to production server (4.251.107.141)
+   2. Set ENABLE_TEST_API=1 environment variable
+   3. Restart HTTP server: sudo systemctl restart veligo-http-server
+   4. Re-run tests
+
+Error: Critical test data seeding failed. Set ENABLE_TEST_API=1 on the backend to enable seeding.
+
+   at helpers/seed.ts:110
+
+  108 |       console.error('   Example: export ENABLE_TEST_API=1 && systemctl restart veligo-http-server');
+  109 |       console.error('');
+> 110 |       throw new Error('Critical test data seeding failed. Set ENABLE_TEST_API=1 on the backend to enable seeding.');
+      |             ^
+  111 |     }
+  112 |   } catch (error) {
+
+Les tests E2E nécessitent une configuration backend spéciale. Vérifions que la syntaxe Svelte est correcte:
+[91m[1m| [0m[90m Bash     [0mSvelte check for syntax errors
+
+Loading svelte-check in workspace: /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend
+Getting Svelte diagnostics...
+
+Preprocessing failed
+Error: The "/(admin)/dashboard" and "/(app)/dashboard" routes conflict with each other
+    at prevent_conflicts (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:569:11)
+    at create_routes_and_nodes (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:385:2)
+    at create_manifest_data (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:29:28)
+    at create (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/sync.js:26:24)
+    at Module.all (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/sync.js:58:9)
+    at config (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/exports/vite/index.js:372:27)
+    at runConfigHook (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:49479:23)
+    at async resolveConfig (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:48785:12)
+    at async createCssTransform (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/vite-plugin-svelte/src/preprocess.js:111:20) {
+  __source: 'Style'
+}
+Preprocessing failed
+Error: The "/(admin)/dashboard" and "/(app)/dashboard" routes conflict with each other
+    at prevent_conflicts (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:569:11)
+    at create_routes_and_nodes (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:385:2)
+    at create_manifest_data (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:29:28)
+    at create (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/sync.js:26:24)
+    at Module.all (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/sync.js:58:9)
+    at config (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/exports/vite/index.js:372:27)
+    at runConfigHook (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:49479:23)
+    at async resolveConfig (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:48785:12)
+    at async createCssTransform (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/vite-plugin-svelte/src/preprocess.js:111:20) {
+  __source: 'Style'
+}
+Preprocessing failed
+Error: The "/(admin)/dashboard" and "/(app)/dashboard" routes conflict with each other
+    at prevent_conflicts (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:569:11)
+    at create_routes_and_nodes (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:385:2)
+    at create_manifest_data (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:29:28)
+    at create (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/sync.js:26:24)
+    at Module.all (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/sync.js:58:9)
+    at config (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/exports/vite/index.js:372:27)
+    at runConfigHook (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:49479:23)
+    at async resolveConfig (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:48785:12)
+    at async createCssTransform (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/vite-plugin-svelte/src/preprocess.js:111:20) {
+  __source: 'Style'
+}
+Preprocessing failed
+Error: The "/(admin)/dashboard" and "/(app)/dashboard" routes conflict with each other
+    at prevent_conflicts (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:569:11)
+    at create_routes_and_nodes (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:385:2)
+    at create_manifest_data (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:29:28)
+    at create (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/sync.js:26:24)
+    at Module.all (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/sync.js:58:9)
+    at config (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/exports/vite/index.js:372:27)
+    at runConfigHook (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:49479:23)
+    at async resolveConfig (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:48785:12)
+    at async createCssTransform (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/vite-plugin-svelte/src/preprocess.js:111:20) {
+  __source: 'Style'
+}
+Preprocessing failed
+Error: The "/(admin)/dashboard" and "/(app)/dashboard" routes conflict with each other
+    at prevent_conflicts (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:569:11)
+    at create_routes_and_nodes (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:385:2)
+    at create_manifest_data (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:29:28)
+    at create (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/sync.js:26:24)
+    at Module.all (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/sync.js:58:9)
+    at config (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/exports/vite/index.js:372:27)
+    at runConfigHook (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:49479:23)
+    at async resolveConfig (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:48785:12)
+    at async createCssTransform (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/vite-plugin-svelte/src/preprocess.js:111:20) {
+  __source: 'Style'
+}
+Preprocessing failed
+Error: The "/(admin)/dashboard" and "/(app)/dashboard" routes conflict with each other
+    at prevent_conflicts (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:569:11)
+    at create_routes_and_nodes (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:385:2)
+    at create_manifest_data (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:29:28)
+    at create (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/sync.js:26:24)
+    at Module.all (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/sync.js:58:9)
+    at config (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/exports/vite/index.js:372:27)
+    at runConfigHook (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:49479:23)
+    at async resolveConfig (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:48785:12)
+    at async createCssTransform (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/vite-plugin-svelte/src/preprocess.js:111:20) {
+  __source: 'Style'
+
+Le problème de build est un conflit de routes dashboard préexistant (non lié à mes modifications MFA). Vérifions le contenu de mes modifications:
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/routes/(app)/settings/mfa/+page.svelte
+Vérifions le bilan final:
+[91m[1m| [0m[90m Bash     [0mCheck MFA files status
+
+=== Fichiers MFA ===
+ls: /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/src/lib/components/MfaSetup.svelte: No such file or directory
+-rw-r--r--  1 sylvain  staff  38089 Jan 12 17:25 /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/src/lib/components/auth/MFASetup.svelte
+
+[91m[1m| [0m[90m Bash     [0mCount lines in MFA files
+
+zsh:1: no matches found: /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/src/routes/(app)/settings/mfa/+page.svelte
+
+[91m[1m| [0m[90m Bash     [0mCount lines in MFA files
+
+    1494 /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/src/lib/components/auth/MFASetup.svelte
+     178 /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/src/routes/(app)/settings/mfa/+page.svelte
+
+Vérifions que l'import dans profile/security fonctionne:
+[91m[1m| [0m[90m Bash     [0mCheck profile security imports
+
+zsh:1: no matches found: /Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/src/routes/(app)/profile/security/+page.svelte
+
+[91m[1m| [0m[90m Bash     [0mCheck profile security imports
+
+<script lang="ts">
+  import { page } from '$app/stores';
+  import Icon from '$lib/components/icons/Icon.svelte';
+  import { ICON_NAMES } from '$lib/components/icons';
+  import MFASetup from '$lib/components/auth/MFASetup.svelte';
+  import { announce, announceSuccess } from '$lib/accessibility';
+
+  // State
+  let mfaEnabled = $state(false);
+  let showPasswordChangeModal = $state(false);

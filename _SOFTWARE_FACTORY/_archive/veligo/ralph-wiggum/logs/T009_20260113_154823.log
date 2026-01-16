@@ -1,0 +1,92 @@
+RLM Light Agent - Task: Tu es un agent TDD autonome pour Veligo (vélos en libre-service).
+
+## TÂCHE
+Task T009: Résoudre les 11 tests skippés Bike Maintenance Journey
+
+## DÉTAILS
+# Task T009: Résoudre les 11 tests skippés Bike Maintenance Journey
+
+**Priority**: P1
+**Time Estimate**: 1.5h
+**WSJF Score**: 7.5
+**Complexity**: medium
+**Queue**: TDD
+
+## Description
+veligo-platform/tests/e2e/journeys/19-bike-maintenance.spec.ts a 11 tests skippés pour le parcours maintenance vélo.
+
+## Success Criteria
+- [ ] Workflow maintenance complet
+- [ ] 11 tests passent
+- [ ] Owner peut gérer maintenance
+
+## Actions
+1. Analyser les 11 tests skippés
+2. Vérifier modules/fleet-management
+3. Implémenter endpoints manquants
+4. Créer UI maintenance si nécessaire
+
+## Files to Create/Modify
+- [ ] veligo-platform/tests/e2e/journeys/19-bike-maintenance.spec.ts (MODIFY)
+
+## Ralph Status Block
+---RALPH_STATUS---
+STATUS: IN_PROGRESS
+COMPLEXITY: medium
+MODEL_TIER: TIER2
+WSJF: 7.5
+---END_RALPH_STATUS---
+
+## 🔴 RÈGLE ABSOLUE: VÉRIFIER AVANT MODIFIER
+
+AVANT de modifier ou créer un fichier, tu DOIS:
+1. Utiliser `Read` pour VÉRIFIER que le fichier existe
+2. Utiliser `veligo_grep` pour trouver les patterns existants
+3. NE JAMAIS inventer un fichier qui n'existe pas
+
+Si un fichier n'existe pas:
+- Cherche un fichier similaire avec `Glob` ou `veligo_rag_query`
+- Adapte ton approche au code RÉEL
+
+## INSTRUCTIONS TDD (Red → Green)
+
+1. **PHASE EXPLORATION**: Comprendre le contexte
+   - `veligo_rag_query("test skip failing")` pour trouver tests problématiques
+   - `veligo_grep("TODO|FIXME", "*.rs")` pour trouver points d'attention
+   - `Read` sur les fichiers mentionnés pour VÉRIFIER qu'ils existent
+
+2. **PHASE RED**: Lis le test qui échoue
+   - Utilise `Read` pour voir le fichier test (VÉRIFIE qu'il existe!)
+   - Comprends ce que le test attend
+
+3. **PHASE CODE**: Implémente la solution
+   - Utilise `Read` AVANT d'utiliser `Edit`
+   - Modifie max 3 fichiers
+   - Fais des changements minimaux
+
+4. **PHASE GREEN**: Vérifie
+   - Rust: `cargo test --lib`
+   - Frontend: `npm run test`
+   - E2E: `npx playwright test <file>`
+
+## RÈGLES ANTI-HALLUCINATION
+- ❌ JAMAIS modifier un fichier sans l'avoir lu d'abord
+- ❌ JAMAIS inventer un chemin de fichier
+- ❌ JAMAIS prétendre "tests pass" sans exécuter la commande
+- ✅ Utilise veligo_grep pour trouver le bon fichier
+- ✅ Utilise Read pour vérifier l'existence
+
+## OUTILS MCP DISPONIBLES
+- veligo_rag_query: Recherche sémantique dans le code
+- veligo_ao_search: Recherche dans les specs AO
+- veligo_grep: Grep pattern dans fichiers
+
+Commence maintenant. Réponds avec: SUCCESS ou NEEDS_MORE_WORK
+Traceback (most recent call last):
+  File "/Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/rlm_light_client.py", line 350, in <module>
+    main()
+    ~~~~^^
+  File "/Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/rlm_light_client.py", line 343, in main
+    print(f"API: {LLAMA_API_URL}", file=sys.stderr)
+                  ^^^^^^^^^^^^^
+NameError: name 'LLAMA_API_URL' is not defined. Did you mean: 'LOCAL_API_URL'?

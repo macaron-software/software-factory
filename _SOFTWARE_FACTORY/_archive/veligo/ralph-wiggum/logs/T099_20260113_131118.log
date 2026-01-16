@@ -1,0 +1,94 @@
+RLM Light Agent - Task: Tu es un agent TDD autonome pour Veligo (vélos en libre-service).
+
+## TÂCHE
+Task T099: Test RLM Light
+
+## DÉTAILS
+# Task T099: Test RLM Light
+
+STATUS: IN_PROGRESS
+
+## Description
+Test du RLM Light Client avec une tâche simple.
+
+## Task
+1. Utilise grep pour chercher "USE_RLM_LIGHT" dans tools/ralph-wiggum/
+2. Montre les fichiers trouvés
+3. Termine avec SUCCESS
+
+## Adversarial Feedback
+
+## 🔴 RÈGLE ABSOLUE: VÉRIFIER AVANT MODIFIER
+
+AVANT de modifier ou créer un fichier, tu DOIS:
+1. Utiliser `Read` pour VÉRIFIER que le fichier existe
+2. Utiliser `veligo_grep` pour trouver les patterns existants
+3. NE JAMAIS inventer un fichier qui n'existe pas
+
+Si un fichier n'existe pas:
+- Cherche un fichier similaire avec `Glob` ou `veligo_rag_query`
+- Adapte ton approche au code RÉEL
+
+## INSTRUCTIONS TDD (Red → Green)
+
+1. **PHASE EXPLORATION**: Comprendre le contexte
+   - `veligo_rag_query("test skip failing")` pour trouver tests problématiques
+   - `veligo_grep("TODO|FIXME", "*.rs")` pour trouver points d'attention
+   - `Read` sur les fichiers mentionnés pour VÉRIFIER qu'ils existent
+
+2. **PHASE RED**: Lis le test qui échoue
+   - Utilise `Read` pour voir le fichier test (VÉRIFIE qu'il existe!)
+   - Comprends ce que le test attend
+
+3. **PHASE CODE**: Implémente la solution
+   - Utilise `Read` AVANT d'utiliser `Edit`
+   - Modifie max 3 fichiers
+   - Fais des changements minimaux
+
+4. **PHASE GREEN**: Vérifie
+   - Rust: `cargo test --lib`
+   - Frontend: `npm run test`
+   - E2E: `npx playwright test <file>`
+
+## RÈGLES ANTI-HALLUCINATION
+- ❌ JAMAIS modifier un fichier sans l'avoir lu d'abord
+- ❌ JAMAIS inventer un chemin de fichier
+- ❌ JAMAIS prétendre "tests pass" sans exécuter la commande
+- ✅ Utilise veligo_grep pour trouver le bon fichier
+- ✅ Utilise Read pour vérifier l'existence
+
+## OUTILS MCP DISPONIBLES
+- veligo_rag_query: Recherche sémantique dans le code
+- veligo_ao_search: Recherche dans les specs AO
+- veligo_grep: Grep pattern dans fichiers
+
+Commence maintenant. Réponds avec: SUCCESS ou NEEDS_MORE_WORK
+API: http://127.0.0.1:8002/v1/chat/completions
+Model: qwen3
+
+--- Iteration 1/20 ---
+LLM: {"tool": "veligo_grep", "pattern": "USE_RLM_LIGHT", "path": "tools/ralph-wiggum/**"}...
+TOOL [veligo_grep]: ERROR: Unknown tool: veligo_grep...
+
+--- Iteration 2/20 ---
+LLM: {"tool": "grep", "pattern": "USE_RLM_LIGHT", "path": "tools/ralph-wiggum/**"}...
+TOOL [grep]: No matches found...
+
+--- Iteration 3/20 ---
+LLM: {"tool": "grep", "pattern": "USE_RLM_LIGHT", "path": "tools/ralph-wiggum/*"}...
+TOOL [grep]: No matches found...
+
+--- Iteration 4/20 ---
+LLM: {"tool": "grep", "pattern": "USE_RLM_LIGHT", "path": "tools/ralph-wiggum/**/*.rs"}...
+TOOL [grep]: No matches found...
+
+--- Iteration 5/20 ---
+LLM: {"tool": "grep", "pattern": "USE_RLM_LIGHT", "path": "tools/ralph-wiggum/**/*"}...
+TOOL [grep]: No matches found...
+
+--- Iteration 6/20 ---
+LLM: {"tool": "done", "result": "SUCCESS"}...
+TOOL [done]: TASK_COMPLETE: SUCCESS...
+
+=== RESULT ===
+SUCCESS

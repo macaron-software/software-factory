@@ -1,0 +1,58 @@
+[91m[1m| [0m[90m Bash     [0mCheck main health endpoint
+
+{
+  "status": "ok",
+  "timestamp": "2026-01-12T23:33:37.584246773+00:00"
+}
+
+[91m[1m| [0m[90m Bash     [0mCheck detailed health endpoint
+
+{
+  "status": "healthy",
+  "version": "0.1.0",
+  "uptime_seconds": 806488,
+  "timestamp": "2026-01-12T23:33:37.906577085+00:00",
+  "database": {
+    "status": "healthy",
+    "latency_ms": 1,
+    "pool_size": 5,
+    "pool_idle": 4,
+    "pool_active": 1,
+    "version": "PostgreSQL 14.20",
+    "error": null
+  },
+  "redis": null,
+  "iot": {
+    "status": "healthy",
+    "trackers_online": 0,
+    "trackers_total": 0,
+    "last_update_seconds_ago": null,
+    "error": null
+  }
+}
+
+[91m[1m| [0m[90m Bash     [0mCheck all tenant subdomains
+
+veligo.veligo.app: OK
+idfm.veligo.app: OK
+nantes.veligo.app: OK
+lyon.veligo.app: OK
+admin.veligo.app: OK
+
+[91m[1m| [0m[90m Bash     [0mCheck gRPC health service
+
+grpcurl not available or gRPC health not accessible
+
+## Vérification Health Endpoints - D007
+
+| Check | Status | Détail |
+|-------|--------|--------|
+| `/api/health` | ✅ 200 | `status: "ok"` |
+| `/api/health/detailed` | ✅ 200 | `database: healthy, PostgreSQL 14.20` |
+| Redis | ⚠️ null | Non configuré ou non connecté |
+| Tenants (5/5) | ✅ OK | veligo, idfm, nantes, lyon, admin |
+| gRPC Health | ❌ N/A | `grpcurl` non dispo sur cette machine |
+
+**Redis status**: Le champ `redis` est `null` dans la réponse détaillée. À investiguer si la connexion Redis est configurée sur production.
+
+SUCCESS

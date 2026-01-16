@@ -1,0 +1,303 @@
+Je vais commencer par lire le fichier de tests pour comprendre ce qui est attendu.
+[96m[1m| [0m[90m Read     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[94m[1m| [0m[90m Grep     [0mreferral
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/api/referral_api.rs
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/referral*.svelte"}
+[91m[1m| [0m[90m Bash     [0mList frontend routes directory
+
+total 40
+drwxr-xr-x  15 sylvain  staff   480 Jan  7 06:24 (admin)
+drwxr-xr-x  23 sylvain  staff   736 Jan  9 08:21 (app)
+drwxr-xr-x   6 sylvain  staff   192 Jan  5 11:40 (landing)
+drwxr-xr-x   5 sylvain  staff   160 Dec 27 12:12 (tenant)
+-rw-r--r--   1 sylvain  staff  5064 Jan  5 11:40 +layout.svelte
+-rw-------   1 sylvain  staff   169 Dec 30 17:01 +layout.ts
+-rw-r--r--   1 sylvain  staff     0 Dec 15 08:16 +page-platform.svelte.tmp
+-rw-r--r--   1 sylvain  staff  6790 Jan  5 11:40 +page.svelte
+drwxr-xr-x  30 sylvain  staff   960 Jan  5 11:40 .
+drwxr-xr-x   9 sylvain  staff   288 Jan  5 10:17 ..
+drwxr-xr-x   3 sylvain  staff    96 Dec 13 16:06 \(app\)
+drwxr-xr-x   3 sylvain  staff    96 Jan  1 21:59 api
+drwxr-xr-x   6 sylvain  staff   192 Dec 30 13:10 auth
+drwxr-xr-x   3 sylvain  staff    96 Jan  5 11:40 catalog
+drwx------   3 sylvain  staff    96 Dec 30 15:09 forgot-password
+drwxr-xr-x   3 sylvain  staff    96 Jan  7 09:37 invoices
+drwxr-xr-x   4 sylvain  staff   128 Jan  1 17:02 legal
+drwxr-xr-x   4 sylvain  staff   128 Jan  7 09:36 login
+drwxr-xr-x   3 sylvain  staff    96 Jan  5 11:40 maintenance
+drwxr-xr-x   4 sylvain  staff   128 Dec 11 14:13 mock
+drwxr-xr-x  14 sylvain  staff   448 Jan  7 09:37 owner
+drwxr-xr-x   3 sylvain  staff    96 Jan  7 09:37 privacy
+drwxr-xr-x   3 sylvain  staff    96 Jan  7 09:37 register
+drwxr-xr-x   3 sylvain  staff    96 Jan  5 11:40 reset-password
+drwxr-xr-x   4 sylvain  staff   128 Jan  7 09:37 signup
+drwxr-xr-x   4 sylvain  staff   128 Jan  5 11:40 store
+drwxr-xr-x   3 sylvain  staff    96 Jan  1 17:02 subscriptions
+drwxr-xr-x   4 sylvain  staff   128 Jan  7 09:37 support
+drwxr-xr-x   3 sylvain  staff    96 Jan  7 09:37 terms
+drwx------   3 sylvain  staff    96 Jan  7 09:37 verify-email
+
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/pages/referral*"}
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/routes/*.ts"}
+[91m[1m| [0m[90m Bash     [0mList API lib directory
+
+total 376
+drwxr-xr-x  21 sylvain  staff    672 Jan  7 09:37 .
+drwxr-xr-x  20 sylvain  staff    640 Jan  7 09:37 ..
+-rw-------   1 sylvain  staff   5666 Dec 27 12:39 README.md
+-rw-r--r--   1 sylvain  staff   9853 Jan  2 15:41 admin-grpc.ts
+-rw-r--r--   1 sylvain  staff  26083 Jan  2 15:41 admin-service.ts
+-rw-r--r--   1 sylvain  staff   6972 Dec 17 22:50 admin.ts
+-rw-------   1 sylvain  staff   3493 Dec 27 12:38 auth-helpers.ts
+-rw-r--r--   1 sylvain  staff   1091 Dec 27 12:39 auth.ts
+-rw-r--r--   1 sylvain  staff  24602 Jan  7 09:37 bookings.ts
+-rw-------   1 sylvain  staff  11527 Dec 27 13:23 client.ts
+-rw-------   1 sylvain  staff   9222 Dec 27 12:13 endpoints.ts
+-rw-r--r--   1 sylvain  staff   7199 Jan  2 15:41 incidents.ts
+-rw-------   1 sylvain  staff   1205 Dec 27 12:15 index.ts
+-rw-r--r--   1 sylvain  staff    676 Dec 27 12:12 modules.ts
+-rw-------   1 sylvain  staff  12204 Jan  2 10:03 owner.ts
+-rw-r--r--   1 sylvain  staff   2313 Jan  2 15:41 payment.ts
+-rw-r--r--   1 sylvain  staff   3562 Jan  2 15:41 plugins.ts
+-rw-r--r--   1 sylvain  staff  13056 Jan  2 15:41 subscriptions.ts
+-rw-------   1 sylvain  staff   2754 Dec 27 11:24 tenants.ts
+-rw-------   1 sylvain  staff  11497 Dec 27 12:14 transformers.ts
+-rw-------   1 sylvain  staff   1329 Dec 27 13:24 types.ts
+
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/lib/api/endpoints.ts
+[91m[1m| [0m[90m Bash     [0mList frontend routes
+
+total 40
+drwxr-xr-x  15 sylvain  staff   480 Jan  7 06:24 (admin)
+drwxr-xr-x  23 sylvain  staff   736 Jan  9 08:21 (app)
+drwxr-xr-x   6 sylvain  staff   192 Jan  5 11:40 (landing)
+drwxr-xr-x   5 sylvain  staff   160 Dec 27 12:12 (tenant)
+-rw-r--r--   1 sylvain  staff  5064 Jan  5 11:40 +layout.svelte
+-rw-------   1 sylvain  staff   169 Dec 30 17:01 +layout.ts
+-rw-r--r--   1 sylvain  staff     0 Dec 15 08:16 +page-platform.svelte.tmp
+-rw-r--r--   1 sylvain  staff  6790 Jan  5 11:40 +page.svelte
+drwxr-xr-x  30 sylvain  staff   960 Jan  5 11:40 .
+drwxr-xr-x   9 sylvain  staff   288 Jan  5 10:17 ..
+drwxr-xr-x   3 sylvain  staff    96 Dec 13 16:06 \(app\)
+drwxr-xr-x   3 sylvain  staff    96 Jan  1 21:59 api
+drwxr-xr-x   6 sylvain  staff   192 Dec 30 13:10 auth
+drwxr-xr-x   3 sylvain  staff    96 Jan  5 11:40 catalog
+drwx------   3 sylvain  staff    96 Dec 30 15:09 forgot-password
+drwxr-xr-x   3 sylvain  staff    96 Jan  7 09:37 invoices
+drwxr-xr-x   4 sylvain  staff   128 Jan  1 17:02 legal
+drwxr-xr-x   4 sylvain  staff   128 Jan  7 09:36 login
+drwxr-xr-x   3 sylvain  staff    96 Jan  5 11:40 maintenance
+drwxr-xr-x   4 sylvain  staff   128 Dec 11 14:13 mock
+drwxr-xr-x  14 sylvain  staff   448 Jan  7 09:37 owner
+drwxr-xr-x   3 sylvain  staff    96 Jan  7 09:37 privacy
+drwxr-xr-x   3 sylvain  staff    96 Jan  7 09:37 register
+drwxr-xr-x   3 sylvain  staff    96 Jan  5 11:40 reset-password
+drwxr-xr-x   4 sylvain  staff   128 Jan  7 09:37 signup
+drwxr-xr-x   4 sylvain  staff   128 Jan  5 11:40 store
+drwxr-xr-x   3 sylvain  staff    96 Jan  1 17:02 subscriptions
+drwxr-xr-x   4 sylvain  staff   128 Jan  7 09:37 support
+drwxr-xr-x   3 sylvain  staff    96 Jan  7 09:37 terms
+drwx------   3 sylvain  staff    96 Jan  7 09:37 verify-email
+
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/routes/signup/+page.svelte
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/lib/api/subscriptions.ts
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/lib/grpc-client.ts
+[91m[1m| [0m[90m Bash     [0mList gRPC types directory
+
+total 344
+drwxr-xr-x  18 sylvain  staff     576 Jan  7 09:37 .
+drwxr-xr-x  20 sylvain  staff     640 Jan  7 09:37 ..
+drwxr-xr-x   3 sylvain  staff      96 Dec 19 10:22 auth
+drwxr-xr-x   3 sylvain  staff      96 Jan  1 14:18 bike
+-rw-r--r--   1 sylvain  staff    8027 Jan  3 20:32 bike.ts
+drwxr-xr-x   3 sylvain  staff      96 Jan  1 13:41 booking
+-rw-r--r--   1 sylvain  staff    6188 Jan  3 20:26 booking.ts
+-rw-r--r--   1 sylvain  staff    9467 Jan  7 09:37 client.ts
+drwxr-xr-x   3 sylvain  staff      96 Jan  1 14:18 common
+drwxr-xr-x   3 sylvain  staff      96 Dec 19 10:22 google
+drwxr-xr-x   3 sylvain  staff      96 Dec 19 10:22 module
+drwxr-xr-x   3 sylvain  staff      96 Jan  1 14:18 report
+drwxr-xr-x   3 sylvain  staff      96 Jan  1 14:18 rgpd
+drwxr-xr-x   3 sylvain  staff      96 Jan  1 13:41 station
+-rw-r--r--   1 sylvain  staff    7831 Jan  3 20:26 station.ts
+drwxr-xr-x   3 sylvain  staff      96 Dec 19 10:22 subscription
+drwxr-xr-x   3 sylvain  staff      96 Jan  1 14:18 user
+-rw-r--r--   1 sylvain  staff  136755 Jan  1 14:23 veligo.ts
+
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/routes/invoices/+page.svelte
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/lib/api/payment.ts
+Je vais maintenant créer les fichiers nécessaires pour implémenter le programme de parrainage.
+[92m[1m| [0m[90m Write    [0mveligo-platform/frontend/src/lib/api/referral.ts
+[91m[1m| [0m[90m Bash     [0mCreate referral route directory
+[92m[1m| [0m[90m Write    [0mveligo-platform/frontend/src/routes/referral/+page.svelte
+
+Maintenant, activons les tests en retirant les `test.skip()`:
+[92m[1m| [0m[90m Edit     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[92m[1m| [0m[90m Edit     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[92m[1m| [0m[90m Edit     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[92m[1m| [0m[90m Edit     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[92m[1m| [0m[90m Edit     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[92m[1m| [0m[90m Edit     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[92m[1m| [0m[90m Edit     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[92m[1m| [0m[90m Edit     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+[96m[1m| [0m[90m Read     [0mveligo-platform/tests/e2e/journeys/20-referral-program.spec.ts
+Les tests ont été activés. Vérifions maintenant que le frontend compile:
+[91m[1m| [0m[90m Bash     [0mBuild frontend to check for errors
+
+
+> veligo-frontend@0.0.1 build
+> vite build
+
+error during build:
+Error: The "/(admin)/dashboard" and "/(app)/dashboard" routes conflict with each other
+    at prevent_conflicts (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:569:11)
+    at create_routes_and_nodes (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:385:2)
+    at create_manifest_data (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/create_manifest_data/index.js:29:28)
+    at create (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/sync.js:26:24)
+    at Module.all (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/core/sync/sync.js:58:9)
+    at config (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/@sveltejs/kit/src/exports/vite/index.js:372:27)
+    at runConfigHook (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:49479:23)
+    at async resolveConfig (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:48785:12)
+    at async createBuilder (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:46736:18)
+    at async CAC.<anonymous> (file:///Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/frontend/node_modules/vite/dist/node/cli.js:862:23)
+
+[91m[1m| [0m[90m Bash     [0mCheck referral page for errors
+
+    } catch (error) {
+    } catch (error) {
+    } catch (error) {
+import { error, redirect } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
+        class:badge-error={station.availableBikes === 0}
+        class:badge-error={station.availableBikes === 0}
+                    <div data-testid="bike-low-battery" class="text-xs text-error mb-2">Batterie faible</div>
+                    <div data-testid="bike-low-battery" class="text-xs text-error mb-2">Batterie faible</div>
+                      class="btn btn-sm btn-error btn-outline"
+                      class="btn btn-sm btn-error btn-outline"
+https://svelte.dev/e/js_parse_error (ts)
+import { loading, error, reservations } from '$lib/stores';
+import { loading, error, reservations } from '$lib/stores';
+import { loading, error, reservations } from '$lib/stores';
+    error.set('Failed to load dashboard data');
+
+[91m[1m| [0m[90m Bash     [0mRun referral program tests
+
+Error: Project(s) "chromium" not found. Available projects: ""
+    at filterProjects (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/runner/projectUtils.js:80:11)
+    at runTests (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/program.js:217:42)
+    at async i.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/node_modules/playwright/lib/program.js:71:7)
+
+[91m[1m| [0m[90m Bash     [0mRun referral program tests with default config
+
+Error: Playwright Test did not expect test.describe() to be called here.
+Most common reasons include:
+- You are calling test.describe() in a configuration file.
+- You are calling test.describe() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+
+   at tests/e2e/journeys/20-referral-program.spec.ts:29
+
+  27 | };
+  28 |
+> 29 | test.describe('Referral Program Journey', () => {
+     |      ^
+  30 |   test.beforeEach(async ({ page }) => {
+  31 |     await page.goto(BASE_URL);
+  32 |     await page.waitForLoadState('networkidle');
+    at TestTypeImpl._currentSuite (/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/node_modules/playwright/lib/common/testType.js:75:13)
+    at TestTypeImpl._describe (/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/node_modules/playwright/lib/common/testType.js:115:24)
+    at Function.describe (/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/node_modules/playwright/lib/transform/transform.js:275:12)
+    at Object.<anonymous> (/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/tests/e2e/journeys/20-referral-program.spec.ts:29:6)
+
+Error: No tests found.
+Make sure that arguments are regular expressions matching test files.
+You may need to escape symbols like "$" or "*" and quote the arguments.
+
+[1A[2K
+[91m[1m| [0m[90m Bash     [0mRun referral program tests from correct directory
+
+🚴 Veligo E2E Tests - Global Setup
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RÈGLES ABSOLUES:
+  ❌ AUCUNE erreur console tolérée (sync ou async)
+  ❌ AUCUN warning critique toléré
+  ❌ AUCUN test.skip() autorisé
+  ❌ AUCUN retry - Si ça échoue, on corrige
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 Base URL: https://idfm.veligo.app
+🔧 Workers: 5
+🔄 Retries: 0
+
+🔍 Checking HTTP server availability...
+✅ HTTP server is running
+🔧 PR-005: Starting gRPC-Web proxy server...
+⚠️  Port 8080 already in use, assuming proxy is already running
+🌱 PR-010: Seeding test data...
+🌱 Seeding test data...
+  ✓ User marie.dupont@test-idfm.fr already exists (skipping)
+  ✓ User jean.martin@test-nantes.fr already exists (skipping)
+  ✓ User pierre.bernard@test-lyon.fr already exists (skipping)
+  ✓ User admin@idfm.fr already exists (skipping)
+  ✓ User admin@idfm.fr already exists (skipping)
+  ⚠️  User owner@veligo.app registration failed with database error (might already exist): Database error: error returned from database: record "new" has no field "user_id"
+  ⚠️  User test@veligo.app registration failed with database error (might already exist): Database error: error returned from database: record "new" has no field "user_id"
+✅ Users seeded
+  📊 Attempting to seed 13 stations from fixtures
+  ⚠️  Check endpoint returned 404: 
+⚠️  Test API seed endpoint not available (404).
+   Checking if stations already exist in database...
+❌ ERROR: Test API seed endpoint not available (404) and no stations found.
+   Set ENABLE_TEST_API=1 on the backend to enable automatic seeding.
+   Without stations seeded, E2E tests will fail.
+❌ Station seeding failed: Station seeding failed: Test API endpoint disabled (404). Set ENABLE_TEST_API=1.
+
+❌ CRITICAL: Station seeding failed!
+   Station gRPC tests require stations to be seeded.
+   SOLUTION: Set ENABLE_TEST_API=1 on the backend.
+
+  📊 Attempting to seed 53 bikes from fixtures
+⚠️  Test API seed endpoint not available (404).
+   Checking if bikes already exist in database...
+❌ ERROR: Test API seed endpoint not available (404) and no bikes found.
+   Set ENABLE_TEST_API=1 on the backend to enable automatic seeding.
+   Without bikes seeded, E2E tests will fail.
+❌ Bike seeding failed: Bike seeding failed: Test API endpoint disabled (404). Set ENABLE_TEST_API=1.
+
+❌ CRITICAL: Bike seeding failed!
+   Bike gRPC tests require bikes to be seeded.
+   SOLUTION: Set ENABLE_TEST_API=1 on the backend.
+
+Bookings will be created during test execution
+✅ Bookings seeded
+🌱 Test data seeding complete
+
+❌ CRITICAL: Test data seeding failed!
+   Tests require stations and bikes to be seeded.
+   SOLUTION: Set ENABLE_TEST_API=1 on the backend.
+   Example: export ENABLE_TEST_API=1 && systemctl restart veligo-http-server
+
+
+❌ CRITICAL: Test data seeding failed!
+   Error: Critical test data seeding failed. Set ENABLE_TEST_API=1 on the backend to enable seeding.
+
+   SOLUTION: Enable test API on backend:
+   1. SSH to production server (4.251.107.141)
+   2. Set ENABLE_TEST_API=1 environment variable
+   3. Restart HTTP server: sudo systemctl restart veligo-http-server
+   4. Re-run tests
+
+Error: Critical test data seeding failed. Set ENABLE_TEST_API=1 on the backend to enable seeding.
+
+   at helpers/seed.ts:110
+
+  108 |       console.error('   Example: export ENABLE_TEST_API=1 && systemctl restart veligo-http-server');
+  109 |       console.error('');
+> 110 |       throw new Error('Critical test data seeding failed. Set ENABLE_TEST_API=1 on the backend to enable seeding.');
+      |             ^
+  111 |     }
+  112 |   } catch (error) {

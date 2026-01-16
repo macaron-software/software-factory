@@ -1,0 +1,237 @@
+[15:38:30] STAGING DEPLOY: code=1
+╔══════════════════════════════════════════╗
+║      🚴 Veligo Platform CLI v0.1.0      ║
+╚══════════════════════════════════════════╝
+
+📡 REAL Rsync Deployment to Azure VM
+
+📡 Step 1/4: Rsync sources to VM...
+Transfer starting: 11168 files
+cannot delete non-empty directory: modules/tracking
+cannot delete non-empty directory: veligo-platform/backend/tonic-standalone
+cannot delete non-empty directory: veligo-platform/backend/.cargo
+
+sent 1140826 bytes  received 50 bytes  3727134 bytes/sec
+total size is 74359511  speedup is 65.18
+   ✓ Sources synced to VM
+
+🔨 Step 2/4: Building backend on VM (x86_64)...
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /home/azureadmin/veligo/veligo-platform/backend/Cargo.toml
+workspace: /home/azureadmin/veligo/veligo-platform/Cargo.toml
+    Blocking waiting for file lock on build directory
+warning: unused import: `Method`
+ --> backend/src/api/test_api.rs:8:12
+  |
+8 |     http::{Method, StatusCode},
+  |            ^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `error`
+ --> backend/src/infrastructure/email/queue.rs:9:22
+  |
+9 | use tracing::{debug, error, info, warn};
+  |                      ^^^^^
+
+warning: unused import: `error`
+  --> backend/src/infrastructure/email/mod.rs:23:15
+   |
+23 | use tracing::{error, info, warn};
+   |               ^^^^^
+
+warning: unused import: `error`
+  --> backend/src/infrastructure/erp/erp_client.rs:12:22
+   |
+12 | use tracing::{debug, error, info};
+   |                      ^^^^^
+
+warning: unused import: `async_trait::async_trait`
+ --> backend/src/infrastructure/modules/registry.rs:7:5
+  |
+7 | use async_trait::async_trait;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `error`
+  --> backend/src/infrastructure/multimodal/tcl_client.rs:18:22
+   |
+18 | use tracing::{debug, error, info, warn};
+   |                      ^^^^^
+
+warning: unused import: `warn`
+ --> backend/src/jobs/fraud_detection.rs:8:28
+  |
+8 | use tracing::{error, info, warn};
+  |                            ^^^^
+
+warning: variable does not need to be mutable
+   --> backend/src/jobs/fraud_detection.rs:179:13
+    |
+179 |         let mut alerts_created = 0u64;
+    |             ----^^^^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> backend/src/jobs/fraud_detection.rs:180:13
+    |
+180 |         let mut errors = 0u64;
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused import: `Row`
+ --> backend/src/modules/station_management_module.rs:9:57
+  |
+9 | use sqlx::{Error as SqlxError, FromRow, Pool, Postgres, Row};
+  |                                                         ^^^
+
+warning: unused variable: `fleet_calc`
+   --> backend/src/domain/aom_reporting/kpi_calculator/orchestrator.rs:196:13
+    |
+196 |         let fleet_calc = FleetKpiCalculator::new(&self.pool);
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_fleet_calc`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `service_calc`
+   --> backend/src/domain/aom_reporting/kpi_calculator/orchestrator.rs:197:13
+    |
+197 |         let service_calc = ServiceKpiCalculator::new(&self.pool);
+    |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_service_calc`
+
+warning: unused variable: `usage_calc`
+   --> backend/src/domain/aom_reporting/kpi_calculator/orchestrator.rs:198:13
+    |
+198 |         let usage_calc = UsageKpiCalculator::new(&self.pool);
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_usage_calc`
+
+warning: unused variable: `user_id`
+   --> backend/src/jobs/fraud_detection.rs:182:13
+    |
+182 |         for user_id in users {
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_user_id`
+
+warning: `veligo-api` (lib) generated 14 warnings (run `cargo fix --lib -p veligo-api` to apply 13 suggestions)
+warning: unused import: `GrpcRateLimitConfig`
+  --> backend/src/bin/tonic-server.rs:29:49
+   |
+29 | use veligo_api::middleware::rate_limiter_grpc::{GrpcRateLimitConfig, GrpcRateLimiter};
+   |                                                 ^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `created_at` is never read
+   --> backend/src/bin/tonic-server.rs:144:5
+    |
+135 | struct DbStation {
+    |        --------- field in this struct
+...
+144 |     created_at: chrono::DateTime<chrono::Utc>,
+    |     ^^^^^^^^^^
+    |
+    = note: `DbStation` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: fields `id` and `station_id` are never read
+   --> backend/src/bin/tonic-server.rs:150:5
+    |
+149 | struct DbStationSlot {
+    |        ------------- fields in this struct
+150 |     id: Uuid,
+    |     ^^
+151 |     station_id: Uuid,
+    |     ^^^^^^^^^^
+    |
+    = note: `DbStationSlot` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: struct `DbBike` is never constructed
+   --> backend/src/bin/tonic-server.rs:158:8
+    |
+158 | struct DbBike {
+    |        ^^^^^^
+
+warning: fields `booked_at`, `duration_minutes`, and `updated_at` are never read
+  --> backend/src/bin/../grpc/services/booking_service.rs:36:5
+   |
+30 | struct DbBooking {
+   |        --------- fields in this struct
+...
+36 |     booked_at: chrono::DateTime<chrono::Utc>,
+   |     ^^^^^^^^^
+...
+42 |     duration_minutes: Option<i32>,
+   |     ^^^^^^^^^^^^^^^^
+43 |     created_at: chrono::DateTime<chrono::Utc>,
+44 |     updated_at: chrono::DateTime<chrono::Utc>,
+   |     ^^^^^^^^^^
+   |
+   = note: `DbBooking` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: method `resolve_tenant_id` is never used
+  --> backend/src/bin/../grpc/services/booking_service.rs:53:14
+   |
+47 | impl BookingServiceImpl {
+   | ----------------------- method in this implementation
+...
+53 |     async fn resolve_tenant_id(&self, tenant_id: &str) -> Result<Uuid, Status> {
+   |              ^^^^^^^^^^^^^^^^^
+
+warning: `veligo-api` (bin "tonic-server") generated 6 warnings (run `cargo fix --bin "tonic-server" -p veligo-api` to apply 1 suggestion)
+    Finished `release` profile [optimized] target(s) in 2m 16s
+warning: the following packages contain code that will be rejected by a future version of Rust: redis v0.24.0
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+   ✓ Backend compiled
+
+🔨 Step 3/4: Building plugin modules on VM...
+Building auth-biometric...
+bash: line 1: cargo: command not found
+   ✓ Modules compiled
+
+🎨 Step 3.5/5: Building frontend on VM (adapter-static)...
+
+changed 7 packages, and audited 204 packages in 2s
+
+31 packages are looking for funding
+  run `npm fund` for details
+
+7 vulnerabilities (5 low, 2 moderate)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+npm notice
+npm notice New major version of npm available! 10.8.2 -> 11.7.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.7.0
+npm notice To update run: npm install -g npm@11.7.0
+npm notice
+
+> veligo-frontend@0.0.1 build
+> vite build
+
+vite v6.4.1 building SSR bundle for production...
+transforming...
+2:38:30 PM [vite-plugin-svelte] src/routes/+layout.svelte:108:8 Redundant role 'main'
+https://svelte.dev/e/a11y_no_redundant_roles
+106:         id="main-content"
+107:         class="container mx-auto p-4"
+108:         role="main"
+                        ^
+109:         aria-label={ariaLabels.mainContent}
+110:       >
+✓ 10 modules transformed.
+✗ Build failed in 432ms
+error during build:
+[vite-plugin-svelte] [plugin vite-plugin-svelte] src/routes/(admin)/admin-dashboard/+page.svelte (1:13): /home/azureadmin/veligo/veligo-platform/frontend/src/routes/(admin)/admin-dashboard/+page.svelte:1:13 Expected attribute value
+https://svelte.dev/e/expected_attribute_value
+file: /home/azureadmin/veligo/veligo-platform/frontend/src/routes/(admin)/admin-dashboard/+page.svelte:1:13
+
+ 1 |  <script lang=
+                   ^
+
+
+Error: ❌ Frontend build failed on VM
+

@@ -1,0 +1,127 @@
+[0;32m[AGENT] Real Agent starting[0m
+[0;34m[AGENT] Task: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks/T1049.md[0m
+[0;34m[AGENT] Queue: tdd[0m
+[0;34m[AGENT] Backend: auto[0m
+[0;32m[AGENT] Starting task: T1049[0m
+[0;34m[AGENT] Iteration 1/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'find veligo-platform/backend -name "*.rs" -path "*/payment/*" 2>/dev/nu[0m
+[0;34m$ find veligo-platform/backend -name "*.rs" -path "*/payment/*" 2>/dev/null | head -20[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'ls -la veligo-platform/backend/src/payment/ 2>/dev/null || ls -la velig[0m
+[0;34m$ ls -la veligo-platform/backend/src/payment/ 2>/dev/null || ls -la veligo-platform/backend/src/infrastructure/adapters/payment/ 2>/dev/null[0m
+[0;34m[AGENT] Iteration 2/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'ls -la veligo-platform/backend/src/infrastructure/adapters/payment/'}[0m
+[0;34m$ ls -la veligo-platform/backend/src/infrastructure/adapters/payment/[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/mod.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/payment/mod.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/payment/adapter.rs'}[0m
+[0;34m$ cat veligo-platform/backend/src/payment/adapter.rs[0m
+[0;34m[AGENT] Iteration 3/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/infrastructure/adapters/payment/factory[0m
+[0;34m$ cat veligo-platform/backend/src/infrastructure/adapters/payment/factory.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/infrastructure/adapters/payment/mod.rs'[0m
+[0;34m$ cat veligo-platform/backend/src/infrastructure/adapters/payment/mod.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/infrastructure/adapters/payment/mock_ad[0m
+[0;34m$ cat veligo-platform/backend/src/infrastructure/adapters/payment/mock_adapter.rs[0m
+[0;34m[AGENT] Iteration 4/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'wc -l veligo-platform/backend/src/infrastructure/adapters/payment/facto[0m
+[0;34m$ wc -l veligo-platform/backend/src/infrastructure/adapters/payment/factory.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'tail -200 veligo-platform/backend/src/infrastructure/adapters/payment/f[0m
+[0;34m$ tail -200 veligo-platform/backend/src/infrastructure/adapters/payment/factory.rs[0m
+[0;34m[AGENT] Iteration 5/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'head -250 veligo-platform/backend/src/infrastructure/adapters/payment/f[0m
+[0;34m$ head -250 veligo-platform/backend/src/infrastructure/adapters/payment/factory.rs[0m
+[0;34m[AGENT] Iteration 6/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': "sed -n '1,410p' veligo-platform/backend/src/infrastructure/adapters/pay[0m
+[0;34m$ sed -n '1,410p' veligo-platform/backend/src/infrastructure/adapters/payment/factory.rs[0m
+[0;34m[AGENT] Iteration 7/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': "sed -n '1,100p' veligo-platform/backend/src/infrastructure/adapters/pay[0m
+[0;34m$ sed -n '1,100p' veligo-platform/backend/src/infrastructure/adapters/payment/factory.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': "sed -n '100,200p' veligo-platform/backend/src/infrastructure/adapters/p[0m
+[0;34m$ sed -n '100,200p' veligo-platform/backend/src/infrastructure/adapters/payment/factory.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': "sed -n '200,300p' veligo-platform/backend/src/infrastructure/adapters/p[0m
+[0;34m$ sed -n '200,300p' veligo-platform/backend/src/infrastructure/adapters/payment/factory.rs[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': "sed -n '300,410p' veligo-platform/backend/src/infrastructure/adapters/p[0m
+[0;34m$ sed -n '300,410p' veligo-platform/backend/src/infrastructure/adapters/payment/factory.rs[0m
+[0;34m[AGENT] Iteration 8/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': "sed -n '250,410p' veligo-platform/backend/src/infrastructure/adapters/p[0m
+[0;34m$ sed -n '250,410p' veligo-platform/backend/src/infrastructure/adapters/payment/factory.rs[0m
+[0;34m[AGENT] Iteration 9/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': "sed -n '200,410p' veligo-platform/backend/src/infrastructure/adapters/p[0m
+[0;34m$ sed -n '200,410p' veligo-platform/backend/src/infrastructure/adapters/payment/factory.rs[0m
+[0;34m[AGENT] Iteration 10/10[0m
+[0;34m[AGENT] Executing: bash - {'type': 'bash', 'command': 'cat veligo-platform/backend/src/infrastructure/adapters/payment/factory[0m
+[0;34m$ cat veligo-platform/backend/src/infrastructure/adapters/payment/factory.rs | head -n 410[0m
+
+============================================================
+RESULT: FAILED
+============================================================
+=== Action Results ===
+bash: OK
+            let adapter = factory.create_adapter();
+            assert!(adapter.is_ok());
+            let adapter = adapter.unwrap();
+            // Verify the adapter can process payments
+            let result = adapter.process_payment(100, "USD").await;
+            assert!(result.is_ok());
+        }
+
+        #[tokio::test]
+        async fn test_create_stripe_adapter_without_config_returns_error() {
+            let config = PaymentAdapterFactoryConfig {
+                default_provider: Paymen
+
+=== LLM Response ===
+<think>
+Let me see the rest of the test file and understand the full factory.rs implementation.
+</think>
+
+<bash>
+sed -n '200,410p' veligo-platform/backend/src/infrastructure/adapters/payment/factory.rs
+</bash>
+
+=== Action Results ===
+bash: OK
+            })
+        }
+
+        async fn get_payment_status(
+            &self,
+            _transaction_id: &str,
+        ) -> Result<PaymentTransaction, PaymentError> {
+            Ok(PaymentTransaction {
+                id: self.id.clone(),
+                amount: 100,
+                currency: "USD".to_string(),
+                status: TransactionStatus::Completed,
+                created_at: chrono::Utc::now(),
+            })
+        }
+    }
+
+    mod factory_construction {
+        use sup
+
+=== LLM Response ===
+<think>
+Let me get the full file content by saving it in a different way.
+</think>
+
+<bash>
+cat veligo-platform/backend/src/infrastructure/adapters/payment/factory.rs | head -n 410
+</bash>
+
+=== Action Results ===
+bash: OK
+// Trace: Sprint 004 - 2025-12-11T12:46:10Z - Payment Adapter Factory
+// Updated: 2025-12-27 - Production-ready: Stripe + Paynum adapters
+
+#[allow(deprecated)]
+use super::mock_adapter::MockPaymentAdapter;
+use super::paynum::{PaynumAdapter, PaynumConfig};
+use super::stripe_adapter::StripeAdapter;
+use crate::domain::payment::{PaymentError, PaymentPort, PaymentProvider};
+use std::sync::Arc;
+
+/// Payment Adapter Factory
+///
+/// Selects the appropriate payment provider based on tenant configuration.

@@ -1,0 +1,188 @@
+Je vais examiner la configuration du Rate Limiting et vérifier son activation.
+
+## Étape 1: Examiner les fichiers existants
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/middleware/rate_limiter.rs
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/bin/tonic-server.rs
+Le fichier `rate_limiter.rs` est complet avec la configuration (/auth: 5/min, /api: 30/min). Cependant, je vois que `tonic-server.rs` est un serveur gRPC Tonic. Je dois vérifier comment le middleware devrait être intégré car le rate limiter Axum ne s'applique pas directement aux services gRPC.
+
+## Étape 2: Vérifier l'implémentation du rate limiting pour gRPC
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/bin/tonic-server.rs
+[94m[1m| [0m[90m Grep     [0mrate_limit|RateLimiter
+Je vois maintenant le problème. Le `rate_limiter.rs` est utilisé dans `http-server.rs` (serveur HTTP Axum sur le port 8888) mais le `tonic-server.rs` (serveur gRPC sur le port 50051) ne l'utilise pas. Vérifions le http-server.rs:
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/bin/http-server.rs
+Excellent! Le rate limiter est **activé** dans `http-server.rs`. Voici l'analyse:
+
+## Analyse du Rate Limiting
+
+### Serveurs Veligo:
+1. **http-server.rs** (port 8888) - ✅ Rate Limiter ACTIVÉ (lignes 182-206, 344-347)
+2. **tonic-server.rs** (port 50051) - Serveur gRPC, rate limiter Axum non applicable
+
+### Configuration actuelle (dans rate_limiter.rs):
+- `/auth`: 5 requêtes/minute
+- `/api`: 30 requêtes/minute  
+- `/health`: 60 requêtes/minute
+
+## Étape 3: Vérifier Redis et tester le rate limiting
+[91m[1m| [0m[90m Bash     [0mCheck REDIS_URL environment variable
+[91m[1m| [0m[90m Bash     [0mTest Redis connection
+
+PONG
+
+Redis est accessible (PONG). Testons le rate limiting sur `/auth`:
+[91m[1m| [0m[90m Bash     [0mBuild backend to verify compilation
+
+   |                      ^^^^^
+
+error[E0277]: `?` couldn't convert the error to `interface::ModuleError`
+   --> backend/src/infrastructure/modules/registry.rs:230:74
+    |
+230 |             let config: Option<serde_json::Value> = row.try_get("config")?;
+    |                                                         -----------------^ the trait `std::convert::From<sqlx::Error>` is not implemented for `interface::ModuleError`
+    |                                                         |
+    |                                                         this can't be annotated with `?` because it has type `Result<_, sqlx::Error>`
+    |
+note: `interface::ModuleError` needs to implement `From<sqlx::Error>`
+   --> backend/src/infrastructure/modules/interface.rs:115:1
+    |
+115 | pub enum ModuleError {
+    | ^^^^^^^^^^^^^^^^^^^^
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+
+For more information about this error, try `rustc --explain E0277`.
+warning: `veligo-api` (lib) generated 6 warnings
+error: could not compile `veligo-api` (lib) due to 1 previous error; 6 warnings emitted
+
+Il y a une erreur de compilation préexistante. Vérifions si c'est lié au rate limiter ou un autre problème:
+[91m[1m| [0m[90m Bash     [0mCheck if rate_limiter has errors
+
+error[E0277]: `?` couldn't convert the error to `interface::ModuleError`
+
+L'erreur n'est pas liée au rate limiter (c'est dans `registry.rs`). Vérifions les tests E2E existants pour le rate limiting:
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/tests/e2e/security_comprehensive_tests.rs
+Le test `sec_029_login_rate_limited()` vérifie le rate limiting. Testons en production:
+[91m[1m| [0m[90m Bash     [0mTest rate limit headers on /auth/login
+
+HTTP/2 200 
+server: nginx/1.18.0 (Ubuntu)
+date: Mon, 12 Jan 2026 21:11:31 GMT
+content-type: text/html
+content-length: 2005
+last-modified: Mon, 05 Jan 2026 12:25:00 GMT
+etag: "695bad9c-7d5"
+strict-transport-security: max-age=63072000; includeSubDomains; preload
+x-frame-options: DENY
+x-content-type-options: nosniff
+x-xss-protection: 1; mode=block
+referrer-policy: strict-origin-when-cross-origin
+permissions-policy: geolocation=(), camera=(), microphone=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=()
+content-security-policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' wss: https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests
+accept-ranges: bytes
+
+
+Les headers rate limiting ne sont pas visibles car les requêtes vers `/auth/*` sont probablement servies par le frontend. Testons les endpoints backend:
+[91m[1m| [0m[90m Bash     [0mTest health endpoint headers
+
+HTTP/2 200 
+server: nginx/1.18.0 (Ubuntu)
+date: Mon, 12 Jan 2026 21:11:38 GMT
+content-type: application/json
+x-request-id: 4f5fe728-dd37-4c3e-9f17-dc065e37ebef
+vary: origin, access-control-request-method, access-control-request-headers
+vary: accept-encoding
+access-control-allow-credentials: true
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-xss-protection: 1; mode=block
+referrer-policy: strict-origin-when-cross-origin
+content-security-policy: default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ws: wss:
+cache-control: no-store, no-cache, must-revalidate, private
+pragma: no-cache
+
+[91m[1m| [0m[90m Bash     [0mTest auth endpoint and check headers
+
+HTTP/2 401 
+server: nginx/1.18.0 (Ubuntu)
+date: Mon, 12 Jan 2026 21:11:39 GMT
+x-request-id: fa36c822-abff-4720-8642-07625256b48c
+vary: origin, access-control-request-method, access-control-request-headers
+access-control-allow-credentials: true
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-xss-protection: 1; mode=block
+referrer-policy: strict-origin-when-cross-origin
+content-security-policy: default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ws: wss:
+cache-control: no-store, no-cache, must-revalidate, private
+pragma: no-cache
+x-permitted-cross-domain-policies: none
+x-download-options: noopen
+x-dns-prefetch-control: off
+strict-transport-security: max-age=63072000; includeSubDomains; preload
+x-frame-options: DENY
+x-content-type-options: nosniff
+x-xss-protection: 1; mode=block
+
+Les headers X-RateLimit sont **ABSENTS**. Regardons la configuration nginx:
+[91m[1m| [0m[90m Bash     [0mCheck nginx configuration for routing
+
+veligo@4.251.107.141: Permission denied (publickey).
+
+Pas d'accès SSH. Vérifions si le rate limiter est déployé en vérifiant les logs du projet:
+[91m[1m| [0m[90m Bash     [0mCheck recent git commits
+
+94d89b661 docs: Update security status after validation
+9abb9efda WIP on feat/grpc-login-1: a0be26032 feat(tdd-004): grpc reset_password
+474888d82 index on feat/grpc-login-1: a0be26032 feat(tdd-004): grpc reset_password
+a0be26032 feat(tdd-004): grpc reset_password
+1ae5fd957 fix(tenant): Complete tenant detection fix across all files
+3c0c1e342 fix(tenant): Fix tenant detection to check subdomain first
+43add69d7 fix(dark-mode): Unify dark mode to use .dark class selector
+821289310 fix(a11y): WCAG AA color contrast compliance for landing pages
+c46c31c50 feat(pr-n07): User Dashboard with Booking History
+1b0d1730c feat(pr-n05): Station Map Interactive Features
+bdbf6412e feat(pr-n01): Fix Test Discovery Configuration
+56dee2390 feat(pr-n03): Complete Booking gRPC Service
+c160ba65f feat(pr-n01): Fix Test Discovery Configuration
+e2fcbbc9f feat(pr-n04): Frontend gRPC-Web Error Handling
+0a41e0f0b feat(pr-n05): Station Map Interactive Features
+8c4cd0903 fix(pr-n04): Fix duplicate data-testid attributes in dashboard empty state
+b4fcecab8 feat(pr-n04): Frontend gRPC-Web Error Handling
+5861832d2 feat(pr-008): Booking Flow - Station to Confirmation
+7d72d7b2a feat(pr-006): Frontend gRPC-Web Client Setup
+7b6bd2e81 feat(pr-007): Station List & Map Page
+
+[91m[1m| [0m[90m Bash     [0mCheck for rate limit related commits
+[91m[1m| [0m[90m Bash     [0mCheck when rate_limit_middleware was added to http-server.rs
+[91m[1m| [0m[90m Bash     [0mCheck recent changes to http-server.rs
+
+5861832d2 feat(pr-008): Booking Flow - Station to Confirmation
+7b6bd2e81 feat(pr-007): Station List & Map Page
+94120cc16 feat(pr-001): Database Migrations - Core Tables
+b3d46c433 feat(tdd-sprint): 4 PRs GREEN (240 tests) + PR-001 prep
+a90864f8f feat(pr-002): Station gRPC Service
+
+[91m[1m| [0m[90m Bash     [0mVerify rate_limiter code exists in http-server.rs
+
+72:use veligo_api::middleware::rate_limiter::{rate_limit_middleware, RateLimitConfig, RateLimiter};
+188:    let rate_limiter = match RateLimiter::with_defaults(&redis_url) {
+345:            rate_limiter,
+346:            rate_limit_middleware,
+
+Le code rate limiter est présent mais pas déployé sur production. Les tests existants montrent le comportement attendu:
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/tests/e2e/security_comprehensive_tests.rs
+## Bilan - Task D002: Rate Limiting
+
+### Code Review:
+- ✅ **rate_limiter.rs**: Complet avec config `/auth: 5/min`, `/api: 30/min`
+- ✅ **http-server.rs**: Rate limiter activé (lignes 72, 188, 344-347)
+
+### Test Production (curl):
+- ❌ **X-RateLimit headers ABSENTS** sur `/api/auth/login`
+- ❌ Rate limiting non actif en production
+
+### Conclusion:
+Le code rate limiter est **implémenté mais non déployé** en production.
+
+**NEEDS_MORE_WORK**
+
+Le rate limiter nécessite un déploiement via `veligo cicd pipeline` pour être actif sur les endpoints `/auth/*`.

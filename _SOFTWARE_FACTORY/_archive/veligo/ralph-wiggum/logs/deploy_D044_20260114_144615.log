@@ -1,0 +1,25 @@
+[14:46:19] STAGING DEPLOY: code=1
+error: unexpected argument '--env' found
+
+Usage: veligo deploy rsync [OPTIONS]
+
+For more information, try '--help'.
+╔══════════════════════════════════════════╗
+║      🚴 Veligo Platform CLI v0.1.0      ║
+╚══════════════════════════════════════════╝
+
+🚀 Deploying to staging environment
+
+[1/5] Checking current deployment
+  Current: blue | Target: green
+[2/5] Building Docker images
+time="2026-01-14T14:46:16+01:00" level=warning msg="/Users/sylvain/_LAPOSTE/_VELIGO2/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Image veligo2-backend Building 
+ Image veligo2-frontend Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.05kB done
+#1 DONE 0.0s
+unable to prepare context: path "/Users/sylvain/_LAPOSTE/_VELIGO2/_appli_blanche/backend" not found
+
+Error: Docker build failed
+

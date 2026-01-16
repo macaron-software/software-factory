@@ -1,0 +1,95 @@
+{
+  "pattern": "breadcrumb",
+  "wai_aria_reference": "https://www.w3.org/WAI/ARIA/apg/patterns/breadcrumb/",
+  "description": "Breadcrumb navigation showing the user's location within a site hierarchy",
+  
+  "figma_component_ids": {
+    "item_default": "1917:69873",
+    "item_current": "28695:18834",
+    "note": "When generating HTML for INSTANCE nodes, check componentId to determine semantic element"
+  },
+  
+  "semantic_inheritance": {
+    "description": "Composite components (like Breadcrumb) use INSTANCE nodes to reference child components (like .Item - Breadcrumb). The semantic HTML rules of the child component must be applied based on componentId.",
+    "rules": [
+      {
+        "componentId": "1917:69873",
+        "component": ".Item - Breadcrumb (State=Default)",
+        "element": "a",
+        "attributes": "href=\"#\""
+      },
+      {
+        "componentId": "28695:18834", 
+        "component": ".Item - Breadcrumb (State=Current)",
+        "element": "span",
+        "attributes": "aria-current=\"page\""
+      }
+    ]
+  },
+  
+  "structure": {
+    "container": {
+      "element": "nav",
+      "aria": ["aria-label=\"Breadcrumb\""]
+    },
+    "list": {
+      "element": "ol",
+      "role": null
+    },
+    "item": {
+      "element": "li"
+    },
+    "link": {
+      "element": "a",
+      "aria": ["href"],
+      "note": "All items EXCEPT current are links"
+    },
+    "current": {
+      "element": "a",
+      "aria": ["aria-current=\"page\""],
+      "note": "Current page is NOT a link (or link with aria-current)"
+    },
+    "separator": {
+      "element": "span",
+      "aria": ["aria-hidden=\"true\""],
+      "note": "Visual separators like / or > should be hidden from screen readers"
+    }
+  },
+  
+  "states": {
+    "default": {
+      "element": "a",
+      "href": "#",
+      "focusable": true
+    },
+    "hover": {
+      "element": "a",
+      "href": "#",
+      "focusable": true
+    },
+    "focus": {
+      "element": "a",
+      "href": "#",
+      "focusable": true,
+      "css": "outline: 2px solid var(--color-focus); outline-offset: 2px"
+    },
+    "current": {
+      "element": "span",
+      "aria": ["aria-current=\"page\""],
+      "focusable": false,
+      "note": "Current page - not a link, not focusable"
+    }
+  },
+  
+  "keyboard": {
+    "Tab": { "action": "move_to_next_link" },
+    "Shift+Tab": { "action": "move_to_previous_link" }
+  },
+  
+  "focus_management": {
+    "type": "natural",
+    "note": "Links receive focus in natural tab order"
+  },
+  
+  "example_html": "<nav aria-label=\"Breadcrumb\">\n  <ol>\n    <li><a href=\"/\">Home</a></li>\n    <li><a href=\"/products\">Products</a></li>\n    <li><a href=\"/products/category\" aria-current=\"page\">Category</a></li>\n  </ol>\n</nav>"
+}

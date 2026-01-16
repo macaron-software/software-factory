@@ -1,0 +1,47 @@
+Je commence la PHASE RED - analyse des tests skippés.
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/tests/chaos-resilience.spec.ts
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/chaos/scenarios.rs
+Je vois le problème. Les tests E2E attendent un objet `window.chaosMonkey` qui n'existe pas côté frontend, et les scénarios Rust retournent mostly `ChaosTestResult::default()`. Cherchons l'intégration frontend existante.
+[94m[1m| [0m[90m Glob     [0m{"pattern":"**/*chaos*.{ts,js,svelte}"}
+[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/chaos/mod.rs
+[94m[1m| [0m[90m Grep     [0mchaosMonkey
+[96m[1m| [0m[90m Read     [0mveligo-platform/frontend/src/lib/chaos/ChaosMonkey.ts
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/lib/modules/chaos/ChaosMonkey.ts
+Je vois que `ChaosMonkey.ts` existe mais manque des méthodes attendues par les tests. Vérifions les autres fichiers de test pour comprendre les globales attendues.
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/tests/module-injection.spec.ts
+Je vois le pattern. Les tests attendent plusieurs globales sur `window`. Regardons comment elles sont exposées dans le fichier de launch.
+[96m[1m| [0m[90m Read     [0mlaunch-resilience-agents.sh
+
+Je dois créer les globales manquantes dans le frontend. Regardons l'entrée principale.
+[94m[1m| [0m[90m Glob     [0m{"pattern":"tenant/frontend-user/src/app.{ts,html}"}
+[94m[1m| [0m[90m Glob     [0m{"pattern":"tenant/frontend-user/src/routes/+layout.svelte"}
+[94m[1m| [0m[90m Glob     [0m{"pattern":"tenant/frontend-user/src/lib/modules/**/*.ts"}
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/routes/+layout.svelte
+[94m[1m| [0m[90m Glob     [0m{"pattern":"tenant/frontend-user/src/**/*.ts"}
+
+Le fichier `+layout.svelte` appelle `initializeGlobalApis()` qui n'existe pas encore. Je dois le créer.
+[93m[1m| [0m[90m Todo     [0m5 todos
+[91m[1m| [0m[90m Bash     [0mList modules directory
+
+total 88
+drwxr-xr-x  17 sylvain  staff    544 Jan 12 17:42 .
+drwxr-xr-x  10 sylvain  staff    320 Dec 26 08:39 ..
+-rw-r--r--   1 sylvain  staff   4201 Dec 16 14:45 CompleteModuleLoader.ts
+-rw-r--r--   1 sylvain  staff   5973 Jan 12 17:42 GlobalExports.ts
+-rw-r--r--   1 sylvain  staff   5586 Dec 16 07:04 ModuleHookConfig.ts
+-rw-r--r--   1 sylvain  staff  10840 Dec 26 09:40 ModuleLoader.ts
+-rw-r--r--   1 sylvain  staff   6791 Dec 16 14:33 ModuleLoaderComplete.ts
+drwxr-xr-x   2 sylvain  staff     64 Dec 16 14:28 account
+drwxr-xr-x   5 sylvain  staff    160 Dec 26 09:40 auth
+drwxr-xr-x   4 sylvain  staff    128 Dec 16 14:45 bike-booking
+drwxr-xr-x   3 sylvain  staff     96 Dec 26 08:45 chaos
+drwxr-xr-x   3 sylvain  staff     96 Dec 26 08:45 health
+drwxr-xr-x   4 sylvain  staff    128 Dec 26 08:48 killswitch
+drwxr-xr-x   4 sylvain  staff    128 Dec 16 14:45 payment
+drwxr-xr-x   3 sylvain  staff     96 Dec 26 08:45 resilience
+drwxr-xr-x   4 sylvain  staff    128 Dec 16 14:45 subscription
+drwxr-xr-x   3 sylvain  staff     96 Dec 15 21:56 user-profile
+
+[96m[1m| [0m[90m Read     [0mtenant/frontend-user/src/lib/modules/GlobalExports.ts
+Je dois compléter `GlobalExports.ts` avec les globales manquantes et modifier `ChaosMonkey.ts` pour ajouter les méthodes manquantes.
+[92m[1m| [0m[90m Edit     [0mtenant/frontend-user/src/lib/modules/GlobalExports.ts

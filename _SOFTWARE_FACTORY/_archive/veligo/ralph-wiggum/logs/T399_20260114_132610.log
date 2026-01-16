@@ -1,0 +1,13 @@
+[0;32m[AGENT] Real Agent starting[0m
+[0;34m[AGENT] Task: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks/T399.md[0m
+[0;34m[AGENT] Queue: tdd[0m
+[0;34m[AGENT] Backend: auto[0m
+[0;32m[AGENT] Starting task: T399[0m
+[0;33m[AGENT] Task T399 decomposed into 1 sub-tasks: T505[0m
+[FRACTAL] Task T399 needs decomposition: domains=3 > 2
+[FRACTAL] Created 1 sub-tasks: T505
+
+============================================================
+RESULT: SUCCESS
+============================================================
+DECOMPOSED: T399 -> T505

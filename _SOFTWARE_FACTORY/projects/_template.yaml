@@ -1,0 +1,132 @@
+# Project Configuration Template
+# ===============================
+# Copy this file and rename to <project>.yaml
+
+project:
+  name: my-project                    # Unique identifier
+  display_name: "My Project"          # Human-readable name
+  root_path: /path/to/project         # Absolute path to project root
+  vision_doc: CLAUDE.md               # Vision document filename
+
+# Domain configurations
+# Define one or more domains with their paths, extensions, and commands
+domains:
+  # Example: TypeScript domain
+  typescript:
+    paths:
+      - src/
+    extensions:
+      - .ts
+      - .tsx
+    build_cmd: npm run build
+    test_cmd: npm run test
+    lint_cmd: npm run lint
+
+  # Example: Rust domain
+  # rust:
+  #   paths:
+  #     - backend/
+  #   extensions:
+  #     - .rs
+  #   build_cmd: cargo build
+  #   test_cmd: cargo test
+
+# Deployment configuration
+deploy:
+  strategy: validation-only           # blue-green | canary | validation-only
+  auto_prod: false                    # Automatic production deployment
+  # staging:
+  #   url: https://staging.example.com
+  #   health: /health
+  # prod:
+  #   url: https://example.com
+  #   health: /health
+  rollback_on_fail: true
+  # gate_approval: false              # Require human approval
+
+# FRACTAL decomposition thresholds
+fractal:
+  max_files: 5                        # Max files per atomic task
+  max_loc: 400                        # Max LOC estimate per task
+  max_items: 10                       # Max acceptance criteria
+  max_depth: 3                        # Max recursion depth
+
+# Adversarial gate configuration
+adversarial:
+  threshold: 5                        # Score threshold for rejection
+  core_patterns: true                 # Use core patterns (test.skip, etc.)
+  security_check: true                # Check for hardcoded secrets
+  custom_patterns: []                 # Project-specific patterns
+    # - pattern: 'dangerous_function\('
+    #   score: 3
+    #   message: "Usage of dangerous_function detected"
+    #   max_occurrences: 0           # Optional: max allowed
+
+# Multi-tenant configuration (optional)
+# tenants:
+#   - name: tenant1
+#     staging_url: https://staging-tenant1.example.com
+#     prod_url: https://tenant1.example.com
+
+# MCP servers (optional)
+# mcp:
+#   custom:
+#     server: mcp_custom_server.py
+#     tools:
+#       - custom_tool
+
+# AO compliance (optional)
+# ao_compliance:
+#   enabled: false
+#   refs_file: AO_TRACEABILITY.md
+
+# Error Capture Configuration (RLM Feedback Loop)
+# Captures errors from build, E2E, and mobile tests
+# Feeds errors back to TDD backlog as new tasks
+error_capture:
+  enabled: true                         # Enable error capture
+  feedback_to_backlog: true             # Create tasks from errors
+  deduplicate: true                     # Skip duplicate errors
+
+  # Build error sources
+  build:
+    enabled: true
+    domains: []                         # All domains by default
+    # domains: [rust, typescript]       # Or specific domains
+
+  # E2E test error sources
+  e2e:
+    enabled: true
+    playwright:
+      report_path: playwright-report/   # JSON report location
+      fail_on_console_error: false      # Fail tests on console.error
+      capture_grpc: true                # Capture gRPC errors
+    # detox:                            # React Native E2E
+    #   enabled: false
+    # xcuitest:                         # iOS native E2E
+    #   enabled: false
+    # espresso:                         # Android native E2E
+    #   enabled: false
+
+  # Mobile app error capture
+  mobile:
+    enabled: false                      # Enable mobile capture
+    # ios:
+    #   bundle_id: com.example.app      # iOS app bundle ID
+    #   capture_duration: 10            # Seconds to capture logs
+    # android:
+    #   package_name: com.example.app   # Android package name
+    #   capture_duration: 10            # Seconds to capture logs
+    #   device_id: null                 # Optional specific device
+
+  # Error severity thresholds
+  severity:
+    create_task_min: medium             # Minimum severity to create task
+    # critical, high, medium, low
+
+# Active analyzers
+analyzers: []
+  # - rust
+  # - typescript
+  # - playwright
+  # - security
