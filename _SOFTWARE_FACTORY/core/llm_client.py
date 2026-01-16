@@ -63,11 +63,11 @@ class ProviderConfig:
         """Get API key from environment variable"""
         if self.api_key_env:
             return os.environ.get(self.api_key_env)
-        # Default env var names
+        # Default env var names (only used providers)
         defaults = {
             "anthropic": "ANTHROPIC_API_KEY",
             "minimax": "MINIMAX_API_KEY",
-            "openai": "OPENAI_API_KEY",
+            "local": None,  # Local llama.cpp doesn't need API key
         }
         env_var = defaults.get(self.name)
         return os.environ.get(env_var) if env_var else None
@@ -278,7 +278,7 @@ class LLMClient:
             if "anthropic" in provider.base_url:
                 return await self._call_anthropic_api(provider, model_id, prompt, max_tokens)
             else:
-                return await self._call_openai_api(provider, model_id, prompt, max_tokens, temperature)
+                return await self._call_local_api(provider, model_id, prompt, max_tokens, temperature)
         else:
             log(f"No base_url for provider {provider_name}", "ERROR")
             return None
@@ -385,7 +385,7 @@ class LLMClient:
             log(f"{provider.name} exception: {e}", "WARN")
             return None
 
-    async def _call_openai_api(
+    async def _call_local_api(
         self,
         provider: ProviderConfig,
         model: str,
@@ -394,8 +394,9 @@ class LLMClient:
         temperature: float,
     ) -> Optional[str]:
         """
-        Call OpenAI-compatible API (local llama.cpp, vLLM, etc.).
-        Used for: Sub-agents, fast iterations, fallback.
+        Call OpenAI-compatible local API (llama.cpp, vLLM with Qwen).
+        Used for: Fallback when MiniMax unavailable.
+        NOT OpenAI cloud - just compatible API format.
         """
         log(f"Calling {provider.name} API ({model})...")
 
