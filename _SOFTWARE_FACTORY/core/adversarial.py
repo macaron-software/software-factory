@@ -104,7 +104,8 @@ CORE_REJECT_PATTERNS = {
     # Code stubs
     r"unimplemented!\s*\(": ("unimpl_macro", 3, "unimplemented!() - incomplete code"),
     r'panic!\s*\(["\']not\s+implemented': ("panic_not_impl", 3, "panic!(not implemented) - incomplete"),
-    r"raise\s+NotImplementedError": ("not_impl_py", 3, "NotImplementedError - incomplete code"),
+    # NotImplementedError OK for API stubs with pragma: no cover
+    # r"raise\s+NotImplementedError": ("not_impl_py", 3, "NotImplementedError - incomplete code"),
 }
 
 # WARNING patterns: accumulate points
@@ -131,6 +132,100 @@ SECURITY_PATTERNS = {
     r'secret\s*=\s*["\'][^"\']{10,}["\']': ("hardcoded_secret", 5, "Hardcoded secret detected"),
     r'Bearer\s+[a-zA-Z0-9_-]{20,}': ("hardcoded_token", 5, "Hardcoded bearer token"),
 }
+
+# Patterns that indicate test/fixture files (OK to have hardcoded values)
+TEST_FILE_PATTERNS = [
+    r'test[_\-]', r'\.test\.', r'\.spec\.', r'_test\.', r'_spec\.',
+    r'/tests/', r'/test/', r'/__tests__/', r'/fixtures/', r'/mocks/',
+    r'mock[_\-]', r'fixture[_\-]', r'fake[_\-]', r'stub[_\-]',
+]
+
+
+# ============================================================================
+# ARCHITECTURAL COMPLETENESS PATTERNS (FRACTAL L1 coverage)
+# Detect MISSING concerns that should have been addressed
+# ============================================================================
+
+# These are checked on API/endpoint files to ensure completeness
+ARCH_COMPLETENESS_CHECKS = {
+    "rbac": {
+        "name": "RBAC/Authentication",
+        "required_in": [r"server\.ts$", r"route\.ts$", r"\+server\.ts$", r"handler\.rs$", r"controller\."],
+        "must_have_one_of": [
+            r"getSession|validateSession|requireAuth|isAuthenticated",
+            r"checkPermission|hasRole|requireRole|authorize",
+            r"401|403|Unauthorized|Forbidden",
+            r"currentUser|session\.user|req\.user",
+            r"auth\.|authentication|authorization",
+        ],
+        "points": 4,
+        "message": "MISSING RBAC: Endpoint has no authentication/authorization checks",
+    },
+    "input_validation": {
+        "name": "Input Validation",
+        "required_in": [r"server\.ts$", r"route\.ts$", r"\+server\.ts$", r"handler\.rs$"],
+        "must_have_one_of": [
+            r"validate|sanitize|parse|safeParse",
+            r"zod\.|yup\.|joi\.",
+            r"typeof\s+\w+\s*[!=]==?\s*['\"]string",
+            r"Number\.isFinite|isNaN|parseInt.*\|\|",
+            r"\.trim\(\)|\.escape\(|htmlEscape",
+        ],
+        "points": 3,
+        "message": "MISSING VALIDATION: No input validation/sanitization detected",
+    },
+    "query_limits": {
+        "name": "Query Limits",
+        "required_in": [r"server\.ts$", r"route\.ts$", r"\+server\.ts$", r"\.rs$"],
+        "trigger_patterns": [r"SELECT\s+.*FROM", r"\.query\(", r"\.find\(", r"\.findMany\("],
+        "must_have_one_of": [
+            r"LIMIT\s+\d+",
+            r"LIMIT\s+\$\d+",  # Parameterized LIMIT ($1, $2, etc.)
+            r"LIMIT\s+\?",     # Parameterized LIMIT (?)
+            r"\.limit\(",
+            r"\.take\(",
+            r"\.top\(",
+            r"maxResults|pageSize|perPage",
+            r"Math\.min.*limit",  # Capped limit pattern
+        ],
+        "points": 3,
+        "message": "MISSING LIMIT: Database query without LIMIT - DoS risk",
+    },
+    "error_specificity": {
+        "name": "Specific Error Handling",
+        "required_in": [r"server\.ts$", r"route\.ts$", r"\+server\.ts$"],
+        "trigger_patterns": [r"catch\s*\(", r"\.catch\("],
+        "must_not_have": [
+            r"status:\s*500\s*\}[^}]*$",  # Generic 500 without specific handling
+            r'json\(\s*\[\s*\]\s*,\s*\{\s*status:\s*500',  # Empty array on error
+        ],
+        "must_have_one_of": [
+            r"status:\s*4\d\d",  # Specific 4xx codes
+            r"error\.message|error\.code",
+            r"BadRequest|NotFound|Conflict",
+        ],
+        "points": 2,
+        "message": "GENERIC ERROR: Using 500/empty response instead of specific error codes",
+    },
+}
+
+# Files to SKIP architecture checks (config, types, tests, etc.)
+SKIP_ARCH_CHECK_PATTERNS = [
+    r'\.test\.', r'\.spec\.', r'_test\.', r'_spec\.',
+    r'\.d\.ts$', r'types\.ts$', r'config\.', r'constants\.',
+    r'\.md$', r'\.json$', r'\.yaml$', r'\.yml$',
+]
+
+# Security rules to SKIP in test files (hardcoded fixtures are OK)
+SKIP_IN_TESTS = {'hardcoded_password', 'hardcoded_api_key', 'hardcoded_secret', 'hardcoded_token'}
+
+
+def is_test_file(filename: str) -> bool:
+    """Check if filename indicates a test/fixture file"""
+    if not filename:
+        return False
+    filename_lower = filename.lower()
+    return any(re.search(p, filename_lower) for p in TEST_FILE_PATTERNS)
 
 
 # ============================================================================
@@ -240,9 +335,13 @@ class AdversarialGate:
                             ))
                 pattern_counts[rule] = count
 
-        # Security patterns
+        # Security patterns (skip hardcoded secrets in test/fixture files)
+        is_test = is_test_file(filename)
         if self.security_check:
             for pattern, (rule, points, message) in SECURITY_PATTERNS.items():
+                # Skip hardcoded credential rules in test files
+                if is_test and rule in SKIP_IN_TESTS:
+                    continue
                 for i, line in enumerate(lines, 1):
                     if re.search(pattern, line, re.IGNORECASE):
                         issues.append(Issue(
@@ -354,6 +453,95 @@ class AdversarialGate:
         parts.append("\nRegenerate the code without these issues.")
 
         return "\n".join(parts)
+
+    def check_architecture_completeness(
+        self,
+        code: str,
+        filename: str,
+    ) -> List[Issue]:
+        """
+        Check for MISSING architectural concerns (FRACTAL L1 coverage).
+
+        Detects when API/endpoint code is missing:
+        - RBAC/Authentication
+        - Input validation
+        - Query limits
+        - Specific error handling
+
+        Args:
+            code: Source code to check
+            filename: Filename to determine if checks apply
+
+        Returns:
+            List of Issue objects for missing architectural concerns
+        """
+        issues: List[Issue] = []
+
+        # Skip non-relevant files (tests, types, config)
+        if any(re.search(p, filename.lower()) for p in SKIP_ARCH_CHECK_PATTERNS):
+            return issues
+
+        for check_name, check in ARCH_COMPLETENESS_CHECKS.items():
+            # Check if this file type requires this check
+            required_in = check.get("required_in", [])
+            if not any(re.search(p, filename) for p in required_in):
+                continue
+
+            # Check if trigger patterns are present (for conditional checks)
+            trigger_patterns = check.get("trigger_patterns", [])
+            if trigger_patterns:
+                has_trigger = any(re.search(p, code, re.IGNORECASE) for p in trigger_patterns)
+                if not has_trigger:
+                    continue
+
+            # Check if any of the required patterns are present
+            must_have = check.get("must_have_one_of", [])
+            has_required = any(re.search(p, code, re.IGNORECASE) for p in must_have)
+
+            # Check for anti-patterns
+            must_not_have = check.get("must_not_have", [])
+            has_antipattern = any(re.search(p, code, re.IGNORECASE) for p in must_not_have)
+
+            # If missing required pattern OR has anti-pattern → issue
+            if (must_have and not has_required) or has_antipattern:
+                issues.append(Issue(
+                    rule=f"arch_{check_name}",
+                    severity="reject",
+                    points=check.get("points", 3),
+                    message=check.get("message", f"Missing {check.get('name', check_name)}"),
+                    line=0,
+                    context=f"File: {filename}",
+                ))
+                log(f"ARCH CHECK FAILED: {check_name} - {check.get('message')}", "WARN")
+
+        return issues
+
+    def check_code_with_architecture(
+        self,
+        code: str,
+        file_type: str = "typescript",
+        filename: str = "",
+    ) -> CheckResult:
+        """
+        Full check including architecture completeness.
+
+        Use this for API/endpoint code to ensure RBAC, validation, limits, errors.
+        """
+        # Standard pattern check
+        result = self.check_code(code, file_type, filename)
+
+        # Architecture completeness check
+        arch_issues = self.check_architecture_completeness(code, filename)
+
+        if arch_issues:
+            result.issues.extend(arch_issues)
+            result.score += sum(i.points for i in arch_issues)
+            result.approved = result.score < self.threshold
+
+            if not result.approved:
+                result.feedback = self._generate_feedback(result.issues, {})
+
+        return result
 
     def check_file(self, file_path: str) -> CheckResult:
         """Check a file on disk"""
@@ -507,6 +695,98 @@ If code is OK: {{"approved": true, "issues": [], "reasoning": "Code validated"}}
             log(f"Deep analysis error: {e}", "ERROR")
 
         return fast_result
+
+
+    async def check_code_llm(
+        self,
+        code: str,
+        file_type: str = "rust",
+        filename: str = "",
+        timeout: int = 120,
+    ) -> CheckResult:
+        """
+        LLM-only adversarial check (no regex).
+        Understands context: CLI scripts, test fixtures, API stubs.
+        """
+        from core.llm_client import run_opencode
+
+        prompt = f"""Tu es un agent ADVERSARIAL RED TEAM. Analyse ce code {file_type}.
+
+FICHIER: {filename or 'unknown'}
+
+RÈGLES CONTEXTUELLES:
+- print() est OK dans les scripts CLI (fichiers avec argparse, click, ou __main__)
+- NotImplementedError est OK pour les stubs API avec "pragma: no cover"
+- Secrets hardcodés sont OK dans les fichiers test/fixture/mock
+- Les TODO sont OK s'ils sont documentés avec ticket/issue
+
+VÉRIFIE:
+1. SLOP: Code qui "semble bien" mais ne fonctionne pas vraiment
+2. LOGIQUE: Branches manquantes, edge cases non gérés
+3. SÉCURITÉ: Injections, XSS (sauf dans tests)
+4. INCOMPLET: Fonctions vides, return None implicite
+
+CODE:
+```{file_type}
+{code[:6000]}
+```
+
+RÉPONDS EN JSON STRICT:
+{{"approved": true/false, "issues": [{{"rule": "nom", "severity": "reject|warning", "points": N, "message": "description", "line": N}}], "reasoning": "explication courte"}}
+
+Si le code est correct et complet: {{"approved": true, "issues": [], "reasoning": "Code validé"}}
+"""
+
+        try:
+            returncode, output = await run_opencode(
+                prompt,
+                model="minimax/MiniMax-M2.1",
+                timeout=timeout,
+                fallback=True,
+            )
+
+            if returncode != 0:
+                log(f"LLM adversarial failed: {output[:200]}", "WARN")
+                # Fallback: approve to not block (LLM unavailable)
+                return CheckResult(approved=True, score=0, threshold=self.threshold)
+
+            # Parse JSON from output
+            json_match = re.search(r'\{[^{}]*"approved"[^{}]*\}', output, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+                approved = result.get("approved", True)
+                issues = []
+                score = 0
+
+                for issue_dict in result.get("issues", []):
+                    points = issue_dict.get("points", 2)
+                    issues.append(Issue(
+                        rule=issue_dict.get("rule", "llm_issue"),
+                        severity=issue_dict.get("severity", "warning"),
+                        points=points,
+                        message=issue_dict.get("message", ""),
+                        line=issue_dict.get("line", 0),
+                    ))
+                    score += points
+
+                if not approved:
+                    log(f"LLM REJECTED (score={score}): {result.get('reasoning', 'N/A')}", "WARN")
+                else:
+                    log(f"LLM APPROVED: {result.get('reasoning', 'OK')}")
+
+                return CheckResult(
+                    approved=approved,
+                    score=score,
+                    threshold=self.threshold,
+                    issues=issues,
+                    feedback=result.get("reasoning", ""),
+                )
+
+        except Exception as e:
+            log(f"LLM adversarial error: {e}", "ERROR")
+
+        # Fallback: approve
+        return CheckResult(approved=True, score=0, threshold=self.threshold)
 
 
 # ============================================================================

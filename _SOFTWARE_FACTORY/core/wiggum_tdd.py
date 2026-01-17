@@ -85,7 +85,7 @@ class WiggumWorker:
     """
 
     MAX_ITERATIONS = 10  # Max retry iterations
-    OPENCODE_TIMEOUT = 600  # 10 min per iteration
+    OPENCODE_TIMEOUT = 600  # 10 min - let model work. Fallback only on RATE LIMIT, not timeout.
 
     def __init__(
         self,
@@ -114,52 +114,28 @@ class WiggumWorker:
         self.log(f"Description: {task.description[:80]}...")
 
         try:
-            # 1. Check FRACTAL - decompose if needed (FORCED at depth 0)
-            task_dict = task.to_dict()
-            current_depth = task_dict.get("fractal_depth", 0)
-            
-            should_split, analysis = self.decomposer.should_decompose(task_dict, current_depth)
-            
-            if should_split:
-                force_l1 = getattr(analysis, 'force_level1', False)
-                self.log(f"Decomposing task (force_L1={force_l1}, {analysis.reason})...")
-                
-                subtasks = await self.decomposer.decompose(task_dict, current_depth)
-                
-                if len(subtasks) > 1:
-                    # Check if we should run subtasks in parallel (L1 with parallel_subagents)
-                    if force_l1 and self.decomposer.config.parallel_subagents:
-                        self.log(f"🔀 Running {len(subtasks)} sub-agents in PARALLEL...")
-                        result = await self._run_parallel_subtasks(task, subtasks)
-                        return result
-                    else:
-                        # Standard: Create subtasks in store for pool workers
-                        import uuid
-                        for st in subtasks:
-                            subtask = Task(
-                                id=f"subtask-{task.domain}-{uuid.uuid4().hex[:8]}",
-                                project_id=self.project.id,
-                                parent_id=task.id,
-                                type=st.get("type", task.type),
-                                domain=st.get("domain", task.domain),
-                                description=st.get("description", ""),
-                                status="pending",
-                                files=st.get("files", []),
-                                context=st,
-                                depth=task.depth + 1,
-                            )
-                            self.task_store.create_task(subtask)
-                        # Mark parent as decomposed
-                        self.task_store.transition(task.id, TaskStatus.DECOMPOSED)
-                        result.success = True
-                        result.error = f"Decomposed into {len(subtasks)} subtasks"
-                        return result
-
-            # 2. Lock task and transition to TDD in progress
-            # PENDING → LOCKED → TDD_IN_PROGRESS (per VALID_TRANSITIONS)
+            # 1. LOCK FIRST to prevent race conditions (before FRACTAL check)
+            # PENDING → LOCKED
             if not self.task_store.transition(task.id, TaskStatus.LOCKED, changed_by=self.worker_id):
                 self.log("Failed to lock task, may be taken by another worker", "WARN")
                 return result
+
+            # 2. FRACTAL: Check if task should be decomposed into atomic sub-tasks
+            # Purpose: Prevent agents from responding partially and leaving gaps
+            task_dict = task.to_dict()
+            current_depth = task_dict.get("depth", 0)
+            should_split, analysis = self.decomposer.should_decompose(task_dict, current_depth)
+
+            if should_split and current_depth < 3:  # Max 3 levels deep
+                self.log(f"🔀 FRACTAL: Decomposing task (depth={current_depth}, reason={analysis.reason})")
+                subtasks = await self.decomposer.decompose(task_dict, current_depth)
+                if subtasks and len(subtasks) > 0:
+                    return await self._run_parallel_subtasks(task, subtasks)
+                else:
+                    self.log("FRACTAL: No subtasks generated, processing directly", "WARN")
+
+            # 3. Transition to TDD in progress
+            # LOCKED → TDD_IN_PROGRESS
             self.task_store.transition(task.id, TaskStatus.TDD_IN_PROGRESS, changed_by=self.worker_id)
 
             # 3. TDD iterations - loop until validation (RLM pattern)
@@ -203,68 +179,22 @@ class WiggumWorker:
 
                 result.code_written = True
 
-                # 4. LEAN: Verify compilation first
-                build_success, build_error_tasks = await self._run_build(task.domain)
-                if not build_success:
-                    self.log("Build failed, retrying...", "WARN")
-                    # 🔴 CREATE FEEDBACK TASKS FROM BUILD ERRORS
-                    if build_error_tasks:
-                        self._create_feedback_tasks(build_error_tasks, task)
+                # 4. ADVERSARIAL CHECK - LLM validates code quality (context-aware)
+                check_result = await self._run_adversarial(code_changes)
+                if not check_result.approved:
+                    self.log(f"❌ Adversarial REJECTED (score={check_result.score}): {check_result.issues[:200]}", "WARN")
+                    feedback = f"ADVERSARIAL REJECTED (score {check_result.score}/{check_result.threshold}):\n{check_result.issues}"
+                    # Revert changes and retry
+                    await self._git_reset()
                     continue
 
-                # 4.5. Run lint
-                lint_result = await self._run_lint(task.domain)
-                if not lint_result:
-                    self.log("Lint failed, retrying...", "WARN")
-                    continue
+                self.log(f"✅ Adversarial APPROVED (score={check_result.score})")
 
-                # 5. Run tests
-                test_success, test_error_tasks = await self._run_tests(task.domain)
-                if test_success:
-                    result.test_passed = True
-
-                    # 5.5. Transition to TDD_SUCCESS (tests passed)
-                    self.task_store.transition(task.id, TaskStatus.TDD_SUCCESS)
-
-                    # 5. Adversarial check
-                    adv_result = self._run_adversarial(code_changes)
-                    if adv_result.approved:
-                        result.adversarial_passed = True
-
-                        # 6. Commit
-                        commit_success = await self._git_commit(task)
-                        if commit_success:
-                            result.committed = True
-                            result.success = True
-
-                            # Transition: TDD_SUCCESS → MERGED (adversarial passed + committed)
-                            self.task_store.transition(task.id, TaskStatus.MERGED)
-
-                            # Check if deploy is enabled
-                            deploy_strategy = self.project.deploy.get("strategy", "validation-only")
-                            if deploy_strategy != "validation-only":
-                                # Queue for deployment
-                                self.task_store.transition(task.id, TaskStatus.QUEUED_FOR_DEPLOY)
-                                self.log("✅ Task completed, queued for deploy")
-                            else:
-                                # No deploy, mark as completed
-                                self.task_store.transition(task.id, TaskStatus.COMPLETED)
-                                self.log("✅ Task completed successfully")
-                            return result
-                    else:
-                        self.log(f"Adversarial rejected: {adv_result.feedback[:100]}", "WARN")
-                        # Transition: TDD_SUCCESS → ADVERSARIAL_REJECTED
-                        self.task_store.transition(task.id, TaskStatus.ADVERSARIAL_REJECTED)
-                        # Accumulate feedback for next iteration (RLM loop pattern)
-                        feedback = f"ADVERSARIAL REJECTED (iteration {iteration + 1}):\n{adv_result.feedback}\n\nFix these issues and try again."
-                        # Transition back to TDD_IN_PROGRESS for retry
-                        self.task_store.transition(task.id, TaskStatus.TDD_IN_PROGRESS)
-                        # Continue loop - don't break!
-                else:
-                    self.log("Tests failed", "WARN")
-                    # 🔴 CREATE FEEDBACK TASKS FROM TEST ERRORS
-                    if test_error_tasks:
-                        self._create_feedback_tasks(test_error_tasks, task)
+                # 5. Transition to CODE_WRITTEN → Build worker will pick it up
+                self.task_store.transition(task.id, TaskStatus.CODE_WRITTEN)
+                self.log(f"✅ Code written, queued for build ({len(code_changes)} files)")
+                result.success = True
+                return result
 
             # Max iterations reached
             result.error = "Max iterations reached"
@@ -449,7 +379,7 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
             sub_decomposer.config.force_level1 = False  # Don't force L1 for subtasks
             
             sub_worker = WiggumWorker(
-                worker_id=self.worker_id * 100 + index,  # Unique sub-worker ID
+                worker_id=f"{self.worker_id}-S{index}",  # Unique sub-worker ID (string safe)
                 project=self.project,
                 task_store=self.task_store,
                 adversarial=self.adversarial,
@@ -490,7 +420,7 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
         if successes == len(subtask_ids):
             result.success = True
             result.error = f"All {len(subtask_ids)} sub-agents completed successfully"
-            self.task_store.transition(parent_task.id, TaskStatus.DONE, changed_by=self.worker_id)
+            self.task_store.transition(parent_task.id, TaskStatus.CODE_WRITTEN, changed_by=self.worker_id)
             self.log(f"✅ Parent {parent_task.id}: ALL sub-agents passed")
         else:
             result.success = False
@@ -545,8 +475,21 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
                 cwd=str(self.project.root_path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                start_new_session=True,  # Process group for cleanup
             )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            except asyncio.TimeoutError:
+                # Kill entire process group (test runner + child processes)
+                import os
+                import signal
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                await proc.wait()
+                self.log("Tests timed out - killed process group", "WARN")
+                return False, []
 
             # Combine output for error parsing
             full_output = stdout.decode() + "\n" + stderr.decode()
@@ -567,10 +510,6 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
                         self.error_capture.clear()
 
                 return False, captured_tasks
-
-        except asyncio.TimeoutError:
-            self.log("Tests timed out", "WARN")
-            return False, []
         except Exception as e:
             self.log(f"Test error: {e}", "ERROR")
             return False, []
@@ -593,8 +532,20 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
                 cwd=str(self.project.root_path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                start_new_session=True,  # Process group for cleanup
             )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+            except asyncio.TimeoutError:
+                import os
+                import signal
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                await proc.wait()
+                self.log("Build timed out - killed process group", "WARN")
+                return False, []
 
             # Combine stdout and stderr for error parsing
             full_output = stdout.decode() + "\n" + stderr.decode()
@@ -614,10 +565,6 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
                         self.error_capture.clear()  # Clear for next run
 
                 return False, captured_tasks
-
-        except asyncio.TimeoutError:
-            self.log("Build timed out", "WARN")
-            return False, []
         except Exception as e:
             self.log(f"Build error: {e}", "ERROR")
             return False, []
@@ -634,8 +581,20 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
                 cwd=str(self.project.root_path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                start_new_session=True,
             )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            except asyncio.TimeoutError:
+                import os
+                import signal
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                await proc.wait()
+                self.log("Lint timed out - killed process group", "WARN")
+                return False
 
             if proc.returncode == 0:
                 self.log("Lint passed ✓")
@@ -643,32 +602,92 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
             else:
                 self.log(f"Lint failed: {stderr.decode()[:200]}", "WARN")
                 return False
-
-        except asyncio.TimeoutError:
-            self.log("Lint timed out", "WARN")
-            return False
         except Exception as e:
             self.log(f"Lint error: {e}", "ERROR")
             return False
 
-    def _run_adversarial(self, code_changes: Dict[str, str]) -> CheckResult:
-        """Run adversarial check on changed files"""
-        all_code = ""
+    async def _run_adversarial(self, code_changes: Dict[str, str]) -> CheckResult:
+        """Run adversarial check: FAST regex + Architecture + LLM semantic"""
+        from core.adversarial import CheckResult
 
-        for file_path in code_changes.keys():
+        all_issues = []
+        total_score = 0
+
+        # Process each changed file
+        for file_path in list(code_changes.keys())[:5]:  # Limit to 5 files
+            full_path = self.project.root_path / file_path
+            if not full_path.exists():
+                continue
+
+            try:
+                code = full_path.read_text()
+            except Exception:
+                continue
+
+            # Detect file type
+            file_type = "rust" if file_path.endswith(".rs") else \
+                       "typescript" if file_path.endswith((".ts", ".tsx")) else \
+                       "python" if file_path.endswith(".py") else \
+                       "kotlin" if file_path.endswith(".kt") else "code"
+
+            # 1. FAST regex check (patterns + security)
+            fast_result = self.adversarial.check_code(code, file_type, file_path)
+            all_issues.extend(fast_result.issues)
+            total_score += fast_result.score
+
+            # 2. Architecture completeness check (RBAC, validation, limits, errors)
+            arch_issues = self.adversarial.check_architecture_completeness(code, file_path)
+            all_issues.extend(arch_issues)
+            total_score += sum(i.points for i in arch_issues)
+
+        # Early reject if score already too high
+        if total_score >= self.adversarial.threshold:
+            feedback = self.adversarial._generate_feedback(all_issues, {})
+            return CheckResult(
+                approved=False,
+                score=total_score,
+                threshold=self.adversarial.threshold,
+                issues=all_issues,
+                feedback=feedback,
+            )
+
+        # 3. LLM semantic check (context-aware, catches subtle issues)
+        combined_code = ""
+        for file_path in list(code_changes.keys())[:5]:
             full_path = self.project.root_path / file_path
             if full_path.exists():
                 try:
-                    all_code += f"\n// FILE: {file_path}\n"
-                    all_code += full_path.read_text()[:5000]
+                    code = full_path.read_text()[:3000]
+                    combined_code += f"\n// === FILE: {file_path} ===\n{code}\n"
                 except Exception:
                     pass
 
-        if not all_code:
-            # No code to check = pass
-            return CheckResult(approved=True, score=0, threshold=self.adversarial.threshold)
+        if combined_code:
+            first_file = list(code_changes.keys())[0] if code_changes else ""
+            file_type = "rust" if first_file.endswith(".rs") else \
+                       "typescript" if first_file.endswith((".ts", ".tsx")) else \
+                       "python" if first_file.endswith(".py") else "code"
 
-        return self.adversarial.check_code(all_code)
+            llm_result = await self.adversarial.check_code_llm(
+                combined_code,
+                file_type=file_type,
+                filename=first_file,
+            )
+
+            all_issues.extend(llm_result.issues)
+            total_score += llm_result.score
+
+        # Final result
+        approved = total_score < self.adversarial.threshold
+        feedback = "" if approved else self.adversarial._generate_feedback(all_issues, {})
+
+        return CheckResult(
+            approved=approved,
+            score=total_score,
+            threshold=self.adversarial.threshold,
+            issues=all_issues,
+            feedback=feedback,
+        )
 
     async def _git_commit(self, task: Task) -> bool:
         """Commit changes to git"""
@@ -693,6 +712,18 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
         except Exception as e:
             self.log(f"Git commit error: {e}", "ERROR")
             return False
+
+    async def _git_reset(self):
+        """Reset git changes (revert uncommitted code)"""
+        try:
+            proc = await asyncio.create_subprocess_shell(
+                "git checkout -- . && git clean -fd",
+                cwd=str(self.project.root_path),
+            )
+            await proc.wait()
+            self.log("Git reset completed")
+        except Exception as e:
+            self.log(f"Git reset error: {e}", "WARN")
 
     def stop(self):
         """Stop the worker"""

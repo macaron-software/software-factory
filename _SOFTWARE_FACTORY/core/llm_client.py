@@ -304,11 +304,23 @@ class LLMClient:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 stdin=asyncio.subprocess.PIPE,
+                start_new_session=True,  # Process group for cleanup
             )
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(input=prompt.encode()),
-                timeout=600,  # 10 min timeout for heavy analysis
-            )
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    proc.communicate(input=prompt.encode()),
+                    timeout=600,  # 10 min timeout for heavy analysis
+                )
+            except asyncio.TimeoutError:
+                import os
+                import signal
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                await proc.wait()
+                log("Claude CLI timeout (10min) - killed process group", "ERROR")
+                return None
 
             if proc.returncode == 0:
                 response = stdout.decode().strip()
@@ -320,9 +332,6 @@ class LLMClient:
                 return None
         except FileNotFoundError:
             log("claude CLI not found - install with: npm i -g @anthropic-ai/claude-code", "ERROR")
-            return None
-        except asyncio.TimeoutError:
-            log("Claude CLI timeout (10min)", "ERROR")
             return None
         except Exception as e:
             log(f"Claude CLI exception: {e}", "ERROR")
@@ -467,61 +476,121 @@ def query_sync(prompt: str, role: str = "wiggum", **kwargs) -> str:
 # CLI TOOLS SUPPORT
 # ============================================================================
 
+# Fallback model chain for rate limits
+FALLBACK_MODELS = [
+    "minimax/MiniMax-M2.1",          # Primary (paid, fast)
+    "opencode/glm-4.7-free",         # Fallback1 (free, capable)
+    "minimax/MiniMax-M2",            # Fallback2 (free tier M2)
+]
+
+
 async def run_opencode(
     prompt: str,
     model: str = "minimax/MiniMax-M2.1",
     cwd: str = None,
-    timeout: int = 600,
+    timeout: int = None,  # IGNORED - no timeout. Model runs until complete. Fallback only on RATE LIMIT.
     project: str = None,
+    fallback: bool = True,
 ) -> Tuple[int, str]:
     """
-    Run opencode CLI for agent-based tasks with tools (Read, Write, Bash, MCP).
+    Run opencode CLI with fallback chain for rate limits.
+
+    Fallback chain:
+    1. MiniMax M2.1 (primary)
+    2. MiniMax M2 (free, on rate limit)
+    3. GLM-4.7 free (fallback)
+    4. GPT-5 nano (fallback)
 
     Args:
         prompt: Task description
         model: Model in format "provider/model"
         cwd: Working directory
-        timeout: Timeout in seconds
+        timeout: IGNORED - no timeout, model runs until complete
         project: Project name for MCP LRM tools
+        fallback: Enable fallback chain on error
 
     Returns:
         Tuple of (returncode, output)
     """
-    log(f"Running opencode ({model})...")
+    # Build model chain
+    import os
+    import signal
+    
+    if fallback:
+        models_to_try = [model] + [m for m in FALLBACK_MODELS if m != model]
+    else:
+        models_to_try = [model]
 
     # Set environment with project for MCP LRM
     env = os.environ.copy()
     if project:
         env["FACTORY_PROJECT"] = project
 
-    try:
-        # Use "opencode run" command for non-interactive execution
-        proc = await asyncio.create_subprocess_exec(
-            "opencode",
-            "run",
-            "-m", model,
-            prompt,
-            cwd=cwd,
-            env=env,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(),
-            timeout=timeout,
-        )
+    last_error = ""
+    for i, current_model in enumerate(models_to_try):
+        is_fallback = i > 0
+        if is_fallback:
+            log(f"Fallback to {current_model}...", "WARN")
 
-        output = stdout.decode() + stderr.decode()
-        return proc.returncode, output
-    except FileNotFoundError:
-        log("opencode CLI not found", "ERROR")
-        return 1, "Error: opencode not installed"
-    except asyncio.TimeoutError:
-        log(f"opencode timeout ({timeout}s)", "ERROR")
-        return 1, f"Error: timeout after {timeout}s"
-    except Exception as e:
-        log(f"opencode exception: {e}", "ERROR")
-        return 1, f"Error: {e}"
+        log(f"Running opencode ({current_model})...")
+
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "opencode",
+                "run",
+                "-m", current_model,
+                prompt,
+                cwd=cwd,
+                env=env,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                start_new_session=True,  # Create process group for cleanup
+            )
+
+            # Max 30 min safety timeout - prevents infinite hangs
+            # But don't fallback on timeout (model was working, just stuck)
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=1800)
+            except asyncio.TimeoutError:
+                # Kill entire process group (opencode + all child processes)
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass  # Already dead
+                await proc.wait()
+                log(f"opencode MAX TIMEOUT 30min ({current_model}) - killed process group", "ERROR")
+                return 1, "Error: max timeout 30min (process stuck, not rate limited)"
+            output = stdout.decode() + stderr.decode()
+
+            # Check for rate limit in output → fallback
+            if proc.returncode != 0:
+                if "rate" in output.lower() or "limit" in output.lower() or "429" in output:
+                    last_error = output
+                    log(f"Rate limit detected ({current_model}), trying fallback...", "WARN")
+                    if i < len(models_to_try) - 1:
+                        continue  # Try fallback
+                return proc.returncode, output
+
+            # Check for rate limit message in success output
+            if "rate limit" in output.lower() or "too many requests" in output.lower():
+                last_error = output
+                log(f"Rate limit in output ({current_model}), trying fallback...", "WARN")
+                if i < len(models_to_try) - 1:
+                    continue  # Try fallback
+
+            return proc.returncode, output
+
+        except FileNotFoundError:
+            log("opencode CLI not found", "ERROR")
+            return 1, "Error: opencode not installed"
+        except Exception as e:
+            last_error = str(e)
+            log(f"opencode exception: {e}", "ERROR")
+            if i < len(models_to_try) - 1:
+                continue  # Try fallback
+            return 1, f"Error: {e}"
+
+    return 1, f"Error: all models failed - {last_error}"
 
 
 async def run_claude_agent(

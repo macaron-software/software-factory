@@ -324,6 +324,239 @@ if CLICK_AVAILABLE:
             if result.feedback_tasks:
                 click.echo(f"   Feedback tasks: {len(result.feedback_tasks)}")
 
+    # --- CYCLE WORKER (Phased Pipeline) ---
+    @cli.group()
+    @click.pass_context
+    def cycle(ctx):
+        """Cycle daemon - Phased TDD → Build → Deploy pipeline"""
+        pass
+
+    @cycle.command("start")
+    @click.option("--foreground", "-f", is_flag=True, help="Run in foreground")
+    @click.option("--workers", "-w", default=5, help="TDD workers per cycle")
+    @click.option("--batch", "-b", default=10, help="Tasks per batch before build")
+    @click.option("--timeout", "-t", default=30, help="TDD phase timeout (minutes)")
+    @click.option("--skip-deploy", is_flag=True, help="Skip deploy phase (dev mode)")
+    @click.pass_context
+    def cycle_start(ctx, foreground, workers, batch, timeout, skip_deploy):
+        """Start Cycle daemon - Phased TDD → Build → Deploy"""
+        from core.cycle_worker import CycleDaemon, CycleConfig
+        from core.project_registry import get_project
+
+        project_name = ctx.obj.get("project")
+        if not project_name:
+            click.echo("Error: --project/-p required")
+            return
+
+        project = get_project(project_name)
+        if not project:
+            click.echo(f"Error: Project {project_name} not found")
+            return
+
+        config = CycleConfig(
+            tdd_workers=workers,
+            tdd_batch_size=batch,
+            tdd_timeout_minutes=timeout,
+            skip_deploy=skip_deploy,
+        )
+
+        click.echo(f"Starting cycle-{project.name} (workers={workers}, batch={batch}, timeout={timeout}m)")
+        daemon = CycleDaemon(project, config)
+        daemon.start(foreground=foreground)
+
+    @cycle.command("stop")
+    @click.pass_context
+    def cycle_stop(ctx):
+        """Stop Cycle daemon"""
+        from core.cycle_worker import CycleDaemon
+        from core.project_registry import get_project
+
+        project_name = ctx.obj.get("project")
+        if not project_name:
+            click.echo("Error: --project/-p required")
+            return
+
+        project = get_project(project_name)
+        if not project:
+            click.echo(f"Error: Project {project_name} not found")
+            return
+
+        daemon = CycleDaemon(project)
+        daemon.stop()
+
+    @cycle.command("status")
+    @click.pass_context
+    def cycle_status(ctx):
+        """Show Cycle daemon status"""
+        from core.cycle_worker import CycleDaemon
+        from core.project_registry import get_project
+        from core.daemon import print_daemon_status
+
+        project_name = ctx.obj.get("project")
+        if not project_name:
+            click.echo("Error: --project/-p required")
+            return
+
+        project = get_project(project_name)
+        if not project:
+            click.echo(f"Error: Project {project_name} not found")
+            return
+
+        daemon = CycleDaemon(project)
+        status = daemon.status()
+        print_daemon_status(status)
+
+    # --- BUILD WORKER ---
+    @cli.group()
+    @click.pass_context
+    def build(ctx):
+        """Build daemon - compile/test with limited concurrency"""
+        pass
+
+    @build.command("start")
+    @click.option("--foreground", "-f", is_flag=True, help="Run in foreground")
+    @click.option("--max-builds", "-m", default=3, help="Max concurrent builds")
+    @click.pass_context
+    def build_start(ctx, foreground, max_builds):
+        """Start Build daemon"""
+        from core.build_worker import BuildDaemon
+        from core.project_registry import get_project
+
+        project_name = ctx.obj.get("project")
+        if not project_name:
+            click.echo("Error: --project/-p required")
+            return
+
+        project = get_project(project_name)
+        if not project:
+            click.echo(f"Project not found: {project_name}")
+            return
+
+        daemon = BuildDaemon(project, max_builds=max_builds)
+        click.echo(f"Starting build-{project_name} (max {max_builds} builds)...")
+        daemon.start(foreground=foreground)
+
+    @build.command("stop")
+    @click.pass_context
+    def build_stop(ctx):
+        """Stop Build daemon"""
+        from core.build_worker import BuildDaemon
+        from core.project_registry import get_project
+
+        project_name = ctx.obj.get("project")
+        if not project_name:
+            click.echo("Error: --project/-p required")
+            return
+
+        project = get_project(project_name)
+        if not project:
+            click.echo(f"Project not found: {project_name}")
+            return
+
+        daemon = BuildDaemon(project)
+        daemon.stop()
+
+    @build.command("status")
+    @click.pass_context
+    def build_status(ctx):
+        """Show Build daemon status"""
+        from core.build_worker import BuildDaemon
+        from core.project_registry import get_project
+
+        project_name = ctx.obj.get("project")
+        if not project_name:
+            click.echo("Error: --project/-p required")
+            return
+
+        project = get_project(project_name)
+        if not project:
+            click.echo(f"Project not found: {project_name}")
+            return
+
+        daemon = BuildDaemon(project)
+        status = daemon.status()
+        if status.get("running"):
+            click.echo(f"✅ build-{project_name}: RUNNING (PID {status.get('pid')})")
+        elif status.get("stale"):
+            click.echo(f"❌ build-{project_name}: DEAD (stale PID)")
+        else:
+            click.echo(f"⚪ build-{project_name}: NOT RUNNING")
+
+    # --- COMMIT WORKER ---
+    @cli.group()
+    @click.pass_context
+    def commit(ctx):
+        """Commit daemon - sequential git commits"""
+        pass
+
+    @commit.command("start")
+    @click.option("--foreground", "-f", is_flag=True, help="Run in foreground")
+    @click.pass_context
+    def commit_start(ctx, foreground):
+        """Start Commit daemon"""
+        from core.commit_worker import CommitDaemon
+        from core.project_registry import get_project
+
+        project_name = ctx.obj.get("project")
+        if not project_name:
+            click.echo("Error: --project/-p required")
+            return
+
+        project = get_project(project_name)
+        if not project:
+            click.echo(f"Project not found: {project_name}")
+            return
+
+        daemon = CommitDaemon(project)
+        click.echo(f"Starting commit-{project_name} (sequential)...")
+        daemon.start(foreground=foreground)
+
+    @commit.command("stop")
+    @click.pass_context
+    def commit_stop(ctx):
+        """Stop Commit daemon"""
+        from core.commit_worker import CommitDaemon
+        from core.project_registry import get_project
+
+        project_name = ctx.obj.get("project")
+        if not project_name:
+            click.echo("Error: --project/-p required")
+            return
+
+        project = get_project(project_name)
+        if not project:
+            click.echo(f"Project not found: {project_name}")
+            return
+
+        daemon = CommitDaemon(project)
+        daemon.stop()
+
+    @commit.command("status")
+    @click.pass_context
+    def commit_status(ctx):
+        """Show Commit daemon status"""
+        from core.commit_worker import CommitDaemon
+        from core.project_registry import get_project
+
+        project_name = ctx.obj.get("project")
+        if not project_name:
+            click.echo("Error: --project/-p required")
+            return
+
+        project = get_project(project_name)
+        if not project:
+            click.echo(f"Project not found: {project_name}")
+            return
+
+        daemon = CommitDaemon(project)
+        status = daemon.status()
+        if status.get("running"):
+            click.echo(f"✅ commit-{project_name}: RUNNING (PID {status.get('pid')})")
+        elif status.get("stale"):
+            click.echo(f"❌ commit-{project_name}: DEAD (stale PID)")
+        else:
+            click.echo(f"⚪ commit-{project_name}: NOT RUNNING")
+
     # --- EXPERIENCE LEARNING AGENT ---
     @cli.group()
     @click.pass_context
@@ -676,6 +909,46 @@ if CLICK_AVAILABLE:
             click.echo(f"\n📝 Files modified:")
             for f in mods['files_modified']:
                 click.echo(f"   - {f}")
+
+    # --- MCP ---
+    @cli.group()
+    def mcp():
+        """MCP LRM Server management - shared server for all workers"""
+        pass
+
+    @mcp.command("start")
+    @click.option("--foreground", "-f", is_flag=True, help="Run in foreground")
+    @click.option("--port", "-p", default=9500, help="Port to bind")
+    def mcp_start(foreground, port):
+        """Start MCP LRM server (daemon)"""
+        from mcp_lrm.server_sse import run_server, start_daemon, DEFAULT_HOST
+
+        if foreground:
+            click.echo(f"Starting MCP LRM Server on {DEFAULT_HOST}:{port} (foreground)")
+            run_server(DEFAULT_HOST, port)
+        else:
+            start_daemon()
+
+    @mcp.command("stop")
+    def mcp_stop():
+        """Stop MCP LRM server"""
+        from mcp_lrm.server_sse import stop_daemon
+        stop_daemon()
+
+    @mcp.command("status")
+    def mcp_status():
+        """Check MCP LRM server status"""
+        from mcp_lrm.server_sse import status_daemon
+        status_daemon()
+
+    @mcp.command("restart")
+    def mcp_restart():
+        """Restart MCP LRM server"""
+        from mcp_lrm.server_sse import stop_daemon, start_daemon
+        import time
+        stop_daemon()
+        time.sleep(1)
+        start_daemon()
 
     # --- STATUS ---
     @cli.command()

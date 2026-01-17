@@ -37,6 +37,11 @@ domains:
     build_cmd: cd ms-dashboard && npm run build --if-present 2>/dev/null || npx svelte-kit sync 2>/dev/null || true
     test_cmd: cd ms-dashboard && npm run test:unit 2>/dev/null || true
     lint_cmd: cd ms-dashboard && npm run lint 2>/dev/null || npx eslint . 2>/dev/null || true
+    conventions:
+      # CRITICAL: SvelteKit reserved file names
+      - "NEVER create test files with + prefix (e.g., +page.test.ts, +layout.spec.ts)"
+      - "Test files go in __tests__/ subfolder (e.g., routes/admin/__tests__/auth.test.ts)"
+      - "Files starting with + are RESERVED by SvelteKit for routing"
 
   patient-web:
     paths:

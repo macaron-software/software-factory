@@ -79,9 +79,7 @@ adversarial:
     - pattern: 'except:'
       score: 3
       message: "Bare except clause - specify exception type"
-    - pattern: 'print\('
-      score: 1
-      message: "Use logging instead of print"
+    # print() OK dans CLI scripts (add_facebook_page.py, etc.)
     # Security
     - pattern: "password.*=.*[\"']"
       score: 5

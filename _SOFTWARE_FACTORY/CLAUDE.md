@@ -1,126 +1,203 @@
 # SOFTWARE FACTORY - RLM (MIT CSAIL arXiv:2512.24601)
 
+## PHILOSOPHIE: Lean + Agile + KISS + XP
+
+| Principe | Implémentation |
+|----------|----------------|
+| **Lean** | WIP limits, flow continu, éliminer waste |
+| **Agile** | Feedback rapide, adapt, WSJF priorité |
+| **KISS** | FRACTAL atomic tasks, minimal code |
+| **XP** | TDD first, pair review, refactor continu |
+
 ## ARCH
 ```
-BRAIN (Opus4.5) + MCP → deep recursive → backlog enrichi
-    ↓ opencode (MiniMax) + MCP → sub-analyses
-WIGGUM TDD (MiniMax×N) → FRACTAL L1 forced → 3 sub-agents // → commit
+BRAIN (Opus4.5) + MCP → deep recursive → backlog WSJF priorité
     ↓
-WIGGUM DEPLOY → staging → E2E → prod → rollback
+FRACTAL L1 → 3 concerns // : feature/guards/failures
     ↓
-FEEDBACK → errs → new tasks
+WIP-LIMITED WORKERS → TDD atomic
     ↓
-XP AGENT → learn → SELF-MODIFY FACTORY
+ADVERSARIAL PAIR → 2 LLMs débattent qualité
+    ↓
+BUILD + QUALITY GATES → coverage 80%+, complexity check
+    ↓
+DEPLOY CANARY → 1% traffic, metrics watch
+    ↓
+PROMOTE/ROLLBACK AUTO → based on error rate
+    ↓
+FEEDBACK → errs + metrics → new tasks WSJF recalc
+    ↓
+XP AGENT → retrospective auto → SELF-MODIFY FACTORY
 ```
+
+## LEAN/XP FEATURES (NEW)
+
+### WIP Limits
+```yaml
+# projects/*.yaml
+wip:
+  max_concurrent: 5        # workers actifs max
+  max_per_domain: 2        # évite saturation d'un domaine
+  queue_priority: wsjf     # WSJF dynamique, pas FIFO
+```
+
+### WSJF Dynamique
+- Brain calcule WSJF initial
+- Recalcul après feedback (erreurs = boost priorité)
+- Decay temporel (vieilles tasks montent)
+
+### Adversarial Pair Review
+```
+LLM1 (impl) → code
+LLM2 (review) → critique, trouve failles
+LLM1 → fix ou argue
+Consensus → merge ou reject
+```
+
+### Quality Gates
+| Gate | Seuil | Action si fail |
+|------|-------|----------------|
+| Coverage | 80%+ | Block build |
+| Complexity | <15 cyclomatic | Warn, suggest refactor |
+| Security | 0 critical | Block deploy |
+| Perf | <200ms p95 | Canary rollback |
+
+### Canary Deploy
+```
+1% traffic → 10% → 50% → 100%
+Rollback auto si error_rate > baseline + 5%
+Feature flags pour rollback granulaire
+```
+
+### Retrospective Auto (XP Agent)
+- Analyse weekly: success rate, time-to-deploy, rework %
+- Identifie patterns: "Rust .unwrap() = 80% failures"
+- Auto-patch adversarial rules
+- Propose factory improvements
+
+## MCP ARCHITECTURE (Single Daemon)
+```
+MCP LRM Server (1 daemon, port 9500)
+         ▲ HTTP
+    ┌────┼────┐
+    │    │    │
+ proxy proxy proxy  (stdio, ~10MB each)
+    │    │    │
+ opencode × 50 workers
+```
+
+**Commandes:**
+```bash
+factory mcp start/stop/status/restart
+```
+
+**Config opencode** (`~/.config/opencode/opencode.json`):
+```json
+"mcp": {"lrm": {"type": "local", "command": ["python3", ".../mcp_lrm/proxy.py"]}}
+```
+
+**Fichiers:** `mcp_lrm/server_sse.py` (daemon), `mcp_lrm/proxy.py` (bridge)
+
+## CYCLE WORKER (NEW)
+```
+Phase1 TDD: N workers // écrivent code, pas build
+    ↓ batch_size atteint ou timeout
+Phase2 BUILD: compile tout CODE_WRITTEN
+    ↓ si OK
+Phase3 DEPLOY: staging→E2E→prod
+    ↓ si err
+FEEDBACK: new tasks → retour Phase1
+```
+
+Config: `-w workers -b batch -t timeout --skip-deploy`
 
 ## CORE
 
-### Brain (`core/brain.py`)
-**Deep Recursive Analysis Engine** with MCP tools:
+### Brain `core/brain.py`
+- deep recursive ~1500 files ~500K lines
+- `--chat "q"` → conversationnel | default → tasks JSON WSJF
+- tools: lrm_locate/summarize/conventions/examples/build
+- tiers: Opus→MiniMax→Qwen
 
-**TOOLS** (claude CLI + MCP server `mcp_lrm`):
-- `lrm_locate`: find files matching pattern
-- `lrm_summarize`: get file content summary
-- `lrm_conventions`: domain conventions
-- `lrm_examples`: example code
-- `lrm_build`: run build/test
+### Cycle `core/cycle_worker.py`
+- phases: TDD→BUILD→DEPLOY
+- no FRACTAL (batch mode, pas subtasks)
+- workers // avec lock
+- process cleanup on timeout (killpg)
 
-**COST TIERS**:
-- depth=0: **Opus 4.5** via `claude` CLI + MCP ($$$)
-- depth=1-2: **MiniMax M2.1** via `opencode` + MCP ($$)
-- depth=3: **Qwen 30B local** (free)
+### Wiggum TDD `core/wiggum_tdd.py`
+- pool workers daemon
+- FRACTAL enabled: 3 concerns (L1) → KISS atomic (L2)
+- cycle: lock→FRACTAL?→TDD→adversarial→commit
+- LLM: MiniMax M2.1 opencode
+- process cleanup: `start_new_session=True` + `os.killpg()` on timeout
 
-Flow:
-1. Claude Opus explores via MCP tools
-2. Deep sub-analyses delegated to MiniMax
-3. JSON task list with WSJF scores
+### FRACTAL `core/fractal.py`
+```
+L1 (depth=0): Split into 3 CONCERNS
+  ├── FEATURE: happy path, core business logic
+  ├── GUARDS: auth(401) + permission(403) + validation + sanitization
+  └── FAILURES: errors(400/404/409) + edge cases + LIMIT + logging
 
-### Wiggum TDD (`core/wiggum_tdd.py`)
-- pool workers // (daemon)
-- **FRACTAL L1 FORCED**: ALL depth=0 tasks → 3 sub-agents //
-  - impl (core logic), test (validation), integ (edge cases)
-  - `asyncio.gather()` parallel execution
-  - parent DONE ssi ALL sub-agents succeed
-- cycle: lock → TDD (test fail→code→pass) → adversarial → commit
-- LLM: MiniMax M2.1 `opencode`
-
-### FRACTAL (`core/fractal.py`)
-```yaml
-fractal:
-  force_level1: true      # FORCED for depth=0
-  min_subtasks: 3         # 3 parallel sub-agents
-  parallel_subagents: true
-  max_depth: 3
-  max_files: 5
-  max_loc: 400
+L2 (depth=1): KISS atomic
+  ├── IMPL: minimal code
+  ├── TEST: focused unit test
+  └── VERIFY: run & fix
 ```
 
-### Wiggum Deploy (`core/wiggum_deploy.py`)
-- pipeline: build→staging→E2E→prod→verify
-- rollback auto
-- feedback tasks on err
+**Config** (`projects/*.yaml`):
+```yaml
+fractal:
+  enabled: true
+  force_level1: true  # Always split root tasks
+  max_depth: 3
+  min_subtasks: 3
+```
 
-### Adversarial (`core/adversarial.py`)
-- reject: test.skip, @ts-ignore, TODO>2, .unwrap()>3, panic!
-- score>=5 → REJECT → retry (max 10)
-- deep: Qwen semantic (SLOP, BYPASS, SECURITY)
-- **XP-learned patterns**: auto-injected from factory failures
+**Coverage comparison:**
+- Standard: 38% (3/8 checks) - LLM focuses on happy path
+- FRACTAL:  100% (8/8 checks) - explicit prompts per concern
 
-### XP Agent (`core/experience_agent.py`)
-Meta-brain that **SELF-MODIFIES THE FACTORY**:
-- learning memory: `learnings` table
-- pattern evolution: `pattern_evolutions` table
-- ROI tracking (GenAI Divide: 5% success)
-- **chaos**: resilience tests (retry, circuit breaker, timeout)
-- **security**: CVE fetch NVD, OWASP Top10, pentest staging/prod
-- **journeys**: Playwright E2E w/ RBAC personas, real data
-- **logs**: prod log analysis → backlog tasks
-- **improve**: patches adversarial.py, fractal.py, brain prompts
+### Adversarial `core/adversarial.py`
+- reject: test.skip, @ts-ignore, TODO>2, .unwrap()>3
+- score>=5 → REJECT → retry max10
 
-### TaskStore (`core/task_store.py`)
-- SQLite `data/factory.db`
-- semantic+zlib: 53% reduction
-- status: pending→tdd_in_progress→tdd_success→queued_for_deploy→completed
+### TaskStore `core/task_store.py`
+- SQLite data/factory.db
+- status: pending→locked→tdd_in_progress→code_written→build→commit→deploy
 
-### Daemon (`core/daemon.py`)
-- double-fork Unix
-- PID `/tmp/factory/wiggum-tdd-<proj>.pid`
-- logs rotatifs `data/logs/`
-- SIGTERM graceful
+### Daemon `core/daemon.py`
+- double-fork, PID /tmp/factory/*.pid
+- logs data/logs/
 
 ## CLI
 
 ```bash
-# Brain (Deep Recursive RLM with cost tiers)
-factory <p> brain run              # full RLM 5-phase (Opus→MiniMax→Qwen)
-factory <p> brain run --quick      # reduced depth
-factory <p> brain run -q "iOS security"  # focus
+# Brain
+factory <p> brain run              # tasks JSON
+factory <p> brain --chat "q"       # conversationnel
 
-# Wiggum TDD (FRACTAL L1 forced)
-factory <p> wiggum start           # daemon bg
-factory <p> wiggum start -w 10     # 10 workers
-factory <p> wiggum start -f        # fg debug
+# Cycle (NEW - phases TDD→Build→Deploy)
+factory <p> cycle start            # daemon
+factory <p> cycle start -f         # foreground
+factory <p> cycle start -w 5 -b 10 -t 30  # 5workers, batch10, 30min
+factory <p> cycle start --skip-deploy     # dev mode
+factory <p> cycle stop
+factory <p> cycle status
+
+# Wiggum (legacy, continuous)
+factory <p> wiggum start -w 10
 factory <p> wiggum stop
-factory <p> wiggum restart
-factory <p> wiggum status
-factory <p> wiggum once            # 1 task → 3 sub-agents
 
-# Deploy
-factory <p> deploy start/stop/status/once
+# Deploy (legacy, continuous)
+factory <p> deploy start/stop
 
-# XP Agent (Self-Modifying Factory)
-factory xp analyze                 # no LLM
-factory xp analyze --apply         # +auto-fix
-factory xp report                  # Opus report
-factory xp fix                     # reset stuck
-factory xp impact                  # ROI metrics
-factory xp learn                   # full cycle
-factory xp chaos -p ppz            # resilience tests
-factory xp security -p ppz         # CVE/OWASP/pentest
-factory xp journeys -p ppz         # E2E personas RBAC
-factory xp logs -p ppz             # prod log analysis
-factory xp improve                 # SELF-MODIFY factory code
-factory xp full -p ppz --apply     # ALL + improve + create tasks
+# Build (legacy, continuous)
+factory <p> build start/stop
+
+# XP Agent
+factory xp analyze --apply
+factory xp full -p <proj> --apply
 
 # Status
 factory status --all
@@ -128,124 +205,211 @@ factory status --all
 
 ## PROJECTS
 
-`projects/*.yaml`:
-- ppz (rust/ts/swift/kotlin/e2e)
-- psy (rust/ts/swift/kotlin/svelte)
-- veligo (rust/svelte/e2e)
-- yolonow (rust/py/ts/swift/kotlin)
-- fervenza (py)
-- solaris (angular/figma)
+ppz psy veligo yolonow fervenza solaris **factory** (self)
 
-### Config ex
-```yaml
-project:
-  name: psy
-  root_path: /path
-  vision_doc: CLAUDE.md
+## LLM
 
-domains:
-  rust:
-    paths: [backend/]
-    build_cmd: cargo check
-    test_cmd: cargo test
-  swift:
-    paths: [ios/]
-    build_cmd: xcodebuild -scheme App build
-
-fractal:
-  force_level1: true      # NEW: force 3 sub-agents
-  min_subtasks: 3
-  parallel_subagents: true
-  max_files: 5
-  max_loc: 400
-  max_depth: 3
-
-adversarial:
-  threshold: 5
-  custom_patterns:
-    - pattern: '\.unwrap\(\)'
-      score: 2
-      max_occurrences: 3
-```
-
-## LLM CFG
-
-`~/.config/factory/llm.yaml`:
-```yaml
-providers:
-  minimax:
-    base_url: https://api.minimax.io/anthropic/v1
-    api_key: ${MINIMAX_API_KEY}
-    models:
-      m2.1: MiniMax-M2.1
-  local:
-    base_url: http://localhost:8002/v1
-    models:
-      qwen: qwen3-30b-a3b
-
-defaults:
-  brain: claude-cli/opus     # uses `claude` CLI + MCP
-  brain_sub: opencode/minimax # sub-analyses via `opencode`
-  wiggum: opencode/minimax   # TDD workers via opencode
-```
+- brain: claude CLI Opus4.5
+- wiggum/cycle: opencode + MCP proxy
+- fallback: MiniMax-M2.1 → GLM-4.7-free → MiniMax-M2
+- timeout: 30min max, kills process group (parent + children)
 
 ## MONITOR
 
 ```bash
-tail -f data/logs/wiggum-tdd-*.log
+tail -f data/logs/cycle-*.log
 sqlite3 data/factory.db "SELECT project_id,status,COUNT(*) FROM tasks GROUP BY 1,2"
-ls /tmp/factory/*.pid
-for f in /tmp/factory/*.pid; do kill $(cat $f) 2>/dev/null; rm $f; done
+ps aux | grep opencode | wc -l
 ```
 
-## RATE LIMIT
+## LLM FALLBACK LOGIC
 
-MiniMax timeout w/ too many workers:
-- 10 workers/proj max
-- 50 total
-- timeout 600s → reduce or fallback Qwen
+```
+Rate limit detected → immediate fallback to next model
+No timeout → model runs until complete (never cut working response)
+```
+
+Fallback chain: MiniMax-M2.1 → GLM-4.7-free → MiniMax-M2
+
+## SELF-IMPROVEMENT (META)
+
+La Factory s'auto-améliore comme tout autre projet: `factory factory brain run`
+
+### Refactoring Triggers
+
+| Trigger | Seuil | Action |
+|---------|-------|--------|
+| **Duplication** | >10 lignes, 85% sim | Extract to shared module |
+| **Complexity** | cyclomatic >10 | Split function |
+| **Long functions** | >100 LOC | Decompose |
+| **Too many params** | >5 | Introduce config object |
+
+### Mutualization Candidates
+
+| Pattern | Target Module | Raison |
+|---------|---------------|--------|
+| `start_new_session`, `os.killpg` | `core/utils/process.py` | Process cleanup |
+| `fallback.*chain`, `rate.*limit` | `core/utils/llm.py` | LLM resilience |
+| `logging.getLogger`, `RotatingFileHandler` | `core/utils/logging.py` | Logging setup |
+| `_run_(tests\|build\|lint)` | `core/utils/subprocess.py` | Subprocess patterns |
+
+### Service Consolidation
+
+| Service | Pattern | Objectif |
+|---------|---------|----------|
+| TaskStore | Singleton | 1 instance DB par process |
+| LLMClient | Singleton + pool | Rate limit global |
+| MCPServer | Daemon unique | Pas de spawn multiple |
+
+### Interface Extraction
+
+```
+Worker (interface)
+├── WiggumTDD
+├── CycleWorker
+├── BuildWorker
+└── DeployWorker
+
+Analyzer (interface)
+├── RustAnalyzer
+├── TypeScriptAnalyzer
+└── PlaywrightAnalyzer
+```
+
+### Brain Self-Improvement
+
+```bash
+# Analyser la factory elle-même
+factory factory brain run
+
+# Focus refactoring
+factory factory brain run -q "duplication and consolidation"
+
+# Lancer amélioration
+factory factory wiggum start -w 5
+```
+
+## CROSS-CUTTING CONCERNS
+
+### Niveau 1: FRACTAL (systematic checks)
+
+| Concern | Check | Applicable si |
+|---------|-------|---------------|
+| **Security** | OWASP, secrets env, parameterized queries, CSP | toujours |
+| **Robustesse** | input validation, null safety, error codes | toujours |
+| **Résilience** | retry+backoff, timeout, fallback, idempotence | API, async |
+| **i18n** | clés traduites, RTL, formats locaux | UI, user-facing |
+| **Accessibilité** | WCAG 2.1 AA, aria-*, contraste, nav clavier | UI |
+| **RGPD** | consentement, anonymisation, retention | user data |
+| **Multi-devise** | ISO 4217, Decimal, conversion | e-commerce |
+
+### Niveau 2: Brain (context-dependent)
+
+**Frontend (si UI):**
+| Concern | Check |
+|---------|-------|
+| Design System | tokens (no hardcoded), composants, Figma sync |
+| Theming | light/dark, CSS vars, multi-brand |
+| SEO | meta, sitemap, JSON-LD, canonical |
+| PWA | service worker, offline, manifest |
+| Performance | bundle <200KB, lazy load, WebP/AVIF |
+| Visual QA | Storybook, visual regression tests |
+
+**Backend (si API):**
+| Concern | Check |
+|---------|-------|
+| API Design | REST conventions, versioning, pagination, rate limit |
+| Database | migrations, indexing, N+1, connection pool |
+| Caching | TTL, invalidation, cache-aside, CDN |
+| Async | queues, events, webhooks idempotents |
+| Auth | OAuth2/JWT, refresh, RBAC, session |
+
+**Domaines métier (si applicable):**
+| Concern | Check | Projet |
+|---------|-------|--------|
+| Paiements | Stripe, idempotency, PCI-DSS | ppz, yolonow |
+| Notifications | email templates, push, unsubscribe | all |
+| Search | full-text, fuzzy, facets | veligo, ppz |
+| Files | upload, S3, streaming, virus scan | all |
+| Multi-tenancy | isolation, context, partitioning | veligo |
+| Real-time | WebSocket, SSE, reconnection | psy |
+
+**Ops (si deploy):**
+| Concern | Check |
+|---------|-------|
+| Health checks | liveness/readiness, deep health |
+| Graceful shutdown | drain, SIGTERM, cleanup |
+| Observabilité | logs JSON, traces OTEL, métriques |
+| Audit logs | who/what/when, immutable |
+| Cost | resource sizing, query optimization |
+
+**Qualité code:**
+| Concern | Check |
+|---------|-------|
+| Testabilité | DI, mocking, coverage >80% |
+| Clean code | SOLID, <200 LOC/fn, cyclomatic <10 |
+| Documentation | OpenAPI, changelog, ADRs |
+| Backward compat | semver, deprecation warnings |
+| Green IT | cache, requêtes optimisées |
+
+**Refactoring (Brain détecte, FRACTAL corrige):**
+| Concern | Check | Action |
+|---------|-------|--------|
+| Duplication | >10 lignes similaires | Extract shared function/module |
+| God class | >500 LOC, >10 methods | Split by responsibility |
+| Feature envy | Accès fréquent autre classe | Move method |
+| Long param list | >5 params | Introduce parameter object |
+| Primitive obsession | Strings partout | Value objects |
+| Divergent change | 1 fichier, N raisons | SRP split |
+| Shotgun surgery | 1 change, N fichiers | Consolidate |
+| Dead code | Unused imports/functions | Remove |
+| Speculative generality | Abstract sans impl | YAGNI delete |
+
+## CONVENTIONS
+
+- SvelteKit: NEVER create test files with `+` prefix in routes (reserved)
+- Tests go in `__tests__/` subfolder (e.g., `routes/admin/__tests__/auth.test.ts`)
+- Adversarial uses LLM (not regex) for context-aware validation
+
+## OPENCODE CONFIG (~/.config/opencode/opencode.json)
+
+CRITICAL: Must have `permission: { "doom_loop": "allow" }` to prevent infinite hang in non-interactive mode. Default is "ask" which waits for stdin.
 
 ## FILES
 
 ```
-_SOFTWARE_FACTORY/
-├── cli/factory.py
-├── core/
-│   ├── brain.py           # Single RLM Brain (Opus→MiniMax→Qwen tiers)
-│   ├── wiggum_tdd.py      # FRACTAL L1 + 3 sub-agents
-│   ├── wiggum_deploy.py
-│   ├── adversarial.py     # XP-learned patterns
-│   ├── experience_agent.py # Self-modifying XP
-│   ├── fractal.py         # force_level1, parallel_subagents
-│   ├── task_store.py
-│   ├── daemon.py
-│   └── llm_client.py
-├── _rlm/                  # MIT CSAIL RLM lib
-│   └── rlm/clients/opencode.py  # Custom opencode client
-├── projects/*.yaml
-├── data/
-│   ├── factory.db
-│   ├── rlm_logs/          # RLM execution logs
-│   └── logs/
-└── /tmp/factory/*.pid
+cli/factory.py
+core/cycle_worker.py   # phases TDD→Build→Deploy
+core/brain.py
+core/wiggum_tdd.py     # FRACTAL enabled
+core/fractal.py        # 3 concerns decomposition
+core/adversarial.py
+core/task_store.py
+core/llm_client.py     # process group cleanup
+core/daemon.py
+mcp_lrm/server_sse.py  # SSE daemon (single instance)
+mcp_lrm/proxy.py       # stdio→HTTP bridge
+projects/*.yaml
+data/factory.db
+data/logs/
 ```
 
 ## WORKFLOW
 
 ```bash
-# 1. Deep recursive analysis
-factory psy brain run -q "iOS security RBAC"
+# 0. Start MCP server (once)
+factory mcp start
 
-# 2. Start workers (FRACTAL L1 → 3 sub-agents per task)
-factory psy wiggum start -w 10
+# 1. Brain analyse
+factory psy brain run -q "focus"
+
+# 2. Cycle (phases TDD→Build→Deploy)
+factory psy cycle start -w 5 -b 10 -t 60
 
 # 3. Monitor
-tail -f data/logs/wiggum-tdd-psy.log
-factory status --all
+tail -f data/logs/cycle-psy.log
+curl localhost:9500/health  # MCP connections
 
-# 4. XP Agent self-improve
+# 4. XP improve
 factory xp full -p psy --apply
-
-# 5. Stop
-factory psy wiggum stop
 ```

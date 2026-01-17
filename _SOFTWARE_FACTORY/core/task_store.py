@@ -39,16 +39,24 @@ class TaskStatus(Enum):
     # Initial
     PENDING = "pending"
 
-    # TDD Queue
+    # TDD Queue - Phase 1: Write code only (no build)
     LOCKED = "locked"
     TDD_IN_PROGRESS = "tdd_in_progress"
-    TDD_SUCCESS = "tdd_success"
+    CODE_WRITTEN = "code_written"  # NEW: Code written, ready for build
+    TDD_SUCCESS = "tdd_success"  # Legacy: kept for compatibility
     TDD_FAILED = "tdd_failed"  # TDD cycle failed after max retries
 
-    # Adversarial Gate
+    # Build Queue - Phase 2: Compile/test (limited workers)
+    BUILD_QUEUED = "build_queued"  # NEW: Waiting for build slot
+    BUILD_IN_PROGRESS = "build_in_progress"  # NEW: Building
+    BUILD_SUCCESS = "build_success"  # NEW: Build passed
+    BUILD_FAILED = "build_failed"  # NEW: Build failed
+
+    # Adversarial Gate - Phase 3: LLM review
     ADVERSARIAL_REJECTED = "adversarial_rejected"
 
-    # Git
+    # Commit Queue - Phase 4: Git commit (sequential)
+    COMMIT_QUEUED = "commit_queued"  # NEW: Ready for commit
     MERGED = "merged"
 
     # Deploy Queue
@@ -78,17 +86,27 @@ class TaskStatus(Enum):
 
 
 # Valid state transitions
-# Flow: Wiggum TDD → Adversarial Gate → (if OK) → Deploy Queue
+# Flow: TDD (write only) → Build (limited) → Adversarial → Commit → Deploy
 VALID_TRANSITIONS = {
-    # TDD Queue
-    TaskStatus.PENDING: [TaskStatus.LOCKED, TaskStatus.FAILED],
-    TaskStatus.LOCKED: [TaskStatus.TDD_IN_PROGRESS, TaskStatus.PENDING],
-    TaskStatus.TDD_IN_PROGRESS: [TaskStatus.TDD_SUCCESS, TaskStatus.TDD_FAILED, TaskStatus.DECOMPOSED],
-    TaskStatus.TDD_SUCCESS: [TaskStatus.ADVERSARIAL_REJECTED, TaskStatus.MERGED],
+    # Phase 1: TDD Queue (write code only, no build)
+    TaskStatus.PENDING: [TaskStatus.LOCKED, TaskStatus.FAILED, TaskStatus.DECOMPOSED],  # FRACTAL can decompose from pending
+    TaskStatus.LOCKED: [TaskStatus.TDD_IN_PROGRESS, TaskStatus.PENDING, TaskStatus.DECOMPOSED],  # FRACTAL: can decompose from locked
+    TaskStatus.TDD_IN_PROGRESS: [TaskStatus.CODE_WRITTEN, TaskStatus.TDD_FAILED, TaskStatus.DECOMPOSED, TaskStatus.TDD_SUCCESS],
+    TaskStatus.CODE_WRITTEN: [TaskStatus.BUILD_IN_PROGRESS, TaskStatus.BUILD_SUCCESS, TaskStatus.BUILD_FAILED, TaskStatus.COMMIT_QUEUED],  # Direct to build (skip BUILD_QUEUED)
+    TaskStatus.TDD_SUCCESS: [TaskStatus.ADVERSARIAL_REJECTED, TaskStatus.MERGED, TaskStatus.COMMIT_QUEUED],  # Legacy compat
     TaskStatus.TDD_FAILED: [TaskStatus.PENDING, TaskStatus.BLOCKED],  # Retry or escalate
 
-    # Adversarial Gate
-    TaskStatus.ADVERSARIAL_REJECTED: [TaskStatus.TDD_IN_PROGRESS, TaskStatus.BLOCKED],
+    # Phase 2: Build Queue (limited workers - 2-3 max)
+    TaskStatus.BUILD_QUEUED: [TaskStatus.BUILD_IN_PROGRESS],
+    TaskStatus.BUILD_IN_PROGRESS: [TaskStatus.BUILD_SUCCESS, TaskStatus.BUILD_FAILED],
+    TaskStatus.BUILD_SUCCESS: [TaskStatus.ADVERSARIAL_REJECTED, TaskStatus.COMMIT_QUEUED],  # To adversarial or direct commit
+    TaskStatus.BUILD_FAILED: [TaskStatus.PENDING, TaskStatus.TDD_IN_PROGRESS, TaskStatus.CODE_WRITTEN],  # Retry
+
+    # Phase 3: Adversarial Gate (LLM review)
+    TaskStatus.ADVERSARIAL_REJECTED: [TaskStatus.TDD_IN_PROGRESS, TaskStatus.BLOCKED, TaskStatus.PENDING],
+
+    # Phase 4: Commit Queue (sequential - 1 worker)
+    TaskStatus.COMMIT_QUEUED: [TaskStatus.MERGED, TaskStatus.TDD_IN_PROGRESS],  # Commit or retry
     TaskStatus.MERGED: [TaskStatus.QUEUED_FOR_DEPLOY, TaskStatus.COMPLETED],  # COMPLETED if deploy disabled
 
     # Deploy Queue - Full pipeline (or DEPLOYED for validation-only)
@@ -146,6 +164,8 @@ class Task:
     # FRACTAL support
     parent_id: Optional[str] = None
     depth: int = 0  # Fractal depth level
+    fractal_concern: Optional[str] = None  # core|rbac|security|edge|error
+    severity: str = "medium"  # critical|high|medium|low
 
     # Tracking
     created_at: str = None

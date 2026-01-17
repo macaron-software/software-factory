@@ -435,32 +435,77 @@ RESPOND IN JSON:
             "fractal_depth": task.get("fractal_depth", 0) + 1,
         }
 
-        # Strategy 0: Force L1 - Create min_subtasks by splitting into aspects
-        if analysis.force_level1:
+        # Strategy 0: FRACTAL L1/L2 decomposition based on depth
+        current_depth = task.get("fractal_depth", 0)
+
+        if analysis.force_level1 or current_depth == 0:
             description = task.get("description", "")
             files = task.get("files", [])
-            
-            # Define aspect-based splitting for 3 parallel sub-agents
-            aspects = [
-                ("impl", "Implement core logic", 0.5),
-                ("test", "Write tests and validations", 0.3),
-                ("integ", "Integration and edge cases", 0.2),
-            ]
-            
+
+            if current_depth == 0:
+                # ========================================================
+                # L1: 3 CONCERNS (KISS - not 5!)
+                # Based on what LLMs actually miss:
+                # - FEATURE: the happy path (LLMs do this well)
+                # - GUARDS: auth + validation (LLMs often forget)
+                # - FAILURES: errors + edge cases (LLMs often skip)
+                # ========================================================
+                aspects = [
+                    ("feature",
+                     "FEATURE (Happy Path): Implement the main business logic. "
+                     "Focus on the primary use case. Make it work for valid inputs. "
+                     "Don't worry about auth or errors yet - just the core functionality.",
+                     0.4),
+                    ("guards",
+                     "GUARDS (Auth + Validation): Add ALL protective checks. "
+                     "1) AUTHENTICATION: Verify user is logged in (return 401 if not). "
+                     "2) AUTHORIZATION: Verify user has permission (return 403 if not). "
+                     "3) INPUT VALIDATION: Validate all inputs - types, formats, ranges. "
+                     "4) SANITIZATION: Prevent injection (SQL, XSS, command). "
+                     "Use parameterized queries. Escape outputs.",
+                     0.3),
+                    ("failures",
+                     "FAILURES (Errors + Edge Cases): Handle everything that can go wrong. "
+                     "1) SPECIFIC ERRORS: Use proper HTTP codes (400, 404, 409) not generic 500. "
+                     "2) EDGE CASES: null/undefined, empty arrays, max limits, concurrent access. "
+                     "3) QUERY LIMITS: Add LIMIT to all SELECT queries (prevent DoS). "
+                     "4) LOGGING: Log errors with context for debugging. "
+                     "5) GRACEFUL DEGRADATION: Return meaningful error messages.",
+                     0.3),
+                ]
+                log(f"L1: Decomposing into {len(aspects)} concerns (feature/guards/failures)")
+
+            else:
+                # ========================================================
+                # L2: KISS ATOMIC IMPLEMENTATION
+                # Split each L1 concern into simple, testable pieces
+                # ========================================================
+                aspects = [
+                    ("impl", "IMPLEMENT: Write the minimal code to fulfill this specific concern. "
+                             "Keep it simple (KISS). Single responsibility. No over-engineering.", 0.4),
+                    ("test", "TEST: Write a focused unit test that verifies this implementation. "
+                             "Test the specific behavior. Include positive and negative cases.", 0.3),
+                    ("verify", "VERIFY: Run the test, ensure it passes. "
+                               "Fix any issues. Ensure no regressions.", 0.3),
+                ]
+                log(f"L2: Decomposing into {len(aspects)} KISS atomic tasks")
+
             # Distribute files proportionally
             file_chunks = self._distribute_files(files, [a[2] for a in aspects])
-            
-            for i, (suffix, aspect_desc, _) in enumerate(aspects[:min_subtasks]):
+
+            for i, (suffix, aspect_desc, _) in enumerate(aspects):
                 subtask_files = file_chunks[i] if i < len(file_chunks) else []
                 subtasks.append({
                     **base_task,
                     "id": f"{parent_id}_{suffix}",
-                    "description": f"{description} - {aspect_desc}",
+                    "description": f"{description}\n\n---\n\n{aspect_desc}",
                     "files": subtask_files or files,  # Fallback to all files
                     "aspect": suffix,
+                    "fractal_concern": suffix,  # For DB tracking
+                    "fractal_level": "L1" if current_depth == 0 else "L2",
                 })
-            
-            log(f"Force L1: Split into {len(subtasks)} parallel sub-agents")
+
+            log(f"Split into {len(subtasks)} parallel sub-agents (depth={current_depth})")
             return subtasks
 
         # Strategy 1: Split by files
