@@ -1006,6 +1006,144 @@ if CLICK_AVAILABLE:
 
         click.echo("\n" + format_table(headers, rows))
 
+    # --- FRACTAL REPROCESS ---
+    @cli.group()
+    @click.pass_context
+    def fractal(ctx):
+        """FRACTAL decomposition commands - reprocess existing features"""
+        pass
+
+    @fractal.command("reprocess")
+    @click.option("--status", "-s", default="deployed,merged,commit_queued",
+                  help="Status to reprocess (comma-separated)")
+    @click.option("--limit", "-l", default=50, help="Max tasks to reprocess")
+    @click.option("--dry-run", is_flag=True, help="Show what would be reprocessed")
+    @click.pass_context
+    def fractal_reprocess(ctx, status, limit, dry_run):
+        """Reprocess completed features through FRACTAL 3-concerns analysis.
+
+        Takes tasks that were completed WITHOUT FRACTAL decomposition
+        and queues them for re-analysis with the 3-concerns approach:
+        - FEATURE (happy path)
+        - GUARDS (auth, validation, sanitization)
+        - FAILURES (error handling, edge cases)
+        """
+        from core.project_registry import get_project
+        from core.task_store import TaskStore
+
+        project_name = ctx.obj.get("project")
+        if not project_name:
+            click.echo("Error: Project required. Use: factory <project> fractal reprocess")
+            return
+
+        try:
+            project = get_project(project_name)
+        except Exception as e:
+            click.echo(f"Error loading project: {e}")
+            return
+
+        store = TaskStore()
+        statuses = [s.strip() for s in status.split(",")]
+
+        # Find tasks without FRACTAL decomposition
+        tasks = store.get_tasks_by_project(project.id)
+
+        # Filter: completed status, no fractal_concern field, no parent_id (root tasks)
+        reprocess_candidates = []
+        for task in tasks:
+            if task.status.lower() in [s.lower() for s in statuses]:
+                task_dict = task.__dict__ if hasattr(task, '__dict__') else task
+                # Only root tasks (no parent_id) that weren't decomposed
+                if not getattr(task, 'parent_id', None) and not getattr(task, 'fractal_concern', None):
+                    reprocess_candidates.append(task)
+
+        reprocess_candidates = reprocess_candidates[:limit]
+
+        click.echo(f"\n🔄 FRACTAL Reprocess - {project_name}")
+        click.echo(f"   Found {len(reprocess_candidates)} tasks to reprocess")
+        click.echo(f"   Status filter: {statuses}")
+
+        if not reprocess_candidates:
+            click.echo("\n   No tasks found matching criteria.")
+            return
+
+        # Show tasks
+        click.echo("\n   Tasks to reprocess:")
+        for i, task in enumerate(reprocess_candidates[:10], 1):
+            desc = getattr(task, 'description', str(task))[:60]
+            click.echo(f"   {i}. [{task.status}] {desc}...")
+
+        if len(reprocess_candidates) > 10:
+            click.echo(f"   ... and {len(reprocess_candidates) - 10} more")
+
+        if dry_run:
+            click.echo("\n   [DRY RUN] No changes made.")
+            return
+
+        # Reset tasks to pending for FRACTAL reprocessing
+        click.echo("\n   Resetting tasks to 'pending' for FRACTAL reprocessing...")
+        reset_count = 0
+        for task in reprocess_candidates:
+            try:
+                store.update_task(task.id, status="pending")
+                reset_count += 1
+            except Exception as e:
+                click.echo(f"   Error resetting {task.id}: {e}")
+
+        click.echo(f"\n   ✅ Reset {reset_count} tasks to pending")
+        click.echo(f"   Run 'factory {project_name} wiggum start' to process with FRACTAL")
+
+    @fractal.command("status")
+    @click.pass_context
+    def fractal_status(ctx):
+        """Show FRACTAL decomposition statistics"""
+        from core.project_registry import get_project
+        from core.task_store import TaskStore
+        import sqlite3
+
+        project_name = ctx.obj.get("project")
+        if not project_name:
+            click.echo("Error: Project required.")
+            return
+
+        try:
+            project = get_project(project_name)
+        except Exception as e:
+            click.echo(f"Error: {e}")
+            return
+
+        store = TaskStore()
+
+        # Query FRACTAL stats using direct connection
+        conn = sqlite3.connect(str(store.db_path))
+        conn.row_factory = sqlite3.Row
+
+        stats = conn.execute("""
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN parent_id IS NOT NULL THEN 1 ELSE 0 END) as subtasks,
+                SUM(CASE WHEN status = 'decomposed' THEN 1 ELSE 0 END) as decomposed
+            FROM tasks
+            WHERE project_id = ?
+        """, (project.id,)).fetchone()
+
+        click.echo(f"\n📊 FRACTAL Stats - {project_name}")
+        click.echo(f"   Total tasks:    {stats[0]}")
+        click.echo(f"   Subtasks:       {stats[1]} ({100*stats[1]//max(stats[0],1)}%)")
+        click.echo(f"   Decomposed:     {stats[2]}")
+
+        # Parent tasks without subtasks (need FRACTAL)
+        non_fractal = conn.execute("""
+            SELECT COUNT(*) FROM tasks
+            WHERE project_id = ? AND parent_id IS NULL
+            AND status IN ('deployed', 'merged', 'commit_queued')
+            AND id NOT IN (SELECT DISTINCT parent_id FROM tasks WHERE parent_id IS NOT NULL)
+        """, (project.id,)).fetchone()[0]
+
+        click.echo(f"   Non-FRACTAL:    {non_fractal} (can be reprocessed)")
+
+        conn.close()
+
     # --- PROJECTS ---
     @cli.command()
     @click.option("--json", "as_json", is_flag=True, help="Output as JSON")

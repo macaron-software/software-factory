@@ -134,16 +134,21 @@ Config: `-w workers -b batch -t timeout --skip-deploy`
 
 ### FRACTAL `core/fractal.py`
 ```
-L1 (depth=0): Split into 3 CONCERNS
-  ├── FEATURE: happy path, core business logic
-  ├── GUARDS: auth(401) + permission(403) + validation + sanitization
-  └── FAILURES: errors(400/404/409) + edge cases + LIMIT + logging
+L1 (depth=0): Split into 3 CONCERNS (SEQUENTIAL execution)
+  1. FEATURE: happy path, core business logic (runs FIRST)
+  2. GUARDS: auth(401) + permission(403) + validation (builds on feature)
+  3. FAILURES: errors(400/404/409) + edge cases (builds on guards)
+
+  Order matters: feature → guards → failures
+  Each concern ENRICHES the code written by the previous one
 
 L2 (depth=1): KISS atomic
   ├── IMPL: minimal code
   ├── TEST: focused unit test
   └── VERIFY: run & fix
 ```
+
+**Thinking activé**: `opencode --variant high` pour extended reasoning
 
 **Config** (`projects/*.yaml`):
 ```yaml

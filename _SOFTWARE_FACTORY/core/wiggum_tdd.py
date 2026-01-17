@@ -320,26 +320,35 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
 
     async def _run_parallel_subtasks(self, parent_task: Task, subtasks: List[Dict]) -> TDDResult:
         """
-        Run subtasks in parallel using sub-agents.
-        
-        Each subtask is executed concurrently. Parent task is marked DONE
-        only if ALL subtasks succeed.
-        
+        Run subtasks SEQUENTIALLY by concern order: feature → guards → failures.
+
+        This ensures each concern builds on the previous:
+        - feature: implements happy path
+        - guards: adds validation/auth to feature code
+        - failures: adds error handling to guards code
+
         Args:
             parent_task: The parent task being decomposed
             subtasks: List of subtask dicts from FRACTAL decomposition
-            
+
         Returns:
             TDDResult with success=True if all subtasks passed
         """
         result = TDDResult(success=False, task_id=parent_task.id)
-        
-        self.log(f"🔀 Launching {len(subtasks)} parallel sub-agents...")
 
-        # Create subtasks in store first
+        # Sort subtasks by concern order: feature → guards → failures
+        concern_order = {"feature": 0, "guards": 1, "failures": 2}
+        sorted_subtasks = sorted(
+            subtasks,
+            key=lambda st: concern_order.get(st.get("aspect", ""), 99)
+        )
+
+        self.log(f"🔀 Running {len(sorted_subtasks)} sub-agents SEQUENTIALLY (feature→guards→failures)...")
+
+        # Create subtasks in store first (in sorted order)
         import uuid
         subtask_ids = []
-        for st in subtasks:
+        for st in sorted_subtasks:
             subtask = Task(
                 id=f"subtask-{parent_task.domain}-{uuid.uuid4().hex[:8]}",
                 project_id=self.project.id,
@@ -392,29 +401,30 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
             except Exception as e:
                 return (subtask_id, False, str(e))
         
-        # Execute all subtasks concurrently
-        tasks = [
-            run_subtask(sid, i) 
-            for i, sid in enumerate(subtask_ids)
-        ]
-        
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Aggregate results
+        # Execute subtasks SEQUENTIALLY (feature → guards → failures)
+        # Each concern builds on the code written by the previous one
         successes = 0
         failures = []
-        
-        for res in results:
-            if isinstance(res, Exception):
-                failures.append(f"Exception: {res}")
-            else:
+
+        for i, sid in enumerate(subtask_ids):
+            aspect = sorted_subtasks[i].get("aspect", "sub")
+            self.log(f"  [{i+1}/{len(subtask_ids)}] Running {aspect.upper()} concern...")
+
+            try:
+                res = await run_subtask(sid, i)
                 sid, success, error = res
+
                 if success:
                     successes += 1
-                    self.log(f"  ✅ {sid}: PASSED")
+                    self.log(f"  ✅ {sid} ({aspect}): PASSED")
                 else:
                     failures.append(f"{sid}: {error}")
-                    self.log(f"  ❌ {sid}: {error[:50]}")
+                    self.log(f"  ❌ {sid} ({aspect}): {error[:50]}")
+                    # Continue to next concern even if this one fails
+                    # (guards can still add validation even if feature failed)
+            except Exception as e:
+                failures.append(f"{sid}: Exception {e}")
+                self.log(f"  ❌ {sid} ({aspect}): Exception {e}")
         
         # Parent succeeds only if ALL subtasks succeed
         if successes == len(subtask_ids):

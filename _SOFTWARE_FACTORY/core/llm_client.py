@@ -535,11 +535,17 @@ async def run_opencode(
         log(f"Running opencode ({current_model})...")
 
         try:
-            proc = await asyncio.create_subprocess_exec(
+            # Build command with variant for extended thinking
+            cmd = [
                 "opencode",
                 "run",
                 "-m", current_model,
+                "--variant", "high",  # Enable extended thinking/reasoning
                 prompt,
+            ]
+
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
                 cwd=cwd,
                 env=env,
                 stdout=asyncio.subprocess.PIPE,
