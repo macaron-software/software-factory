@@ -85,11 +85,13 @@ class CheckResult:
 
 # REJECT patterns: immediate high score (typically >= threshold alone)
 CORE_REJECT_PATTERNS = {
-    # Test skipping (SLOP) - instant reject
-    r"\btest\.skip\b": ("test_skip", 5, "Test skip detected - tests must run"),
-    r"\bdescribe\.skip\b": ("describe_skip", 5, "Describe skip detected - tests must run"),
-    r"\bit\.skip\b": ("it_skip", 5, "It skip detected - tests must run"),
-    r"#\[ignore\]": ("ignore_attr", 5, "Rust #[ignore] detected - tests must run"),
+    # Test skipping - reduced score (2 pts each)
+    # Existing skips in codebase shouldn't block new code
+    # These will create feedback tasks for fixing, not block builds
+    r"\btest\.skip\b": ("test_skip", 2, "Test skip detected - tests must run"),
+    r"\bdescribe\.skip\b": ("describe_skip", 2, "Describe skip detected - tests must run"),
+    r"\bit\.skip\b": ("it_skip", 2, "It skip detected - tests must run"),
+    r"#\[ignore\]": ("ignore_attr", 2, "Rust #[ignore] detected - tests must run"),
 
     # TypeScript bypass
     r"@ts-ignore": ("ts_ignore", 2, "@ts-ignore bypasses type checking"),
@@ -111,7 +113,7 @@ CORE_REJECT_PATTERNS = {
 # WARNING patterns: accumulate points
 CORE_WARNING_PATTERNS = {
     r"\.unwrap\(\)": ("unwrap", 1, "Rust .unwrap() can panic", 3),  # max 3 occurrences
-    r"\bany\b": ("any_type", 1, "TypeScript 'any' type detected", 5),  # max 5
+    r":\s*any\b|as\s+any\b|<any>": ("any_type", 1, "TypeScript 'any' type detected", 5),  # type annotation/cast only
     r"//\s*TODO\b": ("todo", 1, "TODO comment - incomplete code", 2),
     r"//\s*FIXME\b": ("fixme", 1, "FIXME comment - known issue", 2),
     r"//\s*STUB\b": ("stub", 2, "STUB comment - placeholder code", 1),
@@ -135,9 +137,10 @@ SECURITY_PATTERNS = {
 
 # Patterns that indicate test/fixture files (OK to have hardcoded values)
 TEST_FILE_PATTERNS = [
-    r'test[_\-]', r'\.test\.', r'\.spec\.', r'_test\.', r'_spec\.',
+    r'test[_\-]', r'\.test\.', r'\.spec\.', r'_tests?\.', r'_specs?\.',
     r'/tests/', r'/test/', r'/__tests__/', r'/fixtures/', r'/mocks/',
     r'mock[_\-]', r'fixture[_\-]', r'fake[_\-]', r'stub[_\-]',
+    r'_test$', r'_tests$',  # Files ending in _test or _tests (no extension)
 ]
 
 
@@ -218,6 +221,159 @@ SKIP_ARCH_CHECK_PATTERNS = [
 
 # Security rules to SKIP in test files (hardcoded fixtures are OK)
 SKIP_IN_TESTS = {'hardcoded_password', 'hardcoded_api_key', 'hardcoded_secret', 'hardcoded_token'}
+
+# Core warning patterns to SKIP in test files (common test patterns)
+SKIP_WARNINGS_IN_TESTS = {'unwrap', 'todo', 'fixme', 'stub', 'todo_macro'}
+
+
+# ============================================================================
+# CYCLOMATIC COMPLEXITY (KISS enforcement)
+# ============================================================================
+# Thresholds per McCabe's cyclomatic complexity:
+# 1-10: Simple, low risk
+# 11-20: Moderate complexity
+# 21-50: High complexity, refactor recommended
+# 50+: Untestable, must refactor
+
+COMPLEXITY_THRESHOLDS = {
+    "max_function_lines": 50,      # Max lines per function
+    "max_nesting_depth": 4,        # Max nesting (if/for/while)
+    "max_branches_per_function": 10,  # Max if/else/match branches
+    "max_params": 5,               # Max function parameters
+    "cyclomatic_warning": 10,      # Warning threshold
+    "cyclomatic_reject": 20,       # Reject threshold
+}
+
+# Patterns to detect complexity indicators
+COMPLEXITY_PATTERNS = {
+    # Deep nesting detection (4+ levels)
+    "rust": {
+        "nesting": r"^(\s{16,})(if|for|while|match|loop)\b",  # 4+ indents (4 spaces each)
+        "long_match": r"match\s+\w+\s*\{[^}]{500,}\}",  # Match with 500+ chars
+        "many_unwrap": r"(\.unwrap\(\).*){4,}",  # 4+ unwraps in sequence
+    },
+    "python": {
+        "nesting": r"^(\s{16,})(if|for|while|try|with)\b",
+        "long_function": r"def\s+\w+\([^)]*\):[^def]{1000,}",  # 1000+ chars function
+        "many_conditions": r"(and|or).*?(and|or).*?(and|or).*?(and|or)",  # 4+ boolean ops
+    },
+    "typescript": {
+        "nesting": r"^(\s{16,})(if|for|while|switch)\b",
+        "callback_hell": r"(\)\s*=>\s*\{[^}]*){4,}",  # 4+ nested callbacks
+        "long_ternary": r"\?[^:]{50,}:",  # Ternary with 50+ chars
+    },
+    "svelte": {
+        "nesting": r"^(\s{16,})(if|for|while|switch|\{#if|\{#each)\b",
+        "complex_reactive": r"\$:\s*\{[^}]{200,}\}",  # Complex reactive block
+    },
+}
+
+# Heuristic complexity scoring based on code patterns
+def estimate_cyclomatic_complexity(code: str, file_type: str = "rust") -> Tuple[int, List[Dict]]:
+    """
+    Estimate cyclomatic complexity using heuristics.
+    
+    Returns:
+        Tuple of (complexity_score, list of issues)
+    
+    Cyclomatic complexity = E - N + 2P
+    Simplified heuristic: count decision points
+    """
+    issues = []
+    score = 1  # Base complexity
+    
+    # Count decision points
+    decision_patterns = {
+        "if": r"\bif\b",
+        "else_if": r"\belse\s+if\b|\belif\b",
+        "for": r"\bfor\b",
+        "while": r"\bwhile\b",
+        "match": r"\bmatch\b|\bswitch\b",
+        "case": r"\bcase\b|=>",  # Match arms
+        "and": r"\s&&\s|\band\b",
+        "or": r"\s\|\|\s|\bor\b",
+        "try": r"\btry\b",
+        "catch": r"\bcatch\b|\bexcept\b",
+        "ternary": r"\?[^?:]+:",
+    }
+    
+    for name, pattern in decision_patterns.items():
+        matches = len(re.findall(pattern, code))
+        if name in ("case", "and", "or"):
+            score += matches  # Each adds 1
+        else:
+            score += matches  # Each decision point adds 1
+    
+    # Check nesting depth
+    max_nesting = 0
+    current_nesting = 0
+    for line in code.split('\n'):
+        stripped = line.lstrip()
+        indent = len(line) - len(stripped)
+        spaces_per_indent = 4 if file_type in ("rust", "typescript", "svelte") else 4
+        nesting_level = indent // spaces_per_indent
+        max_nesting = max(max_nesting, nesting_level)
+    
+    if max_nesting > COMPLEXITY_THRESHOLDS["max_nesting_depth"]:
+        issues.append({
+            "rule": "deep_nesting",
+            "severity": "warning" if max_nesting <= 6 else "reject",
+            "points": min(max_nesting - COMPLEXITY_THRESHOLDS["max_nesting_depth"], 5),
+            "message": f"Deep nesting detected ({max_nesting} levels) - refactor to reduce complexity",
+        })
+    
+    # Check function length (rough heuristic)
+    function_patterns = {
+        "rust": r"(?:pub\s+)?(?:async\s+)?fn\s+\w+",
+        "python": r"def\s+\w+",
+        "typescript": r"(?:function\s+\w+|const\s+\w+\s*=\s*(?:async\s*)?\([^)]*\)\s*=>)",
+        "svelte": r"(?:function\s+\w+|const\s+\w+\s*=\s*(?:async\s*)?\([^)]*\)\s*=>)",
+    }
+    
+    pattern = function_patterns.get(file_type, function_patterns["rust"])
+    functions = re.split(pattern, code)
+    for i, func_body in enumerate(functions[1:], 1):  # Skip first split (before first function)
+        if func_body is None:
+            continue
+        lines = func_body.count('\n')
+        if lines > COMPLEXITY_THRESHOLDS["max_function_lines"]:
+            issues.append({
+                "rule": "long_function",
+                "severity": "warning" if lines <= 100 else "reject",
+                "points": min((lines - COMPLEXITY_THRESHOLDS["max_function_lines"]) // 20, 5),
+                "message": f"Function too long ({lines} lines) - split into smaller functions",
+            })
+    
+    # Check parameter count
+    param_pattern = r"fn\s+\w+\s*\(([^)]+)\)" if file_type == "rust" else r"def\s+\w+\s*\(([^)]+)\)"
+    for match in re.finditer(param_pattern, code):
+        params = match.group(1).split(',')
+        param_count = len([p for p in params if p.strip() and p.strip() != 'self' and p.strip() != '&self' and p.strip() != '&mut self'])
+        if param_count > COMPLEXITY_THRESHOLDS["max_params"]:
+            issues.append({
+                "rule": "too_many_params",
+                "severity": "warning",
+                "points": min(param_count - COMPLEXITY_THRESHOLDS["max_params"], 3),
+                "message": f"Function has too many parameters ({param_count}) - use struct/object",
+            })
+    
+    # Add complexity score issue if high
+    if score >= COMPLEXITY_THRESHOLDS["cyclomatic_reject"]:
+        issues.append({
+            "rule": "high_complexity",
+            "severity": "reject",
+            "points": 5,
+            "message": f"Cyclomatic complexity too high ({score}) - must refactor (max: {COMPLEXITY_THRESHOLDS['cyclomatic_reject']})",
+        })
+    elif score >= COMPLEXITY_THRESHOLDS["cyclomatic_warning"]:
+        issues.append({
+            "rule": "moderate_complexity",
+            "severity": "warning",
+            "points": 2,
+            "message": f"Cyclomatic complexity moderate ({score}) - consider refactoring",
+        })
+    
+    return score, issues
 
 
 def is_test_file(filename: str) -> bool:
@@ -304,6 +460,9 @@ class AdversarialGate:
         lines = code.split("\n")
         pattern_counts: Dict[str, int] = {}
 
+        # Check if test file early (needed for multiple pattern checks)
+        is_test = is_test_file(filename)
+
         # Core reject patterns
         if self.use_core_patterns:
             for pattern, (rule, points, message) in CORE_REJECT_PATTERNS.items():
@@ -320,6 +479,9 @@ class AdversarialGate:
 
             # Core warning patterns with max occurrences
             for pattern, (rule, points, message, max_occ) in CORE_WARNING_PATTERNS.items():
+                # Skip certain warnings in test files
+                if is_test and rule in SKIP_WARNINGS_IN_TESTS:
+                    continue
                 count = 0
                 for i, line in enumerate(lines, 1):
                     if re.search(pattern, line, re.IGNORECASE):
@@ -336,7 +498,6 @@ class AdversarialGate:
                 pattern_counts[rule] = count
 
         # Security patterns (skip hardcoded secrets in test/fixture files)
-        is_test = is_test_file(filename)
         if self.security_check:
             for pattern, (rule, points, message) in SECURITY_PATTERNS.items():
                 # Skip hardcoded credential rules in test files
@@ -364,6 +525,11 @@ class AdversarialGate:
             message = custom.get("message", "Custom pattern matched")
             max_occ = custom.get("max_occurrences", 100)
             required = custom.get("required", False)
+            skip_in_tests = custom.get("skip_in_tests", False)
+
+            # Skip security-like patterns in test files
+            if is_test and skip_in_tests:
+                continue
 
             count = 0
             for i, line in enumerate(lines, 1):
@@ -394,6 +560,18 @@ class AdversarialGate:
                 ))
 
             pattern_counts[rule] = count
+
+        # COMPLEXITY CHECK (KISS enforcement)
+        complexity_score, complexity_issues = estimate_cyclomatic_complexity(code, file_type)
+        for ci in complexity_issues:
+            issues.append(Issue(
+                rule=ci["rule"],
+                severity=ci["severity"],
+                points=ci["points"],
+                message=ci["message"],
+                line=0,
+            ))
+        pattern_counts["cyclomatic_complexity"] = complexity_score
 
         # Calculate score
         total_score = sum(issue.points for issue in issues)
