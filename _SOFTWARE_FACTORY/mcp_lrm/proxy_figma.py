@@ -4,6 +4,8 @@ MCP Figma Proxy - Stdio-to-HTTP bridge for Figma MCP
 =====================================================
 Forwards MCP requests to Figma's MCP server (desktop or remote).
 
+Figma MCP uses SSE (Server-Sent Events) for responses.
+
 Usage in opencode config:
   "figma": {
     "type": "local",
@@ -16,6 +18,7 @@ import sys
 import urllib.request
 import urllib.error
 import os
+import re
 from typing import Optional, Dict, Any
 
 # Figma MCP endpoints
@@ -24,6 +27,9 @@ FIGMA_REMOTE_URL = "https://mcp.figma.com/mcp"
 
 # Get Figma token from env (for remote server)
 FIGMA_TOKEN = os.environ.get("FIGMA_ACCESS_TOKEN", "")
+
+# Session ID for Figma MCP (set after initialize)
+SESSION_ID = None
 
 
 def read_message() -> Optional[Dict]:
@@ -53,22 +59,21 @@ def make_error(id: Any, code: int, message: str) -> Dict:
 
 
 def check_desktop_server() -> bool:
-    """Check if Figma desktop MCP server is running"""
+    """Check if Figma desktop MCP server is running by trying a simple GET"""
+    import socket
     try:
-        req = urllib.request.Request(
-            FIGMA_DESKTOP_URL,
-            method='POST',
-            headers={"Content-Type": "application/json"},
-            data=json.dumps({"jsonrpc": "2.0", "method": "initialize", "id": 0}).encode()
-        )
-        with urllib.request.urlopen(req, timeout=2) as resp:
-            return resp.status == 200
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        result = sock.connect_ex(('127.0.0.1', 3845))
+        sock.close()
+        return result == 0
     except:
         return False
 
 
-def call_figma_server(method: str, params: Dict = None) -> Dict:
+def call_figma_server(method: str, params: Dict = None, msg_id: Any = 1) -> Dict:
     """Call Figma MCP server (desktop first, fallback to remote)"""
+    global SESSION_ID
     
     # Prefer desktop server (no auth needed)
     use_desktop = check_desktop_server()
@@ -79,10 +84,17 @@ def call_figma_server(method: str, params: Dict = None) -> Dict:
         "jsonrpc": "2.0",
         "method": method,
         "params": params or {},
-        "id": 1
+        "id": msg_id
     }
     
-    headers = {"Content-Type": "application/json"}
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream"
+    }
+    
+    # Add session ID if we have one
+    if SESSION_ID:
+        headers["mcp-session-id"] = SESSION_ID
     
     # Add auth for remote server
     if not use_desktop and FIGMA_TOKEN:
@@ -97,7 +109,23 @@ def call_figma_server(method: str, params: Dict = None) -> Dict:
         )
         
         with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.loads(resp.read().decode())
+            # Extract session ID from response headers
+            new_session = resp.headers.get("mcp-session-id")
+            if new_session:
+                SESSION_ID = new_session
+            
+            # Parse SSE response
+            content = resp.read().decode()
+            
+            # Extract JSON from SSE format: "data: {...}"
+            for line in content.split('\n'):
+                if line.startswith('data: '):
+                    json_str = line[6:]  # Remove "data: " prefix
+                    return json.loads(json_str)
+            
+            # Fallback: try parsing as plain JSON
+            return json.loads(content)
+            
     except urllib.error.HTTPError as e:
         return {"error": {"code": e.code, "message": f"HTTP {e.code}: {e.reason}"}}
     except Exception as e:
@@ -105,22 +133,26 @@ def call_figma_server(method: str, params: Dict = None) -> Dict:
 
 
 def handle_initialize(msg_id: Any) -> Dict:
-    """Handle MCP initialize request"""
-    return make_response(msg_id, {
+    """Handle MCP initialize request - forward to Figma"""
+    result = call_figma_server("initialize", {
         "protocolVersion": "2024-11-05",
-        "serverInfo": {
-            "name": "figma-proxy",
-            "version": "1.0.0"
-        },
-        "capabilities": {
-            "tools": {}
-        }
-    })
+        "capabilities": {},
+        "clientInfo": {"name": "factory-proxy", "version": "1.0"}
+    }, msg_id)
+    
+    if "error" in result:
+        return make_error(msg_id, result["error"].get("code", -1), result["error"].get("message", "Init failed"))
+    
+    return make_response(msg_id, result.get("result", {
+        "protocolVersion": "2024-11-05",
+        "serverInfo": {"name": "figma-proxy", "version": "1.0.0"},
+        "capabilities": {"tools": {}}
+    }))
 
 
 def handle_tools_list(msg_id: Any) -> Dict:
     """Forward tools/list to Figma server"""
-    result = call_figma_server("tools/list")
+    result = call_figma_server("tools/list", {}, msg_id)
     
     if "error" in result:
         # Return empty tools if server unavailable
@@ -131,7 +163,7 @@ def handle_tools_list(msg_id: Any) -> Dict:
 
 def handle_tools_call(msg_id: Any, params: Dict) -> Dict:
     """Forward tools/call to Figma server"""
-    result = call_figma_server("tools/call", params)
+    result = call_figma_server("tools/call", params, msg_id)
     
     if "error" in result:
         return make_error(msg_id, result["error"].get("code", -1), result["error"].get("message", "Unknown error"))
