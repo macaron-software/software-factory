@@ -140,6 +140,8 @@ class WiggumWorker:
 
             # 3. TDD iterations - loop until validation (RLM pattern)
             feedback = ""  # Accumulated feedback from adversarial
+            last_adversarial_issues = []  # Store last issues for feedback loop
+            last_code_changes = {}  # Store last code changes for context
             for iteration in range(self.MAX_ITERATIONS):
                 result.iterations = iteration + 1
                 self.log(f"Iteration {iteration + 1}/{self.MAX_ITERATIONS}")
@@ -178,12 +180,14 @@ class WiggumWorker:
                     self.log(f"Detected {len(code_changes)} file changes: {list(code_changes.keys())[:3]}")
 
                 result.code_written = True
+                last_code_changes = code_changes  # Store for feedback loop
 
                 # 4. ADVERSARIAL CHECK - LLM validates code quality (context-aware)
                 check_result = await self._run_adversarial(code_changes)
                 if not check_result.approved:
                     self.log(f"❌ Adversarial REJECTED (score={check_result.score}): {check_result.issues[:200]}", "WARN")
                     feedback = f"ADVERSARIAL REJECTED (score {check_result.score}/{check_result.threshold}):\n{check_result.issues}"
+                    last_adversarial_issues = check_result.issues  # Store for feedback loop
                     # Revert changes and retry
                     await self._git_reset()
                     continue
@@ -196,10 +200,22 @@ class WiggumWorker:
                 result.success = True
                 return result
 
-            # Max iterations reached
+            # Max iterations reached - RLM FEEDBACK LOOP: Create tasks from adversarial issues
             result.error = "Max iterations reached"
             self.task_store.transition(task.id, TaskStatus.TDD_FAILED)
             self.log("❌ Task failed after max iterations", "WARN")
+
+            # Create feedback tasks from adversarial issues (RLM pattern)
+            if last_adversarial_issues:
+                source_files = list(last_code_changes.keys()) if last_code_changes else task.files
+                created_tasks = self.task_store.create_tasks_from_adversarial(
+                    project_id=self.project.id,
+                    domain=task.domain,
+                    issues=last_adversarial_issues,
+                    source_files=source_files,
+                )
+                if created_tasks:
+                    self.log(f"🔄 RLM FEEDBACK: Created {len(created_tasks)} fix tasks from adversarial issues")
 
         except Exception as e:
             result.error = str(e)
@@ -233,6 +249,20 @@ The code passed TDD but FAILED in Deploy. You MUST fix the issues above.
 You MUST address ALL the issues above before proceeding.
 """
 
+        # Check if project has Figma integration
+        figma_config = self.project.figma or {}
+        figma_enabled = figma_config.get('enabled', False)
+        
+        figma_instructions = ""
+        if figma_enabled and task.domain in ['svelte', 'typescript', 'frontend']:
+            figma_instructions = """
+FIGMA DESIGN SYSTEM (Source of Truth):
+- get_design_context: Get CSS specs from Figma for selected component
+- get_variable_defs: Get design tokens (colors, spacing)
+For Svelte components, ALWAYS check Figma specs before writing CSS.
+Use clientFrameworks="svelte" when calling Figma tools.
+"""
+
         prompt = f"""You are a TDD agent. Complete this task using strict TDD.
 
 PROJECT: {self.project.name} ({self.project.display_name})
@@ -251,7 +281,7 @@ MCP TOOLS AVAILABLE (use these to explore the project):
 - lrm_conventions(domain): Get coding conventions for this domain
 - lrm_examples(type, domain): Get example tests/code
 - lrm_build(domain, command): Run build/test/lint commands
-
+{figma_instructions}
 TDD CYCLE:
 1. Use lrm_locate and lrm_summarize to understand the codebase context
 2. Use lrm_conventions to follow project patterns
@@ -847,8 +877,22 @@ class WiggumPool:
         log(f"Starting Wiggum Pool: {self.num_workers} workers")
         log("=" * 60)
 
+        last_cleanup = 0
+        CLEANUP_INTERVAL = 300  # 5 minutes
+
         try:
             while self._running:
+                # Periodic cleanup of stuck tasks (every 5 min)
+                import time
+                now = time.time()
+                if now - last_cleanup > CLEANUP_INTERVAL:
+                    reset_count = self.task_store.cleanup_stuck_tasks(
+                        self.project.id, max_age_minutes=60
+                    )
+                    if reset_count > 0:
+                        log(f"🔄 Cleanup: reset {reset_count} stuck tasks")
+                    last_cleanup = now
+
                 # Get pending tasks
                 pending = self.task_store.get_pending_tasks(self.project.id, limit=100)
 

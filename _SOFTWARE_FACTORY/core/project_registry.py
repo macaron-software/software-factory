@@ -143,6 +143,7 @@ class ProjectConfig:
     analyzers: List[str]
     config_path: Path
     cli: Dict[str, Any] = None  # Project-specific CLI commands
+    figma: Dict[str, Any] = None  # Figma MCP integration config
 
     @property
     def vision_path(self) -> Path:
@@ -172,48 +173,46 @@ class ProjectConfig:
 
     def get_build_cmd(self, domain: str = None) -> str:
         """Get build command for domain or all"""
-        # PRIORITY 1: domain-specific build_cmd in domains section
-        if domain:
-            domain_cfg = self.get_domain(domain)
-            if domain_cfg and domain_cfg.get("build_cmd"):
-                return domain_cfg["build_cmd"]
-        # PRIORITY 2: cli section
+        # PRIORITY 1: cli section (project CLI is preferred)
         if self.cli and "build" in self.cli:
             build_cmds = self.cli["build"]
             if domain and domain in build_cmds:
                 return build_cmds[domain]
-            return build_cmds.get("all", f"{self.get_cli_binary()} build")
+            if "all" in build_cmds:
+                return build_cmds["all"]
+        # PRIORITY 2: domain-specific build_cmd in domains section (legacy)
+        if domain:
+            domain_cfg = self.get_domain(domain)
+            if domain_cfg and domain_cfg.get("build_cmd"):
+                return domain_cfg["build_cmd"]
         return f"{self.get_cli_binary()} build"
 
     def get_test_cmd(self, domain: str = None) -> str:
         """Get test command for domain or all"""
-        # PRIORITY 1: domain-specific test_cmd in domains section
-        if domain:
-            domain_cfg = self.get_domain(domain)
-            if domain_cfg and domain_cfg.get("test_cmd"):
-                return domain_cfg["test_cmd"]
-        # PRIORITY 2: cli section
+        # PRIORITY 1: cli section (project CLI is preferred)
         if self.cli and "test" in self.cli:
             test_cmds = self.cli["test"]
             if domain and domain in test_cmds:
                 return test_cmds[domain]
-            return test_cmds.get("all", f"{self.get_cli_binary()} test")
+            if "all" in test_cmds:
+                return test_cmds["all"]
+        # PRIORITY 2: domain-specific test_cmd in domains section (legacy)
+        if domain:
+            domain_cfg = self.get_domain(domain)
+            if domain_cfg and domain_cfg.get("test_cmd"):
+                return domain_cfg["test_cmd"]
         return f"{self.get_cli_binary()} test"
 
     def get_lint_cmd(self, domain: str = None) -> str:
         """Get lint command for domain or all"""
-        # PRIORITY 1: domain-specific lint_cmd in domains section
-        if domain:
-            domain_cfg = self.get_domain(domain)
-            if domain_cfg and domain_cfg.get("lint_cmd"):
-                return domain_cfg["lint_cmd"]
-        # PRIORITY 2: cli section
+        # PRIORITY 1: cli section (project CLI is preferred)
         if self.cli and "lint" in self.cli:
             lint_cmds = self.cli["lint"]
             if domain and domain in lint_cmds:
                 return lint_cmds[domain]
-            return lint_cmds.get("all", f"{self.get_cli_binary()} lint")
-        # PRIORITY 3: fallback to domain config (legacy path - now handled above)
+            if "all" in lint_cmds:
+                return lint_cmds["all"]
+        # PRIORITY 2: domain-specific lint_cmd in domains section (legacy)
         if domain:
             domain_cfg = self.get_domain(domain)
             if domain_cfg and domain_cfg.get("lint_cmd"):
@@ -322,6 +321,7 @@ def _parse_project(config_path: Path) -> ProjectConfig:
         analyzers=raw.get("analyzers", []),
         config_path=config_path,
         cli=raw.get("cli"),  # Project-specific CLI commands
+        figma=raw.get("figma", {"enabled": False}),  # Figma MCP integration
     )
 
 

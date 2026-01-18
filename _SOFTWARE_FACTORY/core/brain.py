@@ -53,6 +53,126 @@ def log(msg: str, level: str = "INFO"):
 
 
 # ============================================================================
+# BRAIN MODES - Specialized analysis prompts
+# ============================================================================
+
+BRAIN_MODES = {
+    "fix": {
+        "name": "FIX",
+        "description": "Bugs, build errors, crashes, compilation issues",
+        "focus": """Focus on QUALITY & FIXES only:
+1. Build errors and compilation issues
+2. Runtime crashes and panics (.unwrap() abuse)
+3. Logic bugs and incorrect behavior
+4. Missing error handling
+5. Broken tests
+Do NOT generate new features - only FIX existing broken code.
+Task types: fix only.""",
+        "task_types": ["fix"],
+    },
+    "vision": {
+        "name": "VISION",
+        "description": "New features, product roadmap, innovation",
+        "focus": """Focus on NEW FEATURES only:
+1. Features from the vision document not yet implemented
+2. New user-facing capabilities
+3. New integrations and APIs
+4. New platforms and markets
+5. Innovation and competitive advantages
+Do NOT generate fix/refactor tasks - only NEW FEATURES.
+Task types: feature only.""",
+        "task_types": ["feature"],
+    },
+    "security": {
+        "name": "SECURITY",
+        "description": "OWASP, secrets, vulnerabilities, auth issues",
+        "focus": """Focus on SECURITY only:
+1. OWASP Top 10 vulnerabilities (injection, XSS, CSRF, etc.)
+2. Hardcoded secrets and credentials
+3. Authentication and authorization flaws
+4. Data exposure and privacy issues
+5. Insecure dependencies
+Do NOT generate feature/refactor tasks - only SECURITY fixes.
+Task types: security only.""",
+        "task_types": ["security"],
+    },
+    "perf": {
+        "name": "PERF",
+        "description": "Performance optimization, caching, queries",
+        "focus": """Focus on PERFORMANCE only:
+1. N+1 database queries
+2. Missing caching opportunities
+3. Slow algorithms and data structures
+4. Memory leaks and excessive allocations
+5. Blocking I/O and concurrency issues
+Do NOT generate feature/security tasks - only PERFORMANCE improvements.
+Task types: refactor (perf) only.""",
+        "task_types": ["refactor"],
+    },
+    "refactor": {
+        "name": "REFACTOR",
+        "description": "Code quality, DRY, patterns, architecture",
+        "focus": """Focus on CODE QUALITY only:
+1. DRY violations (duplicated code)
+2. SOLID principle violations
+3. God classes and long methods
+4. Missing abstractions
+5. Inconsistent patterns
+Do NOT generate feature/fix tasks - only REFACTORING.
+Task types: refactor only.""",
+        "task_types": ["refactor"],
+    },
+    "test": {
+        "name": "TEST",
+        "description": "Test coverage gaps, missing tests, edge cases",
+        "focus": """Focus on TEST COVERAGE only:
+1. Untested public functions
+2. Missing edge case tests
+3. Missing integration tests
+4. Missing E2E tests
+5. Flaky tests that need fixing
+Do NOT generate feature/fix tasks - only TEST tasks.
+Task types: test only.""",
+        "task_types": ["test"],
+    },
+    "migrate": {
+        "name": "MIGRATE",
+        "description": "REST→gRPC, v1→v2, deprecations, upgrades",
+        "focus": """Focus on MIGRATIONS only:
+1. Legacy API migrations (REST→gRPC, etc.)
+2. Version upgrades (v1→v2)
+3. Deprecated code removal
+4. Library/framework upgrades
+5. Protocol changes
+Do NOT generate feature/fix tasks - only MIGRATION tasks.
+Task types: refactor (migrate) only.""",
+        "task_types": ["refactor"],
+    },
+    "debt": {
+        "name": "DEBT",
+        "description": "TODOs, FIXMEs, deprecated, technical debt",
+        "focus": """Focus on TECHNICAL DEBT only:
+1. TODO comments that need implementation
+2. FIXME comments that need fixing
+3. Deprecated code that needs updating
+4. Hack/workaround code that needs proper solution
+5. Dead code that needs removal
+Do NOT generate feature/security tasks - only DEBT cleanup.
+Task types: fix, refactor.""",
+        "task_types": ["fix", "refactor"],
+    },
+}
+
+# Default mode runs all types
+BRAIN_MODES["all"] = {
+    "name": "ALL",
+    "description": "Complete analysis (all modes)",
+    "focus": None,  # No focus restriction
+    "task_types": ["fix", "feature", "refactor", "test", "security"],
+}
+
+
+# ============================================================================
 # FILE COLLECTOR
 # ============================================================================
 
@@ -155,6 +275,7 @@ class RLMBrain:
         vision_prompt: str = None,
         domains: List[str] = None,
         deep_analysis: bool = True,
+        mode: str = "all",
     ) -> List[Task]:
         """
         Run DEEP RECURSIVE Brain analysis with MCP.
@@ -166,25 +287,36 @@ class RLMBrain:
             vision_prompt: Optional focus prompt for analysis
             domains: Specific domains to analyze (default: all)
             deep_analysis: If True, use full recursive depth
+            mode: Brain mode (fix|vision|security|perf|refactor|test|migrate|debt|all)
 
         Returns:
             List of created Task objects
         """
+        # Resolve mode
+        mode_config = BRAIN_MODES.get(mode, BRAIN_MODES["all"])
+        mode_name = mode_config["name"]
+
         log("═" * 70)
-        log("🧠 STARTING DEEP RECURSIVE BRAIN ANALYSIS WITH MCP")
+        log(f"🧠 STARTING BRAIN ANALYSIS [{mode_name}] WITH MCP")
         log("═" * 70)
         log(f"Project: {self.project.name}")
         log(f"Domains: {domains or list(self.project.domains.keys())}")
         log(f"Deep analysis: {deep_analysis}")
+        log(f"Mode: {mode_name}")
 
         # 1. Load vision document
         vision_content = self.project.get_vision_content() or ""
         log(f"Vision doc: {len(vision_content)} chars")
 
-        # 2. Build the analysis prompt
+        # 2. Combine mode focus with user prompt
+        combined_focus = vision_prompt or ""
+        if mode_config.get("focus"):
+            combined_focus = f"{mode_config['focus']}\n\n{combined_focus}" if combined_focus else mode_config["focus"]
+
+        # 3. Build the analysis prompt
         prompt = self._build_analysis_prompt(
             vision_content,
-            vision_prompt,
+            combined_focus,
             domains,
             deep_analysis,
         )
@@ -254,7 +386,7 @@ class RLMBrain:
                 "claude",
                 "-p",  # Print mode (non-interactive)
                 "--model", "claude-opus-4-5-20251101",
-                "--max-turns", "10",  # Allow multiple tool calls
+                "--max-turns", "100",  # Allow extensive MCP exploration
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -409,6 +541,28 @@ Respond with JSON:
 
         domains_list = domains or list(self.project.domains.keys())
         vision_truncated = vision[:8000] if vision else "No vision document"
+        
+        # Check if project has Figma integration
+        figma_config = self.project.figma or {}
+        figma_enabled = figma_config.get('enabled', False)
+        
+        figma_instructions = ""
+        if figma_enabled:
+            figma_instructions = """
+FIGMA DESIGN SYSTEM INTEGRATION:
+This project uses Figma as source of truth for UI components.
+You have access to Figma MCP tools:
+- get_design_context: Get design specs for selected Figma node
+- get_variable_defs: Get design tokens (colors, spacing, typography)
+- get_screenshot: Get visual of component
+- add_code_connect_map: Map Figma node to Svelte component
+
+For Svelte components:
+1. Check Figma specs before generating/modifying components
+2. Compare CSS values with Figma design tokens
+3. Generate tasks if CSS doesn't match Figma specs (padding, colors, radius)
+4. Use clientFrameworks="svelte" when calling Figma tools
+"""
 
         return f'''You are a DEEP RECURSIVE ANALYSIS ENGINE for the "{self.project.name}" project.
 
@@ -418,6 +572,7 @@ IMPORTANT: You have access to MCP tools for project navigation. USE THEM:
 - lrm_conventions: Get coding conventions for a domain
 - lrm_examples: Get example code
 - lrm_build: Run build/test commands
+{figma_instructions}
 
 ══════════════════════════════════════════════════════════════════════════════
 PROJECT: {self.project.name}
@@ -755,8 +910,8 @@ BEGIN DEEP RECURSIVE ANALYSIS NOW. Use llm_query() extensively!
         }
 
     def close(self):
-        """Clean up RLM resources."""
-        self.rlm.close()
+        """Clean up resources."""
+        pass  # No persistent connections to close
 
 
 # ============================================================================
