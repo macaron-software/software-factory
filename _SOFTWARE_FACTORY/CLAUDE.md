@@ -98,18 +98,30 @@ factory mcp start/stop/status/restart
 
 **Fichiers:** `mcp_lrm/server_sse.py` (daemon), `mcp_lrm/proxy.py` (bridge)
 
-## CYCLE WORKER (NEW)
+## CYCLE WORKER (PREFERRED over wiggum)
+
+**Pourquoi cycle > wiggum:**
+| Mode | Build | CPU | Usage |
+|------|-------|-----|-------|
+| `wiggum` | 1 par 1 immédiat | Explose CPU | Legacy |
+| `cycle` | Batch de N | Optimisé | Recommandé |
+
 ```
-Phase1 TDD: N workers // écrivent code, pas build
-    ↓ batch_size atteint ou timeout
-Phase2 BUILD: compile tout CODE_WRITTEN
+Phase1 TDD: N workers // écrivent code, PAS DE BUILD
+    ↓ batch_size atteint OU timeout
+Phase2 BUILD: cargo build/npm build UNE SEULE FOIS
     ↓ si OK
 Phase3 DEPLOY: staging→E2E→prod
     ↓ si err
 FEEDBACK: new tasks → retour Phase1
 ```
 
-Config: `-w workers -b batch -t timeout --skip-deploy`
+**Config:** `-w workers -b batch -t timeout --skip-deploy`
+
+**Exemple:** `factory ppz cycle start -w 10 -b 20 -t 30`
+- 10 workers génèrent code en //
+- Build déclenché quand 20 tâches CODE_WRITTEN (ou timeout 30min)
+- 1 build pour 20 changements = ~20x moins CPU
 
 ## CORE
 
@@ -190,8 +202,26 @@ fractal:
 - FRACTAL:  100% (8/8 checks) - explicit prompts per concern
 
 ### Adversarial `core/adversarial.py`
-- reject: test.skip, @ts-ignore, TODO>2, .unwrap()>3
-- score>=5 → REJECT → retry max10
+
+**Mode 100% LLM** (recommandé): Désactive les regex patterns qui causent des faux positifs
+```yaml
+# projects/*.yaml
+adversarial:
+  threshold: 5
+  core_patterns: false      # DISABLE regex patterns
+  security_check: false     # LLM handles security
+  custom_patterns: []       # No regex - 100% LLM semantic analysis
+```
+
+**Pourquoi 100% LLM:**
+- Regex `.any()` matche l'itérateur Rust (faux positif)
+- Regex `unwrap()` rejette les tests (normal en tests)
+- Regex `panic!` rejette les assertions de test
+- LLM comprend le contexte (test vs prod)
+
+**ARCH CHECKS** (toujours actifs): `query_limits` détecte queries sans LIMIT
+
+**Score:** >=5 → REJECT → retry max 10
 
 ### TaskStore `core/task_store.py`
 - SQLite data/factory.db
@@ -208,16 +238,16 @@ fractal:
 factory <p> brain run              # tasks JSON
 factory <p> brain --chat "q"       # conversationnel
 
-# Cycle (NEW - phases TDD→Build→Deploy)
-factory <p> cycle start            # daemon
+# Cycle (RECOMMANDÉ - batch build, CPU optimisé)
+factory <p> cycle start            # daemon (default: w=5, b=10, t=30)
 factory <p> cycle start -f         # foreground
-factory <p> cycle start -w 5 -b 10 -t 30  # 5workers, batch10, 30min
-factory <p> cycle start --skip-deploy     # dev mode
+factory <p> cycle start -w 10 -b 20 -t 30  # 10workers, batch20, 30min timeout
+factory <p> cycle start --skip-deploy     # dev mode (TDD+build only)
 factory <p> cycle stop
 factory <p> cycle status
 
-# Wiggum (legacy, continuous)
-factory <p> wiggum start -w 10
+# Wiggum (LEGACY - build 1 par 1, explose CPU, ÉVITER)
+factory <p> wiggum start -w 10     # À éviter: build immédiat par tâche
 factory <p> wiggum stop
 
 # Deploy (legacy, continuous)
@@ -400,7 +430,9 @@ factory factory wiggum start -w 5
 
 - SvelteKit: NEVER create test files with `+` prefix in routes (reserved)
 - Tests go in `__tests__/` subfolder (e.g., `routes/admin/__tests__/auth.test.ts`)
-- Adversarial uses LLM (not regex) for context-aware validation
+- **Adversarial 100% LLM**: Désactiver regex (`core_patterns: false`) - LLM comprend contexte test vs prod
+- **Cycle > Wiggum**: Toujours utiliser `cycle` pour batch build (wiggum = legacy, explose CPU)
+- **Batch size**: 10-20 tâches avant build selon CPU disponible
 
 ## OPENCODE CONFIG (~/.config/opencode/opencode.json)
 
@@ -431,16 +463,73 @@ data/logs/
 # 0. Start MCP server (once)
 factory mcp start
 
-# 1. Brain analyse
-factory psy brain run -q "focus"
+# 1. Brain analyse (génère backlog)
+factory ppz brain run -q "focus"
 
-# 2. Cycle (phases TDD→Build→Deploy)
-factory psy cycle start -w 5 -b 10 -t 60
+# 2. Cycle (RECOMMANDÉ - batch build)
+factory ppz cycle start -w 10 -b 20 -t 30
+# -w 10: 10 workers TDD en parallèle
+# -b 20: build après 20 tâches CODE_WRITTEN
+# -t 30: timeout 30min max par phase
 
 # 3. Monitor
-tail -f data/logs/cycle-psy.log
-curl localhost:9500/health  # MCP connections
+tail -f data/logs/cycle-ppz.log
+sqlite3 data/factory.db "SELECT status,COUNT(*) FROM tasks WHERE project_id='ppz' GROUP BY status"
 
-# 4. XP improve
-factory xp full -p psy --apply
+# 4. Si besoin wiggum (legacy, build 1 par 1 - ÉVITER)
+factory ppz wiggum start -w 10  # Explose CPU!
+
+# 5. XP improve
+factory xp full -p ppz --apply
 ```
+
+**Config adversarial 100% LLM** (dans `projects/ppz.yaml`):
+```yaml
+adversarial:
+  threshold: 5
+  core_patterns: false    # Pas de regex
+  security_check: false   # LLM analyse
+  custom_patterns: []     # 100% LLM
+```
+
+## FIGMA MCP INTEGRATION
+
+### Architecture
+```
+Figma (SOURCE OF TRUTH)
+    ↓ MCP
+Brain/Wiggum → proxy_figma.py → Figma Desktop (127.0.0.1:3845)
+                              ↘ Figma Remote (mcp.figma.com) [fallback]
+```
+
+### Config opencode
+```json
+"mcp": {
+  "figma": {
+    "type": "local",
+    "command": ["python3", ".../mcp_lrm/proxy_figma.py"]
+  }
+}
+```
+
+### Usage
+```bash
+# Brain can query Figma specs
+factory veligo brain run --mode vision  # Uses Figma MCP for component specs
+
+# Wiggum TDD validates against Figma
+# Adversarial rejects if CSS != Figma specs
+```
+
+### Figma MCP Tools
+- `get_file` - Get file structure
+- `get_node` - Get specific node (component, frame)
+- `get_styles` - Get design tokens (colors, typography)
+- `get_selection` - Get currently selected element (desktop only)
+
+### Workflow
+1. Brain analyses Svelte component
+2. Calls Figma MCP: "get_node(Button, Size=Medium)"
+3. Compares with component CSS
+4. If mismatch → generate fix task
+5. Adversarial validates Figma compliance before commit

@@ -180,3 +180,26 @@ analyzers:
   - playwright
   - grpc
   - ao_compliance
+
+# Figma MCP Integration
+# =====================
+# Use official Figma MCP as source of truth for design specs
+figma:
+  enabled: true
+  mcp_server: figma  # Uses proxy_figma.py via opencode config
+  
+  # Figma file references for Veligo design system
+  design_system:
+    file_key: "YOUR_FIGMA_FILE_KEY"  # TODO: Add Veligo DS Figma file key
+    components_page: "Components"
+  
+  # Validation rules - reject if CSS doesn't match Figma specs
+  validation:
+    check_colors: true
+    check_spacing: true
+    check_typography: true
+    check_border_radius: true
+    tolerance_px: 2  # Allow 2px tolerance for rounding
+  
+  # Adversarial check: compare generated Svelte components with Figma
+  adversarial_figma_check: true
