@@ -119,6 +119,25 @@ Config: `-w workers -b batch -t timeout --skip-deploy`
 - tools: lrm_locate/summarize/conventions/examples/build
 - tiers: Opus→MiniMax→Qwen
 
+**Brain Modes** (`--mode`):
+| Mode | Focus |
+|------|-------|
+| `all` | Complete analysis (default) |
+| `vision` | NEW features, roadmap, innovation |
+| `fix` | Bugs, build errors, crashes |
+| `security` | OWASP, secrets, vulns |
+| `perf` | N+1, caching, optimization |
+| `refactor` | DRY, patterns, architecture |
+| `test` | Coverage gaps, missing tests |
+| `migrate` | REST→gRPC, v1→v2, deprecations |
+| `debt` | TODOs, FIXMEs, tech debt |
+
+```bash
+factory <p> brain run --mode vision    # features only
+factory <p> brain run --mode fix       # bugs only
+factory <p> brain run --mode security  # vulns only
+```
+
 ### Cycle `core/cycle_worker.py`
 - phases: TDD→BUILD→DEPLOY
 - no FRACTAL (batch mode, pas subtasks)
@@ -149,6 +168,13 @@ L2 (depth=1): KISS atomic
 ```
 
 **Thinking activé**: `opencode --variant high` pour extended reasoning
+
+**Streaming + Timeouts** (`core/llm_client.py`):
+- MAX_TIMEOUT: 40 min (2400s) - safety net
+- PROGRESS_INTERVAL: 60s - log chars produced
+- Stream logs: `[STREAM] 120s | +5432 chars | total 12456 chars`
+- Kill on stuck: `os.killpg()` process group cleanup
+- No fallback on timeout (model working, just slow)
 
 **Config** (`projects/*.yaml`):
 ```yaml

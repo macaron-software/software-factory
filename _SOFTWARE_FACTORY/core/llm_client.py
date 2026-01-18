@@ -484,6 +484,51 @@ FALLBACK_MODELS = [
 ]
 
 
+def ensure_mcp_server_running():
+    """Check MCP server health and auto-restart if down."""
+    import urllib.request
+    import subprocess
+
+    MCP_URL = "http://127.0.0.1:9500/health"
+
+    try:
+        req = urllib.request.Request(MCP_URL, method='GET')
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            if resp.status == 200:
+                return True  # Server is running
+    except Exception:
+        pass  # Server is down
+
+    # Auto-restart MCP server
+    log("MCP server down - auto-restarting...", "WARN")
+    try:
+        # Start daemon in background
+        subprocess.Popen(
+            ["python3", "-c",
+             "from mcp_lrm.server_sse import start_daemon; start_daemon()"],
+            cwd=str(Path(__file__).parent.parent),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        import time
+        time.sleep(2)  # Wait for startup
+
+        # Verify it started
+        try:
+            req = urllib.request.Request(MCP_URL, method='GET')
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                if resp.status == 200:
+                    log("MCP server auto-restarted successfully", "INFO")
+                    return True
+        except Exception:
+            log("MCP server failed to restart", "ERROR")
+            return False
+    except Exception as e:
+        log(f"Failed to auto-restart MCP server: {e}", "ERROR")
+        return False
+
+
 async def run_opencode(
     prompt: str,
     model: str = "minimax/MiniMax-M2.1",
@@ -512,10 +557,13 @@ async def run_opencode(
     Returns:
         Tuple of (returncode, output)
     """
+    # Ensure MCP server is running before starting
+    ensure_mcp_server_running()
+
     # Build model chain
     import os
     import signal
-    
+
     if fallback:
         models_to_try = [model] + [m for m in FALLBACK_MODELS if m != model]
     else:
@@ -549,14 +597,52 @@ async def run_opencode(
                 cwd=cwd,
                 env=env,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,  # Merge stderr into stdout for streaming
                 start_new_session=True,  # Create process group for cleanup
             )
 
-            # Max 30 min safety timeout - prevents infinite hangs
-            # But don't fallback on timeout (model was working, just stuck)
+            # Stream output with progress logging every 60s
+            output_chunks = []
+            last_progress_time = asyncio.get_event_loop().time()
+            last_progress_len = 0
+            PROGRESS_INTERVAL = 60  # Log progress every 60s
+            MAX_TIMEOUT = 2400  # 40 min max safety timeout
+            start_time = asyncio.get_event_loop().time()
+
+            async def read_stream():
+                nonlocal last_progress_time, last_progress_len
+                while True:
+                    try:
+                        chunk = await asyncio.wait_for(proc.stdout.read(4096), timeout=PROGRESS_INTERVAL)
+                        if not chunk:
+                            break  # EOF
+                        output_chunks.append(chunk.decode(errors='replace'))
+                        
+                        # Progress logging
+                        now = asyncio.get_event_loop().time()
+                        current_len = sum(len(c) for c in output_chunks)
+                        elapsed = int(now - start_time)
+                        
+                        if now - last_progress_time >= PROGRESS_INTERVAL:
+                            delta = current_len - last_progress_len
+                            log(f"[STREAM] {elapsed}s | +{delta} chars | total {current_len} chars", "DEBUG")
+                            last_progress_time = now
+                            last_progress_len = current_len
+                    except asyncio.TimeoutError:
+                        # No output for 60s - check if process alive
+                        if proc.returncode is not None:
+                            break
+                        elapsed = int(asyncio.get_event_loop().time() - start_time)
+                        current_len = sum(len(c) for c in output_chunks)
+                        log(f"[STREAM] {elapsed}s | waiting... | {current_len} chars so far", "DEBUG")
+                        
+                        # Check max timeout
+                        if elapsed > MAX_TIMEOUT:
+                            raise asyncio.TimeoutError("MAX_TIMEOUT")
+
             try:
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=1800)
+                await read_stream()
+                await proc.wait()
             except asyncio.TimeoutError:
                 # Kill entire process group (opencode + all child processes)
                 try:
@@ -564,9 +650,11 @@ async def run_opencode(
                 except ProcessLookupError:
                     pass  # Already dead
                 await proc.wait()
-                log(f"opencode MAX TIMEOUT 30min ({current_model}) - killed process group", "ERROR")
-                return 1, "Error: max timeout 30min (process stuck, not rate limited)"
-            output = stdout.decode() + stderr.decode()
+                elapsed = int(asyncio.get_event_loop().time() - start_time)
+                log(f"opencode MAX TIMEOUT {elapsed}s ({current_model}) - killed process group", "ERROR")
+                return 1, f"Error: max timeout {elapsed}s (process stuck, not rate limited)"
+            
+            output = "".join(output_chunks)
 
             # Check for rate limit in output → fallback
             if proc.returncode != 0:
