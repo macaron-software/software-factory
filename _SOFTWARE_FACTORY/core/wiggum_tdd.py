@@ -256,11 +256,18 @@ You MUST address ALL the issues above before proceeding.
         figma_instructions = ""
         if figma_enabled and task.domain in ['svelte', 'typescript', 'frontend']:
             figma_instructions = """
-FIGMA DESIGN SYSTEM (Source of Truth):
-- get_design_context: Get CSS specs from Figma for selected component
-- get_variable_defs: Get design tokens (colors, spacing)
-For Svelte components, ALWAYS check Figma specs before writing CSS.
-Use clientFrameworks="svelte" when calling Figma tools.
+⚠️ MANDATORY FIGMA CHECK (Design System Source of Truth):
+Before writing ANY CSS or styling code, you MUST:
+1. Call figma_get_design_context to get exact specs for the component
+2. Call figma_get_variable_defs to get design tokens (colors, spacing, radius)
+3. Use ONLY values from Figma (no hardcoded colors/spacing)
+
+Figma tools (USE THEM):
+- figma_get_design_context(fileKey, nodeId, clientFrameworks="svelte"): Get CSS specs
+- figma_get_variable_defs(fileKey): Get design tokens
+- figma_get_screenshot(fileKey, nodeId): Get visual reference
+
+If you skip Figma check, the adversarial gate will REJECT your code.
 """
 
         prompt = f"""You are a TDD agent. Complete this task using strict TDD.
