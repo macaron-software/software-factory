@@ -14,11 +14,16 @@ Memory footprint: ~10MB per proxy vs ~50MB per full server
 
 import json
 import sys
+import time
 import urllib.request
 import urllib.error
 from typing import Optional, Dict, Any
 
 SERVER_URL = "http://127.0.0.1:9500"
+
+# Retry configuration for transient errors
+MAX_RETRIES = 3
+RETRY_DELAY = 2  # seconds
 
 
 def read_message() -> Optional[Dict]:
@@ -48,31 +53,46 @@ def make_error(id: Any, code: int, message: str) -> Dict:
 
 
 def call_server(name: str, arguments: Dict) -> Dict:
-    """Forward tool call to SSE server"""
-    try:
-        data = json.dumps({"name": name, "arguments": arguments}).encode()
-        req = urllib.request.Request(
-            f"{SERVER_URL}/call",
-            data=data,
-            headers={"Content-Type": "application/json"},
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=300) as resp:
-            return json.loads(resp.read())
-    except urllib.error.URLError as e:
-        return {"error": f"Server unavailable: {e}"}
-    except Exception as e:
-        return {"error": str(e)}
+    """Forward tool call to SSE server with retry on transient errors"""
+    last_error = None
+
+    for attempt in range(MAX_RETRIES):
+        try:
+            data = json.dumps({"name": name, "arguments": arguments}).encode()
+            req = urllib.request.Request(
+                f"{SERVER_URL}/call",
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=300) as resp:
+                return json.loads(resp.read())
+        except urllib.error.URLError as e:
+            last_error = f"Server unavailable: {e}"
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(RETRY_DELAY * (attempt + 1))  # Exponential backoff
+                continue
+        except Exception as e:
+            last_error = str(e)
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(RETRY_DELAY * (attempt + 1))
+                continue
+
+    return {"error": last_error}
 
 
 def get_tools() -> list:
-    """Get tools from server"""
-    try:
-        with urllib.request.urlopen(f"{SERVER_URL}/tools", timeout=5) as resp:
-            data = json.loads(resp.read())
-            return data.get("tools", [])
-    except:
-        return []
+    """Get tools from server with retry"""
+    for attempt in range(MAX_RETRIES):
+        try:
+            with urllib.request.urlopen(f"{SERVER_URL}/tools", timeout=5) as resp:
+                data = json.loads(resp.read())
+                return data.get("tools", [])
+        except Exception:
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(RETRY_DELAY * (attempt + 1))
+                continue
+    return []
 
 
 def main():

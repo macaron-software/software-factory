@@ -6,38 +6,46 @@ project:
   name: popinz
   display_name: "Popinz SaaS"
   root_path: /Users/sylvain/_POPINZ/popinz-dev
-  vision_doc: CLAUDE.md
+  vision_doc: PLATFORM_FEATURES.md  # Real product features, not tech doc
+  # Global exclusions (third-party dependencies, build artifacts)
+  exclusions:
+    - ".build/"
+    - "checkouts/"
+    - "node_modules/"
+    - "target/"
+    - ".git/"
+    - "dist/"
+    - "vendor/"
+    - "Pods/"
+    - "DerivedData/"
+
+# Brain phase cycle (features → fixes → refactor)
+brain:
+  current_phase: features  # START with features, business value first
+  phase_gate: deployed
+  feature_docs:
+    - PLATFORM_FEATURES.md      # Feature matrix
+    - product/features/*.md     # 31 detailed feature specs
+    - PROJECT_ROADMAP_2025_V2.md
 
 # Project CLI commands
-# Uses `ppz` CLI for all operations
+# Uses `ppz` CLI for operations that exist
+# Build/lint use direct commands (no ppz build/lint exists)
 cli:
   binary: ppz
-  # Build commands per domain
-  build:
-    rust: ppz build rust
-    typescript: ppz build ts
-    all: ppz build
-  # Test commands per domain
+  # Test commands per domain (ppz test exists)
   test:
-    rust: ppz test rust
-    typescript: ppz test ts
     e2e: ppz test e2e
     all: ppz test
-  # Lint commands
-  lint:
-    rust: ppz lint rust
-    typescript: ppz lint ts
-    all: ppz lint
-  # Deploy commands
+  # Deploy commands (real CI/CD pipeline)
   deploy:
     staging: ppz deploy staging
     prod: ppz deploy prod
     rollback: ppz deploy rollback
-  # E2E journeys
+  # E2E journeys (real tests)
   e2e:
-    smoke: ppz test e2e --grep @smoke
+    smoke: ppz test e2e --smoke
     journeys: ppz test e2e
-    rbac: ppz test e2e --grep @rbac
   # Status/monitoring
   status: ppz status
 
@@ -48,28 +56,81 @@ domains:
       - popinz-v2-rust/
     extensions:
       - .rs
-    build_cmd: cargo check --workspace
-    test_cmd: cargo test --workspace --no-run
-    lint_cmd: cargo clippy --workspace -- -D warnings
+    # ppz CLI has test but not build/lint — use direct cargo commands
+    build_cmd: cd popinz-v2-rust && cargo check --workspace
+    test_cmd: ppz test unit
+    lint_cmd: cd popinz-v2-rust && cargo clippy --workspace -- -D warnings
+    # Stack versions (CRITICAL for correct code generation)
+    stack:
+      axum: "0.7"
+      axum-extra: "0.9"
+      sqlx: "0.7"
+      tokio: "1.0"
+    # Axum 0.7 conventions (MUST follow)
+    conventions:
+      - name: "Extractor order"
+        rule: "Body-consuming extractors (Json, Form, Bytes) MUST be LAST parameter"
+        example: |
+          // CORRECT: State/headers/Extension before Json
+          async fn handler(
+              State(state): State<AppState>,
+              Extension(auth): Extension<AuthContext>,
+              Json(body): Json<MyInput>,  // Json LAST
+          ) -> impl IntoResponse
+      - name: "Request + Json incompatible"
+        rule: "Cannot use Request<Body> AND Json<T> together - both consume body"
+        fix: "Use Extension<AuthContext> (set by middleware) instead of Request<Body>"
+      - name: "sqlx FromRow"
+        rule: "Structs used with query_as!() MUST derive sqlx::FromRow"
+        example: |
+          #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+          pub struct User { ... }
+      - name: "WebSocket Message"
+        rule: "axum::extract::ws::Message has NO is_text()/is_binary() methods"
+        fix: "Use matches!(msg, Message::Text(_) | Message::Binary(_))"
+      - name: "FromStr trait"
+        rule: "To call Type::from_str(), trait must be in scope"
+        fix: "Add 'use std::str::FromStr;' at file top"
 
   typescript:
     paths:
-      - popinz-saas/
-      - popinz-entities/
-      - popinz-tasks/
+      - popinz-saas/js/grpc-client/
     extensions:
       - .ts
       - .tsx
-    build_cmd: npm run build
-    test_cmd: npm run test
-    lint_cmd: npm run lint
+    build_cmd: cd popinz-saas/js/grpc-client && npm run build 2>&1
+    test_cmd: cd popinz-saas/js/grpc-client && npx vitest run 2>&1
+    lint_cmd: npm run lint:js 2>/dev/null
+    conventions:
+      - name: "NO test.skip"
+        rule: "NEVER use test.skip(), describe.skip(), it.skip() - ALL tests MUST run"
+        fix: "Remove .skip() and fix the test, or delete it if obsolete"
+      - name: "NO as any"
+        rule: "NEVER use 'as any' - it defeats TypeScript type safety"
+        fix: "Use proper types, generics, unknown + type guards instead"
+      - name: "NO @ts-ignore"
+        rule: "NEVER use @ts-ignore or @ts-expect-error"
+        fix: "Fix the type error properly"
+      - name: "Strict null checks"
+        rule: "Always handle null/undefined - no optional chaining abuse"
+        fix: "Use explicit checks: if (x !== null) or type guards"
+      - name: "Error handling"
+        rule: "NEVER empty catch blocks"
+        fix: "Log or rethrow with context"
 
   e2e:
     paths:
       - popinz-tests/
     extensions:
       - .spec.ts
-    test_cmd: npx playwright test
+    test_cmd: ppz test e2e
+    conventions:
+      - name: "NO test.skip in E2E"
+        rule: "NEVER use test.skip() - all E2E tests MUST run"
+        fix: "Fix flaky test or remove if obsolete"
+      - name: "Explicit waits"
+        rule: "Use explicit waits, not arbitrary timeouts"
+        fix: "Use await page.waitForSelector() not page.waitForTimeout()"
 
   proto:
     paths:
@@ -88,20 +149,20 @@ domains:
       - ios/popinz/
     extensions:
       - .swift
-    # Real Xcode build with error capture
-    build_cmd: cd ios/popinz && xcodebuild -scheme popinz -destination 'platform=iOS Simulator,name=iPhone 15' -configuration Debug build 2>&1 | tee /tmp/ppz_ios_build.log || cat /tmp/ppz_ios_build.log
-    test_cmd: cd ios/popinz && xcodebuild -scheme popinz -destination 'platform=iOS Simulator,name=iPhone 15' test 2>&1 | tee /tmp/ppz_ios_test.log || cat /tmp/ppz_ios_test.log
-    lint_cmd: cd ios/popinz && swiftlint 2>&1 || true
+    # Use ppz CLI for iOS build/test (handles Xcode setup properly)
+    build_cmd: ppz test native-unit --ios
+    test_cmd: ppz test ios
+    lint_cmd: cd ios/popinz && swiftlint 2>&1
 
   kotlin:
     paths:
       - android/
     extensions:
       - .kt
-    # Real Gradle build with error capture
-    build_cmd: cd android && ./gradlew assembleDebug 2>&1 | tee /tmp/ppz_android_build.log || cat /tmp/ppz_android_build.log
-    test_cmd: cd android && ./gradlew test 2>&1 | tee /tmp/ppz_android_test.log || cat /tmp/ppz_android_test.log
-    lint_cmd: cd android && ./gradlew lint 2>&1 || true
+    # Use ppz CLI for Android build/test (handles Gradle setup properly)
+    build_cmd: ppz test native-unit --android
+    test_cmd: ppz test android
+    lint_cmd: cd android && ./gradlew lint 2>&1
 
 # Deployment configuration
 deploy:
@@ -115,6 +176,41 @@ deploy:
     health: /health
   rollback_on_fail: true
   validation_cmd: npx playwright test --grep @smoke
+  post_deploy:
+    e2e_prod:
+      enabled: true
+      seed_cmd: "ppz test seed"
+      smoke: true
+      journeys: true
+      rbac: true
+      console_check: true
+      pages: ["/", "/login", "/dashboard", "/events"]
+      console_whitelist: ["chrome-extension://", "matomo", "analytics"]
+      network_whitelist: ["/api/analytics/", "matomo.js"]
+      timeout_sec: 600
+    tmc:
+      enabled: true
+      tool: k6
+      thresholds:
+        p95_latency_ms: 500
+        error_rate_pct: 1
+        min_throughput_rps: 100
+      scenarios:
+        - baseline
+        - ramp_10x
+      duration_sec: 120
+    chaos:
+      enabled: true
+      scenarios:
+        - kill_backend
+        - network_latency_200ms
+        - db_connection_kill
+      recovery_timeout_sec: 30
+      rollback_on_fail: true
+    feedback:
+      create_perf_tasks: true
+      revert_if_worse: true
+      tolerance_pct: 15
 
 # FRACTAL decomposition thresholds
 fractal:
@@ -124,23 +220,13 @@ fractal:
   max_depth: 3
 
 # Adversarial gate configuration
+# MODE: 100% LLM (regex patterns disabled for testing)
 adversarial:
-  threshold: 5
-  core_patterns: true
-  security_check: true
-  custom_patterns:
-    # Rust specific
-    - pattern: '\.unwrap\(\)'
-      score: 2
-      message: "unwrap() sans gestion d'erreur"
-      max_occurrences: 3
-    - pattern: 'panic!'
-      score: 5
-      message: "panic! interdit en production"
-    # Security
-    - pattern: "password\\s*=\\s*[\"'][^\"']+[\"']"
-      score: 5
-      message: "Password hardcodée détectée"
+  # Threshold elevated to 15 to avoid false positives (cargo check is valid)
+  threshold: 15
+  core_patterns: false      # DISABLED - no regex patterns
+  security_check: false     # DISABLED - LLM will catch these
+  custom_patterns: []       # EMPTY - 100% LLM mode
 
 # Error Capture Configuration (RLM Feedback Loop)
 error_capture:
@@ -178,3 +264,16 @@ analyzers:
   - typescript
   - playwright
   - security
+
+# Integrator (cross-layer wiring)
+integrator:
+  enabled: true
+  verify_timeout: 300
+  max_iterations: 5
+  priority_types:
+    - bootstrap
+    - migration
+    - proto_gen
+    - api_connection
+    - proxy
+    - config

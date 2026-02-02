@@ -9,54 +9,43 @@ project:
   vision_doc: CLAUDE.md
 
 # Project CLI commands
-# Uses `fervenza` CLI for all operations
+# NOTE: `fervenza` CLI is for BUSINESS operations (weddings), not build/test
+# Build/test uses direct commands (cargo, pytest, ruff) from root_path
 cli:
   binary: fervenza
-  # Build commands per domain
   build:
-    firmware: fervenza build firmware
-    backend: fervenza build backend
-    webapp: fervenza build webapp
-    all: fervenza build
-  # Test commands per domain
+    rust: cargo check --workspace
+    python: ruff check .
+    all: cargo check --workspace
   test:
-    firmware: fervenza test firmware
-    backend: fervenza test backend
-    webapp: fervenza test webapp
-    integration: fervenza test integration
-    all: fervenza test
-  # Lint commands
+    rust: cargo test --workspace
+    python: pytest
+    e2e: pytest tests/
+    all: cargo test --workspace && pytest
   lint:
-    firmware: fervenza lint firmware
-    backend: fervenza lint backend
-    webapp: fervenza lint webapp
-    all: fervenza lint
-  # Deploy commands
+    rust: cargo clippy --workspace -- -D warnings
+    python: ruff check . --fix
+    all: cargo clippy --workspace && ruff check .
   deploy:
-    staging: fervenza deploy staging
-    prod: fervenza deploy prod
+    staging: fervenza deploy server
+    prod: fervenza deploy all
     rollback: fervenza deploy rollback
-    firmware_ota: fervenza deploy firmware --ota
-  # E2E journeys
   e2e:
-    smoke: fervenza test e2e --grep @smoke
-    journeys: fervenza test e2e
-    device: fervenza test device
-  # Status/monitoring
-  status: fervenza status
-  devices: fervenza devices list
+    smoke: pytest tests/
+    journeys: pytest tests/
+  status: fervenza version
 
 # Domain configurations
+# Direct commands (no fervenza CLI for builds)
 domains:
   rust:
     paths:
-      - src/
-      - backend/
+      - crates/
     extensions:
       - .rs
-    build_cmd: cargo check 2>/dev/null || true
-    test_cmd: cargo test 2>/dev/null || true
-    lint_cmd: cargo clippy 2>/dev/null || true
+    build_cmd: cargo check --workspace
+    test_cmd: cargo test --workspace
+    lint_cmd: cargo clippy --workspace -- -D warnings
 
   firmware:
     paths:
@@ -65,9 +54,10 @@ domains:
       - .c
       - .h
       - .cpp
-    build_cmd: cd firmware && make 2>/dev/null || echo "No Makefile"
-    test_cmd: echo "Firmware tests require hardware"
-    lint_cmd: echo "Firmware lint OK"
+    # Firmware requires hardware toolchain (PlatformIO / arm-gcc)
+    build_cmd: "cd firmware && pio check 2>/dev/null || echo 'SKIP - PlatformIO not installed'"
+    test_cmd: "cd firmware && pio test 2>/dev/null || echo 'SKIP - PlatformIO not installed'"
+    lint_cmd: "cd firmware && pio check 2>/dev/null || echo 'SKIP - PlatformIO not installed'"
 
   backend:
     paths:
@@ -75,9 +65,9 @@ domains:
     extensions:
       - .rs
       - .py
-    build_cmd: cd backend && (cargo check 2>/dev/null || python3 -m py_compile *.py 2>/dev/null || true)
-    test_cmd: cd backend && (cargo test 2>/dev/null || pytest -q 2>/dev/null || true)
-    lint_cmd: cd backend && (cargo clippy 2>/dev/null || ruff check . 2>/dev/null || true)
+    build_cmd: cargo check --workspace
+    test_cmd: cargo test --workspace
+    lint_cmd: cargo clippy --workspace
 
   webapp:
     paths:
@@ -86,33 +76,33 @@ domains:
       - .ts
       - .tsx
       - .svelte
-    build_cmd: cd webapp && npm run build --if-present 2>/dev/null || npx tsc --noEmit 2>/dev/null || true
-    test_cmd: cd webapp && npm test --if-present 2>/dev/null || true
-    lint_cmd: cd webapp && npm run lint 2>/dev/null || npx eslint . 2>/dev/null || true
+    build_cmd: cd webapp && npm run build
+    test_cmd: pytest tests/
+    lint_cmd: ruff check .
 
   e2e:
     paths:
       - tests/
     extensions:
       - .spec.ts
-    build_cmd: echo "E2E tests ready"
-    test_cmd: cd tests && npx playwright test 2>/dev/null || true
-    lint_cmd: cd tests && npx eslint . 2>/dev/null || true
+    build_cmd: cargo check --workspace
+    test_cmd: pytest tests/
+    lint_cmd: ruff check tests/
 
   python:
     paths:
-      - rlm/
+      - fervenza/
       - tests/
     extensions:
       - .py
-    build_cmd: python3 -c "import compileall; compileall.compile_dir('.', force=True, quiet=2)" 2>/dev/null || true
-    test_cmd: pytest tests/ -q 2>/dev/null || true
-    lint_cmd: ruff check . 2>/dev/null || true
+    build_cmd: ruff check .
+    test_cmd: pytest
+    lint_cmd: ruff check . --fix
 
 # Deployment configuration
 deploy:
   strategy: blue-green
-  auto_prod: false
+  auto_prod: true       # AUTO deploy enabled
   staging:
     url: https://staging.fervenza.io
     health: /api/health
@@ -120,6 +110,21 @@ deploy:
     url: https://fervenza.io
     health: /api/health
   rollback_on_fail: true
+  post_deploy:
+    e2e_prod:
+      enabled: true
+      smoke: true
+      journeys: false
+      rbac: false
+      console_check: true
+      pages: ["/", "/api/health"]
+      console_whitelist: ["chrome-extension://"]
+      network_whitelist: []
+      timeout_sec: 300
+    tmc:
+      enabled: false
+    chaos:
+      enabled: false
 
 # FRACTAL decomposition thresholds
 fractal:
@@ -178,3 +183,12 @@ analyzers:
   - rust
   - typescript
   - security
+
+# Integrator (cross-layer wiring)
+integrator:
+  enabled: true
+  verify_timeout: 300
+  max_iterations: 5
+  priority_types:
+    - bootstrap
+    - config

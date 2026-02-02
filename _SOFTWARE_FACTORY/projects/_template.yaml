@@ -51,16 +51,17 @@ fractal:
   max_items: 10                       # Max acceptance criteria
   max_depth: 3                        # Max recursion depth
 
-# Adversarial gate configuration
+# Adversarial gate configuration (100% LLM - no regex)
 adversarial:
-  threshold: 5                        # Score threshold for rejection
-  core_patterns: true                 # Use core patterns (test.skip, etc.)
-  security_check: true                # Check for hardcoded secrets
-  custom_patterns: []                 # Project-specific patterns
-    # - pattern: 'dangerous_function\('
-    #   score: 3
-    #   message: "Usage of dangerous_function detected"
-    #   max_occurrences: 0           # Optional: max allowed
+  threshold: 5                        # Score threshold for rejection (LLM decides)
+
+# Global Build Queue (cross-project job serialization)
+# Prevents CPU/IO saturation by running builds/tests sequentially
+# Daemon auto-starts when first build is triggered
+build_queue:
+  enabled: true                       # Use global queue (default: true)
+  priority: 10                        # WSJF priority (higher = first)
+  timeout: 300                        # Per-job timeout in seconds
 
 # Multi-tenant configuration (optional)
 # tenants:

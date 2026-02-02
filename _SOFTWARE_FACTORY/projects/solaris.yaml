@@ -52,9 +52,9 @@ domains:
       - .ts
       - .scss
       - .html
-    build_cmd: cd design-system && ng build 2>/dev/null || npx tsc --noEmit 2>/dev/null || true
-    test_cmd: cd design-system && ng test --no-watch --browsers=ChromeHeadless 2>/dev/null || true
-    lint_cmd: cd design-system && ng lint 2>/dev/null || npx eslint . 2>/dev/null || true
+    build_cmd: cd design-system && ng build 2>/dev/null || npx tsc --noEmit 2>/dev/null
+    test_cmd: cd design-system && ng test --no-watch --browsers=ChromeHeadless 2>/dev/null
+    lint_cmd: cd design-system && ng lint 2>/dev/null || npx eslint . 2>/dev/null
 
   figma:
     paths:
@@ -62,7 +62,7 @@ domains:
     extensions:
       - .json
     build_cmd: echo "Figma JSON validation OK"
-    test_cmd: python3 -c "import json; [json.load(open(f)) for f in __import__('glob').glob('design-system/figma-data/*.json')]" 2>/dev/null || true
+    test_cmd: python3 -c "import json; [json.load(open(f)) for f in __import__('glob').glob('design-system/figma-data/*.json')]" 2>/dev/null
     lint_cmd: echo "Figma lint OK"
 
   generated:

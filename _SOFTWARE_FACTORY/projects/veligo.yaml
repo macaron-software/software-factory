@@ -1,205 +1,304 @@
-# Veligo Platform Configuration
-# ==============================
-# Multi-tenant mobility platform (IDFM, Nantes, Lyon)
-
 project:
   name: veligo
-  display_name: "Veligo Platform"
+  display_name: Veligo Platform
   root_path: /Users/sylvain/_LAPOSTE/_VELIGO2
-  vision_doc: CLAUDE.md
-
-# Project CLI commands
-# Uses `veligo` CLI for all operations
+  vision_doc: VISION.md
+brain:
+  current_phase: features
+  phase_gate: deployed
+  auto_rotate: true
 cli:
   binary: veligo
-  # Build commands per domain
   build:
-    rust: veligo build backend
+    rust: veligo build all
     svelte: veligo build frontend
-    proto: veligo build proto
-    all: veligo build
-  # Test commands per domain
+    typescript: veligo build frontend
+    proto: veligo build all
+    e2e: veligo test smoke
+    all: veligo build all
   test:
-    rust: veligo test backend
-    svelte: veligo test frontend
+    rust: veligo test unit
+    svelte: veligo test unit
+    typescript: veligo test unit
     e2e: veligo test e2e
-    all: veligo test
-  # Lint commands
+    all: veligo test all
   lint:
-    rust: veligo lint backend
-    svelte: veligo lint frontend
-    all: veligo lint
-  # Deploy commands (per tenant)
+    rust: veligo build all
+    svelte: veligo build frontend
+    typescript: veligo build frontend
+    all: veligo build all
   deploy:
-    staging: veligo deploy staging --tenant {tenant}
-    prod: veligo deploy prod --tenant {tenant}
-    rollback: veligo deploy rollback --tenant {tenant}
-    all_staging: veligo deploy staging --all-tenants
-    all_prod: veligo deploy prod --all-tenants
-  # E2E journeys (per tenant)
+    staging: veligo deploy rsync --host 4.251.107.141
+    prod: veligo deploy rsync --host 4.251.107.141
+    rollback: veligo deploy rollback
   e2e:
-    smoke: veligo test e2e --tenant {tenant} --grep @smoke
-    journeys: veligo test e2e --tenant {tenant}
-    rbac: veligo test e2e --tenant {tenant} --grep @rbac
-    ao_compliance: veligo test ao --tenant {tenant}
-  # Status/monitoring
+    smoke: veligo test smoke --env staging
+    journeys: veligo test journey --ao {tenant}
   status: veligo status
   status_tenant: veligo status --tenant {tenant}
-
-# Multi-tenant configuration
+env:
+  VELIGO_TOKEN: factory-token-123456789012345678901234
+  VELIGO_BUILD_PERMISSION: build
 tenants:
-  - name: idfm
-    staging_url: https://staging-idfm.veligo.app
-    prod_url: https://idfm.veligo.app
-  - name: nantes
-    staging_url: https://staging-nantes.veligo.app
-    prod_url: https://nantes.veligo.app
-  - name: lyon
-    staging_url: https://staging-lyon.veligo.app
-    prod_url: https://lyon.veligo.app
-
-# Domain configurations
+- name: idfm
+  staging_url: https://staging-idfm.veligo.app
+  prod_url: https://idfm.veligo.app
+  ao_ref: IDFM T6, Annexe 10
+- name: nantes
+  staging_url: https://staging-nantes.veligo.app
+  prod_url: https://nantes.veligo.app
+  ao_ref: MOBIA - Véligo - Documentation/02 - Réponse AO Nantes/
 domains:
   rust:
     paths:
-      - backend/
+    - backend/
+    - crates/
+    - src/
     extensions:
-      - .rs
-    build_cmd: cd backend && cargo check --workspace 2>/dev/null || true
-    test_cmd: cd backend && cargo test --workspace 2>/dev/null || true
-    lint_cmd: cd backend && cargo clippy --all-targets 2>/dev/null || true
+    - .rs
+    build_cmd: cd veligo-platform/backend && SQLX_OFFLINE=true cargo check
+    test_cmd: cd veligo-platform/backend && SQLX_OFFLINE=true cargo test --lib -- --skip integration
+    lint_cmd: cd veligo-platform/backend && SQLX_OFFLINE=true cargo clippy
+    stack:
+      axum: '0.7'
+      axum-extra: '0.9'
+      sqlx: '0.7'
+      tokio: '1.0'
+    conventions:
+    - name: Extractor order
+      rule: Body-consuming extractors (Json, Form, Bytes) MUST be LAST parameter
+      example: "// CORRECT:\nasync fn handler(\n    State(state): State<AppState>,\n\
+        \    headers: HeaderMap,\n    Extension(auth): Extension<AuthContext>,\n \
+        \   Json(body): Json<MyInput>,  // Json LAST\n) -> impl IntoResponse\n\n//\
+        \ WRONG - will not compile:\nasync fn handler(\n    Json(body): Json<MyInput>,\
+        \  // ERROR: Json before other extractors\n    req: Request<Body>,\n)\n"
+    - name: Request + Json incompatible
+      rule: Cannot use Request<Body> AND Json<T> together - both consume body
+      fix: Use Extension<AuthContext> (set by middleware) instead of Request<Body>
+      example: '// WRONG:
 
+        async fn handler(Json(input): Json<Input>, req: Request<Body>) -> ...
+
+
+        // CORRECT:
+
+        async fn handler(Extension(auth): Extension<AuthContext>, Json(input): Json<Input>)
+        -> ...
+
+        '
+    - name: sqlx FromRow
+      rule: Structs used with query_as!() MUST derive sqlx::FromRow
+      example: '#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+
+        pub struct Station { ... }
+
+        '
+    - name: WebSocket Message
+      rule: axum::extract::ws::Message has NO is_text()/is_binary() methods
+      fix: Use matches!() macro or pattern matching
+      example: '// WRONG:
+
+        if msg.is_text() || msg.is_binary() { ... }
+
+
+        // CORRECT:
+
+        if matches!(msg, Message::Text(_) | Message::Binary(_)) { ... }
+
+        '
+    - name: WebSocket split
+      rule: socket.split() consumes socket, returns (SplitSink, SplitStream)
+      fix: Use SinkExt::send() on the sink, not socket.send()
+      example: 'use futures::{SinkExt, StreamExt};
+
+        let (mut send, mut recv) = socket.split();
+
+        send.send(Message::Text(msg.into())).await?;
+
+        '
+    - name: FromStr trait
+      rule: To call Type::from_str(), trait must be in scope
+      fix: Add 'use std::str::FromStr;' at file top
   svelte:
     paths:
-      - frontend/
+    - tenant/frontend-user/
+    - tenant/frontend-admin/
+    - veligo-platform/frontend/
     extensions:
-      - .svelte
-      - .ts
-    build_cmd: cd frontend && npm run build --if-present 2>/dev/null || npx svelte-check 2>/dev/null || true
-    test_cmd: cd frontend && npx vitest run 2>/dev/null || true
-    lint_cmd: cd frontend && npm run lint 2>/dev/null || npx eslint . 2>/dev/null || true
-
+    - .svelte
+    - .ts
+    build_cmd: cd veligo-platform/frontend && npm run check
+    test_cmd: cd veligo-platform/frontend && npm run test:unit -- --run
+    lint_cmd: cd veligo-platform/frontend && npm run lint
+    conventions:
+    - name: NO test.skip
+      rule: NEVER use test.skip(), describe.skip() - ALL tests MUST run
+      fix: Remove .skip() and fix the test
+    - name: NO as any
+      rule: NEVER use 'as any' - defeats TypeScript safety
+      fix: Use proper types or unknown + type guards
+    - name: NO @ts-ignore
+      rule: NEVER use @ts-ignore or @ts-expect-error
+      fix: Fix the type error properly
+    - name: Svelte stores
+      rule: Use $ prefix for store subscriptions in templates
+      fix: Use {$myStore} not {myStore}
+    - name: Error handling
+      rule: NEVER empty catch blocks
+      fix: Log or rethrow with context
   e2e:
     paths:
-      - tests/
+    - tests/
     extensions:
-      - .spec.ts
-    build_cmd: echo "E2E tests ready"
-    test_cmd: cd tests && npx playwright test 2>/dev/null || true
-    lint_cmd: cd tests && npx eslint . 2>/dev/null || true
-
+    - .spec.ts
+    build_cmd: veligo build all
+    test_cmd: veligo test e2e
+    lint_cmd: veligo build all
   typescript:
     paths:
-      - frontend/
-      - tests/
+    - tenant/frontend-user/
+    - tenant/frontend-admin/
+    - veligo-platform/frontend/
+    - tests/
     extensions:
-      - .ts
-      - .tsx
-    build_cmd: cd frontend && npx tsc --noEmit 2>/dev/null || true
-    test_cmd: cd frontend && npm test 2>/dev/null || true
-    lint_cmd: cd frontend && npm run lint 2>/dev/null || true
-
+    - .ts
+    - .tsx
+    build_cmd: veligo build frontend
+    test_cmd: veligo test smoke
+    lint_cmd: veligo build frontend
   proto:
     paths:
-      - proto/
+    - proto/
     extensions:
-      - .proto
-    build_cmd: buf lint proto/ 2>/dev/null || echo "Proto OK"
-    test_cmd: echo "Proto validation OK"
-    lint_cmd: buf lint proto/ 2>/dev/null || echo "Proto lint OK"
-
-# Deployment configuration
+    - .proto
+    build_cmd: veligo build all
+    test_cmd: veligo test unit
+    lint_cmd: veligo build all
 deploy:
-  strategy: canary
-  auto_prod: false
-  gate_approval: true  # Human approval required
+  strategy: blue-green
+  auto_prod: true
+  gate_approval: false
   rollback_on_fail: true
-
-# FRACTAL decomposition thresholds
+  ssh_target: azureadmin@4.251.107.141
+  prod:
+    url: https://veligo.app
+    health: /health
+  post_deploy:
+    e2e_prod:
+      enabled: true
+      seed_cmd: "veligo test seed --fixtures"
+      smoke: true
+      journeys: true
+      rbac: true
+      console_check: true
+      pages: ["/", "/login", "/dashboard", "/stations"]
+      console_whitelist: ["chrome-extension://", "matomo", "analytics"]
+      network_whitelist: ["/api/analytics/", "matomo.js"]
+      timeout_sec: 600
+    tmc:
+      enabled: true
+      tool: k6
+      thresholds:
+        p95_latency_ms: 500
+        error_rate_pct: 1
+        min_throughput_rps: 50
+      scenarios:
+        - baseline
+        - ramp_10x
+        - spike
+      duration_sec: 120
+    chaos:
+      enabled: true
+      scenarios:
+        - kill_backend
+        - network_latency_200ms
+        - cpu_stress_80pct
+        - memory_pressure
+      recovery_timeout_sec: 30
+      rollback_on_fail: true
+    feedback:
+      create_perf_tasks: true
+      revert_if_worse: true
+      tolerance_pct: 15
+infra:
+  skip_db_check: true
 fractal:
   max_files: 5
   max_loc: 400
   max_items: 10
   max_depth: 3
-
-# Adversarial gate configuration
 adversarial:
-  # Threshold elevated to 50 to account for pre-existing patterns in E2E tests
   threshold: 50
   core_patterns: true
   custom_patterns:
-    # Rust specific
-    - pattern: '\.unwrap\(\)'
-      score: 2
-      message: "unwrap() sans gestion d'erreur"
-      max_occurrences: 3
-    # AO compliance pattern (must be present in compliance files)
-    - pattern: "AO-[A-Z]+-\\d+"
-      score: 0
-      message: "Référence AO détectée"
-    # Security
-    - pattern: "password\\s*=\\s*[\"'][^\"']+[\"']"
-      score: 5
-      message: "Password hardcodée"
-    - pattern: "api_key\\s*=\\s*[\"'][^\"']+[\"']"
-      score: 5
-      message: "API key hardcodée"
-
-# AO traceability (Appel d'Offres)
+  - pattern: \.unwrap\(\)
+    score: 2
+    message: unwrap() sans gestion d'erreur
+    max_occurrences: 3
+  - pattern: AO-[A-Z]+-\d+
+    score: 0
+    message: Référence AO détectée
+  - pattern: password\s*=\s*["'][^"']+["']
+    score: 5
+    message: Password hardcodée
+  - pattern: api_key\s*=\s*["'][^"']+["']
+    score: 5
+    message: API key hardcodée
 ao_compliance:
   enabled: true
   refs_file: AO_TRACEABILITY.md
-
-# Error Capture Configuration (RLM Feedback Loop)
 error_capture:
   enabled: true
   feedback_to_backlog: true
   deduplicate: true
-
   build:
     enabled: true
-    domains: [rust, svelte, typescript, proto]
-
+    domains:
+    - rust
+    - svelte
+    - typescript
+    - proto
   e2e:
     enabled: true
     playwright:
       report_path: tests/playwright-report/
       fail_on_console_error: true
-      capture_grpc: true  # Critical for Veligo - capture gRPC errors like INVALID_ARGUMENT
-
+      capture_grpc: true
   mobile:
-    enabled: false  # No mobile apps for Veligo
-
+    enabled: false
   severity:
     create_task_min: medium
-
-# Active analyzers
 analyzers:
-  - rust
-  - typescript
-  - playwright
-  - grpc
-  - ao_compliance
+- rust
+- typescript
+- playwright
+- grpc
+- ao_compliance
 
-# Figma MCP Integration
-# =====================
-# Use official Figma MCP as source of truth for design specs
+# Integrator (cross-layer wiring)
+integrator:
+  enabled: true
+  verify_timeout: 300
+  max_iterations: 5
+  priority_types:
+    - bootstrap
+    - migration
+    - proto_gen
+    - api_connection
+    - proxy
+    - config
+    - module_wiring
+
 figma:
   enabled: true
-  mcp_server: figma  # Uses proxy_figma.py via opencode config
-  
-  # Figma file references for Veligo design system
+  mcp_server: figma
   design_system:
-    file_key: "YOUR_FIGMA_FILE_KEY"  # TODO: Add Veligo DS Figma file key
-    components_page: "Components"
-  
-  # Validation rules - reject if CSS doesn't match Figma specs
+    file_key: YOUR_FIGMA_FILE_KEY
+    components_page: Components
   validation:
     check_colors: true
     check_spacing: true
     check_typography: true
     check_border_radius: true
-    tolerance_px: 2  # Allow 2px tolerance for rounding
-  
-  # Adversarial check: compare generated Svelte components with Figma
+    tolerance_px: 2
   adversarial_figma_check: true

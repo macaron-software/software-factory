@@ -30,6 +30,7 @@ Usage:
 import asyncio
 import json
 import os
+import re
 import sys
 import signal
 import uuid
@@ -74,6 +75,32 @@ def log(msg: str, level: str = "INFO"):
             f.write(line + "\n")
     except:
         pass
+
+
+def _constrain_vitest(cmd: str) -> str:
+    """Inject --pool=forks --poolOptions.forks.maxForks=1 into vitest commands.
+    Prevents 4GB RAM per vitest worker process."""
+    if "vitest" not in cmd:
+        return cmd
+    constraint = "--pool=forks --poolOptions.forks.maxForks=1"
+    if constraint in cmd or "--pool=" in cmd:
+        return cmd  # already constrained
+    # Insert after 'vitest run' or 'vitest' keyword
+    cmd = re.sub(
+        r'(vitest\s+run)\b',
+        rf'\1 {constraint}',
+        cmd,
+    )
+    if constraint not in cmd:
+        # Fallback: insert after 'vitest'
+        cmd = re.sub(
+            r'(vitest)\b',
+            rf'\1 {constraint}',
+            cmd,
+            count=1,
+        )
+    log(f"Vitest constrained: {cmd[:120]}")
+    return cmd
 
 
 # ============================================================================
@@ -292,14 +319,15 @@ class MCPLRMServer:
             return {"error": str(e)}
 
     async def _tool_conventions(self, args: Dict) -> Dict:
-        """Get project conventions"""
+        """Get project conventions including stack versions and framework-specific rules"""
         project = self.get_project(args.get("project"))
         if not project:
             return {"error": "Project not found"}
 
         domain = args.get("domain", "")
 
-        conventions = {
+        # Default conventions (baseline)
+        default_conventions = {
             "rust": {
                 "error_handling": "Use Result<T, E> and ? operator. Avoid .unwrap() in production.",
                 "testing": "Use #[cfg(test)] mod tests { ... } with #[test] functions.",
@@ -317,7 +345,28 @@ class MCPLRMServer:
             },
         }
 
-        return {"conventions": conventions.get(domain, {}), "domain": domain}
+        result = default_conventions.get(domain, {})
+
+        # Merge project-specific conventions from YAML
+        if project and hasattr(project, 'config') and project.config:
+            domains_config = project.config.get("domains", {})
+            domain_config = domains_config.get(domain, {})
+
+            # Add stack versions (CRITICAL for correct code generation)
+            if "stack" in domain_config:
+                result["stack"] = domain_config["stack"]
+
+            # Add framework-specific conventions (e.g., axum 0.7 rules)
+            if "conventions" in domain_config:
+                result["framework_conventions"] = domain_config["conventions"]
+
+            # Add build/test commands
+            if "build_cmd" in domain_config:
+                result["build_cmd"] = domain_config["build_cmd"]
+            if "test_cmd" in domain_config:
+                result["test_cmd"] = domain_config["test_cmd"]
+
+        return {"conventions": result, "domain": domain}
 
     async def _tool_task_read(self, args: Dict) -> Dict:
         """Read task details"""
@@ -362,6 +411,9 @@ class MCPLRMServer:
 
         if not cmd:
             return {"error": f"No {command} command for domain {domain}"}
+
+        # Vitest memory constraint: prevent 4GB per worker
+        cmd = _constrain_vitest(cmd)
 
         import subprocess
         try:

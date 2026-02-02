@@ -15,18 +15,19 @@ domains:
       - backend/
     extensions:
       - .rs
-    build_cmd: cd backend && cargo check 2>/dev/null || true
-    test_cmd: cd backend && cargo test 2>/dev/null || true
-    lint_cmd: cd backend && cargo clippy 2>/dev/null || true
+    # psy CLI has test but not build/lint
+    build_cmd: cd backend && SQLX_OFFLINE=true cargo check
+    test_cmd: psy test unit
+    lint_cmd: cd backend && SQLX_OFFLINE=true cargo clippy
 
   proto:
     paths:
       - backend/proto/
     extensions:
       - .proto
-    build_cmd: echo "Proto build via Rust"
-    test_cmd: echo "Proto tests via Rust"
-    lint_cmd: buf lint backend/proto/ 2>/dev/null || echo "Proto lint OK"
+    build_cmd: cd backend && SQLX_OFFLINE=true cargo check
+    test_cmd: psy test unit
+    lint_cmd: buf lint backend/proto/
 
   svelte:
     paths:
@@ -34,14 +35,38 @@ domains:
     extensions:
       - .svelte
       - .ts
-    build_cmd: cd ms-dashboard && npm run build --if-present 2>/dev/null || npx svelte-kit sync 2>/dev/null || true
-    test_cmd: cd ms-dashboard && npm run test:unit 2>/dev/null || true
-    lint_cmd: cd ms-dashboard && npm run lint 2>/dev/null || npx eslint . 2>/dev/null || true
+    build_cmd: cd ms-dashboard && npm run build
+    test_cmd: cd ms-dashboard && npm run test:unit
+    lint_cmd: cd ms-dashboard && npm run lint
     conventions:
-      # CRITICAL: SvelteKit reserved file names
-      - "NEVER create test files with + prefix (e.g., +page.test.ts, +layout.spec.ts)"
-      - "Test files go in __tests__/ subfolder (e.g., routes/admin/__tests__/auth.test.ts)"
-      - "Files starting with + are RESERVED by SvelteKit for routing"
+      - name: "NO test.skip"
+        rule: "NEVER use test.skip(), describe.skip(), it.skip() - ALL tests MUST run"
+        fix: "Remove .skip() and fix the test, or delete it if obsolete"
+        example: |
+          // WRONG: test.skip('should work', () => {})
+          // CORRECT: test('should work', () => { expect(true).toBe(true) })
+      - name: "NO as any"
+        rule: "NEVER use 'as any' - it defeats TypeScript type safety"
+        fix: "Use proper types, generics, or type guards instead"
+        example: |
+          // WRONG: (window as any).myProp
+          // CORRECT: declare global { interface Window { myProp: string } }
+          // CORRECT: if ('myProp' in window) { window.myProp }
+      - name: "NO @ts-ignore"
+        rule: "NEVER use @ts-ignore or @ts-expect-error without justification"
+        fix: "Fix the type error properly or use proper type narrowing"
+      - name: "SvelteKit file names"
+        rule: "NEVER create test files with + prefix (reserved for routing)"
+        fix: "Test files go in __tests__/ subfolder"
+        example: |
+          // WRONG: routes/admin/+page.test.ts
+          // CORRECT: routes/admin/__tests__/page.test.ts
+      - name: "Proper error handling"
+        rule: "NEVER empty catch blocks, NEVER swallow errors silently"
+        fix: "Log errors or rethrow with context"
+        example: |
+          // WRONG: catch (e) {}
+          // CORRECT: catch (e) { console.error('Context:', e); throw e; }
 
   patient-web:
     paths:
@@ -49,9 +74,9 @@ domains:
     extensions:
       - .ts
       - .tsx
-    build_cmd: cd patient-web && npm run build --if-present 2>/dev/null || npx tsc --noEmit 2>/dev/null || true
-    test_cmd: cd patient-web && npm test --if-present 2>/dev/null || true
-    lint_cmd: cd patient-web && npm run lint 2>/dev/null || npx eslint . 2>/dev/null || true
+    build_cmd: cd patient-web && npm run build
+    test_cmd: cd patient-web && npm test
+    lint_cmd: cd patient-web && npm run lint
 
   admin:
     paths:
@@ -59,27 +84,27 @@ domains:
     extensions:
       - .ts
       - .tsx
-    build_cmd: cd admin-dashboard && npm run build --if-present 2>/dev/null || npx tsc --noEmit 2>/dev/null || true
-    test_cmd: cd admin-dashboard && npm test --if-present 2>/dev/null || true
-    lint_cmd: cd admin-dashboard && npm run lint 2>/dev/null || npx eslint . 2>/dev/null || true
+    build_cmd: cd admin-dashboard && npm run build
+    test_cmd: cd admin-dashboard && npm test
+    lint_cmd: cd admin-dashboard && npm run lint
 
   website:
     paths:
       - website/
     extensions:
       - .ts
-    build_cmd: cd website && npm run build --if-present 2>/dev/null || npx wrangler deploy --dry-run 2>/dev/null || true
-    test_cmd: cd website && npm test --if-present 2>/dev/null || true
-    lint_cmd: cd website && npm run lint 2>/dev/null || npx eslint . 2>/dev/null || true
+    build_cmd: cd website && npm run build
+    test_cmd: cd website && npm test
+    lint_cmd: cd website && npm run lint
 
   e2e:
     paths:
       - ms-dashboard/tests/
     extensions:
       - .spec.ts
-    build_cmd: echo "E2E tests ready"
-    test_cmd: cd ms-dashboard && npx playwright test 2>/dev/null || true
-    lint_cmd: cd ms-dashboard/tests && npx eslint . 2>/dev/null || true
+    build_cmd: cd ms-dashboard && npm run build
+    test_cmd: psy test e2e
+    lint_cmd: cd ms-dashboard/tests && npx eslint .
 
   swift:
     paths:
@@ -91,7 +116,7 @@ domains:
     # Real Xcode build with error capture
     build_cmd: cd ios && xcodebuild -project LiACTApp.xcodeproj -scheme LiACTApp -destination 'platform=iOS Simulator,name=iPhone 15' -configuration Debug build 2>&1 | tee /tmp/psy_ios_build.log || cat /tmp/psy_ios_build.log
     test_cmd: cd ios && xcodebuild -project LiACTApp.xcodeproj -scheme LiACTApp -destination 'platform=iOS Simulator,name=iPhone 15' test 2>&1 | tee /tmp/psy_ios_test.log || cat /tmp/psy_ios_test.log
-    lint_cmd: cd ios && swiftlint 2>&1 || true
+    lint_cmd: cd ios && swiftlint 2>&1
 
   kotlin:
     paths:
@@ -102,7 +127,7 @@ domains:
     # Real Gradle build with error capture
     build_cmd: cd android && ./gradlew assembleDebug 2>&1 | tee /tmp/psy_android_build.log || cat /tmp/psy_android_build.log
     test_cmd: cd android && ./gradlew test 2>&1 | tee /tmp/psy_android_test.log || cat /tmp/psy_android_test.log
-    lint_cmd: cd android && ./gradlew lint 2>&1 || true
+    lint_cmd: cd android && ./gradlew lint 2>&1
 
 # Deployment configuration
 deploy:
@@ -115,6 +140,39 @@ deploy:
     url: https://macaron-software.com
     health: /api/health
   rollback_on_fail: true
+  post_deploy:
+    e2e_prod:
+      enabled: true
+      seed_cmd: "psy test seed"
+      smoke: true
+      journeys: true
+      rbac: true
+      console_check: true
+      pages: ["/", "/login", "/dashboard", "/patients"]
+      console_whitelist: ["chrome-extension://", "matomo", "analytics"]
+      network_whitelist: ["/api/analytics/", "matomo.js"]
+      timeout_sec: 600
+    tmc:
+      enabled: false
+    chaos:
+      enabled: false
+
+# CLI commands for deployment (use psy CLI)
+cli:
+  binary: psy
+  # Deploy commands (git promotion triggers CI/CD)
+  deploy:
+    staging: psy git promote-staging
+    prod: psy git promote-prod
+    rollback: echo "PSY rollback - manual git revert"
+  # Test commands
+  test:
+    unit: psy test unit
+    e2e: psy test all
+  # E2E journeys (real tests)
+  e2e:
+    smoke: psy test e2e --smoke
+    journeys: psy test all
 
 # FRACTAL decomposition thresholds
 fractal:
@@ -184,3 +242,14 @@ analyzers:
   - typescript
   - playwright
   - security
+
+# Integrator (cross-layer wiring)
+integrator:
+  enabled: true
+  verify_timeout: 300
+  max_iterations: 5
+  priority_types:
+    - bootstrap
+    - migration
+    - api_connection
+    - config

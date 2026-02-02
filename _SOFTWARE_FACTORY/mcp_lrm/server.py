@@ -108,7 +108,7 @@ class MCPLRMServer:
         """Return tool definitions for MCP"""
         return [
             {
-                "name": "lrm_locate",
+                "name": "locate",
                 "description": "Find files in project matching pattern or search query",
                 "inputSchema": {
                     "type": "object",
@@ -132,7 +132,7 @@ class MCPLRMServer:
                 },
             },
             {
-                "name": "lrm_summarize",
+                "name": "summarize",
                 "description": "Get summarized view of files with focus goal",
                 "inputSchema": {
                     "type": "object",
@@ -151,7 +151,7 @@ class MCPLRMServer:
                 },
             },
             {
-                "name": "lrm_conventions",
+                "name": "conventions",
                 "description": "Get project conventions for a domain",
                 "inputSchema": {
                     "type": "object",
@@ -165,7 +165,7 @@ class MCPLRMServer:
                 },
             },
             {
-                "name": "lrm_examples",
+                "name": "examples",
                 "description": "Get example code from project",
                 "inputSchema": {
                     "type": "object",
@@ -183,7 +183,7 @@ class MCPLRMServer:
                 },
             },
             {
-                "name": "lrm_task_read",
+                "name": "task_read",
                 "description": "Read task details by ID",
                 "inputSchema": {
                     "type": "object",
@@ -197,7 +197,7 @@ class MCPLRMServer:
                 },
             },
             {
-                "name": "lrm_task_update",
+                "name": "task_update",
                 "description": "Update task status",
                 "inputSchema": {
                     "type": "object",
@@ -219,7 +219,7 @@ class MCPLRMServer:
                 },
             },
             {
-                "name": "lrm_subtask_create",
+                "name": "subtask_create",
                 "description": "Create sub-task (FRACTAL decomposition)",
                 "inputSchema": {
                     "type": "object",
@@ -242,7 +242,7 @@ class MCPLRMServer:
                 },
             },
             {
-                "name": "lrm_build",
+                "name": "build",
                 "description": "Run build or test command for domain",
                 "inputSchema": {
                     "type": "object",
@@ -260,19 +260,39 @@ class MCPLRMServer:
                     "required": ["domain"],
                 },
             },
+            {
+                "name": "context",
+                "description": "Get project context from RAG (vision, architecture, requirements, conventions)",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "category": {
+                            "type": "string",
+                            "description": "Category: vision, architecture, data_model, api_surface, conventions, state, history, all",
+                            "default": "all",
+                        },
+                        "max_chars": {
+                            "type": "integer",
+                            "description": "Max chars to return",
+                            "default": 8000,
+                        },
+                    },
+                },
+            },
         ]
 
     async def handle_tool_call(self, name: str, arguments: Dict) -> Any:
         """Handle a tool call"""
         handlers = {
-            "lrm_locate": self._tool_locate,
-            "lrm_summarize": self._tool_summarize,
-            "lrm_conventions": self._tool_conventions,
-            "lrm_examples": self._tool_examples,
-            "lrm_task_read": self._tool_task_read,
-            "lrm_task_update": self._tool_task_update,
-            "lrm_subtask_create": self._tool_subtask_create,
-            "lrm_build": self._tool_build,
+            "locate": self._tool_locate,
+            "summarize": self._tool_summarize,
+            "conventions": self._tool_conventions,
+            "examples": self._tool_examples,
+            "task_read": self._tool_task_read,
+            "task_update": self._tool_task_update,
+            "subtask_create": self._tool_subtask_create,
+            "build": self._tool_build,
+            "context": self._tool_context,
         }
 
         handler = handlers.get(name)
@@ -384,9 +404,10 @@ class MCPLRMServer:
         return {"summaries": summaries, "goal": goal}
 
     async def _tool_conventions(self, args: Dict) -> Dict:
-        """Get project conventions for domain"""
+        """Get project conventions for domain including stack versions and framework rules"""
         domain = args.get("domain", "")
 
+        # Default conventions (baseline)
         conventions = {
             "rust": {
                 "error_handling": "Use Result<T, E> with ? operator, avoid .unwrap()",
@@ -410,11 +431,19 @@ class MCPLRMServer:
 
         domain_conventions = conventions.get(domain, {})
 
-        # Add project-specific conventions if available
+        # Add project-specific conventions from YAML
         if self.project_config and self.project_config.get_domain(domain):
             domain_config = self.project_config.get_domain(domain)
             domain_conventions["build_cmd"] = domain_config.get("build_cmd")
             domain_conventions["test_cmd"] = domain_config.get("test_cmd")
+
+            # Add stack versions (CRITICAL for correct code generation)
+            if "stack" in domain_config:
+                domain_conventions["stack"] = domain_config["stack"]
+
+            # Add framework-specific conventions (e.g., axum 0.7 rules)
+            if "conventions" in domain_config:
+                domain_conventions["framework_conventions"] = domain_config["conventions"]
 
         return {"domain": domain, "conventions": domain_conventions}
 
@@ -522,7 +551,7 @@ class MCPLRMServer:
             return {"error": str(e)}
 
     async def _tool_build(self, args: Dict) -> Dict:
-        """Run build command"""
+        """Run build command via global build queue (prevents CPU saturation)"""
         import subprocess
 
         domain = args.get("domain", "")
@@ -545,23 +574,98 @@ class MCPLRMServer:
         if not cmd:
             return {"error": f"No {command_type} command configured for {domain}"}
 
+        # Use global build queue to prevent CPU saturation (1 build at a time)
         try:
-            proc = subprocess.run(
-                cmd,
-                shell=True,
+            from core.build_queue import GlobalBuildQueue
+            queue = GlobalBuildQueue.instance()
+
+            # Enqueue and wait for completion
+            job_id = queue.enqueue(
+                project=self.project_name or "unknown",
+                cmd=cmd,
                 cwd=str(self.project_root),
-                capture_output=True,
-                text=True,
                 timeout=300,
+                priority=5,  # Lower priority than deploy builds
             )
+
+            # Wait for job completion (async)
+            import asyncio
+            job = await queue.wait_for(job_id)
+
             return {
                 "command": cmd,
-                "returncode": proc.returncode,
-                "stdout": proc.stdout[:5000],
-                "stderr": proc.stderr[:2000],
+                "returncode": 0 if job.status.value == "success" else 1,
+                "stdout": (job.stdout or "")[:5000],
+                "stderr": (job.stderr or "")[:2000],
+                "queued": True,
+                "job_id": job_id,
             }
-        except subprocess.TimeoutExpired:
-            return {"error": "Command timed out (300s)"}
+        except (ImportError, Exception) as e:
+            # Fallback if build_queue not available - direct execution
+            try:
+                proc = subprocess.run(
+                    cmd,
+                    shell=True,
+                    cwd=str(self.project_root),
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                )
+                return {
+                    "command": cmd,
+                    "returncode": proc.returncode,
+                    "stdout": proc.stdout[:5000],
+                    "stderr": proc.stderr[:2000],
+                    "queued": False,
+                }
+            except subprocess.TimeoutExpired:
+                return {"error": "Command timed out (300s)"}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _tool_context(self, args: Dict) -> Dict:
+        """Get project context from RAG (ProjectContext)
+
+        Returns vision, architecture, requirements, conventions, etc.
+        Used by agents to understand project scope and avoid slop.
+        """
+        category = args.get("category", "all")
+        max_chars = args.get("max_chars", 8000)
+
+        if not self.project_config:
+            return {"error": "No project config available"}
+
+        try:
+            from core.project_context import ProjectContext
+            ctx = ProjectContext(self.project_name)
+
+            # Refresh if stale
+            if ctx.is_stale():
+                ctx.refresh()
+
+            if category == "all":
+                # Return full summary
+                summary = ctx.get_summary(max_chars=max_chars)
+                return {
+                    "project": self.project_name,
+                    "context": summary,
+                    "categories": ["vision", "architecture", "data_model", "api_surface",
+                                   "conventions", "state", "history", "domain"],
+                }
+            else:
+                # Return specific category
+                cat_data = getattr(ctx, category, None)
+                if cat_data:
+                    return {
+                        "project": self.project_name,
+                        "category": category,
+                        "content": cat_data.content[:max_chars] if hasattr(cat_data, 'content') else str(cat_data)[:max_chars],
+                        "keywords": cat_data.keywords if hasattr(cat_data, 'keywords') else [],
+                    }
+                else:
+                    return {"error": f"Category '{category}' not found"}
+        except ImportError:
+            return {"error": "ProjectContext not available"}
         except Exception as e:
             return {"error": str(e)}
 

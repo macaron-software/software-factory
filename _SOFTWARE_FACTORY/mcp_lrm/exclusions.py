@@ -125,12 +125,16 @@ def should_exclude_path(path: Path, root: Path = None) -> bool:
     Check if a path should be excluded from MCP access.
 
     Args:
-        path: Path to check
+        path: Path to check (can be str or Path)
         root: Project root (for relative path checking)
 
     Returns:
         True if path should be excluded
     """
+    # Ensure path is Path object
+    if isinstance(path, str):
+        path = Path(path)
+
     # Check directory exclusions
     for part in path.parts:
         if part in EXCLUDED_DIRS:
