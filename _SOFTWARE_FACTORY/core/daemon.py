@@ -28,6 +28,33 @@ Usage:
 """
 
 import os
+from typing import Set
+
+# Global registry of child process groups to kill on shutdown
+# Workers register their PIDs here, daemon kills them on SIGTERM
+_child_pgroups: Set[int] = set()
+
+
+def register_child_pgroup(pid: int):
+    """Register a child process group PID for cleanup on shutdown."""
+    _child_pgroups.add(pid)
+
+
+def unregister_child_pgroup(pid: int):
+    """Unregister a child process group PID after it exits."""
+    _child_pgroups.discard(pid)
+
+
+def kill_all_child_pgroups():
+    """Kill all registered child process groups."""
+    import signal
+    for pid in list(_child_pgroups):
+        try:
+            os.killpg(pid, signal.SIGKILL)
+        except (OSError, ProcessLookupError):
+            pass
+    _child_pgroups.clear()
+
 import sys
 import time
 import signal
@@ -324,6 +351,9 @@ class Daemon:
         def handle_signal(signum, frame):
             self.logger.info(f"Received signal {signum}, shutting down...")
             self.running = False
+            # Kill all registered child process groups (opencode workers)
+            self.logger.info(f"Killing {len(_child_pgroups)} child process groups...")
+            kill_all_child_pgroups()
             if self._loop:
                 self._loop.stop()
 
@@ -441,6 +471,198 @@ class DaemonManager:
                     os.kill(daemon["pid"], signal.SIGKILL)
                 except OSError:
                     pass
+
+
+# ============================================================================
+# WATCHDOG - Auto-restart dead daemons + alerting
+# ============================================================================
+
+class DaemonWatchdog:
+    """
+    Watchdog that monitors all factory daemons.
+
+    - Checks PID files every interval
+    - Detects daemons that died unexpectedly (PID file exists, process dead)
+    - Restarts them automatically
+    - Logs CRITICAL alerts
+    - Writes alerts to file for external monitoring
+    """
+
+    PID_DIR = Daemon.PID_DIR
+    LOG_DIR = Daemon.LOG_DIR
+    ALERT_FILE = Daemon.BASE_DIR / "data" / "alerts.jsonl"
+
+    # Map daemon names to their restart commands
+    RESTART_COMMANDS = {
+        "cycle": "factory {project} cycle start",
+        "wiggum-tdd": "factory {project} wiggum start",
+        "wiggum-deploy": "factory {project} deploy start --batch",
+    }
+
+    def __init__(self, check_interval: int = 60):
+        self.check_interval = check_interval
+        self.logger = logging.getLogger("watchdog")
+        self.logger.setLevel(logging.INFO)
+        if not self.logger.handlers:
+            handler = RotatingFileHandler(
+                self.LOG_DIR / "watchdog.log",
+                maxBytes=10 * 1024 * 1024,
+                backupCount=3,
+            )
+            handler.setFormatter(logging.Formatter(
+                "[%(asctime)s] [WATCHDOG] [%(levelname)s] %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            ))
+            self.logger.addHandler(handler)
+        self._restart_counts = {}  # daemon_name -> count (prevent restart loops)
+        self._restart_cooldown = {}  # daemon_name -> last_restart_time
+
+    def _is_running(self, pid: int) -> bool:
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+
+    def _alert(self, daemon_name: str, message: str, level: str = "CRITICAL"):
+        """Log alert and write to alerts file."""
+        self.logger.critical(f"[{daemon_name}] {message}")
+
+        # Write structured alert
+        import json
+        alert = {
+            "timestamp": datetime.now().isoformat(),
+            "daemon": daemon_name,
+            "level": level,
+            "message": message,
+        }
+        try:
+            self.ALERT_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.ALERT_FILE, "a") as f:
+                f.write(json.dumps(alert) + "\n")
+        except Exception as e:
+            self.logger.error(f"Failed to write alert: {e}")
+
+    def _should_restart(self, daemon_name: str) -> bool:
+        """Check cooldown and max restart count to prevent restart loops."""
+        now = datetime.now()
+
+        # Max 3 restarts per daemon per hour
+        count = self._restart_counts.get(daemon_name, 0)
+        if count >= 3:
+            last = self._restart_cooldown.get(daemon_name)
+            if last and (now - last).total_seconds() < 3600:
+                self._alert(daemon_name,
+                    f"RESTART LOOP DETECTED: {count} restarts in 1h. Manual intervention required.",
+                    level="EMERGENCY")
+                return False
+            # Reset after cooldown
+            self._restart_counts[daemon_name] = 0
+
+        return True
+
+    def _restart_daemon(self, daemon_name: str, project: str):
+        """Restart a dead daemon."""
+        import subprocess
+
+        if not self._should_restart(daemon_name):
+            return False
+
+        # Find the daemon type from the name
+        daemon_type = None
+        for dtype in self.RESTART_COMMANDS:
+            if daemon_name.startswith(dtype):
+                daemon_type = dtype
+                break
+
+        if not daemon_type:
+            self._alert(daemon_name, f"Unknown daemon type, cannot restart: {daemon_name}")
+            return False
+
+        cmd = self.RESTART_COMMANDS[daemon_type].format(project=project)
+        self._alert(daemon_name, f"RESTARTING: {cmd}")
+
+        try:
+            # Clean stale PID file first
+            pidfile = self.PID_DIR / f"{daemon_name}.pid"
+            if pidfile.exists():
+                pidfile.unlink()
+
+            result = subprocess.run(
+                cmd.split(),
+                capture_output=True,
+                text=True,
+                timeout=30,
+                cwd=str(Daemon.BASE_DIR),
+            )
+
+            if result.returncode == 0:
+                self._alert(daemon_name, f"RESTARTED OK: {cmd}", level="WARNING")
+                self._restart_counts[daemon_name] = self._restart_counts.get(daemon_name, 0) + 1
+                self._restart_cooldown[daemon_name] = datetime.now()
+                return True
+            else:
+                self._alert(daemon_name, f"RESTART FAILED (exit {result.returncode}): {result.stderr[:200]}")
+                return False
+        except Exception as e:
+            self._alert(daemon_name, f"RESTART ERROR: {e}")
+            return False
+
+    def check_all(self) -> list:
+        """
+        Check all daemons, restart dead ones.
+
+        Returns list of actions taken.
+        """
+        actions = []
+
+        if not self.PID_DIR.exists():
+            return actions
+
+        for pidfile in self.PID_DIR.glob("*.pid"):
+            daemon_name = pidfile.stem
+            try:
+                pid = int(pidfile.read_text().strip())
+            except (ValueError, FileNotFoundError):
+                continue
+
+            if not self._is_running(pid):
+                # Extract project from daemon name (e.g., "cycle-veligo" -> "veligo")
+                parts = daemon_name.rsplit("-", 1)
+                project = parts[-1] if len(parts) > 1 else "unknown"
+
+                self._alert(daemon_name,
+                    f"DAEMON DEAD: PID {pid} not running. PID file exists = unexpected crash.")
+
+                restarted = self._restart_daemon(daemon_name, project)
+                actions.append({
+                    "daemon": daemon_name,
+                    "pid": pid,
+                    "action": "restarted" if restarted else "restart_failed",
+                    "project": project,
+                })
+
+        return actions
+
+    def run_once(self) -> list:
+        """Single watchdog check. Returns actions taken."""
+        self.logger.info("Watchdog check started")
+        actions = self.check_all()
+        if actions:
+            self.logger.warning(f"Watchdog actions: {len(actions)} daemons handled")
+        else:
+            self.logger.info("All daemons healthy")
+        return actions
+
+    async def run_loop(self):
+        """Continuous watchdog loop."""
+        self.logger.info(f"Watchdog started (interval={self.check_interval}s)")
+        while True:
+            try:
+                self.check_all()
+            except Exception as e:
+                self.logger.error(f"Watchdog error: {e}")
+            await asyncio.sleep(self.check_interval)
 
 
 # ============================================================================

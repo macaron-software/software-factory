@@ -8,7 +8,7 @@ Config loaded from ~/.config/factory/llm.yaml
 Providers:
 - anthropic: Claude via `claude` CLI (Opus 4.5 for Brain)
 - minimax: MiniMax M2.1 via API (Wiggums)
-- local: Qwen local via llama-cpp API (fallback)
+- local: GLM-4.7-Flash via mlx_lm.server (fallback, Apple Silicon)
 
 Usage:
     from core.llm_client import LLMClient, get_client
@@ -67,7 +67,7 @@ class ProviderConfig:
         defaults = {
             "anthropic": "ANTHROPIC_API_KEY",
             "minimax": "MINIMAX_API_KEY",
-            "local": None,  # Local llama.cpp doesn't need API key
+            "local": None,  # Local mlx_lm doesn't need API key
         }
         env_var = defaults.get(self.name)
         return os.environ.get(env_var) if env_var else None
@@ -137,13 +137,13 @@ def _default_config() -> LLMConfig:
             "local": ProviderConfig(
                 name="local",
                 base_url="http://localhost:8002/v1",
-                models={"qwen": "qwen3-30b-a3b"},
+                models={"glm": "mlx-community/GLM-4.7-Flash-4bit"},
                 timeout=300,
             ),
         },
         brain_provider="anthropic/opus",
         wiggum_provider="minimax/m2.1",
-        fallback_chain=["minimax/m2.1", "local/qwen"],
+        fallback_chain=["minimax/m2.1", "local/glm"],
     )
 
 
@@ -158,10 +158,10 @@ class LLMClient:
     Roles:
     - "brain": Claude Opus 4.5 via claude CLI (heavy analysis, vision)
     - "wiggum": MiniMax M2.1 via API (code generation, TDD)
-    - "sub": Local Qwen via llama-cpp (fast iteration, fallback)
+    - "sub": Local GLM-4.7-Flash via mlx_lm (fast iteration, fallback)
 
     Direct provider access:
-    - "anthropic/opus", "minimax/m2.1", "local/qwen"
+    - "anthropic/opus", "minimax/m2.1", "local/glm"
     """
 
     def __init__(self, config: LLMConfig = None):
@@ -193,7 +193,7 @@ class LLMClient:
         role_map = {
             "brain": self.config.brain_provider,
             "wiggum": self.config.wiggum_provider,
-            "sub": "local/qwen",
+            "sub": "local/glm",
         }
 
         provider_str = role_map.get(role_or_provider, role_or_provider)
@@ -213,7 +213,7 @@ class LLMClient:
         self,
         prompt: str,
         role: str = "wiggum",
-        max_tokens: int = 4096,
+        max_tokens: int = 32000,  # No artificial limit - let model produce full response
         temperature: float = 0.3,
         use_fallback: bool = True,
     ) -> str:
@@ -403,9 +403,10 @@ class LLMClient:
         temperature: float,
     ) -> Optional[str]:
         """
-        Call OpenAI-compatible local API (llama.cpp, vLLM with Qwen).
+        Call OpenAI-compatible local API (mlx_lm.server with GLM-4.7-Flash).
         Used for: Fallback when MiniMax unavailable.
         NOT OpenAI cloud - just compatible API format.
+        Start server: python -m mlx_lm.server --model mlx-community/GLM-4.7-Flash-4bit --port 8002
         """
         log(f"Calling {provider.name} API ({model})...")
 
@@ -479,8 +480,8 @@ def query_sync(prompt: str, role: str = "wiggum", **kwargs) -> str:
 # Fallback model chain for rate limits
 FALLBACK_MODELS = [
     "minimax/MiniMax-M2.1",          # Primary (paid, fast)
-    "opencode/glm-4.7-free",         # Fallback1 (free, capable)
-    "minimax/MiniMax-M2",            # Fallback2 (free tier M2)
+    "minimax/MiniMax-M2",            # Fallback1 (free tier M2)
+    # Note: local/glm requires mlx_lm.server running (Apple Silicon only)
 ]
 
 
@@ -529,6 +530,20 @@ def ensure_mcp_server_running():
         return False
 
 
+# ============================================================================
+# GLOBAL CONCURRENCY LIMITER - Prevents memory explosion from too many opencode
+# ============================================================================
+_opencode_semaphore: Optional[asyncio.Semaphore] = None
+_MAX_CONCURRENT_OPENCODE = 20  # Max 20 concurrent opencode processes system-wide
+
+def _get_opencode_semaphore() -> asyncio.Semaphore:
+    """Get or create global semaphore for opencode concurrency"""
+    global _opencode_semaphore
+    if _opencode_semaphore is None:
+        _opencode_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_OPENCODE)
+    return _opencode_semaphore
+
+
 async def run_opencode(
     prompt: str,
     model: str = "minimax/MiniMax-M2.1",
@@ -536,6 +551,7 @@ async def run_opencode(
     timeout: int = None,  # IGNORED - no timeout. Model runs until complete. Fallback only on RATE LIMIT.
     project: str = None,
     fallback: bool = True,
+    project_env: Dict[str, str] = None,  # Project-specific env vars to set
 ) -> Tuple[int, str]:
     """
     Run opencode CLI with fallback chain for rate limits.
@@ -557,6 +573,22 @@ async def run_opencode(
     Returns:
         Tuple of (returncode, output)
     """
+    # CONCURRENCY LIMITER - Acquire semaphore to limit parallel opencode processes
+    semaphore = _get_opencode_semaphore()
+    async with semaphore:
+        return await _run_opencode_impl(prompt, model, cwd, timeout, project, fallback, project_env)
+
+
+async def _run_opencode_impl(
+    prompt: str,
+    model: str = "minimax/MiniMax-M2.1",
+    cwd: str = None,
+    timeout: int = None,
+    project: str = None,
+    fallback: bool = True,
+    project_env: Dict[str, str] = None,
+) -> Tuple[int, str]:
+    """Internal implementation - runs under semaphore"""
     # Ensure MCP server is running before starting
     ensure_mcp_server_running()
 
@@ -573,6 +605,11 @@ async def run_opencode(
     env = os.environ.copy()
     if project:
         env["FACTORY_PROJECT"] = project
+
+    # Add project-specific environment variables
+    if project_env:
+        env.update(project_env)
+        log(f"Added {len(project_env)} project env vars: {list(project_env.keys())}")
 
     last_error = ""
     for i, current_model in enumerate(models_to_try):
@@ -601,28 +638,40 @@ async def run_opencode(
                 start_new_session=True,  # Create process group for cleanup
             )
 
+            # Register process group for cleanup on daemon shutdown
+            from core.daemon import register_child_pgroup, unregister_child_pgroup
+            register_child_pgroup(proc.pid)
+
             # Stream output with progress logging every 60s
             output_chunks = []
             last_progress_time = asyncio.get_event_loop().time()
             last_progress_len = 0
+            last_output_time = asyncio.get_event_loop().time()  # Track when output last changed
             PROGRESS_INTERVAL = 60  # Log progress every 60s
-            MAX_TIMEOUT = 2400  # 40 min max safety timeout
+            MAX_TIMEOUT = 900  # 15 min max safety timeout (was 40 min)
+            STUCK_TIMEOUT = 600  # 10 min with 0 chars = likely stuck (was 3 min, too aggressive)
+            STALE_TIMEOUT = 180  # 3 min with no NEW output = process stuck (was 10 min)
             start_time = asyncio.get_event_loop().time()
+            stuck_triggered = False  # Track if stuck detection triggered
 
             async def read_stream():
-                nonlocal last_progress_time, last_progress_len
+                nonlocal last_progress_time, last_progress_len, stuck_triggered, last_output_time
                 while True:
                     try:
                         chunk = await asyncio.wait_for(proc.stdout.read(4096), timeout=PROGRESS_INTERVAL)
                         if not chunk:
                             break  # EOF
                         output_chunks.append(chunk.decode(errors='replace'))
-                        
+
                         # Progress logging
                         now = asyncio.get_event_loop().time()
                         current_len = sum(len(c) for c in output_chunks)
                         elapsed = int(now - start_time)
-                        
+
+                        # Track when output was last produced
+                        if current_len > last_progress_len:
+                            last_output_time = now
+
                         if now - last_progress_time >= PROGRESS_INTERVAL:
                             delta = current_len - last_progress_len
                             log(f"[STREAM] {elapsed}s | +{delta} chars | total {current_len} chars", "DEBUG")
@@ -632,10 +681,24 @@ async def run_opencode(
                         # No output for 60s - check if process alive
                         if proc.returncode is not None:
                             break
-                        elapsed = int(asyncio.get_event_loop().time() - start_time)
+                        now = asyncio.get_event_loop().time()
+                        elapsed = int(now - start_time)
                         current_len = sum(len(c) for c in output_chunks)
-                        log(f"[STREAM] {elapsed}s | waiting... | {current_len} chars so far", "DEBUG")
-                        
+                        stale_duration = int(now - last_output_time)
+                        log(f"[STREAM] {elapsed}s | waiting... | {current_len} chars so far | stale {stale_duration}s", "DEBUG")
+
+                        # STUCK DETECTION: 0 chars for 5+ min = likely rate limited
+                        if current_len == 0 and elapsed > STUCK_TIMEOUT:
+                            log(f"STUCK DETECTED: {elapsed}s with 0 chars - likely rate limited", "WARN")
+                            stuck_triggered = True
+                            raise asyncio.TimeoutError("STUCK_RATE_LIMITED")
+
+                        # STALE DETECTION: No new output for 10+ min after producing some = process stuck
+                        if current_len > 0 and stale_duration > STALE_TIMEOUT:
+                            log(f"STALE DETECTED: No new output for {stale_duration}s after producing {current_len} chars", "WARN")
+                            stuck_triggered = True
+                            raise asyncio.TimeoutError("STALE_OUTPUT")
+
                         # Check max timeout
                         if elapsed > MAX_TIMEOUT:
                             raise asyncio.TimeoutError("MAX_TIMEOUT")
@@ -643,30 +706,59 @@ async def run_opencode(
             try:
                 await read_stream()
                 await proc.wait()
-            except asyncio.TimeoutError:
+                unregister_child_pgroup(proc.pid)  # Process exited normally
+            except asyncio.TimeoutError as te:
                 # Kill entire process group (opencode + all child processes)
                 try:
                     os.killpg(proc.pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass  # Already dead
                 await proc.wait()
+                unregister_child_pgroup(proc.pid)  # Process killed
                 elapsed = int(asyncio.get_event_loop().time() - start_time)
+
+                # STUCK or STALE = likely rate limited or process hung → try fallback
+                if stuck_triggered or str(te) in ["STUCK_RATE_LIMITED", "STALE_OUTPUT"]:
+                    current_len = sum(len(c) for c in output_chunks)
+                    reason = "0 output = rate limited" if current_len == 0 else f"stale after {current_len} chars = process stuck"
+                    log(f"STUCK/STALE {elapsed}s ({current_model}) - {reason} - triggering fallback", "WARN")
+                    last_error = f"Stuck/stale {elapsed}s ({reason})"
+                    if i < len(models_to_try) - 1:
+                        continue  # Try fallback model
+                    return 1, last_error
+
                 log(f"opencode MAX TIMEOUT {elapsed}s ({current_model}) - killed process group", "ERROR")
                 return 1, f"Error: max timeout {elapsed}s (process stuck, not rate limited)"
             
             output = "".join(output_chunks)
 
             # Check for rate limit in output → fallback
+            # Be STRICT: only trigger on actual API rate limit errors, not code containing "rate" or "limit"
+            RATE_LIMIT_PATTERNS = [
+                "rate_limit",           # API error type
+                "rate limit exceeded",  # Common error message
+                "too many requests",    # HTTP 429 message
+                "requests per minute",  # Quota message
+                "quota exceeded",       # Quota message
+                '"type": "rate_limit"', # JSON error response
+                "error code: 429",      # HTTP status in message
+            ]
+
+            def is_rate_limited(text: str) -> bool:
+                """Strict rate limit detection - only API errors, not code mentioning 'rate'"""
+                text_lower = text.lower()
+                return any(pattern in text_lower for pattern in RATE_LIMIT_PATTERNS)
+
             if proc.returncode != 0:
-                if "rate" in output.lower() or "limit" in output.lower() or "429" in output:
+                if is_rate_limited(output):
                     last_error = output
                     log(f"Rate limit detected ({current_model}), trying fallback...", "WARN")
                     if i < len(models_to_try) - 1:
                         continue  # Try fallback
                 return proc.returncode, output
 
-            # Check for rate limit message in success output
-            if "rate limit" in output.lower() or "too many requests" in output.lower():
+            # Check for rate limit message in success output (API returned 200 but with rate limit warning)
+            if is_rate_limited(output):
                 last_error = output
                 log(f"Rate limit in output ({current_model}), trying fallback...", "WARN")
                 if i < len(models_to_try) - 1:
@@ -759,9 +851,10 @@ providers:
     timeout: 180
 
   local:
+    # Start: python -m mlx_lm.server --model mlx-community/GLM-4.7-Flash-4bit --port 8002
     base_url: http://localhost:8002/v1
     models:
-      qwen: qwen3-30b-a3b
+      glm: mlx-community/GLM-4.7-Flash-4bit
     timeout: 300
 
 defaults:
@@ -769,7 +862,7 @@ defaults:
   wiggum: minimax/m2.1       # TDD workers
   fallback_chain:
     - minimax/m2.1
-    - local/qwen
+    - local/glm
 """
 
 
