@@ -40,6 +40,7 @@ from core.task_store import TaskStore, Task, TaskStatus
 from core.llm_client import run_opencode
 from core.error_capture import ErrorCapture, ErrorType, ErrorSeverity
 from core.daemon import Daemon, DaemonManager, print_daemon_status, print_all_status
+from core.project_context import ProjectContext
 
 
 def log(msg: str, level: str = "INFO", worker_id: str = None):
@@ -62,6 +63,7 @@ class DeployStage(str, Enum):
     LOAD = "load"
     PROD = "prod"
     VERIFY = "verify"
+    E2E_PROD = "e2e_prod"
 
 
 @dataclass
@@ -107,9 +109,18 @@ class E2EExecutor:
     def __init__(self, project: ProjectConfig, tenant: str = None):
         self.project = project
         self.tenant = tenant
+        self.env = "staging"
         self.base_url = self._get_base_url("staging")
         self.error_capture = ErrorCapture(project)  # Error capture for feedback loop
         self.captured_error_tasks: List[Dict] = []  # Tasks generated from captured errors
+
+    def set_env(self, env: str, base_url: str = None):
+        """Switch environment (staging/prod) for E2E execution."""
+        self.env = env
+        if base_url:
+            self.base_url = base_url
+        else:
+            self.base_url = self._get_base_url(env)
 
     def _get_base_url(self, env: str) -> str:
         """Get base URL for environment"""
@@ -133,45 +144,43 @@ class E2EExecutor:
 
     async def run_smoke_tests(self) -> Tuple[bool, str, List[Dict]]:
         """
-        Run smoke tests using LLM agent with MCP tools.
+        Run smoke tests via DIRECT CLI execution (not LLM).
+
+        Executes: veligo test e2e --env staging
+        Parses real Playwright output for pass/fail.
 
         Returns:
             Tuple of (success, error_message, captured_error_tasks)
         """
         smoke_cmd = self.project.get_e2e_cmd("smoke", self.tenant)
-        log(f"Running smoke tests via LLM agent: {smoke_cmd}")
+        log(f"Running smoke tests DIRECTLY: {smoke_cmd}")
         captured_tasks = []
 
-        prompt = f"""You are an E2E Test agent. Execute SMOKE TESTS.
-
-PROJECT: {self.project.name}
-BASE URL: {self.base_url}
-{f"TENANT: {self.tenant}" if self.tenant else ""}
-
-MCP TOOLS AVAILABLE:
-- lrm_build(domain, command): Run test commands
-- lrm_locate(query, scope): Find test files
-
-YOUR TASK:
-1. Run smoke tests: {smoke_cmd}
-2. Set TEST_ENV=staging and BASE_URL={self.base_url}
-3. Analyze results and report
-
-Execute smoke tests now.
-Output "SMOKE_SUCCESS" if all pass, or "SMOKE_FAILED: <reason>" if any fail.
-Include FULL OUTPUT of any errors (gRPC, console.error, assertions).
-"""
-
         try:
-            returncode, output = await run_opencode(
-                prompt,
-                model="minimax/MiniMax-M2.1",
+            # DIRECT EXECUTION - No LLM involved
+            env = {
+                **dict(subprocess.os.environ),
+                "TEST_ENV": self.env,
+                "BASE_URL": self.base_url or "",
+            }
+
+            proc = await asyncio.create_subprocess_shell(
+                smoke_cmd,
                 cwd=str(self.project.root_path),
-                timeout=300,
-                project=self.project.name,
+                env=env,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
 
-            # 🔴 CAPTURE ERRORS FROM OUTPUT (RLM feedback loop)
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(),
+                timeout=300  # 5 min timeout
+            )
+
+            output = stdout.decode() + "\n" + stderr.decode()
+            returncode = proc.returncode
+
+            # Parse real Playwright output
             errors = self.error_capture.parse_e2e_output(output, test_name="smoke")
             if errors:
                 log(f"Captured {len(errors)} errors from smoke tests")
@@ -179,21 +188,24 @@ Include FULL OUTPUT of any errors (gRPC, console.error, assertions).
                 self.captured_error_tasks.extend(captured_tasks)
                 self.error_capture.clear()
 
-            if "SMOKE_SUCCESS" in output:
-                log("Smoke tests passed ✓")
+            # Check ACTUAL exit code and output
+            if returncode == 0:
+                log("Smoke tests passed ✓ (exit code 0)")
                 return True, "", captured_tasks
-            elif "SMOKE_FAILED" in output:
-                error = output.split("SMOKE_FAILED:")[-1].strip()[:500]
-                return False, f"Smoke tests failed: {error}", captured_tasks
             else:
-                # Check for test passing indicators
-                if "passed" in output.lower() and "failed" not in output.lower():
-                    log("Smoke tests passed (implicit)")
-                    return True, "", captured_tasks
-                return False, "Smoke test results unclear", captured_tasks
+                # Extract failure summary from Playwright output
+                error_summary = ""
+                for line in output.split("\n"):
+                    if "failed" in line.lower() or "error" in line.lower():
+                        error_summary += line + "\n"
+                        if len(error_summary) > 500:
+                            break
+                return False, f"Smoke tests failed (exit {returncode}): {error_summary[:500]}", captured_tasks
 
+        except asyncio.TimeoutError:
+            return False, "Smoke tests timed out (300s)", captured_tasks
         except Exception as e:
-            return False, str(e), captured_tasks
+            return False, f"Smoke test execution error: {str(e)}", captured_tasks
 
     async def run_journeys(self, journeys: List[E2EJourney]) -> Tuple[bool, List[Dict], List[Dict]]:
         """
@@ -229,48 +241,54 @@ Include FULL OUTPUT of any errors (gRPC, console.error, assertions).
 
     async def _run_journey(self, journey: E2EJourney) -> Tuple[bool, str, List[Dict]]:
         """
-        Execute a single journey using LLM agent with MCP tools.
+        Execute a single journey via DIRECT CLI execution (not LLM).
+
+        Uses project-specific e2e command (with tenant substitution).
+        Only adds --grep if the base command doesn't already have filtering.
 
         Returns:
             Tuple of (success, error_message, captured_error_tasks)
         """
         tenant = journey.tenant or self.tenant
         base_cmd = self.project.get_e2e_cmd("journeys", tenant)
-        cmd = f'{base_cmd} --grep "{journey.name}"'
         captured_tasks = []
 
-        prompt = f"""You are an E2E Test agent. Execute a USER JOURNEY test.
+        # Only add --grep if the command doesn't already have filtering
+        # (e.g., veligo uses --ao {tenant}, others might use --grep)
+        if "--ao" in base_cmd or "--category" in base_cmd or "--module" in base_cmd:
+            # Project config already specifies filtering, use as-is
+            cmd = base_cmd
+        else:
+            # Legacy behavior: add --grep for journey name
+            cmd = f'{base_cmd} --grep "{journey.name}"'
 
-PROJECT: {self.project.name}
-JOURNEY: {journey.name}
-DESCRIPTION: {journey.description}
-BASE URL: {self.base_url}
-{f"TENANT: {tenant}" if tenant else ""}
-
-MCP TOOLS AVAILABLE:
-- lrm_build(domain, command): Run test commands
-- lrm_locate(query, scope): Find test files
-
-YOUR TASK:
-1. Run the journey test: {cmd}
-2. Set TEST_ENV=staging and BASE_URL={self.base_url}
-3. Analyze results - look for failures in UI interactions
-
-Execute the journey test now.
-Output "JOURNEY_SUCCESS" if pass, or "JOURNEY_FAILED: <detailed failure reason>" if fail.
-Include FULL OUTPUT of any errors (gRPC, console.error, assertions, network errors).
-"""
+        log(f"Running journey DIRECTLY: {cmd}")
 
         try:
-            returncode, output = await run_opencode(
-                prompt,
-                model="minimax/MiniMax-M2.1",
+            # DIRECT EXECUTION - No LLM involved
+            env = {
+                **dict(subprocess.os.environ),
+                "TEST_ENV": self.env,
+                "BASE_URL": self.base_url or "",
+            }
+
+            proc = await asyncio.create_subprocess_shell(
+                cmd,
                 cwd=str(self.project.root_path),
-                timeout=300,
-                project=self.project.name,
+                env=env,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
 
-            # 🔴 CAPTURE ERRORS FROM OUTPUT (RLM feedback loop)
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(),
+                timeout=300  # 5 min timeout per journey
+            )
+
+            output = stdout.decode() + "\n" + stderr.decode()
+            returncode = proc.returncode
+
+            # Parse real Playwright output
             errors = self.error_capture.parse_e2e_output(output, test_name=journey.name)
             if errors:
                 log(f"Captured {len(errors)} errors from journey '{journey.name}'")
@@ -278,18 +296,25 @@ Include FULL OUTPUT of any errors (gRPC, console.error, assertions, network erro
                 self.captured_error_tasks.extend(captured_tasks)
                 self.error_capture.clear()
 
-            if "JOURNEY_SUCCESS" in output:
+            # Check ACTUAL exit code
+            if returncode == 0:
+                log(f"Journey '{journey.name}' passed ✓")
                 return True, "", captured_tasks
-            elif "JOURNEY_FAILED" in output:
-                error = output.split("JOURNEY_FAILED:")[-1].strip()[:1000]
-                return False, error, captured_tasks
             else:
-                if "passed" in output.lower() and "failed" not in output.lower():
-                    return True, "", captured_tasks
-                return False, "Journey results unclear", captured_tasks
+                # Extract failure details from Playwright output
+                error_lines = []
+                for line in output.split("\n"):
+                    if any(kw in line.lower() for kw in ["fail", "error", "timeout", "assert"]):
+                        error_lines.append(line)
+                        if len("\n".join(error_lines)) > 1000:
+                            break
+                error_summary = "\n".join(error_lines)[:1000] or f"Exit code {returncode}"
+                return False, error_summary, captured_tasks
 
+        except asyncio.TimeoutError:
+            return False, f"Journey '{journey.name}' timed out (300s)", captured_tasks
         except Exception as e:
-            return False, str(e), captured_tasks
+            return False, f"Journey execution error: {str(e)}", captured_tasks
 
     def get_captured_error_tasks(self) -> List[Dict]:
         """Get all captured error tasks and clear the list"""
@@ -301,6 +326,128 @@ Include FULL OUTPUT of any errors (gRPC, console.error, assertions, network erro
         """Clear all captured errors"""
         self.error_capture.clear()
         self.captured_error_tasks = []
+
+    async def run_console_network_check(self, pages: List[str], config: Dict) -> Tuple[bool, str, List[Dict]]:
+        """
+        Navigate main pages and capture console errors + network failures.
+
+        Uses Playwright via project CLI to check for:
+        - console.error / unhandled rejections
+        - Network requests returning 4xx/5xx
+        - gRPC failures
+
+        Returns:
+            Tuple of (success, error_summary, captured_error_tasks)
+        """
+        console_whitelist = config.get("console_whitelist", [])
+        network_whitelist = config.get("network_whitelist", [])
+        base_url = self.base_url or ""
+        captured_tasks = []
+
+        if not base_url:
+            log("Console/network check: no base URL, skipping")
+            return True, "", []
+
+        # Build a Playwright script that navigates pages and captures errors
+        pages_js = ", ".join([f'"{p}"' for p in pages]) if pages else '"/"'
+        whitelist_console_js = ", ".join([f'"{w}"' for w in console_whitelist])
+        whitelist_network_js = ", ".join([f'"{w}"' for w in network_whitelist])
+
+        script = f"""
+const {{ chromium }} = require('playwright');
+(async () => {{
+  const browser = await chromium.launch({{ headless: true }});
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  const consoleErrors = [];
+  const networkErrors = [];
+  const whitelist_console = [{whitelist_console_js}];
+  const whitelist_network = [{whitelist_network_js}];
+
+  page.on('console', msg => {{
+    if (msg.type() === 'error') {{
+      const text = msg.text();
+      const dominated = whitelist_console.some(w => text.includes(w));
+      if (!dominated) consoleErrors.push(text);
+    }}
+  }});
+
+  page.on('response', resp => {{
+    const status = resp.status();
+    const url = resp.url();
+    if (status >= 400) {{
+      const dominated = whitelist_network.some(w => url.includes(w));
+      if (!dominated) networkErrors.push(`${{status}} ${{url}}`);
+    }}
+  }});
+
+  const pages = [{pages_js}];
+  for (const p of pages) {{
+    try {{
+      await page.goto(`{base_url}${{p}}`, {{ timeout: 30000, waitUntil: 'networkidle' }});
+      await page.waitForTimeout(2000);
+    }} catch (e) {{
+      networkErrors.push(`NAVIGATION_FAILED: {base_url}${{p}} - ${{e.message}}`);
+    }}
+  }}
+
+  await browser.close();
+
+  if (consoleErrors.length > 0) {{
+    console.log('CONSOLE_ERRORS:');
+    consoleErrors.forEach(e => console.log(`  - ${{e}}`));
+  }}
+  if (networkErrors.length > 0) {{
+    console.log('NETWORK_ERRORS:');
+    networkErrors.forEach(e => console.log(`  - ${{e}}`));
+  }}
+  if (consoleErrors.length === 0 && networkErrors.length === 0) {{
+    console.log('CONSOLE_NETWORK_CHECK_PASSED');
+  }}
+
+  process.exit(consoleErrors.length + networkErrors.length > 0 ? 1 : 0);
+}})();
+"""
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "node", "-e", script,
+                cwd=str(self.project.root_path),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(),
+                timeout=config.get("timeout_sec", 120)
+            )
+
+            output = stdout.decode() + "\n" + stderr.decode()
+            returncode = proc.returncode
+
+            # Parse errors for feedback
+            errors = self.error_capture.parse_e2e_output(output, test_name="console_network_check")
+            if errors:
+                captured_tasks = self.error_capture.errors_to_tasks(errors)
+                self.captured_error_tasks.extend(captured_tasks)
+                self.error_capture.clear()
+
+            if returncode == 0:
+                log("Console/network check passed ✓")
+                return True, "", captured_tasks
+
+            # Extract error summary
+            error_lines = [l for l in output.split("\n") if l.strip().startswith("- ") or "ERRORS:" in l]
+            error_summary = "\n".join(error_lines)[:1000]
+            log(f"Console/network check FAILED: {error_summary}", "WARN")
+            return False, error_summary, captured_tasks
+
+        except asyncio.TimeoutError:
+            return False, "Console/network check timed out", []
+        except Exception as e:
+            log(f"Console/network check error: {e}", "WARN")
+            # Non-blocking: if Playwright not available, warn but don't fail
+            return True, f"Console check skipped: {e}", []
 
     async def run_rbac_checks(self, roles: List[str]) -> Tuple[bool, List[Dict]]:
         """Verify RBAC permissions for different roles using LLM agent"""
@@ -1024,6 +1171,9 @@ class DeployWorker:
 
         deploy_config = self.project.deploy
         strategy = deploy_config.get("strategy", "validation-only")
+        # LOG: Make it explicit when no real deploy happens
+        if strategy == "validation-only":
+            self.log(f"⚠️ Strategy: validation-only — task will be COMMITTED, NOT deployed to prod")
 
         # 📱 MOBILE DOMAINS: Always use validation-only (no staging/prod deployment)
         # Mobile apps (iOS/Android) are built and validated locally, not deployed to web servers
@@ -1070,12 +1220,34 @@ class DeployWorker:
                     continue
                 self.log(f"Adversarial APPROVED build (score: {adv_review.score}/10)")
 
-                # VALIDATION-ONLY: Build success = task completed (skip staging, e2e, etc.)
+                # VALIDATION-ONLY: Build success = COMMITTED (NOT deployed to prod)
                 if strategy == "validation-only":
                     result.success = True
-                    self.task_store.transition(task.id, TaskStatus.DEPLOYED)
-                    self.log("✅ Validation-only: Build passed → task completed")
+                    # Two-step transition: code_written → commit_queued → merged
+                    current = self.task_store.get_task(task.id)
+                    if current:
+                        status_val = current.status.value if hasattr(current.status, 'value') else str(current.status)
+                        if status_val == "code_written":
+                            self.task_store.transition(task.id, TaskStatus.COMMIT_QUEUED)
+                    self.task_store.transition(task.id, TaskStatus.MERGED)
+                    self.log("✅ Validation-only: Build passed → COMMITTED (not deployed to prod)")
                     return result
+
+                # 1.8 INFRA CHECK (before staging/E2E)
+                # Verify infrastructure is working - auto-fix if possible
+                infra_ok, infra_error = await self._stage_infra_check()
+                if not infra_ok:
+                    result.stages_failed.append("infra_check")
+                    result.error = infra_error
+                    result.feedback_tasks.append({
+                        "type": "fix",
+                        "domain": "infra",
+                        "stage": "infra_check",
+                        "description": f"Infrastructure issue: {infra_error}",
+                        "source_task": task.id,
+                    })
+                    continue
+                result.stages_passed.append("infra_check")
 
                 # 2. STAGING
                 if strategy != "validation-only":
@@ -1296,30 +1468,102 @@ class DeployWorker:
                         continue
                     self.log(f"Adversarial APPROVED prod deploy (score: {adv_review.score}/10)")
 
-                    # 9. VERIFY PROD
-                    success, output = await self._stage_verify_prod()
-                    self.stages_outputs["verify"] = output if not success else "VERIFY_SUCCESS"
+                    # 9. POST-PROD E2E VALIDATION (full: health → seed → smoke → journeys → RBAC → console/network)
+                    self.task_store.transition(task.id, TaskStatus.E2E_PROD)
+                    success, output = await self._stage_post_prod_e2e(task)
+                    self.stages_outputs["e2e_prod"] = output if not success else "E2E_PROD_SUCCESS"
                     if not success:
-                        result.stages_failed.append(DeployStage.VERIFY)
+                        self.task_store.transition(task.id, TaskStatus.E2E_PROD_FAILED)
+                        result.stages_failed.append(DeployStage.E2E_PROD)
                         result.error = output
                         await self._rollback()
+                        # Create feedback task for E2E prod failure
+                        result.feedback_tasks.append({
+                            "type": "fix",
+                            "domain": task.domain or "e2e",
+                            "stage": "e2e_prod",
+                            "description": f"Fix post-prod E2E failure: {output[:300]}",
+                            "source_task": task.id,
+                        })
                         continue
-                    result.stages_passed.append(DeployStage.VERIFY)
+                    result.stages_passed.append(DeployStage.E2E_PROD)
 
-                    # 9.5 ADVERSARIAL: Final Verify Review
-                    adv_review = await self.adversarial.review_stage("verify", self.stages_outputs["verify"], task)
+                    # 9.5 ADVERSARIAL: Review E2E Prod results
+                    adv_review = await self.adversarial.review_stage("e2e_prod", self.stages_outputs["e2e_prod"], task)
                     if not adv_review.approved:
-                        self.log(f"Adversarial REJECTED verification: {adv_review.feedback}", "WARN")
+                        self.log(f"Adversarial REJECTED E2E prod: {adv_review.feedback}", "WARN")
                         await self._rollback()
-                        result.stages_failed.append("adversarial_verify")
-                        result.error = f"Adversarial rejected verification: {adv_review.feedback}"
+                        result.stages_failed.append("adversarial_e2e_prod")
+                        result.error = f"Adversarial rejected E2E prod: {adv_review.feedback}"
                         continue
-                    self.log(f"Adversarial APPROVED verification (score: {adv_review.score}/10)")
+                    self.log(f"Adversarial APPROVED E2E prod (score: {adv_review.score}/10)")
+
+                    # 10. POST-DEPLOY: TMC Baseline (load testing)
+                    tmc_baseline_result = None
+                    post_deploy_cfg = self.deploy_config.get("post_deploy", {})
+                    tmc_cfg = post_deploy_cfg.get("tmc", {})
+                    chaos_cfg = post_deploy_cfg.get("chaos", {})
+
+                    if tmc_cfg.get("enabled"):
+                        from core.tmc_runner import TMCRunner
+                        tmc = TMCRunner(self.project_name, self.deploy_config, self.root_path)
+                        self.task_store.transition(task.id, TaskStatus.TMC_BASELINE)
+                        self.log("📊 Running TMC baseline (load testing)...")
+                        tmc_baseline_result = await tmc.run_baseline()
+                        self.log(f"TMC baseline:\n{tmc_baseline_result.summary()}")
+
+                        if not tmc_baseline_result.meets_thresholds(tmc_cfg.get("thresholds")):
+                            self.task_store.transition(task.id, TaskStatus.TMC_BASELINE_FAILED)
+                            self.log("⚠️ TMC baseline below thresholds — creating perf task (NOT rolling back)", "WARN")
+                            # Create perf feedback task but don't rollback — app works, just slow
+                            feedback = tmc.build_feedback_context(tmc_baseline_result)
+                            await self._create_tmc_feedback(feedback, task)
+                            # Continue to deploy — it's functional, just needs optimization
+                        else:
+                            self.log("✅ TMC baseline meets thresholds")
+
+                    # 11. POST-DEPLOY: Chaos Monkey (resilience testing)
+                    if chaos_cfg.get("enabled"):
+                        from core.chaos_runner import ChaosRunner
+                        chaos = ChaosRunner(self.project_name, self.deploy_config, self.root_path)
+                        self.task_store.transition(task.id, TaskStatus.CHAOS_PROD)
+                        self.log("🔥 Running Chaos Monkey on production...")
+                        chaos_result = await chaos.run_all()
+                        self.log(f"Chaos result:\n{chaos_result.summary()}")
+
+                        if not chaos_result.all_passed:
+                            self.task_store.transition(task.id, TaskStatus.CHAOS_PROD_FAILED)
+                            self.log("🔥 CHAOS FAILED — service did not recover — ROLLBACK", "ERROR")
+                            await self._rollback()
+                            # Create resilience feedback task
+                            feedback = chaos.build_feedback_context(chaos_result)
+                            await self._create_chaos_feedback(feedback, task)
+                            result.stages_failed.append("chaos_prod")
+                            result.error = f"Chaos failed: {chaos_result.summary()}"
+                            continue
+                        self.log("✅ Chaos Monkey: all scenarios passed")
+
+                        # 12. POST-DEPLOY: TMC Verify (post-chaos comparison)
+                        if tmc_baseline_result and tmc_cfg.get("enabled"):
+                            self.task_store.transition(task.id, TaskStatus.TMC_VERIFY)
+                            self.log("📊 Running TMC post-chaos verification...")
+                            tmc_verify_result = await tmc.run_verify(tmc_baseline_result)
+                            self.log(f"TMC verify:\n{tmc_verify_result.summary()}")
+
+                            tolerance = post_deploy_cfg.get("feedback", {}).get("tolerance_pct", 15)
+                            if tmc_verify_result.degraded_vs(tmc_baseline_result, tolerance_pct=tolerance):
+                                self.task_store.transition(task.id, TaskStatus.TMC_VERIFY_FAILED)
+                                self.log(f"📉 TMC post-chaos degradation > {tolerance}% — ROLLBACK", "ERROR")
+                                await self._rollback()
+                                result.stages_failed.append("tmc_verify")
+                                result.error = f"Post-chaos degradation: {tmc_verify_result.summary()}"
+                                continue
+                            self.log("✅ TMC post-chaos: no degradation")
 
                 # SUCCESS!
                 result.success = True
                 self.task_store.transition(task.id, TaskStatus.DEPLOYED)
-                self.log("✅ Deploy pipeline completed successfully (ALL ADVERSARIAL GATES PASSED)")
+                self.log("✅ Deploy pipeline completed successfully (ALL GATES PASSED — including TMC/Chaos)")
                 return result
 
             except Exception as e:
@@ -1377,44 +1621,39 @@ class DeployWorker:
 
     async def _stage_build(self, task: Task) -> Tuple[bool, str, List[Dict]]:
         """
-        Build artifact using LLM agent with MCP tools.
+        Build artifact using DIRECT subprocess execution.
+
+        CRITICAL: Uses direct subprocess (not LLM) to preserve cargo cache.
+        LLM agents spawn with different env → fingerprint changes → recompiles everything.
+        Direct subprocess = consistent env = cargo cache works = fast incremental builds.
 
         Returns:
             Tuple of (success, error_message, captured_error_tasks)
         """
         build_cmd = self.project.get_build_cmd(task.domain)
-        self.log(f"Building artifact via LLM agent: {build_cmd}")
+        self.log(f"Building artifact DIRECTLY: {build_cmd}")
         captured_tasks = []
 
-        prompt = f"""You are a Deploy agent. Execute the BUILD stage for this task.
-
-PROJECT: {self.project.name} ({self.project.display_name})
-ROOT: {self.project.root_path}
-DOMAIN: {task.domain}
-
-MCP TOOLS AVAILABLE:
-- lrm_locate(query, scope, limit): Find files
-- lrm_build(domain, command): Run build commands
-- lrm_summarize(files, goal): Understand code
-
-YOUR TASK:
-1. Use lrm_build to run: {build_cmd}
-2. If build fails, analyze the error
-3. Report SUCCESS or FAILURE with details
-
-Execute the build now and report the result.
-Output "BUILD_SUCCESS" if successful, or "BUILD_FAILED: <reason>" if failed.
-Include FULL ERROR OUTPUT if build fails (compilation errors, type errors, etc.).
-"""
-
         try:
-            returncode, output = await run_opencode(
-                prompt,
-                model="minimax/MiniMax-M2.1",
+            # DIRECT EXECUTION - Preserves cargo cache/fingerprints
+            # Use current environment to maintain CARGO_HOME, RUSTUP_HOME, etc.
+            env = dict(subprocess.os.environ)
+
+            proc = await asyncio.create_subprocess_shell(
+                build_cmd,
                 cwd=str(self.project.root_path),
-                timeout=self.OPENCODE_TIMEOUT,
-                project=self.project.name,
+                env=env,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
+
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(),
+                timeout=self.OPENCODE_TIMEOUT
+            )
+
+            output = stdout.decode() + "\n" + stderr.decode()
+            returncode = proc.returncode
 
             # 🔴 CAPTURE BUILD ERRORS (RLM feedback loop)
             errors = self.error_capture.parse_build_output(output, domain=task.domain)
@@ -1423,20 +1662,23 @@ Include FULL ERROR OUTPUT if build fails (compilation errors, type errors, etc.)
                 captured_tasks = self.error_capture.errors_to_tasks(errors)
                 self.error_capture.clear()
 
-            if returncode != 0:
-                return False, f"Build agent failed: {output[:500]}", captured_tasks
-
-            if "BUILD_SUCCESS" in output:
-                self.log("Build passed ✓")
-                return True, "", captured_tasks
-            elif "BUILD_FAILED" in output:
-                error = output.split("BUILD_FAILED:")[-1].strip()[:500]
-                return False, f"Build failed: {error}", captured_tasks
+            # Check ACTUAL exit code
+            if returncode == 0:
+                self.log("Build passed ✓ (exit code 0)")
+                return True, f"BUILD_SUCCESS\n{output}", captured_tasks
             else:
-                # Assume success if no explicit failure
-                self.log("Build completed (implicit success)")
-                return True, "", captured_tasks
+                # Extract error summary from output
+                error_lines = []
+                for line in output.split("\n"):
+                    if any(kw in line.lower() for kw in ["error", "failed", "cannot find", "not found"]):
+                        error_lines.append(line)
+                        if len("\n".join(error_lines)) > 1000:
+                            break
+                error_summary = "\n".join(error_lines)[:1000] or f"Exit code {returncode}"
+                return False, f"BUILD_FAILED: {error_summary}", captured_tasks
 
+        except asyncio.TimeoutError:
+            return False, f"Build timed out ({self.OPENCODE_TIMEOUT}s)", captured_tasks
         except Exception as e:
             return False, str(e), captured_tasks
 
@@ -1486,10 +1728,60 @@ Output "STAGING_SUCCESS" if successful, or "STAGING_FAILED: <reason>" if failed.
                 error = output.split("STAGING_FAILED:")[-1].strip()[:500]
                 return False, f"Staging deploy failed: {error}"
             else:
-                self.log("Staging deploy completed (implicit success)")
-                return True, ""
+                self.log("⚠️ Staging deploy: no explicit success/failure signal — treating as FAILED", "WARN")
+                return False, "No explicit success signal from staging deploy"
 
         except Exception as e:
+            return False, str(e)
+
+    async def _stage_infra_check(self) -> Tuple[bool, str]:
+        """
+        Verify infrastructure is working before E2E tests.
+
+        Uses wiggum_infra to:
+        1. Check all configured URLs respond
+        2. Auto-fix common issues (nginx 403, etc.)
+        3. Create feedback tasks for unfixable issues
+
+        Returns:
+            Tuple of (success, error_message)
+        """
+        self.log("Running infrastructure check...")
+
+        try:
+            from core.wiggum_infra import InfraAgent
+
+            agent = InfraAgent(self.project.name)
+            issues = await agent.verify_all()
+
+            if not issues:
+                self.log("✅ Infrastructure check passed")
+                return True, ""
+
+            # Attempt auto-fix
+            self.log(f"Found {len(issues)} infra issues, attempting auto-fix...")
+            fix_results = await agent.fix_issues(issues)
+
+            if fix_results["failed"] == 0 and fix_results["skipped"] == 0:
+                self.log(f"✅ All {fix_results['fixed']} infra issues auto-fixed")
+                return True, ""
+
+            # Re-verify after fixes
+            remaining_issues = await agent.verify_all()
+            if not remaining_issues:
+                self.log("✅ Infrastructure check passed after fixes")
+                return True, ""
+
+            # Still have issues - report them
+            error_msg = "; ".join([f"{i.check.name}: {i.check.message}" for i in remaining_issues[:3]])
+            self.log(f"❌ Infrastructure issues remain: {error_msg}", "ERROR")
+            return False, error_msg
+
+        except ImportError:
+            self.log("wiggum_infra not available, skipping infra check", "WARN")
+            return True, ""
+        except Exception as e:
+            self.log(f"Infra check failed: {e}", "ERROR")
             return False, str(e)
 
     async def _stage_smoke(self) -> Tuple[bool, str, List[Dict]]:
@@ -1549,8 +1841,8 @@ Output "PROD_SUCCESS" if successful, or "PROD_FAILED: <reason>" if failed.
                 error = output.split("PROD_FAILED:")[-1].strip()[:500]
                 return False, f"Prod deploy failed: {error}"
             else:
-                self.log("Prod deploy completed (implicit success)")
-                return True, ""
+                self.log("⚠️ Prod deploy: no explicit success/failure signal — treating as FAILED", "WARN")
+                return False, "No explicit success signal from prod deploy"
 
         except Exception as e:
             return False, str(e)
@@ -1597,14 +1889,118 @@ Output "VERIFY_SUCCESS" if healthy, or "VERIFY_FAILED: <reason>" if unhealthy.
                 error = output.split("VERIFY_FAILED:")[-1].strip()[:500]
                 return False, f"Prod verification failed: {error}"
             else:
-                # Check for common success indicators
-                if "200" in output or "healthy" in output.lower() or "ok" in output.lower():
-                    self.log("Prod verification passed (implicit)")
+                # Check for explicit health indicators only
+                if "200" in output or "healthy" in output.lower():
+                    self.log("Prod verification passed (health check OK)")
                     return True, ""
-                return False, "Verification unclear"
+                self.log("⚠️ Prod verification: no clear health signal — treating as FAILED", "WARN")
+                return False, "No explicit health check signal from prod verification"
 
         except Exception as e:
             return False, str(e)
+
+    async def _stage_post_prod_e2e(self, task) -> Tuple[bool, str]:
+        """
+        Full E2E validation on production after deploy.
+
+        Steps:
+        1. Health check (quick, is server up?)
+        2. Seed fixtures via project CLI (if configured)
+        3. Smoke tests on prod
+        4. E2E journeys on prod
+        5. RBAC checks on prod
+        6. Console/network error check (JS errors, 4xx/5xx, gRPC)
+
+        Returns:
+            Tuple of (success, error_or_output_summary)
+        """
+        e2e_prod_cfg = self.deploy_config.get("post_deploy", {}).get("e2e_prod", {})
+        if not e2e_prod_cfg.get("enabled"):
+            self.log("E2E prod: disabled, skipping")
+            return True, "E2E_PROD_SKIPPED"
+
+        prod_url = self.deploy_config.get("prod", {}).get("url", "")
+        health_endpoint = self.deploy_config.get("prod", {}).get("health", "/health")
+        summary_parts = []
+
+        # 1. Health check
+        self.log("🏥 E2E Prod: health check...")
+        health_ok, health_output = await self._stage_verify_prod()
+        if not health_ok:
+            return False, f"E2E Prod: health check failed: {health_output}"
+        summary_parts.append("health: OK")
+
+        # 2. Seed fixtures
+        seed_cmd = e2e_prod_cfg.get("seed_cmd")
+        if seed_cmd:
+            self.log(f"🌱 E2E Prod: seeding fixtures via: {seed_cmd}")
+            try:
+                proc = await asyncio.create_subprocess_shell(
+                    seed_cmd,
+                    cwd=str(self.project.root_path),
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    env={**dict(subprocess.os.environ), "TEST_ENV": "prod", "BASE_URL": prod_url},
+                )
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+                if proc.returncode != 0:
+                    output = stdout.decode() + "\n" + stderr.decode()
+                    return False, f"E2E Prod: seed failed (exit {proc.returncode}): {output[:500]}"
+                summary_parts.append("seed: OK")
+            except asyncio.TimeoutError:
+                return False, "E2E Prod: seed timed out (120s)"
+            except Exception as e:
+                return False, f"E2E Prod: seed error: {e}"
+
+        # Switch E2E executor to prod environment
+        self.e2e.set_env("prod", prod_url)
+
+        try:
+            # 3. Smoke tests on prod
+            if e2e_prod_cfg.get("smoke", True):
+                self.log("💨 E2E Prod: smoke tests...")
+                success, error, smoke_tasks = await self.e2e.run_smoke_tests()
+                if not success:
+                    return False, f"E2E Prod: smoke failed: {error}"
+                summary_parts.append(f"smoke: OK ({len(smoke_tasks)} captured)")
+
+            # 4. E2E journeys on prod
+            if e2e_prod_cfg.get("journeys", True):
+                self.log("🧭 E2E Prod: journeys...")
+                journeys = self._get_journeys(task)
+                if journeys:
+                    success, failures, journey_tasks = await self.e2e.run_journeys(journeys)
+                    if not success:
+                        failed_names = [f["journey"] for f in failures[:3]]
+                        return False, f"E2E Prod: journeys failed: {', '.join(failed_names)}"
+                    summary_parts.append(f"journeys: OK ({len(journeys)} passed)")
+                else:
+                    summary_parts.append("journeys: skipped (none configured)")
+
+            # 5. RBAC checks on prod
+            if e2e_prod_cfg.get("rbac", True):
+                self.log("🔐 E2E Prod: RBAC checks...")
+                success, rbac_failures = await self.e2e.run_rbac_checks(["user", "admin", "guest"])
+                if not success:
+                    return False, f"E2E Prod: RBAC failed: {rbac_failures}"
+                summary_parts.append("rbac: OK")
+
+            # 6. Console/Network check
+            if e2e_prod_cfg.get("console_check", True):
+                self.log("🖥️ E2E Prod: console/network check...")
+                pages = e2e_prod_cfg.get("pages", ["/", "/login", "/dashboard"])
+                success, error, console_tasks = await self.e2e.run_console_network_check(pages, e2e_prod_cfg)
+                if not success:
+                    return False, f"E2E Prod: console/network errors: {error}"
+                summary_parts.append(f"console: OK ({len(console_tasks)} captured)")
+
+        finally:
+            # Restore E2E executor to staging
+            self.e2e.set_env("staging")
+
+        summary = " | ".join(summary_parts)
+        self.log(f"✅ E2E Prod: ALL CHECKS PASSED — {summary}")
+        return True, f"E2E_PROD_SUCCESS: {summary}"
 
     async def _rollback(self, tenant: str = None):
         """Rollback production deployment using LLM agent"""
@@ -1642,7 +2038,7 @@ Output "ROLLBACK_SUCCESS" or "ROLLBACK_FAILED: <reason>".
                 error = output.split("ROLLBACK_FAILED:")[-1].strip()[:200]
                 self.log(f"Rollback failed: {error}", "ERROR")
             else:
-                self.log("Rollback completed (status unclear)")
+                self.log("⚠️ Rollback: no explicit success/failure signal — MANUAL CHECK REQUIRED", "ERROR")
 
         except Exception as e:
             self.log(f"Rollback error: {e}", "ERROR")
@@ -1665,6 +2061,42 @@ Output "ROLLBACK_SUCCESS" or "ROLLBACK_FAILED: <reason>".
                 ))
 
         return journeys
+
+    async def _create_tmc_feedback(self, feedback_ctx: Dict, task: Task):
+        """Create perf optimization task from TMC results"""
+        try:
+            new_id = self.task_store.create_task_from_failure(
+                original_task=task,
+                failure_reason=f"Perf bottleneck: {feedback_ctx.get('suggestion', 'Optimize slow endpoints')}",
+                failure_stage="tmc_baseline",
+                evidence={
+                    "type": "perf",
+                    "domain": task.domain or "rust",
+                    "source_task": task.id,
+                    "context": feedback_ctx,
+                },
+            )
+            self.log(f"Created perf task {new_id} from TMC feedback")
+        except Exception as e:
+            self.log(f"Failed to create TMC feedback task: {e}", "ERROR")
+
+    async def _create_chaos_feedback(self, feedback_ctx: Dict, task: Task):
+        """Create resilience fix task from Chaos failure"""
+        try:
+            new_id = self.task_store.create_task_from_failure(
+                original_task=task,
+                failure_reason=f"Resilience failure: {feedback_ctx.get('suggestion', 'Fix service recovery')}",
+                failure_stage="chaos_prod",
+                evidence={
+                    "type": "fix",
+                    "domain": task.domain or "rust",
+                    "source_task": task.id,
+                    "context": feedback_ctx,
+                },
+            )
+            self.log(f"Created resilience task {new_id} from Chaos feedback")
+        except Exception as e:
+            self.log(f"Failed to create Chaos feedback task: {e}", "ERROR")
 
     def _create_feedback_tasks(self, result: DeployResult, original_task: Task):
         """Create feedback tasks in store from deploy failures"""
@@ -1884,6 +2316,253 @@ class WiggumDeployDaemon(Daemon):
                     self.log(f"📝 Created feedback task: {feedback_task.id}")
                 except Exception as e:
                     self.log(f"Failed to create feedback task: {e}", "ERROR")
+
+
+# ============================================================================
+# GLOBAL DEPLOY DAEMON (Cross-Project, Batch by Commit or 20)
+# ============================================================================
+
+BATCH_SIZE = 20  # Deploy up to 20 tasks at once
+
+class GlobalDeployDaemon(Daemon):
+    """
+    Global deploy daemon that processes ALL projects sequentially.
+    BATCH DEPLOY: Groups tasks by commit_sha (preferred) or up to 20 per project (fallback).
+
+    Args:
+        project_filter: Optional project ID to process only that project (faster)
+    """
+
+    def __init__(self, project_filter: str = None):
+        name = f"wiggum-deploy-{project_filter}" if project_filter else "wiggum-deploy-global"
+        super().__init__(name=name, project=project_filter or "global")
+        self.task_store = TaskStore()
+        self.projects_cache = {}
+        self._last_project_index = 0  # For round-robin between projects
+        self.project_filter = project_filter  # None = all projects
+
+    def _get_project(self, project_id: str) -> ProjectConfig:
+        """Get or cache project config"""
+        if project_id not in self.projects_cache:
+            self.projects_cache[project_id] = get_project(project_id)
+        return self.projects_cache[project_id]
+
+    async def run(self):
+        """Main daemon loop - BATCH deploy by commit or by 20"""
+        mode = f"PROJECT {self.project_filter}" if self.project_filter else "ALL PROJECTS"
+        self.log(f"Starting Deploy daemon ({mode}, BATCH by commit or {BATCH_SIZE})")
+
+        try:
+            while self.running:
+                # Get deployable tasks (filtered by project if set)
+                if self.project_filter:
+                    all_tasks = self.task_store.get_deployable_tasks(self.project_filter, limit=BATCH_SIZE * 2)
+                else:
+                    all_tasks = self.task_store.get_all_deployable_tasks(limit=BATCH_SIZE * 2)
+
+                if not all_tasks:
+                    await asyncio.sleep(10)
+                    continue
+
+                # If filtering by project, skip round-robin
+                if self.project_filter:
+                    target_project = self.project_filter
+                    project_tasks = all_tasks
+                else:
+                    # ROUND-ROBIN: Get distinct projects and rotate between them
+                    projects_in_queue = list(set(t.project_id for t in all_tasks))
+                    if not projects_in_queue:
+                        await asyncio.sleep(10)
+                        continue
+
+                    # Pick next project in rotation (prevents starvation)
+                    self._last_project_index = (self._last_project_index + 1) % len(projects_in_queue)
+                    target_project = projects_in_queue[self._last_project_index]
+
+                    # Get tasks for this project
+                    project_tasks = [t for t in all_tasks if t.project_id == target_project]
+                if not project_tasks:
+                    continue
+
+                task = project_tasks[0]
+                project = self._get_project(task.project_id)
+
+                # BATCH STRATEGY:
+                # 1. If task has commit_sha → batch ALL tasks with same commit_sha
+                # 2. Else → batch up to BATCH_SIZE from same project
+                if task.commit_sha:
+                    batch_tasks = self.task_store.get_tasks_by_commit(task.commit_sha)
+                    self.log(f"[{task.project_id}] 📦 BATCH by commit {task.commit_sha[:8]}: {len(batch_tasks)} tasks")
+                else:
+                    # Fallback: batch by project
+                    batch_tasks = project_tasks[:BATCH_SIZE]
+                    self.log(f"[{task.project_id}] 📦 BATCH by project: {len(batch_tasks)} tasks (no commit_sha)")
+
+                # ============================================================
+                # TRUE BATCH DEPLOY: 1 build + 1 adversarial for ALL tasks
+                # ============================================================
+                worker = DeployWorker(
+                    worker_id=task.project_id,
+                    project=project,
+                    task_store=self.task_store,
+                )
+
+                # Collect all domains in batch for context
+                batch_domains = list(set(t.domain for t in batch_tasks))
+                batch_descriptions = [t.description[:100] for t in batch_tasks[:5]]  # First 5 for context
+
+                self.log(f"🔨 BATCH BUILD: {len(batch_tasks)} tasks, domains: {batch_domains}")
+
+                # 1. ONE BUILD for the batch (use first task's domain or most common)
+                primary_domain = max(set(t.domain for t in batch_tasks), key=lambda d: sum(1 for t in batch_tasks if t.domain == d))
+                success, output, build_error_tasks = await worker._stage_build(task)
+
+                if not success:
+                    self.log(f"❌ BATCH BUILD FAILED: {output[:200]}", "ERROR")
+                    # Return all to TDD with build feedback
+                    for t in batch_tasks:
+                        try:
+                            context = t.get_context() or {}
+                            context["deploy_feedback"] = f"Build failed: {output[:500]}"
+                            self.task_store.update_task_context(t.id, context)
+                            self.task_store.transition(t.id, TaskStatus.BUILD_FAILED)
+                        except:
+                            pass
+                    # Create feedback tasks for build errors
+                    if build_error_tasks:
+                        for et in build_error_tasks:
+                            try:
+                                import uuid
+                                from datetime import datetime
+                                feedback_task = Task(
+                                    id=f"feedback-{task.domain}-{uuid.uuid4().hex[:8]}",
+                                    project_id=task.project_id,
+                                    type=et.get("type", "fix"),
+                                    domain=et.get("domain", task.domain),
+                                    description=et.get("description", "Fix build error"),
+                                    status="pending",
+                                    files=et.get("files", []),
+                                    context=et,
+                                    created_at=datetime.now().isoformat(),
+                                    updated_at=datetime.now().isoformat(),
+                                )
+                                self.task_store.create_task(feedback_task)
+                            except:
+                                pass
+                    self.log(f"[{task.project_id}] ❌ BATCH BUILD FAILED: {len(batch_tasks)} tasks → BUILD_FAILED")
+                    await asyncio.sleep(2)
+                    continue
+
+                self.log(f"✅ BATCH BUILD PASSED")
+
+                # 2. ONE ADVERSARIAL REVIEW for the whole batch
+                # Include REAL build output, truncated to avoid token limits
+                # Tell adversarial to ONLY review what's provided - TDD adversarial already passed
+                build_output_truncated = output[:3000] if output else "No output captured"
+                batch_context = f"""BATCH DEPLOY REVIEW - BUILD STAGE ONLY
+
+IMPORTANT: Each task in this batch has ALREADY passed TDD adversarial review individually.
+Your job is ONLY to verify the BUILD succeeded. Do NOT explore the codebase.
+Do NOT run additional tests. Do NOT look for issues in files.
+ONLY review the build output below.
+
+Tasks: {len(batch_tasks)} (all previously TDD-validated)
+Domains: {', '.join(batch_domains)}
+Sample descriptions:
+{chr(10).join(f'- {d}' for d in batch_descriptions)}
+
+BUILD COMMAND OUTPUT:
+{build_output_truncated}
+
+BUILD STATUS: SUCCESS (no errors in output above)
+
+If the build output shows SUCCESS with no errors → approve.
+If the build output shows errors → reject with specific error from output."""
+
+                # Create a pseudo-task for batch adversarial review
+                batch_task_for_review = Task(
+                    id=f"batch-{task.project_id}",
+                    project_id=task.project_id,
+                    type="batch",
+                    domain=primary_domain,
+                    description=f"Batch of {len(batch_tasks)} tasks: {', '.join(batch_domains)}",
+                    status="deploying",
+                )
+
+                adv_review = await worker.adversarial.review_stage("build", batch_context, batch_task_for_review)
+
+                if not adv_review.approved:
+                    self.log(f"❌ BATCH ADVERSARIAL REJECTED: {adv_review.feedback}", "WARN")
+                    # Return all to TDD with adversarial feedback
+                    for t in batch_tasks:
+                        try:
+                            context = t.get_context() or {}
+                            context["deploy_feedback"] = f"Adversarial rejected: {adv_review.feedback}"
+                            context["adversarial_issues"] = adv_review.issues
+                            self.task_store.update_task_context(t.id, context)
+                            self.task_store.transition(t.id, TaskStatus.TDD_FAILED)
+                        except:
+                            pass
+                    self.log(f"[{task.project_id}] ❌ BATCH REJECTED: {len(batch_tasks)} tasks → TDD_FAILED")
+                    await asyncio.sleep(2)
+                    continue
+
+                self.log(f"✅ BATCH ADVERSARIAL APPROVED (score: {adv_review.score}/10)")
+
+                # 3. ALL PASSED - Mark based on strategy
+                # validation-only = MERGED (committed, not in prod)
+                # blue-green/canary = QUEUED_FOR_DEPLOY (needs real deploy)
+                deploy_config = getattr(worker, 'deploy_config', {}) or {}
+                batch_strategy = deploy_config.get("strategy", "validation-only")
+                if batch_strategy in ("blue-green", "canary"):
+                    final_status = TaskStatus.QUEUED_FOR_DEPLOY
+                    status_label = "QUEUED_FOR_DEPLOY (needs real deploy)"
+                else:
+                    final_status = TaskStatus.MERGED
+                    status_label = "COMMITTED (validation-only, not in prod)"
+                for t in batch_tasks:
+                    try:
+                        # Two-step transition: code_written → commit_queued → merged/queued_for_deploy
+                        # Required by TaskStore state machine
+                        current = self.task_store.get_task(t.id)
+                        if not current:
+                            continue
+                        current_status = current.status.value if hasattr(current.status, 'value') else str(current.status)
+                        target_status = final_status.value if hasattr(final_status, 'value') else str(final_status)
+                        # Skip if already at target
+                        if current_status == target_status:
+                            continue
+                        # Path: code_written → commit_queued → final
+                        if current_status == "code_written":
+                            self.task_store.transition(t.id, TaskStatus.COMMIT_QUEUED)
+                            self.task_store.transition(t.id, final_status)
+                        # Path: commit_queued → final
+                        elif current_status == "commit_queued":
+                            self.task_store.transition(t.id, final_status)
+                        # Other: try direct (may fail)
+                        else:
+                            self.task_store.transition(t.id, final_status)
+                    except Exception as e:
+                        pass  # Silently ignore transition errors
+                self.log(f"[{task.project_id}] ✅ BATCH {status_label}: {len(batch_tasks)} tasks")
+
+                # 4. Update project context (incremental - state and history only)
+                try:
+                    ctx = ProjectContext(task.project_id)
+                    ctx.refresh(categories=['state', 'history'])
+                    self.log(f"[{task.project_id}] Context updated (state, history)")
+                except Exception as e:
+                    self.log(f"[{task.project_id}] Context update failed: {e}", "WARN")
+
+                await asyncio.sleep(2)
+
+        except asyncio.CancelledError:
+            self.log("Daemon cancelled")
+        except Exception as e:
+            self.log(f"Daemon error: {e}", "ERROR")
+        finally:
+            self.running = False
+            self.log("Daemon stopped")
 
 
 # ============================================================================

@@ -95,6 +95,12 @@ if PYDANTIC_AVAILABLE:
         enabled: bool = False
         refs_file: Optional[str] = None
 
+    class BrainConfig(BaseModel):
+        """Brain phase rotation configuration"""
+        current_phase: str = "features"  # features | fixes | refactor
+        phase_gate: str = "deployed"  # Status required to move to next phase
+        auto_rotate: bool = True  # Auto-switch phase when all tasks deployed
+
     class ProjectInfo(BaseModel):
         """Project metadata"""
         name: str
@@ -112,6 +118,7 @@ if PYDANTIC_AVAILABLE:
         tenants: List[TenantConfig] = Field(default_factory=list)
         mcp: Dict[str, MCPConfig] = Field(default_factory=dict)
         ao_compliance: AOComplianceConfig = Field(default_factory=AOComplianceConfig)
+        brain: BrainConfig = Field(default_factory=BrainConfig)
         analyzers: List[str] = Field(default_factory=list)
 
 else:
@@ -140,10 +147,14 @@ class ProjectConfig:
     tenants: List[Dict[str, Any]]
     mcp: Dict[str, Any]
     ao_compliance: Dict[str, Any]
-    analyzers: List[str]
-    config_path: Path
+    brain: Dict[str, Any] = None  # Brain phase rotation config
+    analyzers: List[str] = field(default_factory=list)
+    config_path: Path = None
+    raw_config: Dict[str, Any] = None  # Raw YAML config for dynamic access
     cli: Dict[str, Any] = None  # Project-specific CLI commands
     figma: Dict[str, Any] = None  # Figma MCP integration config
+    env: Dict[str, str] = None  # Project-specific environment variables
+    integrator: Dict[str, Any] = None  # Cross-layer integration config
 
     @property
     def vision_path(self) -> Path:
@@ -163,6 +174,78 @@ class ProjectConfig:
         """Check if project is multi-tenant"""
         return len(self.tenants) > 0
 
+    # ==================== BRAIN PHASE ROTATION ====================
+
+    PHASE_ORDER = ["features", "fixes", "refactor"]
+    PHASE_MODE_MAP = {
+        "features": "vision",
+        "fixes": "fix",
+        "refactor": "refactor"
+    }
+
+    def get_brain_phase(self) -> str:
+        """Get current brain phase"""
+        if self.brain:
+            return self.brain.get("current_phase", "features")
+        return "features"
+
+    def get_brain_mode(self) -> str:
+        """Get brain mode for current phase"""
+        phase = self.get_brain_phase()
+        return self.PHASE_MODE_MAP.get(phase, "vision")
+
+    def get_next_phase(self) -> str:
+        """Get the next phase in rotation"""
+        current = self.get_brain_phase()
+        try:
+            idx = self.PHASE_ORDER.index(current)
+            return self.PHASE_ORDER[(idx + 1) % len(self.PHASE_ORDER)]
+        except ValueError:
+            return self.PHASE_ORDER[0]
+
+    def is_auto_rotate_enabled(self) -> bool:
+        """Check if auto-rotation is enabled"""
+        if self.brain:
+            return self.brain.get("auto_rotate", True)
+        return True
+
+    def set_brain_phase(self, phase: str) -> bool:
+        """
+        Update current brain phase and save to YAML.
+
+        Returns True if successful, False otherwise.
+        """
+        if phase not in self.PHASE_ORDER:
+            return False
+
+        if not self.config_path or not self.config_path.exists():
+            return False
+
+        try:
+            # Read current YAML
+            with open(self.config_path, 'r') as f:
+                content = f.read()
+                raw = yaml.safe_load(content)
+
+            # Update brain config
+            if "brain" not in raw:
+                raw["brain"] = {}
+            raw["brain"]["current_phase"] = phase
+
+            # Write back with preserved formatting (best effort)
+            with open(self.config_path, 'w') as f:
+                yaml.dump(raw, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+            # Update local state
+            if self.brain is None:
+                self.brain = {}
+            self.brain["current_phase"] = phase
+
+            return True
+        except Exception as e:
+            print(f"[BRAIN] Failed to save phase: {e}")
+            return False
+
     # ==================== CLI COMMANDS ====================
 
     def get_cli_binary(self) -> str:
@@ -170,6 +253,30 @@ class ProjectConfig:
         if self.cli:
             return self.cli.get("binary", self.name)
         return self.name
+
+    def get_env(self) -> Dict[str, str]:
+        """
+        Get project-specific environment variables.
+
+        Supports variable expansion: ${VAR} or $VAR
+        Returns: Dict with resolved env vars
+        """
+        if not self.env:
+            return {}
+
+        import re
+        result = {}
+        for key, value in self.env.items():
+            if isinstance(value, str):
+                # Expand ${VAR} or $VAR patterns
+                def expand_var(match):
+                    var_name = match.group(1) or match.group(2)
+                    return os.environ.get(var_name, match.group(0))
+                expanded = re.sub(r'\$\{([^}]+)\}|\$([A-Z_][A-Z0-9_]*)', expand_var, value)
+                result[key] = expanded
+            else:
+                result[key] = str(value)
+        return result
 
     def get_build_cmd(self, domain: str = None) -> str:
         """Get build command for domain or all"""
@@ -185,7 +292,8 @@ class ProjectConfig:
             domain_cfg = self.get_domain(domain)
             if domain_cfg and domain_cfg.get("build_cmd"):
                 return domain_cfg["build_cmd"]
-        return f"{self.get_cli_binary()} build"
+        # SAFE FALLBACK: no-op instead of broken CLI command
+        return "echo 'No build command configured for this domain'"
 
     def get_test_cmd(self, domain: str = None) -> str:
         """Get test command for domain or all"""
@@ -201,7 +309,8 @@ class ProjectConfig:
             domain_cfg = self.get_domain(domain)
             if domain_cfg and domain_cfg.get("test_cmd"):
                 return domain_cfg["test_cmd"]
-        return f"{self.get_cli_binary()} test"
+        # SAFE FALLBACK: no-op instead of broken CLI command
+        return "echo 'No test command configured for this domain'"
 
     def get_lint_cmd(self, domain: str = None) -> str:
         """Get lint command for domain or all"""
@@ -217,7 +326,8 @@ class ProjectConfig:
             domain_cfg = self.get_domain(domain)
             if domain_cfg and domain_cfg.get("lint_cmd"):
                 return domain_cfg["lint_cmd"]
-        return f"{self.get_cli_binary()} lint"
+        # SAFE FALLBACK: no-op instead of broken CLI command
+        return "echo 'No lint command configured for this domain'"
 
     def get_deploy_cmd(self, env: str, tenant: str = None) -> str:
         """
@@ -318,10 +428,18 @@ def _parse_project(config_path: Path) -> ProjectConfig:
         tenants=raw.get("tenants", []),
         mcp=raw.get("mcp", {}),
         ao_compliance=raw.get("ao_compliance", {"enabled": False}),
+        brain=raw.get("brain", {
+            "current_phase": "features",
+            "phase_gate": "deployed",
+            "auto_rotate": True
+        }),
         analyzers=raw.get("analyzers", []),
         config_path=config_path,
+        raw_config=raw,  # Full raw YAML for dynamic access
         cli=raw.get("cli"),  # Project-specific CLI commands
         figma=raw.get("figma", {"enabled": False}),  # Figma MCP integration
+        env=raw.get("env", {}),  # Project-specific environment variables
+        integrator=raw.get("integrator", {"enabled": False}),  # Cross-layer integration
     )
 
 
@@ -369,9 +487,21 @@ def get_project(name: str = None) -> ProjectConfig:
         name = list(available.keys())[0]
 
     if name not in available:
-        raise KeyError(
-            f"Project '{name}' not found. Available: {', '.join(available.keys())}"
-        )
+        # Try to find by project.name instead of filename
+        for proj_id, proj_path in available.items():
+            try:
+                with open(proj_path, 'r') as f:
+                    raw = yaml.safe_load(f) or {}
+                    proj_name = raw.get("project", {}).get("name", "")
+                    if proj_name == name:
+                        name = proj_id  # Use the ID, not the name
+                        break
+            except:
+                pass
+        else:
+            raise KeyError(
+                f"Project '{name}' not found. Available: {', '.join(available.keys())}"
+            )
 
     # Load and cache
     config = _parse_project(available[name])

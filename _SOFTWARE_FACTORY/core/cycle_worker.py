@@ -18,10 +18,13 @@ PHASE 3: DEPLOY
 """
 
 import asyncio
+import os
+import signal
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from core.daemon import Daemon
@@ -40,7 +43,7 @@ class CyclePhase(Enum):
 class CycleConfig:
     """Configuration for development cycle"""
     # Phase 1: TDD
-    tdd_workers: int = 5
+    tdd_workers: int = 3  # OOM safe (was 5)
     tdd_batch_size: int = 10  # Tasks to complete before build
     tdd_timeout_minutes: int = 30  # Max time in TDD phase
 
@@ -51,6 +54,13 @@ class CycleConfig:
     # Phase 3: Deploy
     deploy_timeout_minutes: int = 20
     skip_deploy: bool = False  # For testing
+
+    # Auto-cleanup: Reset stuck tasks
+    stuck_task_hours: float = 1.0  # Hours before a task is considered stuck
+
+    # Auto-Brain: Trigger Brain when backlog empty
+    auto_brain: bool = True  # Auto-run Brain analysis when pending=0
+    auto_brain_cooldown_minutes: int = 10  # Min time between auto Brain runs
 
 
 @dataclass
@@ -71,7 +81,10 @@ class CycleState:
 
     # Phase 3 stats
     deploy_attempted: int = 0
-    deploy_success: int = 0
+    commit_success: int = 0
+
+    # Auto-Brain tracking
+    last_brain_run: Optional[datetime] = None
 
 
 class CycleWorker:
@@ -115,14 +128,52 @@ class CycleWorker:
                 self.state.cycle_count += 1
                 self.log(f"=== CYCLE {self.state.cycle_count} ===")
 
-                # Check if there are pending tasks
+                # AUTO-CLEANUP: Reset tasks stuck for >1h (crash/timeout recovery)
+                stuck_reset = self.task_store.reset_stuck_tasks(
+                    self.project.id, stuck_hours=self.config.stuck_task_hours
+                )
+                if stuck_reset > 0:
+                    self.log(f"Auto-cleanup: reset {stuck_reset} stuck tasks to pending")
+
+                # PHASE 0: Check for orphaned COMMIT_QUEUED tasks (from previous cycles)
+                commit_queued = self.task_store.get_tasks_by_status(
+                    self.project.id, TaskStatus.COMMIT_QUEUED, limit=100
+                )
+                if commit_queued and not self.config.skip_deploy:
+                    self.log(f"Found {len(commit_queued)} orphaned COMMIT_QUEUED tasks, deploying first...")
+                    await self._phase_deploy()
+
+                # Check if there are pending tasks OR active work (decomposed, in-progress)
                 pending = self.task_store.get_tasks_by_status(
                     self.project.id, TaskStatus.PENDING, limit=1
                 )
-                if not pending:
-                    self.log("No pending tasks, waiting...")
-                    await asyncio.sleep(60)
+                decomposed = self.task_store.get_tasks_by_status(
+                    self.project.id, TaskStatus.DECOMPOSED, limit=1
+                ) if hasattr(TaskStatus, 'DECOMPOSED') else []
+                tdd_active = self.task_store.get_tasks_by_status(
+                    self.project.id, TaskStatus.TDD_IN_PROGRESS, limit=1
+                )
+                integration_active = self.task_store.get_tasks_by_status(
+                    self.project.id, TaskStatus.INTEGRATION_IN_PROGRESS, limit=1
+                )
+
+                if not pending and not decomposed and not tdd_active and not integration_active:
+                    # Backlog truly empty — auto-brain
+                    if self.config.auto_brain:
+                        await self._auto_brain_if_needed()
+                    else:
+                        self.log("No pending tasks, waiting...")
+                        await asyncio.sleep(60)
                     continue
+                elif not pending:
+                    # Tasks still being processed (decomposed/in-progress), wait
+                    active_count = len(decomposed) + len(tdd_active) + len(integration_active)
+                    self.log(f"No pending tasks but {active_count}+ still in progress, waiting...")
+                    await asyncio.sleep(30)
+                    continue
+
+                # PHASE 0.5: INTEGRATION (cross-layer wiring, before TDD)
+                await self._phase_integration()
 
                 # PHASE 1: TDD Massif
                 await self._phase_tdd()
@@ -153,6 +204,31 @@ class CycleWorker:
             except Exception as e:
                 self.log(f"Cycle error: {e}", "ERROR")
                 await asyncio.sleep(30)
+
+    async def _phase_integration(self):
+        """Phase 0.5: Integration - Wire layers together before TDD"""
+        # Check for pending integration tasks
+        from core.task_store import TaskStatus
+        integration_tasks = [
+            t for t in self.task_store.get_tasks_by_status(
+                self.project.id, TaskStatus.PENDING, limit=50
+            ) if t.type == "integration"
+        ]
+
+        if not integration_tasks:
+            return  # No integration work needed
+
+        self.log(f"[PHASE 0.5] INTEGRATION - {len(integration_tasks)} tasks pending")
+
+        from core.integrator_worker import IntegratorWorker
+        from core.adversarial import AdversarialGate
+
+        adversarial = AdversarialGate(self.project)
+        integrator = IntegratorWorker(self.project, self.task_store, adversarial)
+
+        # Run integration tasks sequentially (order matters: bootstrap → migration → api)
+        completed = await integrator.run_pending()
+        self.log(f"[PHASE 0.5] Integration complete: {completed}/{len(integration_tasks)} tasks done")
 
     async def _phase_tdd(self):
         """Phase 1: TDD Massif - Run workers until batch ready"""
@@ -234,6 +310,20 @@ class CycleWorker:
                     continue
 
                 task = tasks[0]
+
+                # AO COMPLIANCE CHECK - Reject SLOP features without REQ-ID
+                if task.type == "feature":
+                    from core.adversarial import check_ao_compliance
+                    ao_result = check_ao_compliance(task.description or "", task.type, self.project.raw_config, task.id)
+                    if not ao_result.approved:
+                        self.log(f"[W{worker_idx}] AO REJECTED: {task.id} - {ao_result.feedback[:60]}", "WARN")
+                        self.task_store.update_task_status(
+                            task.id,
+                            TaskStatus.SKIPPED,
+                            notes=f"AO compliance failed: {ao_result.feedback}"
+                        )
+                        continue
+
                 self.state.tdd_started += 1
 
                 # Process task
@@ -301,24 +391,26 @@ class CycleWorker:
         return all_success
 
     async def _build_domain(self, domain: str, tasks: List) -> bool:
-        """Build all tasks for a domain"""
+        """Build all tasks for a domain via global queue (if enabled) or direct"""
         self.log(f"Building domain {domain}: {len(tasks)} tasks")
 
         domain_config = self.project.domains.get(domain, {})
         build_cmd = domain_config.get("build_cmd", "echo 'no build cmd'")
         test_cmd = domain_config.get("test_cmd", "")
 
-        # Run build command
-        proc = await asyncio.create_subprocess_shell(
-            f"cd {self.project.root_path} && {build_cmd}",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
+        # Check if global queue is enabled (default: True)
+        raw_config = getattr(self.project, 'raw_config', None) or {}
+        use_queue = raw_config.get("build_queue", {}).get("enabled", True)
 
-        if proc.returncode != 0:
-            error = stderr.decode()[:500] if stderr else "Build failed"
-            self.log(f"Build failed for {domain}: {error}", "ERROR")
+        # Run build command
+        if use_queue:
+            await self._ensure_queue_daemon()
+            success, error = await self._run_via_queue(build_cmd, f"build-{domain}")
+        else:
+            success, error = await self._run_direct(build_cmd)
+
+        if not success:
+            self.log(f"Build failed for {domain}: {error[:200] if error else 'unknown'}", "ERROR")
 
             # Mark tasks as BUILD_FAILED
             for task in tasks:
@@ -335,16 +427,13 @@ class CycleWorker:
 
         # Run tests if configured
         if test_cmd:
-            proc = await asyncio.create_subprocess_shell(
-                f"cd {self.project.root_path} && {test_cmd}",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, stderr = await proc.communicate()
+            if use_queue:
+                success, error = await self._run_via_queue(test_cmd, f"test-{domain}")
+            else:
+                success, error = await self._run_direct(test_cmd)
 
-            if proc.returncode != 0:
-                error = stderr.decode()[:500] if stderr else "Tests failed"
-                self.log(f"Tests failed for {domain}: {error}", "ERROR")
+            if not success:
+                self.log(f"Tests failed for {domain}: {error[:200] if error else 'unknown'}", "ERROR")
 
                 for task in tasks:
                     self.state.build_attempted += 1
@@ -369,10 +458,127 @@ class CycleWorker:
         self.log(f"Build success for {domain}: {len(tasks)} tasks")
         return True
 
+    async def _ensure_queue_daemon(self):
+        """Auto-start queue daemon if not running (via subprocess to avoid fork issues)"""
+        from core.build_queue import QueueDaemon
+        import subprocess
+        daemon = QueueDaemon()
+        status = daemon.status()
+        if not status.get("running"):
+            self.log("Auto-starting queue daemon via subprocess...")
+            # Start daemon in separate process to avoid fork/async conflicts
+            subprocess.Popen(
+                ["python3", "cli/factory.py", "queue", "start"],
+                cwd=str(Path(__file__).parent.parent),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            await asyncio.sleep(2)  # Give daemon time to start
+
+    async def _run_via_queue(self, cmd: str, job_type: str) -> tuple:
+        """Run command via global build queue"""
+        from core.build_queue import GlobalBuildQueue, JobStatus
+
+        queue = GlobalBuildQueue.instance()
+        raw_config = getattr(self.project, 'raw_config', None) or {}
+        priority = raw_config.get("build_queue", {}).get("priority", 10)
+        timeout = raw_config.get("build_queue", {}).get("timeout", 300)
+
+        self.log(f"Queueing {job_type}: {cmd[:50]}... (priority={priority})")
+        job_id = queue.enqueue(
+            project=self.project.name,
+            cmd=cmd,
+            cwd=str(self.project.root_path),
+            priority=priority,
+            timeout=timeout,
+        )
+
+        # Wait for completion
+        job = await queue.wait_for(job_id)
+
+        if job.status == JobStatus.SUCCESS:
+            return True, ""
+        elif job.status == JobStatus.TIMEOUT:
+            return False, f"Queue timeout ({timeout}s)"
+        else:
+            return False, job.stderr or job.stdout or job.error or "Unknown error"
+
+    async def _run_direct(self, cmd: str) -> tuple:
+        """Run command directly (bypass queue)"""
+        # Inject project-specific env vars (e.g., VELIGO_TOKEN)
+        env = os.environ.copy()
+        project_env = self.project.get_env()
+        if project_env:
+            env.update(project_env)
+
+        proc = await asyncio.create_subprocess_shell(
+            f"cd {self.project.root_path} && {cmd}",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+            start_new_session=True,  # Isolate process group for clean kill
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+        except asyncio.TimeoutError:
+            # Kill entire process group (including vitest/cargo children)
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            return False, "Command timeout (300s)"
+
+        if proc.returncode == 0:
+            return True, ""
+        else:
+            return False, stderr.decode()[:500] if stderr else "Command failed"
+
     def _create_build_feedback(self, domain: str, error: str, tasks: List):
-        """Create feedback tasks from build errors"""
+        """Create feedback tasks from build errors - ONLY for code errors, NOT infra/CI/CD"""
         from core.task_store import Task
         import hashlib
+
+        # ANTI-SLOP: Filter out infrastructure/CI/CD errors
+        # These should NOT create TDD tasks - they need factory/config fixes
+        INFRA_ERROR_PATTERNS = [
+            # CLI/command errors (NOT code issues)
+            "command not found",
+            "unrecognized subcommand",
+            "missing script",
+            "npm error",
+            "VELIGO_TOKEN",
+            "auth required",
+            "permission denied",
+
+            # Environment errors (NOT code issues)
+            "environment variable",
+            "file lock",
+            "timeout",
+            "connection refused",
+            "network error",
+
+            # NOTE: E0432/E0433 (unresolved import, failed to resolve) are CODE errors
+            # They MUST create feedback tasks — workers need to fix missing imports/types
+        ]
+
+        error_lower = error.lower()
+        is_infra_error = any(pattern.lower() in error_lower for pattern in INFRA_ERROR_PATTERNS)
+
+        if is_infra_error:
+            self.log(f"[INFRA ERROR] Skipping feedback task - not a code issue: {error[:100]}...", "WARN")
+            return  # Don't create feedback task for infra errors
+
+        # META-AWARENESS: Check for systemic/cross-project errors
+        # If detected, create a FACTORY task instead of a project task
+        try:
+            from core.meta_awareness import record_build_error
+            factory_task_id = record_build_error(self.project.id, error)
+            if factory_task_id:
+                self.log(f"[META-AWARENESS] Systemic error detected → Factory task: {factory_task_id}", "WARN")
+                # Still create project feedback for visibility, but factory will fix root cause
+        except Exception as e:
+            self.log(f"Meta-awareness check failed: {e}", "DEBUG")
 
         # Create ONE feedback task per domain (not per task)
         feedback_id = f"feedback-build-{domain}-{hashlib.md5(error.encode()).hexdigest()[:8]}"
@@ -395,12 +601,56 @@ class CycleWorker:
         except:
             pass  # May already exist
 
+    def _check_deploy_daemon_alive(self) -> bool:
+        """Check if the deploy daemon is running. Alert if dead."""
+        from pathlib import Path
+        pid_dir = Path("/tmp/factory")
+        pidfile = pid_dir / f"wiggum-deploy-{self.project.id}.pid"
+
+        if not pidfile.exists():
+            self.log("DEPLOY DAEMON NOT RUNNING: no PID file", "ERROR")
+            self._try_restart_deploy_daemon()
+            return False
+
+        try:
+            pid = int(pidfile.read_text().strip())
+            os.kill(pid, 0)  # Check if alive
+            return True
+        except (OSError, ValueError):
+            self.log(f"DEPLOY DAEMON DEAD: PID file exists but process not running", "ERROR")
+            pidfile.unlink(missing_ok=True)
+            self._try_restart_deploy_daemon()
+            return False
+
+    def _try_restart_deploy_daemon(self):
+        """Attempt to restart the deploy daemon."""
+        import subprocess
+        cmd = f"python3 cli/factory.py {self.project.id} deploy start --batch"
+        self.log(f"AUTO-RESTART deploy daemon: {cmd}", "WARN")
+        try:
+            subprocess.Popen(
+                cmd.split(),
+                cwd=str(Path(__file__).parent.parent),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            self.log("Deploy daemon restart initiated", "WARN")
+        except Exception as e:
+            self.log(f"Deploy daemon restart FAILED: {e}", "ERROR")
+
     async def _phase_deploy(self):
         """Phase 3: Deploy - Staging → E2E → Prod"""
         self.state.phase = CyclePhase.DEPLOY
         self.state.phase_start = datetime.now()
 
         self.log("[PHASE 3] Deploy - Starting deployment pipeline")
+
+        # CHECK: Deploy daemon must be alive
+        if not self._check_deploy_daemon_alive():
+            self.log("[PHASE 3] Deploy daemon not available - tasks stay in commit_queued", "WARN")
+            # Don't abort - still commit, but warn loudly
+            # The watchdog or auto-restart should fix it
 
         # Get COMMIT_QUEUED tasks
         tasks = self.task_store.get_tasks_by_status(
@@ -411,30 +661,84 @@ class CycleWorker:
             self.log("No tasks to deploy")
             return
 
-        self.log(f"Deploying {len(tasks)} tasks...")
+        self.log(f"Committing {len(tasks)} tasks...")
 
-        # 1. Git commit
-        commit_success = await self._git_commit(tasks)
-        if not commit_success:
+        # 1. Git commit - returns commit_sha for batch deploy
+        commit_sha = await self._git_commit(tasks)
+        if not commit_sha:
             self.log("Commit failed, aborting deploy")
             return
 
-        # 2. Deploy to staging (via git push which triggers CI/CD)
-        # The actual deployment is handled by CI/CD pipeline
-        self.log("Commit pushed - CI/CD pipeline will handle staging → E2E → prod")
+        # 2. Queue for deploy daemon (real E2E validation)
+        # The deploy daemon will handle: staging → adversarial → E2E → prod
+        self.log(f"Commit {commit_sha[:8]} pushed - queueing for deploy daemon (batch of {len(tasks)})")
 
-        # Mark tasks as deployed
+        # Mark tasks as queued_for_deploy with commit_sha for batch deploy
         for task in tasks:
             try:
-                self.task_store.transition(task.id, TaskStatus.DEPLOYED)
-                self.state.deploy_success += 1
-            except:
-                pass
+                # Set commit_sha so deploy daemon can batch by commit
+                self.task_store.update_task(task.id, commit_sha=commit_sha)
+                self.task_store.transition(task.id, TaskStatus.QUEUED_FOR_DEPLOY)
+                self.state.commit_success += 1
+            except Exception as e:
+                self.log(f"Failed to queue task {task.id}: {e}", "WARN")
 
-        self.log(f"[PHASE 3] Complete: {self.state.deploy_success} tasks deployed")
+        self.log(f"[PHASE 3] Complete: {self.state.commit_success} tasks committed (commit {commit_sha[:8]}) — awaiting real deploy")
 
-    async def _git_commit(self, tasks: List) -> bool:
-        """Commit all changes"""
+    async def _auto_brain_if_needed(self):
+        """Auto-trigger Brain analysis when backlog is empty.
+
+        Order: 1) Integration gap detection  2) Phase-based brain (vision/fix/refactor)
+        Integration runs FIRST because without wired layers, new features are useless.
+        """
+        from datetime import timedelta
+
+        # Check cooldown
+        if self.state.last_brain_run:
+            elapsed = datetime.now() - self.state.last_brain_run
+            cooldown = timedelta(minutes=self.config.auto_brain_cooldown_minutes)
+            if elapsed < cooldown:
+                remaining = int((cooldown - elapsed).total_seconds() / 60)
+                self.log(f"Auto-Brain cooldown: {remaining}min remaining, waiting...")
+                await asyncio.sleep(60)
+                return
+
+        self.state.last_brain_run = datetime.now()
+
+        try:
+            from core.brain import RLMBrain
+
+            brain = RLMBrain(self.project.id)
+
+            # STEP 1: Integration gap detection (deterministic + LLM)
+            integrator_cfg = (self.project.raw_config or {}).get('integrator', {})
+            if integrator_cfg.get('enabled', False):
+                self.log("🔗 AUTO-BRAIN: Checking integration gaps...")
+                try:
+                    integration_tasks = await brain.run(mode="integrator", deep_analysis=True)
+                    if integration_tasks and len(integration_tasks) > 0:
+                        self.log(f"🔗 AUTO-BRAIN: Created {len(integration_tasks)} integration tasks")
+                        return  # Let cycle process integration tasks first
+                except Exception as e:
+                    self.log(f"🔗 Integration detection error: {e}", "WARN")
+
+            # STEP 2: Phase-based brain (vision/fix/refactor)
+            mode = self.project.get_brain_mode() if hasattr(self.project, 'get_brain_mode') else "vision"
+            self.log(f"🧠 AUTO-BRAIN: Running Brain analysis (mode={mode})...")
+            tasks_created = await brain.run(mode=mode, deep_analysis=True)
+
+            if tasks_created and len(tasks_created) > 0:
+                self.log(f"🧠 AUTO-BRAIN: Created {len(tasks_created)} new tasks")
+            else:
+                self.log("🧠 AUTO-BRAIN: No new tasks created, waiting...")
+                await asyncio.sleep(300)
+
+        except Exception as e:
+            self.log(f"🧠 AUTO-BRAIN error: {e}", "ERROR")
+            await asyncio.sleep(60)
+
+    async def _git_commit(self, tasks: List) -> Optional[str]:
+        """Commit all changes. Returns commit_sha on success, None on failure."""
         import subprocess
 
         cwd = self.project.root_path
@@ -449,7 +753,14 @@ class CycleWorker:
 
         if not result.stdout.strip():
             self.log("No changes to commit")
-            return True
+            # Return current HEAD as commit_sha (tasks still need to deploy)
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=cwd,
+                capture_output=True,
+                text=True
+            )
+            return result.stdout.strip() if result.returncode == 0 else None
 
         # Stage all changes
         proc = await asyncio.create_subprocess_shell(
@@ -478,11 +789,42 @@ class CycleWorker:
         if proc.returncode != 0:
             error = stderr.decode() if stderr else "Commit failed"
             self.log(f"Commit failed: {error}", "ERROR")
-            return False
+            return None
 
-        # Push
+        # Get commit SHA
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=cwd,
+            capture_output=True,
+            text=True
+        )
+        commit_sha = result.stdout.strip() if result.returncode == 0 else None
+
+        # Push - detect remote and branch automatically
+        # Get current branch
+        branch_result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=cwd,
+            capture_output=True,
+            text=True
+        )
+        branch = branch_result.stdout.strip() if branch_result.returncode == 0 else "dev"
+
+        # Get remote (prefer 'origin', fallback to first remote)
+        remote_result = subprocess.run(
+            ["git", "remote"],
+            cwd=cwd,
+            capture_output=True,
+            text=True
+        )
+        remotes = remote_result.stdout.strip().split('\n') if remote_result.returncode == 0 else []
+        remote = "origin" if "origin" in remotes else (remotes[0] if remotes else "origin")
+
+        push_cmd = f"git push {remote} {branch}"
+        self.log(f"Pushing: {push_cmd}")
+
         proc = await asyncio.create_subprocess_shell(
-            "git push",
+            push_cmd,
             cwd=cwd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -492,10 +834,12 @@ class CycleWorker:
         if proc.returncode != 0:
             error = stderr.decode() if stderr else "Push failed"
             self.log(f"Push failed: {error}", "ERROR")
-            return False
+            # Don't fail completely - commit exists locally, can be pushed manually
+            self.log(f"Local commit {commit_sha[:8]} created, push manually: {push_cmd}", "WARN")
+            return commit_sha  # Return sha anyway so deploy can continue
 
-        self.log(f"Committed and pushed {len(tasks)} tasks")
-        return True
+        self.log(f"Committed and pushed {len(tasks)} tasks (commit {commit_sha[:8] if commit_sha else 'unknown'})")
+        return commit_sha
 
 
 class CycleDaemon(Daemon):

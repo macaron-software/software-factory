@@ -21,17 +21,171 @@ import sqlite3
 import json
 import zlib
 import re
+import asyncio
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from contextlib import contextmanager
+from difflib import SequenceMatcher
 import threading
+import logging
+
+logger = logging.getLogger("task_store")
 
 # Default DB path
 DATA_DIR = Path(__file__).parent.parent / "data"
 DB_PATH = DATA_DIR / "factory.db"
+
+# Deduplication settings
+DEDUP_FUZZY_THRESHOLD = 0.85  # String similarity threshold for fast check
+DEDUP_LLM_ENABLED = True  # Enable LLM semantic check
+
+
+class TaskDeduplicator:
+    """
+    LLM-powered task deduplication to prevent feedback loop explosion.
+
+    Two-phase approach:
+    1. Fast fuzzy match (difflib) - O(n) scan of pending tasks
+    2. LLM semantic check - only if fuzzy match finds candidates
+    """
+
+    def __init__(self, db_path: Path = DB_PATH):
+        self.db_path = db_path
+        self._cache = {}  # project_id -> list of (id, description) for pending tasks
+        self._cache_time = {}
+        self._cache_ttl = 60  # seconds
+
+    def _get_pending_descriptions(self, project_id: str, domain: str) -> List[Tuple[str, str]]:
+        """Get pending task descriptions for a project+domain (cached)"""
+        import time
+        cache_key = f"{project_id}:{domain}"
+
+        # Check cache freshness
+        if cache_key in self._cache:
+            if time.time() - self._cache_time.get(cache_key, 0) < self._cache_ttl:
+                return self._cache[cache_key]
+
+        # Refresh cache
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT id, description FROM tasks
+            WHERE project_id = ? AND domain = ? AND status = 'pending' AND depth = 0
+            LIMIT 1000
+        """, (project_id, domain)).fetchall()
+        conn.close()
+
+        result = [(row['id'], row['description']) for row in rows]
+        self._cache[cache_key] = result
+        self._cache_time[cache_key] = time.time()
+        return result
+
+    def _fuzzy_match(self, desc1: str, desc2: str) -> float:
+        """Fast fuzzy string similarity (0-1)"""
+        # Normalize: lowercase, remove line numbers and UUIDs
+        def normalize(s):
+            s = s.lower()
+            s = re.sub(r':\d+', '', s)  # Remove line numbers
+            s = re.sub(r'[a-f0-9]{8,}', '', s)  # Remove hex IDs
+            s = re.sub(r'\s+', ' ', s).strip()
+            return s[:200]  # Limit length
+
+        n1, n2 = normalize(desc1), normalize(desc2)
+        return SequenceMatcher(None, n1, n2).ratio()
+
+    def find_fuzzy_duplicates(self, project_id: str, domain: str,
+                               description: str, threshold: float = DEDUP_FUZZY_THRESHOLD) -> List[Tuple[str, str, float]]:
+        """Find potential duplicates using fuzzy matching"""
+        pending = self._get_pending_descriptions(project_id, domain)
+        candidates = []
+
+        for task_id, existing_desc in pending:
+            score = self._fuzzy_match(description, existing_desc)
+            if score >= threshold:
+                candidates.append((task_id, existing_desc, score))
+
+        # Sort by score descending
+        candidates.sort(key=lambda x: x[2], reverse=True)
+        return candidates[:5]  # Top 5 candidates
+
+    async def is_semantic_duplicate(self, new_desc: str, candidates: List[Tuple[str, str, float]]) -> Tuple[bool, Optional[str]]:
+        """Use LLM to check if semantically duplicate"""
+        if not DEDUP_LLM_ENABLED or not candidates:
+            return False, None
+
+        # Build prompt for LLM
+        candidate_list = "\n".join([
+            f"- [{task_id}] (similarity={score:.0%}): {desc[:150]}"
+            for task_id, desc, score in candidates
+        ])
+
+        prompt = f"""You are a task deduplication agent. Determine if the NEW task is a semantic duplicate of any EXISTING task.
+
+NEW TASK:
+{new_desc}
+
+EXISTING PENDING TASKS:
+{candidate_list}
+
+Rules:
+- DUPLICATE if they fix the SAME error/issue in the SAME file (even with different line numbers)
+- DUPLICATE if one is a subset of the other (e.g., "fix error in auth.rs" vs "fix error in auth.rs line 10")
+- NOT DUPLICATE if they are genuinely different issues
+
+Respond with EXACTLY one line:
+- "DUPLICATE:<task_id>" if duplicate of an existing task
+- "UNIQUE" if this is a new unique task
+
+Response:"""
+
+        try:
+            from core.llm_client import run_opencode
+            returncode, output = await run_opencode(
+                prompt,
+                model="minimax/MiniMax-M2.1",
+                timeout=30,
+                fallback=False,  # Fast, no retry
+            )
+
+            if returncode == 0 and output:
+                # Parse response
+                output = output.strip().upper()
+                if output.startswith("DUPLICATE:"):
+                    dup_id = output.replace("DUPLICATE:", "").strip()
+                    return True, dup_id
+                elif "DUPLICATE" in output and ":" in output:
+                    # Try to extract ID
+                    match = re.search(r'DUPLICATE[:\s]+([a-zA-Z0-9_-]+)', output)
+                    if match:
+                        return True, match.group(1)
+
+            return False, None
+        except Exception as e:
+            logger.warning(f"Dedup LLM check failed: {e}")
+            return False, None
+
+    def invalidate_cache(self, project_id: str = None, domain: str = None):
+        """Invalidate cache after task creation"""
+        if project_id and domain:
+            cache_key = f"{project_id}:{domain}"
+            self._cache.pop(cache_key, None)
+        else:
+            self._cache.clear()
+            self._cache_time.clear()
+
+
+# Global deduplicator instance
+_deduplicator: Optional[TaskDeduplicator] = None
+
+def get_deduplicator() -> TaskDeduplicator:
+    """Get or create global deduplicator"""
+    global _deduplicator
+    if _deduplicator is None:
+        _deduplicator = TaskDeduplicator()
+    return _deduplicator
 
 
 class TaskStatus(Enum):
@@ -45,6 +199,10 @@ class TaskStatus(Enum):
     CODE_WRITTEN = "code_written"  # NEW: Code written, ready for build
     TDD_SUCCESS = "tdd_success"  # Legacy: kept for compatibility
     TDD_FAILED = "tdd_failed"  # TDD cycle failed after max retries
+
+    # Integration Queue - Phase 0.5: Cross-layer wiring
+    INTEGRATION_IN_PROGRESS = "integration_in_progress"
+    INTEGRATION_FAILED = "integration_failed"
 
     # Build Queue - Phase 2: Compile/test (limited workers)
     BUILD_QUEUED = "build_queued"  # NEW: Waiting for build slot
@@ -76,6 +234,18 @@ class TaskStatus(Enum):
     PROD_OK = "prod_ok"
     PROD_FAILED = "prod_failed"
 
+    # Post-deploy E2E validation on live prod
+    E2E_PROD = "e2e_prod"  # Full E2E on prod (seed+smoke+journeys+rbac+console)
+    E2E_PROD_FAILED = "e2e_prod_failed"  # E2E on prod failed → rollback
+
+    # Post-deploy validation (TMC + Chaos on live prod)
+    TMC_BASELINE = "tmc_baseline"  # Load testing baseline capture
+    TMC_BASELINE_FAILED = "tmc_baseline_failed"  # Baseline below thresholds
+    CHAOS_PROD = "chaos_prod"  # Chaos monkey on prod
+    CHAOS_PROD_FAILED = "chaos_prod_failed"  # Service did not recover
+    TMC_VERIFY = "tmc_verify"  # Post-chaos TMC comparison
+    TMC_VERIFY_FAILED = "tmc_verify_failed"  # Degradation > tolerance
+
     # Final states
     COMPLETED = "completed"
     DEPLOYED = "deployed"  # Successfully deployed to production
@@ -89,12 +259,16 @@ class TaskStatus(Enum):
 # Flow: TDD (write only) → Build (limited) → Adversarial → Commit → Deploy
 VALID_TRANSITIONS = {
     # Phase 1: TDD Queue (write code only, no build)
-    TaskStatus.PENDING: [TaskStatus.LOCKED, TaskStatus.FAILED, TaskStatus.DECOMPOSED],  # FRACTAL can decompose from pending
+    TaskStatus.PENDING: [TaskStatus.LOCKED, TaskStatus.FAILED, TaskStatus.DECOMPOSED, TaskStatus.INTEGRATION_IN_PROGRESS],  # FRACTAL can decompose, integration can claim
     TaskStatus.LOCKED: [TaskStatus.TDD_IN_PROGRESS, TaskStatus.PENDING, TaskStatus.DECOMPOSED],  # FRACTAL: can decompose from locked
     TaskStatus.TDD_IN_PROGRESS: [TaskStatus.CODE_WRITTEN, TaskStatus.TDD_FAILED, TaskStatus.DECOMPOSED, TaskStatus.TDD_SUCCESS],
-    TaskStatus.CODE_WRITTEN: [TaskStatus.BUILD_IN_PROGRESS, TaskStatus.BUILD_SUCCESS, TaskStatus.BUILD_FAILED, TaskStatus.COMMIT_QUEUED],  # Direct to build (skip BUILD_QUEUED)
+    TaskStatus.CODE_WRITTEN: [TaskStatus.BUILD_IN_PROGRESS, TaskStatus.BUILD_SUCCESS, TaskStatus.BUILD_FAILED, TaskStatus.COMMIT_QUEUED],  # No shortcut to DEPLOYED
     TaskStatus.TDD_SUCCESS: [TaskStatus.ADVERSARIAL_REJECTED, TaskStatus.MERGED, TaskStatus.COMMIT_QUEUED],  # Legacy compat
     TaskStatus.TDD_FAILED: [TaskStatus.PENDING, TaskStatus.BLOCKED],  # Retry or escalate
+
+    # Phase 0.5: Integration Queue (cross-layer wiring)
+    TaskStatus.INTEGRATION_IN_PROGRESS: [TaskStatus.CODE_WRITTEN, TaskStatus.INTEGRATION_FAILED],
+    TaskStatus.INTEGRATION_FAILED: [TaskStatus.PENDING],  # Retry
 
     # Phase 2: Build Queue (limited workers - 2-3 max)
     TaskStatus.BUILD_QUEUED: [TaskStatus.BUILD_IN_PROGRESS],
@@ -106,11 +280,11 @@ VALID_TRANSITIONS = {
     TaskStatus.ADVERSARIAL_REJECTED: [TaskStatus.TDD_IN_PROGRESS, TaskStatus.BLOCKED, TaskStatus.PENDING],
 
     # Phase 4: Commit Queue (sequential - 1 worker)
-    TaskStatus.COMMIT_QUEUED: [TaskStatus.MERGED, TaskStatus.TDD_IN_PROGRESS],  # Commit or retry
+    TaskStatus.COMMIT_QUEUED: [TaskStatus.MERGED, TaskStatus.TDD_IN_PROGRESS, TaskStatus.QUEUED_FOR_DEPLOY],  # No shortcut to DEPLOYED - must go through deploy pipeline
     TaskStatus.MERGED: [TaskStatus.QUEUED_FOR_DEPLOY, TaskStatus.COMPLETED],  # COMPLETED if deploy disabled
 
-    # Deploy Queue - Full pipeline (or DEPLOYED for validation-only)
-    TaskStatus.QUEUED_FOR_DEPLOY: [TaskStatus.DEPLOYING_STAGING, TaskStatus.DEPLOY_FAILED, TaskStatus.DEPLOYED],
+    # Deploy Queue - Full pipeline
+    TaskStatus.QUEUED_FOR_DEPLOY: [TaskStatus.DEPLOYING_STAGING, TaskStatus.DEPLOY_FAILED, TaskStatus.DEPLOYED, TaskStatus.MERGED],
     TaskStatus.DEPLOYING_STAGING: [TaskStatus.STAGING_OK, TaskStatus.STAGING_FAILED],
     TaskStatus.STAGING_FAILED: [TaskStatus.QUEUED_FOR_DEPLOY, TaskStatus.DEPLOY_FAILED],  # Retry or fail
 
@@ -133,12 +307,24 @@ VALID_TRANSITIONS = {
 
     # Production deployment
     TaskStatus.DEPLOYING_PROD: [TaskStatus.PROD_OK, TaskStatus.PROD_FAILED],
-    TaskStatus.PROD_OK: [TaskStatus.DEPLOYED, TaskStatus.COMPLETED],
+    TaskStatus.PROD_OK: [TaskStatus.E2E_PROD, TaskStatus.TMC_BASELINE, TaskStatus.DEPLOYED, TaskStatus.COMPLETED],  # E2E prod → TMC → deployed
     TaskStatus.PROD_FAILED: [TaskStatus.QUEUED_FOR_DEPLOY, TaskStatus.DEPLOY_FAILED],
+
+    # Post-deploy E2E on live prod (seed+smoke+journeys+rbac+console)
+    TaskStatus.E2E_PROD: [TaskStatus.TMC_BASELINE, TaskStatus.E2E_PROD_FAILED, TaskStatus.DEPLOYED],
+    TaskStatus.E2E_PROD_FAILED: [TaskStatus.QUEUED_FOR_DEPLOY, TaskStatus.DEPLOY_FAILED],  # Rollback
+
+    # Post-deploy validation: TMC → Chaos → TMC_verify → DEPLOYED
+    TaskStatus.TMC_BASELINE: [TaskStatus.CHAOS_PROD, TaskStatus.TMC_BASELINE_FAILED, TaskStatus.DEPLOYED],
+    TaskStatus.TMC_BASELINE_FAILED: [TaskStatus.DEPLOYED],  # Below thresholds = perf task, not rollback
+    TaskStatus.CHAOS_PROD: [TaskStatus.TMC_VERIFY, TaskStatus.CHAOS_PROD_FAILED],
+    TaskStatus.CHAOS_PROD_FAILED: [TaskStatus.QUEUED_FOR_DEPLOY, TaskStatus.DEPLOY_FAILED],  # Rollback
+    TaskStatus.TMC_VERIFY: [TaskStatus.DEPLOYED, TaskStatus.TMC_VERIFY_FAILED],
+    TaskStatus.TMC_VERIFY_FAILED: [TaskStatus.QUEUED_FOR_DEPLOY, TaskStatus.DEPLOY_FAILED],  # Rollback
 
     # Final states
     TaskStatus.COMPLETED: [],
-    TaskStatus.DEPLOYED: [],  # Final: successfully in production
+    TaskStatus.DEPLOYED: [],  # Final: ACTUALLY running in production (verified)
     TaskStatus.FAILED: [TaskStatus.PENDING],  # Can be reset by Brain
     TaskStatus.DEPLOY_FAILED: [TaskStatus.PENDING],  # Creates feedback task, can be reset
     TaskStatus.BLOCKED: [TaskStatus.PENDING],  # Brain can reset
@@ -611,8 +797,18 @@ class TaskStore:
 
     # ==================== TASKS ====================
 
-    def create_task(self, task: Task) -> str:
-        """Create a new task"""
+    def create_task(self, task: Task, skip_dedup: bool = False) -> str:
+        """Create a new task (sync version, no LLM dedup)"""
+        # Fast fuzzy dedup check (no LLM)
+        if not skip_dedup and task.depth == 0 and task.status == "pending":
+            dedup = get_deduplicator()
+            candidates = dedup.find_fuzzy_duplicates(
+                task.project_id, task.domain, task.description
+            )
+            if candidates and candidates[0][2] >= 0.95:  # >95% match = definite duplicate
+                logger.info(f"DEDUP: Skipping duplicate task (fuzzy={candidates[0][2]:.0%}): {task.description[:60]}")
+                return candidates[0][0]  # Return existing task ID
+
         with self._get_connection() as conn:
             context_gz = compress_json(task.context) if task.context else None
 
@@ -635,7 +831,47 @@ class TaskStore:
                 task.created_at, task.updated_at
             ))
             conn.commit()
+
+        # Invalidate dedup cache for this project+domain
+        get_deduplicator().invalidate_cache(task.project_id, task.domain)
         return task.id
+
+    async def create_task_with_llm_dedup(self, task: Task) -> Tuple[str, bool]:
+        """
+        Create task with LLM-powered deduplication.
+
+        Returns:
+            (task_id, is_new) - task_id of created or existing task, is_new=False if duplicate
+        """
+        if task.depth != 0 or task.status != "pending":
+            # Skip dedup for subtasks or non-pending
+            return self.create_task(task, skip_dedup=True), True
+
+        dedup = get_deduplicator()
+
+        # Phase 1: Fast fuzzy match
+        candidates = dedup.find_fuzzy_duplicates(
+            task.project_id, task.domain, task.description
+        )
+
+        if not candidates:
+            # No candidates, definitely new
+            return self.create_task(task, skip_dedup=True), True
+
+        # High confidence fuzzy match (>95%) - skip LLM
+        if candidates[0][2] >= 0.95:
+            logger.info(f"DEDUP: Fuzzy duplicate ({candidates[0][2]:.0%}): {task.description[:60]}")
+            return candidates[0][0], False
+
+        # Phase 2: LLM semantic check for borderline cases (85-95%)
+        is_dup, existing_id = await dedup.is_semantic_duplicate(task.description, candidates)
+
+        if is_dup and existing_id:
+            logger.info(f"DEDUP: LLM confirmed duplicate of {existing_id}: {task.description[:60]}")
+            return existing_id, False
+
+        # Not a duplicate, create new task
+        return self.create_task(task, skip_dedup=True), True
 
     def get_task(self, task_id: str) -> Optional[Task]:
         """Get a task by ID"""
@@ -811,19 +1047,133 @@ class TaskStore:
 
             return [self._row_to_task(row) for row in rows]
 
+    def reset_stuck_tasks(self, project_id: str, stuck_hours: float = 1.0) -> int:
+        """
+        Reset tasks stuck in tdd_in_progress or build_failed for too long.
+
+        This prevents infinite blocking when workers crash/timeout without cleanup.
+        Called at the start of each cycle to ensure tasks can be retried.
+
+        Args:
+            project_id: Project to clean up
+            stuck_hours: Hours after which a task is considered stuck (default: 1h)
+
+        Returns:
+            Number of tasks reset to pending
+        """
+        with self._get_connection() as conn:
+            now = datetime.now().isoformat()
+
+            # Calculate cutoff time
+            from datetime import timedelta
+            cutoff = (datetime.now() - timedelta(hours=stuck_hours)).isoformat()
+
+            # Reset stuck tdd_in_progress tasks
+            result = conn.execute("""
+                UPDATE tasks
+                SET status = 'pending', locked_by = NULL, updated_at = ?
+                WHERE project_id = ?
+                AND status IN ('tdd_in_progress', 'locked')
+                AND updated_at < ?
+            """, (now, project_id, cutoff))
+            tdd_reset = result.rowcount
+
+            # Reset build_failed tasks (they should be retried)
+            result = conn.execute("""
+                UPDATE tasks
+                SET status = 'pending', locked_by = NULL, updated_at = ?
+                WHERE project_id = ?
+                AND status = 'build_failed'
+                AND updated_at < ?
+            """, (now, project_id, cutoff))
+            build_reset = result.rowcount
+
+            # Reset tdd_failed tasks
+            result = conn.execute("""
+                UPDATE tasks
+                SET status = 'pending', locked_by = NULL, updated_at = ?
+                WHERE project_id = ?
+                AND status = 'tdd_failed'
+                AND updated_at < ?
+            """, (now, project_id, cutoff))
+            tdd_failed_reset = result.rowcount
+
+            conn.commit()
+
+            total = tdd_reset + build_reset + tdd_failed_reset
+            if total > 0:
+                logger.info(f"[{project_id}] Reset {total} stuck tasks: "
+                           f"tdd_in_progress={tdd_reset}, build_failed={build_reset}, "
+                           f"tdd_failed={tdd_failed_reset}")
+            return total
+
     def get_deployable_tasks(self, project_id: str, limit: int = 10) -> List[Task]:
         """
-        Get tasks ready for deployment (MERGED or QUEUED_FOR_DEPLOY).
+        Get tasks ready for deployment.
+        Includes: merged, queued_for_deploy, commit_queued, code_written
         """
         with self._get_connection() as conn:
             rows = conn.execute("""
                 SELECT * FROM tasks
                 WHERE project_id = ?
-                AND status IN ('merged', 'queued_for_deploy')
+                AND status IN ('merged', 'queued_for_deploy', 'commit_queued', 'code_written')
                 ORDER BY wsjf_score DESC, created_at ASC
                 LIMIT ?
             """, (project_id, limit)).fetchall()
 
+            return [self._row_to_task(row) for row in rows]
+
+    def get_all_deployable_tasks(self, limit: int = 10) -> List[Task]:
+        """
+        Get tasks ready for deployment from ALL projects.
+        Uses ROUND-ROBIN to prevent starvation of newer projects.
+        Each project gets up to `limit` tasks (not divided).
+
+        Includes: queued_for_deploy, commit_queued, code_written
+        """
+        with self._get_connection() as conn:
+            # Get distinct projects with deployable tasks
+            # Include all statuses that mean "ready for build/deploy"
+            projects = conn.execute("""
+                SELECT DISTINCT project_id FROM tasks
+                WHERE status IN ('queued_for_deploy', 'commit_queued', 'code_written')
+            """).fetchall()
+
+            if not projects:
+                return []
+
+            # Round-robin: get up to `limit` tasks PER PROJECT (not divided)
+            # This ensures batch can be full 20 for any project
+            all_tasks = []
+
+            for (project_id,) in projects:
+                rows = conn.execute("""
+                    SELECT * FROM tasks
+                    WHERE status IN ('queued_for_deploy', 'commit_queued', 'code_written')
+                    AND project_id = ?
+                    ORDER BY wsjf_score DESC, created_at ASC
+                    LIMIT ?
+                """, (project_id, limit)).fetchall()  # Full limit per project
+                all_tasks.extend([self._row_to_task(row) for row in rows])
+
+            # Sort by wsjf then created_at for final ordering
+            all_tasks.sort(key=lambda t: (-t.wsjf_score, t.created_at))
+            return all_tasks
+
+    def get_tasks_by_commit(self, commit_sha: str) -> List[Task]:
+        """
+        Get all tasks with the same commit_sha.
+        Used for batch deploy - deploy once, mark all as deployed.
+        """
+        if not commit_sha:
+            return []
+        with self._get_connection() as conn:
+            rows = conn.execute("""
+                SELECT * FROM tasks
+                WHERE commit_sha = ?
+                AND status IN ('queued_for_deploy', 'commit_queued')
+                ORDER BY created_at ASC
+            """, (commit_sha,)).fetchall()
             return [self._row_to_task(row) for row in rows]
 
     def create_task_from_failure(self, original_task: Task, failure_reason: str,
@@ -887,6 +1237,82 @@ class TaskStore:
             """, (project_id,)).fetchall()
 
             return [self._row_to_task(row) for row in rows]
+
+    def create_tasks_from_adversarial(
+        self,
+        project_id: str,
+        domain: str,
+        issues: Any,  # Can be string or list of issues
+        source_files: List[str] = None,
+    ) -> List[str]:
+        """
+        Create feedback tasks from adversarial review issues.
+        Uses deduplication to prevent duplicate task explosion.
+
+        Args:
+            project_id: Project ID
+            domain: Domain (rust, typescript, etc.)
+            issues: Issues from adversarial review (string or list)
+            source_files: Files that were being modified
+
+        Returns:
+            List of created task IDs (empty if all were duplicates)
+        """
+        import uuid
+
+        # Normalize issues to list of strings
+        if isinstance(issues, str):
+            # Split by newlines or semicolons
+            issue_list = [i.strip() for i in re.split(r'[;\n]', issues) if i.strip()]
+        elif isinstance(issues, list):
+            issue_list = [str(i) for i in issues if i]
+        else:
+            issue_list = [str(issues)] if issues else []
+
+        if not issue_list:
+            return []
+
+        created_ids = []
+        dedup = get_deduplicator()
+
+        for issue in issue_list[:5]:  # Max 5 feedback tasks per rejection
+            # Build description
+            desc = f"[ADVERSARIAL FIX] {issue[:200]}"
+
+            # Check for duplicates (fast fuzzy)
+            candidates = dedup.find_fuzzy_duplicates(project_id, domain, desc)
+            if candidates and candidates[0][2] >= 0.90:  # 90% match = duplicate
+                logger.debug(f"DEDUP: Skipping adversarial duplicate: {desc[:60]}")
+                continue
+
+            # Create task
+            task_id = f"adversarial-{domain}-{uuid.uuid4().hex[:8]}"
+            task = Task(
+                id=task_id,
+                project_id=project_id,
+                domain=domain,
+                description=desc,
+                type="fix",
+                status="pending",
+                priority=15,  # High priority for adversarial fixes
+                wsjf_score=10.0,
+                files=source_files or [],
+                depth=0,
+                context={
+                    "source": "adversarial_feedback",
+                    "original_issue": issue,
+                },
+            )
+
+            try:
+                self.create_task(task, skip_dedup=True)  # Already deduped above
+                created_ids.append(task_id)
+            except Exception as e:
+                logger.warning(f"Failed to create adversarial task: {e}")
+
+        # Invalidate cache
+        dedup.invalidate_cache(project_id, domain)
+        return created_ids
 
     def get_tasks_by_project(self, project_id: str, limit: int = 1000) -> List[Task]:
         """Get all tasks for a project."""

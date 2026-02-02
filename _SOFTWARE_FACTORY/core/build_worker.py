@@ -148,83 +148,197 @@ class BuildWorker:
         return result
 
     async def _run_build(self, domain: str) -> tuple[bool, str]:
-        """Run build command for domain"""
-        domain_config = self.project.domains.get(domain, {})
-        build_cmd = domain_config.get("build_cmd")
+        """Run build command for domain via global queue (if enabled) or direct"""
+        build_cmd = self.project.get_build_cmd(domain)
 
         if not build_cmd:
             self.log(f"No build_cmd for domain {domain}, skipping build")
             return True, ""
 
-        self.log(f"Running: {build_cmd}")
+        # Check if global queue is enabled (default: True)
+        raw_config = getattr(self.project, 'raw_config', None) or {}
+        use_queue = raw_config.get("build_queue", {}).get("enabled", True)
+        
+        if use_queue:
+            # Auto-start queue daemon if not running
+            await self._ensure_queue_daemon()
+            return await self._run_via_queue(build_cmd, "build")
+        else:
+            return await self._run_direct(build_cmd)
+
+    async def _run_via_queue(self, cmd: str, job_type: str) -> tuple[bool, str]:
+        """Run command via global build queue"""
+        from core.build_queue import GlobalBuildQueue, JobStatus
+        
+        queue = GlobalBuildQueue.instance()
+        raw_config = getattr(self.project, 'raw_config', None) or {}
+        priority = raw_config.get("build_queue", {}).get("priority", 10)
+        timeout = raw_config.get("build_queue", {}).get("timeout", BUILD_TIMEOUT)
+        
+        self.log(f"Queueing {job_type}: {cmd[:50]}... (priority={priority})")
+        job_id = queue.enqueue(
+            project=self.project.name,
+            cmd=cmd,
+            cwd=str(self.project.root_path),
+            priority=priority,
+            timeout=timeout,
+        )
+        
+        # Wait for completion
+        job = await queue.wait_for(job_id)
+        
+        if job.status == JobStatus.SUCCESS:
+            return True, ""
+        elif job.status == JobStatus.TIMEOUT:
+            return False, f"Queue timeout ({timeout}s)"
+        else:
+            return False, job.stderr or job.stdout or job.error or "Unknown error"
+
+    async def _run_direct(self, cmd: str) -> tuple[bool, str]:
+        """Run command directly (bypass queue)"""
+        self.log(f"Running: {cmd}")
         try:
+            # Inject project-specific env vars (e.g., VELIGO_TOKEN)
+            env = os.environ.copy()
+            project_env = self.project.get_env()
+            if project_env:
+                env.update(project_env)
+
             proc = await asyncio.create_subprocess_shell(
-                build_cmd,
+                cmd,
                 cwd=str(self.project.root_path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
+                env=env,
+                start_new_session=True,  # Isolate process group for clean kill
             )
-            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=BUILD_TIMEOUT)
+            try:
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=BUILD_TIMEOUT)
+            except asyncio.TimeoutError:
+                # Kill entire process group (including child processes)
+                import signal
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                return False, "Build timeout"
+
             output = stdout.decode() if stdout else ""
 
             if proc.returncode == 0:
                 return True, ""
             else:
                 return False, output
-        except asyncio.TimeoutError:
-            return False, "Build timeout"
         except Exception as e:
             return False, str(e)
 
     async def _run_lint(self, domain: str) -> bool:
-        """Run lint command for domain"""
-        domain_config = self.project.domains.get(domain, {})
-        lint_cmd = domain_config.get("lint_cmd")
+        """Run lint command for domain using project CLI"""
+        lint_cmd = self.project.get_lint_cmd(domain)
 
         if not lint_cmd:
             return True  # No lint = pass
 
+        # Check if global queue is enabled (default: True)
+        raw_config = getattr(self.project, 'raw_config', None) or {}
+        use_queue = raw_config.get("build_queue", {}).get("enabled", True)
+        
+        if use_queue:
+            await self._ensure_queue_daemon()
+            success, _ = await self._run_via_queue(lint_cmd, "lint")
+            return success
+        
         self.log(f"Linting: {lint_cmd}")
         try:
+            # Inject project-specific env vars
+            env = os.environ.copy()
+            project_env = self.project.get_env()
+            if project_env:
+                env.update(project_env)
+
             proc = await asyncio.create_subprocess_shell(
                 lint_cmd,
                 cwd=str(self.project.root_path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
+                env=env,
+                start_new_session=True,  # Isolate process group for clean kill
             )
-            await asyncio.wait_for(proc.communicate(), timeout=BUILD_TIMEOUT)
+            try:
+                await asyncio.wait_for(proc.communicate(), timeout=BUILD_TIMEOUT)
+            except asyncio.TimeoutError:
+                # Kill entire process group
+                import signal
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                return False
             return proc.returncode == 0
         except:
             return False
 
     async def _run_tests(self, domain: str) -> tuple[bool, str]:
-        """Run test command for domain"""
-        domain_config = self.project.domains.get(domain, {})
-        test_cmd = domain_config.get("test_cmd")
+        """Run test command for domain via global queue (if enabled) or direct"""
+        test_cmd = self.project.get_test_cmd(domain)
 
         if not test_cmd:
             self.log(f"No test_cmd for domain {domain}, skipping tests")
             return True, ""
 
+        # Check if global queue is enabled (default: True)
+        raw_config = getattr(self.project, 'raw_config', None) or {}
+        use_queue = raw_config.get("build_queue", {}).get("enabled", True)
+        
+        if use_queue:
+            await self._ensure_queue_daemon()
+            return await self._run_via_queue(test_cmd, "test")
+        
         self.log(f"Testing: {test_cmd}")
         try:
+            # Inject project-specific env vars
+            env = os.environ.copy()
+            project_env = self.project.get_env()
+            if project_env:
+                env.update(project_env)
+
             proc = await asyncio.create_subprocess_shell(
                 test_cmd,
                 cwd=str(self.project.root_path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
+                env=env,
+                start_new_session=True,  # Isolate process group for clean kill
             )
-            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=BUILD_TIMEOUT)
+            try:
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=BUILD_TIMEOUT)
+            except asyncio.TimeoutError:
+                # Kill entire process group (including vitest children)
+                import os
+                import signal
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                return False, "Test timeout"
+
             output = stdout.decode() if stdout else ""
 
             if proc.returncode == 0:
                 return True, ""
             else:
                 return False, output
-        except asyncio.TimeoutError:
-            return False, "Test timeout"
         except Exception as e:
             return False, str(e)
+
+    async def _ensure_queue_daemon(self):
+        """Auto-start queue daemon if not running"""
+        from core.build_queue import QueueDaemon
+        daemon = QueueDaemon()
+        status = daemon.status()
+        if not status.get("running"):
+            self.log("Auto-starting queue daemon...")
+            daemon.start(foreground=False)
 
     async def _run_adversarial(self, task: Task) -> Any:
         """Run adversarial check on the task"""

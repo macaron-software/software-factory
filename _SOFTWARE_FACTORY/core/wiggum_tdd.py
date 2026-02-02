@@ -18,7 +18,7 @@ Uses MiniMax M2.1 via `opencode` for code generation.
 Usage:
     from core.wiggum_tdd import WiggumPool
 
-    pool = WiggumPool("ppz", workers=50)
+    pool = WiggumPool("ppz", workers=5)  # OOM safe
     await pool.run()  # Daemon mode
     await pool.run_once()  # Single task
 """
@@ -87,6 +87,38 @@ class WiggumWorker:
     MAX_ITERATIONS = 10  # Max retry iterations
     OPENCODE_TIMEOUT = 600  # 10 min - let model work. Fallback only on RATE LIMIT, not timeout.
 
+    # Transient errors that should be retried, not marked as TDD_FAILED
+    TRANSIENT_ERROR_PATTERNS = [
+        # Network/API errors
+        "Unable to connect",
+        "Invalid Tool",
+        "Server unavailable",
+        "MCP server",
+        "rate limit",
+        "Rate limit",
+        "RATE_LIMIT",
+        "connection reset",
+        "Connection reset",
+        "timeout",
+        "Timeout",
+        "ETIMEDOUT",
+        "ECONNREFUSED",
+        # Docker errors (daemon crashes, resource issues)
+        "Cannot connect to the Docker daemon",
+        "docker daemon",
+        "Docker daemon",
+        "docker.sock",
+        "No such container",
+        "container is not running",
+        "OCI runtime",
+        "failed to create shim",
+        "Error response from daemon",
+        "docker: Error",
+        "docker build failed",
+        "docker-compose",
+        "docker: command not found",
+    ]
+
     def __init__(
         self,
         worker_id: int,
@@ -105,6 +137,30 @@ class WiggumWorker:
 
     def log(self, msg: str, level: str = "INFO"):
         log(msg, level, self.worker_id)
+
+    def _is_transient_error(self, output: str) -> bool:
+        """Check if the error is transient (infra issue, not code issue)"""
+        if not output:
+            return False
+        for pattern in self.TRANSIENT_ERROR_PATTERNS:
+            if pattern in output:
+                return True
+        return False
+
+    def _is_truncated_output(self, output: str) -> bool:
+        """Detect if LLM output was truncated (hit token limit).
+        Truncated = task too large for single agent, needs FRACTAL decomposition."""
+        if not output:
+            return False
+        # Common truncation indicators
+        if output.rstrip().endswith(('...', '``', '```', '// ...', '/* ...', '...')):
+            return True
+        # Unbalanced braces/brackets (code cut mid-block)
+        opens = output.count('{') + output.count('[')
+        closes = output.count('}') + output.count(']')
+        if opens > closes + 3:  # Significant imbalance
+            return True
+        return False
 
     async def run_single(self, task: Task) -> TDDResult:
         """Run TDD cycle for a single task"""
@@ -142,6 +198,8 @@ class WiggumWorker:
             feedback = ""  # Accumulated feedback from adversarial
             last_adversarial_issues = []  # Store last issues for feedback loop
             last_code_changes = {}  # Store last code changes for context
+            transient_failures = 0  # Track transient errors for retry logic
+            total_failures = 0  # Track all failures
             for iteration in range(self.MAX_ITERATIONS):
                 result.iterations = iteration + 1
                 self.log(f"Iteration {iteration + 1}/{self.MAX_ITERATIONS}")
@@ -165,8 +223,20 @@ class WiggumWorker:
                 )
 
                 if returncode != 0:
-                    self.log(f"opencode failed: {output[:200]}", "WARN")
+                    total_failures += 1
+                    if self._is_transient_error(output):
+                        transient_failures += 1
+                        self.log(f"⚡ Transient error (infra): {output[:100]}", "WARN")
+                    else:
+                        self.log(f"opencode failed: {output[:200]}", "WARN")
                     continue
+
+                # Detect truncated output (task too large, needs better FRACTAL split)
+                if self._is_truncated_output(output or ""):
+                    self.log(f"⚠️ TRUNCATED output detected — task may be too large for single agent", "WARN")
+                    feedback = ("TRUNCATED: Your previous output was cut off (token limit). "
+                                "Write LESS code. Focus on the MINIMUM change needed. "
+                                "Do NOT write full files — only the changed parts.")
 
                 # Detect code changes using git (more reliable than output parsing)
                 code_changes = self._detect_git_changes(git_before)
@@ -200,7 +270,15 @@ class WiggumWorker:
                 result.success = True
                 return result
 
-            # Max iterations reached - RLM FEEDBACK LOOP: Create tasks from adversarial issues
+            # Max iterations reached - check if all failures were transient
+            if total_failures > 0 and transient_failures == total_failures:
+                # ALL failures were transient (infra issues) → release lock for retry
+                result.error = "All iterations failed due to transient errors (infra)"
+                self.task_store.transition(task.id, TaskStatus.PENDING, changed_by=self.worker_id)
+                self.log(f"⚡ All {transient_failures} failures were transient - released for retry", "WARN")
+                return result
+
+            # RLM FEEDBACK LOOP: Create tasks from adversarial issues
             result.error = "Max iterations reached"
             self.task_store.transition(task.id, TaskStatus.TDD_FAILED)
             self.log("❌ Task failed after max iterations", "WARN")
@@ -219,8 +297,13 @@ class WiggumWorker:
 
         except Exception as e:
             result.error = str(e)
-            self.log(f"Exception: {e}", "ERROR")
-            self.task_store.transition(task.id, TaskStatus.TDD_FAILED)
+            # Check if exception is transient
+            if self._is_transient_error(str(e)):
+                self.log(f"⚡ Transient exception: {e}", "WARN")
+                self.task_store.transition(task.id, TaskStatus.PENDING, changed_by=self.worker_id)
+            else:
+                self.log(f"Exception: {e}", "ERROR")
+                self.task_store.transition(task.id, TaskStatus.TDD_FAILED)
 
         return result
 
@@ -252,7 +335,7 @@ You MUST address ALL the issues above before proceeding.
         # Check if project has Figma integration
         figma_config = self.project.figma or {}
         figma_enabled = figma_config.get('enabled', False)
-        
+
         figma_instructions = ""
         if figma_enabled and task.domain in ['svelte', 'typescript', 'frontend']:
             figma_instructions = """
@@ -270,6 +353,38 @@ Figma tools (USE THEM):
 If you skip Figma check, the adversarial gate will REJECT your code.
 """
 
+        # Get domain-specific stack versions and framework conventions from YAML
+        stack_instructions = ""
+        if self.project.raw_config:
+            domains_config = self.project.raw_config.get("domains", {})
+            domain_config = domains_config.get(task.domain, {})
+
+            stack = domain_config.get("stack", {})
+            conventions = domain_config.get("conventions", [])
+
+            if stack or conventions:
+                stack_instructions = "\n⚠️ STACK VERSIONS & FRAMEWORK CONVENTIONS (MUST FOLLOW):\n"
+
+                if stack:
+                    stack_instructions += f"Stack: {', '.join(f'{k} {v}' for k, v in stack.items())}\n\n"
+
+                if conventions:
+                    for conv in conventions:
+                        name = conv.get("name", "")
+                        rule = conv.get("rule", "")
+                        fix = conv.get("fix", "")
+                        example = conv.get("example", "")
+
+                        stack_instructions += f"📌 {name}:\n"
+                        stack_instructions += f"   Rule: {rule}\n"
+                        if fix:
+                            stack_instructions += f"   Fix: {fix}\n"
+                        if example:
+                            # Truncate long examples
+                            example_preview = example[:300] + "..." if len(example) > 300 else example
+                            stack_instructions += f"   Example:\n{example_preview}\n"
+                        stack_instructions += "\n"
+
         prompt = f"""You are a TDD agent. Complete this task using strict TDD.
 
 PROJECT: {self.project.name} ({self.project.display_name})
@@ -281,7 +396,7 @@ FILES: {task.files}
 
 CONTEXT:
 {json.dumps(context, indent=2)[:3000]}
-{feedback_section}
+{feedback_section}{stack_instructions}
 MCP TOOLS AVAILABLE (use these to explore the project):
 - lrm_locate(query, scope, limit): Find files matching pattern
 - lrm_summarize(files, goal): Get file summaries
@@ -294,13 +409,21 @@ TDD CYCLE:
 2. Use lrm_conventions to follow project patterns
 3. RED: Write a failing test that verifies the fix
 4. GREEN: Write minimal code to make the test pass
-5. VERIFY: The test must pass
+5. VERIFY: Run ONLY your specific test using lrm_build or targeted command
 
 RULES:
 - NO test.skip, @ts-ignore, or #[ignore]
 - NO .unwrap() abuse (max 3 per file)
 - NO TODO/FIXME in committed code
 - Complete, working code only
+- NEVER run full test suite (cargo test --workspace, npm test without filter)
+- Run ONLY your specific test: `cargo test <test_name>` or `npm test -- -t '<test>'`
+- VITEST: ALWAYS use `npx vitest run --pool=forks --poolOptions.forks.maxForks=1 <test_file>` (prevents 4GB RAM per worker)
+- NEVER run `vitest` without --pool=forks --poolOptions.forks.maxForks=1
+- NEVER create or modify .md files (README, VISION, CLAUDE, reports, analyses)
+- NEVER create _REPORT, _ANALYSIS, _REVIEW, _SUMMARY files
+- NEVER touch node_modules/, _archive/, .git/, dist/, target/
+- Write CODE only. No documentation. No reports. No summaries.
 
 Start by exploring the relevant files with lrm_locate, then execute the TDD cycle.
 """
@@ -654,86 +777,61 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
             return False
 
     async def _run_adversarial(self, code_changes: Dict[str, str]) -> CheckResult:
-        """Run adversarial check: FAST regex + Architecture + LLM semantic"""
+        """
+        Run TEAM OF RIVALS adversarial check (arXiv:2601.14351).
+
+        Cascade: L0 (fast) → L1a (code) → L1b (security) → L2 (arch)
+        Multi-vendor: MiniMax, GLM-4.7-free, Opus for cognitive diversity.
+        """
         from core.adversarial import CheckResult
 
-        all_issues = []
-        total_score = 0
+        # 0. File protection check (reject protected/forbidden files)
+        protection_issues = self.adversarial.check_file_protection(code_changes)
+        if protection_issues:
+            total_score = sum(i.points for i in protection_issues)
+            if total_score >= self.adversarial.threshold:
+                feedback = self.adversarial._generate_feedback(protection_issues, {})
+                return CheckResult(
+                    approved=False,
+                    score=total_score,
+                    threshold=self.adversarial.threshold,
+                    issues=protection_issues,
+                    feedback=feedback,
+                )
 
-        # Process each changed file
+        # Combine all changed files for cascade review
+        combined_code = ""
+        first_file = ""
+        file_type = "code"
+
         for file_path in list(code_changes.keys())[:5]:  # Limit to 5 files
             full_path = self.project.root_path / file_path
             if not full_path.exists():
                 continue
 
             try:
-                code = full_path.read_text()
+                code = full_path.read_text()[:4000]
+                combined_code += f"\n// === FILE: {file_path} ===\n{code}\n"
+                if not first_file:
+                    first_file = file_path
+                    file_type = "rust" if file_path.endswith(".rs") else \
+                               "typescript" if file_path.endswith((".ts", ".tsx")) else \
+                               "python" if file_path.endswith(".py") else \
+                               "kotlin" if file_path.endswith(".kt") else \
+                               "swift" if file_path.endswith(".swift") else "code"
             except Exception:
                 continue
 
-            # Detect file type
-            file_type = "rust" if file_path.endswith(".rs") else \
-                       "typescript" if file_path.endswith((".ts", ".tsx")) else \
-                       "python" if file_path.endswith(".py") else \
-                       "kotlin" if file_path.endswith(".kt") else "code"
+        if not combined_code:
+            return CheckResult(approved=True, score=0, threshold=self.adversarial.threshold)
 
-            # 1. FAST regex check (patterns + security)
-            fast_result = self.adversarial.check_code(code, file_type, file_path)
-            all_issues.extend(fast_result.issues)
-            total_score += fast_result.score
-
-            # 2. Architecture completeness check (RBAC, validation, limits, errors)
-            arch_issues = self.adversarial.check_architecture_completeness(code, file_path)
-            all_issues.extend(arch_issues)
-            total_score += sum(i.points for i in arch_issues)
-
-        # Early reject if score already too high
-        if total_score >= self.adversarial.threshold:
-            feedback = self.adversarial._generate_feedback(all_issues, {})
-            return CheckResult(
-                approved=False,
-                score=total_score,
-                threshold=self.adversarial.threshold,
-                issues=all_issues,
-                feedback=feedback,
-            )
-
-        # 3. LLM semantic check (context-aware, catches subtle issues)
-        combined_code = ""
-        for file_path in list(code_changes.keys())[:5]:
-            full_path = self.project.root_path / file_path
-            if full_path.exists():
-                try:
-                    code = full_path.read_text()[:3000]
-                    combined_code += f"\n// === FILE: {file_path} ===\n{code}\n"
-                except Exception:
-                    pass
-
-        if combined_code:
-            first_file = list(code_changes.keys())[0] if code_changes else ""
-            file_type = "rust" if first_file.endswith(".rs") else \
-                       "typescript" if first_file.endswith((".ts", ".tsx")) else \
-                       "python" if first_file.endswith(".py") else "code"
-
-            llm_result = await self.adversarial.check_code_llm(
-                combined_code,
-                file_type=file_type,
-                filename=first_file,
-            )
-
-            all_issues.extend(llm_result.issues)
-            total_score += llm_result.score
-
-        # Final result
-        approved = total_score < self.adversarial.threshold
-        feedback = "" if approved else self.adversarial._generate_feedback(all_issues, {})
-
-        return CheckResult(
-            approved=approved,
-            score=total_score,
-            threshold=self.adversarial.threshold,
-            issues=all_issues,
-            feedback=feedback,
+        # TEAM OF RIVALS: Cascaded critics with multi-vendor cognitive diversity
+        # L0: Fast deterministic → L1a: Code (MiniMax) → L1b: Security (GLM) → L2: Arch (Opus)
+        return await self.adversarial.check_cascade(
+            combined_code,
+            file_type=file_type,
+            filename=first_file,
+            timeout=120,
         )
 
     async def _git_commit(self, task: Task) -> bool:
@@ -845,14 +943,14 @@ class WiggumPool:
     def __init__(
         self,
         project_name: str = None,
-        workers: int = 50,
+        workers: int = 3,  # OOM safe (was 50→5→3)
     ):
         """
         Initialize worker pool.
 
         Args:
             project_name: Project from projects/*.yaml
-            workers: Number of parallel workers (default: 50)
+            workers: Number of parallel workers (default: 5, OOM safe)
         """
         self.project = get_project(project_name)
         self.task_store = TaskStore()
@@ -949,6 +1047,23 @@ class WiggumPool:
             log("No task to process")
             return None
 
+        # AO COMPLIANCE CHECK - Reject SLOP features without REQ-ID
+        if task.type == "feature":
+            from core.adversarial import check_ao_compliance
+            ao_result = check_ao_compliance(task.description or "", task.type, self.project.raw_config, task.id)
+            if not ao_result.approved:
+                log(f"AO REJECTED: {task.id} - {ao_result.feedback[:60]}", "WARN")
+                self.task_store.update_task_status(
+                    task.id,
+                    TaskStatus.SKIPPED,
+                    notes=f"AO compliance failed: {ao_result.feedback}"
+                )
+                return TDDResult(
+                    success=False,
+                    task_id=task.id,
+                    error=f"AO compliance rejected: {ao_result.feedback}",
+                )
+
         worker = WiggumWorker(
             worker_id=0,
             project=self.project,
@@ -962,6 +1077,23 @@ class WiggumPool:
     async def _process_task(self, task: Task) -> TDDResult:
         """Process a task with semaphore"""
         async with self._semaphore:
+            # AO COMPLIANCE CHECK - Reject SLOP features without REQ-ID
+            if task.type == "feature":
+                from core.adversarial import check_ao_compliance
+                ao_result = check_ao_compliance(task.description or "", task.type, self.project.raw_config, task.id)
+                if not ao_result.approved:
+                    log(f"AO REJECTED: {task.id} - {ao_result.feedback[:60]}", "WARN")
+                    self.task_store.update_task_status(
+                        task.id,
+                        TaskStatus.SKIPPED,
+                        notes=f"AO compliance failed: {ao_result.feedback}"
+                    )
+                    return TDDResult(
+                        success=False,
+                        task_id=task.id,
+                        error=f"AO compliance rejected: {ao_result.feedback}",
+                    )
+
             worker_id = hash(task.id) % self.num_workers
             worker = WiggumWorker(
                 worker_id=worker_id,
@@ -1003,13 +1135,13 @@ class WiggumTDDDaemon(Daemon):
     Wiggum TDD as a system daemon.
 
     Usage:
-        daemon = WiggumTDDDaemon("ppz", workers=50)
+        daemon = WiggumTDDDaemon("ppz", workers=3)  # OOM safe
         daemon.start()   # Daemonize and run
         daemon.stop()    # Graceful shutdown
         daemon.status()  # Check status
     """
 
-    def __init__(self, project: str, workers: int = 50):
+    def __init__(self, project: str, workers: int = 3):  # OOM safe (was 50→5→3)
         super().__init__(name="wiggum-tdd", project=project)
         self.workers = workers
         self.pool: Optional[WiggumPool] = None
@@ -1102,7 +1234,7 @@ Examples:
                         choices=["start", "stop", "restart", "status", "run", "once"],
                         help="Daemon command")
     parser.add_argument("--project", "-p", help="Project name")
-    parser.add_argument("--workers", "-w", type=int, default=50, help="Number of workers")
+    parser.add_argument("--workers", "-w", type=int, default=3, help="Number of workers (OOM safe)")
     parser.add_argument("--task", "-t", help="Specific task ID (for 'once')")
     parser.add_argument("--all", action="store_true", help="Show all projects status")
 

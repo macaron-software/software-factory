@@ -43,15 +43,15 @@ def log(msg: str, level: str = "INFO"):
 @dataclass
 class FractalConfig:
     """FRACTAL decomposition thresholds"""
-    max_files: int = 5        # Max files touched per atomic task
-    max_loc: int = 400        # Max LOC estimate per task
-    max_items: int = 10       # Max acceptance criteria/items
+    max_files: int = 3        # Max files touched per atomic task (was 5, lowered to prevent truncation)
+    max_loc: int = 250        # Max LOC estimate per task (was 400, lowered to prevent truncation)
+    max_items: int = 8        # Max acceptance criteria/items (was 10)
     max_depth: int = 3        # Max recursion depth
     enabled: bool = True
-    # NEW: Force level 1 decomposition for all root tasks
     force_level1: bool = True      # Always decompose depth=0 tasks
-    min_subtasks: int = 3          # Minimum subtasks when forcing L1
+    min_subtasks: int = 0          # 0 = LLM can decide no split needed
     parallel_subagents: bool = True  # Run subtasks in parallel
+    llm_first: bool = True         # Prefer LLM over rule-based decomposition
 
 
 def load_fractal_config(project_config: Any = None) -> FractalConfig:
@@ -75,8 +75,9 @@ def load_fractal_config(project_config: Any = None) -> FractalConfig:
             max_depth=fc.get("max_depth", 3),
             enabled=fc.get("enabled", True),
             force_level1=fc.get("force_level1", True),
-            min_subtasks=fc.get("min_subtasks", 3),
+            min_subtasks=fc.get("min_subtasks", 0),
             parallel_subagents=fc.get("parallel_subagents", True),
+            llm_first=fc.get("llm_first", True),
         )
 
     return FractalConfig()
@@ -257,7 +258,20 @@ class FractalDecomposer:
         if not self.config.enabled:
             return False, ComplexityAnalysis()
 
-        # NEW: Force level 1 decomposition for root tasks (depth=0)
+        desc = task.get("description", "").lower()
+
+        # Pre-filter: trivially simple tasks never need decomposition
+        SIMPLE_TASK_PATTERNS = [
+            "typo", "rename", "remove unused", "delete",
+            "update version", "bump", "change import",
+            "fix import", "add import", "missing import",
+            "single file", "one line",
+        ]
+        if any(pattern in desc for pattern in SIMPLE_TASK_PATTERNS):
+            log(f"Skipping FRACTAL for trivial task: {desc[:50]}...")
+            return False, ComplexityAnalysis()
+
+        # Force decomposition for root tasks (depth=0) — LLM will decide how many
         if self.config.force_level1 and current_depth == 0:
             analysis = analyze_complexity(task, self.config, current_depth)
             analysis.force_level1 = True
@@ -287,39 +301,44 @@ class FractalDecomposer:
             List of sub-task dicts
         """
         should_decompose, analysis = self.should_decompose(task, current_depth)
-        
-        # Determine minimum subtask count
-        min_subtasks = force_count or (self.config.min_subtasks if getattr(analysis, 'force_level1', False) else 1)
 
         if not should_decompose:
             log(f"Task within limits ({analysis.reason}), no decomposition needed")
             return [task]
 
+        min_subtasks = force_count if force_count is not None else self.config.min_subtasks
+
         log(f"Decomposing task (depth={current_depth}, {analysis.reason}, min={min_subtasks})")
 
-        # Try LLM decomposition first
-        if self.llm_client:
+        # LLM-first: let the LLM decide how many sub-agents (0-10)
+        if self.llm_client and self.config.llm_first:
             subtasks = await self._llm_decompose(task, analysis, min_subtasks)
-            if subtasks and len(subtasks) >= min_subtasks:
+            if subtasks is not None:  # None = LLM failed; [] = LLM says no split
+                if len(subtasks) == 0:
+                    log("LLM decided no decomposition needed")
+                    return [task]
                 return subtasks
 
         # Fallback to rule-based decomposition
-        return self._rule_based_decompose(task, analysis, min_subtasks)
+        return self._rule_based_decompose(task, analysis, max(min_subtasks, 2))
 
     async def _llm_decompose(
         self,
         task: Dict[str, Any],
         analysis: ComplexityAnalysis,
-        min_subtasks: int = 2,
+        min_subtasks: int = 0,
     ) -> Optional[List[Dict[str, Any]]]:
-        """Decompose using LLM for intelligent splitting"""
+        """Decompose using LLM for intelligent splitting.
+
+        Returns:
+            List of subtasks (may be empty = no split needed), or None if LLM failed.
+        """
         try:
             prompt = self._build_decomposition_prompt(task, analysis, min_subtasks)
             response = await self.llm_client.query(prompt, role="sub")
 
-            # Parse subtasks from response
             subtasks = self._parse_subtasks(response, task)
-            if subtasks and len(subtasks) >= min_subtasks:
+            if subtasks is not None:
                 log(f"LLM decomposed into {len(subtasks)} sub-tasks")
                 return subtasks
 
@@ -328,51 +347,78 @@ class FractalDecomposer:
 
         return None
 
+    # Task-type-aware decomposition guidance
+    TYPE_GUIDANCE = {
+        "integration": (
+            "Split by LAYER or COMPONENT. Each sub-agent wires a different layer.\n"
+            "Examples: backend bootstrap, DB migrations, gRPC client gen, frontend API wiring, proxy config.\n"
+            "Order matters — return subtasks in dependency order (bootstrap first)."
+        ),
+        "feature": (
+            "Split by CONCERN or COMPONENT.\n"
+            "Examples: core business logic, input validation & auth guards, error handling & edge cases.\n"
+            "Or by UI component if the feature spans multiple screens."
+        ),
+        "fix": (
+            "Usually 1-2 sub-agents: root cause fix + regression test.\n"
+            "Return 0 subtasks (empty array) if the fix is trivial and one agent can handle it."
+        ),
+        "security": (
+            "Split by VULNERABILITY TYPE.\n"
+            "Examples: SQL injection fixes, XSS sanitization, auth hardening, secret rotation."
+        ),
+        "refactor": (
+            "Split by REFACTORING OPERATION.\n"
+            "Examples: extract shared interface, migrate callers, remove old code & update tests."
+        ),
+        "test": (
+            "Split by TEST CATEGORY.\n"
+            "Examples: unit tests for module A, integration tests for API, edge case coverage."
+        ),
+        "implement": (
+            "Split by MODULE or LAYER.\n"
+            "Examples: data model, business logic, API endpoint, frontend component."
+        ),
+    }
+
     def _build_decomposition_prompt(
         self,
         task: Dict[str, Any],
         analysis: ComplexityAnalysis,
-        min_subtasks: int = 2,
+        min_subtasks: int = 0,
     ) -> str:
-        """Build prompt for LLM decomposition"""
-        force_msg = ""
-        if analysis.force_level1:
-            force_msg = f"\n⚠️ FORCED LEVEL 1: You MUST create exactly {min_subtasks} sub-tasks (parallel sub-agents)."
-        
-        return f"""You are a task decomposition expert. Break down this task into {min_subtasks}-{min_subtasks + 2} smaller, atomic sub-tasks.
-{force_msg}
+        """Build task-type-aware prompt for LLM decomposition"""
+        task_type = task.get("type", "feature")
+        guidance = self.TYPE_GUIDANCE.get(task_type, self.TYPE_GUIDANCE["feature"])
 
-ORIGINAL TASK:
+        return f"""Analyze this task and decide how to split it into sub-agents (0 to 10).
+
+TASK:
+- Type: {task_type}
 - Description: {task.get('description', '')}
 - Files: {task.get('files', [])}
-- Type: {task.get('type', 'fix')}
 - Domain: {task.get('domain', 'unknown')}
 
 COMPLEXITY:
 - Files: {analysis.files_count} (max {self.config.max_files})
 - Estimated LOC: {analysis.loc_estimate} (max {self.config.max_loc})
-- Items: {analysis.items_count} (max {self.config.max_items})
-- Reason: {analysis.reason}
 
-RULES for sub-tasks:
-1. Create EXACTLY {min_subtasks} to {min_subtasks + 2} sub-tasks
-2. Each sub-task must be ATOMIC (one logical change)
-3. Each sub-task should touch max {self.config.max_files} files
-4. Each sub-task should be ~{self.config.max_loc // 2} LOC or less
-5. Sub-tasks must be INDEPENDENT (can be done in parallel by separate agents)
-6. No overlapping file modifications
+DECOMPOSITION GUIDANCE for "{task_type}" tasks:
+{guidance}
 
-RESPOND IN JSON:
-{{
-  "subtasks": [
-    {{
-      "description": "Clear, specific sub-task description",
-      "files": ["file1.rs"],
-      "type": "fix|feature|refactor|test",
-      "acceptance_criteria": ["criterion 1", "criterion 2"]
-    }}
-  ]
-}}
+RULES:
+1. Return 0 subtasks (empty array) if the task is simple enough for 1 agent
+2. Return 1-10 subtasks based on actual complexity — no arbitrary minimum
+3. Each subtask = 1 independent sub-agent with its own files
+4. Each subtask touches max {self.config.max_files} files
+5. No overlapping file modifications between subtasks
+6. Be precise: don't create subtasks for the sake of it
+
+RESPOND IN JSON ONLY:
+{{"subtasks": [
+    {{"description": "...", "files": ["..."], "type": "...", "domain": "{task.get('domain', 'unknown')}"}}
+]}}
+Return {{"subtasks": []}} if no decomposition needed.
 """
 
     def _parse_subtasks(
@@ -417,13 +463,12 @@ RESPOND IN JSON:
         min_subtasks: int = 2,
     ) -> List[Dict[str, Any]]:
         """
-        Rule-based decomposition fallback.
+        Rule-based decomposition fallback (when LLM is unavailable).
 
         Strategies:
-        1. Force L1: Split into min_subtasks parts by aspect
-        2. Split by files (if exceeds_files)
-        3. Split by acceptance criteria (if exceeds_items)
-        4. Split description by conjunctions (if exceeds_loc)
+        1. Split by files (if exceeds_files)
+        2. Split by acceptance criteria (if exceeds_items)
+        3. Split description by conjunctions (if exceeds_loc)
         """
         subtasks = []
         parent_id = task.get("id", "task")
@@ -434,79 +479,6 @@ RESPOND IN JSON:
             "parent_id": parent_id,
             "fractal_depth": task.get("fractal_depth", 0) + 1,
         }
-
-        # Strategy 0: FRACTAL L1/L2 decomposition based on depth
-        current_depth = task.get("fractal_depth", 0)
-
-        if analysis.force_level1 or current_depth == 0:
-            description = task.get("description", "")
-            files = task.get("files", [])
-
-            if current_depth == 0:
-                # ========================================================
-                # L1: 3 CONCERNS (KISS - not 5!)
-                # Based on what LLMs actually miss:
-                # - FEATURE: the happy path (LLMs do this well)
-                # - GUARDS: auth + validation (LLMs often forget)
-                # - FAILURES: errors + edge cases (LLMs often skip)
-                # ========================================================
-                aspects = [
-                    ("feature",
-                     "FEATURE (Happy Path): Implement the main business logic. "
-                     "Focus on the primary use case. Make it work for valid inputs. "
-                     "Don't worry about auth or errors yet - just the core functionality.",
-                     0.4),
-                    ("guards",
-                     "GUARDS (Auth + Validation): Add ALL protective checks. "
-                     "1) AUTHENTICATION: Verify user is logged in (return 401 if not). "
-                     "2) AUTHORIZATION: Verify user has permission (return 403 if not). "
-                     "3) INPUT VALIDATION: Validate all inputs - types, formats, ranges. "
-                     "4) SANITIZATION: Prevent injection (SQL, XSS, command). "
-                     "Use parameterized queries. Escape outputs.",
-                     0.3),
-                    ("failures",
-                     "FAILURES (Errors + Edge Cases): Handle everything that can go wrong. "
-                     "1) SPECIFIC ERRORS: Use proper HTTP codes (400, 404, 409) not generic 500. "
-                     "2) EDGE CASES: null/undefined, empty arrays, max limits, concurrent access. "
-                     "3) QUERY LIMITS: Add LIMIT to all SELECT queries (prevent DoS). "
-                     "4) LOGGING: Log errors with context for debugging. "
-                     "5) GRACEFUL DEGRADATION: Return meaningful error messages.",
-                     0.3),
-                ]
-                log(f"L1: Decomposing into {len(aspects)} concerns (feature/guards/failures)")
-
-            else:
-                # ========================================================
-                # L2: KISS ATOMIC IMPLEMENTATION
-                # Split each L1 concern into simple, testable pieces
-                # ========================================================
-                aspects = [
-                    ("impl", "IMPLEMENT: Write the minimal code to fulfill this specific concern. "
-                             "Keep it simple (KISS). Single responsibility. No over-engineering.", 0.4),
-                    ("test", "TEST: Write a focused unit test that verifies this implementation. "
-                             "Test the specific behavior. Include positive and negative cases.", 0.3),
-                    ("verify", "VERIFY: Run the test, ensure it passes. "
-                               "Fix any issues. Ensure no regressions.", 0.3),
-                ]
-                log(f"L2: Decomposing into {len(aspects)} KISS atomic tasks")
-
-            # Distribute files proportionally
-            file_chunks = self._distribute_files(files, [a[2] for a in aspects])
-
-            for i, (suffix, aspect_desc, _) in enumerate(aspects):
-                subtask_files = file_chunks[i] if i < len(file_chunks) else []
-                subtasks.append({
-                    **base_task,
-                    "id": f"{parent_id}_{suffix}",
-                    "description": f"{description}\n\n---\n\n{aspect_desc}",
-                    "files": subtask_files or files,  # Fallback to all files
-                    "aspect": suffix,
-                    "fractal_concern": suffix,  # For DB tracking
-                    "fractal_level": "L1" if current_depth == 0 else "L2",
-                })
-
-            log(f"Split into {len(subtasks)} parallel sub-agents (depth={current_depth})")
-            return subtasks
 
         # Strategy 1: Split by files
         if analysis.exceeds_files:
@@ -577,7 +549,6 @@ RESPOND IN JSON:
                 start += chunk_size
         
         return result
-        return [task]
 
     async def decompose_recursive(
         self,
