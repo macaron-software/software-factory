@@ -6,8 +6,8 @@ Cascaded critics with multi-vendor cognitive diversity.
 
 Architecture:
 - L0: Fast deterministic checks (test.skip, @ts-ignore, etc.)
-- L1a: Code Critic (MiniMax M2.1) - syntax, logic, API misuse
-- L1b: Security Critic (GLM-4.7-free) - OWASP, secrets, injections
+- L1a: Code Critic (NVIDIA Kimi K2) - syntax, logic, API misuse
+- L1b: Security Critic (NVIDIA Kimi K2) - OWASP, secrets, injections
 - L2: Architecture Critic (Opus) - RBAC, validation, error handling
 
 Paper: "If You Want Coherence, Orchestrate a Team of Rivals"
@@ -277,8 +277,8 @@ Si le code est correct: {{"approved": true, "score": 0, "issues": [], "reasoning
 
         Cascade:
         - L0: Fast deterministic (test.skip, @ts-ignore) - instant
-        - L1a: Code Critic (MiniMax M2.1) - ~5s
-        - L1b: Security Critic (GLM-4.7-free) - ~10s
+        - L1a: Code Critic (NVIDIA Kimi K2) - ~5s
+        - L1b: Security Critic (NVIDIA Kimi K2) - ~5s
         - L2: Architecture Critic (Opus) - ~20s
 
         Each layer has VETO AUTHORITY. Rejection at any layer = REJECT.
@@ -314,7 +314,7 @@ Si le code est correct: {{"approved": true, "score": 0, "issues": [], "reasoning
         # L1a: CODE CRITIC (MiniMax M2.1)
         # Same provider as TDD worker - catches logic/syntax errors
         # ============================================================
-        log("L1a: Code Critic (MiniMax)...")
+        log("L1a: Code Critic (NVIDIA Kimi K2)...")
         l1a_result = await self._l1_code_critic(code, file_type, filename, timeout)
         if not l1a_result.approved:
             metrics.record_l1_code(rejected=True, details={"score": l1a_result.score})
@@ -333,7 +333,7 @@ Si le code est correct: {{"approved": true, "score": 0, "issues": [], "reasoning
         # L1b: SECURITY CRITIC (GLM-4.7-free)
         # Different provider = cognitive diversity
         # ============================================================
-        log("L1b: Security Critic (MiniMax-M2)...")
+        log("L1b: Security Critic (NVIDIA Kimi K2)...")
         l1b_result = await self._l1_security_critic(code, file_type, filename, timeout)
         if not l1b_result.approved:
             metrics.record_l1_security(rejected=True, details={"score": l1b_result.score})
@@ -388,7 +388,7 @@ Si le code est correct: {{"approved": true, "score": 0, "issues": [], "reasoning
         filename: str,
         timeout: int,
     ) -> CheckResult:
-        """L1a: Code Critic (MiniMax M2.1) - syntax, logic, API misuse, SLOP"""
+        """L1a: Code Critic (NVIDIA Kimi K2) - syntax, logic, API misuse, SLOP"""
         from core.llm_client import run_opencode
 
         prompt = f"""Tu es un CODE CRITIC. Analyse ce code pour:
@@ -409,7 +409,8 @@ RÉPONDS EN JSON:
 
 Si le code est correct: {{"approved": true, "score": 0, "issues": [], "reasoning": "Code OK"}}
 """
-        return await self._run_critic(prompt, "minimax/MiniMax-M2.1", timeout)
+        # kimi-k2-instruct for reliable JSON output (thinking model breaks JSON parsing)
+        return await self._run_critic(prompt, "nvidia/moonshotai/kimi-k2-instruct", timeout)
 
     async def _l1_security_critic(
         self,
@@ -418,7 +419,7 @@ Si le code est correct: {{"approved": true, "score": 0, "issues": [], "reasoning
         filename: str,
         timeout: int,
     ) -> CheckResult:
-        """L1b: Security Critic (GLM-4.7-free) - OWASP, secrets, injections"""
+        """L1b: Security Critic (NVIDIA Kimi K2) - OWASP, secrets, injections"""
         from core.llm_client import run_opencode
 
         # Skip security check for test files
@@ -447,9 +448,9 @@ RÉPONDS EN JSON:
 
 Si pas de vulnérabilité: {{"approved": true, "score": 0, "issues": [], "reasoning": "No security issues"}}
 """
-        # Use MiniMax-M2 (different model than L1a's M2.1) for cognitive diversity
-        # Note: GLM-4.7-free has timeout issues, local/glm requires MLX server
-        return await self._run_critic(prompt, "minimax/MiniMax-M2", timeout)
+        # Use NVIDIA Kimi K2 (free tier) for security analysis
+        # kimi-k2-instruct for reliable JSON output
+        return await self._run_critic(prompt, "nvidia/moonshotai/kimi-k2-instruct", timeout)
 
     async def _l2_arch_critic(
         self,
