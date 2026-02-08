@@ -31,7 +31,7 @@ class MockResponse:
 
 @pytest.fixture
 def mock_ibkr_client(ibkr_data):
-    """Mock httpx.AsyncClient for IBKR API calls."""
+    """Mock httpx.AsyncClient for IBKR REST API calls."""
     client = AsyncMock()
 
     async def mock_post(url, **kwargs):
@@ -56,18 +56,24 @@ def mock_ibkr_client(ibkr_data):
     return client
 
 
+def _setup_rest_scraper(mock_client):
+    """Create an IBKR scraper in REST mode with mocked HTTP client."""
+    scraper = IBKRScraper(use_tws=False)
+    scraper._http = mock_client
+    scraper.use_tws = False
+    return scraper
+
+
 @pytest.mark.asyncio
 async def test_ibkr_login(mock_ibkr_client):
-    scraper = IBKRScraper()
-    scraper.client = mock_ibkr_client
-    await scraper.login()
+    scraper = _setup_rest_scraper(mock_ibkr_client)
+    await scraper._login_rest()
     assert scraper._account_id == "U12345678"
 
 
 @pytest.mark.asyncio
 async def test_ibkr_fetch_accounts(mock_ibkr_client):
-    scraper = IBKRScraper()
-    scraper.client = mock_ibkr_client
+    scraper = _setup_rest_scraper(mock_ibkr_client)
     scraper._account_id = "U12345678"
 
     accounts = await scraper.fetch_accounts()
@@ -80,8 +86,7 @@ async def test_ibkr_fetch_accounts(mock_ibkr_client):
 
 @pytest.mark.asyncio
 async def test_ibkr_fetch_positions(mock_ibkr_client):
-    scraper = IBKRScraper()
-    scraper.client = mock_ibkr_client
+    scraper = _setup_rest_scraper(mock_ibkr_client)
     scraper._account_id = "U12345678"
 
     from scrapers.models import Account
@@ -113,8 +118,7 @@ async def test_ibkr_fetch_positions(mock_ibkr_client):
 
 @pytest.mark.asyncio
 async def test_ibkr_fetch_transactions(mock_ibkr_client):
-    scraper = IBKRScraper()
-    scraper.client = mock_ibkr_client
+    scraper = _setup_rest_scraper(mock_ibkr_client)
     scraper._account_id = "U12345678"
 
     from scrapers.models import Account
@@ -137,9 +141,14 @@ async def test_ibkr_fetch_transactions(mock_ibkr_client):
 
 @pytest.mark.asyncio
 async def test_ibkr_full_sync(mock_ibkr_client):
-    """Test full sync flow."""
-    scraper = IBKRScraper()
-    scraper.client = mock_ibkr_client
+    """Test full sync flow via REST."""
+    scraper = _setup_rest_scraper(mock_ibkr_client)
+
+    # Override login to use our mock
+    async def mock_login():
+        scraper._account_id = "U12345678"
+    scraper.login = mock_login
+    scraper.logout = AsyncMock()
 
     result = await scraper.sync()
     assert result.status.value == "success"

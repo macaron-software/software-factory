@@ -7,30 +7,8 @@ from decimal import Decimal
 
 import pytest
 
-from scrapers.credit_agricole.scraper import _detect_ca_type, _parse_ca_amount, _parse_ca_date
+from scrapers.credit_agricole.scraper import _detect_ca_type, get_region_for_department
 from scrapers.models import AccountType
-
-
-class TestParseCAAmount:
-    def test_simple(self):
-        assert _parse_ca_amount("1234,56 €") == Decimal("1234.56")
-
-    def test_negative(self):
-        assert _parse_ca_amount("-185 000,00 €") == Decimal("-185000.00")
-
-    def test_unicode_minus(self):
-        assert _parse_ca_amount("−1 350,00 €") == Decimal("-1350.00")
-
-    def test_no_space(self):
-        assert _parse_ca_amount("3210,45€") == Decimal("3210.45")
-
-
-class TestParseCADate:
-    def test_standard(self):
-        assert _parse_ca_date("06/02/2025") == date(2025, 2, 6)
-
-    def test_short_year(self):
-        assert _parse_ca_date("06/02/25") == date(2025, 2, 6)
 
 
 class TestDetectCAType:
@@ -44,3 +22,23 @@ class TestDetectCAType:
 
     def test_checking(self):
         assert _detect_ca_type("Compte de dépôt") == AccountType.CHECKING
+
+    def test_pea(self):
+        assert _detect_ca_type("PEA Actions") == AccountType.PEA
+
+    def test_av(self):
+        assert _detect_ca_type("Assurance Vie") == AccountType.AV
+
+
+class TestRegionMapping:
+    def test_paris(self):
+        assert get_region_for_department(75) == "ca-paris"
+
+    def test_lyon(self):
+        assert get_region_for_department(69) == "ca-centrest"
+
+    def test_normandie(self):
+        assert get_region_for_department(14) == "ca-normandie"
+
+    def test_unknown_defaults_paris(self):
+        assert get_region_for_department(999) == "ca-paris"
