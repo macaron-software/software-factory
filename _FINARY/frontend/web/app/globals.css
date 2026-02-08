@@ -1,9 +1,151 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;400;500;600;700&display=swap');
+
+/* ── Finary Design System ── */
+/* Source: app.finary.com production CSS (._11raepy class) */
 :root {
-  --gain: #10b981;
-  --loss: #ef4444;
-  --neutral: #6b7280;
+  color-scheme: dark;
+
+  /* Background scale (darkest → lightest) */
+  --bg-0: #000000;
+  --bg-1: #0e0e0f;
+  --bg-2: #131314;
+  --bg-3: #1d1d1f;
+  --bg-hover: hsla(220, 5%, 45%, 0.1);
+  --bg-active: hsla(220, 5%, 45%, 0.2);
+
+  /* Border scale */
+  --border-1: #2e2f33;
+  --border-2: #3e4147;
+
+  /* Text scale (brightest → dimmest) */
+  --text-1: #edf0f5;
+  --text-2: #ced0d6;
+  --text-3: #adb0b8;
+  --text-4: #969ba3;
+  --text-5: #6e727a;
+  --text-6: #3e4147;
+
+  /* Brand / Accent (gold) */
+  --accent: #f1c086;
+  --accent-2: #edb068;
+  --accent-3: #f9d09f;
+  --accent-dim: #c89c69;
+  --accent-bg: hsla(33, 79%, 74%, 0.08);
+  --gradient: linear-gradient(115.79deg, #5682f2 -36.05%, #f9d09f 100.05%);
+
+  /* Semantic: gain / loss / neutral */
+  --green: #1fc090;
+  --green-light: #85e1c0;
+  --green-bg: #083226;
+  --green-mid: #10624a;
+  --red: #e54949;
+  --red-light: #ff7e7e;
+  --red-bg: #3c1313;
+  --red-mid: #752525;
+  --orange: #f49352;
+  --orange-bg: #402715;
+  --blue: #5682f2;
+  --blue-light: #8dadff;
+
+  /* Chart palette (10 colors) */
+  --chart-1: #6f50e5;
+  --chart-2: #d6475d;
+  --chart-3: #f49352;
+  --chart-4: #486df0;
+  --chart-5: #3c898e;
+  --chart-6: #f08696;
+  --chart-7: #9c86f0;
+  --chart-8: #90a5f0;
+  --chart-9: #75cbd1;
+  --chart-10: #f1c086;
+
+  /* Spacing (Finary uses 0/2/4/8/12/16/24/32/40/48/64) */
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 1000px;
 }
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { background: var(--bg-0); }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-feature-settings: normal;
+  background: var(--bg-2);
+  color: var(--text-1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+}
+
+/* Tabular numbers for financial data */
+.tnum {
+  font-feature-settings: "tnum";
+  font-variant: tabular-nums;
+}
+
+/* Card base */
+.card {
+  background: var(--bg-3);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-lg);
+}
+.card:hover {
+  border-color: var(--border-2);
+}
+
+/* Tag styles (like Finary pill badges) */
+.tag-green { background: var(--green-bg); color: var(--green); }
+.tag-red   { background: var(--red-bg);   color: var(--red); }
+.tag-orange { background: var(--orange-bg); color: var(--orange); }
+.tag-accent { background: var(--accent-bg); color: var(--accent); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-2); }
+
+/* Progress bar base */
+.bar-track {
+  height: 6px;
+  background: var(--bg-hover);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width 0.4s ease;
+}
+
+/* Loader spinner */
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-1);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Recharts overrides */
+.recharts-text { fill: var(--text-5) !important; font-size: 11px !important; }
+.recharts-cartesian-grid line { stroke: var(--border-1) !important; }
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: var(--bg-3) !important;
+  border: 1px solid var(--border-1) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 12px !important;
+  font-size: 13px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4) !important;
+}
+.recharts-tooltip-item { color: var(--text-1) !important; }
+.recharts-tooltip-label { color: var(--text-4) !important; margin-bottom: 4px !important; }

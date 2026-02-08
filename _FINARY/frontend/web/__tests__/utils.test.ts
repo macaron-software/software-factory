@@ -77,15 +77,15 @@ describe("formatNumber", () => {
 
 describe("pnlColor", () => {
   it("returns green for positive", () => {
-    expect(pnlColor(100)).toBe("text-emerald-500");
+    expect(pnlColor(100)).toBe("text-[#1fc090]");
   });
 
   it("returns red for negative", () => {
-    expect(pnlColor(-50)).toBe("text-red-500");
+    expect(pnlColor(-50)).toBe("text-[#e54949]");
   });
 
-  it("returns gray for zero", () => {
-    expect(pnlColor(0)).toBe("text-gray-500");
+  it("returns muted for zero", () => {
+    expect(pnlColor(0)).toBe("text-[#6e727a]");
   });
 });
 

@@ -1,148 +1,117 @@
 ---
 name: dashboard-ui
-description: Next.js 14 dashboard components for personal finance visualization. Use when building or modifying the web frontend. Covers net worth charts, portfolio allocation donuts, transaction lists, budget views, and responsive design with TanStack Query, Recharts, Zustand, and Tailwind CSS.
+description: "Next.js 14 dashboard components for Finary-style wealth management. Dark theme design system extracted from Finary production CSS. Covers net worth, portfolio, budget views with Recharts, TanStack Query, Zustand, Tailwind CSS."
 ---
 
-# Dashboard UI
+# Dashboard UI — Finary Design System
 
-Composants Next.js pour le dashboard patrimoine.
+## Design Tokens (from app.finary.com production CSS)
+
+### Colors
+
+```css
+/* Background scale (darkest → lightest) */
+--bg-0: #000000;    /* html */
+--bg-1: #0e0e0f;    /* sidebar */
+--bg-2: #131314;    /* main content area */
+--bg-3: #1d1d1f;    /* cards / surfaces */
+--bg-hover: hsla(220, 5%, 45%, 0.1);
+--bg-active: hsla(220, 5%, 45%, 0.2);
+
+/* Borders */
+--border-1: #2e2f33;  /* subtle */
+--border-2: #3e4147;  /* visible */
+
+/* Text scale */
+--text-1: #edf0f5;   /* primary / headings */
+--text-2: #ced0d6;   /* secondary values */
+--text-3: #adb0b8;   /* labels */
+--text-4: #969ba3;   /* section titles */
+--text-5: #6e727a;   /* captions / muted */
+--text-6: #3e4147;   /* disabled */
+
+/* Brand gold */
+--accent: #f1c086;
+--accent-2: #edb068;
+--gradient: linear-gradient(115.79deg, #5682f2 -36.05%, #f9d09f 100.05%);
+
+/* Semantic */
+--green: #1fc090;   --green-bg: #083226;
+--red: #e54949;     --red-bg: #3c1313;
+--orange: #f49352;  --orange-bg: #402715;
+--blue: #5682f2;
+
+/* Chart palette (10 colors) */
+#6f50e5 #d6475d #f49352 #486df0 #3c898e #f08696 #9c86f0 #90a5f0 #75cbd1 #f1c086
+```
+
+### Typography
+
+- **Font**: Inter (weights 200, 400, 500, 600, 700)
+- **Numbers**: `font-feature-settings: "tnum"; font-variant: tabular-nums;` — use `.tnum` class
+- **Heading**: 40px font-extralight (net worth), 32px font-extralight (page titles)
+- **Body**: 13px (default text), 14px (values)
+- **Caption**: 11px tracking-[0.04em] uppercase (column headers, labels)
+- **Letter spacing**: 0 (body), 0.02em (subtitles), 0.04em (labels)
+
+### Spacing
+
+Finary uses: 0, 2, 4, 8, 12, 16, 24, 32, 40, 48, 64px
+
+### Radius
+
+- `--radius-sm: 4px` (tags, small elements)
+- `--radius-md: 8px` (tooltips, inputs)
+- `--radius-lg: 16px` (cards)
+- `--radius-pill: 1000px` (badges, bar fills)
+
+### Components
+
+**Card**: `.card` class → `bg: var(--bg-3)`, `border: 1px solid var(--border-1)`, `border-radius: 16px`
+**Tags**: `.tag-green` (gain), `.tag-red` (loss), `.tag-accent` (badge)
+**Progress bars**: `.bar-track` + `.bar-fill`
+**Spinner**: `.spinner` (gold accent, no indigo)
 
 ## Stack
 
 - **Next.js 14** (App Router)
 - **TanStack Query** (data fetching + cache)
-- **Recharts** (graphiques)
-- **Zustand** (state management)
-- **Tailwind CSS** (styling)
-- **date-fns** (dates)
+- **Recharts** (charts)
+- **Zustand** (state)
+- **Tailwind CSS** (utility layout, never for colors — use CSS vars)
 
-## API Hooks Pattern
+## Rules
 
-```typescript
-import { useQuery } from "@tanstack/react-query";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-async function fetchApi<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
-
-// Hooks par domaine
-export function useNetWorth() {
-  return useQuery({
-    queryKey: ["networth"],
-    queryFn: () => fetchApi<NetWorth>("/api/v1/networth"),
-    staleTime: 5 * 60 * 1000, // 5min
-  });
-}
-
-export function useAccounts() {
-  return useQuery({
-    queryKey: ["accounts"],
-    queryFn: () => fetchApi<Account[]>("/api/v1/accounts"),
-  });
-}
-
-export function usePortfolio() {
-  return useQuery({
-    queryKey: ["portfolio"],
-    queryFn: () => fetchApi<Portfolio>("/api/v1/portfolio"),
-  });
-}
-
-export function useTransactions(accountId: string, cursor?: string) {
-  return useQuery({
-    queryKey: ["transactions", accountId, cursor],
-    queryFn: () => fetchApi<PaginatedResponse<Transaction>>(
-      `/api/v1/accounts/${accountId}/transactions?cursor=${cursor || ""}`
-    ),
-  });
-}
-```
-
-## Composants Clés
-
-### Net Worth Card
-
-```typescript
-// Composant principal du dashboard
-// Affiche: valeur nette, variation, graphe sparkline
-export function NetWorthCard() {
-  const { data } = useNetWorth();
-  // Variation jour/semaine/mois en € et %
-  // Graphe Area chart (évolution)
-  // Breakdown donut (classes d'actifs)
-}
-```
-
-### Allocation Donut
-
-```typescript
-// Recharts PieChart pour répartition
-// Props: data = [{name, value, pct, color}]
-// Variantes: par classe, par établissement, par secteur, par géo
-```
-
-### Transaction List
-
-```typescript
-// Liste virtualisée (react-window si >1000 items)
-// Catégorie avec icône + couleur
-// Montant coloré (vert positif, rouge négatif)
-// Infinite scroll via cursor pagination
-// Possibilité de re-catégoriser (click → dropdown)
-```
-
-### Performance Chart
-
-```typescript
-// Line chart comparatif: portfolio vs benchmark
-// Sélecteur période: 1M, 3M, 6M, YTD, 1A, MAX
-// Tooltip avec valeur + variation
-```
+1. **NEVER use Tailwind color classes** (`text-slate-*`, `bg-indigo-*`, etc.) — always use CSS variables via `style={{ color: "var(--text-X)" }}`
+2. **NEVER use emojis** — the user hates them
+3. **Always use `.tnum`** class on financial numbers
+4. **Always use `.card`** class for surface containers
+5. **Use `font-extralight` (200)** for large numbers (net worth, totals)
+6. **Use `font-medium` (500)** for values in tables and lists
+7. **PnL colors**: `var(--green)` for gain, `var(--red)` for loss, `var(--text-5)` for zero
+8. **PnL badges**: colored background (`var(--green-bg)`) + text (`var(--green)`)
 
 ## Layout
 
 ```
 app/
-├── layout.tsx              # Sidebar navigation
-├── page.tsx                # Dashboard (net worth + résumé)
-├── accounts/
-│   ├── page.tsx            # Liste comptes
-│   └── [id]/page.tsx       # Détail + transactions
-├── portfolio/
-│   ├── page.tsx            # Positions consolidées
-│   ├── allocation/page.tsx # Répartitions
-│   └── dividends/page.tsx  # Calendrier dividendes
-├── budget/
-│   └── page.tsx            # Revenus/dépenses
-├── real-estate/
-│   └── page.tsx            # Biens immobiliers
-└── settings/
-    └── page.tsx            # Sync, institutions, OTP
+├── layout.tsx              # Sidebar (220px, bg-1) + main content (bg-2, max-w-960)
+├── page.tsx                # Dashboard: net worth (40px extralight) + KPI grid + charts
+├── portfolio/page.tsx      # Positions table with hover rows
+├── accounts/page.tsx       # Grouped by institution
+└── budget/page.tsx         # Bar chart + category breakdown
 ```
 
-## Design Tokens
+## API Hooks Pattern
 
-```css
-/* Couleurs finance */
---color-positive: #10B981;   /* vert gains */
---color-negative: #EF4444;   /* rouge pertes */
---color-neutral: #6B7280;    /* gris neutre */
+```typescript
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-/* Classes d'actifs */
---color-cash: #60A5FA;
---color-stocks: #34D399;
---color-bonds: #A78BFA;
---color-real-estate: #F59E0B;
---color-crypto: #F97316;
-
-/* Formatage montants */
-const formatAmount = (n: number, currency = "EUR") =>
-  new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(n);
-
-const formatPct = (n: number) =>
-  new Intl.NumberFormat("fr-FR", { style: "percent", minimumFractionDigits: 2 }).format(n / 100);
+export function useNetWorth() {
+  return useQuery({
+    queryKey: ["networth"],
+    queryFn: () => fetchApi<NetWorth>("/api/v1/networth"),
+    staleTime: 5 * 60 * 1000,
+  });
+}
 ```

@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { Providers } from "./providers";
+import { Sidebar } from "@/components/Sidebar";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Finary — Patrimoine",
-  description: "Gestion de patrimoine personnel",
+  title: "Finary",
+  description: "Gestion de patrimoine",
 };
 
 export default function RootLayout({
@@ -16,36 +17,13 @@ export default function RootLayout({
     <html lang="fr">
       <body>
         <Providers>
-          <div className="min-h-screen bg-gray-50">
-            <nav className="bg-white border-b border-gray-200 px-6 py-3">
-              <div className="flex items-center justify-between max-w-7xl mx-auto">
-                <h1 className="text-xl font-bold text-gray-900">💰 Finary</h1>
-                <div className="flex gap-6 text-sm font-medium">
-                  <a href="/" className="text-gray-700 hover:text-emerald-600">
-                    Patrimoine
-                  </a>
-                  <a
-                    href="/portfolio"
-                    className="text-gray-700 hover:text-emerald-600"
-                  >
-                    Portfolio
-                  </a>
-                  <a
-                    href="/accounts"
-                    className="text-gray-700 hover:text-emerald-600"
-                  >
-                    Comptes
-                  </a>
-                  <a
-                    href="/budget"
-                    className="text-gray-700 hover:text-emerald-600"
-                  >
-                    Budget
-                  </a>
-                </div>
+          <div className="flex min-h-screen" style={{ background: "var(--bg-2)" }}>
+            <Sidebar />
+            <main className="flex-1 overflow-auto">
+              <div className="max-w-[960px] mx-auto px-8 py-8">
+                {children}
               </div>
-            </nav>
-            <main className="max-w-7xl mx-auto px-6 py-6">{children}</main>
+            </main>
           </div>
         </Providers>
       </body>

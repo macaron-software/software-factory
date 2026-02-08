@@ -32,11 +32,11 @@ export function formatNumber(value: number, decimals = 2): string {
   }).format(value);
 }
 
-/** Color for positive/negative values. */
+/** Color for positive/negative values — Finary exact. */
 export function pnlColor(value: number): string {
-  if (value > 0) return "text-emerald-500";
-  if (value < 0) return "text-red-500";
-  return "text-gray-500";
+  if (value > 0) return "text-[#1fc090]";
+  if (value < 0) return "text-[#e54949]";
+  return "text-[#6e727a]";
 }
 
 /** Category labels in French. */
@@ -61,16 +61,16 @@ export const CATEGORY_LABELS: Record<string, string> = {
   non_categorise: "Non catégorisé",
 };
 
-/** Chart color palette for finance dashboards. */
+/** Chart color palette — Finary exact. */
 export const CHART_COLORS = [
-  "#10b981", // emerald-500
-  "#3b82f6", // blue-500
-  "#f59e0b", // amber-500
-  "#ef4444", // red-500
-  "#8b5cf6", // violet-500
-  "#06b6d4", // cyan-500
-  "#f97316", // orange-500
-  "#ec4899", // pink-500
-  "#14b8a6", // teal-500
-  "#6366f1", // indigo-500
+  "#6f50e5",
+  "#d6475d",
+  "#f49352",
+  "#486df0",
+  "#3c898e",
+  "#f08696",
+  "#9c86f0",
+  "#90a5f0",
+  "#75cbd1",
+  "#f1c086",
 ];

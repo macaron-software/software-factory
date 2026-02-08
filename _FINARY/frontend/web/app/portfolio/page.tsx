@@ -6,59 +6,95 @@ import { formatEUR, formatCurrency, formatPct, pnlColor } from "@/lib/utils";
 export default function PortfolioPage() {
   const { data: positions, isLoading, error } = usePortfolio();
 
-  if (isLoading) return <div className="text-gray-500">Chargement...</div>;
-  if (error) return <div className="text-red-500">Erreur: {error.message}</div>;
+  if (isLoading)
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="spinner" />
+      </div>
+    );
+  if (error)
+    return (
+      <div className="text-[13px]" style={{ color: "var(--red)" }}>
+        Erreur de connexion API
+      </div>
+    );
 
   const totalValue = positions?.reduce((s, p) => s + p.value_eur, 0) ?? 0;
   const totalPnl = positions?.reduce((s, p) => s + p.pnl_eur, 0) ?? 0;
+  const totalPnlPct = totalValue - totalPnl > 0 ? (totalPnl / (totalValue - totalPnl)) * 100 : 0;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Portfolio</h2>
-        <div className="text-right">
-          <p className="text-xl font-bold">{formatEUR(totalValue)}</p>
-          <p className={`text-sm ${pnlColor(totalPnl)}`}>
-            {formatEUR(totalPnl)} ({formatPct(totalValue > 0 ? (totalPnl / (totalValue - totalPnl)) * 100 : 0)})
+      {/* Header */}
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="text-[13px] font-medium mb-1" style={{ color: "var(--text-5)" }}>
+            Investissements
           </p>
+          <p className="tnum text-[32px] font-extralight tracking-tight leading-tight" style={{ color: "var(--text-1)" }}>
+            {formatEUR(totalValue)}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`tnum text-[14px] font-medium ${pnlColor(totalPnl)}`}>
+            {formatEUR(totalPnl)}
+          </span>
+          <span
+            className="tnum text-[11px] font-medium px-2 py-0.5 rounded"
+            style={{
+              background: totalPnl >= 0 ? "var(--green-bg)" : "var(--red-bg)",
+              color: totalPnl >= 0 ? "var(--green)" : "var(--red)",
+            }}
+          >
+            {formatPct(totalPnlPct)}
+          </span>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">Position</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-500">Qté</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-500">PRU</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-500">Cours</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-500">Valeur EUR</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-500">P&amp;L</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-500">Poids</th>
+      {/* Table */}
+      <div className="card overflow-hidden">
+        <table className="w-full text-[13px]">
+          <thead>
+            <tr style={{ borderBottom: "1px solid var(--border-1)" }}>
+              {["Position", "Qte", "PRU", "Cours", "Valeur", "+/- value", "Poids"].map((h, i) => (
+                <th
+                  key={h}
+                  className={`${i === 0 ? "text-left pl-5" : "text-right"} px-4 py-3 text-[11px] font-medium tracking-[0.04em] uppercase`}
+                  style={{ color: "var(--text-5)" }}
+                >
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody>
             {positions?.map((p) => (
-              <tr key={p.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">
-                  <div className="font-medium text-gray-900">{p.ticker}</div>
-                  <div className="text-xs text-gray-500">{p.name}</div>
+              <tr
+                key={p.id}
+                className="transition-colors cursor-default"
+                style={{ borderBottom: "1px solid var(--border-1)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                <td className="pl-5 px-4 py-3">
+                  <div className="font-medium" style={{ color: "var(--text-1)" }}>{p.ticker}</div>
+                  <div className="text-[11px] mt-0.5" style={{ color: "var(--text-5)" }}>{p.name}</div>
                 </td>
-                <td className="text-right px-4 py-3">{p.quantity}</td>
-                <td className="text-right px-4 py-3">
+                <td className="tnum text-right px-4 py-3" style={{ color: "var(--text-3)" }}>{p.quantity}</td>
+                <td className="tnum text-right px-4 py-3" style={{ color: "var(--text-4)" }}>
                   {p.avg_cost ? formatCurrency(p.avg_cost, p.currency) : "—"}
                 </td>
-                <td className="text-right px-4 py-3">
+                <td className="tnum text-right px-4 py-3" style={{ color: "var(--text-2)" }}>
                   {p.current_price ? formatCurrency(p.current_price, p.currency) : "—"}
                 </td>
-                <td className="text-right px-4 py-3 font-medium">
+                <td className="tnum text-right px-4 py-3 font-medium" style={{ color: "var(--text-1)" }}>
                   {formatEUR(p.value_eur)}
                 </td>
-                <td className={`text-right px-4 py-3 ${pnlColor(p.pnl_eur)}`}>
-                  {formatEUR(p.pnl_eur)}
-                  <div className="text-xs">{formatPct(p.pnl_pct)}</div>
+                <td className={`tnum text-right px-4 py-3 ${pnlColor(p.pnl_eur)}`}>
+                  <div className="font-medium">{formatPct(p.pnl_pct)}</div>
+                  <div className="text-[11px] opacity-60">{formatEUR(p.pnl_eur)}</div>
                 </td>
-                <td className="text-right px-4 py-3 text-gray-500">
+                <td className="tnum text-right px-4 pr-5 py-3" style={{ color: "var(--text-5)" }}>
                   {p.weight_pct.toFixed(1)}%
                 </td>
               </tr>

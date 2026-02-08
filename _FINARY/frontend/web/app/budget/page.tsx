@@ -9,10 +9,6 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  Legend,
-  PieChart,
-  Pie,
-  Cell,
 } from "recharts";
 
 export default function BudgetPage() {
@@ -21,55 +17,91 @@ export default function BudgetPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Budget</h2>
+      <p className="text-[13px] font-medium" style={{ color: "var(--text-5)" }}>Budget</p>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
-        <h3 className="text-sm font-medium text-gray-500 mb-4">
-          Revenus vs Dépenses
+      {/* Revenue vs Expenses chart */}
+      <div className="card p-6">
+        <h3 className="text-[13px] font-medium mb-5" style={{ color: "var(--text-4)" }}>
+          Revenus vs Depenses
         </h3>
-        {monthly && (
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={[...monthly].reverse()}>
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <Tooltip formatter={(v: number) => formatEUR(v)} />
-              <Legend />
-              <Bar
-                dataKey="income"
-                name="Revenus"
-                fill={CHART_COLORS[0]}
-                radius={[4, 4, 0, 0]}
+        {monthly && monthly.length > 0 ? (
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={[...monthly].reverse()} barGap={2}>
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 11, fill: "var(--text-5)" }}
+                axisLine={false}
+                tickLine={false}
               />
-              <Bar
-                dataKey="expenses"
-                name="Dépenses"
-                fill={CHART_COLORS[3]}
-                radius={[4, 4, 0, 0]}
+              <YAxis
+                tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                tick={{ fontSize: 11, fill: "var(--text-5)" }}
+                axisLine={false}
+                tickLine={false}
+                width={40}
               />
+              <Tooltip
+                contentStyle={{
+                  background: "var(--bg-3)",
+                  border: "1px solid var(--border-1)",
+                  borderRadius: 8,
+                  color: "var(--text-1)",
+                  fontSize: 13,
+                }}
+                formatter={(v: number) => formatEUR(v)}
+                cursor={{ fill: "var(--bg-hover)" }}
+              />
+              <Bar dataKey="income" name="Revenus" fill="var(--green)" opacity={0.8} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="expenses" name="Depenses" fill="var(--red)" opacity={0.5} radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+        ) : (
+          <p className="text-[13px]" style={{ color: "var(--text-5)" }}>Aucune donnee</p>
         )}
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
-        <h3 className="text-sm font-medium text-gray-500 mb-4">
-          Top catégories (3 mois)
+      {/* Top categories */}
+      <div className="card p-6">
+        <h3 className="text-[13px] font-medium mb-5" style={{ color: "var(--text-4)" }}>
+          Top categories (3 mois)
         </h3>
-        {categories && (
-          <div className="space-y-2">
-            {categories.map((c, i) => (
-              <div key={c.category} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
-                  />
-                  <span>{CATEGORY_LABELS[c.category] || c.category}</span>
+        {categories && categories.length > 0 ? (
+          <div className="space-y-4">
+            {categories.map((c, i) => {
+              const maxTotal = categories[0]?.total ?? 1;
+              const pct = (c.total / maxTotal) * 100;
+              return (
+                <div key={c.category}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
+                      />
+                      <span className="text-[13px]" style={{ color: "var(--text-3)" }}>
+                        {CATEGORY_LABELS[c.category] || c.category}
+                      </span>
+                    </div>
+                    <span className="tnum text-[13px] font-medium" style={{ color: "var(--text-1)" }}>
+                      {formatEUR(c.total)}
+                    </span>
+                  </div>
+                  <div className="bar-track">
+                    <div
+                      className="bar-fill"
+                      style={{
+                        width: `${pct}%`,
+                        backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+                        opacity: 0.6,
+                      }}
+                    />
+                  </div>
                 </div>
-                <span className="font-medium">{formatEUR(c.total)}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
+        ) : (
+          <p className="text-[13px]" style={{ color: "var(--text-5)" }}>Aucune donnee</p>
         )}
       </div>
     </div>
