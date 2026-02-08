@@ -1,0 +1,1 @@
+# Boursobank scraper package

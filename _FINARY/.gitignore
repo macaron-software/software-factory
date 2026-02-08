@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Rust
+backend/target/
+
+# Node
+frontend/web/node_modules/
+frontend/web/.next/
+
+# IDE
+.idea/
+.vscode/
+
+# Env
+.env
+!.env.example
+
+# OS
+.DS_Store

@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --gain: #10b981;
+  --loss: #ef4444;
+  --neutral: #6b7280;
+}

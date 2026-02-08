@@ -1,0 +1,1 @@
+# Crédit Agricole scraper package

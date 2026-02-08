@@ -1,0 +1,382 @@
+{
+  "institutions": [
+    {
+      "name": "ibkr",
+      "display_name": "Interactive Brokers",
+      "scraper_type": "api"
+    },
+    {
+      "name": "trade_republic",
+      "display_name": "Trade Republic",
+      "scraper_type": "playwright"
+    },
+    {
+      "name": "boursobank",
+      "display_name": "Boursobank",
+      "scraper_type": "playwright"
+    },
+    {
+      "name": "credit_agricole",
+      "display_name": "Crédit Agricole",
+      "scraper_type": "playwright"
+    }
+  ],
+  "accounts": [
+    {
+      "institution": "ibkr",
+      "name": "IBKR Brokerage USD",
+      "account_type": "cto",
+      "currency": "USD",
+      "balance": 87543.21,
+      "is_pro": false
+    },
+    {
+      "institution": "trade_republic",
+      "name": "Trade Republic CTO",
+      "account_type": "cto",
+      "currency": "EUR",
+      "balance": 23456.78,
+      "is_pro": false
+    },
+    {
+      "institution": "trade_republic",
+      "name": "Trade Republic Cash",
+      "account_type": "checking",
+      "currency": "EUR",
+      "balance": 1250.00,
+      "is_pro": false
+    },
+    {
+      "institution": "boursobank",
+      "name": "Bourso Compte Courant",
+      "account_type": "checking",
+      "currency": "EUR",
+      "balance": 4532.15,
+      "is_pro": false
+    },
+    {
+      "institution": "boursobank",
+      "name": "Bourso Livret A",
+      "account_type": "savings",
+      "currency": "EUR",
+      "balance": 22950.00,
+      "is_pro": false
+    },
+    {
+      "institution": "boursobank",
+      "name": "Bourso PEA",
+      "account_type": "pea",
+      "currency": "EUR",
+      "balance": 45230.50,
+      "is_pro": false
+    },
+    {
+      "institution": "boursobank",
+      "name": "Bourso Assurance Vie",
+      "account_type": "av",
+      "currency": "EUR",
+      "balance": 15000.00,
+      "is_pro": false
+    },
+    {
+      "institution": "credit_agricole",
+      "name": "CA Compte Courant Perso",
+      "account_type": "checking",
+      "currency": "EUR",
+      "balance": 3210.45,
+      "is_pro": false
+    },
+    {
+      "institution": "credit_agricole",
+      "name": "CA Livret Développement Durable",
+      "account_type": "savings",
+      "currency": "EUR",
+      "balance": 12000.00,
+      "is_pro": false
+    },
+    {
+      "institution": "credit_agricole",
+      "name": "CA Compte Pro",
+      "account_type": "checking",
+      "currency": "EUR",
+      "balance": 18750.30,
+      "is_pro": true
+    },
+    {
+      "institution": "credit_agricole",
+      "name": "CA Prêt Immobilier",
+      "account_type": "loan",
+      "currency": "EUR",
+      "balance": -185000.00,
+      "is_pro": false
+    }
+  ],
+  "positions": [
+    {
+      "account": "IBKR Brokerage USD",
+      "ticker": "AAPL",
+      "isin": "US0378331005",
+      "name": "Apple Inc.",
+      "quantity": 150,
+      "avg_cost": 178.50,
+      "current_price": 230.50,
+      "currency": "USD",
+      "asset_type": "stock",
+      "sector": "Technology",
+      "country": "US"
+    },
+    {
+      "account": "IBKR Brokerage USD",
+      "ticker": "MSFT",
+      "isin": "US5949181045",
+      "name": "Microsoft Corporation",
+      "quantity": 50,
+      "avg_cost": 380.00,
+      "current_price": 420.00,
+      "currency": "USD",
+      "asset_type": "stock",
+      "sector": "Technology",
+      "country": "US"
+    },
+    {
+      "account": "IBKR Brokerage USD",
+      "ticker": "VWCE.DE",
+      "isin": "IE00BK5BQT80",
+      "name": "Vanguard FTSE All-World UCITS ETF",
+      "quantity": 100,
+      "avg_cost": 95.20,
+      "current_price": 112.30,
+      "currency": "EUR",
+      "asset_type": "etf",
+      "sector": null,
+      "country": null
+    },
+    {
+      "account": "Trade Republic CTO",
+      "ticker": "IWDA.AS",
+      "isin": "IE00B4L5Y983",
+      "name": "iShares Core MSCI World UCITS ETF",
+      "quantity": 80,
+      "avg_cost": 72.50,
+      "current_price": 89.40,
+      "currency": "EUR",
+      "asset_type": "etf",
+      "sector": null,
+      "country": null
+    },
+    {
+      "account": "Trade Republic CTO",
+      "ticker": "SAP.DE",
+      "isin": "DE0007164600",
+      "name": "SAP SE",
+      "quantity": 30,
+      "avg_cost": 145.00,
+      "current_price": 198.50,
+      "currency": "EUR",
+      "asset_type": "stock",
+      "sector": "Technology",
+      "country": "DE"
+    },
+    {
+      "account": "Bourso PEA",
+      "ticker": "BNP.PA",
+      "isin": "FR0000131104",
+      "name": "BNP Paribas SA",
+      "quantity": 200,
+      "avg_cost": 52.30,
+      "current_price": 62.50,
+      "currency": "EUR",
+      "asset_type": "stock",
+      "sector": "Financials",
+      "country": "FR"
+    },
+    {
+      "account": "Bourso PEA",
+      "ticker": "CW8.PA",
+      "isin": "LU1681043599",
+      "name": "Amundi MSCI World UCITS ETF",
+      "quantity": 15,
+      "avg_cost": 380.00,
+      "current_price": 445.80,
+      "currency": "EUR",
+      "asset_type": "etf",
+      "sector": null,
+      "country": null
+    },
+    {
+      "account": "Bourso PEA",
+      "ticker": "AI.PA",
+      "isin": "FR0000120073",
+      "name": "Air Liquide SA",
+      "quantity": 50,
+      "avg_cost": 155.00,
+      "current_price": 178.40,
+      "currency": "EUR",
+      "asset_type": "stock",
+      "sector": "Materials",
+      "country": "FR"
+    }
+  ],
+  "transactions": [
+    {
+      "account": "Bourso Compte Courant",
+      "date": "2025-02-07",
+      "description": "CARTE CARREFOUR CITY PARIS",
+      "amount": -45.32
+    },
+    {
+      "account": "Bourso Compte Courant",
+      "date": "2025-02-06",
+      "description": "CARTE UBER EATS",
+      "amount": -28.50
+    },
+    {
+      "account": "Bourso Compte Courant",
+      "date": "2025-02-05",
+      "description": "VIR SALAIRE MACARON SOFTWARE SAS",
+      "amount": 4500.00
+    },
+    {
+      "account": "Bourso Compte Courant",
+      "date": "2025-02-05",
+      "description": "PRLV NETFLIX",
+      "amount": -13.49
+    },
+    {
+      "account": "Bourso Compte Courant",
+      "date": "2025-02-04",
+      "description": "PRLV SPOTIFY PREMIUM",
+      "amount": -10.99
+    },
+    {
+      "account": "Bourso Compte Courant",
+      "date": "2025-02-03",
+      "description": "CARTE FNAC.COM",
+      "amount": -89.99
+    },
+    {
+      "account": "Bourso Compte Courant",
+      "date": "2025-02-03",
+      "description": "PRLV FREE MOBILE",
+      "amount": -19.99
+    },
+    {
+      "account": "Bourso Compte Courant",
+      "date": "2025-02-01",
+      "description": "PRLV LOYER FONCIA",
+      "amount": -1250.00
+    },
+    {
+      "account": "Bourso Compte Courant",
+      "date": "2025-02-01",
+      "description": "PRLV EDF",
+      "amount": -75.00
+    },
+    {
+      "account": "Bourso Compte Courant",
+      "date": "2025-01-31",
+      "description": "VIR EPARGNE VERS LIVRET A",
+      "amount": -500.00
+    },
+    {
+      "account": "CA Compte Courant Perso",
+      "date": "2025-02-06",
+      "description": "CARTE LECLERC DRIVE",
+      "amount": -78.54
+    },
+    {
+      "account": "CA Compte Courant Perso",
+      "date": "2025-02-04",
+      "description": "CARTE PHARMACIE DU CENTRE",
+      "amount": -23.80
+    },
+    {
+      "account": "CA Compte Courant Perso",
+      "date": "2025-02-01",
+      "description": "PRLV MACIF ASSURANCE AUTO",
+      "amount": -65.00
+    },
+    {
+      "account": "CA Compte Courant Perso",
+      "date": "2025-02-01",
+      "description": "ECHEANCE PRET IMMOBILIER",
+      "amount": -1350.00
+    },
+    {
+      "account": "CA Compte Pro",
+      "date": "2025-02-05",
+      "description": "VIR CLIENT PROJET WEB",
+      "amount": 8500.00
+    },
+    {
+      "account": "CA Compte Pro",
+      "date": "2025-02-03",
+      "description": "PRLV URSSAF COTISATIONS",
+      "amount": -2100.00
+    },
+    {
+      "account": "CA Compte Pro",
+      "date": "2025-02-01",
+      "description": "CARTE OVH CLOUD",
+      "amount": -45.60
+    },
+    {
+      "account": "CA Compte Pro",
+      "date": "2025-01-15",
+      "description": "VIR CLIENT MISSION CONSEIL",
+      "amount": 12000.00
+    }
+  ],
+  "dividends": [
+    {
+      "ticker": "AAPL",
+      "ex_date": "2025-02-07",
+      "pay_date": "2025-02-15",
+      "amount_per_share": 0.25,
+      "currency": "USD"
+    },
+    {
+      "ticker": "MSFT",
+      "ex_date": "2025-02-20",
+      "pay_date": "2025-03-13",
+      "amount_per_share": 0.83,
+      "currency": "USD"
+    },
+    {
+      "ticker": "BNP.PA",
+      "ex_date": "2025-05-22",
+      "pay_date": "2025-05-27",
+      "amount_per_share": 4.60,
+      "currency": "EUR"
+    }
+  ],
+  "exchange_rates": {
+    "2025-02-07": {
+      "USD": 1.0380,
+      "GBP": 0.8340,
+      "CHF": 0.9420,
+      "JPY": 157.80
+    },
+    "2025-02-06": {
+      "USD": 1.0395,
+      "GBP": 0.8350,
+      "CHF": 0.9415,
+      "JPY": 158.10
+    }
+  },
+  "real_estate": [
+    {
+      "address": "15 rue de la Paix",
+      "city": "Paris",
+      "postal_code": "75002",
+      "property_type": "primary",
+      "surface_m2": 65.0,
+      "purchase_price": 450000.00,
+      "purchase_date": "2022-06-15",
+      "estimated_value": 480000.00,
+      "loan_remaining": 185000.00,
+      "monthly_payment": 1350.00,
+      "loan_rate": 1.850
+    }
+  ]
+}

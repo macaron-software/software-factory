@@ -1,0 +1,73 @@
+{
+  "auth_status": { "authenticated": true, "competing": false, "connected": true },
+  "accounts": { "accounts": ["U12345678"], "selectedAccount": "U12345678" },
+  "summary": {
+    "totalcashvalue": { "amount": 12543.21, "currency": "USD" },
+    "netliquidation": { "amount": 87543.21, "currency": "USD" },
+    "unrealizedpnl": { "amount": 15234.56, "currency": "USD" },
+    "realizedpnl": { "amount": 3420.10, "currency": "USD" }
+  },
+  "positions": [
+    {
+      "acctId": "U12345678",
+      "conid": 265598,
+      "contractDesc": "AAPL",
+      "ticker": "AAPL",
+      "isin": "US0378331005",
+      "position": 150,
+      "mktPrice": 230.50,
+      "avgCost": 178.50,
+      "currency": "USD",
+      "assetClass": "STK",
+      "unrealizedPnl": 7800.00
+    },
+    {
+      "acctId": "U12345678",
+      "conid": 272093,
+      "contractDesc": "MSFT",
+      "ticker": "MSFT",
+      "isin": "US5949181045",
+      "position": 50,
+      "mktPrice": 420.00,
+      "avgCost": 380.00,
+      "currency": "USD",
+      "assetClass": "STK",
+      "unrealizedPnl": 2000.00
+    },
+    {
+      "acctId": "U12345678",
+      "conid": 999001,
+      "contractDesc": "VWCE",
+      "ticker": "VWCE.DE",
+      "isin": "IE00BK5BQT80",
+      "position": 100,
+      "mktPrice": 112.30,
+      "avgCost": 95.20,
+      "currency": "EUR",
+      "assetClass": "STK",
+      "unrealizedPnl": 1710.00
+    }
+  ],
+  "trades": [
+    {
+      "execution_id": "0001",
+      "symbol": "AAPL",
+      "side": "BUY",
+      "size": 10,
+      "price": 225.00,
+      "net_amount": -2250.00,
+      "trade_time_r": 1707300000000,
+      "currency": "USD"
+    },
+    {
+      "execution_id": "0002",
+      "symbol": "MSFT",
+      "side": "BUY",
+      "size": 5,
+      "price": 415.00,
+      "net_amount": -2075.00,
+      "trade_time_r": 1707200000000,
+      "currency": "USD"
+    }
+  ]
+}

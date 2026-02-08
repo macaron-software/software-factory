@@ -1,0 +1,1 @@
+# Trade Republic scraper package
