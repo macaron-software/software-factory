@@ -11,13 +11,19 @@ import {
 } from "recharts";
 import { PeriodSelector, periodToDays, type Period } from "./PeriodSelector";
 import { formatEUR, formatPct } from "@/lib/utils";
-import { useNetWorthHistory } from "@/lib/hooks/useApi";
-import { generateNetWorthHistory } from "@/lib/fixtures";
 
 interface ChartPoint {
   date: string;
   label: string;
   value: number;
+}
+
+interface Props {
+  title: string;
+  data: { date: string; value: number }[];
+  height?: number;
+  color?: string;
+  defaultPeriod?: Period;
 }
 
 function formatDateLabel(dateStr: string): string {
@@ -28,42 +34,35 @@ function formatDateLabel(dateStr: string): string {
 
 function formatMonthLabel(dateStr: string): string {
   const d = new Date(dateStr);
-  const months = ["Jan", "Fev", "Mar", "Avr", "Mai", "Jun", "Jul", "Aou", "Sep", "Oct", "Nov", "Dec"];
-  return `${months[d.getMonth()]} ${d.getFullYear().toString().slice(2)}`;
+  const months = ["Jan.", "Mar.", "Mai.", "Jul.", "Sep.", "Nov."];
+  const idx = Math.floor(d.getMonth() / 2);
+  return months[idx] || "";
 }
 
-export function NetWorthChart() {
-  const [period, setPeriod] = useState<Period>("1Y");
+/** Reusable Finary-style line chart. Used for portfolio, stocks, positions. */
+export function PriceChart({ title, data, height = 280, color = "#5682f2", defaultPeriod = "1Y" }: Props) {
+  const [period, setPeriod] = useState<Period>(defaultPeriod);
   const [hoverValue, setHoverValue] = useState<number | null>(null);
-  const { data: apiHistory } = useNetWorthHistory(365);
-
-  // Use API data or generate fixtures
-  const rawHistory = useMemo(() => {
-    if (apiHistory && apiHistory.length > 0) return apiHistory;
-    return generateNetWorthHistory(365);
-  }, [apiHistory]);
 
   const chartData = useMemo<ChartPoint[]>(() => {
     const days = periodToDays(period);
-    const sliced = rawHistory.slice(-days);
+    const sliced = data.slice(-days);
     return sliced.map((d) => ({
       date: d.date,
       label: formatDateLabel(d.date),
-      value: d.net_worth,
+      value: d.value,
     }));
-  }, [rawHistory, period]);
+  }, [data, period]);
 
-  // Compute variation
   const currentValue = chartData[chartData.length - 1]?.value ?? 0;
   const startValue = chartData[0]?.value ?? 0;
   const variation = startValue > 0 ? ((currentValue - startValue) / startValue) * 100 : 0;
   const variationAbs = currentValue - startValue;
   const isPositive = variation >= 0;
-
   const displayValue = hoverValue ?? currentValue;
 
-  // X-axis ticks
   const tickInterval = useMemo(() => {
+    if (chartData.length <= 7) return 1;
     if (chartData.length <= 30) return Math.ceil(chartData.length / 6);
     if (chartData.length <= 90) return Math.ceil(chartData.length / 8);
     return Math.ceil(chartData.length / 10);
@@ -77,30 +76,26 @@ export function NetWorthChart() {
     [chartData.length]
   );
 
-  // Y domain with padding
   const [yMin, yMax] = useMemo(() => {
     const values = chartData.map((d) => d.value);
     const min = Math.min(...values);
     const max = Math.max(...values);
-    const padding = (max - min) * 0.1 || 1000;
-    return [Math.floor((min - padding) / 1000) * 1000, Math.ceil((max + padding) / 1000) * 1000];
+    const padding = (max - min) * 0.15 || 1;
+    return [min - padding, max + padding];
   }, [chartData]);
 
   return (
-    <div className="card p-6">
-      <div className="flex items-start justify-between mb-6">
+    <div>
+      <div className="flex items-start justify-between mb-4">
         <div>
-          <p className="text-[11px] font-medium tracking-[0.04em] uppercase mb-2" style={{ color: "var(--text-5)" }}>
-            Patrimoine net
+          <p className="text-[11px] font-medium tracking-[0.04em] uppercase mb-1" style={{ color: "var(--text-5)" }}>
+            {title}
           </p>
-          <p className="tnum text-[32px] font-extralight tracking-tight leading-none" style={{ color: "var(--text-1)" }}>
+          <p className="tnum text-[28px] font-extralight tracking-tight leading-none" style={{ color: "var(--text-1)" }}>
             {formatEUR(displayValue)}
           </p>
-          <div className="flex items-center gap-2 mt-2">
-            <span
-              className="tnum text-[13px] font-medium"
-              style={{ color: isPositive ? "var(--green)" : "var(--red)" }}
-            >
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="tnum text-[13px] font-medium" style={{ color: isPositive ? "var(--green)" : "var(--red)" }}>
               {isPositive ? "+" : ""}{formatEUR(variationAbs)}
             </span>
             <span
@@ -117,16 +112,14 @@ export function NetWorthChart() {
         <PeriodSelector selected={period} onChange={setPeriod} />
       </div>
 
-      <ResponsiveContainer width="100%" height={280}>
+      <ResponsiveContainer width="100%" height={height}>
         <LineChart
           data={chartData}
           margin={{ top: 4, right: 0, left: 0, bottom: 0 }}
           onMouseMove={(e) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const payload = (e as any)?.activePayload;
-            if (payload?.[0]) {
-              setHoverValue(payload[0].payload.value);
-            }
+            if (payload?.[0]) setHoverValue(payload[0].payload.value);
           }}
           onMouseLeave={() => setHoverValue(null)}
         >
@@ -141,7 +134,7 @@ export function NetWorthChart() {
           />
           <YAxis
             domain={[yMin, yMax]}
-            tickFormatter={(v: number) => `€${v.toLocaleString("fr-FR")}`}
+            tickFormatter={(v: number) => `€${Math.round(v).toLocaleString("fr-FR")}`}
             axisLine={false}
             tickLine={false}
             tick={{ fontSize: 10, fill: "var(--text-6)" }}
@@ -149,27 +142,17 @@ export function NetWorthChart() {
           />
           <Tooltip
             content={() => null}
-            cursor={{
-              stroke: "var(--text-5)",
-              strokeWidth: 1,
-              strokeDasharray: "4 4",
-            }}
+            cursor={{ stroke: "var(--text-5)", strokeWidth: 1, strokeDasharray: "4 4" }}
           />
           <Line
             type="monotone"
             dataKey="value"
-            stroke="#5682f2"
+            stroke={color}
             strokeWidth={1.5}
             fill="none"
             dot={false}
-            activeDot={{
-              r: 4,
-              fill: "#5682f2",
-              stroke: "var(--bg-3)",
-              strokeWidth: 2,
-            }}
-            animationDuration={800}
-            animationEasing="ease-out"
+            activeDot={{ r: 4, fill: color, stroke: "var(--bg-3)", strokeWidth: 2 }}
+            animationDuration={600}
           />
         </LineChart>
       </ResponsiveContainer>

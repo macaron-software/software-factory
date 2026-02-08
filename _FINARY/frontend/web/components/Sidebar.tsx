@@ -3,11 +3,38 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const NAV_ITEMS = [
-  { href: "/", label: "Patrimoine" },
-  { href: "/portfolio", label: "Portfolio" },
-  { href: "/accounts", label: "Comptes" },
-  { href: "/budget", label: "Budget" },
+interface NavItem {
+  href: string;
+  label: string;
+}
+
+interface NavSection {
+  title?: string;
+  items: NavItem[];
+}
+
+const SECTIONS: NavSection[] = [
+  {
+    items: [
+      { href: "/", label: "Patrimoine" },
+      { href: "/portfolio", label: "Portfolio" },
+      { href: "/insights", label: "Insights" },
+      { href: "/budget", label: "Budget" },
+    ],
+  },
+  {
+    title: "Investing",
+    items: [
+      { href: "/portfolio/stocks", label: "Actions & Fonds" },
+    ],
+  },
+  {
+    title: "Tools",
+    items: [
+      { href: "/tools/wealth-statement", label: "Declaration patrimoine" },
+      { href: "/accounts", label: "Comptes" },
+    ],
+  },
 ];
 
 function FinaryLogo() {
@@ -42,24 +69,38 @@ export function Sidebar() {
         </span>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 mt-1 space-y-0.5">
-        {NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center h-9 px-3 rounded-lg text-[13px] font-medium transition-colors"
-              style={{
-                color: isActive ? "var(--text-1)" : "var(--text-5)",
-                background: isActive ? "var(--bg-3)" : "transparent",
-              }}
-            >
-              {item.label}
-            </Link>
-          );
-        })}
+      {/* Nav sections */}
+      <nav className="flex-1 px-3 mt-1 space-y-4">
+        {SECTIONS.map((section, si) => (
+          <div key={si}>
+            {section.title && (
+              <p
+                className="text-[10px] font-medium tracking-[0.06em] uppercase px-3 mb-1"
+                style={{ color: "var(--text-6)" }}
+              >
+                {section.title}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="flex items-center h-9 px-3 rounded-lg text-[13px] font-medium transition-colors"
+                    style={{
+                      color: isActive ? "var(--text-1)" : "var(--text-5)",
+                      background: isActive ? "var(--bg-3)" : "transparent",
+                    }}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Footer */}

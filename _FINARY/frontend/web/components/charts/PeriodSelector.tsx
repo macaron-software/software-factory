@@ -1,8 +1,8 @@
 "use client";
 
-export type Period = "1M" | "3M" | "6M" | "YTD" | "1A" | "MAX";
+export type Period = "1D" | "7D" | "1M" | "3M" | "YTD" | "1Y" | "ALL";
 
-const PERIODS: Period[] = ["1M", "3M", "6M", "YTD", "1A", "MAX"];
+const PERIODS: Period[] = ["1D", "7D", "1M", "3M", "YTD", "1Y", "ALL"];
 
 interface Props {
   selected: Period;
@@ -33,15 +33,16 @@ export function PeriodSelector({ selected, onChange }: Props) {
 /** Compute days from period string. */
 export function periodToDays(p: Period): number {
   switch (p) {
+    case "1D": return 1;
+    case "7D": return 7;
     case "1M": return 30;
     case "3M": return 90;
-    case "6M": return 180;
     case "YTD": {
       const now = new Date();
       const jan1 = new Date(now.getFullYear(), 0, 1);
       return Math.ceil((now.getTime() - jan1.getTime()) / 86400000);
     }
-    case "1A": return 365;
-    case "MAX": return 9999;
+    case "1Y": return 365;
+    case "ALL": return 9999;
   }
 }
