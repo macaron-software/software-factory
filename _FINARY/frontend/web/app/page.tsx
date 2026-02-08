@@ -3,8 +3,9 @@
 import { NetWorthCard } from "@/components/dashboard/NetWorthCard";
 import { BreakdownDonut } from "@/components/dashboard/BreakdownDonut";
 import { InstitutionBar } from "@/components/dashboard/InstitutionBar";
+import { NetWorthChart } from "@/components/charts/NetWorthChart";
 import { useNetWorth } from "@/lib/hooks/useApi";
-import { formatEUR } from "@/lib/utils";
+import { formatEUR, formatPct } from "@/lib/utils";
 
 export default function HomePage() {
   const { data: networth, isLoading, error } = useNetWorth();
@@ -24,26 +25,26 @@ export default function HomePage() {
   if (!networth) return null;
 
   return (
-    <div className="space-y-8">
-      {/* Hero: Net worth */}
-      <div>
-        <p className="text-[13px] font-medium mb-1" style={{ color: "var(--text-5)" }}>
-          Patrimoine net
-        </p>
-        <p className="tnum text-[40px] font-extralight tracking-tight leading-tight" style={{ color: "var(--text-1)" }}>
-          {formatEUR(networth.net_worth)}
-        </p>
-      </div>
+    <div className="space-y-6">
+      {/* Net worth evolution chart */}
+      <NetWorthChart />
 
       {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <NetWorthCard label="Actifs" value={networth.total_assets} />
+        <NetWorthCard
+          label="Actifs"
+          value={networth.total_assets}
+          variation={networth.variation_month}
+        />
         <NetWorthCard label="Passifs" value={networth.total_liabilities} negative />
         <NetWorthCard label="Investissements" value={networth.breakdown.investments} />
-        <NetWorthCard label="Liquidites" value={networth.breakdown.cash + networth.breakdown.savings} />
+        <NetWorthCard
+          label="Liquidites"
+          value={networth.breakdown.cash + networth.breakdown.savings}
+        />
       </div>
 
-      {/* Charts */}
+      {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <BreakdownDonut breakdown={networth.breakdown} />
         <InstitutionBar institutions={networth.by_institution} />

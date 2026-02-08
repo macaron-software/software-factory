@@ -139,13 +139,22 @@ body {
 /* Recharts overrides */
 .recharts-text { fill: var(--text-5) !important; font-size: 11px !important; }
 .recharts-cartesian-grid line { stroke: var(--border-1) !important; }
-.recharts-tooltip-wrapper .recharts-default-tooltip {
-  background: var(--bg-3) !important;
-  border: 1px solid var(--border-1) !important;
-  border-radius: var(--radius-md) !important;
-  padding: 12px !important;
-  font-size: 13px !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4) !important;
+.recharts-tooltip-wrapper { pointer-events: none !important; z-index: 10 !important; }
+.recharts-active-dot circle { filter: drop-shadow(0 0 6px currentColor); }
+.recharts-area-curve { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
+
+/* Crosshair cursor */
+.recharts-tooltip-cursor { opacity: 0.5; }
+
+/* Chart tooltip (custom component fallback) */
+.chart-tooltip {
+  font-size: 13px;
+  line-height: 1.4;
 }
-.recharts-tooltip-item { color: var(--text-1) !important; }
-.recharts-tooltip-label { color: var(--text-4) !important; margin-bottom: 4px !important; }
+
+/* Selection highlight for legend items */
+.legend-item {
+  transition: opacity 0.2s, background 0.2s;
+  cursor: default;
+}
+.legend-item:hover { background: var(--bg-hover); }
