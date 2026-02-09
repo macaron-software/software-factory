@@ -51,13 +51,10 @@ export default function BudgetPage() {
       </Section>
 
       {lastMonth && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-5">
           <StatCard label="Revenus" value={lastMonth.income} tone="positive" />
           <StatCard label="Dépenses" value={lastMonth.expenses} tone="negative" />
-          <div className="card px-5 py-4">
-            <p className="text-caption font-medium uppercase text-t-6">Taux d&apos;épargne</p>
-            <p className="tnum text-lg font-semibold mt-1.5 text-t-1">{savingsRate.toFixed(1)}%</p>
-          </div>
+          <StatCard label="Taux d'épargne" value={0} tone="default" detail={`${savingsRate.toFixed(1)}%`} />
         </div>
       )}
 

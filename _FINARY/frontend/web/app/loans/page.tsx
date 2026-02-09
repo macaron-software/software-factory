@@ -34,29 +34,27 @@ export default function LoansPage() {
       {/* Inflation summary */}
       {loans && loans.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="card p-6">
-            <p className="text-caption font-medium uppercase mb-1 text-t-5">Boucliers inflation</p>
+          <Section title="Boucliers inflation">
             <p className="tnum text-heading font-semibold text-gain">{shields.length}</p>
             <p className="text-label text-t-5 mt-1">Taux &lt; inflation 2.4% — garder le plus longtemps</p>
-          </div>
-          <div className="card p-6">
-            <p className="text-caption font-medium uppercase mb-1 text-t-5">Coûteux</p>
+          </Section>
+          <Section title="Coûteux">
             <p className="tnum text-heading font-semibold text-loss">{costly.length}</p>
             <p className="text-label text-t-5 mt-1">Taux &gt; inflation — rembourser en priorité</p>
-          </div>
-          <div className="card p-6">
-            <p className="text-caption font-medium uppercase mb-1 text-t-5">Endettement total</p>
+          </Section>
+          <Section title="Endettement total">
             <p className="tnum text-heading font-semibold text-loss">{formatEUR(totalRemaining)}</p>
-            <div className="bar-track mt-2" style={{ height: "6px" }}>
+            <div className="bar-track mt-3" style={{ height: "6px" }}>
               <div className="bar-fill w-full bg-loss" />
             </div>
-          </div>
+          </Section>
         </div>
       )}
 
       {/* Table */}
-      <div className="card overflow-hidden">
-        <table className="w-full text-body">
+      <Section>
+        <div className="-mx-7 -mb-7 overflow-hidden">
+          <table className="w-full text-body">
           <thead>
             <tr className="border-b border-bd-1">
               {["Crédit", "Établissement", "Type", "Restant", "Mensualité", "Taux", "vs Inflation", "Conseil"].map((h, i) => (
@@ -111,7 +109,8 @@ export default function LoansPage() {
             ))}
           </tbody>
         </table>
-      </div>
+        </div>
+      </Section>
 
       {/* Detailed recommendation cards */}
       {loans && loans.some((l: any) => l.recommendation_detail) && (

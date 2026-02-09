@@ -123,7 +123,7 @@ export default function InsightsPage() {
       )}
 
       {/* Performance chart */}
-      <div className="card p-7">
+      <Section>
         <PriceChart title="Performance" data={perfData} color="#5682f2" defaultPeriod="1Y" />
         <div className="mt-4 pt-4 border-t border-bd-1">
           <div className="flex items-center justify-between">
@@ -147,9 +147,7 @@ export default function InsightsPage() {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* My Movers */}
+      </Section>
       {movers.length > 0 && (
         <Section title="My Movers">
           <div className="space-y-0">

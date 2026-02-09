@@ -47,7 +47,8 @@ export default function ImmobilierPage() {
           <div className="space-y-3">
             <InfoRow label="Adresse" value={prop.address} />
             <InfoRow label="Type" value={`${prop.type} — ${prop.rooms} pièces`} />
-            <InfoRow label="Surface" value={`${prop.surface_m2} m²`} />
+            <InfoRow label="Surface habitable" value={`${prop.surface_m2} m²`} />
+            {prop.terrain_m2 && <InfoRow label="Terrain" value={`${prop.terrain_m2} m²`} />}
             <InfoRow label="DPE" value={prop.dpe_score} />
             <InfoRow label="Date d'achat" value={prop.purchase_date} />
             <InfoRow label="Prix/m² estimé" value={formatEUR(prop.price_per_m2_estimate)} />
@@ -141,7 +142,7 @@ export default function ImmobilierPage() {
           </Section>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            <Section title="Estimation revente (110 m²)">
+            <Section title={`Estimation revente (${prop.surface_m2} m²)`}>
               <div className="space-y-3">
                 <InfoRow label="Fourchette basse" value={formatEUR(market.estimation_revente.low)} />
                 <InfoRow label="Médiane marché" value={formatEUR(market.estimation_revente.median)} />

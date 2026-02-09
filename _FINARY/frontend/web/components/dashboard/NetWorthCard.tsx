@@ -11,7 +11,7 @@ interface Props {
 
 export function NetWorthCard({ label, value, variation, negative }: Props) {
   return (
-    <div className="card px-5 py-4">
+    <div className="card p-5">
       <p className="text-label font-medium uppercase text-t-5">{label}</p>
       <p className={`tnum text-xl font-semibold mt-2 ${negative ? "text-loss" : "text-t-1"}`}>
         {formatEUR(value)}

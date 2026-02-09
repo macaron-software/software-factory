@@ -91,7 +91,7 @@ export default function WealthStatementPage() {
       </div>
 
       {/* Net worth */}
-      <div className="card p-6">
+      <div className="card p-7">
         <div className="flex items-center justify-between">
           <span className="text-title font-semibold text-t-1">Patrimoine net</span>
           <span className="tnum text-[22px] font-extralight text-accent">

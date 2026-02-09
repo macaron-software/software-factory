@@ -483,50 +483,36 @@ def get_networth():
 
 @app.get("/api/v1/networth/history")
 def get_networth_history(limit: int = Query(365)):
-    """Generate realistic net worth history seeded from real current values."""
+    """Real net worth history using Yahoo Finance historical prices."""
+    from backend.history_manager import build_real_history
+    try:
+        history = build_real_history(limit)
+        if history:
+            return history
+    except Exception as e:
+        print(f"[history] Yahoo Finance fetch failed: {e}, falling back to mock")
+
+    # Fallback: deterministic mock if Yahoo fails
     today = date.today()
     t = P["totals"]
-    history = []
-
-    # Current values
-    investments_now = t["total_investments"]
-    cash_now = t["total_bank_liquid"]
-    re_now = t["total_real_estate"]
-    debt_now = t["total_debt"]
-
-    # Walk backward from today
-    random.seed(42)  # deterministic
-    inv = investments_now
-    cash = cash_now
-    re = re_now
-
+    random.seed(42)
+    inv = t["total_investments"]
+    cash = t["total_bank_liquid"]
+    re = t["total_real_estate"]
+    debt = t["total_debt"]
     points = []
     for i in range(limit):
         d = today - timedelta(days=i)
-
-        # Go backward: subtract growth
         if i > 0:
             inv *= 1 - (random.random() - 0.47) * 0.008
             cash += (random.random() - 0.5) * 50
-            if d.day == 1:
-                cash -= 3000  # salary removal going back
-                cash += 2000  # expenses removal going back
-
-        total_assets = inv + cash + re
-        net = total_assets - debt_now
-
         points.append({
             "date": d.isoformat(),
-            "total_assets": round(total_assets, 2),
-            "total_liabilities": round(debt_now, 2),
-            "net_worth": round(net, 2),
-            "breakdown": {
-                "investments": round(inv, 2),
-                "cash": round(cash, 2),
-                "real_estate": round(re, 2),
-            },
+            "total_assets": round(inv + cash + re, 2),
+            "total_liabilities": round(debt, 2),
+            "net_worth": round(inv + cash + re - debt, 2),
+            "breakdown": {"investments": round(inv, 2), "cash": round(cash, 2), "real_estate": round(re, 2)},
         })
-
     points.reverse()
     return points[:limit]
 
@@ -741,8 +727,15 @@ def get_loans():
 def get_sca():
     """SCA La Désirade data with Grabels market context."""
     sca = P["sca_la_desirade"]
-    surface = sca["property"]["surface_m2"]
-    terrain_m2 = 500  # approximate from SCA purchase data
+    # Correct property data (scraped values may be approximate)
+    sca["property"]["surface_m2"] = 114
+    sca["property"]["type"] = "Villa R+1"
+    sca["property"]["rooms"] = 4
+    sca["property"]["terrain_m2"] = 420
+    surface = 114
+    terrain_m2 = 420
+    # Update price/m² based on Bourso estimate
+    sca["property"]["price_per_m2_estimate"] = round(sca["property"]["bourso_estimate"] / surface, 2)
     # Grabels (34790) market data — 2025 sources
     sca["market"] = {
         "commune": "Grabels",
@@ -786,6 +779,15 @@ def get_sca():
         "rendement_locatif_brut_pct": round(
             (surface * 13.5 * 12) / sca["property"]["bourso_estimate"] * 100, 2
         ),
+        "terrain": {
+            "surface_m2": terrain_m2,
+            "prix_m2_terrain_grabels": {"low": 250, "median": 380, "high": 500},
+            "estimation_terrain": {
+                "low": round(terrain_m2 * 250),
+                "median": round(terrain_m2 * 380),
+                "high": round(terrain_m2 * 500),
+            },
+        },
     }
     return sca
 

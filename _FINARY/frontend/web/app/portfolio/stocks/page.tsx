@@ -6,7 +6,7 @@ import { formatEUR, formatPct, formatNumber, pnlColor, CHART_COLORS } from "@/li
 import { PriceChart } from "@/components/charts/PriceChart";
 import { generateNetWorthHistory, generateSparkline } from "@/lib/fixtures";
 import { Sparkline } from "@/components/charts/Sparkline";
-import { Loading, StatCard } from "@/components/ds";
+import { Loading, StatCard, Section } from "@/components/ds";
 
 export default function StocksPage() {
   const { data: positions, isLoading } = usePortfolio();
@@ -42,7 +42,7 @@ export default function StocksPage() {
   return (
     <div className="space-y-8">
       {/* Chart */}
-      <div className="card p-7">
+      <Section>
         <PriceChart title="Actions & Fonds" data={chartData} color="#5682f2" defaultPeriod="1Y" />
         <div className="mt-4 pt-4 border-t border-bd-1">
           <div className="flex items-center justify-between">
@@ -60,20 +60,18 @@ export default function StocksPage() {
             </div>
           </div>
         </div>
-      </div>
+      </Section>
 
       {/* Insights row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="card p-5">
-          <p className="text-label font-medium mb-2 text-t-5">Fee Scanner</p>
+        <Section title="Fee Scanner">
           <div className="flex items-center justify-between">
             <span className="tnum text-heading font-light text-t-1">{formatEUR(totalValue * 0.0099)}</span>
             <span className="tnum text-label text-t-5">/an</span>
           </div>
-        </div>
+        </Section>
 
-        <div className="card p-5">
-          <p className="text-label font-medium mb-2 text-t-5">Diversification</p>
+        <Section title="Diversification">
           <div className="flex items-center justify-between">
             <span className="text-body-lg font-medium text-t-1">
               {diversification?.details.num_countries ?? 0} pays
@@ -82,10 +80,9 @@ export default function StocksPage() {
               {diversification?.details.num_sectors ?? 0} secteurs
             </span>
           </div>
-        </div>
+        </Section>
 
-        <div className="card p-5">
-          <p className="text-label font-medium mb-2 text-t-5">Dividendes</p>
+        <Section title="Dividendes">
           <div className="flex items-center justify-between">
             <span className="tnum text-body-lg font-medium text-gain">
               {formatNumber(dividendYield)}% yield
@@ -98,14 +95,30 @@ export default function StocksPage() {
               return <div key={i} className="flex-1 rounded-sm" style={{ height: `${h}%`, background: CHART_COLORS[4], opacity: 0.6 }} />;
             })}
           </div>
-        </div>
+        </Section>
       </div>
 
       {/* Positions table */}
-      <div className="card overflow-hidden">
+      <Section>
+        <div className="-mx-7 -mb-7 overflow-hidden">
         <div className="px-5 py-3 flex items-center justify-between border-b border-bd-1">
           <p className="text-body font-medium text-t-2">Positions</p>
-          <p className="text-label text-t-5">{positions?.length ?? 0} actifs</p>
+          <div className="flex items-center gap-4">
+            {positions && (() => {
+              const bySource: Record<string, { count: number; total: number }> = {};
+              positions.forEach((p) => {
+                const src = (p as any).source ?? "?";
+                if (!bySource[src]) bySource[src] = { count: 0, total: 0 };
+                bySource[src].count++;
+                bySource[src].total += p.value_eur;
+              });
+              return Object.entries(bySource).map(([src, d]) => (
+                <span key={src} className="text-label text-t-5">
+                  {src}: <span className="tnum font-medium text-t-3">{formatEUR(d.total)}</span> ({d.count})
+                </span>
+              ));
+            })()}
+          </div>
         </div>
         <table className="w-full text-body">
           <thead>
@@ -133,7 +146,12 @@ export default function StocksPage() {
                     </div>
                     <div>
                       <p className="font-medium text-t-1">{p.name}</p>
-                      <p className="text-label text-t-5">{p.ticker} · {p.isin ?? ""}</p>
+                      <p className="text-label text-t-5">
+                        {p.ticker} · {p.isin ?? ""}
+                        <span className={`ml-1.5 text-caption font-medium px-1.5 py-0.5 rounded ${(p as any).source === "Trade Republic" ? "bg-accent-bg text-accent" : "bg-warn-bg text-warn"}`}>
+                          {(p as any).source === "Trade Republic" ? "TR" : "IBKR"}
+                        </span>
+                      </p>
                     </div>
                   </div>
                 </td>
@@ -153,7 +171,8 @@ export default function StocksPage() {
             ))}
           </tbody>
         </table>
-      </div>
+        </div>
+      </Section>
     </div>
   );
 }

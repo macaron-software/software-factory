@@ -53,6 +53,7 @@ export interface SCA {
     type: string;
     rooms: number;
     surface_m2: number;
+    terrain_m2?: number;
     terrain_value_book: number;
     purchase_date: string;
     dpe_score: string;

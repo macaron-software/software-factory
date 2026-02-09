@@ -153,10 +153,58 @@ def compute_diversification(positions: list[dict]) -> dict:
 
 # ─── Loan vs Inflation Analysis ───────────────────────────────────────────────
 
+def _infer_rate(borrowed: float, remaining: float, monthly: float, loan_type: str | None) -> float | None:
+    """Compute annual interest rate from loan amortization data.
+    
+    Strategy:
+    1. If monthly ≈ interest-only on remaining → rate = (monthly*12)/remaining
+    2. If total_paid ≈ borrowed → rate ≈ 0%
+    3. Binary search for amortizing rate
+    """
+    if monthly <= 0 or remaining <= 0:
+        return None
+
+    # Check if payments are interest-only (PAS in différé, IO mortgages)
+    implied_annual = (monthly * 12) / remaining * 100
+    if 0.1 < implied_annual < 8.0:
+        # Verify: if this were interest-only, principal unchanged → borrowed ≈ remaining or small amort
+        principal_paid = borrowed - remaining if borrowed > remaining else 0
+        if borrowed > 0 and principal_paid / borrowed < 0.25:
+            return round(implied_annual, 2)
+
+    # Check near-zero rate: total payments ≈ borrowed amount
+    if borrowed > 0 and monthly > 0:
+        total_months_guess = remaining / monthly
+        total_paid_est = (borrowed - remaining) + remaining  # = borrowed
+        actual_total = ((borrowed - remaining) / monthly + remaining / monthly) * monthly
+        if abs(actual_total - borrowed) / borrowed < 0.05:
+            return 0.01  # effectively 0%
+
+    # Binary search for standard amortizing rate
+    for rate_bp in range(1, 2000):
+        annual_rate = rate_bp / 10000.0
+        r = annual_rate / 12
+        try:
+            inner = 1 - (borrowed * r / monthly)
+            if inner <= 0:
+                continue
+            total_months = int(round(-math.log(inner) / math.log(1 + r)))
+            if total_months < 6 or total_months > 480:
+                continue
+            # Find elapsed months from remaining balance
+            for elapsed in range(0, total_months + 1):
+                bal = borrowed * (1 + r) ** elapsed - monthly * ((1 + r) ** elapsed - 1) / r
+                if abs(bal - remaining) < remaining * 0.02:
+                    return round(annual_rate * 100, 2)
+        except (ValueError, OverflowError):
+            continue
+
+    return None
+
 def analyze_loans(loans: list[dict]) -> list[dict]:
     """Enrich loans with inflation analysis & recommendations."""
     # Default rates for known French loan types
-    TYPE_DEFAULTS = {"PTZ": 0.0}
+    TYPE_DEFAULTS = {"PTZ": 0.0, "PAS": 0.98}
     results = []
     for loan in loans:
         rate_str = loan.get("rate")
@@ -169,8 +217,37 @@ def analyze_loans(loans: list[dict]) -> list[dict]:
         monthly = loan.get("monthly_payment") or 0
         borrowed = loan.get("borrowed") or remaining
 
+        # --- Compute rate from amortization data when missing ---
+        if rate is None and monthly > 0 and remaining > 0:
+            rate = _infer_rate(borrowed, remaining, monthly, loan.get("type"))
+
+        # For Bourso personal loans with no monthly/rate, use typical rates
+        if rate is None and loan.get("institution") == "Boursobank" and loan.get("type") in ("consumer", "CONSUMER"):
+            rate = 0.75  # Bourso prêt perso typical 0.75%
+
+        remaining = loan.get("remaining", 0)
+        monthly = loan.get("monthly_payment") or 0
+        borrowed = loan.get("borrowed") or remaining
+
         # Remaining duration (months)
-        if monthly and monthly > 0 and remaining > 0:
+        if rate is not None and rate > 0 and monthly and monthly > 0 and remaining > 0:
+            # Check if interest-only (monthly ≈ interest on remaining)
+            monthly_interest = remaining * (rate / 100) / 12
+            if abs(monthly - monthly_interest) / monthly < 0.15:
+                # Interest-only — estimate from typical PAS/mortgage duration
+                remaining_months = 300 if loan.get("type") == "PAS" else 240
+            else:
+                # Amortizing — compute from rate
+                r = rate / 100 / 12
+                try:
+                    inner = 1 - (remaining * r / monthly)
+                    if inner > 0:
+                        remaining_months = int(math.ceil(-math.log(inner) / math.log(1 + r)))
+                    else:
+                        remaining_months = math.ceil(remaining / monthly)
+                except (ValueError, OverflowError):
+                    remaining_months = math.ceil(remaining / monthly)
+        elif monthly and monthly > 0 and remaining > 0:
             remaining_months = math.ceil(remaining / monthly)
         else:
             remaining_months = None
