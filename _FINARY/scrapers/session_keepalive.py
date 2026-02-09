@@ -19,7 +19,7 @@ import urllib.request
 from datetime import datetime
 
 CDP_URL = "http://localhost:18800"
-INTERVAL = 90  # seconds between reloads
+INTERVAL = 300  # 5 minutes between reloads
 LOG_FILE = "/tmp/session-keepalive.log"
 PID_FILE = "/tmp/session-keepalive.pid"
 
@@ -57,8 +57,47 @@ async def reload_tab(ws_url: str, bank: str) -> str:
         return f"❌ {type(e).__name__}"
 
 
+API_PORT = 8000
+WEB_PORT = 3000
+FINARY_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def check_restart_servers():
+    """Check API and frontend, restart if down."""
+    import subprocess
+
+    # Check API
+    try:
+        urllib.request.urlopen(f"http://localhost:{API_PORT}/api/v1/status", timeout=5)
+    except Exception:
+        log(f"⚠ API on :{API_PORT} is DOWN — restarting...")
+        subprocess.Popen(
+            ["python3", os.path.join(FINARY_DIR, "backend", "api_server.py")],
+            env={**os.environ, "PYTHONPATH": FINARY_DIR},
+            stdout=open("/tmp/finary-api.log", "a"),
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+        log("  → API restarted")
+
+    # Check Frontend
+    try:
+        urllib.request.urlopen(f"http://localhost:{WEB_PORT}/", timeout=5)
+    except Exception:
+        log(f"⚠ Frontend on :{WEB_PORT} is DOWN — restarting...")
+        subprocess.Popen(
+            ["npx", "next", "start", "-p", str(WEB_PORT)],
+            cwd=os.path.join(FINARY_DIR, "frontend", "web"),
+            env={**os.environ, "PORT": str(WEB_PORT)},
+            stdout=open("/tmp/finary-web.log", "a"),
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+        log("  → Frontend restarted")
+
+
 async def keepalive_loop():
-    log(f"Session keepalive started — Page.reload every {INTERVAL}s")
+    log(f"Session keepalive started — Page.reload every {INTERVAL}s + server watchdog")
     while True:
         try:
             raw = urllib.request.urlopen(f"{CDP_URL}/json/list", timeout=5).read()
@@ -69,23 +108,30 @@ async def keepalive_loop():
             continue
 
         results = []
-        seen_banks = set()
         for p in pages:
             url = p.get("url", "")
             bank = detect_bank(url)
-            if not bank or bank in seen_banks:
+            if not bank:
                 continue
-            seen_banks.add(bank)
+            # Skip non-page resources (service workers, iframes)
+            if p.get("type", "page") != "page":
+                continue
+            if "googletagmanager" in url or "sw.js" in url:
+                continue
             ws_url = p.get("webSocketDebuggerUrl", "")
             if not ws_url:
                 continue
             status = await reload_tab(ws_url, bank)
-            results.append(f"{bank:15} {status}")
+            short_url = url.split("//",1)[-1][:50]
+            results.append(f"{bank:15} {status} ({short_url})")
 
         if results:
             log(" | ".join(results))
         else:
             log("No bank tabs found")
+
+        # Watchdog: restart API/Frontend if crashed
+        check_restart_servers()
 
         await asyncio.sleep(INTERVAL)
 

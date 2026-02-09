@@ -681,7 +681,45 @@ def compute_projections(monthly_data: list[dict], patrimoine: dict) -> dict:
 # ─── Transaction storage helpers ──────────────────────────────────────────────
 
 def load_transactions(months: int = 12) -> list[dict]:
-    """Load transactions from unified storage."""
+    """Load transactions from DuckDB (primary) or JSON files (fallback)."""
+    db_path = DATA_DIR / "finary.duckdb"
+    if db_path.exists():
+        try:
+            import duckdb
+            con = duckdb.connect(str(db_path), read_only=True)
+            today = date.today()
+            cutoff = date(today.year, today.month, 1)
+            for _ in range(months - 1):
+                m, y = cutoff.month - 1, cutoff.year
+                if m <= 0:
+                    m += 12
+                    y -= 1
+                cutoff = date(y, m, 1)
+            rows = con.execute("""
+                SELECT date, description, amount, category, category_parent,
+                       merchant, bank, account, account_id
+                FROM transactions
+                WHERE date >= ?
+                ORDER BY date DESC
+            """, [cutoff.isoformat()]).fetchall()
+            con.close()
+            return [
+                {
+                    "date": str(r[0]),
+                    "description": r[1] or "",
+                    "amount": float(r[2]) if r[2] else 0,
+                    "category": r[3] or r[4] or "autre",
+                    "category_parent": r[4] or "",
+                    "merchant": r[5] or "",
+                    "bank": r[6] or "",
+                    "account": r[7] or "",
+                    "account_id": r[8] or "",
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            print(f"[insights] DuckDB load failed: {e}")
+    # Fallback: JSON files
     TX_DIR.mkdir(parents=True, exist_ok=True)
     all_txs = []
     today = date.today()
@@ -754,6 +792,16 @@ def aggregate_monthly_budget(transactions: list[dict]) -> list[dict]:
     from collections import defaultdict
     monthly: dict[str, dict] = {}
 
+    # Categories to skip (internal transfers, not real income/expenses)
+    SKIP_CATS = {
+        "virement_interne",
+        "Mouvements internes créditeurs",
+        "Mouvements internes débiteurs",
+        "Virements émis de comptes à comptes",
+        "Virements émis",
+        "Virements reçus",
+    }
+
     for tx in transactions:
         d = tx.get("date", "")
         month = d[:7] if len(d) >= 7 else None
@@ -763,14 +811,15 @@ def aggregate_monthly_budget(transactions: list[dict]) -> list[dict]:
             monthly[month] = {"income": 0, "expenses": 0, "categories": defaultdict(float)}
 
         amount = tx.get("amount", 0)
-        category = tx.get("category", "autre")
+        # Use Bourso's native category_parent if available, else our regex
+        category = tx.get("category_parent") or tx.get("category") or categorize_transaction(tx.get("description", ""))
 
         # Skip internal transfers
-        if category == "virement_interne":
+        if category in SKIP_CATS:
             continue
 
-        if category == "revenu" or amount > 0:
-            monthly[month]["income"] += abs(amount)
+        if amount > 0:
+            monthly[month]["income"] += amount
         else:
             monthly[month]["expenses"] += abs(amount)
             monthly[month]["categories"][category] += abs(amount)
@@ -786,6 +835,6 @@ def aggregate_monthly_budget(transactions: list[dict]) -> list[dict]:
             "income": round(income, 2),
             "expenses": round(expenses, 2),
             "savings_rate": round(savings_rate, 1),
-            "categories": {k: round(v, 2) for k, v in m["categories"].items()},
+            "categories": {k: round(v, 2) for k, v in sorted(m["categories"].items(), key=lambda x: -x[1])},
         })
     return result

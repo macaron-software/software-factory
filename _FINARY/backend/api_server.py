@@ -33,6 +33,60 @@ app.add_middleware(
 # ─── Load Data ────────────────────────────────────────────────────────────────
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "scrapers" / "data"
+DB_PATH = DATA_DIR / "finary.duckdb"
+
+def _get_duckdb():
+    """Get a DuckDB connection."""
+    import duckdb
+    return duckdb.connect(str(DB_PATH))
+
+def _persist_market_prices(ticker: str, rows: list[dict]):
+    """Persist OHLCV rows to DuckDB market_prices table."""
+    if not DB_PATH.exists() or not rows:
+        return
+    try:
+        con = _get_duckdb()
+        con.execute("""CREATE TABLE IF NOT EXISTS market_prices (
+            date DATE, ticker VARCHAR, open DECIMAL(12,4), high DECIMAL(12,4),
+            low DECIMAL(12,4), close DECIMAL(12,4), volume BIGINT, currency VARCHAR,
+            PRIMARY KEY (date, ticker)
+        )""")
+        for r in rows:
+            con.execute("""INSERT OR REPLACE INTO market_prices
+                (date, ticker, open, high, low, close, volume)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                [r["date"], ticker, r["open"], r["high"], r["low"], r["close"], r["volume"]])
+        con.close()
+    except Exception as e:
+        print(f"[DB] market_prices persist error: {e}")
+
+def _persist_snapshot():
+    """Store daily net worth snapshot in DuckDB."""
+    if not DB_PATH.exists():
+        return
+    try:
+        con = _get_duckdb()
+        con.execute("""CREATE TABLE IF NOT EXISTS snapshots (
+            date DATE, key VARCHAR, value DECIMAL(15,2), currency VARCHAR DEFAULT 'EUR',
+            PRIMARY KEY (date, key)
+        )""")
+        today = date.today().isoformat()
+        totals = P.get("totals", {})
+        snapshots = {
+            "net_worth": totals.get("net_worth", 0),
+            "total_assets": totals.get("total_assets", 0),
+            "total_liabilities": totals.get("total_liabilities", 0),
+            "portfolio_value": totals.get("portfolio_value", 0),
+            "cash": totals.get("cash_eur", 0),
+            "real_estate": totals.get("real_estate_net", 0),
+        }
+        for key, value in snapshots.items():
+            con.execute("INSERT OR REPLACE INTO snapshots (date, key, value) VALUES (?, ?, ?)",
+                        [today, key, round(float(value), 2)])
+        con.close()
+        print(f"[SNAPSHOT] Saved {len(snapshots)} values for {today}")
+    except Exception as e:
+        print(f"[SNAPSHOT] Error: {e}")
 
 def load_patrimoine():
     files = sorted(DATA_DIR.glob("patrimoine_complet_*.json"), reverse=True)
@@ -603,13 +657,16 @@ def get_diversification():
 
 
 @app.get("/api/v1/transactions")
-def get_transactions(limit: int = Query(50)):
-    return []  # No transaction data scraped yet
+def get_transactions(limit: int = Query(50), months: int = Query(6)):
+    txs = load_transactions(months=months)
+    return txs[:limit]
 
 
 @app.get("/api/v1/accounts/{account_id}/transactions")
 def get_account_transactions(account_id: str, limit: int = Query(50)):
-    return []
+    txs = load_transactions(months=24)
+    filtered = [t for t in txs if t.get("account_id") == account_id or t.get("bank") == account_id]
+    return filtered[:limit]
 
 
 @app.get("/api/v1/budget/monthly")
@@ -638,15 +695,31 @@ def get_monthly_budget(limit: int = Query(12)):
 
 
 @app.get("/api/v1/budget/categories")
-def get_category_spending(limit: int = Query(3)):
+def get_category_spending(months: int = Query(3)):
+    txs = load_transactions(months=months)
+    if txs:
+        budget = aggregate_monthly_budget(txs)
+        # Merge all months' categories
+        from collections import defaultdict
+        total_cats: dict[str, float] = defaultdict(float)
+        cat_counts: dict[str, int] = defaultdict(int)
+        for m in budget:
+            for cat, amount in m.get("categories", {}).items():
+                total_cats[cat] += amount
+                cat_counts[cat] += 1
+        return [
+            {"category": cat, "total": round(amt, 2), "count": cat_counts[cat]}
+            for cat, amt in sorted(total_cats.items(), key=lambda x: -x[1])
+        ]
+    # Fallback: fixed costs
     ca_credits = P["credit_agricole"]["monthly_payments"]
     margin_monthly = P["totals"].get("monthly_margin_cost", 0)
     bourso_loans = P.get("boursobank", {}).get("loans", [])
     bourso_monthly = sum(l.get("monthly_payment", 0) or round(l["remaining"] / 24, 2) for l in bourso_loans)
     return [
-        {"category": "credits_immobilier", "total": round(ca_credits * limit, 2), "count": 2},
-        {"category": "marge_ibkr", "total": round(margin_monthly * limit, 2), "count": limit},
-        {"category": "prets_perso", "total": round(bourso_monthly * limit, 2), "count": len(bourso_loans)},
+        {"category": "credits_immobilier", "total": round(ca_credits * months, 2), "count": 2},
+        {"category": "marge_ibkr", "total": round(margin_monthly * months, 2), "count": months},
+        {"category": "prets_perso", "total": round(bourso_monthly * months, 2), "count": len(bourso_loans)},
     ]
 
 
@@ -659,12 +732,54 @@ def get_fx_rates():
 
 @app.get("/api/v1/market/quote/{ticker}")
 def get_quote(ticker: str):
-    return []
+    """Return live price from yfinance cache."""
+    price = get_live_price(ticker)
+    if price is not None:
+        return {"ticker": ticker, "price": price, "currency": "USD", "date": date.today().isoformat()}
+    # Try resolving ISIN → ticker
+    resolved = ISIN_TO_TICKER.get(ticker, ticker)
+    price = get_live_price(resolved)
+    if price is not None:
+        return {"ticker": resolved, "price": price, "currency": "USD", "date": date.today().isoformat()}
+    # Fetch on-demand via yfinance
+    try:
+        import yfinance as yf
+        t = yf.Ticker(resolved)
+        p = t.fast_info.get("lastPrice") or t.fast_info.get("last_price")
+        if p and not math.isnan(p):
+            with _cache_lock:
+                _price_cache[resolved] = {"price": float(p), "ts": time.time()}
+            return {"ticker": resolved, "price": float(p), "currency": str(t.fast_info.get("currency", "USD")), "date": date.today().isoformat()}
+    except Exception:
+        pass
+    return {"ticker": ticker, "price": None, "error": "not_found"}
 
 
 @app.get("/api/v1/market/history/{ticker}")
-def get_history(ticker: str, limit: int = Query(365)):
-    return []
+def get_history(ticker: str, period: str = Query("1y"), limit: int = Query(365)):
+    """Return OHLCV history from yfinance + persist to DuckDB."""
+    resolved = ISIN_TO_TICKER.get(ticker, ticker)
+    try:
+        import yfinance as yf
+        t = yf.Ticker(resolved)
+        hist = t.history(period=period)
+        if hist.empty:
+            return []
+        rows = []
+        for dt, row in hist.tail(limit).iterrows():
+            rows.append({
+                "date": dt.strftime("%Y-%m-%d"),
+                "open": round(float(row["Open"]), 4),
+                "high": round(float(row["High"]), 4),
+                "low": round(float(row["Low"]), 4),
+                "close": round(float(row["Close"]), 4),
+                "volume": int(row["Volume"]) if not math.isnan(row["Volume"]) else 0,
+            })
+        # Persist to DuckDB
+        _persist_market_prices(resolved, rows)
+        return rows
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.get("/api/v1/alerts")
