@@ -2,11 +2,14 @@
 Finary Clone — API Server
 Serves real scraped patrimoine data to the Next.js frontend.
 Reads from scrapers/data/patrimoine_complet_*.json
+Live market prices via yfinance.
 """
 import json
 import math
 import uuid
 import random
+import time
+import threading
 from pathlib import Path
 from datetime import date, timedelta
 from fastapi import FastAPI, Query
@@ -33,6 +36,86 @@ def load_patrimoine():
         return json.load(f)
 
 P = load_patrimoine()
+
+# ─── Live Market Data ─────────────────────────────────────────────────────────
+
+# ISIN → Yahoo Finance ticker mapping
+ISIN_TO_TICKER = {
+    "US0231351067": "AMZN", "NL0000226223": "STM", "FR0000120321": "OR.PA",
+    "CNE100000296": "1211.HK", "US60770K1079": "MRNA", "DE0008404005": "ALV.DE",
+    "US30231G1022": "XOM", "FR0000121014": "MC.PA", "US7561091049": "O",
+    "US46120E6023": "ISRG", "FR0000120271": "TTE.PA", "US4781601046": "JNJ",
+    "US29355A1079": "ENPH", "US72919P2020": "PLUG", "FR0000120578": "SAN.PA",
+    "IE00B3WJKG14": "IUIT.L", "US58733R1023": "MELI", "FR0013227113": "SOI.PA",
+    "CA1363751027": "CNR.TO", "US81141R1005": "SE", "DE0007030009": "RHM.DE",
+    "US4612021034": "INTU",
+    "US5949181045": "MSFT", "US02079K3059": "GOOGL", "US67066G1040": "NVDA",
+}
+
+# Cache for live prices
+_price_cache: dict[str, dict] = {}
+_cache_lock = threading.Lock()
+_CACHE_TTL = 300  # 5 minutes
+
+def _fetch_live_prices():
+    """Fetch all stock prices + EUR/USD. Batch first, then individual fallback."""
+    try:
+        import yfinance as yf
+        tickers_list = list(set(ISIN_TO_TICKER.values())) + ["EURUSD=X", "HKDEUR=X", "CADEUR=X"]
+        now = time.time()
+
+        # Batch download
+        try:
+            data = yf.download(tickers_list, period="1d", progress=False, threads=True)
+            with _cache_lock:
+                for ticker in tickers_list:
+                    try:
+                        if len(tickers_list) > 1:
+                            close = data["Close"][ticker].iloc[-1]
+                        else:
+                            close = data["Close"].iloc[-1]
+                        if not math.isnan(close):
+                            _price_cache[ticker] = {"price": float(close), "ts": now}
+                    except (KeyError, IndexError):
+                        pass
+        except Exception as e:
+            print(f"[MARKET] Batch error: {e}")
+
+        # Individual fallback for missed tickers
+        missed = [t for t in tickers_list if t not in _price_cache]
+        for ticker in missed:
+            try:
+                t = yf.Ticker(ticker)
+                price = t.fast_info.get("lastPrice") or t.fast_info.get("last_price")
+                if price and not math.isnan(price):
+                    with _cache_lock:
+                        _price_cache[ticker] = {"price": float(price), "ts": now}
+            except Exception:
+                pass
+
+        print(f"[MARKET] Fetched {len(_price_cache)}/{len(tickers_list)} prices (missed: {len(missed) - sum(1 for t in missed if t in _price_cache)})")
+    except Exception as e:
+        print(f"[MARKET] Error: {e}")
+
+def get_live_price(ticker: str) -> float | None:
+    with _cache_lock:
+        cached = _price_cache.get(ticker)
+        if cached and time.time() - cached["ts"] < _CACHE_TTL:
+            return cached["price"]
+    return None
+
+def get_eur_usd() -> float:
+    rate = get_live_price("EURUSD=X")
+    return rate if rate else 1.08  # fallback
+
+# Fetch prices on startup + periodic refresh
+def _price_refresh_loop():
+    _fetch_live_prices()
+    while True:
+        time.sleep(_CACHE_TTL)
+        _fetch_live_prices()
+
+threading.Thread(target=_price_refresh_loop, daemon=True).start()
 
 # ─── Sector/Country mapping for diversification ──────────────────────────────
 
@@ -73,8 +156,6 @@ COUNTRY_NAMES = {
 
 def _id(prefix: str, i: int) -> str:
     return f"{prefix}-{i:04d}"
-
-EUR_USD = 1.08  # approximate
 
 # ─── Build accounts list ─────────────────────────────────────────────────────
 
@@ -172,33 +253,65 @@ def build_accounts():
 
 ACCOUNTS = build_accounts()
 
-# ─── Build positions ─────────────────────────────────────────────────────────
+# ─── Build positions (dynamic with live prices) ──────────────────────────────
 
 def build_positions():
+    """Build positions list. Uses live prices when available, falls back to scraped."""
     positions = []
     total_value = 0
+    eur_usd = get_eur_usd()
 
-    # TR positions
+    # TR positions (EUR)
     for i, pos in enumerate(P["trade_republic"]["positions"]):
-        val = pos["current_value_eur"]
-        cost = pos["shares"] * pos["avg_price_eur"] if pos["shares"] and pos["avg_price_eur"] else 0
-        pnl = pos["unrealized_pnl_eur"]
-        pnl_pct = pos["unrealized_pnl_pct"]
-        total_value += val
         isin = pos["isin"]
+        ticker = ISIN_TO_TICKER.get(isin)
         sector, country = SECTOR_MAP.get(isin, ("Other", "??"))
+        shares = pos["shares"]
+        invested = pos["current_value_eur"] - pos["unrealized_pnl_eur"]
+
+        # Try live price
+        live = get_live_price(ticker) if ticker else None
+        if live and ticker:
+            # Convert to EUR if needed
+            if ticker.endswith(".PA"):
+                current_price = live  # already EUR
+            elif ticker.endswith(".DE"):
+                current_price = live  # already EUR
+            elif ticker == "IUIT.L":
+                current_price = live / eur_usd  # USD → EUR
+            elif ticker == "1211.HK":
+                hkd_eur = get_live_price("HKDEUR=X") or 0.107
+                current_price = live * hkd_eur  # HKD → EUR
+            elif ticker.endswith(".TO"):
+                cad_eur = get_live_price("CADEUR=X") or 0.617
+                current_price = live * cad_eur  # CAD → EUR
+            else:
+                current_price = live / eur_usd  # USD → EUR
+            val = round(shares * current_price, 2)
+            pnl = round(val - invested, 2)
+            pnl_pct = round(pnl / abs(invested) * 100, 2) if invested != 0 else 0
+        else:
+            val = pos["current_value_eur"]
+            current_price = round(val / shares, 2) if shares else None
+            pnl = pos["unrealized_pnl_eur"]
+            pnl_pct = pos["unrealized_pnl_pct"] if pos["unrealized_pnl_pct"] else (
+                round(pnl / abs(invested) * 100, 2) if invested != 0 else 0
+            )
+
+        total_value += val
+        short_name = pos["name"].split()[0][:6].upper() if pos["name"] else isin[:6]
 
         positions.append({
             "id": _id("pos", i + 1),
-            "account_id": "acc-0001",  # TR
-            "ticker": isin[:6] if not pos["name"] else pos["name"].split()[0][:6].upper(),
+            "account_id": "acc-0001",
+            "ticker": short_name,
             "isin": isin,
             "name": pos["name"],
-            "quantity": pos["shares"],
+            "quantity": shares,
             "avg_cost": pos["avg_price_eur"],
-            "current_price": round(val / pos["shares"], 2) if pos["shares"] else None,
+            "current_price": round(current_price, 2) if current_price else None,
             "currency": "EUR",
-            "asset_type": "stock",
+            "asset_type": "etf" if isin == "IE00B3WJKG14" else "stock",
             "sector": sector,
             "country": country,
             "value_native": val,
@@ -206,33 +319,45 @@ def build_positions():
             "pnl_native": pnl,
             "pnl_eur": pnl,
             "pnl_pct": pnl_pct,
-            "weight_pct": 0,  # computed after
+            "weight_pct": 0,
             "pe_ratio": pos.get("pe_ratio"),
             "beta": pos.get("beta"),
             "source": "Trade Republic",
+            "live": live is not None,
         })
 
-    # IBKR positions
+    # IBKR positions (USD)
     for j, pos in enumerate(P["ibkr"]["positions"]):
-        val_usd = pos["market_value_usd"]
-        val_eur = round(val_usd / EUR_USD, 2)
+        isin = pos["isin"]
+        ticker = ISIN_TO_TICKER.get(isin)
+        sector, country = SECTOR_MAP.get(isin, ("Other", "US"))
+        shares = pos["quantity"]
         cost_usd = pos["cost_basis_usd"]
-        pnl_usd = pos["unrealized_pnl_usd"]
-        pnl_eur = round(pnl_usd / EUR_USD, 2)
+
+        live = get_live_price(ticker) if ticker else None
+        if live:
+            current_price_usd = live
+            val_usd = round(shares * current_price_usd, 2)
+            pnl_usd = round(val_usd - cost_usd, 2)
+        else:
+            current_price_usd = pos["last_price_usd"]
+            val_usd = pos["market_value_usd"]
+            pnl_usd = pos["unrealized_pnl_usd"]
+
+        val_eur = round(val_usd / eur_usd, 2)
+        pnl_eur = round(pnl_usd / eur_usd, 2)
         pnl_pct = round(pnl_usd / cost_usd * 100, 2) if cost_usd else 0
         total_value += val_eur
-        isin = pos["isin"]
-        sector, country = SECTOR_MAP.get(isin, ("Other", "US"))
 
         positions.append({
             "id": _id("pos", 100 + j),
-            "account_id": "acc-0002",  # IBKR
+            "account_id": "acc-0002",
             "ticker": pos["symbol"],
             "isin": isin,
             "name": pos["symbol"],
-            "quantity": pos["quantity"],
+            "quantity": shares,
             "avg_cost": pos["avg_price_usd"],
-            "current_price": pos["last_price_usd"],
+            "current_price": round(current_price_usd, 2),
             "currency": "USD",
             "asset_type": "stock",
             "sector": sector,
@@ -246,6 +371,7 @@ def build_positions():
             "dividend_yield_pct": pos.get("dividend_yield_pct"),
             "ex_dividend_date": pos.get("ex_dividend_date"),
             "source": "Interactive Brokers",
+            "live": live is not None,
         })
 
     # Compute weights
@@ -256,35 +382,65 @@ def build_positions():
     positions.sort(key=lambda x: x["value_eur"], reverse=True)
     return positions
 
-POSITIONS = build_positions()
-
 # ─── API Routes ───────────────────────────────────────────────────────────────
+
+@app.get("/api/v1/market/refresh")
+def refresh_prices():
+    """Manually trigger a price refresh."""
+    _fetch_live_prices()
+    return {"status": "ok", "cached": len(_price_cache), "eur_usd": get_eur_usd()}
 
 @app.get("/api/v1/networth")
 def get_networth():
-    t = P["totals"]
-    tr_val = P["trade_republic"]["total_account_value"]
-    ibkr_val = P["ibkr"]["net_liquidation_eur"]
+    positions = build_positions()
+    eur_usd = get_eur_usd()
+
+    tr_portfolio = sum(p["value_eur"] for p in positions if p["source"] == "Trade Republic")
+    tr_cash = P["trade_republic"]["cash"]
+    tr_val = tr_portfolio + tr_cash
+
+    ibkr_portfolio = sum(p["value_eur"] for p in positions if p["source"] == "Interactive Brokers")
+    ibkr_cash_eur = P["ibkr"]["cash"]["total_eur"]
+    ibkr_val = ibkr_portfolio + ibkr_cash_eur
+
+    bourso_liquid = P["boursobank"]["total_liquid"]
+    bourso_savings = P["boursobank"]["total_savings"]
+    ca_liquid = P["credit_agricole"]["accounts"]["checking"]["balance"]
+    sca_prop = P["sca_la_desirade"]["your_share_property_value"]
+
+    total_investments = tr_val + ibkr_val
+    total_bank_liquid = bourso_liquid + bourso_savings + ca_liquid
+    total_real_estate = sca_prop
+    total_assets = total_investments + total_bank_liquid + total_real_estate
+
+    bourso_loans = abs(P["boursobank"]["total_loans"])
+    ca_debt = abs(P["credit_agricole"]["total_debt"])
+    total_debt = bourso_loans + ca_debt
+    net_worth = total_assets - total_debt
+
+    live_count = sum(1 for p in positions if p.get("live"))
 
     return {
-        "net_worth": t["net_worth"],
-        "total_assets": t["total_assets"],
-        "total_liabilities": t["total_debt"],
+        "net_worth": round(net_worth, 2),
+        "total_assets": round(total_assets, 2),
+        "total_liabilities": round(total_debt, 2),
         "breakdown": {
-            "cash": t["total_bank_liquid"],
-            "savings": P["boursobank"]["total_savings"],
-            "investments": t["total_investments"],
-            "real_estate": t["total_real_estate"],
+            "cash": round(total_bank_liquid, 2),
+            "savings": round(bourso_savings, 2),
+            "investments": round(total_investments, 2),
+            "real_estate": round(total_real_estate, 2),
         },
         "by_institution": [
-            {"name": "ibkr", "display_name": "Interactive Brokers", "total": ibkr_val},
-            {"name": "credit_agricole", "display_name": "Crédit Agricole", "total": round(P["credit_agricole"]["accounts"]["checking"]["balance"] + P["credit_agricole"]["total_debt"], 2)},
-            {"name": "boursobank", "display_name": "Boursobank", "total": round(P["boursobank"]["total_liquid"] + P["boursobank"]["total_savings"] + P["boursobank"]["total_loans"], 2)},
-            {"name": "trade_republic", "display_name": "Trade Republic", "total": tr_val},
-            {"name": "sca", "display_name": "SCA La Désirade", "total": P["sca_la_desirade"]["your_share_property_value"]},
+            {"name": "ibkr", "display_name": "Interactive Brokers", "total": round(ibkr_val, 2)},
+            {"name": "credit_agricole", "display_name": "Crédit Agricole", "total": round(ca_liquid + P["credit_agricole"]["total_debt"], 2)},
+            {"name": "boursobank", "display_name": "Boursobank", "total": round(bourso_liquid + bourso_savings + P["boursobank"]["total_loans"], 2)},
+            {"name": "trade_republic", "display_name": "Trade Republic", "total": round(tr_val, 2)},
+            {"name": "sca", "display_name": "SCA La Désirade", "total": round(sca_prop, 2)},
         ],
         "variation_day": None,
         "variation_month": None,
+        "eur_usd": round(eur_usd, 4),
+        "live_prices": live_count,
     }
 
 
@@ -353,7 +509,7 @@ def get_account(account_id: str):
 
 @app.get("/api/v1/portfolio")
 def get_portfolio():
-    return POSITIONS
+    return build_positions()
 
 
 @app.get("/api/v1/portfolio/allocation")
@@ -364,9 +520,10 @@ def get_allocation():
     currencies: dict[str, float] = {}
     asset_types: dict[str, float] = {}
 
-    total = sum(p["value_eur"] for p in POSITIONS)
+    positions = build_positions()
+    total = sum(p["value_eur"] for p in positions)
 
-    for p in POSITIONS:
+    for p in positions:
         s = p.get("sector", "Other")
         sectors[s] = sectors.get(s, 0) + p["value_eur"]
 
@@ -395,8 +552,9 @@ def get_allocation():
 
 @app.get("/api/v1/portfolio/dividends")
 def get_dividends():
+    positions = build_positions()
     divs = []
-    for p in POSITIONS:
+    for p in positions:
         dy = p.get("dividend_yield_pct")
         if dy and dy != "?":
             try:
@@ -417,11 +575,12 @@ def get_dividends():
 
 @app.get("/api/v1/analytics/diversification")
 def get_diversification():
+    positions = build_positions()
     sectors = set()
     countries = set()
     max_w = 0
     max_t = ""
-    for p in POSITIONS:
+    for p in positions:
         sectors.add(p.get("sector", "Other"))
         countries.add(p.get("country", "??"))
         if p["weight_pct"] > max_w:
@@ -429,7 +588,7 @@ def get_diversification():
             max_t = p["ticker"]
 
     # Score: max 100
-    n_pos = len(POSITIONS)
+    n_pos = len(positions)
     n_sec = len(sectors)
     n_cou = len(countries)
     score = min(100, n_pos * 2 + n_sec * 5 + n_cou * 5 + max(0, 30 - max_w))
