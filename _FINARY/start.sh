@@ -73,7 +73,7 @@ cd "$DIR"
 # 4. Start keep-alive (if browser is running)
 if curl -s http://127.0.0.1:9222/json > /dev/null 2>&1; then
     log "Starting keep-alive (browser detected on :9222)..."
-    python3 "$DIR/scrapers/keep_alive.py" > /tmp/finary-keepalive.log 2>&1 &
+    python3 "$DIR/scrapers/session_keepalive.py" > /tmp/finary-keepalive.log 2>&1 &
     KA_PID=$!
     echo $KA_PID > "$PID_DIR/keepalive.pid"
 else
