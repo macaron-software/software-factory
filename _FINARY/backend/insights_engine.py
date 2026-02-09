@@ -252,17 +252,33 @@ def analyze_loans(loans: list[dict]) -> list[dict]:
         else:
             remaining_months = None
 
-        # Total cost (remaining interest + insurance)
-        if monthly and remaining_months:
-            total_payments_remaining = monthly * remaining_months
-            total_interest_remaining = total_payments_remaining - remaining
+        # Insurance (use real data if provided, else estimate)
+        insurance_monthly = loan.get("insurance_monthly", 0) or 0
+        if insurance_monthly > 0:
+            insurance_annual = insurance_monthly * 12
+        else:
+            insurance_annual = borrowed * 0.001 if borrowed else 0  # 0.10% default
+            insurance_monthly = insurance_annual / 12
+        insurance_remaining = insurance_annual * (remaining_months / 12) if remaining_months else None
+
+        # Total cost of credit remaining
+        total_cost_monthly = (monthly + insurance_monthly) if monthly else insurance_monthly
+        if remaining_months and monthly > 0:
+            total_payments_remaining = (monthly + insurance_monthly) * remaining_months
+            # For interest-only: monthly ≈ interest → total interest = all payments
+            monthly_interest = remaining * (rate / 100) / 12 if rate and rate > 0 else 0
+            if rate and rate > 0 and monthly > 0 and abs(monthly - monthly_interest) / monthly < 0.15:
+                # Interest-only phase
+                total_interest_remaining = monthly * remaining_months
+            else:
+                # Amortizing: interest = total payments - principal remaining
+                total_interest_remaining = max(0, monthly * remaining_months - remaining)
+        elif remaining_months and insurance_monthly > 0:
+            total_payments_remaining = insurance_monthly * remaining_months
+            total_interest_remaining = 0
         else:
             total_interest_remaining = None
             total_payments_remaining = None
-
-        # Insurance cost estimate (typically 0.1-0.4% of borrowed)
-        insurance_annual = borrowed * 0.002 if borrowed else 0  # conservative 0.2%
-        insurance_remaining = insurance_annual * (remaining_months / 12) if remaining_months else None
 
         # Real rate = nominal - inflation
         real_rate = (rate - INFLATION_RATE * 100) if rate is not None else None
@@ -305,9 +321,14 @@ def analyze_loans(loans: list[dict]) -> list[dict]:
             "recommendation": reco_text,
             "recommendation_detail": reco_detail,
             "remaining_months": remaining_months,
-            "total_interest_remaining": round(total_interest_remaining, 2) if total_interest_remaining else None,
-            "total_payments_remaining": round(total_payments_remaining, 2) if total_payments_remaining else None,
+            "insurance_monthly": round(insurance_monthly, 2),
+            "insurance_annual": round(insurance_annual, 2),
+            "total_interest_remaining": round(total_interest_remaining, 2) if total_interest_remaining is not None else None,
+            "total_payments_remaining": round(total_payments_remaining, 2) if total_payments_remaining is not None else None,
             "insurance_remaining_est": round(insurance_remaining, 2) if insurance_remaining else None,
+            "total_cost_remaining": round(
+                (total_interest_remaining or 0) + (insurance_remaining or 0), 2
+            ) if total_interest_remaining is not None or insurance_remaining else None,
         })
     return results
 

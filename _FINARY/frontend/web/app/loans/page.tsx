@@ -57,7 +57,7 @@ export default function LoansPage() {
           <table className="w-full text-body">
           <thead>
             <tr className="border-b border-bd-1">
-              {["Crédit", "Établissement", "Type", "Restant", "Mensualité", "Taux", "vs Inflation", "Conseil"].map((h, i) => (
+              {["Crédit", "Établissement", "Type", "Restant", "Mensualité", "Assurance", "Taux", "vs Inflation", "Conseil"].map((h, i) => (
                 <th key={h} className={`${i === 0 ? "text-left pl-5" : "text-right"} px-3 py-3 text-caption font-medium uppercase text-t-6`}>
                   {h}
                 </th>
@@ -82,6 +82,9 @@ export default function LoansPage() {
                 <td className="tnum text-right px-3 py-3 font-medium text-loss">{formatEUR(loan.remaining)}</td>
                 <td className="tnum text-right px-3 py-3 text-t-2">
                   {loan.monthly_payment ? formatEUR(loan.monthly_payment) : "—"}
+                </td>
+                <td className="tnum text-right px-3 py-3 text-t-4">
+                  {loan.insurance_monthly > 0 ? `${formatEUR(loan.insurance_monthly)}/mo` : "—"}
                 </td>
                 <td className="tnum text-right px-3 py-3 text-t-4">
                   {loan.rate_numeric != null ? `${loan.rate_numeric.toFixed(2)}%` : "—"}
@@ -127,7 +130,10 @@ export default function LoansPage() {
                   {loan.total_interest_remaining != null && (
                     <p className="text-caption text-t-5 mt-1">
                       Intérêts restants: {formatEUR(loan.total_interest_remaining)}
-                      {loan.insurance_remaining_est != null && ` · Assurance est.: ${formatEUR(loan.insurance_remaining_est)}`}
+                      {loan.insurance_remaining_est != null && ` · Assurance: ${formatEUR(loan.insurance_remaining_est)}`}
+                      {loan.total_cost_remaining != null && (
+                        <span className="font-medium text-t-3"> · Coût total: {formatEUR(loan.total_cost_remaining)}</span>
+                      )}
                     </p>
                   )}
                 </div>
