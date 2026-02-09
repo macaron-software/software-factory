@@ -70,7 +70,9 @@
   --radius-pill: 1000px;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+@layer base {
+  * { box-sizing: border-box; }
+}
 
 html { background: var(--bg-0); }
 
