@@ -1,0 +1,222 @@
+[
+  {
+    "iidc": "3d9273d89c49",
+    "uuid": "9d878d27-3377-4176-93f3-7d427e5a8da3",
+    "data": {
+      "id": "00004690214",
+      "type": "MONSIEUR LEGLAND SYLVAIN",
+      "resume": {
+        "nom_partenaire": "MONSIEUR LEGLAND SYLVAIN",
+        "montant_emprunte": {
+          "montant": 102000.0,
+          "code_devise": "EUR"
+        },
+        "montant_echeance": {
+          "montant": 0,
+          "code_devise": "EUR"
+        },
+        "date_prochaine_echeance": "05/03/2026",
+        "capital_restant_du": {
+          "montant": 102000.0,
+          "code_devise": "EUR"
+        },
+        "is_cacf": false
+      },
+      "remboursement": {
+        "taux_emprunt": "0,00",
+        "taux_assurance": null,
+        "nature_financement": null,
+        "total_annuel_interets": null,
+        "montant_differe": null,
+        "montant_rembourse": {
+          "montant": 0.0,
+          "code_devise": "EUR"
+        },
+        "periodicite_remboursement": "Mensuelle",
+        "retard_paiement": {
+          "montant": 0.0,
+          "code_devise": "EUR"
+        },
+        "nature_garantie": null,
+        "nature_taux_emprunt": "FIXE"
+      },
+      "caracteristique_credit": {
+        "id_credit": "00004690214",
+        "compte_payeur": "85172056038",
+        "nature_pret": null,
+        "duree_totale": "264",
+        "unite_duree": "Mois",
+        "date_debut": "28/09/2022",
+        "date_fin": "05/10/2044",
+        "periode_differe_debut": null,
+        "periode_differe_fin": null
+      },
+      "top_affichage_echeancier": false
+    }
+  },
+  {
+    "iidc": "8a10587f689c",
+    "uuid": "3dab1b12-80ab-47a9-ad6b-8ced4e8ead67",
+    "data": {
+      "id": "00004690213",
+      "type": "MONSIEUR LEGLAND SYLVAIN",
+      "resume": {
+        "nom_partenaire": "MONSIEUR LEGLAND SYLVAIN",
+        "montant_emprunte": {
+          "montant": 10000.0,
+          "code_devise": "EUR"
+        },
+        "montant_echeance": {
+          "montant": 0,
+          "code_devise": "EUR"
+        },
+        "date_prochaine_echeance": "05/03/2026",
+        "capital_restant_du": {
+          "montant": 10000.0,
+          "code_devise": "EUR"
+        },
+        "is_cacf": false
+      },
+      "remboursement": {
+        "taux_emprunt": "0,00",
+        "taux_assurance": null,
+        "nature_financement": null,
+        "total_annuel_interets": null,
+        "montant_differe": null,
+        "montant_rembourse": {
+          "montant": 0.0,
+          "code_devise": "EUR"
+        },
+        "periodicite_remboursement": "Mensuelle",
+        "retard_paiement": {
+          "montant": 0.0,
+          "code_devise": "EUR"
+        },
+        "nature_garantie": null,
+        "nature_taux_emprunt": "FIXE"
+      },
+      "caracteristique_credit": {
+        "id_credit": "00004690213",
+        "compte_payeur": "85172056038",
+        "nature_pret": null,
+        "duree_totale": "240",
+        "unite_duree": "Mois",
+        "date_debut": "28/09/2022",
+        "date_fin": "05/10/2042",
+        "periode_differe_debut": null,
+        "periode_differe_fin": null
+      },
+      "top_affichage_echeancier": false
+    }
+  },
+  {
+    "iidc": "fb3532ae47a8",
+    "uuid": "c2c2641d-4637-42e3-b45c-b78b06faa6fe",
+    "data": {
+      "id": "00004690212",
+      "type": "MONSIEUR LEGLAND SYLVAIN",
+      "resume": {
+        "nom_partenaire": "MONSIEUR LEGLAND SYLVAIN",
+        "montant_emprunte": {
+          "montant": 138290.0,
+          "code_devise": "EUR"
+        },
+        "montant_echeance": {
+          "montant": 90.32,
+          "code_devise": "EUR"
+        },
+        "date_prochaine_echeance": "05/03/2026",
+        "capital_restant_du": {
+          "montant": 110594.85,
+          "code_devise": "EUR"
+        },
+        "is_cacf": false
+      },
+      "remboursement": {
+        "taux_emprunt": "0,98",
+        "taux_assurance": null,
+        "nature_financement": null,
+        "total_annuel_interets": null,
+        "montant_differe": null,
+        "montant_rembourse": {
+          "montant": 0.0,
+          "code_devise": "EUR"
+        },
+        "periodicite_remboursement": "Mensuelle",
+        "retard_paiement": {
+          "montant": 0.0,
+          "code_devise": "EUR"
+        },
+        "nature_garantie": null,
+        "nature_taux_emprunt": "FIXE"
+      },
+      "caracteristique_credit": {
+        "id_credit": "00004690212",
+        "compte_payeur": "85172056038",
+        "nature_pret": null,
+        "duree_totale": "240",
+        "unite_duree": "Mois",
+        "date_debut": "27/03/2025",
+        "date_fin": "05/04/2045",
+        "periode_differe_debut": null,
+        "periode_differe_fin": null
+      },
+      "top_affichage_echeancier": false
+    }
+  },
+  {
+    "iidc": "9101e4afccc2",
+    "uuid": "84b3c5bc-5237-44cf-b4f4-1aff7a06a83e",
+    "data": {
+      "id": "73140424333",
+      "type": "MONSIEUR LEGLAND SYLVAIN",
+      "resume": {
+        "nom_partenaire": "MONSIEUR LEGLAND SYLVAIN",
+        "montant_emprunte": {
+          "montant": 5000.0,
+          "code_devise": "EUR"
+        },
+        "montant_echeance": {
+          "montant": 73.69,
+          "code_devise": "EUR"
+        },
+        "date_prochaine_echeance": "05/03/2026",
+        "capital_restant_du": {
+          "montant": 1732.77,
+          "code_devise": "EUR"
+        },
+        "is_cacf": true
+      },
+      "remboursement": {
+        "taux_emprunt": "1,9720",
+        "taux_assurance": null,
+        "nature_financement": null,
+        "total_annuel_interets": null,
+        "montant_differe": null,
+        "montant_rembourse": {
+          "montant": 3267.23,
+          "code_devise": "EUR"
+        },
+        "periodicite_remboursement": "Mensuelle",
+        "retard_paiement": {
+          "montant": 0.0,
+          "code_devise": "EUR"
+        },
+        "nature_garantie": null,
+        "nature_taux_emprunt": "FIXE"
+      },
+      "caracteristique_credit": {
+        "id_credit": "73140424333",
+        "compte_payeur": "85172056038",
+        "nature_pret": null,
+        "duree_totale": "72",
+        "unite_duree": "Mois",
+        "date_debut": "25/01/2022",
+        "date_fin": "05/02/2028",
+        "periode_differe_debut": null,
+        "periode_differe_fin": null
+      },
+      "top_affichage_echeancier": false
+    }
+  }
+]

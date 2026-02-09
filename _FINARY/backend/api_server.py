@@ -683,25 +683,32 @@ def get_patrimoine():
 @app.get("/api/v1/loans")
 def get_loans():
     """All loans with inflation analysis & recommendations."""
-    # --- ONLY mathematically proven rates (from scraped amortization data) ---
-    # PTZ: 0% by law (Prêt à Taux Zéro)
-    # PAS 2: 90.32€/mo × 12 = 1,083.84€/yr interest, 1,083.84 / 110,594.85 = 0.98%
-    #   PROOF: interest-only phase (différé), monthly = exact interest
-    # PAS 1: same contract as PAS 2 → 0.98%
-    # PACP: borrowed 5,000€, monthly 73.69€, 5000/73.69=67.9mo → total≈5,000€ → 0%
-    PROVEN_RATES = {
-        "00004690214": 0.0,      # PTZ — 0% par la loi
-        "00004690213": 0.98,     # PAS 1 — même contrat que PAS 2
-        "00004690212": 0.98,     # PAS 2 — prouvé: 90.32×12/110594.85 = 0.98%
-        "73140424333": 0.0,      # PACP — prouvé: total remboursé ≈ capital emprunté
+    # --- REAL rates scraped from CA BFF API (dcam.credit-agricole.fr/bff01/credits/) ---
+    # Scraped 2026-02-09 from credit detail pages via CDP
+    CA_SCRAPED = {
+        "00004690214": {  # PTZ
+            "taux": 0.0, "taux_type": "FIXE", "taux_assurance": None,
+            "duree_mois": 264, "date_debut": "28/09/2022", "date_fin": "05/10/2044",
+        },
+        "00004690213": {  # PAS 1
+            "taux": 0.0, "taux_type": "FIXE", "taux_assurance": None,
+            "duree_mois": 240, "date_debut": "28/09/2022", "date_fin": "05/10/2042",
+        },
+        "00004690212": {  # PAS 2
+            "taux": 0.98, "taux_type": "FIXE", "taux_assurance": None,
+            "duree_mois": 240, "date_debut": "27/03/2025", "date_fin": "05/04/2045",
+        },
+        "73140424333": {  # PACP (Prêt à Consommer Perso)
+            "taux": 1.972, "taux_type": "FIXE", "taux_assurance": None,
+            "duree_mois": 72, "date_debut": "25/01/2022", "date_fin": "05/02/2028",
+        },
     }
-    # Insurance/assurance: NOT scraped → None. To be filled when scraper
-    # navigates to credit detail pages (CA "tableau d'amortissement" link exists).
 
     raw_loans = []
     for credit in P["credit_agricole"]["credits"]:
         acct = credit.get("account", "")
-        rate = PROVEN_RATES.get(acct)
+        scraped = CA_SCRAPED.get(acct, {})
+        rate = scraped.get("taux")
         raw_loans.append({
             "institution": "Crédit Agricole",
             "name": credit["name"],
@@ -710,9 +717,12 @@ def get_loans():
             "remaining": credit["remaining"],
             "monthly_payment": credit["monthly_payment"],
             "rate": rate,
-            "rate_source": "computed" if rate is not None else "unknown",
-            "insurance_monthly": None,  # not scraped yet
-            "start_date": credit.get("start_date"),
+            "rate_source": "scraped" if rate is not None else "unknown",
+            "insurance_monthly": None,  # taux_assurance=null in CA API
+            "start_date": scraped.get("date_debut") or credit.get("start_date"),
+            "end_date": scraped.get("date_fin"),
+            "duration_months": scraped.get("duree_mois"),
+            "rate_type": scraped.get("taux_type"),
             "status": credit.get("status"),
         })
     # Boursobank personal loans — REAL data scraped from detail pages
