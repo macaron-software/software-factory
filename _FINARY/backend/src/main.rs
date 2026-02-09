@@ -4,7 +4,7 @@ mod models;
 mod services;
 
 use axum::{
-    Router,
+    Json, Router,
     routing::get,
 };
 use sqlx::postgres::PgPoolOptions;
@@ -14,6 +14,10 @@ use tower_http::trace::TraceLayer;
 
 pub struct AppState {
     pub db: sqlx::PgPool,
+}
+
+async fn health_check() -> Json<serde_json::Value> {
+    Json(serde_json::json!({"status": "ok", "engine": "rust"}))
 }
 
 pub fn create_router(state: Arc<AppState>) -> Router {
@@ -107,6 +111,15 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             "/api/v1/analytics/diversification",
             get(handlers::analytics::get_diversification),
         )
+        .route(
+            "/api/v1/diversification",
+            get(handlers::analytics::get_diversification),
+        )
+        // Institutions
+        .route(
+            "/api/v1/institutions",
+            get(handlers::institutions::list_institutions),
+        )
         // Alerts
         .route(
             "/api/v1/alerts",
@@ -117,6 +130,8 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             "/api/v1/alerts/{id}",
             axum::routing::delete(handlers::alerts::delete_alert),
         )
+        // Health check
+        .route("/api/v1/status", get(health_check))
         .with_state(state)
         .layer(cors)
         .layer(TraceLayer::new_for_http())
@@ -147,7 +162,7 @@ async fn main() {
     let state = Arc::new(AppState { db: pool });
     let app = create_router(state);
 
-    let addr = "0.0.0.0:8000";
+    let addr = std::env::var("PORT").map(|p| format!("0.0.0.0:{p}")).unwrap_or_else(|_| "0.0.0.0:8001".to_string());
     tracing::info!("Finary API listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();

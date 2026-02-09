@@ -2,6 +2,7 @@ pub mod accounts;
 pub mod alerts;
 pub mod analytics;
 pub mod budget;
+pub mod institutions;
 pub mod market;
 pub mod networth;
 pub mod portfolio;
