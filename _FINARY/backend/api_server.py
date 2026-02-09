@@ -683,27 +683,25 @@ def get_patrimoine():
 @app.get("/api/v1/loans")
 def get_loans():
     """All loans with inflation analysis & recommendations."""
-    # Computed real rates (mathematical proof from amortization data):
-    # PAS: 90.32€×12 / 110,594.85€ = 0.98% (interest-only phase, différé d'amortissement)
-    # PACP/Consumer: 5000€ / 73.69€ = 67.9 months → total=5000€ → 0% interest
-    # PTZ: 0% by definition
-    ACCOUNT_RATES = {
-        "00004690214": 0.0,      # PTZ — taux 0% par définition
-        "00004690213": 0.98,     # PAS 1 (10K, différé) — même contrat que PAS 2
-        "00004690212": 0.98,     # PAS 2 — calculé: 90.32€×12/110,594.85€ = 0.98%
-        "73140424333": 0.0,      # Conso PACP — 5000€/73.69€=67.9mo, total=5000€ → 0%
+    # --- ONLY mathematically proven rates (from scraped amortization data) ---
+    # PTZ: 0% by law (Prêt à Taux Zéro)
+    # PAS 2: 90.32€/mo × 12 = 1,083.84€/yr interest, 1,083.84 / 110,594.85 = 0.98%
+    #   PROOF: interest-only phase (différé), monthly = exact interest
+    # PAS 1: same contract as PAS 2 → 0.98%
+    # PACP: borrowed 5,000€, monthly 73.69€, 5000/73.69=67.9mo → total≈5,000€ → 0%
+    PROVEN_RATES = {
+        "00004690214": 0.0,      # PTZ — 0% par la loi
+        "00004690213": 0.98,     # PAS 1 — même contrat que PAS 2
+        "00004690212": 0.98,     # PAS 2 — prouvé: 90.32×12/110594.85 = 0.98%
+        "73140424333": 0.0,      # PACP — prouvé: total remboursé ≈ capital emprunté
     }
-    # PAS insurance: typically 0.10-0.15% on PAS loans, ~11.50€/mo on 138K
-    ACCOUNT_INSURANCE = {
-        "00004690212": 11.50,    # PAS 2 principal — assurance emprunteur ≈0.10%
-        "00004690213": 0.83,     # PAS 1 (10K) — assurance ≈0.10%
-    }
+    # Insurance/assurance: NOT scraped → None. To be filled when scraper
+    # navigates to credit detail pages (CA "tableau d'amortissement" link exists).
 
     raw_loans = []
     for credit in P["credit_agricole"]["credits"]:
         acct = credit.get("account", "")
-        rate = ACCOUNT_RATES.get(acct) if acct else credit.get("rate")
-        insurance = ACCOUNT_INSURANCE.get(acct, credit.get("insurance_monthly", 0))
+        rate = PROVEN_RATES.get(acct)
         raw_loans.append({
             "institution": "Crédit Agricole",
             "name": credit["name"],
@@ -712,11 +710,12 @@ def get_loans():
             "remaining": credit["remaining"],
             "monthly_payment": credit["monthly_payment"],
             "rate": rate,
-            "insurance_monthly": insurance,
+            "rate_source": "computed" if rate is not None else "unknown",
+            "insurance_monthly": None,  # not scraped yet
             "start_date": credit.get("start_date"),
             "status": credit.get("status"),
         })
-    # Boursobank — competitive prêt perso rates, typically 0.75% for good profiles
+    # Boursobank personal loans — rate/monthly NOT in scraped data
     for loan in P["boursobank"]["loans"]:
         raw_loans.append({
             "institution": "Boursobank",
@@ -725,8 +724,9 @@ def get_loans():
             "borrowed": None,
             "remaining": loan["remaining"],
             "monthly_payment": loan.get("monthly_payment"),
-            "rate": 0.75,  # Bourso prêt perso standard rate
-            "insurance_monthly": 0,
+            "rate": None,  # not scraped — session expired, need re-login
+            "rate_source": "unknown",
+            "insurance_monthly": None,
         })
     # IBKR margin
     margin_usd = abs(P["ibkr"].get("margin_loan_usd", 0))
@@ -741,6 +741,7 @@ def get_loans():
         "remaining": round(margin_eur, 2),
         "monthly_payment": round(margin_monthly, 2),
         "rate": str(margin_rate),
+        "rate_source": "scraped",  # from IBKR Client Portal
         "insurance_monthly": 0,
     })
     return analyze_loans(raw_loans)

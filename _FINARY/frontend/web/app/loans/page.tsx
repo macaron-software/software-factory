@@ -84,10 +84,24 @@ export default function LoansPage() {
                   {loan.monthly_payment ? formatEUR(loan.monthly_payment) : "—"}
                 </td>
                 <td className="tnum text-right px-3 py-3 text-t-4">
-                  {loan.insurance_monthly > 0 ? `${formatEUR(loan.insurance_monthly)}/mo` : "—"}
+                  {loan.insurance_monthly > 0 ? `${formatEUR(loan.insurance_monthly)}/mo` :
+                   <span className="text-t-6 text-caption">Non scrapé</span>}
                 </td>
                 <td className="tnum text-right px-3 py-3 text-t-4">
-                  {loan.rate_numeric != null ? `${loan.rate_numeric.toFixed(2)}%` : "—"}
+                  {loan.rate_numeric != null ? (
+                    <>
+                      {loan.rate_numeric.toFixed(2)}%
+                      <span className={`block text-caption ${
+                        loan.rate_source === "scraped" ? "text-gain" :
+                        loan.rate_source === "computed" ? "text-accent" : "text-t-6"
+                      }`}>
+                        {loan.rate_source === "scraped" ? "scrapé" :
+                         loan.rate_source === "computed" ? "calculé" : ""}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-t-6 text-caption">Non scrapé</span>
+                  )}
                   {loan.real_rate != null && (
                     <span className={`block text-caption ${loan.real_rate <= 0 ? "text-gain" : "text-loss"}`}>
                       réel: {loan.real_rate > 0 ? "+" : ""}{loan.real_rate.toFixed(2)}%
@@ -102,7 +116,7 @@ export default function LoansPage() {
                   }>
                     {loan.vs_inflation === "bouclier_inflation" ? "🛡️ Bouclier" :
                      loan.vs_inflation === "rembourser" ? "⚠️ Rembourser" :
-                     loan.vs_inflation === "neutre" ? "≈ Neutre" : "❓ Inconnu"}
+                     loan.vs_inflation === "neutre" ? "≈ Neutre" : "🔍 Non scrapé"}
                   </Badge>
                 </td>
                 <td className="text-right px-3 pr-5 py-3 text-label text-t-4 max-w-[200px]">

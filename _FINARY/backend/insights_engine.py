@@ -221,9 +221,9 @@ def analyze_loans(loans: list[dict]) -> list[dict]:
         if rate is None and monthly > 0 and remaining > 0:
             rate = _infer_rate(borrowed, remaining, monthly, loan.get("type"))
 
-        # For Bourso personal loans with no monthly/rate, use typical rates
-        if rate is None and loan.get("institution") == "Boursobank" and loan.get("type") in ("consumer", "CONSUMER"):
-            rate = 0.75  # Bourso prêt perso typical 0.75%
+        # For Bourso personal loans with no monthly/rate — data NOT available
+        # Will be scraped when Bourso session is re-authenticated
+        # DO NOT default to a guessed rate
 
         remaining = loan.get("remaining", 0)
         monthly = loan.get("monthly_payment") or 0
@@ -252,14 +252,10 @@ def analyze_loans(loans: list[dict]) -> list[dict]:
         else:
             remaining_months = None
 
-        # Insurance (use real data if provided, else estimate)
-        insurance_monthly = loan.get("insurance_monthly", 0) or 0
-        if insurance_monthly > 0:
-            insurance_annual = insurance_monthly * 12
-        else:
-            insurance_annual = borrowed * 0.001 if borrowed else 0  # 0.10% default
-            insurance_monthly = insurance_annual / 12
-        insurance_remaining = insurance_annual * (remaining_months / 12) if remaining_months else None
+        # Insurance — ONLY use real scraped data, never estimate
+        insurance_monthly = loan.get("insurance_monthly") or 0
+        insurance_annual = insurance_monthly * 12
+        insurance_remaining = insurance_annual * (remaining_months / 12) if remaining_months and insurance_monthly > 0 else None
 
         # Total cost of credit remaining
         total_cost_monthly = (monthly + insurance_monthly) if monthly else insurance_monthly
@@ -308,13 +304,14 @@ def analyze_loans(loans: list[dict]) -> list[dict]:
             reco_text = f"Marge IBKR ~{rate}% — taux très supérieur à l'inflation."
             reco_detail = "Réduisez le levier si possible, sauf si rendement attendu > 6%."
         else:
-            reco = "inconnu"
-            reco_text = "Taux inconnu — vérifiez vos documents."
-            reco_detail = ""
+            reco = "non_scraped"
+            reco_text = "Taux non scrapé — reconnectez-vous pour scraper les détails."
+            reco_detail = "Les sessions bancaires ont expiré. Reconnectez CA/Bourso pour récupérer les vrais taux."
 
         results.append({
             **loan,
             "rate_numeric": rate,
+            "rate_source": loan.get("rate_source", "computed" if rate is not None else "unknown"),
             "real_rate": round(real_rate, 2) if real_rate is not None else None,
             "inflation_rate": INFLATION_RATE * 100,
             "vs_inflation": reco,

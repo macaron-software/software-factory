@@ -58,7 +58,7 @@ done
 # 2. Start API server
 log "Starting API server on :$API_PORT..."
 source "$DIR/scrapers/.venv/bin/activate"
-python3 "$DIR/backend/api_server.py" > /tmp/finary-api.log 2>&1 &
+PYTHONPATH="$DIR" python3 "$DIR/backend/api_server.py" > /tmp/finary-api.log 2>&1 &
 API_PID=$!
 echo $API_PID > "$PID_DIR/api.pid"
 
