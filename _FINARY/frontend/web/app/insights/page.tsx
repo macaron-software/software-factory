@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { usePortfolio, useDiversification, useDividends, useCosts, useInsightsRules } from "@/lib/hooks/useApi";
+import { usePortfolio, useDiversification, useDividends, useCosts, useInsightsRules, useNetWorthHistory } from "@/lib/hooks/useApi";
 import { formatEUR, formatPct, formatNumber, CHART_COLORS } from "@/lib/utils";
-import { generateNetWorthHistory } from "@/lib/fixtures";
 import { PriceChart } from "@/components/charts/PriceChart";
 import { Section, Badge, Loading } from "@/components/ds";
 
@@ -59,6 +58,7 @@ export default function InsightsPage() {
   const { data: dividends } = useDividends();
   const { data: costs } = useCosts() as { data: any };
   const { data: insights } = useInsightsRules() as { data: any[] | undefined };
+  const { data: nwHistory } = useNetWorthHistory(365);
 
   const totalInvested = positions?.reduce((s, p) => s + p.value_eur, 0) ?? 0;
 
@@ -82,12 +82,12 @@ export default function InsightsPage() {
   const simFinal = simulation[simulation.length - 1];
 
   const perfData = useMemo(() => {
-    const hist = generateNetWorthHistory(365);
-    return hist.map((h: any) => ({
+    if (!nwHistory?.length) return [];
+    return nwHistory.map((h: any) => ({
       date: h.date,
-      value: h.breakdown.investments ?? h.net_worth * 0.3,
+      value: h.breakdown?.investments ?? h.net_worth * 0.3,
     }));
-  }, []);
+  }, [nwHistory]);
 
   const movers = useMemo(() => {
     if (!positions || positions.length === 0) return [];

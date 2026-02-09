@@ -73,6 +73,8 @@ export const api = {
     fetchApi<import("./types/api").PriceHistory[]>(
       `/api/v1/market/history/${ticker}?limit=${limit}`
     ),
+  getSparklines: () =>
+    fetchApi<Record<string, number[]>>("/api/v1/market/sparklines"),
   getFxRates: () =>
     fetchApi<import("./types/api").ExchangeRate[]>("/api/v1/market/fx"),
 

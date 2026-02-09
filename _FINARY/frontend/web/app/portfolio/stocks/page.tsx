@@ -1,10 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { usePortfolio, useDividends, useDiversification } from "@/lib/hooks/useApi";
+import { usePortfolio, useDividends, useDiversification, useNetWorthHistory, useSparklines } from "@/lib/hooks/useApi";
 import { formatEUR, formatPct, formatNumber, pnlColor, CHART_COLORS } from "@/lib/utils";
 import { PriceChart } from "@/components/charts/PriceChart";
-import { generateNetWorthHistory, generateSparkline } from "@/lib/fixtures";
 import { Sparkline } from "@/components/charts/Sparkline";
 import { Loading, StatCard, Section } from "@/components/ds";
 
@@ -12,27 +11,30 @@ export default function StocksPage() {
   const { data: positions, isLoading } = usePortfolio();
   const { data: dividends } = useDividends();
   const { data: diversification } = useDiversification();
+  const { data: nwHistory } = useNetWorthHistory(365);
 
   const totalValue = positions?.reduce((s, p) => s + p.value_eur, 0) ?? 0;
   const totalPnl = positions?.reduce((s, p) => s + p.pnl_eur, 0) ?? 0;
   const totalPnlPct = totalValue - totalPnl > 0 ? (totalPnl / (totalValue - totalPnl)) * 100 : 0;
 
   const chartData = useMemo(() => {
-    const hist = generateNetWorthHistory(365);
-    return hist.map((h) => ({
+    if (!nwHistory?.length) return [];
+    return nwHistory.map((h: { date: string; breakdown?: { investments?: number }; net_worth: number }) => ({
       date: h.date,
-      value: h.breakdown.investments ?? totalValue,
+      value: h.breakdown?.investments ?? totalValue,
     }));
-  }, [totalValue]);
+  }, [nwHistory, totalValue]);
 
+  const { data: sparkData } = useSparklines();
   const sparklines = useMemo(() => {
-    if (!positions) return {};
+    if (!positions || !sparkData) return {};
     const map: Record<string, number[]> = {};
     positions.forEach((p) => {
-      map[p.id] = generateSparkline(p.current_price ?? p.avg_cost ?? 100);
+      const key = p.ticker || p.name;
+      if (sparkData[key]) map[p.id] = sparkData[key];
     });
     return map;
-  }, [positions]);
+  }, [positions, sparkData]);
 
   const annualDividends = dividends?.reduce((s, d) => s + d.total_amount, 0) ?? 0;
   const dividendYield = totalValue > 0 ? (annualDividends / totalValue) * 100 : 0;

@@ -12,7 +12,6 @@ import {
 import { PeriodSelector, periodToDays, type Period } from "./PeriodSelector";
 import { formatEUR, formatPct } from "@/lib/utils";
 import { useNetWorthHistory } from "@/lib/hooks/useApi";
-import { generateNetWorthHistory } from "@/lib/fixtures";
 
 interface ChartPoint {
   date: string;
@@ -37,10 +36,9 @@ export function NetWorthChart() {
   const [hoverValue, setHoverValue] = useState<number | null>(null);
   const { data: apiHistory } = useNetWorthHistory(365);
 
-  // Use API data or generate fixtures
   const rawHistory = useMemo(() => {
     if (apiHistory && apiHistory.length > 0) return apiHistory;
-    return generateNetWorthHistory(365);
+    return [];
   }, [apiHistory]);
 
   const chartData = useMemo<ChartPoint[]>(() => {

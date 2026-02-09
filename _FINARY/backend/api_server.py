@@ -782,6 +782,36 @@ def get_history(ticker: str, period: str = Query("1y"), limit: int = Query(365))
         return {"error": str(e)}
 
 
+@app.get("/api/v1/market/sparklines")
+def get_sparklines():
+    """Return 30-day close prices for all portfolio positions (batch)."""
+    import yfinance as yf
+    result = {}
+    tickers = set()
+    for bank_key in ["ibkr", "trade_republic"]:
+        bank = P.get(bank_key, {})
+        for pos in bank.get("positions", []):
+            sym = pos.get("symbol") or ISIN_TO_TICKER.get(pos.get("isin", ""), pos.get("name", "")[:10])
+            if sym:
+                tickers.add(sym)
+    if not tickers:
+        return result
+    try:
+        data = yf.download(list(tickers), period="1mo", group_by="ticker", auto_adjust=True, progress=False)
+        for t in tickers:
+            try:
+                if len(tickers) == 1:
+                    closes = data["Close"].dropna().tolist()
+                else:
+                    closes = data[t]["Close"].dropna().tolist()
+                result[t] = [round(float(c), 2) for c in closes[-30:]]
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"[sparklines] yfinance error: {e}")
+    return result
+
+
 @app.get("/api/v1/alerts")
 def get_alerts():
     return []

@@ -105,6 +105,14 @@ export function usePriceHistory(ticker: string, limit = 365) {
   });
 }
 
+export function useSparklines() {
+  return useQuery({
+    queryKey: ["market", "sparklines"],
+    queryFn: api.getSparklines,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useFxRates() {
   return useQuery({
     queryKey: ["market", "fx"],
