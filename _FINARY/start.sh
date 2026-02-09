@@ -45,6 +45,13 @@ fi
 
 log "━━━ Finary Stack ━━━"
 
+# 0. Ensure browser is running on :18800
+if ! curl -s http://127.0.0.1:18800/json > /dev/null 2>&1; then
+    warn "No browser on :18800 — launching Chrome..."
+    bash "$DIR/scrapers/launch_browser.sh"
+    sleep 3
+fi
+
 # 1. Kill existing processes on our ports
 for port in $API_PORT $WEB_PORT; do
     pid=$(lsof -ti:$port 2>/dev/null | head -1)
@@ -73,9 +80,7 @@ cd "$DIR"
 # 4. Start keep-alive (if browser is running)
 if curl -s http://127.0.0.1:18800/json > /dev/null 2>&1; then
     log "Starting keep-alive (browser detected on :18800)..."
-    python3 "$DIR/scrapers/session_keepalive.py" > /tmp/finary-keepalive.log 2>&1 &
-    KA_PID=$!
-    echo $KA_PID > "$PID_DIR/keepalive.pid"
+    python3 "$DIR/scrapers/session_keepalive.py" --daemon
 else
     warn "No browser on :18800, skipping keep-alive"
 fi
