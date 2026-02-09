@@ -1,0 +1,17 @@
+{
+  "scraped_at": "2026-02-09T08:58:00",
+  "source": "ibkr",
+  "user": "sylvainl34",
+  "account_id": "U15999905",
+  "currency": "EUR",
+  "total_value": 52932.39,
+  "daily_pnl": 139.60,
+  "cash": -6812.84,
+  "unrealized_pnl": 14937.35,
+  "realized_pnl": 0.00,
+  "maintenance_margin": 17960.74,
+  "excess_liquidity": 34971.65,
+  "buying_power": 221194.66,
+  "dividends": 0.00,
+  "notes": "Data extracted from Client Portal dashboard. Portfolio positions and detailed holdings need separate scraping from Portfolio page within the portal SPA."
+}

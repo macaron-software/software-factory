@@ -371,15 +371,247 @@ async def scrape_boursobank():
         await browser.close()
 
 
+async def scrape_trade_republic():
+    """Scrape Trade Republic using pytr WebSocket API."""
+    from pytr.api import TradeRepublicApi
+
+    phone = os.environ["TR_PHONE"]
+    pin = os.environ["TR_PIN"]
+
+    print(f"[trade_republic] Connecting as {phone[:6]}****...")
+
+    tr = TradeRepublicApi(phone_no=phone, pin=pin, locale="fr")
+
+    # Login triggers 2FA — user must confirm on phone
+    print("[trade_republic] Logging in (check your phone for 2FA confirmation)...")
+    tr.login()
+    print("[trade_republic] Initiating web login...")
+    countdown = tr.initiate_weblogin()
+    print(f"[trade_republic] 2FA sent — confirm on your phone within {countdown}s")
+
+    # Wait for confirmation
+    import time
+    for i in range(countdown, 0, -5):
+        print(f"[trade_republic] Waiting for 2FA... {i}s remaining")
+        time.sleep(5)
+        try:
+            tr.complete_weblogin()
+            print("[trade_republic] 2FA confirmed!")
+            break
+        except Exception:
+            continue
+    else:
+        print("[trade_republic] ERROR: 2FA timeout")
+        return
+
+    data = {"scraped_at": datetime.now().isoformat(), "source": "trade_republic"}
+
+    # Get portfolio
+    print("[trade_republic] Fetching portfolio...")
+    try:
+        portfolio = await asyncio.to_thread(tr.portfolio)
+        data["portfolio"] = portfolio
+        print(f"[trade_republic] Portfolio: {json.dumps(portfolio, cls=DecimalEncoder, indent=2)[:500]}")
+    except Exception as e:
+        print(f"[trade_republic] Portfolio error: {e}")
+
+    # Get cash
+    print("[trade_republic] Fetching cash balance...")
+    try:
+        cash = await asyncio.to_thread(tr.cash)
+        data["cash"] = cash
+        print(f"[trade_republic] Cash: {cash}")
+    except Exception as e:
+        print(f"[trade_republic] Cash error: {e}")
+
+    # Get compact portfolio
+    print("[trade_republic] Fetching compact portfolio...")
+    try:
+        compact = await asyncio.to_thread(tr.compact_portfolio)
+        data["compact_portfolio"] = compact
+        print(f"[trade_republic] Compact: {json.dumps(compact, cls=DecimalEncoder, indent=2)[:500]}")
+    except Exception as e:
+        print(f"[trade_republic] Compact portfolio error: {e}")
+
+    # Get timeline (recent transactions)
+    print("[trade_republic] Fetching timeline...")
+    try:
+        timeline = await asyncio.to_thread(tr.timeline_transactions)
+        data["timeline"] = timeline
+        print(f"[trade_republic] Timeline entries: {len(timeline) if isinstance(timeline, list) else 'N/A'}")
+    except Exception as e:
+        print(f"[trade_republic] Timeline error: {e}")
+
+    # Get performance history
+    print("[trade_republic] Fetching performance history...")
+    try:
+        perf = await asyncio.to_thread(tr.performance)
+        data["performance"] = perf
+        print(f"[trade_republic] Performance: {json.dumps(perf, cls=DecimalEncoder, indent=2)[:300]}")
+    except Exception as e:
+        print(f"[trade_republic] Performance error: {e}")
+
+    # Save data
+    out_path = Path("data") / f"trade_republic_{date.today().isoformat()}.json"
+    out_path.parent.mkdir(exist_ok=True)
+    out_path.write_text(json.dumps(data, cls=DecimalEncoder, indent=2, ensure_ascii=False))
+    print(f"\n[trade_republic] DONE. Data saved to {out_path}")
+
+
+async def scrape_ibkr():
+    """Scrape IBKR via Client Portal web login with Playwright."""
+    from playwright.async_api import async_playwright
+
+    username = os.environ["IBKR_USERNAME"]
+    password = os.environ["IBKR_PASSWORD"]
+
+    print(f"[ibkr] Connecting as {username}...")
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=False)
+        ctx = await browser.new_context(
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            viewport={"width": 1280, "height": 800},
+        )
+        page = await ctx.new_page()
+        page.set_default_timeout(60000)
+
+        # Step 1: Go to IBKR Client Portal login
+        print("[ibkr] Loading login page...")
+        await page.goto("https://www.interactivebrokers.com/sso/Login", wait_until="domcontentloaded")
+        await page.wait_for_timeout(3000)
+
+        # Dismiss cookie banner if present
+        for sel in ['button:has-text("Accept Cookies")', 'button:has-text("Reject All")', '#acceptCookies']:
+            try:
+                btn = await page.query_selector(sel)
+                if btn and await btn.is_visible():
+                    await btn.click()
+                    print(f"[ibkr] Dismissed cookie banner via {sel}")
+                    await page.wait_for_timeout(1000)
+                    break
+            except Exception:
+                continue
+
+        await page.screenshot(path="/tmp/ibkr_01_login.png")
+        print("[ibkr] Screenshot saved: /tmp/ibkr_01_login.png")
+
+        # Step 2: Enter credentials
+        print("[ibkr] Entering credentials...")
+        try:
+            await page.fill('input[name="username"]', username)
+            print("[ibkr] Username entered")
+        except Exception:
+            pass
+        try:
+            await page.fill('input[name="password"]', password)
+            print("[ibkr] Password entered")
+        except Exception:
+            pass
+
+        # Step 3: Submit login
+        print("[ibkr] Submitting login...")
+        submit_sels = ['button[type="submit"]', '#submitForm', 'button:has-text("Log In")', 'input[type="submit"]']
+        for sel in submit_sels:
+            try:
+                btn = await page.query_selector(sel)
+                if btn and await btn.is_visible():
+                    await btn.click()
+                    print(f"[ibkr] Submitted via {sel}")
+                    break
+            except Exception:
+                continue
+
+        await page.wait_for_timeout(5000)
+        await page.screenshot(path="/tmp/ibkr_02_after_login.png")
+        current_url = page.url
+        print(f"[ibkr] Current URL: {current_url}")
+
+        # Step 4: Handle 2FA (IBKR uses IB Key mobile app or SMS)
+        body_text = await page.inner_text("body")
+        if any(kw in body_text.lower() for kw in ("two factor", "second factor", "ib key", "security code", "authentication")):
+            print("[ibkr] 2FA required! Check your IB Key app or phone.")
+            print("[ibkr] Waiting 120 seconds for manual 2FA...")
+            for i in range(24):
+                await page.wait_for_timeout(5000)
+                new_url = page.url
+                if new_url != current_url:
+                    print(f"[ibkr] Navigation detected: {new_url}")
+                    break
+            await page.screenshot(path="/tmp/ibkr_03_after_2fa.png")
+
+        # Step 5: Navigate to portfolio/account pages
+        await page.wait_for_timeout(3000)
+        current_url = page.url
+        print(f"[ibkr] Post-auth URL: {current_url}")
+
+        # Dismiss any FYI notification modal
+        try:
+            close_btn = await page.query_selector('button:has-text("Close")')
+            if close_btn and await close_btn.is_visible():
+                await close_btn.click()
+                print("[ibkr] Dismissed FYI notification")
+                await page.wait_for_timeout(1000)
+        except Exception:
+            pass
+
+        data = {"scraped_at": datetime.now().isoformat(), "source": "ibkr", "user": username}
+
+        # Save homepage content (this is the SPA dashboard with all key data)
+        body_text = await page.inner_text("body")
+        Path("/tmp/ibkr_body_text.txt").write_text(body_text)
+        await page.screenshot(path="/tmp/ibkr_04_home.png")
+        print("[ibkr] Home page text saved to /tmp/ibkr_body_text.txt")
+
+        # Parse key values from dashboard text
+        import re as _re
+        for line in body_text.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            # Match "Label  Value" patterns
+            for key in ["Cash", "Unrealized P&L", "Realized P&L", "Maintenance Margin",
+                        "Excess Liquidity", "Buying Power", "Dividends"]:
+                if line.startswith(key):
+                    val = line[len(key):].strip().replace(",", "")
+                    try:
+                        data[key.lower().replace(" ", "_").replace("&", "and")] = float(val)
+                    except ValueError:
+                        data[key.lower().replace(" ", "_").replace("&", "and")] = val
+
+        # Navigate to Portfolio page within the SPA
+        print("[ibkr] Clicking Portfolio tab...")
+        try:
+            portfolio_link = await page.query_selector('a:has-text("Portfolio"), [href*="portfolio"]')
+            if portfolio_link:
+                await portfolio_link.click()
+                await page.wait_for_timeout(5000)
+                await page.screenshot(path="/tmp/ibkr_05_portfolio.png")
+                portfolio_text = await page.inner_text("body")
+                Path("/tmp/ibkr_portfolio_text.txt").write_text(portfolio_text)
+                print("[ibkr] Portfolio page text saved")
+        except Exception as e:
+            print(f"[ibkr] Portfolio tab error: {e}")
+
+        # Save all collected data
+        out_path = Path("data") / f"ibkr_{date.today().isoformat()}.json"
+        out_path.parent.mkdir(exist_ok=True)
+        out_path.write_text(json.dumps(data, cls=DecimalEncoder, indent=2, ensure_ascii=False))
+        print(f"\n[ibkr] DONE. Screenshots/data saved to /tmp/ibkr_*")
+        print("[ibkr] Keeping browser open 30s for inspection...")
+        await page.wait_for_timeout(30000)
+        await browser.close()
+
+
 async def main():
     target = sys.argv[1] if len(sys.argv) > 1 else "boursobank"
 
     if target == "boursobank":
         await scrape_boursobank()
     elif target == "trade_republic":
-        print("Trade Republic scraper — TODO after Boursobank")
+        await scrape_trade_republic()
     elif target == "ibkr":
-        print("IBKR scraper — TODO after TR")
+        await scrape_ibkr()
     elif target == "credit_agricole":
         print("Crédit Agricole scraper — TODO after IBKR")
     else:
