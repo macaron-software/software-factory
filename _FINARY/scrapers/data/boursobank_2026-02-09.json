@@ -1,0 +1,97 @@
+{
+  "scraped_at": "2026-02-09T08:43:00",
+  "source": "boursobank",
+  "user": "SYLVAIN LEGLAND",
+  "total_assets": 121.67,
+  "accounts": {
+    "banking": {
+      "total": 21.67,
+      "items": [
+        {
+          "name": "BOURSORAMA ESSENTIEL SYLVAIN",
+          "number": "00040773846",
+          "balance": 19.33,
+          "available_balance": 19.33,
+          "overdraft_limit": 3500.00,
+          "upcoming_balance": 3.53,
+          "provider": "BoursoBank",
+          "type": "checking"
+        },
+        {
+          "name": "COMPTE CHEQUE",
+          "balance": 2.34,
+          "provider": "Crédit Agricole",
+          "type": "checking"
+        }
+      ]
+    },
+    "investments": {
+      "items": [
+        {
+          "name": "PEA LEGLAND",
+          "balance": 100.00,
+          "provider": "BoursoBank",
+          "type": "pea"
+        }
+      ]
+    },
+    "loans": {
+      "items": [
+        {
+          "name": "PRÊT PERSONNEL",
+          "balance": -1448.78,
+          "provider": "BoursoBank",
+          "type": "personal_loan"
+        },
+        {
+          "name": "PRÊT PERSONNEL",
+          "balance": -6284.35,
+          "provider": "BoursoBank",
+          "type": "personal_loan"
+        },
+        {
+          "name": "PRET 0% - 00004690214",
+          "balance": -102000.00,
+          "provider": "Crédit Agricole",
+          "type": "mortgage"
+        },
+        {
+          "name": "P. ACC.SOC - 00004690213",
+          "balance": -10000.00,
+          "provider": "Crédit Agricole",
+          "type": "social_loan"
+        },
+        {
+          "name": "PACP - 73140424333",
+          "balance": -1803.50,
+          "provider": "Crédit Agricole",
+          "type": "consumer_loan"
+        }
+      ]
+    },
+    "children": {
+      "items": [
+        {
+          "name": "BOURSORAMA ESSENTIEL NATHAEL",
+          "balance": 351.74,
+          "provider": "BoursoBank",
+          "type": "checking"
+        }
+      ]
+    }
+  },
+  "transactions_sample": [
+    {
+      "date": "2026-02-06",
+      "label": "Vir Inst Legland Sylvain",
+      "category": "Virements émis",
+      "amount": -90.00
+    },
+    {
+      "date": "2026-02-06",
+      "label": "Virement de SYLVAIN PHILIPPE LEGLAND",
+      "category": "Virements reçus",
+      "amount": 100.00
+    }
+  ]
+}
