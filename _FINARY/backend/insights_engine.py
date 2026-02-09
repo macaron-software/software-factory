@@ -355,32 +355,67 @@ ETF_TER = {
 }
 
 def compute_fees(patrimoine: dict, positions: list[dict]) -> dict:
-    """Compute real fee breakdown."""
-    tr = patrimoine.get("trade_republic", {})
+    """Compute fee breakdown from real scraped data only — no estimates."""
     ibkr = patrimoine.get("ibkr", {})
+    ca = patrimoine.get("credit_agricole", {})
+    tr = patrimoine.get("trade_republic", {})
 
-    # TR: 1€ per trade, count positions as proxy (each was at least 1 trade)
-    tr_positions = len(tr.get("positions", []))
-    tr_trading_fees = tr_positions * 1.0  # minimum, 1 trade per position
+    # ── Monthly breakdown: build dynamically from real credits ──
+    monthly_breakdown = []
+    monthly_total = 0.0
 
-    # TR PFOF (Payment for Order Flow) spread cost estimate: ~0.1-0.3% per trade
-    tr_total_invested = tr.get("total_invested", 0) or 0
-    tr_pfof_est = tr_total_invested * 0.002  # ~0.2% spread cost on total invested
+    for credit in ca.get("credits", []):
+        payment = credit.get("monthly_payment", 0) or 0
+        insurance = credit.get("insurance_monthly", 0) or 0
+        if payment > 0 or insurance > 0:
+            total_monthly = payment + insurance
+            cat_map = {"PTZ": "immobilier", "PAS": "immobilier", "consumer": "consommation"}
+            cat = cat_map.get(credit.get("type", ""), "autre")
+            label = credit.get("name", "Crédit")
+            rate = credit.get("rate")
+            detail = f"{rate}%" if rate else None
+            item = {
+                "name": label,
+                "amount": round(total_monthly, 2),
+                "type": "credit",
+                "category": cat,
+                "rate_source": "scraped_ca",
+            }
+            if insurance > 0:
+                item["insurance"] = round(insurance, 2)
+            if detail:
+                item["detail"] = detail
+            if credit.get("remaining"):
+                item["remaining"] = round(credit["remaining"], 2)
+            monthly_breakdown.append(item)
+            monthly_total += total_monthly
 
-    # IBKR commissions (tiered: ~$0.0035/share min $0.35, or ~$1/trade for small trades)
-    ibkr_positions = len(ibkr.get("positions", []))
-    ibkr_commission_est = ibkr_positions * 2.0  # ~$2/trade average estimate
-
-    # IBKR margin interest (real)
+    # IBKR margin cost (real: scraped rate × scraped balance)
     margin_usd = abs(ibkr.get("margin_loan_usd", 0))
-    margin_rate_str = ibkr.get("margin_interest_rate", "5.83%")
-    margin_rate = _parse_rate(margin_rate_str) or 5.83
-    margin_interest_annual = margin_usd * margin_rate / 100  # in USD
-    # Convert USD -> EUR
-    eur_usd = patrimoine.get("_eur_usd", 1.19)
-    margin_interest_annual_eur = margin_interest_annual / eur_usd
+    margin_rate_str = ibkr.get("margin_interest_rate", "")
+    margin_rate = _parse_rate(margin_rate_str) if margin_rate_str else None
+    monthly_margin = patrimoine.get("totals", {}).get("monthly_margin_cost", 0)
+    if monthly_margin > 0:
+        monthly_breakdown.append({
+            "name": f"Intérêts marge IBKR" + (f" ({margin_rate:.2f}%)" if margin_rate else ""),
+            "amount": round(monthly_margin, 2),
+            "type": "margin",
+            "category": "investissement",
+            "rate_source": "scraped_ibkr",
+        })
+        monthly_total += monthly_margin
 
-    # ETF TER costs (annual, proportional to holding value)
+    # TR cash interest (income, not cost — 2% p.a. on cash)
+    tr_cash = tr.get("cash", 0) or 0
+    tr_interest_annual = tr_cash * 0.02 if tr_cash > 0 else 0
+
+    # ── Annual fees: only verifiable data ──
+    eur_usd = patrimoine.get("_eur_usd", 1.19)
+    margin_interest_annual_eur = 0.0
+    if margin_usd > 0 and margin_rate:
+        margin_interest_annual_eur = (margin_usd * margin_rate / 100) / eur_usd
+
+    # ETF TER costs (real: known TER × current position value)
     ter_total = 0
     ter_details = []
     for p in positions:
@@ -389,43 +424,66 @@ def compute_fees(patrimoine: dict, positions: list[dict]) -> dict:
             ter = ETF_TER[isin]
             cost = p["value_eur"] * ter / 100
             ter_total += cost
-            ter_details.append({"isin": isin, "name": p.get("name"), "ter": ter, "annual_cost": round(cost, 2)})
+            ter_details.append({
+                "isin": isin, "name": p.get("name"),
+                "ter": ter, "annual_cost": round(cost, 2),
+                "rate_source": "known_ter",
+            })
 
-    # Portfolio-weighted average TER (assume stocks = 0 TER, only ETFs matter)
     total_value = sum(p["value_eur"] for p in positions)
     weighted_ter = (ter_total / total_value * 100) if total_value > 0 else 0
 
-    annual_total = tr_trading_fees + tr_pfof_est + ibkr_commission_est + margin_interest_annual_eur + ter_total
+    annual_fees = {}
+    annual_total = 0.0
 
-    # Monthly costs (from loans)
-    monthly_loan = patrimoine.get("totals", {}).get("monthly_loan_payments", 0)
-    monthly_margin = patrimoine.get("totals", {}).get("monthly_margin_cost", 0)
-    monthly_total = monthly_loan + monthly_margin
+    if margin_interest_annual_eur > 0:
+        annual_fees["margin_interest"] = {
+            "amount": round(margin_interest_annual_eur, 2),
+            "label": "Intérêts marge IBKR",
+            "detail": f"{margin_rate:.2f}% sur ${margin_usd:,.0f}",
+            "rate_source": "scraped_ibkr",
+        }
+        annual_total += margin_interest_annual_eur
 
-    # ETF average TER benchmark
-    benchmark_ter = 0.20  # low-cost ETF benchmark
-    potential_savings = max(0, (weighted_ter - benchmark_ter) / 100 * total_value)
+    if ter_total > 0:
+        annual_fees["etf_ter"] = {
+            "amount": round(ter_total, 2),
+            "label": "TER ETF",
+            "detail": f"TER moyen pondéré: {weighted_ter:.3f}%",
+            "rate_source": "known_ter",
+        }
+        annual_total += ter_total
+
+    # Loan annual cost = monthly × 12
+    loan_annual = sum(it["amount"] for it in monthly_breakdown if it["type"] == "credit") * 12
+    if loan_annual > 0:
+        annual_fees["loan_payments"] = {
+            "amount": round(loan_annual, 2),
+            "label": "Remboursements crédits",
+            "rate_source": "scraped_ca",
+        }
+        annual_total += loan_annual
+
+    # Net worth for % calculation
+    net_worth = patrimoine.get("totals", {}).get("net_worth", 0) or total_value
 
     return {
         "monthly_total": round(monthly_total, 2),
-        "breakdown": [
-            {"name": "PAS 2 (immo)", "amount": 90.32, "type": "credit", "category": "immobilier"},
-            {"name": "PACP (conso)", "amount": 73.69, "type": "credit", "category": "consommation"},
-            {"name": f"Marge IBKR (~{margin_rate:.1f}%)", "amount": round(monthly_margin, 2), "type": "margin", "category": "investissement"},
-        ],
-        "annual_fees": {
-            "tr_trading": round(tr_trading_fees, 2),
-            "tr_pfof_spread_est": round(tr_pfof_est, 2),
-            "ibkr_commissions_est": round(ibkr_commission_est, 2),
-            "margin_interest_annual": round(margin_interest_annual_eur, 2),
-            "etf_ter_total": round(ter_total, 2),
-            "total": round(annual_total, 2),
-        },
+        "breakdown": monthly_breakdown,
+        "annual_fees": annual_fees,
+        "annual_total": round(annual_total, 2),
         "ter_details": ter_details,
         "weighted_avg_ter": round(weighted_ter, 3),
-        "benchmark_ter": benchmark_ter,
-        "potential_savings": round(potential_savings, 2),
-        "pct_of_patrimoine": round(annual_total / max(1, total_value) * 100, 3),
+        "benchmark_ter": 0.20,
+        "potential_savings": round(max(0, (weighted_ter - 0.20) / 100 * total_value), 2),
+        "pct_of_patrimoine": round(annual_total / max(1, net_worth) * 100, 3),
+        "net_worth": round(net_worth, 2),
+        "tr_cash_interest_annual": round(tr_interest_annual, 2),
+        "missing_data": [
+            "IBKR trade history (commissions réelles)",
+            "TR trade history (1€/trade count)",
+            "CA loan rates & insurance details",
+        ],
     }
 
 
@@ -520,7 +578,7 @@ def generate_insights(patrimoine: dict, positions: list[dict], diversification: 
     # 4. Savings rate
     monthly_costs = patrimoine.get("totals", {}).get("monthly_loan_payments", 0) + patrimoine.get("totals", {}).get("monthly_margin_cost", 0)
     if monthly_costs > 0 and net_worth > 0:
-        annual_costs = fees.get("annual_fees", {}).get("total", 0) + monthly_costs * 12
+        annual_costs = fees.get("annual_total", 0) + monthly_costs * 12
         cost_ratio = annual_costs / net_worth * 100
         if cost_ratio > 5:
             insights.append({

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { usePortfolio, useDividends, useDiversification, useNetWorthHistory, useSparklines } from "@/lib/hooks/useApi";
+import { usePortfolio, useDividends, useDiversification, useNetWorthHistory, useSparklines, useCosts } from "@/lib/hooks/useApi";
 import { formatEUR, formatPct, formatNumber, pnlColor, CHART_COLORS } from "@/lib/utils";
 import { PriceChart } from "@/components/charts/PriceChart";
 import { Sparkline } from "@/components/charts/Sparkline";
@@ -12,6 +12,7 @@ export default function StocksPage() {
   const { data: dividends } = useDividends();
   const { data: diversification } = useDiversification();
   const { data: nwHistory } = useNetWorthHistory(365);
+  const { data: costs } = useCosts();
 
   const totalValue = positions?.reduce((s, p) => s + p.value_eur, 0) ?? 0;
   const totalPnl = positions?.reduce((s, p) => s + p.pnl_eur, 0) ?? 0;
@@ -68,7 +69,7 @@ export default function StocksPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <Section title="Fee Scanner">
           <div className="flex items-center justify-between">
-            <span className="tnum text-heading font-light text-t-1">{formatEUR(totalValue * 0.0099)}</span>
+            <span className="tnum text-heading font-light text-t-1">{formatEUR((costs as any)?.annual_total ?? 0)}</span>
             <span className="tnum text-label text-t-5">/an</span>
           </div>
         </Section>

@@ -62,11 +62,10 @@ export default function InsightsPage() {
 
   const totalInvested = positions?.reduce((s, p) => s + p.value_eur, 0) ?? 0;
 
-  // Real costs from engine
-  const annualFees = (costs as any)?.annual_fees as Record<string, number> | undefined;
-  const totalAnnualFees = annualFees
-    ? Object.values(annualFees).reduce((s, v) => s + (typeof v === "number" ? v : 0), 0)
-    : totalInvested * 0.0099;
+  // Real costs from engine (new shape: annual_fees is Record<string, {amount, label, ...}>)
+  const costsData = costs as any;
+  const annualFeesMap = costsData?.annual_fees as Record<string, { amount: number; label: string; detail?: string; rate_source?: string }> | undefined;
+  const totalAnnualFees = costsData?.annual_total ?? 0;
   const feeRate = totalInvested > 0 ? (totalAnnualFees / totalInvested) * 100 : 0;
 
   const annualDividends = dividends?.reduce((s, d) => s + d.total_amount, 0) ?? 0;
@@ -193,37 +192,25 @@ export default function InsightsPage() {
             <div className="bar-track mt-2">
               <div className="bar-fill bg-loss" style={{ width: `${Math.min(feeRate * 50, 100)}%` }} />
             </div>
-            {annualFees && (
+            {annualFeesMap && (
               <div className="space-y-1.5 mt-2">
-                {annualFees.tr_trading > 0 && (
-                  <div className="flex justify-between text-label">
-                    <span className="text-t-5">Trade Republic (1€/trade)</span>
-                    <span className="text-t-3">{formatEUR(annualFees.tr_trading)}</span>
+                {Object.values(annualFeesMap).map((fee, i) => (
+                  <div key={i} className="flex justify-between text-label">
+                    <span className="text-t-5">{fee.label}</span>
+                    <span className="text-t-3">{formatEUR(fee.amount)}</span>
                   </div>
-                )}
-                {annualFees.ibkr_commissions_est > 0 && (
-                  <div className="flex justify-between text-label">
-                    <span className="text-t-5">IBKR commissions</span>
-                    <span className="text-t-3">{formatEUR(annualFees.ibkr_commissions_est)}</span>
-                  </div>
-                )}
-                {annualFees.etf_ter_annual > 0 && (
-                  <div className="flex justify-between text-label">
-                    <span className="text-t-5">ETF TER</span>
-                    <span className="text-t-3">{formatEUR(annualFees.etf_ter_annual)}</span>
-                  </div>
-                )}
-                {annualFees.margin_interest_annual > 0 && (
-                  <div className="flex justify-between text-label">
-                    <span className="text-t-5">Intérêts marge IBKR</span>
-                    <span className="text-t-3">{formatEUR(annualFees.margin_interest_annual)}</span>
-                  </div>
-                )}
+                ))}
               </div>
             )}
-            <p className="text-label text-t-5">
-              Les frais moyens des ETF sont de 0.20%. Vous pourriez économiser {formatEUR(totalAnnualFees * 0.8)}/an.
-            </p>
+              {costsData?.potential_savings > 0 ? (
+                <p className="text-label text-t-5">
+                  TER moyen pondéré vs benchmark 0.20%: économie potentielle {formatEUR(costsData.potential_savings)}/an.
+                </p>
+              ) : (
+                <p className="text-label text-t-5">
+                  Frais vérifiés uniquement. Données manquantes: trades IBKR/TR.
+                </p>
+              )}
           </div>
         </Section>
 
