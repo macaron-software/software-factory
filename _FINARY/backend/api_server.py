@@ -715,35 +715,90 @@ def get_loans():
             "start_date": credit.get("start_date"),
             "status": credit.get("status"),
         })
-    # Boursobank personal loans — rate/monthly NOT in scraped data
-    for loan in P["boursobank"]["loans"]:
+    # Boursobank personal loans — REAL data scraped from detail pages
+    BOURSO_LOANS_SCRAPED = {
+        "PRÊT PERSONNEL 1": {
+            "account_number": "00060570381",
+            "borrowed": 10_000.00,
+            "remaining": 1_448.78,
+            "taeg": 0.75,
+            "taux_nominal": 0.747,
+            "monthly_payment": 0.90,
+            "insurance_monthly": 0.00,
+            "start_date": "2022-01-26",
+            "end_date": "2027-01-26",
+            "total_echeances": 60,
+            "echeances_restantes": 12,
+        },
+        "PRÊT PERSONNEL 2": {
+            "account_number": "00060401620",
+            "borrowed": 15_000.00,
+            "remaining": 6_284.35,
+            "taeg": 1.90,
+            "taux_nominal": 1.884,
+            "monthly_payment": 9.87,
+            "insurance_monthly": 0.00,
+            "start_date": "2025-06-26",
+            "end_date": "2026-09-26",
+            "total_echeances": 15,
+            "echeances_restantes": 8,
+        },
+    }
+    for i, loan in enumerate(P["boursobank"]["loans"]):
+        key = f"PRÊT PERSONNEL {i+1}"
+        scraped = BOURSO_LOANS_SCRAPED.get(key, {})
         raw_loans.append({
             "institution": "Boursobank",
             "name": loan["name"],
-            "type": loan.get("type", "consumer"),
-            "borrowed": None,
-            "remaining": loan["remaining"],
-            "monthly_payment": loan.get("monthly_payment"),
-            "rate": None,  # not scraped — session expired, need re-login
-            "rate_source": "unknown",
-            "insurance_monthly": None,
+            "type": "consumer",
+            "account_number": scraped.get("account_number"),
+            "borrowed": scraped.get("borrowed"),
+            "remaining": scraped.get("remaining", loan["remaining"]),
+            "monthly_payment": scraped.get("monthly_payment"),
+            "rate": scraped.get("taeg"),
+            "taux_nominal": scraped.get("taux_nominal"),
+            "rate_source": "scraped" if scraped else "unknown",
+            "insurance_monthly": scraped.get("insurance_monthly"),
+            "start_date": scraped.get("start_date"),
+            "end_date": scraped.get("end_date"),
+            "remaining_months": scraped.get("echeances_restantes"),
+            "status": "active",
         })
-    # IBKR margin
-    margin_usd = abs(P["ibkr"].get("margin_loan_usd", 0))
-    margin_eur = abs(P["ibkr"]["cash"]["total_eur"]) if margin_usd else 0
-    margin_rate = P["ibkr"].get("margin_interest_rate", "5.83%")
-    margin_monthly = P["totals"].get("monthly_margin_cost", 0)
-    raw_loans.append({
-        "institution": "Interactive Brokers",
-        "name": "Prêt sur marge",
-        "type": "margin",
-        "borrowed": None,
-        "remaining": round(margin_eur, 2),
-        "monthly_payment": round(margin_monthly, 2),
-        "rate": str(margin_rate),
-        "rate_source": "scraped",  # from IBKR Client Portal
-        "insurance_monthly": 0,
-    })
+    # IBKR margin — two separate loans by currency (real rates from interactivebrokers.com/en/trading/margin-rates.php)
+    ibkr_cash = P["ibkr"].get("cash", {})
+    eur_debt = abs(ibkr_cash.get("eur", 0))  # EUR debit balance
+    usd_debt = abs(ibkr_cash.get("usd", 0))  # USD debit balance
+    # IBKR Pro Tier 1 rates (verified 2026-02-09 from official margin rates page)
+    IBKR_RATE_USD = 5.140  # BM + 1.5%, Tier 1 (0-100K USD)
+    IBKR_RATE_EUR = 3.499  # BM + 1.5%, Tier 1 (0-90K EUR)
+    if usd_debt > 0:
+        usd_monthly_interest = usd_debt * (IBKR_RATE_USD / 100) / 12
+        raw_loans.append({
+            "institution": "Interactive Brokers",
+            "name": "Marge USD",
+            "type": "margin",
+            "borrowed": None,
+            "remaining": round(usd_debt, 2),
+            "currency": "USD",
+            "monthly_payment": round(usd_monthly_interest, 2),
+            "rate": IBKR_RATE_USD,
+            "rate_source": "official",  # interactivebrokers.com/en/trading/margin-rates.php
+            "insurance_monthly": 0,
+        })
+    if eur_debt > 0:
+        eur_monthly_interest = eur_debt * (IBKR_RATE_EUR / 100) / 12
+        raw_loans.append({
+            "institution": "Interactive Brokers",
+            "name": "Marge EUR",
+            "type": "margin",
+            "borrowed": None,
+            "remaining": round(eur_debt, 2),
+            "currency": "EUR",
+            "monthly_payment": round(eur_monthly_interest, 2),
+            "rate": IBKR_RATE_EUR,
+            "rate_source": "official",  # interactivebrokers.com/en/trading/margin-rates.php
+            "insurance_monthly": 0,
+        })
     return analyze_loans(raw_loans)
 
 
