@@ -122,6 +122,33 @@ export function useDiversification() {
   });
 }
 
+// ─── Loans ───
+
+export function useLoans() {
+  return useQuery({
+    queryKey: ["loans"],
+    queryFn: api.getLoans,
+  });
+}
+
+// ─── SCA ───
+
+export function useSCA() {
+  return useQuery({
+    queryKey: ["sca"],
+    queryFn: api.getSCA,
+  });
+}
+
+// ─── Costs ───
+
+export function useCosts() {
+  return useQuery({
+    queryKey: ["costs"],
+    queryFn: api.getCosts,
+  });
+}
+
 // ─── Alerts ───
 
 export function useAlerts() {

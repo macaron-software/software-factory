@@ -3,6 +3,8 @@
 export interface Account {
   id: string;
   institution_id: string | null;
+  institution: string;
+  institution_display_name: string;
   external_id: string | null;
   name: string;
   account_type: AccountType;
@@ -10,6 +12,12 @@ export interface Account {
   balance: number;
   is_pro: boolean;
   updated_at: string;
+  // Loan-specific fields
+  loan_borrowed?: number;
+  loan_remaining?: number;
+  loan_monthly?: number;
+  loan_rate?: string;
+  loan_type?: string;
 }
 
 export type AccountType =
@@ -20,6 +28,61 @@ export type AccountType =
   | "av"
   | "loan"
   | "crypto";
+
+export interface Loan {
+  institution: string;
+  name: string;
+  type: string;
+  borrowed: number | null;
+  remaining: number;
+  monthly_payment: number | null;
+  rate: string | null;
+  start_date?: string;
+  status?: string;
+}
+
+export interface SCA {
+  type: string;
+  name: string;
+  role: string;
+  parts: number;
+  total_parts: number;
+  ownership_pct: number;
+  property: {
+    address: string;
+    type: string;
+    rooms: number;
+    surface_m2: number;
+    terrain_value_book: number;
+    purchase_date: string;
+    dpe_score: string;
+    bourso_estimate: number;
+    bourso_estimate_range: { low: number; high: number };
+    price_per_m2_estimate: number;
+  };
+  financials: {
+    capital_souscrit: number;
+    capital_verse: number;
+    cca_avances: number;
+    total_verse: number;
+    total_charges_qp: number;
+    af_impayes: number;
+    solde_net: number;
+    bank_account_balance: number;
+  };
+  co_associate: { name: string; parts: number; ownership_pct: number };
+  your_share_property_value: number;
+}
+
+export interface CostsBreakdown {
+  monthly_total: number;
+  breakdown: { name: string; amount: number; type: string }[];
+  annual_fees: {
+    tr_trading: number;
+    ibkr_commissions_est: number;
+    margin_interest_annual: number;
+  };
+}
 
 export interface Transaction {
   id: string;

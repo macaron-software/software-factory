@@ -26,12 +26,20 @@ const SECTIONS: NavSection[] = [
     title: "Investing",
     items: [
       { href: "/portfolio/stocks", label: "Actions & Fonds" },
+      { href: "/immobilier", label: "Immobilier" },
+    ],
+  },
+  {
+    title: "Finances",
+    items: [
+      { href: "/loans", label: "Crédits" },
+      { href: "/costs", label: "Coûts & Frais" },
     ],
   },
   {
     title: "Tools",
     items: [
-      { href: "/tools/wealth-statement", label: "Declaration patrimoine" },
+      { href: "/tools/wealth-statement", label: "Déclaration patrimoine" },
       { href: "/accounts", label: "Comptes" },
     ],
   },

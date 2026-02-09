@@ -82,6 +82,22 @@ export const api = {
       "/api/v1/analytics/diversification"
     ),
 
+  // ─── Loans ───
+  getLoans: () =>
+    fetchApi<import("./types/api").Loan[]>("/api/v1/loans"),
+
+  // ─── SCA ───
+  getSCA: () =>
+    fetchApi<import("./types/api").SCA>("/api/v1/sca"),
+
+  // ─── Costs ───
+  getCosts: () =>
+    fetchApi<import("./types/api").CostsBreakdown>("/api/v1/costs"),
+
+  // ─── Patrimoine ───
+  getPatrimoine: () =>
+    fetchApi<Record<string, unknown>>("/api/v1/patrimoine"),
+
   // ─── Alerts ───
   getAlerts: () =>
     fetchApi<import("./types/api").PriceAlert[]>("/api/v1/alerts"),
