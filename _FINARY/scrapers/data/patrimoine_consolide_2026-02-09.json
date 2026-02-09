@@ -1,0 +1,297 @@
+{
+  "date": "2026-02-09",
+  "timestamp": "2026-02-09T14:00:21.801808",
+  "trade_republic": {
+    "account_type": "Brokerage",
+    "portfolio_value": 6269.122,
+    "cash": 2169.62,
+    "total": 8438.742,
+    "positions": [
+      {
+        "name": "STMicroelectronics",
+        "isin": "NL0000226223",
+        "value_eur": 26.8,
+        "daily_pct": "6,50 %"
+      },
+      {
+        "name": "L'Oreal",
+        "isin": "FR0000120321",
+        "value_eur": 392.05,
+        "daily_pct": "0,43 %"
+      },
+      {
+        "name": "BYD",
+        "isin": "CNE100000296",
+        "value_eur": 10.03,
+        "daily_pct": "1,23 %"
+      },
+      {
+        "name": "Moderna",
+        "isin": "US60770K1079",
+        "value_eur": 34.4,
+        "daily_pct": "0,44 %"
+      },
+      {
+        "name": "Allianz",
+        "isin": "DE0008404005",
+        "value_eur": 384.7,
+        "daily_pct": "0,62 %"
+      },
+      {
+        "name": "Exxon Mobil",
+        "isin": "US30231G1022",
+        "value_eur": 125.84,
+        "daily_pct": "0,21 %"
+      },
+      {
+        "name": "LVMH Moët Hennessy",
+        "isin": "FR0000121014",
+        "value_eur": 534.7,
+        "daily_pct": "0,26 %"
+      },
+      {
+        "name": "Realty Income",
+        "isin": "US7561091049",
+        "value_eur": 53.22,
+        "daily_pct": "0,28 %"
+      },
+      {
+        "name": "Intuitive Surgical",
+        "isin": "US46120E6023",
+        "value_eur": 410.5,
+        "daily_pct": "0,07 %"
+      },
+      {
+        "name": "TotalEnergies",
+        "isin": "FR0000120271",
+        "value_eur": 62.27,
+        "daily_pct": "0,22 %"
+      },
+      {
+        "name": "Johnson & Johnson",
+        "isin": "US4781601046",
+        "value_eur": 202.15,
+        "daily_pct": "0,22 %"
+      },
+      {
+        "name": "Enphase Energy",
+        "isin": "US29355A1079",
+        "value_eur": 41.86,
+        "daily_pct": "0,22 %"
+      },
+      {
+        "name": "Plug Power",
+        "isin": "US72919P2020",
+        "value_eur": 1.742,
+        "daily_pct": "0,11 %"
+      },
+      {
+        "name": "Sanofi",
+        "isin": "FR0000120578",
+        "value_eur": 80.43,
+        "daily_pct": "0,26 %"
+      },
+      {
+        "name": "S&P 500 Information Tech USD (Acc)",
+        "isin": "IE00B3WJKG14",
+        "value_eur": 33.96,
+        "daily_pct": "0,67 %"
+      },
+      {
+        "name": "MercadoLibre",
+        "isin": "US58733R1023",
+        "value_eur": 1662.4,
+        "daily_pct": "1,88 %"
+      },
+      {
+        "name": "Soitec",
+        "isin": "FR0013227113",
+        "value_eur": 32.82,
+        "daily_pct": "2,98 %"
+      },
+      {
+        "name": "Canadian National Railway",
+        "isin": "CA1363751027",
+        "value_eur": 84.7,
+        "daily_pct": "0,49 %"
+      },
+      {
+        "name": "Sea (ADR)",
+        "isin": "US81141R1005",
+        "value_eur": 90.8,
+        "daily_pct": "0,87 %"
+      },
+      {
+        "name": "Rheinmetall",
+        "isin": "DE0007030009",
+        "value_eur": 1631.5,
+        "daily_pct": "2,00 %"
+      },
+      {
+        "name": "Intuit",
+        "isin": "US4612021034",
+        "value_eur": 372.25,
+        "daily_pct": "0,51 %"
+      }
+    ],
+    "transactions_count": 31
+  },
+  "ibkr": {
+    "account_id": "U15999905",
+    "account_type": "Margin",
+    "net_liquidation": 52593.11,
+    "buying_power": 219695.92,
+    "daily_pnl": -147.9,
+    "unrealized_pnl": 14640.0,
+    "excess_liquidity": 34745.75,
+    "cash_eur": -1206.98,
+    "cash_usd": -6649.83,
+    "total_cash_eur": -6805.23,
+    "positions": [
+      {
+        "symbol": "MSFT",
+        "isin": "US5949181045",
+        "quantity": 45.2854,
+        "last_price": 404.5,
+        "change_pct": "+0.84%",
+        "cost_basis": 20293,
+        "market_value": 18313.87,
+        "avg_price": 448.11,
+        "daily_pnl": 160.0,
+        "unrealized_pnl": -1970.0,
+        "currency": "USD"
+      },
+      {
+        "symbol": "GOOGL",
+        "isin": "US02079K3059",
+        "quantity": 105.3515,
+        "last_price": 321.46,
+        "change_pct": "-0.43%",
+        "cost_basis": 20210,
+        "market_value": 33861.03,
+        "avg_price": 191.84,
+        "daily_pnl": -153.0,
+        "unrealized_pnl": 13650.0,
+        "currency": "USD"
+      },
+      {
+        "symbol": "NVDA",
+        "isin": "US67066G1040",
+        "quantity": 100.0222,
+        "last_price": 183.73,
+        "change_pct": "-0.91%",
+        "cost_basis": 12653,
+        "market_value": 18374.08,
+        "avg_price": 126.5,
+        "daily_pnl": -166.0,
+        "unrealized_pnl": 5730.0,
+        "currency": "USD"
+      }
+    ],
+    "total_market_value_usd": 70548.98,
+    "total_cost_basis_usd": 53156
+  },
+  "boursobank": {
+    "checking_sylvain": {
+      "label": "BOURSORAMA ESSENTIEL SYLVAIN",
+      "balance": 19.33
+    },
+    "pea": {
+      "label": "PEA LEGLAND",
+      "balance": 100.0
+    },
+    "checking_nathael": {
+      "label": "BOURSORAMA ESSENTIEL NATHAEL",
+      "balance": 351.74
+    },
+    "livret_a_nathael": {
+      "label": "LIVRET A NATHAEL",
+      "balance": 7726.18
+    },
+    "loans": [
+      {
+        "name": "PRÊT PERSONNEL 1",
+        "remaining": 1448.78
+      },
+      {
+        "name": "PRÊT PERSONNEL 2",
+        "remaining": 6284.35
+      }
+    ],
+    "property": {
+      "address": "40 chemin de la désirade, 34790 GRABELS",
+      "type": "Maison",
+      "rooms": 4,
+      "surface_m2": 110,
+      "purchase_date": "08/2021",
+      "purchase_price": 141000,
+      "current_estimate": 505254,
+      "estimate_range": {
+        "low": 445129,
+        "high": 565380
+      },
+      "price_per_m2": 4593.22,
+      "unrealized_gain": 364254,
+      "unrealized_gain_pct": 258.34,
+      "dpe_score": "D"
+    }
+  },
+  "credit_agricole": {
+    "checking": {
+      "label": "COMPTE CHEQUE",
+      "account_number": "85172056038",
+      "balance": 2.34
+    },
+    "credits": [
+      {
+        "name": "PTZ Ministère du Logement",
+        "account_number": "00004690214",
+        "borrowed": 102000,
+        "remaining": 102000,
+        "monthly_payment": 0,
+        "rate": "0%",
+        "type": "PTZ"
+      },
+      {
+        "name": "Prêt d'Accession Sociale 1",
+        "account_number": "00004690213",
+        "borrowed": 10000,
+        "remaining": 10000,
+        "monthly_payment": 0,
+        "type": "PAS"
+      },
+      {
+        "name": "Prêt d'Accession Sociale 2",
+        "borrowed": 138290,
+        "remaining": 110594.85,
+        "monthly_payment": 90.32,
+        "type": "PAS"
+      },
+      {
+        "name": "Prêt Conso Personnel (PACP)",
+        "account_number": "73140424333",
+        "borrowed": 5000,
+        "remaining": 1803.5,
+        "monthly_payment": 73.69,
+        "type": "PACP"
+      }
+    ]
+  },
+  "totals": {
+    "financial_assets": 69231.44,
+    "real_estate": 505254,
+    "total_assets": 574485.44,
+    "total_debt": 232131.48,
+    "net_worth": 342353.96,
+    "monthly_loan_payments": 164.01,
+    "breakdown": {
+      "trade_republic": 8438.74,
+      "ibkr": 52593.11,
+      "boursobank_liquid": 8197.25,
+      "credit_agricole_liquid": 2.34,
+      "real_estate": 505254,
+      "boursobank_loans": -7733.13,
+      "credit_agricole_loans": -224398.35
+    }
+  }
+}

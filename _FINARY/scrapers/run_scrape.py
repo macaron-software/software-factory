@@ -372,90 +372,277 @@ async def scrape_boursobank():
 
 
 async def scrape_trade_republic():
-    """Scrape Trade Republic using pytr WebSocket API."""
-    from pytr.api import TradeRepublicApi
+    """Scrape Trade Republic using Playwright browser automation with persistent session."""
+    from playwright.async_api import async_playwright
 
     phone = os.environ["TR_PHONE"]
     pin = os.environ["TR_PIN"]
+    state_path = Path("data/.tr_state")
+    state_path.mkdir(parents=True, exist_ok=True)
 
     print(f"[trade_republic] Connecting as {phone[:6]}****...")
 
-    tr = TradeRepublicApi(phone_no=phone, pin=pin, locale="fr")
+    pw = await async_playwright().start()
+    context = await pw.chromium.launch_persistent_context(
+        str(state_path),
+        headless=False,
+        viewport={"width": 1280, "height": 900},
+        locale="fr-FR",
+    )
+    page = context.pages[0] if context.pages else await context.new_page()
 
-    # Login triggers 2FA — user must confirm on phone
-    print("[trade_republic] Logging in (check your phone for 2FA confirmation)...")
-    tr.login()
-    print("[trade_republic] Initiating web login...")
-    countdown = tr.initiate_weblogin()
-    print(f"[trade_republic] 2FA sent — confirm on your phone within {countdown}s")
+    # Check if already logged in
+    await page.goto("https://app.traderepublic.com/portfolio", wait_until="domcontentloaded")
+    await page.wait_for_timeout(5000)
+    current_url = page.url
 
-    # Wait for confirmation
-    import time
-    for i in range(countdown, 0, -5):
-        print(f"[trade_republic] Waiting for 2FA... {i}s remaining")
-        time.sleep(5)
-        try:
-            tr.complete_weblogin()
-            print("[trade_republic] 2FA confirmed!")
-            break
-        except Exception:
-            continue
+    if "login" in current_url:
+        print("[trade_republic] Not logged in, starting login flow...")
+        await page.wait_for_timeout(2000)
+
+        # Dismiss cookie banner
+        for sel in ['button:has-text("Tout accepter")', 'button:has-text("Accepter")',
+                    'button:has-text("Accept All")']:
+            try:
+                btn = await page.query_selector(sel)
+                if btn and await btn.is_visible():
+                    await btn.click()
+                    print(f"[trade_republic] Dismissed cookies via {sel}")
+                    await page.wait_for_timeout(1000)
+                    break
+            except Exception:
+                continue
+
+        # Enter phone number
+        print("[trade_republic] Entering phone number...")
+        phone_input = await page.query_selector('input[type="tel"]')
+        if not phone_input:
+            for inp in await page.query_selector_all('input'):
+                if await inp.is_visible():
+                    phone_input = inp
+                    break
+        if phone_input:
+            await phone_input.click()
+            await phone_input.fill(phone)
+            print("[trade_republic] Phone entered")
+
+        await page.wait_for_timeout(1000)
+
+        # Click next
+        for sel in ['button:has-text("Suivant")', 'button:has-text("Next")', 'button[type="submit"]']:
+            try:
+                btn = await page.query_selector(sel)
+                if btn and await btn.is_visible():
+                    await btn.click()
+                    print(f"[trade_republic] Clicked next via {sel}")
+                    break
+            except Exception:
+                continue
+
+        await page.wait_for_timeout(3000)
+
+        # Enter PIN
+        print("[trade_republic] Entering PIN...")
+        pin_inputs = await page.query_selector_all('input[type="password"], input[type="tel"][maxlength="1"], input[inputmode="numeric"]')
+        if len(pin_inputs) >= 4:
+            for i, digit in enumerate(str(pin)):
+                if i < len(pin_inputs):
+                    await pin_inputs[i].fill(digit)
+            print("[trade_republic] PIN entered")
+        else:
+            await page.keyboard.type(str(pin))
+            print("[trade_republic] PIN typed via keyboard")
+
+        await page.wait_for_timeout(5000)
+        await page.screenshot(path="/tmp/tr_04_2fa.png")
+
+        # 2FA - try env var first, then wait for user to enter in browser
+        code_2fa = os.environ.get("TR_2FA_CODE", "")
+        if code_2fa:
+            print(f"[trade_republic] Entering 2FA code from env: {code_2fa}")
+            code_inputs = await page.query_selector_all('input[inputmode="numeric"], input[type="tel"][maxlength="1"], input[type="text"][maxlength="1"]')
+            if len(code_inputs) >= len(code_2fa):
+                for i, digit in enumerate(code_2fa):
+                    await code_inputs[i].fill(digit)
+                print("[trade_republic] 2FA code entered")
+            else:
+                await page.keyboard.type(code_2fa)
+        else:
+            print("[trade_republic] ⚠️  Enter the 2FA code in the browser window!")
+            # Wait for user to enter code and get redirected
+            for i in range(30):
+                await page.wait_for_timeout(4000)
+                if 'portfolio' in page.url and 'login' not in page.url:
+                    break
+                print(f"[trade_republic] Waiting for 2FA... {120 - (i+1)*4}s remaining")
+
+        # Wait for redirect to portfolio
+        for i in range(12):
+            await page.wait_for_timeout(3000)
+            current_url = page.url
+            if 'portfolio' in current_url and 'login' not in current_url:
+                print(f"[trade_republic] Logged in! URL: {current_url}")
+                break
+        else:
+            print("[trade_republic] Timeout — continuing anyway")
     else:
-        print("[trade_republic] ERROR: 2FA timeout")
-        return
+        print(f"[trade_republic] Already logged in! URL: {current_url}")
 
-    data = {"scraped_at": datetime.now().isoformat(), "source": "trade_republic"}
+    await page.wait_for_timeout(3000)
+    await page.screenshot(path="/tmp/tr_05_dashboard.png")
 
-    # Get portfolio
-    print("[trade_republic] Fetching portfolio...")
+    # ── Extract portfolio ──
+    body_text = await page.inner_text("body")
+    Path("/tmp/tr_body_text.txt").write_text(body_text)
+
+    import re as _re3
+    investments = []
+    lines = body_text.split('\n')
+    idx = 0
+    in_investments = False
+    while idx < len(lines):
+        line = lines[idx].strip()
+        if line == "Investissements":
+            in_investments = True
+            idx += 1
+            continue
+        if line in ("Mes favoris", "Découvrez"):
+            break
+        if in_investments and line and not line.startswith(('1J', '1S', '1M', '1A', 'Max', 'Aujourd')):
+            if idx + 2 < len(lines):
+                amount_line = lines[idx + 1].strip()
+                pct_line = lines[idx + 2].strip()
+                if _re3.match(r'^[\d\s\xa0,.]+\s*€$', amount_line) and _re3.match(r'^[\d,.]+\s*%$', pct_line):
+                    investments.append({"name": line, "value": amount_line.replace('\xa0', ' ').strip(), "daily_change": pct_line})
+                    idx += 3
+                    continue
+        idx += 1
+
+    total_match = _re3.search(r'([\d\s\xa0,.]+)\s*€', body_text[:200])
+    total_value = total_match.group(1).replace('\xa0', ' ').strip() if total_match else "unknown"
+    print(f"[trade_republic] Portfolio: {total_value} € — {len(investments)} positions")
+
+    # ── Click each position for purchase details ──
+    print("[trade_republic] Fetching individual position details...")
+    for inv in investments:
+        try:
+            link = await page.query_selector(f'text="{inv["name"]}"')
+            if link:
+                await link.click()
+                await page.wait_for_timeout(3000)
+                detail_text = await page.inner_text("body")
+                # Extract key metrics: avg price, total invested, P&L, number of shares
+                for metric_line in detail_text.split('\n'):
+                    ml = metric_line.strip()
+                    if 'Prix moyen' in ml or 'Avg.' in ml or 'Durchschnitt' in ml:
+                        inv["avg_price_label"] = ml
+                    elif 'moyen' in ml.lower() and '€' in ml:
+                        inv["avg_price"] = ml.replace('\xa0', ' ').strip()
+                # Look for structured data
+                perf_match = _re3.search(r'([\+\-][\d\s\xa0,.]+)\s*€\s*\n\s*([\+\-]?[\d,.]+\s*%)', detail_text)
+                if perf_match:
+                    inv["pnl"] = perf_match.group(1).replace('\xa0', ' ').strip()
+                    inv["pnl_pct"] = perf_match.group(2).strip()
+                # Number of shares
+                shares_match = _re3.search(r'([\d,.]+)\s*(?:parts?|actions?|shares?|Anteile|pcs)', detail_text, _re3.IGNORECASE)
+                if shares_match:
+                    inv["shares"] = shares_match.group(1)
+
+                # Save detail text for debugging
+                safe_name = inv["name"].replace(" ", "_").replace("/", "_")[:30]
+                Path(f"/tmp/tr_detail_{safe_name}.txt").write_text(detail_text[:2000])
+
+                # Go back
+                await page.go_back()
+                await page.wait_for_timeout(2000)
+                print(f"[trade_republic]   {inv['name']}: {inv.get('pnl', '?')} | shares={inv.get('shares', '?')}")
+        except Exception as e:
+            print(f"[trade_republic]   {inv['name']}: error {e}")
+            try:
+                await page.goto("https://app.traderepublic.com/portfolio", wait_until="domcontentloaded")
+                await page.wait_for_timeout(3000)
+            except Exception:
+                pass
+
+    # ── Navigate to Profil > Activité for full transaction history ──
+    print("[trade_republic] Navigating to Profil > Activité...")
+    activity_data = []
     try:
-        portfolio = await asyncio.to_thread(tr.portfolio)
-        data["portfolio"] = portfolio
-        print(f"[trade_republic] Portfolio: {json.dumps(portfolio, cls=DecimalEncoder, indent=2)[:500]}")
-    except Exception as e:
-        print(f"[trade_republic] Portfolio error: {e}")
+        profil_link = await page.query_selector('a:has-text("Profil"), a[href*="profile"]')
+        if profil_link:
+            await profil_link.click()
+            await page.wait_for_timeout(3000)
 
-    # Get cash
-    print("[trade_republic] Fetching cash balance...")
+        # Click "Activité"
+        activity_link = await page.query_selector('text="Activité"')
+        if activity_link:
+            await activity_link.click()
+            await page.wait_for_timeout(3000)
+            await page.screenshot(path="/tmp/tr_06_activity.png")
+
+            # Scroll to load all
+            for _ in range(10):
+                await page.evaluate("window.scrollBy(0, 800)")
+                await page.wait_for_timeout(800)
+
+            activity_text = await page.inner_text("body")
+            Path("/tmp/tr_activity_text.txt").write_text(activity_text)
+            print("[trade_republic] Activity page loaded")
+
+            # Parse activity entries
+            a_lines = activity_text.split('\n')
+            current_entry = {}
+            for al in a_lines:
+                al = al.strip()
+                if not al:
+                    continue
+                # Date lines like "09/02" or "09 févr."
+                if _re3.match(r'^\d{2}/\d{2}$', al) or _re3.match(r'^\d{2}\s\w+\.?$', al):
+                    if current_entry and 'label' in current_entry:
+                        activity_data.append(current_entry)
+                    current_entry = {"date": al}
+                elif current_entry and 'label' not in current_entry and not _re3.match(r'^[\d,.€%\s\xa0\+\-]+$', al):
+                    current_entry["label"] = al
+                elif current_entry and _re3.match(r'^[\+\-]?[\d\s\xa0,.]+\s*€$', al):
+                    current_entry["amount"] = al.replace('\xa0', ' ').strip()
+            if current_entry and 'label' in current_entry:
+                activity_data.append(current_entry)
+            print(f"[trade_republic] Found {len(activity_data)} activity entries")
+    except Exception as e:
+        print(f"[trade_republic] Activity error: {e}")
+
+    # ── Espèces (cash) ──
+    cash_text = ""
     try:
-        cash = await asyncio.to_thread(tr.cash)
-        data["cash"] = cash
-        print(f"[trade_republic] Cash: {cash}")
-    except Exception as e:
-        print(f"[trade_republic] Cash error: {e}")
+        cash_link = await page.query_selector('text="Espèces"')
+        if cash_link:
+            await cash_link.click()
+            await page.wait_for_timeout(3000)
+            cash_body = await page.inner_text("body")
+            cash_match = _re3.search(r'([\d\s\xa0,.]+)\s*€', cash_body[:500])
+            cash_text = cash_match.group(1).replace('\xa0', ' ').strip() if cash_match else ""
+            print(f"[trade_republic] Cash: {cash_text} €")
+    except Exception:
+        pass
 
-    # Get compact portfolio
-    print("[trade_republic] Fetching compact portfolio...")
-    try:
-        compact = await asyncio.to_thread(tr.compact_portfolio)
-        data["compact_portfolio"] = compact
-        print(f"[trade_republic] Compact: {json.dumps(compact, cls=DecimalEncoder, indent=2)[:500]}")
-    except Exception as e:
-        print(f"[trade_republic] Compact portfolio error: {e}")
+    # ── Save structured data ──
+    data = {
+        "scraped_at": datetime.now().isoformat(),
+        "source": "trade_republic",
+        "total_value": total_value,
+        "cash": cash_text,
+        "currency": "EUR",
+        "investments": investments,
+        "activity": activity_data,
+    }
 
-    # Get timeline (recent transactions)
-    print("[trade_republic] Fetching timeline...")
-    try:
-        timeline = await asyncio.to_thread(tr.timeline_transactions)
-        data["timeline"] = timeline
-        print(f"[trade_republic] Timeline entries: {len(timeline) if isinstance(timeline, list) else 'N/A'}")
-    except Exception as e:
-        print(f"[trade_republic] Timeline error: {e}")
-
-    # Get performance history
-    print("[trade_republic] Fetching performance history...")
-    try:
-        perf = await asyncio.to_thread(tr.performance)
-        data["performance"] = perf
-        print(f"[trade_republic] Performance: {json.dumps(perf, cls=DecimalEncoder, indent=2)[:300]}")
-    except Exception as e:
-        print(f"[trade_republic] Performance error: {e}")
-
-    # Save data
     out_path = Path("data") / f"trade_republic_{date.today().isoformat()}.json"
     out_path.parent.mkdir(exist_ok=True)
     out_path.write_text(json.dumps(data, cls=DecimalEncoder, indent=2, ensure_ascii=False))
-    print(f"\n[trade_republic] DONE. Data saved to {out_path}")
+    print(f"[trade_republic] Data saved to {out_path}")
+    print(f"\n[trade_republic] DONE. Browser stays open (persistent session).")
+    # DON'T close — keep session alive for re-runs without 2FA
+    await page.wait_for_timeout(5000)
 
 
 async def scrape_ibkr():

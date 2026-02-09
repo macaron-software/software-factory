@@ -1,0 +1,367 @@
+{
+  "trade_republic": {
+    "bank": "trade_republic",
+    "portfolio_total": 680.2,
+    "cash": 2169.62,
+    "positions": [
+      {
+        "name": "STMicroelectronics",
+        "value_eur": 26.8,
+        "daily_pct": "6,50 %"
+      },
+      {
+        "name": "L'Oreal",
+        "value_eur": 392.05,
+        "daily_pct": "0,43 %"
+      },
+      {
+        "name": "BYD",
+        "value_eur": 10.03,
+        "daily_pct": "1,23 %"
+      },
+      {
+        "name": "Moderna",
+        "value_eur": 34.4,
+        "daily_pct": "0,44 %"
+      },
+      {
+        "name": "Allianz",
+        "value_eur": 384.7,
+        "daily_pct": "0,62 %"
+      },
+      {
+        "name": "Exxon Mobil",
+        "value_eur": 125.84,
+        "daily_pct": "0,21 %"
+      },
+      {
+        "name": "LVMH Moët Hennessy",
+        "value_eur": 534.7,
+        "daily_pct": "0,26 %"
+      },
+      {
+        "name": "Realty Income",
+        "value_eur": 53.22,
+        "daily_pct": "0,28 %"
+      },
+      {
+        "name": "Intuitive Surgical",
+        "value_eur": 410.5,
+        "daily_pct": "0,07 %"
+      },
+      {
+        "name": "TotalEnergies",
+        "value_eur": 62.27,
+        "daily_pct": "0,22 %"
+      },
+      {
+        "name": "Johnson & Johnson",
+        "value_eur": 202.15,
+        "daily_pct": "0,22 %"
+      },
+      {
+        "name": "Enphase Energy",
+        "value_eur": 41.86,
+        "daily_pct": "0,22 %"
+      },
+      {
+        "name": "Plug Power",
+        "value_eur": 1.742,
+        "daily_pct": "0,11 %"
+      },
+      {
+        "name": "Sanofi",
+        "value_eur": 80.43,
+        "daily_pct": "0,26 %"
+      },
+      {
+        "name": "S&P 500 Information Tech USD (Acc)",
+        "value_eur": 33.96,
+        "daily_pct": "0,67 %"
+      },
+      {
+        "name": "MercadoLibre",
+        "value_eur": 1662.4,
+        "daily_pct": "1,88 %"
+      },
+      {
+        "name": "Soitec",
+        "value_eur": 32.82,
+        "daily_pct": "2,98 %"
+      },
+      {
+        "name": "Canadian National Railway",
+        "value_eur": 84.7,
+        "daily_pct": "0,49 %"
+      },
+      {
+        "name": "Sea (ADR)",
+        "value_eur": 90.8,
+        "daily_pct": "0,87 %"
+      },
+      {
+        "name": "Rheinmetall",
+        "value_eur": 1631.5,
+        "daily_pct": "2,00 %"
+      },
+      {
+        "name": "Intuit",
+        "value_eur": 372.25,
+        "daily_pct": "0,51 %"
+      }
+    ],
+    "transactions": [
+      {
+        "date": "",
+        "name": "Espèces",
+        "amount": "2 169,62 €"
+      },
+      {
+        "date": "",
+        "name": "09/02",
+        "amount": "5,69 €"
+      },
+      {
+        "date": "",
+        "name": "08/02",
+        "amount": "21,20 €"
+      },
+      {
+        "date": "",
+        "name": "07/02",
+        "amount": "128,76 €"
+      },
+      {
+        "date": "",
+        "name": "06/02",
+        "amount": "32,87 €"
+      },
+      {
+        "date": "",
+        "name": "06/02 - Sent",
+        "amount": "100,00 €"
+      },
+      {
+        "date": "",
+        "name": "05/02 - Sent",
+        "amount": "30,00 €"
+      },
+      {
+        "date": "",
+        "name": "05/02 - Sent",
+        "amount": "630,00 €"
+      },
+      {
+        "date": "",
+        "name": "04/02",
+        "amount": "12,08 €"
+      },
+      {
+        "date": "",
+        "name": "03/02",
+        "amount": "12,40 €"
+      },
+      {
+        "date": "",
+        "name": "02/02 - Round up",
+        "amount": "10,22 €"
+      },
+      {
+        "date": "",
+        "name": "02/02",
+        "amount": "0,26 €"
+      },
+      {
+        "date": "",
+        "name": "01/02",
+        "amount": "1,96 €"
+      },
+      {
+        "date": "",
+        "name": "01/02 - 2 % p.a.",
+        "amount": "+3,87 €"
+      },
+      {
+        "date": "",
+        "name": "31/01",
+        "amount": "151,63 €"
+      },
+      {
+        "date": "",
+        "name": "30/01",
+        "amount": "37,49 €"
+      },
+      {
+        "date": "",
+        "name": "29/01 - Sent",
+        "amount": "1 005,00 €"
+      },
+      {
+        "date": "",
+        "name": "29/01",
+        "amount": "0,35 €"
+      },
+      {
+        "date": "",
+        "name": "28/01",
+        "amount": "23,73 €"
+      },
+      {
+        "date": "",
+        "name": "26/01 - Cancelled",
+        "amount": "120,00 €"
+      },
+      {
+        "date": "",
+        "name": "26/01",
+        "amount": "55,81 €"
+      },
+      {
+        "date": "",
+        "name": "24/01",
+        "amount": "142,06 €"
+      },
+      {
+        "date": "",
+        "name": "24/01",
+        "amount": "49,57 €"
+      },
+      {
+        "date": "",
+        "name": "23/01 - Round up",
+        "amount": "9,16 €"
+      },
+      {
+        "date": "",
+        "name": "23/01 - Completed",
+        "amount": "+3 500,00 €"
+      },
+      {
+        "date": "",
+        "name": "23/01",
+        "amount": "28,02 €"
+      },
+      {
+        "date": "",
+        "name": "20/01",
+        "amount": "22,45 €"
+      },
+      {
+        "date": "",
+        "name": "20/01",
+        "amount": "13,98 €"
+      },
+      {
+        "date": "",
+        "name": "20/01",
+        "amount": "2,45 €"
+      },
+      {
+        "date": "",
+        "name": "19/01",
+        "amount": "43,69 €"
+      },
+      {
+        "date": "",
+        "name": "18/01",
+        "amount": "3,65 €"
+      }
+    ]
+  },
+  "ibkr": {
+    "bank": "ibkr",
+    "summary": {},
+    "positions": [
+      {
+        "raw": [
+          "MSFT",
+          "45,2854\t404,88\t+0,93 %\t20 293",
+          "18 335,15",
+          "448,11\t+170,00\t-1 960,00",
+          "GOOGL",
+          "105,3515\t321,50\t-0,42 %\t20 210",
+          "33 870,51"
+        ]
+      },
+      {
+        "raw": [
+          "NVDA",
+          "100,0222\t183,75\t-0,90 %\t12 653",
+          "18 382,08",
+          "126,50\t-164,00\t+5 730,00",
+          "Cash Holdings",
+          "Devise \t Montant",
+          "EUR (devise de base)\t-1 206,98"
+        ]
+      }
+    ],
+    "trades": [],
+    "performance": {},
+    "portfolio_raw": "S&P 500  6930,27 ▼ -0,03 %\nNASDAQ Comp  C23031,21  —\nRUSSELL 1000  3784,01  0,00 %\nIBKR ForecastTrader\nNouveau !\nAide \n‌\nRecherche symbole ou site\nsymbol_look_up\n6\nTransaction\nPortefeuille\nTransaction\nRecherche\nTransfert et paiement\nPerformance & Rapports\nFormation\nPortefeuille\nU15999905\nÀ 13:46:33 UTC+1\nActualiser\n \nLiquidité nette\n52 593,11\nPouvoir d'achat\n219 695,92\nP&L jour\n-116,10\nP&L non réalisé\n+14 670\nLiquidité excédentaire\n\n34 742,91\n\nPositions\nPerformance\nSoldes\nAnalyse d'impact\nOpérations sur titres\nVos placements\nActualiser\n\t\tINSTRUMENT \t POSITION\t DERNIER\t VARIATION EN %\t COÛT D'ACQUISITION\t VALEUR BOURSIÈRE\t PRIX MOYEN\t P&L JOURNALIER\t P&L NON REALISÉ\t \t\n\t\t\nMSFT \n\t45,2854\t404,88\t+0,93 %\t20 293\t\n18 335,15\n\t448,11\t+169,00\t-1 960,00\t\t\n\t\t\nGOOGL \n\t105,3515\t321,50\t-0,42 %\t20 210\t\n33 870,51\n\t191,84\t-143,00\t+13 660,00\t\t\n\t\t\nNVDA \n\t100,0222\t183,75\t-0,90 %\t12 653\t\n18 382,08\n\t126,50\t-164,00\t+5 730,00\t\t\nCash Holdings\n\tDevise \t Montant\t\t\n\t EUR (devise de base)\t-1 206,98\t\t\n\n\t USD\t-6 649,83\t\n\t\n\tTotal en espèces (in EUR)\t-6 805,23\t\t\nTout convertir en EUR\nInteractive Brokers\nIBKR.com | \nTWS sur bureau | \nIBKR Mobile | \nCarrefour des investisseurs | \nÉtat du système\nDonnées générées par",
+    "performance_raw": "S&P 500  6930,27 ▼ -0,03 %\nNASDAQ Comp  C23031,21  —\nRUSSELL 1000  3784,01  0,00 %\nIBKR ForecastTrader\nNouveau !\nAide \n‌\nRecherche symbole ou site\nsymbol_look_up\n6\nTransaction\nPortefeuille\nTransaction\nRecherche\nTransfert et paiement\nPerformance & Rapports\nFormation\nCompte\nU15999905\nEUR\n52 593,11\n-116,10\nTrésorerie\n-6 805,23\nP&L non réalisé\n14 651,24\nP&L réalisé\n0,00\nMarge de maintien\n17 856,67\nLiquidité excédentaire\n34 736,43\nPouvoir d'achat\n219 695,92\nDividendes\n0,00\nCustomize\n\nOrdres & transactions\n\nDépôt\n\nRetrait\n\nRelevés\n\nPortfolioAnalyst\n\nAssistance\n\nDashboard\nPositions\nPerformance\nBalances\nPortfolio News\nImpact Lens\nPerformance du portefeuilleTAUX DE RENDEMENT CUMULÉ (TWR)\t\nAller à PortfolioAnalyst\n7j\nMTD\n1m\nYTD\n1a\n\t\n‌\nPas de benchmark\nChart\nChart with 261 data points.\nThe chart has 1 X axis displaying Time. Range: 2025-02-10 00:00:00 to 2026-02-09 00:00:00.\nThe chart has 1 Y axis displaying values. Range: -75 to 50.\n-75.0%\n-50.0%\n-25.0%\n0.0%\n25.0%\n50.0%\nmars 2025\navr. 2025\nmai 2025\njuin 2025\njuil. 2025\naoût 2025\nsept. 2025\noct. 2025\nnov. 2025\ndéc. 2025\njanv. 2026\nfévr. 2026\nEnd of interactive chart.\nRépartition du portefeuilleLongueÀ découvert\n\nClasse d'actif\n\nLONG\n59 425\nActions\nLes montants cumulés sur ce graphique sont réinitialisés chaque mois\n\nSecteur\n\nLONG\n59 425\nTechnologie\nCommunications\n\nIndustrie\n\nLONG\n59 425\nSemiconductors\nLogiciel\nInternet\nInteractive Brokers\nIBKR.com | \nTWS sur bureau | \nIBKR Mobile | \nCarrefour des investisseurs | \nÉtat du système\nDonnées générées par",
+    "portfolio_table_0": "\t\tINSTRUMENT \t POSITION\t DERNIER\t VARIATION EN %\t COÛT D'ACQUISITION\t VALEUR BOURSIÈRE\t PRIX MOYEN\t P&L JOURNALIER\t P&L NON REALISÉ\t \t\n\t\t\nMSFT \n\t45,2854\t404,88\t+0,93 %\t20 293\t\n18 335,15\n\t448,11\t+170,00\t-1 960,00\t\t\n\t\t\nGOOGL \n\t105,3515\t321,50\t-0,42 %\t20 210\t\n33 870,51\n\t191,84\t-143,00\t+13 660,00\t\t\n\t\t\nNVDA \n\t100,0222\t183,75\t-0,90 %\t12 653\t\n18 382,08\n\t126,50\t-164,00\t+5 730,00\t\t",
+    "portfolio_table_1": "\tDevise \t Montant\t\t\n\t EUR (devise de base)\t-1 206,98\t\t\n\n\t USD\t-6 649,83\t\n\t\n\tTotal en espèces (in EUR)\t-6 805,23\t\t",
+    "activity_raw": "S&P 500  6930,27 ▼ -0,03 %\nNASDAQ Comp  C23031,21  —\nRUSSELL 1000  3784,01  0,00 %\nIBKR ForecastTrader\nNouveau !\nAide \n‌\nRecherche symbole ou site\nsymbol_look_up\n6\nTransaction\nPortefeuille\nTransaction\nRecherche\nTransfert et paiement\nPerformance & Rapports\nFormation\nInteractive Brokers\nIBKR.com | \nTWS sur bureau | \nIBKR Mobile | \nCarrefour des investisseurs | \nÉtat du système\nDonnées générées par"
+  },
+  "boursobank": {
+    "bank": "boursobank",
+    "accounts": [
+      {
+        "pea_total": 100.0
+      },
+      {
+        "livret_a": 7726.18
+      },
+      {
+        "total": 0.0
+      }
+    ],
+    "pea": [],
+    "loans": [],
+    "insurance": [],
+    "compte_courant_raw": "Aller au contenu principal\nActiver le contraste adapté\nAccueil\nrubrique active\nMes comptes\nServices\nProduits\nParrainage\nCashback\nBourse & Actus\nSe connecter\nLa page demandée n'existe plus !\nJe retourne sur la synthèse\nJ'accède à l'assistance",
+    "patrimoine_raw": "Aller au contenu principal\nActiver le contraste adapté\nAccueil\nMes comptes\nServices\nProduits\nParrainage\nCashback\nBourse & Actus\nAfficher vos notifications\n17\nJ'ajoute un compte externe\nWicount patrimoine\nSynthèse Wicount\nDiagnostic de mon épargne\nEvolution de mon épargne\nMon Immobilier\nWicount budget\nAnalyse de mes dépenses\nAnalyse de mes revenus\nÉvolution de mon solde\nAnalyse prévisionnelle\nSolde prévisionnel\nMes objectifs de dépenses\nMon Immobilier\nValeur actuelle de votre patrimoine\n505 254 €\nValeur d'achat de votre patrimoine\n141 000 €\n+/- value estimée(1)\n364 254 €\nCapital emprunté\n117 000 €\nCapital restant dû\n113 803,50 €\nVotre bien en détails\nterrain désirade\n\nType de bien : Maison\n\nAdresse : 40 chemin de la désirade, 34790 GRABELS\n\nDate d'achat : 08/2021\n\nNombre de pièces : 4\n\nGérer mon bien\n\nPrix d'achat\n\n141 000 €\n\nSuperficie\n\n110 m²\n\nSoit au m²\n\n1 281,82 €\n\nDiagnostic de performance énergétique\nVOTRE SCORE :\nA\nB\nC\nD\nE\nF\nG\nModifier\n\nEstimation du bien\n\n505 254 €\n\nSoit 4 593,22 €/m²\n\nFourchette haute\n\n565 380 €\n\nSoit\n\n5 139,82 €/m²\n\nFourchette basse\n\n445 129 €\n\nSoit\n\n4 046,63 €/m²\n\n+/- value estimée(1)\n364 254 €\n+258,34 % du prix d'achat\nCrédits associés\nPACP - 73140424333\n\nRemboursé : 3 196,50 € sur 5 000 €\n\nRestant à rembourser : 1 803,50 €\n\nVoir détails\nP. ACC.SOC - 00004690213\n\nRemboursé : 0,00 € sur 10 000 €\n\nRestant à rembourser : 10 000,00 €\n\nVoir détails\nPRET 0% - 00004690214\n\nRemboursé : 0,00 € sur 102 000 €\n\nRestant à rembourser : 102 000,00 €\n\nVoir détails\nAjouter un crédit\nPret personnel\nFinancez tous vos projets de rénovation.\n\nSoumis à conditions\n\nEn savoir plus\n\nUn crédit vous engage et doit être remboursé. Vérifiez vos capacités de remboursement avant de vous engager.\n\n \nEvolution de votre bien\n08/2021\n12/2024\n03/2025\n06/2025\n09/2025\n12/2025\n100 000\n200 000\n300 000\n400 000\n500 000\n600 000\nValeur estimée de votre bien\nValeur d'achat\nActualités\nLocataire en copropriété : avez-vous le...\n \nImmobilier locatif : qui sont les bailleurs...\n \nCopropriété et voiture électrique :...\n \nRénovation énergétique : quel bilan...\nAccéder à toutes mes actualités\nProchaine actualisation : 01/03/2026 | Estimé par  \nIndice de fiabilité\n\nCes estimations sont réalisées à partir de l'ensemble des ventes réalisées par le réseau d'agence de Meilleurs Agents, partout en France Métropolitaine ainsi que les données des Demandes de Valeurs Foncières (DVF) produites par la direction générale des Finances publiques. Elles sont réalisées à titre indicatif et n'ont pas valeur contractuelle.\n\n(1) Votre +/- value estimée est la différence entre l'estimation de la valeur de votre bien et la valeur d'achat, que vous avez déclarée. Elle n'a aucune valeur fiscale.\n\nAjouter un bien\nUne question ?\nUne question ? Envoyez un message à notre assistant virtuel.\nAide\nFoire aux Questions\nAccessibilité Numérique (partiellement conforme)\nNos engagements\nNos engagements RSE\nSécurité\nDocumentation Contractuelle et Tarifs\nBrochure tarifaire\nDocument d'information tarifaire\nConditions générales\nCG Ex Direct\nMentions légales et CGU\nPolitique ESG\nProcédure courtiers en crédit immobilier\nDonnées personnelles\nGérer mes cookies\nPolitique de cookies\nPolitique de protection des données clients\nGuides et brochures\nBien utiliser le chèque\nGlossaire Banque au quotidien\nMaîtriser mon budget\nGuide de la mobilité\nLa succession chez BoursoBank\nSolutions pour la Clientèle Fragile\nFonds de garantie en cas de défaillance\nNos sites\nPortail d'informations Boursorama\nSite Groupe & Recrutement\nBoursoBank\n\nCopyright © 2026\n\nBoursorama, SA au capital de 53 576 889,20 € – RCS Nanterre 351 058 151 – TVA FR 69 351 058 151 – 44 rue Traversière, CS 80134, 92772 BOULOGNE BILLANCOURT CEDEX\n\n4,9\n4,8\nDonner votre avis",
+    "budget_raw": "Aller au contenu principal\nActiver le contraste adapté\nAccueil\nMes comptes\nServices\nProduits\nParrainage\nCashback\nBourse & Actus\nAfficher vos notifications\n17\nTotal de mes avoirs\n121,67 €\nMes dossiers en cours\nMes demandes avec le Service Client\nMes comptes bancaires\nTous mes comptes\n21,67 €\nBOURSORAMA ESSENTIEL SYLVAIN\n19,33 €\nBoursoBank\nSYLVAIN LEGLAND\nCOMPTE CHEQUE\n2,34 €\nCrédit Agricole\n\n!\nMes placements financiers\nPEA LEGLAND\n100,00 €\nBoursoBank\nMes crédits\nPRÊT PERSONNEL\n− 1 448,78 €\nBoursoBank\nPRÊT PERSONNEL\n− 6 284,35 €\nBoursoBank\nPRET 0% - 00004690214\n− 102 000,00 €\nCrédit Agricole\nP. ACC.SOC - 00004690213\n− 10 000,00 €\nCrédit Agricole\nPACP - 73140424333\n− 1 803,50 €\nCrédit Agricole\nComptes de mes enfants\nBOURSORAMA ESSENTIEL NATHAEL\n351,74 €\nBoursoBank\nNATHAEL LEGLAND\nLIVRET A NATHAEL\n7 726,18 €\nBoursoBank\nCashback & remises The Corner\n \nJ'ajoute un compte externe\nDétail du compte\nTous mes comptes bancaires\nSolde total de mes comptes bancaires\n21,67 €\nJe recherche dans mes opérations ...\nRechercher\n+ de critères\nComptes\nSélectionnez une ou plusieurs valeurs\nTout sélectionner\nTout désélectionner\nCOMPTES / CARTES BOURSOBANK\nBOURSORAMA ESSENTIEL SYLVAIN - 00040773846\nCOMPTES / CARTES EXTERNES\nCOMPTE CHEQUE - 85172056038\nExporter les opérations\nvendredi 6 février 2026\nVir Inst Legland Sylvain\nVirements émis\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 90,00 €\nVirement de SYLVAIN PHILIPPE LEGLAND\nVirements reçus\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n100,00 €\nVirement interne depuis BOURSORAMA\nVirements émis de comptes à comptes\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 3,00 €\nVirement interne depuis BOURSORAMA\nVirements émis de comptes à comptes\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 3,00 €\njeudi 5 février 2026\nVirement de Sylvain Legland\nVirements émis de comptes à comptes\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 30,00 €\nVirement de SYLVAIN PHILIPPE LEGLAND\nVirements reçus\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n30,00 €\nVirement de SYLVAIN PHILIPPE LEGLAND\nVirements reçus\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n630,00 €\nLycee Notre Dame La Merci\nEtudes (formation, fournitures, cantines…)\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 303,00 €\nLycee Notre Dame La Merci\nEtudes (formation, fournitures, cantines…)\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 322,00 €\nMsf\nLoyers, charges\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 20,00 €\nlundi 2 février 2026\nVirement de Sylvain Legland\nVirements émis de comptes à comptes\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 50,00 €\nVir Sepa Scia La Desirade\nVirements émis\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 14,28 €\nVir Sepa Ca Sylvain\nVirements émis\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 74,56 €\nVir Sepa Legland Sylvain\nVirements émis\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 73,69 €\nvendredi 30 janvier 2026\nPharmacie-susplugas\nPharmacie et laboratoire\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 26,30 €\nVirement interne depuis BOURSORAMA\nVirements émis de comptes à comptes\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 3,00 €\nVirement interne depuis BOURSORAMA\nVirements émis de comptes à comptes\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 3,00 €\njeudi 29 janvier 2026\nVir Inst Sca La Desirade\nVirements émis\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 1 005,00 €\nVirement de SYLVAIN PHILIPPE LEGLAND\nVirements reçus\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n1 005,00 €\nmercredi 28 janvier 2026\nReglomobile\nAbonnements & téléphonie\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 4,80 €\nlundi 26 janvier 2026\nEchéance Prêt\nEmprunt immobilier\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 1 262,79 €\nEchéance Prêt\nEmprunt immobilier\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 161,46 €\nvendredi 23 janvier 2026\nVir Inst Legland Sylvain\nVirements émis\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 3 500,00 €\nVirement interne depuis BOURSORAMA\nVirements émis de comptes à comptes\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 3,00 €\nVirement interne depuis BOURSORAMA\nVirements émis de comptes à comptes\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 3,00 €\nReglomobile\nAbonnements & téléphonie\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 7,80 €\nReglomobile\nAbonnements & téléphonie\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 6,80 €\nReglomobile\nAbonnements & téléphonie\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n− 6,80 €\nmardi 20 janvier 2026\nVir Sepa La Poste Rh\nSalaire fixe\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n4 900,12 €\nlundi 19 janvier 2026\nVir Sepa Complementaire Sante Prevoyance\nRevenus épargne financière (retraite, prévoyance, pea, assurance-vie…)\nBoursoBank\nBOURSORAMA ESSENTIEL SYLVAIN\n7,50 €\nMouvements précédents\nMes virements & prélèvements\nAjouter un compte externe\nUne question ?\nUne question ? Envoyez un message à notre assistant virtuel.\nAide\nFoire aux Questions\nAccessibilité Numérique (partiellement conforme)\nNos engagements\nNos engagements RSE\nSécurité\nDocumentation Contractuelle et Tarifs\nBrochure tarifaire\nDocument d'information tarifaire\nConditions générales\nCG Ex Direct\nMentions légales et CGU\nPolitique ESG\nProcédure courtiers en crédit immobilier\nDonnées personnelles\nGérer mes cookies\nPolitique de cookies\nPolitique de protection des données clients\nGuides et brochures\nBien utiliser le chèque\nGlossaire Banque au quotidien\nMaîtriser mon budget\nGuide de la mobilité\nLa succession chez BoursoBank\nSolutions pour la Clientèle Fragile\nFonds de garantie en cas de défaillance\nNos sites\nPortail d'informations Boursorama\nSite Groupe & Recrutement\nBoursoBank\n\nCopyright © 2026\n\nBoursorama, SA au capital de 53 576 889,20 € – RCS Nanterre 351 058 151 – TVA FR 69 351 058 151 – 44 rue Traversière, CS 80134, 92772 BOULOGNE BILLANCOURT CEDEX\n\n4,9\n4,8\nDonner votre avis",
+    "pea_raw": "Aller au contenu principal\nActiver le contraste adapté\nAccueil\nrubrique active\nMes comptes\nServices\nProduits\nParrainage\nCashback\nBourse & Actus\nSe connecter\nLa page demandée n'existe plus !\nJe retourne sur la synthèse\nJ'accède à l'assistance",
+    "credit_raw": "Aller au contenu principal\nActiver le contraste adapté\nAccueil\nrubrique active\nMes comptes\nServices\nProduits\nParrainage\nCashback\nBourse & Actus\nSe connecter\nLa page demandée n'existe plus !\nJe retourne sur la synthèse\nJ'accède à l'assistance"
+  },
+  "credit_agricole": {
+    "bank": "credit_agricole",
+    "accounts": [],
+    "credits": [
+      {
+        "name": "Prêt à 0% ministère du logement",
+        "account_number": "00004690214",
+        "monthly_payment": 0.0,
+        "borrowed": 102000.0,
+        "remaining": 102000.0
+      },
+      {
+        "name": "Prêt d'Accession Social",
+        "account_number": "00004690213",
+        "monthly_payment": 0.0,
+        "borrowed": 10000.0,
+        "remaining": 10000.0
+      },
+      {
+        "name": "Prêt d'Accession Social",
+        "account_number": "00004690212",
+        "monthly_payment": 90.32,
+        "borrowed": 138290.0,
+        "remaining": 110594.85
+      },
+      {
+        "name": "Prêt à Consommer Perso",
+        "account_number": "73140424333",
+        "monthly_payment": 73.69,
+        "borrowed": 5000.0,
+        "remaining": 1732.77
+      },
+      {
+        "name": "© Crédit Agricole"
+      }
+    ],
+    "insurance": [],
+    "amortissement_link": "/ca-languedoc/particulier/operations/credits/tableau-amortissement.html"
+  }
+}

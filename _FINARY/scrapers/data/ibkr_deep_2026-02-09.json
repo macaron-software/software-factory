@@ -1,0 +1,35 @@
+{
+  "bank": "ibkr",
+  "summary": {},
+  "positions": [
+    {
+      "raw": [
+        "MSFT",
+        "45,2854\t404,88\t+0,93 %\t20 293",
+        "18 335,15",
+        "448,11\t+170,00\t-1 960,00",
+        "GOOGL",
+        "105,3515\t321,50\t-0,42 %\t20 210",
+        "33 870,51"
+      ]
+    },
+    {
+      "raw": [
+        "NVDA",
+        "100,0222\t183,75\t-0,90 %\t12 653",
+        "18 382,08",
+        "126,50\t-164,00\t+5 730,00",
+        "Cash Holdings",
+        "Devise \t Montant",
+        "EUR (devise de base)\t-1 206,98"
+      ]
+    }
+  ],
+  "trades": [],
+  "performance": {},
+  "portfolio_raw": "S&P 500  6930,27 ▼ -0,03 %\nNASDAQ Comp  C23031,21  —\nRUSSELL 1000  3784,01  0,00 %\nIBKR ForecastTrader\nNouveau !\nAide \n‌\nRecherche symbole ou site\nsymbol_look_up\n6\nTransaction\nPortefeuille\nTransaction\nRecherche\nTransfert et paiement\nPerformance & Rapports\nFormation\nPortefeuille\nU15999905\nÀ 13:46:33 UTC+1\nActualiser\n \nLiquidité nette\n52 593,11\nPouvoir d'achat\n219 695,92\nP&L jour\n-116,10\nP&L non réalisé\n+14 670\nLiquidité excédentaire\n\n34 742,91\n\nPositions\nPerformance\nSoldes\nAnalyse d'impact\nOpérations sur titres\nVos placements\nActualiser\n\t\tINSTRUMENT \t POSITION\t DERNIER\t VARIATION EN %\t COÛT D'ACQUISITION\t VALEUR BOURSIÈRE\t PRIX MOYEN\t P&L JOURNALIER\t P&L NON REALISÉ\t \t\n\t\t\nMSFT \n\t45,2854\t404,88\t+0,93 %\t20 293\t\n18 335,15\n\t448,11\t+169,00\t-1 960,00\t\t\n\t\t\nGOOGL \n\t105,3515\t321,50\t-0,42 %\t20 210\t\n33 870,51\n\t191,84\t-143,00\t+13 660,00\t\t\n\t\t\nNVDA \n\t100,0222\t183,75\t-0,90 %\t12 653\t\n18 382,08\n\t126,50\t-164,00\t+5 730,00\t\t\nCash Holdings\n\tDevise \t Montant\t\t\n\t EUR (devise de base)\t-1 206,98\t\t\n\n\t USD\t-6 649,83\t\n\t\n\tTotal en espèces (in EUR)\t-6 805,23\t\t\nTout convertir en EUR\nInteractive Brokers\nIBKR.com | \nTWS sur bureau | \nIBKR Mobile | \nCarrefour des investisseurs | \nÉtat du système\nDonnées générées par",
+  "performance_raw": "S&P 500  6930,27 ▼ -0,03 %\nNASDAQ Comp  C23031,21  —\nRUSSELL 1000  3784,01  0,00 %\nIBKR ForecastTrader\nNouveau !\nAide \n‌\nRecherche symbole ou site\nsymbol_look_up\n6\nTransaction\nPortefeuille\nTransaction\nRecherche\nTransfert et paiement\nPerformance & Rapports\nFormation\nCompte\nU15999905\nEUR\n52 593,11\n-116,10\nTrésorerie\n-6 805,23\nP&L non réalisé\n14 651,24\nP&L réalisé\n0,00\nMarge de maintien\n17 856,67\nLiquidité excédentaire\n34 736,43\nPouvoir d'achat\n219 695,92\nDividendes\n0,00\nCustomize\n\nOrdres & transactions\n\nDépôt\n\nRetrait\n\nRelevés\n\nPortfolioAnalyst\n\nAssistance\n\nDashboard\nPositions\nPerformance\nBalances\nPortfolio News\nImpact Lens\nPerformance du portefeuilleTAUX DE RENDEMENT CUMULÉ (TWR)\t\nAller à PortfolioAnalyst\n7j\nMTD\n1m\nYTD\n1a\n\t\n‌\nPas de benchmark\nChart\nChart with 261 data points.\nThe chart has 1 X axis displaying Time. Range: 2025-02-10 00:00:00 to 2026-02-09 00:00:00.\nThe chart has 1 Y axis displaying values. Range: -75 to 50.\n-75.0%\n-50.0%\n-25.0%\n0.0%\n25.0%\n50.0%\nmars 2025\navr. 2025\nmai 2025\njuin 2025\njuil. 2025\naoût 2025\nsept. 2025\noct. 2025\nnov. 2025\ndéc. 2025\njanv. 2026\nfévr. 2026\nEnd of interactive chart.\nRépartition du portefeuilleLongueÀ découvert\n\nClasse d'actif\n\nLONG\n59 425\nActions\nLes montants cumulés sur ce graphique sont réinitialisés chaque mois\n\nSecteur\n\nLONG\n59 425\nTechnologie\nCommunications\n\nIndustrie\n\nLONG\n59 425\nSemiconductors\nLogiciel\nInternet\nInteractive Brokers\nIBKR.com | \nTWS sur bureau | \nIBKR Mobile | \nCarrefour des investisseurs | \nÉtat du système\nDonnées générées par",
+  "portfolio_table_0": "\t\tINSTRUMENT \t POSITION\t DERNIER\t VARIATION EN %\t COÛT D'ACQUISITION\t VALEUR BOURSIÈRE\t PRIX MOYEN\t P&L JOURNALIER\t P&L NON REALISÉ\t \t\n\t\t\nMSFT \n\t45,2854\t404,88\t+0,93 %\t20 293\t\n18 335,15\n\t448,11\t+170,00\t-1 960,00\t\t\n\t\t\nGOOGL \n\t105,3515\t321,50\t-0,42 %\t20 210\t\n33 870,51\n\t191,84\t-143,00\t+13 660,00\t\t\n\t\t\nNVDA \n\t100,0222\t183,75\t-0,90 %\t12 653\t\n18 382,08\n\t126,50\t-164,00\t+5 730,00\t\t",
+  "portfolio_table_1": "\tDevise \t Montant\t\t\n\t EUR (devise de base)\t-1 206,98\t\t\n\n\t USD\t-6 649,83\t\n\t\n\tTotal en espèces (in EUR)\t-6 805,23\t\t",
+  "activity_raw": "S&P 500  6930,27 ▼ -0,03 %\nNASDAQ Comp  C23031,21  —\nRUSSELL 1000  3784,01  0,00 %\nIBKR ForecastTrader\nNouveau !\nAide \n‌\nRecherche symbole ou site\nsymbol_look_up\n6\nTransaction\nPortefeuille\nTransaction\nRecherche\nTransfert et paiement\nPerformance & Rapports\nFormation\nInteractive Brokers\nIBKR.com | \nTWS sur bureau | \nIBKR Mobile | \nCarrefour des investisseurs | \nÉtat du système\nDonnées générées par"
+}

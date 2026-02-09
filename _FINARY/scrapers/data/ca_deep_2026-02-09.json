@@ -1,0 +1,39 @@
+{
+  "bank": "credit_agricole",
+  "accounts": [],
+  "credits": [
+    {
+      "name": "Prêt à 0% ministère du logement",
+      "account_number": "00004690214",
+      "monthly_payment": 0.0,
+      "borrowed": 102000.0,
+      "remaining": 102000.0
+    },
+    {
+      "name": "Prêt d'Accession Social",
+      "account_number": "00004690213",
+      "monthly_payment": 0.0,
+      "borrowed": 10000.0,
+      "remaining": 10000.0
+    },
+    {
+      "name": "Prêt d'Accession Social",
+      "account_number": "00004690212",
+      "monthly_payment": 90.32,
+      "borrowed": 138290.0,
+      "remaining": 110594.85
+    },
+    {
+      "name": "Prêt à Consommer Perso",
+      "account_number": "73140424333",
+      "monthly_payment": 73.69,
+      "borrowed": 5000.0,
+      "remaining": 1732.77
+    },
+    {
+      "name": "© Crédit Agricole"
+    }
+  ],
+  "insurance": [],
+  "amortissement_link": "/ca-languedoc/particulier/operations/credits/tableau-amortissement.html"
+}
