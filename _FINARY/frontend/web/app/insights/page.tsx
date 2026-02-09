@@ -97,7 +97,7 @@ export default function InsightsPage() {
   }, [positions]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <p className="text-label font-medium uppercase mb-2 text-t-5">Insights</p>
         <p className="text-[22px] font-light text-t-1">Analyse et recommandations</p>
@@ -123,7 +123,7 @@ export default function InsightsPage() {
       )}
 
       {/* Performance chart */}
-      <div className="card p-6">
+      <div className="card p-7">
         <PriceChart title="Performance" data={perfData} color="#5682f2" defaultPeriod="1Y" />
         <div className="mt-4 pt-4 border-t border-bd-1">
           <div className="flex items-center justify-between">
@@ -181,7 +181,7 @@ export default function InsightsPage() {
       )}
 
       {/* Cards grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <Section title="Fee Scanner">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -329,7 +329,7 @@ export default function InsightsPage() {
 
       {/* Investor Profile */}
       <Section title="Profil investisseur">
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-5">
           <div>
             <p className="text-label mb-1 text-t-5">Profil de risque</p>
             <p className="text-body-lg font-semibold text-accent">Long-terme</p>

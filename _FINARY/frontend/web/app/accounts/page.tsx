@@ -29,7 +29,7 @@ export default function AccountsPage() {
   }, {});
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader label="Solde total" value={totalBalance} />
 
       <div className="space-y-5">

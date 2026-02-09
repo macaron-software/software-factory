@@ -25,7 +25,7 @@ export default function ImmobilierPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         label={`Immobilier — ${sca.name}`}
         value={sca.your_share_property_value}
@@ -41,7 +41,7 @@ export default function ImmobilierPage() {
         }
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Property card */}
         <Section title="Propriété">
           <div className="space-y-3">
@@ -112,7 +112,7 @@ export default function ImmobilierPage() {
       {market && (
         <>
           <Section title={`Marché immobilier — ${market.commune} (${market.code_postal})`}>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
               <StatCard
                 label="Prix achat /m² (maison)"
                 value={market.prix_m2_achat.maison.median}
@@ -140,7 +140,7 @@ export default function ImmobilierPage() {
             </p>
           </Section>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             <Section title="Estimation revente (110 m²)">
               <div className="space-y-3">
                 <InfoRow label="Fourchette basse" value={formatEUR(market.estimation_revente.low)} />
@@ -190,7 +190,7 @@ export default function ImmobilierPage() {
 
       {/* Financial details */}
       <Section title="Situation financière SCA">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
           <StatCard label="Capital versé" value={fin.capital_verse} />
           <StatCard label="Avances CCA" value={fin.cca_avances} />
           <StatCard label="Total versé" value={fin.total_verse} tone="accent" />

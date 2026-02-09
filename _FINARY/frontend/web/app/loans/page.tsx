@@ -16,7 +16,7 @@ export default function LoansPage() {
   const costly = loans?.filter((l: any) => l.vs_inflation === "rembourser") ?? [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         label="Crédits & Emprunts"
         value={-totalRemaining}
@@ -33,18 +33,18 @@ export default function LoansPage() {
 
       {/* Inflation summary */}
       {loans && loans.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="card p-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="card p-6">
             <p className="text-caption font-medium uppercase mb-1 text-t-5">Boucliers inflation</p>
             <p className="tnum text-heading font-semibold text-gain">{shields.length}</p>
             <p className="text-label text-t-5 mt-1">Taux &lt; inflation 2.4% — garder le plus longtemps</p>
           </div>
-          <div className="card p-4">
+          <div className="card p-6">
             <p className="text-caption font-medium uppercase mb-1 text-t-5">Coûteux</p>
             <p className="tnum text-heading font-semibold text-loss">{costly.length}</p>
             <p className="text-label text-t-5 mt-1">Taux &gt; inflation — rembourser en priorité</p>
           </div>
-          <div className="card p-4">
+          <div className="card p-6">
             <p className="text-caption font-medium uppercase mb-1 text-t-5">Endettement total</p>
             <p className="tnum text-heading font-semibold text-loss">{formatEUR(totalRemaining)}</p>
             <div className="bar-track mt-2" style={{ height: "6px" }}>

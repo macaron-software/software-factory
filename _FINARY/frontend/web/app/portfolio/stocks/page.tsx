@@ -40,9 +40,9 @@ export default function StocksPage() {
   if (isLoading) return <Loading />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Chart */}
-      <div className="card p-6">
+      <div className="card p-7">
         <PriceChart title="Actions & Fonds" data={chartData} color="#5682f2" defaultPeriod="1Y" />
         <div className="mt-4 pt-4 border-t border-bd-1">
           <div className="flex items-center justify-between">
@@ -63,8 +63,8 @@ export default function StocksPage() {
       </div>
 
       {/* Insights row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="card p-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="card p-5">
           <p className="text-label font-medium mb-2 text-t-5">Fee Scanner</p>
           <div className="flex items-center justify-between">
             <span className="tnum text-heading font-light text-t-1">{formatEUR(totalValue * 0.0099)}</span>
@@ -72,7 +72,7 @@ export default function StocksPage() {
           </div>
         </div>
 
-        <div className="card p-4">
+        <div className="card p-5">
           <p className="text-label font-medium mb-2 text-t-5">Diversification</p>
           <div className="flex items-center justify-between">
             <span className="text-body-lg font-medium text-t-1">
@@ -84,7 +84,7 @@ export default function StocksPage() {
           </div>
         </div>
 
-        <div className="card p-4">
+        <div className="card p-5">
           <p className="text-label font-medium mb-2 text-t-5">Dividendes</p>
           <div className="flex items-center justify-between">
             <span className="tnum text-body-lg font-medium text-gain">

@@ -30,7 +30,7 @@ export default function BudgetPage() {
     : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         label="Budget"
         value={lastMonth ? lastMonth.income - lastMonth.expenses : 0}

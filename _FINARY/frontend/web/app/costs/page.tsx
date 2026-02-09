@@ -20,7 +20,7 @@ export default function CostsPage() {
   const annualTotal = Object.values(costs.annual_fees).reduce((s, v) => s + (typeof v === "number" ? v : 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader label="Coûts & Frais" value={costs.monthly_total} suffix="/mois" />
 
       {/* Monthly costs */}
@@ -73,7 +73,7 @@ export default function CostsPage() {
           </>
         }
       >
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-5">
           {costs.annual_fees.tr_trading > 0 && (
             <StatCard label="Trading TR (1€/trade)" value={costs.annual_fees.tr_trading} color={CHART_COLORS[0]} />
           )}
@@ -94,13 +94,13 @@ export default function CostsPage() {
 
       {/* Impact */}
       <Section title="Impact sur la performance">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-5">
           <StatCard
             label="Coût annuel total"
             value={annualTotal + costs.monthly_total * 12}
             tone="negative"
           />
-          <div className="bg-bg-hover p-4 rounded-lg">
+          <div className="bg-bg-hover p-5 rounded-lg">
             <p className="text-caption font-medium uppercase mb-2 text-t-5">% du patrimoine</p>
             <p className="tnum text-heading font-semibold text-warn">
               {((annualTotal + costs.monthly_total * 12) / 87145 * 100).toFixed(2)}%

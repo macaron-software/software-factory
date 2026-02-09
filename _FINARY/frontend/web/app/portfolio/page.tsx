@@ -27,7 +27,7 @@ export default function PortfolioPage() {
   const totalPnlPct = totalValue - totalPnl > 0 ? (totalPnl / (totalValue - totalPnl)) * 100 : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         label="Investissements"
         value={totalValue}
