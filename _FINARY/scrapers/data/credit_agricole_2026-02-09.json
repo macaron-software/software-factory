@@ -1,0 +1,64 @@
+{
+  "scraped_at": "2026-02-09T10:13:29.834530",
+  "source": "credit_agricole",
+  "region": "languedoc",
+  "owner": "SYLVAIN LEGLAND",
+  "accounts": [
+    {
+      "name": "Compte Principal",
+      "type": "checking",
+      "balance": "1,83",
+      "currency": "EUR"
+    }
+  ],
+  "credits": [
+    {
+      "name": "Prêt à 0% ministère du logement",
+      "account_number": "00004690214",
+      "monthly_payment": "0,00 €",
+      "borrowed": "102 000,00 €",
+      "remaining": "102 000,00 €"
+    },
+    {
+      "name": "Prêt d'Accession Social",
+      "account_number": "00004690213",
+      "monthly_payment": "0,00 €",
+      "borrowed": "10 000,00 €",
+      "remaining": "10 000,00 €"
+    },
+    {
+      "name": "Prêt d'Accession Social",
+      "account_number": "00004690212",
+      "monthly_payment": "90,32 €",
+      "borrowed": "138 290,00 €",
+      "remaining": "110 594,85 €"
+    },
+    {
+      "name": "Prêt à Consommer Perso",
+      "account_number": "73140424333",
+      "monthly_payment": "73,69 €",
+      "borrowed": "5 000,00 €",
+      "remaining": "1 732,77 €"
+    }
+  ],
+  "savings": "Aucune épargne",
+  "insurance": "Aucune assurance",
+  "recent_transactions": [
+    {
+      "date": "06/02",
+      "label": "VIREMENT EN VOTRE FAVEUR VIR INST de Sylvain LEGLAND",
+      "amount": "90,00 €"
+    },
+    {
+      "date": "05/02",
+      "label": "PRELEVEMENT CRCAM DU LANGUEDOC",
+      "amount": "-73,69 €"
+    },
+    {
+      "date": "05/02",
+      "label": "REMBOURSEMENT DE PRET 00004690212 05/02/26 INTERETS",
+      "amount": "-90,32 €"
+    }
+  ],
+  "raw_dashboard": "Aller au Menu\nAller au Contenu\nAller au Pied de page\nSynthèse\nVirement\nComptes & Cartes\nÉpargne\nAssurances\nCrédits\nDocuments\nAssistance de recherche\nContact\nRendez-vous\nMessages\nAutres comptes\nProfil\nSe déconnecter\nBONJOUR\nMONSIEUR SYLVAIN LEGLAND\nDernière connexion le 09/02/2026 à 10h11\nMON COMPTE PRINCIPAL\n1,83 €\nDernières opérations\n06/02\n6 Février 2026\nVIREMENT EN VOTRE FAVEUR VIR INST de Sylvain LEGLAND\n90,00 €\n05/02\n5 Février 2026\nPRELEVEMENT CRCAM DU LANGUEDOC\n-73,69 €\n05/02\n5 Février 2026\nREMBOURSEMENT DE PRET 00004690212 05/02/26 INTERETS\n-90,32 €\nEFFECTUER\nUN VIREMENT\nEDITER UN\nRIB\nGÉRER\nMES CARTES\nACCÉDER À MON\nESPACE PARRAINAGE\nOuverture livret enfant mineur\nBanque en ligne\nSimulateur Prêt immobilier\nSimulateur Crédit à la consommation\nMes crédits\nAfficher mes crédits\nMon épargne\nVous n'avez pas d'épargne actuellement\nMes assurances\nVous n'avez pas d'assurance actuellement\nAller sur la page facebook du Crédit Agricole Languedoc ( nouvel onglet )\nAller sur la page instagram du Crédit Agricole Languedoc ( nouvel onglet )\nAller sur la page youtube du Crédit Agricole Languedoc ( nouvel onglet )\nAller sur la page twitter du Crédit Agricole Languedoc ( nouvel onglet )\nAller sur la page TikTok du Crédit Agricole Master ( nouvel onglet )\nAller sur la page linkedin du Crédit Agricole Languedoc ( nouvel onglet )\n\t\n\nLE CREDIT AGRICOLE\n\nInformations réglementées\nMa Caisse Régionale\nBanque coopérative\nCharte éthique\nGroupe Crédit Agricole\nRecrutement\n\t\n\nINFORMATIONS PRATIQUES\n\nRelation Banque-Client\nRéclamation et médiation\nTarifs\nFonds de Garantie des Dépôts et de Résolution (FGDR)\nFoire Aux Questions (FAQ)\nDemande de résiliation d'un contrat\n\t\n\nSITES SPECIALISES \n\nPrêt immobilier en ligne\nLOA Agilauto\nPatri Immo\nService de télésurveillance\nDispositif lanceur d’alerte\nMon parrainage\nCrédit Agricole Immobilier\nPropulse by CA\nPartenariats sportifs\nPleinchamp.com\nLOA LLD Agilauto\n\t\n\nAccessibilité numérique du site\n\nPlan du site\nAccessibilité sourds ou malentendants\nAccessibilité : partiellement conforme\nMENTIONS LÉGALES\nCOOKIES ET POLITIQUE DE PROTECTION DES DONNÉES PERSONNELLES DU SITE\nPOLITIQUE DE PROTECTION DES DONNÉES PERSONNELLES DE LA CAISSE RÉGIONALE\nESPACE SECURITE ET FRAUDE\nCOOKIES\n\n© Crédit Agricole"
+}

@@ -603,6 +603,321 @@ async def scrape_ibkr():
         await browser.close()
 
 
+async def scrape_credit_agricole():
+    """Scrape Crédit Agricole Languedoc via Playwright."""
+    from playwright.async_api import async_playwright
+
+    username = os.environ["CA_USERNAME"]
+    pin = os.environ["CA_PIN"]
+    region = os.environ.get("CA_REGION", "languedoc")
+
+    # CA regional bank URLs
+    CA_URLS = {
+        "languedoc": "https://www.ca-languedoc.fr",
+        "centre-loire": "https://www.ca-centreloire.fr",
+        "sud-med": "https://www.ca-sudmed.fr",
+        "toulouse": "https://www.ca-toulouse31.fr",
+        "normandie": "https://www.ca-normandie.fr",
+    }
+    base_url = CA_URLS.get(region, f"https://www.ca-{region}.fr")
+
+    print(f"[credit_agricole] Connecting to {region} as {username[:4]}****...")
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=False)
+        ctx = await browser.new_context(
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            viewport={"width": 1280, "height": 800},
+        )
+        page = await ctx.new_page()
+        page.set_default_timeout(60000)
+
+        # Step 1: Go to CA homepage and click "Me connecter"
+        print(f"[credit_agricole] Loading {base_url}...")
+        await page.goto(base_url, wait_until="domcontentloaded")
+        await page.wait_for_timeout(3000)
+
+        # Dismiss cookie banner
+        for sel in ['button:has-text("Tout accepter")', 'button:has-text("Accepter")',
+                    '#onetrust-accept-btn-handler', '.cookie-consent-accept']:
+            try:
+                btn = await page.query_selector(sel)
+                if btn and await btn.is_visible():
+                    await btn.click()
+                    print(f"[credit_agricole] Dismissed cookies via {sel}")
+                    await page.wait_for_timeout(1000)
+                    break
+            except Exception:
+                continue
+
+        # Click "Me connecter"
+        print("[credit_agricole] Clicking 'Me connecter'...")
+        try:
+            connect_btn = await page.query_selector('a:has-text("Me connecter"), button:has-text("Me connecter")')
+            if connect_btn:
+                await connect_btn.click()
+                await page.wait_for_timeout(3000)
+                print("[credit_agricole] Clicked 'Me connecter'")
+            else:
+                # Try direct login URL
+                await page.goto(f"{base_url}/particulier/operations/operations-courantes/mon-espace-client.html", wait_until="domcontentloaded")
+                await page.wait_for_timeout(3000)
+        except Exception:
+            pass
+
+        await page.screenshot(path="/tmp/ca_01_login.png")
+        print("[credit_agricole] Screenshot saved: /tmp/ca_01_login.png")
+        html = await page.content()
+        Path("/tmp/ca_login.html").write_text(html)
+
+        # Step 2: Enter account number
+        print("[credit_agricole] Entering account number...")
+        account_sels = [
+            '#Login-account_number', 'input[name="CCPTE"]', 'input[name="account"]',
+            'input[type="text"]', '#inputCompte',
+        ]
+        filled = False
+        for sel in account_sels:
+            try:
+                el = await page.query_selector(sel)
+                if el and await el.is_visible():
+                    await el.fill(username)
+                    filled = True
+                    print(f"[credit_agricole] Account entered via {sel}")
+                    break
+            except Exception:
+                continue
+
+        if not filled:
+            html = await page.content()
+            Path("/tmp/ca_login.html").write_text(html)
+            print("[credit_agricole] ERROR: Could not find account field. HTML saved.")
+            await browser.close()
+            return
+
+        await page.wait_for_timeout(1000)
+
+        # Step 3: Click "ENTRER MON CODE PERSONNEL" to show the keyboard
+        print("[credit_agricole] Clicking 'Entrer mon code personnel'...")
+        code_sels = [
+            'button:has-text("ENTRER MON CODE PERSONNEL")',
+            'button:has-text("Entrer mon code")',
+            'a:has-text("ENTRER MON CODE")',
+            'button[type="submit"]',
+        ]
+        for sel in code_sels:
+            try:
+                btn = await page.query_selector(sel)
+                if btn and await btn.is_visible():
+                    await btn.click()
+                    print(f"[credit_agricole] Clicked via {sel}")
+                    break
+            except Exception:
+                continue
+
+        await page.wait_for_timeout(3000)
+        await page.screenshot(path="/tmp/ca_02_keyboard.png")
+        print("[credit_agricole] Screenshot saved: /tmp/ca_02_keyboard.png")
+        html = await page.content()
+        Path("/tmp/ca_keyboard.html").write_text(html)
+
+        # Step 4: Handle virtual keyboard for PIN
+
+        # CA keyboard buttons often use data-value or aria-label attributes
+        for digit in pin:
+            clicked = False
+            selectors = [
+                f'button[data-value="{digit}"]',
+                f'a[data-value="{digit}"]',
+                f'div[data-value="{digit}"]',
+                f'button[aria-label="{digit}"]',
+                f'[data-matrix-key] img[alt="{digit}"]',
+            ]
+            for sel in selectors:
+                try:
+                    btn = await page.query_selector(sel)
+                    if btn:
+                        await btn.click()
+                        clicked = True
+                        print(f"[credit_agricole] Clicked digit {digit} via {sel}")
+                        break
+                except Exception:
+                    continue
+
+            if not clicked:
+                # Brute force: find clickable elements with matching text
+                for tag in ['button', 'a', 'div', 'span', 'li', 'td']:
+                    elements = await page.query_selector_all(f'{tag}[class*="wd-key"], {tag}[class*="Key"], {tag}[class*="btn-key"]')
+                    if not elements:
+                        elements = await page.query_selector_all(tag)
+                    for el in elements:
+                        try:
+                            text = (await el.inner_text()).strip()
+                            if text == digit:
+                                box = await el.bounding_box()
+                                if box and box['width'] > 10 and box['height'] > 10:
+                                    await el.click()
+                                    clicked = True
+                                    print(f"[credit_agricole] Clicked digit {digit} via <{tag}> brute force")
+                                    break
+                        except Exception:
+                            continue
+                    if clicked:
+                        break
+
+            if not clicked:
+                print(f"[credit_agricole] WARNING: Could not click digit {digit}")
+
+            await page.wait_for_timeout(300)
+
+        await page.screenshot(path="/tmp/ca_03_after_pin.png")
+
+        # Step 4: Submit login
+        print("[credit_agricole] Submitting login...")
+        submit_sels = [
+            'button:has-text("Valider")', 'button:has-text("OK")',
+            'button[type="submit"]', '#validation', '.btn-submit',
+        ]
+        for sel in submit_sels:
+            try:
+                btn = await page.query_selector(sel)
+                if btn and await btn.is_visible():
+                    await btn.click()
+                    print(f"[credit_agricole] Submitted via {sel}")
+                    break
+            except Exception:
+                continue
+
+        await page.wait_for_timeout(5000)
+        await page.screenshot(path="/tmp/ca_04_after_login.png")
+        current_url = page.url
+        print(f"[credit_agricole] Current URL: {current_url}")
+
+        # Step 5: Extract dashboard data
+        body_text = await page.inner_text("body")
+        Path("/tmp/ca_body_text.txt").write_text(body_text)
+        print("[credit_agricole] Dashboard text saved to /tmp/ca_body_text.txt")
+
+        # Parse main account balance from dashboard
+        import re as _re
+        balance_match = _re.search(r'([\d\s]+,\d{2})\s*€', body_text.replace('\xa0', ' '))
+        main_balance = balance_match.group(1).strip() if balance_match else "unknown"
+        print(f"[credit_agricole] Main account balance: {main_balance} €")
+
+        # Parse recent transactions from dashboard
+        transactions = []
+        tx_pattern = _re.compile(r'(\d{2}/\d{2})\n.*?\n(.+?)\n([-\d\s]+,\d{2}\s*€)')
+        for m in tx_pattern.finditer(body_text):
+            transactions.append({
+                "date": m.group(1),
+                "label": m.group(2).strip(),
+                "amount": m.group(3).strip(),
+            })
+
+        # Step 6: Expand "Mes crédits" and extract credit details
+        print("[credit_agricole] Expanding credits...")
+        credits_data = []
+        try:
+            credits_btn = await page.query_selector('text="Afficher mes crédits"')
+            if credits_btn:
+                await credits_btn.click()
+                await page.wait_for_timeout(3000)
+                await page.screenshot(path="/tmp/ca_05_credits.png")
+                print("[credit_agricole] Credits expanded")
+
+                # Scroll down to see all credits
+                await page.evaluate("window.scrollBy(0, 500)")
+                await page.wait_for_timeout(1000)
+                await page.screenshot(path="/tmp/ca_05b_credits_scroll.png")
+
+                # Extract credit details from the expanded section
+                expanded_text = await page.inner_text("body")
+                Path("/tmp/ca_credits_expanded.txt").write_text(expanded_text)
+
+                # Parse credits: look for loan blocks by pattern
+                import re as _re2
+                lines = expanded_text.split('\n')
+                current_credit = {}
+                expect_field = None
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    # Loan name lines (actual loan names, not transaction/nav text)
+                    if ('Prêt' in line or 'prêt' in line) and 'Simulateur' not in line and 'REMBOURSEMENT' not in line and 'immobilier en ligne' not in line:
+                        if current_credit and 'name' in current_credit:
+                            credits_data.append(current_credit)
+                        current_credit = {"name": line}
+                        expect_field = None
+                    # Account number (11 digits)
+                    elif _re2.match(r'^\d{11}$', line) and current_credit:
+                        current_credit["account_number"] = line
+                    # Field labels
+                    elif 'Echéance' in line or 'Échéance' in line:
+                        expect_field = "monthly_payment"
+                    elif 'Montant emprunté' in line:
+                        expect_field = "borrowed"
+                    elif 'Restant dû' in line:
+                        expect_field = "remaining"
+                    # Amount value
+                    elif _re2.match(r'^[\d\s\xa0]+,\d{2}\s*\xa0?\s*€$', line) and current_credit and expect_field:
+                        current_credit[expect_field] = line.replace('\xa0', ' ').strip()
+                        expect_field = None
+                if current_credit and 'name' in current_credit:
+                    credits_data.append(current_credit)
+                print(f"[credit_agricole] Found {len(credits_data)} credits")
+        except Exception as e:
+            print(f"[credit_agricole] Credits expand error: {e}")
+
+        # Step 7: Navigate to Comptes & Cartes for full account list
+        print("[credit_agricole] Navigating to Comptes & Cartes...")
+        accounts_data_extra = []
+        try:
+            # Use the top nav bar
+            nav_link = await page.query_selector('nav a[href*="comptes"], a:has-text("Comptes")')
+            if not nav_link:
+                nav_link = await page.query_selector('a:has-text("Comptes & Cartes")')
+            if nav_link:
+                await nav_link.click(timeout=10000)
+                await page.wait_for_timeout(5000)
+                await page.screenshot(path="/tmp/ca_06_comptes.png")
+                accounts_text = await page.inner_text("body")
+                Path("/tmp/ca_accounts_text.txt").write_text(accounts_text)
+                print("[credit_agricole] Comptes & Cartes page loaded")
+        except Exception as e:
+            print(f"[credit_agricole] Comptes & Cartes nav error: {e}")
+
+        # Save structured data
+        out_path = Path("data") / f"credit_agricole_{date.today().isoformat()}.json"
+        out_path.parent.mkdir(exist_ok=True)
+        data = {
+            "scraped_at": datetime.now().isoformat(),
+            "source": "credit_agricole",
+            "region": region,
+            "owner": "SYLVAIN LEGLAND",
+            "accounts": [
+                {
+                    "name": "Compte Principal",
+                    "type": "checking",
+                    "balance": main_balance,
+                    "currency": "EUR",
+                }
+            ],
+            "credits": credits_data if credits_data else [],
+            "savings": "Aucune épargne",
+            "insurance": "Aucune assurance",
+            "recent_transactions": transactions,
+            "raw_dashboard": body_text[:3000],
+        }
+        out_path.write_text(json.dumps(data, cls=DecimalEncoder, indent=2, ensure_ascii=False))
+        print(f"[credit_agricole] Data saved to {out_path}")
+
+        print(f"\n[credit_agricole] DONE. Screenshots/data saved to /tmp/ca_*")
+        print("[credit_agricole] Keeping browser open 15s for inspection...")
+        await page.wait_for_timeout(15000)
+        await browser.close()
+
+
 async def main():
     target = sys.argv[1] if len(sys.argv) > 1 else "boursobank"
 
@@ -613,7 +928,7 @@ async def main():
     elif target == "ibkr":
         await scrape_ibkr()
     elif target == "credit_agricole":
-        print("Crédit Agricole scraper — TODO after IBKR")
+        await scrape_credit_agricole()
     else:
         print(f"Unknown target: {target}")
         print("Usage: python run_scrape.py [boursobank|trade_republic|ibkr|credit_agricole]")
