@@ -415,6 +415,36 @@ def compute_fees(patrimoine: dict, positions: list[dict]) -> dict:
     if margin_usd > 0 and margin_rate:
         margin_interest_annual_eur = (margin_usd * margin_rate / 100) / eur_usd
 
+    # ── Real IBKR data from Activity Statements (DuckDB) ──
+    ibkr_real_commissions = 0.0
+    ibkr_real_interest = 0.0
+    ibkr_real_dividends = 0.0
+    ibkr_real_fees = 0.0
+    ibkr_trade_count = 0
+    ibkr_years = []
+    try:
+        scraped_db = DATA_DIR / "transactions.duckdb"
+        if scraped_db.exists():
+            import duckdb
+            con = duckdb.connect(str(scraped_db), read_only=True)
+            summaries = con.execute("SELECT * FROM ibkr_summary ORDER BY year").fetchall()
+            for row in summaries:
+                yr, comm, int_d, int_c, divs, fees_t, pnl, cnt = row
+                ibkr_real_commissions += abs(comm)
+                ibkr_real_interest += abs(int_d)
+                ibkr_real_dividends += divs
+                ibkr_real_fees += abs(fees_t)
+                ibkr_trade_count += cnt
+                ibkr_years.append(yr)
+            con.close()
+    except Exception as e:
+        print(f"[fees] IBKR DuckDB read error: {e}")
+
+    num_years = max(1, len(ibkr_years))
+    ibkr_annual_commissions = ibkr_real_commissions / num_years
+    ibkr_annual_interest = ibkr_real_interest / num_years
+    ibkr_annual_data_fees = ibkr_real_fees / num_years
+
     # ETF TER costs (real: known TER × current position value)
     ter_total = 0
     ter_details = []
@@ -436,7 +466,26 @@ def compute_fees(patrimoine: dict, positions: list[dict]) -> dict:
     annual_fees = {}
     annual_total = 0.0
 
-    if margin_interest_annual_eur > 0:
+    # Real IBKR commissions from Activity Statements
+    if ibkr_real_commissions > 0:
+        annual_fees["ibkr_commissions"] = {
+            "amount": round(ibkr_annual_commissions, 2),
+            "label": "Commissions IBKR",
+            "detail": f"{ibkr_trade_count} trades sur {num_years} an(s), moy {ibkr_annual_commissions:.0f}€/an",
+            "rate_source": "real_ibkr_statement",
+        }
+        annual_total += ibkr_annual_commissions
+
+    # Real IBKR margin interest from Activity Statements
+    if ibkr_real_interest > 0:
+        annual_fees["margin_interest"] = {
+            "amount": round(ibkr_annual_interest, 2),
+            "label": "Intérêts marge IBKR",
+            "detail": f"Réel: {ibkr_annual_interest:,.0f}€/an (relevés {', '.join(str(y) for y in ibkr_years)})",
+            "rate_source": "real_ibkr_statement",
+        }
+        annual_total += ibkr_annual_interest
+    elif margin_interest_annual_eur > 0:
         annual_fees["margin_interest"] = {
             "amount": round(margin_interest_annual_eur, 2),
             "label": "Intérêts marge IBKR",
@@ -444,6 +493,15 @@ def compute_fees(patrimoine: dict, positions: list[dict]) -> dict:
             "rate_source": "scraped_ibkr",
         }
         annual_total += margin_interest_annual_eur
+
+    # IBKR data subscription fees
+    if ibkr_real_fees > 0:
+        annual_fees["ibkr_data_fees"] = {
+            "amount": round(ibkr_annual_data_fees, 2),
+            "label": "Abonnement données IBKR",
+            "detail": "NASDAQ Level I",
+            "rate_source": "real_ibkr_statement",
+        }
 
     if ter_total > 0:
         annual_fees["etf_ter"] = {
@@ -479,10 +537,17 @@ def compute_fees(patrimoine: dict, positions: list[dict]) -> dict:
         "pct_of_patrimoine": round(annual_total / max(1, net_worth) * 100, 3),
         "net_worth": round(net_worth, 2),
         "tr_cash_interest_annual": round(tr_interest_annual, 2),
+        "ibkr_real_data": {
+            "commissions_total": round(ibkr_real_commissions, 2),
+            "interest_total": round(ibkr_real_interest, 2),
+            "dividends_total": round(ibkr_real_dividends, 2),
+            "trade_count": ibkr_trade_count,
+            "years": ibkr_years,
+        } if ibkr_years else None,
         "missing_data": [
-            "IBKR trade history (commissions réelles)",
-            "TR trade history (1€/trade count)",
-            "CA loan rates & insurance details",
+            d for d in [
+                "CA loan rates & insurance details" if not ca.get("credits") else None,
+            ] if d
         ],
     }
 
@@ -740,19 +805,53 @@ def compute_projections(monthly_data: list[dict], patrimoine: dict) -> dict:
 
 def load_transactions(months: int = 12) -> list[dict]:
     """Load transactions from DuckDB (primary) or JSON files (fallback)."""
+    import duckdb
+
+    today = date.today()
+    cutoff = date(today.year, today.month, 1)
+    for _ in range(months - 1):
+        m, y = cutoff.month - 1, cutoff.year
+        if m <= 0:
+            m += 12
+            y -= 1
+        cutoff = date(y, m, 1)
+
+    # Try scraped transactions DB first (real data from parse_transactions.py)
+    scraped_db = DATA_DIR / "transactions.duckdb"
+    if scraped_db.exists():
+        try:
+            con = duckdb.connect(str(scraped_db), read_only=True)
+            rows = con.execute("""
+                SELECT date, description, amount, category, category_parent,
+                       merchant, bank, account, type
+                FROM budget_transactions
+                WHERE date >= ?
+                ORDER BY date DESC
+            """, [cutoff.isoformat()]).fetchall()
+            con.close()
+            if rows:
+                return [
+                    {
+                        "date": str(r[0]),
+                        "description": r[1] or "",
+                        "amount": float(r[2]) if r[2] else 0,
+                        "category": r[3] or r[4] or "autre",
+                        "category_parent": r[4] or "",
+                        "merchant": r[5] or "",
+                        "bank": r[6] or "",
+                        "account": r[7] or "",
+                        "type": r[8] or "",
+                    }
+                    for r in rows
+                ]
+        except Exception as e:
+            print(f"[insights] scraped DuckDB load failed: {e}")
+
+    # Fallback: legacy finary.duckdb
     db_path = DATA_DIR / "finary.duckdb"
     if db_path.exists():
         try:
-            import duckdb
             con = duckdb.connect(str(db_path), read_only=True)
-            today = date.today()
-            cutoff = date(today.year, today.month, 1)
-            for _ in range(months - 1):
-                m, y = cutoff.month - 1, cutoff.year
-                if m <= 0:
-                    m += 12
-                    y -= 1
-                cutoff = date(y, m, 1)
             rows = con.execute("""
                 SELECT date, description, amount, category, category_parent,
                        merchant, bank, account, account_id
@@ -858,6 +957,7 @@ def aggregate_monthly_budget(transactions: list[dict]) -> list[dict]:
         "Virements émis de comptes à comptes",
         "Virements émis",
         "Virements reçus",
+        "Virements",
     }
 
     for tx in transactions:
@@ -872,8 +972,11 @@ def aggregate_monthly_budget(transactions: list[dict]) -> list[dict]:
         # Use Bourso's native category_parent if available, else our regex
         category = tx.get("category_parent") or tx.get("category") or categorize_transaction(tx.get("description", ""))
 
-        # Skip internal transfers
+        # Skip internal transfers (both category-based and type-based)
         if category in SKIP_CATS:
+            continue
+        tx_type = tx.get("type", "")
+        if tx_type == "transfer":
             continue
 
         if amount > 0:

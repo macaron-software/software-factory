@@ -1,0 +1,500 @@
+﻿Statement,Header,Nom champ,Valeur champ
+Statement,Data,BrokerName,Interactive Brokers Ireland Limited
+Statement,Data,BrokerAddress,
+Statement,Data,Title,Relevé de compte
+Statement,Data,Period,"Janvier 1, 2025 - Décembre 31, 2025"
+Statement,Data,WhenGenerated,"2026-02-09, 18:14:34 EST"
+Informations du compte,Header,Nom champ,Valeur champ
+Informations du compte,Data,Nom,sylvain p legland
+Informations du compte,Data,Compte,U15999905
+Informations du compte,Data,Type de compte,Individuel
+Informations du compte,Data,Type de client,Individuel
+Informations du compte,Data,Capacités du compte,Marge
+Informations du compte,Data,Devise de base,EUR
+Actif net,Header,Classe d'actif,Total précédent,Actuel long,Actuel short,Total actuel,Variation
+Actif net,Data,Trésorerie,-48422.085711573,0,-6810.843669083,-6810.843669083,41611.24204249
+Actif net,Data,Valeur du collatéral,48192.29847054,6668.62455,0,6668.62455,-41523.67392054
+Actif net,Data,Action,90553.9371528,62599.8421215,0,62599.8421215,-27954.0950313
+Actif net,Data,Droit d'utilisation des titres,-48192.29847054,0,-6668.62455,-6668.62455,41523.67392054
+Actif net,Data,Intérêts cumulés,-346.2375592,0,-27.736718,-27.736718,318.5008412
+Actif net,Data,Dividendes cumulés,16.129862,0,0,0,-16.129862
+Actif net,Data,Total,41801.743744027,69268.4666715,-13507.204937083,55761.261734417,13959.51799039
+Actif net,Header,Taux de rentabilité pondéré dans le temps
+Actif net,Data,33.394582953%
+Changements de l'actif net,Header,Nom champ,Valeur champ
+Changements de l'actif net,Data,Valeur de départ,41801.743744027
+Changements de l'actif net,Data,Évalué au prix du marché (MtM),15905.213382718
+Changements de l'actif net,Data,Dividendes,598.9274062
+Changements de l'actif net,Data,Retenue fiscale,-52.3899323
+Changements de l'actif net,Data,Variation des dividendes cumulés,-12.1951113
+Changements de l'actif net,Data,Intérêt,-2763.4154026
+Changements de l'actif net,Data,Variation dans l'accumulation des intérêts,304.2213634
+Changements de l'actif net,Data,Autres frais,-12.195315
+Changements de l'actif net,Data,Commissions,-16.55413939
+Changements de l'actif net,Data,Taxe sur les ventes,-2.439063
+Changements de l'actif net,Data,Autre changement de valeur des devises,10.3447271
+Changements de l'actif net,Data,Valeur en fin de période,55761.261734417
+Synthèse de la performance évaluée au prix du marché,Header,Catégorie d'actifs,Symbole,Avant Quantité,Courant Quantité,Avant Prix,Courant Prix,Pertes et profits au prix du marché Position,Pertes et profits au prix du marché Transaction,Pertes et profits au prix du marché Commissions,Pertes et profits au prix du marché Autre,Pertes et profits au prix du marché Total,Code
+Synthèse de la performance évaluée au prix du marché,Data,Actions,AAPL,80,0,250.4200,--,963.33447339,-58.48540681,-1.78015806,47.632878,950.70178652,
+Synthèse de la performance évaluée au prix du marché,Data,Actions,GOOGL,105,105.3515,189.3000,313.0000,10990.78267928,-0.30261091,-0.06445347,64.5230691,11054.938684,
+Synthèse de la performance évaluée au prix du marché,Data,Actions,META,0.0136,0,585.5100,--,0.70629067,0.21782114,-0.07746863,1.6949105,2.54155368,
+Synthèse de la performance évaluée au prix du marché,Data,Actions,MSFT,45,45.2854,421.5000,483.6200,2369.73174727,0.70364954,-0.11357844,113.7288641,2484.05068247,
+Synthèse de la performance évaluée au prix du marché,Data,Actions,NVDA,0,100.0222,--,186.5000,4875.17556906,240.13008946,-0.96495592,2.9534865,5117.2941891,
+Synthèse de la performance évaluée au prix du marché,Data,Actions,SAPd,100,0,236.3000,--,-220,-10,-11.7,235,-6.7,
+Synthèse de la performance évaluée au prix du marché,Data,Actions,UHS,0,0,--,--,0,0,0,0.8439696,0.8439696,
+Synthèse de la performance évaluée au prix du marché,Data,Actions,WMT,115,0,90.3500,--,1328.48736889,37.40876715,-1.81259712,80.8702961,1444.95383502,
+Synthèse de la performance évaluée au prix du marché,Data,Actions,XCUR,1,0,13.6700,--,-8.1026267,0.1630656,-0.04092775,0,-7.98048885,
+Synthèse de la performance évaluée au prix du marché,Data,Total,,,,,,20300.11550186,209.83537517,-16.55413939,547.2474739,21040.64421154,
+Synthèse de la performance évaluée au prix du marché,Data,Forex,EUR,-23996.35342,-1199.75342,1.0000,1.0000,0,0,0,0,0,
+Synthèse de la performance évaluée au prix du marché,Data,Forex,USD,-25289.102242119,-6590.814881169,0.96586,0.85135,-4604.7375123,-0.000109,0,0,-4604.7376213,
+Synthèse de la performance évaluée au prix du marché,Data,Total,,,,,,-4604.7373103,-0.000109,0,0,-4604.7374193,
+Synthèse de la performance évaluée au prix du marché,Data,Total (Tous les actifs),,,,,,15695.37819156,209.83526617,-16.55413939,547.2474739,16435.90679224,
+Synthèse de la performance évaluée au prix du marché,Data,Intérêts du courtier (payés et reçus),,,,,,,,,,-2763.4154026,
+Synthèse de la performance évaluée au prix du marché,Data,Withholding on Interest Received,,,,,,,,,,-0.71,
+Synthèse de la performance évaluée au prix du marché,Data,Other Fees,,,,,,,,,,-12.195315,
+P/L Total pour période relevé de compte,,,,,,,,,,,,13660.29607464,
+Synthèse de la performance réalisée et non-réalisée,Header,Catégorie d'actifs,Symbole,Aj. coût,Realisé Profit C/T,Realisé Perte C/T,Realisé Profit L/T,Realisé Perte L/T,Realisé Total,Non réalisé Profit C/T,Non réalisé Perte C/T,Non réalisé Profit L/T,Non réalisé Perte L/T,Non réalisé Total,Total,Code
+Synthèse de la performance réalisée et non-réalisée,Data,Actions,AAPL,0,1272.21841483,-12.54998154,0,0,1259.66843329,0,0,0,0,0,1259.66843329,
+Synthèse de la performance réalisée et non-réalisée,Data,Actions,GOOGL,0,0,0,0,0,0,30.476858867,0,10836.745148168,0,10867.222007036,10867.222007036,
+Synthèse de la performance réalisée et non-réalisée,Data,Actions,META,0,0.70657811,0,0,0,0.70657811,0,0,0,0,0,0.70657811,
+Synthèse de la performance réalisée et non-réalisée,Data,Actions,MSFT,0,0,0,0,0,0,7.695455663,-1.244299957,1362.451724442,0,1368.902880148,1368.902880148,
+Synthèse de la performance réalisée et non-réalisée,Data,Actions,NVDA,0,0,0,0,0,0,5109.201118212,-0.010778942,0,0,5109.190339269,5109.190339269,
+Synthèse de la performance réalisée et non-réalisée,Data,Actions,SAPd,0,0,-613.695,0,0,-613.695,0,0,0,0,0,-613.695,
+Synthèse de la performance réalisée et non-réalisée,Data,Actions,WMT,0,786.25043294,0,0,0,786.25043294,0,0,0,0,0,786.25043294,
+Synthèse de la performance réalisée et non-réalisée,Data,Actions,XCUR,0,0,-16.42133758,0,0,-16.42133758,0,0,0,0,0,-16.42133758,
+Synthèse de la performance réalisée et non-réalisée,Data,Total,,0,2059.17542588,-642.66631912,0,0,1416.50910676,5147.373432742,-1.2550789,12199.196872611,0,17345.315226453,18761.824333213,
+Synthèse de la performance réalisée et non-réalisée,Data,Forex,USD,0,4044.205889,-0.033405,0,0,4044.172484,46.570616,-0.337162,0,0,46.233454,4090.405938,
+Synthèse de la performance réalisée et non-réalisée,Data,Total,,0,4044.206025,-0.033405,0,0,4044.17262,46.570616,-0.337162,0,0,46.233454,4090.406074,
+Synthèse de la performance réalisée et non-réalisée,Data,Total (Tous les actifs),,0,6103.38145088,-642.69972412,0,0,5460.68172676,5193.944048742,-1.5922409,12199.196872611,0,17391.548680453,22852.230407213,
+Rapport trésorerie,Header,Récapitulatif devise,Devise,Total,Titres,Contrats à terme,
+Rapport trésorerie,Data,Trésorerie de départ,Récapitulatif dans la devise de base,-48422.085711573,-48422.085711573,0,
+Rapport trésorerie,Data,Commissions,Récapitulatif dans la devise de base,-16.55413939,-16.55413939,0,
+Rapport trésorerie,Data,Dividendes,Récapitulatif dans la devise de base,236.5562099,236.5562099,0,
+Rapport trésorerie,Data,Intérêts du courtier (payés et reçus),Récapitulatif dans la devise de base,-2763.4154026,-2763.4154026,0,
+Rapport trésorerie,Data,Transactions (Vente),Récapitulatif dans la devise de base,56742.75918509,56742.75918509,0,
+Rapport trésorerie,Data,Transactions (Achat),Récapitulatif dans la devise de base,-16996.07002552,-16996.07002552,0,
+Rapport trésorerie,Data,Autres frais,Récapitulatif dans la devise de base,-12.195315,-12.195315,0,
+Rapport trésorerie,Data,Paiement tenant lieu de dividendes,Récapitulatif dans la devise de base,362.3711963,362.3711963,0,
+Rapport trésorerie,Data,Retenue fiscale,Récapitulatif dans la devise de base,-52.3899323,-52.3899323,0,
+Rapport trésorerie,Data,Taxe sur les ventes,EUR,-2.439063,-2.439063,0,
+Rapport trésorerie,Data,Gain/Perte conversion de devise,Récapitulatif dans la devise de base,4112.619329,4112.619329,0,
+Rapport trésorerie,Data,Trésorerie finale,Récapitulatif dans la devise de base,-6810.843669083,-6810.843669083,0,
+Rapport trésorerie,Data,Trésorerie finale réglée,Récapitulatif dans la devise de base,-6810.843669083,-6810.843669083,0,
+Rapport trésorerie,Data,Trésorerie de départ,EUR,-23996.35342,-23996.35342,0,
+Rapport trésorerie,Data,Commissions,EUR,-11.7,-11.7,0,
+Rapport trésorerie,Data,Intérêts du courtier (payés et reçus),EUR,-825.99,-825.99,0,
+Rapport trésorerie,Data,Transactions (Vente),EUR,23400,23400,0,
+Rapport trésorerie,Data,Paiement tenant lieu de dividendes,EUR,235,235,0,
+Rapport trésorerie,Data,Retenue fiscale,EUR,-0.71,-0.71,0,
+Rapport trésorerie,Data,Trésorerie finale,EUR,-1199.75342,-1199.75342,0,
+Rapport trésorerie,Data,Trésorerie finale réglée,EUR,-1199.75342,-1199.75342,0,
+Rapport trésorerie,Data,Trésorerie de départ,GBP,0,0,0,
+Rapport trésorerie,Data,Intérêts du courtier (payés et reçus),GBP,-0.02,-0.02,0,
+Rapport trésorerie,Data,Transactions (Vente),GBP,0.02,0.02,0,
+Rapport trésorerie,Data,Trésorerie finale,GBP,0,0,0,
+Rapport trésorerie,Data,Trésorerie finale réglée,GBP,0,0,0,
+Rapport trésorerie,Data,Trésorerie de départ,USD,-25289.102242119,-25289.102242119,0,
+Rapport trésorerie,Data,Commissions,USD,-5.52758906,-5.52758906,0,
+Rapport trésorerie,Data,Dividendes,USD,268.64,268.64,0,
+Rapport trésorerie,Data,Intérêts du courtier (payés et reçus),USD,-2169.85,-2169.85,0,
+Rapport trésorerie,Data,Transactions (Vente),USD,38850.027251,38850.027251,0,
+Rapport trésorerie,Data,Transactions (Achat),USD,-18313.002301,-18313.002301,0,
+Rapport trésorerie,Data,Autres frais,USD,-13.5,-13.5,0,
+Rapport trésorerie,Data,Paiement tenant lieu de dividendes,USD,142.97,142.97,0,
+Rapport trésorerie,Data,Retenue fiscale,USD,-58.77,-58.77,0,
+Rapport trésorerie,Data,Taxe sur les ventes,USD,-2.7,-2.7,0,
+Rapport trésorerie,Data,Trésorerie finale,USD,-6590.814881169,-6590.814881169,0,
+Rapport trésorerie,Data,Trésorerie finale réglée,USD,-6590.814881169,-6590.814881169,0,
+Positions ouvertes,Header,DataDiscriminator,Catégorie d'actifs,Devise,Symbole,Quantité,Mult,Coût,Coût d'acquisition,Cours de clôture,Valeur,P/L non réalisé,Code
+Positions ouvertes,Data,Summary,Actions,USD,GOOGL,105.3515,1,191.837100279,20210.32627,313,32975.02,12764.69373,
+Positions ouvertes,Data,Summary,Actions,USD,MSFT,45.2854,1,448.113735972,20293.009779,483.62,21900.93,1607.920221,
+Positions ouvertes,Data,Summary,Actions,USD,NVDA,100.0222,1,126.500509707,12652.859282,186.5,18654.14,6001.280718,
+Positions ouvertes,Total,,Actions,USD,,,,,53156.195331,,73530.09,20373.894669,
+Positions ouvertes,Total,,Actions,EUR,,,,,45254.526895047,,62599.8421215,17345.315226453,
+Garantie pour prêt client,Header,Catégorie d'actifs,Devise,Symbole,Quantité réglée,Prix de garantie,Valeur,Titres séparés Quantité,Titres séparés Valeur,Titres non ségrégés Quantité,Titres non ségrégés Valeur,Titres non ségrégés : « Droit d'utilisation » tiers Quantité,Titres non ségrégés : « Droit d'utilisation » tiers Valeur,Titres non séparés : Soumis au programme d'amélioration du rendement des actions Quantité,Titres non séparés : Soumis au programme d'amélioration du rendement des actions Valeur
+Garantie pour prêt client,Data,Titres,USD,NVDA,100.0222,186.5000,"18,654.14",58.0222,"10,821.14",42,"7,833.00",42,"7,833.00",0,0.00
+Garantie pour prêt client,Total,,USD,,,,"18,654.14",,"10,821.14",,"7,833.00",,"7,833.00",,0.00
+Garantie pour prêt client,Total,,EUR,,,,"15,881.20",,"9,212.58",,"6,668.62",,"6,668.62",,0.00
+Soldes Forex,Header,Catégorie d'actifs,Devise,Description,Quantité,Coût,Coût d'acquisition en EUR,Cours de clôture,Valeur en EUR,Pertes et profits latents en EUR,Code
+Soldes Forex,Data,Forex,EUR,EUR,-1199.75342,0,1199.75342,1,-1199.75342,0,
+Soldes Forex,Data,Forex,EUR,USD,-6590.814882,0.858364832,5657.323708,0.85135,-5611.090251,46.233454,
+Soldes Forex,Data,Total,,,,,6857.077128,,-6810.843671,46.233454,
+Sommaire des positions nettes d'actions,Header,Catégorie d'actifs,Devise,Symbole,Description,Actions chez IB,Actions empruntées,Actions prêtées,Actions nettes
+Sommaire des positions nettes d'actions,Data,Actions,USD,GOOGL,ALPHABET INC-CL A,105.3515,0,0,105.3515
+Sommaire des positions nettes d'actions,Data,Actions,USD,MSFT,MICROSOFT CORP,45.2854,0,0,45.2854
+Sommaire des positions nettes d'actions,Data,Actions,USD,NVDA,NVIDIA CORP,100.0222,0,0,100.0222
+Transactions,Header,DataDiscriminator,Catégorie d'actifs,Devise,Symbole,Date/Heure,Quantité,Prix trans.,Cours de clôt.,Produit,Comm/Tarif,Base,P/L réalisé,P/L MTM,Code
+Transactions,Data,Order,Actions,EUR,SAPd,"2025-10-28, 10:51:38",-100,234,234.1,23400,-11.7,-24001.995,-613.695,-10,C
+Transactions,SubTotal,,Actions,EUR,SAPd,,-100,,,23400,-11.7,-24001.995,-613.695,-10,
+Transactions,Total,,Actions,EUR,,,,,,23400,-11.7,-24001.995,-613.695,-10, 
+Transactions,Data,Order,Actions,USD,AAPL,"2025-02-14, 09:32:12",0.0702,242.14,244.6,-16.998228,-0.017001457,17.015229457,0,0.1727,O;R
+Transactions,Data,Order,Actions,USD,AAPL,"2025-05-16, 09:34:37",0.0835,211.73,211.26,-17.679455,-0.017683296,17.697138296,0,-0.0392,O;R
+Transactions,Data,Order,Actions,USD,AAPL,"2025-08-15, 09:33:31",0.0759,233.2,231.59,-17.69988,-0.017701929,17.717581929,0,-0.1222,O;R
+Transactions,Data,Order,Actions,USD,AAPL,"2025-10-28, 10:41:48",-100,268.32,269,26832,-1.0188,-20043.833789,1482.3574,-68,C;O;P
+Transactions,Data,Order,Actions,USD,AAPL,"2025-10-28, 10:51:27",19.7704,269.008846761,269,-5318.412504,-1.000434949,5304.790011,-14.622928,-0.1749,C;IM;P;RPA
+Transactions,SubTotal,,Actions,USD,AAPL,,-80,,,21461.209933,-2.071621631,-14686.613828318,1467.734472,-68.1636,
+Transactions,Data,Order,Actions,USD,GOOGL,"2025-03-18, 09:31:09",0.1092,163.4,160.67,-17.84328,-0.017848303,17.861128303,0,-0.2981,O;R
+Transactions,Data,Order,Actions,USD,GOOGL,"2025-06-17, 09:31:10",0.1063,176.47,175.95,-18.758761,-0.018763651,18.777524651,0,-0.0553,O;R
+Transactions,Data,Order,Actions,USD,GOOGL,"2025-09-16, 09:30:01",0.0745,252,251.16,-18.774,-0.018775639,18.792775639,0,-0.0626,O;R
+Transactions,Data,Order,Actions,USD,GOOGL,"2025-12-16, 09:35:04",0.0615,305.22,306.57,-18.77103,-0.01877103,18.78980103,0,0.083,O;R
+Transactions,SubTotal,,Actions,USD,GOOGL,,0.3515,,,-74.147071,-0.074158623,74.221229623,0,-0.333,
+Transactions,Data,Order,Actions,USD,META,"2025-11-03, 09:33:46",-0.0136,656.16,637.71,8.923776,-0.089240317,-8.02059,0.813946,0.2509,C;FP
+Transactions,SubTotal,,Actions,USD,META,,-0.0136,,,8.923776,-0.089240317,-8.02059,0.813946,0.2509,
+Transactions,Data,Order,Actions,USD,MSFT,"2025-03-14, 09:32:19",0.0833,381.13,388.56,-31.748129,-0.031751961,31.779880961,0,0.6189,O;R
+Transactions,Data,Order,Actions,USD,MSFT,"2025-06-16, 09:35:09",0.0667,476.72,479.14,-31.797224,-0.031800292,31.829024292,0,0.1614,O;R
+Transactions,Data,Order,Actions,USD,MSFT,"2025-09-12, 09:30:00",0.0629,506.35,509.9,-31.849415,-0.031850799,31.881265799,0,0.2233,O;R
+Transactions,Data,Order,Actions,USD,MSFT,"2025-12-12, 09:32:18",0.0725,481.69,478.53,-34.922525,-0.034922525,34.957447525,0,-0.2291,O;R
+Transactions,SubTotal,,Actions,USD,MSFT,,0.2854,,,-130.317293,-0.130325577,130.447618577,0,0.7745,
+Transactions,Data,Order,Actions,USD,NVDA,"2025-01-28, 13:08:41",100,126.485,128.99,-12648.5,-1.0035,12649.5035,0,250.5,O
+Transactions,Data,Order,Actions,USD,NVDA,"2025-04-03, 09:33:29",0.008,105.04,101.8,-0.84032,-0.000840688,0.841160688,0,-0.0259,O;R
+Transactions,Data,Order,Actions,USD,NVDA,"2025-07-07, 09:33:23",0.0053,158.73,158.24,-0.841269,-0.000841412,0.842110412,0,-0.0026,O;R
+Transactions,Data,Order,Actions,USD,NVDA,"2025-10-03, 09:31:09",0.0044,189.1,187.62,-0.83204,-0.000832137,0.832872137,0,-0.0065,O;R
+Transactions,Data,Order,Actions,USD,NVDA,"2025-12-29, 09:35:18",0.0045,186.4,188.22,-0.8388,-0.0008388,0.8396388,0,0.0082,O;R
+Transactions,SubTotal,,Actions,USD,NVDA,,100.0222,,,-12651.852429,-1.006853037,12652.859282037,0,250.4732,
+Transactions,Data,Order,Actions,USD,WMT,"2025-01-07, 09:33:02",0.1818,91.84,90.81,-16.696512,-0.016704875,16.713216875,0,-0.1873,O;R
+Transactions,Data,Order,Actions,USD,WMT,"2025-04-08, 09:30:00",0.2675,86,81.79,-23.005,-0.023017305,23.028017305,0,-1.1262,O;R
+Transactions,Data,Order,Actions,USD,WMT,"2025-05-28, 09:30:00",0.2364,97.52,97.24,-23.053728,-0.023064602,23.076792602,0,-0.0662,O;R
+Transactions,Data,Order,Actions,USD,WMT,"2025-09-03, 09:31:10",0.2358,98.03,99.44,-23.115474,-0.023121841,23.138595841,0,0.3325,O;R
+Transactions,Data,Order,Actions,USD,WMT,"2025-10-28, 10:41:26",-100,103.5409,103.17,10354.09,-1.0188,-9565.5048,787.5664,37.09,C;IA
+Transactions,Data,Order,Actions,USD,WMT,"2025-10-28, 10:51:47",-15.9215,103.65,103.17,1650.263475,-1.002993242,-1520.707343,128.55314,7.6423,C;FPA;P
+Transactions,SubTotal,,Actions,USD,WMT,,-115,,,11918.482761,-2.107701865,-11000.255520377,916.11954,43.6851,
+Transactions,Data,Order,Actions,USD,XCUR,"2025-10-28, 10:54:45",-1,4.75,4.56,4.75,-0.047688,-23.836048,-19.133736,0.19,C
+Transactions,SubTotal,,Actions,USD,XCUR,,-1,,,4.75,-0.047688,-23.836048,-19.133736,0.19,
+Transactions,Total,,Actions,USD,,,,,,20537.049677,-5.52758905,-12861.197856458,2365.534222,226.8771, 
+Transactions,Total,,Actions,EUR,,,,,,16346.689269013,-4.85413938,-9758.848043832,2030.204108057,219.835300158, 
+Transactions,Header,DataDiscriminator,Catégorie d'actifs,Devise,Symbole,Date/Heure,Quantité,Prix trans.,,Produit,Comm en EUR,,,Évaluation au prix du marché en EUR,Code
+Transactions,Data,Order,Forex,USD,GBP.USD,"2025-01-09, 01:15:56",0.02,1.23635,,-0.024727,0,,,-0.000109,
+Transactions,SubTotal,,Forex,USD,GBP.USD,,0.02,,,-0.024727,0,,,-0.000109,
+Transactions,Total,,Forex,USD,,,,,,-0.024727,0,,,-0.000109, 
+Transactions,Total,,Forex,EUR,,,,,,-0.024007444,0,,,-0.000109, 
+Frais,Header,Subtitle,Devise,Date,Description,Montant
+Frais,Data,Autres frais,USD,2025-01-03,s*******34:NASDAQ Niveau I pour Jan 2025,-1.5
+Frais,Data,Autres frais,USD,2025-02-04,s*******34:NASDAQ Niveau I pour Fév 2025,-1.5
+Frais,Data,Autres frais,USD,2025-03-04,s*******34:NASDAQ Niveau I pour Mar 2025,-1.5
+Frais,Data,Autres frais,USD,2025-04-02,s*******34:NASDAQ Niveau I pour Avr 2025,-1.5
+Frais,Data,Autres frais,USD,2025-05-02,s*******34:NASDAQ Niveau I pour Mai 2025,-1.5
+Frais,Data,Autres frais,USD,2025-06-03,s*******34:NASDAQ Niveau I pour Juin 2025,-1.5
+Frais,Data,Autres frais,USD,2025-07-02,s*******34:NASDAQ Niveau I pour Juil 2025,-1.5
+Frais,Data,Autres frais,USD,2025-08-04,s*******34:NASDAQ Niveau I pour Aoû 2025,-1.5
+Frais,Data,Autres frais,USD,2025-09-04,s*******34:NASDAQ Niveau I pour Sep 2025,-1.5
+Frais,Data,Total,,,,-13.5
+Frais,Data,Total en EUR,,,,-12.195315
+Frais,Notes,Les données de marché sont fournies par Global Financial Information Services (GmbH). Votre courtier local recueille les montants dus pour les frais et impôts pour ces données au nom de Global Financial Information Services (GmbH). Remarque : vous êtes responsable de toute taxe applicable à la prestation de ce service.
+Dividendes,Header,Devise,Date,Description,Montant
+Dividendes,Data,EUR,2025-05-16,SAP(DE0007164600) Compensation tenant lieu de dividende (Dividende ordinaire),126.9
+Dividendes,Data,EUR,2025-05-16,SAP(DE0007164600) Dividende en espèces EUR 2.35 par action (Dividende ordinaire),108.1
+Dividendes,Data,EUR,2025-05-16,SAP(DE0007164600) Compensation tenant lieu de dividende - Opération inverse (Dividende ordinaire),-126.9
+Dividendes,Data,EUR,2025-05-16,SAP(DE0007164600) Compensation tenant lieu de dividende (Dividende ordinaire),235
+Dividendes,Data,EUR,2025-05-16,SAP(DE0007164600) Dividende en espèces EUR 2.35 par action - Opération inverse (Dividende ordinaire),-108.1
+Dividendes,Data,Total,,,235
+Dividendes,Data,USD,2025-01-06,WMT(US9311421039) Compensation tenant lieu de dividende (Dividende ordinaire),23.45
+Dividendes,Data,USD,2025-01-06,WMT(US9311421039) Dividende en espèces USD 0.2075 par action (Dividende ordinaire),0.42
+Dividendes,Data,USD,2025-02-13,AAPL(US0378331005) Dividende en espèces USD 0.25 par action (Dividende ordinaire),14.75
+Dividendes,Data,USD,2025-02-13,AAPL(US0378331005) Compensation tenant lieu de dividende (Dividende ordinaire),5.25
+Dividendes,Data,USD,2025-03-13,MSFT(US5949181045) Dividende en espèces USD 0.83 par action (Dividende ordinaire),37.35
+Dividendes,Data,USD,2025-03-17,GOOGL(US02079K3059) Dividende en espèces USD 0.20 par action (Dividende ordinaire),21
+Dividendes,Data,USD,2025-03-26,META(US30303M1027) Dividende en espèces USD 0.525 par action (Dividende ordinaire),0.01
+Dividendes,Data,USD,2025-04-02,NVDA(US67066G1040) Compensation tenant lieu de dividende (Dividende ordinaire),0.01
+Dividendes,Data,USD,2025-04-02,NVDA(US67066G1040) Dividende en espèces USD 0.01 par action (Dividende ordinaire),0.99
+Dividendes,Data,USD,2025-04-07,WMT(US9311421039) Dividende en espèces USD 0.235 par action (Dividende ordinaire),13.91
+Dividendes,Data,USD,2025-04-07,WMT(US9311421039) Compensation tenant lieu de dividende (Dividende ordinaire),13.16
+Dividendes,Data,USD,2025-05-15,AAPL(US0378331005) Dividende en espèces USD 0.26 par action (Dividende ordinaire),8.6
+Dividendes,Data,USD,2025-05-15,AAPL(US0378331005) Compensation tenant lieu de dividende (Dividende ordinaire),12.22
+Dividendes,Data,USD,2025-05-27,WMT(US9311421039) Compensation tenant lieu de dividende (Dividende ordinaire),25.85
+Dividendes,Data,USD,2025-05-27,WMT(US9311421039) Dividende en espèces USD 0.235 par action (Dividende ordinaire),1.28
+Dividendes,Data,USD,2025-06-12,MSFT(US5949181045) Dividende en espèces USD 0.83 par action (Dividende ordinaire),37.42
+Dividendes,Data,USD,2025-06-16,GOOGL(US02079K3059) Dividende en espèces USD 0.21 par action (Dividende ordinaire),22.07
+Dividendes,Data,USD,2025-06-26,META(US30303M1027) Dividende en espèces USD 0.525 par action (Dividende ordinaire),0.01
+Dividendes,Data,USD,2025-07-03,NVDA(US67066G1040) Dividende en espèces USD 0.01 par action (Dividende ordinaire),0.61
+Dividendes,Data,USD,2025-07-03,NVDA(US67066G1040) Compensation tenant lieu de dividende (Dividende ordinaire),0.39
+Dividendes,Data,USD,2025-08-14,AAPL(US0378331005) Dividende en espèces USD 0.26 par action (Dividende ordinaire),9.4
+Dividendes,Data,USD,2025-08-14,AAPL(US0378331005) Compensation tenant lieu de dividende (Dividende ordinaire),11.44
+Dividendes,Data,USD,2025-09-02,WMT(US9311421039) Dividende en espèces USD 0.235 par action (Dividende ordinaire),0.16
+Dividendes,Data,USD,2025-09-02,WMT(US9311421039) Compensation tenant lieu de dividende (Dividende ordinaire),27.03
+Dividendes,Data,USD,2025-09-11,MSFT(US5949181045) Dividende en espèces USD 0.83 par action (Dividende ordinaire),20.87
+Dividendes,Data,USD,2025-09-11,MSFT(US5949181045) Compensation tenant lieu de dividende (Dividende ordinaire),16.6
+Dividendes,Data,USD,2025-09-15,GOOGL(US02079K3059) Dividende en espèces USD 0.21 par action (Dividende ordinaire),20
+Dividendes,Data,USD,2025-09-15,GOOGL(US02079K3059) Compensation tenant lieu de dividende (Dividende ordinaire),2.1
+Dividendes,Data,USD,2025-09-29,META(US30303M1027) Dividende en espèces USD 0.525 par action (Dividende ordinaire),0.01
+Dividendes,Data,USD,2025-10-02,NVDA(US67066G1040) Dividende en espèces USD 0.01 par action (Dividende ordinaire),1
+Dividendes,Data,USD,2025-12-11,MSFT(US5949181045) Compensation tenant lieu de dividende (Dividende ordinaire),5.46
+Dividendes,Data,USD,2025-12-11,MSFT(US5949181045) Dividende en espèces USD 0.91 par action (Dividende ordinaire),35.68
+Dividendes,Data,USD,2025-12-15,GOOGL(US02079K3059) Dividende en espèces USD 0.21 par action (Dividende ordinaire),22.11
+Dividendes,Data,USD,2025-12-26,NVDA(US67066G1040) Dividende en espèces USD 0.01 par action (Dividende ordinaire),0.99
+Dividendes,Data,USD,2025-12-26,NVDA(US67066G1040) Compensation tenant lieu de dividende (Dividende ordinaire),0.01
+Dividendes,Data,Total,,,411.61
+Dividendes,Data,Total en EUR,,,363.9274062
+Dividendes,Data,Total Dividendes en EUR,,,598.9274062
+Retenues d'impôts,Header,Devise,Date,Description,Montant,Code
+Retenues d'impôts,Data,EUR,2025-01-06,Withholding @ 20% sur Intérêt créditeur pour Déc-2024,-0.71,
+Retenues d'impôts,Data,EUR,2025-05-16,SAP(DE0007164600) Dividende en espèces EUR 2.35 par action - DE Taxes,-28.51,
+Retenues d'impôts,Data,EUR,2025-05-16,SAP(DE0007164600) Dividende en espèces EUR 2.35 par action - DE Taxes,28.51,
+Retenues d'impôts,Data,Total,,,-0.71,
+Retenues d'impôts,Data,USD,2024-11-14,AAPL(US0378331005) Dividende en espèces USD 0.25 par action - US Taxes,0.3,
+Retenues d'impôts,Data,USD,2024-11-14,AAPL(US0378331005) Dividende en espèces USD 0.25 par action - US Taxes,-0.15,
+Retenues d'impôts,Data,USD,2024-11-14,AAPL(US0378331005) Compensation tenant lieu de dividende - US Taxes,0.45,
+Retenues d'impôts,Data,USD,2024-11-14,AAPL(US0378331005) Compensation tenant lieu de dividende - US Taxes,-0.23,
+Retenues d'impôts,Data,USD,2024-12-17,UHS(US9139031002) Dividende en espèces USD 0.20 par action - US Taxes,1.74,
+Retenues d'impôts,Data,USD,2024-12-17,UHS(US9139031002) Dividende en espèces USD 0.20 par action - US Taxes,-0.87,
+Retenues d'impôts,Data,USD,2024-12-27,META(US30303M1027) Dividende en espèces USD 0.50 par action - US Taxes,3.45,
+Retenues d'impôts,Data,USD,2024-12-27,META(US30303M1027) Dividende en espèces USD 0.50 par action - US Taxes,-1.73,
+Retenues d'impôts,Data,USD,2025-01-06,WMT(US9311421039) Compensation tenant lieu de dividende - US Taxes,-7.04,
+Retenues d'impôts,Data,USD,2025-01-06,WMT(US9311421039) Dividende en espèces USD 0.2075 par action - US Taxes,-0.13,
+Retenues d'impôts,Data,USD,2025-01-06,WMT(US9311421039) Dividende en espèces USD 0.2075 par action - US Taxes,0.13,
+Retenues d'impôts,Data,USD,2025-01-06,WMT(US9311421039) Dividende en espèces USD 0.2075 par action - US Taxes,-0.06,
+Retenues d'impôts,Data,USD,2025-01-06,WMT(US9311421039) Compensation tenant lieu de dividende - US Taxes,7.04,
+Retenues d'impôts,Data,USD,2025-01-06,WMT(US9311421039) Compensation tenant lieu de dividende - US Taxes,-3.52,
+Retenues d'impôts,Data,USD,2025-02-13,AAPL(US0378331005) Dividende en espèces USD 0.25 par action - US Taxes,-2.21,
+Retenues d'impôts,Data,USD,2025-02-13,AAPL(US0378331005) Compensation tenant lieu de dividende - US Taxes,-0.79,
+Retenues d'impôts,Data,USD,2025-03-13,MSFT(US5949181045) Dividende en espèces USD 0.83 par action - US Taxes,-5.6,
+Retenues d'impôts,Data,USD,2025-03-17,GOOGL(US02079K3059) Dividende en espèces USD 0.20 par action - US Taxes,-3.15,
+Retenues d'impôts,Data,USD,2025-04-02,NVDA(US67066G1040) Dividende en espèces USD 0.01 par action - US Taxes,-0.15,
+Retenues d'impôts,Data,USD,2025-04-07,WMT(US9311421039) Dividende en espèces USD 0.235 par action - US Taxes,-2.09,
+Retenues d'impôts,Data,USD,2025-04-07,WMT(US9311421039) Compensation tenant lieu de dividende - US Taxes,-1.97,
+Retenues d'impôts,Data,USD,2025-05-15,AAPL(US0378331005) Dividende en espèces USD 0.26 par action - US Taxes,-1.29,
+Retenues d'impôts,Data,USD,2025-05-15,AAPL(US0378331005) Compensation tenant lieu de dividende - US Taxes,-1.83,
+Retenues d'impôts,Data,USD,2025-05-27,WMT(US9311421039) Compensation tenant lieu de dividende - US Taxes,-3.88,
+Retenues d'impôts,Data,USD,2025-05-27,WMT(US9311421039) Dividende en espèces USD 0.235 par action - US Taxes,-0.19,
+Retenues d'impôts,Data,USD,2025-06-12,MSFT(US5949181045) Dividende en espèces USD 0.83 par action - US Taxes,-5.61,
+Retenues d'impôts,Data,USD,2025-06-16,GOOGL(US02079K3059) Dividende en espèces USD 0.21 par action - US Taxes,-3.31,
+Retenues d'impôts,Data,USD,2025-07-03,NVDA(US67066G1040) Dividende en espèces USD 0.01 par action - US Taxes,-0.09,
+Retenues d'impôts,Data,USD,2025-07-03,NVDA(US67066G1040) Compensation tenant lieu de dividende - US Taxes,-0.06,
+Retenues d'impôts,Data,USD,2025-08-14,AAPL(US0378331005) Dividende en espèces USD 0.26 par action - US Taxes,-1.41,
+Retenues d'impôts,Data,USD,2025-08-14,AAPL(US0378331005) Compensation tenant lieu de dividende - US Taxes,-1.72,
+Retenues d'impôts,Data,USD,2025-09-02,WMT(US9311421039) Dividende en espèces USD 0.235 par action - US Taxes,-0.02,
+Retenues d'impôts,Data,USD,2025-09-02,WMT(US9311421039) Compensation tenant lieu de dividende - US Taxes,-4.05,
+Retenues d'impôts,Data,USD,2025-09-11,MSFT(US5949181045) Dividende en espèces USD 0.83 par action - US Taxes,-3.13,
+Retenues d'impôts,Data,USD,2025-09-11,MSFT(US5949181045) Compensation tenant lieu de dividende - US Taxes,-2.49,
+Retenues d'impôts,Data,USD,2025-09-15,GOOGL(US02079K3059) Dividende en espèces USD 0.21 par action - US Taxes,-3,
+Retenues d'impôts,Data,USD,2025-09-15,GOOGL(US02079K3059) Compensation tenant lieu de dividende - US Taxes,-0.32,
+Retenues d'impôts,Data,USD,2025-10-02,NVDA(US67066G1040) Dividende en espèces USD 0.01 par action - US Taxes,-0.15,
+Retenues d'impôts,Data,USD,2025-12-11,MSFT(US5949181045) Compensation tenant lieu de dividende - US Taxes,-0.82,
+Retenues d'impôts,Data,USD,2025-12-11,MSFT(US5949181045) Dividende en espèces USD 0.91 par action - US Taxes,-5.35,
+Retenues d'impôts,Data,USD,2025-12-15,GOOGL(US02079K3059) Dividende en espèces USD 0.21 par action - US Taxes,-3.32,
+Retenues d'impôts,Data,USD,2025-12-26,NVDA(US67066G1040) Dividende en espèces USD 0.01 par action - US Taxes,-0.15,
+Retenues d'impôts,Data,Total,,,-58.77,
+Retenues d'impôts,Data,Total en EUR,,,-51.6799323,
+Retenues d'impôts,Data,Total Retenues d'impôts en EUR,,,-52.3899323,
+Intérêt,Header,Devise,Date,Description,Montant
+Intérêt,Data,EUR,2025-01-06,EUR Intérêt créditeur pour Déc-2024,3.56
+Intérêt,Data,EUR,2025-01-06,EUR Intérêts débiteurs pour Déc-2024,-62.58
+Intérêt,Data,EUR,2025-02-05,EUR Intérêts débiteurs pour Jan-2025,-90.77
+Intérêt,Data,EUR,2025-03-05,EUR Intérêts débiteurs pour Fév-2025,-79.18
+Intérêt,Data,EUR,2025-04-03,EUR Intérêts débiteurs pour Mar-2025,-83.59
+Intérêt,Data,EUR,2025-05-05,EUR Intérêts débiteurs pour Avr-2025,-78.18
+Intérêt,Data,EUR,2025-06-04,EUR Intérêts débiteurs pour Mai-2025,-75.81
+Intérêt,Data,EUR,2025-07-03,EUR Intérêts débiteurs pour Juin-2025,-71.19
+Intérêt,Data,EUR,2025-08-05,EUR Intérêts débiteurs pour Juil-2025,-72.67
+Intérêt,Data,EUR,2025-09-04,EUR Intérêts débiteurs pour Aoû-2025,-72.8
+Intérêt,Data,EUR,2025-10-03,EUR Intérêts débiteurs pour Sep-2025,-70.37
+Intérêt,Data,EUR,2025-11-05,EUR Intérêts débiteurs pour Oct-2025,-68.97
+Intérêt,Data,EUR,2025-12-03,EUR Intérêts débiteurs pour Nov-2025,-3.44
+Intérêt,Data,Total,,,-825.99
+Intérêt,Data,GBP,2025-01-06,GBP Intérêts débiteurs pour Déc-2024,-0.02
+Intérêt,Data,Total,,,-0.02
+Intérêt,Data,Total en EUR,,,-0.0241
+Intérêt,Data,USD,2025-01-06,USD Intérêts débiteurs pour Déc-2024,-311.4
+Intérêt,Data,USD,2025-01-06,USD IBKR Managed Securities (SYEP) - Intérêts pour Déc-2024,7.58
+Intérêt,Data,USD,2025-02-05,USD Intérêts débiteurs pour Jan-2025,-134.27
+Intérêt,Data,USD,2025-03-05,USD Intérêts débiteurs pour Fév-2025,-173.8
+Intérêt,Data,USD,2025-04-03,USD Intérêts débiteurs pour Mar-2025,-193.32
+Intérêt,Data,USD,2025-05-05,USD Intérêts débiteurs pour Avr-2025,-188.04
+Intérêt,Data,USD,2025-06-04,USD Intérêts débiteurs pour Mai-2025,-195.39
+Intérêt,Data,USD,2025-07-03,USD Intérêts débiteurs pour Juin-2025,-190.05
+Intérêt,Data,USD,2025-08-05,USD Intérêts débiteurs pour Juil-2025,-197.41
+Intérêt,Data,USD,2025-09-04,USD Intérêts débiteurs pour Aoû-2025,-198.28
+Intérêt,Data,USD,2025-10-03,USD Intérêts débiteurs pour Sep-2025,-189.39
+Intérêt,Data,USD,2025-11-05,USD Intérêts débiteurs pour Oct-2025,-176.8
+Intérêt,Data,USD,2025-12-03,USD Intérêts débiteurs pour Nov-2025,-29.28
+Intérêt,Data,Total,,,-2169.85
+Intérêt,Data,Total en EUR,,,-1937.4013026
+Intérêt,Data,Total Intérêt en EUR,,,-2763.4154026
+Intérêts cumulés,Header,Devise,Nom champ,Valeur champ
+Intérêts cumulés,Data,Récapitulatif en devise de base,Solde de départ cumulé,-346.2375592
+Intérêts cumulés,Data,Récapitulatif en devise de base,Intérêts courus,-2459.1940392
+Intérêts cumulés,Data,Récapitulatif en devise de base,Extourne des montants cumulés,2763.4154026
+Intérêts cumulés,Data,Récapitulatif en devise de base,Changement de valeur des devises,14.2794778
+Intérêts cumulés,Data,Récapitulatif en devise de base,Solde cumulé de fin de période,-27.736718
+Intérêts cumulés,Data,EUR,Solde de départ cumulé,-56.75
+Intérêts cumulés,Data,EUR,Intérêts courus,-772.56
+Intérêts cumulés,Data,EUR,Extourne des montants cumulés,825.99
+Intérêts cumulés,Data,EUR,Solde cumulé de fin de période,-3.32
+Intérêts cumulés,Data,GBP,Solde de départ cumulé,0
+Intérêts cumulés,Data,GBP,Intérêts courus,-0.02
+Intérêts cumulés,Data,GBP,Extourne des montants cumulés,0.02
+Intérêts cumulés,Data,GBP,Solde cumulé de fin de période,0
+Intérêts cumulés,Data,GBP,Solde cumulé de fin de période enEUR,0
+Intérêts cumulés,Data,USD,Solde de départ cumulé,-299.72
+Intérêts cumulés,Data,USD,Intérêts courus,-1898.81
+Intérêts cumulés,Data,USD,Extourne des montants cumulés,2169.85
+Intérêts cumulés,Data,USD,Solde cumulé de fin de période,-28.68
+Intérêts cumulés,Data,USD,Solde cumulé de fin de période enEUR,-24.416718
+Variation des dividendes accumulés,Header,Catégorie d'actifs,Devise,Symbole,Date,Date ex,Date de paiement,Quantité,Fiscalité,Frais,Taux brut,Montant brut,Montant net,Code
+Variation des dividendes accumulés,Data,Dividendes initiaux accumulés enEUR,,,,,,,,,,,16.129862,
+Variation des dividendes accumulés,Data,Actions,EUR,SAPd,2025-05-13,2025-05-14,2025-05-16,100,60.74,0,2.35,235,174.26,Po
+Variation des dividendes accumulés,Data,Actions,EUR,SAPd,2025-05-13,2025-05-14,2025-05-16,100,3.1,0,2.35,235,231.9,Po
+Variation des dividendes accumulés,Data,Actions,EUR,SAPd,2025-05-13,2025-05-14,2025-05-16,100,-60.74,0,2.35,-235,-174.26,Re
+Variation des dividendes accumulés,Data,Actions,EUR,SAPd,2025-05-13,2025-05-14,2025-05-16,100,-3.1,0,2.35,-235,-231.9,Re
+Variation des dividendes accumulés,Data,Total,,,,,,,0,0,,0,-0,
+Variation des dividendes accumulés,Data,Actions,USD,AAPL,2025-02-07,2025-02-10,2025-02-13,80,3,0,0.25,20,17,Po
+Variation des dividendes accumulés,Data,Actions,USD,AAPL,2025-02-13,2025-02-10,2025-02-13,80,-3,0,0.25,-20,-17,Re
+Variation des dividendes accumulés,Data,Actions,USD,AAPL,2025-05-09,2025-05-12,2025-05-15,80.0702,3.12,0,0.26,20.82,17.7,Po
+Variation des dividendes accumulés,Data,Actions,USD,AAPL,2025-05-15,2025-05-12,2025-05-15,80.0702,-3.12,0,0.26,-20.82,-17.7,Re
+Variation des dividendes accumulés,Data,Actions,USD,AAPL,2025-08-08,2025-08-11,2025-08-14,80.1537,3.13,0,0.26,20.84,17.71,Po
+Variation des dividendes accumulés,Data,Actions,USD,AAPL,2025-08-14,2025-08-11,2025-08-14,80.1537,-3.13,0,0.26,-20.84,-17.71,Re
+Variation des dividendes accumulés,Data,Actions,USD,GOOGL,2025-03-07,2025-03-10,2025-03-17,105,3.15,0,0.2,21,17.85,Po
+Variation des dividendes accumulés,Data,Actions,USD,GOOGL,2025-03-17,2025-03-10,2025-03-17,105,-3.15,0,0.2,-21,-17.85,Re
+Variation des dividendes accumulés,Data,Actions,USD,GOOGL,2025-06-06,2025-06-09,2025-06-16,105.1092,3.31,0,0.21,22.07,18.76,Po
+Variation des dividendes accumulés,Data,Actions,USD,GOOGL,2025-06-16,2025-06-09,2025-06-16,105.1092,-3.31,0,0.21,-22.07,-18.76,Re
+Variation des dividendes accumulés,Data,Actions,USD,GOOGL,2025-09-05,2025-09-08,2025-09-15,105.2155,3.31,0,0.21,22.1,18.79,Po
+Variation des dividendes accumulés,Data,Actions,USD,GOOGL,2025-09-15,2025-09-08,2025-09-15,105.2155,-3.32,0,0.21,-22.1,-18.78,Re
+Variation des dividendes accumulés,Data,Actions,USD,GOOGL,2025-12-05,2025-12-08,2025-12-15,105.29,3.32,0,0.21,22.11,18.79,Po
+Variation des dividendes accumulés,Data,Actions,USD,GOOGL,2025-12-15,2025-12-08,2025-12-15,105.29,-3.32,0,0.21,-22.11,-18.79,Re
+Variation des dividendes accumulés,Data,Actions,USD,META,2025-03-13,2025-03-14,2025-03-26,0.0136,0,0,0.525,0.01,0.01,Po
+Variation des dividendes accumulés,Data,Actions,USD,META,2025-03-26,2025-03-14,2025-03-26,0.0136,0,0,0.525,-0.01,-0.01,Re
+Variation des dividendes accumulés,Data,Actions,USD,META,2025-06-13,2025-06-16,2025-06-26,0.0136,0,0,0.525,0.01,0.01,Po
+Variation des dividendes accumulés,Data,Actions,USD,META,2025-06-26,2025-06-16,2025-06-26,0.0136,0,0,0.525,-0.01,-0.01,Re
+Variation des dividendes accumulés,Data,Actions,USD,META,2025-09-19,2025-09-22,2025-09-29,0.0136,0,0,0.525,0.01,0.01,Po
+Variation des dividendes accumulés,Data,Actions,USD,META,2025-09-29,2025-09-22,2025-09-29,0.0136,0,0,0.525,-0.01,-0.01,Re
+Variation des dividendes accumulés,Data,Actions,USD,MSFT,2025-02-19,2025-02-20,2025-03-13,45,5.6,0,0.83,37.35,31.75,Po
+Variation des dividendes accumulés,Data,Actions,USD,MSFT,2025-03-13,2025-02-20,2025-03-13,45,-5.6,0,0.83,-37.35,-31.75,Re
+Variation des dividendes accumulés,Data,Actions,USD,MSFT,2025-05-14,2025-05-15,2025-06-12,45.0833,5.61,0,0.83,37.42,31.81,Po
+Variation des dividendes accumulés,Data,Actions,USD,MSFT,2025-06-12,2025-05-15,2025-06-12,45.0833,-5.61,0,0.83,-37.42,-31.81,Re
+Variation des dividendes accumulés,Data,Actions,USD,MSFT,2025-08-20,2025-08-21,2025-09-11,45.15,5.62,0,0.83,37.47,31.85,Po
+Variation des dividendes accumulés,Data,Actions,USD,MSFT,2025-09-11,2025-08-21,2025-09-11,45.15,-5.62,0,0.83,-37.47,-31.85,Re
+Variation des dividendes accumulés,Data,Actions,USD,MSFT,2025-11-19,2025-11-20,2025-12-11,45.2129,6.18,0,0.91,41.14,34.96,Po
+Variation des dividendes accumulés,Data,Actions,USD,MSFT,2025-12-11,2025-11-20,2025-12-11,45.2129,-6.17,0,0.91,-41.14,-34.97,Re
+Variation des dividendes accumulés,Data,Actions,USD,NVDA,2025-03-11,2025-03-12,2025-04-02,100,0.15,0,0.01,1,0.85,Po
+Variation des dividendes accumulés,Data,Actions,USD,NVDA,2025-04-02,2025-03-12,2025-04-02,100,-0.15,0,0.01,-1,-0.85,Re
+Variation des dividendes accumulés,Data,Actions,USD,NVDA,2025-06-10,2025-06-11,2025-07-03,100.008,0.15,0,0.01,1,0.85,Po
+Variation des dividendes accumulés,Data,Actions,USD,NVDA,2025-07-03,2025-06-11,2025-07-03,100.008,-0.15,0,0.01,-1,-0.85,Re
+Variation des dividendes accumulés,Data,Actions,USD,NVDA,2025-09-10,2025-09-11,2025-10-02,100.0133,0.15,0,0.01,1,0.85,Po
+Variation des dividendes accumulés,Data,Actions,USD,NVDA,2025-10-02,2025-09-11,2025-10-02,100.0133,-0.15,0,0.01,-1,-0.85,Re
+Variation des dividendes accumulés,Data,Actions,USD,NVDA,2025-12-03,2025-12-04,2025-12-26,100.0177,0.15,0,0.01,1,0.85,Po
+Variation des dividendes accumulés,Data,Actions,USD,NVDA,2025-12-26,2025-12-04,2025-12-26,100.0177,-0.15,0,0.01,-1,-0.85,Re
+Variation des dividendes accumulés,Data,Actions,USD,WMT,2025-01-06,2024-12-13,2025-01-06,115,-7.17,0,0.2075,-23.87,-16.7,Re
+Variation des dividendes accumulés,Data,Actions,USD,WMT,2025-03-20,2025-03-21,2025-04-07,115.1818,4.06,0,0.235,27.07,23.01,Po
+Variation des dividendes accumulés,Data,Actions,USD,WMT,2025-04-07,2025-03-21,2025-04-07,115.1818,-4.06,0,0.235,-27.07,-23.01,Re
+Variation des dividendes accumulés,Data,Actions,USD,WMT,2025-05-08,2025-05-09,2025-05-27,115.4493,4.07,0,0.235,27.14,23.07,Po
+Variation des dividendes accumulés,Data,Actions,USD,WMT,2025-05-08,2025-05-09,2025-05-27,115.4493,4.07,0,0.235,27.13,23.06,Po
+Variation des dividendes accumulés,Data,Actions,USD,WMT,2025-05-08,2025-05-09,2025-05-27,115.4493,-4.07,0,0.235,-27.14,-23.07,Re
+Variation des dividendes accumulés,Data,Actions,USD,WMT,2025-05-27,2025-05-09,2025-05-27,115.4493,-4.07,0,0.235,-27.13,-23.06,Re
+Variation des dividendes accumulés,Data,Actions,USD,WMT,2025-08-14,2025-08-15,2025-09-02,115.6857,4.07,0,0.235,27.18,23.11,Po
+Variation des dividendes accumulés,Data,Actions,USD,WMT,2025-08-14,2025-08-15,2025-09-02,115.6857,4.07,0,0.235,27.19,23.12,Po
+Variation des dividendes accumulés,Data,Actions,USD,WMT,2025-08-14,2025-08-15,2025-09-02,115.6857,-4.08,0,0.235,-27.19,-23.11,Re
+Variation des dividendes accumulés,Data,Actions,USD,WMT,2025-09-02,2025-08-15,2025-09-02,115.6857,-4.07,0,0.235,-27.19,-23.12,Re
+Variation des dividendes accumulés,Data,Total,,,,,,,-7.18,0,,-23.88,-16.7,
+Variation des dividendes accumulés,Data,Total en EUR,,,,,,,-6.224993,0,,-18.4201043,-12.1951113,
+Variation des dividendes accumulés,Data,Total Actions en EUR,,,,,,,-6.224993,0,,-18.4201043,-12.1951113,
+Variation des dividendes accumulés,Data,Dividendes finaux accumulés enEUR,,,,,,,,,,,0,
+Informations instrument financier,Header,Catégorie d'actifs,Symbole,Description,Conid,ID Titre,Underlying,Liste des Bourses,Multiplicateur,Type,Code
+Informations instrument financier,Data,Actions,AAPL,APPLE INC,265598,US0378331005,AAPL,NASDAQ,1,COMMON,
+Informations instrument financier,Data,Actions,GOOGL,ALPHABET INC-CL A,208813719,US02079K3059,GOOGL,NASDAQ,1,COMMON,
+Informations instrument financier,Data,Actions,META,META PLATFORMS INC-CLASS A,107113386,US30303M1027,META,NASDAQ,1,COMMON,
+Informations instrument financier,Data,Actions,MSFT,MICROSOFT CORP,272093,US5949181045,MSFT,NASDAQ,1,COMMON,
+Informations instrument financier,Data,Actions,NVDA,NVIDIA CORP,4815747,US67066G1040,NVDA,NASDAQ,1,COMMON,
+Informations instrument financier,Data,Actions,SAPd,SAP SE,14204,DE0007164600,SAP,IBIS,1,COMMON,
+Informations instrument financier,Data,Actions,UHS,UNIVERSAL HEALTH SERVICES-B,13206,US9139031002,UHS,NYSE,1,COMMON,
+Informations instrument financier,Data,Actions,WMT,WALMART INC,13824,US9311421039,WMT,NYSE,1,COMMON,
+Informations instrument financier,Data,Actions,XCUR,EXICURE INC,725468694,US30205M3097,XCUR,NASDAQ,1,COMMON,
+Codes,Header,Code,Signification,Code (Cont.),Signification (Cont.)
+Codes,Data,A,Assignation
+Codes,Data,ADR,Accumuluation de frais ADR
+Codes,Data,AEx,Exercice automatique pour les recommandations liées aux dividendes.
+Codes,Data,AFx,AutoFX conversion resulting from trading
+Codes,Data,Adj,Ajustement
+Codes,Data,Al,Allocation
+Codes,Data,Aw,Transaction éxécutée à l'externe
+Codes,Data,B,Rachat automatique
+Codes,Data,Bo,Emprunt direct
+Codes,Data,C,Fermeture de position
+Codes,Data,CD,Livraison espèces
+Codes,Data,CP,Position complexe
+Codes,Data,Ca,Annulé
+Codes,Data,Co,Transaction corrigée
+Codes,Data,Cx,"Une partie ou la totalité de cette transaction a été exécutée comme une opération de crossing menée par IB en qualité d'agent pour les deux contreparties, qui sont des clients IB."
+Codes,Data,DT,Discounted Trade
+Codes,Data,De,Delivery or Conversion Action
+Codes,Data,ETF,Création ou sortie d'ETF
+Codes,Data,Ep,Résulte d'une position ayant expiré
+Codes,Data,Ex,Exercice
+Codes,Data,FP,The fractional portion of this trade was executed against IB or an affiliate.
+Codes,Data,FPA,The fractional portion of this trade was executed against IB or an affiliate. IB acted as agent for the whole share portion of this trade.
+Codes,Data,G,Trader sur le segment de compte garanti
+Codes,Data,GEA,Exercice ou attribution résultant de la compensation de positions
+Codes,Data,HC,Choix de l'assiette imposable sur les coûts les plus élevés
+Codes,Data,HFI,Investissement transféré vers un Hedge Fund
+Codes,Data,HFR,Remboursement Hedge Fund
+Codes,Data,I,Transfert interne
+Codes,Data,IA,The transaction was executed against IB or an affiliate
+Codes,Data,IM,A portion of the order was executed against IB or an affiliate; IB acted as agent on a portion.
+Codes,Data,INV,Transfert d'investissement en provenance de l'investisseur
+Codes,Data,IPO,Cette transaction a été exécutée dans le cadre d'une introduction en Bourse dans laquelle IB faisait partie du groupe vendeur et est considérée comme une transaction principale.
+Codes,Data,L,Effectuée par IB (Violation de marge)
+Codes,Data,LD,Ajusté pour perte non admissible de vente fictive
+Codes,Data,LF,Liquidation of fractional position by IB
+Codes,Data,LI,"Dernier Entré, Premier Sorti (LIFO)"
+Codes,Data,LT,P/L à long terme
+Codes,Data,Lo,Prêt direct
+Codes,Data,M,Entrée manuelle par IB
+Codes,Data,MEx,Exercice manuel pour les recommandations liées aux dividendes.
+Codes,Data,ML,Maximiser les pertes à des fins d'imposition
+Codes,Data,MLG,Choix de la méthode d'imposition Augmentation des gains à long terme
+Codes,Data,MLL,Choix de la méthode d'imposition Augmentation des pertes à long terme
+Codes,Data,MSG,Choix de la méthode d'imposition Augmentation des gains à court terme
+Codes,Data,MSL,Choix de la méthode d'imposition Augmentation des pertes à court terme
+Codes,Data,O,Ouverture de position
+Codes,Data,Off,Yes and No contracts offset to $1.00 cash settlement
+Codes,Data,P,Exécution partielle
+Codes,Data,PE,Perpetual Investment
+Codes,Data,PI,Amélioration de prix
+Codes,Data,PTA,Post Trade Allocation
+Codes,Data,Po,Ajout à intérêts ou dividendes accumulés
+Codes,Data,Pr,Une partie ou la totalité de cette transaction a été exécutée par la Bourse comme une opération de crossing menée par IB auprès d'une filiale IB. IB est donc considéré comme donneur d'ordre pour la transaction et non comme agent.
+Codes,Data,R,Réinvestissement des dividendes
+Codes,Data,RED,Remboursement à l'investisseur
+Codes,Data,RI,Investissement récurrent
+Codes,Data,RP,"IB a git en tant qu'agent pour la partie en fractions d'actions de cette transaction, qui a été exécutée par une société affiliée d'IB en tant qu'opérateur de capital sans risque."
+Codes,Data,RPA,IB a agit en tant qu'agent pour le partie en fractions d'actions et la partie en actions entières de cette transaction ; la partie en fractions d'actions a été exécutée par une société affiliée d'IB en tant qu'opérateur de capital sans risque.
+Codes,Data,Rb,Rebill
+Codes,Data,Re,Extourne des intérêts ou dividendes cumulés
+Codes,Data,Ri,Remboursement
+Codes,Data,S0,Contract settled to zero value
+Codes,Data,S1,Contract settled to $1.00
+Codes,Data,SF,Trade is subject to IBKR Lite Surcharge Fee if volume of such trades exceeds 10% of the total monthly Lite trade volume
+Codes,Data,SI,Cet ordre a été sollicité par Interactive Brokers.
+Codes,Data,SL,Choix de l'unité pour le récapitulatif fiscal
+Codes,Data,SO,Cet ordre a été marqué comme sollicité par votre courtier introducteur.
+Codes,Data,SS,"Le client a demandé un règlement anticipé pour cet ordre, qui sera donc exécuté à un prix supérieur au cours actuel."
+Codes,Data,ST,P/L à court terme
+Codes,Data,T,Transfert
+Codes,Data,Un,"Actions dont les droits ne sont pas acquis, du programme d'attribution d'actions"
+Codes,Data,XCH,Mutual Fund Exchange Transaction
+Mentions légales,Header,Type,Remarque
+Mentions légales,Data,Notes,"Stock exchange transactions generally settle on the trade date plus one business day (T+1). Options, futures and US open-end mutual fund transactions also settle on trade date plus one business day. Some exchanges and other transaction types may have longer or shorter settlement periods. Ending settled cash reflects the cash that has actually settled."
+Mentions légales,Data,Notes,Les exigences de marge initiale et de marge de maintien sont accessibles à partir de la fenêtre Compte de la Trader Workstation.
+Mentions légales,Data,Notes,"Les quantités précédées d'un signe ""-"" indiquent des transactions de vente. Les autres transactions sont des achats."
+Mentions légales,Data,Notes,"For shares traded on US markets, Interactive Brokers Ireland Limited (IBIE) acts as agent in executing the fractional portion of your order. In certain circumstances, IBIE routes that portion to an affiliate, which may execute it either as principal or riskless principal. If an IB affiliate executes as i) principal, the order will be executed at the price displayed for the opposite side of the NBBO from your order (the offer if you are buying and the bid if you are selling) at the time of execution, ii) riskless principal, the affiliate will execute that portion of your order at the price it receives for the execution of the whole share. The way in which the fractional portion of the order is executed is indicated by the codes associated with the trade. For shares traded on European Markets, IBIE will generally act as counterparty for any fractional portion of your order for shares, which it will execute as principal, for a total consideration which is equal to (or better than), the total consideration for the execution of a full share available at the European trading venues and SIs to which IBIE has access. In certain circumstances, IBIE may route a full share order to the available European trading venues acting in an Agency capacity and the fractional portion of the order will be allocated to your account at the price traded in the trading venue and the remaining fractional portion will be allocated to an affiliate. "
+Mentions légales,Data,Notes,"En cas d'exécution partielle, les commissions sont facturées sur la quantité totale exécutée pour l'ordre d'origine. La commission s'affiche uniquement pour la première exécution partielle."
+Mentions légales,Data,Notes,Les horaires d'exécution affichés correspondent à l'heure de l'Est.
+Mentions légales,Data,Notes,Les frais réglementaires applicables à vos transactions sont disponibles sur le site d'IB à l'adresse www.interactivebrokers.com/en/accounts/fees/exchangeAndRegulatoryFees.php.
+Mentions légales,Data,Notes,"Le taux de commission d'emprunt représente le coût d'emprunt des actions, exprimé en pourcentage par an. Il est appliqué à la valeur de garantie du contrat d'emprunt d'actions et est distinct de tout intérêt perçu sur les soldes de trésorerie créditeurs. De même, le taux de commission de prêt représente l'avantage de prêter des actions. Un taux positif indique un coût pour l'emprunteur/un avantage pour le prêteur et un taux négatif indique un avantage pour l'emprunteur/un coût pour le prêteur. En général, les taux de commission pour les actions difficiles à emprunter sont plus élevés que pour les actions normalement disponibles."
+Mentions légales,Data,Notes,Les taux d'intérêts sur les collatéraux du client représentent les intérêts payés sur le collatéral comptabilisé sur le compte client provenant d'un prêt d'action. Un taux positif indique un gain pour le préteur.
+Mentions légales,Data,Notes,Les cours de clôture qui figurent sur ce relevé d'activité sont présentés à titre indicatif et peuvent émaner de prestataires tiers. Interactive Brokers ne garantit pas l'exactitude des cours fournis par des sources tierces. En raison de différence de fuseaux horaires
+Mentions légales,Data,Notes,Tous les services de données de marché et recherche sont fournis par Global Financial Information Services (GmbH).
+Mentions légales,Data,Notes,Les données de marché sont fournies par Global Financial Information Services (GmbH). Votre courtier local recueille les montants dus pour les frais et impôts pour ces données au nom de Global Financial Information Services (GmbH). Remarque : vous êtes responsable de toute taxe applicable à la prestation de ce service.
+Mentions légales,Data,Notes,"Directive 2014/65/EU and its implementing measures (MiFID II) applies to all client funds and client financial instruments (Client Assets) on this statement except those Client Assets that are not classified as segregated assets, namely securities lent under the Stock Yield Enhancement Programme as identified in the IBKR Managed Securities Lent section of this statement and Client Assets noted as Not Segregated in the Collateral for Customer Borrowing section of this statement.  IBIE applies the MiFID II Client Asset protection requirements to funds and instruments that are not subject to MiFID II in the same way as it applies those requirements to Client Assets. IBIE is also subject to the client asset requirements set out in the Central Bank (Supervision and Enforcement) Act 2013 (Section 48(1))(Investment Firms) Regulations 2023 (=S.I. No. 10 of 2023)."
+Mentions légales,Data,Notes,RUS denotes Ruble balances that have been restricted by Russian authorities.
+Mentions légales,Data,Mutual Fund Notes,"All purchase and sales of mutual funds are calculated against the published NAV (Net Asset Value) of the underlying fund and is displayed on this confirmation as the ""C. Price"" (Closing Price). Due to any fees charged by a fund and/or any share rounding, the net price you pay may vary from the published NAV and is shown on this confirmation as the ""T. Price"" (Trade Price)."
+Mentions légales,Data,Titres à revenu fixe,"Call features for bonds or preferred stocks may affect the yield. For zero coupon, compound interest and multiplier securities, there are no periodic payments and securities may be callable below maturity value without notice to holder unless registered. For asset-backed securities, the actual yield may vary depending on the speed at which the underlying note is pre-paid. For additional information regarding bond yield, please contact the IB Help Desk at: ibkr.com/help. If this debt security is unrated by a nationally recognized statistical rating organization, it may pose a high risk of default. You should consult an independent advisor to determine whether unrated bonds are appropriate for your portfolio in light of your goals and your financial circumstances. Fees charged by bond trading centers are included in the cost of bond transactions."
+Mentions légales,Data,Mentions légales,"Please promptly report any inaccuracy or discrepancy in this statement, or in your account, to Interactive Brokers Ireland Limited (""IBIE""). You can contact us by telephone or electronically through the IBIE website at, www.interactivebrokers.ie. If you report an error by telephone, you should re-confirm such oral communication in writing in order to protect your rights, including your rights under the Investor Compensation Scheme."
+Mentions légales,Data,Mentions légales,"Unless otherwise noted, IBIE acted as agent in the execution of the above transactions. IBIE may execute your trades through affiliates or third-party brokers who are members of the relevant exchange or market center. Please see the IBIE CAKID Bank Account List at www.ibkr.ie/cakid for custody details."
+Mentions légales,Data,Mentions légales,"IBIE acts as agent or riskless principal in foreign currency exchange transactions and CFDs. Such transactions are executed against an IBIE affiliate, which acts as principal in such transactions and may have a long or short position and may have profited or lost in connection with the transaction."
+Mentions légales,Data,Mentions légales,"IBIE routes orders in US products through its US affiliate, IBLLC. IBLLC accepts liquidity rebates or other order flow payments from Alternative Trading Systems, market makers and exchanges for certain orders in US stocks. IBLLC receives payment for some US option orders pursuant to exchange-mandated marketing fee programs or other arrangements."
+Mentions légales,Data,Mentions légales,Veuillez rapidement informer IB-IE de tout changement dans vos objectifs d'investissement ou votre situation financière.
+Mentions légales,Data,Mentions légales,"Un bilan financier à jour d'IBIE est disponible pour vous sur www.interactivebrokers.ie ou dans ses bureaux, ou alors une copie du bilan financier vous sera envoyée sur demande écrite."
+Mentions légales,Data,Mentions légales,"IBIE est un membre de l'Investor Compensation Scheme, qui fournit une protection aux xlient en cas de défaut d'IBIE. Plus d'informations sur l'Investor Compensation Scheme sur www.investorcompensation.ie."
+Mentions légales,Data,Mentions légales,IBIE est constitué en vertu des lois irlandaises et enregistré auprès du Bureau d'enregistrement des sociétés irlandaises au numéro d'enregistrement des sociétés 657406.
+Mentions légales,Data,Mentions légales,IBIE est réglementé par la Banque centrale d'Irlande.
+Mentions légales,Data,Mentions légales,"IBIE's Registered Office address is 91 North Wall Quay, Dublin, D01 H7V7, Ireland."
+Mentions légales,Data,Mentions légales,"IBIE is included in the Central Bank of Ireland's register of authorised firms under number C423427. The CBI's address is New Wapping Street, North Wall Quay, Dublin 1, D01 F7X3. The CBI's website is www.centralbank.ie."
