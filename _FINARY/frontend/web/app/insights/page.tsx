@@ -1,48 +1,31 @@
 "use client";
 
 import { useMemo } from "react";
-import { usePortfolio, useDiversification, useDividends } from "@/lib/hooks/useApi";
+import { usePortfolio, useDiversification, useDividends, useCosts, useInsightsRules } from "@/lib/hooks/useApi";
 import { formatEUR, formatPct, formatNumber, CHART_COLORS } from "@/lib/utils";
 import { generateNetWorthHistory } from "@/lib/fixtures";
 import { PriceChart } from "@/components/charts/PriceChart";
-import { Section } from "@/components/ds";
+import { Section, Badge, Loading } from "@/components/ds";
 
-/* ── Fixture generators for insights demo ── */
+/* ── Simulation helper ── */
 
 function generateSimulation(monthly: number, years: number, annualReturn: number) {
   const data: { year: number; savings: number; returns: number; total: number }[] = [];
   let totalSaved = 0;
   let totalReturns = 0;
   const monthlyRate = annualReturn / 12;
-
   for (let y = 1; y <= years; y++) {
     for (let m = 0; m < 12; m++) {
       totalSaved += monthly;
       totalReturns += (totalSaved + totalReturns) * monthlyRate;
     }
-    data.push({
-      year: new Date().getFullYear() + y,
-      savings: Math.round(totalSaved),
-      returns: Math.round(totalReturns),
-      total: Math.round(totalSaved + totalReturns),
-    });
+    data.push({ year: new Date().getFullYear() + y, savings: Math.round(totalSaved), returns: Math.round(totalReturns), total: Math.round(totalSaved + totalReturns) });
   }
   return data;
 }
 
-const LEADERBOARD = [
-  { rank: 1, name: "BNP Paribas Easy S&P 500 UCITS ETF EUR C", ticker: "ESE", pct: "8.05%" },
-  { rank: 2, name: "Amundi MSCI World UCITS ETF Acc", ticker: "CW8", pct: "7.21%" },
-  { rank: 3, name: "iShares Core MSCI World UCITS ETF", ticker: "IWDA", pct: "6.89%" },
-  { rank: 4, name: "Amundi Nasdaq-100 UCITS ETF Acc", ticker: "ANX", pct: "5.54%" },
-  { rank: 5, name: "Lyxor MSCI World PEA ETF", ticker: "EWLD", pct: "4.82%" },
-  { rank: 6, name: "BNP Paribas Easy STOXX Europe 600", ticker: "ETZ", pct: "3.91%" },
-  { rank: 7, name: "Amundi S&P 500 UCITS ETF Acc", ticker: "500", pct: "3.45%" },
-  { rank: 8, name: "Amundi MSCI Emerging Markets ETF", ticker: "AEEM", pct: "2.87%" },
-];
-
 /* ── Score gauge ── */
-function ScoreGauge({ score, max, label }: { score: number; max: number; label: string }) {
+function ScoreGauge({ score, max, label, detail }: { score: number; max: number; label: string; detail?: string }) {
   const pct = (score / max) * 100;
   const color = score <= 3 ? "var(--red)" : score <= 6 ? "var(--orange)" : "var(--green)";
   const status = score <= 3 ? "Insuffisant" : score <= 6 ? "Moyen" : "Bon";
@@ -58,31 +41,49 @@ function ScoreGauge({ score, max, label }: { score: number; max: number; label: 
         </div>
         <span className="tnum text-body font-semibold" style={{ color }}>{score}/{max}</span>
       </div>
+      {detail && <p className="text-label mt-2 text-t-5">{detail}</p>}
     </div>
   );
 }
+
+/* ── Severity badge colors ── */
+const SEVERITY_VARIANT: Record<string, "loss" | "warn" | "accent" | "neutral" | "gain"> = {
+  critical: "loss",
+  warn: "warn",
+  info: "accent",
+};
 
 export default function InsightsPage() {
   const { data: positions } = usePortfolio();
   const { data: diversification } = useDiversification();
   const { data: dividends } = useDividends();
+  const { data: costs } = useCosts() as { data: any };
+  const { data: insights } = useInsightsRules() as { data: any[] | undefined };
 
   const totalInvested = positions?.reduce((s, p) => s + p.value_eur, 0) ?? 0;
-  const estimatedFees = totalInvested * 0.0099;
-  const feeRate = 0.99;
+
+  // Real costs from engine
+  const annualFees = (costs as any)?.annual_fees as Record<string, number> | undefined;
+  const totalAnnualFees = annualFees
+    ? Object.values(annualFees).reduce((s, v) => s + (typeof v === "number" ? v : 0), 0)
+    : totalInvested * 0.0099;
+  const feeRate = totalInvested > 0 ? (totalAnnualFees / totalInvested) * 100 : 0;
 
   const annualDividends = dividends?.reduce((s, d) => s + d.total_amount, 0) ?? 0;
   const dividendYield = totalInvested > 0 ? (annualDividends / totalInvested) * 100 : 0;
 
-  const divScore = diversification?.score ?? 4;
-  const divMax = diversification?.max_score ?? 10;
+  const divData = diversification as any;
+  const divScore = divData?.score ?? 4;
+  const divMax = divData?.max_score ?? 10;
+  const divDetails = divData?.details;
+  const divBreakdown = divData?.breakdown;
 
   const simulation = useMemo(() => generateSimulation(250, 30, 0.07), []);
   const simFinal = simulation[simulation.length - 1];
 
   const perfData = useMemo(() => {
     const hist = generateNetWorthHistory(365);
-    return hist.map((h) => ({
+    return hist.map((h: any) => ({
       date: h.date,
       value: h.breakdown.investments ?? h.net_worth * 0.3,
     }));
@@ -101,6 +102,25 @@ export default function InsightsPage() {
         <p className="text-label font-medium uppercase mb-2 text-t-5">Insights</p>
         <p className="text-[22px] font-light text-t-1">Analyse et recommandations</p>
       </div>
+
+      {/* ── Alerts from rules engine ── */}
+      {insights && insights.length > 0 && (
+        <Section title="Alertes">
+          <div className="space-y-3">
+            {insights.map((insight: any, i: number) => (
+              <div key={i} className="flex items-start gap-3 py-2">
+                <Badge variant={SEVERITY_VARIANT[insight.severity] ?? "neutral"}>
+                  {insight.severity === "critical" ? "⚠️" : insight.severity === "warn" ? "⚡" : "ℹ️"} {insight.severity.toUpperCase()}
+                </Badge>
+                <div className="flex-1">
+                  <p className="text-body font-medium text-t-1">{insight.title}</p>
+                  <p className="text-label text-t-4 mt-0.5">{insight.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* Performance chart */}
       <div className="card p-6">
@@ -166,17 +186,45 @@ export default function InsightsPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-body text-t-4">Frais estimés</span>
-              <span className="tnum text-title font-semibold text-loss">{formatEUR(estimatedFees)}/an</span>
+              <span className="tnum text-title font-semibold text-loss">{formatEUR(totalAnnualFees)}/an</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-body text-t-4">Taux moyen</span>
-              <span className="tnum text-body font-medium text-t-2">{feeRate}%</span>
+              <span className="tnum text-body font-medium text-t-2">{formatNumber(feeRate)}%</span>
             </div>
             <div className="bar-track mt-2">
               <div className="bar-fill bg-loss" style={{ width: `${Math.min(feeRate * 50, 100)}%` }} />
             </div>
+            {annualFees && (
+              <div className="space-y-1.5 mt-2">
+                {annualFees.tr_trading > 0 && (
+                  <div className="flex justify-between text-label">
+                    <span className="text-t-5">Trade Republic (1€/trade)</span>
+                    <span className="text-t-3">{formatEUR(annualFees.tr_trading)}</span>
+                  </div>
+                )}
+                {annualFees.ibkr_commissions_est > 0 && (
+                  <div className="flex justify-between text-label">
+                    <span className="text-t-5">IBKR commissions</span>
+                    <span className="text-t-3">{formatEUR(annualFees.ibkr_commissions_est)}</span>
+                  </div>
+                )}
+                {annualFees.etf_ter_annual > 0 && (
+                  <div className="flex justify-between text-label">
+                    <span className="text-t-5">ETF TER</span>
+                    <span className="text-t-3">{formatEUR(annualFees.etf_ter_annual)}</span>
+                  </div>
+                )}
+                {annualFees.margin_interest_annual > 0 && (
+                  <div className="flex justify-between text-label">
+                    <span className="text-t-5">Intérêts marge IBKR</span>
+                    <span className="text-t-3">{formatEUR(annualFees.margin_interest_annual)}</span>
+                  </div>
+                )}
+              </div>
+            )}
             <p className="text-label text-t-5">
-              Les frais moyens des ETF sont de 0.20%. Vous pourriez économiser {formatEUR(estimatedFees * 0.8)}/an.
+              Les frais moyens des ETF sont de 0.20%. Vous pourriez économiser {formatEUR(totalAnnualFees * 0.8)}/an.
             </p>
           </div>
         </Section>
@@ -206,19 +254,21 @@ export default function InsightsPage() {
         </Section>
 
         <Section title="Diversification sectorielle">
-          <ScoreGauge score={divScore} max={divMax} label="Secteurs" />
-          <p className="text-label mt-3 text-t-5">
-            Votre portefeuille est concentré sur {diversification?.details.num_sectors ?? 3} secteurs.
-            La position {diversification?.details.max_weight_ticker ?? "—"} représente {formatNumber(diversification?.details.max_weight_pct ?? 0)}% du total.
-          </p>
+          <ScoreGauge
+            score={divBreakdown?.sectoral?.score ?? divScore}
+            max={divBreakdown?.sectoral?.max ?? divMax}
+            label="Secteurs"
+            detail={`Votre portefeuille couvre ${divDetails?.num_sectors ?? "?"} secteurs. La position ${divDetails?.max_weight_ticker ?? "—"} représente ${formatNumber(divDetails?.max_weight_pct ?? 0)}% du total. Top 3 = ${formatNumber(divDetails?.top3_weight_pct ?? 0)}%.`}
+          />
         </Section>
 
         <Section title="Diversification géographique">
-          <ScoreGauge score={Math.min(divScore + 1, divMax)} max={divMax} label="Géographie" />
-          <p className="text-label mt-3 text-t-5">
-            Vous êtes exposé à {diversification?.details.num_countries ?? 2} pays.
-            Diversifiez vers les marchés émergents et l&apos;Asie pour améliorer votre score.
-          </p>
+          <ScoreGauge
+            score={divBreakdown?.geographic?.score ?? divScore}
+            max={divBreakdown?.geographic?.max ?? divMax}
+            label="Géographie"
+            detail={`Exposé à ${divDetails?.num_countries ?? "?"} pays, ${divDetails?.num_zones ?? "?"} zones (${(divDetails?.zones ?? []).join(", ")}). HHI = ${divDetails?.hhi ?? "?"} (${divData?.rating ?? ""}).`}
+          />
         </Section>
       </div>
 
@@ -238,9 +288,7 @@ export default function InsightsPage() {
                     <div className="flex-1" />
                     <div className="rounded-t-sm" style={{ height: `${h - savingsH}%`, background: "var(--chart-4)", opacity: 0.8 }} />
                     <div className="rounded-b-sm" style={{ height: `${savingsH}%`, background: "var(--chart-1)", opacity: 0.6 }} />
-                    {i % 5 === 0 && (
-                      <span className="text-[8px] text-center mt-1 text-t-6">{s.year}</span>
-                    )}
+                    {i % 5 === 0 && <span className="text-[8px] text-center mt-1 text-t-6">{s.year}</span>}
                   </div>
                 );
               })}
@@ -265,12 +313,7 @@ export default function InsightsPage() {
               <p className="text-label mb-1 text-t-5">Durée</p>
               <div className="flex gap-2 mt-1">
                 {[10, 20, 30].map((y) => (
-                  <span
-                    key={y}
-                    className={`text-label font-medium px-3 py-1 rounded-md border ${
-                      y === 30 ? "bg-bg-3 text-t-1 border-bd-2" : "text-t-5 border-bd-1"
-                    }`}
-                  >
+                  <span key={y} className={`text-label font-medium px-3 py-1 rounded-md border ${y === 30 ? "bg-bg-3 text-t-1 border-bd-2" : "text-t-5 border-bd-1"}`}>
                     {y} ans
                   </span>
                 ))}
@@ -281,44 +324,6 @@ export default function InsightsPage() {
               <p className="tnum text-title font-medium text-t-1">7.00%</p>
             </div>
           </div>
-        </div>
-      </Section>
-
-      {/* Leaderboard */}
-      <Section title="Leaderboard">
-        <div className="flex items-center gap-3 mb-4">
-          {["ETF", "Actions", "Crypto", "SCPI"].map((tab, i) => (
-            <button
-              key={tab}
-              className={`text-label font-medium px-3 py-1.5 rounded-md transition-colors ${
-                i === 0 ? "bg-bg-3 text-t-1" : "text-t-5 hover:bg-bg-hover"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-        <div className="space-y-0">
-          {LEADERBOARD.map((item, i) => (
-            <div
-              key={item.rank}
-              className={`flex items-center justify-between py-2.5 transition-colors ${i < LEADERBOARD.length - 1 ? "border-b border-bd-1" : ""}`}
-            >
-              <div className="flex items-center gap-3">
-                <span className={`tnum text-label font-semibold w-6 ${item.rank <= 3 ? "text-accent" : "text-t-5"}`}>
-                  #{item.rank}
-                </span>
-                <div className="w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-bold bg-bg-hover text-t-3">
-                  {item.ticker}
-                </div>
-                <div>
-                  <p className="text-label font-medium truncate max-w-[280px] text-t-1">{item.name}</p>
-                  <p className="text-caption text-t-5">EUR</p>
-                </div>
-              </div>
-              <span className="tnum text-label font-medium text-t-4">{item.pct} utilisateurs</span>
-            </div>
-          ))}
         </div>
       </Section>
 

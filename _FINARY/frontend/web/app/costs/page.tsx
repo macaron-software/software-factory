@@ -4,17 +4,20 @@ import { useCosts } from "@/lib/hooks/useApi";
 import { formatEUR, CHART_COLORS } from "@/lib/utils";
 import { Loading, ErrorState, PageHeader, Section, StatCard } from "@/components/ds";
 
+interface CostItem { name: string; amount: number; type: string; category?: string }
+interface AnnualFees { tr_trading: number; tr_pfof_spread_est: number; ibkr_commissions_est: number; etf_ter_annual: number; margin_interest_annual: number; [k: string]: number }
+interface CostsData { monthly_total: number; breakdown: CostItem[]; annual_fees: AnnualFees }
+
 export default function CostsPage() {
-  const { data: costs, isLoading, error } = useCosts();
+  const { data: rawCosts, isLoading, error } = useCosts();
 
   if (isLoading) return <Loading />;
   if (error) return <ErrorState />;
-  if (!costs) return null;
+  if (!rawCosts) return null;
 
-  const annualTotal =
-    costs.annual_fees.tr_trading +
-    costs.annual_fees.ibkr_commissions_est +
-    costs.annual_fees.margin_interest_annual;
+  const costs = rawCosts as unknown as CostsData;
+
+  const annualTotal = Object.values(costs.annual_fees).reduce((s, v) => s + (typeof v === "number" ? v : 0), 0);
 
   return (
     <div className="space-y-6">
@@ -31,7 +34,7 @@ export default function CostsPage() {
         }
       >
         <div className="space-y-3">
-          {costs.breakdown.map((item, i) => {
+          {costs.breakdown.map((item: CostItem, i: number) => {
             const pct = costs.monthly_total > 0 ? (item.amount / costs.monthly_total * 100) : 0;
             const color = item.type === "margin" ? "var(--orange)" : CHART_COLORS[i % CHART_COLORS.length];
             return (
@@ -43,7 +46,7 @@ export default function CostsPage() {
                     <span className={`text-caption font-medium px-1.5 py-0.5 rounded ${
                       item.type === "margin" ? "bg-warn-bg text-warn" : "bg-accent-bg text-accent"
                     }`}>
-                      {item.type}
+                      {item.category || item.type}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
@@ -70,25 +73,22 @@ export default function CostsPage() {
           </>
         }
       >
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <StatCard
-            label="Trading Trade Republic"
-            value={costs.annual_fees.tr_trading}
-            detail={`${costs.annual_fees.tr_trading.toFixed(0)} trades × 1€`}
-            color={CHART_COLORS[0]}
-          />
-          <StatCard
-            label="Commissions IBKR"
-            value={costs.annual_fees.ibkr_commissions_est}
-            detail="Estimé (tiered $1/trade)"
-            color={CHART_COLORS[3]}
-          />
-          <StatCard
-            label="Intérêts Marge IBKR"
-            value={costs.annual_fees.margin_interest_annual}
-            detail="~5.83% sur solde débiteur"
-            color="var(--orange)"
-          />
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          {costs.annual_fees.tr_trading > 0 && (
+            <StatCard label="Trading TR (1€/trade)" value={costs.annual_fees.tr_trading} color={CHART_COLORS[0]} />
+          )}
+          {costs.annual_fees.tr_pfof_spread_est > 0 && (
+            <StatCard label="Spread PFOF TR" value={costs.annual_fees.tr_pfof_spread_est} detail="~0.2% du capital TR" color={CHART_COLORS[1]} />
+          )}
+          {costs.annual_fees.ibkr_commissions_est > 0 && (
+            <StatCard label="Commissions IBKR" value={costs.annual_fees.ibkr_commissions_est} detail="Tiered ~$2/trade" color={CHART_COLORS[3]} />
+          )}
+          {costs.annual_fees.etf_ter_annual > 0 && (
+            <StatCard label="TER ETF" value={costs.annual_fees.etf_ter_annual} detail="Frais de gestion annuels" color={CHART_COLORS[4]} />
+          )}
+          {costs.annual_fees.margin_interest_annual > 0 && (
+            <StatCard label="Intérêts Marge IBKR" value={costs.annual_fees.margin_interest_annual} detail="~5.83% sur solde débiteur" color="var(--orange)" />
+          )}
         </div>
       </Section>
 

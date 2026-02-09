@@ -92,7 +92,15 @@ export const api = {
 
   // ─── Costs ───
   getCosts: () =>
-    fetchApi<import("./types/api").CostsBreakdown>("/api/v1/costs"),
+    fetchApi<Record<string, unknown>>("/api/v1/costs"),
+
+  // ─── Insights ───
+  getInsightsRules: () =>
+    fetchApi<Record<string, unknown>[]>("/api/v1/insights/rules"),
+  getBudgetProjections: () =>
+    fetchApi<Record<string, unknown>>("/api/v1/budget/projections"),
+  getLoansAnalysis: () =>
+    fetchApi<Record<string, unknown>>("/api/v1/loans/analysis"),
 
   // ─── Patrimoine ───
   getPatrimoine: () =>

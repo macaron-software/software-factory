@@ -149,6 +149,29 @@ export function useCosts() {
   });
 }
 
+// ─── Insights ───
+
+export function useInsightsRules() {
+  return useQuery({
+    queryKey: ["insights", "rules"],
+    queryFn: api.getInsightsRules,
+  });
+}
+
+export function useBudgetProjections() {
+  return useQuery({
+    queryKey: ["budget", "projections"],
+    queryFn: api.getBudgetProjections,
+  });
+}
+
+export function useLoansAnalysis() {
+  return useQuery({
+    queryKey: ["loans", "analysis"],
+    queryFn: api.getLoansAnalysis,
+  });
+}
+
 // ─── Alerts ───
 
 export function useAlerts() {

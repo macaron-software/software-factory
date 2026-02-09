@@ -72,6 +72,28 @@ export interface SCA {
   };
   co_associate: { name: string; parts: number; ownership_pct: number };
   your_share_property_value: number;
+  market?: {
+    commune: string;
+    code_postal: string;
+    date_source: string;
+    prix_m2_achat: {
+      appartement: { low: number; median: number; high: number };
+      maison: { low: number; median: number; high: number };
+      neuf_maison: { low: number; median: number; high: number };
+      source: string;
+    };
+    loyer_m2: { median: number; low: number; high: number; source: string };
+    cout_construction_m2: {
+      economique: { low: number; high: number };
+      standard: { low: number; high: number };
+      contemporain: { low: number; high: number };
+      source: string;
+    };
+    estimation_revente: { low: number; median: number; high: number; bourso: number };
+    estimation_loyer_mensuel: { low: number; median: number; high: number };
+    cout_reconstruction: { economique: number; standard: number; contemporain: number };
+    rendement_locatif_brut_pct: number;
+  };
 }
 
 export interface CostsBreakdown {

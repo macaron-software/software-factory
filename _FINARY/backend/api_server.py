@@ -14,6 +14,12 @@ from pathlib import Path
 from datetime import date, timedelta
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from backend.insights_engine import (
+    compute_diversification, analyze_loans, compute_fees,
+    generate_insights, compute_projections,
+    load_transactions, aggregate_monthly_budget, categorize_transaction,
+    INFLATION_RATE,
+)
 
 app = FastAPI(title="Finary Clone API", version="1.0.0")
 
@@ -607,34 +613,7 @@ def get_dividends():
 @app.get("/api/v1/analytics/diversification")
 def get_diversification():
     positions = build_positions()
-    sectors = set()
-    countries = set()
-    max_w = 0
-    max_t = ""
-    for p in positions:
-        sectors.add(p.get("sector", "Other"))
-        countries.add(p.get("country", "??"))
-        if p["weight_pct"] > max_w:
-            max_w = p["weight_pct"]
-            max_t = p["ticker"]
-
-    # Score: max 100
-    n_pos = len(positions)
-    n_sec = len(sectors)
-    n_cou = len(countries)
-    score = min(100, n_pos * 2 + n_sec * 5 + n_cou * 5 + max(0, 30 - max_w))
-
-    return {
-        "score": round(score),
-        "max_score": 100,
-        "details": {
-            "num_positions": n_pos,
-            "num_sectors": n_sec,
-            "num_countries": n_cou,
-            "max_weight_pct": round(max_w, 1),
-            "max_weight_ticker": max_t,
-        },
-    }
+    return compute_diversification(positions)
 
 
 @app.get("/api/v1/transactions")
@@ -649,6 +628,11 @@ def get_account_transactions(account_id: str, limit: int = Query(50)):
 
 @app.get("/api/v1/budget/monthly")
 def get_monthly_budget(limit: int = Query(12)):
+    # Try real transaction data first
+    txs = load_transactions(months=limit)
+    if txs:
+        return aggregate_monthly_budget(txs)[-limit:]
+    # Fallback: basic fixed-cost budget
     monthly_costs = P["totals"]["monthly_loan_payments"] + P["totals"].get("monthly_margin_cost", 0)
     months = []
     today = date.today()
@@ -712,10 +696,10 @@ def get_patrimoine():
 
 @app.get("/api/v1/loans")
 def get_loans():
-    """All loans across institutions."""
-    loans = []
+    """All loans with inflation analysis & recommendations."""
+    raw_loans = []
     for credit in P["credit_agricole"]["credits"]:
-        loans.append({
+        raw_loans.append({
             "institution": "Crédit Agricole",
             "name": credit["name"],
             "type": credit.get("type", "unknown"),
@@ -727,7 +711,7 @@ def get_loans():
             "status": credit.get("status"),
         })
     for loan in P["boursobank"]["loans"]:
-        loans.append({
+        raw_loans.append({
             "institution": "Boursobank",
             "name": loan["name"],
             "type": loan.get("type", "consumer"),
@@ -741,7 +725,7 @@ def get_loans():
     margin_eur = abs(P["ibkr"]["cash"]["total_eur"]) if margin_usd else 0
     margin_rate = P["ibkr"].get("margin_interest_rate", "5.83%")
     margin_monthly = P["totals"].get("monthly_margin_cost", 0)
-    loans.append({
+    raw_loans.append({
         "institution": "Interactive Brokers",
         "name": "Prêt sur marge",
         "type": "margin",
@@ -750,32 +734,101 @@ def get_loans():
         "monthly_payment": round(margin_monthly, 2),
         "rate": str(margin_rate),
     })
-    return loans
+    return analyze_loans(raw_loans)
 
 
 @app.get("/api/v1/sca")
 def get_sca():
-    """SCA La Désirade data."""
-    return P["sca_la_desirade"]
+    """SCA La Désirade data with Grabels market context."""
+    sca = P["sca_la_desirade"]
+    surface = sca["property"]["surface_m2"]
+    terrain_m2 = 500  # approximate from SCA purchase data
+    # Grabels (34790) market data — 2025 sources
+    sca["market"] = {
+        "commune": "Grabels",
+        "code_postal": "34790",
+        "date_source": "2025-Q1",
+        "prix_m2_achat": {
+            "appartement": {"low": 2610, "median": 3121, "high": 4129},
+            "maison": {"low": 2550, "median": 3530, "high": 4630},
+            "neuf_maison": {"low": 3690, "median": 4100, "high": 4690},
+            "source": "MeilleursAgents / Le Figaro / PAP",
+        },
+        "loyer_m2": {
+            "median": 13.5,
+            "low": 11.8,
+            "high": 15.2,
+            "source": "Carte des loyers (ecologie.gouv.fr) + SeLoger",
+        },
+        "cout_construction_m2": {
+            "economique": {"low": 1400, "high": 1600},
+            "standard": {"low": 1800, "high": 2200},
+            "contemporain": {"low": 2200, "high": 2800},
+            "source": "Constructeurs Hérault / Cobea / Villasgaia 2025",
+        },
+        # Computed analyses
+        "estimation_revente": {
+            "low": round(surface * 2550),
+            "median": round(surface * 3530),
+            "high": round(surface * 4630),
+            "bourso": sca["property"]["bourso_estimate"],
+        },
+        "estimation_loyer_mensuel": {
+            "low": round(surface * 11.8),
+            "median": round(surface * 13.5),
+            "high": round(surface * 15.2),
+        },
+        "cout_reconstruction": {
+            "economique": round(surface * 1500),
+            "standard": round(surface * 2000),
+            "contemporain": round(surface * 2500),
+        },
+        "rendement_locatif_brut_pct": round(
+            (surface * 13.5 * 12) / sca["property"]["bourso_estimate"] * 100, 2
+        ),
+    }
+    return sca
 
 
 @app.get("/api/v1/costs")
 def get_costs():
-    """Monthly recurring costs breakdown."""
-    margin_monthly = P["totals"].get("monthly_margin_cost", 0)
-    margin_eur = abs(P["ibkr"]["cash"]["total_eur"])
-    monthly_total = P["totals"]["monthly_loan_payments"] + margin_monthly
+    """Monthly recurring costs + annual fee analysis."""
+    positions = build_positions()
+    P["_eur_usd"] = get_eur_usd()
+    return compute_fees(P, positions)
+
+
+@app.get("/api/v1/insights/rules")
+def get_insights_rules():
+    """Rules-based financial insights with severity."""
+    positions = build_positions()
+    P["_eur_usd"] = get_eur_usd()
+    diversification = compute_diversification(positions)
+    fees = compute_fees(P, positions)
+    loans = get_loans()
+    return generate_insights(P, positions, diversification, fees, loans)
+
+
+@app.get("/api/v1/budget/projections")
+def get_budget_projections():
+    """M+1/+2/+3 and Y+1 projections."""
+    txs = load_transactions(months=12)
+    monthly = aggregate_monthly_budget(txs) if txs else []
+    return compute_projections(monthly, P)
+
+
+@app.get("/api/v1/loans/analysis")
+def get_loans_analysis():
+    """Detailed loan analysis with inflation comparison."""
+    loans = get_loans()
     return {
-        "monthly_total": round(monthly_total, 2),
-        "breakdown": [
-            {"name": "PAS 2 (immo)", "amount": 90.32, "type": "credit"},
-            {"name": "PACP (conso)", "amount": 73.69, "type": "credit"},
-            {"name": "Marge IBKR (~5.83%)", "amount": round(margin_monthly, 2), "type": "margin"},
-        ],
-        "annual_fees": {
-            "tr_trading": round(len(P["trade_republic"]["positions"]) * 1.0, 2),
-            "ibkr_commissions_est": 12.0,
-            "margin_interest_annual": round(margin_eur * 0.0583, 2),
+        "loans": loans,
+        "inflation_rate": INFLATION_RATE * 100,
+        "summary": {
+            "total_debt": sum(l.get("remaining", 0) for l in loans),
+            "total_monthly": sum(l.get("monthly_payment", 0) or 0 for l in loans),
+            "shields": len([l for l in loans if l.get("vs_inflation") == "bouclier_inflation"]),
+            "costly": len([l for l in loans if l.get("vs_inflation") == "rembourser"]),
         },
     }
 
