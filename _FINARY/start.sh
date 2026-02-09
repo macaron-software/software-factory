@@ -71,13 +71,13 @@ echo $WEB_PID > "$PID_DIR/web.pid"
 cd "$DIR"
 
 # 4. Start keep-alive (if browser is running)
-if curl -s http://127.0.0.1:9222/json > /dev/null 2>&1; then
-    log "Starting keep-alive (browser detected on :9222)..."
+if curl -s http://127.0.0.1:18800/json > /dev/null 2>&1; then
+    log "Starting keep-alive (browser detected on :18800)..."
     python3 "$DIR/scrapers/session_keepalive.py" > /tmp/finary-keepalive.log 2>&1 &
     KA_PID=$!
     echo $KA_PID > "$PID_DIR/keepalive.pid"
 else
-    warn "No browser on :9222, skipping keep-alive"
+    warn "No browser on :18800, skipping keep-alive"
 fi
 
 # 5. Wait for API to be ready

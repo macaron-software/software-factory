@@ -159,7 +159,7 @@ async def main():
     from playwright.async_api import async_playwright
 
     pw = await async_playwright().start()
-    browser = await pw.chromium.connect_over_cdp("http://localhost:9222")
+    browser = await pw.chromium.connect_over_cdp("http://localhost:18800")
     ctx = browser.contexts[0]
 
     results = {}

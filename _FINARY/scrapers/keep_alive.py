@@ -6,7 +6,7 @@ import json
 import time
 import urllib.request
 
-CDP_URL = "http://127.0.0.1:9222"
+CDP_URL = "http://127.0.0.1:18800"
 INTERVAL = 4 * 60  # 4 minutes
 BANK_DOMAINS = [
     "credit-agricole",

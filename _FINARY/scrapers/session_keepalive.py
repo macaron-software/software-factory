@@ -20,7 +20,7 @@ import signal
 import urllib.request
 from datetime import datetime
 
-CDP_URL = "http://localhost:9222"
+CDP_URL = "http://localhost:18800"
 INTERVAL = 120  # seconds between pings
 LOG_FILE = "/tmp/session-keepalive.log"
 PID_FILE = "/tmp/session-keepalive.pid"

@@ -536,7 +536,7 @@ async def main():
         headless=False,
         viewport={"width": 1400, "height": 900},
         locale="fr-FR",
-        args=["--remote-debugging-port=9222"],
+        args=["--remote-debugging-port=18800"],
     )
 
     print(f"🔍 Deep scraper — target: {target}")

@@ -2,7 +2,7 @@
 """daily_sync.py — Connects to existing CDP browser and scrapes all 4 banks.
 
 This script is designed to be run by launchd daily at 08:00.
-It connects to Chrome on port 9222 (must already be running with bank sessions).
+It connects to Chrome on port 18800 (must already be running with bank sessions).
 After scraping, it rebuilds patrimoine_complet.
 
 Usage:
@@ -28,19 +28,19 @@ async def sync_all():
     # Check browser is accessible
     try:
         async with httpx.AsyncClient() as client:
-            r = await client.get("http://127.0.0.1:9222/json", timeout=5)
+            r = await client.get("http://127.0.0.1:18800/json", timeout=5)
             tabs = r.json()
             print(f"📡 Connected to Chrome — {len(tabs)} tabs found")
     except Exception as e:
-        print(f"❌ Cannot connect to Chrome on :9222 — {e}")
-        print("   Start Chrome with: open -a 'Google Chrome' --args --remote-debugging-port=9222")
+        print(f"❌ Cannot connect to Chrome on :18800 — {e}")
+        print("   Start Chrome with: open -a 'Google Chrome' --args --remote-debugging-port=18800")
         return False
 
     # Use playwright to connect to CDP
     from playwright.async_api import async_playwright
 
     async with async_playwright() as pw:
-        browser = await pw.chromium.connect_over_cdp("http://127.0.0.1:9222")
+        browser = await pw.chromium.connect_over_cdp("http://127.0.0.1:18800")
         context = browser.contexts[0] if browser.contexts else None
         if not context:
             print("❌ No browser context found")

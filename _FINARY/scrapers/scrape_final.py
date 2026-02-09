@@ -10,7 +10,7 @@ import os
 from datetime import datetime
 from playwright.async_api import async_playwright
 
-CDP_URL = "http://localhost:9222"
+CDP_URL = "http://localhost:18800"
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 TODAY = datetime.now().strftime("%Y-%m-%d")
 
