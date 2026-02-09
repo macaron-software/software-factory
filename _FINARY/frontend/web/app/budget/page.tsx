@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useMonthlyBudget, useCategorySpending } from "@/lib/hooks/useApi";
 import { formatEUR, CATEGORY_LABELS, CHART_COLORS } from "@/lib/utils";
 import { BudgetChart } from "@/components/charts/BudgetChart";
+import { PageHeader, Badge, Section, StatCard } from "@/components/ds";
 import {
   generateMonthlyBudget,
   generateCategorySpending,
@@ -23,7 +24,6 @@ export default function BudgetPage() {
     return generateCategorySpending();
   }, [apiCategories]);
 
-  // Compute totals for current month
   const lastMonth = monthly[monthly.length - 1];
   const savingsRate = lastMonth
     ? ((lastMonth.income - lastMonth.expenses) / lastMonth.income) * 100
@@ -31,77 +31,37 @@ export default function BudgetPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <p className="text-[11px] font-medium tracking-[0.04em] uppercase mb-2" style={{ color: "var(--text-5)" }}>
-          Budget
-        </p>
-        {lastMonth && (
-          <div className="flex items-center gap-6">
-            <div>
-              <p className="tnum text-[32px] font-extralight tracking-tight leading-none" style={{ color: "var(--text-1)" }}>
-                {formatEUR(lastMonth.income - lastMonth.expenses)}
-              </p>
-              <p className="text-[11px] mt-1" style={{ color: "var(--text-5)" }}>
-                epargne ce mois
-              </p>
+      <PageHeader
+        label="Budget"
+        value={lastMonth ? lastMonth.income - lastMonth.expenses : 0}
+        right={
+          lastMonth ? (
+            <div className="flex flex-col items-end gap-1">
+              <Badge variant={savingsRate >= 0 ? "gain" : "loss"}>
+                {savingsRate.toFixed(0)}% du revenu
+              </Badge>
+              <span className="text-label text-t-5">épargne ce mois</span>
             </div>
-            <span
-              className="tnum text-[12px] font-medium px-2.5 py-1 rounded"
-              style={{
-                background: savingsRate >= 0 ? "var(--green-bg)" : "var(--red-bg)",
-                color: savingsRate >= 0 ? "var(--green)" : "var(--red)",
-              }}
-            >
-              {savingsRate.toFixed(0)}% du revenu
-            </span>
-          </div>
-        )}
-      </div>
+          ) : undefined
+        }
+      />
 
-      {/* Revenue vs Expenses chart */}
-      <div className="card p-6">
-        <h3 className="text-[11px] font-medium tracking-[0.04em] uppercase mb-5" style={{ color: "var(--text-5)" }}>
-          Revenus vs Depenses
-        </h3>
+      <Section title="Revenus vs Dépenses">
         <BudgetChart data={monthly} />
-      </div>
+      </Section>
 
-      {/* KPI cards */}
       {lastMonth && (
         <div className="grid grid-cols-3 gap-3">
+          <StatCard label="Revenus" value={lastMonth.income} tone="positive" />
+          <StatCard label="Dépenses" value={lastMonth.expenses} tone="negative" />
           <div className="card px-5 py-4">
-            <p className="text-[10px] font-medium tracking-[0.06em] uppercase" style={{ color: "var(--text-6)" }}>
-              Revenus
-            </p>
-            <p className="tnum text-lg font-semibold mt-1.5" style={{ color: "var(--green)" }}>
-              {formatEUR(lastMonth.income)}
-            </p>
-          </div>
-          <div className="card px-5 py-4">
-            <p className="text-[10px] font-medium tracking-[0.06em] uppercase" style={{ color: "var(--text-6)" }}>
-              Depenses
-            </p>
-            <p className="tnum text-lg font-semibold mt-1.5" style={{ color: "var(--red)" }}>
-              {formatEUR(lastMonth.expenses)}
-            </p>
-          </div>
-          <div className="card px-5 py-4">
-            <p className="text-[10px] font-medium tracking-[0.06em] uppercase" style={{ color: "var(--text-6)" }}>
-              Taux d&apos;epargne
-            </p>
-            <p className="tnum text-lg font-semibold mt-1.5" style={{ color: "var(--text-1)" }}>
-              {savingsRate.toFixed(1)}%
-            </p>
+            <p className="text-caption font-medium uppercase text-t-6">Taux d&apos;épargne</p>
+            <p className="tnum text-lg font-semibold mt-1.5 text-t-1">{savingsRate.toFixed(1)}%</p>
           </div>
         </div>
       )}
 
-      {/* Top categories */}
-      <div className="card p-6">
-        <h3 className="text-[11px] font-medium tracking-[0.04em] uppercase mb-5" style={{ color: "var(--text-5)" }}>
-          Top categories (3 mois)
-        </h3>
+      <Section title="Top catégories (3 mois)">
         <div className="space-y-3">
           {categories.map((c, i) => {
             const maxTotal = categories[0]?.total ?? 1;
@@ -109,9 +69,7 @@ export default function BudgetPage() {
             return (
               <div
                 key={c.category}
-                className="flex items-center gap-4 py-2 px-2 -mx-2 rounded-lg transition-colors cursor-default"
-                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                className="flex items-center gap-4 py-2 px-2 -mx-2 rounded-lg transition-colors cursor-default hover:bg-bg-hover"
               >
                 <div
                   className="w-2.5 h-2.5 rounded-sm shrink-0"
@@ -119,16 +77,12 @@ export default function BudgetPage() {
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[13px]" style={{ color: "var(--text-2)" }}>
+                    <span className="text-body text-t-2">
                       {CATEGORY_LABELS[c.category] || c.category}
                     </span>
                     <div className="flex items-center gap-3">
-                      <span className="tnum text-[13px] font-medium" style={{ color: "var(--text-1)" }}>
-                        {formatEUR(c.total)}
-                      </span>
-                      <span className="tnum text-[11px] w-[32px] text-right" style={{ color: "var(--text-5)" }}>
-                        {c.count}x
-                      </span>
+                      <span className="tnum text-body font-medium text-t-1">{formatEUR(c.total)}</span>
+                      <span className="tnum text-label w-[32px] text-right text-t-5">{c.count}x</span>
                     </div>
                   </div>
                   <div className="bar-track">
@@ -146,7 +100,7 @@ export default function BudgetPage() {
             );
           })}
         </div>
-      </div>
+      </Section>
     </div>
   );
 }

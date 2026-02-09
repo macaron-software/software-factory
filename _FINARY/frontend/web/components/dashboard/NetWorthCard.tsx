@@ -12,22 +12,15 @@ interface Props {
 export function NetWorthCard({ label, value, variation, negative }: Props) {
   return (
     <div className="card px-5 py-4">
-      <p className="text-[11px] font-medium tracking-[0.04em] uppercase" style={{ color: "var(--text-5)" }}>
-        {label}
-      </p>
-      <p
-        className="tnum text-xl font-semibold mt-2"
-        style={{ color: negative ? "var(--red)" : "var(--text-1)" }}
-      >
+      <p className="text-label font-medium uppercase text-t-5">{label}</p>
+      <p className={`tnum text-xl font-semibold mt-2 ${negative ? "text-loss" : "text-t-1"}`}>
         {formatEUR(value)}
       </p>
       {variation !== undefined && variation !== null && (
         <span
-          className="tnum inline-block text-[11px] font-medium mt-2 px-2 py-0.5 rounded"
-          style={{
-            background: variation >= 0 ? "var(--green-bg)" : "var(--red-bg)",
-            color: variation >= 0 ? "var(--green)" : "var(--red)",
-          }}
+          className={`tnum inline-block text-label font-medium mt-2 px-2 py-0.5 rounded ${
+            variation >= 0 ? "bg-gain-bg text-gain" : "bg-loss-bg text-loss"
+          }`}
         >
           {variation >= 0 ? "+" : ""}{variation.toFixed(2)}%
         </span>

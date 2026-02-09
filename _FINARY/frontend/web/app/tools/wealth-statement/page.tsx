@@ -2,11 +2,11 @@
 
 import { useNetWorth, usePortfolio, useAccounts } from "@/lib/hooks/useApi";
 import { formatEUR } from "@/lib/utils";
+import { Loading } from "@/components/ds";
 
 interface StatementRow {
   label: string;
   value: number;
-  indent?: boolean;
 }
 
 export default function WealthStatementPage() {
@@ -14,7 +14,7 @@ export default function WealthStatementPage() {
   const { data: positions } = usePortfolio();
   const { data: accounts } = useAccounts();
 
-  if (nwLoading) return <div className="flex items-center justify-center h-64"><div className="spinner" /></div>;
+  if (nwLoading) return <Loading />;
   if (!networth) return null;
 
   const investmentTotal = positions?.reduce((s, p) => s + p.value_eur, 0) ?? 0;
@@ -28,7 +28,7 @@ export default function WealthStatementPage() {
     { label: "Livrets", value: savingsTotal },
     { label: "PEA", value: peaTotal },
     { label: "CTO", value: ctoTotal },
-    { label: "Investissements (valeur marche)", value: investmentTotal },
+    { label: "Investissements (valeur marché)", value: investmentTotal },
     { label: "Immobilier", value: networth.breakdown.real_estate ?? 0 },
   ];
 
@@ -42,61 +42,59 @@ export default function WealthStatementPage() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <p className="text-[11px] font-medium tracking-[0.04em] uppercase mb-2" style={{ color: "var(--text-5)" }}>
-          Declaration de patrimoine
+        <p className="text-label font-medium uppercase mb-2 text-t-5">
+          Déclaration de patrimoine
         </p>
-        <p className="text-[22px] font-light" style={{ color: "var(--text-1)" }}>
-          Etat au {new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+        <p className="text-[22px] font-light text-t-1">
+          État au {new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
         </p>
       </div>
 
       {/* Assets */}
       <div className="card overflow-hidden">
-        <div className="px-5 py-3" style={{ borderBottom: "1px solid var(--border-1)" }}>
-          <p className="text-[13px] font-semibold" style={{ color: "var(--text-1)" }}>Actifs</p>
+        <div className="px-5 py-3 border-b border-bd-1">
+          <p className="text-body font-semibold text-t-1">Actifs</p>
         </div>
         {assets.map((row, i) => (
           <div
             key={row.label}
-            className="flex items-center justify-between px-5 py-3"
-            style={{ borderBottom: i < assets.length - 1 ? "1px solid var(--border-1)" : "none" }}
+            className={`flex items-center justify-between px-5 py-3 ${i < assets.length - 1 ? "border-b border-bd-1" : ""}`}
           >
-            <span className="text-[13px]" style={{ color: "var(--text-3)" }}>{row.label}</span>
-            <span className="tnum text-[13px] font-medium" style={{ color: "var(--text-1)" }}>{formatEUR(row.value)}</span>
+            <span className="text-body text-t-3">{row.label}</span>
+            <span className="tnum text-body font-medium text-t-1">{formatEUR(row.value)}</span>
           </div>
         ))}
-        <div className="flex items-center justify-between px-5 py-3" style={{ background: "var(--bg-hover)", borderTop: "1px solid var(--border-1)" }}>
-          <span className="text-[13px] font-semibold" style={{ color: "var(--text-1)" }}>Total actifs</span>
-          <span className="tnum text-[15px] font-semibold" style={{ color: "var(--text-1)" }}>{formatEUR(totalAssets)}</span>
+        <div className="flex items-center justify-between px-5 py-3 bg-bg-hover border-t border-bd-1">
+          <span className="text-body font-semibold text-t-1">Total actifs</span>
+          <span className="tnum text-title font-semibold text-t-1">{formatEUR(totalAssets)}</span>
         </div>
       </div>
 
       {/* Liabilities */}
       <div className="card overflow-hidden">
-        <div className="px-5 py-3" style={{ borderBottom: "1px solid var(--border-1)" }}>
-          <p className="text-[13px] font-semibold" style={{ color: "var(--text-1)" }}>Passifs</p>
+        <div className="px-5 py-3 border-b border-bd-1">
+          <p className="text-body font-semibold text-t-1">Passifs</p>
         </div>
         {liabilities.map((row, i) => (
           <div
             key={row.label}
-            className="flex items-center justify-between px-5 py-3"
-            style={{ borderBottom: i < liabilities.length - 1 ? "1px solid var(--border-1)" : "none" }}
+            className={`flex items-center justify-between px-5 py-3 ${i < liabilities.length - 1 ? "border-b border-bd-1" : ""}`}
           >
-            <span className="text-[13px]" style={{ color: "var(--text-3)" }}>{row.label}</span>
-            <span className="tnum text-[13px] font-medium" style={{ color: "var(--red)" }}>{formatEUR(row.value)}</span>
+            <span className="text-body text-t-3">{row.label}</span>
+            <span className="tnum text-body font-medium text-loss">{formatEUR(row.value)}</span>
           </div>
         ))}
-        <div className="flex items-center justify-between px-5 py-3" style={{ background: "var(--bg-hover)", borderTop: "1px solid var(--border-1)" }}>
-          <span className="text-[13px] font-semibold" style={{ color: "var(--text-1)" }}>Total passifs</span>
-          <span className="tnum text-[15px] font-semibold" style={{ color: "var(--red)" }}>{formatEUR(totalLiabilities)}</span>
+        <div className="flex items-center justify-between px-5 py-3 bg-bg-hover border-t border-bd-1">
+          <span className="text-body font-semibold text-t-1">Total passifs</span>
+          <span className="tnum text-title font-semibold text-loss">{formatEUR(totalLiabilities)}</span>
         </div>
       </div>
 
       {/* Net worth */}
       <div className="card p-5">
         <div className="flex items-center justify-between">
-          <span className="text-[15px] font-semibold" style={{ color: "var(--text-1)" }}>Patrimoine net</span>
-          <span className="tnum text-[22px] font-extralight" style={{ color: "var(--accent)" }}>
+          <span className="text-title font-semibold text-t-1">Patrimoine net</span>
+          <span className="tnum text-[22px] font-extralight text-accent">
             {formatEUR(totalAssets - totalLiabilities)}
           </span>
         </div>

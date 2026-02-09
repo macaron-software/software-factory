@@ -84,16 +84,11 @@ export function Sidebar() {
   const liveLabel = status?.live_prices ? `${status.live_prices} prix live` : null;
 
   return (
-    <aside
-      className="w-[220px] shrink-0 flex flex-col"
-      style={{ background: "var(--bg-1)", borderRight: "1px solid var(--border-1)" }}
-    >
+    <aside className="w-[220px] shrink-0 flex flex-col bg-bg-1 border-r border-bd-1">
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-5 h-14">
         <FinaryLogo />
-        <span className="text-[15px] font-semibold" style={{ color: "var(--text-1)" }}>
-          finary
-        </span>
+        <span className="text-title font-semibold text-t-1">finary</span>
       </div>
 
       {/* Nav sections */}
@@ -101,10 +96,7 @@ export function Sidebar() {
         {SECTIONS.map((section, si) => (
           <div key={si}>
             {section.title && (
-              <p
-                className="text-[10px] font-medium tracking-[0.06em] uppercase px-3 mb-1"
-                style={{ color: "var(--text-6)" }}
-              >
+              <p className="text-caption font-medium uppercase px-3 mb-1 text-t-6">
                 {section.title}
               </p>
             )}
@@ -115,11 +107,9 @@ export function Sidebar() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className="flex items-center h-9 px-3 rounded-lg text-[13px] font-medium transition-colors"
-                    style={{
-                      color: isActive ? "var(--text-1)" : "var(--text-5)",
-                      background: isActive ? "var(--bg-3)" : "transparent",
-                    }}
+                    className={`flex items-center h-9 px-3 rounded-lg text-body font-medium transition-colors ${
+                      isActive ? "text-t-1 bg-bg-3" : "text-t-5 hover:bg-bg-hover"
+                    }`}
                   >
                     {item.label}
                   </Link>
@@ -131,17 +121,13 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-5 py-4" style={{ borderTop: "1px solid var(--border-1)" }}>
-        <p className="text-[11px]" style={{ color: "var(--text-5)" }}>
-          Dernière sync
-        </p>
-        <p className="text-[11px] mt-0.5" style={{ color: status?.stale ? "#ef4444" : "var(--text-6)" }}>
+      <div className="px-5 py-4 border-t border-bd-1">
+        <p className="text-label text-t-5">Dernière sync</p>
+        <p className={`text-label mt-0.5 ${status?.stale ? "text-loss" : "text-t-6"}`}>
           {syncLabel}
         </p>
         {liveLabel && (
-          <p className="text-[11px] mt-0.5" style={{ color: "var(--accent-1)" }}>
-            {liveLabel}
-          </p>
+          <p className="text-label mt-0.5 text-accent">{liveLabel}</p>
         )}
       </div>
     </aside>

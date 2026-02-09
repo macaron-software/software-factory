@@ -1,3 +1,8 @@
+/** Merge class names, filtering out falsy values. */
+export function cn(...classes: (string | false | null | undefined)[]): string {
+  return classes.filter(Boolean).join(" ");
+}
+
 /** Format a number as EUR currency. */
 export function formatEUR(value: number): string {
   return new Intl.NumberFormat("fr-FR", {
