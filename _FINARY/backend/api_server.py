@@ -649,8 +649,7 @@ def get_account_transactions(account_id: str, limit: int = Query(50)):
 
 @app.get("/api/v1/budget/monthly")
 def get_monthly_budget(limit: int = Query(12)):
-    # Placeholder with monthly loan payments as expenses
-    monthly_costs = P["totals"]["total_monthly_costs"]
+    monthly_costs = P["totals"]["monthly_loan_payments"] + P["totals"].get("monthly_margin_cost", 0)
     months = []
     today = date.today()
     for i in range(limit - 1, -1, -1):
@@ -671,12 +670,13 @@ def get_monthly_budget(limit: int = Query(12)):
 @app.get("/api/v1/budget/categories")
 def get_category_spending(limit: int = Query(3)):
     ca_credits = P["credit_agricole"]["monthly_payments"]
-    margin = P["ibkr"]["margin_loan"]["monthly_cost_estimate_eur"]
-    bourso_loans = round((P["boursobank"]["loans"][0]["remaining"] + P["boursobank"]["loans"][1]["remaining"]) / 24, 2)
+    margin_monthly = P["totals"].get("monthly_margin_cost", 0)
+    bourso_loans = P.get("boursobank", {}).get("loans", [])
+    bourso_monthly = sum(l.get("monthly_payment", 0) or round(l["remaining"] / 24, 2) for l in bourso_loans)
     return [
         {"category": "credits_immobilier", "total": round(ca_credits * limit, 2), "count": 2},
-        {"category": "marge_ibkr", "total": round(margin * limit, 2), "count": limit},
-        {"category": "prets_perso", "total": round(bourso_loans * limit, 2), "count": 2},
+        {"category": "marge_ibkr", "total": round(margin_monthly * limit, 2), "count": limit},
+        {"category": "prets_perso", "total": round(bourso_monthly * limit, 2), "count": len(bourso_loans)},
     ]
 
 
@@ -737,15 +737,18 @@ def get_loans():
             "rate": None,
         })
     # IBKR margin
-    ml = P["ibkr"]["margin_loan"]
+    margin_usd = abs(P["ibkr"].get("margin_loan_usd", 0))
+    margin_eur = abs(P["ibkr"]["cash"]["total_eur"]) if margin_usd else 0
+    margin_rate = P["ibkr"].get("margin_interest_rate", "5.83%")
+    margin_monthly = P["totals"].get("monthly_margin_cost", 0)
     loans.append({
         "institution": "Interactive Brokers",
         "name": "Prêt sur marge",
         "type": "margin",
         "borrowed": None,
-        "remaining": ml["amount_eur"],
-        "monthly_payment": ml["monthly_cost_estimate_eur"],
-        "rate": ml["interest_rate_usd"],
+        "remaining": round(margin_eur, 2),
+        "monthly_payment": round(margin_monthly, 2),
+        "rate": str(margin_rate),
     })
     return loans
 
@@ -759,19 +762,20 @@ def get_sca():
 @app.get("/api/v1/costs")
 def get_costs():
     """Monthly recurring costs breakdown."""
-    ml = P["ibkr"]["margin_loan"]
-    ca = P["credit_agricole"]
+    margin_monthly = P["totals"].get("monthly_margin_cost", 0)
+    margin_eur = abs(P["ibkr"]["cash"]["total_eur"])
+    monthly_total = P["totals"]["monthly_loan_payments"] + margin_monthly
     return {
-        "monthly_total": P["totals"]["total_monthly_costs"],
+        "monthly_total": round(monthly_total, 2),
         "breakdown": [
             {"name": "PAS 2 (immo)", "amount": 90.32, "type": "credit"},
             {"name": "PACP (conso)", "amount": 73.69, "type": "credit"},
-            {"name": "Marge IBKR (~5.83%)", "amount": ml["monthly_cost_estimate_eur"], "type": "margin"},
+            {"name": "Marge IBKR (~5.83%)", "amount": round(margin_monthly, 2), "type": "margin"},
         ],
         "annual_fees": {
             "tr_trading": round(len(P["trade_republic"]["positions"]) * 1.0, 2),
             "ibkr_commissions_est": 12.0,
-            "margin_interest_annual": round(ml["amount_eur"] * 0.0583, 2),
+            "margin_interest_annual": round(margin_eur * 0.0583, 2),
         },
     }
 
