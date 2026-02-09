@@ -1,0 +1,243 @@
+{
+  "tr_positions": [
+    {
+      "name": "Amazon.com",
+      "isin": "US0231351067",
+      "shares": 0.404108,
+      "avg_price": 203.31,
+      "total_value": 71.62,
+      "performance_eur": 10.54,
+      "performance_pct": 12.82,
+      "portfolio_pct": 10.52,
+      "pe_ratio": 29.32,
+      "beta": 1.4
+    },
+    {
+      "name": "STMicroelectronics",
+      "isin": "NL0000226223",
+      "shares": 2.108535,
+      "avg_price": 23.24,
+      "total_value": 56.46,
+      "performance_eur": 7.46,
+      "performance_pct": 15.22,
+      "portfolio_pct": 8.29,
+      "pe_ratio": 29.37,
+      "beta": 1.28,
+      "market_cap": "22,60B",
+      "dividend_yield": 1.14
+    },
+    {
+      "name": "L'Oreal",
+      "isin": "FR0000120321",
+      "shares": 0.122492,
+      "avg_price": 342.88,
+      "total_value": 48.07,
+      "performance_eur": 6.07,
+      "performance_pct": 14.46,
+      "portfolio_pct": 7.06,
+      "pe_ratio": 34.51,
+      "beta": 0.95,
+      "market_cap": "210,3B"
+    },
+    {
+      "name": "BYD",
+      "isin": "CNE100000296",
+      "shares": 4.377616,
+      "avg_price": 13.7,
+      "total_value": 43.89,
+      "performance_eur": 16.1,
+      "performance_pct": 26.85,
+      "portfolio_pct": 6.45,
+      "pe_ratio": 19.18,
+      "beta": 0.94,
+      "market_cap": "96,54B",
+      "dividend_yield": 1.57
+    },
+    {
+      "name": "Moderna",
+      "isin": "US60770K1079",
+      "shares": 1.189668,
+      "avg_price": 35.3,
+      "total_value": 41.07,
+      "performance_eur": 0.93,
+      "performance_pct": 2.22,
+      "portfolio_pct": 6.03,
+      "beta": 1.34,
+      "market_cap": "13,58B"
+    },
+    {
+      "name": "Allianz"
+    },
+    {
+      "name": "Exxon Mobil"
+    },
+    {
+      "name": "LVMH Moët Hennessy",
+      "isin": "FR0000121014",
+      "shares": 0.062342,
+      "avg_price": 673.7,
+      "total_value": 33.32,
+      "performance_eur": 8.68,
+      "performance_pct": 20.66,
+      "portfolio_pct": 4.9,
+      "pe_ratio": 24.37,
+      "beta": 1.45,
+      "market_cap": "266,9B"
+    },
+    {
+      "name": "Realty Income",
+      "isin": "US7561091049",
+      "shares": 0.609714,
+      "avg_price": 52.48,
+      "total_value": 32.39,
+      "performance_eur": 0.39,
+      "performance_pct": 1.23,
+      "portfolio_pct": 4.76,
+      "pe_ratio": 59.06,
+      "beta": 0.79,
+      "market_cap": "49,32B",
+      "dividend_yield": 5.11
+    },
+    {
+      "name": "Intuitive Surgical",
+      "isin": "US46120E6023",
+      "shares": 0.076069,
+      "avg_price": 552.13,
+      "total_value": 31.21,
+      "performance_eur": 10.79,
+      "performance_pct": 25.7,
+      "portfolio_pct": 4.59,
+      "pe_ratio": 61.97,
+      "beta": 1.67,
+      "market_cap": "147,0B"
+    },
+    {
+      "name": "TotalEnergies",
+      "isin": "FR0000120271",
+      "shares": 0.497438,
+      "avg_price": 56.29,
+      "total_value": 30.98,
+      "performance_eur": 2.98,
+      "performance_pct": 10.63,
+      "portfolio_pct": 4.55,
+      "pe_ratio": 11.39,
+      "beta": 0.46,
+      "market_cap": "137,6B"
+    },
+    {
+      "name": "Johnson & Johnson"
+    },
+    {
+      "name": "Enphase Energy",
+      "isin": "US29355A1079",
+      "shares": 0.682999,
+      "avg_price": 61.49,
+      "total_value": 28.71,
+      "performance_eur": 13.29,
+      "performance_pct": 31.64,
+      "portfolio_pct": 4.22,
+      "pe_ratio": 38.8,
+      "beta": 1.33,
+      "market_cap": "5,526B"
+    },
+    {
+      "name": "Plug Power"
+    },
+    {
+      "name": "Sanofi"
+    },
+    {
+      "name": "S&P 500 Information Tech USD (Acc)"
+    },
+    {
+      "name": "MercadoLibre"
+    },
+    {
+      "name": "Soitec"
+    },
+    {
+      "name": "Canadian National Railway",
+      "isin": "CA1363751027",
+      "shares": 0.213692,
+      "avg_price": 98.27,
+      "total_value": 18.1,
+      "performance_eur": 2.9,
+      "performance_pct": 13.79,
+      "portfolio_pct": 2.66,
+      "pe_ratio": 18.3,
+      "beta": 0.86,
+      "market_cap": "52,56B",
+      "dividend_yield": 2.64
+    },
+    {
+      "name": "Sea (ADR)"
+    },
+    {
+      "name": "Rheinmetall"
+    },
+    {
+      "name": "Intuit",
+      "isin": "US4612021034",
+      "shares": 0.026071,
+      "avg_price": 574.97,
+      "total_value": 9.74,
+      "performance_eur": 5.25,
+      "performance_pct": 35.03,
+      "portfolio_pct": 1.43,
+      "pe_ratio": 30.4,
+      "beta": 1.25,
+      "market_cap": "104,7B",
+      "dividend_yield": 1.08
+    }
+  ],
+  "ibkr_positions": [
+    {
+      "symbol": "MSFT",
+      "isin": "US5949181045",
+      "quantity": 45.2854,
+      "last_price_usd": 404.5,
+      "avg_price_usd": 448.11,
+      "cost_basis_usd": 20293,
+      "market_value_usd": 18313.87,
+      "unrealized_pnl_usd": -1970.0,
+      "currency": "USD",
+      "dividend": 0.91,
+      "dividend_yield_pct": 0.9,
+      "ex_dividend_date": "Feb19'26"
+    },
+    {
+      "symbol": "GOOGL",
+      "isin": "US02079K3059",
+      "quantity": 105.3515,
+      "last_price_usd": 321.46,
+      "avg_price_usd": 191.84,
+      "cost_basis_usd": 20210,
+      "market_value_usd": 33861.03,
+      "unrealized_pnl_usd": 13650.0,
+      "currency": "USD"
+    },
+    {
+      "symbol": "NVDA",
+      "isin": "US67066G1040",
+      "quantity": 100.0222,
+      "last_price_usd": 183.73,
+      "avg_price_usd": 126.5,
+      "cost_basis_usd": 12653,
+      "market_value_usd": 18374.08,
+      "unrealized_pnl_usd": 5730.0,
+      "currency": "USD"
+    }
+  ],
+  "ibkr_extras": {
+    "net_liquidation_eur": 52593.11,
+    "buying_power_eur": 219695.92,
+    "unrealized_pnl_eur": 14640.0,
+    "total_cash_eur": -6805.23,
+    "cash_eur": -1206.98,
+    "cash_usd": -6649.83,
+    "maintenance_margin": 17856.67,
+    "excess_liquidity": 34745.75,
+    "margin_interest_rate": "5.83% USD / 4.83% EUR (IBKR Pro benchmark rates)",
+    "commissions": "min $1.00/trade (tiered), ~$0.005/share"
+  }
+}

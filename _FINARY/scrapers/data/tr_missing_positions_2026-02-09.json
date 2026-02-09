@@ -1,0 +1,123 @@
+[
+  {
+    "name": "Allianz",
+    "isin": "DE0008404005",
+    "shares": 0.090489,
+    "avg_price": 309.43,
+    "total_value": 34.77,
+    "performance_eur": 6.77,
+    "performance_pct": 24.2,
+    "portfolio_pct": 5.11,
+    "pe_ratio": 14.29,
+    "beta": 0.76,
+    "dividend_yield": 3.98
+  },
+  {
+    "name": "Exxon Mobil",
+    "isin": "US30231G1022",
+    "shares": 0.265045,
+    "avg_price": 105.64,
+    "total_value": 33.32,
+    "performance_eur": 5.32,
+    "performance_pct": 19.01,
+    "portfolio_pct": 4.9,
+    "pe_ratio": 22.26,
+    "beta": 0.35,
+    "dividend_yield": 2.76
+  },
+  {
+    "name": "Johnson & Johnson",
+    "isin": "US4781601046",
+    "shares": 0.145001,
+    "avg_price": 144.83,
+    "total_value": 29.24,
+    "performance_eur": 8.24,
+    "performance_pct": 39.24,
+    "portfolio_pct": 4.3,
+    "pe_ratio": 21.73,
+    "beta": 0.34,
+    "dividend_yield": 2.17
+  },
+  {
+    "name": "Plug Power",
+    "isin": "US72919P2020",
+    "shares": 13.524823,
+    "avg_price": 2.22,
+    "total_value": 23.76,
+    "performance_eur": 6.24,
+    "performance_pct": 20.79,
+    "portfolio_pct": 3.49,
+    "beta": 1.9
+  },
+  {
+    "name": "Sanofi",
+    "isin": "FR0000120578",
+    "shares": 0.280977,
+    "avg_price": 99.65,
+    "total_value": 22.6,
+    "performance_eur": 5.4,
+    "performance_pct": 19.3,
+    "portfolio_pct": 3.32,
+    "beta": 0.62
+  },
+  {
+    "name": "S&P 500 Information Tech USD (Acc)",
+    "isin": "IE00B3WJKG14",
+    "shares": 0.597015,
+    "avg_price": 32.23,
+    "total_value": 20.31,
+    "performance_eur": 1.07,
+    "performance_pct": 5.56,
+    "portfolio_pct": 2.99,
+    "pe_ratio": 41.02
+  },
+  {
+    "name": "MercadoLibre",
+    "isin": "US58733R1023",
+    "shares": 0.011593,
+    "avg_price": 1811.44,
+    "total_value": 19.3,
+    "performance_eur": 1.7,
+    "performance_pct": 8.12,
+    "portfolio_pct": 2.84,
+    "pe_ratio": 48.09,
+    "beta": 1.46
+  },
+  {
+    "name": "Soitec",
+    "isin": "FR0013227113",
+    "shares": 0.566902,
+    "avg_price": 74.09,
+    "total_value": 18.52,
+    "performance_eur": 23.48,
+    "performance_pct": 55.92,
+    "portfolio_pct": 2.72,
+    "pe_ratio": 121.18,
+    "beta": 1.17
+  },
+  {
+    "name": "Sea (ADR)",
+    "isin": "US81141R1005",
+    "shares": 0.186302,
+    "avg_price": 112.72,
+    "total_value": 16.92,
+    "performance_eur": 4.08,
+    "performance_pct": 19.45,
+    "portfolio_pct": 2.49,
+    "pe_ratio": 48.46,
+    "beta": 1.59
+  },
+  {
+    "name": "Rheinmetall",
+    "isin": "DE0007030009",
+    "shares": 0.009967,
+    "avg_price": 1805.96,
+    "total_value": 16.3,
+    "performance_eur": 1.7,
+    "performance_pct": 9.44,
+    "portfolio_pct": 2.4,
+    "pe_ratio": 87.98,
+    "beta": 0.36,
+    "dividend_yield": 0.51
+  }
+]
