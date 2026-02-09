@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """
-Session Keep-Alive Daemon — prevents bank sessions from expiring.
-
-Runs every 2 minutes, sends a lightweight JS ping on each bank tab
-via CDP websocket. Does NOT navigate, click, or change URLs.
+Session Keep-Alive Daemon — prevents bank sessions from expiring
+by doing a full Page.reload() every 90s on each bank tab.
 
 Usage:
     python3 scrapers/session_keepalive.py          # foreground
-    python3 scrapers/session_keepalive.py --daemon  # background (writes to /tmp/session-keepalive.log)
+    python3 scrapers/session_keepalive.py --daemon  # background
 
 Kill:
     kill $(cat /tmp/session-keepalive.pid)
@@ -21,82 +19,49 @@ import urllib.request
 from datetime import datetime
 
 CDP_URL = "http://localhost:18800"
-INTERVAL = 120  # seconds between pings
+INTERVAL = 90  # seconds between reloads
 LOG_FILE = "/tmp/session-keepalive.log"
 PID_FILE = "/tmp/session-keepalive.pid"
 
-# Lightweight JS that triggers cookie/session refresh without visible side effects
-KEEPALIVE_JS = {
-    "credit-agricole": "fetch(document.location.href, {method:'HEAD',credentials:'include'}).then(()=>'ok').catch(()=>'err')",
-    "bourso": "fetch(document.location.href, {method:'HEAD',credentials:'include'}).then(()=>'ok').catch(()=>'err')",
-    "interactive": "fetch(document.location.href,{method:'HEAD',credentials:'include'}).then(()=>'ok').catch(()=>'err')",
-    "traderepublic": "fetch(document.location.href, {method:'HEAD',credentials:'include'}).then(()=>'ok').catch(()=>'err')",
-}
+BANK_KEYS = ["credit-agricole", "bourso", "interactive", "traderepublic"]
 
 
 def log(msg: str):
     ts = datetime.now().strftime("%H:%M:%S")
-    line = f"[{ts}] {msg}"
-    print(line, flush=True)
+    print(f"[{ts}] {msg}", flush=True)
 
 
 def detect_bank(url: str) -> str | None:
-    for key in KEEPALIVE_JS:
+    for key in BANK_KEYS:
         if key in url:
             return key
     return None
 
 
-def is_logged_out(text: str) -> bool:
-    lower = text.lower()[:300]
-    return any(kw in lower for kw in [
-        "se connecter", "connexion", "mot de passe", "identifiant",
-        "sign in", "log in", "authentication",
-    ])
-
-
-async def ping_page(ws_url: str, bank: str, page_url: str) -> str:
-    """Send keepalive ping to a single page. Returns status string."""
+async def reload_tab(ws_url: str, bank: str) -> str:
+    """Full Page.reload on a tab. Returns status string."""
     import websockets
     try:
         async with websockets.connect(ws_url, open_timeout=5, close_timeout=3) as ws:
-            # 1. Check if still logged in (read-only)
             await ws.send(json.dumps({
-                "id": 1,
-                "method": "Runtime.evaluate",
-                "params": {"expression": "document.body?.innerText?.substring(0,300) || ''"}
-            }))
-            resp = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
-            text = resp.get("result", {}).get("result", {}).get("value", "")
-
-            if is_logged_out(text):
-                return "⚠ LOGGED OUT"
-
-            # 2. Send keepalive fetch (background, no navigation)
-            js = KEEPALIVE_JS.get(bank, "Promise.resolve('skip')")
-            await ws.send(json.dumps({
-                "id": 2,
-                "method": "Runtime.evaluate",
-                "params": {
-                    "expression": js,
-                    "awaitPromise": True,
-                    "returnByValue": True,
-                }
+                "id": 1, "method": "Page.reload",
+                "params": {"ignoreCache": False}
             }))
             resp = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
-            val = resp.get("result", {}).get("result", {}).get("value", "?")
-            return f"✅ ping={val}"
+            if "error" in resp:
+                return f"❌ {resp['error'].get('message', '?')}"
+            return "✅ reloaded"
     except asyncio.TimeoutError:
         return "⏱ timeout"
     except Exception as e:
-        return f"❌ {type(e).__name__}: {e}"
+        return f"❌ {type(e).__name__}"
 
 
 async def keepalive_loop():
-    log(f"Session keepalive started (every {INTERVAL}s)")
+    log(f"Session keepalive started — Page.reload every {INTERVAL}s")
     while True:
         try:
-            raw = urllib.request.urlopen(f"{CDP_URL}/json/list", timeout=3).read()
+            raw = urllib.request.urlopen(f"{CDP_URL}/json/list", timeout=5).read()
             pages = json.loads(raw)
         except Exception as e:
             log(f"CDP unreachable: {e}")
@@ -104,16 +69,18 @@ async def keepalive_loop():
             continue
 
         results = []
+        seen_banks = set()
         for p in pages:
             url = p.get("url", "")
             bank = detect_bank(url)
-            if not bank:
+            if not bank or bank in seen_banks:
                 continue
+            seen_banks.add(bank)
             ws_url = p.get("webSocketDebuggerUrl", "")
             if not ws_url:
                 continue
-            status = await ping_page(ws_url, bank, url)
-            results.append(f"{bank:20} {status}")
+            status = await reload_tab(ws_url, bank)
+            results.append(f"{bank:15} {status}")
 
         if results:
             log(" | ".join(results))
@@ -125,7 +92,6 @@ async def keepalive_loop():
 
 def daemonize():
     """Fork to background."""
-    # Kill existing daemon
     if os.path.exists(PID_FILE):
         try:
             old_pid = int(open(PID_FILE).read().strip())
@@ -142,12 +108,10 @@ def daemonize():
         print(f"  Kill: kill $(cat {PID_FILE})")
         sys.exit(0)
 
-    # Child process
     os.setsid()
     with open(PID_FILE, "w") as f:
         f.write(str(os.getpid()))
 
-    # Redirect stdout/stderr to log
     sys.stdout = open(LOG_FILE, "a", buffering=1)
     sys.stderr = sys.stdout
 
@@ -155,7 +119,6 @@ def daemonize():
 def main():
     if "--daemon" in sys.argv:
         daemonize()
-
     try:
         asyncio.run(keepalive_loop())
     except KeyboardInterrupt:

@@ -1,33 +1,14 @@
 """
+⚠️  DEPRECATED — use session_keepalive.py instead.
+This script did Page.reload() which LOGS OUT bank sessions.
+Kept for reference only. Do NOT run.
+
 Keep-alive: recharge les pages bancaires via WebSocket CDP toutes les 4 min.
 Envoie Page.reload sur chaque onglet bancaire pour maintenir la session serveur active.
 """
-import json
-import time
-import urllib.request
-
-CDP_URL = "http://127.0.0.1:18800"
-INTERVAL = 4 * 60  # 4 minutes
-BANK_DOMAINS = [
-    "credit-agricole",
-    "ca-languedoc",
-    "ca-centrest",
-    "interactivebrokers",
-    "boursobank.com",
-    "traderepublic.com",
-]
-
-
-def get_bank_tabs():
-    """Get all open bank tabs from CDP."""
-    try:
-        with urllib.request.urlopen(f"{CDP_URL}/json") as resp:
-            tabs = json.loads(resp.read())
-        return [t for t in tabs
-                if any(d in t.get("url", "") for d in BANK_DOMAINS)
-                and "googletagmanager" not in t.get("url", "")
-                and t.get("type") == "page"]
-    except Exception as e:
+import sys
+print("⚠️  DEPRECATED: use session_keepalive.py --daemon instead", file=sys.stderr)
+sys.exit(1)
         print(f"[KEEP-ALIVE] CDP unreachable: {e}")
         return []
 
