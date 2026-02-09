@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.finary.daily-sync</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/sylvain/_MACARON-SOFTWARE/_FINARY/scrapers/.venv/bin/python3</string>
+        <string>/Users/sylvain/_MACARON-SOFTWARE/_FINARY/scrapers/daily_sync.py</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>8</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/finary-daily-sync.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/finary-daily-sync.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    </dict>
+</dict>
+</plist>

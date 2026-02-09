@@ -814,6 +814,14 @@ async def main():
     print("   Close the browser manually when finished.")
     print("   Re-run this script to scrape again without re-login.")
 
+    # Auto-build patrimoine_complet from scraped data
+    try:
+        from build_patrimoine import build
+        build()
+        print("✅ patrimoine_complet rebuilt from fresh scrape data")
+    except Exception as e:
+        print(f"⚠️  Failed to rebuild patrimoine: {e}")
+
     # Keep alive — don't close!
     try:
         await asyncio.Event().wait()

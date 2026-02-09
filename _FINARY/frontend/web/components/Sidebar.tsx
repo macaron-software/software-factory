@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 
 interface NavItem {
   href: string;
@@ -64,6 +65,24 @@ function FinaryLogo() {
 export function Sidebar() {
   const pathname = usePathname();
 
+  const { data: status } = useQuery({
+    queryKey: ["status"],
+    queryFn: () => fetch("http://localhost:8000/api/v1/status").then((r) => r.json()),
+    refetchInterval: 60_000,
+  });
+
+  const syncLabel = (() => {
+    if (!status?.data_timestamp) return "—";
+    const d = new Date(status.data_timestamp);
+    const now = new Date();
+    const diffH = (now.getTime() - d.getTime()) / 3600000;
+    if (diffH < 1) return "Il y a moins d'1h";
+    if (diffH < 24) return `Aujourd'hui, ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
+    return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  })();
+
+  const liveLabel = status?.live_prices ? `${status.live_prices} prix live` : null;
+
   return (
     <aside
       className="w-[220px] shrink-0 flex flex-col"
@@ -114,11 +133,16 @@ export function Sidebar() {
       {/* Footer */}
       <div className="px-5 py-4" style={{ borderTop: "1px solid var(--border-1)" }}>
         <p className="text-[11px]" style={{ color: "var(--text-5)" }}>
-          Derniere sync
+          Dernière sync
         </p>
-        <p className="text-[11px] mt-0.5" style={{ color: "var(--text-6)" }}>
-          Aujourd&apos;hui, 08:00
+        <p className="text-[11px] mt-0.5" style={{ color: status?.stale ? "#ef4444" : "var(--text-6)" }}>
+          {syncLabel}
         </p>
+        {liveLabel && (
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--accent-1)" }}>
+            {liveLabel}
+          </p>
+        )}
       </div>
     </aside>
   );

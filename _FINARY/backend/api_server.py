@@ -390,6 +390,37 @@ def refresh_prices():
     _fetch_live_prices()
     return {"status": "ok", "cached": len(_price_cache), "eur_usd": get_eur_usd()}
 
+@app.get("/api/v1/status")
+def get_status():
+    """Health check with data freshness info."""
+    positions = build_positions()
+    live_count = sum(1 for p in positions if p.get("live"))
+    total_val = sum(p["value_eur"] for p in positions)
+    total_pnl = sum(p["pnl_eur"] for p in positions)
+
+    # Data file info
+    data_file = sorted(DATA_DIR.glob("patrimoine_complet_*.json"), reverse=True)[0]
+    file_mtime = data_file.stat().st_mtime
+    import os
+    hours_ago = (time.time() - file_mtime) / 3600
+
+    return {
+        "status": "ok",
+        "data_date": P.get("date", "?"),
+        "data_timestamp": P.get("timestamp", "?"),
+        "data_file": data_file.name,
+        "data_age_hours": round(hours_ago, 1),
+        "stale": hours_ago > 48,
+        "net_worth": round(total_val + P.get("totals", {}).get("total_bank_liquid", 0) +
+                          P.get("totals", {}).get("total_real_estate", 0) -
+                          P.get("totals", {}).get("total_debt", 0), 2),
+        "positions": len(positions),
+        "live_prices": live_count,
+        "eur_usd": round(get_eur_usd(), 4),
+        "total_portfolio": round(total_val, 2),
+        "total_pnl": round(total_pnl, 2),
+    }
+
 @app.get("/api/v1/networth")
 def get_networth():
     positions = build_positions()
