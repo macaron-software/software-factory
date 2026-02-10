@@ -18,6 +18,8 @@ export interface Account {
   loan_monthly?: number;
   loan_rate?: string;
   loan_type?: string;
+  owner?: string;
+  excluded?: boolean;
 }
 
 export type AccountType =
