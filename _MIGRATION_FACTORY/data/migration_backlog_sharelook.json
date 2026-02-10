@@ -1,7 +1,7 @@
 {
   "project_id": "sharelook",
   "generated_at": "2026-02-10T16:44:09.486138",
-  "total_tasks": 42,
+  "total_tasks": 41,
   "tasks": [
     {
       "id": "sharelook-deps-ai12-15to16",
@@ -435,27 +435,6 @@
       "description": "Migrate AI12 feature \"shared\" to standalone (~3 modules)",
       "metadata": {},
       "created_at": "2026-02-10T16:44:09.486084"
-    },
-    {
-      "id": "sharelook-control-flow-ai12-core",
-      "project_id": "sharelook",
-      "phase": "control-flow",
-      "framework": "angular",
-      "from_version": "16.2.12",
-      "to_version": "17.3.0",
-      "breaking_changes": [
-        "ANG-17-005"
-      ],
-      "codemod_available": true,
-      "risk_score": 3,
-      "wsjf_score": 4.67,
-      "rollback_strategy": "git_tag",
-      "files": [],
-      "file_count": 3,
-      "status": "pending",
-      "description": "Migrate AI12 feature \"core\" to @if/@for syntax (~3 components)",
-      "metadata": {},
-      "created_at": "2026-02-10T16:44:09.486128"
     },
     {
       "id": "sharelook-control-flow-ai12-home",
