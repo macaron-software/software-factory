@@ -12,19 +12,8 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "scrapers" / "data"
 SNAPSHOTS_DIR = DATA_DIR / "snapshots"
 HISTORY_CACHE = DATA_DIR / "portfolio_history.json"
 
-# IBKR positions (the big ones that move the needle)
-IBKR_HOLDINGS = {
-    "MSFT": {"qty": 45.2854, "cost_usd": 20293},
-    "GOOGL": {"qty": 105.3515, "cost_usd": 20210},
-    "NVDA": {"qty": 100.0222, "cost_usd": 12653},
-}
-
-# TR positions (small, fractional — treat as constant for history)
-TR_TOTAL_EUR = 2861.0
-
-
-def _load_current_constants() -> tuple[float, float, float]:
-    """Load current cash, real_estate, debt from latest patrimoine file."""
+def _load_current_constants() -> tuple[float, float, float, float, dict]:
+    """Load current values from latest patrimoine file."""
     files = sorted(DATA_DIR.glob("patrimoine_complet_*.json"), reverse=True)
     if files:
         P = json.loads(files[0].read_text())
@@ -32,10 +21,30 @@ def _load_current_constants() -> tuple[float, float, float]:
         cash = t.get("total_bank_liquid", 221.16)
         real_estate = t.get("total_real_estate", 483800)
         debt = t.get("total_debt", 232060.75)
-        return cash, real_estate, debt
-    return 221.16, 483800, 232060.75
+        tr_val = P.get("trade_republic", {}).get("total_account_value", 2861.0)
+        # IBKR positions from patrimoine
+        ibkr = P.get("interactive_brokers", {})
+        holdings = {}
+        for pos in ibkr.get("positions", []):
+            ticker = pos.get("ticker", "")
+            if ticker:
+                holdings[ticker] = {
+                    "qty": pos.get("quantity", 0),
+                    "cost_usd": pos.get("cost_basis_usd", 0),
+                }
+        if not holdings:
+            holdings = _DEFAULT_IBKR_HOLDINGS
+        return cash, real_estate, debt, tr_val, holdings
+    return 221.16, 483800, 232060.75, 2861.0, _DEFAULT_IBKR_HOLDINGS
 
-CASH_EUR, REAL_ESTATE_EUR, DEBT_EUR = _load_current_constants()
+# Fallback if patrimoine file missing
+_DEFAULT_IBKR_HOLDINGS = {
+    "MSFT": {"qty": 45.2854, "cost_usd": 20293},
+    "GOOGL": {"qty": 105.3515, "cost_usd": 20210},
+    "NVDA": {"qty": 100.0222, "cost_usd": 12653},
+}
+
+CASH_EUR, REAL_ESTATE_EUR, DEBT_EUR, TR_TOTAL_EUR, IBKR_HOLDINGS = _load_current_constants()
 
 
 def _fetch_historical_prices(days: int = 365) -> dict[str, list[dict]]:

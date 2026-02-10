@@ -4,7 +4,7 @@ import { useMemo, useState, useCallback } from "react";
 import { useMonthlyBudget, useCategorySpending, useCategoryTransactions } from "@/lib/hooks/useApi";
 import { formatEUR, CATEGORY_LABELS, CHART_COLORS } from "@/lib/utils";
 import { BudgetChart } from "@/components/charts/BudgetChart";
-import { PageHeader, Badge, Section, StatCard, DetailSheet } from "@/components/ds";
+import { PageHeader, Badge, Section, StatCard, DetailSheet, SourceBadge } from "@/components/ds";
 import {
   generateMonthlyBudget,
   generateCategorySpending,
@@ -64,7 +64,10 @@ export default function BudgetPage() {
               <Badge variant={savingsRate >= 0 ? "gain" : "loss"}>
                 {savingsRate.toFixed(0)}% du revenu
               </Badge>
-              <span className="text-label text-t-5">épargne ce mois</span>
+              <div className="flex items-center gap-2">
+                <span className="text-label text-t-5">épargne ce mois</span>
+                <SourceBadge source="scraped" />
+              </div>
             </div>
           ) : undefined
         }

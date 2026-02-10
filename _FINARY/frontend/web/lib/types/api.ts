@@ -168,7 +168,7 @@ export interface PositionValuation extends Position {
   source?: string;
 }
 
-export type DataSource = "live" | "scraped" | "estimate" | "mock" | "computed" | "official";
+export type DataSource = "live" | "scraped" | "estimate" | "mock" | "computed" | "official" | "hardcoded" | "manual";
 
 export interface NetWorthSummary {
   net_worth: number;

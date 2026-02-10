@@ -2,7 +2,7 @@
 
 import { useCosts } from "@/lib/hooks/useApi";
 import { formatEUR, CHART_COLORS } from "@/lib/utils";
-import { Loading, ErrorState, PageHeader, Section, StatCard } from "@/components/ds";
+import { Loading, ErrorState, PageHeader, Section, StatCard, SourceBadge } from "@/components/ds";
 
 interface CostItem { name: string; amount: number; type: string; category?: string; rate_source?: string; remaining?: number; insurance?: number; detail?: string }
 interface AnnualFee { amount: number; label: string; detail?: string; rate_source?: string }
@@ -18,15 +18,14 @@ interface CostsData {
   ter_details: { isin: string; name: string; ter: number; annual_cost: number }[];
 }
 
-function SourceBadge({ source }: { source?: string }) {
+function CostSourceBadge({ source }: { source?: string }) {
   if (!source) return null;
-  const labels: Record<string, [string, string]> = {
-    scraped_ca: ["CA", "bg-green-900/30 text-green-400"],
-    scraped_ibkr: ["IBKR", "bg-blue-900/30 text-blue-400"],
-    known_ter: ["TER", "bg-purple-900/30 text-purple-400"],
+  const map: Record<string, "scraped" | "live" | "hardcoded"> = {
+    scraped_ca: "scraped",
+    scraped_ibkr: "live",
+    known_ter: "hardcoded",
   };
-  const [label, cls] = labels[source] || [source, "bg-bg-hover text-t-4"];
-  return <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${cls}`}>{label}</span>;
+  return <SourceBadge source={map[source] ?? "scraped"} />;
 }
 
 export default function CostsPage() {
@@ -69,7 +68,7 @@ export default function CostsPage() {
                     }`}>
                       {item.category || item.type}
                     </span>
-                    <SourceBadge source={item.rate_source} />
+                    <CostSourceBadge source={item.rate_source} />
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="tnum text-body font-semibold text-t-1">{formatEUR(item.amount)}</span>
@@ -104,7 +103,7 @@ export default function CostsPage() {
               <div key={i} className="bg-bg-hover p-5 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <p className="text-caption font-medium uppercase text-t-5">{fee.label}</p>
-                  <SourceBadge source={fee.rate_source} />
+                  <CostSourceBadge source={fee.rate_source} />
                 </div>
                 <p className="tnum text-heading font-semibold text-loss">{formatEUR(fee.amount)}</p>
                 {fee.detail && <p className="text-caption text-t-4 mt-1">{fee.detail}</p>}

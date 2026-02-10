@@ -2,11 +2,12 @@
 
 import { useNetWorth, usePortfolio, useAccounts } from "@/lib/hooks/useApi";
 import { formatEUR } from "@/lib/utils";
-import { Loading } from "@/components/ds";
+import { Loading, SourceBadge } from "@/components/ds";
 
 interface StatementRow {
   label: string;
   value: number;
+  source: "live" | "scraped" | "estimate" | "computed" | "manual";
 }
 
 export default function WealthStatementPage() {
@@ -24,16 +25,16 @@ export default function WealthStatementPage() {
   const ctoTotal = accounts?.filter((a) => a.account_type === "cto").reduce((s, a) => s + a.balance, 0) ?? 0;
 
   const assets: StatementRow[] = [
-    { label: "Comptes courants", value: checkingTotal },
-    { label: "Livrets", value: savingsTotal },
-    { label: "PEA", value: peaTotal },
-    { label: "CTO", value: ctoTotal },
-    { label: "Investissements (valeur marché)", value: investmentTotal },
-    { label: "Immobilier", value: networth.breakdown.real_estate ?? 0 },
+    { label: "Comptes courants", value: checkingTotal, source: "scraped" },
+    { label: "Livrets", value: savingsTotal, source: "scraped" },
+    { label: "PEA", value: peaTotal, source: "scraped" },
+    { label: "CTO", value: ctoTotal, source: "live" },
+    { label: "Investissements (valeur marché)", value: investmentTotal, source: "live" },
+    { label: "Immobilier", value: networth.breakdown.real_estate ?? 0, source: "estimate" },
   ];
 
   const liabilities: StatementRow[] = [
-    { label: "Emprunts immobiliers", value: networth.total_liabilities },
+    { label: "Emprunts immobiliers", value: networth.total_liabilities, source: "scraped" },
   ];
 
   const totalAssets = assets.reduce((s, r) => s + r.value, 0);
@@ -61,7 +62,10 @@ export default function WealthStatementPage() {
             className={`flex items-center justify-between px-5 py-3 ${i < assets.length - 1 ? "border-b border-bd-1" : ""}`}
           >
             <span className="text-body text-t-3">{row.label}</span>
-            <span className="tnum text-body font-medium text-t-1">{formatEUR(row.value)}</span>
+            <div className="flex items-center gap-2">
+              <span className="tnum text-body font-medium text-t-1">{formatEUR(row.value)}</span>
+              <SourceBadge source={row.source} />
+            </div>
           </div>
         ))}
         <div className="flex items-center justify-between px-5 py-3 bg-bg-hover border-t border-bd-1">
@@ -81,7 +85,10 @@ export default function WealthStatementPage() {
             className={`flex items-center justify-between px-5 py-3 ${i < liabilities.length - 1 ? "border-b border-bd-1" : ""}`}
           >
             <span className="text-body text-t-3">{row.label}</span>
-            <span className="tnum text-body font-medium text-loss">{formatEUR(row.value)}</span>
+            <div className="flex items-center gap-2">
+              <span className="tnum text-body font-medium text-loss">{formatEUR(row.value)}</span>
+              <SourceBadge source={row.source} />
+            </div>
           </div>
         ))}
         <div className="flex items-center justify-between px-5 py-3 bg-bg-hover border-t border-bd-1">

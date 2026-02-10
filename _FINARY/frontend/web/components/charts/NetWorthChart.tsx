@@ -12,6 +12,7 @@ import {
 import { PeriodSelector, periodToDays, type Period } from "./PeriodSelector";
 import { formatEUR, formatPct } from "@/lib/utils";
 import { useNetWorthHistory } from "@/lib/hooks/useApi";
+import { SourceBadge } from "@/components/ds";
 
 interface ChartPoint {
   date: string;
@@ -89,7 +90,7 @@ export function NetWorthChart() {
       <div className="flex items-start justify-between mb-6">
         <div>
           <p className="text-[11px] font-medium tracking-[0.04em] uppercase mb-2" style={{ color: "var(--text-5)" }}>
-            Patrimoine net
+            Patrimoine net <SourceBadge source="computed" />
           </p>
           <p className="tnum text-[32px] font-extralight tracking-tight leading-none" style={{ color: "var(--text-1)" }}>
             {formatEUR(displayValue)}

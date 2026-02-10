@@ -2,7 +2,7 @@
 
 import { useAccounts } from "@/lib/hooks/useApi";
 import { formatEUR } from "@/lib/utils";
-import { Loading, ErrorState, PageHeader } from "@/components/ds";
+import { Loading, ErrorState, PageHeader, SourceBadge } from "@/components/ds";
 
 const TYPE_LABELS: Record<string, string> = {
   checking: "Compte courant",
@@ -11,6 +11,13 @@ const TYPE_LABELS: Record<string, string> = {
   cto: "CTO",
   av: "Assurance Vie",
   loan: "Crédit",
+};
+
+const INST_SOURCES: Record<string, "live" | "scraped"> = {
+  "Interactive Brokers": "live",
+  "Trade Republic": "live",
+  "Boursobank": "scraped",
+  "Crédit Agricole": "scraped",
 };
 
 export default function AccountsPage() {
@@ -42,6 +49,7 @@ export default function AccountsPage() {
                   {institution}
                 </span>
                 <span className="tnum text-label font-medium text-t-4">{formatEUR(instTotal)}</span>
+                <SourceBadge source={INST_SOURCES[institution] ?? "scraped"} />
               </div>
               <div className="card overflow-hidden divide-y divide-bd-1">
                 {accs!.map((acc) => (
@@ -64,9 +72,14 @@ export default function AccountsPage() {
                         </div>
                       </div>
                     </div>
-                    <p className={`tnum text-body-lg font-medium ${acc.balance < 0 ? "text-loss" : "text-t-1"}`}>
-                      {formatEUR(acc.balance)}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className={`tnum text-body-lg font-medium ${acc.balance < 0 ? "text-loss" : "text-t-1"}`}>
+                        {formatEUR(acc.balance)}
+                      </p>
+                      {acc.excluded && (
+                        <span className="text-caption text-t-6 bg-bg-hover px-1.5 py-0.5 rounded">Exclu</span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

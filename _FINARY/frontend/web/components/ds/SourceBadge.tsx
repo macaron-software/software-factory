@@ -1,6 +1,6 @@
 "use client";
 
-type Source = "live" | "scraped" | "estimate" | "mock" | "computed" | "official";
+type Source = "live" | "scraped" | "estimate" | "mock" | "computed" | "official" | "hardcoded" | "manual";
 
 interface Props {
   source: Source;
@@ -8,12 +8,14 @@ interface Props {
 }
 
 const CONFIG: Record<Source, { label: string; color: string; bg: string }> = {
-  live:     { label: "Live",    color: "var(--green)",  bg: "var(--green-bg)" },
-  scraped:  { label: "Scrapé",  color: "var(--blue)",   bg: "rgba(86,130,242,0.12)" },
-  estimate: { label: "Estimé",  color: "var(--orange)",  bg: "var(--orange-bg)" },
-  computed: { label: "Calculé", color: "var(--accent)", bg: "var(--accent-bg)" },
-  official: { label: "Officiel",color: "var(--blue-light)", bg: "rgba(86,130,242,0.12)" },
-  mock:     { label: "Mock",    color: "var(--red)",    bg: "var(--red-bg)" },
+  live:       { label: "Live",     color: "var(--green)",      bg: "var(--green-bg)" },
+  scraped:    { label: "Scrapé",   color: "var(--blue)",       bg: "rgba(86,130,242,0.12)" },
+  estimate:   { label: "Estimé",   color: "var(--orange)",     bg: "var(--orange-bg)" },
+  computed:   { label: "Calculé",  color: "var(--accent)",     bg: "var(--accent-bg)" },
+  official:   { label: "Officiel", color: "var(--blue-light)", bg: "rgba(86,130,242,0.12)" },
+  hardcoded:  { label: "Fixe",     color: "var(--text-5)",     bg: "var(--bg-hover)" },
+  manual:     { label: "Manuel",   color: "var(--orange)",     bg: "var(--orange-bg)" },
+  mock:       { label: "Mock",     color: "var(--red)",        bg: "var(--red-bg)" },
 };
 
 export function SourceBadge({ source, className = "" }: Props) {

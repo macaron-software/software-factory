@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { usePortfolio, useDiversification, useDividends, useCosts, useInsightsRules, useNetWorthHistory } from "@/lib/hooks/useApi";
 import { formatEUR, formatPct, formatNumber, CHART_COLORS } from "@/lib/utils";
 import { PriceChart } from "@/components/charts/PriceChart";
-import { Section, Badge, Loading } from "@/components/ds";
+import { Section, Badge, Loading, SourceBadge } from "@/components/ds";
 
 /* ── Simulation helper ── */
 
@@ -179,7 +179,7 @@ export default function InsightsPage() {
 
       {/* Cards grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <Section title="Fee Scanner">
+        <Section title={<>Fee Scanner <SourceBadge source="computed" /></>}>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-body text-t-4">Frais estimés</span>
@@ -214,7 +214,7 @@ export default function InsightsPage() {
           </div>
         </Section>
 
-        <Section title="Revenus passifs">
+        <Section title={<>Revenus passifs <SourceBadge source="hardcoded" /></>}>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-body text-t-4">Rendement</span>

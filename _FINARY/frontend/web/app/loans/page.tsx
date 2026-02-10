@@ -2,7 +2,7 @@
 
 import { useLoans } from "@/lib/hooks/useApi";
 import { formatEUR } from "@/lib/utils";
-import { Loading, ErrorState, PageHeader, Badge, Section } from "@/components/ds";
+import { Loading, ErrorState, PageHeader, Badge, Section, SourceBadge } from "@/components/ds";
 
 export default function LoansPage() {
   const { data: loans, isLoading, error } = useLoans();
@@ -79,7 +79,12 @@ export default function LoansPage() {
                     {loan.type?.toUpperCase()}
                   </Badge>
                 </td>
-                <td className="tnum text-right px-3 py-3 font-medium text-loss">{formatEUR(loan.remaining)}</td>
+                <td className="tnum text-right px-3 py-3 font-medium text-loss">
+                  <div className="flex items-center justify-end gap-1.5">
+                    {formatEUR(loan.remaining)}
+                    <SourceBadge source={loan.institution === "Interactive Brokers" ? "live" : "scraped"} />
+                  </div>
+                </td>
                 <td className="tnum text-right px-3 py-3 text-t-2">
                   {loan.monthly_payment ? formatEUR(loan.monthly_payment) : "—"}
                 </td>
@@ -91,8 +96,11 @@ export default function LoansPage() {
                 <td className="tnum text-right px-3 py-3 text-t-2">
                   {loan.rate_numeric != null ? (
                     <div>
-                      <span className="font-medium">{loan.rate_numeric.toFixed(2)}%</span>
-                      {loan.rate_type && <span className="text-caption text-t-5 ml-1">{loan.rate_type}</span>}
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="font-medium">{loan.rate_numeric.toFixed(2)}%</span>
+                        {loan.rate_type && <span className="text-caption text-t-5">{loan.rate_type}</span>}
+                        <SourceBadge source={loan.institution === "Interactive Brokers" ? "live" : "scraped"} />
+                      </div>
                       {loan.real_rate != null && (
                         <div className={`text-caption mt-0.5 ${loan.real_rate <= 0 ? "text-gain" : "text-loss"}`}>
                           réel {loan.real_rate > 0 ? "+" : ""}{loan.real_rate.toFixed(2)}%
