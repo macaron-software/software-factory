@@ -1,7 +1,7 @@
 {
   "project_id": "sharelook",
   "generated_at": "2026-02-10T16:44:09.486138",
-  "total_tasks": 45,
+  "total_tasks": 42,
   "tasks": [
     {
       "id": "sharelook-deps-ai12-15to16",
@@ -114,8 +114,10 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 feature \"domain\" \u2192 CSS Grid/CDK (~100 occurrences)",
-      "metadata": {},
+      "description": "Remove @angular/flex-layout AI08 feature \"domain\" \u2192 CSS Grid/CDK (~157 occurrences)",
+      "metadata": {
+        "occurrences": 157
+      },
       "created_at": "2026-02-10T16:44:09.486087"
     },
     {
@@ -135,8 +137,10 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 feature \"management\" \u2192 CSS Grid/CDK (~40 occurrences)",
-      "metadata": {},
+      "description": "Remove @angular/flex-layout AI08 feature \"management\" \u2192 CSS Grid/CDK (~30 occurrences)",
+      "metadata": {
+        "occurrences": 30
+      },
       "created_at": "2026-02-10T16:44:09.486089"
     },
     {
@@ -156,8 +160,10 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 feature \"contacts\" \u2192 CSS Grid/CDK (~30 occurrences)",
-      "metadata": {},
+      "description": "Remove @angular/flex-layout AI08 feature \"contacts\" \u2192 CSS Grid/CDK (~9 occurrences)",
+      "metadata": {
+        "occurrences": 9
+      },
       "created_at": "2026-02-10T16:44:09.486091"
     },
     {
@@ -177,8 +183,10 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 feature \"referentials\" \u2192 CSS Grid/CDK (~25 occurrences)",
-      "metadata": {},
+      "description": "Remove @angular/flex-layout AI08 feature \"referentials\" \u2192 CSS Grid/CDK (~30 occurrences)",
+      "metadata": {
+        "occurrences": 30
+      },
       "created_at": "2026-02-10T16:44:09.486093"
     },
     {
@@ -198,8 +206,10 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 feature \"report-config\" \u2192 CSS Grid/CDK (~20 occurrences)",
-      "metadata": {},
+      "description": "Remove @angular/flex-layout AI08 feature \"report-config\" \u2192 CSS Grid/CDK (~22 occurrences)",
+      "metadata": {
+        "occurrences": 22
+      },
       "created_at": "2026-02-10T16:44:09.486095"
     },
     {
@@ -219,8 +229,10 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 feature \"metadata\" \u2192 CSS Grid/CDK (~18 occurrences)",
-      "metadata": {},
+      "description": "Remove @angular/flex-layout AI08 feature \"metadata\" \u2192 CSS Grid/CDK (~9 occurrences)",
+      "metadata": {
+        "occurrences": 9
+      },
       "created_at": "2026-02-10T16:44:09.486097"
     },
     {
@@ -240,30 +252,11 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 feature \"collectable-topics\" \u2192 CSS Grid/CDK (~15 occurrences)",
-      "metadata": {},
+      "description": "Remove @angular/flex-layout AI08 feature \"collectable-topics\" \u2192 CSS Grid/CDK (~8 occurrences)",
+      "metadata": {
+        "occurrences": 8
+      },
       "created_at": "2026-02-10T16:44:09.486099"
-    },
-    {
-      "id": "sharelook-flex-layout-ai08-home",
-      "project_id": "sharelook",
-      "phase": "flex-layout",
-      "framework": "angular",
-      "from_version": "16.2.12",
-      "to_version": "17.3.0",
-      "breaking_changes": [
-        "ANG-17-006"
-      ],
-      "codemod_available": false,
-      "risk_score": 7,
-      "wsjf_score": 13.0,
-      "rollback_strategy": "git_tag",
-      "files": [],
-      "file_count": 1,
-      "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 feature \"home\" \u2192 CSS Grid/CDK (~15 occurrences)",
-      "metadata": {},
-      "created_at": "2026-02-10T16:44:09.486101"
     },
     {
       "id": "sharelook-flex-layout-ai08-shared",
@@ -282,30 +275,11 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 feature \"shared\" \u2192 CSS Grid/CDK (~15 occurrences)",
-      "metadata": {},
+      "description": "Remove @angular/flex-layout AI08 feature \"shared\" \u2192 CSS Grid/CDK (~17 occurrences)",
+      "metadata": {
+        "occurrences": 17
+      },
       "created_at": "2026-02-10T16:44:09.486103"
-    },
-    {
-      "id": "sharelook-flex-layout-ai08-core",
-      "project_id": "sharelook",
-      "phase": "flex-layout",
-      "framework": "angular",
-      "from_version": "16.2.12",
-      "to_version": "17.3.0",
-      "breaking_changes": [
-        "ANG-17-006"
-      ],
-      "codemod_available": false,
-      "risk_score": 7,
-      "wsjf_score": 13.0,
-      "rollback_strategy": "git_tag",
-      "files": [],
-      "file_count": 1,
-      "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 feature \"core\" \u2192 CSS Grid/CDK (~5 occurrences)",
-      "metadata": {},
-      "created_at": "2026-02-10T16:44:09.486104"
     },
     {
       "id": "sharelook-flex-layout-ai12-all",
@@ -565,7 +539,9 @@
       "file_count": 4,
       "status": "pending",
       "description": "Migrate AI08 feature \"collectable-topics\" to standalone (~4 modules)",
-      "metadata": {},
+      "metadata": {
+        "components": 2
+      },
       "created_at": "2026-02-10T16:44:09.486057"
     },
     {
@@ -587,7 +563,9 @@
       "file_count": 4,
       "status": "pending",
       "description": "Migrate AI08 feature \"contacts\" to standalone (~4 modules)",
-      "metadata": {},
+      "metadata": {
+        "components": 2
+      },
       "created_at": "2026-02-10T16:44:09.486060"
     },
     {
@@ -631,7 +609,9 @@
       "file_count": 4,
       "status": "pending",
       "description": "Migrate AI08 feature \"home\" to standalone (~4 modules)",
-      "metadata": {},
+      "metadata": {
+        "components": 1
+      },
       "created_at": "2026-02-10T16:44:09.486066"
     },
     {
@@ -653,7 +633,9 @@
       "file_count": 4,
       "status": "pending",
       "description": "Migrate AI08 feature \"management\" to standalone (~4 modules)",
-      "metadata": {},
+      "metadata": {
+        "components": 5
+      },
       "created_at": "2026-02-10T16:44:09.486068"
     },
     {
@@ -675,7 +657,9 @@
       "file_count": 4,
       "status": "pending",
       "description": "Migrate AI08 feature \"metadata\" to standalone (~4 modules)",
-      "metadata": {},
+      "metadata": {
+        "components": 2
+      },
       "created_at": "2026-02-10T16:44:09.486070"
     },
     {
@@ -697,7 +681,9 @@
       "file_count": 4,
       "status": "pending",
       "description": "Migrate AI08 feature \"referentials\" to standalone (~4 modules)",
-      "metadata": {},
+      "metadata": {
+        "components": 5
+      },
       "created_at": "2026-02-10T16:44:09.486071"
     },
     {
@@ -719,7 +705,9 @@
       "file_count": 4,
       "status": "pending",
       "description": "Migrate AI08 feature \"report-config\" to standalone (~4 modules)",
-      "metadata": {},
+      "metadata": {
+        "components": 2
+      },
       "created_at": "2026-02-10T16:44:09.486073"
     },
     {
@@ -741,7 +729,9 @@
       "file_count": 4,
       "status": "pending",
       "description": "Migrate AI08 feature \"shared\" to standalone (~4 modules)",
-      "metadata": {},
+      "metadata": {
+        "components": 10
+      },
       "created_at": "2026-02-10T16:44:09.486076"
     },
     {
@@ -759,10 +749,12 @@
       "wsjf_score": 2.33,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 6,
+      "file_count": 2,
       "status": "pending",
-      "description": "Migrate AI08 feature \"collectable-topics\" to @if/@for syntax (~6 components)",
-      "metadata": {},
+      "description": "Migrate AI08 feature \"collectable-topics\" to @if/@for syntax (~2 components)",
+      "metadata": {
+        "components": 2
+      },
       "created_at": "2026-02-10T16:44:09.486109"
     },
     {
@@ -780,32 +772,13 @@
       "wsjf_score": 2.33,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 6,
+      "file_count": 2,
       "status": "pending",
-      "description": "Migrate AI08 feature \"contacts\" to @if/@for syntax (~6 components)",
-      "metadata": {},
+      "description": "Migrate AI08 feature \"contacts\" to @if/@for syntax (~2 components)",
+      "metadata": {
+        "components": 2
+      },
       "created_at": "2026-02-10T16:44:09.486111"
-    },
-    {
-      "id": "sharelook-control-flow-ai08-core",
-      "project_id": "sharelook",
-      "phase": "control-flow",
-      "framework": "angular",
-      "from_version": "16.2.12",
-      "to_version": "17.3.0",
-      "breaking_changes": [
-        "ANG-17-005"
-      ],
-      "codemod_available": true,
-      "risk_score": 3,
-      "wsjf_score": 2.33,
-      "rollback_strategy": "git_tag",
-      "files": [],
-      "file_count": 6,
-      "status": "pending",
-      "description": "Migrate AI08 feature \"core\" to @if/@for syntax (~6 components)",
-      "metadata": {},
-      "created_at": "2026-02-10T16:44:09.486113"
     },
     {
       "id": "sharelook-control-flow-ai08-home",
@@ -822,10 +795,12 @@
       "wsjf_score": 2.33,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 6,
+      "file_count": 1,
       "status": "pending",
-      "description": "Migrate AI08 feature \"home\" to @if/@for syntax (~6 components)",
-      "metadata": {},
+      "description": "Migrate AI08 feature \"home\" to @if/@for syntax (~1 components)",
+      "metadata": {
+        "components": 1
+      },
       "created_at": "2026-02-10T16:44:09.486116"
     },
     {
@@ -843,10 +818,12 @@
       "wsjf_score": 2.33,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 6,
+      "file_count": 5,
       "status": "pending",
-      "description": "Migrate AI08 feature \"management\" to @if/@for syntax (~6 components)",
-      "metadata": {},
+      "description": "Migrate AI08 feature \"management\" to @if/@for syntax (~5 components)",
+      "metadata": {
+        "components": 5
+      },
       "created_at": "2026-02-10T16:44:09.486118"
     },
     {
@@ -864,10 +841,12 @@
       "wsjf_score": 2.33,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 6,
+      "file_count": 2,
       "status": "pending",
-      "description": "Migrate AI08 feature \"metadata\" to @if/@for syntax (~6 components)",
-      "metadata": {},
+      "description": "Migrate AI08 feature \"metadata\" to @if/@for syntax (~2 components)",
+      "metadata": {
+        "components": 2
+      },
       "created_at": "2026-02-10T16:44:09.486119"
     },
     {
@@ -885,10 +864,12 @@
       "wsjf_score": 2.33,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 6,
+      "file_count": 5,
       "status": "pending",
-      "description": "Migrate AI08 feature \"referentials\" to @if/@for syntax (~6 components)",
-      "metadata": {},
+      "description": "Migrate AI08 feature \"referentials\" to @if/@for syntax (~5 components)",
+      "metadata": {
+        "components": 5
+      },
       "created_at": "2026-02-10T16:44:09.486122"
     },
     {
@@ -906,10 +887,12 @@
       "wsjf_score": 2.33,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 6,
+      "file_count": 2,
       "status": "pending",
-      "description": "Migrate AI08 feature \"report-config\" to @if/@for syntax (~6 components)",
-      "metadata": {},
+      "description": "Migrate AI08 feature \"report-config\" to @if/@for syntax (~2 components)",
+      "metadata": {
+        "components": 2
+      },
       "created_at": "2026-02-10T16:44:09.486124"
     },
     {
@@ -927,10 +910,12 @@
       "wsjf_score": 2.33,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 6,
+      "file_count": 10,
       "status": "pending",
-      "description": "Migrate AI08 feature \"shared\" to @if/@for syntax (~6 components)",
-      "metadata": {},
+      "description": "Migrate AI08 feature \"shared\" to @if/@for syntax (~10 components)",
+      "metadata": {
+        "components": 10
+      },
       "created_at": "2026-02-10T16:44:09.486126"
     },
     {
@@ -952,7 +937,9 @@
       "file_count": 10,
       "status": "pending",
       "description": "Migrate AI08 feature \"domain\" to standalone (~10 modules)",
-      "metadata": {},
+      "metadata": {
+        "components": 30
+      },
       "created_at": "2026-02-10T16:44:09.486064"
     },
     {
@@ -970,10 +957,12 @@
       "wsjf_score": 0.93,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 15,
+      "file_count": 30,
       "status": "pending",
-      "description": "Migrate AI08 feature \"domain\" to @if/@for syntax (~15 components)",
-      "metadata": {},
+      "description": "Migrate AI08 feature \"domain\" to @if/@for syntax (~30 components)",
+      "metadata": {
+        "components": 30
+      },
       "created_at": "2026-02-10T16:44:09.486115"
     }
   ],
@@ -999,6 +988,8 @@
     "oidc_lib": "angular-auth-oidc-client + @cddng/auth-oidc-apim",
     "note": "AI12 needs 15\u219216 BEFORE 16\u219217",
     "typed_forms": "EXCLUDED - out of scope",
-    "grouping": "By REAL feature module names from filesystem"
+    "grouping": "By REAL feature module names from filesystem",
+    "version": "v4.1-final",
+    "status": "VALIDATED by SHARELOOK"
   }
 }
