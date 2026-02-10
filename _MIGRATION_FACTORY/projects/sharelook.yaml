@@ -18,8 +18,8 @@ migration:
     typescript: "5.1.3"
     node: "18.x"
     architecture: "NgModule-based"
-    modules_count: 50  # Estimation (2 IHM)
-    components_count: 150
+    modules_count: 48  # 38 AI08 + 10 AI12
+    components_count: 70  # 60 AI08 + 10 AI12
     forms: "Untyped (FormGroup, FormControl)"
     templates: "Old syntax (*ngIf, *ngFor)"
     routing: "RouterModule.forRoot"
@@ -30,8 +30,8 @@ migration:
     typescript: "5.2.0"
     node: "18.x"
     architecture: "Standalone components"
-    modules_count: 0  # All converted to standalone
-    forms: "Typed (FormGroup<T>)"
+    modules_count: "minimal"  # AppModule routing + lazy-loaded feature routes
+    forms: "Unchanged (FormGroup, FormControl)"  # Typed forms HORS SCOPE
     templates: "Control flow (@if, @for)"
     routing: "provideRouter"
 
@@ -45,7 +45,7 @@ migration:
       modules: 38  # Réel (scan grep)
       components: 60  # Réel
       standalone_count: 2
-      formgroups: 54  # Fichiers avec FormGroup/FormBuilder
+      formgroups: 26  # Source files hors tests (vérifié par CP)
       routes: 72
       flex_layout_usages: 283  # CHANTIER MAJEUR
       description: "Admin IHM - gestion règles, actions, référentiels"
@@ -82,28 +82,23 @@ migration:
       risk: high  # Architectural change
       auto: false
       order: 2
-      estimated_tasks: 50  # 1 per module
+      estimated_tasks: 14  # 10 AI08 + 4 AI12 (regroupé par feature module)
 
-    - name: typed-forms
-      description: "Add types to FormGroups"
-      risk: medium
-      auto: semi  # Can detect, needs manual validation
-      order: 3
-      estimated_tasks: 45
+    # typed-forms: HORS SCOPE (exclu par CP SHARELOOK)
 
     - name: flex-layout
       description: "Remove @angular/flex-layout → CSS Grid/CDK Layout"
       risk: high  # 283 occurrences AI08, 10 AI12
       auto: false  # Manual migration required
       order: 4
-      estimated_tasks: 23  # 20 AI08 + 3 AI12
+      estimated_tasks: 9  # 8 AI08 + 1 AI12 (regroupé par feature module)
 
     - name: control-flow
       description: "Migrate *ngIf/*ngFor → @if/@for"
       risk: low
       auto: true
       order: 5
-      estimated_tasks: 70  # 60 AI08 + 10 AI12
+      estimated_tasks: 12  # 9 AI08 + 3 AI12 (regroupé par feature module, core exclu)
 
     - name: signals
       description: "Optional: Migrate to Signals API"
