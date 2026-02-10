@@ -1,18 +1,24 @@
 "use client";
 
 import { formatEUR } from "@/lib/utils";
+import { SourceBadge } from "@/components/ds";
+import type { DataSource } from "@/lib/types/api";
 
 interface Props {
   label: string;
   value: number;
   variation?: number | null;
   negative?: boolean;
+  source?: DataSource;
 }
 
-export function NetWorthCard({ label, value, variation, negative }: Props) {
+export function NetWorthCard({ label, value, variation, negative, source }: Props) {
   return (
     <div className="card p-5">
-      <p className="text-label font-medium uppercase text-t-5">{label}</p>
+      <div className="flex items-center gap-2">
+        <p className="text-label font-medium uppercase text-t-5">{label}</p>
+        {source && <SourceBadge source={source} />}
+      </div>
       <p className={`tnum text-xl font-semibold mt-2 ${negative ? "text-loss" : "text-t-1"}`}>
         {formatEUR(value)}
       </p>

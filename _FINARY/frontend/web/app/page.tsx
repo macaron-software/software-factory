@@ -69,6 +69,8 @@ export default function HomePage() {
   const sheetAccounts = getSheetAccounts();
   const sheetTotal = sheetAccounts.reduce((s, a) => s + a.balance, 0);
 
+  const src = networth.sources;
+
   return (
     <div className="space-y-8">
       <NetWorthChart />
@@ -82,15 +84,16 @@ export default function HomePage() {
           />
         </div>
         <div className="cursor-pointer" onClick={() => setSheet("passifs")}>
-          <NetWorthCard label="Passifs" value={networth.total_liabilities} negative />
+          <NetWorthCard label="Passifs" value={networth.total_liabilities} negative source={src?.liabilities} />
         </div>
         <div className="cursor-pointer" onClick={() => setSheet("investissements")}>
-          <NetWorthCard label="Investissements" value={networth.breakdown.investments} />
+          <NetWorthCard label="Investissements" value={networth.breakdown.investments} source={src?.investments} />
         </div>
         <div className="cursor-pointer" onClick={() => setSheet("liquidites")}>
           <NetWorthCard
             label="Liquidités"
             value={networth.breakdown.cash + networth.breakdown.savings}
+            source={src?.cash}
           />
         </div>
       </div>
@@ -99,6 +102,7 @@ export default function HomePage() {
         <BreakdownDonut
           breakdown={networth.breakdown}
           onSliceClick={(cls) => setSheet({ class: cls })}
+          sources={src}
         />
         <InstitutionBar
           institutions={networth.by_institution}

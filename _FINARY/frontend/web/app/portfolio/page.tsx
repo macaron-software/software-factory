@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { usePortfolio, useSparklines } from "@/lib/hooks/useApi";
 import { formatEUR, formatCurrency, formatPct, pnlColor } from "@/lib/utils";
 import { Sparkline } from "@/components/charts/Sparkline";
-import { Loading, ErrorState, PageHeader, Badge } from "@/components/ds";
+import { Loading, ErrorState, PageHeader, Badge, SourceBadge } from "@/components/ds";
 
 export default function PortfolioPage() {
   const { data: positions, isLoading, error } = usePortfolio();
@@ -81,7 +81,10 @@ export default function PortfolioPage() {
                   {p.avg_cost ? formatCurrency(p.avg_cost, p.currency) : "—"}
                 </td>
                 <td className="tnum text-right px-3 py-3 text-t-2">
-                  {p.current_price ? formatCurrency(p.current_price, p.currency) : "—"}
+                  <div className="flex items-center justify-end gap-1.5">
+                    {p.current_price ? formatCurrency(p.current_price, p.currency) : "—"}
+                    {p.live ? <SourceBadge source="live" /> : <SourceBadge source="scraped" />}
+                  </div>
                 </td>
                 <td className="tnum text-right px-3 py-3 font-medium text-t-1">{formatEUR(p.value_eur)}</td>
                 <td className={`tnum text-right px-3 py-3 ${pnlColor(p.pnl_eur)}`}>

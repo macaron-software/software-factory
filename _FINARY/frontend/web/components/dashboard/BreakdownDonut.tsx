@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from "recharts";
 import { formatEUR, CHART_COLORS } from "@/lib/utils";
+import { SourceBadge } from "@/components/ds";
+import type { DataSource } from "@/lib/types/api";
 
 interface Props {
   breakdown: {
@@ -12,6 +14,7 @@ interface Props {
     real_estate: number;
   };
   onSliceClick?: (className: string) => void;
+  sources?: Record<string, DataSource>;
 }
 
 const LABELS: Record<string, string> = {
@@ -19,6 +22,13 @@ const LABELS: Record<string, string> = {
   savings: "Epargne",
   investments: "Investissements",
   real_estate: "Immobilier",
+};
+
+const SOURCE_MAP: Record<string, string> = {
+  cash: "cash",
+  savings: "savings",
+  investments: "investments",
+  real_estate: "real_estate",
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -39,12 +49,13 @@ function ActiveShape(props: any) {
   );
 }
 
-export function BreakdownDonut({ breakdown, onSliceClick }: Props) {
+export function BreakdownDonut({ breakdown, onSliceClick, sources }: Props) {
   const [activeIndex, setActiveIndex] = useState<number>(-1);
 
   const data = Object.entries(breakdown)
     .filter(([, v]) => v > 0)
     .map(([key, value]) => ({
+      key,
       name: LABELS[key] || key,
       value,
     }));
@@ -114,12 +125,13 @@ export function BreakdownDonut({ breakdown, onSliceClick }: Props) {
               onMouseLeave={() => setActiveIndex(-1)}
               onClick={() => onSliceClick?.(d.name)}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <div
                   className="w-2.5 h-2.5 rounded-sm shrink-0"
                   style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
                 />
                 <span className="text-[13px]" style={{ color: "var(--text-3)" }}>{d.name}</span>
+                {sources?.[SOURCE_MAP[d.key]] && <SourceBadge source={sources[SOURCE_MAP[d.key]]} />}
               </div>
               <div className="flex items-center gap-3">
                 <span className="tnum text-[13px] font-medium" style={{ color: "var(--text-1)" }}>

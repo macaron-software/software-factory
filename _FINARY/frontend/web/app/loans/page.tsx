@@ -2,7 +2,7 @@
 
 import { useLoans } from "@/lib/hooks/useApi";
 import { formatEUR } from "@/lib/utils";
-import { Loading, ErrorState, PageHeader, Badge, Section } from "@/components/ds";
+import { Loading, ErrorState, PageHeader, Badge, Section, SourceBadge } from "@/components/ds";
 
 export default function LoansPage() {
   const { data: loans, isLoading, error } = useLoans();
@@ -85,25 +85,24 @@ export default function LoansPage() {
                 </td>
                 <td className="tnum text-right px-3 py-3 text-t-4">
                   {loan.insurance_monthly > 0 ? `${formatEUR(loan.insurance_monthly)}/mo` :
-                   <span className="text-t-6 text-caption">Non scrapé</span>}
+                   loan.insurance_monthly === 0 ? <span className="text-t-5 text-caption">Aucune</span> :
+                   <SourceBadge source="mock" />}
                 </td>
                 <td className="tnum text-right px-3 py-3 text-t-4">
                   {loan.rate_numeric != null ? (
-                    <>
-                      {loan.rate_numeric.toFixed(2)}%
-                      <span className={`block text-caption ${
-                        loan.rate_source === "scraped" ? "text-gain" :
-                        loan.rate_source === "computed" ? "text-accent" : "text-t-6"
-                      }`}>
-                        {loan.rate_source === "scraped" ? "scrapé" :
-                         loan.rate_source === "computed" ? "calculé" : ""}
-                      </span>
-                    </>
+                    <div className="flex flex-col items-end gap-1">
+                      <span>{loan.rate_numeric.toFixed(2)}%</span>
+                      <SourceBadge source={
+                        loan.rate_source === "scraped" ? "scraped" :
+                        loan.rate_source === "computed" ? "computed" :
+                        loan.rate_source === "official" ? "official" : "mock"
+                      } />
+                    </div>
                   ) : (
-                    <span className="text-t-6 text-caption">Non scrapé</span>
+                    <SourceBadge source="mock" />
                   )}
                   {loan.real_rate != null && (
-                    <span className={`block text-caption ${loan.real_rate <= 0 ? "text-gain" : "text-loss"}`}>
+                    <span className={`block text-caption mt-1 ${loan.real_rate <= 0 ? "text-gain" : "text-loss"}`}>
                       réel: {loan.real_rate > 0 ? "+" : ""}{loan.real_rate.toFixed(2)}%
                     </span>
                   )}

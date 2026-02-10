@@ -3,7 +3,7 @@
 import { useSCA } from "@/lib/hooks/useApi";
 import { formatEUR, formatNumber, CHART_COLORS } from "@/lib/utils";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { Loading, ErrorState, PageHeader, Badge, Section, StatCard } from "@/components/ds";
+import { Loading, ErrorState, PageHeader, Badge, Section, StatCard, SourceBadge } from "@/components/ds";
 
 export default function ImmobilierPage() {
   const { data: sca, isLoading, error } = useSCA();
@@ -54,6 +54,7 @@ export default function ImmobilierPage() {
             <InfoRow label="Prix/m² estimé" value={formatEUR(prop.price_per_m2_estimate)} />
             <div className="pt-3 mt-3 border-t border-bd-1">
               <InfoRow label="Estimation Bourso" value={formatEUR(prop.bourso_estimate)} highlight />
+              <div className="flex justify-end mt-0.5"><SourceBadge source="estimate" /></div>
               <p className="text-label mt-1 text-right text-t-5">
                 {formatEUR(prop.bourso_estimate_range.low)} — {formatEUR(prop.bourso_estimate_range.high)}
               </p>

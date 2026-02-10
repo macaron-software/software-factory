@@ -37,7 +37,24 @@ export interface Loan {
   remaining: number;
   monthly_payment: number | null;
   rate: string | null;
+  rate_source?: string;
+  rate_numeric?: number | null;
+  rate_type?: string;
+  real_rate?: number | null;
+  inflation_rate?: number;
+  vs_inflation?: string;
+  recommendation?: string;
+  recommendation_detail?: string;
+  insurance_monthly?: number;
+  insurance_annual?: number;
+  insurance_remaining_est?: number;
+  remaining_months?: number;
+  total_interest_remaining?: number;
+  total_payments_remaining?: number;
+  total_cost_remaining?: number;
   start_date?: string;
+  end_date?: string;
+  duration_months?: number;
   status?: string;
 }
 
@@ -141,7 +158,11 @@ export interface PositionValuation extends Position {
   pnl_eur: number;
   pnl_pct: number;
   weight_pct: number;
+  live?: boolean;
+  source?: string;
 }
+
+export type DataSource = "live" | "scraped" | "estimate" | "mock" | "computed" | "official";
 
 export interface NetWorthSummary {
   net_worth: number;
@@ -156,6 +177,7 @@ export interface NetWorthSummary {
   by_institution: { name: string; display_name: string; total: number }[];
   variation_day: number | null;
   variation_month: number | null;
+  sources?: Record<string, DataSource>;
 }
 
 export interface NetWorthHistory {

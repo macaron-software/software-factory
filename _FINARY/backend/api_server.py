@@ -532,6 +532,13 @@ def get_networth():
         "variation_month": None,
         "eur_usd": round(eur_usd, 4),
         "live_prices": live_count,
+        "sources": {
+            "investments": "live" if live_count > 0 else "scraped",
+            "cash": "scraped",
+            "savings": "scraped",
+            "real_estate": "estimate",
+            "liabilities": "scraped",
+        },
     }
 
 
@@ -850,40 +857,48 @@ def get_loans():
     """All loans with inflation analysis & recommendations."""
     # --- REAL rates scraped from CA BFF API (dcam.credit-agricole.fr/bff01/credits/) ---
     # Scraped 2026-02-09 from credit detail pages via CDP
-    CA_SCRAPED = {
-        "00004690214": {  # PTZ
+    CA_SCRAPED_BY_INDEX = [
+        {  # 0: PTZ
+            "account": "00004690214",
             "taux": 0.0, "taux_type": "FIXE", "taux_assurance": None,
+            "mensualite": 0.0,
             "duree_mois": 264, "date_debut": "28/09/2022", "date_fin": "05/10/2044",
         },
-        "00004690213": {  # PAS 1
+        {  # 1: PAS 10K
+            "account": "00004690213",
             "taux": 0.0, "taux_type": "FIXE", "taux_assurance": None,
+            "mensualite": 0.0,
             "duree_mois": 240, "date_debut": "28/09/2022", "date_fin": "05/10/2042",
         },
-        "00004690212": {  # PAS 2
+        {  # 2: PAS 138K
+            "account": "00004690212",
             "taux": 0.98, "taux_type": "FIXE", "taux_assurance": None,
+            "mensualite": 636.91,
             "duree_mois": 240, "date_debut": "27/03/2025", "date_fin": "05/04/2045",
         },
-        "73140424333": {  # PACP (Prêt à Consommer Perso)
+        {  # 3: Prêt Conso
+            "account": "73140424333",
             "taux": 1.972, "taux_type": "FIXE", "taux_assurance": None,
+            "mensualite": 73.69,
             "duree_mois": 72, "date_debut": "25/01/2022", "date_fin": "05/02/2028",
         },
-    }
+    ]
 
     raw_loans = []
-    for credit in P["credit_agricole"]["credits"]:
-        acct = credit.get("account", "")
-        scraped = CA_SCRAPED.get(acct, {})
+    for idx, credit in enumerate(P["credit_agricole"]["credits"]):
+        scraped = CA_SCRAPED_BY_INDEX[idx] if idx < len(CA_SCRAPED_BY_INDEX) else {}
         rate = scraped.get("taux")
+        monthly = scraped.get("mensualite") or credit["monthly_payment"]
         raw_loans.append({
             "institution": "Crédit Agricole",
             "name": credit["name"],
             "type": credit.get("type", "unknown"),
             "borrowed": credit["borrowed"],
             "remaining": credit["remaining"],
-            "monthly_payment": credit["monthly_payment"],
+            "monthly_payment": monthly,
             "rate": rate,
             "rate_source": "scraped" if rate is not None else "unknown",
-            "insurance_monthly": None,  # taux_assurance=null in CA API
+            "insurance_monthly": None,  # CA doesn't expose assurance via BFF
             "start_date": scraped.get("date_debut") or credit.get("start_date"),
             "end_date": scraped.get("date_fin"),
             "duration_months": scraped.get("duree_mois"),
