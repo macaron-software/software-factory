@@ -49,8 +49,22 @@ CATEGORY_RULES: list[tuple[str, str]] = [
 
 # ─── HHI Diversification Score ────────────────────────────────────────────────
 
+ZONE_MAP = {
+    "US": "Amérique du Nord", "CA": "Amérique du Nord",
+    "FR": "Europe", "DE": "Europe", "NL": "Europe", "IE": "Europe",
+    "CN": "Asie", "SG": "Asie", "JP": "Asie", "KR": "Asie",
+    "BR": "Amérique Latine",
+}
+
+COUNTRY_LABELS = {
+    "US": "États-Unis", "FR": "France", "DE": "Allemagne", "NL": "Pays-Bas",
+    "CN": "Chine", "IE": "Irlande", "BR": "Brésil", "CA": "Canada", "SG": "Singapour",
+}
+
+
 def compute_diversification(positions: list[dict]) -> dict:
-    """Compute diversification score using Herfindahl-Hirschman Index."""
+    """Compute diversification score using Herfindahl-Hirschman Index.
+    Returns detailed sector/country/zone breakdowns with position lists."""
     if not positions:
         return {"score": 0, "max_score": 10, "details": {}, "breakdown": {}}
 
@@ -61,42 +75,83 @@ def compute_diversification(positions: list[dict]) -> dict:
     weights = [p["value_eur"] / total_value * 100 for p in positions]
     weights_sorted = sorted(weights, reverse=True)
 
-    # HHI = sum of squared market shares (0-10000 scale)
     hhi = sum(w ** 2 for w in weights)
 
-    # Concentration metrics
     top1 = weights_sorted[0] if weights_sorted else 0
     top3 = sum(weights_sorted[:3])
     top5 = sum(weights_sorted[:5])
 
-    sectors = set(p.get("sector", "Other") for p in positions)
-    countries = set(p.get("country", "??") for p in positions)
-
-    # Country zone mapping
-    zones = set()
-    zone_map = {
-        "US": "Amérique du Nord", "CA": "Amérique du Nord",
-        "FR": "Europe", "DE": "Europe", "NL": "Europe", "IE": "Europe",
-        "CN": "Asie", "SG": "Asie", "JP": "Asie", "KR": "Asie",
-        "BR": "Amérique Latine",
-    }
+    # --- Sector aggregation ---
+    sector_agg: dict[str, float] = {}
+    sector_positions: dict[str, list[dict]] = {}
     for p in positions:
-        z = zone_map.get(p.get("country", ""), "Autre")
-        zones.add(z)
+        sec = p.get("sector", "Other")
+        val = p["value_eur"]
+        sector_agg[sec] = sector_agg.get(sec, 0) + val
+        sector_positions.setdefault(sec, []).append({
+            "ticker": p.get("ticker", "?"),
+            "name": p.get("name", ""),
+            "value_eur": round(val, 2),
+            "weight_pct": round(val / total_value * 100, 1),
+        })
 
-    max_ticker = ""
-    max_w = 0
+    sectors_detail = sorted([
+        {"name": s, "value_eur": round(v, 2), "weight_pct": round(v / total_value * 100, 1),
+         "positions": sorted(sector_positions[s], key=lambda x: -x["value_eur"])}
+        for s, v in sector_agg.items()
+    ], key=lambda x: -x["value_eur"])
+
+    # Sector HHI
+    sector_hhi = sum((v / total_value * 100) ** 2 for v in sector_agg.values())
+
+    # --- Country aggregation ---
+    country_agg: dict[str, float] = {}
+    country_positions: dict[str, list[dict]] = {}
     for p in positions:
-        w = p["value_eur"] / total_value * 100
-        if w > max_w:
-            max_w = w
-            max_ticker = p.get("ticker", "")
+        cc = p.get("country", "??")
+        val = p["value_eur"]
+        country_agg[cc] = country_agg.get(cc, 0) + val
+        country_positions.setdefault(cc, []).append({
+            "ticker": p.get("ticker", "?"),
+            "name": p.get("name", ""),
+            "value_eur": round(val, 2),
+            "weight_pct": round(val / total_value * 100, 1),
+        })
 
-    # Score calculation /10:
-    # - Concentration (0-4 points): HHI penalty
-    #   HHI < 1000 (well diversified) = 4pts
-    #   HHI 1000-2500 (moderate) = 2pts
-    #   HHI > 2500 (concentrated) = 0-1pts
+    countries_detail = sorted([
+        {"code": c, "name": COUNTRY_LABELS.get(c, c), "value_eur": round(v, 2),
+         "weight_pct": round(v / total_value * 100, 1),
+         "zone": ZONE_MAP.get(c, "Autre"),
+         "positions": sorted(country_positions[c], key=lambda x: -x["value_eur"])}
+        for c, v in country_agg.items()
+    ], key=lambda x: -x["value_eur"])
+
+    # --- Zone aggregation ---
+    zone_agg: dict[str, float] = {}
+    for c, v in country_agg.items():
+        z = ZONE_MAP.get(c, "Autre")
+        zone_agg[z] = zone_agg.get(z, 0) + v
+
+    zones_detail = sorted([
+        {"name": z, "value_eur": round(v, 2), "weight_pct": round(v / total_value * 100, 1)}
+        for z, v in zone_agg.items()
+    ], key=lambda x: -x["value_eur"])
+
+    zone_hhi = sum((v / total_value * 100) ** 2 for v in zone_agg.values())
+
+    # --- Concentration top N ---
+    top_positions = sorted(
+        [{"ticker": p.get("ticker", "?"), "name": p.get("name", ""),
+          "value_eur": round(p["value_eur"], 2),
+          "weight_pct": round(p["value_eur"] / total_value * 100, 1)}
+         for p in positions],
+        key=lambda x: -x["value_eur"]
+    )
+
+    max_ticker = top_positions[0]["ticker"] if top_positions else ""
+    max_w = top_positions[0]["weight_pct"] if top_positions else 0
+
+    # Score calculation /10
     if hhi < 500:
         concentration_score = 4.0
     elif hhi < 1000:
@@ -108,16 +163,12 @@ def compute_diversification(positions: list[dict]) -> dict:
     else:
         concentration_score = 0.0
 
-    # - Sectors (0-3 points)
-    sector_score = min(3.0, len(sectors) * 0.3)
-
-    # - Geographic (0-3 points)
-    geo_score = min(3.0, len(zones) * 0.75)
+    sector_score = min(3.0, len(sector_agg) * 0.3)
+    geo_score = min(3.0, len(zone_agg) * 0.75)
 
     total_score = round(concentration_score + sector_score + geo_score, 1)
     total_score = min(10, total_score)
 
-    # Rating
     if total_score <= 3:
         rating = "Insuffisant"
     elif total_score <= 5:
@@ -127,16 +178,47 @@ def compute_diversification(positions: list[dict]) -> dict:
     else:
         rating = "Bon"
 
+    # --- Rebalancing suggestions ---
+    suggestions = []
+    if max_w > 30:
+        suggestions.append({
+            "type": "reduce",
+            "ticker": max_ticker,
+            "reason": f"{max_ticker} = {max_w:.0f}% du portefeuille. Cible < 25% pour réduire le risque idiosyncratique.",
+            "severity": "critical" if max_w > 40 else "warn",
+        })
+    if top3 > 75:
+        suggestions.append({
+            "type": "diversify",
+            "reason": f"Top 3 positions = {top3:.0f}%. Diversifiez vers d'autres secteurs/zones.",
+            "severity": "warn",
+        })
+    weak_zones = {"Asie", "Amérique Latine", "Autre"} - set(zone_agg.keys())
+    missing_zones = {"Asie", "Amérique Latine"} - set(z for z, v in zone_agg.items() if v / total_value > 0.05)
+    if missing_zones:
+        suggestions.append({
+            "type": "geographic",
+            "reason": f"Sous-exposé: {', '.join(sorted(missing_zones))}. Considérez un ETF Emerging Markets.",
+            "severity": "info",
+        })
+    if sector_hhi > 3000:
+        top_sector = sectors_detail[0]
+        suggestions.append({
+            "type": "sector",
+            "reason": f"Concentration sectorielle: {top_sector['name']} = {top_sector['weight_pct']:.0f}%. Diversifiez.",
+            "severity": "warn",
+        })
+
     return {
         "score": total_score,
         "max_score": 10,
         "rating": rating,
         "details": {
             "num_positions": len(positions),
-            "num_sectors": len(sectors),
-            "num_countries": len(countries),
-            "num_zones": len(zones),
-            "zones": sorted(zones),
+            "num_sectors": len(sector_agg),
+            "num_countries": len(country_agg),
+            "num_zones": len(zone_agg),
+            "zones": sorted(zone_agg.keys()),
             "max_weight_pct": round(max_w, 1),
             "max_weight_ticker": max_ticker,
             "top3_weight_pct": round(top3, 1),
@@ -144,10 +226,28 @@ def compute_diversification(positions: list[dict]) -> dict:
             "hhi": round(hhi),
         },
         "breakdown": {
-            "concentration": {"score": concentration_score, "max": 4, "hhi": round(hhi)},
-            "sectoral": {"score": round(sector_score, 1), "max": 3, "sectors": len(sectors)},
-            "geographic": {"score": round(geo_score, 1), "max": 3, "zones": len(zones)},
+            "concentration": {
+                "score": concentration_score, "max": 4, "hhi": round(hhi),
+                "top_positions": top_positions[:10],
+                "top1_pct": round(top1, 1),
+                "top3_pct": round(top3, 1),
+                "top5_pct": round(top5, 1),
+            },
+            "sectoral": {
+                "score": round(sector_score, 1), "max": 3,
+                "sectors": len(sector_agg),
+                "hhi": round(sector_hhi),
+                "detail": sectors_detail,
+            },
+            "geographic": {
+                "score": round(geo_score, 1), "max": 3,
+                "zones": len(zone_agg),
+                "hhi": round(zone_hhi),
+                "zones_detail": zones_detail,
+                "countries_detail": countries_detail,
+            },
         },
+        "suggestions": suggestions,
     }
 
 

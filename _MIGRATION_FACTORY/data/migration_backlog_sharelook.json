@@ -1,15 +1,38 @@
 {
   "project_id": "sharelook",
-  "generated_at": "2026-02-10T16:34:38.087800",
-  "total_tasks": 50,
+  "generated_at": "2026-02-10T16:44:09.486138",
+  "total_tasks": 45,
   "tasks": [
+    {
+      "id": "sharelook-deps-ai12-15to16",
+      "project_id": "sharelook",
+      "phase": "deps",
+      "framework": "angular",
+      "from_version": "15.2.9",
+      "to_version": "16.2.12",
+      "breaking_changes": [
+        "ANG-16-001"
+      ],
+      "codemod_available": false,
+      "risk_score": 2,
+      "wsjf_score": 29.0,
+      "rollback_strategy": "git_tag",
+      "files": [
+        "ai12-reporting-ihm/package.json"
+      ],
+      "file_count": 1,
+      "status": "pending",
+      "description": "AI12: Update Angular 15\u219216 (intermediate step before 16\u219217)",
+      "metadata": {},
+      "created_at": "2026-02-10T16:44:09.486034"
+    },
     {
       "id": "sharelook-oidc-001",
       "project_id": "sharelook",
       "phase": "oidc",
       "framework": "angular",
-      "from_version": "angular-oauth2-oidc 13.x",
-      "to_version": "angular-oauth2-oidc 17.x",
+      "from_version": "angular-auth-oidc-client 16.0",
+      "to_version": "angular-auth-oidc-client 17.0",
       "breaking_changes": [
         "ANG-17-009"
       ],
@@ -22,9 +45,9 @@
       ],
       "file_count": 1,
       "status": "pending",
-      "description": "Update angular-oauth2-oidc 13\u219217 dependencies (AI08)",
+      "description": "Update angular-auth-oidc-client + @cddng/auth-oidc-apim 16\u219217 (AI08)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087695"
+      "created_at": "2026-02-10T16:44:09.486047"
     },
     {
       "id": "sharelook-deps-001",
@@ -49,15 +72,15 @@
       "status": "pending",
       "description": "Update Angular 16\u219217 dependencies (both apps)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087680"
+      "created_at": "2026-02-10T16:44:09.486044"
     },
     {
       "id": "sharelook-oidc-003",
       "project_id": "sharelook",
       "phase": "oidc",
       "framework": "angular",
-      "from_version": "angular-oauth2-oidc 13.x",
-      "to_version": "angular-oauth2-oidc 17.x",
+      "from_version": "angular-auth-oidc-client 16.0",
+      "to_version": "angular-auth-oidc-client 17.0",
       "breaking_changes": [
         "ANG-17-009"
       ],
@@ -70,12 +93,12 @@
       ],
       "file_count": 2,
       "status": "pending",
-      "description": "Update auth guards with new OIDC API (AI08)",
+      "description": "Update auth guards with angular-auth-oidc-client 17 API (AI08)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087701"
+      "created_at": "2026-02-10T16:44:09.486051"
     },
     {
-      "id": "sharelook-flex-layout-ai08-001",
+      "id": "sharelook-flex-layout-ai08-domain",
       "project_id": "sharelook",
       "phase": "flex-layout",
       "framework": "angular",
@@ -91,12 +114,12 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 1 \u2192 CSS Grid/CDK (~14 occurrences)",
+      "description": "Remove @angular/flex-layout AI08 feature \"domain\" \u2192 CSS Grid/CDK (~100 occurrences)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087734"
+      "created_at": "2026-02-10T16:44:09.486087"
     },
     {
-      "id": "sharelook-flex-layout-ai08-002",
+      "id": "sharelook-flex-layout-ai08-management",
       "project_id": "sharelook",
       "phase": "flex-layout",
       "framework": "angular",
@@ -112,12 +135,12 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 2 \u2192 CSS Grid/CDK (~14 occurrences)",
+      "description": "Remove @angular/flex-layout AI08 feature \"management\" \u2192 CSS Grid/CDK (~40 occurrences)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087736"
+      "created_at": "2026-02-10T16:44:09.486089"
     },
     {
-      "id": "sharelook-flex-layout-ai08-003",
+      "id": "sharelook-flex-layout-ai08-contacts",
       "project_id": "sharelook",
       "phase": "flex-layout",
       "framework": "angular",
@@ -133,12 +156,12 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 3 \u2192 CSS Grid/CDK (~14 occurrences)",
+      "description": "Remove @angular/flex-layout AI08 feature \"contacts\" \u2192 CSS Grid/CDK (~30 occurrences)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087738"
+      "created_at": "2026-02-10T16:44:09.486091"
     },
     {
-      "id": "sharelook-flex-layout-ai08-004",
+      "id": "sharelook-flex-layout-ai08-referentials",
       "project_id": "sharelook",
       "phase": "flex-layout",
       "framework": "angular",
@@ -154,12 +177,12 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 4 \u2192 CSS Grid/CDK (~14 occurrences)",
+      "description": "Remove @angular/flex-layout AI08 feature \"referentials\" \u2192 CSS Grid/CDK (~25 occurrences)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087740"
+      "created_at": "2026-02-10T16:44:09.486093"
     },
     {
-      "id": "sharelook-flex-layout-ai08-005",
+      "id": "sharelook-flex-layout-ai08-report-config",
       "project_id": "sharelook",
       "phase": "flex-layout",
       "framework": "angular",
@@ -175,12 +198,12 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 5 \u2192 CSS Grid/CDK (~14 occurrences)",
+      "description": "Remove @angular/flex-layout AI08 feature \"report-config\" \u2192 CSS Grid/CDK (~20 occurrences)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087741"
+      "created_at": "2026-02-10T16:44:09.486095"
     },
     {
-      "id": "sharelook-flex-layout-ai08-006",
+      "id": "sharelook-flex-layout-ai08-metadata",
       "project_id": "sharelook",
       "phase": "flex-layout",
       "framework": "angular",
@@ -196,12 +219,12 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 6 \u2192 CSS Grid/CDK (~14 occurrences)",
+      "description": "Remove @angular/flex-layout AI08 feature \"metadata\" \u2192 CSS Grid/CDK (~18 occurrences)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087743"
+      "created_at": "2026-02-10T16:44:09.486097"
     },
     {
-      "id": "sharelook-flex-layout-ai08-007",
+      "id": "sharelook-flex-layout-ai08-collectable-topics",
       "project_id": "sharelook",
       "phase": "flex-layout",
       "framework": "angular",
@@ -217,12 +240,12 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 7 \u2192 CSS Grid/CDK (~14 occurrences)",
+      "description": "Remove @angular/flex-layout AI08 feature \"collectable-topics\" \u2192 CSS Grid/CDK (~15 occurrences)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087745"
+      "created_at": "2026-02-10T16:44:09.486099"
     },
     {
-      "id": "sharelook-flex-layout-ai08-008",
+      "id": "sharelook-flex-layout-ai08-home",
       "project_id": "sharelook",
       "phase": "flex-layout",
       "framework": "angular",
@@ -238,12 +261,12 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 8 \u2192 CSS Grid/CDK (~14 occurrences)",
+      "description": "Remove @angular/flex-layout AI08 feature \"home\" \u2192 CSS Grid/CDK (~15 occurrences)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087746"
+      "created_at": "2026-02-10T16:44:09.486101"
     },
     {
-      "id": "sharelook-flex-layout-ai08-009",
+      "id": "sharelook-flex-layout-ai08-shared",
       "project_id": "sharelook",
       "phase": "flex-layout",
       "framework": "angular",
@@ -259,12 +282,12 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 9 \u2192 CSS Grid/CDK (~14 occurrences)",
+      "description": "Remove @angular/flex-layout AI08 feature \"shared\" \u2192 CSS Grid/CDK (~15 occurrences)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087748"
+      "created_at": "2026-02-10T16:44:09.486103"
     },
     {
-      "id": "sharelook-flex-layout-ai08-010",
+      "id": "sharelook-flex-layout-ai08-core",
       "project_id": "sharelook",
       "phase": "flex-layout",
       "framework": "angular",
@@ -280,12 +303,12 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 10 \u2192 CSS Grid/CDK (~14 occurrences)",
+      "description": "Remove @angular/flex-layout AI08 feature \"core\" \u2192 CSS Grid/CDK (~5 occurrences)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087750"
+      "created_at": "2026-02-10T16:44:09.486104"
     },
     {
-      "id": "sharelook-flex-layout-ai08-011",
+      "id": "sharelook-flex-layout-ai12-all",
       "project_id": "sharelook",
       "phase": "flex-layout",
       "framework": "angular",
@@ -301,269 +324,17 @@
       "files": [],
       "file_count": 1,
       "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 11 \u2192 CSS Grid/CDK (~14 occurrences)",
+      "description": "Remove @angular/flex-layout AI12 (all features, ~10 occurrences) \u2192 CSS Grid/CDK",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087751"
-    },
-    {
-      "id": "sharelook-flex-layout-ai08-012",
-      "project_id": "sharelook",
-      "phase": "flex-layout",
-      "framework": "angular",
-      "from_version": "16.2.12",
-      "to_version": "17.3.0",
-      "breaking_changes": [
-        "ANG-17-006"
-      ],
-      "codemod_available": false,
-      "risk_score": 7,
-      "wsjf_score": 13.0,
-      "rollback_strategy": "git_tag",
-      "files": [],
-      "file_count": 1,
-      "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 12 \u2192 CSS Grid/CDK (~14 occurrences)",
-      "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087753"
-    },
-    {
-      "id": "sharelook-flex-layout-ai08-013",
-      "project_id": "sharelook",
-      "phase": "flex-layout",
-      "framework": "angular",
-      "from_version": "16.2.12",
-      "to_version": "17.3.0",
-      "breaking_changes": [
-        "ANG-17-006"
-      ],
-      "codemod_available": false,
-      "risk_score": 7,
-      "wsjf_score": 13.0,
-      "rollback_strategy": "git_tag",
-      "files": [],
-      "file_count": 1,
-      "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 13 \u2192 CSS Grid/CDK (~14 occurrences)",
-      "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087755"
-    },
-    {
-      "id": "sharelook-flex-layout-ai08-014",
-      "project_id": "sharelook",
-      "phase": "flex-layout",
-      "framework": "angular",
-      "from_version": "16.2.12",
-      "to_version": "17.3.0",
-      "breaking_changes": [
-        "ANG-17-006"
-      ],
-      "codemod_available": false,
-      "risk_score": 7,
-      "wsjf_score": 13.0,
-      "rollback_strategy": "git_tag",
-      "files": [],
-      "file_count": 1,
-      "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 14 \u2192 CSS Grid/CDK (~14 occurrences)",
-      "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087756"
-    },
-    {
-      "id": "sharelook-flex-layout-ai08-015",
-      "project_id": "sharelook",
-      "phase": "flex-layout",
-      "framework": "angular",
-      "from_version": "16.2.12",
-      "to_version": "17.3.0",
-      "breaking_changes": [
-        "ANG-17-006"
-      ],
-      "codemod_available": false,
-      "risk_score": 7,
-      "wsjf_score": 13.0,
-      "rollback_strategy": "git_tag",
-      "files": [],
-      "file_count": 1,
-      "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 15 \u2192 CSS Grid/CDK (~14 occurrences)",
-      "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087759"
-    },
-    {
-      "id": "sharelook-flex-layout-ai08-016",
-      "project_id": "sharelook",
-      "phase": "flex-layout",
-      "framework": "angular",
-      "from_version": "16.2.12",
-      "to_version": "17.3.0",
-      "breaking_changes": [
-        "ANG-17-006"
-      ],
-      "codemod_available": false,
-      "risk_score": 7,
-      "wsjf_score": 13.0,
-      "rollback_strategy": "git_tag",
-      "files": [],
-      "file_count": 1,
-      "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 16 \u2192 CSS Grid/CDK (~14 occurrences)",
-      "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087761"
-    },
-    {
-      "id": "sharelook-flex-layout-ai08-017",
-      "project_id": "sharelook",
-      "phase": "flex-layout",
-      "framework": "angular",
-      "from_version": "16.2.12",
-      "to_version": "17.3.0",
-      "breaking_changes": [
-        "ANG-17-006"
-      ],
-      "codemod_available": false,
-      "risk_score": 7,
-      "wsjf_score": 13.0,
-      "rollback_strategy": "git_tag",
-      "files": [],
-      "file_count": 1,
-      "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 17 \u2192 CSS Grid/CDK (~14 occurrences)",
-      "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087763"
-    },
-    {
-      "id": "sharelook-flex-layout-ai08-018",
-      "project_id": "sharelook",
-      "phase": "flex-layout",
-      "framework": "angular",
-      "from_version": "16.2.12",
-      "to_version": "17.3.0",
-      "breaking_changes": [
-        "ANG-17-006"
-      ],
-      "codemod_available": false,
-      "risk_score": 7,
-      "wsjf_score": 13.0,
-      "rollback_strategy": "git_tag",
-      "files": [],
-      "file_count": 1,
-      "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 18 \u2192 CSS Grid/CDK (~14 occurrences)",
-      "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087764"
-    },
-    {
-      "id": "sharelook-flex-layout-ai08-019",
-      "project_id": "sharelook",
-      "phase": "flex-layout",
-      "framework": "angular",
-      "from_version": "16.2.12",
-      "to_version": "17.3.0",
-      "breaking_changes": [
-        "ANG-17-006"
-      ],
-      "codemod_available": false,
-      "risk_score": 7,
-      "wsjf_score": 13.0,
-      "rollback_strategy": "git_tag",
-      "files": [],
-      "file_count": 1,
-      "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 19 \u2192 CSS Grid/CDK (~14 occurrences)",
-      "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087766"
-    },
-    {
-      "id": "sharelook-flex-layout-ai08-020",
-      "project_id": "sharelook",
-      "phase": "flex-layout",
-      "framework": "angular",
-      "from_version": "16.2.12",
-      "to_version": "17.3.0",
-      "breaking_changes": [
-        "ANG-17-006"
-      ],
-      "codemod_available": false,
-      "risk_score": 7,
-      "wsjf_score": 13.0,
-      "rollback_strategy": "git_tag",
-      "files": [],
-      "file_count": 1,
-      "status": "pending",
-      "description": "Remove @angular/flex-layout AI08 group 20 \u2192 CSS Grid/CDK (~14 occurrences)",
-      "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087768"
-    },
-    {
-      "id": "sharelook-flex-layout-ai12-001",
-      "project_id": "sharelook",
-      "phase": "flex-layout",
-      "framework": "angular",
-      "from_version": "15.2.9",
-      "to_version": "17.3.0",
-      "breaking_changes": [
-        "ANG-17-006"
-      ],
-      "codemod_available": false,
-      "risk_score": 7,
-      "wsjf_score": 13.0,
-      "rollback_strategy": "git_tag",
-      "files": [],
-      "file_count": 1,
-      "status": "pending",
-      "description": "Remove @angular/flex-layout AI12 group 1 \u2192 CSS Grid/CDK (~3 occurrences)",
-      "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087770"
-    },
-    {
-      "id": "sharelook-flex-layout-ai12-002",
-      "project_id": "sharelook",
-      "phase": "flex-layout",
-      "framework": "angular",
-      "from_version": "15.2.9",
-      "to_version": "17.3.0",
-      "breaking_changes": [
-        "ANG-17-006"
-      ],
-      "codemod_available": false,
-      "risk_score": 7,
-      "wsjf_score": 13.0,
-      "rollback_strategy": "git_tag",
-      "files": [],
-      "file_count": 1,
-      "status": "pending",
-      "description": "Remove @angular/flex-layout AI12 group 2 \u2192 CSS Grid/CDK (~3 occurrences)",
-      "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087771"
-    },
-    {
-      "id": "sharelook-flex-layout-ai12-003",
-      "project_id": "sharelook",
-      "phase": "flex-layout",
-      "framework": "angular",
-      "from_version": "15.2.9",
-      "to_version": "17.3.0",
-      "breaking_changes": [
-        "ANG-17-006"
-      ],
-      "codemod_available": false,
-      "risk_score": 7,
-      "wsjf_score": 13.0,
-      "rollback_strategy": "git_tag",
-      "files": [],
-      "file_count": 1,
-      "status": "pending",
-      "description": "Remove @angular/flex-layout AI12 group 3 \u2192 CSS Grid/CDK (~3 occurrences)",
-      "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087773"
+      "created_at": "2026-02-10T16:44:09.486107"
     },
     {
       "id": "sharelook-oidc-002",
       "project_id": "sharelook",
       "phase": "oidc",
       "framework": "angular",
-      "from_version": "angular-oauth2-oidc 13.x",
-      "to_version": "angular-oauth2-oidc 17.x",
+      "from_version": "angular-auth-oidc-client 16.0",
+      "to_version": "angular-auth-oidc-client 17.0",
       "breaking_changes": [
         "ANG-17-009"
       ],
@@ -576,17 +347,17 @@
       ],
       "file_count": 3,
       "status": "pending",
-      "description": "Update OIDC types and interfaces (AI08)",
+      "description": "Update OIDC types and interfaces with angular-auth-oidc-client 17 API (AI08)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087698"
+      "created_at": "2026-02-10T16:44:09.486049"
     },
     {
       "id": "sharelook-oidc-004",
       "project_id": "sharelook",
       "phase": "oidc",
       "framework": "angular",
-      "from_version": "angular-oauth2-oidc 13.x",
-      "to_version": "angular-oauth2-oidc 17.x",
+      "from_version": "angular-auth-oidc-client 16.0",
+      "to_version": "angular-auth-oidc-client 17.0",
       "breaking_changes": [
         "ANG-17-009"
       ],
@@ -599,16 +370,16 @@
       ],
       "file_count": 3,
       "status": "pending",
-      "description": "Update auth tests for OIDC 17 (AI08)",
+      "description": "Update auth tests for angular-auth-oidc-client 17 (AI08)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087703"
+      "created_at": "2026-02-10T16:44:09.486053"
     },
     {
-      "id": "sharelook-standalone-ai12-001",
+      "id": "sharelook-standalone-ai12-core",
       "project_id": "sharelook",
       "phase": "standalone",
       "framework": "angular",
-      "from_version": "15.2.9",
+      "from_version": "16.2.12",
       "to_version": "17.3.0",
       "breaking_changes": [
         "ANG-17-002",
@@ -621,16 +392,16 @@
       "files": [],
       "file_count": 3,
       "status": "pending",
-      "description": "Migrate AI12 feature \"reporting\" to standalone (~3 modules)",
+      "description": "Migrate AI12 feature \"core\" to standalone (~3 modules)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087727"
+      "created_at": "2026-02-10T16:44:09.486079"
     },
     {
-      "id": "sharelook-standalone-ai12-002",
+      "id": "sharelook-standalone-ai12-home",
       "project_id": "sharelook",
       "phase": "standalone",
       "framework": "angular",
-      "from_version": "15.2.9",
+      "from_version": "16.2.12",
       "to_version": "17.3.0",
       "breaking_changes": [
         "ANG-17-002",
@@ -643,16 +414,38 @@
       "files": [],
       "file_count": 3,
       "status": "pending",
-      "description": "Migrate AI12 feature \"dashboard\" to standalone (~3 modules)",
+      "description": "Migrate AI12 feature \"home\" to standalone (~3 modules)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087729"
+      "created_at": "2026-02-10T16:44:09.486081"
     },
     {
-      "id": "sharelook-standalone-ai12-003",
+      "id": "sharelook-standalone-ai12-report",
       "project_id": "sharelook",
       "phase": "standalone",
       "framework": "angular",
-      "from_version": "15.2.9",
+      "from_version": "16.2.12",
+      "to_version": "17.3.0",
+      "breaking_changes": [
+        "ANG-17-002",
+        "ANG-17-003"
+      ],
+      "codemod_available": true,
+      "risk_score": 7,
+      "wsjf_score": 4.67,
+      "rollback_strategy": "git_tag",
+      "files": [],
+      "file_count": 3,
+      "status": "pending",
+      "description": "Migrate AI12 feature \"report\" to standalone (~3 modules)",
+      "metadata": {},
+      "created_at": "2026-02-10T16:44:09.486082"
+    },
+    {
+      "id": "sharelook-standalone-ai12-shared",
+      "project_id": "sharelook",
+      "phase": "standalone",
+      "framework": "angular",
+      "from_version": "16.2.12",
       "to_version": "17.3.0",
       "breaking_changes": [
         "ANG-17-002",
@@ -667,14 +460,14 @@
       "status": "pending",
       "description": "Migrate AI12 feature \"shared\" to standalone (~3 modules)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087731"
+      "created_at": "2026-02-10T16:44:09.486084"
     },
     {
-      "id": "sharelook-control-flow-ai12-001",
+      "id": "sharelook-control-flow-ai12-core",
       "project_id": "sharelook",
       "phase": "control-flow",
       "framework": "angular",
-      "from_version": "15.2.9",
+      "from_version": "16.2.12",
       "to_version": "17.3.0",
       "breaking_changes": [
         "ANG-17-005"
@@ -686,16 +479,16 @@
       "files": [],
       "file_count": 3,
       "status": "pending",
-      "description": "Migrate AI12 feature \"reporting\" to @if/@for syntax (~3 components)",
+      "description": "Migrate AI12 feature \"core\" to @if/@for syntax (~3 components)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087791"
+      "created_at": "2026-02-10T16:44:09.486128"
     },
     {
-      "id": "sharelook-control-flow-ai12-002",
+      "id": "sharelook-control-flow-ai12-home",
       "project_id": "sharelook",
       "phase": "control-flow",
       "framework": "angular",
-      "from_version": "15.2.9",
+      "from_version": "16.2.12",
       "to_version": "17.3.0",
       "breaking_changes": [
         "ANG-17-005"
@@ -707,16 +500,37 @@
       "files": [],
       "file_count": 3,
       "status": "pending",
-      "description": "Migrate AI12 feature \"dashboard\" to @if/@for syntax (~3 components)",
+      "description": "Migrate AI12 feature \"home\" to @if/@for syntax (~3 components)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087793"
+      "created_at": "2026-02-10T16:44:09.486130"
     },
     {
-      "id": "sharelook-control-flow-ai12-003",
+      "id": "sharelook-control-flow-ai12-report",
       "project_id": "sharelook",
       "phase": "control-flow",
       "framework": "angular",
-      "from_version": "15.2.9",
+      "from_version": "16.2.12",
+      "to_version": "17.3.0",
+      "breaking_changes": [
+        "ANG-17-005"
+      ],
+      "codemod_available": true,
+      "risk_score": 3,
+      "wsjf_score": 4.67,
+      "rollback_strategy": "git_tag",
+      "files": [],
+      "file_count": 3,
+      "status": "pending",
+      "description": "Migrate AI12 feature \"report\" to @if/@for syntax (~3 components)",
+      "metadata": {},
+      "created_at": "2026-02-10T16:44:09.486132"
+    },
+    {
+      "id": "sharelook-control-flow-ai12-shared",
+      "project_id": "sharelook",
+      "phase": "control-flow",
+      "framework": "angular",
+      "from_version": "16.2.12",
       "to_version": "17.3.0",
       "breaking_changes": [
         "ANG-17-005"
@@ -730,10 +544,10 @@
       "status": "pending",
       "description": "Migrate AI12 feature \"shared\" to @if/@for syntax (~3 components)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087795"
+      "created_at": "2026-02-10T16:44:09.486133"
     },
     {
-      "id": "sharelook-standalone-ai08-001",
+      "id": "sharelook-standalone-ai08-collectable-topics",
       "project_id": "sharelook",
       "phase": "standalone",
       "framework": "angular",
@@ -745,17 +559,17 @@
       ],
       "codemod_available": true,
       "risk_score": 7,
-      "wsjf_score": 2.8,
+      "wsjf_score": 3.5,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 5,
+      "file_count": 4,
       "status": "pending",
-      "description": "Migrate AI08 feature \"authentication\" to standalone (~5 modules)",
+      "description": "Migrate AI08 feature \"collectable-topics\" to standalone (~4 modules)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087709"
+      "created_at": "2026-02-10T16:44:09.486057"
     },
     {
-      "id": "sharelook-standalone-ai08-002",
+      "id": "sharelook-standalone-ai08-contacts",
       "project_id": "sharelook",
       "phase": "standalone",
       "framework": "angular",
@@ -767,17 +581,17 @@
       ],
       "codemod_available": true,
       "risk_score": 7,
-      "wsjf_score": 2.8,
+      "wsjf_score": 3.5,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 5,
+      "file_count": 4,
       "status": "pending",
-      "description": "Migrate AI08 feature \"management\" to standalone (~5 modules)",
+      "description": "Migrate AI08 feature \"contacts\" to standalone (~4 modules)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087712"
+      "created_at": "2026-02-10T16:44:09.486060"
     },
     {
-      "id": "sharelook-standalone-ai08-003",
+      "id": "sharelook-standalone-ai08-core",
       "project_id": "sharelook",
       "phase": "standalone",
       "framework": "angular",
@@ -789,17 +603,17 @@
       ],
       "codemod_available": true,
       "risk_score": 7,
-      "wsjf_score": 2.8,
+      "wsjf_score": 3.5,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 5,
+      "file_count": 4,
       "status": "pending",
-      "description": "Migrate AI08 feature \"reporting\" to standalone (~5 modules)",
+      "description": "Migrate AI08 feature \"core\" to standalone (~4 modules)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087714"
+      "created_at": "2026-02-10T16:44:09.486062"
     },
     {
-      "id": "sharelook-standalone-ai08-004",
+      "id": "sharelook-standalone-ai08-home",
       "project_id": "sharelook",
       "phase": "standalone",
       "framework": "angular",
@@ -811,17 +625,17 @@
       ],
       "codemod_available": true,
       "risk_score": 7,
-      "wsjf_score": 2.8,
+      "wsjf_score": 3.5,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 5,
+      "file_count": 4,
       "status": "pending",
-      "description": "Migrate AI08 feature \"rules\" to standalone (~5 modules)",
+      "description": "Migrate AI08 feature \"home\" to standalone (~4 modules)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087716"
+      "created_at": "2026-02-10T16:44:09.486066"
     },
     {
-      "id": "sharelook-standalone-ai08-005",
+      "id": "sharelook-standalone-ai08-management",
       "project_id": "sharelook",
       "phase": "standalone",
       "framework": "angular",
@@ -833,17 +647,17 @@
       ],
       "codemod_available": true,
       "risk_score": 7,
-      "wsjf_score": 2.8,
+      "wsjf_score": 3.5,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 5,
+      "file_count": 4,
       "status": "pending",
-      "description": "Migrate AI08 feature \"actions\" to standalone (~5 modules)",
+      "description": "Migrate AI08 feature \"management\" to standalone (~4 modules)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087718"
+      "created_at": "2026-02-10T16:44:09.486068"
     },
     {
-      "id": "sharelook-standalone-ai08-006",
+      "id": "sharelook-standalone-ai08-metadata",
       "project_id": "sharelook",
       "phase": "standalone",
       "framework": "angular",
@@ -855,17 +669,17 @@
       ],
       "codemod_available": true,
       "risk_score": 7,
-      "wsjf_score": 2.8,
+      "wsjf_score": 3.5,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 5,
+      "file_count": 4,
       "status": "pending",
-      "description": "Migrate AI08 feature \"referentials\" to standalone (~5 modules)",
+      "description": "Migrate AI08 feature \"metadata\" to standalone (~4 modules)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087720"
+      "created_at": "2026-02-10T16:44:09.486070"
     },
     {
-      "id": "sharelook-standalone-ai08-007",
+      "id": "sharelook-standalone-ai08-referentials",
       "project_id": "sharelook",
       "phase": "standalone",
       "framework": "angular",
@@ -877,17 +691,17 @@
       ],
       "codemod_available": true,
       "risk_score": 7,
-      "wsjf_score": 2.8,
+      "wsjf_score": 3.5,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 5,
+      "file_count": 4,
       "status": "pending",
-      "description": "Migrate AI08 feature \"monitoring\" to standalone (~5 modules)",
+      "description": "Migrate AI08 feature \"referentials\" to standalone (~4 modules)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087721"
+      "created_at": "2026-02-10T16:44:09.486071"
     },
     {
-      "id": "sharelook-standalone-ai08-008",
+      "id": "sharelook-standalone-ai08-report-config",
       "project_id": "sharelook",
       "phase": "standalone",
       "framework": "angular",
@@ -899,17 +713,39 @@
       ],
       "codemod_available": true,
       "risk_score": 7,
-      "wsjf_score": 2.8,
+      "wsjf_score": 3.5,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 5,
+      "file_count": 4,
       "status": "pending",
-      "description": "Migrate AI08 feature \"shared\" to standalone (~5 modules)",
+      "description": "Migrate AI08 feature \"report-config\" to standalone (~4 modules)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087723"
+      "created_at": "2026-02-10T16:44:09.486073"
     },
     {
-      "id": "sharelook-control-flow-ai08-001",
+      "id": "sharelook-standalone-ai08-shared",
+      "project_id": "sharelook",
+      "phase": "standalone",
+      "framework": "angular",
+      "from_version": "16.2.12",
+      "to_version": "17.3.0",
+      "breaking_changes": [
+        "ANG-17-002",
+        "ANG-17-003"
+      ],
+      "codemod_available": true,
+      "risk_score": 7,
+      "wsjf_score": 3.5,
+      "rollback_strategy": "git_tag",
+      "files": [],
+      "file_count": 4,
+      "status": "pending",
+      "description": "Migrate AI08 feature \"shared\" to standalone (~4 modules)",
+      "metadata": {},
+      "created_at": "2026-02-10T16:44:09.486076"
+    },
+    {
+      "id": "sharelook-control-flow-ai08-collectable-topics",
       "project_id": "sharelook",
       "phase": "control-flow",
       "framework": "angular",
@@ -920,17 +756,17 @@
       ],
       "codemod_available": true,
       "risk_score": 3,
-      "wsjf_score": 1.75,
+      "wsjf_score": 2.33,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 8,
+      "file_count": 6,
       "status": "pending",
-      "description": "Migrate AI08 feature \"authentication\" to @if/@for syntax (~8 components)",
+      "description": "Migrate AI08 feature \"collectable-topics\" to @if/@for syntax (~6 components)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087775"
+      "created_at": "2026-02-10T16:44:09.486109"
     },
     {
-      "id": "sharelook-control-flow-ai08-002",
+      "id": "sharelook-control-flow-ai08-contacts",
       "project_id": "sharelook",
       "phase": "control-flow",
       "framework": "angular",
@@ -941,17 +777,17 @@
       ],
       "codemod_available": true,
       "risk_score": 3,
-      "wsjf_score": 1.75,
+      "wsjf_score": 2.33,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 8,
+      "file_count": 6,
       "status": "pending",
-      "description": "Migrate AI08 feature \"management\" to @if/@for syntax (~8 components)",
+      "description": "Migrate AI08 feature \"contacts\" to @if/@for syntax (~6 components)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087778"
+      "created_at": "2026-02-10T16:44:09.486111"
     },
     {
-      "id": "sharelook-control-flow-ai08-003",
+      "id": "sharelook-control-flow-ai08-core",
       "project_id": "sharelook",
       "phase": "control-flow",
       "framework": "angular",
@@ -962,17 +798,17 @@
       ],
       "codemod_available": true,
       "risk_score": 3,
-      "wsjf_score": 1.75,
+      "wsjf_score": 2.33,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 8,
+      "file_count": 6,
       "status": "pending",
-      "description": "Migrate AI08 feature \"reporting\" to @if/@for syntax (~8 components)",
+      "description": "Migrate AI08 feature \"core\" to @if/@for syntax (~6 components)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087780"
+      "created_at": "2026-02-10T16:44:09.486113"
     },
     {
-      "id": "sharelook-control-flow-ai08-004",
+      "id": "sharelook-control-flow-ai08-home",
       "project_id": "sharelook",
       "phase": "control-flow",
       "framework": "angular",
@@ -983,17 +819,17 @@
       ],
       "codemod_available": true,
       "risk_score": 3,
-      "wsjf_score": 1.75,
+      "wsjf_score": 2.33,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 8,
+      "file_count": 6,
       "status": "pending",
-      "description": "Migrate AI08 feature \"rules\" to @if/@for syntax (~8 components)",
+      "description": "Migrate AI08 feature \"home\" to @if/@for syntax (~6 components)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087781"
+      "created_at": "2026-02-10T16:44:09.486116"
     },
     {
-      "id": "sharelook-control-flow-ai08-005",
+      "id": "sharelook-control-flow-ai08-management",
       "project_id": "sharelook",
       "phase": "control-flow",
       "framework": "angular",
@@ -1004,17 +840,17 @@
       ],
       "codemod_available": true,
       "risk_score": 3,
-      "wsjf_score": 1.75,
+      "wsjf_score": 2.33,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 8,
+      "file_count": 6,
       "status": "pending",
-      "description": "Migrate AI08 feature \"actions\" to @if/@for syntax (~8 components)",
+      "description": "Migrate AI08 feature \"management\" to @if/@for syntax (~6 components)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087783"
+      "created_at": "2026-02-10T16:44:09.486118"
     },
     {
-      "id": "sharelook-control-flow-ai08-006",
+      "id": "sharelook-control-flow-ai08-metadata",
       "project_id": "sharelook",
       "phase": "control-flow",
       "framework": "angular",
@@ -1025,17 +861,17 @@
       ],
       "codemod_available": true,
       "risk_score": 3,
-      "wsjf_score": 1.75,
+      "wsjf_score": 2.33,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 8,
+      "file_count": 6,
       "status": "pending",
-      "description": "Migrate AI08 feature \"referentials\" to @if/@for syntax (~8 components)",
+      "description": "Migrate AI08 feature \"metadata\" to @if/@for syntax (~6 components)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087786"
+      "created_at": "2026-02-10T16:44:09.486119"
     },
     {
-      "id": "sharelook-control-flow-ai08-007",
+      "id": "sharelook-control-flow-ai08-referentials",
       "project_id": "sharelook",
       "phase": "control-flow",
       "framework": "angular",
@@ -1046,17 +882,17 @@
       ],
       "codemod_available": true,
       "risk_score": 3,
-      "wsjf_score": 1.75,
+      "wsjf_score": 2.33,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 8,
+      "file_count": 6,
       "status": "pending",
-      "description": "Migrate AI08 feature \"monitoring\" to @if/@for syntax (~8 components)",
+      "description": "Migrate AI08 feature \"referentials\" to @if/@for syntax (~6 components)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087788"
+      "created_at": "2026-02-10T16:44:09.486122"
     },
     {
-      "id": "sharelook-control-flow-ai08-008",
+      "id": "sharelook-control-flow-ai08-report-config",
       "project_id": "sharelook",
       "phase": "control-flow",
       "framework": "angular",
@@ -1067,35 +903,102 @@
       ],
       "codemod_available": true,
       "risk_score": 3,
-      "wsjf_score": 1.75,
+      "wsjf_score": 2.33,
       "rollback_strategy": "git_tag",
       "files": [],
-      "file_count": 8,
+      "file_count": 6,
       "status": "pending",
-      "description": "Migrate AI08 feature \"shared\" to @if/@for syntax (~8 components)",
+      "description": "Migrate AI08 feature \"report-config\" to @if/@for syntax (~6 components)",
       "metadata": {},
-      "created_at": "2026-02-10T16:34:38.087789"
+      "created_at": "2026-02-10T16:44:09.486124"
+    },
+    {
+      "id": "sharelook-control-flow-ai08-shared",
+      "project_id": "sharelook",
+      "phase": "control-flow",
+      "framework": "angular",
+      "from_version": "16.2.12",
+      "to_version": "17.3.0",
+      "breaking_changes": [
+        "ANG-17-005"
+      ],
+      "codemod_available": true,
+      "risk_score": 3,
+      "wsjf_score": 2.33,
+      "rollback_strategy": "git_tag",
+      "files": [],
+      "file_count": 6,
+      "status": "pending",
+      "description": "Migrate AI08 feature \"shared\" to @if/@for syntax (~6 components)",
+      "metadata": {},
+      "created_at": "2026-02-10T16:44:09.486126"
+    },
+    {
+      "id": "sharelook-standalone-ai08-domain",
+      "project_id": "sharelook",
+      "phase": "standalone",
+      "framework": "angular",
+      "from_version": "16.2.12",
+      "to_version": "17.3.0",
+      "breaking_changes": [
+        "ANG-17-002",
+        "ANG-17-003"
+      ],
+      "codemod_available": true,
+      "risk_score": 7,
+      "wsjf_score": 1.4,
+      "rollback_strategy": "git_tag",
+      "files": [],
+      "file_count": 10,
+      "status": "pending",
+      "description": "Migrate AI08 feature \"domain\" to standalone (~10 modules)",
+      "metadata": {},
+      "created_at": "2026-02-10T16:44:09.486064"
+    },
+    {
+      "id": "sharelook-control-flow-ai08-domain",
+      "project_id": "sharelook",
+      "phase": "control-flow",
+      "framework": "angular",
+      "from_version": "16.2.12",
+      "to_version": "17.3.0",
+      "breaking_changes": [
+        "ANG-17-005"
+      ],
+      "codemod_available": true,
+      "risk_score": 3,
+      "wsjf_score": 0.93,
+      "rollback_strategy": "git_tag",
+      "files": [],
+      "file_count": 15,
+      "status": "pending",
+      "description": "Migrate AI08 feature \"domain\" to @if/@for syntax (~15 components)",
+      "metadata": {},
+      "created_at": "2026-02-10T16:44:09.486115"
     }
   ],
   "metadata": {
-    "ai08_stats": {
-      "modules": 38,
-      "components": 60,
-      "feature_modules": 8,
-      "forms_source": 24,
-      "routes": 72,
-      "flex_layout": 283
-    },
-    "ai12_stats": {
-      "modules": 10,
-      "components": 10,
-      "feature_modules": 3,
-      "forms_source": 2,
-      "routes": 10,
-      "flex_layout": 10
-    },
-    "note": "AI12 needs Angular 15\u219216 migration BEFORE 16\u219217",
-    "typed_forms": "EXCLUDED - out of scope per SHARELOOK",
-    "grouping": "By feature module (not individual files)"
+    "ai08_features": [
+      "collectable-topics",
+      "contacts",
+      "core",
+      "domain",
+      "home",
+      "management",
+      "metadata",
+      "referentials",
+      "report-config",
+      "shared"
+    ],
+    "ai12_features": [
+      "core",
+      "home",
+      "report",
+      "shared"
+    ],
+    "oidc_lib": "angular-auth-oidc-client + @cddng/auth-oidc-apim",
+    "note": "AI12 needs 15\u219216 BEFORE 16\u219217",
+    "typed_forms": "EXCLUDED - out of scope",
+    "grouping": "By REAL feature module names from filesystem"
   }
 }
