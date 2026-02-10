@@ -19,11 +19,19 @@ import urllib.request
 from datetime import datetime
 
 CDP_URL = "http://localhost:18800"
-INTERVAL = 300  # 5 minutes between reloads
+INTERVAL = 240  # 4 minutes between checks
 LOG_FILE = "/tmp/session-keepalive.log"
 PID_FILE = "/tmp/session-keepalive.pid"
 
 BANK_KEYS = ["credit-agricole", "bourso", "interactive", "traderepublic"]
+
+# URL patterns that indicate a logged-out session
+LOGOUT_PATTERNS = {
+    "interactive":      ["AmAuthentication", "sso/Login", "login"],
+    "traderepublic":    ["/login"],
+    "credit-agricole":  ["particulier.html", "acceder-a-mes-comptes"],
+    "bourso":           ["connexion", "saisie-mot-de-pas"],
+}
 
 
 def log(msg: str):
@@ -36,6 +44,12 @@ def detect_bank(url: str) -> str | None:
         if key in url:
             return key
     return None
+
+
+def is_logged_out(bank: str, url: str) -> bool:
+    """Check if the URL indicates the bank session has expired."""
+    patterns = LOGOUT_PATTERNS.get(bank, [])
+    return any(p in url for p in patterns)
 
 
 async def reload_tab(ws_url: str, bank: str) -> str:
@@ -97,7 +111,9 @@ def check_restart_servers():
 
 
 async def keepalive_loop():
-    log(f"Session keepalive started — Page.reload every {INTERVAL}s + server watchdog")
+    log(f"Session keepalive started — reload every {INTERVAL}s + logout detection + server watchdog")
+    relogin_notified = set()  # avoid spamming notifications
+
     while True:
         try:
             raw = urllib.request.urlopen(f"{CDP_URL}/json/list", timeout=5).read()
@@ -108,12 +124,13 @@ async def keepalive_loop():
             continue
 
         results = []
+        logged_out_banks = []
+
         for p in pages:
             url = p.get("url", "")
             bank = detect_bank(url)
             if not bank:
                 continue
-            # Skip non-page resources (service workers, iframes)
             if p.get("type", "page") != "page":
                 continue
             if "googletagmanager" in url or "sw.js" in url:
@@ -121,14 +138,40 @@ async def keepalive_loop():
             ws_url = p.get("webSocketDebuggerUrl", "")
             if not ws_url:
                 continue
-            status = await reload_tab(ws_url, bank)
-            short_url = url.split("//",1)[-1][:50]
-            results.append(f"{bank:15} {status} ({short_url})")
+
+            short_url = url.split("//", 1)[-1][:50]
+
+            if is_logged_out(bank, url):
+                results.append(f"{bank:15} ⚠️  LOGGED OUT ({short_url})")
+                logged_out_banks.append(bank)
+            else:
+                status = await reload_tab(ws_url, bank)
+                results.append(f"{bank:15} {status} ({short_url})")
 
         if results:
             log(" | ".join(results))
         else:
             log("No bank tabs found")
+
+        # Notify about logged-out banks (once per bank)
+        new_logouts = [b for b in logged_out_banks if b not in relogin_notified]
+        if new_logouts:
+            names = ", ".join(new_logouts)
+            log(f"🔐 Sessions expired: {names} — run: python3 scrapers/daily_sync.py")
+            try:
+                import subprocess
+                subprocess.run([
+                    "osascript", "-e",
+                    f'display notification "Sessions expirées: {names}" with title "Finary — Re-login nécessaire"'
+                ], timeout=5)
+            except Exception:
+                pass
+            relogin_notified.update(new_logouts)
+
+        # Reset notification when banks come back online
+        for bank in list(relogin_notified):
+            if bank not in logged_out_banks:
+                relogin_notified.discard(bank)
 
         # Watchdog: restart API/Frontend if crashed
         check_restart_servers()
