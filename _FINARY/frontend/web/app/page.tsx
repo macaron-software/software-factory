@@ -81,6 +81,7 @@ export default function HomePage() {
             label="Actifs"
             value={networth.total_assets}
             variation={networth.variation_month}
+            source="computed"
           />
         </div>
         <div className="cursor-pointer" onClick={() => setSheet("passifs")}>

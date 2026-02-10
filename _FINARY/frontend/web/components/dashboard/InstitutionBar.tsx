@@ -1,11 +1,21 @@
 "use client";
 
 import { formatEUR, CHART_COLORS } from "@/lib/utils";
+import { SourceBadge } from "@/components/ds";
+import type { DataSource } from "@/lib/types/api";
 
 interface Props {
   institutions: { name: string; display_name: string; total: number }[];
   onItemClick?: (institutionName: string) => void;
 }
+
+const INST_SOURCE: Record<string, DataSource> = {
+  ibkr: "live",
+  trade_republic: "live",
+  boursobank: "scraped",
+  credit_agricole: "scraped",
+  sca: "estimate",
+};
 
 const INSTITUTION_ICONS: Record<string, string> = {
   boursobank: "B",
@@ -54,9 +64,12 @@ export function InstitutionBar({ institutions, onItemClick }: Props) {
               {/* Content */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[13px] font-medium truncate" style={{ color: "var(--text-2)" }}>
-                    {inst.display_name}
-                  </span>
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="text-[13px] font-medium truncate" style={{ color: "var(--text-2)" }}>
+                      {inst.display_name}
+                    </span>
+                    <SourceBadge source={INST_SOURCE[inst.name] ?? "scraped"} />
+                  </div>
                   <span
                     className="tnum text-[13px] font-semibold ml-3"
                     style={{ color: inst.total < 0 ? "var(--red)" : "var(--text-1)" }}

@@ -268,6 +268,7 @@ def build_accounts():
             "account_type": "savings" if "livret" in key.lower() else "checking",
             "currency": "EUR", "balance": acc_data["balance"],
             "is_pro": False, "updated_at": P["date"],
+            "owner": "Nathael", "excluded": True,
         })
     for loan in b["loans"]:
         i += 1
@@ -494,8 +495,11 @@ def get_networth():
     ibkr_cash_eur = P["ibkr"]["cash"]["total_eur"]
     ibkr_val = ibkr_portfolio + ibkr_cash_eur
 
-    bourso_liquid = P["boursobank"]["total_liquid"]
-    bourso_savings = P["boursobank"]["total_savings"]
+    # Exclude children accounts (Nathael = son, not user's patrimoine)
+    children = P["boursobank"].get("children_accounts", {})
+    nathael_total = sum(a["balance"] for a in children.values())
+    bourso_liquid = P["boursobank"]["total_liquid"] - children.get("checking_nathael", {}).get("balance", 0)
+    bourso_savings = P["boursobank"]["total_savings"] - children.get("livret_a_nathael", {}).get("balance", 0)
     ca_liquid = P["credit_agricole"]["accounts"]["checking"]["balance"]
     sca_prop = P["sca_la_desirade"]["your_share_property_value"]
 

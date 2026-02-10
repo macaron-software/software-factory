@@ -305,7 +305,10 @@ def build(d: str) -> dict:
 
     # ─── Totals ───────────────────────────────────────────────────
     total_investments = trade_republic["total_account_value"] + ibkr["net_liquidation_eur"]
-    total_bank_liquid = boursobank["total_liquid"] + boursobank["total_savings"] + ca_checking
+    # Exclude children accounts (Nathael) from user's patrimoine
+    nathael_liquid = children_checking
+    nathael_savings = livret_a
+    total_bank_liquid = boursobank["total_liquid"] - nathael_liquid + boursobank["total_savings"] - nathael_savings + ca_checking
     total_real_estate = sca["your_share_property_value"]
     total_assets = total_investments + total_bank_liquid + total_real_estate
     total_debt = abs(ca_total_debt) + abs(total_loans)
