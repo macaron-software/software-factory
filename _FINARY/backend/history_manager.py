@@ -19,13 +19,23 @@ IBKR_HOLDINGS = {
     "NVDA": {"qty": 100.0222, "cost_usd": 12653},
 }
 
-# TR positions (small, fractional — treat as constant)
-TR_TOTAL_EUR = 680.60
+# TR positions (small, fractional — treat as constant for history)
+TR_TOTAL_EUR = 2861.0
 
-# Non-investment values (relatively stable)
-CASH_EUR = 8199.59
-REAL_ESTATE_EUR = 255633.26
-DEBT_EUR = 232060.75
+
+def _load_current_constants() -> tuple[float, float, float]:
+    """Load current cash, real_estate, debt from latest patrimoine file."""
+    files = sorted(DATA_DIR.glob("patrimoine_complet_*.json"), reverse=True)
+    if files:
+        P = json.loads(files[0].read_text())
+        t = P.get("totals", {})
+        cash = t.get("total_bank_liquid", 221.16)
+        real_estate = t.get("total_real_estate", 483800)
+        debt = t.get("total_debt", 232060.75)
+        return cash, real_estate, debt
+    return 221.16, 483800, 232060.75
+
+CASH_EUR, REAL_ESTATE_EUR, DEBT_EUR = _load_current_constants()
 
 
 def _fetch_historical_prices(days: int = 365) -> dict[str, list[dict]]:
