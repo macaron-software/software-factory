@@ -41,15 +41,27 @@ migration:
       path: ai08-admin-ihm
       type: angular-app
       priority: high
-      modules: 30  # Estimation
+      angular_version: "16.2.12"
+      modules: 38  # Réel (scan grep)
+      components: 60  # Réel
+      standalone_count: 2
+      formgroups: 54  # Fichiers avec FormGroup/FormBuilder
+      routes: 72
+      flex_layout_usages: 283  # CHANTIER MAJEUR
       description: "Admin IHM - gestion règles, actions, référentiels"
 
     - name: ai12-reporting-ihm
       path: ai12-reporting-ihm
       type: angular-app
-      priority: high
-      modules: 20  # Estimation
-      description: "Reporting IHM - métriques, historique, dashboards"
+      priority: critical  # PILOTE first
+      angular_version: "15.2.9"  # Path 15→16→17
+      modules: 10  # Réel
+      components: 10  # Réel
+      standalone_count: 0
+      formgroups: 2  # Fichiers
+      routes: 10
+      flex_layout_usages: 10
+      description: "Reporting IHM - métriques, historique, dashboards (PILOTE)"
 
     - name: backend-services
       path: "."
@@ -79,25 +91,32 @@ migration:
       order: 3
       estimated_tasks: 45
 
+    - name: flex-layout
+      description: "Remove @angular/flex-layout → CSS Grid/CDK Layout"
+      risk: high  # 283 occurrences AI08, 10 AI12
+      auto: false  # Manual migration required
+      order: 4
+      estimated_tasks: 23  # 20 AI08 + 3 AI12
+
     - name: control-flow
       description: "Migrate *ngIf/*ngFor → @if/@for"
       risk: low
       auto: true
-      order: 4
-      estimated_tasks: 150  # Many templates
+      order: 5
+      estimated_tasks: 70  # 60 AI08 + 10 AI12
 
     - name: signals
       description: "Optional: Migrate to Signals API"
       risk: low
       auto: false
-      order: 5
+      order: 6
       optional: true
 
     - name: material
       description: "Update Angular Material 16 → 17"
       risk: medium  # Visual changes
       auto: semi
-      order: 6
+      order: 7
 
   # Breaking changes (from Angular CHANGELOG)
   breaking_changes:

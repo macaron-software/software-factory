@@ -135,21 +135,30 @@ class MigrationBrain:
         framework = migration_config['framework']
         from_version = migration_config['from_version']
         to_version = migration_config['to_version']
-        root_path = migration_config['root_path']
+        root_path = self.config['project']['root_path']
 
         # 1. Load breaking changes
         breaking_changes = self.db.get_changes(framework, from_version, to_version)
         print(f"[Migration Brain] Found {len(breaking_changes)} breaking changes")
 
         # 2. Scan codebase
-        analyzer = AngularAnalyzer(root_path)
+        # Get Angular apps from config
+        angular_apps = [
+            app for app in migration_config.get('applications', [])
+            if app.get('type') == 'angular-app'
+        ]
+
+        # Build src_paths for each app
+        src_paths = [f"{app['path']}/src" for app in angular_apps]
+
+        analyzer = AngularAnalyzer(root_path, src_paths=src_paths)
         analysis = analyzer.analyze()
         print(f"[Migration Brain] Scanned: {analysis.stats}")
 
         # 3. Generate tasks per phase
         all_tasks = []
 
-        for phase_config in self.config.get('phases', []):
+        for phase_config in migration_config.get('phases', []):
             phase_name = phase_config['name']
             print(f"[Migration Brain] Generating tasks for phase: {phase_name}")
 

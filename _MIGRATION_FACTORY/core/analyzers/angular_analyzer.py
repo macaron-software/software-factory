@@ -75,9 +75,21 @@ class AngularAnalyzer:
         print(f"Forms: {len(result.forms)}")
     """
 
-    def __init__(self, project_root: str):
+    def __init__(self, project_root: str, src_paths: Optional[List[str]] = None):
+        """
+        Args:
+            project_root: Root directory of the project
+            src_paths: Optional list of source directories to scan (relative to project_root).
+                      If None, defaults to ["src"]. For multi-app projects, pass ["app1/src", "app2/src"].
+        """
         self.project_root = Path(project_root)
-        self.src_path = self.project_root / "src"
+
+        # If src_paths provided, use them; otherwise default to ["src"]
+        if src_paths:
+            self.src_paths = [self.project_root / path for path in src_paths]
+        else:
+            # Default behavior: look for src/
+            self.src_paths = [self.project_root / "src"]
 
     def analyze(self) -> AnalysisResult:
         """
@@ -319,61 +331,65 @@ class AngularAnalyzer:
 
     def _grep_files(self, pattern: str, file_pattern: str = "*") -> List[str]:
         """
-        Grep for pattern in project files
+        Grep for pattern in project files (across all src_paths)
 
         Returns: List of absolute file paths
         """
-        try:
-            # Use ripgrep if available (faster), fallback to grep
-            cmd = [
-                'rg',
-                '--files-with-matches',
-                '--type', 'typescript',
-                '--glob', file_pattern,
-                pattern,
-                str(self.src_path)
-            ]
+        all_files = []
 
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=False  # Don't raise on non-zero (no matches)
-            )
+        for src_path in self.src_paths:
+            if not src_path.exists():
+                print(f"[Analyzer] Warning: {src_path} does not exist, skipping")
+                continue
 
-            if result.returncode == 0:
-                files = result.stdout.strip().split('\n')
-                return [f for f in files if f]
-
-            return []
-
-        except FileNotFoundError:
-            # Fallback to grep if rg not available
             try:
+                # Use ripgrep if available (faster), fallback to grep
                 cmd = [
-                    'grep',
-                    '-rl',
-                    '--include', file_pattern,
+                    'rg',
+                    '--files-with-matches',
+                    '--type', 'typescript',
+                    '--glob', file_pattern,
                     pattern,
-                    str(self.src_path)
+                    str(src_path)
                 ]
 
                 result = subprocess.run(
                     cmd,
                     capture_output=True,
                     text=True,
-                    check=False
+                    check=False  # Don't raise on non-zero (no matches)
                 )
 
                 if result.returncode == 0:
                     files = result.stdout.strip().split('\n')
-                    return [f for f in files if f]
+                    all_files.extend([f for f in files if f])
 
-                return []
+            except FileNotFoundError:
+                # Fallback to grep if rg not available
+                try:
+                    cmd = [
+                        'grep',
+                        '-rl',
+                        '--include', file_pattern,
+                        pattern,
+                        str(src_path)
+                    ]
 
-            except Exception as e:
-                print(f"[Analyzer] Grep failed: {e}")
-                return []
+                    result = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        check=False
+                    )
+
+                    if result.returncode == 0:
+                        files = result.stdout.strip().split('\n')
+                        all_files.extend([f for f in files if f])
+
+                except Exception as e:
+                    print(f"[Analyzer] Grep failed for {src_path}: {e}")
+
+        return all_files
 
     def _extract_array(self, metadata: str, key: str) -> List[str]:
         """
