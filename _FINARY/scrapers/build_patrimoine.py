@@ -299,9 +299,24 @@ def build(d: str) -> dict:
 
     # ─── SCA ──────────────────────────────────────────────────────
     sca = dict(SCA)
-    sca["your_share_property_value"] = round(
+    # Market median: MeilleursAgents 3,530€/m² × 114m² = 402,420€
+    surface = sca["property"].get("surface_m2", 110)
+    if surface < 114:
+        surface = 114  # corrected surface
+    market_median_price_m2 = 3530  # Grabels (34790), maisons, 2025-Q1
+    market_median_total = surface * market_median_price_m2
+
+    sca["market_median_total"] = market_median_total
+    sca["your_share_market_median"] = round(
+        market_median_total * sca["ownership_pct"] / 100, 2
+    )
+    sca["your_share_bourso_estimate"] = round(
         sca["property"]["bourso_estimate"] * sca["ownership_pct"] / 100, 2
     )
+    # total_verse is already the user's payment (capital_verse + cca_avances)
+    sca["your_share_construction_cost"] = sca["financials"]["total_verse"]
+    # Use market median for patrimoine (conservative, MeilleursAgents source)
+    sca["your_share_property_value"] = sca["your_share_market_median"]
 
     # ─── Totals ───────────────────────────────────────────────────
     total_investments = trade_republic["total_account_value"] + ibkr["net_liquidation_eur"]

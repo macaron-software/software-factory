@@ -1,6 +1,6 @@
 {
   "date": "2026-02-10",
-  "timestamp": "2026-02-10T09:02:31.496543",
+  "timestamp": "2026-02-10T12:11:31.072480",
   "trade_republic": {
     "type": "cto",
     "currency": "EUR",
@@ -506,15 +506,19 @@
       "electricite_qp": 264.3,
       "divers_qp": 138.88
     },
-    "your_share_property_value": 255633.26
+    "market_median_total": 402420,
+    "your_share_market_median": 203604.4,
+    "your_share_bourso_estimate": 255633.26,
+    "your_share_construction_cost": 318228.65,
+    "your_share_property_value": 203604.4
   },
   "totals": {
     "total_investments": 56517.45,
-    "total_bank_liquid": 8199.08,
-    "total_real_estate": 255633.26,
-    "total_assets": 320349.79,
+    "total_bank_liquid": 121.16,
+    "total_real_estate": 203604.4,
+    "total_assets": 260243.01,
     "total_debt": 232060.75,
-    "net_worth": 88289.04,
+    "net_worth": 28182.26,
     "monthly_loan_payments": 0,
     "monthly_margin_cost": 0.0
   }

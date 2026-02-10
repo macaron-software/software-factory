@@ -97,6 +97,13 @@ def load_patrimoine():
 
 P = load_patrimoine()
 
+@app.post("/api/v1/reload")
+def reload_patrimoine():
+    """Hot-reload patrimoine data from disk."""
+    global P
+    P = load_patrimoine()
+    return {"status": "ok", "date": P.get("date", "?")}
+
 # ─── Live Market Data ─────────────────────────────────────────────────────────
 
 # ISIN → Yahoo Finance ticker mapping

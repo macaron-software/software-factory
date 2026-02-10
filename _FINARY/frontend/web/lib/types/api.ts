@@ -90,6 +90,10 @@ export interface SCA {
   };
   co_associate: { name: string; parts: number; ownership_pct: number };
   your_share_property_value: number;
+  your_share_market_median?: number;
+  your_share_bourso_estimate?: number;
+  your_share_construction_cost?: number;
+  market_median_total?: number;
   market?: {
     commune: string;
     code_postal: string;
