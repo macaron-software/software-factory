@@ -1,0 +1,206 @@
+# Sharelook Migration Project - Angular 16 → 17
+
+project:
+  id: sharelook
+  name: Sharelook Platform
+  display_name: "Sharelook (La Poste Courrier)"
+  root_path: /Users/sylvain/_LAPOSTE/_SHARELOOK/sharelook-legacy
+  description: "Migration Angular 16.2.12 → 17.3.0 (2 IHM + microservices backend)"
+
+migration:
+  framework: angular
+  from_version: "16.2.12"
+  to_version: "17.3.0"
+
+  # État actuel (BEFORE)
+  current_state:
+    angular: "16.2.12"
+    typescript: "5.1.3"
+    node: "18.x"
+    architecture: "NgModule-based"
+    modules_count: 50  # Estimation (2 IHM)
+    components_count: 150
+    forms: "Untyped (FormGroup, FormControl)"
+    templates: "Old syntax (*ngIf, *ngFor)"
+    routing: "RouterModule.forRoot"
+
+  # État cible (AFTER)
+  target_state:
+    angular: "17.3.0"
+    typescript: "5.2.0"
+    node: "18.x"
+    architecture: "Standalone components"
+    modules_count: 0  # All converted to standalone
+    forms: "Typed (FormGroup<T>)"
+    templates: "Control flow (@if, @for)"
+    routing: "provideRouter"
+
+  # Applications à migrer
+  applications:
+    - name: ai08-admin-ihm
+      path: ai08-admin-ihm
+      type: angular-app
+      priority: high
+      modules: 30  # Estimation
+      description: "Admin IHM - gestion règles, actions, référentiels"
+
+    - name: ai12-reporting-ihm
+      path: ai12-reporting-ihm
+      type: angular-app
+      priority: high
+      modules: 20  # Estimation
+      description: "Reporting IHM - métriques, historique, dashboards"
+
+    - name: backend-services
+      path: "."
+      type: java-spring
+      priority: low  # Backend Java 21 + Spring Boot 3.5.5 déjà récent
+      description: "Microservices (js01-collector, js02-ingester, etc.)"
+
+  # Phases de migration (ordre obligatoire)
+  phases:
+    - name: deps
+      description: "Update Angular 16 → 17 dependencies"
+      risk: low
+      auto: true
+      order: 1
+
+    - name: standalone
+      description: "Convert NgModules → Standalone components"
+      risk: high  # Architectural change
+      auto: false
+      order: 2
+      estimated_tasks: 50  # 1 per module
+
+    - name: typed-forms
+      description: "Add types to FormGroups"
+      risk: medium
+      auto: semi  # Can detect, needs manual validation
+      order: 3
+      estimated_tasks: 45
+
+    - name: control-flow
+      description: "Migrate *ngIf/*ngFor → @if/@for"
+      risk: low
+      auto: true
+      order: 4
+      estimated_tasks: 150  # Many templates
+
+    - name: signals
+      description: "Optional: Migrate to Signals API"
+      risk: low
+      auto: false
+      order: 5
+      optional: true
+
+    - name: material
+      description: "Update Angular Material 16 → 17"
+      risk: medium  # Visual changes
+      auto: semi
+      order: 6
+
+  # Breaking changes (from Angular CHANGELOG)
+  breaking_changes:
+    - ref: "ANG-17-001"
+      title: "ModuleWithProviders<T> type parameter required"
+      impact: medium
+      files_pattern: "**/*.module.ts"
+      codemod: "codemods/angular/module_providers.ts"
+
+    - ref: "ANG-17-002"
+      title: "RouterModule.forRoot deprecated → provideRouter"
+      impact: high
+      files_pattern: "app.module.ts"
+      codemod: null  # Manual
+
+    - ref: "ANG-17-003"
+      title: "FormGroup must be typed"
+      impact: medium
+      files_pattern: "**/*.component.ts"
+      codemod: "codemods/angular/typed_forms.ts"
+
+    - ref: "ANG-17-004"
+      title: "Control flow syntax (*ngIf → @if)"
+      impact: low
+      files_pattern: "**/*.html"
+      codemod: "codemods/angular/control_flow.ts"
+
+  # Rollback strategy
+  rollback:
+    strategy: "feature_flag"  # or "git_tag" or "canary"
+    feature_flag_key: "angular17_enabled"
+    git_tag_prefix: "pre-angular17-"
+
+  # Success criteria
+  success_criteria:
+    - "All unit tests pass (karma)"
+    - "All E2E tests pass"
+    - "Build succeeds (ng build --configuration production)"
+    - "Old behavior === new behavior (golden files)"
+    - "No runtime errors in prod (7 days monitoring)"
+    - "Performance ≥ baseline (no regression)"
+
+# Domains for analysis
+domains:
+  angular:
+    root: "."
+    patterns:
+      - "ai08-admin-ihm/**/*.ts"
+      - "ai08-admin-ihm/**/*.html"
+      - "ai12-reporting-ihm/**/*.ts"
+      - "ai12-reporting-ihm/**/*.html"
+    exclude:
+      - "**/node_modules/**"
+      - "**/dist/**"
+      - "**/coverage/**"
+    build_cmd: "cd {app} && npm run build"
+    test_cmd: "cd {app} && npm test"
+
+  java:
+    root: "."
+    patterns:
+      - "js*/**/*.java"
+      - "lib/**/*.java"
+    exclude:
+      - "**/target/**"
+    build_cmd: "mvn clean install -DskipTests"
+    test_cmd: "mvn test"
+
+# Deploy (canary strategy)
+deploy:
+  canary:
+    enabled: true
+    stages: [1, 10, 50, 100]  # % traffic
+    stage_duration: 300  # 5min per stage
+    rollback_on_error_rate: 10  # % increase
+
+  post_deploy:
+    tmc:
+      enabled: true
+      tool: k6
+      thresholds:
+        p95_latency_ms: 500
+        error_rate_pct: 1
+        min_throughput_rps: 50
+      scenarios: [baseline, ramp_10x]
+
+    chaos:
+      enabled: false  # Disable for first migration
+
+    golden_files:
+      enabled: true
+      paths:
+        - "golden_files/api_responses/*.json"
+        - "golden_files/screenshots/*.png"
+      diff_threshold_pct: 1  # 1% pixel diff max
+
+# CLI tool (for backend if needed)
+cli_tool: "mvn"
+
+# Migration-specific settings
+migration_settings:
+  parallel_transforms: 3  # Max parallel transform workers
+  backup_before_transform: true
+  git_tag_before_phase: true
+  create_migration_branch: true
+  branch_name: "migration/angular-16-to-17"
