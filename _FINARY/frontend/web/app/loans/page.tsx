@@ -2,7 +2,7 @@
 
 import { useLoans } from "@/lib/hooks/useApi";
 import { formatEUR } from "@/lib/utils";
-import { Loading, ErrorState, PageHeader, Badge, Section, SourceBadge } from "@/components/ds";
+import { Loading, ErrorState, PageHeader, Badge, Section } from "@/components/ds";
 
 export default function LoansPage() {
   const { data: loans, isLoading, error } = useLoans();
@@ -86,25 +86,21 @@ export default function LoansPage() {
                 <td className="tnum text-right px-3 py-3 text-t-4">
                   {loan.insurance_monthly > 0 ? `${formatEUR(loan.insurance_monthly)}/mo` :
                    loan.insurance_monthly === 0 ? <span className="text-t-5 text-caption">Aucune</span> :
-                   <SourceBadge source="mock" />}
+                   <span className="text-t-6">—</span>}
                 </td>
-                <td className="tnum text-right px-3 py-3 text-t-4">
+                <td className="tnum text-right px-3 py-3 text-t-2">
                   {loan.rate_numeric != null ? (
-                    <div className="flex flex-col items-end gap-1">
-                      <span>{loan.rate_numeric.toFixed(2)}%</span>
-                      <SourceBadge source={
-                        loan.rate_source === "scraped" ? "scraped" :
-                        loan.rate_source === "computed" ? "computed" :
-                        loan.rate_source === "official" ? "official" : "mock"
-                      } />
+                    <div>
+                      <span className="font-medium">{loan.rate_numeric.toFixed(2)}%</span>
+                      {loan.rate_type && <span className="text-caption text-t-5 ml-1">{loan.rate_type}</span>}
+                      {loan.real_rate != null && (
+                        <div className={`text-caption mt-0.5 ${loan.real_rate <= 0 ? "text-gain" : "text-loss"}`}>
+                          réel {loan.real_rate > 0 ? "+" : ""}{loan.real_rate.toFixed(2)}%
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <SourceBadge source="mock" />
-                  )}
-                  {loan.real_rate != null && (
-                    <span className={`block text-caption mt-1 ${loan.real_rate <= 0 ? "text-gain" : "text-loss"}`}>
-                      réel: {loan.real_rate > 0 ? "+" : ""}{loan.real_rate.toFixed(2)}%
-                    </span>
+                    <span className="text-t-6">—</span>
                   )}
                 </td>
                 <td className="text-right px-3 py-3">

@@ -243,12 +243,19 @@ def parse_bourso_csv(filepath: Path, con: duckdb.DuckDBPyConnection):
             desc_low = desc.lower()
             is_self = "legland" in desc_low
 
-            if parent_low in ("revenus du travail", "revenus d'épargne"):
+            # Loan disbursements are NOT income
+            is_loan_disburse = "deblocage pret" in desc_low or "déblocage prêt" in desc_low
+            # Self-company transfers are NOT income
+            is_company = any(x in desc_low for x in ("macaron software", "every one"))
+            # Inter-bank transfers (TR→Bourso, etc.) are NOT income
+            is_interbank = any(x in desc_low for x in ("trade republic", "interactive brokers"))
+
+            if is_loan_disburse or is_company or is_self or is_interbank:
+                tx_type = "transfer"
+            elif parent_low in ("revenus du travail", "revenus d'épargne"):
                 tx_type = "income"
             elif "salaire" in cat_low or "prime" in cat_low:
                 tx_type = "income"
-            elif is_self:
-                tx_type = "transfer"
             elif "virements émis" in cat_low:
                 tx_type = "transfer"
             elif "echéance prêt" in cat_low or "remboursement de prêt" in cat_low:
