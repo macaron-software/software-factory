@@ -13,6 +13,30 @@ export function formatEUR(value: number): string {
   }).format(value);
 }
 
+/** Compact EUR: no centimes for |value| ≥ 100, "K" for |value| ≥ 10 000. */
+export function formatEURCompact(value: number): string {
+  const abs = Math.abs(value);
+  if (abs >= 10_000) {
+    const k = value / 1_000;
+    const frac = abs >= 100_000 ? 0 : 1;
+    return new Intl.NumberFormat("fr-FR", {
+      style: "currency",
+      currency: "EUR",
+      minimumFractionDigits: frac,
+      maximumFractionDigits: frac,
+    }).format(k).replace(/€/, "K€").replace(/\s+K/, "K");
+  }
+  if (abs >= 100) {
+    return new Intl.NumberFormat("fr-FR", {
+      style: "currency",
+      currency: "EUR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  }
+  return formatEUR(value);
+}
+
 /** Format a number as a given currency. */
 export function formatCurrency(value: number, currency: string): string {
   return new Intl.NumberFormat("fr-FR", {
