@@ -45,18 +45,21 @@ export default function ImmobilierPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Valuation summary */}
-        <Section title="Valorisation de votre part (50.6%)">
+        <Section title="Valorisation — votre maison (118m²)">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-label text-t-5">Médiane marché</span>
+              <span className="text-label text-t-5">Médiane neuf</span>
               <div className="flex items-center gap-2">
-                <span className="tnum text-body font-semibold text-accent">{formatEUR(sca.your_share_market_median ?? sca.your_share_property_value)}</span>
+                <span className="tnum text-body font-semibold text-accent">{formatEUR(sca.your_house_market_neuf ?? sca.your_share_property_value)}</span>
                 <SourceBadge source="estimate" />
               </div>
             </div>
-            <p className="text-caption text-t-6 text-right -mt-2">
-              {sca.market_median_total ? `${formatEUR(sca.market_median_total)} total · MeilleursAgents` : ""}
-            </p>
+            <p className="text-caption text-t-6 text-right -mt-2">4 100€/m² × 118m² · MeilleursAgents</p>
+            <div className="flex items-center justify-between">
+              <span className="text-label text-t-5">Médiane ancien</span>
+              <span className="tnum text-body font-medium text-t-3">{formatEUR(sca.your_house_market_ancien ?? 0)}</span>
+            </div>
+            <p className="text-caption text-t-6 text-right -mt-2">3 530€/m² × 118m²</p>
             <div className="flex items-center justify-between">
               <span className="text-label text-t-5">Estimation Bourso</span>
               <div className="flex items-center gap-2">
@@ -64,9 +67,6 @@ export default function ImmobilierPage() {
                 <SourceBadge source="scraped" />
               </div>
             </div>
-            <p className="text-caption text-t-6 text-right -mt-2">
-              {formatEUR(prop.bourso_estimate)} total · Boursorama
-            </p>
             <div className="pt-3 mt-3 border-t border-bd-1">
               <div className="flex items-center justify-between">
                 <span className="text-label text-t-5">Coût construction</span>
@@ -76,12 +76,12 @@ export default function ImmobilierPage() {
             </div>
             <div className="pt-3 mt-3 border-t border-bd-1">
               <div className="flex items-center justify-between">
-                <span className="text-label font-medium text-t-3">Plus/moins-value latente</span>
+                <span className="text-label font-medium text-t-3">Plus-value latente</span>
                 <span className={`tnum text-body font-semibold ${gainEur >= 0 ? "text-gain" : "text-loss"}`}>
                   {gainEur >= 0 ? "+" : ""}{formatEUR(gainEur)} ({gainPct >= 0 ? "+" : ""}{gainPct.toFixed(1)}%)
                 </span>
               </div>
-              <p className="text-caption text-t-6 text-right mt-0.5">Marché vs investissement</p>
+              <p className="text-caption text-t-6 text-right mt-0.5">Neuf vs investissement</p>
             </div>
           </div>
         </Section>
@@ -92,7 +92,8 @@ export default function ImmobilierPage() {
             <InfoRow label="Adresse" value={prop.address} />
             <InfoRow label="Type" value={`${prop.type} — ${prop.rooms} pièces`} />
             <InfoRow label="Surface habitable" value={`${prop.surface_m2} m²`} />
-            {prop.terrain_m2 && <InfoRow label="Terrain" value={`${prop.terrain_m2} m²`} />}
+            {prop.terrain_privatif_m2 && <InfoRow label="Terrain privatif" value={`${prop.terrain_privatif_m2} m²`} />}
+            {prop.terrain_commun_m2 && <InfoRow label="Terrain commun" value={`${prop.terrain_commun_m2} m²`} />}
             <InfoRow label="DPE" value={prop.dpe_score} />
             <InfoRow label="Date d'achat" value={prop.purchase_date} />
             <InfoRow label="Prix/m² estimé" value={formatEUR(prop.price_per_m2_estimate)} />
@@ -189,7 +190,8 @@ export default function ImmobilierPage() {
             <Section title={`Estimation revente (${prop.surface_m2} m²)`}>
               <div className="space-y-3">
                 <InfoRow label="Fourchette basse" value={formatEUR(market.estimation_revente.low)} />
-                <InfoRow label="Médiane marché" value={formatEUR(market.estimation_revente.median)} />
+                <InfoRow label="Médiane ancien" value={formatEUR(market.estimation_revente.median_ancien ?? market.estimation_revente.median ?? 0)} />
+                <InfoRow label="Médiane neuf" value={formatEUR(market.estimation_revente.median_neuf ?? 0)} />
                 <InfoRow label="Fourchette haute" value={formatEUR(market.estimation_revente.high)} />
                 <div className="pt-3 mt-3 border-t border-bd-1">
                   <InfoRow label="Estimation Bourso" value={formatEUR(market.estimation_revente.bourso)} highlight />

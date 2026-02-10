@@ -1,6 +1,6 @@
 {
   "date": "2026-02-10",
-  "timestamp": "2026-02-10T12:11:31.072480",
+  "timestamp": "2026-02-10T12:35:23.260125",
   "trade_republic": {
     "type": "cto",
     "currency": "EUR",
@@ -467,9 +467,11 @@
     "ownership_pct": 50.595,
     "property": {
       "address": "40 chemin de la désirade, 34790 GRABELS",
-      "type": "Maison",
+      "type": "Villa R+1",
       "rooms": 4,
-      "surface_m2": 110,
+      "surface_m2": 118,
+      "terrain_privatif_m2": 466,
+      "terrain_commun_m2": 300,
       "terrain_value_book": 282000,
       "purchase_date": "08/2021",
       "dpe_score": "D",
@@ -478,7 +480,7 @@
         "low": 445129,
         "high": 565380
       },
-      "price_per_m2_estimate": 4593.22
+      "price_per_m2_estimate": 4281.81
     },
     "financials": {
       "capital_souscrit": 352078,
@@ -493,7 +495,9 @@
     "co_associate": {
       "name": "Mme Françoise BEAUSSIER",
       "parts": 343795,
-      "ownership_pct": 49.405
+      "ownership_pct": 49.405,
+      "surface_m2": 89,
+      "terrain_privatif_m2": 466
     },
     "charges_breakdown": {
       "terrain_qp": 142678.33,
@@ -506,19 +510,19 @@
       "electricite_qp": 264.3,
       "divers_qp": 138.88
     },
-    "market_median_total": 402420,
-    "your_share_market_median": 203604.4,
-    "your_share_bourso_estimate": 255633.26,
+    "your_house_market_neuf": 483800,
+    "your_house_market_ancien": 416540,
+    "your_share_bourso_estimate": 505254,
     "your_share_construction_cost": 318228.65,
-    "your_share_property_value": 203604.4
+    "your_share_property_value": 483800
   },
   "totals": {
     "total_investments": 56517.45,
     "total_bank_liquid": 121.16,
-    "total_real_estate": 203604.4,
-    "total_assets": 260243.01,
+    "total_real_estate": 483800,
+    "total_assets": 540438.61,
     "total_debt": 232060.75,
-    "net_worth": 28182.26,
+    "net_worth": 308377.86,
     "monthly_loan_payments": 0,
     "monthly_margin_cost": 0.0
   }

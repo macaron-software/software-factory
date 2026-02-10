@@ -70,6 +70,8 @@ export interface SCA {
     type: string;
     rooms: number;
     surface_m2: number;
+    terrain_privatif_m2?: number;
+    terrain_commun_m2?: number;
     terrain_m2?: number;
     terrain_value_book: number;
     purchase_date: string;
@@ -90,10 +92,10 @@ export interface SCA {
   };
   co_associate: { name: string; parts: number; ownership_pct: number };
   your_share_property_value: number;
-  your_share_market_median?: number;
+  your_house_market_neuf?: number;
+  your_house_market_ancien?: number;
   your_share_bourso_estimate?: number;
   your_share_construction_cost?: number;
-  market_median_total?: number;
   market?: {
     commune: string;
     code_postal: string;
@@ -111,7 +113,7 @@ export interface SCA {
       contemporain: { low: number; high: number };
       source: string;
     };
-    estimation_revente: { low: number; median: number; high: number; bourso: number };
+    estimation_revente: { low: number; median_ancien?: number; median_neuf?: number; median?: number; high: number; bourso: number };
     estimation_loyer_mensuel: { low: number; median: number; high: number };
     cout_reconstruction: { economique: number; standard: number; contemporain: number };
     rendement_locatif_brut_pct: number;

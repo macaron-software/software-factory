@@ -25,15 +25,17 @@ SCA = {
     "ownership_pct": 50.595,
     "property": {
         "address": "40 chemin de la désirade, 34790 GRABELS",
-        "type": "Maison",
+        "type": "Villa R+1",
         "rooms": 4,
-        "surface_m2": 110,
+        "surface_m2": 118,
+        "terrain_privatif_m2": 466,
+        "terrain_commun_m2": 300,
         "terrain_value_book": 282000,
         "purchase_date": "08/2021",
         "dpe_score": "D",
         "bourso_estimate": 505254,
         "bourso_estimate_range": {"low": 445129, "high": 565380},
-        "price_per_m2_estimate": 4593.22,
+        "price_per_m2_estimate": 4281.81,
     },
     "financials": {
         "capital_souscrit": 352078,
@@ -49,6 +51,8 @@ SCA = {
         "name": "Mme Françoise BEAUSSIER",
         "parts": 343795,
         "ownership_pct": 49.405,
+        "surface_m2": 89,
+        "terrain_privatif_m2": 466,
     },
     "charges_breakdown": {
         "terrain_qp": 142678.33,
@@ -299,24 +303,18 @@ def build(d: str) -> dict:
 
     # ─── SCA ──────────────────────────────────────────────────────
     sca = dict(SCA)
-    # Market median: MeilleursAgents 3,530€/m² × 114m² = 402,420€
-    surface = sca["property"].get("surface_m2", 110)
-    if surface < 114:
-        surface = 114  # corrected surface
-    market_median_price_m2 = 3530  # Grabels (34790), maisons, 2025-Q1
-    market_median_total = surface * market_median_price_m2
+    # SCA has 2 separate houses: user's (118m²) + Beaussier's (89m²)
+    # User's house is valued independently, NOT as ownership% of total
+    surface = sca["property"]["surface_m2"]  # 118m²
+    market_median_neuf_m2 = 4100  # Grabels (34790), maisons neuves, 2025-Q1
+    market_median_ancien_m2 = 3530  # maisons existantes
 
-    sca["market_median_total"] = market_median_total
-    sca["your_share_market_median"] = round(
-        market_median_total * sca["ownership_pct"] / 100, 2
-    )
-    sca["your_share_bourso_estimate"] = round(
-        sca["property"]["bourso_estimate"] * sca["ownership_pct"] / 100, 2
-    )
-    # total_verse is already the user's payment (capital_verse + cca_avances)
-    sca["your_share_construction_cost"] = sca["financials"]["total_verse"]
-    # Use market median for patrimoine (conservative, MeilleursAgents source)
-    sca["your_share_property_value"] = sca["your_share_market_median"]
+    sca["your_house_market_neuf"] = surface * market_median_neuf_m2  # 483,800€
+    sca["your_house_market_ancien"] = surface * market_median_ancien_m2  # 416,540€
+    sca["your_share_bourso_estimate"] = sca["property"]["bourso_estimate"]  # 505,254€
+    sca["your_share_construction_cost"] = sca["financials"]["total_verse"]  # 318,229€
+    # Use market median neuf for patrimoine (maison neuve)
+    sca["your_share_property_value"] = sca["your_house_market_neuf"]
 
     # ─── Totals ───────────────────────────────────────────────────
     total_investments = trade_republic["total_account_value"] + ibkr["net_liquidation_eur"]

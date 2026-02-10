@@ -1007,13 +1007,11 @@ def get_loans():
 def get_sca():
     """SCA La Désirade data with Grabels market context."""
     sca = P["sca_la_desirade"]
-    # Correct property data (scraped values may be approximate)
-    sca["property"]["surface_m2"] = 114
-    sca["property"]["type"] = "Villa R+1"
-    sca["property"]["rooms"] = 4
-    sca["property"]["terrain_m2"] = 420
-    surface = 114
-    terrain_m2 = 420
+    # Property data now correct in build_patrimoine (118m², Villa R+1)
+    surface = sca["property"]["surface_m2"]  # 118
+    terrain_privatif = sca["property"].get("terrain_privatif_m2", 466)
+    terrain_commun = sca["property"].get("terrain_commun_m2", 300)
+    terrain_total = terrain_privatif + terrain_commun // 2  # ~616m² effective
     # Update price/m² based on Bourso estimate
     sca["property"]["price_per_m2_estimate"] = round(sca["property"]["bourso_estimate"] / surface, 2)
     # Grabels (34790) market data — 2025 sources
@@ -1042,7 +1040,8 @@ def get_sca():
         # Computed analyses
         "estimation_revente": {
             "low": round(surface * 2550),
-            "median": round(surface * 3530),
+            "median_ancien": round(surface * 3530),
+            "median_neuf": round(surface * 4100),
             "high": round(surface * 4630),
             "bourso": sca["property"]["bourso_estimate"],
         },
@@ -1060,12 +1059,13 @@ def get_sca():
             (surface * 13.5 * 12) / sca["property"]["bourso_estimate"] * 100, 2
         ),
         "terrain": {
-            "surface_m2": terrain_m2,
+            "privatif_m2": terrain_privatif,
+            "commun_m2": terrain_commun,
             "prix_m2_terrain_grabels": {"low": 250, "median": 380, "high": 500},
-            "estimation_terrain": {
-                "low": round(terrain_m2 * 250),
-                "median": round(terrain_m2 * 380),
-                "high": round(terrain_m2 * 500),
+            "estimation_terrain_privatif": {
+                "low": round(terrain_privatif * 250),
+                "median": round(terrain_privatif * 380),
+                "high": round(terrain_privatif * 500),
             },
         },
     }
