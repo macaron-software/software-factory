@@ -4,6 +4,7 @@ import { formatEUR, CHART_COLORS } from "@/lib/utils";
 
 interface Props {
   institutions: { name: string; display_name: string; total: number }[];
+  onItemClick?: (institutionName: string) => void;
 }
 
 const INSTITUTION_ICONS: Record<string, string> = {
@@ -13,7 +14,7 @@ const INSTITUTION_ICONS: Record<string, string> = {
   trade_republic: "TR",
 };
 
-export function InstitutionBar({ institutions }: Props) {
+export function InstitutionBar({ institutions, onItemClick }: Props) {
   const data = institutions
     .filter((i) => i.total !== 0)
     .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
@@ -33,10 +34,11 @@ export function InstitutionBar({ institutions }: Props) {
           return (
             <div
               key={inst.name}
-              className="flex items-center gap-4 py-2 px-2 -mx-2 rounded-lg transition-colors cursor-default"
+              className="flex items-center gap-4 py-2 px-2 -mx-2 rounded-lg transition-colors cursor-pointer"
               style={{ background: "transparent" }}
               onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              onClick={() => onItemClick?.(inst.name)}
             >
               {/* Icon */}
               <div

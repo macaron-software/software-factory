@@ -160,3 +160,9 @@ body {
   cursor: default;
 }
 .legend-item:hover { background: var(--bg-hover); }
+
+/* Detail sheet animations */
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes slideIn { from { transform: translateX(100%) } to { transform: translateX(0) } }
+.animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+.animate-slideIn { animation: slideIn 0.25s ease-out; }

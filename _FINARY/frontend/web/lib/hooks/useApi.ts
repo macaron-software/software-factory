@@ -95,6 +95,14 @@ export function useCategorySpending(months = 3) {
   });
 }
 
+export function useCategoryTransactions(category: string | null, months = 3) {
+  return useQuery({
+    queryKey: ["budget", "category-tx", category, months],
+    queryFn: () => api.getCategoryTransactions(category!, months),
+    enabled: !!category,
+  });
+}
+
 // ─── Market ───
 
 export function usePriceHistory(ticker: string, limit = 365) {

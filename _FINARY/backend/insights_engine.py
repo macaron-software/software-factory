@@ -955,9 +955,6 @@ def aggregate_monthly_budget(transactions: list[dict]) -> list[dict]:
         "Mouvements internes créditeurs",
         "Mouvements internes débiteurs",
         "Virements émis de comptes à comptes",
-        "Virements émis",
-        "Virements reçus",
-        "Virements",
     }
 
     for tx in transactions:

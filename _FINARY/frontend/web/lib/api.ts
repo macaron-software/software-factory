@@ -63,6 +63,10 @@ export const api = {
     fetchApi<import("./types/api").CategorySpending[]>(
       `/api/v1/budget/categories?limit=${months}`
     ),
+  getCategoryTransactions: (category: string, months = 3) =>
+    fetchApi<import("./types/api").CategoryTransaction[]>(
+      `/api/v1/budget/categories/${encodeURIComponent(category)}/transactions?months=${months}`
+    ),
 
   // ─── Market ───
   getQuote: (ticker: string) =>

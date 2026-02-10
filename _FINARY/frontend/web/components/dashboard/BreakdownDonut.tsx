@@ -11,6 +11,7 @@ interface Props {
     investments: number;
     real_estate: number;
   };
+  onSliceClick?: (className: string) => void;
 }
 
 const LABELS: Record<string, string> = {
@@ -38,7 +39,7 @@ function ActiveShape(props: any) {
   );
 }
 
-export function BreakdownDonut({ breakdown }: Props) {
+export function BreakdownDonut({ breakdown, onSliceClick }: Props) {
   const [activeIndex, setActiveIndex] = useState<number>(-1);
 
   const data = Object.entries(breakdown)
@@ -105,12 +106,13 @@ export function BreakdownDonut({ breakdown }: Props) {
           {data.map((d, i) => (
             <div
               key={d.name}
-              className="flex items-center justify-between py-1 px-2 -mx-2 rounded-md transition-colors cursor-default"
+              className="flex items-center justify-between py-1 px-2 -mx-2 rounded-md transition-colors cursor-pointer"
               style={{
                 background: activeIndex === i ? "var(--bg-hover)" : "transparent",
               }}
               onMouseEnter={() => setActiveIndex(i)}
               onMouseLeave={() => setActiveIndex(-1)}
+              onClick={() => onSliceClick?.(d.name)}
             >
               <div className="flex items-center gap-3">
                 <div

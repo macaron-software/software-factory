@@ -723,6 +723,26 @@ def get_category_spending(months: int = Query(3)):
     ]
 
 
+@app.get("/api/v1/budget/categories/{category}/transactions")
+def get_category_transactions(category: str, months: int = Query(3)):
+    """Return individual transactions for a given category (parent)."""
+    txs = load_transactions(months=months)
+    matches = [
+        {
+            "date": tx["date"],
+            "description": tx["description"],
+            "amount": tx["amount"],
+            "category": tx["category"],
+            "merchant": tx["merchant"],
+            "bank": tx["bank"],
+        }
+        for tx in txs
+        if tx["type"] == "expense"
+        and (tx.get("category_parent") or tx.get("category", "")) == category
+    ]
+    return sorted(matches, key=lambda x: x["date"], reverse=True)
+
+
 @app.get("/api/v1/market/fx")
 def get_fx_rates():
     return [

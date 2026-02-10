@@ -229,7 +229,7 @@ def parse_bourso_csv(filepath: Path, con: duckdb.DuckDBPyConnection):
     for row in reader:
         try:
             dt = datetime.strptime(row["dateOp"], "%Y-%m-%d").date()
-            amount_str = row["amount"].replace(",", ".").replace("\xa0", "")
+            amount_str = re.sub(r'\s', '', row["amount"]).replace(",", ".")
             amount = float(amount_str)
             desc = row["label"].strip('"')
             category = row.get("category", "")
@@ -237,11 +237,24 @@ def parse_bourso_csv(filepath: Path, con: duckdb.DuckDBPyConnection):
             merchant = row.get("supplierFound", "")
             account = row.get("accountLabel", "")
 
-            # Determine type
-            if amount > 0:
+            # Determine type — use Bourso's own categories
+            cat_low = category.lower()
+            parent_low = cat_parent.lower()
+            desc_low = desc.lower()
+            is_self = "legland" in desc_low
+
+            if parent_low in ("revenus du travail", "revenus d'épargne"):
                 tx_type = "income"
-            elif "virement" in category.lower():
+            elif "salaire" in cat_low or "prime" in cat_low:
+                tx_type = "income"
+            elif is_self:
                 tx_type = "transfer"
+            elif "virements émis" in cat_low:
+                tx_type = "transfer"
+            elif "echéance prêt" in cat_low or "remboursement de prêt" in cat_low:
+                tx_type = "expense"
+            elif amount > 0:
+                tx_type = "income"
             else:
                 tx_type = "expense"
 

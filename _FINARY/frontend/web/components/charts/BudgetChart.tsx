@@ -14,6 +14,7 @@ import type { MonthlyBudget } from "@/lib/types/api";
 
 interface Props {
   data: MonthlyBudget[];
+  onBarClick?: (month: string) => void;
 }
 
 function formatMonth(month: string): string {
@@ -79,15 +80,22 @@ function CustomTooltip({
   );
 }
 
-export function BudgetChart({ data }: Props) {
+export function BudgetChart({ data, onBarClick }: Props) {
   const chartData = data.map((d) => ({
     ...d,
     label: formatMonth(d.month),
   }));
 
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const handleClick = (state: any) => {
+    if (onBarClick && state?.activePayload?.[0]?.payload?.month) {
+      onBarClick(state.activePayload[0].payload.month);
+    }
+  };
+
   return (
     <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={chartData} barGap={2} barCategoryGap="20%">
+      <BarChart data={chartData} barGap={2} barCategoryGap="20%" onClick={handleClick} style={{ cursor: onBarClick ? "pointer" : undefined }}>
         <CartesianGrid
           vertical={false}
           stroke="var(--border-1)"

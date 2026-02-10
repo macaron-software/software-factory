@@ -184,12 +184,22 @@ export interface MonthlyBudget {
   income: number;
   expenses: number;
   savings_rate: number;
+  categories?: Record<string, number>;
 }
 
 export interface CategorySpending {
   category: string;
   total: number;
   count: number;
+}
+
+export interface CategoryTransaction {
+  date: string;
+  description: string;
+  amount: number;
+  category: string;
+  merchant: string;
+  bank: string;
 }
 
 export interface Dividend {
