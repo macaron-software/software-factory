@@ -5,11 +5,11 @@ import { SourceBadge } from "@/components/ds";
 import type { DataSource } from "@/lib/types/api";
 
 interface Props {
-  institutions: { name: string; display_name: string; total: number }[];
+  institutions: { name: string; display_name: string; total: number; source?: string }[];
   onItemClick?: (institutionName: string) => void;
 }
 
-const INST_SOURCE: Record<string, DataSource> = {
+const INST_SOURCE_FALLBACK: Record<string, DataSource> = {
   ibkr: "live",
   trade_republic: "live",
   boursobank: "scraped",
@@ -68,7 +68,7 @@ export function InstitutionBar({ institutions, onItemClick }: Props) {
                     <span className="text-[13px] font-medium truncate" style={{ color: "var(--text-2)" }}>
                       {inst.display_name}
                     </span>
-                    <SourceBadge source={INST_SOURCE[inst.name] ?? "scraped"} />
+                    <SourceBadge source={(inst as any).source ?? INST_SOURCE_FALLBACK[inst.name] ?? "scraped"} />
                   </div>
                   <span
                     className="tnum text-[13px] font-semibold ml-3"
