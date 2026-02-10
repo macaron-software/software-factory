@@ -909,52 +909,29 @@ async def scrape_credit_agricole():
         Path("/tmp/ca_keyboard.html").write_text(html)
 
         # Step 4: Handle virtual keyboard for PIN
-
-        # CA keyboard buttons often use data-value or aria-label attributes
+        # CA uses <a class="Login-key ..."> with digit text in child <div>
         for digit in pin:
-            clicked = False
-            selectors = [
-                f'button[data-value="{digit}"]',
-                f'a[data-value="{digit}"]',
-                f'div[data-value="{digit}"]',
-                f'button[aria-label="{digit}"]',
-                f'[data-matrix-key] img[alt="{digit}"]',
-            ]
-            for sel in selectors:
-                try:
-                    btn = await page.query_selector(sel)
-                    if btn:
-                        await btn.click()
-                        clicked = True
-                        print(f"[credit_agricole] Clicked digit {digit} via {sel}")
-                        break
-                except Exception:
-                    continue
-
-            if not clicked:
-                # Brute force: find clickable elements with matching text
-                for tag in ['button', 'a', 'div', 'span', 'li', 'td']:
-                    elements = await page.query_selector_all(f'{tag}[class*="wd-key"], {tag}[class*="Key"], {tag}[class*="btn-key"]')
-                    if not elements:
-                        elements = await page.query_selector_all(tag)
-                    for el in elements:
-                        try:
-                            text = (await el.inner_text()).strip()
-                            if text == digit:
-                                box = await el.bounding_box()
-                                if box and box['width'] > 10 and box['height'] > 10:
-                                    await el.click()
-                                    clicked = True
-                                    print(f"[credit_agricole] Clicked digit {digit} via <{tag}> brute force")
-                                    break
-                        except Exception:
-                            continue
-                    if clicked:
-                        break
-
-            if not clicked:
-                print(f"[credit_agricole] WARNING: Could not click digit {digit}")
-
+            clicked = await page.evaluate(f"""() => {{
+                const links = document.querySelectorAll('a.Login-key');
+                for (const a of links) {{
+                    if (a.textContent.trim() === '{digit}') {{
+                        a.click();
+                        return true;
+                    }}
+                }}
+                // Fallback: any clickable element with matching single digit
+                for (const tag of ['a', 'button', 'div', 'span']) {{
+                    for (const el of document.querySelectorAll(tag)) {{
+                        if (el.textContent.trim() === '{digit}' && el.offsetParent) {{
+                            const r = el.getBoundingClientRect();
+                            if (r.width > 10 && r.height > 10) {{ el.click(); return true; }}
+                        }}
+                    }}
+                }}
+                return false;
+            }}""")
+            status = "✓" if clicked else "✗"
+            print(f"[credit_agricole] PIN {digit} → {status}")
             await page.wait_for_timeout(300)
 
         await page.screenshot(path="/tmp/ca_03_after_pin.png")
@@ -962,6 +939,7 @@ async def scrape_credit_agricole():
         # Step 4: Submit login
         print("[credit_agricole] Submitting login...")
         submit_sels = [
+            'text=VALIDER', 'text=Valider',
             'button:has-text("Valider")', 'button:has-text("OK")',
             'button[type="submit"]', '#validation', '.btn-submit',
         ]
