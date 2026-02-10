@@ -13,7 +13,7 @@ export function Section({ title, children, footer, className }: Props) {
   return (
     <div className={`card p-7 ${className ?? ""}`}>
       {title && (
-        <h3 className="text-label font-medium uppercase text-t-5 mb-5">{title}</h3>
+        <h3 className="section-title mb-5">{title}</h3>
       )}
       {children}
       {footer && (

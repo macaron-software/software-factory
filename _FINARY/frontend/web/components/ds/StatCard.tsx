@@ -24,10 +24,10 @@ export function StatCard({ label, value, tone = "default", detail, color }: Prop
     <div className="bg-bg-hover p-5 rounded-lg">
       <div className="flex items-center gap-2 mb-2">
         {color && <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: color }} />}
-        <p className="text-caption font-medium uppercase text-t-5">{label}</p>
+        <p className="section-title">{label}</p>
       </div>
-      <p className={`tnum text-heading font-semibold ${toneColor[tone]}`}>{formatEURCompact(value)}</p>
-      {detail && <p className="text-label text-t-5 mt-1.5">{detail}</p>}
+      <p className={`num-stat ${toneColor[tone]}`}>{formatEURCompact(value)}</p>
+      {detail && <p className="text-detail mt-1.5">{detail}</p>}
     </div>
   );
 }

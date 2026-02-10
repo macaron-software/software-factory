@@ -33,7 +33,7 @@ export default function ImmobilierPage() {
         value={sca.your_share_property_value}
         right={
           <div className="flex items-center gap-2">
-            <span className={`tnum text-body font-medium ${gainEur >= 0 ? "text-gain" : "text-loss"}`}>
+            <span className={`num-inline ${gainEur >= 0 ? "text-gain" : "text-loss"}`}>
               {gainEur >= 0 ? "+" : ""}{formatEURCompact(gainEur)}
             </span>
             <Badge variant={gainEur >= 0 ? "gain" : "loss"}>
@@ -50,38 +50,38 @@ export default function ImmobilierPage() {
             <div className="flex items-center justify-between">
               <span className="text-label text-t-5">Médiane neuf</span>
               <div className="flex items-center gap-2">
-                <span className="tnum text-body font-semibold text-accent">{formatEURCompact(sca.your_house_market_neuf ?? sca.your_share_property_value)}</span>
+                <span className="num-inline text-accent">{formatEURCompact(sca.your_house_market_neuf ?? sca.your_share_property_value)}</span>
                 <SourceBadge source="estimate" />
               </div>
             </div>
-            <p className="text-caption text-t-6 text-right -mt-2">4 100€/m² × 118m² · MeilleursAgents</p>
+            <p className="text-source text-right -mt-2">4 100€/m² × 118m² · MeilleursAgents</p>
             <div className="flex items-center justify-between">
               <span className="text-label text-t-5">Médiane ancien</span>
-              <span className="tnum text-body font-medium text-t-3">{formatEURCompact(sca.your_house_market_ancien ?? 0)}</span>
+              <span className="num-inline text-t-3">{formatEURCompact(sca.your_house_market_ancien ?? 0)}</span>
             </div>
-            <p className="text-caption text-t-6 text-right -mt-2">3 530€/m² × 118m²</p>
+            <p className="text-source text-right -mt-2">3 530€/m² × 118m²</p>
             <div className="flex items-center justify-between">
               <span className="text-label text-t-5">Estimation Bourso</span>
               <div className="flex items-center gap-2">
-                <span className="tnum text-body font-medium text-t-2">{formatEURCompact(sca.your_share_bourso_estimate ?? 0)}</span>
+                <span className="num-inline text-t-2">{formatEURCompact(sca.your_share_bourso_estimate ?? 0)}</span>
                 <SourceBadge source="scraped" />
               </div>
             </div>
             <div className="pt-3 mt-3 border-t border-bd-1">
               <div className="flex items-center justify-between">
                 <span className="text-label text-t-5">Coût construction</span>
-                <span className="tnum text-body font-medium text-t-4">{formatEURCompact(constructionCost)}</span>
+                <span className="num-inline text-t-4">{formatEURCompact(constructionCost)}</span>
               </div>
-              <p className="text-caption text-t-6 text-right mt-0.5">Capital versé + avances CCA</p>
+              <p className="text-source text-right mt-0.5">Capital versé + avances CCA</p>
             </div>
             <div className="pt-3 mt-3 border-t border-bd-1">
               <div className="flex items-center justify-between">
                 <span className="text-label font-medium text-t-3">Plus-value latente</span>
-                <span className={`tnum text-body font-semibold ${gainEur >= 0 ? "text-gain" : "text-loss"}`}>
+                <span className={`num-inline font-semibold ${gainEur >= 0 ? "text-gain" : "text-loss"}`}>
                   {gainEur >= 0 ? "+" : ""}{formatEURCompact(gainEur)} ({gainPct >= 0 ? "+" : ""}{gainPct.toFixed(1)}%)
                 </span>
               </div>
-              <p className="text-caption text-t-6 text-right mt-0.5">Neuf vs investissement</p>
+              <p className="text-source text-right mt-0.5">Neuf vs investissement</p>
             </div>
           </div>
         </Section>
@@ -99,7 +99,7 @@ export default function ImmobilierPage() {
             <InfoRow label="Prix/m² estimé" value={formatEURCompact(prop.price_per_m2_estimate)} />
             <div className="pt-3 mt-3 border-t border-bd-1">
               <InfoRow label="Estimation Bourso" value={formatEURCompact(prop.bourso_estimate)} highlight />
-              <p className="text-label mt-1 text-right text-t-5">
+              <p className="text-detail mt-1 text-right">
                 {formatEURCompact(prop.bourso_estimate_range.low)} — {formatEURCompact(prop.bourso_estimate_range.high)}
               </p>
             </div>
@@ -111,10 +111,10 @@ export default function ImmobilierPage() {
           <div className="flex items-center gap-6">
             <div className="w-[140px] h-[140px] shrink-0 relative">
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-[1]">
-                <span className="tnum text-title font-semibold text-t-1">
+                <span className="num-stat text-t-1">
                   {sca.ownership_pct.toFixed(1)}%
                 </span>
-                <span className="text-caption text-t-5">Votre part</span>
+                <span className="text-source">Votre part</span>
               </div>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -181,7 +181,7 @@ export default function ImmobilierPage() {
                 tone={market.rendement_locatif_brut_pct >= 4 ? "positive" : "accent"}
               />
             </div>
-            <p className="text-caption text-t-6 mt-3">
+            <p className="text-source mt-3">
               Sources : {market.prix_m2_achat.source} · {market.loyer_m2.source} · {market.cout_construction_m2.source} — {market.date_source}
             </p>
           </Section>
@@ -226,7 +226,7 @@ export default function ImmobilierPage() {
                 <div className="pt-3 mt-3 border-t border-bd-1">
                   <div className="flex items-center justify-between">
                     <span className="text-label text-t-5">Valeur terrain (bilan)</span>
-                    <span className="tnum text-body font-medium text-accent">{formatEURCompact(prop.terrain_value_book)}</span>
+                    <span className="num-inline text-accent">{formatEURCompact(prop.terrain_value_book)}</span>
                   </div>
                 </div>
               </div>
@@ -256,7 +256,7 @@ function InfoRow({ label, value, highlight }: { label: string; value: string; hi
   return (
     <div className="flex items-center justify-between">
       <span className="text-label text-t-5">{label}</span>
-      <span className={`tnum text-body font-medium ${highlight ? "text-accent" : "text-t-1"}`}>
+      <span className={`num-inline ${highlight ? "text-accent" : "text-t-1"}`}>
         {value}
       </span>
     </div>
@@ -276,9 +276,9 @@ function PriceBar({ low, high, current, label }: { low: number; high: number; cu
         />
       </div>
       <div className="flex justify-between mt-1">
-        <span className="text-caption text-t-6">{formatEURCompact(low)}</span>
+        <span className="text-source">{formatEURCompact(low)}</span>
         <span className="text-caption font-medium text-accent">{label}</span>
-        <span className="text-caption text-t-6">{formatEURCompact(high)}</span>
+        <span className="text-source">{formatEURCompact(high)}</span>
       </div>
     </div>
   );
