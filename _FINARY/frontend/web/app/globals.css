@@ -143,6 +143,17 @@ body {
   color: var(--text-5);
 }
 
+/* ── Privacy blur ── */
+[data-privacy="on"] .num-hero,
+[data-privacy="on"] .num-stat,
+[data-privacy="on"] .num-inline,
+[data-privacy="on"] .tnum,
+[data-privacy="on"] [data-amount] {
+  filter: blur(8px);
+  user-select: none;
+  transition: filter 0.2s ease;
+}
+
 /* Card base */
 .card {
   background: var(--bg-3);

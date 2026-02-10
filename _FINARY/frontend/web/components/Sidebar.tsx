@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -16,8 +17,11 @@ import {
   Building2,
   Wifi,
   WifiOff,
+  Eye,
+  EyeOff,
   type LucideIcon,
 } from "lucide-react";
+import { useAppStore } from "@/lib/store";
 
 interface NavItem {
   href: string;
@@ -80,6 +84,12 @@ function FinaryLogo() {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { privacyMode, togglePrivacy } = useAppStore();
+
+  /* sync data-privacy attribute on mount (for SSR hydration) */
+  React.useEffect(() => {
+    document.documentElement.setAttribute("data-privacy", privacyMode ? "on" : "off");
+  }, [privacyMode]);
 
   const { data: status } = useQuery({
     queryKey: ["status"],
@@ -114,6 +124,23 @@ export function Sidebar() {
         >
           finary
         </span>
+        <button
+          onClick={togglePrivacy}
+          title={privacyMode ? "Afficher les montants" : "Masquer les montants"}
+          className="ml-auto flex items-center justify-center w-7 h-7 rounded-md transition-colors duration-150"
+          style={{
+            color: privacyMode ? "var(--accent)" : "var(--text-5)",
+            background: privacyMode ? "var(--accent-dim)" : "transparent",
+          }}
+          onMouseEnter={(e) => {
+            if (!privacyMode) e.currentTarget.style.background = "var(--bg-hover)";
+          }}
+          onMouseLeave={(e) => {
+            if (!privacyMode) e.currentTarget.style.background = "transparent";
+          }}
+        >
+          {privacyMode ? <EyeOff size={14} /> : <Eye size={14} />}
+        </button>
       </div>
 
       {/* ── Navigation ── */}
