@@ -48,11 +48,12 @@ export default function HomePage() {
 
   const getSheetAccounts = () => {
     if (!accounts) return [];
-    if (sheet === "actifs") return accounts.filter((a) => a.balance > 0);
-    if (sheet === "passifs") return accounts.filter((a) => a.balance < 0);
-    if (sheet === "investissements") return accounts.filter((a) => ["pea", "cto", "av", "crypto"].includes(a.account_type));
-    if (sheet === "liquidites") return accounts.filter((a) => ["checking", "savings"].includes(a.account_type));
-    if (sheet && typeof sheet === "object" && "institution" in sheet) return accounts.filter((a) => a.institution === sheet.institution);
+    const own = accounts.filter((a) => !a.excluded);
+    if (sheet === "actifs") return own.filter((a) => a.balance > 0);
+    if (sheet === "passifs") return own.filter((a) => a.balance < 0);
+    if (sheet === "investissements") return own.filter((a) => ["pea", "cto", "av", "crypto"].includes(a.account_type));
+    if (sheet === "liquidites") return own.filter((a) => ["checking", "savings"].includes(a.account_type));
+    if (sheet && typeof sheet === "object" && "institution" in sheet) return own.filter((a) => a.institution === sheet.institution);
     if (sheet && typeof sheet === "object" && "class" in sheet) {
       const classMap: Record<string, string[]> = {
         Liquidites: ["checking"],

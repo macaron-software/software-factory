@@ -18,11 +18,12 @@ export default function WealthStatementPage() {
   if (nwLoading) return <Loading />;
   if (!networth) return null;
 
+  const ownAccounts = accounts?.filter((a) => !a.excluded) ?? [];
   const investmentTotal = positions?.reduce((s, p) => s + p.value_eur, 0) ?? 0;
-  const checkingTotal = accounts?.filter((a) => a.account_type === "checking").reduce((s, a) => s + a.balance, 0) ?? 0;
-  const savingsTotal = accounts?.filter((a) => a.account_type === "savings").reduce((s, a) => s + a.balance, 0) ?? 0;
-  const peaTotal = accounts?.filter((a) => a.account_type === "pea").reduce((s, a) => s + a.balance, 0) ?? 0;
-  const ctoTotal = accounts?.filter((a) => a.account_type === "cto").reduce((s, a) => s + a.balance, 0) ?? 0;
+  const checkingTotal = ownAccounts.filter((a) => a.account_type === "checking").reduce((s, a) => s + a.balance, 0);
+  const savingsTotal = ownAccounts.filter((a) => a.account_type === "savings").reduce((s, a) => s + a.balance, 0);
+  const peaTotal = ownAccounts.filter((a) => a.account_type === "pea").reduce((s, a) => s + a.balance, 0);
+  const ctoTotal = ownAccounts.filter((a) => a.account_type === "cto").reduce((s, a) => s + a.balance, 0);
 
   const assets: StatementRow[] = [
     { label: "Comptes courants", value: checkingTotal, source: "scraped" },
