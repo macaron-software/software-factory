@@ -743,22 +743,85 @@ def get_category_spending(months: int = Query(3)):
 
 @app.get("/api/v1/budget/categories/{category}/transactions")
 def get_category_transactions(category: str, months: int = Query(3)):
-    """Return individual transactions for a given category (parent)."""
+    """Return individual transactions for a given normalized category."""
+    from backend.insights_engine import _normalize_category
     txs = load_transactions(months=months)
-    matches = [
-        {
-            "date": tx["date"],
-            "description": tx["description"],
-            "amount": tx["amount"],
-            "category": tx["category"],
-            "merchant": tx["merchant"],
-            "bank": tx["bank"],
-        }
-        for tx in txs
-        if tx["type"] == "expense"
-        and (tx.get("category_parent") or tx.get("category", "")) == category
-    ]
+    matches = []
+    for tx in txs:
+        norm = _normalize_category(tx)
+        if norm == category and tx.get("amount", 0) < 0:
+            matches.append({
+                "date": tx["date"],
+                "description": tx["description"],
+                "amount": tx["amount"],
+                "category": norm,
+                "merchant": tx.get("merchant", ""),
+                "bank": tx.get("bank", ""),
+            })
     return sorted(matches, key=lambda x: x["date"], reverse=True)
+
+
+@app.get("/api/v1/budget/projections")
+def get_budget_projections():
+    """Forecast M+1, M+2, M+3 budget based on rolling averages."""
+    txs = load_transactions(months=12)
+    if not txs:
+        return {"projections": []}
+    budget = aggregate_monthly_budget(txs)
+    if len(budget) < 3:
+        return {"projections": []}
+
+    from collections import defaultdict
+    # Use last 6 full months (exclude current partial month)
+    today = date.today()
+    current_month = f"{today.year}-{today.month:02d}"
+    full_months = [m for m in budget if m["month"] != current_month][-6:]
+    if not full_months:
+        full_months = budget[-6:]
+
+    avg_income = sum(m["income"] for m in full_months) / len(full_months)
+    avg_expenses = sum(m["expenses"] for m in full_months) / len(full_months)
+    avg_savings = avg_income - avg_expenses
+
+    # Category averages
+    cat_totals: dict[str, float] = defaultdict(float)
+    for m in full_months:
+        for cat, amt in m.get("categories", {}).items():
+            cat_totals[cat] += amt
+    cat_averages = {cat: round(total / len(full_months), 2) for cat, total in cat_totals.items()}
+
+    projections = []
+    for i in range(1, 4):
+        month_num = today.month + i
+        year = today.year
+        while month_num > 12:
+            month_num -= 12
+            year += 1
+        projections.append({
+            "month": f"{year}-{month_num:02d}",
+            "projected_income": round(avg_income, 2),
+            "projected_expenses": round(avg_expenses, 2),
+            "projected_savings": round(avg_savings, 2),
+            "projected_savings_rate": round((avg_savings / avg_income * 100) if avg_income > 0 else 0, 1),
+            "categories": cat_averages,
+        })
+
+    yearly_income = round(avg_income * 12, 2)
+    yearly_expenses = round(avg_expenses * 12, 2)
+
+    return {
+        "basis_months": len(full_months),
+        "avg_income": round(avg_income, 2),
+        "avg_expenses": round(avg_expenses, 2),
+        "avg_savings": round(avg_savings, 2),
+        "avg_savings_rate": round((avg_savings / avg_income * 100) if avg_income > 0 else 0, 1),
+        "yearly": {
+            "projected_income": yearly_income,
+            "projected_expenses": yearly_expenses,
+            "projected_savings": round(yearly_income - yearly_expenses, 2),
+        },
+        "projections": projections,
+    }
 
 
 @app.get("/api/v1/market/fx")

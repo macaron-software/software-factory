@@ -17,22 +17,26 @@ INFLATION_RATE = 0.024  # 2.4% annuel zone euro Q1 2026
 
 CATEGORY_RULES: list[tuple[str, str]] = [
     # Alimentation
-    (r"carrefour|leclerc|auchan|lidl|aldi|monoprix|picard|franprix|intermarche|casino|biocoop|super u|marche|boulang|primeur", "alimentation"),
-    (r"deliveroo|uber\s*eat|just\s*eat|frichti|getir|gorillas|too\s*good", "alimentation"),
+    (r"carrefour|leclerc|auchan|lidl|aldi|monoprix|picard|franprix|intermarche|intermarch|casino|biocoop|super\s*u|marche|boulang|primeur|trifontaine|grand\s*frais|bio\s*c", "alimentation"),
+    (r"deliveroo|uber\s*eat|just\s*eat|frichti|getir|gorillas|too\s*good|zamca\s*delivery", "alimentation"),
     # Restaurants
-    (r"restaurant|brasserie|mcdon|burger\s*king|kfc|subway|sushi|kebab|pizza|cafe|starbucks|paul\b", "restaurants"),
+    (r"restaurant|brasserie|mcdon|burger|kfc|subway|sushi|kebab|pizza|cafe|starbucks|paul\b|ratatouille|au\s*fil\s*de\s*l", "restaurants"),
     # Transport
-    (r"sncf|ratp|navigo|uber(?!\s*eat)|bolt|lime|bird|blabla|essence|total\s*energ|shell|bp\b|parkm|stationnement|autoroute|peage", "transport"),
+    (r"sncf|ratp|navigo|uber(?!\s*eat)|bolt|lime|bird|blabla|essence|total\s*energ|shell|bp\b|parkm|stationnement|autoroute|peage|wizz\s*air|ryanair|easyjet|gasoliner|eess\b|area\s*de\s*servic|cleverlog|autotei|carburant", "transport"),
     # Logement
-    (r"loyer|edf|engie|gaz|electricite|eau|syndic|assurance\s*hab|charges\s*loc|taxe\s*(?:fonciere|hab)", "logement"),
+    (r"loyer|edf|engie|gaz|electricite|eau|syndic|assurance\s*hab|charges\s*loc|taxe\s*(?:fonciere|hab)|swikly", "logement"),
     # Santé
-    (r"pharmacie|doctolib|medecin|dentiste|ophtal|mutuelle|cpam|ameli", "sante"),
+    (r"pharmacie|doctolib|medecin|dentiste|ophtal|mutuelle|cpam|ameli|cesml", "sante"),
     # Abonnements
     (r"netflix|spotify|amazon\s*prime|disney|dazn|canal|sfr|orange|bouygues|free\b|apple|google\s*(?:one|storage)|notion|chatgpt|github|icloud", "abonnements"),
     # Shopping
-    (r"zara|h&m|uniqlo|amazon(?!\s*prime)|fnac|darty|ikea|decathlon|leroy\s*merlin|aliexpress|apple\s*store", "shopping"),
+    (r"zara|h&m|uniqlo|amazon(?!\s*prime)|fnac|darty|ikea|decathlon|leroy\s*merlin|aliexpress|apple\s*store|alibaba|ifixit|temu", "shopping"),
+    # Éducation & Famille
+    (r"ogec|ecole|cantine|creche|garderie|scolarit|la\s*merci|fourniture", "education_famille"),
     # Loisirs
     (r"cinema|theatre|concert|museum|parc|voyage|hotel|airbnb|booking|sport|salle|gym|piscine", "loisirs"),
+    # Retrait DAB → vie quotidienne
+    (r"retrait\s*dab|retrait\s*especes", "vie_quotidienne"),
     # Banque/Frais
     (r"cotisation|commission|agios|frais\s*bancaire|inter[eê]ts?\s*d[eé]bit|frais\s*carte", "banque_frais"),
     # Assurances
@@ -1044,18 +1048,114 @@ def categorize_transaction(description: str) -> str:
     return "autre"
 
 
+# ─── Normalize Bourso categories to our unified set ───────────────────────────
+
+CATEGORY_NORMALIZE: dict[str, str] = {
+    # Bourso parent categories → our labels
+    "Vie quotidienne": "vie_quotidienne",
+    "Alimentation": "alimentation",
+    "Vie Quotidienne - Autres": "vie_quotidienne",
+    "Electronique et informatique": "shopping",
+    "Bien-être et soins (coiffeur, parfums…)": "vie_quotidienne",
+    "Abonnements & téléphonie": "abonnements",
+    "Education & Famille": "education_famille",
+    "Etudes (formation, fournitures, cantines…)": "education_famille",
+    "Logement": "logement",
+    "Loyers, Charges": "logement",
+    "Emprunt immobilier": "credits",
+    "Travaux, réparation, entretien, aménagement…": "logement",
+    "Energie (électricité, gaz, fuel, chauffage…)": "logement",
+    "Santé": "sante",
+    "Médecins et frais médicaux": "sante",
+    "Loisirs et sorties": "loisirs",
+    "Restaurants, bars, discothèques…": "restaurants",
+    "Divertissement - culture (ciné, théâtre, concerts…)": "loisirs",
+    "Auto & Moto": "transport",
+    "Péages": "transport",
+    "Carburant": "transport",
+    "Assurance véhicule": "assurances",
+    "Shopping": "shopping",
+    "Non catégorisé": "autre",
+    "Revenus du travail": "salaire",
+    "Salaire fixe": "salaire",
+    "Revenus d'épargne": "revenus_epargne",
+    "Revenus épargne financière (retraite, prévoyance, PEA, assurance-vie…)": "revenus_epargne",
+    "Impôts & Taxes": "impots",
+    "Cadeaux": "loisirs",
+    "Animaux": "vie_quotidienne",
+    "Scolarité": "education_famille",
+    "Banque": "banque_frais",
+    "Frais bancaires": "banque_frais",
+    "Assurances": "assurances",
+    # Our regex categories (already normalized)
+    "alimentation": "alimentation",
+    "restaurants": "restaurants",
+    "transport": "transport",
+    "logement": "logement",
+    "sante": "sante",
+    "abonnements": "abonnements",
+    "shopping": "shopping",
+    "loisirs": "loisirs",
+    "banque_frais": "banque_frais",
+    "assurances": "assurances",
+    "epargne_invest": "epargne_invest",
+    "impots": "impots",
+    "revenu": "salaire",
+    "autre": "autre",
+}
+
+# Categories that are internal transfers (not income/expenses)
+TRANSFER_CATS = {
+    "virement_interne",
+    "Mouvements internes créditeurs",
+    "Mouvements internes débiteurs",
+    "Virements émis de comptes à comptes",
+    "Virements émis",
+    "Virements reçus",
+    "Virements",
+}
+
+# Income categories (amount > 0 in these = real income, not transfers)
+INCOME_CATS = {"salaire", "revenus_epargne"}
+
+
+def _normalize_category(tx: dict) -> str:
+    """Normalize a transaction's category to our unified set."""
+    # Prefer Bourso's native category, then parent, then our regex
+    cat = tx.get("category") or ""
+    parent = tx.get("category_parent") or ""
+
+    # Check if it's a known transfer
+    if cat in TRANSFER_CATS or parent in TRANSFER_CATS:
+        return "_transfer"
+
+    # Normalize category (try cat first, then parent)
+    norm = CATEGORY_NORMALIZE.get(cat)
+    if not norm:
+        norm = CATEGORY_NORMALIZE.get(parent)
+    if not norm:
+        # Fall back to regex on description
+        norm = categorize_transaction(tx.get("description", ""))
+        norm = CATEGORY_NORMALIZE.get(norm, norm)
+
+    return norm or "autre"
+
+
+def _is_real_income(tx: dict, norm_cat: str) -> bool:
+    """Determine if a positive amount is real income (salary, dividends) vs transfer."""
+    if norm_cat in INCOME_CATS:
+        return True
+    # Positive amount but not an income category — likely a refund or transfer
+    desc = (tx.get("description") or "").lower()
+    if any(k in desc for k in ("remboursement", "caf ", "allocation", "cpam", "ameli")):
+        return True
+    return False
+
+
 def aggregate_monthly_budget(transactions: list[dict]) -> list[dict]:
-    """Aggregate transactions into monthly budget summaries."""
+    """Aggregate transactions into monthly budget summaries with normalized categories."""
     from collections import defaultdict
     monthly: dict[str, dict] = {}
-
-    # Categories to skip (internal transfers, not real income/expenses)
-    SKIP_CATS = {
-        "virement_interne",
-        "Mouvements internes créditeurs",
-        "Mouvements internes débiteurs",
-        "Virements émis de comptes à comptes",
-    }
 
     for tx in transactions:
         d = tx.get("date", "")
@@ -1063,24 +1163,39 @@ def aggregate_monthly_budget(transactions: list[dict]) -> list[dict]:
         if not month:
             continue
         if month not in monthly:
-            monthly[month] = {"income": 0, "expenses": 0, "categories": defaultdict(float)}
+            monthly[month] = {
+                "income": 0, "salary": 0, "other_income": 0,
+                "expenses": 0, "categories": defaultdict(float),
+                "tx_count": 0,
+            }
 
         amount = tx.get("amount", 0)
-        # Use Bourso's native category_parent if available, else our regex
-        category = tx.get("category_parent") or tx.get("category") or categorize_transaction(tx.get("description", ""))
+        norm_cat = _normalize_category(tx)
 
-        # Skip internal transfers (both category-based and type-based)
-        if category in SKIP_CATS:
+        # Skip transfers
+        if norm_cat == "_transfer":
             continue
         tx_type = tx.get("type", "")
         if tx_type == "transfer":
             continue
 
+        monthly[month]["tx_count"] += 1
+
         if amount > 0:
-            monthly[month]["income"] += amount
+            if _is_real_income(tx, norm_cat):
+                monthly[month]["income"] += amount
+                if norm_cat == "salaire":
+                    monthly[month]["salary"] += amount
+                else:
+                    monthly[month]["other_income"] += amount
+            # else: positive non-income = internal/refund, ignore
         else:
+            # Skip loan repayments from expense count (tracked in loans page)
+            if norm_cat == "credits":
+                monthly[month]["categories"]["credits"] += abs(amount)
+                continue
             monthly[month]["expenses"] += abs(amount)
-            monthly[month]["categories"][category] += abs(amount)
+            monthly[month]["categories"][norm_cat] += abs(amount)
 
     result = []
     for month in sorted(monthly.keys()):
@@ -1091,8 +1206,11 @@ def aggregate_monthly_budget(transactions: list[dict]) -> list[dict]:
         result.append({
             "month": month,
             "income": round(income, 2),
+            "salary": round(m["salary"], 2),
+            "other_income": round(m["other_income"], 2),
             "expenses": round(expenses, 2),
             "savings_rate": round(savings_rate, 1),
+            "tx_count": m["tx_count"],
             "categories": {k: round(v, 2) for k, v in sorted(m["categories"].items(), key=lambda x: -x[1])},
         })
     return result

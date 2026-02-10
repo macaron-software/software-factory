@@ -1,3 +1,5 @@
+import type { BudgetProjections } from "@/lib/types/api";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 async function fetchApi<T>(path: string, init?: RequestInit): Promise<T> {
@@ -104,7 +106,7 @@ export const api = {
   getInsightsRules: () =>
     fetchApi<Record<string, unknown>[]>("/api/v1/insights/rules"),
   getBudgetProjections: () =>
-    fetchApi<Record<string, unknown>>("/api/v1/budget/projections"),
+    fetchApi<BudgetProjections>("/api/v1/budget/projections"),
   getLoansAnalysis: () =>
     fetchApi<Record<string, unknown>>("/api/v1/loans/analysis"),
 

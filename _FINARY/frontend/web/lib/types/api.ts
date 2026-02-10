@@ -212,8 +212,11 @@ export interface AllocationItem {
 export interface MonthlyBudget {
   month: string;
   income: number;
+  salary?: number;
+  other_income?: number;
   expenses: number;
   savings_rate: number;
+  tx_count?: number;
   categories?: Record<string, number>;
 }
 
@@ -230,6 +233,29 @@ export interface CategoryTransaction {
   category: string;
   merchant: string;
   bank: string;
+}
+
+export interface BudgetProjectionMonth {
+  month: string;
+  projected_income: number;
+  projected_expenses: number;
+  projected_savings: number;
+  projected_savings_rate: number;
+  categories: Record<string, number>;
+}
+
+export interface BudgetProjections {
+  basis_months: number;
+  avg_income: number;
+  avg_expenses: number;
+  avg_savings: number;
+  avg_savings_rate: number;
+  yearly: {
+    projected_income: number;
+    projected_expenses: number;
+    projected_savings: number;
+  };
+  projections: BudgetProjectionMonth[];
 }
 
 export interface Dividend {
