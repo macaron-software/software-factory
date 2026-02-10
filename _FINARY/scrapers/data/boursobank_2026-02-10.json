@@ -1,0 +1,90 @@
+{
+  "scraped_at": "2026-02-10T08:53:00.508978",
+  "source": "boursobank",
+  "accounts": [
+    {
+      "name": "Total des avoirs au 10 février 2026",
+      "balance": 121.67,
+      "currency": "EUR"
+    },
+    {
+      "name": "Mes comptes bancaires",
+      "balance": 21.67,
+      "currency": "EUR"
+    },
+    {
+      "name": "BOURSORAMA ESSENTIEL SYLVAIN",
+      "balance": 19.33,
+      "currency": "EUR"
+    },
+    {
+      "name": "COMPTE CHEQUE",
+      "balance": 2.34,
+      "currency": "EUR"
+    },
+    {
+      "name": "Mes placements financiers",
+      "balance": 100.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "PEA LEGLAND",
+      "balance": 100.0,
+      "currency": "EUR"
+    }
+  ],
+  "loans": [
+    {
+      "name": "Mes crédits",
+      "balance": -121536.63,
+      "currency": "EUR"
+    },
+    {
+      "name": "PRÊT PERSONNEL",
+      "balance": -1448.78,
+      "currency": "EUR"
+    },
+    {
+      "name": "PRÊT PERSONNEL",
+      "balance": -6284.35,
+      "currency": "EUR"
+    },
+    {
+      "name": "PRET 0% - 00004690214",
+      "balance": -102000.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "P. ACC.SOC - 00004690213",
+      "balance": -10000.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "PACP - 73140424333",
+      "balance": -1803.5,
+      "currency": "EUR"
+    }
+  ],
+  "children": [
+    {
+      "name": "BOURSORAMA ESSENTIEL NATHAEL",
+      "balance": 351.74,
+      "currency": "EUR"
+    },
+    {
+      "name": "LIVRET A NATHAEL",
+      "balance": 7726.18,
+      "currency": "EUR"
+    },
+    {
+      "name": "Cashback & réductions The Corner",
+      "balance": 0.0,
+      "currency": "EUR"
+    },
+    {
+      "name": "Parrainage",
+      "balance": 0.0,
+      "currency": "EUR"
+    }
+  ]
+}

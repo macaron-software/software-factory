@@ -1,0 +1,270 @@
+{
+  "bank": "trade_republic",
+  "portfolio_total": 680.2,
+  "cash": 2169.62,
+  "positions": [
+    {
+      "name": "STMicroelectronics",
+      "value_eur": 26.8,
+      "daily_pct": "6,50 %"
+    },
+    {
+      "name": "L'Oreal",
+      "value_eur": 392.05,
+      "daily_pct": "0,43 %"
+    },
+    {
+      "name": "BYD",
+      "value_eur": 10.03,
+      "daily_pct": "1,23 %"
+    },
+    {
+      "name": "Moderna",
+      "value_eur": 34.4,
+      "daily_pct": "0,44 %"
+    },
+    {
+      "name": "Allianz",
+      "value_eur": 384.7,
+      "daily_pct": "0,62 %"
+    },
+    {
+      "name": "Exxon Mobil",
+      "value_eur": 125.84,
+      "daily_pct": "0,21 %"
+    },
+    {
+      "name": "LVMH Moët Hennessy",
+      "value_eur": 534.7,
+      "daily_pct": "0,26 %"
+    },
+    {
+      "name": "Realty Income",
+      "value_eur": 53.22,
+      "daily_pct": "0,28 %"
+    },
+    {
+      "name": "Intuitive Surgical",
+      "value_eur": 410.5,
+      "daily_pct": "0,07 %"
+    },
+    {
+      "name": "TotalEnergies",
+      "value_eur": 62.27,
+      "daily_pct": "0,22 %"
+    },
+    {
+      "name": "Johnson & Johnson",
+      "value_eur": 202.15,
+      "daily_pct": "0,22 %"
+    },
+    {
+      "name": "Enphase Energy",
+      "value_eur": 41.86,
+      "daily_pct": "0,22 %"
+    },
+    {
+      "name": "Plug Power",
+      "value_eur": 1.742,
+      "daily_pct": "0,11 %"
+    },
+    {
+      "name": "Sanofi",
+      "value_eur": 80.43,
+      "daily_pct": "0,26 %"
+    },
+    {
+      "name": "S&P 500 Information Tech USD (Acc)",
+      "value_eur": 33.96,
+      "daily_pct": "0,67 %"
+    },
+    {
+      "name": "MercadoLibre",
+      "value_eur": 1662.4,
+      "daily_pct": "1,88 %"
+    },
+    {
+      "name": "Soitec",
+      "value_eur": 32.82,
+      "daily_pct": "2,98 %"
+    },
+    {
+      "name": "Canadian National Railway",
+      "value_eur": 84.7,
+      "daily_pct": "0,49 %"
+    },
+    {
+      "name": "Sea (ADR)",
+      "value_eur": 90.8,
+      "daily_pct": "0,87 %"
+    },
+    {
+      "name": "Rheinmetall",
+      "value_eur": 1631.5,
+      "daily_pct": "2,00 %"
+    },
+    {
+      "name": "Intuit",
+      "value_eur": 372.25,
+      "daily_pct": "0,51 %"
+    }
+  ],
+  "transactions": [
+    {
+      "date": "",
+      "name": "Espèces",
+      "amount": "2 169,62 €"
+    },
+    {
+      "date": "",
+      "name": "09/02",
+      "amount": "5,69 €"
+    },
+    {
+      "date": "",
+      "name": "08/02",
+      "amount": "21,20 €"
+    },
+    {
+      "date": "",
+      "name": "07/02",
+      "amount": "128,76 €"
+    },
+    {
+      "date": "",
+      "name": "06/02",
+      "amount": "32,87 €"
+    },
+    {
+      "date": "",
+      "name": "06/02 - Sent",
+      "amount": "100,00 €"
+    },
+    {
+      "date": "",
+      "name": "05/02 - Sent",
+      "amount": "30,00 €"
+    },
+    {
+      "date": "",
+      "name": "05/02 - Sent",
+      "amount": "630,00 €"
+    },
+    {
+      "date": "",
+      "name": "04/02",
+      "amount": "12,08 €"
+    },
+    {
+      "date": "",
+      "name": "03/02",
+      "amount": "12,40 €"
+    },
+    {
+      "date": "",
+      "name": "02/02 - Round up",
+      "amount": "10,22 €"
+    },
+    {
+      "date": "",
+      "name": "02/02",
+      "amount": "0,26 €"
+    },
+    {
+      "date": "",
+      "name": "01/02",
+      "amount": "1,96 €"
+    },
+    {
+      "date": "",
+      "name": "01/02 - 2 % p.a.",
+      "amount": "+3,87 €"
+    },
+    {
+      "date": "",
+      "name": "31/01",
+      "amount": "151,63 €"
+    },
+    {
+      "date": "",
+      "name": "30/01",
+      "amount": "37,49 €"
+    },
+    {
+      "date": "",
+      "name": "29/01 - Sent",
+      "amount": "1 005,00 €"
+    },
+    {
+      "date": "",
+      "name": "29/01",
+      "amount": "0,35 €"
+    },
+    {
+      "date": "",
+      "name": "28/01",
+      "amount": "23,73 €"
+    },
+    {
+      "date": "",
+      "name": "26/01 - Cancelled",
+      "amount": "120,00 €"
+    },
+    {
+      "date": "",
+      "name": "26/01",
+      "amount": "55,81 €"
+    },
+    {
+      "date": "",
+      "name": "24/01",
+      "amount": "142,06 €"
+    },
+    {
+      "date": "",
+      "name": "24/01",
+      "amount": "49,57 €"
+    },
+    {
+      "date": "",
+      "name": "23/01 - Round up",
+      "amount": "9,16 €"
+    },
+    {
+      "date": "",
+      "name": "23/01 - Completed",
+      "amount": "+3 500,00 €"
+    },
+    {
+      "date": "",
+      "name": "23/01",
+      "amount": "28,02 €"
+    },
+    {
+      "date": "",
+      "name": "20/01",
+      "amount": "22,45 €"
+    },
+    {
+      "date": "",
+      "name": "20/01",
+      "amount": "13,98 €"
+    },
+    {
+      "date": "",
+      "name": "20/01",
+      "amount": "2,45 €"
+    },
+    {
+      "date": "",
+      "name": "19/01",
+      "amount": "43,69 €"
+    },
+    {
+      "date": "",
+      "name": "18/01",
+      "amount": "3,65 €"
+    }
+  ],
+  "portfolio_value": "690.77 €"
+}

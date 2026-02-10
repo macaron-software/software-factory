@@ -1,0 +1,48 @@
+{
+  "scraped_at": "2026-02-10T08:46:03",
+  "source": "ibkr",
+  "summary": {
+    "net_liquidity": 53656.92,
+    "buying_power": 224463.9,
+    "daily_pnl": 52.37,
+    "unrealized_pnl": 15800.0,
+    "excess_liquidity": 35483.32
+  },
+  "positions": [
+    {
+      "symbol": "MSFT",
+      "quantity": 45.2854,
+      "last_price_usd": 414.42,
+      "cost_basis_eur": 20293.0,
+      "market_value_eur": 18763.1,
+      "avg_price_usd": 448.11,
+      "daily_pnl_eur": 33.1,
+      "unrealized_pnl_eur": -1530.0
+    },
+    {
+      "symbol": "NVDA",
+      "quantity": 100.0222,
+      "last_price_usd": 190.67,
+      "cost_basis_eur": 12653.0,
+      "market_value_eur": 19071.23,
+      "avg_price_usd": 126.5,
+      "daily_pnl_eur": 63.0,
+      "unrealized_pnl_eur": 6420.0
+    },
+    {
+      "symbol": "GOOGL",
+      "quantity": 105.3515,
+      "last_price_usd": 324.0,
+      "cost_basis_eur": 20210.0,
+      "market_value_eur": 34133.89,
+      "avg_price_usd": 191.84,
+      "daily_pnl_eur": -33.7,
+      "unrealized_pnl_eur": 13920.0
+    }
+  ],
+  "cash": {
+    "EUR": -1206.98,
+    "USD": -6649.83,
+    "total_eur": -6793.61
+  }
+}

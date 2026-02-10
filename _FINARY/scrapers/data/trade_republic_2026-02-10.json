@@ -1,0 +1,140 @@
+{
+  "scraped_at": "2026-02-10T08:53:18.922774",
+  "source": "trade_republic",
+  "portfolio_value": "690.77 €",
+  "positions": [
+    {
+      "name": "Amazon.com",
+      "shares": 0.443245,
+      "value": "77.98 €",
+      "return_pct": "12.42 %"
+    },
+    {
+      "name": "STMicroelectronics",
+      "shares": 2.108535,
+      "value": "57.58 €",
+      "return_pct": "17.52 %"
+    },
+    {
+      "name": "L'Oreal",
+      "shares": 0.122492,
+      "value": "47.56 €",
+      "return_pct": "13.25 %"
+    },
+    {
+      "name": "BYD",
+      "shares": 4.377616,
+      "value": "44.94 €",
+      "return_pct": "25.09 %"
+    },
+    {
+      "name": "Moderna",
+      "shares": 1.189668,
+      "value": "42.00 €",
+      "return_pct": "0.00 %"
+    },
+    {
+      "name": "Allianz",
+      "shares": 0.090489,
+      "value": "34.59 €",
+      "return_pct": "23.55 %"
+    },
+    {
+      "name": "Exxon Mobil",
+      "shares": 0.265045,
+      "value": "33.71 €",
+      "return_pct": "20.41 %"
+    },
+    {
+      "name": "LVMH Moët Hennessy",
+      "shares": 0.062342,
+      "value": "33.55 €",
+      "return_pct": "20.11 %"
+    },
+    {
+      "name": "Realty Income",
+      "shares": 0.609714,
+      "value": "32.23 €",
+      "return_pct": "0.72 %"
+    },
+    {
+      "name": "Intuitive Surgical",
+      "shares": 0.076069,
+      "value": "31.35 €",
+      "return_pct": "25.35 %"
+    },
+    {
+      "name": "TotalEnergies",
+      "shares": 0.497438,
+      "value": "31.15 €",
+      "return_pct": "11.25 %"
+    },
+    {
+      "name": "Johnson & Johnson",
+      "shares": 0.145001,
+      "value": "29.01 €",
+      "return_pct": "38.17 %"
+    },
+    {
+      "name": "Enphase Energy",
+      "shares": 0.682999,
+      "value": "28.62 €",
+      "return_pct": "31.86 %"
+    },
+    {
+      "name": "Plug Power",
+      "shares": 13.524823,
+      "value": "23.75 €",
+      "return_pct": "20.83 %"
+    },
+    {
+      "name": "Sanofi",
+      "shares": 0.280977,
+      "value": "22.61 €",
+      "return_pct": "19.26 %"
+    },
+    {
+      "name": "S&P 500 Information Tech USD (Acc)",
+      "shares": 0.597015,
+      "value": "20.59 €",
+      "return_pct": "7.04 %"
+    },
+    {
+      "name": "MercadoLibre",
+      "shares": 0.011593,
+      "value": "19.83 €",
+      "return_pct": "5.59 %"
+    },
+    {
+      "name": "Canadian National Railway",
+      "shares": 0.213692,
+      "value": "18.51 €",
+      "return_pct": "11.88 %"
+    },
+    {
+      "name": "Soitec",
+      "shares": 0.566902,
+      "value": "18.41 €",
+      "return_pct": "56.17 %"
+    },
+    {
+      "name": "Sea (ADR)",
+      "shares": 0.186302,
+      "value": "16.95 €",
+      "return_pct": "19.27 %"
+    },
+    {
+      "name": "Rheinmetall",
+      "shares": 0.009967,
+      "value": "16.46 €",
+      "return_pct": "8.58 %"
+    },
+    {
+      "name": "Intuit",
+      "shares": 0.026071,
+      "value": "9.53 €",
+      "return_pct": "36.41 %"
+    }
+  ],
+  "cash_balance": null
+}
