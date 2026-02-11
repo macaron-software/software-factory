@@ -422,7 +422,7 @@ def build_positions():
             "account_id": "acc-0002",
             "ticker": pos["symbol"],
             "isin": isin,
-            "name": pos["symbol"],
+            "name": {"GOOGL": "Alphabet (Google)", "NVDA": "NVIDIA", "MSFT": "Microsoft"}.get(pos["symbol"], pos["symbol"]),
             "quantity": shares,
             "avg_cost": pos["avg_price_usd"],
             "current_price": round(current_price_usd, 2),
@@ -885,16 +885,26 @@ def get_history(ticker: str, period: str = Query("1y"), limit: int = Query(365))
 
 @app.get("/api/v1/market/sparklines")
 def get_sparklines():
-    """Return 30-day close prices for all portfolio positions (batch)."""
+    """Return 30-day close prices for all portfolio positions (batch).
+    Keys include both Yahoo ticker AND portfolio display ticker for frontend matching."""
     import yfinance as yf
     result = {}
     tickers = set()
+    # Build mapping: yahoo_ticker → portfolio display ticker(s)
+    yahoo_to_display: dict[str, list[str]] = {}
     for bank_key in ["ibkr", "trade_republic"]:
         bank = P.get(bank_key, {})
         for pos in bank.get("positions", []):
-            sym = pos.get("symbol") or ISIN_TO_TICKER.get(pos.get("isin", ""), pos.get("name", "")[:10])
+            isin = pos.get("isin", "")
+            sym = pos.get("symbol") or ISIN_TO_TICKER.get(isin, "")
             if sym:
                 tickers.add(sym)
+                # Portfolio display ticker
+                if bank_key == "trade_republic":
+                    display = pos["name"].split()[0][:6].upper() if pos.get("name") else isin[:6]
+                else:
+                    display = pos.get("symbol", sym)
+                yahoo_to_display.setdefault(sym, []).append(display)
     if not tickers:
         return result
     try:
@@ -905,7 +915,12 @@ def get_sparklines():
                     closes = data["Close"].dropna().tolist()
                 else:
                     closes = data[t]["Close"].dropna().tolist()
-                result[t] = [round(float(c), 2) for c in closes[-30:]]
+                points = [round(float(c), 2) for c in closes[-30:]]
+                result[t] = points
+                # Also store under display ticker for frontend matching
+                for disp in yahoo_to_display.get(t, []):
+                    if disp != t:
+                        result[disp] = points
             except Exception:
                 pass
     except Exception as e:

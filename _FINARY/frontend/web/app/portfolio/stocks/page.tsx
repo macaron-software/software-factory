@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { usePortfolio, useDividends, useDiversification, useNetWorthHistory, useSparklines, useCosts } from "@/lib/hooks/useApi";
-import { formatEUR, formatPct, formatNumber, pnlColor, CHART_COLORS } from "@/lib/utils";
+import { formatEUR, formatPct, formatNumber, formatCurrency, pnlColor, CHART_COLORS } from "@/lib/utils";
 import { PriceChart } from "@/components/charts/PriceChart";
 import { MiniChart } from "@/components/charts/MiniChart";
 import { Sparkline } from "@/components/charts/Sparkline";
@@ -183,7 +183,7 @@ export default function StocksPage() {
                   {sparklines[p.id] ? <Sparkline data={sparklines[p.id]} /> : <span className="text-t-6">—</span>}
                 </td>
                 <td className="tnum text-right px-3 py-3 text-t-2">
-                  {p.current_price ? formatEUR(p.current_price) : "—"}
+                  {p.current_price ? formatCurrency(p.current_price, (p as any).currency ?? "EUR") : "—"}
                 </td>
                 <td className="tnum text-right px-3 py-3 font-medium text-t-1">{formatEUR(p.value_eur)}</td>
                 <td className={`tnum text-right px-3 py-3 ${pnlColor(p.pnl_eur)}`}>
