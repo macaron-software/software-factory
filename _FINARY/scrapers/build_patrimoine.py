@@ -109,15 +109,54 @@ def build(d: str) -> dict:
     prev_tr = {}
     if prev and "trade_republic" in prev:
         for p in prev["trade_republic"].get("positions", []):
-            prev_tr[p["isin"]] = p
+            prev_tr[p.get("isin", "")] = p
+
+    # Load missing positions data (has ISINs from detail scrape)
+    missing_file = DATA_DIR / f"tr_missing_positions_{d}.json"
+    if not missing_file.exists():
+        # Try previous day
+        missing_files = sorted(DATA_DIR.glob("tr_missing_positions_*.json"), reverse=True)
+        if missing_files:
+            missing_file = missing_files[0]
+    missing_by_name = {}
+    if missing_file.exists():
+        for mp in json.loads(missing_file.read_text()):
+            missing_by_name[mp["name"]] = mp
+
+    # Static ISIN map (fallback for positions where click-scrape failed)
+    TR_ISIN_MAP = {
+        "Allianz": "DE0008404005", "Exxon Mobil": "US30231G1022",
+        "Johnson & Johnson": "US4781601046", "Plug Power": "US72919P2020",
+        "Sanofi": "FR0000120578", "MercadoLibre": "US58733R1023",
+        "Soitec": "FR0013227113", "Sea (ADR)": "US81141R1005",
+        "Rheinmetall": "DE0007030009",
+        "S&P 500 Information Tech USD (Acc)": "IE00B3WJKG14",
+    }
 
     tr_positions = []
     for p in ext["tr_positions"]:
+        # Enrich ISIN from missing_positions file or static map
+        if not p.get("isin"):
+            name = p.get("name", "")
+            if name in missing_by_name:
+                p["isin"] = missing_by_name[name]["isin"]
+                # Also enrich shares/performance if missing
+                mp = missing_by_name[name]
+                p.setdefault("shares", mp.get("shares"))
+                p.setdefault("performance_eur", mp.get("performance_eur", 0))
+                p.setdefault("performance_pct", mp.get("performance_pct", 0))
+                p.setdefault("portfolio_pct", mp.get("portfolio_pct", 0))
+                p.setdefault("total_value", mp.get("total_value", 0))
+                p.setdefault("pe_ratio", mp.get("pe_ratio"))
+                p.setdefault("beta", mp.get("beta"))
+                p.setdefault("dividend_yield_pct", mp.get("dividend_yield"))
+            elif name in TR_ISIN_MAP:
+                p["isin"] = TR_ISIN_MAP[name]
+
         if "isin" not in p or "total_value" not in p:
             # Incomplete scrape — use previous data if available
             fb = prev_tr.get(p.get("isin", ""))
             if not fb:
-                # Try to find by name in previous
                 for pp in prev_tr.values():
                     if pp["name"] == p.get("name"):
                         fb = pp
