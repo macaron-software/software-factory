@@ -194,6 +194,7 @@ export interface NetWorthHistory {
   total_liabilities: number;
   net_worth: number;
   breakdown: Record<string, number>;
+  sp500?: number;
 }
 
 export interface Allocation {

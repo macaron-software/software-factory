@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { usePortfolio, useDividends, useDiversification, useNetWorthHistory, useSparklines, useCosts } from "@/lib/hooks/useApi";
 import { formatEUR, formatPct, formatNumber, pnlColor, CHART_COLORS } from "@/lib/utils";
 import { PriceChart } from "@/components/charts/PriceChart";
+import { MiniChart } from "@/components/charts/MiniChart";
 import { Sparkline } from "@/components/charts/Sparkline";
 import { Loading, StatCard, Section } from "@/components/ds";
 
@@ -18,13 +19,28 @@ export default function StocksPage() {
   const totalPnl = positions?.reduce((s, p) => s + p.pnl_eur, 0) ?? 0;
   const totalPnlPct = totalValue - totalPnl > 0 ? (totalPnl / (totalValue - totalPnl)) * 100 : 0;
 
-  const chartData = useMemo(() => {
+  const ibkrValue = positions?.filter((p) => (p as any).source === "Interactive Brokers").reduce((s, p) => s + p.value_eur, 0) ?? 0;
+  const trValue = positions?.filter((p) => (p as any).source === "Trade Republic").reduce((s, p) => s + p.value_eur, 0) ?? 0;
+
+  const chartTotal = useMemo(() => {
     if (!nwHistory?.length) return [];
-    return nwHistory.map((h: { date: string; breakdown?: { investments?: number }; net_worth: number }) => ({
-      date: h.date,
-      value: h.breakdown?.investments ?? totalValue,
-    }));
+    return nwHistory.map((h) => ({ date: h.date, value: h.breakdown?.investments ?? totalValue }));
   }, [nwHistory, totalValue]);
+
+  const chartIbkr = useMemo(() => {
+    if (!nwHistory?.length) return [];
+    return nwHistory.map((h) => ({ date: h.date, value: h.breakdown?.ibkr_eur ?? ibkrValue }));
+  }, [nwHistory, ibkrValue]);
+
+  const chartTr = useMemo(() => {
+    if (!nwHistory?.length) return [];
+    return nwHistory.map((h) => ({ date: h.date, value: h.breakdown?.tr_eur ?? trValue }));
+  }, [nwHistory, trValue]);
+
+  const chartSp500 = useMemo(() => {
+    if (!nwHistory?.length) return [];
+    return nwHistory.filter((h) => h.sp500).map((h) => ({ date: h.date, value: h.sp500! }));
+  }, [nwHistory]);
 
   const { data: sparkData } = useSparklines();
   const sparklines = useMemo(() => {
@@ -44,23 +60,28 @@ export default function StocksPage() {
 
   return (
     <div className="space-y-8">
-      {/* Chart */}
+      {/* ── Charts 2x2 ── */}
+      <div className="grid grid-cols-2 gap-4">
+        <MiniChart title="Portfolio Total" data={chartTotal} color="#5682f2" liveValue={totalValue} />
+        <MiniChart title="Interactive Brokers" data={chartIbkr} color="#f59e0b" liveValue={ibkrValue} />
+        <MiniChart title="Trade Republic" data={chartTr} color="#10b981" liveValue={trValue} />
+        <MiniChart title="S&P 500" data={chartSp500} color="#8b5cf6" />
+      </div>
+
+      {/* P&L Summary */}
       <Section>
-        <PriceChart title="Actions & Fonds" data={chartData} color="#5682f2" defaultPeriod="1Y" liveValue={totalValue} />
-        <div className="mt-4 pt-4 border-t border-bd-1">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-label mb-1 text-t-5">P&L Actions & Fonds</p>
-              <p className={`tnum text-title font-medium ${totalPnl >= 0 ? "text-gain" : "text-loss"}`}>
-                {totalPnl >= 0 ? "+" : ""}{formatEUR(totalPnl)}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-label mb-1 text-t-5">Performance</p>
-              <p className={`tnum text-title font-medium ${totalPnl >= 0 ? "text-gain" : "text-loss"}`}>
-                {formatPct(totalPnlPct)}
-              </p>
-            </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-label mb-1 text-t-5">P&L Actions & Fonds</p>
+            <p className={`tnum text-title font-medium ${totalPnl >= 0 ? "text-gain" : "text-loss"}`}>
+              {totalPnl >= 0 ? "+" : ""}{formatEUR(totalPnl)}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-label mb-1 text-t-5">Performance</p>
+            <p className={`tnum text-title font-medium ${totalPnl >= 0 ? "text-gain" : "text-loss"}`}>
+              {formatPct(totalPnlPct)}
+            </p>
           </div>
         </div>
       </Section>

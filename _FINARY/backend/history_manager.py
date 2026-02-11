@@ -51,7 +51,7 @@ def _fetch_historical_prices(days: int = 365) -> dict[str, list[dict]]:
     """Fetch historical close prices from Yahoo Finance."""
     import yfinance as yf
 
-    tickers = list(IBKR_HOLDINGS.keys()) + ["EURUSD=X"]
+    tickers = list(IBKR_HOLDINGS.keys()) + ["EURUSD=X", "^GSPC"]
     end = date.today()
     start = end - timedelta(days=days + 10)
 
@@ -100,6 +100,11 @@ def build_real_history(days: int = 365) -> list[dict]:
     for p in prices.get("EURUSD=X", []):
         eurusd_map[p["date"]] = p["close"]
 
+    # Build S&P 500 lookup
+    sp500_map: dict[str, float] = {}
+    for p in prices.get("^GSPC", []):
+        sp500_map[p["date"]] = p["close"]
+
     # Build price maps per ticker
     price_maps: dict[str, dict[str, float]] = {}
     for ticker in IBKR_HOLDINGS:
@@ -119,12 +124,17 @@ def build_real_history(days: int = 365) -> list[dict]:
     history = []
     last_eurusd = 1.08
     last_prices: dict[str, float] = {}
+    last_sp500 = 0.0
 
     for d_str in all_dates:
         # EUR/USD
         if d_str in eurusd_map:
             last_eurusd = eurusd_map[d_str]
         eur_usd = last_eurusd
+
+        # S&P 500
+        if d_str in sp500_map:
+            last_sp500 = sp500_map[d_str]
 
         # IBKR portfolio value
         ibkr_val_usd = 0
@@ -151,9 +161,12 @@ def build_real_history(days: int = 365) -> list[dict]:
             "total_liabilities": round(DEBT_EUR, 2),
             "breakdown": {
                 "investments": round(investments, 2),
+                "ibkr_eur": round(ibkr_val_eur, 2),
+                "tr_eur": round(TR_TOTAL_EUR, 2),
                 "cash": round(CASH_EUR, 2),
                 "real_estate": round(REAL_ESTATE_EUR, 2),
             },
+            "sp500": round(last_sp500, 2),
             "pnl_eur": round(pnl_eur, 2),
             "eur_usd": round(eur_usd, 4),
         })
