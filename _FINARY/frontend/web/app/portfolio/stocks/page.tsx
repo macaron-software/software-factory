@@ -46,7 +46,7 @@ export default function StocksPage() {
     <div className="space-y-8">
       {/* Chart */}
       <Section>
-        <PriceChart title="Actions & Fonds" data={chartData} color="#5682f2" defaultPeriod="1Y" />
+        <PriceChart title="Actions & Fonds" data={chartData} color="#5682f2" defaultPeriod="1Y" liveValue={totalValue} />
         <div className="mt-4 pt-4 border-t border-bd-1">
           <div className="flex items-center justify-between">
             <div>

@@ -24,6 +24,8 @@ interface Props {
   height?: number;
   color?: string;
   defaultPeriod?: Period;
+  /** Live value override — displayed instead of last chart point when not hovering */
+  liveValue?: number;
 }
 
 function formatDateLabel(dateStr: string): string {
@@ -40,7 +42,7 @@ function formatMonthLabel(dateStr: string): string {
 }
 
 /** Reusable Finary-style line chart. Used for portfolio, stocks, positions. */
-export function PriceChart({ title, data, height = 280, color = "#5682f2", defaultPeriod = "1Y" }: Props) {
+export function PriceChart({ title, data, height = 280, color = "#5682f2", defaultPeriod = "1Y", liveValue }: Props) {
   const [period, setPeriod] = useState<Period>(defaultPeriod);
   const [hoverValue, setHoverValue] = useState<number | null>(null);
 
@@ -54,12 +56,12 @@ export function PriceChart({ title, data, height = 280, color = "#5682f2", defau
     }));
   }, [data, period]);
 
-  const currentValue = chartData[chartData.length - 1]?.value ?? 0;
+  const currentValue = liveValue ?? chartData[chartData.length - 1]?.value ?? 0;
   const startValue = chartData[0]?.value ?? 0;
-  const variation = startValue > 0 ? ((currentValue - startValue) / startValue) * 100 : 0;
-  const variationAbs = currentValue - startValue;
+  const refValue = hoverValue ?? chartData[chartData.length - 1]?.value ?? currentValue;
+  const variation = startValue > 0 ? ((refValue - startValue) / startValue) * 100 : 0;
+  const variationAbs = refValue - startValue;
   const isPositive = variation >= 0;
-  const displayValue = hoverValue ?? currentValue;
 
   const tickInterval = useMemo(() => {
     if (chartData.length <= 7) return 1;
@@ -92,7 +94,7 @@ export function PriceChart({ title, data, height = 280, color = "#5682f2", defau
             {title}
           </p>
           <p className="tnum text-[28px] font-extralight tracking-tight leading-none" style={{ color: "var(--text-1)" }}>
-            {formatEUR(displayValue)}
+            {formatEUR(currentValue)}
           </p>
           <div className="flex items-center gap-2 mt-1.5">
             <span className="tnum text-[13px] font-medium" style={{ color: isPositive ? "var(--green)" : "var(--red)" }}>

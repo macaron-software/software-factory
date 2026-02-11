@@ -74,7 +74,7 @@ export default function HomePage() {
 
   return (
     <div className="space-y-8">
-      <NetWorthChart />
+      <NetWorthChart liveValue={networth.net_worth} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
         <div className="cursor-pointer" onClick={() => setSheet("actifs")}>

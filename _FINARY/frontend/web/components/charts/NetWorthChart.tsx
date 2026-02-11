@@ -32,7 +32,7 @@ function formatMonthLabel(dateStr: string): string {
   return `${months[d.getMonth()]} ${d.getFullYear().toString().slice(2)}`;
 }
 
-export function NetWorthChart() {
+export function NetWorthChart({ liveValue }: { liveValue?: number }) {
   const [period, setPeriod] = useState<Period>("1Y");
   const [hoverValue, setHoverValue] = useState<number | null>(null);
   const { data: apiHistory } = useNetWorthHistory(365);
@@ -52,14 +52,13 @@ export function NetWorthChart() {
     }));
   }, [rawHistory, period]);
 
-  // Compute variation
-  const currentValue = chartData[chartData.length - 1]?.value ?? 0;
+  // Compute variation — hero always shows live/current, hover only affects variation
+  const currentValue = liveValue ?? chartData[chartData.length - 1]?.value ?? 0;
   const startValue = chartData[0]?.value ?? 0;
-  const variation = startValue > 0 ? ((currentValue - startValue) / startValue) * 100 : 0;
-  const variationAbs = currentValue - startValue;
+  const refValue = hoverValue ?? chartData[chartData.length - 1]?.value ?? currentValue;
+  const variation = startValue > 0 ? ((refValue - startValue) / startValue) * 100 : 0;
+  const variationAbs = refValue - startValue;
   const isPositive = variation >= 0;
-
-  const displayValue = hoverValue ?? currentValue;
 
   // X-axis ticks
   const tickInterval = useMemo(() => {
@@ -93,7 +92,7 @@ export function NetWorthChart() {
             Patrimoine net <SourceBadge source="computed" />
           </p>
           <p className="tnum text-[32px] font-extralight tracking-tight leading-none" style={{ color: "var(--text-1)" }}>
-            {formatEUR(displayValue)}
+            {formatEUR(currentValue)}
           </p>
           <div className="flex items-center gap-2 mt-2">
             <span
