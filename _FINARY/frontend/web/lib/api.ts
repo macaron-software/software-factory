@@ -113,6 +113,8 @@ export const api = {
   // ─── Patrimoine ───
   getPatrimoine: () =>
     fetchApi<Record<string, unknown>>("/api/v1/patrimoine"),
+  getPatrimoineProjection: () =>
+    fetchApi<Record<string, unknown>>("/api/v1/patrimoine/projection"),
 
   // ─── Alerts ───
   getAlerts: () =>

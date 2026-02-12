@@ -188,6 +188,13 @@ export function useLoansAnalysis() {
   });
 }
 
+export function usePatrimoineProjection() {
+  return useQuery({
+    queryKey: ["patrimoine", "projection"],
+    queryFn: api.getPatrimoineProjection,
+  });
+}
+
 // ─── Alerts ───
 
 export function useAlerts() {

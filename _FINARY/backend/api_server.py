@@ -1179,17 +1179,149 @@ def get_budget_projections():
 
 @app.get("/api/v1/loans/analysis")
 def get_loans_analysis():
-    """Detailed loan analysis with inflation comparison."""
+    """Detailed loan analysis with inflation comparison + projections."""
     loans = get_loans()
+    total_debt = sum(l.get("remaining", 0) for l in loans)
+    inf = INFLATION_RATE  # 0.024
+
+    # Inflation-adjusted debt projections (year 0 → 20)
+    projections = []
+    for year in range(0, 21):
+        # Nominal debt reduces by amortization, but we also show the real value
+        # Real value of 1€ owed in N years = 1 / (1 + inflation)^N
+        deflator = 1 / ((1 + inf) ** year)
+        # For each loan: project remaining nominal debt after N years of payments
+        nom_debt = 0
+        for l in loans:
+            rem = l.get("remaining", 0)
+            rate = (l.get("rate_numeric") or 0) / 100
+            monthly = l.get("monthly_payment") or 0
+            rm = l.get("remaining_months")
+            if rm and year * 12 >= rm:
+                # Loan fully paid off
+                continue
+            if monthly > 0 and rate > 0:
+                r = rate / 12
+                # Outstanding after year*12 payments
+                n_paid = min(year * 12, rm or year * 12)
+                balance = rem * ((1 + r) ** n_paid) - monthly * (((1 + r) ** n_paid - 1) / r)
+                nom_debt += max(0, balance)
+            elif monthly > 0:
+                # 0% loan: linear amortization
+                nom_debt += max(0, rem - monthly * year * 12)
+            else:
+                # Interest-only or no payment (PTZ deferred)
+                nom_debt += rem
+        real_debt = round(nom_debt * deflator, 0)
+        projections.append({
+            "year": year,
+            "nominal_debt": round(nom_debt, 0),
+            "real_debt": real_debt,
+            "inflation_erosion": round(nom_debt - real_debt, 0),
+        })
+
     return {
         "loans": loans,
         "inflation_rate": INFLATION_RATE * 100,
         "summary": {
-            "total_debt": sum(l.get("remaining", 0) for l in loans),
+            "total_debt": total_debt,
             "total_monthly": sum(l.get("monthly_payment", 0) or 0 for l in loans),
             "shields": len([l for l in loans if l.get("vs_inflation") == "bouclier_inflation"]),
             "costly": len([l for l in loans if l.get("vs_inflation") == "rembourser"]),
+            "real_debt_today": total_debt,
+            "real_debt_10y": projections[10]["real_debt"] if len(projections) > 10 else None,
+            "inflation_gain_10y": projections[10]["inflation_erosion"] if len(projections) > 10 else None,
         },
+        "projections": projections,
+    }
+
+
+@app.get("/api/v1/patrimoine/projection")
+def get_patrimoine_projection():
+    """20-year patrimoine projection accounting for inflation.
+    Real estate appreciates with inflation, debt erodes in real terms."""
+    inf = INFLATION_RATE  # 2.4%
+    real_estate_extra = 0.005  # Real estate historically +0.5% above inflation in France
+
+    # Current values
+    sca = P.get("sca_la_desirade", {})
+    property_val = sca.get("property", {}).get("bourso_estimate", 0) * sca.get("ownership_pct", 50.633) / 100
+    investments = sum(p["value_eur"] for p in build_positions())
+    cash = sum(a["balance"] for a in ACCOUNTS if a["account_type"] in ("checking", "savings") and not a.get("excluded"))
+    loans_data = get_loans()
+    total_debt = sum(l.get("remaining", 0) for l in loans_data)
+
+    # Assumptions
+    STOCK_REAL_RETURN = 0.07  # 7% nominal (~4.6% real)
+    SAVINGS_RATE = 0.03       # Livrets regulated rate
+
+    projections = []
+    for year in range(0, 21):
+        deflator = 1 / ((1 + inf) ** year)
+
+        # Real estate: appreciates at inflation + 0.5%/year (nominal)
+        re_nominal = property_val * ((1 + inf + real_estate_extra) ** year)
+        re_real = round(re_nominal * deflator, 0)
+
+        # Investments: 7% nominal growth
+        inv_nominal = investments * ((1 + STOCK_REAL_RETURN) ** year)
+        inv_real = round(inv_nominal * deflator, 0)
+
+        # Cash/savings: grows at savings rate
+        cash_nominal = cash * ((1 + SAVINGS_RATE) ** year)
+        cash_real = round(cash_nominal * deflator, 0)
+
+        # Debt: amortization schedule (nominal), then deflate
+        nom_debt = 0
+        for l in loans_data:
+            rem = l.get("remaining", 0)
+            rate = (l.get("rate_numeric") or 0) / 100
+            monthly = l.get("monthly_payment") or 0
+            rm = l.get("remaining_months")
+            if rm and year * 12 >= rm:
+                continue
+            if monthly > 0 and rate > 0:
+                r = rate / 12
+                n_paid = min(year * 12, rm or year * 12)
+                try:
+                    balance = rem * ((1 + r) ** n_paid) - monthly * (((1 + r) ** n_paid - 1) / r)
+                except OverflowError:
+                    balance = 0
+                nom_debt += max(0, balance)
+            elif monthly > 0:
+                nom_debt += max(0, rem - monthly * year * 12)
+            else:
+                nom_debt += rem
+        debt_real = round(nom_debt * deflator, 0)
+
+        net_nominal = round(re_nominal + inv_nominal + cash_nominal - nom_debt, 0)
+        net_real = round(re_real + inv_real + cash_real - debt_real, 0)
+
+        projections.append({
+            "year": year,
+            "net_nominal": net_nominal,
+            "net_real": net_real,
+            "real_estate_real": re_real,
+            "investments_real": inv_real,
+            "cash_real": cash_real,
+            "debt_real": debt_real,
+        })
+
+    return {
+        "inflation_rate": inf * 100,
+        "assumptions": {
+            "stock_return": STOCK_REAL_RETURN * 100,
+            "savings_rate": SAVINGS_RATE * 100,
+            "real_estate_extra": real_estate_extra * 100,
+        },
+        "current": {
+            "real_estate": round(property_val, 0),
+            "investments": round(investments, 0),
+            "cash": round(cash, 0),
+            "debt": round(total_debt, 0),
+            "net": round(property_val + investments + cash - total_debt, 0),
+        },
+        "projections": projections,
     }
 
 

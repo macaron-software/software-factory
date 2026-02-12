@@ -1,11 +1,13 @@
 "use client";
 
-import { useLoans } from "@/lib/hooks/useApi";
-import { formatEUR } from "@/lib/utils";
+import { useLoans, useLoansAnalysis } from "@/lib/hooks/useApi";
+import { formatEUR, formatEURCompact } from "@/lib/utils";
 import { Loading, ErrorState, PageHeader, Badge, Section, SourceBadge } from "@/components/ds";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 export default function LoansPage() {
   const { data: loans, isLoading, error } = useLoans();
+  const { data: analysis } = useLoansAnalysis();
 
   if (isLoading) return <Loading />;
   if (error) return <ErrorState />;
@@ -42,13 +44,38 @@ export default function LoansPage() {
             <p className="tnum text-heading font-semibold text-loss">{costly.length}</p>
             <p className="text-label text-t-5 mt-1">Taux &gt; inflation — rembourser en priorité</p>
           </Section>
-          <Section title="Endettement total">
-            <p className="tnum text-heading font-semibold text-loss">{formatEUR(totalRemaining)}</p>
-            <div className="bar-track mt-3" style={{ height: "6px" }}>
-              <div className="bar-fill w-full bg-loss" />
-            </div>
+          <Section title="Gain inflation à 10 ans">
+            <p className="tnum text-heading font-semibold text-gain">
+              {(analysis as any)?.summary?.inflation_gain_10y ? formatEURCompact((analysis as any).summary.inflation_gain_10y) : "—"}
+            </p>
+            <p className="text-label text-t-5 mt-1">
+              L&apos;inflation réduit la valeur réelle de votre dette
+            </p>
           </Section>
         </div>
+      )}
+
+      {/* Inflation erosion chart */}
+      {(analysis as any)?.projections && (
+        <Section title="Dette nominale vs valeur réelle (inflation 2.4%/an)">
+          <p className="text-label text-t-5 mb-4">
+            En euros constants, votre dette perd de la valeur chaque année grâce à l&apos;inflation
+          </p>
+          <ResponsiveContainer width="100%" height={260}>
+            <AreaChart data={(analysis as any).projections} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-1)" />
+              <XAxis dataKey="year" tick={{ fontSize: 11, fill: "var(--text-5)" }} tickFormatter={(v: number) => `${v}a`} />
+              <YAxis tick={{ fontSize: 11, fill: "var(--text-5)" }} tickFormatter={(v: number) => `${Math.round(v / 1000)}K`} />
+              <Tooltip
+                contentStyle={{ background: "var(--bg-3)", border: "1px solid var(--border-2)", borderRadius: 8, fontSize: 12 }}
+                formatter={(v: any, name: any) => [formatEURCompact(v), name === "nominal_debt" ? "Nominal" : name === "real_debt" ? "Réel" : "Érosion"]}
+                labelFormatter={(l: any) => `Année ${l}`}
+              />
+              <Area type="monotone" dataKey="nominal_debt" stroke="var(--red)" fill="var(--red-bg)" strokeWidth={2} name="Nominal" />
+              <Area type="monotone" dataKey="real_debt" stroke="var(--green)" fill="var(--green-bg)" strokeWidth={2} name="Réel" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </Section>
       )}
 
       {/* Table */}
