@@ -62,7 +62,7 @@ def notify(title, msg):
 # ════════════════════════════════════════════════════════════════
 
 async def login_all(ctx):
-    """Auto-login all 4 banks on their existing tabs. Returns dict of logged-in pages."""
+    """Auto-login all 4 banks on their existing tabs (or create new ones)."""
     pages = {}
     for p in ctx.pages:
         u = p.url.lower()
@@ -76,6 +76,22 @@ async def login_all(ctx):
             pages["ca"] = p
 
     log(f"🏦 Found tabs: {list(pages.keys())}")
+
+    # Create missing bank tabs
+    BANK_URLS = {
+        "ibkr": "https://www.interactivebrokers.ie/portal/#/portfolio",
+        "bourso": "https://clients.boursobank.com/connexion/",
+        "tr": "https://app.traderepublic.com/login",
+        "ca": f"https://www.credit-agricole.fr/ca-{os.environ.get('CA_REGION', 'languedoc')}/particulier/acceder-a-mes-comptes.html",
+    }
+    for bank, url in BANK_URLS.items():
+        if bank not in pages:
+            log(f"  [{bank.upper()}] No tab found — creating one")
+            page = await ctx.new_page()
+            await page.goto(url, wait_until="domcontentloaded")
+            await page.wait_for_timeout(3000)
+            pages[bank] = page
+
     logged = {}
 
     # ─── IBKR ───
