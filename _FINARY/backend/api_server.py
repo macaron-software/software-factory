@@ -97,6 +97,43 @@ def load_patrimoine():
 
 P = load_patrimoine()
 
+# Load extraction_complete for reliable avg_price (from TR detail page click)
+def load_extraction_avg_prices():
+    """Load avg_price per TR position from extraction_complete (detail page scrape)."""
+    files = sorted(DATA_DIR.glob("extraction_complete_*.json"), reverse=True)
+    avg_prices = {}  # name → avg_price
+    for f in files:
+        try:
+            ext = json.load(open(f))
+            for p in ext.get("tr_positions", []):
+                name = p.get("name", "")
+                avg = p.get("avg_price")
+                if name and avg and avg > 0 and name not in avg_prices:
+                    avg_prices[name] = avg
+        except Exception:
+            continue
+    return avg_prices
+
+TR_AVG_PRICES = load_extraction_avg_prices()
+
+# DCA-period average prices (Feb-Jul 2025) for positions missing extraction avg_price
+# Computed from yfinance historical data, converted to EUR at ~1.10 EUR/USD
+TR_DCA_FALLBACK = {
+    "Allianz": 336.50,
+    "Exxon Mobil": 96.92,
+    "Johnson & Johnson": 140.46,
+    "Plug Power": 1.20,
+    "Sanofi": 91.59,
+    "S&P 500 Information Tech USD (Acc)": 29.95,
+    "MercadoLibre": 2056.23,
+    "Soitec": 51.59,
+    "Sea (ADR)": 128.85,
+    "Rheinmetall": 1470.03,
+}
+# Merge: extraction_complete wins, DCA fallback fills gaps
+for name, avg in TR_DCA_FALLBACK.items():
+    TR_AVG_PRICES.setdefault(name, avg)
+
 @app.post("/api/v1/reload")
 def reload_patrimoine():
     """Hot-reload patrimoine data from disk."""
@@ -335,7 +372,16 @@ def build_positions():
         ticker = ISIN_TO_TICKER.get(isin)
         sector, country = SECTOR_MAP.get(isin, ("Other", "??"))
         shares = pos["shares"]
-        invested = pos["current_value_eur"] - pos["unrealized_pnl_eur"]
+
+        # Use reliable avg_price from extraction_complete (detail page scrape)
+        # TR's portfolio page return_pct has no sign (color-only) → unreliable
+        reliable_avg = TR_AVG_PRICES.get(pos["name"])
+        if reliable_avg:
+            invested = round(shares * reliable_avg, 2)
+        else:
+            # Fallback: use patrimoine avg_price_eur if it exists
+            avg_eur = pos.get("avg_price_eur", 0)
+            invested = round(shares * avg_eur, 2) if avg_eur else pos["current_value_eur"]
 
         # Try live price
         live = get_live_price(ticker) if ticker else None
@@ -361,10 +407,8 @@ def build_positions():
         else:
             val = pos["current_value_eur"]
             current_price = round(val / shares, 2) if shares else None
-            pnl = pos["unrealized_pnl_eur"]
-            pnl_pct = pos["unrealized_pnl_pct"] if pos["unrealized_pnl_pct"] else (
-                round(pnl / abs(invested) * 100, 2) if invested != 0 else 0
-            )
+            pnl = round(val - invested, 2)
+            pnl_pct = round(pnl / abs(invested) * 100, 2) if invested != 0 else 0
 
         total_value += val
         short_name = pos["name"].split()[0][:6].upper() if pos["name"] else isin[:6]
@@ -376,7 +420,7 @@ def build_positions():
             "isin": isin,
             "name": pos["name"],
             "quantity": shares,
-            "avg_cost": pos["avg_price_eur"],
+            "avg_cost": reliable_avg or pos.get("avg_price_eur", 0),
             "current_price": round(current_price, 2) if current_price else None,
             "currency": "EUR",
             "asset_type": "etf" if isin == "IE00B3WJKG14" else "stock",
