@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<a href="/sessions/new" class="btn btn-primary">
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Nouveau Projet
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="projects-dashboard">
+    <h3 style="margin-bottom:16px;font-size:15px;color:var(--text-secondary)">
+        Projets ({{ projects|length }})
+    </h3>
+
+    <!-- Project cards grid -->
+    <div class="projects-grid">
+        {% for p in projects %}
+        <a href="/projects/{{ p.info.id }}" class="project-card">
+            <div class="project-card-header">
+                <div class="project-card-title">
+                    <span class="project-type-dot {{ p.info.factory_type }}"></span>
+                    <h4>{{ p.info.name }}</h4>
+                </div>
+                <span class="badge badge-{% if p.info.factory_type == 'sf' %}blue{% elif p.info.factory_type == 'mf' %}purple{% else %}yellow{% endif %}">
+                    {{ p.info.factory_type | upper }}
+                </span>
+            </div>
+
+            {% if p.info.values %}
+            <div class="project-card-values">
+                {% for v in p.info.values[:4] %}
+                <span class="tag tag-value">{{ v }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if p.info.vision %}
+            <p class="project-card-desc">{{ p.info.vision[:120] }}{% if p.info.vision|length > 120 %}…{% endif %}</p>
+            {% elif p.info.description %}
+            <p class="project-card-desc">{{ p.info.description[:120] }}{% if p.info.description|length > 120 %}…{% endif %}</p>
+            {% endif %}
+
+            <!-- Git info — lazy loaded -->
+            {% if p.info.has_git %}
+            <div class="project-card-git"
+                 hx-get="/api/projects/{{ p.info.id }}/git-status"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+                <span class="text-muted">loading git…</span>
+            </div>
+            {% endif %}
+
+            <!-- Bottom meta -->
+            <div class="project-card-bottom">
+                <div class="project-card-domains">
+                    {% for d in p.info.domains[:3] %}
+                    <span class="tag">{{ d }}</span>
+                    {% endfor %}
+                </div>
+                <div class="project-card-agents">
+                    {% if p.info.lead_agent_id %}
+                    <span class="badge badge-purple" style="font-size:0.65rem">{{ p.info.lead_agent_id }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
