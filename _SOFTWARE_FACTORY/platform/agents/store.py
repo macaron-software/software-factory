@@ -20,7 +20,7 @@ class AgentDef:
     description: str = ""
     system_prompt: str = ""
     provider: str = "minimax"
-    model: str = "MiniMax-M2.1"
+    model: str = "MiniMax-M2.5"
     temperature: float = 0.7
     max_tokens: int = 4096
     skills: list[str] = field(default_factory=list)
@@ -150,7 +150,7 @@ class AgentStore:
         builtins = [
             AgentDef(id="brain", name="Brain", role="brain",
                      description="Strategic orchestrator. Deep recursive analysis, task decomposition, WSJF prioritization.",
-                     provider="minimax", model="MiniMax-M2.1",
+                     provider="minimax", model="MiniMax-M2.5",
                      temperature=0.3, max_tokens=8192,
                      icon="building", color="#bc8cff", is_builtin=True,
                      tags=["orchestrator", "planning"],
@@ -161,7 +161,7 @@ class AgentStore:
 
             AgentDef(id="worker", name="TDD Worker", role="worker",
                      description="Writes code following strict TDD: Red → Green → Refactor. Atomic, KISS.",
-                     provider="minimax", model="MiniMax-M2.1",
+                     provider="minimax", model="MiniMax-M2.5",
                      temperature=0.4, max_tokens=4096,
                      icon="code", color="#58a6ff", is_builtin=True,
                      tags=["coding", "tdd"],
@@ -171,7 +171,7 @@ class AgentStore:
 
             AgentDef(id="code-critic", name="Code Critic", role="critic",
                      description="Reviews code for quality: SLOP detection, API misuse, syntax/logic errors.",
-                     provider="minimax", model="MiniMax-M2.1",
+                     provider="minimax", model="MiniMax-M2.5",
                      temperature=0.2, max_tokens=4096,
                      icon="eye", color="#d29922", is_builtin=True,
                      tags=["review", "quality"],
@@ -185,7 +185,7 @@ class AgentStore:
 
             AgentDef(id="security-critic", name="Security Critic", role="critic",
                      description="OWASP Top 10, secrets detection, SQL injection, XSS analysis.",
-                     provider="minimax", model="MiniMax-M2.1",
+                     provider="minimax", model="MiniMax-M2.5",
                      temperature=0.1, max_tokens=4096,
                      icon="lock", color="#f85149", is_builtin=True,
                      tags=["security", "owasp"],
@@ -224,7 +224,7 @@ class AgentStore:
 
             AgentDef(id="chef-projet", name="Chef de Projet", role="pm",
                      description="Project management: planning, priorities, deadlines, team coordination.",
-                     provider="minimax", model="MiniMax-M2.1",
+                     provider="minimax", model="MiniMax-M2.5",
                      temperature=0.5, max_tokens=4096,
                      icon="clipboard", color="#58a6ff", is_builtin=True,
                      tags=["planning", "coordination"],
@@ -236,7 +236,7 @@ class AgentStore:
 
             AgentDef(id="testeur", name="Testeur", role="tester",
                      description="E2E testing: Playwright smoke, API tests, browser workflows.",
-                     provider="minimax", model="MiniMax-M2.1",
+                     provider="minimax", model="MiniMax-M2.5",
                      temperature=0.3, max_tokens=4096,
                      icon="flask", color="#d29922", is_builtin=True,
                      tags=["testing", "e2e", "playwright"],
