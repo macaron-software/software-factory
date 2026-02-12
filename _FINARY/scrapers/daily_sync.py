@@ -467,6 +467,19 @@ async def scrape_all(pages):
         try:
             await page.goto("https://app.traderepublic.com/portfolio", wait_until="domcontentloaded")
             await page.wait_for_timeout(6000)
+
+            # Ensure "Depuis achat" / "Since buy" tab is selected (not daily/1M/1Y)
+            for tab_text in ["Depuis achat", "Since buy"]:
+                try:
+                    tab = await page.query_selector(f'text="{tab_text}"')
+                    if tab and await tab.is_visible():
+                        await tab.click()
+                        log(f"    Clicked '{tab_text}' tab")
+                        await page.wait_for_timeout(3000)
+                        break
+                except Exception:
+                    continue
+
             raw = await page.inner_text("body")
             lines = [l.strip() for l in raw.split("\n") if l.strip()]
             positions = []
@@ -484,16 +497,46 @@ async def scrape_all(pages):
                 if l in ("Following", "Favorites", "Discover", "Mes favoris", "Close"):
                     break
                 if in_inv and not re.match(r"^[\d.]+$", l) and "€" not in l and "%" not in l \
-                        and l not in ("Open your PEA", "To access your PEA account, please use your app."):
+                        and l not in ("Open your PEA", "To access your PEA account, please use your app.",
+                                      "Ouvrez votre PEA", "Pour accéder à votre compte PEA, veuillez utiliser votre application."):
                     if i + 3 < len(lines) and re.match(r"^[\d.]+$", lines[i + 1]) \
                             and "€" in lines[i + 2] and "%" in lines[i + 3]:
                         val = float(lines[i + 2].replace("\xa0", "").replace(" ", "").replace(",", ".").replace("€", ""))
-                        pct = float(lines[i + 3].replace("\xa0", "").replace(" ", "").replace(",", ".").replace("%", ""))
+                        pct = float(lines[i + 3].replace("\xa0", "").replace(" ", "").replace(",", ".").replace("%", "").replace("+", "").replace("−", "-").replace("–", "-"))
+                        # TR uses color (not text sign) for negative returns — detect from value
                         positions.append({"name": l, "shares": float(lines[i + 1]),
                                           "value": val, "return_pct": pct})
                         i += 4
                         continue
                 i += 1
+
+            # Fix return signs by clicking each position to read actual PnL with sign
+            if positions:
+                log(f"    📊 Verifying PnL signs for {len(positions)} positions...")
+                for pos in positions:
+                    try:
+                        link = await page.query_selector(f'text="{pos["name"]}"')
+                        if link:
+                            await link.click()
+                            await page.wait_for_timeout(2500)
+                            detail = await page.inner_text("body")
+                            # Look for signed PnL like "+4,09 €" or "−12,30 €" or "-12,30 €"
+                            pnl_match = re.search(r'([+\-−–][\d\s\xa0,.]+)\s*€\s*\n\s*([+\-−–]?[\d,.]+\s*%)', detail)
+                            if pnl_match:
+                                pnl_str = pnl_match.group(1).replace("\xa0", "").replace(" ", "").replace(",", ".").replace("−", "-").replace("–", "-")
+                                pnl_eur = float(pnl_str)
+                                if pnl_eur < 0 and pos["return_pct"] > 0:
+                                    pos["return_pct"] = -pos["return_pct"]
+                                    log(f"      {pos['name']}: sign corrected → {pos['return_pct']:+.2f}%")
+                            await page.go_back()
+                            await page.wait_for_timeout(1500)
+                    except Exception as e:
+                        log(f"      {pos['name']}: detail check failed: {e}")
+                        try:
+                            await page.goto("https://app.traderepublic.com/portfolio", wait_until="domcontentloaded")
+                            await page.wait_for_timeout(3000)
+                        except Exception:
+                            pass
 
             tr_data = {"scraped_at": datetime.now().isoformat(), "source": "trade_republic",
                        "portfolio_value": sum(p["value"] for p in positions),

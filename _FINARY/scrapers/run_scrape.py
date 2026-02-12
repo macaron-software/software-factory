@@ -491,6 +491,18 @@ async def scrape_trade_republic():
     await page.wait_for_timeout(3000)
     await page.screenshot(path="/tmp/tr_05_dashboard.png")
 
+    # Ensure "Depuis achat" / "Since buy" tab is selected
+    for tab_text in ["Depuis achat", "Since buy"]:
+        try:
+            tab = await page.query_selector(f'text="{tab_text}"')
+            if tab and await tab.is_visible():
+                await tab.click()
+                print(f"[trade_republic] Clicked '{tab_text}' tab")
+                await page.wait_for_timeout(3000)
+                break
+        except Exception:
+            continue
+
     # ── Extract portfolio ──
     body_text = await page.inner_text("body")
     Path("/tmp/tr_body_text.txt").write_text(body_text)
@@ -538,11 +550,11 @@ async def scrape_trade_republic():
                         inv["avg_price_label"] = ml
                     elif 'moyen' in ml.lower() and '€' in ml:
                         inv["avg_price"] = ml.replace('\xa0', ' ').strip()
-                # Look for structured data
-                perf_match = _re3.search(r'([\+\-][\d\s\xa0,.]+)\s*€\s*\n\s*([\+\-]?[\d,.]+\s*%)', detail_text)
+                # Look for structured data (handle Unicode minus − U+2212 and en-dash –)
+                perf_match = _re3.search(r'([+\-−–][\d\s\xa0,.]+)\s*€\s*\n\s*([+\-−–]?[\d,.]+\s*%)', detail_text)
                 if perf_match:
-                    inv["pnl"] = perf_match.group(1).replace('\xa0', ' ').strip()
-                    inv["pnl_pct"] = perf_match.group(2).strip()
+                    inv["pnl"] = perf_match.group(1).replace('\xa0', ' ').replace('−', '-').replace('–', '-').strip()
+                    inv["pnl_pct"] = perf_match.group(2).replace('−', '-').replace('–', '-').strip()
                 # Number of shares
                 shares_match = _re3.search(r'([\d,.]+)\s*(?:parts?|actions?|shares?|Anteile|pcs)', detail_text, _re3.IGNORECASE)
                 if shares_match:
