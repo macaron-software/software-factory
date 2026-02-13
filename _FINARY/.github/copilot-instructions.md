@@ -56,18 +56,23 @@ Objet: immeuble collectif divisé en fractions attribuées aux associés. 40 che
 
 **Statuts clés:** Art.18 (AF obligatoires), Art.19 (défaillance AF → vente forcée parts, AG 2/3 hors défaillant), Art.36 (dissolution: pas d'indivision, personnalité morale survit, partage limité aux associés en règle, passif proportionnel aux parts)
 
-**Dettes Beaussier:** AF impayés 25 335€, capital non libéré 192 128€, QP fournisseurs 11 487€, travaux non conformes (Combes) 45 960€, indemnité occupation ~800-1 000€/mois. Total ~140-154K€ hors capital.
+**Point comptable critique — CCA vs AF:** Beaussier (ex-cogérante) a payé fournisseurs directement depuis ses comptes perso → comptabilisé en CCA (compte courant associé = prêt remboursable) au lieu d'AF (contribution définitive). EC doit trancher : requalification CCA→AF, compensation dettes réciproques, ou remboursement CCA puis nouvel AF. Impact direct sur art.19 (défaillance AF uniquement, pas CCA).
 
-**Stratégie Vernhet:** joue la montre (pas de conclusions, LRAR sans assignation, espère dissolution = libération). Aucun argument de fond. Beaussier croit que dissolution la libère (faux — art.36).
+**Dettes Beaussier vs SCA:** AF impayés 25 335€, capital non libéré 192 128€, QP fournisseurs 11 487€, travaux non conformes (Combes) 45 960€, indemnité occupation ~800-1 000€/mois. Total ~140-154K€ hors capital. CCA Beaussier (créance SCA→Beaussier) à chiffrer par EC.
 
-**Actions en cours:**
-- ✅ Permis modificatif déposé mi-janvier 2026 (régularise non-conformités → lève AIT)
-- ✅ Expert-comptable contacté, FEC transmis (arrêté des comptes)
-- ⏳ AG comptes (dès EC prêt) → AG art.19 (mise en demeure + 1 mois)
-- Banque OK pour reporter prêt si avancement démontré
+**Stratégie Vernhet:** joue la montre (pas de conclusions expulsion, LRAR contestation AG sans assignation en nullité = sans effet juridique, espère dissolution = libération). Aucun argument de fond. Ne met pas son nom sur les contestations (LRAR Beaussier directe). Beaussier croit dissolution la libère (faux — art.36 : personnalité morale survit, pas d'indivision, partage limité aux associés en règle).
+
+**Actions en cours (fév 2026):**
+- ✅ Permis modificatif déposé mi-janvier (régularise non-conformités → lève AIT)
+- ✅ Expert-comptable contacté, FEC transmis (arrêté comptes + analyse CCA/AF)
+- ⏳ AG comptes (dès EC prêt) → chiffrage créances certifié par tiers indépendant
+- ⏳ Mise en demeure art.19 (huissier) → AG art.19 (1 mois après)
+- ⏳ AGE prolongation 2 ans (Legland 50,6% < 2/3 → probable abus de minorité Beaussier → prolongation judiciaire)
+- Banque OK pour reporter prêt si avancement démontré (permis + AIT levé)
+- Appel HAH : délibéré 31/03/2026
 
 **Factures Me Saint Martin:** 9 factures (SCA/Perso tags, payée/impayée), totaux avec montants inconnus
-**Estimation frais Beaussier (Me Vernhet):** 22-39K€, préjudices judiciaires détaillés (rapport expertise + conclusions Axel)
+**Estimation frais Beaussier (Me Vernhet):** 22-39K€, préjudices judiciaires (rapport Combes + conclusions Axel)
 **Source données:** FEC SCA (622600/401/512), DuckDB Bourso transactions, emails Outlook CDP, statuts `/Users/sylvain/MAISON GRABELS/COMPTA SCA/STATUTS_SCA.txt`, jugements `/Users/sylvain/MAISON GRABELS/PROCEDURE JUDICIAIRE/`
 
 ## Key files
