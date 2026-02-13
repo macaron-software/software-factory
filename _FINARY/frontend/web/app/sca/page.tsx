@@ -7,6 +7,10 @@ import {
   PieChart, Pie, Cell,
 } from "recharts";
 import { Loading, ErrorState, PageHeader, Badge, Section, StatCard } from "@/components/ds";
+import {
+  DollarSign, Scale, Ban, FileText, Wrench, XCircle, Clock,
+  Gavel, Zap, Timer, ClipboardList, CheckCircle, AlertCircle,
+} from "lucide-react";
 
 type BadgeVariant = "gain" | "loss" | "accent" | "warn" | "neutral";
 
@@ -40,7 +44,6 @@ export default function SCAPage() {
   const chartMonthly = (legal as any).chart_monthly as any[];
   const beaussierDebt = (legal as any).beaussier_debt;
   const beaussierLegal = (legal as any).beaussier_legal_estimate;
-  const axelUnpaid = (legal as any).axel_unpaid;
   const cashflow = (legal as any).sca_cashflow as any[];
 
   const fin = sca.financials;
@@ -104,7 +107,7 @@ export default function SCAPage() {
       {/* ─── Estimation Beaussier + Axel Unpaid ─── */}
       <div className="grid md:grid-cols-2 gap-6">
         {beaussierLegal && (
-          <Section title="💸 Estimation frais Beaussier (Me Vernhet)">
+          <Section title={<span className="flex items-center gap-2"><DollarSign className="w-4 h-4 text-loss" />Estimation frais Beaussier (Me Vernhet)</span>}>
             <p className="text-t-4 text-xs mb-3 italic">{beaussierLegal.note}</p>
             <div className="space-y-1.5 mb-4">
               {beaussierLegal.procedures?.map((p: any, i: number) => (
@@ -127,7 +130,7 @@ export default function SCAPage() {
             </div>
             {beaussierLegal.condamnation_hah_perdu && (
               <div className="mt-3 p-3 rounded-lg bg-loss/10 border border-loss/20">
-                <p className="text-loss text-xs font-semibold mb-1">⚖️ Condamnation Art. 700 CPC (référé HAH 1ère instance)</p>
+                <p className="text-loss text-xs font-semibold mb-1 flex items-center gap-1.5"><Scale className="w-3.5 h-3.5" />Condamnation Art. 700 CPC (référé HAH 1ère instance)</p>
                 <div className="flex justify-between text-xs">
                   <span className="text-t-3">Art. 700 → Legland (perso)</span>
                   <span className="text-loss font-mono">{formatEUR(beaussierLegal.condamnation_hah_perdu.art_700_legland)}</span>
@@ -144,7 +147,7 @@ export default function SCAPage() {
             )}
             {beaussierLegal.qp_impayes_sca && (
               <div className="mt-3 p-3 rounded-lg bg-loss/10 border border-loss/20">
-                <p className="text-loss text-xs font-semibold mb-2">🚫 QP Beaussier impayées (procédures SCA)</p>
+                <p className="text-loss text-xs font-semibold mb-2 flex items-center gap-1.5"><Ban className="w-3.5 h-3.5" />QP Beaussier impayées (procédures SCA)</p>
                 <div className="space-y-1">
                   {beaussierLegal.qp_impayes_sca.map((item: any, i: number) => (
                     <div key={i} className="flex justify-between text-xs gap-2">
@@ -165,7 +168,7 @@ export default function SCAPage() {
               <>
                 {/* Préjudices Legland retenus par l'expert */}
                 <div className="mt-4 p-3 rounded-lg border border-bd-1 bg-bg-1">
-                  <p className="text-t-2 text-xs font-semibold mb-2">📋 Préjudices Legland (rapport expert — 77 535€)</p>
+                  <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" />Préjudices Legland (rapport expert — 77 535€)</p>
                   <div className="space-y-1.5">
                     {pj.demandes_legland?.map((p: any, i: number) => (
                       <div key={i} className="text-xs">
@@ -190,7 +193,7 @@ export default function SCAPage() {
                 </div>
                 {/* Travaux remise en conformité — 100% Beaussier */}
                 <div className="mt-3 p-3 rounded-lg border border-loss/20 bg-loss/5">
-                  <p className="text-t-2 text-xs font-semibold mb-2">🔧 Travaux remise en conformité (100% Beaussier)</p>
+                  <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><Wrench className="w-3.5 h-3.5" />Travaux remise en conformité (100% Beaussier)</p>
                   <div className="space-y-1">
                     {pj.travaux_remise_conformite?.map((p: any, i: number) => (
                       <div key={i} className="text-xs">
@@ -210,7 +213,7 @@ export default function SCAPage() {
                 </div>
                 {/* Demandes Beaussier — toutes rejetées par expert */}
                 <div className="mt-3 p-3 rounded-lg border border-gain/20 bg-gain/5">
-                  <p className="text-t-2 text-xs font-semibold mb-2">❌ Demandes Beaussier (expert : 0€)</p>
+                  <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><XCircle className="w-3.5 h-3.5 text-gain" />Demandes Beaussier (expert : 0€)</p>
                   <div className="space-y-1">
                     {pj.demandes_beaussier?.map((p: any, i: number) => (
                       <div key={i} className="text-xs">
@@ -230,7 +233,7 @@ export default function SCAPage() {
                 {/* Demandes en cours */}
                 {pj.demandes_en_cours && (
                   <div className="mt-3 p-3 rounded-lg border border-accent/20 bg-accent/5">
-                    <p className="text-t-2 text-xs font-semibold mb-2">⏳ Demandes en cours (pas encore jugées)</p>
+                    <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-accent" />Demandes en cours (pas encore jugées)</p>
                     <div className="space-y-2">
                       {pj.demandes_en_cours.map((d: any, i: number) => (
                         <div key={i} className="text-xs">
@@ -253,7 +256,7 @@ export default function SCAPage() {
                 {/* Condamnations prononcées */}
                 {pj.condamnations && (
                   <div className="mt-3 p-3 rounded-lg border border-gain/30 bg-gain/5">
-                    <p className="text-t-2 text-xs font-semibold mb-2">⚖️ Condamnations prononcées</p>
+                    <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><Gavel className="w-3.5 h-3.5 text-gain" />Condamnations prononcées</p>
                     <div className="space-y-1">
                       {pj.condamnations.map((c: any, i: number) => (
                         <div key={i} className="flex justify-between text-xs gap-2">
@@ -270,64 +273,115 @@ export default function SCAPage() {
           </Section>
         )}
 
-        {axelUnpaid && (
-          <Section title="📋 Situation Me Saint Martin">
-            <div className="space-y-3">
+        {legal.axel_situation && (() => {
+          const ax = legal.axel_situation;
+          const StatusDot = ({ status }: { status: string }) =>
+            status === "payee" ? (
+              <CheckCircle className="w-3 h-3 text-gain shrink-0" />
+            ) : (
+              <AlertCircle className="w-3 h-3 text-loss shrink-0" />
+            );
+          return (
+          <Section title={<span className="flex items-center gap-2"><ClipboardList className="w-4 h-4" />Situation Me Saint Martin</span>}>
+            <div className="space-y-4">
+              {/* Factures SCA */}
               <div>
-                <p className="text-t-4 text-xs font-semibold mb-2">Factures SCA payées</p>
-                <div className="space-y-1">
-                  {axelUnpaid.paid_sca?.map((p: any, i: number) => (
-                    <div key={i} className="flex justify-between text-xs">
-                      <span className="text-t-3">{fmtDate(p.date)} — {p.desc}</span>
-                      <span className="text-t-1 font-mono">{formatEUR(p.amount)}</span>
+                <p className="text-t-4 text-xs font-semibold mb-2">Factures SCA</p>
+                <div className="space-y-1.5">
+                  {ax.factures_sca.map((f: any, i: number) => (
+                    <div key={i} className="flex items-start gap-2 text-xs">
+                      <StatusDot status={f.status} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between gap-2">
+                          <span className="text-t-3 truncate">
+                            {fmtDate(f.date)} — {f.desc}
+                            {f.ref !== "—" && <span className="text-t-5 ml-1">n°{f.ref}</span>}
+                          </span>
+                          <span className="text-t-1 font-mono shrink-0">{formatEUR(f.amount)}</span>
+                        </div>
+                        <span className={`text-[10px] ${f.status === "payee" ? "text-gain" : "text-loss"}`}>
+                          {f.status === "payee" ? `Payée ${fmtDate(f.paid_date)} — ${f.paid_by}` : "Non payée — " + f.note}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
-                <div className="flex justify-between text-xs font-semibold mt-1 pt-1 border-t border-bd-1/30">
-                  <span className="text-t-2">Total payé SCA</span>
-                  <span className="text-t-1 font-mono">{formatEUR(axelUnpaid.total_paid_sca)}</span>
+                <div className="flex justify-between text-xs font-semibold mt-2 pt-2 border-t border-bd-1/30">
+                  <span className="text-t-2">Facturé SCA</span>
+                  <span className="text-t-1 font-mono">{formatEUR(ax.total_facture_sca)}</span>
                 </div>
+                <div className="flex justify-between text-xs mt-0.5">
+                  <span className="text-gain">Payé</span>
+                  <span className="text-gain font-mono">{formatEUR(ax.total_paye_sca)}</span>
+                </div>
+                {ax.total_impaye_sca > 0 && (
+                  <div className="flex justify-between text-xs mt-0.5">
+                    <span className="text-loss">Impayé</span>
+                    <span className="text-loss font-mono">{formatEUR(ax.total_impaye_sca)}</span>
+                  </div>
+                )}
               </div>
-
+              {/* Factures perso */}
               <div>
-                <p className="text-t-4 text-xs font-semibold mb-2">Paiements perso</p>
-                <div className="space-y-1">
-                  {axelUnpaid.paid_perso?.map((p: any, i: number) => (
-                    <div key={i} className="flex justify-between text-xs">
-                      <span className="text-t-3">{fmtDate(p.date)} — {p.desc}</span>
-                      <span className="text-t-1 font-mono">{formatEUR(p.amount)}</span>
+                <p className="text-t-4 text-xs font-semibold mb-2">Paiements perso (Legland)</p>
+                <div className="space-y-1.5">
+                  {ax.factures_perso.map((f: any, i: number) => (
+                    <div key={i} className="flex items-start gap-2 text-xs">
+                      <StatusDot status={f.status} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between gap-2">
+                          <span className="text-t-3 truncate">{fmtDate(f.date)} — {f.desc}</span>
+                          <span className="text-t-1 font-mono shrink-0">{formatEUR(f.amount)}</span>
+                        </div>
+                        <span className="text-gain text-[10px]">Payée {fmtDate(f.paid_date)} — {f.paid_by}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
-                <div className="flex justify-between text-xs font-semibold mt-1 pt-1 border-t border-bd-1/30">
-                  <span className="text-t-2">Total payé perso</span>
-                  <span className="text-t-1 font-mono">{formatEUR(axelUnpaid.total_paid_perso)}</span>
+                <div className="flex justify-between text-xs font-semibold mt-2 pt-2 border-t border-bd-1/30">
+                  <span className="text-t-2">Total perso</span>
+                  <span className="text-t-1 font-mono">{formatEUR(ax.total_facture_perso)}</span>
                 </div>
               </div>
-
+              {/* Résumé */}
               <div className="p-3 rounded-lg bg-bg-1 border border-bd-1 space-y-1.5">
-                <div className="flex justify-between text-xs">
-                  <span className="text-accent">SCA doit à Legland</span>
-                  <span className="text-accent font-mono font-semibold">{formatEUR(axelUnpaid.sca_owes_legland)}</span>
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-t-2">Total facturé (SCA + perso)</span>
+                  <span className="text-t-1 font-mono">{formatEUR(ax.resume.total_facture)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-loss">Beaussier QP impayée (SCA)</span>
-                  <span className="text-loss font-mono font-semibold">{formatEUR(axelUnpaid.beaussier_qp_unpaid)}</span>
+                  <span className="text-gain">Total payé</span>
+                  <span className="text-gain font-mono">{formatEUR(ax.resume.total_paye)}</span>
                 </div>
-                <p className="text-t-5 text-[10px] mt-1">{axelUnpaid.note}</p>
+                <div className="flex justify-between text-xs">
+                  <span className="text-loss font-semibold">Total impayé</span>
+                  <span className="text-loss font-mono font-semibold">{formatEUR(ax.resume.total_impaye)}</span>
+                </div>
+                <div className="mt-2 pt-2 border-t border-bd-1 space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-accent">SCA dette fournisseurs (QP Legland)</span>
+                    <span className="text-accent font-mono">{formatEUR(ax.resume.sca_dette_fournisseurs_legland)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-loss">SCA dette fournisseurs (QP Beaussier)</span>
+                    <span className="text-loss font-mono">{formatEUR(ax.resume.sca_dette_fournisseurs_beaussier)}</span>
+                  </div>
+                </div>
+                <p className="text-t-5 text-[10px] mt-1">{ax.resume.note}</p>
               </div>
             </div>
           </Section>
-        )}
+          );
+        })()}
       </div>
 
       {/* ─── Strategy / Critical Path ─── */}
       {strategy && (
-        <Section title="⚡ Chemin critique">
+        <Section title={<span className="flex items-center gap-2"><Zap className="w-4 h-4 text-accent" />Chemin critique</span>}>
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <p className="text-loss text-xs font-semibold mb-2">
-                ⏰ Dissolution SCA: {strategy.dissolution_date?.slice(0, 7)}
+              <p className="text-loss text-xs font-semibold mb-2 flex items-center gap-1.5">
+                <Timer className="w-3.5 h-3.5" />Dissolution SCA: {strategy.dissolution_date?.slice(0, 7)}
               </p>
               <p className="text-t-3 text-xs mb-3">{strategy.dissolution_note}</p>
               <p className="text-t-4 text-xs font-semibold mb-1">Stratégie adverse</p>

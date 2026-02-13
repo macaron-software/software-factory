@@ -1627,25 +1627,62 @@ def get_sca_legal():
                 ],
             },
         },
-        # Impayés envers Me Axel Saint Martin
-        "axel_unpaid": {
-            "paid_sca": [
-                {"date": "2024-04-11", "amount": 1800, "desc": "Mandataire ad'hoc (Me Sandian/AMAJ)"},
-                {"date": "2025-07-15", "amount": 1050, "desc": "Référé Beaussier"},
-                {"date": "2025-10-14", "amount": 1800, "desc": "Référé Expulsion (n°2025-10-112)"},
-                {"date": "2025-10-14", "amount": 1800, "desc": "Défense Référé Nullité AG (n°2025-10-113)"},
-                {"date": "2025-10-27", "amount": 1275, "desc": "Assignation Mandataire (n°2025-10-124)"},
+        # Factures Me Axel Saint Martin — SCA & Legland
+        "axel_situation": {
+            "factures_sca": [
+                # Payée via banque SCA (512000)
+                {"ref": "—", "date": "2024-04-11", "amount": 1800.00,
+                 "desc": "Mandataire ad'hoc (Me Sandian/AMAJ)",
+                 "status": "payee", "paid_date": "2024-04-11", "paid_by": "SCA (banque)",
+                 "note": "Avancé 100% par Legland via CCA (455100)"},
+                # Payée via banque SCA (512000)
+                {"ref": "—", "date": "2025-07-15", "amount": 1050.00,
+                 "desc": "Avocat Référé Beaussier (provision)",
+                 "status": "payee", "paid_date": "2025-07-15", "paid_by": "SCA (banque)",
+                 "note": "Virement SCA → Saint Martin"},
+                # Facturées oct 2025 — en compta fournisseurs (401), PAS encore payées
+                {"ref": "2025-10-112", "date": "2025-10-14", "amount": 1800.00,
+                 "desc": "Référé Expulsion",
+                 "status": "non_payee", "paid_by": None,
+                 "note": "En compta 401 (QP Legland 910,44€ + QP Beaussier 889,56€). Pas de débit 512."},
+                {"ref": "2025-10-113", "date": "2025-10-14", "amount": 1800.00,
+                 "desc": "Défense Référé Nullité AG",
+                 "status": "non_payee", "paid_by": None,
+                 "note": "En compta 401 (QP Legland 910,44€ + QP Beaussier 889,56€). Pas de débit 512."},
+                {"ref": "2025-10-124", "date": "2025-10-27", "amount": 1275.00,
+                 "desc": "Assignation Mandataire Ad'hoc",
+                 "status": "non_payee", "paid_by": None,
+                 "note": "En compta 401 (QP Legland 644,90€ + QP Beaussier 630,10€). Pas de débit 512."},
             ],
-            "total_paid_sca": 7725,
-            "paid_perso": [
-                {"date": "2024-08-21", "amount": 3000, "desc": "Virement perso (provision)"},
-                {"date": "2025-07-15", "amount": 1050, "desc": "Virement perso (remboursé via SCA)"},
-                {"date": "2025-07-15", "amount": 600, "desc": "Virement perso"},
+            "total_facture_sca": 7725.00,
+            "total_paye_sca": 2850.00,
+            "total_impaye_sca": 4875.00,
+            "factures_perso": [
+                {"ref": "—", "date": "2024-08-21", "amount": 3000.00,
+                 "desc": "Provision avocat (expertise + défense perso)",
+                 "status": "payee", "paid_date": "2024-08-21", "paid_by": "Bourso perso",
+                 "note": "Vir Inst Axel Saint Martin — Bourso Essentiel"},
+                {"ref": "—", "date": "2025-07-15", "amount": 1050.00,
+                 "desc": "Remboursement avancé SCA (même jour que paiement SCA)",
+                 "status": "payee", "paid_date": "2025-07-15", "paid_by": "Bourso perso",
+                 "note": "Legland avance pour SCA puis se rembourse le même jour"},
+                {"ref": "—", "date": "2025-07-15", "amount": 600.00,
+                 "desc": "Complément honoraires perso",
+                 "status": "payee", "paid_date": "2025-07-15", "paid_by": "Bourso perso",
+                 "note": "Vir Inst Axel Saint Martin — Bourso Essentiel"},
             ],
-            "total_paid_perso": 4650,
-            "sca_owes_legland": 2974.11,
-            "beaussier_qp_unpaid": 7105.89,
-            "note": "SCA doit 2 974€ à Legland (QP fournisseurs). Beaussier doit 7 106€ à la SCA (QP impayée).",
+            "total_facture_perso": 4650.00,
+            "total_paye_perso": 4650.00,
+            "total_impaye_perso": 0,
+            # Résumé
+            "resume": {
+                "total_facture": 12375.00,
+                "total_paye": 7500.00,
+                "total_impaye": 4875.00,
+                "sca_dette_fournisseurs_legland": 2974.11,
+                "sca_dette_fournisseurs_beaussier": 7105.89,
+                "note": "3 factures SCA impayées (4 875€) en compta fournisseurs 401. Beaussier refuse de régler sa QP (7 106€).",
+            },
         },
     }
 
