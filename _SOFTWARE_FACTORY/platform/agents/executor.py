@@ -22,7 +22,7 @@ from ..agents.store import AgentDef
 logger = logging.getLogger(__name__)
 
 # Max tool-calling rounds to prevent infinite loops
-MAX_TOOL_ROUNDS = 5
+MAX_TOOL_ROUNDS = 8
 
 
 def _get_tool_registry():
@@ -360,6 +360,14 @@ class AgentExecutor:
 
                 logger.info("Agent %s tool round %d: %d calls", agent.id, round_num + 1,
                             len(llm_resp.tool_calls))
+
+                # On penultimate round, disable tools to force synthesis next iteration
+                if round_num >= MAX_TOOL_ROUNDS - 2 and tools is not None:
+                    tools = None
+                    messages.append(LLMMessage(
+                        role="system",
+                        content="You have used many tool calls. Now synthesize your findings and respond to the user. Do not call more tools.",
+                    ))
             else:
                 content = llm_resp.content or "(Max tool rounds reached)"
 
