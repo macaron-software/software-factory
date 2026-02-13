@@ -161,8 +161,8 @@ class AgentStore:
                      description="Strategic orchestrator. Deep recursive analysis, task decomposition, WSJF prioritization.",
                      provider="azure", model="gpt-5.2",
                      temperature=0.3, max_tokens=8192,
-                     icon="building", color="#bc8cff",
-                     avatar="🧠", tagline="I see the big picture",
+                     icon="brain", color="#bc8cff",
+                     avatar="brain", tagline="I see the big picture",
                      is_builtin=True, tags=["orchestrator", "planning"],
                      system_prompt="You are the Brain — strategic orchestrator of the Software Factory.\n"
                      "Your role: analyze codebases deeply, decompose into atomic tasks (FRACTAL),\n"
@@ -174,7 +174,7 @@ class AgentStore:
                      provider="minimax", model="MiniMax-M2.5",
                      temperature=0.4, max_tokens=4096,
                      icon="code", color="#58a6ff",
-                     avatar="👷", tagline="Test first, code second",
+                     avatar="hardhat", tagline="Test first, code second",
                      is_builtin=True, tags=["coding", "tdd"],
                      system_prompt="You are a TDD Worker. Write code following strict Red-Green-Refactor.\n"
                      "Each task is atomic and KISS. Write the test FIRST, then minimal code to pass.\n"
@@ -185,7 +185,7 @@ class AgentStore:
                      provider="minimax", model="MiniMax-M2.5",
                      temperature=0.2, max_tokens=4096,
                      icon="eye", color="#d29922",
-                     avatar="👁️", tagline="Nothing escapes my review",
+                     avatar="eye", tagline="Nothing escapes my review",
                      is_builtin=True, tags=["review", "quality"],
                      permissions={"can_veto": True, "veto_level": "absolute"},
                      system_prompt="You are the Code Critic. Review code for:\n"
@@ -199,8 +199,8 @@ class AgentStore:
                      description="OWASP Top 10, secrets detection, SQL injection, XSS analysis.",
                      provider="minimax", model="MiniMax-M2.5",
                      temperature=0.1, max_tokens=4096,
-                     icon="lock", color="#f85149",
-                     avatar="🔒", tagline="Zero vulnerabilities tolerated",
+                     icon="shield", color="#f85149",
+                     avatar="shield", tagline="Zero vulnerabilities tolerated",
                      is_builtin=True, tags=["security", "owasp"],
                      permissions={"can_veto": True, "veto_level": "absolute"},
                      system_prompt="You are the Security Critic (cognitive diversity: different LLM provider).\n"
@@ -213,7 +213,7 @@ class AgentStore:
                      provider="azure-ai", model="DeepSeek-R1-0528",
                      temperature=0.3, max_tokens=4096,
                      icon="building", color="#bc8cff",
-                     avatar="🏗️", tagline="Clean architecture, strong foundations",
+                     avatar="building", tagline="Clean architecture, strong foundations",
                      is_builtin=True, tags=["architecture", "design"],
                      permissions={"can_veto": True, "veto_level": "strong"},
                      system_prompt="You are the Architecture Critic. Review for:\n"
@@ -227,24 +227,24 @@ class AgentStore:
                      description="Build, deploy, infrastructure. Docker, CI/CD, monitoring.",
                      provider="minimax", model="MiniMax-M2.5",
                      temperature=0.3, max_tokens=4096,
-                     icon="settings", color="#3fb950",
-                     avatar="🚀", tagline="Ship it, monitor it",
+                     icon="rocket", color="#3fb950",
+                     avatar="rocket", tagline="Ship it, monitor it",
                      is_builtin=True, tags=["deploy", "infra", "ci-cd"]),
 
             AgentDef(id="product", name="Product Owner", role="product",
                      description="Business value, user stories, acceptance criteria. WSJF prioritization.",
                      provider="azure", model="gpt-5.2",
                      temperature=0.5, max_tokens=4096,
-                     icon="users", color="#f78166",
-                     avatar="📋", tagline="Value over features",
+                     icon="clipboard", color="#f78166",
+                     avatar="clipboard", tagline="Value over features",
                      is_builtin=True, tags=["product", "business"]),
 
             AgentDef(id="tester", name="QA Engineer", role="tester",
                      description="E2E tests, smoke tests, regression. Playwright specialist.",
                      provider="minimax", model="MiniMax-M2.5",
                      temperature=0.3, max_tokens=4096,
-                     icon="check-circle", color="#a371f7",
-                     avatar="🧪", tagline="If it's not tested, it's broken",
+                     icon="flask", color="#a371f7",
+                     avatar="flask", tagline="If it's not tested, it's broken",
                      is_builtin=True, tags=["testing", "e2e", "qa"]),
         ]
 

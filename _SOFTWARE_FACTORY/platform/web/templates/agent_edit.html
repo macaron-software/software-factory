@@ -48,8 +48,13 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="avatar">Avatar (emoji)</label>
-                            <input type="text" id="avatar" name="avatar" value="{{ agent.avatar }}" placeholder="🧠" maxlength="4" style="width:60px;font-size:1.5rem;text-align:center">
+                            <label for="avatar">Avatar icon</label>
+                            <select id="avatar" name="avatar" style="width:140px">
+                                <option value="">— default —</option>
+                                {% for ic in icons %}
+                                <option value="{{ ic }}" {% if agent.avatar == ic %}selected{% endif %}>{{ ic }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                         <div class="form-group" style="flex:1">
                             <label for="tagline">Tagline</label>

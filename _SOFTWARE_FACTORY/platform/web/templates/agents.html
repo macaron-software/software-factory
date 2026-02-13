@@ -14,7 +14,7 @@
         <div class="item-icon">
             {% if agent.avatar %}
             <div class="agent-avatar-circle" style="background:{{ agent.color }}20;border-color:{{ agent.color }}">
-                <span class="agent-avatar-emoji">{{ agent.avatar }}</span>
+                <svg class="icon icon-sm" style="color:{{ agent.color }}"><use href="#icon-{{ agent.avatar }}"/></svg>
             </div>
             {% else %}
             <div class="agent-dot" style="background:{{ agent.color }}">

@@ -64,7 +64,7 @@
                     {% if msg.from_agent != 'user' %}
                     <div class="chat-msg-avatar agent-avatar-sm">
                         {% if lead_agent and lead_agent.avatar %}
-                        <span>{{ lead_agent.avatar }}</span>
+                        <svg class="icon icon-sm" style="color:{{ lead_agent.color }}"><use href="#icon-{{ lead_agent.avatar }}"/></svg>
                         {% else %}
                         <svg class="icon icon-sm"><use href="#icon-bot"/></svg>
                         {% endif %}
@@ -98,7 +98,7 @@
                 <div class="chat-welcome">
                     <div class="chat-welcome-icon">
                         {% if lead_agent and lead_agent.avatar %}
-                        <span class="agent-avatar-lg">{{ lead_agent.avatar }}</span>
+                        <svg class="icon" style="width:48px;height:48px;color:{{ lead_agent.color }}"><use href="#icon-{{ lead_agent.avatar }}"/></svg>
                         {% else %}
                         <svg class="icon" style="width:48px;height:48px;color:var(--purple)"><use href="#icon-bot"/></svg>
                         {% endif %}
@@ -233,6 +233,7 @@ const PROJECT_ID = "{{ project.id }}";
 const PROJECT_NAME = "{{ project.name }}";
 const SESSION_ID = "{{ active_session.id if active_session else '' }}";
 const AGENT_AVATAR = "{{ lead_agent.avatar if lead_agent and lead_agent.avatar else '' }}";
+const AGENT_COLOR = "{{ lead_agent.color if lead_agent and lead_agent.color else '#bc8cff' }}";
 const AGENT_NAME = "{{ lead_agent.name if lead_agent else project.name }}";
 let chatBusy = false;
 
@@ -254,7 +255,7 @@ function addUserBubble(text) {
 function addStreamingBubble() {
     const id = 'stream-' + Date.now();
     const avatarHtml = AGENT_AVATAR
-        ? `<div class="chat-msg-avatar agent-avatar-sm"><span>${AGENT_AVATAR}</span></div>`
+        ? `<div class="chat-msg-avatar agent-avatar-sm"><svg class="icon icon-sm" style="color:${AGENT_COLOR}"><use href="#icon-${AGENT_AVATAR}"/></svg></div>`
         : `<div class="chat-msg-avatar"><svg class="icon icon-sm"><use href="#icon-bot"/></svg></div>`;
     document.getElementById('chat-messages').insertAdjacentHTML('beforeend',
         `<div class="chat-msg chat-msg-agent" id="${id}">
