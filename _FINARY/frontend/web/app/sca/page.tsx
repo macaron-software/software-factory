@@ -159,6 +159,62 @@ export default function SCAPage() {
                 </div>
               </div>
             )}
+            {beaussierLegal.prejudices && (
+              <>
+                <div className="mt-4 p-3 rounded-lg border border-bd-1 bg-bg-1">
+                  <p className="text-t-2 text-xs font-semibold mb-2">⚠️ Préjudices vs SCA</p>
+                  <div className="space-y-1">
+                    {beaussierLegal.prejudices.vs_sca?.map((p: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between text-xs gap-2">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-t-3 block truncate">{p.desc}</span>
+                          {p.note && <span className="text-t-5 text-[10px]">{p.note}</span>}
+                        </div>
+                        <span className="text-loss font-mono shrink-0">
+                          {p.amount ? formatEUR(p.amount) : `${formatEUR(p.amount_low)}–${formatEUR(p.amount_high)}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold mt-2 pt-2 border-t border-bd-1">
+                    <span className="text-t-2">Certain</span>
+                    <span className="text-loss font-mono">{formatEUR(beaussierLegal.prejudices.total_vs_sca_certain)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs mt-1">
+                    <span className="text-t-4">+ potentiel (estimation)</span>
+                    <span className="text-loss/70 font-mono">
+                      {formatEUR(beaussierLegal.prejudices.total_vs_sca_potentiel_low)}–{formatEUR(beaussierLegal.prejudices.total_vs_sca_potentiel_high)}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-3 p-3 rounded-lg border border-bd-1 bg-bg-1">
+                  <p className="text-t-2 text-xs font-semibold mb-2">⚠️ Préjudices vs Legland (perso)</p>
+                  <div className="space-y-1">
+                    {beaussierLegal.prejudices.vs_legland?.map((p: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between text-xs gap-2">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-t-3 block truncate">{p.desc}</span>
+                          {p.note && <span className="text-t-5 text-[10px]">{p.note}</span>}
+                        </div>
+                        <span className="text-loss font-mono shrink-0">
+                          {p.amount ? formatEUR(p.amount) : `${formatEUR(p.amount_low)}–${formatEUR(p.amount_high)}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold mt-2 pt-2 border-t border-bd-1">
+                    <span className="text-t-2">Certain</span>
+                    <span className="text-loss font-mono">{formatEUR(beaussierLegal.prejudices.total_vs_legland_certain)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs mt-1">
+                    <span className="text-t-4">+ potentiel (estimation)</span>
+                    <span className="text-loss/70 font-mono">
+                      {formatEUR(beaussierLegal.prejudices.total_vs_legland_potentiel_low)}–{formatEUR(beaussierLegal.prejudices.total_vs_legland_potentiel_high)}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
           </Section>
         )}
 
