@@ -39,6 +39,8 @@ export default function SCAPage() {
   const personalLegal = (legal as any).personal_legal as any[];
   const chartMonthly = (legal as any).chart_monthly as any[];
   const beaussierDebt = (legal as any).beaussier_debt;
+  const beaussierLegal = (legal as any).beaussier_legal_estimate;
+  const axelUnpaid = (legal as any).axel_unpaid;
   const cashflow = (legal as any).sca_cashflow as any[];
 
   const fin = sca.financials;
@@ -97,6 +99,101 @@ export default function SCAPage() {
         <StatCard label="Coût construction" value={fin.total_verse} />
         <StatCard label="Frais procédure" value={s.total_legal_all} tone="negative" />
         <StatCard label="Impayés Beaussier" value={beaussierDebt.af_impayes} tone="negative" />
+      </div>
+
+      {/* ─── Estimation Beaussier + Axel Unpaid ─── */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {beaussierLegal && (
+          <Section title="💸 Estimation frais Beaussier (Me Vernhet)">
+            <p className="text-t-4 text-xs mb-3 italic">{beaussierLegal.note}</p>
+            <div className="space-y-1.5 mb-4">
+              {beaussierLegal.procedures?.map((p: any, i: number) => (
+                <div key={i} className="flex items-center justify-between text-xs gap-2">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-t-2 truncate block">{p.name}</span>
+                    {p.note && <span className="text-t-5 text-[10px]">{p.note}</span>}
+                  </div>
+                  <span className="text-loss font-mono shrink-0">
+                    {formatEUR(p.estimate_low)}–{formatEUR(p.estimate_high)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-bd-1 pt-3 flex justify-between text-sm font-semibold">
+              <span className="text-t-2">Total estimé Beaussier</span>
+              <span className="text-loss font-mono">
+                {formatEUR(beaussierLegal.total_low)}–{formatEUR(beaussierLegal.total_high)}
+              </span>
+            </div>
+            {beaussierLegal.condamnation_hah_perdu && (
+              <div className="mt-3 p-3 rounded-lg bg-loss/10 border border-loss/20">
+                <p className="text-loss text-xs font-semibold mb-1">⚖️ Condamnation appel perdu (31/03)</p>
+                <div className="flex justify-between text-xs">
+                  <span className="text-t-3">Art. 700 CPC</span>
+                  <span className="text-loss font-mono">
+                    {formatEUR(beaussierLegal.condamnation_hah_perdu.art_700.low)}–{formatEUR(beaussierLegal.condamnation_hah_perdu.art_700.high)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-t-3">Dépens</span>
+                  <span className="text-loss font-mono">
+                    {formatEUR(beaussierLegal.condamnation_hah_perdu.depens.low)}–{formatEUR(beaussierLegal.condamnation_hah_perdu.depens.high)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </Section>
+        )}
+
+        {axelUnpaid && (
+          <Section title="📋 Situation Me Saint Martin">
+            <div className="space-y-3">
+              <div>
+                <p className="text-t-4 text-xs font-semibold mb-2">Factures SCA payées</p>
+                <div className="space-y-1">
+                  {axelUnpaid.paid_sca?.map((p: any, i: number) => (
+                    <div key={i} className="flex justify-between text-xs">
+                      <span className="text-t-3">{fmtDate(p.date)} — {p.desc}</span>
+                      <span className="text-t-1 font-mono">{formatEUR(p.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between text-xs font-semibold mt-1 pt-1 border-t border-bd-1/30">
+                  <span className="text-t-2">Total payé SCA</span>
+                  <span className="text-t-1 font-mono">{formatEUR(axelUnpaid.total_paid_sca)}</span>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-t-4 text-xs font-semibold mb-2">Paiements perso</p>
+                <div className="space-y-1">
+                  {axelUnpaid.paid_perso?.map((p: any, i: number) => (
+                    <div key={i} className="flex justify-between text-xs">
+                      <span className="text-t-3">{fmtDate(p.date)} — {p.desc}</span>
+                      <span className="text-t-1 font-mono">{formatEUR(p.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between text-xs font-semibold mt-1 pt-1 border-t border-bd-1/30">
+                  <span className="text-t-2">Total payé perso</span>
+                  <span className="text-t-1 font-mono">{formatEUR(axelUnpaid.total_paid_perso)}</span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-bg-1 border border-bd-1 space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-accent">SCA doit à Legland</span>
+                  <span className="text-accent font-mono font-semibold">{formatEUR(axelUnpaid.sca_owes_legland)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-loss">Beaussier QP impayée (SCA)</span>
+                  <span className="text-loss font-mono font-semibold">{formatEUR(axelUnpaid.beaussier_qp_unpaid)}</span>
+                </div>
+                <p className="text-t-5 text-[10px] mt-1">{axelUnpaid.note}</p>
+              </div>
+            </div>
+          </Section>
+        )}
       </div>
 
       {/* ─── Strategy / Critical Path ─── */}

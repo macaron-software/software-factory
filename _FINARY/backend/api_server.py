@@ -1484,6 +1484,52 @@ def get_sca_legal():
             "fournisseurs_qp": 7105.89,
             "total": 25334.71 + 7105.89,
         },
+        # Estimation des frais juridiques de Beaussier (Me Vernhet, avocat cher Montpellier)
+        "beaussier_legal_estimate": {
+            "note": "Estimation basée sur tarifs avocat Montpellier haut de gamme (350-450€/h)",
+            "procedures": [
+                {"name": "Expertise judiciaire (défense + dires + réunions)", "estimate_low": 4000, "estimate_high": 6000,
+                 "note": "2 réunions expertise + 3 dires + conclusions"},
+                {"name": "Référé heure-à-heure AG (1ère instance — gagné)", "estimate_low": 2500, "estimate_high": 4000,
+                 "note": "Assignation + plaidoirie + ordonnance favorable"},
+                {"name": "Appel référé heure-à-heure (PERDU — délibéré 31/03)", "estimate_low": 3000, "estimate_high": 5000,
+                 "note": "Conclusions d'appel + plaidoirie CA — procédure perdue"},
+                {"name": "Référé expulsion (conclusions + plaidoirie)", "estimate_low": 3000, "estimate_high": 5000,
+                 "note": "Conclusions adverses 23/03 + audience à venir"},
+                {"name": "Prolongation SCA (opposition)", "estimate_low": 1500, "estimate_high": 3000,
+                 "note": "Renvoi obtenu de droit, audience 26/02"},
+                {"name": "Procédure au fond (à venir)", "estimate_low": 5000, "estimate_high": 10000,
+                 "note": "Procédure la plus lourde — expertise + assignation + conclusions + plaidoirie"},
+                {"name": "Heure-à-heure sur chaque AG", "estimate_low": 1500, "estimate_high": 2500,
+                 "note": "~3 AG contestées à ce jour"},
+            ],
+            "total_low": 20500,
+            "total_high": 35500,
+            "condamnation_hah_perdu": {
+                "art_700": {"low": 1500, "high": 3000, "note": "Art. 700 CPC — frais irrépétibles appel perdu"},
+                "depens": {"low": 500, "high": 1500, "note": "Dépens d'appel (huissier, greffe)"},
+            },
+        },
+        # Impayés envers Me Axel Saint Martin
+        "axel_unpaid": {
+            "paid_sca": [
+                {"date": "2024-04-11", "amount": 1800, "desc": "Mandataire ad'hoc (Me Sandian/AMAJ)"},
+                {"date": "2025-07-15", "amount": 1050, "desc": "Référé Beaussier"},
+                {"date": "2025-10-14", "amount": 1800, "desc": "Référé Expulsion (n°2025-10-112)"},
+                {"date": "2025-10-14", "amount": 1800, "desc": "Défense Référé Nullité AG (n°2025-10-113)"},
+                {"date": "2025-10-27", "amount": 1275, "desc": "Assignation Mandataire (n°2025-10-124)"},
+            ],
+            "total_paid_sca": 7725,
+            "paid_perso": [
+                {"date": "2024-08-21", "amount": 3000, "desc": "Virement perso (provision)"},
+                {"date": "2025-07-15", "amount": 1050, "desc": "Virement perso (remboursé via SCA)"},
+                {"date": "2025-07-15", "amount": 600, "desc": "Virement perso"},
+            ],
+            "total_paid_perso": 4650,
+            "sca_owes_legland": 2974.11,
+            "beaussier_qp_unpaid": 7105.89,
+            "note": "SCA doit 2 974€ à Legland (QP fournisseurs). Beaussier doit 7 106€ à la SCA (QP impayée).",
+        },
     }
 
 
