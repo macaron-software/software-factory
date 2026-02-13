@@ -127,18 +127,35 @@ export default function SCAPage() {
             </div>
             {beaussierLegal.condamnation_hah_perdu && (
               <div className="mt-3 p-3 rounded-lg bg-loss/10 border border-loss/20">
-                <p className="text-loss text-xs font-semibold mb-1">⚖️ Condamnation appel perdu (31/03)</p>
+                <p className="text-loss text-xs font-semibold mb-1">⚖️ Condamnation Art. 700 CPC (référé HAH 1ère instance)</p>
                 <div className="flex justify-between text-xs">
-                  <span className="text-t-3">Art. 700 CPC</span>
-                  <span className="text-loss font-mono">
-                    {formatEUR(beaussierLegal.condamnation_hah_perdu.art_700.low)}–{formatEUR(beaussierLegal.condamnation_hah_perdu.art_700.high)}
-                  </span>
+                  <span className="text-t-3">Art. 700 → Legland (perso)</span>
+                  <span className="text-loss font-mono">{formatEUR(beaussierLegal.condamnation_hah_perdu.art_700_legland)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-t-3">Dépens</span>
-                  <span className="text-loss font-mono">
-                    {formatEUR(beaussierLegal.condamnation_hah_perdu.depens.low)}–{formatEUR(beaussierLegal.condamnation_hah_perdu.depens.high)}
-                  </span>
+                  <span className="text-t-3">Art. 700 → SCA</span>
+                  <span className="text-loss font-mono">{formatEUR(beaussierLegal.condamnation_hah_perdu.art_700_sca)}</span>
+                </div>
+                <div className="flex justify-between text-xs font-semibold mt-1 pt-1 border-t border-loss/30">
+                  <span className="text-loss">Total condamnation</span>
+                  <span className="text-loss font-mono">{formatEUR(beaussierLegal.condamnation_hah_perdu.total)}</span>
+                </div>
+              </div>
+            )}
+            {beaussierLegal.qp_impayes_sca && (
+              <div className="mt-3 p-3 rounded-lg bg-loss/10 border border-loss/20">
+                <p className="text-loss text-xs font-semibold mb-2">🚫 QP Beaussier impayées (procédures SCA)</p>
+                <div className="space-y-1">
+                  {beaussierLegal.qp_impayes_sca.map((item: any, i: number) => (
+                    <div key={i} className="flex justify-between text-xs gap-2">
+                      <span className="text-t-3 flex-1 min-w-0 truncate">{item.desc}</span>
+                      <span className="text-loss font-mono shrink-0">{formatEUR(item.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between text-xs font-semibold mt-2 pt-2 border-t border-loss/30">
+                  <span className="text-loss">Total QP impayées</span>
+                  <span className="text-loss font-mono">{formatEUR(beaussierLegal.total_qp_impayes)}</span>
                 </div>
               </div>
             )}

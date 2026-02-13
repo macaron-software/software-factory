@@ -1509,9 +1509,21 @@ def get_sca_legal():
             "total_low": 22500,
             "total_high": 39500,
             "condamnation_hah_perdu": {
-                "art_700": {"low": 1500, "high": 3000, "note": "Art. 700 CPC — frais irrépétibles appel perdu"},
-                "depens": {"low": 500, "high": 1500, "note": "Dépens d'appel (huissier, greffe)"},
+                "note": "Référé HAH 1ère instance — Beaussier condamnée Art. 700 CPC",
+                "art_700_legland": 1000,
+                "art_700_sca": 1000,
+                "total": 2000,
             },
+            # QP Beaussier impayée sur les procédures SCA (elle refuse de payer sa part)
+            "qp_impayes_sca": [
+                {"desc": "Epsilon GE — étude murs soutènement (100% Beaussier)", "amount": 4200.00},
+                {"desc": "Avocat Référé Expulsion (QP 49,4%)", "amount": 889.56},
+                {"desc": "Avocat Défense Référé Nullité AG (QP 49,4%)", "amount": 889.56},
+                {"desc": "Avocat Assignation Mandataire (QP 49,4%)", "amount": 630.10},
+                {"desc": "Condamnation Mairie Art. L.761-1 (QP 49,4%)", "amount": 496.67},
+                {"desc": "Expertise judiciaire — consignation (QP 49,4% de 11 039,57€)", "amount": 5454.10},
+            ],
+            "total_qp_impayes": 12559.99,
         },
         # Impayés envers Me Axel Saint Martin
         "axel_unpaid": {
