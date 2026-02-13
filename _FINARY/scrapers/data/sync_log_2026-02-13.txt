@@ -1,0 +1,52 @@
+[09:53:27] 🔄 Daily sync — 2026-02-13
+[09:53:27] 📡 Chrome CDP connected — 8 tabs
+[09:53:27] ⏭️  Skipping login (--scrape mode)
+[09:53:27] 
+📊 Phase 2: Scrape (4 banks)
+[09:53:27]   📊 [IBKR] Scraping portfolio...
+[09:53:32]     ✅ 3 positions, NLV=51,592€
+[09:53:32]     📄 Downloading Activity Statement...
+[09:53:37]     ❌ IBKR scrape failed: Page.click: Timeout 5000ms exceeded.
+Call log:
+  - waiting for locator("button:has-text(\"Statements\")")
+
+[09:53:37]   📊 [Bourso] Scraping accounts...
+[09:53:41]     ✅ 3 accounts, 9 loans
+[09:53:47]   📊 [TR] Scraping portfolio...
+[09:53:53]     Clicked 'Since buy' tab
+[09:53:56]     📊 Verifying PnL signs for 22 positions...
+[09:54:26]       Amazon.com: detail check failed: ElementHandle.click: Timeout 30000ms exceeded.
+Call log:
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is not visible
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is not visible
+    - retrying click action
+      - waiting 100ms
+    56 × waiting for element to be visible, enabled and stable
+       - element is not visible
+     - retrying click action
+       - waiting 500ms
+
+[09:55:57]     ✅ 22 positions, total=679.24€
+[09:55:57]     📜 Scraping TR activities...
+[09:55:58]     ❌ TR scrape failed: Page.goto: net::ERR_TIMED_OUT at https://app.traderepublic.com/profile/transactions
+Call log:
+  - navigating to "https://app.traderepublic.com/profile/transactions", waiting until "domcontentloaded"
+
+[09:55:58]   📊 [CA] Scraping accounts & credits...
+[09:56:06]     ✅ 1 accounts, 4 credits
+[09:56:06] 
+🔨 Phase 3: Build
+[09:56:06]   ✅ extraction_complete: 3 IBKR + 22 TR
+[09:56:06]   ✅ patrimoine_complet rebuilt
+[09:56:06] 
+📄 Phase 4: Parse transactions
+[09:56:07]   ✅ transactions.duckdb updated
+[09:56:07] 
+==================================================
+[09:56:07] ✅ Daily sync complete — 09:56:07
+[09:56:07]    Banks scraped: ['ibkr', 'bourso', 'tr', 'ca']

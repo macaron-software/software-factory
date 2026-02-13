@@ -1,0 +1,529 @@
+{
+  "date": "2026-02-13",
+  "timestamp": "2026-02-13T09:56:06.355213",
+  "trade_republic": {
+    "type": "cto",
+    "currency": "EUR",
+    "cash": 2169.62,
+    "portfolio_value": 679.24,
+    "total_invested": 573.71,
+    "unrealized_pnl": 105.5,
+    "total_account_value": 2848.86,
+    "fees_per_trade": 1.0,
+    "positions": [
+      {
+        "name": "Amazon.com",
+        "isin": "",
+        "shares": 0.443245,
+        "avg_price_eur": 144.43,
+        "current_value_eur": 74.48,
+        "unrealized_pnl_eur": 10.46,
+        "unrealized_pnl_pct": 16.34,
+        "portfolio_weight_pct": 10.97,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "STMicroelectronics",
+        "isin": "",
+        "shares": 2.108535,
+        "avg_price_eur": 23.24,
+        "current_value_eur": 59.28,
+        "unrealized_pnl_eur": 10.28,
+        "unrealized_pnl_pct": 20.98,
+        "portfolio_weight_pct": 8.73,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "BYD",
+        "isin": "",
+        "shares": 4.377616,
+        "avg_price_eur": 8.52,
+        "current_value_eur": 45.99,
+        "unrealized_pnl_eur": 8.7,
+        "unrealized_pnl_pct": 23.34,
+        "portfolio_weight_pct": 6.77,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "L'Oreal",
+        "isin": "",
+        "shares": 0.122492,
+        "avg_price_eur": 342.88,
+        "current_value_eur": 45.14,
+        "unrealized_pnl_eur": 3.14,
+        "unrealized_pnl_pct": 7.47,
+        "portfolio_weight_pct": 6.65,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "Moderna",
+        "isin": "",
+        "shares": 1.189668,
+        "avg_price_eur": 31.16,
+        "current_value_eur": 39.38,
+        "unrealized_pnl_eur": 2.31,
+        "unrealized_pnl_pct": 6.23,
+        "portfolio_weight_pct": 5.8,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "Allianz",
+        "isin": "DE0008404005",
+        "shares": 0.090489,
+        "avg_price_eur": 309.43,
+        "current_value_eur": 33.47,
+        "unrealized_pnl_eur": 5.47,
+        "unrealized_pnl_pct": 19.54,
+        "portfolio_weight_pct": 4.93,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": 3.98
+      },
+      {
+        "name": "Exxon Mobil",
+        "isin": "US30231G1022",
+        "shares": 0.265045,
+        "avg_price_eur": 105.64,
+        "current_value_eur": 33.46,
+        "unrealized_pnl_eur": 5.46,
+        "unrealized_pnl_pct": 19.52,
+        "portfolio_weight_pct": 4.93,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": 2.76
+      },
+      {
+        "name": "Realty Income",
+        "isin": "",
+        "shares": 0.609714,
+        "avg_price_eur": 52.48,
+        "current_value_eur": 33.22,
+        "unrealized_pnl_eur": 1.22,
+        "unrealized_pnl_pct": 3.8,
+        "portfolio_weight_pct": 4.89,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "LVMH Moët Hennessy",
+        "isin": "",
+        "shares": 0.062342,
+        "avg_price_eur": 423.47,
+        "current_value_eur": 32.42,
+        "unrealized_pnl_eur": 6.02,
+        "unrealized_pnl_pct": 22.81,
+        "portfolio_weight_pct": 4.77,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "TotalEnergies",
+        "isin": "",
+        "shares": 0.497438,
+        "avg_price_eur": 56.29,
+        "current_value_eur": 31.91,
+        "unrealized_pnl_eur": 3.91,
+        "unrealized_pnl_pct": 13.95,
+        "portfolio_weight_pct": 4.7,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "Intuitive Surgical",
+        "isin": "",
+        "shares": 0.076069,
+        "avg_price_eur": 317.47,
+        "current_value_eur": 30.67,
+        "unrealized_pnl_eur": 6.52,
+        "unrealized_pnl_pct": 26.98,
+        "portfolio_weight_pct": 4.52,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "Johnson & Johnson",
+        "isin": "US4781601046",
+        "shares": 0.145001,
+        "avg_price_eur": 144.83,
+        "current_value_eur": 29.85,
+        "unrealized_pnl_eur": 8.85,
+        "unrealized_pnl_pct": 42.14,
+        "portfolio_weight_pct": 4.39,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": 2.17
+      },
+      {
+        "name": "Enphase Energy",
+        "isin": "",
+        "shares": 0.682999,
+        "avg_price_eur": 26.72,
+        "current_value_eur": 25.45,
+        "unrealized_pnl_eur": 7.2,
+        "unrealized_pnl_pct": 39.42,
+        "portfolio_weight_pct": 3.75,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "Sanofi",
+        "isin": "FR0000120578",
+        "shares": 0.280977,
+        "avg_price_eur": 65.02,
+        "current_value_eur": 22.11,
+        "unrealized_pnl_eur": 3.84,
+        "unrealized_pnl_pct": 21.05,
+        "portfolio_weight_pct": 3.26,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "Plug Power",
+        "isin": "US72919P2020",
+        "shares": 13.524823,
+        "avg_price_eur": 1.22,
+        "current_value_eur": 21.32,
+        "unrealized_pnl_eur": 4.79,
+        "unrealized_pnl_pct": 28.95,
+        "portfolio_weight_pct": 3.14,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "Soitec",
+        "isin": "FR0013227113",
+        "shares": 0.566902,
+        "avg_price_eur": 23.65,
+        "current_value_eur": 20.33,
+        "unrealized_pnl_eur": 6.92,
+        "unrealized_pnl_pct": 51.6,
+        "portfolio_weight_pct": 2.99,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "S&P 500 Information Tech USD (Acc)",
+        "isin": "IE00B3WJKG14",
+        "shares": 0.597015,
+        "avg_price_eur": 32.23,
+        "current_value_eur": 20.11,
+        "unrealized_pnl_eur": 0.87,
+        "unrealized_pnl_pct": 4.54,
+        "portfolio_weight_pct": 2.96,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "MercadoLibre",
+        "isin": "US58733R1023",
+        "shares": 0.011593,
+        "avg_price_eur": 1592.34,
+        "current_value_eur": 19.65,
+        "unrealized_pnl_eur": 1.19,
+        "unrealized_pnl_pct": 6.45,
+        "portfolio_weight_pct": 2.89,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "Canadian National Railway",
+        "isin": "",
+        "shares": 0.213692,
+        "avg_price_eur": 83.48,
+        "current_value_eur": 19.29,
+        "unrealized_pnl_eur": 1.45,
+        "unrealized_pnl_pct": 8.15,
+        "portfolio_weight_pct": 2.84,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "Sea (ADR)",
+        "isin": "US81141R1005",
+        "shares": 0.186302,
+        "avg_price_eur": 76.27,
+        "current_value_eur": 16.95,
+        "unrealized_pnl_eur": 2.74,
+        "unrealized_pnl_pct": 19.27,
+        "portfolio_weight_pct": 2.5,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      },
+      {
+        "name": "Rheinmetall",
+        "isin": "DE0007030009",
+        "shares": 0.009967,
+        "avg_price_eur": 1446.77,
+        "current_value_eur": 16.01,
+        "unrealized_pnl_eur": 1.59,
+        "unrealized_pnl_pct": 11.04,
+        "portfolio_weight_pct": 2.36,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": 0.51
+      },
+      {
+        "name": "Intuit",
+        "isin": "",
+        "shares": 0.026071,
+        "avg_price_eur": 237.04,
+        "current_value_eur": 8.75,
+        "unrealized_pnl_eur": 2.57,
+        "unrealized_pnl_pct": 41.66,
+        "portfolio_weight_pct": 1.29,
+        "pe_ratio": null,
+        "beta": null,
+        "dividend_yield_pct": null
+      }
+    ]
+  },
+  "ibkr": {
+    "type": "cto_margin",
+    "account_id": "U13393818",
+    "currency_base": "EUR",
+    "net_liquidation_eur": 51592.44,
+    "buying_power_eur": 215194.32,
+    "maintenance_margin_eur": 0,
+    "excess_liquidity_eur": 34031.61,
+    "cash": {
+      "total_eur": -6813.92,
+      "eur": -1206.98,
+      "usd": 0
+    },
+    "margin_loan_usd": 0,
+    "margin_interest_rate": "5.83%",
+    "positions": [
+      {
+        "symbol": "MSFT",
+        "isin": "US5949181045",
+        "quantity": 45.2854,
+        "last_price_usd": 401.38,
+        "avg_price_usd": 448.11,
+        "cost_basis_usd": 20293.0,
+        "market_value_usd": 18174.39,
+        "unrealized_pnl_usd": -2120.0,
+        "dividend_yield_pct": 0.9,
+        "ex_dividend_date": "Feb19'26"
+      },
+      {
+        "symbol": "NVDA",
+        "isin": "US67066G1040",
+        "quantity": 100.0222,
+        "last_price_usd": 187.1,
+        "avg_price_usd": 126.5,
+        "cost_basis_usd": 12653.0,
+        "market_value_usd": 18702.15,
+        "unrealized_pnl_usd": 6050.0,
+        "dividend_yield_pct": null,
+        "ex_dividend_date": null
+      },
+      {
+        "symbol": "GOOGL",
+        "isin": "US02079K3059",
+        "quantity": 105.3515,
+        "last_price_usd": 308.69,
+        "avg_price_usd": 191.84,
+        "cost_basis_usd": 20210.0,
+        "market_value_usd": 32520.95,
+        "unrealized_pnl_usd": 12310.0,
+        "dividend_yield_pct": null,
+        "ex_dividend_date": null
+      }
+    ]
+  },
+  "boursobank": {
+    "type": "bank",
+    "accounts": {
+      "checking": {
+        "label": "BOURSORAMA ESSENTIEL SYLVAIN",
+        "balance": 19.33,
+        "type": "checking"
+      },
+      "pea": {
+        "label": "PEA LEGLAND",
+        "balance": 100.0,
+        "type": "PEA"
+      }
+    },
+    "children_accounts": {
+      "checking_nathael": {
+        "label": "BOURSORAMA ESSENTIEL NATHAEL",
+        "balance": 351.74
+      },
+      "livret_a_nathael": {
+        "label": "LIVRET A NATHAEL",
+        "balance": 7726.18
+      }
+    },
+    "loans": [
+      {
+        "name": "PRÊT PERSONNEL 1",
+        "remaining": 1448.78,
+        "monthly_payment": 0,
+        "rate": null
+      },
+      {
+        "name": "PRÊT PERSONNEL 2",
+        "remaining": 6284.35,
+        "monthly_payment": 0,
+        "rate": null
+      }
+    ],
+    "total_liquid": 371.07,
+    "total_savings": 7826.18,
+    "total_loans": -7733.13
+  },
+  "credit_agricole": {
+    "type": "bank",
+    "region": "Languedoc",
+    "accounts": {
+      "checking": {
+        "label": "COMPTE CHEQUE",
+        "balance": 1.83,
+        "account": "00040636024"
+      }
+    },
+    "credits": [
+      {
+        "name": "PTZ",
+        "account": "",
+        "type": "consumer",
+        "borrowed": 102000.0,
+        "remaining": 102000.0,
+        "monthly_payment": 0,
+        "rate": null,
+        "insurance_monthly": 0,
+        "start_date": null,
+        "status": null
+      },
+      {
+        "name": "PAS",
+        "account": "",
+        "type": "consumer",
+        "borrowed": 10000.0,
+        "remaining": 10000.0,
+        "monthly_payment": 0,
+        "rate": null,
+        "insurance_monthly": 0,
+        "start_date": null,
+        "status": null
+      },
+      {
+        "name": "PAS",
+        "account": "",
+        "type": "consumer",
+        "borrowed": 138290.0,
+        "remaining": 110594.85,
+        "monthly_payment": 0,
+        "rate": null,
+        "insurance_monthly": 0,
+        "start_date": null,
+        "status": null
+      },
+      {
+        "name": "Prêt Conso",
+        "account": "",
+        "type": "consumer",
+        "borrowed": 5000.0,
+        "remaining": 1732.77,
+        "monthly_payment": 0,
+        "rate": null,
+        "insurance_monthly": 0,
+        "start_date": null,
+        "status": null
+      }
+    ],
+    "total_debt": -224327.62,
+    "monthly_payments": 0
+  },
+  "sca_la_desirade": {
+    "type": "sca",
+    "name": "SCA La Désirade",
+    "role": "Associé - Groupe 1",
+    "parts": 352078,
+    "total_parts": 695873,
+    "ownership_pct": 50.595,
+    "property": {
+      "address": "40 chemin de la désirade, 34790 GRABELS",
+      "type": "Villa R+1",
+      "rooms": 4,
+      "surface_m2": 118,
+      "terrain_privatif_m2": 466,
+      "terrain_commun_m2": 300,
+      "terrain_value_book": 282000,
+      "purchase_date": "08/2021",
+      "dpe_score": "D",
+      "bourso_estimate": 505254,
+      "bourso_estimate_range": {
+        "low": 445129,
+        "high": 565380
+      },
+      "price_per_m2_estimate": 4281.81
+    },
+    "financials": {
+      "capital_souscrit": 352078,
+      "capital_verse": 286711.09,
+      "cca_avances": 31517.56,
+      "total_verse": 318228.65,
+      "total_charges_qp": 312694.1,
+      "af_impayes": 11930.01,
+      "solde_net": 5534.55,
+      "bank_account_balance": 3002.11
+    },
+    "co_associate": {
+      "name": "Mme Françoise BEAUSSIER",
+      "parts": 343795,
+      "ownership_pct": 49.405,
+      "surface_m2": 89,
+      "terrain_privatif_m2": 466
+    },
+    "charges_breakdown": {
+      "terrain_qp": 142678.33,
+      "travaux_groupe1": 136738.65,
+      "travaux_communs_qp": 667.86,
+      "honoraires_total_qp": 19209.65,
+      "taxes_total_qp": 6990.42,
+      "frais_bancaires_qp": 511.25,
+      "eau_qp": 5494.76,
+      "electricite_qp": 264.3,
+      "divers_qp": 138.88
+    },
+    "your_house_market_neuf": 483800,
+    "your_house_market_ancien": 416540,
+    "your_share_bourso_estimate": 505254,
+    "your_share_construction_cost": 318228.65,
+    "your_share_property_value": 483800
+  },
+  "totals": {
+    "total_investments": 54441.3,
+    "total_bank_liquid": 121.16,
+    "total_real_estate": 483800,
+    "total_assets": 538362.46,
+    "total_debt": 232060.75,
+    "net_worth": 306301.71,
+    "monthly_loan_payments": 0,
+    "monthly_margin_cost": 0.0
+  }
+}
