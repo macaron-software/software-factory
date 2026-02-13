@@ -1,11 +1,15 @@
 """Web routes — HTMX-driven pages and API endpoints."""
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
+from datetime import datetime
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _templates(request: Request):
@@ -15,6 +19,7 @@ def _templates(request: Request):
 # ── Pages ────────────────────────────────────────────────────────
 
 @router.get("/", response_class=HTMLResponse)
+@router.get("/projects", response_class=HTMLResponse)
 async def index(request: Request):
     """Projects dashboard — main page."""
     from ..projects.manager import get_project_store
@@ -84,10 +89,33 @@ async def project_detail(request: Request, project_id: str):
     # Get sessions for this project
     sess_store = get_session_store()
     sessions = [s for s in sess_store.list_all() if s.project_id == project_id]
+    # Select active session — from query param or most recent active
+    requested_session = request.query_params.get("session")
+    active_session = None
+    if requested_session:
+        active_session = sess_store.get(requested_session)
+    if not active_session:
+        active_sessions = [s for s in sessions if s.status == "active"]
+        if active_sessions:
+            active_session = active_sessions[0]
+    # Load messages for selected session
+    messages = []
+    if active_session:
+        messages = sess_store.get_messages(active_session.id)
+        messages = [m for m in messages if m.from_agent != "system"]
     # Get agents
     agent_store = get_agent_store()
     agents = agent_store.list_all()
     lead = agent_store.get(project.lead_agent_id) if project.lead_agent_id else None
+    # Load project memory files (CLAUDE.md, copilot-instructions.md, etc.)
+    memory_files = []
+    if project.path:
+        try:
+            from ..memory.project_files import get_project_memory
+            pmem = get_project_memory(project_id, project.path)
+            memory_files = pmem.files
+        except Exception:
+            pass
     return _templates(request).TemplateResponse("project_detail.html", {
         "request": request,
         "page_title": project.name,
@@ -99,8 +127,11 @@ async def project_detail(request: Request, project_id: str):
         "tasks": tasks,
         "recent_tasks": recent_tasks,
         "sessions": sessions,
+        "active_session": active_session,
         "agents": agents,
         "lead_agent": lead,
+        "messages": messages,
+        "memory_files": memory_files,
     })
 
 
@@ -297,14 +328,66 @@ async def pattern_delete(pattern_id: str):
 
 @router.get("/skills", response_class=HTMLResponse)
 async def skills_page(request: Request):
-    """Skill library — SF skills + role definitions."""
+    """Skill library — local + GitHub skills with pagination & filtering."""
     from ..skills.library import get_skill_library
     library = get_skill_library()
-    skills = library.scan_all()
+    all_skills = library.scan_all()
+    gh_sources = library.get_github_sources()
+
+    # Query params
+    q = request.query_params.get("q", "").strip().lower()
+    source_filter = request.query_params.get("source", "")
+    repo_filter = request.query_params.get("repo", "")
+    page = int(request.query_params.get("page", "1"))
+    per_page = int(request.query_params.get("per_page", "50"))
+
+    # Filter
+    filtered = all_skills
+    if q:
+        filtered = [s for s in filtered if q in s.name.lower() or q in s.description.lower() or q in s.id.lower() or any(q in t.lower() for t in s.tags)]
+    if source_filter:
+        filtered = [s for s in filtered if s.source == source_filter]
+    if repo_filter:
+        filtered = [s for s in filtered if s.repo == repo_filter]
+
+    total = len(filtered)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = max(1, min(page, total_pages))
+    skills = filtered[(page - 1) * per_page : page * per_page]
+
+    # Unique repos for filter dropdown
+    repos = sorted(set(s.repo for s in all_skills if s.repo))
+
+    # Source counts
+    from collections import Counter
+    source_counts = Counter(s.source for s in all_skills)
+
+    # Check if HTMX partial request (for infinite scroll / filter)
+    is_htmx = request.headers.get("HX-Request") == "true"
+    target = request.headers.get("HX-Target", "")
+
+    if is_htmx and target == "skills-grid":
+        return _templates(request).TemplateResponse("partials/skills_grid.html", {
+            "request": request, "skills": skills, "page": page,
+            "total_pages": total_pages, "total": total, "q": q,
+            "source_filter": source_filter, "repo_filter": repo_filter,
+        })
+
     return _templates(request).TemplateResponse("skills.html", {
         "request": request,
         "page_title": "Skills",
         "skills": skills,
+        "github_sources": gh_sources,
+        "total": total,
+        "total_all": len(all_skills),
+        "page": page,
+        "total_pages": total_pages,
+        "per_page": per_page,
+        "q": q,
+        "source_filter": source_filter,
+        "repo_filter": repo_filter,
+        "repos": repos,
+        "source_counts": dict(source_counts),
     })
 
 
@@ -395,27 +478,30 @@ async def sessions_page(request: Request):
 async def new_session_page(request: Request):
     """New session form."""
     from ..agents.store import get_agent_store
+    from ..patterns.store import get_pattern_store
+    from ..workflows.store import get_workflow_store
     agents = get_agent_store().list_all()
-    patterns = []
-    try:
-        from ..db.migrations import get_db as _gdb
-        conn = _gdb()
-        patterns = [dict(r) for r in conn.execute("SELECT id, name FROM patterns").fetchall()]
-        conn.close()
-    except Exception:
-        pass
+    patterns = get_pattern_store().list_all()
+    workflows = get_workflow_store().list_all()
     projects = []
     try:
         from ..projects.manager import get_project_store
         projects = get_project_store().list_all()
     except Exception:
         pass
+    patterns_json = json.dumps({
+        p.id: {"name": p.name, "type": p.type, "description": p.description,
+               "agents": p.agents, "edges": p.edges}
+        for p in patterns
+    })
     return _templates(request).TemplateResponse("new_session.html", {
         "request": request,
         "page_title": "New Session",
         "agents": agents,
         "patterns": patterns,
+        "workflows": workflows,
         "projects": projects,
+        "patterns_json": patterns_json,
     })
 
 
@@ -424,6 +510,7 @@ async def session_page(request: Request, session_id: str):
     """Active session conversation view."""
     from ..sessions.store import get_session_store
     from ..agents.store import get_agent_store
+    from ..patterns.store import get_pattern_store
     store = get_session_store()
     session = store.get(session_id)
     if not session:
@@ -431,6 +518,18 @@ async def session_page(request: Request, session_id: str):
     messages = store.get_messages(session_id)
     agents = get_agent_store().list_all()
     agent_map = {a.id: {"name": a.name, "icon": a.icon, "color": a.color, "role": a.role} for a in agents}
+    pattern_name = ""
+    if session.pattern_id:
+        pat = get_pattern_store().get(session.pattern_id)
+        if pat:
+            pattern_name = pat.name
+    workflow_name = ""
+    wf_id = (session.config or {}).get("workflow_id", "")
+    if wf_id:
+        from ..workflows.store import get_workflow_store
+        wf = get_workflow_store().get(wf_id)
+        if wf:
+            workflow_name = wf.name
     return _templates(request).TemplateResponse("conversation.html", {
         "request": request,
         "page_title": session.name,
@@ -438,6 +537,8 @@ async def session_page(request: Request, session_id: str):
         "messages": messages,
         "agents": agents,
         "agent_map": agent_map,
+        "pattern_name": pattern_name,
+        "workflow_name": workflow_name,
     })
 
 
@@ -453,7 +554,10 @@ async def create_session(request: Request):
         pattern_id=str(form.get("pattern_id", "")) or None,
         project_id=str(form.get("project_id", "")) or None,
         status="active",
-        config={"lead_agent": str(form.get("lead_agent", ""))} if form.get("lead_agent") else {},
+        config={
+            "lead_agent": str(form.get("lead_agent", "")),
+            "workflow_id": str(form.get("workflow_id", "")),
+        },
     )
     session = store.create(session)
     # Add system message
@@ -550,12 +654,255 @@ async def stop_session(session_id: str):
     return HTMLResponse("")
 
 
+@router.post("/api/sessions/{session_id}/run-pattern")
+async def run_session_pattern(request: Request, session_id: str):
+    """Execute the pattern assigned to this session."""
+    from ..sessions.store import get_session_store, MessageDef
+    from ..patterns.store import get_pattern_store
+    from ..patterns.engine import run_pattern
+
+    store = get_session_store()
+    session = store.get(session_id)
+    if not session:
+        return HTMLResponse("Session not found", status_code=404)
+
+    form = await request.form()
+    task = str(form.get("task", session.goal or "Execute the pattern")).strip()
+    pattern_id = str(form.get("pattern_id", session.pattern_id or "")).strip()
+
+    if not pattern_id:
+        return HTMLResponse('<div class="msg-system-text">No pattern assigned to this session.</div>')
+
+    pattern = get_pattern_store().get(pattern_id)
+    if not pattern:
+        return HTMLResponse(f'<div class="msg-system-text">Pattern {pattern_id} not found.</div>')
+
+    # Store user's task as a message
+    store.add_message(MessageDef(
+        session_id=session_id,
+        from_agent="user",
+        message_type="text",
+        content=f"🚀 Run pattern **{pattern.name}**: {task}",
+    ))
+
+    # Run pattern asynchronously (agents will post messages to the session)
+    asyncio.create_task(_run_pattern_background(
+        pattern, session_id, task, session.project_id or ""))
+
+    return HTMLResponse(
+        '<div class="msg-system-text">Pattern started — agents are working...</div>')
+
+
+async def _run_pattern_background(pattern, session_id: str, task: str, project_id: str):
+    """Background task for pattern execution."""
+    from ..patterns.engine import run_pattern
+    try:
+        await run_pattern(pattern, session_id, task, project_id)
+    except Exception as e:
+        logger.error("Pattern execution failed: %s", e)
+        from ..sessions.store import get_session_store, MessageDef
+        get_session_store().add_message(MessageDef(
+            session_id=session_id,
+            from_agent="system",
+            message_type="system",
+            content=f"Pattern execution error: {e}",
+        ))
+
+
+
 @router.delete("/api/sessions/{session_id}")
 async def delete_session(session_id: str):
     """Delete a session and all its messages."""
     from ..sessions.store import get_session_store
     get_session_store().delete(session_id)
     return HTMLResponse("")
+
+
+@router.get("/api/sessions/{session_id}/sse")
+async def session_sse(request: Request, session_id: str):
+    """SSE endpoint for real-time session updates."""
+    from ..sessions.runner import add_sse_listener, remove_sse_listener
+
+    q = add_sse_listener(session_id)
+
+    async def event_generator():
+        try:
+            yield "data: {\"type\":\"connected\"}\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.wait_for(q.get(), timeout=30.0)
+                    yield f"data: {json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        finally:
+            remove_sse_listener(session_id, q)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ── Workflows ────────────────────────────────────────────────────
+
+@router.get("/workflows", response_class=HTMLResponse)
+async def workflows_page(request: Request):
+    """Workflow templates listing."""
+    from ..workflows.store import get_workflow_store
+    from ..patterns.store import get_pattern_store
+    workflows = get_workflow_store().list_all()
+    patterns = {p.id: p for p in get_pattern_store().list_all()}
+    return _templates(request).TemplateResponse("workflows.html", {
+        "request": request,
+        "page_title": "Workflows",
+        "workflows": workflows,
+        "patterns": patterns,
+    })
+
+
+@router.get("/workflows/new", response_class=HTMLResponse)
+async def workflow_new(request: Request):
+    """New workflow form."""
+    from ..patterns.store import get_pattern_store
+    patterns = [{"id": p.id, "name": p.name, "type": p.type} for p in get_pattern_store().list_all()]
+    return _templates(request).TemplateResponse("workflow_edit.html", {
+        "request": request,
+        "page_title": "New Workflow",
+        "workflow": None,
+        "patterns": patterns,
+    })
+
+
+@router.get("/workflows/{wf_id}/edit", response_class=HTMLResponse)
+async def workflow_edit(request: Request, wf_id: str):
+    """Edit workflow form."""
+    from ..workflows.store import get_workflow_store
+    from ..patterns.store import get_pattern_store
+    wf = get_workflow_store().get(wf_id)
+    if not wf:
+        return HTMLResponse("<h2>Workflow not found</h2>", status_code=404)
+    patterns = [{"id": p.id, "name": p.name, "type": p.type} for p in get_pattern_store().list_all()]
+    return _templates(request).TemplateResponse("workflow_edit.html", {
+        "request": request,
+        "page_title": f"Edit: {wf.name}",
+        "workflow": wf,
+        "patterns": patterns,
+    })
+
+
+@router.post("/api/workflows")
+async def create_workflow(request: Request):
+    """Create or update a workflow."""
+    from ..workflows.store import get_workflow_store, WorkflowDef, WorkflowPhase
+    import json as _json
+    form = await request.form()
+    wf_id = str(form.get("id", ""))
+    name = str(form.get("name", "New Workflow"))
+    description = str(form.get("description", ""))
+    icon = str(form.get("icon", "workflow"))
+    phases_raw = str(form.get("phases_json", "[]"))
+    try:
+        phases_data = _json.loads(phases_raw)
+    except Exception:
+        phases_data = []
+    phases = [WorkflowPhase(
+        id=p.get("id", f"p{i+1}"),
+        pattern_id=p.get("pattern_id", ""),
+        name=p.get("name", f"Phase {i+1}"),
+        description=p.get("description", ""),
+        gate=p.get("gate", "always"),
+    ) for i, p in enumerate(phases_data)]
+
+    wf = WorkflowDef(id=wf_id, name=name, description=description, icon=icon, phases=phases)
+    store = get_workflow_store()
+    store.create(wf)
+    return RedirectResponse(url="/workflows", status_code=303)
+
+
+@router.post("/api/workflows/{wf_id}")
+async def update_workflow(request: Request, wf_id: str):
+    """Update an existing workflow."""
+    from ..workflows.store import get_workflow_store, WorkflowDef, WorkflowPhase
+    import json as _json
+    form = await request.form()
+    name = str(form.get("name", ""))
+    description = str(form.get("description", ""))
+    icon = str(form.get("icon", "workflow"))
+    phases_raw = str(form.get("phases_json", "[]"))
+    try:
+        phases_data = _json.loads(phases_raw)
+    except Exception:
+        phases_data = []
+    phases = [WorkflowPhase(
+        id=p.get("id", f"p{i+1}"),
+        pattern_id=p.get("pattern_id", ""),
+        name=p.get("name", f"Phase {i+1}"),
+        description=p.get("description", ""),
+        gate=p.get("gate", "always"),
+    ) for i, p in enumerate(phases_data)]
+
+    wf = WorkflowDef(id=wf_id, name=name, description=description, icon=icon, phases=phases)
+    store = get_workflow_store()
+    store.create(wf)  # INSERT OR REPLACE
+    return RedirectResponse(url="/workflows", status_code=303)
+
+
+@router.post("/api/workflows/{wf_id}/delete")
+async def delete_workflow(request: Request, wf_id: str):
+    """Delete a workflow."""
+    from ..workflows.store import get_workflow_store
+    get_workflow_store().delete(wf_id)
+    return RedirectResponse(url="/workflows", status_code=303)
+
+
+@router.post("/api/sessions/{session_id}/run-workflow")
+async def run_session_workflow(request: Request, session_id: str):
+    """Execute a workflow in a session."""
+    from ..sessions.store import get_session_store, MessageDef
+    from ..workflows.store import get_workflow_store, run_workflow
+
+    store = get_session_store()
+    session = store.get(session_id)
+    if not session:
+        return HTMLResponse("Session not found", status_code=404)
+
+    form = await request.form()
+    workflow_id = str(form.get("workflow_id", "")).strip()
+    task = str(form.get("task", session.goal or "Execute workflow")).strip()
+
+    wf = get_workflow_store().get(workflow_id)
+    if not wf:
+        return HTMLResponse(f'<div class="msg-system-text">Workflow {workflow_id} not found.</div>')
+
+    store.add_message(MessageDef(
+        session_id=session_id,
+        from_agent="user",
+        message_type="text",
+        content=f"🔄 Run workflow **{wf.name}**: {task}",
+    ))
+
+    asyncio.create_task(_run_workflow_background(wf, session_id, task, session.project_id or ""))
+    return HTMLResponse(
+        f'<div class="msg-system-text">Workflow "{wf.name}" started — {len(wf.phases)} phases.</div>')
+
+
+async def _run_workflow_background(wf, session_id: str, task: str, project_id: str):
+    """Background workflow execution."""
+    from ..workflows.store import run_workflow
+    try:
+        await run_workflow(wf, session_id, task, project_id)
+    except Exception as e:
+        logger.error("Workflow failed: %s", e)
+        from ..sessions.store import get_session_store, MessageDef
+        get_session_store().add_message(MessageDef(
+            session_id=session_id,
+            from_agent="system",
+            message_type="system",
+            content=f"Workflow error: {e}",
+        ))
 
 
 # ── Monitoring / Settings ────────────────────────────────────────
@@ -676,19 +1023,227 @@ async def project_chat(request: Request, project_id: str):
     # Get agent response
     agent_msg = await handle_user_message(session.id, content, proj.lead_agent_id or "")
 
-    # For HTMX: return inline response with link to full conversation
+    # For HTMX: return both the user message and agent response as chat bubbles
+    import html as html_mod
+    import markdown as md_lib
+    user_html = (
+        f'<div class="chat-msg chat-msg-user">'
+        f'<div class="chat-msg-body"><div class="chat-msg-text">{html_mod.escape(content)}</div></div>'
+        f'<div class="chat-msg-avatar user">S</div>'
+        f'</div>'
+    )
     if agent_msg:
         agent_content = agent_msg.get("content", "") if isinstance(agent_msg, dict) else getattr(agent_msg, "content", str(agent_msg))
-        return HTMLResponse(
-            f'<div class="quick-chat-response">'
-            f'<div class="msg-content" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.5rem">{agent_content[:500]}</div>'
-            f'<a href="/sessions/{session.id}" class="btn btn-sm">Open full conversation →</a>'
-            f'</div>'
+        # Render tool calls if present
+        tools_html = ""
+        tool_calls = None
+        if isinstance(agent_msg, dict):
+            tool_calls = agent_msg.get("metadata", {}).get("tool_calls") if agent_msg.get("metadata") else None
+        elif hasattr(agent_msg, "metadata") and agent_msg.metadata:
+            tool_calls = agent_msg.metadata.get("tool_calls")
+        if tool_calls:
+            pills = "".join(f'<span class="chat-tool-pill">🔧 {html_mod.escape(str(tc.get("name", tc) if isinstance(tc, dict) else tc))}</span>' for tc in tool_calls)
+            tools_html = f'<div class="chat-msg-tools">{pills}</div>'
+        # Render markdown to HTML
+        rendered = md_lib.markdown(str(agent_content), extensions=["fenced_code", "tables", "nl2br"])
+        agent_html = (
+            f'<div class="chat-msg chat-msg-agent">'
+            f'<div class="chat-msg-avatar"><svg class="icon icon-sm"><use href="#icon-bot"/></svg></div>'
+            f'<div class="chat-msg-body">'
+            f'<div class="chat-msg-sender">{html_mod.escape(proj.name)}</div>'
+            f'<div class="chat-msg-text md-rendered">{rendered}</div>'
+            f'{tools_html}'
+            f'</div></div>'
         )
-    return HTMLResponse(f'<a href="/sessions/{session.id}" class="btn btn-sm">Open conversation →</a>')
+        return HTMLResponse(user_html + agent_html)
+    return HTMLResponse(user_html)
 
 
-# ── SSE Live Stream ─────────────────────────────────────────────
+# ── Conversation Management ──────────────────────────────────────
+
+@router.post("/api/projects/{project_id}/conversations")
+async def create_conversation(request: Request, project_id: str):
+    """Create a new conversation session for a project."""
+    from ..sessions.store import get_session_store, SessionDef
+    from ..projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return JSONResponse({"error": "Project not found"}, status_code=404)
+
+    store = get_session_store()
+    # Archive any existing active sessions
+    active = [s for s in store.list_all() if s.project_id == project_id and s.status == "active"]
+    for s in active:
+        store.update_status(s.id, "completed")
+
+    session = store.create(SessionDef(
+        name=f"{proj.name} — {datetime.utcnow().strftime('%b %d, %H:%M')}",
+        goal="Project conversation",
+        project_id=project_id,
+        status="active",
+        config={"lead_agent": proj.lead_agent_id or "brain"},
+    ))
+    return JSONResponse({"session_id": session.id})
+
+
+# ── Streaming Chat (SSE) ────────────────────────────────────────
+
+@router.post("/api/projects/{project_id}/chat/stream")
+async def project_chat_stream(request: Request, project_id: str):
+    """Stream agent response via SSE — shows live progress to the user."""
+    from ..sessions.store import get_session_store, SessionDef, MessageDef
+    from ..sessions.runner import _build_context
+    from ..projects.manager import get_project_store
+    from ..agents.store import get_agent_store
+    from ..agents.executor import get_executor, ExecutionContext
+
+    form = await request.form()
+    content = str(form.get("content", "")).strip()
+    session_id = str(form.get("session_id", "")).strip()
+    if not content:
+        return HTMLResponse("")
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return HTMLResponse("Project not found", status_code=404)
+
+    store = get_session_store()
+    session = None
+    if session_id:
+        session = store.get(session_id)
+    if not session:
+        sessions = [s for s in store.list_all() if s.project_id == project_id and s.status == "active"]
+        if sessions:
+            session = sessions[0]
+    if not session:
+        session = store.create(SessionDef(
+            name=f"{proj.name} — {datetime.utcnow().strftime('%b %d, %H:%M')}",
+            goal="Project conversation",
+            project_id=project_id,
+            status="active",
+            config={"lead_agent": proj.lead_agent_id or "brain"},
+        ))
+
+    # Store user message
+    store.add_message(MessageDef(
+        session_id=session.id, from_agent="user",
+        message_type="text", content=content,
+    ))
+
+    # Find agent
+    agent_store = get_agent_store()
+    agent_id = proj.lead_agent_id or "brain"
+    agent = agent_store.get(agent_id)
+    if not agent:
+        all_agents = agent_store.list_all()
+        agent = all_agents[0] if all_agents else None
+
+    async def event_generator():
+        import html as html_mod
+        import markdown as md_lib
+
+        def sse(event: str, data: dict) -> str:
+            return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+        yield sse("status", {"label": "Thinking…"})
+
+        if not agent:
+            yield sse("error", {"message": "No agent available"})
+            return
+
+        try:
+            # Build context
+            ctx = await _build_context(agent, session)
+
+            # Progress callback — called by executor for each tool invocation
+            progress_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+
+            async def on_tool_call(name: str, args: dict, result: str):
+                # RLM sub-events: args contains {"status": "label"}
+                if name == "deep_search" and isinstance(args, dict) and "status" in args:
+                    label = args["status"]
+                    await progress_queue.put(("status", name, label))
+                    return
+                labels = {
+                    "deep_search": "🔬 Deep search…",
+                    "code_read": "📄 Reading files…",
+                    "code_search": "🔍 Searching code…",
+                    "git_log": "📋 Checking git…",
+                    "git_diff": "📋 Checking diff…",
+                    "memory_search": "🧠 Searching memory…",
+                    "memory_store": "🧠 Storing to memory…",
+                }
+                label = labels.get(name, f"🔧 {name}…")
+                await progress_queue.put(("tool", name, label))
+
+            ctx.on_tool_call = on_tool_call
+
+            # Run executor in background task
+            result_holder = {}
+            async def run_agent():
+                executor = get_executor()
+                result_holder["result"] = await executor.run(ctx, content)
+
+            task = asyncio.create_task(run_agent())
+
+            # Yield progress events while agent is working
+            while not task.done():
+                try:
+                    kind, name, label = await asyncio.wait_for(
+                        progress_queue.get(), timeout=0.5
+                    )
+                    event_type = "status" if kind == "status" else "tool"
+                    yield sse(event_type, {"name": name, "label": label})
+                except asyncio.TimeoutError:
+                    pass
+
+            # Drain any remaining events
+            while not progress_queue.empty():
+                kind, name, label = progress_queue.get_nowait()
+                event_type = "status" if kind == "status" else "tool"
+                yield sse(event_type, {"name": name, "label": label})
+
+            # Wait for result
+            await task
+            result = result_holder.get("result")
+            if not result:
+                yield sse("error", {"message": "No response from agent"})
+                return
+
+            # Store agent message
+            store.add_message(MessageDef(
+                session_id=session.id,
+                from_agent=agent.id,
+                to_agent="user",
+                message_type="text",
+                content=result.content,
+                metadata={
+                    "model": result.model,
+                    "provider": result.provider,
+                    "tokens_in": result.tokens_in,
+                    "tokens_out": result.tokens_out,
+                    "duration_ms": result.duration_ms,
+                    "tool_calls": result.tool_calls if result.tool_calls else None,
+                },
+            ))
+
+            # Build final HTML
+            rendered = md_lib.markdown(
+                str(result.content),
+                extensions=["fenced_code", "tables", "nl2br"]
+            )
+            yield sse("done", {"html": rendered})
+
+        except Exception as exc:
+            logger.exception("Streaming chat error")
+            yield sse("error", {"message": str(exc)[:200]})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 @router.get("/api/sessions/{session_id}/stream")
 async def session_sse_stream(request: Request, session_id: str):
@@ -808,3 +1363,57 @@ async def reload_skills():
     from ..skills.loader import get_skill_loader
     count = get_skill_loader().reload()
     return {"reloaded": count}
+
+
+@router.post("/api/skills/github/add")
+async def add_github_skill_source(request: Request):
+    """Add a GitHub repo as skill source."""
+    from ..skills.library import get_skill_library
+    form = await request.form()
+    repo = str(form.get("repo", "")).strip()
+    path = str(form.get("path", "")).strip()
+    branch = str(form.get("branch", "main")).strip() or "main"
+    if not repo or "/" not in repo:
+        return HTMLResponse(
+            '<div class="alert alert-error">Invalid repo format. Use owner/repo</div>',
+            status_code=400,
+        )
+    library = get_skill_library()
+    result = library.add_github_source(repo, path, branch)
+    if result.get("errors"):
+        errs = "; ".join(result["errors"])
+        return HTMLResponse(
+            f'<div class="gh-sync-result error">⚠️ {repo}: {errs}</div>'
+        )
+    return HTMLResponse(
+        f'<div class="gh-sync-result success">✅ {repo}: {result["fetched"]} skills fetched</div>'
+    )
+
+
+@router.post("/api/skills/github/sync")
+async def sync_github_skills():
+    """Sync all GitHub skill sources via git clone (runs in thread)."""
+    import asyncio
+    from ..skills.library import get_skill_library
+    library = get_skill_library()
+    results = await asyncio.get_event_loop().run_in_executor(None, library.sync_all_github)
+    total = sum(r.get("fetched", 0) for r in results)
+    errors = [e for r in results for e in r.get("errors", [])]
+    if errors:
+        return HTMLResponse(
+            f'<div class="gh-sync-result">🔄 Synced {total} skills, {len(errors)} errors</div>'
+        )
+    return HTMLResponse(
+        f'<div class="gh-sync-result success">✅ Synced {total} skills from {len(results)} repos</div>'
+    )
+
+
+@router.post("/api/skills/github/remove")
+async def remove_github_skill_source(request: Request):
+    """Remove a GitHub skill source."""
+    from ..skills.library import get_skill_library
+    form = await request.form()
+    repo = str(form.get("repo", "")).strip()
+    if repo:
+        get_skill_library().remove_github_source(repo)
+    return HTMLResponse("")

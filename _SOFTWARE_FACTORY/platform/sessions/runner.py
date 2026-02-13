@@ -119,6 +119,7 @@ async def handle_user_message(session_id: str, content: str, to_agent: str = "")
             "tokens_in": result.tokens_in,
             "tokens_out": result.tokens_out,
             "duration_ms": result.duration_ms,
+            "tool_calls": result.tool_calls if result.tool_calls else None,
         },
     ))
 
@@ -164,19 +165,46 @@ async def handle_user_message(session_id: str, content: str, to_agent: str = "")
 async def _build_context(agent: AgentDef, session: SessionDef) -> ExecutionContext:
     """Build the execution context for an agent."""
     store = get_session_store()
-    history = store.get_messages(session.id, limit=30)
+    history = store.get_messages(session.id, limit=50)
     history_dicts = [{"from_agent": m.from_agent, "content": m.content,
                       "message_type": m.message_type} for m in history]
+
+    # Compress history if too long
+    project_name = ""
+    if session.project_id:
+        try:
+            proj_store = get_project_store()
+            p = proj_store.get(session.project_id)
+            project_name = p.name if p else ""
+        except Exception:
+            pass
+
+    try:
+        from .compressor import compress_history
+        cached_summary = session.config.get("_summary")
+        cached_hash = session.config.get("_summary_hash")
+        history_dicts, new_summary, new_hash = await compress_history(
+            history_dicts, project_name, cached_summary, cached_hash
+        )
+        # Cache the summary in session config for next time
+        if new_summary and new_hash:
+            session.config["_summary"] = new_summary
+            session.config["_summary_hash"] = new_hash
+            store.update_config(session.id, session.config)
+    except Exception as exc:
+        logger.debug("Context compression skipped: %s", exc)
 
     # Load project context if available
     project_context = ""
     vision = ""
+    project_path = ""
     if session.project_id:
         try:
             proj_store = get_project_store()
             project = proj_store.get(session.project_id)
             if project:
                 vision = project.vision[:3000] if project.vision else ""
+                project_path = getattr(project, "path", "") or ""
                 # Load project memory
                 mem = get_memory_manager()
                 entries = mem.project_get(session.project_id, limit=10)
@@ -202,12 +230,24 @@ async def _build_context(agent: AgentDef, session: SessionDef) -> ExecutionConte
         except Exception:
             pass
 
+    # Load project memory files (CLAUDE.md, copilot-instructions.md, etc.)
+    project_memory_str = ""
+    if project_path:
+        try:
+            from ..memory.project_files import get_project_memory
+            pmem = get_project_memory(session.project_id or "", project_path)
+            project_memory_str = pmem.combined
+        except Exception as exc:
+            logger.debug("Failed to load project memory files: %s", exc)
+
     return ExecutionContext(
         agent=agent,
         session_id=session.id,
         project_id=session.project_id,
+        project_path=project_path,
         history=history_dicts,
         project_context=project_context,
+        project_memory=project_memory_str,
         skills_prompt=skills_prompt,
         vision=vision,
     )

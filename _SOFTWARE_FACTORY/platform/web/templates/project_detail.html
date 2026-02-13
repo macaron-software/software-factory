@@ -2,193 +2,382 @@
 
 {% block topbar_actions %}
 <div class="project-topbar-info">
+    <span class="project-type-dot {{ project.factory_type }} dot-lg"></span>
+    <span style="font-size:0.8rem;color:var(--text-secondary)">{{ project.path }}</span>
+    <button class="btn btn-sm btn-ghost" onclick="document.getElementById('project-sidebar').classList.toggle('open')" title="Project info">
+        <svg class="icon icon-sm"><use href="#icon-settings"/></svg> Info
+    </button>
     {% if project.factory_type == 'sf' %}
     <button class="btn btn-primary btn-sm" title="Run Brain analysis">
         <svg class="icon icon-sm"><use href="#icon-zap"/></svg> Brain
     </button>
-    <button class="btn btn-sm" title="Start TDD Cycle">
-        <svg class="icon icon-sm"><use href="#icon-play"/></svg> Cycle
-    </button>
     {% elif project.factory_type == 'mf' %}
     <button class="btn btn-primary btn-sm" title="Run Migration analysis">
         <svg class="icon icon-sm"><use href="#icon-zap"/></svg> Analyze
-    </button>
-    <button class="btn btn-sm" title="Start Transform">
-        <svg class="icon icon-sm"><use href="#icon-play"/></svg> Transform
     </button>
     {% endif %}
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="project-detail">
-    <!-- Project header -->
-    <div class="project-hero">
-        <div class="project-hero-left">
-            <span class="project-type-dot {{ project.factory_type }} dot-lg"></span>
-            <div>
-                <h3>{{ project.name }}</h3>
-                <code class="project-path">{{ project.path }}</code>
+<div class="project-chat-layout">
+
+    <!-- ═══ Main: ChatGPT-style conversation ═══ -->
+    <div class="project-chat-main">
+        <!-- Conversation header -->
+        <div class="chat-header">
+            <div class="chat-header-left">
+                <button class="btn btn-ghost btn-sm chat-history-btn" onclick="toggleConversationList()" title="Conversation history">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+                </button>
+                <span class="chat-header-title" id="chat-conv-title">
+                    {% if active_session %}{{ active_session.name }}{% else %}New conversation{% endif %}
+                </span>
+                {% if messages %}
+                <span class="chat-header-count">{{ messages|length }} messages</span>
+                {% endif %}
             </div>
+            <button class="btn btn-ghost btn-sm" onclick="newConversation()" title="New conversation">
+                <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                New
+            </button>
         </div>
-        <div class="project-hero-right">
-            <span class="badge badge-{% if project.factory_type == 'sf' %}blue{% elif project.factory_type == 'mf' %}purple{% else %}yellow{% endif %}">
-                {% if project.factory_type == 'sf' %}Software Factory
-                {% elif project.factory_type == 'mf' %}Migration Factory
-                {% else %}Standalone{% endif %}
-            </span>
-            {% for d in project.domains %}
-            <span class="tag">{{ d }}</span>
+
+        <!-- Conversation list (hidden by default) -->
+        <div class="chat-conv-list" id="chat-conv-list" style="display:none">
+            {% for s in sessions %}
+            <a class="chat-conv-item {{ 'active' if active_session and s.id == active_session.id }}"
+               href="/projects/{{ project.id }}?session={{ s.id }}">
+                <span class="chat-conv-name">{{ s.name }}</span>
+                <span class="chat-conv-date">{{ s.created_at[:10] if s.created_at else '' }}</span>
+            </a>
             {% endfor %}
+            {% if not sessions %}
+            <div class="chat-conv-empty">No conversations yet</div>
+            {% endif %}
         </div>
-    </div>
 
-    <!-- Vision, Values & Quick Chat -->
-    <div class="project-meta-row">
-        {% if project.vision %}
-        <section class="panel project-panel vision-panel">
-            <div class="panel-header">
-                <h3><svg class="icon icon-sm"><use href="#icon-eye"/></svg> Vision</h3>
-            </div>
-            <div class="panel-body">
-                <div class="vision-text">{{ project.vision[:500] }}{% if project.vision|length > 500 %}…{% endif %}</div>
-            </div>
-        </section>
-        {% endif %}
-
-        <section class="panel project-panel values-panel">
-            <div class="panel-header">
-                <h3><svg class="icon icon-sm"><use href="#icon-heart"/></svg> Values & Lead</h3>
-            </div>
-            <div class="panel-body">
-                <div class="values-tags">
-                    {% for v in project.values %}
-                    <span class="tag tag-value">{{ v }}</span>
-                    {% endfor %}
-                    {% if not project.values %}
-                    <span class="empty-hint">No values defined</span>
+        <div class="chat-messages" id="chat-messages">
+            {% if messages %}
+                {% for msg in messages %}
+                <div class="chat-msg {{ 'chat-msg-user' if msg.from_agent == 'user' else 'chat-msg-agent' }}">
+                    {% if msg.from_agent != 'user' %}
+                    <div class="chat-msg-avatar">
+                        <svg class="icon icon-sm"><use href="#icon-bot"/></svg>
+                    </div>
+                    {% endif %}
+                    <div class="chat-msg-body">
+                        {% if msg.from_agent != 'user' and msg.from_agent != 'system' %}
+                        <div class="chat-msg-sender">{{ project.name }}</div>
+                        {% endif %}
+                        {% if msg.from_agent == 'user' %}
+                        <div class="chat-msg-text">{{ msg.content }}</div>
+                        {% else %}
+                        <div class="chat-msg-text md-rendered">{{ msg.content | markdown | safe }}</div>
+                        {% endif %}
+                        {% if msg.metadata and msg.metadata.tool_calls %}
+                        <div class="chat-msg-tools">
+                            {% for tc in msg.metadata.tool_calls %}
+                            <span class="chat-tool-pill">🔧 {{ tc.name }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if msg.from_agent == 'user' %}
+                    <div class="chat-msg-avatar user">S</div>
                     {% endif %}
                 </div>
-                {% if project.lead_agent_id %}
-                <div class="lead-agent-info" style="margin-top:0.75rem">
-                    <span class="label-sm">Lead Agent:</span>
-                    <span class="badge badge-purple">{{ project.lead_agent_id }}</span>
-                </div>
-                {% endif %}
-            </div>
-        </section>
-
-        <section class="panel project-panel chat-panel">
-            <div class="panel-header">
-                <h3><svg class="icon icon-sm"><use href="#icon-message-circle"/></svg> Quick Chat</h3>
-            </div>
-            <div class="panel-body">
-                <form hx-post="/api/projects/{{ project.id }}/chat"
-                      hx-target="#quick-chat-result"
-                      hx-swap="innerHTML"
-                      hx-indicator="#chat-spinner">
-                    <div class="input-group">
-                        <input type="text" name="content" placeholder="Ask the lead agent..."
-                               class="input" autocomplete="off">
-                        <button type="submit" class="btn btn-primary btn-sm">
-                            <svg class="icon icon-sm"><use href="#icon-send"/></svg>
-                        </button>
+                {% endfor %}
+            {% else %}
+                <div class="chat-welcome">
+                    <div class="chat-welcome-icon">
+                        <svg class="icon" style="width:48px;height:48px;color:var(--purple)"><use href="#icon-bot"/></svg>
                     </div>
-                </form>
-                <div id="quick-chat-result" style="margin-top:0.5rem"></div>
-                <div id="chat-spinner" class="htmx-indicator" style="text-align:center;padding:0.5rem">
-                    <span class="typing-indicator"><span></span><span></span><span></span></span>
+                    <h3>{{ project.name }}</h3>
+                    <p>Ask anything about this project — the agent can browse files, read code, search git history, and more.</p>
+                    <div class="chat-suggestions">
+                        <button class="chat-suggestion" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">What is this project about?</button>
+                        <button class="chat-suggestion" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">Show me the project structure</button>
+                        <button class="chat-suggestion" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">What are the recent changes?</button>
+                    </div>
                 </div>
-            </div>
-        </section>
+            {% endif %}
+        </div>
+
+        <!-- Input bar -->
+        <div class="chat-input-bar">
+            <form id="chat-form">
+                <div class="chat-input-row">
+                    <textarea id="chat-input" name="content" rows="1" placeholder="Message {{ project.name }}…"
+                              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"
+                              oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+                    <button type="button" class="chat-send-btn" onclick="sendChat()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
-    <div class="project-grid">
-        <!-- Git Panel -->
-        <section class="panel project-panel" id="git-panel"
-                 hx-get="/api/projects/{{ project.id }}/git"
-                 hx-trigger="every 10s"
-                 hx-swap="innerHTML">
-            {% include "partials/git_panel.html" %}
-        </section>
+    <!-- ═══ Sidebar: Project info (collapsible) ═══ -->
+    <aside class="project-sidebar" id="project-sidebar">
+        <div class="ps-section">
+            <h4>Vision</h4>
+            {% if project.vision %}
+            <p class="ps-text">{{ project.vision[:400] }}{% if project.vision|length > 400 %}…{% endif %}</p>
+            {% else %}
+            <p class="ps-empty">No vision defined</p>
+            {% endif %}
+        </div>
 
-        <!-- Task Panel -->
-        <section class="panel project-panel" id="task-panel"
-                 hx-get="/api/projects/{{ project.id }}/tasks"
-                 hx-trigger="every 10s"
-                 hx-swap="innerHTML">
-            {% include "partials/task_panel.html" %}
-        </section>
-
-        <!-- Workflow Pipeline -->
-        <section class="panel project-panel workflow-panel">
-            <div class="panel-header">
-                <h3><svg class="icon icon-sm"><use href="#icon-activity"/></svg> Workflow Pipeline</h3>
+        <div class="ps-section">
+            <h4>Values</h4>
+            <div class="ps-tags">
+                {% for v in project.values %}
+                <span class="item-tag">{{ v }}</span>
+                {% endfor %}
+                {% if not project.values %}
+                <span class="ps-empty">No values</span>
+                {% endif %}
             </div>
-            <div class="panel-body">
+        </div>
+
+        {% if project.lead_agent_id %}
+        <div class="ps-section">
+            <h4>Lead Agent</h4>
+            <span class="item-badge accent">{{ project.lead_agent_id }}</span>
+        </div>
+        {% endif %}
+
+        <div class="ps-section">
+            <h4>Domains</h4>
+            <div class="ps-tags">
+                {% for d in project.domains %}
+                <span class="item-tag">{{ d }}</span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Memory files (auto-loaded) -->
+        <div class="ps-section">
+            <h4>📝 Memory</h4>
+            {% if memory_files %}
+            <div class="ps-memory-list">
+                {% for mf in memory_files %}
+                <details class="ps-memory-file">
+                    <summary>
+                        <span class="ps-memory-name">{{ mf.path }}</span>
+                        <span class="ps-memory-size">{{ (mf.size / 1024) | round(1) }}K</span>
+                    </summary>
+                    <div class="ps-memory-content md-rendered">{{ mf.content[:800] | markdown | safe }}{% if mf.content|length > 800 %}<p class="ps-empty">… (truncated)</p>{% endif %}</div>
+                </details>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="ps-empty">No memory files found (CLAUDE.md, copilot-instructions.md, etc.)</p>
+            {% endif %}
+        </div>
+
+        <!-- Git panel -->
+        <div class="ps-section" id="git-panel"
+             hx-get="/api/projects/{{ project.id }}/git"
+             hx-trigger="load, every 30s"
+             hx-swap="innerHTML">
+            <p class="ps-empty">Loading git…</p>
+        </div>
+
+        <!-- Task panel -->
+        <div class="ps-section" id="task-panel"
+             hx-get="/api/projects/{{ project.id }}/tasks"
+             hx-trigger="load, every 30s"
+             hx-swap="innerHTML">
+            <p class="ps-empty">Loading tasks…</p>
+        </div>
+
+        {% if project.factory_type in ('sf', 'mf') %}
+        <div class="ps-section">
+            <h4>Pipeline</h4>
+            <div class="ps-pipeline">
                 {% if project.factory_type == 'sf' %}
-                <div class="pipeline">
-                    <div class="pipeline-step" data-step="brain">
-                        <div class="step-icon"><svg class="icon"><use href="#icon-zap"/></svg></div>
-                        <div class="step-label">Brain</div>
-                        <div class="step-desc">Analysis & task generation</div>
-                    </div>
-                    <div class="pipeline-arrow"><svg class="icon icon-sm"><use href="#icon-arrow-right"/></svg></div>
-                    <div class="pipeline-step" data-step="tdd">
-                        <div class="step-icon"><svg class="icon"><use href="#icon-code"/></svg></div>
-                        <div class="step-label">TDD</div>
-                        <div class="step-desc">Code + tests</div>
-                    </div>
-                    <div class="pipeline-arrow"><svg class="icon icon-sm"><use href="#icon-arrow-right"/></svg></div>
-                    <div class="pipeline-step" data-step="adversarial">
-                        <div class="step-icon"><svg class="icon"><use href="#icon-shield"/></svg></div>
-                        <div class="step-label">Review</div>
-                        <div class="step-desc">Adversarial critics</div>
-                    </div>
-                    <div class="pipeline-arrow"><svg class="icon icon-sm"><use href="#icon-arrow-right"/></svg></div>
-                    <div class="pipeline-step" data-step="build">
-                        <div class="step-icon"><svg class="icon"><use href="#icon-terminal"/></svg></div>
-                        <div class="step-label">Build</div>
-                        <div class="step-desc">Compile & test</div>
-                    </div>
-                    <div class="pipeline-arrow"><svg class="icon icon-sm"><use href="#icon-arrow-right"/></svg></div>
-                    <div class="pipeline-step" data-step="deploy">
-                        <div class="step-icon"><svg class="icon"><use href="#icon-rocket"/></svg></div>
-                        <div class="step-label">Deploy</div>
-                        <div class="step-desc">Staging → E2E → Prod</div>
-                    </div>
-                </div>
-                {% elif project.factory_type == 'mf' %}
-                <div class="pipeline">
-                    <div class="pipeline-step" data-step="analyze">
-                        <div class="step-icon"><svg class="icon"><use href="#icon-eye"/></svg></div>
-                        <div class="step-label">Analyze</div>
-                        <div class="step-desc">Breaking changes</div>
-                    </div>
-                    <div class="pipeline-arrow"><svg class="icon icon-sm"><use href="#icon-arrow-right"/></svg></div>
-                    <div class="pipeline-step" data-step="transform">
-                        <div class="step-icon"><svg class="icon"><use href="#icon-code"/></svg></div>
-                        <div class="step-label">Transform</div>
-                        <div class="step-desc">Codemods + LLM</div>
-                    </div>
-                    <div class="pipeline-arrow"><svg class="icon icon-sm"><use href="#icon-arrow-right"/></svg></div>
-                    <div class="pipeline-step" data-step="compare">
-                        <div class="step-icon"><svg class="icon"><use href="#icon-shield"/></svg></div>
-                        <div class="step-label">Compare</div>
-                        <div class="step-desc">ISO 100% validation</div>
-                    </div>
-                    <div class="pipeline-arrow"><svg class="icon icon-sm"><use href="#icon-arrow-right"/></svg></div>
-                    <div class="pipeline-step" data-step="deploy">
-                        <div class="step-icon"><svg class="icon"><use href="#icon-rocket"/></svg></div>
-                        <div class="step-label">Deploy</div>
-                        <div class="step-desc">Canary rollout</div>
-                    </div>
-                </div>
+                    {% for step in ['Brain', 'TDD', 'Review', 'Build', 'Deploy'] %}
+                    <span class="ps-pipe-step">{{ step }}</span>{% if not loop.last %}<span class="ps-pipe-arrow">→</span>{% endif %}
+                    {% endfor %}
                 {% else %}
-                <p class="empty-state">No factory pipeline configured for standalone projects.</p>
+                    {% for step in ['Analyze', 'Transform', 'Compare', 'Deploy'] %}
+                    <span class="ps-pipe-step">{{ step }}</span>{% if not loop.last %}<span class="ps-pipe-arrow">→</span>{% endif %}
+                    {% endfor %}
                 {% endif %}
             </div>
-        </section>
-    </div>
+        </div>
+        {% endif %}
+    </aside>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PROJECT_ID = "{{ project.id }}";
+const PROJECT_NAME = "{{ project.name }}";
+const SESSION_ID = "{{ active_session.id if active_session else '' }}";
+let chatBusy = false;
+
+function scrollChat() {
+    const el = document.getElementById('chat-messages');
+    el.scrollTop = el.scrollHeight;
+}
+
+function addUserBubble(text) {
+    const esc = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    document.getElementById('chat-messages').insertAdjacentHTML('beforeend',
+        `<div class="chat-msg chat-msg-user"><div class="chat-msg-body"><div class="chat-msg-text">${esc}</div></div><div class="chat-msg-avatar user">S</div></div>`);
+    // Remove welcome screen
+    const w = document.querySelector('.chat-welcome');
+    if (w) w.remove();
+    scrollChat();
+}
+
+function addStreamingBubble() {
+    const id = 'stream-' + Date.now();
+    document.getElementById('chat-messages').insertAdjacentHTML('beforeend',
+        `<div class="chat-msg chat-msg-agent" id="${id}">
+            <div class="chat-msg-avatar"><svg class="icon icon-sm"><use href="#icon-bot"/></svg></div>
+            <div class="chat-msg-body">
+                <div class="chat-msg-sender">${PROJECT_NAME}</div>
+                <div class="chat-stream-status">
+                    <div class="stream-dots"><span></span><span></span><span></span></div>
+                    <span class="stream-label">Thinking…</span>
+                </div>
+                <div class="chat-msg-text md-rendered" style="display:none"></div>
+                <div class="chat-msg-tools"></div>
+            </div>
+        </div>`);
+    scrollChat();
+    return id;
+}
+
+function updateStreamStatus(bubbleId, label) {
+    const el = document.querySelector(`#${bubbleId} .stream-label`);
+    if (el) el.textContent = label;
+    scrollChat();
+}
+
+function addStreamTool(bubbleId, name) {
+    const tools = document.querySelector(`#${bubbleId} .chat-msg-tools`);
+    if (tools) {
+        const esc = name.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+        tools.insertAdjacentHTML('beforeend', `<span class="chat-tool-pill">🔧 ${esc}</span>`);
+    }
+}
+
+function finalizeStream(bubbleId, html) {
+    const bubble = document.getElementById(bubbleId);
+    if (!bubble) return;
+    // Remove status indicator
+    const status = bubble.querySelector('.chat-stream-status');
+    if (status) status.remove();
+    // Show rendered content
+    const text = bubble.querySelector('.chat-msg-text');
+    if (text) { text.innerHTML = html; text.style.display = ''; }
+    scrollChat();
+}
+
+function failStream(bubbleId, error) {
+    const bubble = document.getElementById(bubbleId);
+    if (!bubble) return;
+    const status = bubble.querySelector('.chat-stream-status');
+    if (status) status.remove();
+    const text = bubble.querySelector('.chat-msg-text');
+    if (text) {
+        text.innerHTML = `<p style="color:var(--text-secondary);opacity:.6">⚠ ${error || 'Request failed'}</p>`;
+        text.style.display = '';
+    }
+}
+
+function toggleConversationList() {
+    const list = document.getElementById('chat-conv-list');
+    list.style.display = list.style.display === 'none' ? 'block' : 'none';
+}
+
+async function newConversation() {
+    const resp = await fetch(`/api/projects/${PROJECT_ID}/conversations`, { method: 'POST' });
+    if (resp.ok) {
+        const data = await resp.json();
+        window.location.href = `/projects/${PROJECT_ID}?session=${data.session_id}`;
+    }
+}
+
+// Scroll to bottom on page load (existing messages)
+document.addEventListener('DOMContentLoaded', () => { scrollChat(); });
+
+async function sendChat() {
+    if (chatBusy) return;
+    const input = document.getElementById('chat-input');
+    const content = input.value.trim();
+    if (!content) return;
+
+    chatBusy = true;
+    input.value = '';
+    input.style.height = 'auto';
+    document.querySelector('.chat-send-btn').disabled = true;
+
+    addUserBubble(content);
+    const bubbleId = addStreamingBubble();
+
+    try {
+        const resp = await fetch(`/api/projects/${PROJECT_ID}/chat/stream`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'content=' + encodeURIComponent(content) + (SESSION_ID ? '&session_id=' + SESSION_ID : ''),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const {value, done} = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, {stream: true});
+
+            // Parse SSE lines
+            const lines = buffer.split('\n');
+            buffer = lines.pop();  // keep incomplete line
+
+            let eventType = 'message';
+            for (const line of lines) {
+                if (line.startsWith('event: ')) {
+                    eventType = line.slice(7).trim();
+                } else if (line.startsWith('data: ')) {
+                    const raw = line.slice(6);
+                    try {
+                        const data = JSON.parse(raw);
+                        if (eventType === 'status') {
+                            updateStreamStatus(bubbleId, data.label || 'Working…');
+                        } else if (eventType === 'tool') {
+                            addStreamTool(bubbleId, data.name || 'tool');
+                            updateStreamStatus(bubbleId, data.label || 'Working…');
+                        } else if (eventType === 'done') {
+                            finalizeStream(bubbleId, data.html || '');
+                        } else if (eventType === 'error') {
+                            failStream(bubbleId, data.message || 'Error');
+                        }
+                    } catch(e) {}
+                    eventType = 'message';
+                }
+            }
+        }
+        // If stream closed without 'done', check if we got content
+        if (document.querySelector(`#${bubbleId} .chat-stream-status`)) {
+            failStream(bubbleId, 'Stream ended unexpectedly');
+        }
+    } catch(e) {
+        failStream(bubbleId, e.message || 'Network error');
+    } finally {
+        chatBusy = false;
+        document.querySelector('.chat-send-btn').disabled = false;
+        input.focus();
+    }
+}
+</script>
 {% endblock %}
