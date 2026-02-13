@@ -1237,7 +1237,7 @@ def get_sca_legal():
                     })
 
     # Expertise judiciaire — consignation payée par chèque perso au TJ (régie)
-    # SELARL AMAJ (Philippe Combes): 11 039,57€ TTC (rapport du 31/01/2025)
+    # Expert judiciaire Philippe Combes (Architecte DPLG): 11 039,57€ TTC (rapport du 31/01/2025)
     # Consignation initiale ~juil 2023 + complémentaire ~oct 2023, 100% Legland
     legal_entries.append({
         "date": "2023-07-27", "category": "expertise_judiciaire",
@@ -1333,7 +1333,7 @@ def get_sca_legal():
                 {"date": "2024-04-11", "event": "Nomination mandataire ad'hoc (Me Sandian — 1 800€)"},
                 {"date": "2024-08-16", "event": "Note expert aux parties n°3"},
                 {"date": "2024-08-28", "event": "Convocation expertise + réunion"},
-                {"date": "2025-01-31", "event": "Rapport expertise déposé (SELARL AMAJ Philippe Combes — 11 039,57€ TTC)"},
+                {"date": "2025-01-31", "event": "Rapport expertise déposé (Philippe Combes, expert judiciaire — 11 039,57€ TTC)"},
             ],
             "cost": 11039.57,
             "cost_note": "Consignation 100% avancée par Legland (8 399,57€ + 2 640€ sapiteur géomètre)",
@@ -1347,9 +1347,9 @@ def get_sca_legal():
             "adverse": "Me Vernhet (avocat Beaussier)",
             "jurisdiction": "TJ Montpellier",
             "start_date": "2025-01-31",
-            "note": "Suite au rapport d'expertise judiciaire (SELARL AMAJ, 31/01/2025). Pas encore d'assignation au fond. Porte sur les malfaçons / étanchéité entre les 2 ouvrages.",
+            "note": "Suite au rapport d'expertise judiciaire (Philippe Combes, 31/01/2025). Pas encore d'assignation au fond. Porte sur les malfaçons / étanchéité entre les 2 ouvrages.",
             "key_dates": [
-                {"date": "2025-01-31", "event": "Rapport expertise déposé (SELARL AMAJ — 11 039,57€ TTC)"},
+                {"date": "2025-01-31", "event": "Rapport expertise déposé (Philippe Combes, expert judiciaire — 11 039,57€ TTC)"},
             ],
         },
         {
@@ -1567,7 +1567,7 @@ def get_sca_legal():
             "total_qp_impayes": 11486.51,
             # Préjudices judiciaires — basés sur le rapport d'expertise et conclusions
             "prejudices": {
-                "note": "Montants issus du rapport d'expertise (SELARL AMAJ, 31/01/2025) et des conclusions d'avocat",
+                "note": "Montants issus du rapport d'expertise (Philippe Combes, 31/01/2025) et des conclusions d'avocat",
                 # Demandes de Legland (Me Saint Martin — Dire n°5)
                 "demandes_legland": [
                     {"desc": "Préjudice de loyer (24 mois depuis jan 2023)", "amount_demande": 30720.00,
