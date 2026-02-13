@@ -1628,6 +1628,7 @@ def get_sca_legal():
             },
         },
         # Factures Me Axel Saint Martin — liste unifiée avec tag SCA/Perso
+        # Sources: FEC SCA (622600/401/512), DuckDB Bourso, emails Outlook (pièces jointes PDF)
         "axel_factures": [
             {"ref": "—", "date": "2024-04-11", "amount": 1800.00, "tag": "SCA",
              "desc": "Mandataire ad'hoc (Me Sandian/AMAJ)",
@@ -1645,17 +1646,21 @@ def get_sca_legal():
              "desc": "Complément honoraires perso",
              "status": "payee", "paid_date": "2025-07-15"},
             {"ref": "2025-10-112", "date": "2025-10-14", "amount": 1800.00, "tag": "SCA",
-             "desc": "Référé Expulsion",
+             "desc": "Référé Expulsion (SCA La Désirade)",
              "status": "non_payee"},
             {"ref": "2025-10-113", "date": "2025-10-14", "amount": 1800.00, "tag": "SCA",
-             "desc": "Défense Référé Nullité AG",
+             "desc": "Défense Référé Nullité AG (SCA La Désirade)",
+             "status": "non_payee"},
+            {"ref": "2025-10-114", "date": "2025-10-14", "amount": None, "tag": "Perso",
+             "desc": "Expertise Legland c/ Beaussier (facture perso)",
              "status": "non_payee"},
             {"ref": "2025-10-124", "date": "2025-10-27", "amount": 1275.00, "tag": "SCA",
-             "desc": "Assignation Mandataire Ad'hoc",
+             "desc": "Assignation Mandataire Ad'hoc (note de provision)",
              "status": "non_payee"},
         ],
         "axel_totaux": {
-            "total": 12375.00, "paye": 7500.00, "impaye": 4875.00,
+            "total_connu": 12375.00, "paye": 7500.00, "impaye_connu": 4875.00,
+            "note": "n°2025-10-114 (perso) : montant inconnu — PDF joint à l'email du 14/10/2025",
         },
     }
 

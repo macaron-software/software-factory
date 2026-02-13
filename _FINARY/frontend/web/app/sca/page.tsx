@@ -295,7 +295,7 @@ export default function SCAPage() {
                     <td className="py-1.5 text-t-4 whitespace-nowrap">{fmtDate(f.date)}</td>
                     <td className="py-1.5 text-t-2">{f.desc}</td>
                     <td className="py-1.5 text-t-5 font-mono">{f.ref !== "—" ? f.ref : ""}</td>
-                    <td className="py-1.5 text-t-1 font-mono text-right">{formatEUR(f.amount)}</td>
+                    <td className="py-1.5 text-t-1 font-mono text-right">{f.amount != null ? formatEUR(f.amount) : <span className="text-t-5 italic">inconnu</span>}</td>
                     <td className="py-1.5 text-center">
                       <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
                         f.tag === "SCA" ? "bg-accent/15 text-accent" : "bg-blue-500/15 text-blue-400"
@@ -317,8 +317,8 @@ export default function SCAPage() {
               </tbody>
               <tfoot className="border-t border-bd-1">
                 <tr className="text-t-2 font-semibold">
-                  <td colSpan={3} className="pt-2">Total</td>
-                  <td className="pt-2 text-t-1 font-mono text-right">{formatEUR(tot.total)}</td>
+                  <td colSpan={3} className="pt-2">Total connu</td>
+                  <td className="pt-2 text-t-1 font-mono text-right">{formatEUR(tot.total_connu)}</td>
                   <td></td>
                   <td></td>
                 </tr>
@@ -328,13 +328,16 @@ export default function SCAPage() {
                   <td></td>
                   <td></td>
                 </tr>
-                {tot.impaye > 0 && (
+                {tot.impaye_connu > 0 && (
                   <tr className="text-loss font-semibold">
                     <td colSpan={3} className="pt-0.5">Impayé</td>
-                    <td className="pt-0.5 font-mono text-right">{formatEUR(tot.impaye)}</td>
+                    <td className="pt-0.5 font-mono text-right">{formatEUR(tot.impaye_connu)}</td>
                     <td></td>
                     <td></td>
                   </tr>
+                )}
+                {tot.note && (
+                  <tr><td colSpan={6} className="pt-1 text-t-5 text-[10px] italic">{tot.note}</td></tr>
                 )}
               </tfoot>
             </table>
