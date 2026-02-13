@@ -159,62 +159,114 @@ export default function SCAPage() {
                 </div>
               </div>
             )}
-            {beaussierLegal.prejudices && (
+            {beaussierLegal.prejudices && (() => {
+              const pj = beaussierLegal.prejudices;
+              return (
               <>
+                {/* Préjudices Legland retenus par l'expert */}
                 <div className="mt-4 p-3 rounded-lg border border-bd-1 bg-bg-1">
-                  <p className="text-t-2 text-xs font-semibold mb-2">⚠️ Préjudices vs SCA</p>
-                  <div className="space-y-1">
-                    {beaussierLegal.prejudices.vs_sca?.map((p: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between text-xs gap-2">
-                        <div className="flex-1 min-w-0">
-                          <span className="text-t-3 block truncate">{p.desc}</span>
-                          {p.note && <span className="text-t-5 text-[10px]">{p.note}</span>}
+                  <p className="text-t-2 text-xs font-semibold mb-2">📋 Préjudices Legland (rapport expert — 77 535€)</p>
+                  <div className="space-y-1.5">
+                    {pj.demandes_legland?.map((p: any, i: number) => (
+                      <div key={i} className="text-xs">
+                        <div className="flex justify-between gap-2">
+                          <span className="text-t-3 flex-1 min-w-0 truncate">{p.desc}</span>
+                          <div className="flex gap-3 shrink-0 font-mono">
+                            <span className="text-t-4">{formatEUR(p.amount_demande)}</span>
+                            <span className={p.amount_expert > 0 ? "text-gain" : "text-loss"}>{formatEUR(p.amount_expert)}</span>
+                          </div>
                         </div>
-                        <span className="text-loss font-mono shrink-0">
-                          {p.amount ? formatEUR(p.amount) : `${formatEUR(p.amount_low)}–${formatEUR(p.amount_high)}`}
-                        </span>
+                        {p.note && <span className="text-t-5 text-[10px]">{p.note}</span>}
                       </div>
                     ))}
                   </div>
                   <div className="flex justify-between text-xs font-semibold mt-2 pt-2 border-t border-bd-1">
-                    <span className="text-t-2">Certain</span>
-                    <span className="text-loss font-mono">{formatEUR(beaussierLegal.prejudices.total_vs_sca_certain)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs mt-1">
-                    <span className="text-t-4">+ potentiel (estimation)</span>
-                    <span className="text-loss/70 font-mono">
-                      {formatEUR(beaussierLegal.prejudices.total_vs_sca_potentiel_low)}–{formatEUR(beaussierLegal.prejudices.total_vs_sca_potentiel_high)}
-                    </span>
+                    <span className="text-t-4">Demandé / Retenu expert</span>
+                    <div className="flex gap-3 font-mono">
+                      <span className="text-t-4">{formatEUR(pj.total_demande_legland)}</span>
+                      <span className="text-gain">{formatEUR(pj.total_expert_legland)}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="mt-3 p-3 rounded-lg border border-bd-1 bg-bg-1">
-                  <p className="text-t-2 text-xs font-semibold mb-2">⚠️ Préjudices vs Legland (perso)</p>
+                {/* Travaux remise en conformité — 100% Beaussier */}
+                <div className="mt-3 p-3 rounded-lg border border-loss/20 bg-loss/5">
+                  <p className="text-t-2 text-xs font-semibold mb-2">🔧 Travaux remise en conformité (100% Beaussier)</p>
                   <div className="space-y-1">
-                    {beaussierLegal.prejudices.vs_legland?.map((p: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between text-xs gap-2">
-                        <div className="flex-1 min-w-0">
-                          <span className="text-t-3 block truncate">{p.desc}</span>
-                          {p.note && <span className="text-t-5 text-[10px]">{p.note}</span>}
+                    {pj.travaux_remise_conformite?.map((p: any, i: number) => (
+                      <div key={i} className="text-xs">
+                        <div className="flex justify-between gap-2">
+                          <span className="text-t-3 flex-1 min-w-0 truncate">{p.desc}</span>
+                          <span className="text-loss font-mono shrink-0">{formatEUR(p.amount)}</span>
                         </div>
-                        <span className="text-loss font-mono shrink-0">
-                          {p.amount ? formatEUR(p.amount) : `${formatEUR(p.amount_low)}–${formatEUR(p.amount_high)}`}
-                        </span>
+                        {p.note && <span className="text-t-5 text-[10px]">{p.note}</span>}
                       </div>
                     ))}
                   </div>
-                  <div className="flex justify-between text-xs font-semibold mt-2 pt-2 border-t border-bd-1">
-                    <span className="text-t-2">Certain</span>
-                    <span className="text-loss font-mono">{formatEUR(beaussierLegal.prejudices.total_vs_legland_certain)}</span>
+                  <div className="flex justify-between text-xs font-semibold mt-2 pt-2 border-t border-loss/30">
+                    <span className="text-loss">Total travaux</span>
+                    <span className="text-loss font-mono">{formatEUR(pj.total_travaux)}</span>
                   </div>
-                  <div className="flex justify-between text-xs mt-1">
-                    <span className="text-t-4">+ potentiel (estimation)</span>
-                    <span className="text-loss/70 font-mono">
-                      {formatEUR(beaussierLegal.prejudices.total_vs_legland_potentiel_low)}–{formatEUR(beaussierLegal.prejudices.total_vs_legland_potentiel_high)}
-                    </span>
-                  </div>
+                  <p className="text-t-5 text-[10px] mt-1">{pj.note_travaux}</p>
                 </div>
+                {/* Demandes Beaussier — toutes rejetées par expert */}
+                <div className="mt-3 p-3 rounded-lg border border-gain/20 bg-gain/5">
+                  <p className="text-t-2 text-xs font-semibold mb-2">❌ Demandes Beaussier (expert : 0€)</p>
+                  <div className="space-y-1">
+                    {pj.demandes_beaussier?.map((p: any, i: number) => (
+                      <div key={i} className="text-xs">
+                        <div className="flex justify-between gap-2">
+                          <span className="text-t-4 flex-1 min-w-0 truncate line-through">{p.desc}</span>
+                          <div className="flex gap-3 shrink-0 font-mono">
+                            <span className="text-t-5">{p.amount_demande ? formatEUR(p.amount_demande) : "—"}</span>
+                            <span className="text-gain">0€</span>
+                          </div>
+                        </div>
+                        {p.note && <span className="text-t-5 text-[10px]">{p.note}</span>}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-gain text-[10px] mt-2 font-semibold">{pj.note_beaussier}</p>
+                </div>
+                {/* Demandes en cours */}
+                {pj.demandes_en_cours && (
+                  <div className="mt-3 p-3 rounded-lg border border-accent/20 bg-accent/5">
+                    <p className="text-t-2 text-xs font-semibold mb-2">⏳ Demandes en cours (pas encore jugées)</p>
+                    <div className="space-y-2">
+                      {pj.demandes_en_cours.map((d: any, i: number) => (
+                        <div key={i} className="text-xs">
+                          <div className="flex justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <span className="text-t-2 font-medium">{d.procedure}</span>
+                              <span className="text-t-4 ml-2">({d.demandeur})</span>
+                            </div>
+                            <span className="text-accent font-mono shrink-0">
+                              {formatEUR(d.estimation_low)}–{formatEUR(d.estimation_high)}
+                            </span>
+                          </div>
+                          <p className="text-t-4">{d.desc}</p>
+                          {d.note && <p className="text-t-5 text-[10px]">{d.note}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Condamnations prononcées */}
+                {pj.condamnations && (
+                  <div className="mt-3 p-3 rounded-lg border border-gain/30 bg-gain/5">
+                    <p className="text-t-2 text-xs font-semibold mb-2">⚖️ Condamnations prononcées</p>
+                    <div className="space-y-1">
+                      {pj.condamnations.map((c: any, i: number) => (
+                        <div key={i} className="flex justify-between text-xs gap-2">
+                          <span className="text-t-3 flex-1">{c.desc}</span>
+                          <span className="text-gain font-mono shrink-0">{c.amount ? formatEUR(c.amount) : "—"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
-            )}
+              );
+            })()}
           </Section>
         )}
 
