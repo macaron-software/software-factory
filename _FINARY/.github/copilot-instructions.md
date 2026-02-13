@@ -48,10 +48,27 @@ Tailwind: `bg-bg-2`, `text-t-1`, `text-gain`, `text-loss`, `border-bd-1`
 
 ## SCA La Désirade — Legal tracking
 
-8 procédures: expertise (terminée, Philippe Combes), fond (en attente), appel HAH RG 25/04363 (CA Montpellier, délibéré 31/03), nullité AG 17/03/2025, référé expulsion JCP, prolongation SCA, recours TA arrêté (Grabels), vente forcée art.19
-Factures Me Saint Martin: 9 factures (SCA/Perso tags, payée/impayée), totaux avec montants inconnus
-Estimation frais Beaussier (Me Vernhet): 22-39K€, préjudices judiciaires détaillés (rapport expertise + conclusions)
-Source données: FEC SCA (622600/401/512), DuckDB Bourso transactions, emails Outlook CDP
+SCA attribution (L.212-1 CCH). Legland 50,6% / Beaussier 49,4%. Capital 695 873€. Dissolution auto 06/09/2026.
+Objet: immeuble collectif divisé en fractions attribuées aux associés. 40 chemin de la Désirade, Grabels.
+
+**8 procédures:** expertise (terminée, expert Philippe Combes architecte DPLG), fond (en attente), appel HAH RG 25/04363 (CA Montpellier, délibéré 31/03), nullité AG 17/03/2025, référé expulsion JCP (Vernhet ne conclut pas — joue la montre), prolongation SCA, recours TA arrêté Grabels, vente forcée art.19
+**Avocats:** Me Axel Saint Martin (SCA+Legland) vs Me Vernhet (Beaussier). Mandataire ad'hoc: Me Sandian (SELARL AMAJ, 1 800€).
+
+**Statuts clés:** Art.18 (AF obligatoires), Art.19 (défaillance AF → vente forcée parts, AG 2/3 hors défaillant), Art.36 (dissolution: pas d'indivision, personnalité morale survit, partage limité aux associés en règle, passif proportionnel aux parts)
+
+**Dettes Beaussier:** AF impayés 25 335€, capital non libéré 192 128€, QP fournisseurs 11 487€, travaux non conformes (Combes) 45 960€, indemnité occupation ~800-1 000€/mois. Total ~140-154K€ hors capital.
+
+**Stratégie Vernhet:** joue la montre (pas de conclusions, LRAR sans assignation, espère dissolution = libération). Aucun argument de fond. Beaussier croit que dissolution la libère (faux — art.36).
+
+**Actions en cours:**
+- ✅ Permis modificatif déposé mi-janvier 2026 (régularise non-conformités → lève AIT)
+- ✅ Expert-comptable contacté, FEC transmis (arrêté des comptes)
+- ⏳ AG comptes (dès EC prêt) → AG art.19 (mise en demeure + 1 mois)
+- Banque OK pour reporter prêt si avancement démontré
+
+**Factures Me Saint Martin:** 9 factures (SCA/Perso tags, payée/impayée), totaux avec montants inconnus
+**Estimation frais Beaussier (Me Vernhet):** 22-39K€, préjudices judiciaires détaillés (rapport expertise + conclusions Axel)
+**Source données:** FEC SCA (622600/401/512), DuckDB Bourso transactions, emails Outlook CDP, statuts `/Users/sylvain/MAISON GRABELS/COMPTA SCA/STATUTS_SCA.txt`, jugements `/Users/sylvain/MAISON GRABELS/PROCEDURE JUDICIAIRE/`
 
 ## Key files
 
