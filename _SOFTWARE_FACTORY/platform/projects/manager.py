@@ -75,8 +75,8 @@ class Project:
         return (self.vision[:200] + "...") if len(self.vision) > 200 else self.vision
 
     def load_vision_from_file(self) -> str:
-        """Try to load VISION.md from project root."""
-        for name in ("VISION.md", "vision.md", "README.md"):
+        """Try to load VISION.md from project root (NOT README.md — that's memory)."""
+        for name in ("VISION.md", "vision.md"):
             p = Path(self.path) / name
             if p.exists():
                 try:

@@ -218,6 +218,8 @@ async def agent_save(request: Request, agent_id: str = ""):
     agent.permissions = permissions
     agent.icon = str(form.get("icon", "bot"))
     agent.color = str(form.get("color", "#f78166"))
+    agent.avatar = str(form.get("avatar", ""))
+    agent.tagline = str(form.get("tagline", ""))
 
     if existing:
         store.update(agent)

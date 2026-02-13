@@ -62,13 +62,19 @@
                 {% for msg in messages %}
                 <div class="chat-msg {{ 'chat-msg-user' if msg.from_agent == 'user' else 'chat-msg-agent' }}">
                     {% if msg.from_agent != 'user' %}
-                    <div class="chat-msg-avatar">
+                    <div class="chat-msg-avatar agent-avatar-sm">
+                        {% if lead_agent and lead_agent.avatar %}
+                        <span>{{ lead_agent.avatar }}</span>
+                        {% else %}
                         <svg class="icon icon-sm"><use href="#icon-bot"/></svg>
+                        {% endif %}
                     </div>
                     {% endif %}
                     <div class="chat-msg-body">
                         {% if msg.from_agent != 'user' and msg.from_agent != 'system' %}
-                        <div class="chat-msg-sender">{{ project.name }}</div>
+                        <div class="chat-msg-sender">
+                            {% if lead_agent %}{{ lead_agent.name }}{% else %}{{ project.name }}{% endif %}
+                        </div>
                         {% endif %}
                         {% if msg.from_agent == 'user' %}
                         <div class="chat-msg-text">{{ msg.content }}</div>
@@ -91,9 +97,16 @@
             {% else %}
                 <div class="chat-welcome">
                     <div class="chat-welcome-icon">
+                        {% if lead_agent and lead_agent.avatar %}
+                        <span class="agent-avatar-lg">{{ lead_agent.avatar }}</span>
+                        {% else %}
                         <svg class="icon" style="width:48px;height:48px;color:var(--purple)"><use href="#icon-bot"/></svg>
+                        {% endif %}
                     </div>
-                    <h3>{{ project.name }}</h3>
+                    <h3>{% if lead_agent %}{{ lead_agent.name }}{% else %}{{ project.name }}{% endif %}</h3>
+                    {% if lead_agent and lead_agent.tagline %}
+                    <p style="color:var(--text-secondary);font-style:italic;margin-bottom:0.5rem">{{ lead_agent.tagline }}</p>
+                    {% endif %}
                     <p>Ask anything about this project — the agent can browse files, read code, search git history, and more.</p>
                     <div class="chat-suggestions">
                         <button class="chat-suggestion" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">What is this project about?</button>
@@ -124,9 +137,9 @@
         <div class="ps-section">
             <h4>Vision</h4>
             {% if project.vision %}
-            <p class="ps-text">{{ project.vision[:400] }}{% if project.vision|length > 400 %}…{% endif %}</p>
+            <div class="ps-text md-rendered">{{ project.vision[:800] | markdown | safe }}</div>
             {% else %}
-            <p class="ps-empty">No vision defined</p>
+            <p class="ps-empty">No vision defined — add a VISION.md to your project</p>
             {% endif %}
         </div>
 
@@ -219,6 +232,8 @@
 const PROJECT_ID = "{{ project.id }}";
 const PROJECT_NAME = "{{ project.name }}";
 const SESSION_ID = "{{ active_session.id if active_session else '' }}";
+const AGENT_AVATAR = "{{ lead_agent.avatar if lead_agent and lead_agent.avatar else '' }}";
+const AGENT_NAME = "{{ lead_agent.name if lead_agent else project.name }}";
 let chatBusy = false;
 
 function scrollChat() {
@@ -238,11 +253,14 @@ function addUserBubble(text) {
 
 function addStreamingBubble() {
     const id = 'stream-' + Date.now();
+    const avatarHtml = AGENT_AVATAR
+        ? `<div class="chat-msg-avatar agent-avatar-sm"><span>${AGENT_AVATAR}</span></div>`
+        : `<div class="chat-msg-avatar"><svg class="icon icon-sm"><use href="#icon-bot"/></svg></div>`;
     document.getElementById('chat-messages').insertAdjacentHTML('beforeend',
         `<div class="chat-msg chat-msg-agent" id="${id}">
-            <div class="chat-msg-avatar"><svg class="icon icon-sm"><use href="#icon-bot"/></svg></div>
+            ${avatarHtml}
             <div class="chat-msg-body">
-                <div class="chat-msg-sender">${PROJECT_NAME}</div>
+                <div class="chat-msg-sender">${AGENT_NAME}</div>
                 <div class="chat-stream-status">
                     <div class="stream-dots"><span></span><span></span><span></span></div>
                     <span class="stream-label">Thinking…</span>
