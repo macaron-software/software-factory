@@ -1194,6 +1194,199 @@ def get_sca():
     return sca
 
 
+@app.get("/api/v1/sca/legal")
+def get_sca_legal():
+    """SCA La Désirade — legal costs, procedures, timeline."""
+    import csv
+    from collections import defaultdict
+
+    # 1. Parse FEC for SCA legal expenses (accounts 6221/6226/6227)
+    fec_path = Path("/Users/sylvain/MAISON GRABELS/COMPTA SCA/EXPORT_EXPERT_COMPTABLE/FEC_SCA_2021_2025.txt")
+    legal_entries = []
+    if fec_path.exists():
+        with open(fec_path) as f:
+            for row in csv.DictReader(f, delimiter='|'):
+                compte = row.get("CompteNum", "")
+                if row.get("JournalCode") == "ACH" and compte.startswith(("6221", "6226", "6227")):
+                    d = float(row.get("Debit", "0") or 0)
+                    if d > 0:
+                        cat = "notaire" if "6221" in compte else ("avocat" if "6226" in compte else "huissier")
+                        dt = row["EcritureDate"]
+                        legal_entries.append({
+                            "date": f"{dt[:4]}-{dt[4:6]}-{dt[6:]}",
+                            "category": cat,
+                            "account": row["CompteLib"],
+                            "description": row["EcritureLib"],
+                            "amount": d,
+                            "piece_ref": row.get("PieceRef", ""),
+                        })
+
+    # 2. Personal legal payments (Bourso → Saint Martin / Huissiers, not via SCA)
+    personal_legal = []
+    try:
+        import duckdb
+        db = duckdb.connect(str(DATA_DIR / "finary.duckdb"), read_only=True)
+        rows = db.execute("""
+            SELECT date, description, amount FROM transactions
+            WHERE LOWER(description) LIKE '%axel saint martin%'
+               OR LOWER(description) LIKE '%alfier%'
+               OR (LOWER(description) LIKE '%huissier%' AND bank = 'boursobank')
+            ORDER BY date
+        """).fetchall()
+        for r in rows:
+            personal_legal.append({
+                "date": str(r[0]),
+                "description": r[1].split("|")[0].strip(),
+                "amount": round(abs(r[2]), 2),
+            })
+        db.close()
+    except Exception:
+        pass
+
+    # 3. SCA cash flow (Bourso → SCA transfers)
+    sca_cashflow = []
+    try:
+        db = duckdb.connect(str(DATA_DIR / "finary.duckdb"), read_only=True)
+        rows = db.execute("""
+            SELECT date, description, amount FROM transactions
+            WHERE (LOWER(description) LIKE '%scia la desirade%'
+               OR LOWER(description) LIKE '%sca la desirade%')
+            ORDER BY date
+        """).fetchall()
+        for r in rows:
+            sca_cashflow.append({
+                "date": str(r[0]),
+                "description": r[1].split("|")[0].strip(),
+                "amount": round(r[2], 2),
+            })
+        db.close()
+    except Exception:
+        pass
+
+    # 4. Totals by category
+    by_cat = defaultdict(float)
+    for e in legal_entries:
+        by_cat[e["category"]] += e["amount"]
+    total_sca_legal = sum(by_cat.values())
+    total_personal = sum(e["amount"] for e in personal_legal)
+
+    # Some personal payments were refunded via SCA (e.g., Saint Martin 1050 on 15/07)
+    # The 3000€ from Aug 2024 and 600€ from Jul 2025 are pure personal
+    personal_only = total_personal - by_cat.get("avocat", 0)  # approx overlap
+
+    # 5. Procedures timeline
+    procedures = [
+        {
+            "id": "expertise",
+            "name": "Expertise Judiciaire (Beaussier c/ Legland)",
+            "type": "expertise",
+            "status": "terminée",
+            "lawyer": "Me Axel Saint Martin",
+            "start_date": "2023-03-01",
+            "key_dates": [
+                {"date": "2024-04-11", "event": "Nomination mandataire ad'hoc (Me Sandian, 1 800€)"},
+                {"date": "2024-08-16", "event": "Note expert aux parties n°3"},
+                {"date": "2024-08-28", "event": "Convocation expertise + réunion"},
+                {"date": "2025-01-31", "event": "Rapport expertise judiciaire déposé"},
+            ],
+        },
+        {
+            "id": "refere_beaussier",
+            "name": "Référé Expulsion (Beaussier occupante sans titre)",
+            "type": "judiciaire_civil",
+            "status": "en_cours",
+            "lawyer": "Me Axel Saint Martin",
+            "jurisdiction": "TJ Montpellier — JCP (Juge des Contentieux de la Protection)",
+            "start_date": "2025-08-26",
+            "key_dates": [
+                {"date": "2025-08-26", "event": "Assignation TJ JCP — occupant sans droit ni titre"},
+                {"date": "2025-10-14", "event": "Facture Me Saint Martin — Référé Expulsion (1 800€)"},
+                {"date": "2025-10-14", "event": "Facture Me Saint Martin — Défense Référé Nullité AG (1 800€)"},
+                {"date": "2025-10-27", "event": "Facture Me Saint Martin — Assignation Mandataire (1 275€)"},
+                {"date": "2026-02-12", "event": "Conclusions adverses reportées au 23/03"},
+                {"date": "2026-03-23", "event": "📋 Conclusions adverses (attendues)"},
+                {"date": "2026-03-31", "event": "⚖️ Délibéré heure-à-heure"},
+                {"date": "2026-05-18", "event": "📋 Conclusions en réplique (à confirmer)"},
+            ],
+        },
+        {
+            "id": "ta_grabels",
+            "name": "Recours TA — Arrêté Interruptif (Commune de Grabels)",
+            "type": "administratif",
+            "status": "en_cours",
+            "lawyer": "Me Sébastien Avallone",
+            "jurisdiction": "Tribunal Administratif de Montpellier",
+            "reference": "2025-733",
+            "start_date": "2025-07-07",
+            "key_dates": [
+                {"date": "2025-06-24", "event": "Arrêté interruptif de travaux par la Mairie de Grabels"},
+                {"date": "2025-07-07", "event": "Requête en référé suspension au TA"},
+                {"date": "2025-08-01", "event": "Provision Me Avallone (4 800€)"},
+                {"date": "2025-08-29", "event": "Ordonnance TA référé"},
+                {"date": "2025-09-01", "event": "Requête en excès de pouvoir (fond)"},
+                {"date": "2026-01-28", "event": "LRAR à Mairie de Grabels"},
+                {"date": "2026-02-12", "event": "Pas encore de date de plaidoirie (en attente TA)"},
+            ],
+        },
+        {
+            "id": "art19",
+            "name": "Vente Forcée Parts Art. 19 (Beaussier)",
+            "type": "vente_forcee",
+            "status": "en_preparation",
+            "lawyer": "Me Axel Saint Martin",
+            "start_date": "2025-11-01",
+            "key_dates": [
+                {"date": "2025-03-17", "event": "AGO Révocation Beaussier de la cogérance"},
+                {"date": "2025-05-27", "event": "AGE Modification statuts"},
+                {"date": "2025-11-03", "event": "AGO Approbation comptes + AF impayés"},
+                {"date": "2025-11-25", "event": "Provision huissier vente art.19 (58,75€)"},
+                {"date": "2026-02-01", "event": "Validation comptes par expert-comptable (en cours)"},
+                {"date": "2026-03-01", "event": "📋 AGO Approbation comptes (à planifier)"},
+                {"date": "2026-04-01", "event": "📋 Libération capital restant (à planifier)"},
+                {"date": "2026-05-01", "event": "📋 AG Article 19 — mise en vente forcée"},
+            ],
+        },
+    ]
+
+    # 6. Monthly spending chart data
+    monthly_spend = defaultdict(float)
+    for e in legal_entries:
+        month = e["date"][:7]  # YYYY-MM
+        monthly_spend[month] += e["amount"]
+    for e in personal_legal:
+        month = e["date"][:7]
+        monthly_spend[month] += e["amount"]
+
+    chart_data = [{"month": k, "amount": round(v, 2)} for k, v in sorted(monthly_spend.items())]
+
+    return {
+        "summary": {
+            "total_legal_sca": round(total_sca_legal, 2),
+            "total_legal_personal": round(total_personal, 2),
+            "total_legal_all": round(total_sca_legal + total_personal, 2),
+            "by_category": {
+                "notaire": round(by_cat.get("notaire", 0), 2),
+                "avocat_sca": round(by_cat.get("avocat", 0), 2),
+                "huissier": round(by_cat.get("huissier", 0), 2),
+                "avocat_perso": round(total_personal, 2),
+            },
+            "total_sca_cashflow_out": round(sum(e["amount"] for e in sca_cashflow if e["amount"] < 0), 2),
+            "total_sca_cashflow_in": round(sum(e["amount"] for e in sca_cashflow if e["amount"] > 0), 2),
+        },
+        "legal_entries": sorted(legal_entries, key=lambda x: x["date"]),
+        "personal_legal": personal_legal,
+        "sca_cashflow": sca_cashflow,
+        "procedures": procedures,
+        "chart_monthly": chart_data,
+        "beaussier_debt": {
+            "af_impayes": 25334.71,
+            "capital_non_libere": 192127.97,
+            "fournisseurs_qp": 7105.89,
+            "total": 25334.71 + 7105.89,
+        },
+    }
+
+
 @app.get("/api/v1/costs")
 def get_costs():
     """Monthly recurring costs + annual fee analysis."""

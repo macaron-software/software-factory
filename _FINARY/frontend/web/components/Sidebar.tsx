@@ -19,6 +19,7 @@ import {
   WifiOff,
   Eye,
   EyeOff,
+  Scale,
   type LucideIcon,
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
@@ -48,6 +49,7 @@ const SECTIONS: NavSection[] = [
     items: [
       { href: "/portfolio/stocks", label: "Actions & Fonds", icon: TrendingUp },
       { href: "/immobilier", label: "Immobilier", icon: Home },
+      { href: "/sca", label: "SCA La Désirade", icon: Scale },
     ],
   },
   {

@@ -156,6 +156,13 @@ export function useSCA() {
   });
 }
 
+export function useSCALegal() {
+  return useQuery({
+    queryKey: ["sca-legal"],
+    queryFn: api.getSCALegal,
+  });
+}
+
 // ─── Costs ───
 
 export function useCosts() {
