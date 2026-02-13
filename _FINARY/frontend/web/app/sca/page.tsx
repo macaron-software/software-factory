@@ -273,103 +273,71 @@ export default function SCAPage() {
           </Section>
         )}
 
-        {legal.axel_situation && (() => {
-          const ax = legal.axel_situation;
-          const StatusDot = ({ status }: { status: string }) =>
-            status === "payee" ? (
-              <CheckCircle className="w-3 h-3 text-gain shrink-0" />
-            ) : (
-              <AlertCircle className="w-3 h-3 text-loss shrink-0" />
-            );
+        {legal.axel_factures && (() => {
+          const factures = legal.axel_factures;
+          const tot = legal.axel_totaux;
           return (
-          <Section title={<span className="flex items-center gap-2"><ClipboardList className="w-4 h-4" />Situation Me Saint Martin</span>}>
-            <div className="space-y-4">
-              {/* Factures SCA */}
-              <div>
-                <p className="text-t-4 text-xs font-semibold mb-2">Factures SCA</p>
-                <div className="space-y-1.5">
-                  {ax.factures_sca.map((f: any, i: number) => (
-                    <div key={i} className="flex items-start gap-2 text-xs">
-                      <StatusDot status={f.status} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between gap-2">
-                          <span className="text-t-3 truncate">
-                            {fmtDate(f.date)} — {f.desc}
-                            {f.ref !== "—" && <span className="text-t-5 ml-1">n°{f.ref}</span>}
-                          </span>
-                          <span className="text-t-1 font-mono shrink-0">{formatEUR(f.amount)}</span>
-                        </div>
-                        <span className={`text-[10px] ${f.status === "payee" ? "text-gain" : "text-loss"}`}>
-                          {f.status === "payee" ? `Payée ${fmtDate(f.paid_date)} — ${f.paid_by}` : "Non payée — " + f.note}
+          <Section title={<span className="flex items-center gap-2"><ClipboardList className="w-4 h-4" />Factures Me Saint Martin</span>}>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-t-5 text-left border-b border-bd-1/30">
+                  <th className="pb-1.5 font-medium">Date</th>
+                  <th className="pb-1.5 font-medium">Description</th>
+                  <th className="pb-1.5 font-medium">Ref</th>
+                  <th className="pb-1.5 font-medium text-right">Montant</th>
+                  <th className="pb-1.5 font-medium text-center">Tag</th>
+                  <th className="pb-1.5 font-medium text-center">Statut</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-bd-1/20">
+                {factures.map((f: any, i: number) => (
+                  <tr key={i} className="hover:bg-bg-1/50">
+                    <td className="py-1.5 text-t-4 whitespace-nowrap">{fmtDate(f.date)}</td>
+                    <td className="py-1.5 text-t-2">{f.desc}</td>
+                    <td className="py-1.5 text-t-5 font-mono">{f.ref !== "—" ? f.ref : ""}</td>
+                    <td className="py-1.5 text-t-1 font-mono text-right">{formatEUR(f.amount)}</td>
+                    <td className="py-1.5 text-center">
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                        f.tag === "SCA" ? "bg-accent/15 text-accent" : "bg-blue-500/15 text-blue-400"
+                      }`}>{f.tag}</span>
+                    </td>
+                    <td className="py-1.5 text-center">
+                      {f.status === "payee" ? (
+                        <span className="inline-flex items-center gap-1 text-gain text-[10px]">
+                          <CheckCircle className="w-3 h-3" /> Payée
                         </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-between text-xs font-semibold mt-2 pt-2 border-t border-bd-1/30">
-                  <span className="text-t-2">Facturé SCA</span>
-                  <span className="text-t-1 font-mono">{formatEUR(ax.total_facture_sca)}</span>
-                </div>
-                <div className="flex justify-between text-xs mt-0.5">
-                  <span className="text-gain">Payé</span>
-                  <span className="text-gain font-mono">{formatEUR(ax.total_paye_sca)}</span>
-                </div>
-                {ax.total_impaye_sca > 0 && (
-                  <div className="flex justify-between text-xs mt-0.5">
-                    <span className="text-loss">Impayé</span>
-                    <span className="text-loss font-mono">{formatEUR(ax.total_impaye_sca)}</span>
-                  </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-loss text-[10px]">
+                          <AlertCircle className="w-3 h-3" /> Impayée
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="border-t border-bd-1">
+                <tr className="text-t-2 font-semibold">
+                  <td colSpan={3} className="pt-2">Total</td>
+                  <td className="pt-2 text-t-1 font-mono text-right">{formatEUR(tot.total)}</td>
+                  <td></td>
+                  <td></td>
+                </tr>
+                <tr className="text-gain">
+                  <td colSpan={3} className="pt-0.5">Payé</td>
+                  <td className="pt-0.5 font-mono text-right">{formatEUR(tot.paye)}</td>
+                  <td></td>
+                  <td></td>
+                </tr>
+                {tot.impaye > 0 && (
+                  <tr className="text-loss font-semibold">
+                    <td colSpan={3} className="pt-0.5">Impayé</td>
+                    <td className="pt-0.5 font-mono text-right">{formatEUR(tot.impaye)}</td>
+                    <td></td>
+                    <td></td>
+                  </tr>
                 )}
-              </div>
-              {/* Factures perso */}
-              <div>
-                <p className="text-t-4 text-xs font-semibold mb-2">Paiements perso (Legland)</p>
-                <div className="space-y-1.5">
-                  {ax.factures_perso.map((f: any, i: number) => (
-                    <div key={i} className="flex items-start gap-2 text-xs">
-                      <StatusDot status={f.status} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between gap-2">
-                          <span className="text-t-3 truncate">{fmtDate(f.date)} — {f.desc}</span>
-                          <span className="text-t-1 font-mono shrink-0">{formatEUR(f.amount)}</span>
-                        </div>
-                        <span className="text-gain text-[10px]">Payée {fmtDate(f.paid_date)} — {f.paid_by}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-between text-xs font-semibold mt-2 pt-2 border-t border-bd-1/30">
-                  <span className="text-t-2">Total perso</span>
-                  <span className="text-t-1 font-mono">{formatEUR(ax.total_facture_perso)}</span>
-                </div>
-              </div>
-              {/* Résumé */}
-              <div className="p-3 rounded-lg bg-bg-1 border border-bd-1 space-y-1.5">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-t-2">Total facturé (SCA + perso)</span>
-                  <span className="text-t-1 font-mono">{formatEUR(ax.resume.total_facture)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-gain">Total payé</span>
-                  <span className="text-gain font-mono">{formatEUR(ax.resume.total_paye)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-loss font-semibold">Total impayé</span>
-                  <span className="text-loss font-mono font-semibold">{formatEUR(ax.resume.total_impaye)}</span>
-                </div>
-                <div className="mt-2 pt-2 border-t border-bd-1 space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-accent">SCA dette fournisseurs (QP Legland)</span>
-                    <span className="text-accent font-mono">{formatEUR(ax.resume.sca_dette_fournisseurs_legland)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-loss">SCA dette fournisseurs (QP Beaussier)</span>
-                    <span className="text-loss font-mono">{formatEUR(ax.resume.sca_dette_fournisseurs_beaussier)}</span>
-                  </div>
-                </div>
-                <p className="text-t-5 text-[10px] mt-1">{ax.resume.note}</p>
-              </div>
-            </div>
+              </tfoot>
+            </table>
           </Section>
           );
         })()}
