@@ -10,9 +10,16 @@ import { Loading, ErrorState, PageHeader, Badge, Section, StatCard } from "@/com
 
 type BadgeVariant = "gain" | "loss" | "accent" | "warn" | "neutral";
 
+/** Format ISO date as "DD/MM/YYYY" */
+function fmtDate(iso: string) {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 const STATUS_MAP: Record<string, { label: string; variant: BadgeVariant }> = {
   terminée: { label: "Terminée", variant: "neutral" },
   en_cours: { label: "En cours", variant: "warn" },
+  en_attente: { label: "En attente", variant: "neutral" },
   en_preparation: { label: "En préparation", variant: "accent" },
 };
 
@@ -40,9 +47,10 @@ export default function SCAPage() {
   // Pie data for cost breakdown — combine SCA + perso categories
   const allCats: Record<string, number> = {};
   const LABELS: Record<string, string> = {
-    notaire: "Notaire", avocat: "Avocat (SCA)", huissier: "Huissier",
-    géomètre: "Géomètre", architecte: "Architecte", publication: "Publication JO",
-    divers: "Divers (condamnation)", greffe: "Greffe (perso)",
+    avocat: "Avocat (SCA)", huissier: "Huissier", condamnation: "Condamnation Art. L.761-1",
+    publication: "Publication JO", expertise_judiciaire: "Expertise judiciaire",
+    études_géomètre: "Géomètre (BET Seals)", études_architecte: "Architecte (permis modif.)",
+    acquisition_notaire: "Notaire (acquisition terrain)", greffe: "Greffe (perso)",
   };
   if (s.by_category_sca) {
     for (const [k, v] of Object.entries(s.by_category_sca)) allCats[k] = (allCats[k] || 0) + (v as number);
@@ -87,7 +95,7 @@ export default function SCAPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Valeur estimée" value={sca.your_share_property_value} tone="accent" />
         <StatCard label="Coût construction" value={fin.total_verse} />
-        <StatCard label="Total frais juridiques" value={s.total_legal_all} tone="negative" />
+        <StatCard label="Frais procédure" value={s.total_legal_all} tone="negative" />
         <StatCard label="Impayés Beaussier" value={beaussierDebt.af_impayes} tone="negative" />
       </div>
 
@@ -155,8 +163,8 @@ export default function SCAPage() {
                   <div className="mb-2">
                     {futureEvents.map((d: any, i: number) => (
                       <div key={i} className="flex items-start gap-3 py-1.5 text-xs">
-                        <span className="text-accent font-mono font-semibold w-20 shrink-0">
-                          {d.date.slice(5)}
+                        <span className="text-accent font-mono font-semibold w-24 shrink-0">
+                          {fmtDate(d.date)}
                         </span>
                         <span className="text-accent">{d.event}</span>
                       </div>
@@ -172,7 +180,7 @@ export default function SCAPage() {
                     </summary>
                     {pastEvents.map((d: any, i: number) => (
                       <div key={i} className="flex items-start gap-3 py-1 text-t-5">
-                        <span className="font-mono w-20 shrink-0">{d.date.slice(5)}</span>
+                        <span className="font-mono w-24 shrink-0">{fmtDate(d.date)}</span>
                         <span>{d.event}</span>
                       </div>
                     ))}
@@ -313,7 +321,7 @@ export default function SCAPage() {
               <tbody>
                 {legalEntries.map((e: any, i: number) => (
                   <tr key={i} className="border-b border-bd-1/30">
-                    <td className="py-1.5 font-mono text-t-4">{e.date.slice(2)}</td>
+                    <td className="py-1.5 font-mono text-t-4">{fmtDate(e.date)}</td>
                     <td className="py-1.5">
                       <Badge variant={e.category === "avocat" ? "warn" : e.category === "huissier" ? "accent" : "neutral"}>
                         {e.category}
@@ -347,7 +355,7 @@ export default function SCAPage() {
               <tbody>
                 {personalLegal.map((e: any, i: number) => (
                   <tr key={i} className="border-b border-bd-1/30">
-                    <td className="py-1.5 font-mono text-t-4">{e.date.slice(2)}</td>
+                    <td className="py-1.5 font-mono text-t-4">{fmtDate(e.date)}</td>
                     <td className="py-1.5 text-t-2">{e.description}</td>
                     <td className="py-1.5 text-right text-loss font-mono">{formatEUR(e.amount)}</td>
                   </tr>

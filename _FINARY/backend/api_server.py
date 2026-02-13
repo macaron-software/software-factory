@@ -1203,10 +1203,13 @@ def get_sca_legal():
     # 1. Parse FEC for SCA legal expenses (accounts 6221/6226/6227)
     fec_path = Path("/Users/sylvain/MAISON GRABELS/COMPTA SCA/EXPORT_EXPERT_COMPTABLE/FEC_SCA_2021_2025.txt")
     legal_entries = []
-    # All professional fee accounts: 622* (notaire, géomètre, architecte, avocat, huissier) + 623* (pub JO)
+    # Professional fee accounts — classified by purpose:
+    # juridique: avocat, huissier, divers (condamnation), publication
+    # études: géomètre (BET Seals), architecte (permis modificatif)
+    # acquisition: notaire (terrain)
     COMPTE_MAP = {
-        "6220": "divers", "6221": "notaire", "6222": "géomètre", "6223": "architecte",
-        "6226": "avocat", "6227": "huissier", "6234": "publication",
+        "6220": "condamnation", "6221": "acquisition_notaire", "6222": "études_géomètre",
+        "6223": "études_architecte", "6226": "avocat", "6227": "huissier", "6234": "publication",
     }
     if fec_path.exists():
         with open(fec_path) as f:
@@ -1232,6 +1235,20 @@ def get_sca_legal():
                         "amount": d,
                         "piece_ref": row.get("PieceRef", ""),
                     })
+
+    # Expertise judiciaire — consignation payée par chèque perso au TJ (régie)
+    # SELARL AMAJ (Philippe Combes): 11 039,57€ TTC (rapport du 31/01/2025)
+    # Consignation initiale ~juil 2023 + complémentaire ~oct 2023, 100% Legland
+    legal_entries.append({
+        "date": "2023-07-27", "category": "expertise_judiciaire",
+        "account": "Consignation TJ", "description": "Consignation initiale expertise (chèque régie TJ)",
+        "amount": 8399.57, "piece_ref": "AMAJ-2023",
+    })
+    legal_entries.append({
+        "date": "2023-10-24", "category": "expertise_judiciaire",
+        "account": "Consignation TJ", "description": "Consignation complémentaire sapiteur géomètre (chèque régie TJ)",
+        "amount": 2640.00, "piece_ref": "AMAJ-2023-COMP",
+    })
 
     # 2. Personal legal payments (Bourso → lawyers / huissiers / greffe, not via SCA)
     personal_legal = []
@@ -1318,15 +1335,14 @@ def get_sca_legal():
             "id": "fond_beaussier",
             "name": "Procédure au Fond (Beaussier c/ SCA — suite expertise)",
             "type": "judiciaire_civil",
-            "status": "en_cours",
+            "status": "en_attente",
             "lawyer": "Me Axel Saint Martin",
             "adverse": "Me Vernhet (avocat Beaussier)",
             "jurisdiction": "TJ Montpellier",
-            "start_date": "2025-02-01",
-            "note": "Suite au rapport d'expertise judiciaire du 31/01/2025. Procédure au fond sur les malfaçons / étanchéité entre les 2 ouvrages. Beaussier réclame des travaux correctifs.",
+            "start_date": "2025-01-31",
+            "note": "Suite au rapport d'expertise judiciaire (SELARL AMAJ, 31/01/2025). Pas encore d'assignation au fond. Porte sur les malfaçons / étanchéité entre les 2 ouvrages.",
             "key_dates": [
-                {"date": "2025-01-31", "event": "Rapport expertise déposé — base de la procédure au fond"},
-                {"date": "2025-08-26", "event": "Assignation au fond (liée au référé expulsion)"},
+                {"date": "2025-01-31", "event": "Rapport expertise déposé (SELARL AMAJ — 11 039,57€ TTC)"},
             ],
         },
         {
