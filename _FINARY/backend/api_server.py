@@ -1413,6 +1413,7 @@ def get_sca_legal():
                 {"date": "2026-01-28", "event": "LRAR à Mairie de Grabels"},
                 {"date": "2026-02-12", "event": "Pas encore de date de plaidoirie (en attente TA)"},
             ],
+            "note": "Beaussier est intervenue volontairement dans la procédure TA aux côtés de la commune contre la SCA.",
         },
         {
             "id": "art19",
@@ -1502,9 +1503,11 @@ def get_sca_legal():
                  "note": "Procédure la plus lourde — expertise + assignation + conclusions + plaidoirie"},
                 {"name": "Heure-à-heure sur chaque AG", "estimate_low": 1500, "estimate_high": 2500,
                  "note": "~3 AG contestées à ce jour"},
+                {"name": "Intervention volontaire TA (arrêté interruptif)", "estimate_low": 2000, "estimate_high": 4000,
+                 "note": "Intervention aux côtés de la commune contre la SCA au TA"},
             ],
-            "total_low": 20500,
-            "total_high": 35500,
+            "total_low": 22500,
+            "total_high": 39500,
             "condamnation_hah_perdu": {
                 "art_700": {"low": 1500, "high": 3000, "note": "Art. 700 CPC — frais irrépétibles appel perdu"},
                 "depens": {"low": 500, "high": 1500, "note": "Dépens d'appel (huissier, greffe)"},
