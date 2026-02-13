@@ -1203,25 +1203,37 @@ def get_sca_legal():
     # 1. Parse FEC for SCA legal expenses (accounts 6221/6226/6227)
     fec_path = Path("/Users/sylvain/MAISON GRABELS/COMPTA SCA/EXPORT_EXPERT_COMPTABLE/FEC_SCA_2021_2025.txt")
     legal_entries = []
+    # All professional fee accounts: 622* (notaire, géomètre, architecte, avocat, huissier) + 623* (pub JO)
+    COMPTE_MAP = {
+        "6220": "divers", "6221": "notaire", "6222": "géomètre", "6223": "architecte",
+        "6226": "avocat", "6227": "huissier", "6234": "publication",
+    }
     if fec_path.exists():
         with open(fec_path) as f:
             for row in csv.DictReader(f, delimiter='|'):
                 compte = row.get("CompteNum", "")
-                if row.get("JournalCode") == "ACH" and compte.startswith(("6221", "6226", "6227")):
-                    d = float(row.get("Debit", "0") or 0)
-                    if d > 0:
-                        cat = "notaire" if "6221" in compte else ("avocat" if "6226" in compte else "huissier")
-                        dt = row["EcritureDate"]
-                        legal_entries.append({
-                            "date": f"{dt[:4]}-{dt[4:6]}-{dt[6:]}",
-                            "category": cat,
-                            "account": row["CompteLib"],
-                            "description": row["EcritureLib"],
-                            "amount": d,
-                            "piece_ref": row.get("PieceRef", ""),
-                        })
+                if row.get("JournalCode") != "ACH":
+                    continue
+                cat = None
+                for prefix, c in COMPTE_MAP.items():
+                    if compte.startswith(prefix):
+                        cat = c
+                        break
+                if not cat:
+                    continue
+                d = float(row.get("Debit", "0") or 0)
+                if d > 0:
+                    dt = row["EcritureDate"]
+                    legal_entries.append({
+                        "date": f"{dt[:4]}-{dt[4:6]}-{dt[6:]}",
+                        "category": cat,
+                        "account": row["CompteLib"],
+                        "description": row["EcritureLib"],
+                        "amount": d,
+                        "piece_ref": row.get("PieceRef", ""),
+                    })
 
-    # 2. Personal legal payments (Bourso → Saint Martin / Huissiers, not via SCA)
+    # 2. Personal legal payments (Bourso → lawyers / huissiers / greffe, not via SCA)
     personal_legal = []
     try:
         import duckdb
@@ -1231,13 +1243,24 @@ def get_sca_legal():
             WHERE LOWER(description) LIKE '%axel saint martin%'
                OR LOWER(description) LIKE '%alfier%'
                OR (LOWER(description) LIKE '%huissier%' AND bank = 'boursobank')
+               OR LOWER(description) LIKE '%greffe%'
+               OR LOWER(description) LIKE '%infogreffe%'
             ORDER BY date
         """).fetchall()
+        seen = set()
         for r in rows:
+            # Deduplicate (some Bourso entries appear twice)
+            key = (str(r[0]), round(r[2], 2))
+            if key in seen:
+                continue
+            seen.add(key)
             personal_legal.append({
                 "date": str(r[0]),
                 "description": r[1].split("|")[0].strip(),
                 "amount": round(abs(r[2]), 2),
+                "category": "greffe" if "greffe" in r[1].lower() or "infogreffe" in r[1].lower()
+                    else "huissier" if "alfier" in r[1].lower() or "huissier" in r[1].lower()
+                    else "avocat",
             })
         db.close()
     except Exception:
@@ -1264,15 +1287,15 @@ def get_sca_legal():
         pass
 
     # 4. Totals by category
-    by_cat = defaultdict(float)
+    by_cat_sca = defaultdict(float)
     for e in legal_entries:
-        by_cat[e["category"]] += e["amount"]
-    total_sca_legal = sum(by_cat.values())
-    total_personal = sum(e["amount"] for e in personal_legal)
+        by_cat_sca[e["category"]] += e["amount"]
+    total_sca_legal = sum(by_cat_sca.values())
 
-    # Some personal payments were refunded via SCA (e.g., Saint Martin 1050 on 15/07)
-    # The 3000€ from Aug 2024 and 600€ from Jul 2025 are pure personal
-    personal_only = total_personal - by_cat.get("avocat", 0)  # approx overlap
+    by_cat_perso = defaultdict(float)
+    for e in personal_legal:
+        by_cat_perso[e.get("category", "avocat")] += e["amount"]
+    total_personal = sum(by_cat_perso.values())
 
     # 5. Procedures timeline
     procedures = [
@@ -1289,6 +1312,21 @@ def get_sca_legal():
                 {"date": "2024-08-16", "event": "Note expert aux parties n°3"},
                 {"date": "2024-08-28", "event": "Convocation expertise + réunion"},
                 {"date": "2025-01-31", "event": "Rapport expertise judiciaire déposé"},
+            ],
+        },
+        {
+            "id": "fond_beaussier",
+            "name": "Procédure au Fond (Beaussier c/ SCA — suite expertise)",
+            "type": "judiciaire_civil",
+            "status": "en_cours",
+            "lawyer": "Me Axel Saint Martin",
+            "adverse": "Me Vernhet (avocat Beaussier)",
+            "jurisdiction": "TJ Montpellier",
+            "start_date": "2025-02-01",
+            "note": "Suite au rapport d'expertise judiciaire du 31/01/2025. Procédure au fond sur les malfaçons / étanchéité entre les 2 ouvrages. Beaussier réclame des travaux correctifs.",
+            "key_dates": [
+                {"date": "2025-01-31", "event": "Rapport expertise déposé — base de la procédure au fond"},
+                {"date": "2025-08-26", "event": "Assignation au fond (liée au référé expulsion)"},
             ],
         },
         {
@@ -1413,12 +1451,8 @@ def get_sca_legal():
             "total_legal_sca": round(total_sca_legal, 2),
             "total_legal_personal": round(total_personal, 2),
             "total_legal_all": round(total_sca_legal + total_personal, 2),
-            "by_category": {
-                "notaire": round(by_cat.get("notaire", 0), 2),
-                "avocat_sca": round(by_cat.get("avocat", 0), 2),
-                "huissier": round(by_cat.get("huissier", 0), 2),
-                "avocat_perso": round(total_personal, 2),
-            },
+            "by_category_sca": {k: round(v, 2) for k, v in sorted(by_cat_sca.items())},
+            "by_category_perso": {k: round(v, 2) for k, v in sorted(by_cat_perso.items())},
             "total_sca_cashflow_out": round(sum(e["amount"] for e in sca_cashflow if e["amount"] < 0), 2),
             "total_sca_cashflow_in": round(sum(e["amount"] for e in sca_cashflow if e["amount"] > 0), 2),
         },

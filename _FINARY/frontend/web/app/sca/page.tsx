@@ -37,13 +37,27 @@ export default function SCAPage() {
   const fin = sca.financials;
   const prop = sca.property;
 
-  // Pie data for cost breakdown
-  const costPie = [
-    { name: "Notaire", value: s.by_category.notaire },
-    { name: "Avocat (SCA)", value: s.by_category.avocat_sca },
-    { name: "Huissier", value: s.by_category.huissier },
-    { name: "Avocat (perso)", value: s.by_category.avocat_perso },
-  ].filter((d) => d.value > 0);
+  // Pie data for cost breakdown — combine SCA + perso categories
+  const allCats: Record<string, number> = {};
+  const LABELS: Record<string, string> = {
+    notaire: "Notaire", avocat: "Avocat (SCA)", huissier: "Huissier",
+    géomètre: "Géomètre", architecte: "Architecte", publication: "Publication JO",
+    divers: "Divers (condamnation)", greffe: "Greffe (perso)",
+  };
+  if (s.by_category_sca) {
+    for (const [k, v] of Object.entries(s.by_category_sca)) allCats[k] = (allCats[k] || 0) + (v as number);
+  }
+  if (s.by_category_perso) {
+    for (const [k, v] of Object.entries(s.by_category_perso)) {
+      const key = k === "avocat" ? "avocat_perso" : k;
+      allCats[key] = (allCats[key] || 0) + (v as number);
+    }
+  }
+  if (allCats["avocat_perso"]) LABELS["avocat_perso"] = "Avocat (perso)";
+  const costPie = Object.entries(allCats)
+    .filter(([, v]) => v > 0)
+    .sort(([, a], [, b]) => b - a)
+    .map(([k, v]) => ({ name: LABELS[k] || k, value: v }));
 
   // Monthly cashflow for chart
   const cashflowByMonth: Record<string, { in: number; out: number }> = {};
@@ -199,11 +213,13 @@ export default function SCAPage() {
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="grid grid-cols-2 gap-3 mt-4 text-xs">
-            <div className="flex justify-between"><span className="text-t-4">Notaire</span><span className="text-t-1">{formatEUR(s.by_category.notaire)}</span></div>
-            <div className="flex justify-between"><span className="text-t-4">Avocat SCA</span><span className="text-t-1">{formatEUR(s.by_category.avocat_sca)}</span></div>
-            <div className="flex justify-between"><span className="text-t-4">Huissier</span><span className="text-t-1">{formatEUR(s.by_category.huissier)}</span></div>
-            <div className="flex justify-between"><span className="text-t-4">Avocat perso</span><span className="text-t-1">{formatEUR(s.by_category.avocat_perso)}</span></div>
+          <div className="grid grid-cols-2 gap-2 mt-4 text-xs">
+            {costPie.map((c) => (
+              <div key={c.name} className="flex justify-between">
+                <span className="text-t-4">{c.name}</span>
+                <span className="text-t-1">{formatEUR(c.value)}</span>
+              </div>
+            ))}
           </div>
         </Section>
 
