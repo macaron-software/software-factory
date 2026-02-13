@@ -12,6 +12,23 @@ import {
   Gavel, Zap, Timer, ClipboardList, CheckCircle, AlertCircle,
 } from "lucide-react";
 
+/** Render event text, replacing [TAG] prefixes with Lucide icons */
+function renderEvent(text: string) {
+  const tagMap: Record<string, { icon: React.ReactNode; cls: string }> = {
+    "[DELIBERE]": { icon: <Gavel className="w-3 h-3 inline mr-1" />, cls: "text-accent font-semibold" },
+    "[AUDIENCE]": { icon: <Scale className="w-3 h-3 inline mr-1" />, cls: "text-accent font-semibold" },
+    "[DEADLINE]": { icon: <ClipboardList className="w-3 h-3 inline mr-1" />, cls: "" },
+    "[RISQUE]": { icon: <AlertCircle className="w-3 h-3 inline mr-1" />, cls: "text-loss" },
+    "[A PLANIFIER]": { icon: <Clock className="w-3 h-3 inline mr-1" />, cls: "text-t-3" },
+  };
+  for (const [tag, { icon, cls }] of Object.entries(tagMap)) {
+    if (text.startsWith(tag)) {
+      return <span className={cls}>{icon}{text.slice(tag.length + 1)}</span>;
+    }
+  }
+  return text;
+}
+
 type BadgeVariant = "gain" | "loss" | "accent" | "warn" | "neutral";
 
 /** Format ISO date as "DD/MM/YYYY" */
@@ -274,8 +291,8 @@ export default function SCAPage() {
         )}
 
         {legal.axel_factures && (() => {
-          const factures = legal.axel_factures;
-          const tot = legal.axel_totaux;
+          const factures = legal.axel_factures as any[];
+          const tot = legal.axel_totaux as any;
           return (
           <Section title={<span className="flex items-center gap-2"><ClipboardList className="w-4 h-4" />Factures Me Saint Martin</span>}>
             <table className="w-full text-xs">
@@ -390,7 +407,10 @@ export default function SCAPage() {
               <div key={proc.id} className="card p-5 border border-bd-1">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h4 className="text-t-1 font-semibold text-sm">{proc.name}</h4>
+                    <h4 className="text-t-1 font-semibold text-sm">
+                      {proc.name}
+                      {proc.reference && <span className="text-t-4 font-normal ml-2">({proc.reference})</span>}
+                    </h4>
                     <p className="text-t-4 text-xs mt-1">
                       {proc.lawyer} {proc.jurisdiction ? `— ${proc.jurisdiction}` : ""}
                     </p>
@@ -413,7 +433,7 @@ export default function SCAPage() {
                         <span className="text-accent font-mono font-semibold w-24 shrink-0">
                           {fmtDate(d.date)}
                         </span>
-                        <span className="text-accent">{d.event}</span>
+                        <span className="text-accent">{renderEvent(d.event)}</span>
                       </div>
                     ))}
                   </div>
@@ -428,7 +448,7 @@ export default function SCAPage() {
                     {pastEvents.map((d: any, i: number) => (
                       <div key={i} className="flex items-start gap-3 py-1 text-t-5">
                         <span className="font-mono w-24 shrink-0">{fmtDate(d.date)}</span>
-                        <span>{d.event}</span>
+                        <span>{renderEvent(d.event)}</span>
                       </div>
                     ))}
                   </details>
