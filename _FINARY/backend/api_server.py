@@ -1282,6 +1282,7 @@ def get_sca_legal():
             "type": "expertise",
             "status": "terminée",
             "lawyer": "Me Axel Saint Martin",
+            "adverse": "Me Vernhet (avocat Beaussier)",
             "start_date": "2023-03-01",
             "key_dates": [
                 {"date": "2024-04-11", "event": "Nomination mandataire ad'hoc (Me Sandian, 1 800€)"},
@@ -1291,22 +1292,53 @@ def get_sca_legal():
             ],
         },
         {
-            "id": "refere_beaussier",
+            "id": "refere_hah",
+            "name": "Appel Référé Heure-à-Heure (Beaussier)",
+            "type": "judiciaire_civil",
+            "status": "en_cours",
+            "lawyer": "Me Axel Saint Martin",
+            "adverse": "Me Vernhet (avocat Beaussier)",
+            "jurisdiction": "Cour d'Appel Montpellier",
+            "start_date": "2025-10-01",
+            "note": "Appel du référé heure-à-heure. Me Saint Martin a plaidé le 12/02/2026.",
+            "key_dates": [
+                {"date": "2025-10-14", "event": "Facture Me Saint Martin — Défense Référé Nullité AG (1 800€)"},
+                {"date": "2026-02-12", "event": "Plaidoirie Me Saint Martin (appel heure-à-heure)"},
+                {"date": "2026-03-31", "event": "⚖️ DÉLIBÉRÉ — Décision attendue"},
+            ],
+        },
+        {
+            "id": "refere_expulsion",
             "name": "Référé Expulsion (Beaussier occupante sans titre)",
             "type": "judiciaire_civil",
             "status": "en_cours",
             "lawyer": "Me Axel Saint Martin",
+            "adverse": "Me Vernhet (avocat Beaussier) — joue la montre (dissolution SCA sept. 2026)",
             "jurisdiction": "TJ Montpellier — JCP (Juge des Contentieux de la Protection)",
             "start_date": "2025-08-26",
+            "note": "Me Vernhet parie sur la dissolution automatique de la SCA en septembre 2026 (5 ans). Stratégie dilatoire.",
             "key_dates": [
                 {"date": "2025-08-26", "event": "Assignation TJ JCP — occupant sans droit ni titre"},
                 {"date": "2025-10-14", "event": "Facture Me Saint Martin — Référé Expulsion (1 800€)"},
-                {"date": "2025-10-14", "event": "Facture Me Saint Martin — Défense Référé Nullité AG (1 800€)"},
                 {"date": "2025-10-27", "event": "Facture Me Saint Martin — Assignation Mandataire (1 275€)"},
-                {"date": "2026-02-12", "event": "Conclusions adverses reportées au 23/03"},
-                {"date": "2026-03-23", "event": "📋 Conclusions adverses (attendues)"},
-                {"date": "2026-03-31", "event": "⚖️ Délibéré heure-à-heure"},
-                {"date": "2026-05-18", "event": "📋 Conclusions en réplique (à confirmer)"},
+                {"date": "2026-03-23", "event": "📋 Conclusions adverses (Vernhet — deadline)"},
+                {"date": "2026-05-04", "event": "📋 Conclusions en réplique (Saint Martin — deadline)"},
+            ],
+        },
+        {
+            "id": "prolongation",
+            "name": "Prolongation SCA (2 ans — mandataire ad'hoc)",
+            "type": "judiciaire_civil",
+            "status": "en_cours",
+            "lawyer": "Me Axel Saint Martin",
+            "adverse": "Me Vernhet — a demandé renvoi (accordé de droit au 1er appel)",
+            "jurisdiction": "TJ Montpellier — Référé",
+            "start_date": "2026-01-22",
+            "note": "Assignation mandataire ad'hoc pour prolonger la SCA de 2 ans (dissolution prévue sept. 2026). Vernhet a obtenu un renvoi de droit au 1er appel, mais le président a renvoyé au 26/02 (les autres renvoyés en avril).",
+            "key_dates": [
+                {"date": "2026-01-22", "event": "Audience référé — 1ère audience utile (assignation mandataire)"},
+                {"date": "2026-01-23", "event": "Renvoi demandé par Vernhet (de droit au 1er appel)"},
+                {"date": "2026-02-26", "event": "⚖️ AUDIENCE — Prolongation SCA (renvoi accéléré par le président)"},
             ],
         },
         {
@@ -1335,18 +1367,35 @@ def get_sca_legal():
             "status": "en_preparation",
             "lawyer": "Me Axel Saint Martin",
             "start_date": "2025-11-01",
+            "note": "Dépend de: validation comptes → AGO → libération capital → AG art.19. Vernhet bloquera en heure-à-heure à chaque étape.",
             "key_dates": [
                 {"date": "2025-03-17", "event": "AGO Révocation Beaussier de la cogérance"},
                 {"date": "2025-05-27", "event": "AGE Modification statuts"},
                 {"date": "2025-11-03", "event": "AGO Approbation comptes + AF impayés"},
                 {"date": "2025-11-25", "event": "Provision huissier vente art.19 (58,75€)"},
-                {"date": "2026-02-01", "event": "Validation comptes par expert-comptable (en cours)"},
+                {"date": "2026-02-01", "event": "Validation comptes par Lionel (expert-comptable — en cours)"},
                 {"date": "2026-03-01", "event": "📋 AGO Approbation comptes (à planifier)"},
                 {"date": "2026-04-01", "event": "📋 Libération capital restant (à planifier)"},
                 {"date": "2026-05-01", "event": "📋 AG Article 19 — mise en vente forcée"},
+                {"date": "2026-06-01", "event": "⚠️ Heure-à-heure probable (Vernhet bloquera)"},
             ],
         },
     ]
+
+    # Key strategic context
+    strategy = {
+        "dissolution_date": "2026-09-01",
+        "dissolution_note": "SCA créée 28/07/2021, durée 5 ans → dissolution automatique ~sept. 2026",
+        "adverse_strategy": "Me Vernhet joue la montre: renvois systématiques, heure-à-heure sur chaque AG. Pari = SCA dissoute avant expulsion/vente art.19.",
+        "our_counter": "Prolongation SCA de 2 ans (audience 26/02) + accélérer art.19 en parallèle",
+        "critical_path": [
+            "26/02 → Prolongation SCA (bloque la dissolution)",
+            "31/03 → Délibéré appel heure-à-heure",
+            "23/03 → Conclusions adverses expulsion",
+            "04/05 → Nos conclusions en réplique",
+            "Comptes validés → AGO → Libération capital → AG art.19",
+        ],
+    }
 
     # 6. Monthly spending chart data
     monthly_spend = defaultdict(float)
@@ -1377,6 +1426,7 @@ def get_sca_legal():
         "personal_legal": personal_legal,
         "sca_cashflow": sca_cashflow,
         "procedures": procedures,
+        "strategy": strategy,
         "chart_monthly": chart_data,
         "beaussier_debt": {
             "af_impayes": 25334.71,

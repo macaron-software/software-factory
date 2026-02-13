@@ -27,6 +27,7 @@ export default function SCAPage() {
 
   const s = (legal as any).summary;
   const procedures = (legal as any).procedures as any[];
+  const strategy = (legal as any).strategy;
   const legalEntries = (legal as any).legal_entries as any[];
   const personalLegal = (legal as any).personal_legal as any[];
   const chartMonthly = (legal as any).chart_monthly as any[];
@@ -76,6 +77,35 @@ export default function SCAPage() {
         <StatCard label="Impayés Beaussier" value={beaussierDebt.af_impayes} tone="negative" />
       </div>
 
+      {/* ─── Strategy / Critical Path ─── */}
+      {strategy && (
+        <Section title="⚡ Chemin critique">
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <p className="text-loss text-xs font-semibold mb-2">
+                ⏰ Dissolution SCA: {strategy.dissolution_date?.slice(0, 7)}
+              </p>
+              <p className="text-t-3 text-xs mb-3">{strategy.dissolution_note}</p>
+              <p className="text-t-4 text-xs font-semibold mb-1">Stratégie adverse</p>
+              <p className="text-t-3 text-xs mb-3">{strategy.adverse_strategy}</p>
+              <p className="text-gain text-xs font-semibold mb-1">Notre contre-stratégie</p>
+              <p className="text-t-2 text-xs">{strategy.our_counter}</p>
+            </div>
+            <div>
+              <p className="text-t-4 text-xs font-semibold mb-2">Prochaines étapes clés</p>
+              <div className="space-y-1.5">
+                {strategy.critical_path?.map((step: string, i: number) => (
+                  <div key={i} className="flex items-start gap-2 text-xs">
+                    <span className="text-accent mt-0.5">›</span>
+                    <span className="text-t-2">{step}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Section>
+      )}
+
       {/* ─── Procedures Timeline ─── */}
       <Section title="Procédures en cours">
         <div className="space-y-4">
@@ -95,9 +125,16 @@ export default function SCAPage() {
                     <p className="text-t-4 text-xs mt-1">
                       {proc.lawyer} {proc.jurisdiction ? `— ${proc.jurisdiction}` : ""}
                     </p>
+                    {proc.adverse && (
+                      <p className="text-loss text-xs mt-0.5">vs {proc.adverse}</p>
+                    )}
                   </div>
                   <Badge variant={st.variant}>{st.label}</Badge>
                 </div>
+
+                {proc.note && (
+                  <p className="text-t-3 text-xs mb-3 italic border-l-2 border-accent pl-3">{proc.note}</p>
+                )}
 
                 {/* Future dates (highlighted) */}
                 {futureEvents.length > 0 && (
