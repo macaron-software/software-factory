@@ -55,7 +55,7 @@ export default function SCAPage() {
     avocat: "Avocat (SCA)", huissier: "Huissier", condamnation: "Condamnation Art. L.761-1",
     publication: "Publication JO", expertise_judiciaire: "Expertise judiciaire",
     études_géomètre: "Géomètre (BET Seals)", études_architecte: "Architecte (permis modif.)",
-    acquisition_notaire: "Notaire (acquisition terrain)", greffe: "Greffe (perso)",
+    greffe: "Greffe (perso)",
   };
   if (s.by_category_sca) {
     for (const [k, v] of Object.entries(s.by_category_sca)) allCats[k] = (allCats[k] || 0) + (v as number);

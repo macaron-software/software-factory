@@ -1206,9 +1206,9 @@ def get_sca_legal():
     # Professional fee accounts — classified by purpose:
     # juridique: avocat, huissier, divers (condamnation), publication
     # études: géomètre (BET Seals), architecte (permis modificatif)
-    # acquisition: notaire (terrain)
+    # NOTE: 6221 (notaire acquisition terrain) exclu — pas lié à la procédure
     COMPTE_MAP = {
-        "6220": "condamnation", "6221": "acquisition_notaire", "6222": "études_géomètre",
+        "6220": "condamnation", "6222": "études_géomètre",
         "6223": "études_architecte", "6226": "avocat", "6227": "huissier", "6234": "publication",
     }
     if fec_path.exists():
