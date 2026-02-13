@@ -175,7 +175,9 @@ class ProjectStore:
     def seed_from_registry(self):
         """Import projects from ProjectRegistry (SF/MF yaml discovery) into DB."""
         from .registry import get_project_registry
+        from ..agents.store import get_agent_store, AgentDef
         registry = get_project_registry()
+        agent_store = get_agent_store()
 
         for info in registry.all():
             existing = self.get(info.id)
@@ -194,19 +196,40 @@ class ProjectStore:
             if p.exists:
                 p.vision = p.load_vision_from_file()
 
-            # Default values for SF projects
+            # Create a dedicated project agent
+            agent_id = f"agent-{info.id}"
+            if not agent_store.get(agent_id):
+                agent = AgentDef(
+                    id=agent_id,
+                    name=info.name,
+                    role="project-agent",
+                    description=f"Conversational agent for {info.name}. Knows the codebase, can search files, read code, and answer questions.",
+                    provider="minimax", model="MiniMax-M2.5",
+                    temperature=0.5, max_tokens=4096,
+                    icon="bot", color=_project_color(info.id),
+                    avatar="bot", tagline=info.description[:60] if info.description else f"Your guide to {info.name}",
+                    is_builtin=True,
+                    tags=["project", info.factory_type or "general"],
+                    system_prompt=f"You are the project agent for {info.name}.\n"
+                    f"Project path: {info.path}\n"
+                    f"Type: {info.factory_type or 'general'}\n"
+                    "You help the team understand the codebase, find files, explain architecture, "
+                    "and answer questions. You can trigger deep search (RLM) for complex queries. "
+                    "Be concise, precise, and helpful.",
+                )
+                agent_store.create(agent)
+
+            p.lead_agent_id = agent_id
+
             if p.factory_type == "sf":
                 p.values = ["quality", "feedback", "tdd", "zero-skip", "kaizen"]
-                p.lead_agent_id = "brain"
             elif p.factory_type == "mf":
                 p.values = ["quality", "feedback", "zero-skip"]
-                p.lead_agent_id = "brain"
             else:
                 p.values = ["quality", "feedback"]
-                p.lead_agent_id = "lead-dev"
 
             self.create(p)
-            logger.info("Seeded project %s (%s)", p.id, p.factory_type)
+            logger.info("Seeded project %s (%s) with agent %s", p.id, p.factory_type, agent_id)
 
     def _row_to_project(self, row) -> Project:
         return Project(
@@ -225,6 +248,17 @@ class ProjectStore:
             created_at=row["created_at"] or "",
             updated_at=row["updated_at"] or "",
         )
+
+
+def _project_color(project_id: str) -> str:
+    """Assign a distinct color per project."""
+    colors = {
+        "factory": "#bc8cff", "fervenza": "#f0883e", "veligo": "#58a6ff",
+        "ppz": "#3fb950", "psy": "#a371f7", "yolonow": "#f85149",
+        "solaris": "#d29922", "sharelook": "#79c0ff", "finary": "#56d364",
+        "lpd": "#db6d28", "logs-facteur": "#8b949e",
+    }
+    return colors.get(project_id, "#8b949e")
 
 
 # Singleton
