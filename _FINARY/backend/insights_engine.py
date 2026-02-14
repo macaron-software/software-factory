@@ -16,39 +16,50 @@ INFLATION_RATE = 0.024  # 2.4% annuel zone euro Q1 2026
 # ─── Categorization rules ─────────────────────────────────────────────────────
 
 CATEGORY_RULES: list[tuple[str, str]] = [
-    # Alimentation
+    # Alimentation (FR + foreign supermarkets)
     (r"carrefour|leclerc|auchan|lidl|aldi|monoprix|picard|franprix|intermarche|intermarch|casino|biocoop|super\s*u|marche|boulang|primeur|trifontaine|grand\s*frais|bio\s*c", "alimentation"),
     (r"deliveroo|uber\s*eat|just\s*eat|frichti|getir|gorillas|too\s*good|zamca\s*delivery", "alimentation"),
-    # Restaurants
+    # Foreign supermarkets (Scandinavia, Spain, Portugal, Germany, Belgium, NL)
+    (r"kiwi\s*\d|bunnpris|superbrugsen|edeka|lekkerland|qstar|coop\s*prix|rema\s*1000|familycash|inter\s*marinha|viacatarina|ingo\s*bro|maes\s*mechelen", "alimentation"),
+    # Restaurants (FR + foreign)
     (r"restaurant|brasserie|mcdon|burger|kfc|subway|sushi|kebab|pizza|cafe|starbucks|paul\b|ratatouille|au\s*fil\s*de\s*l", "restaurants"),
-    # Transport
+    (r"chopchop|papyburger|leve\s*alfama|fermin\s*calbeton|morarita|gelet\s*a\s*veneziana|russia\s*no\s*porto|paume\b|portas\s*d\s*el\s*rei|basilic\s*&|cafe\s*joyeux|café\s*joyeux|grill\s*house|atelier\s*gourmand|don\s*pepino|casa\s*vergara|elior|a\s*padaria", "restaurants"),
+    # Transport (FR + foreign tolls/fuel/ferries)
     (r"sncf|ratp|navigo|uber(?!\s*eat)|bolt|lime|bird|blabla|essence|total\s*energ|shell|bp\b|parkm|stationnement|autoroute|peage|wizz\s*air|ryanair|easyjet|gasoliner|eess\b|area\s*de\s*servic|cleverlog|autotei|carburant", "transport"),
-    # Logement
-    (r"loyer|edf|engie|gaz|electricite|eau|syndic|assurance\s*hab|charges\s*loc|taxe\s*(?:fonciere|hab)|swikly", "logement"),
+    (r"gavio|satap|sitaf|autost\s*direzione|epass24|superspeed|uno-x|din-x|bunker\s*oil|st1\s*aarjang|indigo\s*tres|mulhouse\s*dist|bleu\s*libe|a3m\s*fleming|nehopro|sudel|apk2|effia|combustiveis|airea|el\s*canto|us\d+\w*\s*(?:salamanca|santa\s*maria)|us\s*customs\s*esta|norauto|family\s*energy", "transport"),
+    # Logement (cautions, utilities, loan insurance)
+    (r"loyer|edf|engie|gaz|electricite|eau|syndic|assurance\s*hab|charges\s*loc|taxe\s*(?:fonciere|hab)|swikly|regie\s*eaux|reglement\s*assu.*pret\s*habitat", "logement"),
     # Santé
-    (r"pharmacie|doctolib|medecin|dentiste|ophtal|mutuelle|cpam|ameli|cesml", "sante"),
-    # Abonnements
+    (r"pharmacie|doctolib|medecin|dentiste|ophtal|mutuelle|cpam|ameli|cesml|ordoclic|proevestens\s*apote", "sante"),
+    # Abonnements (SaaS + media)
     (r"netflix|spotify|amazon\s*prime|disney|dazn|canal|sfr|orange|bouygues|free\b|apple|google\s*(?:one|storage)|notion|chatgpt|github|icloud", "abonnements"),
+    (r"openai|replit|monodirect|buymeacoffee|cybersco|kindle|digiacademy|porkbun|steam|lebara|aws", "abonnements"),
     # Shopping
     (r"zara|h&m|uniqlo|amazon(?!\s*prime)|fnac|darty|ikea|decathlon|leroy\s*merlin|aliexpress|apple\s*store|alibaba|ifixit|temu", "shopping"),
+    (r"action\s*(?:is\s*the|4580)|napoleon\s*dynamit|wechat|la\s*poste|flomad|netnomad|getnomad|pyn\.*eu|c3mr|origine\s*coiffure|coiffure|tmp\s*aliados|assuntos", "shopping"),
     # Éducation & Famille
-    (r"ogec|ecole|cantine|creche|garderie|scolarit|la\s*merci|fourniture", "education_famille"),
-    # Loisirs
+    (r"ogec|ecole|cantine|creche|garderie|scolarit|la\s*merci|fourniture|le\s*bris\s*segolene", "education_famille"),
+    # Loisirs (museums, activities, tourism)
     (r"cinema|theatre|concert|museum|parc|voyage|hotel|airbnb|booking|sport|salle|gym|piscine", "loisirs"),
+    (r"skansen|the\s*fjords|kinboat|basilique|stranda\s*kommu|sternenko|arenal|ticketingcine|coff\.ee", "loisirs"),
+    # Hébergement voyage
+    (r"hotelcom\d|hotel\s*com|trivago", "hebergement"),
     # Retrait DAB → vie quotidienne
     (r"retrait\s*dab|retrait\s*especes", "vie_quotidienne"),
     # Banque/Frais
-    (r"cotisation|commission|agios|frais\s*bancaire|inter[eê]ts?\s*d[eé]bit|frais\s*carte", "banque_frais"),
+    (r"cotisation|commission|agios|frais\s*bancaire|inter[eê]ts?\s*d[eé]bit|frais\s*carte|trade\s*republic\s*card", "banque_frais"),
     # Assurances
     (r"assurance|maif|maaf|axa|allianz|generali|groupama|macif|mma|matmut", "assurances"),
     # Épargne/Investissement (virements vers épargne)
-    (r"trade\s*republic|interactive\s*brokers|ibkr|bourso.*pea|virement.*epargne|livret", "epargne_invest"),
+    (r"trade\s*republic(?!\s*card)|interactive\s*brokers|ibkr|bourso.*pea|virement.*epargne|livret", "epargne_invest"),
     # Impôts
     (r"impot|dgfip|tresor\s*public|taxe|csg|crds|prelevement\s*source", "impots"),
     # Virements entre comptes (à neutraliser)
     (r"virement\s*(?:emis|recu|permanent)|transfert|sepa.*(?:legland|sylvain)", "virement_interne"),
     # Revenus
     (r"salaire|paie|prime|remboursement|caf\b|pole\s*emploi|allocation|dividende|coupon", "revenu"),
+    # PayPal (catch-all for remaining PayPal)
+    (r"^paypal$", "abonnements"),
 ]
 
 # ─── HHI Diversification Score ────────────────────────────────────────────────
@@ -1057,7 +1068,10 @@ CATEGORY_NORMALIZE: dict[str, str] = {
     "Vie Quotidienne - Autres": "vie_quotidienne",
     "Electronique et informatique": "shopping",
     "Bien-être et soins (coiffeur, parfums…)": "vie_quotidienne",
+    "Bien-être": "vie_quotidienne",
     "Abonnements & téléphonie": "abonnements",
+    "Abonnements & téléphonie - Autres": "abonnements",
+    "Abonnements": "abonnements",
     "Education & Famille": "education_famille",
     "Etudes (formation, fournitures, cantines…)": "education_famille",
     "Logement": "logement",
@@ -1065,28 +1079,66 @@ CATEGORY_NORMALIZE: dict[str, str] = {
     "Emprunt immobilier": "credits",
     "Travaux, réparation, entretien, aménagement…": "logement",
     "Energie (électricité, gaz, fuel, chauffage…)": "logement",
+    "Énergie": "logement",
     "Santé": "sante",
     "Médecins et frais médicaux": "sante",
+    "Pharmacie et laboratoire": "sante",
+    "Remboursements frais de santé": "sante",
+    "Optique, audition…": "sante",
     "Loisirs et sorties": "loisirs",
+    "Loisirs": "loisirs",
     "Restaurants, bars, discothèques…": "restaurants",
+    "Restauration": "restaurants",
     "Divertissement - culture (ciné, théâtre, concerts…)": "loisirs",
     "Auto & Moto": "transport",
     "Péages": "transport",
     "Carburant": "transport",
+    "Transport": "transport",
+    "Transports quotidiens (métro, bus…)": "transport",
+    "Transports longue distance (avions, trains…)": "transport",
+    "Parking": "transport",
+    "Taxis": "transport",
     "Assurance véhicule": "assurances",
+    "Assurances (Auto/Moto)": "assurances",
+    "Assurance habitation et RC": "assurances",
     "Shopping": "shopping",
+    "Vêtements et accessoires": "shopping",
+    "Livres, CD/DVD, bijoux, jouets…": "shopping",
+    "Mobilier, électroménager, décoration…": "shopping",
+    "Bricolage et jardinage": "shopping",
     "Non catégorisé": "autre",
+    "Autre": "autre",
+    "Autres dépenses": "autre",
     "Revenus du travail": "salaire",
     "Salaire fixe": "salaire",
     "Revenus d'épargne": "revenus_epargne",
     "Revenus épargne financière (retraite, prévoyance, PEA, assurance-vie…)": "revenus_epargne",
+    "Revenus financiers": "revenus_epargne",
     "Impôts & Taxes": "impots",
     "Cadeaux": "loisirs",
+    "Dons et Cadeaux": "loisirs",
+    "Contraventions": "transport",
     "Animaux": "vie_quotidienne",
     "Scolarité": "education_famille",
     "Banque": "banque_frais",
     "Frais bancaires": "banque_frais",
+    "Frais bancaires et de gestion (dont agios)": "banque_frais",
     "Assurances": "assurances",
+    "Assurance": "assurances",
+    "Retraits cash": "vie_quotidienne",
+    "Chèques": "vie_quotidienne",
+    "Club / association (sport, hobby, art…)": "loisirs",
+    "Hébergement (hôtels, camping…)": "loisirs",
+    "Hébergement": "loisirs",
+    "Services professionnels (avocats, notaires, comptabilité…)": "autre",
+    "Entretien - Réparation": "logement",
+    "Téléphonie (fixe et mobile)": "abonnements",
+    "Prélèvements": "autre",
+    # TR savings plans → exclude from budget
+    "Épargne investissement": "epargne_invest",
+    "Épargne": "epargne_invest",
+    # CA-specific
+    "Autres revenus": "autre",
     # Our regex categories (already normalized)
     "alimentation": "alimentation",
     "restaurants": "restaurants",
@@ -1101,6 +1153,10 @@ CATEGORY_NORMALIZE: dict[str, str] = {
     "epargne_invest": "epargne_invest",
     "impots": "impots",
     "revenu": "salaire",
+    "education_famille": "education_famille",
+    "vie_quotidienne": "vie_quotidienne",
+    "hebergement": "hebergement",
+    "credits": "credits",
     "autre": "autre",
 }
 
@@ -1121,7 +1177,6 @@ INCOME_CATS = {"salaire", "revenus_epargne"}
 
 def _normalize_category(tx: dict) -> str:
     """Normalize a transaction's category to our unified set."""
-    # Prefer Bourso's native category, then parent, then our regex
     cat = tx.get("category") or ""
     parent = tx.get("category_parent") or ""
 
@@ -1129,9 +1184,14 @@ def _normalize_category(tx: dict) -> str:
     if cat in TRANSFER_CATS or parent in TRANSFER_CATS:
         return "_transfer"
 
-    # Normalize category (try cat first, then parent)
-    norm = CATEGORY_NORMALIZE.get(cat)
-    if not norm:
+    # Categories that are too vague — fall through to regex
+    VAGUE_CATS = {"Autre", "Non catégorisé", "Vie Quotidienne - Autres", "Autres dépenses"}
+
+    # Normalize category (try cat first, then parent, skip vague ones)
+    norm = None
+    if cat not in VAGUE_CATS:
+        norm = CATEGORY_NORMALIZE.get(cat)
+    if not norm and parent not in VAGUE_CATS:
         norm = CATEGORY_NORMALIZE.get(parent)
     if not norm:
         # Fall back to regex on description
@@ -1176,7 +1236,7 @@ def aggregate_monthly_budget(transactions: list[dict]) -> list[dict]:
         if norm_cat == "_transfer":
             continue
         tx_type = tx.get("type", "")
-        if tx_type == "transfer":
+        if tx_type in ("transfer", "investment", "savings"):
             continue
 
         monthly[month]["tx_count"] += 1
@@ -1193,6 +1253,9 @@ def aggregate_monthly_budget(transactions: list[dict]) -> list[dict]:
             # Skip loan repayments from expense count (tracked in loans page)
             if norm_cat == "credits":
                 monthly[month]["categories"]["credits"] += abs(amount)
+                continue
+            # Skip savings/investment from expense count
+            if norm_cat == "epargne_invest":
                 continue
             monthly[month]["expenses"] += abs(amount)
             monthly[month]["categories"][norm_cat] += abs(amount)

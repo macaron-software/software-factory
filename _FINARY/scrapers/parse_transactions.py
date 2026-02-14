@@ -287,23 +287,34 @@ def parse_bourso_csv(filepath: Path, con: duckdb.DuckDBPyConnection):
 
 # Category mapping for Trade Republic merchants
 TR_CATEGORIES = {
+    # Alimentation
     "carrefour": "Alimentation",
     "lidl": "Alimentation",
     "auchan": "Alimentation",
     "intermarche": "Alimentation",
+    "intermarché": "Alimentation",
     "monoprix": "Alimentation",
     "picard": "Alimentation",
     "leclerc": "Alimentation",
     "bio": "Alimentation",
     "boulangerie": "Alimentation",
-    "amazon": "Shopping",
-    "aliexpress": "Shopping",
-    "shein": "Shopping",
-    "temu": "Shopping",
-    "ikea": "Shopping",
-    "decathlon": "Shopping",
-    "action": "Shopping",
+    "marie blachère": "Alimentation",
+    "marie blachere": "Alimentation",
+    "la grange des pains": "Alimentation",
+    "le fournil": "Alimentation",
+    "pain d'epi": "Alimentation",
+    "la mie": "Alimentation",
+    "superbrugsen": "Alimentation",
+    "bunnpris": "Alimentation",
+    "edeka": "Alimentation",
+    "kiwi ": "Alimentation",
+    "ica ": "Alimentation",
+    "coop ": "Alimentation",
+    "rema ": "Alimentation",
+    "familycash": "Alimentation",
+    # Restauration
     "burger king": "Restauration",
+    "burger ratatouille": "Restauration",
     "mcdonalds": "Restauration",
     "mcdonald": "Restauration",
     "kfc": "Restauration",
@@ -311,6 +322,20 @@ TR_CATEGORIES = {
     "subway": "Restauration",
     "uber eats": "Restauration",
     "deliveroo": "Restauration",
+    "pizza": "Restauration",
+    "restaurant": "Restauration",
+    "brasserie": "Restauration",
+    "basilic & co": "Restauration",
+    "l'atelier gourmand": "Restauration",
+    "café joyeux": "Restauration",
+    "grill house": "Restauration",
+    "padaria": "Restauration",
+    "don pepino": "Restauration",
+    "elior": "Restauration",
+    "casa vergara": "Restauration",
+    "zamca": "Restauration",
+    "coff.ee": "Restauration",
+    # Transport
     "sncf": "Transport",
     "ratp": "Transport",
     "uber": "Transport",
@@ -318,23 +343,107 @@ TR_CATEGORIES = {
     "total": "Transport",
     "shell": "Transport",
     "bp ": "Transport",
+    "vinci autoroutes": "Transport",
+    "cleverlog": "Transport",
+    "effia": "Transport",
+    "apk2": "Transport",
+    "norauto": "Transport",
+    "gasolinera": "Transport",
+    "combustiveis": "Transport",
+    "eess ": "Transport",
+    "uno-x": "Transport",
+    "qstar": "Transport",
+    "bunker oil": "Transport",
+    "st1 ": "Transport",
+    "area de servico": "Transport",
+    "airea": "Transport",
+    # Abonnements
     "netflix": "Abonnements",
     "spotify": "Abonnements",
     "disney": "Abonnements",
     "apple": "Abonnements",
     "google": "Abonnements",
+    "aws": "Abonnements",
+    "steam": "Abonnements",
+    "lebara": "Abonnements",
+    "porkbun": "Abonnements",
+    "replit": "Abonnements",
+    "openai": "Abonnements",
+    # Shopping
+    "amazon": "Shopping",
+    "aliexpress": "Shopping",
+    "shein": "Shopping",
+    "temu": "Shopping",
+    "ikea": "Shopping",
+    "decathlon": "Shopping",
+    "action": "Shopping",
+    "kiabi": "Shopping",
+    "ifixit": "Shopping",
+    "botanic": "Shopping",
+    # Santé
     "pharmacie": "Santé",
     "doctolib": "Santé",
+    "au fil de l'o": "Bien-être",
+    "origine coiffure": "Bien-être",
+    "paume": "Bien-être",
+    # Hébergement
+    "booking": "Hébergement",
+    "sercotel": "Hébergement",
+    "hotel": "Hébergement",
+    # Énergie / Eau
+    "regie des eaux": "Énergie",
+    "family energy": "Énergie",
+    # Loisirs
+    "ticketingcine": "Loisirs",
+    # Assurance
+    "macif": "Assurance",
+    # Logement
+    "swikly": "Logement",
+    "cesml": "Logement",
+    "trifontaine": "Logement",
+}
+
+# TR Savings Plans — stock names (NOT expenses, these are investment purchases)
+TR_SAVINGS_PLANS = {
+    "byd", "xiaomi", "rheinmetall", "rolls royce", "leonardo-finmeccanica",
+    "nu", "unitedhealth", "soitec", "allianz", "sanofi", "johnson & johnson",
+    "exxon mobil", "snowflake", "mercadolibre", "sea (adr)", "moderna",
+    "intuitive surgical", "intuit", "realty income", "stmicroelectronics",
+    "lvmh", "asml", "canadian national", "enphase energy", "l'oreal",
+    "schneider electric", "alphabet", "ibm", "nvidia", "plug power",
+    "alibaba group",  # "Alibaba Group" (savings plan) vs "Alibaba" (shopping)
 }
 
 
 def categorize_tr(merchant: str) -> str:
     """Map TR merchant to category."""
     ml = merchant.lower()
+    # Check savings plans first (stock purchases)
+    for stock in TR_SAVINGS_PLANS:
+        if stock in ml:
+            return "Épargne investissement"
     for key, cat in TR_CATEGORIES.items():
         if key in ml:
             return cat
     return "Autre"
+
+
+def classify_tr_type(merchant: str, status: str, amount: float) -> tuple[str, str]:
+    """Return (type, category) for TR transaction."""
+    desc_lower = merchant.lower()
+    if "saving" in desc_lower or "round up" in status.lower():
+        return "savings", "Épargne"
+    if "interest" in desc_lower:
+        return "income", "Revenus financiers"
+    if "sent" in status.lower():
+        return "transfer", "Virements"
+    if "received" in status.lower():
+        return "transfer", "Virements"
+    # Check if savings plan
+    for stock in TR_SAVINGS_PLANS:
+        if stock in desc_lower:
+            return "investment", "Épargne investissement"
+    return "expense", categorize_tr(merchant)
 
 
 def parse_tr_text(filepath: Path, con: duckdb.DuckDBPyConnection):
@@ -462,10 +571,11 @@ def parse_tr_text(filepath: Path, con: duckdb.DuckDBPyConnection):
             tx_type = "transfer"
             category = "Virements"
         else:
-            # Card purchase (expense)
-            tx_type = "expense"
-            category = categorize_tr(merchant)
-            amount = -amount  # expenses negative
+            tx_type, category = classify_tr_type(merchant, status, amount)
+            if tx_type == "expense":
+                amount = -amount  # expenses negative
+            elif tx_type == "investment":
+                amount = -amount  # investment outflow
 
         txns.append((dt, amount, merchant, category, "", merchant,
                      "trade_republic", "TR Card", tx_type))
@@ -482,6 +592,109 @@ def parse_tr_text(filepath: Path, con: duckdb.DuckDBPyConnection):
         print(f"  Period: {min(dates)} → {max(dates)}")
         expenses = sum(t[1] for t in txns if t[8] == "expense")
         print(f"  Total expenses: {expenses:,.2f}€")
+
+
+def parse_ca_csv(filepath: Path, con: duckdb.DuckDBPyConnection):
+    """Parse Crédit Agricole CSV export.
+
+    Format: Latin-1, semicolon separator, multiline labels in quotes,
+    separate Débit/Crédit columns.
+    """
+    print(f"\n{'='*60}")
+    print(f"Parsing Crédit Agricole: {filepath.name}")
+
+    raw = filepath.read_bytes().decode("latin-1")
+    lines = raw.split("\n")
+
+    # Find header row
+    data_start = None
+    for i, line in enumerate(lines):
+        if line.startswith("Date;Libellé") or line.startswith("Date;Libell"):
+            data_start = i + 1
+            break
+
+    if not data_start:
+        print("  ⚠ Could not find header row")
+        return
+
+    data = "\n".join(lines[data_start:])
+
+    # Each entry starts with DD/MM/YYYY;
+    entries = re.split(r'(?=\d{2}/\d{2}/\d{4};)', data)
+    entries = [e.strip() for e in entries if e.strip()]
+
+    txns = []
+    for entry in entries:
+        m = re.match(
+            r'(\d{2}/\d{2}/\d{4});"(.*?)";([\d\s,.]*);([\d\s,.]*)',
+            entry, re.DOTALL
+        )
+        if not m:
+            continue
+
+        dd, mm, yyyy = m.group(1).split("/")
+        dt = date(int(yyyy), int(mm), int(dd))
+
+        label_raw = m.group(2).strip()
+        label = re.sub(r'\s+', ' ', label_raw).strip()
+
+        def _parse_amt(s: str) -> float:
+            s = s.replace(" ", "").replace("\xa0", "").replace(",", ".").strip()
+            return float(s) if s else 0.0
+
+        debit = _parse_amt(m.group(3))
+        credit = _parse_amt(m.group(4))
+        amount = credit - debit
+
+        # Classify
+        desc_up = label.upper()
+        if "SALAIRE" in desc_up or "TRAITEMENT" in desc_up:
+            tx_type = "income"
+            category = "Salaire fixe"
+        elif "REMBOURSEMENT DE PRET" in desc_up or "PRELEVEMENT PRET" in desc_up:
+            tx_type = "expense"
+            category = "Emprunt immobilier"
+        elif "ASSU" in desc_up and "PRET" in desc_up:
+            tx_type = "expense"
+            category = "Assurance habitation et RC"
+        elif "TENUE DE COMPTE" in desc_up or "FRAIS" in desc_up or "COTISATION" in desc_up:
+            tx_type = "expense"
+            category = "Frais bancaires"
+        elif "VIREMENT" in desc_up and ("BOURSO" in desc_up or "LEGLAND" in desc_up):
+            tx_type = "transfer"
+            category = "Virements"
+        elif "VIREMENT" in desc_up:
+            tx_type = "transfer" if amount > 0 else "expense"
+            category = "Virements"
+        elif "PRELEVEMENT" in desc_up:
+            tx_type = "expense"
+            # Try to identify the merchant
+            if "CRCAM" in desc_up:
+                category = "Emprunt immobilier"
+            else:
+                category = "Prélèvements"
+        elif amount > 0:
+            tx_type = "income"
+            category = "Autres revenus"
+        else:
+            tx_type = "expense"
+            category = "Autre"
+
+        txns.append((dt, amount, label, category, "", "",
+                     "credit_agricole", "Compte Principal", tx_type))
+
+    con.execute("DELETE FROM budget_transactions WHERE bank = 'credit_agricole'")
+    if txns:
+        con.executemany("INSERT INTO budget_transactions VALUES (?,?,?,?,?,?,?,?,?)", txns)
+
+    print(f"  Transactions: {len(txns)}")
+    if txns:
+        dates = [t[0] for t in txns]
+        print(f"  Period: {min(dates)} → {max(dates)}")
+        expenses = sum(t[1] for t in txns if t[8] == "expense")
+        income = sum(t[1] for t in txns if t[8] == "income")
+        print(f"  Total expenses: {expenses:,.2f}€")
+        print(f"  Total income: {income:,.2f}€")
 
 
 def print_summary(con: duckdb.DuckDBPyConnection):
@@ -563,6 +776,11 @@ def main():
     tr = DATA_DIR / "tr_transactions_raw.txt"
     if tr.exists():
         parse_tr_text(tr, con)
+
+    # Parse Crédit Agricole
+    ca = DATA_DIR / "ca_export.csv"
+    if ca.exists():
+        parse_ca_csv(ca, con)
 
     print_summary(con)
     con.close()

@@ -792,7 +792,13 @@ def get_category_transactions(category: str, months: int = Query(3)):
     txs = load_transactions(months=months)
     matches = []
     for tx in txs:
+        # Skip transfers/investments (same logic as aggregate_monthly_budget)
+        tx_type = tx.get("type", "")
+        if tx_type in ("transfer", "investment", "savings"):
+            continue
         norm = _normalize_category(tx)
+        if norm == "_transfer":
+            continue
         if norm == category and tx.get("amount", 0) < 0:
             matches.append({
                 "date": tx["date"],
