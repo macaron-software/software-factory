@@ -46,34 +46,25 @@ Icons: lucide-react (Gavel, Scale, Clock, AlertCircle, CheckCircle, etc.)
 Dark theme. `--bg-0..3`, `--text-1..6`, `--green`/`--red` gain/loss, `--accent` gold #f1c086
 Tailwind: `bg-bg-2`, `text-t-1`, `text-gain`, `text-loss`, `border-bd-1`
 
-## SCA La Désirade — Legal tracking
+## SCA La Désirade
 
-SCA attribution (L.212-1 CCH). Legland 50,6% / Beaussier 49,4%. Capital 695 873€. Dissolution auto 06/09/2026.
-Objet: immeuble collectif divisé en fractions attribuées aux associés. 40 chemin de la Désirade, Grabels.
+SCA attribution L.212-1 CCH. Legland 50,6% / Beaussier 49,4%. Capital 695 873€. Dissolution auto 06/09/2026. Grabels.
+Avocats: Me Axel Saint Martin (SCA+Legland) vs Me Vernhet (Beaussier). Mandataire ad'hoc: Me Sandian (AMAJ, 1 800€). Expert: Philippe Combes (architecte DPLG).
+Statuts: Art.18 (AF), Art.19 (défaillance AF → vente forcée, AG 2/3 hors défaillant), Art.36 (dissolution: personnalité morale survit, pas indivision, partage limité associés en règle, passif proportionnel indéfiniment)
+CCA vs AF: Beaussier payait fournisseurs direct depuis perso → comptabilisé CCA (prêt remboursable) pas AF (contribution définitive). EC doit trancher. Art.19 = AF uniquement.
+Dettes Beaussier: AF 25K€, capital non libéré 192K€, QP fournisseurs 11K€, travaux Combes 45K€, indemnité occupation ~1K€/mois. Total ~140-154K€ hors capital.
+Vernhet: joue la montre, pas de conclusions, LRAR sans assignation (sans effet juridique), croit dissolution = libération (faux art.36).
+8 proc: expertise ✅ (Combes), fond (attente), appel HAH (délibéré 31/03), nullité AG, expulsion JCP (reportée mai→juillet probable), prolongation, TA arrêté, art.19
+Actions fév 2026: ✅ permis modificatif déposé mi-janv, ✅ EC contacté FEC transmis, ⏳ AG comptes, ⏳ art.19, ⏳ prolongation 2 ans (abus minorité si bloquée), banque reporte prêt
+Factures Axel: 9 factures SCA/Perso, montants partiellement inconnus. Estimation frais Vernhet: 22-39K€.
+Sources: FEC SCA, DuckDB Bourso, Outlook CDP, statuts `MAISON GRABELS/COMPTA SCA/STATUTS_SCA.txt`, jugements `MAISON GRABELS/PROCEDURE JUDICIAIRE/`
 
-**8 procédures:** expertise (terminée, expert Philippe Combes architecte DPLG), fond (en attente), appel HAH RG 25/04363 (CA Montpellier, délibéré 31/03), nullité AG 17/03/2025, référé expulsion JCP (Vernhet ne conclut pas — joue la montre), prolongation SCA, recours TA arrêté Grabels, vente forcée art.19
-**Avocats:** Me Axel Saint Martin (SCA+Legland) vs Me Vernhet (Beaussier). Mandataire ad'hoc: Me Sandian (SELARL AMAJ, 1 800€).
+## Situation perso
 
-**Statuts clés:** Art.18 (AF obligatoires), Art.19 (défaillance AF → vente forcée parts, AG 2/3 hors défaillant), Art.36 (dissolution: pas d'indivision, personnalité morale survit, partage limité aux associés en règle, passif proportionnel aux parts)
-
-**Point comptable critique — CCA vs AF:** Beaussier (ex-cogérante) a payé fournisseurs directement depuis ses comptes perso → comptabilisé en CCA (compte courant associé = prêt remboursable) au lieu d'AF (contribution définitive). EC doit trancher : requalification CCA→AF, compensation dettes réciproques, ou remboursement CCA puis nouvel AF. Impact direct sur art.19 (défaillance AF uniquement, pas CCA).
-
-**Dettes Beaussier vs SCA:** AF impayés 25 335€, capital non libéré 192 128€, QP fournisseurs 11 487€, travaux non conformes (Combes) 45 960€, indemnité occupation ~800-1 000€/mois. Total ~140-154K€ hors capital. CCA Beaussier (créance SCA→Beaussier) à chiffrer par EC.
-
-**Stratégie Vernhet:** joue la montre (pas de conclusions expulsion, LRAR contestation AG sans assignation en nullité = sans effet juridique, espère dissolution = libération). Aucun argument de fond. Ne met pas son nom sur les contestations (LRAR Beaussier directe). Beaussier croit dissolution la libère (faux — art.36 : personnalité morale survit, pas d'indivision, partage limité aux associés en règle).
-
-**Actions en cours (fév 2026):**
-- ✅ Permis modificatif déposé mi-janvier (régularise non-conformités → lève AIT)
-- ✅ Expert-comptable contacté, FEC transmis (arrêté comptes + analyse CCA/AF)
-- ⏳ AG comptes (dès EC prêt) → chiffrage créances certifié par tiers indépendant
-- ⏳ Mise en demeure art.19 (huissier) → AG art.19 (1 mois après)
-- ⏳ AGE prolongation 2 ans (Legland 50,6% < 2/3 → probable abus de minorité Beaussier → prolongation judiciaire)
-- Banque OK pour reporter prêt si avancement démontré (permis + AIT levé)
-- Appel HAH : délibéré 31/03/2026
-
-**Factures Me Saint Martin:** 9 factures (SCA/Perso tags, payée/impayée), totaux avec montants inconnus
-**Estimation frais Beaussier (Me Vernhet):** 22-39K€, préjudices judiciaires (rapport Combes + conclusions Axel)
-**Source données:** FEC SCA (622600/401/512), DuckDB Bourso transactions, emails Outlook CDP, statuts `/Users/sylvain/MAISON GRABELS/COMPTA SCA/STATUTS_SCA.txt`, jugements `/Users/sylvain/MAISON GRABELS/PROCEDURE JUDICIAIRE/`
+Trésorerie tendue: cash ~2K€, salaire ~3 500€/mois, charges ~2 650€/mois, marge ~850€. Prêts Bourso reportés 3 mois (→ avril). IBKR 58K€ liquidable si urgence.
+Prêts: PAS CA 637€/mois, conso CA 74€/mois, PTZ différé, Bourso ~11€/mois (reporté).
+Scolarité 2 enfants (lycée privé Montpellier): Nathaël 2 899€, Abigaëlle 2 725€. QP mère 33% / père 67%. Mère verse 127,66€/mois + avancé inscription Nathaël 140€ + voyage NY 1 500€. Septembre: fille potentiel école autre ville + chambre étudiante + prêt étudiant.
+Objectif été: permis modificatif → AIT levé → fenêtres → emménagement Grabels → économie loyer ~700€/mois.
 
 ## Key files
 
