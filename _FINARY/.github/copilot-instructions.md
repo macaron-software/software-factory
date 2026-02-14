@@ -53,11 +53,13 @@ Avocats: Me Axel Saint Martin (SCA+Legland) vs Me Vernhet (Beaussier). Mandatair
 Statuts: Art.18 (AF), Art.19 (défaillance AF → vente forcée, AG 2/3 hors défaillant), Art.36 (dissolution: personnalité morale survit, pas indivision, partage limité associés en règle, passif proportionnel indéfiniment)
 CCA vs AF: Beaussier payait fournisseurs direct depuis perso → comptabilisé CCA (prêt remboursable) pas AF (contribution définitive). EC doit trancher. Art.19 = AF uniquement.
 Dettes Beaussier: AF 25K€, capital non libéré 192K€, QP fournisseurs 11K€, travaux Combes 45K€, indemnité occupation ~1K€/mois. Total ~140-154K€ hors capital.
-Vernhet: joue la montre, pas de conclusions, LRAR sans assignation (sans effet juridique), croit dissolution = libération (faux art.36).
-8 proc: expertise ✅ (Combes), fond (attente), appel HAH (délibéré 31/03), nullité AG, expulsion JCP (reportée mai→juillet probable), prolongation, TA arrêté, art.19
-Actions fév 2026: ✅ permis modificatif déposé mi-janv, ✅ EC contacté FEC transmis, ⏳ AG comptes, ⏳ art.19, ⏳ prolongation 2 ans (abus minorité si bloquée), banque reporte prêt
-Factures Axel: 9 factures SCA/Perso, montants partiellement inconnus. Estimation frais Vernhet: 22-39K€.
-Sources: FEC SCA, DuckDB Bourso, Outlook CDP, statuts `MAISON GRABELS/COMPTA SCA/STATUTS_SCA.txt`, jugements `MAISON GRABELS/PROCEDURE JUDICIAIRE/`
+Vernhet: implication ~2/10. Conclusions vides (5p vs 17p Axel), écrit "SCI" au lieu de "SCA", pas de réponse art.28 (unanimité présents), 40K€ sans chiffrage ni dispositif, LRAR sans assignation. Phase 3 (minimum syndical, probablement impayé). Beaussier croit dissolution = libération (faux art.36).
+8 proc: expertise ✅ (Combes), fond (Beaussier demanderesse — reconventionnelle à déposer par Axel: fautes gestion + AF + Combes + occupation + obstruction = ~112K€), appel HAH (délibéré 31/03, confirmation quasi certaine vu conclusions vides), nullité AG, expulsion JCP (reportée mai→juillet), prolongation, TA arrêté, art.19
+Art.28 statuts = argument massue: AGO unanimité des PRÉSENTS. Beaussier ne vient pas → Legland vote seul = unanimité. Abus de majorité impossible (1ère instance + Axel l'a démontré).
+Actions fév 2026: ✅ permis modificatif déposé mi-janv, ✅ EC contacté FEC transmis, ⏳ AG comptes (EC), ⏳ mise en demeure art.19 (huissier), ⏳ AG art.19, ⏳ prolongation 2 ans (abus minorité → judiciaire), ⏳ reconventionnelle au fond (après EC + appel), banque reporte prêt
+Calendrier: mars-avril permis obtenu→AIT levé, 31/03 délibéré appel, avril AG comptes, mai AG art.19 + reconventionnelle, été travaux lot Legland
+Factures Axel: 9 factures SCA/Perso. Estimation frais Vernhet: 22-39K€. Art.700 cumulés: 2K€ (1ère instance) + ~4K€ (appel probable) = ~6K€ Beaussier doit.
+Sources: FEC SCA, DuckDB Bourso, Outlook CDP, statuts `MAISON GRABELS/COMPTA SCA/STATUTS_SCA.txt`, jugements + conclusions `MAISON GRABELS/PROCEDURE JUDICIAIRE/`
 
 ## Situation perso
 
