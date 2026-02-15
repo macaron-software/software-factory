@@ -173,7 +173,7 @@
 
         <!-- Memory files (auto-loaded) -->
         <div class="ps-section">
-            <h4>📝 Memory</h4>
+            <h4><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-filetext"/></svg> Memory</h4>
             {% if memory_files %}
             <div class="ps-memory-list">
                 {% for mf in memory_files %}
@@ -226,7 +226,7 @@
 
         {% if workflows %}
         <div class="ps-section">
-            <h4>🔄 Workflows</h4>
+            <h4><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-workflow"/></svg> Workflows</h4>
             {% for witem in workflows %}
             <div class="ps-workflow-card">
                 <div class="ps-workflow-name">{{ witem.wf.name }}</div>
@@ -234,11 +234,11 @@
                 <div class="ps-workflow-actions">
                     {% if witem.session %}
                     <a href="/sessions/{{ witem.session.id }}/live" class="btn btn-sm btn-primary" title="Live multi-agent view">
-                        🔮 Live
+                        <svg class="icon icon-xs"><use href="#icon-share"/></svg> Live
                     </a>
                     {% endif %}
                     <a href="/workflows/{{ witem.wf.id }}/edit" class="btn btn-sm btn-ghost" title="Edit workflow">
-                        ✏️ Editor
+                        <svg class="icon icon-xs"><use href="#icon-edit"/></svg> Editor
                     </a>
                 </div>
             </div>

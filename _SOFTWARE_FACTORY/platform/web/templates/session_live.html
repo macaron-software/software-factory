@@ -67,7 +67,14 @@
 .thread-arrow{color:var(--text-secondary);font-size:0.75rem}
 .thread-target{font-size:0.78rem;color:var(--text-secondary)}
 .thread-time{font-size:0.7rem;color:var(--text-secondary);margin-left:auto;white-space:nowrap}
-.thread-content{font-size:0.84rem;color:var(--text-primary);line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.thread-content{font-size:0.84rem;color:var(--text-primary);line-height:1.55;word-break:break-word}
+.thread-content:not(.md-rendered){white-space:pre-wrap}
+.thread-content table{border-collapse:collapse;margin:0.4rem 0;font-size:0.78rem;width:100%}
+.thread-content th,.thread-content td{border:1px solid var(--border);padding:0.25rem 0.5rem;text-align:left}
+.thread-content th{background:var(--bg-tertiary);font-weight:600}
+.thread-content code{background:var(--bg-tertiary);padding:0.1rem 0.3rem;border-radius:3px;font-size:0.78rem;font-family:'SF Mono',monospace}
+.thread-content h2,.thread-content h3,.thread-content h4{margin:0.4rem 0 0.2rem;font-size:0.88rem}
+.thread-content ul{margin:0.2rem 0;padding-left:1.2rem}
 
 /* ── Chat mode ── */
 .chat-split{display:grid;grid-template-columns:1fr 300px;height:100%}
@@ -105,10 +112,18 @@
 .panel-content{font-size:0.72rem;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* ── Graph mode ── */
-.graph-split{display:grid;grid-template-rows:1fr 200px;height:100%}
-.graph-canvas{position:relative;overflow:hidden;background:var(--bg-primary)}
+.graph-split{display:grid;grid-template-columns:1fr 240px;grid-template-rows:1fr 200px;height:100%}
+.graph-canvas{position:relative;overflow:hidden;background:var(--bg-primary);grid-row:1;grid-column:1}
 .graph-canvas svg{width:100%;height:100%}
-.graph-log{border-top:1px solid var(--border);overflow-y:auto;padding:0.5rem 0.75rem;background:var(--bg-secondary);position:relative}
+.graph-memory{grid-row:1/3;grid-column:2;border-left:1px solid var(--border);background:var(--bg-secondary);overflow-y:auto;padding:0.5rem 0.6rem;font-size:0.75rem}
+.graph-memory-title{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);margin:0.6rem 0 0.3rem;display:flex;align-items:center;gap:0.3rem}
+.graph-memory-title:first-child{margin-top:0}
+.graph-memory-entry{background:var(--bg-tertiary);border-radius:6px;padding:0.4rem 0.5rem;margin-bottom:0.35rem;border:1px solid var(--border)}
+.graph-memory-key{font-weight:600;color:var(--text-primary);font-size:0.7rem;margin-bottom:0.15rem}
+.graph-memory-val{color:var(--text-secondary);font-size:0.68rem;line-height:1.35;word-break:break-word;white-space:pre-wrap;max-height:4rem;overflow:hidden}
+.graph-memory-meta{font-size:0.6rem;color:var(--text-secondary);margin-top:0.15rem;opacity:0.7}
+.graph-memory-empty{color:var(--text-secondary);font-style:italic;font-size:0.68rem;padding:0.5rem 0}
+.graph-log{border-top:1px solid var(--border);overflow-y:auto;padding:0.5rem 0.75rem;background:var(--bg-secondary);position:relative;grid-row:2;grid-column:1}
 .graph-log-line{display:flex;align-items:baseline;gap:0.5rem;padding:0.2rem 0;font-size:0.78rem}
 .graph-log-time{color:var(--text-secondary);font-size:0.7rem;font-family:'SF Mono',monospace;white-space:nowrap;flex-shrink:0}
 .graph-log-from{font-weight:600;color:var(--text-primary)}
@@ -172,9 +187,9 @@
       </span>
     </div>
     <div class="session-tabs">
-      <button class="session-tab active" data-tab="thread">📋 Thread</button>
-      <button class="session-tab" data-tab="chat">💬 Chat</button>
-      <button class="session-tab" data-tab="graph">🔮 Graph</button>
+      <button class="session-tab active" data-tab="thread"><svg class="icon icon-xs"><use href="#icon-clipboard"/></svg> Thread</button>
+      <button class="session-tab" data-tab="chat"><svg class="icon icon-xs"><use href="#icon-send"/></svg> Chat</button>
+      <button class="session-tab" data-tab="graph"><svg class="icon icon-xs"><use href="#icon-share"/></svg> Graph</button>
     </div>
   </div>
 
@@ -196,7 +211,7 @@
               <span class="thread-target">{{ target.name if target else (msg.to_agent or 'all') }}</span>
               <span class="thread-time">{{ msg.timestamp }}</span>
             </div>
-            <div class="thread-content">{{ msg.content }}</div>
+            <div class="thread-content md-rendered">{{ msg.content | markdown | safe }}</div>
           </div>
         </div>
         {% endfor %}
@@ -246,6 +261,47 @@
           </svg>
           <div class="node-tooltip" id="nodeTooltip"></div>
         </div>
+        <!-- Memory sidebar -->
+        <div class="graph-memory" id="memoryPanel">
+          <div class="graph-memory-title"><svg class="icon icon-xs"><use href="#icon-database"/></svg> Session Memory</div>
+          {% if memory.session %}
+            {% for m in memory.session %}
+            <div class="graph-memory-entry">
+              <div class="graph-memory-key">{{ m.key }}</div>
+              <div class="graph-memory-val">{{ m.value[:200] }}</div>
+              <div class="graph-memory-meta">{{ m.author_agent or 'system' }} · {{ m.type or 'context' }}</div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="graph-memory-empty">No session memory yet</div>
+          {% endif %}
+
+          <div class="graph-memory-title"><svg class="icon icon-xs"><use href="#icon-folder"/></svg> Project Memory</div>
+          {% if memory.project %}
+            {% for m in memory.project %}
+            <div class="graph-memory-entry">
+              <div class="graph-memory-key">{{ m.key }}</div>
+              <div class="graph-memory-val">{{ m.value[:200] }}</div>
+              <div class="graph-memory-meta">{{ m.source or 'system' }} · {{ m.category or 'context' }}</div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="graph-memory-empty">No project memory yet</div>
+          {% endif %}
+
+          <div class="graph-memory-title"><svg class="icon icon-xs"><use href="#icon-share"/></svg> Shared Memory</div>
+          {% if memory.shared %}
+            {% for m in memory.shared %}
+            <div class="graph-memory-entry">
+              <div class="graph-memory-key">{{ m.key }}</div>
+              <div class="graph-memory-val">{{ m.value[:200] }}</div>
+              <div class="graph-memory-meta">{{ m.category or 'global' }}</div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="graph-memory-empty">No shared memory yet</div>
+          {% endif %}
+        </div>
         <div class="graph-log" id="graphLog">
           {% for msg in messages %}
           {% set fa = agents | selectattr('id', 'equalto', msg.from_agent) | first %}
@@ -258,7 +314,7 @@
             <span class="graph-log-content" data-type="{{ msg.type }}">{% if msg.type == 'veto' %}[VETO] {% elif msg.type == 'approve' %}[OK] {% endif %}{{ msg.content[:100] }}</span>
           </div>
           {% endfor %}
-          <button class="graph-new-btn" id="graphNewBtn" onclick="scrollGraphLog()">⬇ New messages</button>
+          <button class="graph-new-btn" id="graphNewBtn" onclick="scrollGraphLog()"><svg class="icon icon-xs"><use href="#icon-arrow-right"/></svg> New messages</button>
         </div>
       </div>
     </div>
@@ -273,7 +329,7 @@
       {% endfor %}
     </select>
     <input type="text" id="msgInput" class="input-text" placeholder="Send a message..." autocomplete="off">
-    <button id="btnSend" class="input-send">▶</button>
+    <button id="btnSend" class="input-send"><svg class="icon icon-xs"><use href="#icon-send"/></svg></button>
   </div>
 </div>
 
@@ -289,6 +345,30 @@ const NODE_W = 180, NODE_H = 90;
 
 function agentById(id){ return AGENTS.find(a=>a.id===id) || null; }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function md(s){
+  // Lightweight markdown: bold, italic, code, headers, lists, links, tables
+  let h = esc(s);
+  h = h.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+  h = h.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+  h = h.replace(/^# (.+)$/gm, '<h2>$1</h2>');
+  h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+  h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  h = h.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  h = h.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // Tables: detect | header | ... | lines
+  h = h.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)*)/gm, (m, hdr, sep, body)=>{
+    const th = hdr.split('|').filter(c=>c.trim()).map(c=>`<th>${c.trim()}</th>`).join('');
+    const rows = body.trim().split('\n').map(r=>{
+      const cells = r.split('|').filter(c=>c.trim()).map(c=>`<td>${c.trim()}</td>`).join('');
+      return `<tr>${cells}</tr>`;
+    }).join('');
+    return `<table><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table>`;
+  });
+  h = h.replace(/^- (.+)$/gm, '<li>$1</li>');
+  h = h.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+  h = h.replace(/\n/g, '<br>');
+  return h;
+}
 
 /* ── Tab switching ── */
 const tabs = document.querySelectorAll('.session-tab');
@@ -365,7 +445,7 @@ function appendThread(data){
         <span class="thread-target">${esc(target?target.name:(data.to_agent||'all'))}</span>
         <span class="thread-time">now</span>
       </div>
-      <div class="thread-content">${esc(data.content)}</div>
+      <div class="thread-content md-rendered">${md(data.content)}</div>
     </div>`;
   feed.appendChild(div);
   feed.scrollTop = feed.scrollHeight;
@@ -410,7 +490,7 @@ function appendChatBubble(data){
       <span class="chat-bubble-name">${isUser?'You':esc(agent?agent.name:data.from_agent)}</span>
       <span class="chat-bubble-time">now</span>
     </div>
-    <div class="chat-bubble-text">${esc(data.content)}</div>`;
+    <div class="chat-bubble-text md-rendered">${md(data.content)}</div>`;
   cont.appendChild(div);
   cont.scrollTop = cont.scrollHeight;
 }
@@ -530,7 +610,7 @@ function renderLiveNodes(){
     const agent = agentById(n.agent_id || n.id);
     const col = (agent && agent.color) || 'var(--purple)';
     const name = esc(agent ? agent.name : (n.label || n.id));
-    const emoji = agent ? agent.avatar : '⚙';
+    const emoji = agent ? agent.avatar : '';
     const role = esc(agent ? agent.role : (n.role || ''));
     const status = (agent && agent.status) || n.status || 'idle';
     const sel = (n.id||n.agent_id) === highlightedNode;
@@ -559,7 +639,7 @@ function renderLiveNodes(){
       <text class="live-node-role" x="38" y="42">${role.length>22?role.substring(0,21)+'…':role}</text>
       <circle class="node-status node-status--${status}" cx="${NODE_W-14}" cy="16" r="5"/>
       <text class="live-node-skill-tag" x="${NODE_W-14}" y="42" text-anchor="end">${status}</text>
-      ${skillCount||toolCount ? `<text class="live-node-skill-tag" x="14" y="${NODE_H-8}">🛠${toolCount} 📚${skillCount}</text>` : ''}
+      ${skillCount||toolCount ? `<text class="live-node-skill-tag" x="14" y="${NODE_H-8}">${toolCount}T ${skillCount}S</text>` : ''}
       ${skillTags}
     `;
     g.addEventListener('click', (e)=> { e.stopPropagation(); onNodeClick(n, g); });
@@ -577,13 +657,14 @@ function onNodeClick(node, gEl){
 
   const agent = agentById(agentId);
   const status = agent ? agent.status : 'unknown';
-  const statusDot = status==='thinking'?'🟡':status==='acting'?'🟢':status==='error'?'🔴':'⚪';
+  const statusCls = status==='thinking'?'dot--thinking':status==='acting'?'dot--active':status==='error'?'dot--error':'';
+  const statusDot = `<span class="dot ${statusCls}" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${status==='thinking'?'var(--yellow)':status==='acting'?'var(--green)':status==='error'?'var(--red)':'#6b7280'}"></span>`;
 
   // Skills section
   let skillsHtml = '';
   if(agent && agent.skills && agent.skills.length){
     skillsHtml = `<div class="node-tooltip-section">
-      <div class="node-tooltip-section-title">📚 Skills (${agent.skills.length})</div>
+      <div class="node-tooltip-section-title"><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-layers"/></svg> Skills (${agent.skills.length})</div>
       <div class="node-tooltip-tags">${agent.skills.map(s=>`<span class="node-tooltip-tag node-tooltip-tag--skill">${esc(s)}</span>`).join('')}</div>
     </div>`;
   }
@@ -592,7 +673,7 @@ function onNodeClick(node, gEl){
   let toolsHtml = '';
   if(agent && agent.tools && agent.tools.length){
     toolsHtml = `<div class="node-tooltip-section">
-      <div class="node-tooltip-section-title">🛠 Tools (${agent.tools.length})</div>
+      <div class="node-tooltip-section-title"><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-settings"/></svg> Tools (${agent.tools.length})</div>
       <div class="node-tooltip-tags">${agent.tools.map(t=>`<span class="node-tooltip-tag node-tooltip-tag--tool">${esc(t)}</span>`).join('')}</div>
     </div>`;
   }
@@ -601,7 +682,7 @@ function onNodeClick(node, gEl){
   let mcpsHtml = '';
   if(agent && agent.mcps && agent.mcps.length){
     mcpsHtml = `<div class="node-tooltip-section">
-      <div class="node-tooltip-section-title">🔌 MCPs (${agent.mcps.length})</div>
+      <div class="node-tooltip-section-title"><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-plug"/></svg> MCPs (${agent.mcps.length})</div>
       <div class="node-tooltip-tags">${agent.mcps.map(m=>`<span class="node-tooltip-tag node-tooltip-tag--mcp">${esc(m)}</span>`).join('')}</div>
     </div>`;
   }
@@ -610,7 +691,7 @@ function onNodeClick(node, gEl){
   let modelHtml = '';
   if(agent && (agent.model || agent.provider)){
     modelHtml = `<div class="node-tooltip-section">
-      <div class="node-tooltip-section-title">🧠 LLM</div>
+      <div class="node-tooltip-section-title"><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-brain"/></svg> LLM</div>
       <span class="node-tooltip-tag">${esc(agent.provider||'')} ${esc(agent.model||'default')}</span>
     </div>`;
   }
@@ -624,7 +705,7 @@ function onNodeClick(node, gEl){
   tooltip.innerHTML = `
     <button class="node-tooltip-close" onclick="document.getElementById('nodeTooltip').classList.remove('visible');highlightedNode=null;renderLiveNodes();">✕</button>
     <div class="node-tooltip-header">
-      <span class="node-tooltip-avatar">${agent?agent.avatar:'⚙'}</span>
+      <span class="node-tooltip-avatar">${agent?agent.avatar:''}</span>
       <div class="node-tooltip-info">
         <div class="node-tooltip-name">${esc(agent?agent.name:agentId)}</div>
         <div class="node-tooltip-role">${esc(agent?agent.role:'')}</div>

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="new-session-form">
+    <h3>
+        <svg class="icon icon-sm"><use href="#icon-rocket"/></svg>
+        Create a New Session
+    </h3>
+    <form action="/api/sessions" method="post">
+        <div class="form-group">
+            <label for="name">Session Name</label>
+            <input type="text" id="name" name="name" placeholder="e.g. Review auth module" required>
+        </div>
+
+        <div class="form-group">
+            <label for="goal">Goal</label>
+            <textarea id="goal" name="goal" rows="3"
+                      placeholder="What should the agents accomplish?"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="pattern_id">Orchestration Pattern</label>
+            <select id="pattern_id" name="pattern_id" onchange="showPatternPreview(this.value)">
+                <option value="">— Solo Chat (direct agent) —</option>
+                {% for p in patterns %}
+                <option value="{{ p.id }}">{{ p.name }} ({{ p.type }})</option>
+                {% endfor %}
+            </select>
+            <div id="pattern-preview" class="pattern-preview-box" style="display:none;"></div>
+        </div>
+
+        <div class="form-group">
+            <label for="workflow_id">Workflow (optional — chains patterns)</label>
+            <select id="workflow_id" name="workflow_id">
+                <option value="">— No workflow —</option>
+                {% for wf in workflows %}
+                <option value="{{ wf.id }}">{{ wf.name }} ({{ wf.phases|length }} phases)</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="project_id">Project (optional)</label>
+            <select id="project_id" name="project_id">
+                <option value="">— None —</option>
+                {% for proj in projects %}
+                <option value="{{ proj.id }}">{{ proj.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="lead_agent">Lead Agent (for Solo Chat)</label>
+            <select id="lead_agent" name="lead_agent">
+                <option value="">— Default (Brain) —</option>
+                {% for a in agents %}
+                <option value="{{ a.id }}" style="color:{{ a.color }}">
+                    {{ a.name }} — {{ a.role }}
+                </option>
+                {% endfor %}
+            </select>
+            <small class="form-hint">When using a pattern, agents are assigned automatically.</small>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg">
+            <svg class="icon icon-sm"><use href="#icon-rocket"/></svg> Start Session
+        </button>
+    </form>
+</div>
+
+<script>
+const patternData = {{ patterns_json | safe if patterns_json is defined else '{}' }};
+function showPatternPreview(pid) {
+    const box = document.getElementById('pattern-preview');
+    if (!pid || !patternData[pid]) { box.style.display = 'none'; return; }
+    const p = patternData[pid];
+    box.style.display = 'block';
+    box.innerHTML = '<div class="pp-desc">' + (p.description || '') + '</div>' +
+        '<div class="pp-agents">' +
+        (p.agents || []).map(a => '<span class="pp-agent-chip">' + (a.label || a.agent_id || '?') + '</span>').join(' → ') +
+        '</div>' +
+        '<div class="pp-type">Type: <strong>' + p.type + '</strong>' +
+        (p.agents ? ' • ' + p.agents.length + ' agents' : '') + '</div>';
+}
+</script>
+{% endblock %}

@@ -587,6 +587,18 @@ async def session_live_page(request: Request, session_id: str):
             "from_avatar": getattr(a, "avatar", "🤖") if a else "💬",
         })
 
+    # Load memory for this session
+    memory_data = {"session": [], "project": [], "shared": []}
+    try:
+        from ..memory.manager import get_memory_manager
+        mem = get_memory_manager()
+        memory_data["session"] = mem.pattern_get(session_id, limit=20)
+        if session.project_id:
+            memory_data["project"] = mem.project_get(session.project_id, limit=20)
+        memory_data["shared"] = mem.global_get(limit=10)
+    except Exception:
+        pass
+
     return _templates(request).TemplateResponse("session_live.html", {
         "request": request,
         "page_title": f"Live: {session.name}",
@@ -596,6 +608,7 @@ async def session_live_page(request: Request, session_id: str):
         "agents": agents,
         "messages": msg_list,
         "graph": graph,
+        "memory": memory_data,
     })
 
 
@@ -1370,8 +1383,8 @@ async def project_chat_stream(request: Request, project_id: str):
                     "code_search": "🔍 Searching code…",
                     "git_log": "📋 Checking git…",
                     "git_diff": "📋 Checking diff…",
-                    "memory_search": "🧠 Searching memory…",
-                    "memory_store": "🧠 Storing to memory…",
+                    "memory_search": "Searching memory…",
+                    "memory_store": "Storing to memory…",
                 }
                 label = labels.get(name, f"🔧 {name}…")
                 await progress_queue.put(("tool", name, label))

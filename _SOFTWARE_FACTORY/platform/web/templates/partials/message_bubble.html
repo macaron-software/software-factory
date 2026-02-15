@@ -1,0 +1,73 @@
+{# WhatsApp-style message bubble #}
+<div class="message-bubble {% if msg.from_agent == 'user' %}from-user{% elif msg.from_agent == 'system' %}from-system{% else %}from-agent{% endif %} msg-type-{{ msg.message_type }}"
+     data-msg-id="{{ msg.id }}">
+    {% if msg.from_agent not in ('user', 'system') %}
+    <div class="msg-avatar-col">
+        {% set agent = agent_map.get(msg.from_agent, {}) if agent_map is defined else {} %}
+        <div class="msg-avatar" style="background:{{ agent.get('color','#8b949e') }}30;border-color:{{ agent.get('color','#8b949e') }}">
+            <svg class="icon icon-sm" style="color:{{ agent.get('color','#8b949e') }}"><use href="#icon-{{ agent.get('icon','bot') }}"/></svg>
+        </div>
+    </div>
+    {% endif %}
+    <div class="msg-bubble-wrap">
+        {% if msg.from_agent not in ('user', 'system') %}
+        <div class="msg-sender-row">
+            {% set agent = agent_map.get(msg.from_agent, {}) if agent_map is defined else {} %}
+            <span class="msg-sender-name" style="color:{{ agent.get('color','#9e95b0') }}">
+                {{ agent.get('name', msg.from_agent) }}
+            </span>
+            {% if msg.to_agent and msg.to_agent not in ('user', 'session', '') %}
+            {% set to_ag = agent_map.get(msg.to_agent, {}) if agent_map is defined else {} %}
+            <span class="msg-to-arrow">→</span>
+            <span class="msg-to-name" style="color:{{ to_ag.get('color','#6e6e6e') }}">
+                {{ to_ag.get('name', msg.to_agent) }}
+            </span>
+            {% endif %}
+            {% if agent.get('role') %}
+            <span class="msg-role-tag">{{ agent.get('role') }}</span>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% if msg.message_type == 'system' %}
+        <div class="msg-content msg-system-text">{{ msg.content }}</div>
+        {% elif msg.message_type == 'veto' %}
+        <div class="msg-content"><span class="msg-badge msg-badge-veto">VETO</span> {{ msg.content }}</div>
+        {% elif msg.message_type in ('approval', 'approve') %}
+        <div class="msg-content"><span class="msg-badge msg-badge-approval">APPROVED</span> {{ msg.content }}</div>
+        {% elif msg.message_type in ('delegation', 'delegate') %}
+        <div class="msg-content"><span class="msg-badge msg-badge-delegation">DELEGATION</span> {{ msg.content }}</div>
+        {% elif msg.message_type == 'instruction' %}
+        <div class="msg-content"><span class="msg-badge msg-badge-instruction">INSTRUCTION</span> {{ msg.content }}</div>
+        {% elif msg.message_type == 'code' or msg.message_type == 'artifact' %}
+        <div class="msg-content"><pre><code>{{ msg.content }}</code></pre></div>
+        {% else %}
+        <div class="msg-content">{{ msg.content }}</div>
+        {% endif %}
+        {% if msg.metadata and msg.metadata is mapping and msg.metadata.get('tool_calls') %}
+        <div class="msg-tools">
+            {% for tc in msg.metadata['tool_calls'][:5] %}
+            <div class="msg-tool-call">
+                <span class="msg-tool-icon">🔧</span>
+                <span class="msg-tool-name">{{ tc.get('name','?') }}</span>
+                <span class="msg-tool-result">{{ tc.get('result','')[:120] }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <div class="msg-footer">
+            <span class="msg-time">{{ msg.timestamp[11:16] if msg.timestamp|length > 16 else msg.timestamp }}</span>
+            {% if msg.metadata %}
+            {% set meta = msg.metadata if msg.metadata is mapping else {} %}
+            {% if meta.get('model') %}
+            <span class="msg-model-tag">{{ meta['model'] }}</span>
+            {% endif %}
+            {% if meta.get('tokens_in') or meta.get('tokens_out') %}
+            <span class="msg-tokens-tag">{{ (meta.get('tokens_in',0) or 0) + (meta.get('tokens_out',0) or 0) }} tok</span>
+            {% endif %}
+            {% endif %}
+            {% if msg.from_agent == 'user' %}
+            <svg class="msg-checks" width="16" height="10" viewBox="0 0 16 10"><path d="M1 5l3 3L9 2" stroke="#7c8aff" stroke-width="1.5" fill="none"/><path d="M5 5l3 3L13 2" stroke="#7c8aff" stroke-width="1.5" fill="none"/></svg>
+            {% endif %}
+        </div>
+    </div>
+</div>

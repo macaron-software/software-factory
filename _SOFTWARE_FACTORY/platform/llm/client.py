@@ -23,6 +23,33 @@ logger = logging.getLogger(__name__)
 
 # Provider configs — OpenAI-compatible endpoints
 _PROVIDERS = {
+    "azure": {
+        "name": "Azure OpenAI (GPT-5.2)",
+        "base_url": os.environ.get("AZURE_OPENAI_ENDPOINT", "https://castudioiatestopenai.openai.azure.com/").rstrip("/"),
+        "key_env": "AZURE_OPENAI_API_KEY",
+        "models": ["gpt-5.2", "gpt-5.1", "gpt-5.1-codex", "gpt-5.1-codex-mini"],
+        "default": "gpt-5.2",
+        "auth_header": "api-key",
+        "auth_prefix": "",
+        "azure_api_version": "2024-10-21",
+        "azure_deployment_map": {"gpt-5.2": "gpt-52", "gpt-5.1": "gpt-51", "gpt-5.1-codex": "gpt-51-codex", "gpt-5.1-codex-mini": "gpt-51-codex-mini"},
+        "max_tokens_param": {"gpt-5.2": "max_completion_tokens"},
+    },
+    "azure-ai": {
+        "name": "Azure AI Foundry",
+        "base_url": os.environ.get("AZURE_AI_ENDPOINT", "https://swedencentral.api.cognitive.microsoft.com/").rstrip("/"),
+        "key_env": "AZURE_AI_API_KEY",
+        "models": ["DeepSeek-R1-0528", "gpt-5.2", "claude-sonnet-4-5"],
+        "default": "DeepSeek-R1-0528",
+        "auth_header": "api-key",
+        "auth_prefix": "",
+        "azure_api_version": "2024-10-21",
+        "azure_deployment_map": {
+            "DeepSeek-R1-0528": "deepseek-r1",
+            "gpt-5.2": "gpt-52",
+            "claude-sonnet-4-5": "claude-sonnet-45",
+        },
+    },
     "minimax": {
         "name": "MiniMax",
         "base_url": "https://api.minimaxi.chat/v1",
@@ -50,27 +77,26 @@ _PROVIDERS = {
         "auth_header": "",
         "auth_prefix": "",
     },
-    "azure": {
-        "name": "Azure OpenAI",
-        "base_url": os.environ.get("AZURE_OPENAI_ENDPOINT", "").rstrip("/"),
-        "key_env": "AZURE_OPENAI_API_KEY",
-        "models": ["gpt-4o", "gpt-4o-mini"],
-        "default": "gpt-4o",
-        "auth_header": "api-key",
-        "auth_prefix": "",
-        "azure_api_version": "2024-10-21",
-    },
 }
 
-# Fallback chain: try providers in order
-_FALLBACK_CHAIN = ["minimax", "nvidia", "local"]
+# Fallback chain: Azure first (most capable), then MiniMax, NVIDIA, local
+_FALLBACK_CHAIN = ["azure", "azure-ai", "minimax", "nvidia", "local"]
 
 
 @dataclass
 class LLMMessage:
-    role: str  # system | user | assistant
+    role: str  # system | user | assistant | tool
     content: str
     name: Optional[str] = None
+    tool_call_id: Optional[str] = None  # for role=tool responses
+    tool_calls: Optional[list[dict]] = None  # for assistant tool_calls
+
+
+@dataclass
+class LLMToolCall:
+    id: str
+    function_name: str
+    arguments: dict
 
 
 @dataclass
@@ -82,6 +108,7 @@ class LLMResponse:
     tokens_out: int = 0
     duration_ms: int = 0
     finish_reason: str = "stop"
+    tool_calls: list[LLMToolCall] = field(default_factory=list)
 
 
 @dataclass
@@ -118,8 +145,10 @@ class LLMClient:
     def _build_url(self, pcfg: dict, model: str) -> str:
         base = pcfg["base_url"].rstrip("/")
         if pcfg.get("azure_api_version") and base:
-            # Azure uses deployment-based URLs
-            return f"{base}/openai/deployments/{model}/chat/completions?api-version={pcfg['azure_api_version']}"
+            # Azure uses deployment-based URLs; map model name → deployment name
+            dep_map = pcfg.get("azure_deployment_map", {})
+            deployment = dep_map.get(model, model)
+            return f"{base}/openai/deployments/{deployment}/chat/completions?api-version={pcfg['azure_api_version']}"
         return f"{base}/chat/completions"
 
     def _build_headers(self, pcfg: dict) -> dict:
@@ -137,6 +166,7 @@ class LLMClient:
         temperature: float = 0.7,
         max_tokens: int = 4096,
         system_prompt: str = "",
+        tools: Optional[list[dict]] = None,
     ) -> LLMResponse:
         """Send a chat completion request. Falls back to next provider on failure."""
         providers_to_try = [provider] + [p for p in _FALLBACK_CHAIN if p != provider]
@@ -149,7 +179,7 @@ class LLMClient:
 
             use_model = model if (prov == provider and model) else pcfg["default"]
             try:
-                result = await self._do_chat(pcfg, prov, use_model, messages, temperature, max_tokens, system_prompt)
+                result = await self._do_chat(pcfg, prov, use_model, messages, temperature, max_tokens, system_prompt, tools)
                 self._stats["calls"] += 1
                 self._stats["tokens_in"] += result.tokens_in
                 self._stats["tokens_out"] += result.tokens_out
@@ -164,7 +194,7 @@ class LLMClient:
     async def _do_chat(
         self, pcfg: dict, provider: str, model: str,
         messages: list[LLMMessage], temperature: float, max_tokens: int,
-        system_prompt: str,
+        system_prompt: str, tools: Optional[list[dict]] = None,
     ) -> LLMResponse:
         http = await self._get_http()
         url = self._build_url(pcfg, model)
@@ -174,17 +204,28 @@ class LLMClient:
         if system_prompt:
             msgs.append({"role": "system", "content": system_prompt})
         for m in messages:
-            d = {"role": m.role, "content": m.content}
+            d = {"role": m.role, "content": m.content or ""}
             if m.name:
                 d["name"] = m.name
+            if m.tool_call_id:
+                d["tool_call_id"] = m.tool_call_id
+            if m.tool_calls:
+                d["tool_calls"] = m.tool_calls
+                d.pop("content", None)  # assistant tool_call msgs may have no content
             msgs.append(d)
 
         body = {
             "model": model,
             "messages": msgs,
             "temperature": temperature,
-            "max_tokens": max_tokens,
         }
+        # Some models (gpt-5.2) use max_completion_tokens instead of max_tokens
+        mt_param = pcfg.get("max_tokens_param", {}).get(model, "max_tokens")
+        body[mt_param] = max_tokens
+
+        if tools:
+            body["tools"] = tools
+            body["tool_choice"] = "auto"
 
         t0 = time.monotonic()
         resp = await http.post(url, json=body, headers=headers)
@@ -196,11 +237,26 @@ class LLMClient:
         data = resp.json()
         choice = data.get("choices", [{}])[0]
         msg = choice.get("message", {})
-        content = msg.get("content", "")
+        content = msg.get("content", "") or ""
         # Strip <think> blocks from MiniMax
         if "<think>" in content and "</think>" in content:
             idx = content.index("</think>") + len("</think>")
             content = content[idx:].strip()
+
+        # Parse tool calls from response
+        parsed_tool_calls = []
+        raw_tool_calls = msg.get("tool_calls", [])
+        for tc in raw_tool_calls:
+            fn = tc.get("function", {})
+            try:
+                args = json.loads(fn.get("arguments", "{}"))
+            except (json.JSONDecodeError, TypeError):
+                args = {}
+            parsed_tool_calls.append(LLMToolCall(
+                id=tc.get("id", ""),
+                function_name=fn.get("name", ""),
+                arguments=args,
+            ))
 
         usage = data.get("usage", {})
         return LLMResponse(
@@ -211,6 +267,7 @@ class LLMClient:
             tokens_out=usage.get("completion_tokens", 0),
             duration_ms=elapsed,
             finish_reason=choice.get("finish_reason", "stop"),
+            tool_calls=parsed_tool_calls,
         )
 
     async def stream(

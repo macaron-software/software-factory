@@ -302,7 +302,7 @@ class AgentStore:
                     description=raw.get("persona", {}).get("description", "").strip() if isinstance(raw.get("persona"), dict) else "",
                     system_prompt=raw.get("system_prompt", ""),
                     provider=raw.get("llm", {}).get("provider", "azure") if isinstance(raw.get("llm"), dict) else "azure",
-                    model=raw.get("llm", {}).get("model", "gpt-4o") if isinstance(raw.get("llm"), dict) else "gpt-4o",
+                    model=raw.get("llm", {}).get("model", "gpt-5.1") if isinstance(raw.get("llm"), dict) else "gpt-5.1",
                     temperature=raw.get("llm", {}).get("temperature", 0.7) if isinstance(raw.get("llm"), dict) else 0.7,
                     max_tokens=raw.get("llm", {}).get("max_tokens", 4096) if isinstance(raw.get("llm"), dict) else 4096,
                     skills=raw.get("skills", []),

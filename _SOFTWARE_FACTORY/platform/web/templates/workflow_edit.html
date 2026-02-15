@@ -1,0 +1,535 @@
+{% extends "base.html" %}
+{% block content %}
+
+{# ── Hidden form fields ── #}
+<form id="wfForm" method="post"
+      action="{% if workflow %}/api/workflows/{{ workflow.id }}{% else %}/api/workflows{% endif %}"
+      style="display:none">
+  {% if not workflow %}<input type="hidden" name="id" value="">{% endif %}
+  <input type="hidden" name="name"        id="hName"   value="{{ workflow.name if workflow else '' }}">
+  <input type="hidden" name="description" id="hDesc"   value="{{ workflow.description if workflow else '' }}">
+  <input type="hidden" name="icon"        id="hIcon"   value="{{ workflow.icon if workflow else 'workflow' }}">
+  <input type="hidden" name="phases_json" id="hPhases" value="[]">
+  <input type="hidden" name="config_json" id="hConfig" value="{}">
+</form>
+
+{# ── Editor chrome ── #}
+<div class="ge-wrap">
+
+  {# ── Top bar ── #}
+  <header class="ge-topbar">
+    <div class="ge-topbar-left">
+      <a href="/workflows" class="ge-back" title="Back">←</a>
+      <input type="text" id="wfName" class="ge-title-input"
+             value="{{ workflow.name if workflow else 'New Workflow' }}" placeholder="Workflow name">
+      <input type="text" id="wfDesc" class="ge-desc-input"
+             value="{{ workflow.description if workflow else '' }}" placeholder="Description…">
+      <select id="wfIcon" class="ge-icon-select">
+        {% for ico in ['workflow','rocket','eye','briefcase','shield','beaker','cog'] %}
+        <option value="{{ ico }}" {% if workflow and workflow.icon == ico %}selected{% endif %}>{{ ico }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="ge-topbar-right">
+      {% if workflow %}
+      <button class="ge-btn ge-btn-danger" onclick="if(confirm('Delete?')) fetch('/api/workflows/{{ workflow.id }}/delete',{method:'POST'}).then(()=>location='/workflows')">🗑</button>
+      {% endif %}
+      <button class="ge-btn ge-btn-primary" id="btnSave">💾 Save</button>
+    </div>
+  </header>
+
+  {# ── Three-column body ── #}
+  <div class="ge-body">
+
+    {# ── Left panel ── #}
+    <aside class="ge-left">
+      <div class="ge-panel-title">Pattern</div>
+      <select id="selPattern" class="ge-select">
+        {% for pat in (patterns or []) %}
+        <option value="{{ pat.id }}">{{ pat.name }}</option>
+        {% endfor %}
+      </select>
+
+      <div class="ge-panel-title" style="margin-top:1rem">Ajouter Agent</div>
+      <select id="selAgent" class="ge-select">
+        <option value="">— choisir —</option>
+        {% for a in (agents or []) %}
+        <option value="{{ a.id }}">{{ a.name }}</option>
+        {% endfor %}
+      </select>
+      <button class="ge-btn ge-btn-accent ge-btn-block" id="btnAddAgent">+ Ajouter</button>
+
+      <div class="ge-panel-title" style="margin-top:1.2rem">Options globales</div>
+      <label class="ge-toggle-row">
+        <span>Tools partagés</span>
+        <input type="checkbox" id="chkGlobalTools">
+        <span class="ge-toggle-track"><span class="ge-toggle-thumb"></span></span>
+      </label>
+      <label class="ge-toggle-row">
+        <span>Memory partagée</span>
+        <input type="checkbox" id="chkGlobalMem">
+        <span class="ge-toggle-track"><span class="ge-toggle-thumb"></span></span>
+      </label>
+
+      <div class="ge-left-footer">
+        <span class="ge-node-count" id="nodeCount">0 agents</span>
+      </div>
+    </aside>
+
+    {# ── Center canvas ── #}
+    <div class="ge-canvas-wrap" id="canvasWrap">
+      <svg id="graphSvg" width="100%" height="100%">
+        <defs>
+          <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+            <path d="M 24 0 L 0 0 0 24" fill="none" stroke="var(--border)" stroke-width="0.4" opacity="0.35"/>
+          </pattern>
+          <marker id="arrowHead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--purple)" stroke-width="1"/>
+          </marker>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid)"/>
+        <g id="edgesLayer"></g>
+        <g id="nodesLayer"></g>
+      </svg>
+      <div class="ge-canvas-hint" id="canvasHint">Sélectionnez un pattern et ajoutez des agents</div>
+    </div>
+
+    {# ── Right panel ── #}
+    <aside class="ge-right" id="rightPanel">
+      <div class="ge-right-empty" id="rightEmpty">
+        <p>Cliquez sur un agent pour voir ses propriétés</p>
+      </div>
+      <div class="ge-right-content" id="rightContent" style="display:none">
+        <div class="ge-panel-title">Propriétés Agent</div>
+
+        <label class="ge-field-label">Nom</label>
+        <input type="text" class="ge-input" id="propName">
+
+        <label class="ge-field-label">Rôle / Description</label>
+        <textarea class="ge-input ge-textarea" id="propRole" rows="3"></textarea>
+
+        <label class="ge-field-label">Tools
+          <button class="ge-btn-icon" id="btnAddTool" title="Add tool">+</button>
+        </label>
+        <div id="propTools" class="ge-tools-list"></div>
+
+        <label class="ge-field-label">Skills</label>
+        <div id="propSkills" class="ge-skills-list"></div>
+
+        <label class="ge-toggle-row" style="margin-top:0.8rem">
+          <span>Memory (Long Term Vector DB)</span>
+          <input type="checkbox" id="propMemory">
+          <span class="ge-toggle-track"><span class="ge-toggle-thumb"></span></span>
+        </label>
+
+        <button class="ge-btn ge-btn-danger ge-btn-block" style="margin-top:1.2rem" id="btnRemoveNode">🗑 Supprimer Agent</button>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+{# ═══════════════════════ STYLES ═══════════════════════ #}
+<style>
+/* --- layout --- */
+.ge-wrap{display:flex;flex-direction:column;height:calc(100vh - 56px);overflow:hidden;background:var(--bg-primary)}
+.ge-topbar{display:flex;align-items:center;justify-content:space-between;padding:0.5rem 1rem;background:var(--bg-secondary);border-bottom:1px solid var(--border);gap:0.6rem;flex-shrink:0}
+.ge-topbar-left{display:flex;align-items:center;gap:0.6rem;flex:1;min-width:0}
+.ge-topbar-right{display:flex;gap:0.5rem;flex-shrink:0}
+.ge-back{color:var(--text-secondary);text-decoration:none;font-size:1.3rem;line-height:1;padding:0 0.2rem}
+.ge-back:hover{color:var(--text-primary)}
+.ge-title-input{background:transparent;border:1px solid transparent;color:var(--text-primary);font-size:1.05rem;font-weight:600;padding:0.25rem 0.5rem;border-radius:6px;width:180px}
+.ge-title-input:hover,.ge-title-input:focus{border-color:var(--border);background:var(--bg-tertiary);outline:none}
+.ge-desc-input{background:transparent;border:1px solid transparent;color:var(--text-secondary);font-size:0.82rem;padding:0.25rem 0.5rem;border-radius:6px;flex:1;min-width:100px}
+.ge-desc-input:hover,.ge-desc-input:focus{border-color:var(--border);background:var(--bg-tertiary);outline:none}
+.ge-icon-select{background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:0.25rem 0.4rem;font-size:0.82rem}
+
+.ge-body{display:grid;grid-template-columns:220px 1fr 260px;flex:1;overflow:hidden}
+
+/* --- left panel --- */
+.ge-left{background:var(--bg-secondary);border-right:1px solid var(--border);padding:1rem;display:flex;flex-direction:column;gap:0.4rem;overflow-y:auto}
+.ge-left-footer{margin-top:auto;padding-top:0.8rem;border-top:1px solid var(--border);text-align:center}
+.ge-node-count{font-size:0.75rem;color:var(--text-secondary)}
+
+/* --- right panel --- */
+.ge-right{background:var(--bg-secondary);border-left:1px solid var(--border);padding:1rem;overflow-y:auto}
+.ge-right-empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);font-size:0.85rem;text-align:center;padding:2rem}
+.ge-right-content{display:flex;flex-direction:column;gap:0.4rem}
+
+/* --- canvas --- */
+.ge-canvas-wrap{position:relative;overflow:hidden;background:var(--bg-primary);cursor:grab}
+.ge-canvas-wrap.dragging-node{cursor:grabbing}
+.ge-canvas-hint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--text-secondary);font-size:0.9rem;pointer-events:none;opacity:0.6}
+
+/* --- common ui --- */
+.ge-panel-title{font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-secondary);font-weight:700;margin-bottom:0.3rem;margin-top:0.2rem}
+.ge-select{width:100%;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);padding:0.4rem 0.5rem;border-radius:8px;font-size:0.82rem;margin-bottom:0.4rem}
+.ge-input{width:100%;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);padding:0.4rem 0.55rem;border-radius:8px;font-size:0.82rem;margin-bottom:0.3rem;font-family:inherit}
+.ge-input:focus{outline:none;border-color:var(--purple)}
+.ge-textarea{resize:vertical;min-height:48px}
+.ge-field-label{font-size:0.75rem;color:var(--text-secondary);display:flex;align-items:center;justify-content:space-between;margin-top:0.5rem;margin-bottom:0.15rem}
+
+/* buttons */
+.ge-btn{border:none;border-radius:8px;padding:0.4rem 0.9rem;font-size:0.82rem;cursor:pointer;font-weight:600;transition:background .15s,opacity .15s}
+.ge-btn-primary{background:var(--purple);color:#fff}
+.ge-btn-primary:hover{opacity:0.85}
+.ge-btn-accent{background:var(--purple);color:#fff}
+.ge-btn-accent:hover{opacity:0.85}
+.ge-btn-danger{background:var(--red);color:#fff}
+.ge-btn-danger:hover{opacity:0.85}
+.ge-btn-block{width:100%;margin-top:0.4rem}
+.ge-btn-icon{background:none;border:1px solid var(--border);color:var(--green);width:22px;height:22px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:0.9rem;line-height:1}
+.ge-btn-icon:hover{border-color:var(--green)}
+
+/* toggle */
+.ge-toggle-row{display:flex;align-items:center;justify-content:space-between;font-size:0.8rem;color:var(--text-primary);cursor:pointer;padding:0.25rem 0;gap:0.5rem}
+.ge-toggle-row input{display:none}
+.ge-toggle-track{position:relative;width:34px;height:18px;border-radius:9px;background:var(--bg-tertiary);border:1px solid var(--border);flex-shrink:0;transition:background .2s}
+.ge-toggle-thumb{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--text-secondary);transition:transform .2s,background .2s}
+.ge-toggle-row input:checked+.ge-toggle-track{background:var(--purple);border-color:var(--purple)}
+.ge-toggle-row input:checked+.ge-toggle-track .ge-toggle-thumb{transform:translateX(16px);background:#fff}
+
+/* tools / skills lists */
+.ge-tools-list{display:flex;flex-direction:column;gap:0.25rem}
+.ge-tool-item{display:flex;align-items:center;gap:0.4rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:0.25rem 0.5rem;font-size:0.78rem;color:var(--text-primary)}
+.ge-tool-item span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ge-tool-rm{background:none;border:none;color:var(--red);cursor:pointer;font-size:0.85rem;line-height:1;padding:0 2px}
+.ge-tool-rm:hover{opacity:0.7}
+.ge-skills-list{display:flex;flex-wrap:wrap;gap:0.3rem}
+.ge-skill-tag{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:10px;padding:0.15rem 0.55rem;font-size:0.72rem;color:var(--text-secondary)}
+
+/* ── SVG node styling ── */
+.node-card{cursor:grab;user-select:none}
+.node-card:hover .node-bg{filter:brightness(1.12)}
+.node-card.selected .node-bg{stroke:var(--purple);stroke-width:2.5}
+.node-bg{rx:12;ry:12;fill:var(--bg-secondary);stroke:var(--border);stroke-width:1.2;transition:stroke .15s}
+.node-title{fill:var(--text-primary);font-size:12px;font-weight:700;font-family:inherit}
+.node-role{fill:var(--text-secondary);font-size:9.5px;font-family:inherit}
+.node-badge{rx:4;ry:4;fill:var(--bg-tertiary);stroke:var(--border);stroke-width:0.6}
+.node-badge-text{fill:var(--text-secondary);font-size:8.5px;font-family:inherit}
+.node-icon{font-size:11px}
+.edge-line{fill:none;stroke:var(--purple);stroke-width:1.8;opacity:0.55;marker-end:url(#arrowHead)}
+.edge-line:hover{opacity:0.9;stroke-width:2.5}
+</style>
+
+{# ═══════════════════════ SCRIPT ═══════════════════════ #}
+<script>
+(function(){
+"use strict";
+
+/* ── Data bootstrap ── */
+const PATTERNS = {{ patterns | tojson if patterns else '[]' }};
+const AGENTS   = {{ agents  | tojson if agents  else '[]' }};
+const EXISTING = {{ (workflow.config | tojson) if workflow and workflow.config else '{}' }};
+
+const NODE_W = 160, NODE_H = 72;
+
+/* ── State ── */
+let graph = {nodes:[], edges:[], pattern:'hierarchical'};
+let selectedId = null;
+let nextId = 1;
+
+/* Restore from existing config */
+if (EXISTING.graph) {
+  graph = JSON.parse(JSON.stringify(EXISTING.graph));
+  graph.nodes.forEach(n => { const num = parseInt((n.id||'').replace(/\D/g,'')); if(num>=nextId) nextId=num+1; });
+}
+if (graph.pattern) document.addEventListener('DOMContentLoaded', ()=>{ document.getElementById('selPattern').value = graph.pattern; });
+
+/* ── DOM refs ── */
+const svg         = ()=> document.getElementById('graphSvg');
+const edgesLayer  = ()=> document.getElementById('edgesLayer');
+const nodesLayer  = ()=> document.getElementById('nodesLayer');
+const canvasWrap  = ()=> document.getElementById('canvasWrap');
+const hint        = ()=> document.getElementById('canvasHint');
+
+/* ── Helpers ── */
+function agentDef(agentId){ return AGENTS.find(a=>a.id===agentId) || {}; }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+
+/* ── Auto-layout ── */
+function autoLayout(){
+  const W = canvasWrap().clientWidth  || 800;
+  const H = canvasWrap().clientHeight || 500;
+  const N = graph.nodes.length;
+  if(!N) return;
+  const p = graph.pattern || 'hierarchical';
+
+  if(p==='pipeline' || p==='sequence'){
+    const gap = Math.min(200, (W-NODE_W)/(N||1));
+    const startX = Math.max(30, (W - gap*(N-1) - NODE_W)/2);
+    graph.nodes.forEach((n,i)=>{ n.x=startX+i*gap; n.y=H/2-NODE_H/2; });
+    graph.edges=[];
+    for(let i=0;i<N-1;i++) graph.edges.push({from:graph.nodes[i].id, to:graph.nodes[i+1].id});
+
+  } else if(p==='debate' || p==='round_robin'){
+    const cx=W/2, cy=H/2, r=Math.min(W,H)*0.32;
+    graph.nodes.forEach((n,i)=>{ const a=2*Math.PI*i/N - Math.PI/2; n.x=cx+r*Math.cos(a)-NODE_W/2; n.y=cy+r*Math.sin(a)-NODE_H/2; });
+    graph.edges=[];
+    for(let i=0;i<N;i++) graph.edges.push({from:graph.nodes[i].id, to:graph.nodes[(i+1)%N].id});
+
+  } else if(p==='parallel'){
+    const gap = Math.min(180, (W-NODE_W)/(N||1));
+    const startX = Math.max(30, (W - gap*(N-1) - NODE_W)/2);
+    graph.nodes.forEach((n,i)=>{ n.x=startX+i*gap; n.y=H/2-NODE_H/2; });
+    graph.edges=[];
+
+  } else if(p==='solo' && N===1){
+    graph.nodes[0].x=W/2-NODE_W/2; graph.nodes[0].y=H/2-NODE_H/2;
+    graph.edges=[];
+
+  } else {
+    /* hierarchical / default — tree layout */
+    if(N===1){ graph.nodes[0].x=W/2-NODE_W/2; graph.nodes[0].y=40; graph.edges=[]; }
+    else {
+      graph.nodes[0].x=W/2-NODE_W/2; graph.nodes[0].y=40;
+      const children = graph.nodes.slice(1);
+      const cols = children.length;
+      const gap = Math.min(190, (W-NODE_W)/(cols||1));
+      const startX = Math.max(20, (W - gap*(cols-1) - NODE_W)/2);
+      children.forEach((n,i)=>{ n.x=startX+i*gap; n.y=180; });
+      graph.edges=[];
+      children.forEach(c=> graph.edges.push({from:graph.nodes[0].id, to:c.id}));
+    }
+  }
+}
+
+/* ── Render edges ── */
+function renderEdges(){
+  const el = edgesLayer(); el.innerHTML='';
+  graph.edges.forEach(e=>{
+    const fn = graph.nodes.find(n=>n.id===e.from);
+    const tn = graph.nodes.find(n=>n.id===e.to);
+    if(!fn||!tn) return;
+    const x1=fn.x+NODE_W/2, y1=fn.y+NODE_H;
+    const x2=tn.x+NODE_W/2, y2=tn.y;
+    /* Bézier control points */
+    const dy = Math.abs(y2-y1), dx = Math.abs(x2-x1);
+    let cp;
+    if(graph.pattern==='pipeline'||graph.pattern==='sequence'){
+      /* horizontal */
+      const hx1=fn.x+NODE_W, hy1=fn.y+NODE_H/2;
+      const hx2=tn.x, hy2=tn.y+NODE_H/2;
+      const off=Math.max(30,Math.abs(hx2-hx1)*0.35);
+      cp=`M${hx1},${hy1} C${hx1+off},${hy1} ${hx2-off},${hy2} ${hx2},${hy2}`;
+    } else if(graph.pattern==='debate'||graph.pattern==='round_robin'){
+      const cx1=fn.x+NODE_W/2, cy1=fn.y+NODE_H/2;
+      const cx2=tn.x+NODE_W/2, cy2=tn.y+NODE_H/2;
+      const mx=(cx1+cx2)/2, my=(cy1+cy2)/2;
+      const canW = canvasWrap().clientWidth||800, canH = canvasWrap().clientHeight||500;
+      const pull = 0.15;
+      const cmx=mx+(canW/2-mx)*pull, cmy=my+(canH/2-my)*pull;
+      cp=`M${cx1},${cy1} Q${cmx},${cmy} ${cx2},${cy2}`;
+    } else {
+      const off = Math.max(40, dy*0.45);
+      cp=`M${x1},${y1} C${x1},${y1+off} ${x2},${y2-off} ${x2},${y2}`;
+    }
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', cp);
+    path.setAttribute('class','edge-line');
+    el.appendChild(path);
+  });
+}
+
+/* ── Render nodes ── */
+function renderNodes(){
+  const nl = nodesLayer(); nl.innerHTML='';
+  graph.nodes.forEach(n=>{
+    const def  = agentDef(n.agent_id);
+    const col  = def.color || 'var(--purple)';
+    const name = esc(n.name || def.name || n.agent_id);
+    const role = esc(n.role_desc || def.description || '').substring(0,42);
+    const tc   = (n.tools||[]).length;
+    const mem  = n.memory;
+    const sel  = n.id===selectedId;
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('class','node-card'+(sel?' selected':''));
+    g.setAttribute('transform',`translate(${n.x},${n.y})`);
+    g.dataset.nid = n.id;
+
+    g.innerHTML = `
+      <rect class="node-bg" width="${NODE_W}" height="${NODE_H}" style="${sel?'stroke:'+col+';stroke-width:2.5':''}" />
+      <line x1="0" y1="0" x2="${NODE_W}" y2="0" stroke="${col}" stroke-width="3" stroke-linecap="round"/>
+      <text class="node-title" x="12" y="24">${name}</text>
+      <text class="node-role"  x="12" y="38">${role}</text>
+      <rect class="node-badge" x="10" y="${NODE_H-24}" width="38" height="16"/>
+      <text class="node-badge-text" x="16" y="${NODE_H-12}">T:${tc}</text>
+      ${mem?`<rect class="node-badge" x="54" y="${NODE_H-24}" width="38" height="16"/>
+      <text class="node-badge-text" x="60" y="${NODE_H-12}">MEM</text>`:''}
+    `;
+    nl.appendChild(g);
+  });
+  hint().style.display = graph.nodes.length ? 'none':'block';
+  document.getElementById('nodeCount').textContent = graph.nodes.length + ' agent' + (graph.nodes.length!==1?'s':'');
+}
+
+function render(){ renderEdges(); renderNodes(); }
+
+/* ── Drag handling ── */
+let drag = null;
+function onPointerDown(e){
+  const card = e.target.closest('.node-card');
+  if(!card) { selectNode(null); return; }
+  const nid = card.dataset.nid;
+  selectNode(nid);
+  const node = graph.nodes.find(n=>n.id===nid); if(!node) return;
+  const rect = svg().getBoundingClientRect();
+  drag = { nid, ox: e.clientX - rect.left - node.x, oy: e.clientY - rect.top - node.y };
+  canvasWrap().classList.add('dragging-node');
+  e.preventDefault();
+}
+function onPointerMove(e){
+  if(!drag) return;
+  const node = graph.nodes.find(n=>n.id===drag.nid); if(!node) return;
+  const rect = svg().getBoundingClientRect();
+  node.x = clamp(e.clientX - rect.left - drag.ox, 0, rect.width - NODE_W);
+  node.y = clamp(e.clientY - rect.top  - drag.oy, 0, rect.height - NODE_H);
+  render();
+}
+function onPointerUp(){
+  if(drag){ drag=null; canvasWrap().classList.remove('dragging-node'); }
+}
+
+/* ── Select / double-click ── */
+function selectNode(nid){
+  selectedId = nid;
+  render();
+  showProps();
+}
+
+function onDblClick(e){
+  const card = e.target.closest('.node-card');
+  if(!card) return;
+  const nid = card.dataset.nid;
+  if(confirm('Supprimer cet agent du graphe ?')) removeNode(nid);
+}
+
+function removeNode(nid){
+  graph.nodes = graph.nodes.filter(n=>n.id!==nid);
+  graph.edges = graph.edges.filter(e=>e.from!==nid && e.to!==nid);
+  if(selectedId===nid) selectedId=null;
+  render(); showProps();
+}
+
+/* ── Right panel ── */
+function showProps(){
+  const empty   = document.getElementById('rightEmpty');
+  const content = document.getElementById('rightContent');
+  if(!selectedId){ empty.style.display='flex'; content.style.display='none'; return; }
+  empty.style.display='none'; content.style.display='flex';
+  const node = graph.nodes.find(n=>n.id===selectedId); if(!node) return;
+  const def = agentDef(node.agent_id);
+
+  document.getElementById('propName').value = node.name || def.name || '';
+  document.getElementById('propRole').value = node.role_desc || def.description || '';
+  document.getElementById('propMemory').checked = !!node.memory;
+
+  /* tools */
+  const tl = document.getElementById('propTools'); tl.innerHTML='';
+  (node.tools||[]).forEach((t,i)=>{
+    tl.innerHTML += `<div class="ge-tool-item"><span>${esc(t)}</span><button class="ge-tool-rm" data-ti="${i}">×</button></div>`;
+  });
+  tl.querySelectorAll('.ge-tool-rm').forEach(btn=>{
+    btn.onclick = ()=>{ node.tools.splice(+btn.dataset.ti,1); render(); showProps(); };
+  });
+
+  /* skills */
+  const sl = document.getElementById('propSkills'); sl.innerHTML='';
+  (def.skills||[]).forEach(s=>{
+    sl.innerHTML += `<span class="ge-skill-tag">${esc(s)}</span>`;
+  });
+}
+
+/* ── Prop change listeners ── */
+function bindPropListeners(){
+  document.getElementById('propName').addEventListener('input', function(){
+    const n = graph.nodes.find(n=>n.id===selectedId); if(n){ n.name=this.value; render(); }
+  });
+  document.getElementById('propRole').addEventListener('input', function(){
+    const n = graph.nodes.find(n=>n.id===selectedId); if(n){ n.role_desc=this.value; }
+  });
+  document.getElementById('propMemory').addEventListener('change', function(){
+    const n = graph.nodes.find(n=>n.id===selectedId); if(n){ n.memory=this.checked; render(); }
+  });
+  document.getElementById('btnAddTool').addEventListener('click', function(){
+    const n = graph.nodes.find(n=>n.id===selectedId); if(!n) return;
+    const t = prompt('Nom du tool :'); if(!t) return;
+    if(!n.tools) n.tools=[];
+    n.tools.push(t); render(); showProps();
+  });
+  document.getElementById('btnRemoveNode').addEventListener('click', function(){
+    if(selectedId && confirm('Supprimer cet agent ?')) removeNode(selectedId);
+  });
+}
+
+/* ── Add agent ── */
+function addAgent(){
+  const sel = document.getElementById('selAgent');
+  const aid = sel.value; if(!aid) return;
+  const def = agentDef(aid);
+  const id  = 'n'+(nextId++);
+  const W   = canvasWrap().clientWidth || 800;
+  const H   = canvasWrap().clientHeight || 500;
+  graph.nodes.push({
+    id, agent_id: aid,
+    name: def.name || aid,
+    x: W/2 - NODE_W/2 + (Math.random()-0.5)*80,
+    y: H/2 - NODE_H/2 + (Math.random()-0.5)*80,
+    tools: [], memory: false,
+    role_desc: def.description || ''
+  });
+  autoLayout();
+  render();
+  selectNode(id);
+  sel.value='';
+}
+
+/* ── Pattern change ── */
+function onPatternChange(){
+  graph.pattern = document.getElementById('selPattern').value;
+  autoLayout();
+  render();
+}
+
+/* ── Save ── */
+function save(){
+  document.getElementById('hName').value  = document.getElementById('wfName').value;
+  document.getElementById('hDesc').value  = document.getElementById('wfDesc').value;
+  document.getElementById('hIcon').value  = document.getElementById('wfIcon').value;
+
+  /* Build a single-phase from the graph pattern */
+  const phase = {
+    id:'p1',
+    pattern_id: graph.pattern || 'hierarchical',
+    name:'Main',
+    description:'',
+    gate:'always'
+  };
+  document.getElementById('hPhases').value = JSON.stringify([phase]);
+  document.getElementById('hConfig').value = JSON.stringify({graph});
+
+  document.getElementById('wfForm').submit();
+}
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', function(){
+  /* Wire events */
+  svg().addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup',   onPointerUp);
+  svg().addEventListener('dblclick', onDblClick);
+
+  document.getElementById('btnAddAgent').addEventListener('click', addAgent);
+  document.getElementById('selPattern').addEventListener('change', onPatternChange);
+  document.getElementById('btnSave').addEventListener('click', save);
+  bindPropListeners();
+
+  /* Initial render */
+  if(graph.nodes.length) render(); else hint().style.display='block';
+});
+
+})();
+</script>
+{% endblock %}

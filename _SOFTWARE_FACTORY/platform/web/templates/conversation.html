@@ -3,7 +3,7 @@
 {% block topbar_actions %}
 <div style="display:flex;align-items:center;gap:12px;">
     <a href="/sessions/{{ session.id }}/live" class="btn btn-sm" style="background:var(--accent-purple);color:#fff;">
-        🔮 Live View
+        <svg class="icon icon-sm"><use href="#icon-share"/></svg> Live View
     </a>
     <span class="badge {% if session.status == 'active' %}badge-green{% elif session.status == 'completed' %}badge-blue{% elif session.status == 'failed' %}badge-red{% else %}badge-yellow{% endif %}">
         {{ session.status }}
@@ -252,7 +252,7 @@ if (ml) observer.observe(ml, {childList: true});
                     // Add log entry
                     addLogEntry(data.type === 'pattern_start'
                         ? '▶ ' + (data.pattern_name || 'Pattern') + ' started'
-                        : (data.success ? '✅ Pattern completed' : '❌ Pattern failed'));
+                        : (data.success ? '<svg class="icon icon-xs"><use href="#icon-check"/></svg> Pattern completed' : '<svg class="icon icon-xs"><use href="#icon-stop"/></svg> Pattern failed'));
                 }
             } catch(err) {}
         };
