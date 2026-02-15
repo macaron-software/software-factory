@@ -129,7 +129,7 @@ Code Changes
 └─────────────────────────────────────────────────────────────┘
     ↓ (si L0 passe)
 ┌─────────────────────────────────────────────────────────────┐
-│ L1a: CODE CRITIC (MiniMax M2.1, ~5s)                        │
+│ L1a: CODE CRITIC (MiniMax M2.5, ~5s)                        │
 │     - Syntax/logic errors                                   │
 │     - API misuse (axum extractors, sqlx FromRow)            │
 │     - SLOP detection (code qui compile mais ne fait rien)   │
@@ -161,8 +161,8 @@ Code Changes
 | Role | LLM | Provider | Raison |
 |------|-----|----------|--------|
 | **Brain** | Opus 4.5 | Anthropic | Best reasoning |
-| **TDD Worker** | MiniMax M2.1 | MiniMax | Fast, cheap |
-| **Code Critic** | MiniMax M2.1 | MiniMax | Same perspective as worker |
+| **TDD Worker** | MiniMax M2.5 | MiniMax | Fast, cheap |
+| **Code Critic** | MiniMax M2.5 | MiniMax | Same perspective as worker |
 | **Security Critic** | GLM-4.7-free | Zhipu AI | Different provider = cognitive diversity |
 | **Arch Critic** | Opus 4.5 | Anthropic | Architectural reasoning |
 
@@ -625,7 +625,7 @@ Found 5 REAL missing implementations:
 - pool workers daemon
 - FRACTAL enabled: 3 concerns (L1) → KISS atomic (L2)
 - cycle: lock→FRACTAL?→TDD→adversarial→commit
-- LLM: MiniMax M2.1 opencode
+- LLM: MiniMax M2.5 opencode
 - process cleanup: `start_new_session=True` + `os.killpg()` on timeout
 - **Skills auto-load**: domain → skills prompt injection
 
@@ -869,7 +869,7 @@ ppz psy veligo yolonow fervenza solaris **factory** (self)
 
 - brain: claude CLI Opus4.5
 - wiggum/cycle: opencode + MCP proxy
-- fallback: MiniMax-M2.1 → GLM-4.7-free → MiniMax-M2
+- fallback: MiniMax-M2.5 → MiniMax-M2.1 → GLM-4.7-free
 - timeout: 30min max, kills process group (parent + children)
 
 ## MONITOR
@@ -887,7 +887,7 @@ Rate limit detected → immediate fallback to next model
 No timeout → model runs until complete (never cut working response)
 ```
 
-Fallback chain: MiniMax-M2.1 → GLM-4.7-free → MiniMax-M2
+Fallback chain: MiniMax-M2.5 → MiniMax-M2.1 → GLM-4.7-free
 
 ## META-AWARENESS (Cross-Project Learning)
 
@@ -1619,3 +1619,132 @@ migrate sharelook status --rollback-safe
 3. Lancer phase deps: `migrate sharelook execute --phase deps`
 4. Phase standalone: 50 modules, 3 workers //, comparative adversarial strict
 5. Deploy canary: 1% → 10% → 50% → 100% (auto-rollback si erreur)
+
+---
+
+## MACARON AGENT PLATFORM (Web Multi-Agent)
+
+**Location:** `_SOFTWARE_FACTORY/platform/` | **Port:** 8090
+**Stack:** FastAPI + HTMX + Jinja2 + SSE + SQLite | Dark purple/indigo theme
+
+### VISION: Real Agentic ≠ Workflow Automation
+
+n8n/LangFlow/Flowise = RPA + LLM wrapper = if/then glorifié = bullshit
+Macaron = VRAIE orchestration: autonomie, communication, conflits, mémoire, émergence
+Team of Rivals: agents débattent, véto, négocient, délèguent — PAS des boîtes avec flèches
+
+### ARCH
+
+```
+Projects (centre) → Agent conversationnel par projet
+    ↓
+Workflows = collaboration agents (graphe SVG éditable)
+    ↓
+Patterns = topologies (hiérarchique, débat, adversarial, pipeline, 8 total)
+    ↓
+Agents = rôles SAFe (48 agents, 5 niveaux Portfolio→Team)
+    ↓
+Skills = compétences (1200+ GitHub + locales)
+    ↓
+Memory = 4 layers (session/pattern/project/global, FTS5)
+    ↓
+MCPs = outils (Figma, GitHub, LRM, etc.)
+```
+
+### NAV
+Projects → Workflows → Patterns → Agents → Skills → Memory → MCPs | Settings (bas)
+
+### MULTI-AGENT RUNTIME
+
+```
+AgentLoop (agents/loop.py) ←→ MessageBus (a2a/bus.py)
+    ↓ think                         ↓ route
+AgentExecutor (agents/executor.py)  SSE → Frontend
+    ↓ LLM call
+Azure OpenAI / MiniMax / Foundry (llm/client.py)
+```
+
+**AgentLoop** — boucle autonome asyncio.Task par agent:
+- inbox (bus) → think (executor+LLM) → parse actions → route via bus → idle
+- Actions: `[DELEGATE:id]`, `[VETO:reason]`, `[APPROVE]`, `[ASK:id:q]`, `[ESCALATE]`
+- Status: IDLE→THINKING→ACTING→IDLE, 120s think timeout
+- AgentLoopManager: singleton, gère tous loops keyed `{session_id}:{agent_id}`
+
+**MessageBus** (a2a/bus.py) — async queues per-agent:
+- Topics, SSE bridge (`add_sse_listener`), dead letter, DB persistence
+- Protocol: 11 message types (REQUEST/RESPONSE/DELEGATE/VETO/APPROVE/INFORM/NEGOTIATE/ESCALATE/...)
+- Priority mapping (VETO=10, REQUEST=5)
+
+**Conflicts:** Negotiation (propose→counter→vote), Veto 3 niveaux (ABSOLUTE/STRONG/ADVISORY)
+
+### LIVE IHM — 3 Modes Switchables
+
+```
+session_live.html — SSE /sse/session/{id}
+├── Thread (📋)     — feed chronologique, color-coded par type, avatars
+├── Chat+Panel (💬) — 1:1 gauche + activité inter-agents droite
+└── Graph Live (🔮) — SVG animé (nodes pulsent = thinking) + message log
+```
+
+### ROUTES LIVE
+```
+GET  /sessions/{id}/live              → session_live.html (3 modes)
+POST /api/sessions/{id}/agents/start  → démarre AgentLoops (agent_ids=a,b,c)
+POST /api/sessions/{id}/agents/stop   → arrête tous loops session
+POST /api/sessions/{id}/agents/{aid}/message → user→agent via bus
+GET  /sse/session/{id}                → SSE filtered par session_id
+```
+
+### STACK COMPLET
+```
+platform/
+├── server.py                    # FastAPI app factory + lifespan
+├── models.py                    # Pydantic: A2AMessage, AgentStatus, MessageType
+├── llm/client.py                # Multi-provider (Azure/MiniMax/NVIDIA), fallback, streaming
+├── a2a/
+│   ├── bus.py                   # MessageBus singleton, SSE bridge, dead letter
+│   ├── protocol.py              # Message types, priority, permissions
+│   ├── negotiation.py           # Proposal→counter→vote cycle
+│   └── veto.py                  # 3 niveaux, cooldown, override
+├── agents/
+│   ├── loop.py                  # AgentLoop autonome + AgentLoopManager
+│   ├── executor.py              # LLM + 8 rounds tool calling
+│   └── store.py                 # SQLite CRUD + YAML seed (48 agents)
+├── orchestrator/patterns.py     # 8 patterns (Parallel/Sequential/Loop/Router/...)
+├── sessions/
+│   ├── store.py                 # SessionDef + MessageDef
+│   └── runner.py                # Context builder, history compression
+├── memory/manager.py            # 4 layers, FTS5 search
+├── skills/
+│   ├── library.py               # Scan local + GitHub (1200+ skills)
+│   └── definitions/*.yaml       # 42 YAML agents SAFe
+├── web/
+│   ├── routes.py                # Toutes routes (~1600 lignes)
+│   ├── ws.py                    # SSE endpoints (session/agents/monitoring)
+│   └── templates/
+│       ├── base.html            # Layout + sidebar nav
+│       ├── session_live.html    # 3-mode live view (Thread/Chat/Graph)
+│       ├── conversation.html    # Session classique + bouton "Go Live"
+│       ├── workflow_edit.html   # Éditeur SVG graphe d'agents
+│       └── skills.html          # 50/page, search, filtres source
+└── data/
+    ├── platform.db              # SQLite (rm pour re-seed)
+    └── github_skills/           # Cache 1156 skills .md
+```
+
+### CONVENTIONS
+- DB fresh: `rm -f platform/data/platform.db` avant restart → re-seed 48 agents
+- Pas de `--reload` (conflit module `platform` stdlib)
+- `--ws none` obligatoire (websocket issue)
+- `start_new_session=True` pour process persistant (survit shell close)
+- Skills GitHub: git clone shallow (pas API rate-limited)
+- Theme: CSS vars `--bg-primary:#0f0d1a` `--purple:#7c3aed`
+- Views: 4 modes display (card/compact/list/list-compact)
+- SSE: bus.add_sse_listener() + filter session_id, keepalive 30s
+
+### START
+```bash
+cd _SOFTWARE_FACTORY && rm -f platform/data/platform.db
+AZURE_OPENAI_API_KEY=dummy AZURE_AI_API_KEY=dummy \
+python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
+```
