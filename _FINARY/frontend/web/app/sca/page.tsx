@@ -154,32 +154,51 @@ export default function SCAPage() {
 
           {/* Base légale + Procédure */}
           {scenario.base_legale && (
-            <div className="grid md:grid-cols-2 gap-6 mb-6">
-              <div className="p-3 rounded-lg bg-bg-1 border border-bd-1">
-                <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><Gavel className="w-3.5 h-3.5 text-accent" />Base légale</p>
-                <p className="text-accent text-xs font-mono mb-2">{scenario.base_legale.article}</p>
-                <p className="text-t-3 text-xs mb-3">{scenario.base_legale.mecanisme}</p>
-                <p className="text-t-4 text-[10px] font-semibold mb-1">Conditions remplies :</p>
-                <div className="space-y-1">
-                  {scenario.base_legale.conditions.map((c: string, i: number) => (
-                    <div key={i} className="flex items-start gap-2 text-xs">
-                      <CheckCircle className="w-3 h-3 text-gain mt-0.5 shrink-0" />
-                      <span className="text-t-2">{c}</span>
-                    </div>
-                  ))}
+            <div className="space-y-6 mb-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="p-3 rounded-lg bg-bg-1 border border-bd-1">
+                  <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><Gavel className="w-3.5 h-3.5 text-accent" />Base légale</p>
+                  <p className="text-accent text-xs font-mono mb-2">{scenario.base_legale.article}</p>
+                  {scenario.base_legale.texte_cle && (
+                    <blockquote className="text-t-3 text-xs italic border-l-2 border-accent/40 pl-2 mb-3">{scenario.base_legale.texte_cle}</blockquote>
+                  )}
+                  <p className="text-t-3 text-xs mb-3">{scenario.base_legale.mecanisme}</p>
+                  <p className="text-t-4 text-[10px] font-semibold mb-1">Conditions remplies :</p>
+                  <div className="space-y-1">
+                    {scenario.base_legale.conditions.map((c: string, i: number) => (
+                      <div key={i} className="flex items-start gap-2 text-xs">
+                        <CheckCircle className="w-3 h-3 text-gain mt-0.5 shrink-0" />
+                        <span className="text-t-2">{c}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg bg-bg-1 border border-bd-1">
+                  <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5" />Procédure ({scenario.base_legale.delai_estime})</p>
+                  <div className="space-y-1.5">
+                    {scenario.base_legale.procedure.map((step: string, i: number) => (
+                      <div key={i} className="flex items-start gap-2 text-xs">
+                        <span className="text-accent font-mono font-bold w-4 shrink-0 text-right">{i + 1}</span>
+                        <span className="text-t-2">{step.replace(/^\d+\.\s*/, "")}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-bg-1 border border-bd-1">
-                <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5" />Procédure ({scenario.base_legale.delai_estime})</p>
-                <div className="space-y-1.5">
-                  {scenario.base_legale.procedure.map((step: string, i: number) => (
-                    <div key={i} className="flex items-start gap-2 text-xs">
-                      <span className="text-accent font-mono font-bold w-4 shrink-0 text-right">{i + 1}</span>
-                      <span className="text-t-2">{step.replace(/^\d+\.\s*/, "")}</span>
-                    </div>
-                  ))}
+              {/* Avantages vs procédure judiciaire */}
+              {scenario.base_legale.avantages_vs_judiciaire && (
+                <div className="p-3 rounded-lg bg-gain/5 border border-gain/20">
+                  <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-gain" />Avantages vs procédure judiciaire</p>
+                  <div className="grid md:grid-cols-2 gap-x-6 gap-y-1">
+                    {scenario.base_legale.avantages_vs_judiciaire.map((a: string, i: number) => (
+                      <div key={i} className="flex items-start gap-2 text-xs">
+                        <CheckCircle className="w-3 h-3 text-gain mt-0.5 shrink-0" />
+                        <span className="text-t-3">{a}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -207,11 +226,12 @@ export default function SCAPage() {
                   <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><Gavel className="w-3.5 h-3.5" />Frais vente forcée</p>
                   <div className="space-y-1">
                     {[
-                      { label: "Avocat (assignation art. 19)", value: scenario.frais_vente_forcee.avocat_art19 },
-                      { label: "Publication JAL/BODACC", value: scenario.frais_vente_forcee.publication_jal },
-                      { label: "Notaire (acte de cession)", value: scenario.frais_vente_forcee.notaire_acte },
-                      { label: "Greffe TC", value: scenario.frais_vente_forcee.greffe },
-                      { label: "Droits d'enregistrement", value: scenario.frais_vente_forcee.droits_enregistrement },
+                      { label: "Huissier (mise en demeure)", value: scenario.frais_vente_forcee.huissier_mise_en_demeure },
+                      { label: "PV Assemblée Générale", value: scenario.frais_vente_forcee.pv_ag },
+                      { label: "Publication JAL", value: scenario.frais_vente_forcee.publication_jal },
+                      { label: "LRAR notification", value: scenario.frais_vente_forcee.lrar_notification },
+                      { label: "Cahier des charges + adjudication", value: scenario.frais_vente_forcee.cahier_charges_adjudication },
+                      { label: "Avocat (accompagnement)", value: scenario.frais_vente_forcee.avocat_accompagnement },
                     ].map((c) => (
                       <div key={c.label} className="flex justify-between text-xs">
                         <span className="text-t-3">{c.label}</span>

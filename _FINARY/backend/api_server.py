@@ -1201,7 +1201,7 @@ def get_sca():
 
 
 def _build_scenario_rachat(sca_data: dict) -> dict:
-    """Scénario: vente forcée art. 19 loi 1986 — enchères judiciaires à 1€."""
+    """Scénario: vente forcée art. 19 statuts SCA — défaillance associé."""
     prop = sca_data["property"]
     co = sca_data["co_associate"]
     fin = sca_data["financials"]
@@ -1210,105 +1210,114 @@ def _build_scenario_rachat(sca_data: dict) -> dict:
     surface_totale = surface_legland + surface_beaussier  # 207m²
     terrain_privatif = prop.get("terrain_privatif_m2", 466)
     terrain_commun = prop.get("terrain_commun_m2", 300)
-    terrain_total_m2 = terrain_privatif * 2 + terrain_commun  # 2 lots privatifs + commun
+    terrain_total_m2 = terrain_privatif * 2 + terrain_commun
 
-    # Prix m² Grabels
     prix_m2_ancien = 3530
     prix_m2_neuf = 4100
 
-    # Valeur lot Beaussier (89m² construit — gros œuvre non terminé)
-    valeur_lot_beaussier_neuf = surface_beaussier * prix_m2_neuf       # 364 900€ si fini
-    valeur_lot_beaussier_ancien = surface_beaussier * prix_m2_ancien   # 314 170€ si fini
-    # En l'état (gros œuvre) = ~40% de la valeur finie
+    valeur_lot_beaussier_neuf = surface_beaussier * prix_m2_neuf
+    valeur_lot_beaussier_ancien = surface_beaussier * prix_m2_ancien
     coeff_etat_actuel = 0.40
     valeur_lot_beaussier_etat = round(valeur_lot_beaussier_ancien * coeff_etat_actuel)
 
-    # Coût pour finir le lot Beaussier (89m² × 1200-2200€/m² second œuvre)
-    cout_finition_low = surface_beaussier * 1200   # économique
-    cout_finition_mid = surface_beaussier * 1600   # standard
-    cout_finition_high = surface_beaussier * 2200  # qualité
+    cout_finition_low = surface_beaussier * 1200
+    cout_finition_mid = surface_beaussier * 1600
+    cout_finition_high = surface_beaussier * 2200
 
-    # Valeur totale propriété après (100% SCA = 207m² + terrains)
     valeur_totale_finie_ancien = surface_totale * prix_m2_ancien
     valeur_totale_finie_neuf = surface_totale * prix_m2_neuf
     bourso_legland = prop.get("bourso_estimate", 505254)
 
-    # Frais vente forcée (enchères judiciaires)
-    cout_acquisition = 1  # 1€ = mise à prix enchères, seul enchérisseur
-    frais_avocat_art19 = 3000    # honoraires assignation + audience vente forcée
-    frais_publication = 500      # publication au JO / JAL
-    emoluments_notaire = 1500    # acte de cession forcée
-    frais_greffe = 200           # greffe TC
-    droits_enregistrement = round(valeur_lot_beaussier_etat * 0.05)  # 5% sur prix adjudication (1€ → base minimum)
-    # En réalité droits d'enregistrement sur 1€ = quasi nul, mais l'administration
-    # peut requalifier sur valeur vénale → provisionner sur valeur état actuel
-    droits_enregistrement_reel = 125  # forfait minimum sur adjudication à 1€
-    total_frais_vente = frais_avocat_art19 + frais_publication + emoluments_notaire + frais_greffe + droits_enregistrement_reel
+    # Frais procédure art. 19 statuts
+    cout_acquisition = 1
+    frais_huissier_med = 200       # mise en demeure par acte extrajudiciaire
+    frais_ag_pv = 500              # PV AG (notarié ou sous seing privé)
+    frais_publication_jal = 300    # publication JAL (siège social)
+    frais_lrar = 50                # LRAR à l'associé défaillant
+    frais_redaction_cahier = 1500  # rédaction cahier des charges + procès-verbal adjudication
+    frais_avocat = 2000            # accompagnement Axel (optionnel mais prudent)
+    total_frais_vente = frais_huissier_med + frais_ag_pv + frais_publication_jal + frais_lrar + frais_redaction_cahier + frais_avocat
 
-    # Gain net = valeur lot fini - finition - frais vente
     gain_brut_low = valeur_lot_beaussier_ancien - cout_finition_high - total_frais_vente
     gain_brut_mid = valeur_lot_beaussier_ancien - cout_finition_mid - total_frais_vente
     gain_brut_high = valeur_lot_beaussier_neuf - cout_finition_low - total_frais_vente
 
-    # Dettes Beaussier qui s'éteignent (elle perd ses parts → plus de créance à recouvrer)
     dettes_annulees = {
         "af_impayes": 25334.71,
         "capital_non_libere": 192127.97,
         "fournisseurs_qp": 7105.89,
         "qp_procedures": 11486.51,
-        "total": 25334.71 + 7105.89 + 11486.51,  # dettes réelles récupérables
+        "total": 25334.71 + 7105.89 + 11486.51,
     }
 
-    # Patrimoine immobilier total post-acquisition
-    patrimoine_avant = bourso_legland  # 505 254€ (lot Legland seul)
-    patrimoine_apres_low = valeur_totale_finie_ancien  # 207m² × 3530
-    patrimoine_apres_high = valeur_totale_finie_neuf   # 207m² × 4100
+    patrimoine_avant = bourso_legland
+    patrimoine_apres_low = valeur_totale_finie_ancien
+    patrimoine_apres_high = valeur_totale_finie_neuf
     plus_value_low = patrimoine_apres_low - patrimoine_avant - cout_finition_high
     plus_value_high = patrimoine_apres_high - patrimoine_avant - cout_finition_low
 
-    # Revenus locatifs potentiels (lot Beaussier 89m² une fois fini)
     loyer_m2 = 13.5
     loyer_mensuel_lot_b = round(surface_beaussier * loyer_m2)
     loyer_annuel_lot_b = loyer_mensuel_lot_b * 12
     rendement_brut = round(loyer_annuel_lot_b / cout_finition_mid * 100, 1)
 
     return {
-        "titre": "Vente forcée Art. 19 — Enchères judiciaires",
+        "titre": "Vente forcée Art. 19 statuts — Défaillance associé",
         "hypothese": (
-            "Vente forcée des parts de Beaussier (343 795 parts, 49,4%) aux enchères judiciaires "
-            "sur le fondement de l'art. 19 de la loi du 10/09/1947 (SCI à capital variable). "
-            "Aucun repreneur potentiel vu la complexité du dossier (8 procédures, expertise défavorable, "
-            "travaux non conformes, impayés massifs) → adjudication à 1€ comme seul enchérisseur."
+            "Vente publique des parts de Beaussier (343 795 parts, 49,4%) sur le fondement "
+            "de l'article 19 des statuts de la SCA La Désirade (CCH art. L.212-4). "
+            "Beaussier n'a pas contribué aux appels de fonds → mise en demeure restée sans effet "
+            "→ AG autorise la vente → adjudication publique. Aucun repreneur vu la complexité "
+            "→ mise à prix baissée indéfiniment → adjudication à 1€."
         ),
         "base_legale": {
-            "article": "Art. 19 loi n°47-1775 du 10/09/1947",
-            "mecanisme": "Exclusion de l'associé défaillant + vente forcée de ses parts aux enchères",
+            "article": "Article 19 des statuts SCA La Désirade (CCH art. L.212-4)",
+            "texte_cle": (
+                "« Si un associé ne contribue pas aux appels de fonds nécessités par la construction, "
+                "un mois après mise en demeure par acte extrajudiciaire restée sans effet, "
+                "la mise en vente publique de ses parts peut être autorisée par l'AG. »"
+            ),
+            "mecanisme": (
+                "Vente publique des parts pour compte et aux risques de l'associé défaillant. "
+                "Faute d'acquéreur au prix fixé par l'AG, la mise à prix peut être baissée indéfiniment. "
+                "Par le fait de l'adjudication, l'associé défaillant est dépossédé de ses parts "
+                "et son expulsion peut être décidée par simple ordonnance de référé."
+            ),
             "conditions": [
-                "Non-libération du capital souscrit (192 128€ non libérés)",
-                "Non-paiement des appels de fonds (25 335€ d'AF impayés)",
-                "Fautes de gestion caractérisées (rapport expertise Combes)",
-                "Mise en demeure restée sans effet (commandement de payer)",
+                f"Non-contribution aux appels de fonds: {dettes_annulees['af_impayes']:,.0f}€ impayés",
+                f"Capital non libéré: {dettes_annulees['capital_non_libere']:,.0f}€ sur 343 795 parts",
+                "Mise en demeure par acte extrajudiciaire restée sans effet (1 mois)",
+                "AG vote la mise en vente (majorité 2/3 — Legland a 50,6%, Beaussier exclue du vote)",
             ],
             "procedure": [
-                "1. Mise en demeure par LRAR (déjà faite via commandement)",
-                "2. Délibération AG excluant l'associé défaillant",
-                "3. Assignation devant TJ pour vente forcée des parts",
-                "4. Jugement ordonnant la vente aux enchères publiques",
-                "5. Publication (JAL/BODACC) — délai 1 mois",
-                "6. Audience d'adjudication — mise à prix 1€",
-                "7. Adjudication au seul enchérisseur (Legland)",
-                "8. Transfert de propriété par acte notarié",
+                "1. Mise en demeure par acte d'huissier (commandement de payer AF)",
+                "2. Attendre 1 mois sans réponse/paiement",
+                "3. Convoquer AG avec mise en vente à l'ordre du jour",
+                "4. AG vote la mise en vente + fixe la mise à prix (2/3 sans compter Beaussier)",
+                "5. Notifier Beaussier par LRAR + publier au JAL",
+                "6. Vente publique 10 jours après la LRAR",
+                "7. Faute d'acquéreur → baisser la mise à prix indéfiniment → 1€",
+                "8. Adjudication → Legland seul enchérisseur → dépossession immédiate",
+                "9. Expulsion par simple ordonnance de référé (art. 19 statuts)",
             ],
-            "delai_estime": "6-12 mois après assignation",
+            "delai_estime": "2-3 mois (mise en demeure 1 mois + 10 jours vente + AG)",
+            "avantages_vs_judiciaire": [
+                "Pas besoin de jugement TJ — procédure statutaire (contractuelle)",
+                "Délai 2-3 mois vs 6-12 mois pour vente forcée judiciaire",
+                "Expulsion par simple référé après adjudication (pas de procédure au fond)",
+                "Mise à prix baissée indéfiniment → garantie d'adjudication",
+                "Produit affecté par privilège au paiement des dettes de Beaussier envers la SCA",
+                "Le privilège l'emporte sur toutes sûretés réelles conventionnelles",
+            ],
         },
         "pourquoi_aucun_repreneur": [
             "8 procédures judiciaires en cours (expertise, appel, expulsion, fond, TA…)",
             "Rapport d'expertise 100% défavorable à Beaussier — 0€ retenu",
             "Travaux non conformes au PC — remise en conformité 46K€ à charge",
-            "Impayés massifs: 25K€ AF + 192K€ capital + 7K€ fournisseurs",
+            f"Impayés massifs: {dettes_annulees['af_impayes']:,.0f}€ AF + {dettes_annulees['capital_non_libere']:,.0f}€ capital",
             "Lot en gros œuvre non terminé — 107-196K€ de finition nécessaires",
             "Occupation illicite sans DAACT — risque juridique pour tout acquéreur",
-            "Co-associé (Legland 50,6%) détient la majorité et le terrain",
+            "Co-associé (Legland 50,6%) détient la majorité et le terrain privatif",
             "Dissolution SCA programmée août 2027",
         ],
         "acquisition": {
@@ -1319,13 +1328,14 @@ def _build_scenario_rachat(sca_data: dict) -> dict:
             "resultat": "100% des parts SCA + 207m² habitables + 1 232m² terrain",
         },
         "frais_vente_forcee": {
-            "avocat_art19": frais_avocat_art19,
-            "publication_jal": frais_publication,
-            "notaire_acte": emoluments_notaire,
-            "greffe": frais_greffe,
-            "droits_enregistrement": droits_enregistrement_reel,
+            "huissier_mise_en_demeure": frais_huissier_med,
+            "pv_ag": frais_ag_pv,
+            "publication_jal": frais_publication_jal,
+            "lrar_notification": frais_lrar,
+            "cahier_charges_adjudication": frais_redaction_cahier,
+            "avocat_accompagnement": frais_avocat,
             "total": total_frais_vente,
-            "note": "Droits d'enregistrement: forfait minimum sur adjudication à 1€ (administration peut requalifier)",
+            "note": "Procédure statutaire — pas de frais de justice (pas de TJ). Droits d'enregistrement sur 1€ = négligeables.",
         },
         "valeur_acquise": {
             "lot_beaussier_fini_ancien": valeur_lot_beaussier_ancien,
@@ -1362,14 +1372,14 @@ def _build_scenario_rachat(sca_data: dict) -> dict:
             "note": f"Location lot Beaussier fini ({surface_beaussier}m²) à {loyer_m2}€/m²/mois",
         },
         "leviers_pression": [
-            f"Impayés AF: {dettes_annulees['af_impayes']:,.0f}€ — commandement de payer → exclusion",
-            f"Capital non libéré: {dettes_annulees['capital_non_libere']:,.0f}€ — condition art. 19",
-            "Rapport expertise Combes: 0€ retenu pour Beaussier, 77K€ pour Legland",
-            "Travaux non conformes 100% imputés Beaussier → 46K€ remise en conformité",
-            f"Frais avocat Vernhet: 22-39K€ dépensés pour 0€ de résultat",
-            "Référé expulsion → indemnité d'occupation 1 600€/mois (57-72K€ cumulés)",
-            "Procédure au fond → 77-130K€ préjudices + travaux",
-            "Dissolution SCA août 2027 → liquidation forcée = même résultat",
+            f"AF impayés: {dettes_annulees['af_impayes']:,.0f}€ — condition art. 19 statuts remplie",
+            f"Capital non libéré: {dettes_annulees['capital_non_libere']:,.0f}€ — défaillance caractérisée",
+            "Art. 19: Beaussier EXCLUE du vote AG (pas comptée dans le quorum)",
+            "Art. 19: mise à prix baissée INDÉFINIMENT → adjudication garantie",
+            "Art. 19: expulsion par SIMPLE RÉFÉRÉ après adjudication",
+            "Art. 19: privilège sur produit → sûretés Beaussier inopposables",
+            "Rapport expertise Combes: 0€ pour Beaussier, 77K€ pour Legland",
+            f"Frais Vernhet: 22-39K€ dépensés pour 0€ de résultat → pression financière",
         ],
     }
 
