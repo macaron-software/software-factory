@@ -1384,6 +1384,33 @@ def _build_scenario_rachat(sca_data: dict) -> dict:
             "Rapport expertise Combes: 0€ pour Beaussier, 77K€ pour Legland",
             f"Frais Vernhet: 22-39K€ dépensés pour 0€ de résultat → pression financière",
         ],
+        "strategie_dissolution": {
+            "titre": "Filet de sécurité — dissolution sept. 2027",
+            "logique": (
+                "Si la prolongation SCA (2 ans) n'est pas votée → dissolution automatique sept. 2027. "
+                "Le liquidateur est TENU d'exécuter les résolutions d'AG déjà votées. "
+                "En votant AG1 (comptes) + AG2 (art. 19) AVANT la dissolution, "
+                "le liquidateur n'a plus de marge de manœuvre : il applique."
+            ),
+            "scenarios": [
+                {
+                    "cas": "Prolongation votée",
+                    "resultat": "Art. 19 s'applique normalement → vente forcée → adjudication",
+                    "issue": "Legland 100% propriétaire, SCA continue",
+                },
+                {
+                    "cas": "Prolongation refusée → dissolution",
+                    "resultat": "Liquidateur exécute résolutions AG déjà votées (art. 19)",
+                    "issue": "Adjudication dans le cadre de la liquidation → même résultat",
+                },
+                {
+                    "cas": "Dissolution + art. 19 non encore voté",
+                    "resultat": "Liquidateur attribue lots au prorata des parts libérées",
+                    "issue": "Beaussier n'a rien libéré → attribution 0 → Legland récupère tout",
+                },
+            ],
+            "conclusion": "Dans TOUS les cas, Legland récupère le lot Beaussier. L'AG art. 19 avant dissolution verrouille le résultat.",
+        },
     }
 
 

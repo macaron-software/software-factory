@@ -225,6 +225,24 @@ export default function SCAPage() {
             </div>
           )}
 
+          {/* Stratégie dissolution — filet de sécurité */}
+          {scenario.strategie_dissolution && (
+            <div className="p-3 rounded-lg bg-accent/5 border border-accent/20 mb-6">
+              <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-accent" />{scenario.strategie_dissolution.titre}</p>
+              <p className="text-t-3 text-xs mb-3">{scenario.strategie_dissolution.logique}</p>
+              <div className="space-y-2">
+                {scenario.strategie_dissolution.scenarios.map((s: any, i: number) => (
+                  <div key={i} className="p-2 rounded bg-bg-1 border border-bd-1">
+                    <p className="text-accent text-[10px] font-semibold">{s.cas}</p>
+                    <p className="text-t-3 text-xs">{s.resultat}</p>
+                    <p className="text-gain text-[10px] font-semibold">→ {s.issue}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-gain text-xs font-semibold mt-2 text-center">{scenario.strategie_dissolution.conclusion}</p>
+            </div>
+          )}
+
           <div className="grid md:grid-cols-2 gap-6">
             {/* Coûts (finition + frais vente forcée) */}
             <div className="space-y-4">
