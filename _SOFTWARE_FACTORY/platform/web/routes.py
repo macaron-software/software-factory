@@ -507,6 +507,74 @@ async def new_session_page(request: Request):
     })
 
 
+
+# ── Live session (multi-agent real-time view) ─────────────────────
+
+@router.get("/sessions/{session_id}/live", response_class=HTMLResponse)
+async def session_live_page(request: Request, session_id: str):
+    """Live multi-agent session view with 3 modes: Thread, Chat+Panel, Graph."""
+    from ..sessions.store import get_session_store
+    from ..agents.store import get_agent_store
+    from ..agents.loop import get_loop_manager
+
+    store = get_session_store()
+    session = store.get(session_id)
+    if not session:
+        return HTMLResponse("<h2>Session not found</h2>", status_code=404)
+
+    messages = store.get_messages(session_id, limit=200)
+    all_agents = get_agent_store().list_all()
+    agent_map = {a.id: a for a in all_agents}
+
+    # Get running loop statuses
+    mgr = get_loop_manager()
+
+    # Build agent list with status
+    agents = []
+    for a in all_agents:
+        loop = mgr.get_loop(a.id, session_id)
+        agents.append({
+            "id": a.id, "name": a.name, "role": a.role,
+            "icon": a.icon, "color": a.color,
+            "avatar": getattr(a, "avatar", "") or "🤖",
+            "status": loop.status.value if loop else "idle",
+            "description": a.description,
+        })
+
+    # Build graph from workflow config if available
+    graph = {"nodes": [], "edges": []}
+    wf_id = (session.config or {}).get("workflow_id", "")
+    if wf_id:
+        from ..workflows.store import get_workflow_store
+        wf = get_workflow_store().get(wf_id)
+        if wf and wf.config and wf.config.get("graph"):
+            graph = wf.config["graph"]
+
+    # Serialize messages for template
+    msg_list = []
+    for m in messages:
+        a = agent_map.get(m.from_agent)
+        msg_list.append({
+            "id": m.id, "from_agent": m.from_agent, "to_agent": getattr(m, "to_agent", ""),
+            "type": m.message_type, "content": m.content,
+            "timestamp": m.timestamp if isinstance(m.timestamp, str) else m.timestamp.isoformat() if hasattr(m.timestamp, "isoformat") else str(m.timestamp),
+            "from_name": a.name if a else m.from_agent,
+            "from_color": a.color if a else "#6b7280",
+            "from_avatar": getattr(a, "avatar", "🤖") if a else "💬",
+        })
+
+    return _templates(request).TemplateResponse("session_live.html", {
+        "request": request,
+        "page_title": f"Live: {session.name}",
+        "session": {"id": session.id, "name": session.name, "goal": session.goal,
+                     "status": session.status, "pattern": getattr(session, "pattern_id", ""),
+                     "project_id": session.project_id},
+        "agents": agents,
+        "messages": msg_list,
+        "graph": graph,
+    })
+
+
 @router.get("/sessions/{session_id}", response_class=HTMLResponse)
 async def session_page(request: Request, session_id: str):
     """Active session conversation view."""
@@ -720,6 +788,91 @@ async def delete_session(session_id: str):
     return HTMLResponse("")
 
 
+@router.post("/api/sessions/{session_id}/agents/start")
+async def start_session_agents(request: Request, session_id: str):
+    """Start agent loops for a session — the agents begin thinking autonomously."""
+    from ..sessions.store import get_session_store
+    from ..agents.loop import get_loop_manager
+    from ..projects.manager import get_project_store
+
+    store = get_session_store()
+    session = store.get(session_id)
+    if not session:
+        return JSONResponse({"error": "Session not found"}, status_code=404)
+
+    form = await request.form()
+    agent_ids = str(form.get("agent_ids", "")).split(",")
+    agent_ids = [a.strip() for a in agent_ids if a.strip()]
+    if not agent_ids:
+        return JSONResponse({"error": "No agent_ids provided"}, status_code=400)
+
+    # Resolve project path
+    project_path = ""
+    if session.project_id:
+        try:
+            proj = get_project_store().get(session.project_id)
+            if proj:
+                project_path = proj.path
+        except Exception:
+            pass
+
+    mgr = get_loop_manager()
+    started = []
+    for aid in agent_ids:
+        try:
+            await mgr.start_agent(aid, session_id, session.project_id or "", project_path)
+            started.append(aid)
+        except Exception as e:
+            logger.error("Failed to start agent %s: %s", aid, e)
+
+    return JSONResponse({"started": started, "count": len(started)})
+
+
+@router.post("/api/sessions/{session_id}/agents/stop")
+async def stop_session_agents(session_id: str):
+    """Stop all agent loops for a session."""
+    from ..agents.loop import get_loop_manager
+    mgr = get_loop_manager()
+    await mgr.stop_session(session_id)
+    return JSONResponse({"stopped": True})
+
+
+@router.post("/api/sessions/{session_id}/agents/{agent_id}/message")
+async def send_to_agent(request: Request, session_id: str, agent_id: str):
+    """Send a message to a specific agent via the bus (user → agent)."""
+    from ..a2a.bus import get_bus
+    from ..models import A2AMessage, MessageType
+    from ..sessions.store import get_session_store, MessageDef
+
+    form = await request.form()
+    content = str(form.get("content", "")).strip()
+    if not content:
+        return JSONResponse({"error": "Empty message"}, status_code=400)
+
+    # Store user message in session
+    store = get_session_store()
+    store.add_message(MessageDef(
+        session_id=session_id,
+        from_agent="user",
+        message_type="text",
+        content=content,
+    ))
+
+    # Publish to bus so the agent's loop picks it up
+    bus = get_bus()
+    msg = A2AMessage(
+        session_id=session_id,
+        from_agent="user",
+        to_agent=agent_id,
+        message_type=MessageType.REQUEST,
+        content=content,
+        requires_response=True,
+    )
+    await bus.publish(msg)
+
+    return JSONResponse({"sent": True, "to": agent_id})
+
+
 @router.get("/api/sessions/{session_id}/sse")
 async def session_sse(request: Request, session_id: str):
     """SSE endpoint for real-time session updates."""
@@ -769,12 +922,17 @@ async def workflows_page(request: Request):
 async def workflow_new(request: Request):
     """New workflow form."""
     from ..patterns.store import get_pattern_store
+    from ..agents.store import get_agent_store
     patterns = [{"id": p.id, "name": p.name, "type": p.type} for p in get_pattern_store().list_all()]
+    agents = [{"id": a.id, "name": a.name, "role": a.role, "icon": a.icon, "color": a.color,
+               "skills": a.skills, "description": a.description}
+              for a in get_agent_store().list_all()]
     return _templates(request).TemplateResponse("workflow_edit.html", {
         "request": request,
         "page_title": "New Workflow",
         "workflow": None,
         "patterns": patterns,
+        "agents": agents,
     })
 
 
@@ -783,15 +941,20 @@ async def workflow_edit(request: Request, wf_id: str):
     """Edit workflow form."""
     from ..workflows.store import get_workflow_store
     from ..patterns.store import get_pattern_store
+    from ..agents.store import get_agent_store
     wf = get_workflow_store().get(wf_id)
     if not wf:
         return HTMLResponse("<h2>Workflow not found</h2>", status_code=404)
     patterns = [{"id": p.id, "name": p.name, "type": p.type} for p in get_pattern_store().list_all()]
+    agents = [{"id": a.id, "name": a.name, "role": a.role, "icon": a.icon, "color": a.color,
+               "skills": a.skills, "description": a.description}
+              for a in get_agent_store().list_all()]
     return _templates(request).TemplateResponse("workflow_edit.html", {
         "request": request,
         "page_title": f"Edit: {wf.name}",
         "workflow": wf,
         "patterns": patterns,
+        "agents": agents,
     })
 
 
@@ -818,7 +981,12 @@ async def create_workflow(request: Request):
         gate=p.get("gate", "always"),
     ) for i, p in enumerate(phases_data)]
 
-    wf = WorkflowDef(id=wf_id, name=name, description=description, icon=icon, phases=phases)
+    config_raw = str(form.get("config_json", "{}"))
+    try:
+        config = _json.loads(config_raw)
+    except Exception:
+        config = {}
+    wf = WorkflowDef(id=wf_id, name=name, description=description, icon=icon, phases=phases, config=config)
     store = get_workflow_store()
     store.create(wf)
     return RedirectResponse(url="/workflows", status_code=303)
@@ -846,7 +1014,12 @@ async def update_workflow(request: Request, wf_id: str):
         gate=p.get("gate", "always"),
     ) for i, p in enumerate(phases_data)]
 
-    wf = WorkflowDef(id=wf_id, name=name, description=description, icon=icon, phases=phases)
+    config_raw = str(form.get("config_json", "{}"))
+    try:
+        config = _json.loads(config_raw)
+    except Exception:
+        config = {}
+    wf = WorkflowDef(id=wf_id, name=name, description=description, icon=icon, phases=phases, config=config)
     store = get_workflow_store()
     store.create(wf)  # INSERT OR REPLACE
     return RedirectResponse(url="/workflows", status_code=303)

@@ -1,0 +1,605 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<div style="display:flex;align-items:center;gap:12px;">
+    <span class="badge {% if session.status == 'active' %}badge-green{% elif session.status == 'completed' %}badge-blue{% elif session.status == 'failed' %}badge-red{% else %}badge-yellow{% endif %}">
+        {{ session.status }}
+    </span>
+    <button class="btn btn-sm btn-danger"
+            hx-post="/api/sessions/{{ session.id }}/stop"
+            hx-swap="none"
+            hx-on::after-request="location.reload()">
+        <svg class="icon icon-sm"><use href="#icon-stop"/></svg> Stop
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+/* ── Layout ── */
+.session-wrap{display:flex;flex-direction:column;height:calc(100vh - 56px);background:var(--bg-primary);overflow:hidden}
+.session-header{display:flex;align-items:center;justify-content:space-between;padding:0.6rem 1.25rem;border-bottom:1px solid var(--border);background:var(--bg-secondary);flex-shrink:0}
+.session-title{display:flex;align-items:center;gap:0.6rem;font-size:0.95rem;color:var(--text-primary);font-weight:600}
+.session-status{display:inline-flex;align-items:center;gap:0.35rem;font-size:0.75rem;padding:0.2rem 0.55rem;border-radius:10px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)}
+.session-status .dot{width:7px;height:7px;border-radius:50%;background:#6b7280}
+.session-status .dot--active{background:var(--green);box-shadow:0 0 6px var(--green)}
+.session-status .dot--thinking{background:var(--yellow);animation:pulse 1s infinite}
+.session-status .dot--error{background:var(--red)}
+.session-tabs{display:flex;gap:0}
+.session-tab{background:none;border:none;color:var(--text-secondary);padding:0.45rem 1rem;font-size:0.82rem;cursor:pointer;border-radius:6px;transition:all .15s;display:flex;align-items:center;gap:0.35rem}
+.session-tab:hover{background:var(--bg-tertiary);color:var(--text-primary)}
+.session-tab.active{background:var(--purple);color:#fff}
+.session-content{flex:1;overflow:hidden;position:relative}
+.session-pane{display:none;height:100%;width:100%}
+.session-pane.active{display:block}
+
+/* ── Bottom input bar ── */
+.session-input{display:flex;align-items:center;gap:0.5rem;padding:0.6rem 1rem;border-top:1px solid var(--border);background:var(--bg-secondary);flex-shrink:0}
+.input-agent-select{background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.78rem;outline:none;cursor:pointer;min-width:120px}
+.input-agent-select:focus{border-color:var(--purple)}
+.input-text{flex:1;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;padding:0.55rem 0.85rem;font-size:0.85rem;outline:none;font-family:inherit}
+.input-text::placeholder{color:var(--text-secondary)}
+.input-text:focus{border-color:var(--purple);box-shadow:0 0 0 2px rgba(124,58,237,.15)}
+.input-send{background:var(--purple);color:#fff;border:none;border-radius:8px;padding:0.55rem 1rem;font-size:0.85rem;cursor:pointer;font-weight:600;transition:background .15s}
+.input-send:hover{background:#6d28d9}
+.input-send:active{transform:scale(0.97)}
+
+/* ── Thread mode ── */
+.thread-feed{overflow-y:auto;height:100%;padding:1rem 1.25rem}
+.thread-msg{display:flex;gap:0.75rem;padding:0.65rem 0;border-left:3px solid transparent;padding-left:0.75rem;transition:background .1s}
+.thread-msg:hover{background:rgba(255,255,255,.02)}
+.thread-msg--request,.thread-msg--delegate{border-left-color:var(--yellow)}
+.thread-msg--response,.thread-msg--approve{border-left-color:var(--green)}
+.thread-msg--veto{border-left-color:var(--red)}
+.thread-msg--inform,.thread-msg--system{border-left-color:#6b7280}
+.thread-msg--negotiate{border-left-color:var(--blue)}
+.thread-msg--human_request,.thread-msg--human_response{border-left-color:var(--purple)}
+.thread-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;color:#fff;font-weight:600}
+.thread-body{flex:1;min-width:0}
+.thread-meta{display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;margin-bottom:0.2rem}
+.thread-name{font-size:0.82rem;font-weight:600;color:var(--text-primary)}
+.thread-badge{font-size:0.62rem;padding:0.1rem 0.4rem;border-radius:4px;text-transform:uppercase;font-weight:700;letter-spacing:0.03em;background:var(--bg-tertiary);color:var(--text-secondary)}
+.thread-badge--veto{background:var(--red);color:#fff}
+.thread-badge--approve{background:var(--green);color:#fff}
+.thread-badge--delegate,.thread-badge--request{background:var(--yellow);color:#111}
+.thread-badge--negotiate{background:var(--blue);color:#fff}
+.thread-badge--human_request,.thread-badge--human_response{background:var(--purple);color:#fff}
+.thread-arrow{color:var(--text-secondary);font-size:0.75rem}
+.thread-target{font-size:0.78rem;color:var(--text-secondary)}
+.thread-time{font-size:0.7rem;color:var(--text-secondary);margin-left:auto;white-space:nowrap}
+.thread-content{font-size:0.84rem;color:var(--text-primary);line-height:1.55;white-space:pre-wrap;word-break:break-word}
+
+/* ── Chat mode ── */
+.chat-split{display:grid;grid-template-columns:1fr 300px;height:100%}
+.chat-main{display:flex;flex-direction:column;overflow:hidden}
+.chat-selector{padding:0.6rem 1rem;border-bottom:1px solid var(--border);background:var(--bg-secondary)}
+.chat-selector select{background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:0.35rem 0.6rem;font-size:0.82rem;outline:none}
+.chat-messages{flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:0.6rem}
+.chat-bubble{max-width:78%;padding:0.65rem 0.85rem;border-radius:12px;font-size:0.84rem;line-height:1.5;position:relative;word-break:break-word}
+.chat-bubble--agent{background:var(--bg-tertiary);color:var(--text-primary);align-self:flex-start;border-bottom-left-radius:4px}
+.chat-bubble--user{background:var(--purple);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+.chat-bubble-meta{display:flex;align-items:center;gap:0.4rem;margin-bottom:0.25rem}
+.chat-bubble-name{font-size:0.72rem;font-weight:600;opacity:0.85}
+.chat-bubble-time{font-size:0.65rem;opacity:0.55;margin-left:auto}
+.chat-bubble-text{white-space:pre-wrap}
+.chat-thinking{display:flex;align-items:center;gap:0.4rem;padding:0.5rem 0.85rem;color:var(--text-secondary);font-size:0.8rem;font-style:italic}
+.chat-thinking .dots span{animation:blink 1.4s infinite both}
+.chat-thinking .dots span:nth-child(2){animation-delay:0.2s}
+.chat-thinking .dots span:nth-child(3){animation-delay:0.4s}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+
+/* Chat right panel */
+.chat-panel{border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;background:var(--bg-primary)}
+.chat-panel-header{padding:0.5rem 0.75rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0.5rem;background:var(--bg-secondary);flex-shrink:0}
+.chat-panel-header span{font-size:0.78rem;font-weight:600;color:var(--text-primary)}
+.chat-panel-filters{display:flex;gap:0.25rem;margin-left:auto}
+.panel-filter{background:none;border:1px solid var(--border);color:var(--text-secondary);border-radius:4px;padding:0.15rem 0.4rem;font-size:0.65rem;cursor:pointer;transition:all .12s}
+.panel-filter.active{background:var(--purple);color:#fff;border-color:var(--purple)}
+.chat-panel-feed{flex:1;overflow-y:auto;padding:0.5rem}
+.panel-msg{display:flex;gap:0.4rem;padding:0.35rem 0.3rem;border-radius:4px;transition:background .1s}
+.panel-msg:hover{background:var(--bg-tertiary)}
+.panel-avatar{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.65rem;flex-shrink:0}
+.panel-body{flex:1;min-width:0}
+.panel-meta{display:flex;align-items:center;gap:0.3rem;font-size:0.68rem;color:var(--text-secondary)}
+.panel-meta .panel-badge{font-size:0.58rem;padding:0.05rem 0.3rem;border-radius:3px;text-transform:uppercase;font-weight:700}
+.panel-content{font-size:0.72rem;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── Graph mode ── */
+.graph-split{display:grid;grid-template-rows:1fr 200px;height:100%}
+.graph-canvas{position:relative;overflow:hidden;background:var(--bg-primary)}
+.graph-canvas svg{width:100%;height:100%}
+.graph-log{border-top:1px solid var(--border);overflow-y:auto;padding:0.5rem 0.75rem;background:var(--bg-secondary);position:relative}
+.graph-log-line{display:flex;align-items:baseline;gap:0.5rem;padding:0.2rem 0;font-size:0.78rem}
+.graph-log-time{color:var(--text-secondary);font-size:0.7rem;font-family:'SF Mono',monospace;white-space:nowrap;flex-shrink:0}
+.graph-log-from{font-weight:600;color:var(--text-primary)}
+.graph-log-arrow{color:var(--text-secondary)}
+.graph-log-to{color:var(--text-primary)}
+.graph-log-content{color:var(--text-secondary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.graph-log-content[data-type="veto"]{color:var(--red)}
+.graph-log-content[data-type="approve"]{color:var(--green)}
+.graph-log-content[data-type="delegate"]{color:var(--yellow)}
+.graph-new-btn{position:sticky;bottom:0;left:50%;transform:translateX(-50%);background:var(--purple);color:#fff;border:none;border-radius:12px;padding:0.25rem 0.75rem;font-size:0.72rem;cursor:pointer;display:none;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+
+/* Graph node cards (SVG) */
+.live-node{cursor:pointer;user-select:none}
+.live-node:hover .live-node-bg{filter:brightness(1.15)}
+.live-node-bg{rx:12;ry:12;fill:var(--bg-secondary);stroke:var(--border);stroke-width:1.2;transition:stroke .2s,filter .15s}
+.live-node.highlight .live-node-bg{stroke:var(--purple);stroke-width:2.5}
+.live-node-bar{stroke-linecap:round}
+.live-node-name{fill:var(--text-primary);font-size:12px;font-weight:700;font-family:inherit}
+.live-node-role{fill:var(--text-secondary);font-size:9.5px;font-family:inherit}
+.live-node-emoji{font-size:14px}
+.node-status{transition:fill .3s}
+.node-status--idle{fill:#6b7280}
+.node-status--thinking{fill:var(--yellow);animation:pulse 1s infinite}
+.node-status--acting{fill:var(--green)}
+.node-status--error{fill:var(--red)}
+.node-status--done{fill:var(--green)}
+.edge-line{fill:none;stroke:var(--purple);stroke-width:1.8;opacity:0.45;marker-end:url(#liveArrow)}
+.edge-active{stroke-dasharray:8 4;animation:dash 0.6s linear infinite;opacity:0.85;stroke-width:2.2}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes dash{to{stroke-dashoffset:-12}}
+
+/* Tooltip */
+.node-tooltip{position:absolute;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:0.5rem 0.7rem;font-size:0.78rem;color:var(--text-primary);max-width:260px;box-shadow:0 4px 16px rgba(0,0,0,.45);pointer-events:none;z-index:20;display:none;word-break:break-word}
+.node-tooltip.visible{display:block}
+</style>
+
+<div class="session-wrap">
+  <!-- Header -->
+  <div class="session-header">
+    <div class="session-title">
+      Session: "{{ session.name }}"
+      <span class="session-status">
+        <span class="dot {% if session.status == 'active' %}dot--active{% elif session.status == 'thinking' %}dot--thinking{% elif session.status == 'failed' %}dot--error{% endif %}"></span>
+        {{ session.status }}
+      </span>
+    </div>
+    <div class="session-tabs">
+      <button class="session-tab active" data-tab="thread">📋 Thread</button>
+      <button class="session-tab" data-tab="chat">💬 Chat</button>
+      <button class="session-tab" data-tab="graph">🔮 Graph</button>
+    </div>
+  </div>
+
+  <!-- Content area -->
+  <div class="session-content">
+    <!-- MODE 1: Thread -->
+    <div class="session-pane active" id="pane-thread">
+      <div class="thread-feed" id="threadFeed">
+        {% for msg in messages %}
+        <div class="thread-msg thread-msg--{{ msg.type }}" data-id="{{ msg.id }}">
+          {% set agent = agents | selectattr('id', 'equalto', msg.from_agent) | first %}
+          <div class="thread-avatar" style="background:{{ agent.color if agent else '#6b7280' }}">{{ agent.avatar if agent else '?' }}</div>
+          <div class="thread-body">
+            <div class="thread-meta">
+              <span class="thread-name">{{ agent.name if agent else msg.from_agent }}</span>
+              <span class="thread-badge thread-badge--{{ msg.type }}">{{ msg.type }}</span>
+              <span class="thread-arrow">→</span>
+              {% set target = agents | selectattr('id', 'equalto', msg.to_agent) | first %}
+              <span class="thread-target">{{ target.name if target else (msg.to_agent or 'all') }}</span>
+              <span class="thread-time">{{ msg.timestamp }}</span>
+            </div>
+            <div class="thread-content">{{ msg.content }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- MODE 2: Chat + Panel -->
+    <div class="session-pane" id="pane-chat">
+      <div class="chat-split">
+        <div class="chat-main">
+          <div class="chat-selector">
+            <label style="font-size:0.78rem;color:var(--text-secondary);margin-right:0.4rem">Chat with:</label>
+            <select id="chatAgentSelect">
+              {% for a in agents %}
+              <option value="{{ a.id }}">{{ a.avatar }} {{ a.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="chat-messages" id="chatMessages"></div>
+        </div>
+        <div class="chat-panel">
+          <div class="chat-panel-header">
+            <span>Inter-Agent Feed</span>
+            <div class="chat-panel-filters">
+              <button class="panel-filter active" data-filter="all">All</button>
+              <button class="panel-filter" data-filter="decisions">Decisions</button>
+              <button class="panel-filter" data-filter="errors">Errors</button>
+            </div>
+          </div>
+          <div class="chat-panel-feed" id="panelFeed"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODE 3: Graph Live -->
+    <div class="session-pane" id="pane-graph">
+      <div class="graph-split">
+        <div class="graph-canvas" id="graphCanvas">
+          <svg id="liveSvg" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="liveArrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="var(--purple)" opacity="0.6"/>
+              </marker>
+            </defs>
+            <g id="liveEdges"></g>
+            <g id="liveNodes"></g>
+          </svg>
+          <div class="node-tooltip" id="nodeTooltip"></div>
+        </div>
+        <div class="graph-log" id="graphLog">
+          {% for msg in messages %}
+          {% set fa = agents | selectattr('id', 'equalto', msg.from_agent) | first %}
+          {% set ta = agents | selectattr('id', 'equalto', msg.to_agent) | first %}
+          <div class="graph-log-line">
+            <span class="graph-log-time">{{ msg.timestamp }}</span>
+            <span class="graph-log-from">{{ fa.avatar if fa else '?' }} {{ fa.name if fa else msg.from_agent }}</span>
+            <span class="graph-log-arrow">→</span>
+            <span class="graph-log-to">{{ ta.name if ta else (msg.to_agent or 'all') }}</span>
+            <span class="graph-log-content" data-type="{{ msg.type }}">{% if msg.type == 'veto' %}[VETO] {% elif msg.type == 'approve' %}[OK] {% endif %}{{ msg.content[:100] }}</span>
+          </div>
+          {% endfor %}
+          <button class="graph-new-btn" id="graphNewBtn" onclick="scrollGraphLog()">⬇ New messages</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom input bar -->
+  <div class="session-input">
+    <select id="targetAgent" class="input-agent-select">
+      <option value="">All agents</option>
+      {% for a in agents %}
+      <option value="{{ a.id }}">{{ a.avatar }} {{ a.name }}</option>
+      {% endfor %}
+    </select>
+    <input type="text" id="msgInput" class="input-text" placeholder="Send a message..." autocomplete="off">
+    <button id="btnSend" class="input-send">▶</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ── Bootstrap data ── */
+const SESSION_ID = {{ session.id | tojson }};
+const AGENTS = {{ agents | tojson }};
+const GRAPH  = {{ graph | tojson if graph else '{"nodes":[],"edges":[]}' }};
+const NODE_W = 160, NODE_H = 72;
+
+function agentById(id){ return AGENTS.find(a=>a.id===id) || null; }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+
+/* ── Tab switching ── */
+const tabs = document.querySelectorAll('.session-tab');
+const panes = document.querySelectorAll('.session-pane');
+let activeTab = localStorage.getItem('session_tab') || 'thread';
+
+function switchTab(tab){
+  activeTab = tab;
+  localStorage.setItem('session_tab', tab);
+  tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  panes.forEach(p => p.classList.toggle('active', p.id === 'pane-'+tab));
+  if(tab === 'graph') renderGraph();
+}
+
+tabs.forEach(t => t.addEventListener('click', ()=> switchTab(t.dataset.tab)));
+switchTab(activeTab);
+
+/* ── Send message ── */
+const msgInput = document.getElementById('msgInput');
+const targetAgent = document.getElementById('targetAgent');
+const btnSend = document.getElementById('btnSend');
+
+async function sendMessage(){
+  const content = msgInput.value.trim();
+  if(!content) return;
+  const target = targetAgent.value;
+  btnSend.disabled = true;
+  try{
+    await fetch(`/api/sessions/${SESSION_ID}/messages`, {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:`content=${encodeURIComponent(content)}&to_agent=${target}`
+    });
+    msgInput.value = '';
+  } finally { btnSend.disabled = false; }
+}
+
+btnSend.addEventListener('click', sendMessage);
+msgInput.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }});
+
+/* ── SSE Connection ── */
+const es = new EventSource(`/sse/session/${SESSION_ID}`);
+es.addEventListener('message', e=>{
+  try{
+    const data = JSON.parse(e.data);
+    appendMessage(data);
+    updateNodeStatus(data);
+  }catch(err){ console.error('SSE parse error', err); }
+});
+es.addEventListener('error', ()=>{ console.warn('SSE connection lost, will retry...'); });
+
+/* ── Append message to all modes ── */
+function appendMessage(data){
+  appendThread(data);
+  appendChatPanel(data);
+  appendGraphLog(data);
+  appendChatBubble(data);
+}
+
+/* Thread mode */
+function appendThread(data){
+  const feed = document.getElementById('threadFeed');
+  const agent = agentById(data.from_agent);
+  const target = agentById(data.to_agent);
+  const div = document.createElement('div');
+  div.className = `thread-msg thread-msg--${data.msg_type||data.type||'inform'}`;
+  div.innerHTML = `
+    <div class="thread-avatar" style="background:${agent?agent.color:'#6b7280'}">${agent?agent.avatar:'?'}</div>
+    <div class="thread-body">
+      <div class="thread-meta">
+        <span class="thread-name">${esc(agent?agent.name:data.from_agent)}</span>
+        <span class="thread-badge thread-badge--${data.msg_type||data.type||'inform'}">${esc(data.msg_type||data.type||'inform')}</span>
+        <span class="thread-arrow">→</span>
+        <span class="thread-target">${esc(target?target.name:(data.to_agent||'all'))}</span>
+        <span class="thread-time">now</span>
+      </div>
+      <div class="thread-content">${esc(data.content)}</div>
+    </div>`;
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+/* Chat panel (right side) */
+function appendChatPanel(data){
+  const feed = document.getElementById('panelFeed');
+  const agent = agentById(data.from_agent);
+  const type = data.msg_type||data.type||'inform';
+  const div = document.createElement('div');
+  div.className = 'panel-msg';
+  div.dataset.type = type;
+  div.innerHTML = `
+    <div class="panel-avatar" style="background:${agent?agent.color:'#6b7280'}">${agent?agent.avatar:'?'}</div>
+    <div class="panel-body">
+      <div class="panel-meta">
+        <span>${esc(agent?agent.name:data.from_agent)}</span>
+        <span class="panel-badge thread-badge--${type}">${esc(type)}</span>
+      </div>
+      <div class="panel-content">${esc((data.content||'').substring(0,120))}</div>
+    </div>`;
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+/* Chat bubble (left side, filtered by selected agent) */
+function appendChatBubble(data){
+  const sel = document.getElementById('chatAgentSelect').value;
+  const isFromAgent = data.from_agent === sel;
+  const isToAgent = data.to_agent === sel || !data.to_agent;
+  const isHuman = data.from_agent === 'human' || data.from_agent === 'user';
+  if(!isFromAgent && !isToAgent && !isHuman) return;
+
+  const cont = document.getElementById('chatMessages');
+  const agent = agentById(data.from_agent);
+  const isUser = isHuman;
+  const div = document.createElement('div');
+  div.className = `chat-bubble chat-bubble--${isUser?'user':'agent'}`;
+  div.innerHTML = `
+    <div class="chat-bubble-meta">
+      <span class="chat-bubble-name">${isUser?'You':esc(agent?agent.name:data.from_agent)}</span>
+      <span class="chat-bubble-time">now</span>
+    </div>
+    <div class="chat-bubble-text">${esc(data.content)}</div>`;
+  cont.appendChild(div);
+  cont.scrollTop = cont.scrollHeight;
+}
+
+/* Graph log */
+function appendGraphLog(data){
+  const log = document.getElementById('graphLog');
+  const agent = agentById(data.from_agent);
+  const target = agentById(data.to_agent);
+  const type = data.msg_type||data.type||'inform';
+  const prefix = type==='veto'?'[VETO] ':type==='approve'?'[OK] ':'';
+  const div = document.createElement('div');
+  div.className = 'graph-log-line';
+  div.innerHTML = `
+    <span class="graph-log-time">${new Date().toLocaleTimeString()}</span>
+    <span class="graph-log-from">${agent?agent.avatar:'?'} ${esc(agent?agent.name:data.from_agent)}</span>
+    <span class="graph-log-arrow">→</span>
+    <span class="graph-log-to">${esc(target?target.name:(data.to_agent||'all'))}</span>
+    <span class="graph-log-content" data-type="${type}">${prefix}${esc((data.content||'').substring(0,100))}</span>`;
+  log.insertBefore(div, document.getElementById('graphNewBtn'));
+  if(log.scrollTop + log.clientHeight >= log.scrollHeight - 50){
+    log.scrollTop = log.scrollHeight;
+  } else {
+    document.getElementById('graphNewBtn').style.display = 'block';
+  }
+
+  // Animate edge in graph
+  if(data.from_agent && data.to_agent) animateEdge(data.from_agent, data.to_agent);
+}
+
+function scrollGraphLog(){
+  const log = document.getElementById('graphLog');
+  log.scrollTop = log.scrollHeight;
+  document.getElementById('graphNewBtn').style.display = 'none';
+}
+
+/* ── Panel filters ── */
+document.querySelectorAll('.panel-filter').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.panel-filter').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const filter = btn.dataset.filter;
+    document.querySelectorAll('.panel-msg').forEach(m=>{
+      if(filter==='all'){ m.style.display=''; return; }
+      const t = m.dataset.type;
+      if(filter==='decisions') m.style.display=(t==='approve'||t==='veto'||t==='delegate')?'':'none';
+      else if(filter==='errors') m.style.display=(t==='veto'||t==='error')?'':'none';
+    });
+  });
+});
+
+/* ── Chat agent selector ── */
+document.getElementById('chatAgentSelect').addEventListener('change', ()=>{
+  document.getElementById('chatMessages').innerHTML = '';
+});
+
+/* ── Graph rendering ── */
+let graphNodes = GRAPH.nodes || [];
+let graphEdges = GRAPH.edges || [];
+let highlightedNode = null;
+
+function renderGraph(){
+  const canvas = document.getElementById('graphCanvas');
+  const svgEl = document.getElementById('liveSvg');
+  const W = canvas.clientWidth || 800;
+  const H = canvas.clientHeight || 500;
+  svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  // Auto-layout if no positions
+  if(graphNodes.length && graphNodes[0].x == null) autoLayoutGraph(W, H);
+
+  renderLiveEdges(W, H);
+  renderLiveNodes();
+}
+
+function autoLayoutGraph(W, H){
+  const N = graphNodes.length;
+  if(!N) return;
+  if(N === 1){
+    graphNodes[0].x = W/2 - NODE_W/2;
+    graphNodes[0].y = H/2 - NODE_H/2;
+    return;
+  }
+  // Tree layout: first node top-center, rest spread below
+  graphNodes[0].x = W/2 - NODE_W/2;
+  graphNodes[0].y = 40;
+  const children = graphNodes.slice(1);
+  const gap = Math.min(190, (W - NODE_W) / (children.length || 1));
+  const startX = Math.max(20, (W - gap*(children.length-1) - NODE_W) / 2);
+  children.forEach((n,i)=>{ n.x = startX + i*gap; n.y = 180; });
+}
+
+function renderLiveEdges(W, H){
+  const el = document.getElementById('liveEdges');
+  el.innerHTML = '';
+  graphEdges.forEach(e=>{
+    const fn = graphNodes.find(n=>(n.id||n.agent_id)===e.from);
+    const tn = graphNodes.find(n=>(n.id||n.agent_id)===e.to);
+    if(!fn||!tn) return;
+    const x1=fn.x+NODE_W/2, y1=fn.y+NODE_H;
+    const x2=tn.x+NODE_W/2, y2=tn.y;
+    const off = Math.max(40, Math.abs(y2-y1)*0.45);
+    const d = `M${x1},${y1} C${x1},${y1+off} ${x2},${y2-off} ${x2},${y2}`;
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', d);
+    path.setAttribute('class','edge-line');
+    path.dataset.from = e.from;
+    path.dataset.to = e.to;
+    el.appendChild(path);
+  });
+}
+
+function renderLiveNodes(){
+  const nl = document.getElementById('liveNodes');
+  nl.innerHTML = '';
+  graphNodes.forEach(n=>{
+    const agent = agentById(n.agent_id || n.id);
+    const col = (agent && agent.color) || 'var(--purple)';
+    const name = esc(agent ? agent.name : (n.name || n.id));
+    const emoji = agent ? agent.avatar : '⚙';
+    const status = (agent && agent.status) || n.status || 'idle';
+    const sel = (n.id||n.agent_id) === highlightedNode;
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('class', 'live-node' + (sel?' highlight':''));
+    g.setAttribute('transform', `translate(${n.x},${n.y})`);
+    g.dataset.agent = n.agent_id || n.id;
+
+    g.innerHTML = `
+      <rect class="live-node-bg" width="${NODE_W}" height="${NODE_H}" ${sel?`style="stroke:${col};stroke-width:2.5"`:''} />
+      <line class="live-node-bar" x1="0" y1="0" x2="${NODE_W}" y2="0" stroke="${col}" stroke-width="3"/>
+      <text class="live-node-emoji" x="12" y="28">${emoji}</text>
+      <text class="live-node-name" x="32" y="27">${name}</text>
+      <circle class="node-status node-status--${status}" cx="${NODE_W-16}" cy="16" r="5"/>
+    `;
+    g.addEventListener('click', ()=> onNodeClick(n, g));
+    nl.appendChild(g);
+  });
+}
+
+function onNodeClick(node, gEl){
+  const agentId = node.agent_id || node.id;
+  highlightedNode = highlightedNode===agentId ? null : agentId;
+  renderLiveNodes();
+
+  const tooltip = document.getElementById('nodeTooltip');
+  if(!highlightedNode){ tooltip.classList.remove('visible'); return; }
+
+  const agent = agentById(agentId);
+  tooltip.innerHTML = `<strong>${agent?agent.avatar:''} ${esc(agent?agent.name:agentId)}</strong><br>
+    <span style="color:var(--text-secondary);font-size:0.72rem">Status: ${agent?agent.status:'unknown'}</span>`;
+  tooltip.style.left = (node.x + NODE_W + 10) + 'px';
+  tooltip.style.top = node.y + 'px';
+  tooltip.classList.add('visible');
+}
+
+/* ── Graph status updates ── */
+function updateNodeStatus(data){
+  if(data.type === 'status' && data.from_agent){
+    const agent = agentById(data.from_agent);
+    if(agent) agent.status = data.status || 'idle';
+    if(activeTab === 'graph') renderLiveNodes();
+    // Update thinking indicator in chat
+    updateThinking(data);
+  }
+}
+
+function updateThinking(data){
+  const existing = document.querySelector('.chat-thinking');
+  if(data.status === 'thinking' && !existing){
+    const cont = document.getElementById('chatMessages');
+    const div = document.createElement('div');
+    div.className = 'chat-thinking';
+    div.innerHTML = `Thinking<span class="dots"><span>.</span><span>.</span><span>.</span></span>`;
+    cont.appendChild(div);
+    cont.scrollTop = cont.scrollHeight;
+  } else if(data.status !== 'thinking' && existing){
+    existing.remove();
+  }
+}
+
+/* ── Edge animation ── */
+function animateEdge(fromId, toId){
+  const edges = document.querySelectorAll('#liveEdges .edge-line');
+  edges.forEach(path=>{
+    if(path.dataset.from===fromId && path.dataset.to===toId){
+      path.classList.add('edge-active');
+      setTimeout(()=> path.classList.remove('edge-active'), 1200);
+    }
+  });
+}
+
+/* ── Initial scroll ── */
+const threadFeed = document.getElementById('threadFeed');
+if(threadFeed) threadFeed.scrollTop = threadFeed.scrollHeight;
+const graphLog = document.getElementById('graphLog');
+if(graphLog) graphLog.scrollTop = graphLog.scrollHeight;
+
+/* ── Resize handler ── */
+let resizeTimer;
+window.addEventListener('resize', ()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(()=>{ if(activeTab==='graph') renderGraph(); }, 200);
+});
+
+})();
+</script>
+{% endblock %}
