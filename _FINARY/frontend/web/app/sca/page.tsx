@@ -679,6 +679,35 @@ export default function SCAPage() {
                   <p className="text-t-3 text-xs mb-3 italic border-l-2 border-accent pl-3">{proc.note}</p>
                 )}
 
+                {/* Indemnités demandées (TA) */}
+                {proc.indemnites_demandees && (
+                  <details className="mb-3">
+                    <summary className="text-gain text-xs font-semibold cursor-pointer flex items-center gap-1.5">
+                      <Scale className="w-3.5 h-3.5" />
+                      Indemnités demandées : {formatEURCompact(proc.indemnites_demandees.total_low)}–{formatEURCompact(proc.indemnites_demandees.total_high)}
+                    </summary>
+                    <div className="mt-2 space-y-1.5 pl-1">
+                      {proc.indemnites_demandees.postes.map((p: any, j: number) => (
+                        <div key={j} className="p-2 rounded bg-bg-1 border border-bd-1">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="text-t-2 text-xs font-semibold">{p.poste}</span>
+                              <p className="text-t-4 text-[10px]">{p.description}</p>
+                            </div>
+                            <span className="text-gain text-xs font-mono whitespace-nowrap">{formatEURCompact(p.estimate_low)}–{formatEURCompact(p.estimate_high)}</span>
+                          </div>
+                          <p className="text-t-5 text-[10px] italic mt-0.5">{p.calcul}</p>
+                        </div>
+                      ))}
+                      <div className="flex justify-between text-xs font-semibold pt-2 border-t border-bd-1">
+                        <span className="text-t-2">Total indemnités demandées</span>
+                        <span className="text-gain font-mono">{formatEURCompact(proc.indemnites_demandees.total_low)}–{formatEURCompact(proc.indemnites_demandees.total_high)}</span>
+                      </div>
+                      <p className="text-t-5 text-[10px] italic">{proc.indemnites_demandees.note}</p>
+                    </div>
+                  </details>
+                )}
+
                 {/* Future dates (highlighted) */}
                 {futureEvents.length > 0 && (
                   <div className="mb-2">
