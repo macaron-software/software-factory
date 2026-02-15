@@ -1291,7 +1291,7 @@ def _build_scenario_rachat(sca_data: dict) -> dict:
             ],
             "procedure": [
                 "1. ✅ Compta SCA — bilan, FEC, comptes de résultat (FAIT)",
-                "2. Expert-comptable — validation + attestation des comptes SCA",
+                "2. ✅ Expert-comptable Varaine (Amarante) — TVA dégagée, immo en-cours par nature, FEC envoyé (FAIT — en attente attestation)",
                 "3. AG approbation des comptes — constate les impayés Beaussier",
                 "4. Courrier gérance — purge des CCA (hors avances Legland pour Beaussier)",
                 "5. ✅ Mise en demeure par acte d'huissier (commandement de payer AF — FAIT)",
