@@ -126,9 +126,10 @@
 .live-node-bg{rx:12;ry:12;fill:var(--bg-secondary);stroke:var(--border);stroke-width:1.2;transition:stroke .2s,filter .15s}
 .live-node.highlight .live-node-bg{stroke:var(--purple);stroke-width:2.5}
 .live-node-bar{stroke-linecap:round}
-.live-node-name{fill:var(--text-primary);font-size:12px;font-weight:700;font-family:inherit}
-.live-node-role{fill:var(--text-secondary);font-size:9.5px;font-family:inherit}
-.live-node-emoji{font-size:14px}
+.live-node-name{fill:var(--text-primary);font-size:11.5px;font-weight:700;font-family:inherit}
+.live-node-role{fill:var(--text-secondary);font-size:9px;font-family:inherit}
+.live-node-emoji{font-size:20px}
+.live-node-skill-tag{fill:var(--text-secondary);font-size:7.5px;font-family:inherit}
 .node-status{transition:fill .3s}
 .node-status--idle{fill:#6b7280}
 .node-status--thinking{fill:var(--yellow);animation:pulse 1s infinite}
@@ -140,9 +141,24 @@
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes dash{to{stroke-dashoffset:-12}}
 
-/* Tooltip */
-.node-tooltip{position:absolute;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:0.5rem 0.7rem;font-size:0.78rem;color:var(--text-primary);max-width:260px;box-shadow:0 4px 16px rgba(0,0,0,.45);pointer-events:none;z-index:20;display:none;word-break:break-word}
+/* Tooltip → Agent detail panel */
+.node-tooltip{position:absolute;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:10px;padding:0.75rem 0.85rem;font-size:0.78rem;color:var(--text-primary);width:280px;box-shadow:0 6px 24px rgba(0,0,0,.55);pointer-events:auto;z-index:20;display:none;word-break:break-word}
 .node-tooltip.visible{display:block}
+.node-tooltip-header{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;padding-bottom:0.45rem;border-bottom:1px solid var(--border)}
+.node-tooltip-avatar{font-size:1.5rem;line-height:1}
+.node-tooltip-info{flex:1}
+.node-tooltip-name{font-weight:700;font-size:0.88rem}
+.node-tooltip-role{font-size:0.72rem;color:var(--text-secondary)}
+.node-tooltip-status{display:inline-flex;align-items:center;gap:0.3rem;font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:8px;background:var(--bg-secondary)}
+.node-tooltip-section{margin-top:0.45rem}
+.node-tooltip-section-title{font-size:0.68rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.2rem;font-weight:600}
+.node-tooltip-tags{display:flex;flex-wrap:wrap;gap:0.25rem}
+.node-tooltip-tag{display:inline-block;padding:0.1rem 0.4rem;border-radius:4px;font-size:0.68rem;background:var(--bg-secondary);border:1px solid var(--border)}
+.node-tooltip-tag--skill{border-color:rgba(124,58,237,.35);color:var(--purple)}
+.node-tooltip-tag--tool{border-color:rgba(16,185,129,.3);color:var(--green)}
+.node-tooltip-tag--mcp{border-color:rgba(245,158,11,.3);color:var(--yellow)}
+.node-tooltip-desc{font-size:0.72rem;color:var(--text-secondary);line-height:1.35;margin-top:0.35rem}
+.node-tooltip-close{position:absolute;top:0.35rem;right:0.5rem;background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.85rem;padding:0.2rem}
 </style>
 
 <div class="session-wrap">
@@ -269,7 +285,7 @@
 const SESSION_ID = {{ session.id | tojson }};
 const AGENTS = {{ agents | tojson }};
 const GRAPH  = {{ graph | tojson if graph else '{"nodes":[],"edges":[]}' }};
-const NODE_W = 160, NODE_H = 72;
+const NODE_W = 180, NODE_H = 90;
 
 function agentById(id){ return AGENTS.find(a=>a.id===id) || null; }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
@@ -513,24 +529,40 @@ function renderLiveNodes(){
   graphNodes.forEach(n=>{
     const agent = agentById(n.agent_id || n.id);
     const col = (agent && agent.color) || 'var(--purple)';
-    const name = esc(agent ? agent.name : (n.name || n.id));
+    const name = esc(agent ? agent.name : (n.label || n.id));
     const emoji = agent ? agent.avatar : '⚙';
+    const role = esc(agent ? agent.role : (n.role || ''));
     const status = (agent && agent.status) || n.status || 'idle';
     const sel = (n.id||n.agent_id) === highlightedNode;
+    const skillCount = agent ? (agent.skills||[]).length : 0;
+    const toolCount = agent ? (agent.tools||[]).length : 0;
 
     const g = document.createElementNS('http://www.w3.org/2000/svg','g');
     g.setAttribute('class', 'live-node' + (sel?' highlight':''));
     g.setAttribute('transform', `translate(${n.x},${n.y})`);
     g.dataset.agent = n.agent_id || n.id;
 
+    // Skill tags (show first 3)
+    let skillTags = '';
+    if(agent && agent.skills && agent.skills.length > 0){
+      const shown = agent.skills.slice(0,3);
+      const more = agent.skills.length > 3 ? ` +${agent.skills.length-3}` : '';
+      skillTags = shown.map((s,i)=>`<text class="live-node-skill-tag" x="${14 + i*52}" y="${75}">${esc(s.substring(0,8))}</text>`).join('');
+      if(more) skillTags += `<text class="live-node-skill-tag" x="${14 + shown.length*52}" y="${75}">${more}</text>`;
+    }
+
     g.innerHTML = `
       <rect class="live-node-bg" width="${NODE_W}" height="${NODE_H}" ${sel?`style="stroke:${col};stroke-width:2.5"`:''} />
       <line class="live-node-bar" x1="0" y1="0" x2="${NODE_W}" y2="0" stroke="${col}" stroke-width="3"/>
-      <text class="live-node-emoji" x="12" y="28">${emoji}</text>
-      <text class="live-node-name" x="32" y="27">${name}</text>
-      <circle class="node-status node-status--${status}" cx="${NODE_W-16}" cy="16" r="5"/>
+      <text class="live-node-emoji" x="12" y="32">${emoji}</text>
+      <text class="live-node-name" x="38" y="28">${name.length>16?name.substring(0,15)+'…':name}</text>
+      <text class="live-node-role" x="38" y="42">${role.length>22?role.substring(0,21)+'…':role}</text>
+      <circle class="node-status node-status--${status}" cx="${NODE_W-14}" cy="16" r="5"/>
+      <text class="live-node-skill-tag" x="${NODE_W-14}" y="42" text-anchor="end">${status}</text>
+      ${skillCount||toolCount ? `<text class="live-node-skill-tag" x="14" y="${NODE_H-8}">🛠${toolCount} 📚${skillCount}</text>` : ''}
+      ${skillTags}
     `;
-    g.addEventListener('click', ()=> onNodeClick(n, g));
+    g.addEventListener('click', (e)=> { e.stopPropagation(); onNodeClick(n, g); });
     nl.appendChild(g);
   });
 }
@@ -544,12 +576,88 @@ function onNodeClick(node, gEl){
   if(!highlightedNode){ tooltip.classList.remove('visible'); return; }
 
   const agent = agentById(agentId);
-  tooltip.innerHTML = `<strong>${agent?agent.avatar:''} ${esc(agent?agent.name:agentId)}</strong><br>
-    <span style="color:var(--text-secondary);font-size:0.72rem">Status: ${agent?agent.status:'unknown'}</span>`;
-  tooltip.style.left = (node.x + NODE_W + 10) + 'px';
-  tooltip.style.top = node.y + 'px';
+  const status = agent ? agent.status : 'unknown';
+  const statusDot = status==='thinking'?'🟡':status==='acting'?'🟢':status==='error'?'🔴':'⚪';
+
+  // Skills section
+  let skillsHtml = '';
+  if(agent && agent.skills && agent.skills.length){
+    skillsHtml = `<div class="node-tooltip-section">
+      <div class="node-tooltip-section-title">📚 Skills (${agent.skills.length})</div>
+      <div class="node-tooltip-tags">${agent.skills.map(s=>`<span class="node-tooltip-tag node-tooltip-tag--skill">${esc(s)}</span>`).join('')}</div>
+    </div>`;
+  }
+
+  // Tools section
+  let toolsHtml = '';
+  if(agent && agent.tools && agent.tools.length){
+    toolsHtml = `<div class="node-tooltip-section">
+      <div class="node-tooltip-section-title">🛠 Tools (${agent.tools.length})</div>
+      <div class="node-tooltip-tags">${agent.tools.map(t=>`<span class="node-tooltip-tag node-tooltip-tag--tool">${esc(t)}</span>`).join('')}</div>
+    </div>`;
+  }
+
+  // MCPs section
+  let mcpsHtml = '';
+  if(agent && agent.mcps && agent.mcps.length){
+    mcpsHtml = `<div class="node-tooltip-section">
+      <div class="node-tooltip-section-title">🔌 MCPs (${agent.mcps.length})</div>
+      <div class="node-tooltip-tags">${agent.mcps.map(m=>`<span class="node-tooltip-tag node-tooltip-tag--mcp">${esc(m)}</span>`).join('')}</div>
+    </div>`;
+  }
+
+  // Model section
+  let modelHtml = '';
+  if(agent && (agent.model || agent.provider)){
+    modelHtml = `<div class="node-tooltip-section">
+      <div class="node-tooltip-section-title">🧠 LLM</div>
+      <span class="node-tooltip-tag">${esc(agent.provider||'')} ${esc(agent.model||'default')}</span>
+    </div>`;
+  }
+
+  // Description
+  let descHtml = '';
+  if(agent && agent.description){
+    descHtml = `<div class="node-tooltip-desc">${esc(agent.description)}</div>`;
+  }
+
+  tooltip.innerHTML = `
+    <button class="node-tooltip-close" onclick="document.getElementById('nodeTooltip').classList.remove('visible');highlightedNode=null;renderLiveNodes();">✕</button>
+    <div class="node-tooltip-header">
+      <span class="node-tooltip-avatar">${agent?agent.avatar:'⚙'}</span>
+      <div class="node-tooltip-info">
+        <div class="node-tooltip-name">${esc(agent?agent.name:agentId)}</div>
+        <div class="node-tooltip-role">${esc(agent?agent.role:'')}</div>
+      </div>
+      <span class="node-tooltip-status">${statusDot} ${status}</span>
+    </div>
+    ${agent && agent.tagline ? `<div class="node-tooltip-desc" style="font-style:italic;margin-bottom:0.3rem">${esc(agent.tagline)}</div>` : ''}
+    ${descHtml}
+    ${skillsHtml}
+    ${toolsHtml}
+    ${mcpsHtml}
+    ${modelHtml}
+  `;
+
+  // Position tooltip: prefer right of node, fallback left if overflow
+  const canvas = document.getElementById('graphCanvas');
+  const canvasW = canvas.clientWidth || 800;
+  const tipW = 280;
+  let tipX = node.x + NODE_W + 12;
+  if(tipX + tipW > canvasW) tipX = Math.max(8, node.x - tipW - 12);
+  tooltip.style.left = tipX + 'px';
+  tooltip.style.top = Math.max(8, node.y) + 'px';
   tooltip.classList.add('visible');
 }
+
+// Close tooltip when clicking canvas background
+document.getElementById('graphCanvas').addEventListener('click', (e)=>{
+  if(e.target.tagName === 'svg' || e.target.id === 'graphCanvas'){
+    highlightedNode = null;
+    document.getElementById('nodeTooltip').classList.remove('visible');
+    renderLiveNodes();
+  }
+});
 
 /* ── Graph status updates ── */
 function updateNodeStatus(data){

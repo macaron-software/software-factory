@@ -539,6 +539,12 @@ async def session_live_page(request: Request, session_id: str):
             "avatar": getattr(a, "avatar", "") or "🤖",
             "status": loop.status.value if loop else "idle",
             "description": a.description,
+            "skills": getattr(a, "skills", []) or [],
+            "tools": getattr(a, "tools", []) or [],
+            "mcps": getattr(a, "mcps", []) or [],
+            "model": getattr(a, "model", "") or "",
+            "provider": getattr(a, "provider", "") or "",
+            "tagline": getattr(a, "tagline", "") or "",
         })
 
     # Build graph from workflow config if available
