@@ -1200,11 +1200,142 @@ def get_sca():
     return sca
 
 
+def _build_scenario_rachat(sca_data: dict) -> dict:
+    """Scénario: rachat des parts + immo Beaussier à 1€ symbolique."""
+    prop = sca_data["property"]
+    co = sca_data["co_associate"]
+    fin = sca_data["financials"]
+    surface_legland = prop["surface_m2"]       # 118m²
+    surface_beaussier = co["surface_m2"]       # 89m²
+    surface_totale = surface_legland + surface_beaussier  # 207m²
+    terrain_privatif = prop.get("terrain_privatif_m2", 466)
+    terrain_commun = prop.get("terrain_commun_m2", 300)
+    terrain_total_m2 = terrain_privatif * 2 + terrain_commun  # 2 lots privatifs + commun
+
+    # Prix m² Grabels
+    prix_m2_ancien = 3530
+    prix_m2_neuf = 4100
+
+    # Valeur lot Beaussier (89m² construit — à rénover/finir)
+    # Son lot est en gros œuvre non terminé, valeur réduite
+    valeur_lot_beaussier_neuf = surface_beaussier * prix_m2_neuf       # 364 900€ si fini
+    valeur_lot_beaussier_ancien = surface_beaussier * prix_m2_ancien   # 314 170€ si fini
+    # En l'état (gros œuvre) = ~40% de la valeur finie
+    coeff_etat_actuel = 0.40
+    valeur_lot_beaussier_etat = round(valeur_lot_beaussier_ancien * coeff_etat_actuel)
+
+    # Coût pour finir le lot Beaussier (89m² × 1500-2000€/m² second œuvre)
+    cout_finition_low = surface_beaussier * 1200   # économique
+    cout_finition_mid = surface_beaussier * 1600   # standard
+    cout_finition_high = surface_beaussier * 2200  # qualité
+
+    # Valeur totale propriété après rachat (100% SCA = 207m² + terrains)
+    valeur_totale_finie_ancien = surface_totale * prix_m2_ancien
+    valeur_totale_finie_neuf = surface_totale * prix_m2_neuf
+    bourso_legland = prop.get("bourso_estimate", 505254)
+
+    # Gain net = valeur après - coûts
+    cout_acquisition = 1  # 1€ symbolique
+    # Frais juridiques déjà engagés (sunk cost, pas dans le calcul du gain)
+    # Coûts futurs estimés pour finaliser
+    frais_notaire_cession = round(valeur_lot_beaussier_etat * 0.03)  # ~3% sur cession parts SCI
+    # Le gain = valeur du lot acquis - finition - frais
+    gain_brut_low = valeur_lot_beaussier_ancien - cout_finition_high - frais_notaire_cession
+    gain_brut_mid = valeur_lot_beaussier_ancien - cout_finition_mid - frais_notaire_cession
+    gain_brut_high = valeur_lot_beaussier_neuf - cout_finition_low - frais_notaire_cession
+
+    # Dettes Beaussier qui s'annulent (elle ne paiera jamais — récup via les parts)
+    dettes_annulees = {
+        "af_impayes": 25334.71,
+        "capital_non_libere": 192127.97,
+        "fournisseurs_qp": 7105.89,
+        "qp_procedures": 11486.51,
+        "total": 25334.71 + 7105.89 + 11486.51,  # dettes réelles récupérables
+    }
+
+    # Patrimoine immobilier total post-rachat
+    patrimoine_avant = bourso_legland  # 505 254€ (lot Legland seul)
+    patrimoine_apres_low = valeur_totale_finie_ancien  # 207m² × 3530
+    patrimoine_apres_high = valeur_totale_finie_neuf   # 207m² × 4100
+    plus_value_low = patrimoine_apres_low - patrimoine_avant - cout_finition_high
+    plus_value_high = patrimoine_apres_high - patrimoine_avant - cout_finition_low
+
+    # Revenus locatifs potentiels (lot Beaussier 89m² une fois fini)
+    loyer_m2 = 13.5
+    loyer_mensuel_lot_b = round(surface_beaussier * loyer_m2)
+    loyer_annuel_lot_b = loyer_mensuel_lot_b * 12
+    rendement_brut = round(loyer_annuel_lot_b / cout_finition_mid * 100, 1)
+
+    return {
+        "titre": "Rachat parts + immo Beaussier à 1€ symbolique",
+        "hypothese": "Beaussier cède ses 343 795 parts (49,4%) et son lot (89m²) pour 1€ symbolique, "
+                     "sous pression des procédures judiciaires, impayés, et rapport d'expertise défavorable.",
+        "acquisition": {
+            "prix_rachat": cout_acquisition,
+            "parts_acquises": co["parts"],
+            "pct_acquis": co["ownership_pct"],
+            "surface_acquise_m2": surface_beaussier,
+            "resultat": "100% des parts SCA + 207m² habitables + 1 232m² terrain",
+        },
+        "valeur_acquise": {
+            "lot_beaussier_fini_ancien": valeur_lot_beaussier_ancien,
+            "lot_beaussier_fini_neuf": valeur_lot_beaussier_neuf,
+            "lot_beaussier_etat_actuel": valeur_lot_beaussier_etat,
+            "note": f"Lot Beaussier en gros œuvre (~{int(coeff_etat_actuel*100)}% d'avancement) — second œuvre à finir",
+        },
+        "couts_finition": {
+            "economique": cout_finition_low,
+            "standard": cout_finition_mid,
+            "qualite": cout_finition_high,
+            "note": f"Second œuvre {surface_beaussier}m² (plomberie, élec, placo, sols, cuisine, SDB)",
+        },
+        "frais_cession": {
+            "notaire": frais_notaire_cession,
+            "note": "~3% sur valeur estimée des parts cédées (cession parts SCI)",
+        },
+        "gain_net": {
+            "low": gain_brut_low,
+            "mid": gain_brut_mid,
+            "high": gain_brut_high,
+            "note": "Valeur lot fini − coût finition − frais notaire",
+        },
+        "dettes_annulees": dettes_annulees,
+        "patrimoine": {
+            "avant": patrimoine_avant,
+            "apres_low": patrimoine_apres_low,
+            "apres_high": patrimoine_apres_high,
+            "plus_value_low": plus_value_low,
+            "plus_value_high": plus_value_high,
+            "surface_totale_m2": surface_totale,
+            "terrain_total_m2": terrain_total_m2,
+        },
+        "option_locative": {
+            "loyer_mensuel": loyer_mensuel_lot_b,
+            "loyer_annuel": loyer_annuel_lot_b,
+            "rendement_brut_pct": rendement_brut,
+            "note": f"Location lot Beaussier fini ({surface_beaussier}m²) à {loyer_m2}€/m²/mois",
+        },
+        "leviers_pression": [
+            f"Impayés AF: {dettes_annulees['af_impayes']:,.0f}€ — commandement de payer possible",
+            f"Capital non libéré: {dettes_annulees['capital_non_libere']:,.0f}€ — action en libération",
+            "Rapport expertise 100% défavorable — 0€ retenu pour Beaussier",
+            f"Frais avocat Vernhet estimés: 22-39K€ — hémorragie financière",
+            "Référé expulsion en cours — risque d'expulsion + indemnité d'occupation",
+            "Procédure au fond à venir — 77-130K€ de préjudices + travaux",
+            "Dissolution SCA programmée août 2027 — forcer la liquidation",
+        ],
+    }
+
+
+
+
 @app.get("/api/v1/sca/legal")
 def get_sca_legal():
     """SCA La Désirade — legal costs, procedures, timeline."""
     import csv
     from collections import defaultdict
+
+    sca = P["sca_la_desirade"]
 
     # 1. Parse FEC for SCA legal expenses (accounts 6221/6226/6227)
     fec_path = Path("/Users/sylvain/MAISON GRABELS/COMPTA SCA/EXPORT_EXPERT_COMPTABLE/FEC_SCA_2021_2025.txt")
@@ -1693,6 +1824,8 @@ def get_sca_legal():
             "total_connu": 12375.00, "paye": 7500.00, "impaye_connu": 4875.00,
             "note": "n°2025-10-114 (perso) : montant inconnu — PDF joint à l'email du 14/10/2025",
         },
+        # Scénario: rachat parts Beaussier à 1€ symbolique
+        "scenario_rachat": _build_scenario_rachat(sca),
     }
 
 

@@ -10,6 +10,7 @@ import { Loading, ErrorState, PageHeader, Badge, Section, StatCard } from "@/com
 import {
   DollarSign, Scale, Ban, FileText, Wrench, XCircle, Clock,
   Gavel, Zap, Timer, ClipboardList, CheckCircle, AlertCircle,
+  TrendingUp, Home, Key, ShieldCheck,
 } from "lucide-react";
 
 /** Render event text, replacing [TAG] prefixes with Lucide icons */
@@ -62,6 +63,7 @@ export default function SCAPage() {
   const beaussierDebt = (legal as any).beaussier_debt;
   const beaussierLegal = (legal as any).beaussier_legal_estimate;
   const cashflow = (legal as any).sca_cashflow as any[];
+  const scenario = (legal as any).scenario_rachat;
 
   const fin = sca.financials;
   const prop = sca.property;
@@ -120,6 +122,141 @@ export default function SCAPage() {
         <StatCard label="Frais procédure" value={s.total_legal_all} tone="negative" />
         <StatCard label="Impayés Beaussier" value={beaussierDebt.af_impayes} tone="negative" />
       </div>
+
+      {/* ─── Scénario Rachat 1€ ─── */}
+      {scenario && (
+        <Section title={<span className="flex items-center gap-2"><Key className="w-4 h-4 text-accent" />Scénario : {scenario.titre}</span>}>
+          <p className="text-t-3 text-xs mb-4 italic border-l-2 border-accent pl-3">{scenario.hypothese}</p>
+
+          {/* KPI scenario */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="p-3 rounded-lg bg-gain/5 border border-gain/20 text-center">
+              <p className="text-t-4 text-[10px] mb-1">Prix d&apos;acquisition</p>
+              <p className="text-gain text-xl font-bold">1 €</p>
+            </div>
+            <div className="p-3 rounded-lg bg-bg-1 border border-bd-1 text-center">
+              <p className="text-t-4 text-[10px] mb-1">Surface acquise</p>
+              <p className="text-t-1 text-xl font-bold">{scenario.acquisition.surface_acquise_m2} m²</p>
+              <p className="text-t-5 text-[10px]">{scenario.acquisition.resultat}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-bg-1 border border-bd-1 text-center">
+              <p className="text-t-4 text-[10px] mb-1">Valeur lot fini (ancien)</p>
+              <p className="text-accent text-xl font-bold">{formatEURCompact(scenario.valeur_acquise.lot_beaussier_fini_ancien)}</p>
+              <p className="text-t-5 text-[10px]">Neuf: {formatEURCompact(scenario.valeur_acquise.lot_beaussier_fini_neuf)}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-gain/5 border border-gain/20 text-center">
+              <p className="text-t-4 text-[10px] mb-1">Gain net estimé</p>
+              <p className="text-gain text-xl font-bold">{formatEURCompact(scenario.gain_net.mid)}</p>
+              <p className="text-t-5 text-[10px]">{formatEURCompact(scenario.gain_net.low)}–{formatEURCompact(scenario.gain_net.high)}</p>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Coûts & finition */}
+            <div className="space-y-4">
+              <div>
+                <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><Wrench className="w-3.5 h-3.5" />Coûts de finition ({scenario.couts_finition.note})</p>
+                <div className="space-y-1">
+                  {[
+                    { label: "Économique", value: scenario.couts_finition.economique },
+                    { label: "Standard", value: scenario.couts_finition.standard },
+                    { label: "Qualité", value: scenario.couts_finition.qualite },
+                  ].map((c) => (
+                    <div key={c.label} className="flex justify-between text-xs">
+                      <span className="text-t-3">{c.label}</span>
+                      <span className="text-loss font-mono">{formatEUR(c.value)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between text-xs mt-2 pt-2 border-t border-bd-1">
+                  <span className="text-t-4">Frais notaire (cession parts)</span>
+                  <span className="text-loss font-mono">{formatEUR(scenario.frais_cession.notaire)}</span>
+                </div>
+              </div>
+
+              {/* Patrimoine avant/après */}
+              <div>
+                <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><Home className="w-3.5 h-3.5" />Patrimoine immobilier</p>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-t-4">Avant (lot Legland seul)</span>
+                    <span className="text-t-2 font-mono">{formatEUR(scenario.patrimoine.avant)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-t-3">Après (207m² fini, ancien)</span>
+                    <span className="text-accent font-mono font-semibold">{formatEUR(scenario.patrimoine.apres_low)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-t-3">Après (207m² fini, neuf)</span>
+                    <span className="text-accent font-mono font-semibold">{formatEUR(scenario.patrimoine.apres_high)}</span>
+                  </div>
+                </div>
+                <div className="flex justify-between text-xs font-semibold mt-2 pt-2 border-t border-gain/30">
+                  <span className="text-gain flex items-center gap-1"><TrendingUp className="w-3 h-3" />Plus-value nette</span>
+                  <span className="text-gain font-mono">{formatEUR(scenario.patrimoine.plus_value_low)}–{formatEUR(scenario.patrimoine.plus_value_high)}</span>
+                </div>
+              </div>
+
+              {/* Option locative */}
+              <div className="p-3 rounded-lg bg-accent/5 border border-accent/20">
+                <p className="text-t-2 text-xs font-semibold mb-2">💰 Option locative (lot fini)</p>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-t-3">{scenario.option_locative.note}</span>
+                    <span className="text-accent font-mono font-semibold">{formatEUR(scenario.option_locative.loyer_mensuel)}/mois</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-t-4">Revenus annuels bruts</span>
+                    <span className="text-accent font-mono">{formatEUR(scenario.option_locative.loyer_annuel)}/an</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-t-4">Rendement brut / coût finition</span>
+                    <span className="text-accent font-mono">{scenario.option_locative.rendement_brut_pct}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Dettes annulées + leviers */}
+            <div className="space-y-4">
+              <div>
+                <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><Ban className="w-3.5 h-3.5 text-gain" />Dettes Beaussier annulées par cession</p>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-t-3">AF impayés</span>
+                    <span className="text-gain font-mono">{formatEUR(scenario.dettes_annulees.af_impayes)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-t-3">Fournisseurs QP</span>
+                    <span className="text-gain font-mono">{formatEUR(scenario.dettes_annulees.fournisseurs_qp)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-t-3">QP procédures impayées</span>
+                    <span className="text-gain font-mono">{formatEUR(scenario.dettes_annulees.qp_procedures)}</span>
+                  </div>
+                </div>
+                <div className="flex justify-between text-xs font-semibold mt-2 pt-2 border-t border-gain/30">
+                  <span className="text-gain">Total dettes annulées</span>
+                  <span className="text-gain font-mono">{formatEUR(scenario.dettes_annulees.total)}</span>
+                </div>
+                <p className="text-t-5 text-[10px] mt-1">+ capital non libéré: {formatEUR(scenario.dettes_annulees.capital_non_libere)} (théorique)</p>
+              </div>
+
+              <div>
+                <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-accent" />Leviers de pression</p>
+                <div className="space-y-1.5">
+                  {scenario.leviers_pression.map((l: string, i: number) => (
+                    <div key={i} className="flex items-start gap-2 text-xs">
+                      <span className="text-accent mt-0.5 shrink-0">›</span>
+                      <span className="text-t-2">{l}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Section>
+      )}
 
       {/* ─── Estimation Beaussier + Axel Unpaid ─── */}
       <div className="grid md:grid-cols-2 gap-6">
