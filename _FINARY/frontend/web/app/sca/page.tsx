@@ -123,7 +123,7 @@ export default function SCAPage() {
         <StatCard label="Impayés Beaussier" value={beaussierDebt.af_impayes} tone="negative" />
       </div>
 
-      {/* ─── Scénario Rachat 1€ ─── */}
+      {/* ─── Scénario Vente Forcée Art. 19 ─── */}
       {scenario && (
         <Section title={<span className="flex items-center gap-2"><Key className="w-4 h-4 text-accent" />Scénario : {scenario.titre}</span>}>
           <p className="text-t-3 text-xs mb-4 italic border-l-2 border-accent pl-3">{scenario.hypothese}</p>
@@ -131,8 +131,9 @@ export default function SCAPage() {
           {/* KPI scenario */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="p-3 rounded-lg bg-gain/5 border border-gain/20 text-center">
-              <p className="text-t-4 text-[10px] mb-1">Prix d&apos;acquisition</p>
+              <p className="text-t-4 text-[10px] mb-1">Prix d&apos;adjudication</p>
               <p className="text-gain text-xl font-bold">1 €</p>
+              <p className="text-t-5 text-[10px]">Seul enchérisseur</p>
             </div>
             <div className="p-3 rounded-lg bg-bg-1 border border-bd-1 text-center">
               <p className="text-t-4 text-[10px] mb-1">Surface acquise</p>
@@ -151,11 +152,85 @@ export default function SCAPage() {
             </div>
           </div>
 
+          {/* Base légale + Procédure */}
+          {scenario.base_legale && (
+            <div className="grid md:grid-cols-2 gap-6 mb-6">
+              <div className="p-3 rounded-lg bg-bg-1 border border-bd-1">
+                <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><Gavel className="w-3.5 h-3.5 text-accent" />Base légale</p>
+                <p className="text-accent text-xs font-mono mb-2">{scenario.base_legale.article}</p>
+                <p className="text-t-3 text-xs mb-3">{scenario.base_legale.mecanisme}</p>
+                <p className="text-t-4 text-[10px] font-semibold mb-1">Conditions remplies :</p>
+                <div className="space-y-1">
+                  {scenario.base_legale.conditions.map((c: string, i: number) => (
+                    <div key={i} className="flex items-start gap-2 text-xs">
+                      <CheckCircle className="w-3 h-3 text-gain mt-0.5 shrink-0" />
+                      <span className="text-t-2">{c}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-bg-1 border border-bd-1">
+                <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5" />Procédure ({scenario.base_legale.delai_estime})</p>
+                <div className="space-y-1.5">
+                  {scenario.base_legale.procedure.map((step: string, i: number) => (
+                    <div key={i} className="flex items-start gap-2 text-xs">
+                      <span className="text-accent font-mono font-bold w-4 shrink-0 text-right">{i + 1}</span>
+                      <span className="text-t-2">{step.replace(/^\d+\.\s*/, "")}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Pourquoi aucun repreneur */}
+          {scenario.pourquoi_aucun_repreneur && (
+            <div className="p-3 rounded-lg bg-loss/5 border border-loss/20 mb-6">
+              <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><Ban className="w-3.5 h-3.5 text-loss" />Pourquoi aucun repreneur aux enchères</p>
+              <div className="grid md:grid-cols-2 gap-x-6 gap-y-1">
+                {scenario.pourquoi_aucun_repreneur.map((r: string, i: number) => (
+                  <div key={i} className="flex items-start gap-2 text-xs">
+                    <XCircle className="w-3 h-3 text-loss mt-0.5 shrink-0" />
+                    <span className="text-t-3">{r}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid md:grid-cols-2 gap-6">
-            {/* Coûts & finition */}
+            {/* Coûts (finition + frais vente forcée) */}
             <div className="space-y-4">
+              {/* Frais vente forcée */}
+              {scenario.frais_vente_forcee && (
+                <div>
+                  <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><Gavel className="w-3.5 h-3.5" />Frais vente forcée</p>
+                  <div className="space-y-1">
+                    {[
+                      { label: "Avocat (assignation art. 19)", value: scenario.frais_vente_forcee.avocat_art19 },
+                      { label: "Publication JAL/BODACC", value: scenario.frais_vente_forcee.publication_jal },
+                      { label: "Notaire (acte de cession)", value: scenario.frais_vente_forcee.notaire_acte },
+                      { label: "Greffe TC", value: scenario.frais_vente_forcee.greffe },
+                      { label: "Droits d'enregistrement", value: scenario.frais_vente_forcee.droits_enregistrement },
+                    ].map((c) => (
+                      <div key={c.label} className="flex justify-between text-xs">
+                        <span className="text-t-3">{c.label}</span>
+                        <span className="text-loss font-mono">{formatEUR(c.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold mt-2 pt-2 border-t border-bd-1">
+                    <span className="text-t-2">Total frais vente forcée</span>
+                    <span className="text-loss font-mono">{formatEUR(scenario.frais_vente_forcee.total)}</span>
+                  </div>
+                  <p className="text-t-5 text-[10px] mt-1 italic">{scenario.frais_vente_forcee.note}</p>
+                </div>
+              )}
+
+              {/* Coûts finition */}
               <div>
-                <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><Wrench className="w-3.5 h-3.5" />Coûts de finition ({scenario.couts_finition.note})</p>
+                <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><Wrench className="w-3.5 h-3.5" />Coûts de finition</p>
+                <p className="text-t-5 text-[10px] mb-1">{scenario.couts_finition.note}</p>
                 <div className="space-y-1">
                   {[
                     { label: "Économique", value: scenario.couts_finition.economique },
@@ -167,10 +242,6 @@ export default function SCAPage() {
                       <span className="text-loss font-mono">{formatEUR(c.value)}</span>
                     </div>
                   ))}
-                </div>
-                <div className="flex justify-between text-xs mt-2 pt-2 border-t border-bd-1">
-                  <span className="text-t-4">Frais notaire (cession parts)</span>
-                  <span className="text-loss font-mono">{formatEUR(scenario.frais_cession.notaire)}</span>
                 </div>
               </div>
 
@@ -196,6 +267,32 @@ export default function SCAPage() {
                   <span className="text-gain font-mono">{formatEUR(scenario.patrimoine.plus_value_low)}–{formatEUR(scenario.patrimoine.plus_value_high)}</span>
                 </div>
               </div>
+            </div>
+
+            {/* Dettes annulées + option locative + leviers */}
+            <div className="space-y-4">
+              <div>
+                <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><Ban className="w-3.5 h-3.5 text-gain" />Dettes Beaussier éteintes</p>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-t-3">AF impayés</span>
+                    <span className="text-gain font-mono">{formatEUR(scenario.dettes_annulees.af_impayes)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-t-3">Fournisseurs QP</span>
+                    <span className="text-gain font-mono">{formatEUR(scenario.dettes_annulees.fournisseurs_qp)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-t-3">QP procédures impayées</span>
+                    <span className="text-gain font-mono">{formatEUR(scenario.dettes_annulees.qp_procedures)}</span>
+                  </div>
+                </div>
+                <div className="flex justify-between text-xs font-semibold mt-2 pt-2 border-t border-gain/30">
+                  <span className="text-gain">Total dettes éteintes</span>
+                  <span className="text-gain font-mono">{formatEUR(scenario.dettes_annulees.total)}</span>
+                </div>
+                <p className="text-t-5 text-[10px] mt-1">+ capital non libéré: {formatEUR(scenario.dettes_annulees.capital_non_libere)} (théorique)</p>
+              </div>
 
               {/* Option locative */}
               <div className="p-3 rounded-lg bg-accent/5 border border-accent/20">
@@ -214,32 +311,6 @@ export default function SCAPage() {
                     <span className="text-accent font-mono">{scenario.option_locative.rendement_brut_pct}%</span>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Dettes annulées + leviers */}
-            <div className="space-y-4">
-              <div>
-                <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><Ban className="w-3.5 h-3.5 text-gain" />Dettes Beaussier annulées par cession</p>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-t-3">AF impayés</span>
-                    <span className="text-gain font-mono">{formatEUR(scenario.dettes_annulees.af_impayes)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-t-3">Fournisseurs QP</span>
-                    <span className="text-gain font-mono">{formatEUR(scenario.dettes_annulees.fournisseurs_qp)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-t-3">QP procédures impayées</span>
-                    <span className="text-gain font-mono">{formatEUR(scenario.dettes_annulees.qp_procedures)}</span>
-                  </div>
-                </div>
-                <div className="flex justify-between text-xs font-semibold mt-2 pt-2 border-t border-gain/30">
-                  <span className="text-gain">Total dettes annulées</span>
-                  <span className="text-gain font-mono">{formatEUR(scenario.dettes_annulees.total)}</span>
-                </div>
-                <p className="text-t-5 text-[10px] mt-1">+ capital non libéré: {formatEUR(scenario.dettes_annulees.capital_non_libere)} (théorique)</p>
               </div>
 
               <div>

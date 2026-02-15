@@ -1201,7 +1201,7 @@ def get_sca():
 
 
 def _build_scenario_rachat(sca_data: dict) -> dict:
-    """Scénario: rachat des parts + immo Beaussier à 1€ symbolique."""
+    """Scénario: vente forcée art. 19 loi 1986 — enchères judiciaires à 1€."""
     prop = sca_data["property"]
     co = sca_data["co_associate"]
     fin = sca_data["financials"]
@@ -1216,35 +1216,41 @@ def _build_scenario_rachat(sca_data: dict) -> dict:
     prix_m2_ancien = 3530
     prix_m2_neuf = 4100
 
-    # Valeur lot Beaussier (89m² construit — à rénover/finir)
-    # Son lot est en gros œuvre non terminé, valeur réduite
+    # Valeur lot Beaussier (89m² construit — gros œuvre non terminé)
     valeur_lot_beaussier_neuf = surface_beaussier * prix_m2_neuf       # 364 900€ si fini
     valeur_lot_beaussier_ancien = surface_beaussier * prix_m2_ancien   # 314 170€ si fini
     # En l'état (gros œuvre) = ~40% de la valeur finie
     coeff_etat_actuel = 0.40
     valeur_lot_beaussier_etat = round(valeur_lot_beaussier_ancien * coeff_etat_actuel)
 
-    # Coût pour finir le lot Beaussier (89m² × 1500-2000€/m² second œuvre)
+    # Coût pour finir le lot Beaussier (89m² × 1200-2200€/m² second œuvre)
     cout_finition_low = surface_beaussier * 1200   # économique
     cout_finition_mid = surface_beaussier * 1600   # standard
     cout_finition_high = surface_beaussier * 2200  # qualité
 
-    # Valeur totale propriété après rachat (100% SCA = 207m² + terrains)
+    # Valeur totale propriété après (100% SCA = 207m² + terrains)
     valeur_totale_finie_ancien = surface_totale * prix_m2_ancien
     valeur_totale_finie_neuf = surface_totale * prix_m2_neuf
     bourso_legland = prop.get("bourso_estimate", 505254)
 
-    # Gain net = valeur après - coûts
-    cout_acquisition = 1  # 1€ symbolique
-    # Frais juridiques déjà engagés (sunk cost, pas dans le calcul du gain)
-    # Coûts futurs estimés pour finaliser
-    frais_notaire_cession = round(valeur_lot_beaussier_etat * 0.03)  # ~3% sur cession parts SCI
-    # Le gain = valeur du lot acquis - finition - frais
-    gain_brut_low = valeur_lot_beaussier_ancien - cout_finition_high - frais_notaire_cession
-    gain_brut_mid = valeur_lot_beaussier_ancien - cout_finition_mid - frais_notaire_cession
-    gain_brut_high = valeur_lot_beaussier_neuf - cout_finition_low - frais_notaire_cession
+    # Frais vente forcée (enchères judiciaires)
+    cout_acquisition = 1  # 1€ = mise à prix enchères, seul enchérisseur
+    frais_avocat_art19 = 3000    # honoraires assignation + audience vente forcée
+    frais_publication = 500      # publication au JO / JAL
+    emoluments_notaire = 1500    # acte de cession forcée
+    frais_greffe = 200           # greffe TC
+    droits_enregistrement = round(valeur_lot_beaussier_etat * 0.05)  # 5% sur prix adjudication (1€ → base minimum)
+    # En réalité droits d'enregistrement sur 1€ = quasi nul, mais l'administration
+    # peut requalifier sur valeur vénale → provisionner sur valeur état actuel
+    droits_enregistrement_reel = 125  # forfait minimum sur adjudication à 1€
+    total_frais_vente = frais_avocat_art19 + frais_publication + emoluments_notaire + frais_greffe + droits_enregistrement_reel
 
-    # Dettes Beaussier qui s'annulent (elle ne paiera jamais — récup via les parts)
+    # Gain net = valeur lot fini - finition - frais vente
+    gain_brut_low = valeur_lot_beaussier_ancien - cout_finition_high - total_frais_vente
+    gain_brut_mid = valeur_lot_beaussier_ancien - cout_finition_mid - total_frais_vente
+    gain_brut_high = valeur_lot_beaussier_neuf - cout_finition_low - total_frais_vente
+
+    # Dettes Beaussier qui s'éteignent (elle perd ses parts → plus de créance à recouvrer)
     dettes_annulees = {
         "af_impayes": 25334.71,
         "capital_non_libere": 192127.97,
@@ -1253,7 +1259,7 @@ def _build_scenario_rachat(sca_data: dict) -> dict:
         "total": 25334.71 + 7105.89 + 11486.51,  # dettes réelles récupérables
     }
 
-    # Patrimoine immobilier total post-rachat
+    # Patrimoine immobilier total post-acquisition
     patrimoine_avant = bourso_legland  # 505 254€ (lot Legland seul)
     patrimoine_apres_low = valeur_totale_finie_ancien  # 207m² × 3530
     patrimoine_apres_high = valeur_totale_finie_neuf   # 207m² × 4100
@@ -1267,15 +1273,59 @@ def _build_scenario_rachat(sca_data: dict) -> dict:
     rendement_brut = round(loyer_annuel_lot_b / cout_finition_mid * 100, 1)
 
     return {
-        "titre": "Rachat parts + immo Beaussier à 1€ symbolique",
-        "hypothese": "Beaussier cède ses 343 795 parts (49,4%) et son lot (89m²) pour 1€ symbolique, "
-                     "sous pression des procédures judiciaires, impayés, et rapport d'expertise défavorable.",
+        "titre": "Vente forcée Art. 19 — Enchères judiciaires",
+        "hypothese": (
+            "Vente forcée des parts de Beaussier (343 795 parts, 49,4%) aux enchères judiciaires "
+            "sur le fondement de l'art. 19 de la loi du 10/09/1947 (SCI à capital variable). "
+            "Aucun repreneur potentiel vu la complexité du dossier (8 procédures, expertise défavorable, "
+            "travaux non conformes, impayés massifs) → adjudication à 1€ comme seul enchérisseur."
+        ),
+        "base_legale": {
+            "article": "Art. 19 loi n°47-1775 du 10/09/1947",
+            "mecanisme": "Exclusion de l'associé défaillant + vente forcée de ses parts aux enchères",
+            "conditions": [
+                "Non-libération du capital souscrit (192 128€ non libérés)",
+                "Non-paiement des appels de fonds (25 335€ d'AF impayés)",
+                "Fautes de gestion caractérisées (rapport expertise Combes)",
+                "Mise en demeure restée sans effet (commandement de payer)",
+            ],
+            "procedure": [
+                "1. Mise en demeure par LRAR (déjà faite via commandement)",
+                "2. Délibération AG excluant l'associé défaillant",
+                "3. Assignation devant TJ pour vente forcée des parts",
+                "4. Jugement ordonnant la vente aux enchères publiques",
+                "5. Publication (JAL/BODACC) — délai 1 mois",
+                "6. Audience d'adjudication — mise à prix 1€",
+                "7. Adjudication au seul enchérisseur (Legland)",
+                "8. Transfert de propriété par acte notarié",
+            ],
+            "delai_estime": "6-12 mois après assignation",
+        },
+        "pourquoi_aucun_repreneur": [
+            "8 procédures judiciaires en cours (expertise, appel, expulsion, fond, TA…)",
+            "Rapport d'expertise 100% défavorable à Beaussier — 0€ retenu",
+            "Travaux non conformes au PC — remise en conformité 46K€ à charge",
+            "Impayés massifs: 25K€ AF + 192K€ capital + 7K€ fournisseurs",
+            "Lot en gros œuvre non terminé — 107-196K€ de finition nécessaires",
+            "Occupation illicite sans DAACT — risque juridique pour tout acquéreur",
+            "Co-associé (Legland 50,6%) détient la majorité et le terrain",
+            "Dissolution SCA programmée août 2027",
+        ],
         "acquisition": {
-            "prix_rachat": cout_acquisition,
+            "prix_adjudication": cout_acquisition,
             "parts_acquises": co["parts"],
             "pct_acquis": co["ownership_pct"],
             "surface_acquise_m2": surface_beaussier,
             "resultat": "100% des parts SCA + 207m² habitables + 1 232m² terrain",
+        },
+        "frais_vente_forcee": {
+            "avocat_art19": frais_avocat_art19,
+            "publication_jal": frais_publication,
+            "notaire_acte": emoluments_notaire,
+            "greffe": frais_greffe,
+            "droits_enregistrement": droits_enregistrement_reel,
+            "total": total_frais_vente,
+            "note": "Droits d'enregistrement: forfait minimum sur adjudication à 1€ (administration peut requalifier)",
         },
         "valeur_acquise": {
             "lot_beaussier_fini_ancien": valeur_lot_beaussier_ancien,
@@ -1289,15 +1339,11 @@ def _build_scenario_rachat(sca_data: dict) -> dict:
             "qualite": cout_finition_high,
             "note": f"Second œuvre {surface_beaussier}m² (plomberie, élec, placo, sols, cuisine, SDB)",
         },
-        "frais_cession": {
-            "notaire": frais_notaire_cession,
-            "note": "~3% sur valeur estimée des parts cédées (cession parts SCI)",
-        },
         "gain_net": {
             "low": gain_brut_low,
             "mid": gain_brut_mid,
             "high": gain_brut_high,
-            "note": "Valeur lot fini − coût finition − frais notaire",
+            "note": "Valeur lot fini − coût finition − frais vente forcée",
         },
         "dettes_annulees": dettes_annulees,
         "patrimoine": {
@@ -1316,13 +1362,14 @@ def _build_scenario_rachat(sca_data: dict) -> dict:
             "note": f"Location lot Beaussier fini ({surface_beaussier}m²) à {loyer_m2}€/m²/mois",
         },
         "leviers_pression": [
-            f"Impayés AF: {dettes_annulees['af_impayes']:,.0f}€ — commandement de payer possible",
-            f"Capital non libéré: {dettes_annulees['capital_non_libere']:,.0f}€ — action en libération",
-            "Rapport expertise 100% défavorable — 0€ retenu pour Beaussier",
-            f"Frais avocat Vernhet estimés: 22-39K€ — hémorragie financière",
-            "Référé expulsion en cours — risque d'expulsion + indemnité d'occupation",
-            "Procédure au fond à venir — 77-130K€ de préjudices + travaux",
-            "Dissolution SCA programmée août 2027 — forcer la liquidation",
+            f"Impayés AF: {dettes_annulees['af_impayes']:,.0f}€ — commandement de payer → exclusion",
+            f"Capital non libéré: {dettes_annulees['capital_non_libere']:,.0f}€ — condition art. 19",
+            "Rapport expertise Combes: 0€ retenu pour Beaussier, 77K€ pour Legland",
+            "Travaux non conformes 100% imputés Beaussier → 46K€ remise en conformité",
+            f"Frais avocat Vernhet: 22-39K€ dépensés pour 0€ de résultat",
+            "Référé expulsion → indemnité d'occupation 1 600€/mois (57-72K€ cumulés)",
+            "Procédure au fond → 77-130K€ préjudices + travaux",
+            "Dissolution SCA août 2027 → liquidation forcée = même résultat",
         ],
     }
 
