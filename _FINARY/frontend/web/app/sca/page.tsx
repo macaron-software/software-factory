@@ -176,12 +176,20 @@ export default function SCAPage() {
                 <div className="p-3 rounded-lg bg-bg-1 border border-bd-1">
                   <p className="text-t-2 text-xs font-semibold mb-2 flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5" />Procédure ({scenario.base_legale.delai_estime})</p>
                   <div className="space-y-1.5">
-                    {scenario.base_legale.procedure.map((step: string, i: number) => (
-                      <div key={i} className="flex items-start gap-2 text-xs">
-                        <span className="text-accent font-mono font-bold w-4 shrink-0 text-right">{i + 1}</span>
-                        <span className="text-t-2">{step.replace(/^\d+\.\s*/, "")}</span>
-                      </div>
-                    ))}
+                    {scenario.base_legale.procedure.map((step: string, i: number) => {
+                      const done = step.includes("✅");
+                      const label = step.replace(/^\d+\.\s*/, "").replace(/\s*✅\s*/g, " ").replace(/\(FAIT[^)]*\)/g, "").trim();
+                      return (
+                        <div key={i} className={`flex items-start gap-2 text-xs ${done ? "opacity-60" : ""}`}>
+                          {done
+                            ? <CheckCircle className="w-3.5 h-3.5 text-gain mt-0.5 shrink-0" />
+                            : <span className="text-accent font-mono font-bold w-4 shrink-0 text-right">{i + 1}</span>
+                          }
+                          <span className={done ? "text-t-4 line-through" : "text-t-2"}>{label}</span>
+                          {done && <span className="text-gain text-[10px] font-semibold">FAIT</span>}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
