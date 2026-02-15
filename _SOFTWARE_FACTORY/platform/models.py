@@ -120,6 +120,9 @@ class AgentRole(BaseModel):
     """Definition of an agent role (loaded from YAML)."""
     id: str
     name: str
+    role: str = ""
+    avatar: str = ""
+    tagline: str = ""
     version: str = "1.0"
     description: str = ""
     system_prompt: str = ""

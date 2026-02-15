@@ -93,6 +93,9 @@ class AgentRegistry:
         return AgentRole(
             id=raw.get("id", path.stem),
             name=raw.get("name", path.stem.replace("_", " ").title()),
+            role=raw.get("role", ""),
+            avatar=raw.get("avatar", ""),
+            tagline=raw.get("tagline", ""),
             version=raw.get("version", "1.0"),
             description=persona_raw.get("description", raw.get("description", "")),
             system_prompt=raw.get("system_prompt", ""),

@@ -324,8 +324,9 @@
   <div class="session-input">
     <select id="targetAgent" class="input-agent-select">
       <option value="">All agents</option>
-      {% for a in agents %}
-      <option value="{{ a.id }}">{{ a.avatar }} {{ a.name }}</option>
+      {% for n in graph.nodes %}
+        {% set a = agents | selectattr('id', 'equalto', n.agent_id) | first %}
+        <option value="{{ n.agent_id }}">{{ a.avatar if a else '' }} {{ a.name if a else n.label }}</option>
       {% endfor %}
     </select>
     <input type="text" id="msgInput" class="input-text" placeholder="Send a message..." autocomplete="off">

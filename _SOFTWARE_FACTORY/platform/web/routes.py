@@ -1284,8 +1284,10 @@ async def create_conversation(request: Request, project_id: str):
         return JSONResponse({"error": "Project not found"}, status_code=404)
 
     store = get_session_store()
-    # Archive any existing active sessions
-    active = [s for s in store.list_all() if s.project_id == project_id and s.status == "active"]
+    # Archive any existing active CHAT sessions (not workflow sessions)
+    active = [s for s in store.list_all()
+              if s.project_id == project_id and s.status == "active"
+              and not (s.config or {}).get("workflow_id")]
     for s in active:
         store.update_status(s.id, "completed")
 

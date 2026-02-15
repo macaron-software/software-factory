@@ -223,12 +223,12 @@ class AgentStore:
                      "- API design (pagination, rate limiting, versioning)\n"
                      "- Proper separation of concerns"),
 
-            AgentDef(id="devops", name="DevOps", role="devops",
+            AgentDef(id="devops", name="Karim Diallo", role="DevOps / SRE",
                      description="Build, deploy, infrastructure. Docker, CI/CD, monitoring.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider="azure", model="gpt-5.1",
                      temperature=0.3, max_tokens=4096,
                      icon="rocket", color="#3fb950",
-                     avatar="rocket", tagline="Ship it, monitor it",
+                     avatar="KD", tagline="CI/CD, Docker, déploiement canary, monitoring",
                      is_builtin=True, tags=["deploy", "infra", "ci-cd"]),
 
             AgentDef(id="product", name="Product Owner", role="product",
@@ -298,7 +298,7 @@ class AgentStore:
                 agent = AgentDef(
                     id=agent_id,
                     name=raw.get("name", agent_id),
-                    role=raw.get("id", "worker"),
+                    role=raw.get("role", raw.get("id", "worker")),
                     description=raw.get("persona", {}).get("description", "").strip() if isinstance(raw.get("persona"), dict) else "",
                     system_prompt=raw.get("system_prompt", ""),
                     provider=raw.get("llm", {}).get("provider", "azure") if isinstance(raw.get("llm"), dict) else "azure",
@@ -311,6 +311,8 @@ class AgentStore:
                     tags=tags,
                     icon=icon,
                     color=color,
+                    avatar=raw.get("avatar", ""),
+                    tagline=raw.get("tagline", ""),
                     is_builtin=True,
                 )
                 self.create(agent)
