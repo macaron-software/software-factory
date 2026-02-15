@@ -28,6 +28,8 @@ skills:
   - project-management
 
 tools:
+  - web_search
+  - web_fetch
   - code_read
   - code_search
   - git_log

@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime
+from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 
@@ -548,13 +549,18 @@ async def session_live_page(request: Request, session_id: str):
     mgr = get_loop_manager()
 
     # Build agent list with status
+    import os
+    avatar_dir = Path(__file__).parent / "static" / "avatars"
     agents = []
     for a in all_agents:
         loop = mgr.get_loop(a.id, session_id)
+        avatar_file = avatar_dir / f"{a.id}.svg"
+        avatar_url = f"/static/avatars/{a.id}.svg" if avatar_file.exists() else ""
         agents.append({
             "id": a.id, "name": a.name, "role": a.role,
             "icon": a.icon, "color": a.color,
             "avatar": getattr(a, "avatar", "") or "🤖",
+            "avatar_url": avatar_url,
             "status": loop.status.value if loop else "idle",
             "description": a.description,
             "skills": getattr(a, "skills", []) or [],

@@ -29,6 +29,8 @@ skills:
   - code-review-excellence
 
 tools:
+  - web_search
+  - web_fetch
   - code_read
   - code_search
 

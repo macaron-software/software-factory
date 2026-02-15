@@ -46,6 +46,12 @@ def _get_tool_registry():
         register_memory_tools(reg)
     except Exception:
         pass
+    # Web research tools
+    try:
+        from ..tools.web_tools import register_web_tools
+        register_web_tools(reg)
+    except Exception:
+        pass
     return reg
 
 

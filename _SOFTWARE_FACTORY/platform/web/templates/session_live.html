@@ -31,7 +31,7 @@
 .session-tab.active{background:var(--purple);color:#fff}
 .session-content{flex:1;overflow:hidden;position:relative}
 .session-pane{display:none;height:100%;width:100%}
-.session-pane.active{display:block}
+.session-pane.active{display:flex;flex-direction:column}
 
 /* ── Bottom input bar ── */
 .session-input{display:flex;align-items:center;gap:0.5rem;padding:0.6rem 1rem;border-top:1px solid var(--border);background:var(--bg-secondary);flex-shrink:0}
@@ -55,9 +55,11 @@
 .thread-msg--negotiate{border-left-color:var(--blue)}
 .thread-msg--human_request,.thread-msg--human_response{border-left-color:var(--purple)}
 .thread-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;color:#fff;font-weight:600}
+.thread-avatar-img{width:36px;height:36px;border-radius:50%;flex-shrink:0;object-fit:cover}
 .thread-body{flex:1;min-width:0}
 .thread-meta{display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;margin-bottom:0.2rem}
 .thread-name{font-size:0.82rem;font-weight:600;color:var(--text-primary)}
+.thread-role{font-size:0.68rem;color:var(--text-secondary);font-style:italic;opacity:.7}
 .thread-badge{font-size:0.62rem;padding:0.1rem 0.4rem;border-radius:4px;text-transform:uppercase;font-weight:700;letter-spacing:0.03em;background:var(--bg-tertiary);color:var(--text-secondary)}
 .thread-badge--veto{background:var(--red);color:#fff}
 .thread-badge--approve{background:var(--green);color:#fff}
@@ -112,7 +114,7 @@
 .panel-content{font-size:0.72rem;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* ── Graph mode ── */
-.graph-split{display:grid;grid-template-columns:1fr 240px;grid-template-rows:1fr 200px;height:100%}
+.graph-split{display:grid;grid-template-columns:1fr 240px;grid-template-rows:1fr 200px;height:100%;flex:1;min-height:0}
 .graph-canvas{position:relative;overflow:hidden;background:var(--bg-primary);grid-row:1;grid-column:1}
 .graph-canvas svg{width:100%;height:100%}
 .graph-memory{grid-row:1/3;grid-column:2;border-left:1px solid var(--border);background:var(--bg-secondary);overflow-y:auto;padding:0.5rem 0.6rem;font-size:0.75rem}
@@ -201,14 +203,20 @@
         {% for msg in messages %}
         <div class="thread-msg thread-msg--{{ msg.type }}" data-id="{{ msg.id }}">
           {% set agent = agents | selectattr('id', 'equalto', msg.from_agent) | first %}
+          {% if agent and agent.avatar_url %}
+          <img class="thread-avatar-img" src="{{ agent.avatar_url }}" alt="{{ agent.name }}">
+          {% else %}
           <div class="thread-avatar" style="background:{{ agent.color if agent else '#6b7280' }}">{{ agent.avatar if agent else '?' }}</div>
+          {% endif %}
           <div class="thread-body">
             <div class="thread-meta">
               <span class="thread-name">{{ agent.name if agent else msg.from_agent }}</span>
+              {% if agent and agent.role %}<span class="thread-role">{{ agent.role }}</span>{% endif %}
               <span class="thread-badge thread-badge--{{ msg.type }}">{{ msg.type }}</span>
               <span class="thread-arrow">→</span>
               {% set target = agents | selectattr('id', 'equalto', msg.to_agent) | first %}
               <span class="thread-target">{{ target.name if target else (msg.to_agent or 'all') }}</span>
+              {% if target and target.role %}<span class="thread-role">{{ target.role }}</span>{% endif %}
               <span class="thread-time">{{ msg.timestamp }}</span>
             </div>
             <div class="thread-content md-rendered">{{ msg.content | markdown | safe }}</div>
@@ -381,7 +389,7 @@ function switchTab(tab){
   localStorage.setItem('session_tab', tab);
   tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   panes.forEach(p => p.classList.toggle('active', p.id === 'pane-'+tab));
-  if(tab === 'graph') renderGraph();
+  if(tab === 'graph') setTimeout(()=>renderGraph(), 50);
 }
 
 tabs.forEach(t => t.addEventListener('click', ()=> switchTab(t.dataset.tab)));
@@ -436,14 +444,19 @@ function appendThread(data){
   const target = agentById(data.to_agent);
   const div = document.createElement('div');
   div.className = `thread-msg thread-msg--${data.msg_type||data.type||'inform'}`;
+  const avatarHtml = agent && agent.avatar_url
+    ? `<img class="thread-avatar-img" src="${agent.avatar_url}" alt="${esc(agent.name)}">`
+    : `<div class="thread-avatar" style="background:${agent?agent.color:'#6b7280'}">${agent?agent.avatar:'?'}</div>`;
   div.innerHTML = `
-    <div class="thread-avatar" style="background:${agent?agent.color:'#6b7280'}">${agent?agent.avatar:'?'}</div>
+    ${avatarHtml}
     <div class="thread-body">
       <div class="thread-meta">
         <span class="thread-name">${esc(agent?agent.name:data.from_agent)}</span>
+        ${agent&&agent.role?`<span class="thread-role">${esc(agent.role)}</span>`:''}
         <span class="thread-badge thread-badge--${data.msg_type||data.type||'inform'}">${esc(data.msg_type||data.type||'inform')}</span>
         <span class="thread-arrow">→</span>
         <span class="thread-target">${esc(target?target.name:(data.to_agent||'all'))}</span>
+        ${target&&target.role?`<span class="thread-role">${esc(target.role)}</span>`:''}
         <span class="thread-time">now</span>
       </div>
       <div class="thread-content md-rendered">${md(data.content)}</div>
@@ -632,12 +645,18 @@ function renderLiveNodes(){
       if(more) skillTags += `<text class="live-node-skill-tag" x="${14 + shown.length*52}" y="${75}">${more}</text>`;
     }
 
+    const avatarUrl = agent ? agent.avatar_url : '';
+    const avatarSvg = avatarUrl
+      ? `<clipPath id="clip-${n.id}"><circle cx="22" cy="24" r="14"/></clipPath>
+         <image href="${avatarUrl}" x="8" y="10" width="28" height="28" clip-path="url(#clip-${n.id})"/>`
+      : `<text class="live-node-emoji" x="12" y="32">${emoji}</text>`;
+
     g.innerHTML = `
       <rect class="live-node-bg" width="${NODE_W}" height="${NODE_H}" ${sel?`style="stroke:${col};stroke-width:2.5"`:''} />
       <line class="live-node-bar" x1="0" y1="0" x2="${NODE_W}" y2="0" stroke="${col}" stroke-width="3"/>
-      <text class="live-node-emoji" x="12" y="32">${emoji}</text>
-      <text class="live-node-name" x="38" y="28">${name.length>16?name.substring(0,15)+'…':name}</text>
-      <text class="live-node-role" x="38" y="42">${role.length>22?role.substring(0,21)+'…':role}</text>
+      ${avatarSvg}
+      <text class="live-node-name" x="40" y="28">${name.length>14?name.substring(0,13)+'…':name}</text>
+      <text class="live-node-role" x="40" y="42">${role.length>20?role.substring(0,19)+'…':role}</text>
       <circle class="node-status node-status--${status}" cx="${NODE_W-14}" cy="16" r="5"/>
       <text class="live-node-skill-tag" x="${NODE_W-14}" y="42" text-anchor="end">${status}</text>
       ${skillCount||toolCount ? `<text class="live-node-skill-tag" x="14" y="${NODE_H-8}">${toolCount}T ${skillCount}S</text>` : ''}

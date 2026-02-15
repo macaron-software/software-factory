@@ -33,6 +33,8 @@ skills:
   - webapp-testing
 
 tools:
+  - web_search
+  - web_fetch
   - code_read
   - code_write
   - code_edit
