@@ -1732,8 +1732,43 @@ platform/
     └── github_skills/           # Cache 1156 skills .md
 ```
 
+### WORKFLOWS BUILTIN
+
+**Migration Sharelook Angular 16→17** (id=`migration-sharelook`):
+```
+Pattern: Hierarchical + Network hybride
+7 agents, 4 phases, 10 edges
+
+👔 CDP Migration (orchestrateur, GO/NOGO)
+├── 🏗️ Lead Dev Angular (décompose, priorise, VETO STRONG)
+│   ├── 👨‍💻 Dev Frontend Pilot (ai12-reporting, codemods)
+│   └── 👨‍💻 Dev Frontend Main (ai08-admin, 38 modules)
+├── 🧪 QA Migration ISO 100% (golden files, VETO ABSOLU si diff>0%)
+├── 🔒 Security Audit (npm audit, CVE, VETO ABSOLU)
+└── 🚀 DevOps Deploy (staging→canary 1%→100%)
+
+Phases:
+1. Dependencies & Audit (sequential) → CDP + Lead + Security
+2. Pilot ai12-reporting (hierarchical) → Lead + Dev + QA
+3. Main ai08-admin (hierarchical) → Lead + 2 Devs + QA
+4. Deploy Canary (sequential, gate=all_approved) → CDP + QA + Security + DevOps
+
+Communication inter-agents (bus A2A):
+CDP →[DELEGATE]→ Lead "migrer module auth"
+Lead →[DELEGATE]→ Dev "appliquer codemod standalone.ts"
+Lead →[DELEGATE]→ QA "capturer golden files avant migration"
+Dev →[INFORM]→ Lead "AuthModule migré ✅"
+QA →[APPROVE]→ Lead "golden diff 0% ✅"  OU  QA →[VETO]→ "régression screenshot 3px"
+Security →[INFORM]→ CDP "0 CVE critical, GO ✅"
+Lead →[INFORM]→ CDP "phase 2 complete, next phase 3"
+```
+
+### DB PATH
+⚠️ `data/platform.db` (à la racine _SOFTWARE_FACTORY), PAS `platform/data/platform.db`
+- Config: `platform/config.py` → `FACTORY_ROOT = PLATFORM_ROOT.parent` → `DB_PATH = FACTORY_ROOT / "data" / "platform.db"`
+- Seed: `rm -f data/platform.db` pour re-seed (48 agents + 4 workflows)
+
 ### CONVENTIONS
-- DB fresh: `rm -f platform/data/platform.db` avant restart → re-seed 48 agents
 - Pas de `--reload` (conflit module `platform` stdlib)
 - `--ws none` obligatoire (websocket issue)
 - `start_new_session=True` pour process persistant (survit shell close)
@@ -1744,7 +1779,7 @@ platform/
 
 ### START
 ```bash
-cd _SOFTWARE_FACTORY && rm -f platform/data/platform.db
+cd _SOFTWARE_FACTORY && rm -f data/platform.db
 AZURE_OPENAI_API_KEY=dummy AZURE_AI_API_KEY=dummy \
 python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
 ```
