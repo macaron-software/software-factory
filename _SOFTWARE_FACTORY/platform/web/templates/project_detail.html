@@ -223,6 +223,28 @@
             </div>
         </div>
         {% endif %}
+
+        {% if workflows %}
+        <div class="ps-section">
+            <h4>🔄 Workflows</h4>
+            {% for witem in workflows %}
+            <div class="ps-workflow-card">
+                <div class="ps-workflow-name">{{ witem.wf.name }}</div>
+                <div class="ps-workflow-desc">{{ witem.wf.description[:120] }}{% if witem.wf.description|length > 120 %}…{% endif %}</div>
+                <div class="ps-workflow-actions">
+                    {% if witem.session %}
+                    <a href="/sessions/{{ witem.session.id }}/live" class="btn btn-sm btn-primary" title="Live multi-agent view">
+                        🔮 Live
+                    </a>
+                    {% endif %}
+                    <a href="/workflows/{{ witem.wf.id }}/edit" class="btn btn-sm btn-ghost" title="Edit workflow">
+                        ✏️ Editor
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
     </aside>
 </div>
 {% endblock %}

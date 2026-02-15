@@ -107,6 +107,23 @@ async def project_detail(request: Request, project_id: str):
     agent_store = get_agent_store()
     agents = agent_store.list_all()
     lead = agent_store.get(project.lead_agent_id) if project.lead_agent_id else None
+    # Get workflows linked to this project
+    workflows = []
+    try:
+        from ..workflows.store import get_workflow_store
+        wf_store = get_workflow_store()
+        for wf in wf_store.list_all():
+            cfg = wf.config or {}
+            if cfg.get("project_ref") == project_id:
+                # Find linked session
+                linked_session = None
+                for s in sessions:
+                    if (s.config or {}).get("workflow_id") == wf.id:
+                        linked_session = s
+                        break
+                workflows.append({"wf": wf, "session": linked_session})
+    except Exception:
+        pass
     # Load project memory files (CLAUDE.md, copilot-instructions.md, etc.)
     memory_files = []
     if project.path:
@@ -132,6 +149,7 @@ async def project_detail(request: Request, project_id: str):
         "lead_agent": lead,
         "messages": messages,
         "memory_files": memory_files,
+        "workflows": workflows,
     })
 
 

@@ -192,9 +192,11 @@ class ProjectStore:
                 factory_type=info.factory_type,
                 domains=info.domains,
             )
-            # Auto-load vision from file
+            # Auto-load vision from file or workflow config
             if p.exists:
                 p.vision = p.load_vision_from_file()
+            if not p.vision:
+                p.vision = self._load_vision_from_workflow(info.id)
 
             # Create a dedicated project agent
             agent_id = f"agent-{info.id}"
@@ -230,6 +232,64 @@ class ProjectStore:
 
             self.create(p)
             logger.info("Seeded project %s (%s) with agent %s", p.id, p.factory_type, agent_id)
+
+        # Auto-create sessions for projects with linked workflows
+        self._seed_workflow_sessions()
+
+    def _load_vision_from_workflow(self, project_id: str) -> str:
+        """Load vision from linked workflow config."""
+        try:
+            from ..workflows.store import get_workflow_store
+            wf_store = get_workflow_store()
+            for wf in wf_store.list_all():
+                cfg = wf.config or {}
+                if cfg.get("project_ref") == project_id:
+                    if wf.description:
+                        return wf.description
+        except Exception:
+            pass
+        return ""
+
+    def _seed_workflow_sessions(self):
+        """Create sessions linking projects to their workflows."""
+        try:
+            from ..workflows.store import get_workflow_store
+            from ..sessions.store import get_session_store, SessionDef
+            wf_store = get_workflow_store()
+            sess_store = get_session_store()
+            existing = sess_store.list_all()
+
+            for wf in wf_store.list_all():
+                cfg = wf.config or {}
+                project_ref = cfg.get("project_ref")
+                if not project_ref:
+                    continue
+                # Check if session already exists for this project+workflow
+                already = any(
+                    s.project_id == project_ref
+                    and (s.config or {}).get("workflow_id") == wf.id
+                    for s in existing
+                )
+                if already:
+                    continue
+                # Determine lead agent from workflow config
+                lead = ""
+                graph = cfg.get("graph", {})
+                nodes = graph.get("nodes", [])
+                if nodes:
+                    lead = nodes[0].get("agent_id", "")
+                session = SessionDef(
+                    name=wf.name,
+                    goal=wf.description or "",
+                    project_id=project_ref,
+                    status="active",
+                    config={"workflow_id": wf.id, "lead_agent": lead},
+                )
+                session = sess_store.create(session)
+                logger.info("Auto-created session %s for project %s (workflow %s)",
+                           session.id, project_ref, wf.id)
+        except Exception as e:
+            logger.warning("Failed to seed workflow sessions: %s", e)
 
     def _row_to_project(self, row) -> Project:
         return Project(
