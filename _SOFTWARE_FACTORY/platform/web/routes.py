@@ -90,6 +90,7 @@ async def project_detail(request: Request, project_id: str):
     # Get sessions for this project
     sess_store = get_session_store()
     sessions = [s for s in sess_store.list_all() if s.project_id == project_id]
+    sessions.sort(key=lambda s: s.created_at or "", reverse=True)
     # Select active session — from query param or most recent active
     requested_session = request.query_params.get("session")
     active_session = None
@@ -554,8 +555,13 @@ async def session_live_page(request: Request, session_id: str):
     agents = []
     for a in all_agents:
         loop = mgr.get_loop(a.id, session_id)
-        avatar_file = avatar_dir / f"{a.id}.svg"
-        avatar_url = f"/static/avatars/{a.id}.svg" if avatar_file.exists() else ""
+        avatar_jpg = avatar_dir / f"{a.id}.jpg"
+        avatar_svg = avatar_dir / f"{a.id}.svg"
+        avatar_url = ""
+        if avatar_jpg.exists():
+            avatar_url = f"/static/avatars/{a.id}.jpg"
+        elif avatar_svg.exists():
+            avatar_url = f"/static/avatars/{a.id}.svg"
         agents.append({
             "id": a.id, "name": a.name, "role": a.role,
             "icon": a.icon, "color": a.color,
@@ -569,16 +575,161 @@ async def session_live_page(request: Request, session_id: str):
             "model": getattr(a, "model", "") or "",
             "provider": getattr(a, "provider", "") or "",
             "tagline": getattr(a, "tagline", "") or "",
+            "persona": getattr(a, "persona", "") or "",
         })
 
-    # Build graph from workflow config if available
+    # Build unified team graph from actual messages
+    # One network: agents as nodes, communication channels as edges
     graph = {"nodes": [], "edges": []}
     wf_id = (session.config or {}).get("workflow_id", "")
+
+    # Valid agent IDs for filtering corrupt to_agent values
+    valid_agent_ids = {a.id for a in all_agents} | {"all", "session", "user", "system"}
+    non_agent_ids = {"all", "session", "user", "system"}
+
+    # Extract agent communications from messages
+    import re
+    phase_agents = set()          # all agents in phases
+    edge_data = {}                # (from, to) → {count, types: set, patterns: set}
+
+    # Pre-compute: for each message index, which pattern is active
+    msg_pattern = {}  # msg index → pattern name
+    current_pat = ""
+    for i, m in enumerate(messages):
+        content = m.content or ""
+        if m.from_agent == "system":
+            match = re.search(r'started \((\w+)\)', content)
+            if match:
+                current_pat = match.group(1)
+        msg_pattern[i] = current_pat
+
+    for i, m in enumerate(messages):
+        if m.from_agent in ("system", "user"):
+            continue
+
+        # Get metadata for pattern_id
+        meta = {}
+        if hasattr(m, "metadata") and m.metadata:
+            meta = m.metadata if isinstance(m.metadata, dict) else {}
+        elif hasattr(m, "metadata_json") and m.metadata_json:
+            import json as _json
+            try:
+                meta = _json.loads(m.metadata_json)
+            except Exception:
+                pass
+
+        phase_agents.add(m.from_agent)
+        to = getattr(m, "to_agent", "") or ""
+        if to not in valid_agent_ids or to in non_agent_ids:
+            to = "all"
+
+        pat = msg_pattern.get(i, "")
+
+        if to == "all":
+            pass
+        else:
+            phase_agents.add(to)
+            key = (m.from_agent, to)
+            if key not in edge_data:
+                edge_data[key] = {"count": 0, "types": set(), "patterns": set()}
+            edge_data[key]["count"] += 1
+            edge_data[key]["types"].add(m.message_type)
+            if pat:
+                edge_data[key]["patterns"].add(pat)
+
+    # Resolve broadcasts: for each agent that broadcast, create edges to all other agents
+    # Re-scan messages for broadcasts
+    pattern_members = {}  # pattern_id → set of agent_ids
+    for m in messages:
+        if m.from_agent in ("system", "user"):
+            continue
+        meta = {}
+        if hasattr(m, "metadata") and m.metadata:
+            meta = m.metadata if isinstance(m.metadata, dict) else {}
+        elif hasattr(m, "metadata_json") and m.metadata_json:
+            import json as _json
+            try:
+                meta = _json.loads(m.metadata_json)
+            except Exception:
+                pass
+        pid = meta.get("pattern_id", "")
+        if pid:
+            if pid not in pattern_members:
+                pattern_members[pid] = set()
+            pattern_members[pid].add(m.from_agent)
+            to = getattr(m, "to_agent", "") or ""
+            if to in valid_agent_ids and to not in non_agent_ids:
+                pattern_members[pid].add(to)
+
+    for i, m in enumerate(messages):
+        if m.from_agent in ("system", "user"):
+            continue
+        to = getattr(m, "to_agent", "") or ""
+        if to not in valid_agent_ids or to in non_agent_ids:
+            # This was a broadcast
+            meta = {}
+            if hasattr(m, "metadata") and m.metadata:
+                meta = m.metadata if isinstance(m.metadata, dict) else {}
+            elif hasattr(m, "metadata_json") and m.metadata_json:
+                import json as _json
+                try:
+                    meta = _json.loads(m.metadata_json)
+                except Exception:
+                    pass
+            pid = meta.get("pattern_id", "")
+            pat = msg_pattern.get(i, "")
+            targets = pattern_members.get(pid, set()) - {m.from_agent}
+            for t in targets:
+                key = (m.from_agent, t)
+                if key not in edge_data:
+                    edge_data[key] = {"count": 0, "types": set(), "patterns": set()}
+                edge_data[key]["count"] += 1
+                edge_data[key]["types"].add(m.message_type)
+                if pat:
+                    edge_data[key]["patterns"].add(pat)
+
+    # Build graph nodes
+    for aid in phase_agents:
+        a = agent_map.get(aid)
+        graph["nodes"].append({
+            "id": aid,
+            "agent_id": aid,
+            "label": a.name if a else aid,
+            "hierarchy_rank": a.hierarchy_rank if a else 50,
+        })
+
+    # Infer parallel relationships: workers in same hierarchical phase work simultaneously
     if wf_id:
-        from ..workflows.store import get_workflow_store
-        wf = get_workflow_store().get(wf_id)
-        if wf and wf.config and wf.config.get("graph"):
-            graph = wf.config["graph"]
+        from platform.workflows.store import WorkflowStore
+        wf_store = WorkflowStore()
+        wf = wf_store.get(wf_id)
+        if wf and wf.phases:
+            for phase in wf.phases:
+                ptype = phase.pattern_id or ""
+                agents_in_phase = (phase.config or {}).get("agents", [])
+                if ptype == "hierarchical" and len(agents_in_phase) >= 3:
+                    workers = agents_in_phase[1:]
+                    for i, w1 in enumerate(workers):
+                        for w2 in workers[i+1:]:
+                            if w1 in phase_agents and w2 in phase_agents:
+                                key = (w1, w2)
+                                if key not in edge_data:
+                                    edge_data[key] = {"count": 0, "types": set(), "patterns": set()}
+                                edge_data[key]["patterns"].add("parallel")
+                                if edge_data[key]["count"] == 0:
+                                    edge_data[key]["count"] = 1
+                                    edge_data[key]["types"].add("collab")
+
+    # Build graph edges with counts, type info, and patterns
+    for (f, t), info in edge_data.items():
+        types = sorted(info["types"])
+        patterns = sorted(info.get("patterns", set()))
+        graph["edges"].append({
+            "from": f, "to": t,
+            "count": info["count"],
+            "types": types,
+            "patterns": patterns,
+        })
 
     # Serialize messages for template
     msg_list = []
@@ -594,7 +745,65 @@ async def session_live_page(request: Request, session_id: str):
         })
 
     # Load memory for this session
-    memory_data = {"session": [], "project": [], "shared": []}
+    # Extract artifacts from messages (decisions, reports, tool usage)
+    artifacts = []
+    # Extract PRs/deliverables from messages — [PR] pattern
+    import re as _re
+    pr_list = []
+    pr_seen = set()
+    for m in messages:
+        if m.from_agent in ("system", "user"):
+            continue
+        a = agent_map.get(m.from_agent)
+        agent_name = a.name if a else m.from_agent
+        content = (m.content or "")
+
+        # Extract [PR] items from agent messages
+        for pr_match in _re.finditer(r'\[PR\]\s*(.+?)(?:\n|$)', content):
+            pr_title = pr_match.group(1).strip()
+            pr_title = _re.sub(r'[*_`#]', '', pr_title).strip()[:80]
+            if pr_title and pr_title not in pr_seen:
+                pr_seen.add(pr_title)
+                pr_list.append({
+                    "title": pr_title,
+                    "agent": agent_name,
+                    "agent_id": m.from_agent,
+                    "done": False,
+                })
+
+        # Mark PRs as done if later approved
+        if m.message_type == "approve":
+            for pr in pr_list:
+                if pr["agent_id"] == m.from_agent or m.from_agent in ("qa_lead", "lead_dev"):
+                    pr["done"] = True
+
+        # Extract title (first ## heading or first line)
+        title_match = _re.search(r'^##\s*(.+)', content, _re.MULTILINE)
+        title = title_match.group(1).strip()[:60] if title_match else content[:60].strip()
+        title = _re.sub(r'[*_`#]', '', title).strip()
+
+        if m.message_type in ("veto", "approve"):
+            artifacts.append({
+                "type": m.message_type,
+                "title": title,
+                "agent": agent_name,
+                "agent_id": m.from_agent,
+                "icon": "🚫" if m.message_type == "veto" else "✅",
+            })
+        elif any(kw in content[:200].lower() for kw in ("rapport", "audit", "analyse", "synthèse", "conclusion", "décomposition")):
+            meta = {}
+            if hasattr(m, "metadata") and m.metadata:
+                meta = m.metadata if isinstance(m.metadata, dict) else {}
+            has_tools = bool(meta.get("tool_calls"))
+            artifacts.append({
+                "type": "report",
+                "title": title,
+                "agent": agent_name,
+                "agent_id": m.from_agent,
+                "icon": "🔧" if has_tools else "📄",
+            })
+
+    memory_data = {"session": [], "project": [], "shared": [], "artifacts": artifacts, "prs": pr_list}
     try:
         from ..memory.manager import get_memory_manager
         mem = get_memory_manager()
@@ -1098,11 +1307,25 @@ async def run_session_workflow(request: Request, session_id: str):
     store.add_message(MessageDef(
         session_id=session_id,
         from_agent="user",
+        to_agent="all",
         message_type="text",
         content=f"🔄 Run workflow **{wf.name}**: {task}",
     ))
 
-    asyncio.create_task(_run_workflow_background(wf, session_id, task, session.project_id or ""))
+    # Resolve project_id: from session, or from workflow config
+    project_id = session.project_id or ""
+    if not project_id and wf.config:
+        project_id = wf.config.get("project_ref", "")
+    if project_id and not session.project_id:
+        from ..sessions.store import get_db
+        db = get_db()
+        try:
+            db.execute("UPDATE sessions SET project_id=? WHERE id=?", (project_id, session_id))
+            db.commit()
+        finally:
+            db.close()
+
+    asyncio.create_task(_run_workflow_background(wf, session_id, task, project_id))
     return HTMLResponse(
         f'<div class="msg-system-text">Workflow "{wf.name}" started — {len(wf.phases)} phases.</div>')
 
@@ -1213,6 +1436,7 @@ async def project_chat(request: Request, project_id: str):
     store = get_session_store()
     # Find or create active session for this project
     sessions = [s for s in store.list_all() if s.project_id == project_id and s.status == "active"]
+    sessions.sort(key=lambda s: s.created_at or "", reverse=True)
     if sessions:
         session = sessions[0]
     else:
@@ -1334,6 +1558,7 @@ async def project_chat_stream(request: Request, project_id: str):
         session = store.get(session_id)
     if not session:
         sessions = [s for s in store.list_all() if s.project_id == project_id and s.status == "active"]
+        sessions.sort(key=lambda s: s.created_at or "", reverse=True)
         if sessions:
             session = sessions[0]
     if not session:
