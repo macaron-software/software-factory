@@ -2910,7 +2910,7 @@ async def dsi_board_page(request: Request):
         for msg in msgs:
             if msg.from_agent != "user" and len(msg.content) > 20:
                 decisions.append({
-                    "session_name": sess.title or sess.id[:8],
+                    "session_name": sess.name or sess.id[:8],
                     "agent_name": msg.from_agent or "Agent",
                     "content": msg.content[:120],
                     "time": msg.timestamp[:16] if msg.timestamp else "",

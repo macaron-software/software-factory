@@ -245,5 +245,6 @@ _bus: MessageBus | None = None
 def get_bus() -> MessageBus:
     global _bus
     if _bus is None:
-        _bus = MessageBus()
+        from ..db.migrations import get_db
+        _bus = MessageBus(db_conn=get_db())
     return _bus

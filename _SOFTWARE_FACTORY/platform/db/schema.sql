@@ -198,6 +198,7 @@ CREATE TABLE IF NOT EXISTS messages (
     artifacts_json TEXT DEFAULT '[]',
     parent_id TEXT REFERENCES messages(id),
     priority INTEGER DEFAULT 5,
+    requires_response INTEGER DEFAULT 0,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
