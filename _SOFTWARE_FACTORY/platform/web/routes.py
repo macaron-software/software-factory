@@ -91,6 +91,22 @@ async def portfolio_page(request: Request):
             "total_tasks": p_total, "done_tasks": p_done,
         })
 
+    # Build epics progression table
+    epics_data = []
+    for m in all_missions:
+        stats = mission_store.mission_stats(m.id)
+        t_total = stats.get("total", 0)
+        t_done = stats.get("done", 0)
+        pct = int(t_done / t_total * 100) if t_total > 0 else 0
+        p = next((p for p in all_projects if p.id == m.project_id), None)
+        epics_data.append({
+            "id": m.id, "name": m.name, "status": m.status,
+            "project_name": p.name if p else m.project_id or "—",
+            "done": t_done, "total": t_total, "pct": pct,
+            "wsjf": getattr(m, "wsjf", 0) or 0,
+        })
+    epics_data.sort(key=lambda e: e["pct"], reverse=True)
+
     # Load strategic committee graph from workflow
     strat_graph = {"nodes": [], "edges": []}
     try:
@@ -400,6 +416,15 @@ async def project_board_page(request: Request, project_id: str):
     all_agents = agent_store.list_all()
     agents_by_id = {a.id: a for a in all_agents}
 
+    # Helper to get avatar URL
+    avatar_dir = Path(__file__).parent / "static" / "avatars"
+    def _avatar(agent_id):
+        jpg = avatar_dir / f"{agent_id}.jpg"
+        svg = avatar_dir / f"{agent_id}.svg"
+        if jpg.exists(): return f"/static/avatars/{agent_id}.jpg"
+        if svg.exists(): return f"/static/avatars/{agent_id}.svg"
+        return ""
+
     # Build task list from missions/stories
     tasks = []
     try:
@@ -416,7 +441,7 @@ async def project_board_page(request: Request, project_id: str):
                 "title": m.title,
                 "col": col,
                 "status_label": status_labels.get(m.status, m.status),
-                "avatar_url": agent.avatar_url if agent else None,
+                "avatar_url": _avatar(agent.id) if agent else "",
                 "agent_name": agent.name if agent else "",
             })
     except Exception:
@@ -433,19 +458,19 @@ async def project_board_page(request: Request, project_id: str):
             ("Dashboard admin", "backlog", "Planifié"),
             ("Revue sécurité", "backlog", "Planifié"),
         ]
-        sample_agents = [a for a in all_agents if a.avatar_url][:5]
+        sample_agents = [a for a in all_agents if _avatar(a.id)][:5]
         for i, (title, col, label) in enumerate(demo):
             ag = sample_agents[i % len(sample_agents)] if sample_agents else None
             tasks.append({
                 "title": title, "col": col, "status_label": label,
-                "avatar_url": ag.avatar_url if ag else None,
+                "avatar_url": _avatar(ag.id) if ag else "",
                 "agent_name": ag.name if ag else "",
             })
 
     # Agent flow nodes (project team or general agents)
     flow_nodes = []
     flow_edges = []
-    team_agents = sample_agents if not tasks else [a for a in all_agents if a.avatar_url][:6]
+    team_agents = [a for a in all_agents if _avatar(a.id)][:6]
     positions = [(60, 100), (160, 50), (160, 150), (280, 100), (380, 50), (380, 150)]
     for i, ag in enumerate(team_agents[:6]):
         x, y = positions[i] if i < len(positions) else (60 + i * 80, 100)
@@ -2706,17 +2731,17 @@ async def dsi_board_page(request: Request):
     # Recent session messages for decisions feed
     from ..sessions.store import get_session_store
     session_store = get_session_store()
-    recent_sessions = session_store.list_sessions()[:5]
+    recent_sessions = session_store.list_all(limit=5)
     decisions = []
     for sess in recent_sessions:
-        msgs = session_store.list_messages(sess.id, limit=3)
+        msgs = session_store.get_messages(sess.id, limit=3)
         for msg in msgs:
-            if msg.role == "assistant" and len(msg.content) > 20:
+            if msg.from_agent != "user" and len(msg.content) > 20:
                 decisions.append({
                     "session_name": sess.title or sess.id[:8],
-                    "agent_name": msg.agent_id or "Agent",
+                    "agent_name": msg.from_agent or "Agent",
                     "content": msg.content[:120],
-                    "time": msg.created_at[:16] if msg.created_at else "",
+                    "time": msg.timestamp[:16] if msg.timestamp else "",
                     "status": "approved",
                 })
         if len(decisions) >= 6:
@@ -2728,12 +2753,14 @@ async def dsi_board_page(request: Request):
     all_workflows = wf_store.list_all()
     system_patterns = []
     for wf in all_workflows:
-        graph = wf.graph_config or {}
+        cfg = wf.config or {}
+        graph = cfg.get("graph", {})
         nodes = graph.get("nodes", [])
         edges = graph.get("edges", [])
+        pattern = wf.phases[0].pattern_id if wf.phases else "sequential"
         system_patterns.append({
             "id": wf.id, "name": wf.name,
-            "pattern": wf.pattern_type or "sequential",
+            "pattern": pattern,
             "node_count": len(nodes),
             "edge_count": len(edges),
         })
@@ -2768,7 +2795,7 @@ async def metier_page(request: Request):
     wf_store = get_workflow_store()
     session_store = get_session_store()
     all_workflows = wf_store.list_all()
-    all_sessions = session_store.list_sessions()
+    all_sessions = session_store.list_all()
 
     # Build department swim lanes from workflows
     dept_map = {
@@ -2777,7 +2804,7 @@ async def metier_page(request: Request):
         "Support": {"color": "var(--yellow)", "icon": "headphones", "workflows": []},
     }
     for wf in all_workflows:
-        pattern = wf.pattern_type or "sequential"
+        pattern = wf.phases[0].pattern_id if wf.phases else "sequential"
         entry = {"name": wf.name, "pattern": pattern}
         # Distribute workflows across departments
         if "migration" in wf.id or "pipeline" in wf.id:

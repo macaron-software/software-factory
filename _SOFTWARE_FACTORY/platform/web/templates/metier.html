@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<a href="/ideation" class="btn btn-primary">
+    <svg class="icon icon-sm"><use href="#icon-compass"/></svg> Nouvelle Idée
+</a>
+{% endblock %}
+
+{% block content %}
+<style>
+/* ── Vue Métier ── */
+.met-layout{display:grid;grid-template-columns:1fr 300px;gap:1.2rem}
+@media(max-width:1000px){.met-layout{grid-template-columns:1fr}}
+
+.met-panel{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.met-panel-header{display:flex;align-items:center;justify-content:space-between;padding:0.7rem 0.9rem;border-bottom:1px solid var(--border)}
+.met-panel-title{font-size:0.82rem;font-weight:700;display:flex;align-items:center;gap:0.4rem}
+.met-panel-title svg{width:15px;height:15px;color:var(--purple)}
+.met-panel-body{padding:0.8rem 0.9rem}
+
+/* Flow swim lanes */
+.met-swimlanes{display:flex;flex-direction:column;gap:0}
+.met-lane{display:grid;grid-template-columns:80px 1fr;border-bottom:1px solid var(--border);min-height:90px}
+.met-lane:last-child{border-bottom:none}
+.met-lane-label{writing-mode:vertical-lr;text-orientation:mixed;transform:rotate(180deg);display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-secondary);background:var(--bg-tertiary);border-right:1px solid var(--border);padding:0.5rem}
+.met-lane-content{padding:0.6rem;display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap}
+
+/* Flow nodes */
+.met-node{display:flex;flex-direction:column;align-items:center;gap:0.2rem;min-width:70px}
+.met-node-icon{width:40px;height:40px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;background:var(--bg-tertiary);transition:border-color .15s}
+.met-node-icon svg{width:18px;height:18px;color:var(--text-secondary)}
+.met-node-icon.active{border-color:var(--purple);background:rgba(124,58,237,.08)}
+.met-node-icon.active svg{color:var(--purple)}
+.met-node-label{font-size:0.62rem;color:var(--text-secondary);text-align:center;max-width:80px}
+.met-arrow{color:var(--text-muted);font-size:0.7rem;display:flex;align-items:center}
+.met-arrow svg{width:16px;height:16px}
+
+/* Pattern box */
+.met-pattern-box{background:var(--bg-tertiary);border:1px dashed var(--border);border-radius:8px;padding:0.4rem 0.6rem;font-size:0.65rem;color:var(--text-secondary);text-align:center}
+.met-pattern-box-title{font-weight:700;font-size:0.6rem;text-transform:uppercase;letter-spacing:.5px;margin-bottom:0.2rem}
+
+/* Productivity chart */
+.met-bar-chart{display:flex;flex-direction:column;gap:0.3rem;padding:0.5rem 0}
+.met-bar-row{display:flex;align-items:center;gap:0.4rem}
+.met-bar-label{font-size:0.68rem;color:var(--text-secondary);width:80px;text-align:right;flex-shrink:0}
+.met-bar{flex:1;height:14px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden}
+.met-bar-fill{height:100%;border-radius:3px;transition:width .5s}
+
+/* Calendar heatmap */
+.met-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;padding:0.5rem 0}
+.met-cal-day{width:100%;aspect-ratio:1;border-radius:3px;font-size:0.6rem;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);cursor:pointer}
+.met-cal-day.l0{background:var(--bg-tertiary)}
+.met-cal-day.l1{background:rgba(124,58,237,.15);color:var(--purple-light)}
+.met-cal-day.l2{background:rgba(124,58,237,.3);color:var(--purple-light)}
+.met-cal-day.l3{background:rgba(124,58,237,.5);color:white}
+.met-cal-day.l4{background:var(--purple);color:white}
+.met-cal-header{font-size:0.55rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:center}
+
+/* Donut chart */
+.met-donut{position:relative;width:100px;height:100px;margin:0 auto}
+.met-donut svg{width:100%;height:100%;transform:rotate(-90deg)}
+.met-donut-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;color:var(--text-primary)}
+</style>
+
+<div class="met-layout">
+    <!-- Left: Business process flows -->
+    <div style="display:flex;flex-direction:column;gap:1.2rem">
+        <div class="met-panel">
+            <div class="met-panel-header">
+                <div class="met-panel-title"><svg><use href="#icon-git-merge"/></svg> Flux de Processus Métier</div>
+            </div>
+            <div class="met-panel-body" style="padding:0">
+                <div class="met-swimlanes">
+                    {% for dept in departments %}
+                    <div class="met-lane">
+                        <div class="met-lane-label">{{ dept.name }}</div>
+                        <div class="met-lane-content">
+                            {% for node in dept.nodes %}
+                            {% if not loop.first %}
+                            <div class="met-arrow"><svg><use href="#icon-arrow-right"/></svg></div>
+                            {% endif %}
+
+                            {% if node.type == 'agent' %}
+                            <div class="met-node">
+                                <div class="met-node-icon {{ 'active' if node.active else '' }}">
+                                    <svg><use href="#icon-{{ node.icon }}"/></svg>
+                                </div>
+                                <div class="met-node-label">{{ node.label }}</div>
+                            </div>
+                            {% elif node.type == 'pattern' %}
+                            <div class="met-pattern-box">
+                                <div class="met-pattern-box-title">Patterns</div>
+                                {{ node.label }}
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right sidebar -->
+    <div style="display:flex;flex-direction:column;gap:1.2rem">
+        <!-- Performance -->
+        <div class="met-panel">
+            <div class="met-panel-header">
+                <div class="met-panel-title"><svg><use href="#icon-chart"/></svg> Performance Métier</div>
+            </div>
+            <div class="met-panel-body">
+                <div style="font-size:0.72rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.4rem">Productivité Agents</div>
+                <!-- Donut -->
+                <div class="met-donut">
+                    <svg viewBox="0 0 36 36">
+                        <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--bg-tertiary)" stroke-width="3"/>
+                        <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--purple)" stroke-width="3"
+                            stroke-dasharray="{{ productivity_pct }},{{ 100 - productivity_pct }}" stroke-linecap="round"/>
+                    </svg>
+                    <div class="met-donut-center">{{ productivity_pct }}%</div>
+                </div>
+
+                <div class="met-bar-chart" style="margin-top:0.8rem">
+                    {% for dept in departments %}
+                    <div class="met-bar-row">
+                        <span class="met-bar-label">{{ dept.name }}</span>
+                        <div class="met-bar"><div class="met-bar-fill" style="width:{{ dept.efficiency }}%;background:{{ dept.color }}"></div></div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity calendar -->
+        <div class="met-panel">
+            <div class="met-panel-header">
+                <div class="met-panel-title"><svg><use href="#icon-calendar"/></svg> Activité des Flux</div>
+            </div>
+            <div class="met-panel-body">
+                <div class="met-cal">
+                    <div class="met-cal-header">Lun</div>
+                    <div class="met-cal-header">Mar</div>
+                    <div class="met-cal-header">Mer</div>
+                    <div class="met-cal-header">Jeu</div>
+                    <div class="met-cal-header">Ven</div>
+                    <div class="met-cal-header">Sam</div>
+                    <div class="met-cal-header">Dim</div>
+                    {% for day in calendar_days %}
+                    <div class="met-cal-day l{{ day.level }}">{{ day.num }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

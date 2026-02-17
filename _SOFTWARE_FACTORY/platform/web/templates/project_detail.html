@@ -4,6 +4,9 @@
 <div class="project-topbar-info">
     <span class="project-type-dot {{ project.factory_type }} dot-lg"></span>
     <span style="font-size:0.8rem;color:var(--text-secondary)">{{ project.path }}</span>
+    <a href="/projects/{{ project.id }}/board" class="btn btn-sm btn-ghost" title="Kanban Board">
+        <svg class="icon icon-sm"><use href="#icon-columns"/></svg> Board
+    </a>
     <button class="btn btn-sm btn-ghost" onclick="document.getElementById('project-sidebar').classList.toggle('open')" title="Project info">
         <svg class="icon icon-sm"><use href="#icon-settings"/></svg> Info
     </button>
