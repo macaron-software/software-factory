@@ -21,34 +21,64 @@
 
             <div class="sidebar-section">
                 <ul class="nav-links">
-                    <li><a href="/" data-tooltip="Portfolio" class="{% if page_title == 'Portfolio' or page_title == 'Projects' %}active{% endif %}">
+                    <li><a href="/" data-tooltip="Portfolio" data-views="all" class="{% if page_title == 'Portfolio' or page_title == 'Projects' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-home"/></svg>
                     </a></li>
-                    <li><a href="/missions" data-tooltip="Missions" class="{% if page_title == 'Missions' or page_title == 'Mission' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-rocket"/></svg>
+                    <li><a href="/dsi" data-tooltip="DSI Board" data-views="dsi,all" class="{% if page_title == 'DSI Board' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-kanban"/></svg>
                     </a></li>
-                    <li><a href="/workflows" data-tooltip="Workflows" class="{% if page_title == 'Workflows' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-workflow"/></svg>
-                    </a></li>
-                    <li><a href="/patterns" data-tooltip="Patterns" class="{% if page_title == 'Patterns' %}active{% endif %}">
+                    <li><a href="/product" data-tooltip="Product" data-views="product,all" class="{% if page_title == 'Product' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-layers"/></svg>
                     </a></li>
-                    <li><a href="/agents" data-tooltip="Équipe" class="{% if page_title == 'Agents' %}active{% endif %}">
+                    <li><a href="/ideation" data-tooltip="Idéation" data-views="product,all" class="{% if page_title == 'Idéation' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-lightbulb"/></svg>
+                    </a></li>
+                    <li><a href="/missions" data-tooltip="Missions" data-views="dsi,product,all" class="{% if page_title == 'Missions' or page_title == 'Mission' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-rocket"/></svg>
+                    </a></li>
+                    <li><a href="/workflows" data-tooltip="Workflows" data-views="engineering" class="{% if page_title == 'Workflows' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-workflow"/></svg>
+                    </a></li>
+                    <li><a href="/patterns" data-tooltip="Patterns" data-views="engineering" class="{% if page_title == 'Patterns' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-clipboard"/></svg>
+                    </a></li>
+                    <li><a href="/agents" data-tooltip="Équipe" data-views="engineering" class="{% if page_title == 'Agents' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-bot"/></svg>
                     </a></li>
-                    <li><a href="/skills" data-tooltip="Skills" class="{% if page_title == 'Skills' %}active{% endif %}">
+                    <li><a href="/skills" data-tooltip="Skills" data-views="engineering" class="{% if page_title == 'Skills' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-target"/></svg>
                     </a></li>
-                    <li><a href="/memory" data-tooltip="Memory" class="{% if page_title == 'Memory' %}active{% endif %}">
+                    <li><a href="/memory" data-tooltip="Memory" data-views="engineering" class="{% if page_title == 'Memory' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-brain"/></svg>
                     </a></li>
-                    <li><a href="/mcps" data-tooltip="MCPs" class="{% if page_title == 'MCPs' %}active{% endif %}">
+                    <li><a href="/mcps" data-tooltip="MCPs" data-views="engineering" class="{% if page_title == 'MCPs' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-plug"/></svg>
+                    </a></li>
+                    <li><a href="/generate" data-tooltip="Team Generator" data-views="dsi,product,all" class="{% if page_title == 'Team Generator' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-lightning"/></svg>
+                    </a></li>
+                    <li><a href="/metrics" data-tooltip="DORA Metrics" data-views="dsi,all" class="{% if page_title == 'DORA Metrics' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-chart"/></svg>
                     </a></li>
                 </ul>
             </div>
 
             <div class="sidebar-section" style="margin-top: auto">
+                <!-- View mode switcher -->
+                <div class="sidebar-view-switch">
+                    <button class="view-switch-btn" data-mode="all" title="Tous les outils">
+                        <svg class="icon icon-xs"><use href="#icon-grid"/></svg>
+                    </button>
+                    <button class="view-switch-btn" data-mode="dsi" title="Vue DSI">
+                        <svg class="icon icon-xs"><use href="#icon-kanban"/></svg>
+                    </button>
+                    <button class="view-switch-btn" data-mode="product" title="Vue Product">
+                        <svg class="icon icon-xs"><use href="#icon-layers"/></svg>
+                    </button>
+                    <button class="view-switch-btn" data-mode="engineering" title="Vue Engineering">
+                        <svg class="icon icon-xs"><use href="#icon-settings"/></svg>
+                    </button>
+                </div>
                 <ul class="nav-links">
                     <li><a href="/settings" data-tooltip="Settings" class="{% if page_title == 'Settings' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-settings"/></svg>
@@ -78,6 +108,51 @@
             </div>
         </main>
     </div>
+
+    <style>
+    .sidebar-view-switch{display:flex;justify-content:center;gap:2px;padding:0.3rem 0.4rem;margin:0 0.3rem 0.3rem;background:var(--bg-tertiary);border-radius:8px}
+    .view-switch-btn{background:none;border:none;color:var(--text-secondary);padding:0.3rem;border-radius:6px;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center}
+    .view-switch-btn:hover{color:var(--text-primary);background:var(--bg-secondary)}
+    .view-switch-btn.active{color:#fff;background:var(--purple)}
+    .nav-links li.view-hidden{display:none}
+    </style>
+    <script>
+    (function(){
+      // Auto-detect view from current page
+      const PAGE_VIEW_MAP = {
+        'DSI Board': 'dsi',
+        'DORA Metrics': 'dsi',
+        'Product': 'product',
+        'Idéation': 'product',
+      };
+      const pageTitle = document.querySelector('.topbar h2')?.textContent?.trim() || '';
+      const autoView = PAGE_VIEW_MAP[pageTitle] || null;
+      const savedView = localStorage.getItem('sidebar_view') || 'all';
+      const currentView = autoView || savedView;
+
+      function applyView(mode){
+        localStorage.setItem('sidebar_view', mode);
+        // Toggle nav items
+        document.querySelectorAll('.nav-links a[data-views]').forEach(a=>{
+          const views = a.dataset.views.split(',');
+          const show = mode === 'all' || views.includes(mode) || views.includes('all');
+          a.closest('li').classList.toggle('view-hidden', !show);
+        });
+        // Toggle active button
+        document.querySelectorAll('.view-switch-btn').forEach(b=>{
+          b.classList.toggle('active', b.dataset.mode === mode);
+        });
+      }
+
+      // Init
+      applyView(currentView);
+
+      // Click handlers
+      document.querySelectorAll('.view-switch-btn').forEach(btn=>{
+        btn.addEventListener('click', ()=> applyView(btn.dataset.mode));
+      });
+    })();
+    </script>
 
     <script src="/static/js/workspace.js" defer></script>
     {% block scripts %}{% endblock %}

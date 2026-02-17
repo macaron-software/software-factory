@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+.dora-container { max-width: 900px; margin: 0 auto; padding: 1.5rem 1rem; }
+.dora-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+.dora-header h3 { margin: 0; font-size: 1.3rem; }
+.dora-filters { display: flex; gap: 0.75rem; align-items: center; }
+.dora-select {
+    padding: 0.4rem 0.75rem; border-radius: 6px;
+    background: var(--bg-secondary); color: var(--text-primary);
+    border: 1px solid var(--border); font-size: 0.85rem;
+}
+.dora-overall {
+    text-align: center; margin-bottom: 2rem; padding: 1.5rem;
+    background: var(--bg-secondary); border-radius: 12px;
+    border: 1px solid var(--border);
+}
+.dora-overall-level {
+    font-size: 2.5rem; font-weight: 700; margin-bottom: 0.25rem;
+}
+.dora-overall-label { color: var(--text-secondary); font-size: 0.9rem; }
+.dora-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem; margin-bottom: 2rem;
+}
+.dora-card {
+    background: var(--bg-secondary); border-radius: 10px; padding: 1.25rem;
+    border: 1px solid var(--border); text-align: center;
+}
+.dora-card-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+.dora-card-title { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.dora-card-value { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.25rem; }
+.dora-card-detail { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem; }
+.dora-card-level {
+    display: inline-block; padding: 3px 10px; border-radius: 12px;
+    font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+}
+.level-elite { background: #16a34a22; color: #16a34a; }
+.level-high { background: #2563eb22; color: #3b82f6; }
+.level-medium { background: #ea580c22; color: #ea580c; }
+.level-low { background: #dc262622; color: #dc2626; }
+
+.dora-trend {
+    background: var(--bg-secondary); border-radius: 10px; padding: 1.25rem;
+    border: 1px solid var(--border);
+}
+.dora-trend h4 { margin: 0 0 1rem 0; font-size: 0.9rem; }
+.dora-trend-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem; }
+.dora-trend-label { width: 100px; font-size: 0.8rem; color: var(--text-secondary); flex-shrink: 0; }
+.dora-sparkline { flex: 1; height: 24px; }
+.dora-sparkline-bar {
+    display: inline-block; width: 6px; height: 100%; margin-right: 2px;
+    border-radius: 2px; vertical-align: bottom;
+    transition: height 0.3s;
+}
+</style>
+
+<div class="dora-container">
+    <div class="dora-header">
+        <h3><svg class="icon icon-sm" style="vertical-align:-2px"><use href="#icon-chart"/></svg> DORA Metrics</h3>
+        <div class="dora-filters">
+            <select class="dora-select" onchange="location.href='/metrics?project='+this.value+'&period={{ period }}'">
+                <option value="" {% if not selected_project %}selected{% endif %}>Tous les projets</option>
+                {% for p in projects %}
+                <option value="{{ p.id }}" {% if selected_project == p.id %}selected{% endif %}>{{ p.name }}</option>
+                {% endfor %}
+            </select>
+            <select class="dora-select" onchange="location.href='/metrics?project={{ selected_project }}&period='+this.value">
+                <option value="7" {% if period == 7 %}selected{% endif %}>7 jours</option>
+                <option value="30" {% if period == 30 %}selected{% endif %}>30 jours</option>
+                <option value="90" {% if period == 90 %}selected{% endif %}>90 jours</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Overall Level -->
+    <div class="dora-overall">
+        {% set level = dora.overall_level %}
+        {% set level_colors = {'elite': 'var(--purple)', 'high': 'var(--green)', 'medium': 'var(--yellow)', 'low': 'var(--red)'} %}
+        {% set level_icons = {'elite': 'trophy', 'high': 'check', 'medium': 'activity', 'low': 'alert-triangle'} %}
+        {% set level_text = {'elite': 'Elite', 'high': 'High', 'medium': 'Medium', 'low': 'Low'} %}
+        <div class="dora-overall-level"><svg class="icon icon-sm" style="color:{{ level_colors.get(level, 'var(--text-secondary)') }};vertical-align:-2px"><use href="#icon-{{ level_icons.get(level, 'circle') }}"/></svg> {{ level_text.get(level, level) }}</div>
+        <div class="dora-overall-label">Niveau global — {{ dora.period_days }} derniers jours</div>
+    </div>
+
+    <!-- 4 Metric Cards -->
+    <div class="dora-grid">
+        <!-- Deployment Frequency -->
+        <div class="dora-card">
+            <div class="dora-card-icon"><svg class="icon" style="color:var(--green)"><use href="#icon-rocket"/></svg></div>
+            <div class="dora-card-title">Deploy Frequency</div>
+            <div class="dora-card-value">{{ dora.deployment_frequency.count }}</div>
+            <div class="dora-card-detail">{{ dora.deployment_frequency.per_day }}/jour</div>
+            <span class="dora-card-level level-{{ dora.deployment_frequency.level }}">{{ dora.deployment_frequency.level }}</span>
+        </div>
+
+        <!-- Lead Time -->
+        <div class="dora-card">
+            <div class="dora-card-icon"><svg class="icon" style="color:var(--blue)"><use href="#icon-clock"/></svg></div>
+            <div class="dora-card-title">Lead Time</div>
+            <div class="dora-card-value">{{ dora.lead_time.median_hours }}h</div>
+            <div class="dora-card-detail">p90: {{ dora.lead_time.p90_hours }}h</div>
+            <span class="dora-card-level level-{{ dora.lead_time.level }}">{{ dora.lead_time.level }}</span>
+        </div>
+
+        <!-- Change Failure Rate -->
+        <div class="dora-card">
+            <div class="dora-card-icon"><svg class="icon" style="color:var(--red)"><use href="#icon-alert-circle"/></svg></div>
+            <div class="dora-card-title">Failure Rate</div>
+            <div class="dora-card-value">{{ dora.change_failure_rate.rate_pct }}%</div>
+            <div class="dora-card-detail">{{ dora.change_failure_rate.failures }}/{{ dora.change_failure_rate.total }}</div>
+            <span class="dora-card-level level-{{ dora.change_failure_rate.level }}">{{ dora.change_failure_rate.level }}</span>
+        </div>
+
+        <!-- MTTR -->
+        <div class="dora-card">
+            <div class="dora-card-icon"><svg class="icon" style="color:var(--yellow)"><use href="#icon-wrench"/></svg></div>
+            <div class="dora-card-title">MTTR</div>
+            <div class="dora-card-value">{{ dora.mttr.median_hours }}h</div>
+            <div class="dora-card-detail">{{ dora.mttr.count }} incidents</div>
+            <span class="dora-card-level level-{{ dora.mttr.level }}">{{ dora.mttr.level }}</span>
+        </div>
+    </div>
+
+    <!-- Sparkline Trends -->
+    <div class="dora-trend">
+        <h4><svg class="icon icon-sm" style="vertical-align:-2px"><use href="#icon-trending-up"/></svg> Tendance — 12 dernières semaines</h4>
+
+        <div class="dora-trend-row">
+            <span class="dora-trend-label">Deploys</span>
+            <div class="dora-sparkline" id="sparkDeploy"></div>
+        </div>
+        <div class="dora-trend-row">
+            <span class="dora-trend-label">Lead Time (h)</span>
+            <div class="dora-sparkline" id="sparkLeadTime"></div>
+        </div>
+        <div class="dora-trend-row">
+            <span class="dora-trend-label">Failure %</span>
+            <div class="dora-sparkline" id="sparkFailure"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const trend = {{ trend | tojson }};
+
+function renderSparkline(containerId, data, color) {
+    const el = document.getElementById(containerId);
+    if (!el || !data || data.length === 0) return;
+    const max = Math.max(...data, 1);
+    el.innerHTML = data.map(v => {
+        const h = Math.max(2, (v / max) * 24);
+        return `<span class="dora-sparkline-bar" style="height:${h}px;background:${color}" title="${v}"></span>`;
+    }).join('');
+}
+
+renderSparkline('sparkDeploy', trend.deploy, '#16a34a');
+renderSparkline('sparkLeadTime', trend.lead_time, '#3b82f6');
+renderSparkline('sparkFailure', trend.failure, '#dc2626');
+</script>
+{% endblock %}

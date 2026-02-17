@@ -150,6 +150,7 @@
 /* Graph node cards (SVG) */
 .live-node{cursor:pointer;user-select:none}
 .live-node:hover .live-node-bg{filter:brightness(1.15)}
+.live-node.dimmed{opacity:0.18;pointer-events:none;transition:opacity .3s}
 .live-node-bg{rx:12;ry:12;fill:var(--bg-secondary);stroke:var(--border);stroke-width:1.2;transition:stroke .2s,filter .15s}
 .live-node.highlight .live-node-bg{stroke:var(--purple);stroke-width:2.5}
 .live-node-bar{stroke-linecap:round}
@@ -162,13 +163,41 @@
 .live-node-meta{fill:var(--text-secondary);font-size:7.5px;font-family:inherit}
 .node-status{transition:fill .3s}
 .node-status--idle{fill:#6b7280}
-.node-status--thinking{fill:var(--yellow);animation:pulse 1s infinite}
-.node-status--acting{fill:var(--green)}
+.node-status--thinking{fill:var(--yellow);animation:statusPulse 1.2s ease-in-out infinite}
+.node-status--acting{fill:var(--green);animation:statusPulse 2s ease-in-out infinite}
 .node-status--error{fill:var(--red)}
 .node-status--done{fill:var(--green)}
 .edge-line{fill:none;stroke:var(--purple);stroke-width:1.8;opacity:0.45;marker-end:url(#arrow-default);transition:stroke-width .2s,opacity .2s}
+.edge-line.dimmed{opacity:0.06!important;stroke-width:1px!important}
 .edge-active{stroke-dasharray:8 4;animation:dash 0.6s linear infinite;opacity:0.85!important;stroke-width:2.5px!important}
 .edge-count{fill:var(--text-secondary);font-size:9px;font-family:'SF Mono',monospace;text-anchor:middle;pointer-events:none}
+.edge-count.dimmed{opacity:0.1}
+
+/* Pulse ring for thinking/acting nodes */
+.pulse-ring{fill:none;stroke-width:2;opacity:0;animation:pulseRing 2s ease-out infinite}
+@keyframes pulseRing{0%{r:24;opacity:.6;stroke-width:3}100%{r:38;opacity:0;stroke-width:0.5}}
+@keyframes statusPulse{0%,100%{opacity:1;r:5}50%{opacity:.5;r:6.5}}
+
+/* Flow particle */
+.flow-particle{fill:var(--purple);opacity:0}
+.flow-particle.animate{opacity:1;transition:none}
+
+/* Graph pan/zoom */
+.graph-canvas{position:relative;overflow:hidden;background:var(--bg-primary);grid-row:1;grid-column:1;cursor:grab}
+.graph-canvas.panning{cursor:grabbing}
+.graph-canvas svg#liveSvg{width:100%;min-height:100%;transform-origin:0 0}
+
+/* Zoom controls */
+.graph-zoom-controls{position:absolute;top:12px;right:260px;display:flex;flex-direction:column;gap:4px;z-index:15}
+.graph-zoom-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.graph-zoom-btn:hover{background:var(--bg-tertiary)}
+.graph-zoom-level{font-size:0.62rem;text-align:center;color:var(--text-secondary);font-family:'SF Mono',monospace}
+
+/* Minimap */
+.graph-minimap{position:absolute;bottom:12px;right:252px;width:160px;height:100px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;z-index:15;overflow:hidden;cursor:pointer;opacity:0.85;transition:opacity .2s}
+.graph-minimap:hover{opacity:1}
+.graph-minimap svg{width:100%;height:100%}
+.minimap-viewport{fill:rgba(124,58,237,0.12);stroke:var(--purple);stroke-width:1.5;rx:2;cursor:move}
 .graph-legend{position:absolute;bottom:12px;left:12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:8px 12px;z-index:10;min-width:140px}
 .graph-legend-title{font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);margin-bottom:6px}
 .graph-legend-items{display:flex;flex-direction:column;gap:5px}
@@ -177,6 +206,50 @@
 .graph-legend-icon{font-size:0.8rem;width:16px;text-align:center}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes dash{to{stroke-dashoffset:-12}}
+
+/* ── Agent Chat 1:1 slide-in panel ── */
+.agent-chat-panel{position:absolute;top:0;right:0;width:380px;height:100%;background:var(--bg-secondary);border-left:1px solid var(--border);z-index:25;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;box-shadow:-4px 0 20px rgba(0,0,0,.3)}
+.agent-chat-panel.open{transform:translateX(0)}
+.agent-chat-header{display:flex;align-items:center;gap:0.6rem;padding:0.75rem 1rem;border-bottom:1px solid var(--border);background:var(--bg-tertiary);flex-shrink:0}
+.agent-chat-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;font-weight:700;color:#fff}
+.agent-chat-avatar img{width:44px;height:44px;border-radius:50%;object-fit:cover}
+.agent-chat-info{flex:1;min-width:0}
+.agent-chat-name{font-size:0.9rem;font-weight:700;color:var(--text-primary)}
+.agent-chat-role{font-size:0.72rem;color:var(--text-secondary)}
+.agent-chat-status-bar{display:flex;align-items:center;gap:0.35rem;margin-top:0.15rem}
+.agent-chat-status-dot{width:8px;height:8px;border-radius:50%;background:#6b7280;flex-shrink:0}
+.agent-chat-status-dot.thinking{background:var(--yellow);animation:pulse 1s infinite}
+.agent-chat-status-dot.acting{background:var(--green);animation:pulse 2s infinite}
+.agent-chat-status-dot.error{background:var(--red)}
+.agent-chat-status-text{font-size:0.68rem;color:var(--text-secondary)}
+.agent-chat-close{background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:0.3rem;border-radius:6px;transition:background .12s}
+.agent-chat-close:hover{background:var(--bg-secondary);color:var(--text-primary)}
+
+.agent-chat-skills{display:flex;flex-wrap:wrap;gap:0.2rem;padding:0.4rem 1rem;border-bottom:1px solid var(--border);flex-shrink:0;max-height:48px;overflow:hidden}
+.agent-chat-skill{display:inline-block;padding:0.08rem 0.35rem;border-radius:4px;font-size:0.62rem;background:rgba(124,58,237,0.12);color:var(--purple);border:1px solid rgba(124,58,237,0.25)}
+
+.agent-chat-actions{display:flex;gap:0.35rem;padding:0.4rem 1rem;border-bottom:1px solid var(--border);flex-shrink:0}
+.agent-chat-action{background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary);border-radius:6px;padding:0.25rem 0.6rem;font-size:0.68rem;cursor:pointer;transition:all .12s;display:flex;align-items:center;gap:0.25rem}
+.agent-chat-action:hover{background:var(--purple);color:#fff;border-color:var(--purple)}
+
+.agent-chat-messages{flex:1;overflow-y:auto;padding:0.75rem 1rem;display:flex;flex-direction:column;gap:0.5rem}
+.agent-chat-bubble{max-width:90%;padding:0.6rem 0.75rem;border-radius:10px;font-size:0.82rem;line-height:1.5;word-break:break-word}
+.agent-chat-bubble--user{background:var(--purple);color:#fff;align-self:flex-end;border-bottom-right-radius:3px}
+.agent-chat-bubble--agent{background:var(--bg-tertiary);color:var(--text-primary);align-self:flex-start;border-bottom-left-radius:3px}
+.agent-chat-bubble-meta{font-size:0.62rem;opacity:0.65;margin-bottom:0.15rem}
+.agent-chat-bubble-text{white-space:pre-wrap}
+.agent-chat-bubble-text code{background:rgba(0,0,0,.2);padding:0.08rem 0.25rem;border-radius:3px;font-size:0.76rem;font-family:'SF Mono',monospace}
+.agent-chat-typing{padding:0.4rem 0.75rem;color:var(--text-secondary);font-size:0.76rem;font-style:italic;display:none;align-items:center;gap:0.3rem}
+.agent-chat-typing.visible{display:flex}
+.agent-chat-typing .dots span{animation:blink 1.4s infinite both}
+.agent-chat-typing .dots span:nth-child(2){animation-delay:0.2s}
+.agent-chat-typing .dots span:nth-child(3){animation-delay:0.4s}
+
+.agent-chat-input-bar{display:flex;align-items:center;gap:0.4rem;padding:0.6rem 0.75rem;border-top:1px solid var(--border);flex-shrink:0}
+.agent-chat-input{flex:1;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;padding:0.5rem 0.75rem;font-size:0.82rem;outline:none;font-family:inherit}
+.agent-chat-input:focus{border-color:var(--purple);box-shadow:0 0 0 2px rgba(124,58,237,.15)}
+.agent-chat-send{background:var(--purple);color:#fff;border:none;border-radius:8px;padding:0.5rem 0.8rem;cursor:pointer;font-weight:600;transition:background .15s}
+.agent-chat-send:hover{background:#6d28d9}
 
 /* Tooltip → Agent detail panel */
 .node-tooltip{position:absolute;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:10px;padding:0.75rem 0.85rem;font-size:0.78rem;color:var(--text-primary);width:280px;box-shadow:0 6px 24px rgba(0,0,0,.55);pointer-events:auto;z-index:20;display:none;word-break:break-word}
@@ -320,7 +393,45 @@
             <div class="graph-legend-title">Patterns</div>
             <div class="graph-legend-items"></div>
           </div>
+          <!-- Zoom controls -->
+          <div class="graph-zoom-controls">
+            <button class="graph-zoom-btn" id="zoomIn" title="Zoom in">+</button>
+            <div class="graph-zoom-level" id="zoomLevel">100%</div>
+            <button class="graph-zoom-btn" id="zoomOut" title="Zoom out">−</button>
+            <button class="graph-zoom-btn" id="zoomFit" title="Fit all" style="font-size:0.72rem;margin-top:2px">⊞</button>
+          </div>
+          <!-- Minimap -->
+          <div class="graph-minimap" id="graphMinimap"><svg id="minimapSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
           <div class="node-tooltip" id="nodeTooltip"></div>
+          <!-- Agent Chat 1:1 panel -->
+          <div class="agent-chat-panel" id="agentChatPanel">
+            <div class="agent-chat-header">
+              <div class="agent-chat-avatar" id="acAvatar"></div>
+              <div class="agent-chat-info">
+                <div class="agent-chat-name" id="acName"></div>
+                <div class="agent-chat-role" id="acRole"></div>
+                <div class="agent-chat-status-bar">
+                  <span class="agent-chat-status-dot" id="acStatusDot"></span>
+                  <span class="agent-chat-status-text" id="acStatusText">idle</span>
+                </div>
+              </div>
+              <button class="agent-chat-close" id="acClose"><svg class="icon"><use href="#icon-x"/></svg></button>
+            </div>
+            <div class="agent-chat-skills" id="acSkills"></div>
+            <div class="agent-chat-actions" id="acActions">
+              <button class="agent-chat-action" data-action="status"><svg class="icon icon-xs"><use href="#icon-activity"/></svg> Status</button>
+              <button class="agent-chat-action" data-action="review"><svg class="icon icon-xs"><use href="#icon-eye"/></svg> Review</button>
+              <button class="agent-chat-action" data-action="delegate"><svg class="icon icon-xs"><use href="#icon-send"/></svg> Delegate</button>
+            </div>
+            <div class="agent-chat-messages" id="acMessages"></div>
+            <div class="agent-chat-typing" id="acTyping">
+              Thinking<span class="dots"><span>.</span><span>.</span><span>.</span></span>
+            </div>
+            <div class="agent-chat-input-bar">
+              <input type="text" class="agent-chat-input" id="acInput" placeholder="Message this agent..." autocomplete="off">
+              <button class="agent-chat-send" id="acSend"><svg class="icon icon-xs"><use href="#icon-send"/></svg></button>
+            </div>
+          </div>
         </div>
         <!-- Memory sidebar -->
         <div class="graph-memory" id="memoryPanel">
@@ -510,6 +621,7 @@ es.addEventListener('message', e=>{
     const data = JSON.parse(e.data);
     appendMessage(data);
     updateNodeStatus(data);
+    routeToAgentChat(data);
   }catch(err){ console.error('SSE parse error', err); }
 });
 es.addEventListener('error', ()=>{ console.warn('SSE connection lost, will retry...'); });
@@ -653,6 +765,73 @@ document.getElementById('chatAgentSelect').addEventListener('change', ()=>{
 let graphNodes = GRAPH.nodes || [];
 let graphEdges = GRAPH.edges || [];
 let highlightedNode = null;
+let focusedNode = null; // for dim/focus mode
+
+/* ── Pan & Zoom state ── */
+let zoomLevel = 1;
+const ZOOM_MIN = 0.3, ZOOM_MAX = 3, ZOOM_STEP = 0.15;
+let panX = 0, panY = 0;
+let isPanning = false, panStartX = 0, panStartY = 0, panStartPX = 0, panStartPY = 0;
+let graphW = 800, graphH = 500; // full content size
+
+function applyViewTransform(){
+  const svgEl = document.getElementById('liveSvg');
+  if(!svgEl) return;
+  svgEl.style.transform = `translate(${panX}px,${panY}px) scale(${zoomLevel})`;
+  document.getElementById('zoomLevel').textContent = Math.round(zoomLevel*100)+'%';
+  updateMinimap();
+}
+
+// Wheel zoom
+document.getElementById('graphCanvas').addEventListener('wheel', e=>{
+  if(activeTab!=='graph') return;
+  e.preventDefault();
+  const canvas = document.getElementById('graphCanvas');
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const oldZ = zoomLevel;
+  zoomLevel = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoomLevel + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP)));
+  const ratio = zoomLevel / oldZ;
+  panX = mx - ratio * (mx - panX);
+  panY = my - ratio * (my - panY);
+  applyViewTransform();
+}, {passive:false});
+
+// Mouse drag pan
+const graphCanvas = document.getElementById('graphCanvas');
+graphCanvas.addEventListener('mousedown', e=>{
+  if(e.target.closest('.live-node,.node-tooltip,.agent-chat-panel,.graph-legend,.graph-zoom-controls,.graph-minimap')) return;
+  isPanning = true;
+  panStartX = e.clientX; panStartY = e.clientY;
+  panStartPX = panX; panStartPY = panY;
+  graphCanvas.classList.add('panning');
+});
+window.addEventListener('mousemove', e=>{
+  if(!isPanning) return;
+  panX = panStartPX + (e.clientX - panStartX);
+  panY = panStartPY + (e.clientY - panStartY);
+  applyViewTransform();
+});
+window.addEventListener('mouseup', ()=>{
+  isPanning = false;
+  graphCanvas.classList.remove('panning');
+});
+
+// Zoom buttons
+document.getElementById('zoomIn').addEventListener('click', ()=>{ zoomLevel = Math.min(ZOOM_MAX, zoomLevel + ZOOM_STEP); applyViewTransform(); });
+document.getElementById('zoomOut').addEventListener('click', ()=>{ zoomLevel = Math.max(ZOOM_MIN, zoomLevel - ZOOM_STEP); applyViewTransform(); });
+document.getElementById('zoomFit').addEventListener('click', ()=>{
+  const canvas = document.getElementById('graphCanvas');
+  if(!graphNodes.length) return;
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  graphNodes.forEach(n=>{minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x+NODE_W);maxY=Math.max(maxY,n.y+NODE_H)});
+  const cw = canvas.clientWidth, ch = canvas.clientHeight - 20;
+  const sw = (maxX-minX+80), sh = (maxY-minY+80);
+  zoomLevel = Math.min(ZOOM_MAX, Math.min(cw/sw, ch/sh));
+  panX = (cw - sw*zoomLevel)/2 - minX*zoomLevel + 40*zoomLevel;
+  panY = (ch - sh*zoomLevel)/2 - minY*zoomLevel + 40*zoomLevel;
+  applyViewTransform();
+});
 
 function renderGraph(){
   const canvas = document.getElementById('graphCanvas');
@@ -661,16 +840,22 @@ function renderGraph(){
   const baseH = canvas.clientHeight || 500;
   if(graphNodes.length && graphNodes[0].x == null) autoLayoutGraph(W, baseH);
 
-  // Compute actual height from node positions
-  let maxY = baseH;
-  graphNodes.forEach(n => { if(n.y != null) maxY = Math.max(maxY, n.y + NODE_H + 40); });
-  const H = maxY;
-  svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  svgEl.style.height = H + 'px';
+  let maxY = baseH, maxX = W;
+  graphNodes.forEach(n => {
+    if(n.y != null) maxY = Math.max(maxY, n.y + NODE_H + 40);
+    if(n.x != null) maxX = Math.max(maxX, n.x + NODE_W + 40);
+  });
+  graphW = maxX; graphH = maxY;
+  svgEl.setAttribute('viewBox', `0 0 ${graphW} ${graphH}`);
+  svgEl.style.width = graphW + 'px';
+  svgEl.style.height = graphH + 'px';
 
   document.getElementById('livePhases').innerHTML = '';
-  renderLiveEdges(W, H);
+  renderLiveEdges(graphW, graphH);
   renderLiveNodes();
+  updateMinimap();
+  // Show minimap only for larger graphs
+  document.getElementById('graphMinimap').style.display = graphNodes.length > 6 ? '' : 'none';
 }
 
 function autoLayoutGraph(W, H){
@@ -827,21 +1012,34 @@ function renderLiveEdges(W, H){
 function renderLiveNodes(){
   const nl = document.getElementById('liveNodes');
   nl.innerHTML = '';
+
+  // Compute connected set for focus mode
+  let connectedSet = null;
+  if(focusedNode){
+    connectedSet = new Set([focusedNode]);
+    graphEdges.forEach(e=>{
+      if(e.from===focusedNode) connectedSet.add(e.to);
+      if(e.to===focusedNode) connectedSet.add(e.from);
+    });
+  }
+
   graphNodes.forEach(n=>{
-    const agent = agentById(n.agent_id || n.id);
+    const agId = n.agent_id || n.id;
+    const agent = agentById(agId);
     const col = (agent && agent.color) || 'var(--purple)';
     const name = esc(agent ? agent.name : (n.label || n.id));
     const emoji = agent ? agent.avatar : '';
     const role = esc(agent ? agent.role : (n.role || ''));
     const status = (agent && agent.status) || n.status || 'idle';
-    const sel = (n.id||n.agent_id) === highlightedNode;
+    const sel = agId === highlightedNode;
+    const isDimmed = connectedSet && !connectedSet.has(agId);
     const skillCount = agent ? (agent.skills||[]).length : 0;
     const toolCount = agent ? (agent.tools||[]).length : 0;
 
     const g = document.createElementNS('http://www.w3.org/2000/svg','g');
-    g.setAttribute('class', 'live-node' + (sel?' highlight':''));
+    g.setAttribute('class', 'live-node' + (sel?' highlight':'') + (isDimmed?' dimmed':''));
     g.setAttribute('transform', `translate(${n.x},${n.y})`);
-    g.dataset.agent = n.agent_id || n.id;
+    g.dataset.agent = agId;
 
     // Skill tags (show first 3)
     let skillTags = '';
@@ -864,6 +1062,11 @@ function renderLiveNodes(){
     const tagline = agent ? (agent.tagline || agent.description || '') : '';
     const textX = avatarCx + avatarR + 12;
 
+    // Pulse ring for thinking/acting agents
+    const pulseRing = (status==='thinking'||status==='acting')
+      ? `<circle class="pulse-ring" cx="${NODE_W-16}" cy="18" r="24" stroke="${status==='thinking'?'var(--yellow)':'var(--green)'}" />`
+      : '';
+
     g.innerHTML = `
       <rect class="live-node-bg" width="${NODE_W}" height="${NODE_H}" ${sel?`style="stroke:${col};stroke-width:2.5"`:''} />
       <line class="live-node-bar" x1="0" y1="0" x2="${NODE_W}" y2="0" stroke="${col}" stroke-width="4"/>
@@ -871,6 +1074,7 @@ function renderLiveNodes(){
       <text class="live-node-name" x="${textX}" y="26">${name.length>18?name.substring(0,17)+'…':name}</text>
       <text class="live-node-role" x="${textX}" y="40">${role.length>24?role.substring(0,23)+'…':role}</text>
       ${tagline ? `<text class="live-node-tagline" x="${textX}" y="54">${esc(tagline.substring(0,30))}${tagline.length>30?'…':''}</text>` : ''}
+      ${pulseRing}
       <circle class="node-status node-status--${status}" cx="${NODE_W-16}" cy="18" r="5"/>
       <text class="live-node-status-label" x="${NODE_W-16}" y="36" text-anchor="middle">${status}</text>
       ${skillCount||toolCount ? `<text class="live-node-meta" x="14" y="${NODE_H-10}">${toolCount}T ${skillCount}S</text>` : ''}
@@ -879,13 +1083,44 @@ function renderLiveNodes(){
     g.addEventListener('click', (e)=> { e.stopPropagation(); onNodeClick(n, g); });
     nl.appendChild(g);
   });
+
+  // Dim/un-dim edges to match focused node
+  document.querySelectorAll('#liveEdges .edge-line').forEach(path=>{
+    if(connectedSet){
+      const edgeConnected = connectedSet.has(path.dataset.from) && connectedSet.has(path.dataset.to);
+      path.classList.toggle('dimmed', !edgeConnected);
+    } else {
+      path.classList.remove('dimmed');
+    }
+  });
+  document.querySelectorAll('#liveEdges .edge-count').forEach(txt=>{
+    // edge-count badges sit right after their paths — dim based on sibling path
+    const prevPath = txt.previousElementSibling;
+    if(prevPath) txt.classList.toggle('dimmed', prevPath.classList.contains('dimmed'));
+  });
 }
 
 function onNodeClick(node, gEl){
   const agentId = node.agent_id || node.id;
-  highlightedNode = highlightedNode===agentId ? null : agentId;
+
+  // Toggle focus mode (dim unconnected nodes)
+  if(focusedNode === agentId){
+    focusedNode = null;
+    highlightedNode = null;
+  } else {
+    focusedNode = agentId;
+    highlightedNode = agentId;
+  }
   renderLiveNodes();
 
+  // Open agent chat panel
+  if(focusedNode){
+    openAgentChat(agentId);
+  } else {
+    closeAgentChat();
+  }
+
+  // Also show the tooltip briefly
   const tooltip = document.getElementById('nodeTooltip');
   if(!highlightedNode){ tooltip.classList.remove('visible'); return; }
 
@@ -972,11 +1207,13 @@ function onNodeClick(node, gEl){
   tooltip.classList.add('visible');
 }
 
-// Close tooltip when clicking canvas background
+// Close tooltip + chat panel when clicking canvas background
 document.getElementById('graphCanvas').addEventListener('click', (e)=>{
   if(e.target.tagName === 'svg' || e.target.id === 'graphCanvas'){
     highlightedNode = null;
+    focusedNode = null;
     document.getElementById('nodeTooltip').classList.remove('visible');
+    closeAgentChat();
     renderLiveNodes();
   }
 });
@@ -1006,15 +1243,233 @@ function updateThinking(data){
   }
 }
 
-/* ── Edge animation ── */
+/* ── Edge animation with flow particle ── */
 function animateEdge(fromId, toId){
   const edges = document.querySelectorAll('#liveEdges .edge-line');
   edges.forEach(path=>{
     if(path.dataset.from===fromId && path.dataset.to===toId){
       path.classList.add('edge-active');
       setTimeout(()=> path.classList.remove('edge-active'), 1200);
+      // Spawn flow particle along the path
+      spawnFlowParticle(path);
     }
   });
+}
+
+function spawnFlowParticle(pathEl){
+  const svgEl = document.getElementById('liveSvg');
+  const edgesGroup = document.getElementById('liveEdges');
+  const pathD = pathEl.getAttribute('d');
+  if(!pathD) return;
+  const color = pathEl.style.stroke || 'var(--purple)';
+
+  const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  circle.setAttribute('r','5');
+  circle.setAttribute('fill', color);
+  circle.setAttribute('class','flow-particle');
+  circle.style.filter = `drop-shadow(0 0 4px ${color})`;
+
+  const anim = document.createElementNS('http://www.w3.org/2000/svg','animateMotion');
+  anim.setAttribute('dur','0.8s');
+  anim.setAttribute('repeatCount','1');
+  anim.setAttribute('fill','freeze');
+  const motionPath = document.createElementNS('http://www.w3.org/2000/svg','mpath');
+  // Create a temporary path with the same d for the particle
+  const tempPath = document.createElementNS('http://www.w3.org/2000/svg','path');
+  const tempId = 'fp-' + Date.now() + Math.random().toString(36).slice(2,6);
+  tempPath.setAttribute('id', tempId);
+  tempPath.setAttribute('d', pathD);
+  tempPath.style.display = 'none';
+  edgesGroup.appendChild(tempPath);
+  motionPath.setAttributeNS('http://www.w3.org/1999/xlink','href','#'+tempId);
+  anim.appendChild(motionPath);
+  circle.appendChild(anim);
+  circle.classList.add('animate');
+  svgEl.appendChild(circle);
+
+  // Cleanup after animation
+  setTimeout(()=>{
+    circle.remove();
+    tempPath.remove();
+  }, 900);
+}
+
+/* ── Minimap ── */
+function updateMinimap(){
+  const minimapSvg = document.getElementById('minimapSvg');
+  if(!minimapSvg || !graphNodes.length) return;
+  const mmW = 160, mmH = 100;
+  minimapSvg.setAttribute('viewBox', `0 0 ${graphW} ${graphH}`);
+
+  let html = '';
+  // Draw edges as thin lines
+  graphEdges.forEach(e=>{
+    const fn = graphNodes.find(n=> n.agent_id===e.from);
+    const tn = graphNodes.find(n=> n.agent_id===e.to);
+    if(!fn || !tn) return;
+    html += `<line x1="${fn.x+NODE_W/2}" y1="${fn.y+NODE_H/2}" x2="${tn.x+NODE_W/2}" y2="${tn.y+NODE_H/2}" stroke="#6b7280" stroke-width="3" opacity="0.3"/>`;
+  });
+  // Draw nodes as small rects
+  graphNodes.forEach(n=>{
+    const agent = agentById(n.agent_id||n.id);
+    const col = (agent&&agent.color)||'#6b7280';
+    html += `<rect x="${n.x}" y="${n.y}" width="${NODE_W}" height="${NODE_H}" rx="6" fill="${col}" opacity="0.5"/>`;
+  });
+  // Viewport indicator
+  const canvas = document.getElementById('graphCanvas');
+  if(canvas){
+    const vw = canvas.clientWidth / zoomLevel;
+    const vh = canvas.clientHeight / zoomLevel;
+    const vx = -panX / zoomLevel;
+    const vy = -panY / zoomLevel;
+    html += `<rect class="minimap-viewport" x="${vx}" y="${vy}" width="${vw}" height="${vh}"/>`;
+  }
+  minimapSvg.innerHTML = html;
+}
+
+// Click minimap to navigate
+document.getElementById('graphMinimap').addEventListener('click', e=>{
+  const mmSvg = document.getElementById('minimapSvg');
+  const rect = mmSvg.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) / rect.width * graphW;
+  const my = (e.clientY - rect.top) / rect.height * graphH;
+  const canvas = document.getElementById('graphCanvas');
+  panX = -(mx - canvas.clientWidth/(2*zoomLevel)) * zoomLevel;
+  panY = -(my - canvas.clientHeight/(2*zoomLevel)) * zoomLevel;
+  applyViewTransform();
+});
+
+/* ── Agent Chat 1:1 Panel ── */
+let chatAgentId = null;
+const acPanel = document.getElementById('agentChatPanel');
+const acMessages = document.getElementById('acMessages');
+const acInput = document.getElementById('acInput');
+
+function openAgentChat(agentId){
+  chatAgentId = agentId;
+  const agent = agentById(agentId);
+  if(!agent) return;
+
+  // Header
+  const avEl = document.getElementById('acAvatar');
+  if(agent.avatar_url){
+    avEl.innerHTML = `<img src="${agent.avatar_url}" alt="${esc(agent.name)}">`;
+    avEl.style.background = 'none';
+  } else {
+    avEl.innerHTML = agent.avatar || agentId.substring(0,2).toUpperCase();
+    avEl.style.background = agent.color || '#6b7280';
+  }
+  document.getElementById('acName').textContent = agent.name || agentId;
+  document.getElementById('acRole').textContent = agent.role || '';
+
+  const status = agent.status || 'idle';
+  const dot = document.getElementById('acStatusDot');
+  dot.className = 'agent-chat-status-dot' + (status==='thinking'?' thinking':'') + (status==='acting'?' acting':'') + (status==='error'?' error':'');
+  document.getElementById('acStatusText').textContent = status;
+
+  // Skills
+  const skillsEl = document.getElementById('acSkills');
+  if(agent.skills && agent.skills.length){
+    skillsEl.innerHTML = agent.skills.slice(0,8).map(s=>`<span class="agent-chat-skill">${esc(s)}</span>`).join('');
+    skillsEl.style.display = '';
+  } else {
+    skillsEl.style.display = 'none';
+  }
+
+  // Load existing messages for this agent from graph log
+  acMessages.innerHTML = '';
+  // Filter: all messages involving this agent from the SSE history
+  // (messages already in DOM are from server-rendered template — we start fresh)
+
+  acPanel.classList.add('open');
+  acInput.focus();
+}
+
+function closeAgentChat(){
+  chatAgentId = null;
+  acPanel.classList.remove('open');
+}
+
+document.getElementById('acClose').addEventListener('click', (e)=>{
+  e.stopPropagation();
+  focusedNode = null;
+  highlightedNode = null;
+  closeAgentChat();
+  document.getElementById('nodeTooltip').classList.remove('visible');
+  renderLiveNodes();
+});
+
+// Send message to agent
+async function sendAgentChatMessage(content){
+  if(!chatAgentId || !content.trim()) return;
+  const text = content.trim();
+  // Add user bubble
+  addAgentChatBubble('user', 'You', text);
+  acInput.value = '';
+  // Show typing
+  document.getElementById('acTyping').classList.add('visible');
+
+  try{
+    await fetch(`/api/sessions/${SESSION_ID}/agents/${chatAgentId}/message`, {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:`content=${encodeURIComponent(text)}`
+    });
+  }catch(err){
+    console.error('Agent chat send error:', err);
+  }
+}
+
+function addAgentChatBubble(who, name, content){
+  const div = document.createElement('div');
+  div.className = `agent-chat-bubble agent-chat-bubble--${who==='user'?'user':'agent'}`;
+  div.innerHTML = `
+    <div class="agent-chat-bubble-meta">${esc(name)} · now</div>
+    <div class="agent-chat-bubble-text">${md(content)}</div>`;
+  acMessages.appendChild(div);
+  acMessages.scrollTop = acMessages.scrollHeight;
+}
+
+document.getElementById('acSend').addEventListener('click', ()=> sendAgentChatMessage(acInput.value));
+acInput.addEventListener('keydown', e=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendAgentChatMessage(acInput.value); }
+});
+
+// Quick action buttons
+document.querySelectorAll('.agent-chat-action').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const action = btn.dataset.action;
+    const prompts = {
+      status: 'What is your current status? What are you working on?',
+      review: 'Please review the latest changes and give your assessment.',
+      delegate: 'I need you to take on a new task. What is your current capacity?'
+    };
+    const text = prompts[action] || '';
+    if(text) sendAgentChatMessage(text);
+  });
+});
+
+// Route SSE messages to agent chat panel
+function routeToAgentChat(data){
+  if(!chatAgentId) return;
+  const fromAgent = data.from_agent;
+  const toAgent = data.to_agent;
+  // Show message if it's from the chatted agent, or addressed to them from user
+  if(fromAgent === chatAgentId){
+    const agent = agentById(fromAgent);
+    addAgentChatBubble('agent', agent?agent.name:fromAgent, data.content);
+    document.getElementById('acTyping').classList.remove('visible');
+  }
+  // Update status dot
+  if(data.type === 'status' && fromAgent === chatAgentId){
+    const st = data.status || 'idle';
+    const dot = document.getElementById('acStatusDot');
+    dot.className = 'agent-chat-status-dot' + (st==='thinking'?' thinking':'') + (st==='acting'?' acting':'') + (st==='error'?' error':'');
+    document.getElementById('acStatusText').textContent = st;
+    // Typing indicator
+    if(st==='thinking') document.getElementById('acTyping').classList.add('visible');
+    else document.getElementById('acTyping').classList.remove('visible');
+  }
 }
 
 /* ── Initial scroll ── */

@@ -46,22 +46,94 @@ Project → Mission (WSJF-ordered)
               → Task (pending|assigned|in_progress|review|done|failed)
 ```
 
-## NAV (sidebar)
-🏠 Portfolio `/` → 🚀 Missions `/missions` → ⚡ Workflows → 🔲 Patterns → 🤖 Équipe → 🎯 Skills → 🧠 Memory → 🔌 MCPs → ⚙️ Settings
+## NAV (sidebar — RBAC view-based)
+Portfolio `/` → DSI Board `/dsi` → Product `/product` → Idéation `/ideation` → Missions `/missions` → Workflows → Patterns → Agents → Skills → Memory → MCPs → Generator `/generate` → DORA `/metrics` → Settings
+
+### View switcher (4 modes, bottom sidebar)
+| Mode | Shows |
+|------|-------|
+| **all** (grid icon) | All 13 nav items |
+| **dsi** (kanban icon) | Portfolio, DSI Board, Missions, Generator, DORA |
+| **product** (layers icon) | Portfolio, Product, Idéation, Missions, Generator |
+| **engineering** (gear icon) | Workflows, Patterns, Agents, Skills, Memory, MCPs |
+
+- `data-views="dsi,product,all"` attr on each `<li>` in base.html
+- Auto-detect from page (DSI Board→dsi, Product→product)
+- Persists in `localStorage('sidebar_view')`
+- Portfolio always visible (`data-views="all"`)
+
+## GRAPH VIZ (session_live.html ~1490L)
+
+### Pan & Zoom
+- Mouse wheel zoom 0.3x–3x, drag-to-pan, +/−/fit-all buttons
+- CSS transform (translate+scale) on SVG, NOT viewBox
+
+### Flow particles
+- SVG `<animateMotion>` along Bézier edge path on SSE message
+- 900ms duration, auto-cleanup
+
+### Focus/dim mode
+- Click node → `focusedNode` + `connectedSet` computed from edges
+- Unconnected: `.dimmed` (opacity 0.18, pointer-events none)
+- Click background to clear
+
+### Minimap
+- 160×100px, auto-hidden if ≤6 agents
+- Viewport rect, click-to-navigate
+
+### Agent chat panel
+- 380px slide-in from right (CSS transform)
+- Avatar, name, role, status dot, skills tags
+- Quick actions: Status/Review/Delegate (pre-filled prompts)
+- Chat bubbles (user/agent), typing indicator
+- Sends via `POST /api/sessions/{id}/agents/{agent_id}/message` → A2A bus
+- SSE routed via `routeToAgentChat()`
+
+### Pulse ring
+- `@keyframes pulseRing` on thinking/acting agents
+
+## SVG SPRITES
+All icons SVG in `partials/svg_sprites.html`. Zero emoji in templates.
+Icons: home, bot, target, brain, plug, settings, rocket, workflow, clipboard,
+kanban, layers, lightbulb, lightning, chart, grid, activity, alert-circle,
+clock, trending-up, wrench, plus, copy, check, play, pause, x, edit,
+trash, search, filter, eye, git-branch, git-commit, users, shield,
+code, external-link, chevron-down/up/right, arrow-left.
+
+## DORA DASHBOARD
+DORA metrics: Deployment Freq, Lead Time, Change Failure Rate, MTTR.
+Level indicators: SVG + color dicts (level_colors/level_icons), no emoji.
+
+## TEAM GENERATOR
+`/generate` — generates team composition from mission brief.
+Input: project type, team size, patterns needed.
+Output: TeamMember objects (agent_id, role, skills, allocation %).
+
+## DSI / PRODUCT / IDÉATION VIEWS
+- `/dsi` — strategic board (budgets, programs, alignment)
+- `/product` — epic/feature management, PRD, user stories
+- `/ideation` — brainstorm w/ ideation+archi agents, challenge features
 
 ## KEY ROUTES
 ```
-GET  /                    portfolio (DSI dashboard)
+GET  /                    portfolio (home)
+GET  /dsi                 DSI strategic board
+GET  /product             product management (epic/features)
+GET  /ideation            ideation MVP
 GET  /projects/{id}       project detail + missions sidebar
 GET  /missions            mission list (filter by project/status)
 GET  /missions/{id}       mission cockpit (sprints + kanban + team)
 GET  /sessions/{id}/live  real-time agent view (graph/thread/chat)
+GET  /generate            team generator
+GET  /metrics             DORA metrics dashboard
 POST /api/missions        create mission
 POST /api/missions/{id}/start   launch mission
 POST /api/missions/{id}/sprints create sprint
 GET  /api/missions/{id}/board   kanban partial (HTMX, 10s refresh)
 POST /api/sessions/{id}/run-pattern  execute pattern
 POST /api/sessions/{id}/run-workflow execute workflow
+POST /api/sessions/{id}/agents/{agent_id}/message  direct agent message
+GET  /api/sessions/{id}/sse    SSE stream (messages, agent_status, connected)
 ```
 
 ## MODULES (key files)
@@ -121,9 +193,9 @@ list_files, deep_search (RLM)
 ```
 
 ### Web
-- `web/routes.py` (2130L) — 70+ endpoints
+- `web/routes.py` (2500L) — 80+ endpoints
 - `web/ws.py` (156L) — SSE endpoints
-- 33 templates (Jinja2), 3 CSS files
+- 35 templates (Jinja2), 3 CSS files
 - HTMX patterns: hx-get/post, hx-target, hx-swap, hx-trigger="load, every 30s"
 
 ## DB TABLES (20)
@@ -250,11 +322,13 @@ platform/
 ├── web/
 │   ├── routes.py (2130L, 70+ endpoints)
 │   ├── ws.py (SSE)
-│   ├── templates/ (33 files)
-│   │   ├── base.html, portfolio.html, missions.html, mission_detail.html
+│   ├── templates/ (35 files)
+│   │   ├── base.html (sidebar RBAC view-switch), portfolio.html, missions.html
+│   │   ├── mission_detail.html, dsi_board.html, product.html, ideation.html
+│   │   ├── dora_dashboard.html, generate.html, session_live.html (1490L graph+chat)
 │   │   ├── agents.html, patterns.html, workflows.html, skills.html
-│   │   ├── project_detail.html, session_live.html, conversation.html
-│   │   └── partials/ (11 reusable components)
+│   │   ├── project_detail.html, conversation.html
+│   │   └── partials/ (11 reusable + svg_sprites.html)
 │   └── static/css/ main.css, agents.css, projects.css
 └── data/ → ../data/platform.db
 ```
