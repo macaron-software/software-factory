@@ -25,6 +25,7 @@ class MissionDef:
     description: str = ""
     goal: str = ""                        # acceptance criteria
     status: str = "planning"              # planning|active|completed|failed|blocked
+    type: str = "feature"                 # feature|epic|bug|debt|migration|security
     workflow_id: Optional[str] = None     # safe-veligo, safe-ppz...
     parent_mission_id: Optional[str] = None  # corrective mission → parent
     wsjf_score: float = 0.0
@@ -73,6 +74,7 @@ def _row_to_mission(row) -> MissionDef:
         id=row["id"], project_id=row["project_id"],
         name=row["name"], description=row["description"] or "",
         goal=row["goal"] or "", status=row["status"] or "planning",
+        type=row["type"] if "type" in row.keys() else "feature",
         workflow_id=row["workflow_id"], parent_mission_id=row["parent_mission_id"],
         wsjf_score=row["wsjf_score"] or 0.0, created_by=row["created_by"] or "",
         config=json.loads(row["config_json"] or "{}"),
@@ -141,10 +143,10 @@ class MissionStore:
         db = get_db()
         try:
             db.execute(
-                """INSERT INTO missions (id, project_id, name, description, goal, status,
+                """INSERT INTO missions (id, project_id, name, description, goal, status, type,
                    workflow_id, parent_mission_id, wsjf_score, created_by, config_json,
-                   created_at, completed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (m.id, m.project_id, m.name, m.description, m.goal, m.status,
+                   created_at, completed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (m.id, m.project_id, m.name, m.description, m.goal, m.status, m.type,
                  m.workflow_id, m.parent_mission_id, m.wsjf_score, m.created_by,
                  json.dumps(m.config), m.created_at, m.completed_at),
             )

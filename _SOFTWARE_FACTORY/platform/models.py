@@ -72,6 +72,14 @@ class ArtifactType(str, Enum):
     DIAGRAM = "diagram"
     REVIEW = "review"
     REPORT = "report"
+    # Product artifacts
+    PRODUCT_BRIEF = "product_brief"
+    PRD = "prd"
+    EPIC = "epic"
+    FEATURE = "feature"
+    USER_STORY = "user_story"
+    SPRINT_GOAL = "sprint_goal"
+    RELEASE_NOTE = "release_note"
 
 
 class VetoLevel(str, Enum):

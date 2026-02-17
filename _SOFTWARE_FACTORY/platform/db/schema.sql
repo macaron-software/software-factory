@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS missions (
     description TEXT DEFAULT '',
     goal TEXT DEFAULT '',
     status TEXT DEFAULT 'planning',
+    type TEXT DEFAULT 'feature',
     workflow_id TEXT,
     parent_mission_id TEXT,
     wsjf_score REAL DEFAULT 0,
