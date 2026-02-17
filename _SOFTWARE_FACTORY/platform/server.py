@@ -38,6 +38,10 @@ async def lifespan(app: FastAPI):
     from .patterns.store import get_pattern_store
     get_pattern_store().seed_builtins()
 
+    # Seed built-in workflows
+    from .workflows.store import get_workflow_store
+    get_workflow_store().seed_builtins()
+
     # Seed skills library into DB
     from .skills.library import get_skill_library
     n = get_skill_library().seed_db()
