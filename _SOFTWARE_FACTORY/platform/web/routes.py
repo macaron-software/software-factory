@@ -2954,6 +2954,387 @@ async def dsi_board_page(request: Request):
     })
 
 
+# ── DSI Workflow Phases ──────────────────────────────────────────
+
+@router.get("/dsi/workflow/{workflow_id}", response_class=HTMLResponse)
+async def dsi_workflow_page(request: Request, workflow_id: str):
+    """DSI workflow with phased timeline, agent graph, and message feed."""
+    from ..workflows.store import get_workflow_store
+    from ..sessions.store import get_session_store
+    from ..agents.store import get_agent_store
+    from pathlib import Path
+
+    wf_store = get_workflow_store()
+    session_store = get_session_store()
+    agent_store = get_agent_store()
+
+    wf = wf_store.get(workflow_id)
+    if not wf:
+        return HTMLResponse("<h2>Workflow introuvable</h2>", 404)
+
+    cfg = wf.config or {}
+    phases_cfg = cfg.get("phases", [])
+    graph_cfg = cfg.get("graph", {})
+    avatar_dir = Path(__file__).parent / "static" / "avatars"
+
+    # Find active session for this workflow
+    all_sessions = session_store.list_all(limit=50)
+    session = None
+    for s in all_sessions:
+        s_cfg = s.config or {}
+        if s_cfg.get("workflow_id") == workflow_id:
+            session = s
+            break
+
+    # Determine current phase from session config
+    current_phase_id = None
+    phase_statuses = {}
+    if session:
+        s_cfg = session.config or {}
+        current_phase_id = s_cfg.get("current_phase", phases_cfg[0]["id"] if phases_cfg else None)
+        phase_statuses = s_cfg.get("phase_statuses", {})
+
+    # Build phases list with status
+    phase_colors = ["#a855f7", "#3b82f6", "#f59e0b", "#34d399"]
+    phases = []
+    current_phase = None
+    current_phase_idx = 0
+    for i, p in enumerate(phases_cfg):
+        status = phase_statuses.get(p["id"], "waiting")
+        if current_phase_id and p["id"] == current_phase_id:
+            status = "active"
+            current_phase_idx = i
+        elif current_phase_id:
+            idx_current = next((j for j, pp in enumerate(phases_cfg) if pp["id"] == current_phase_id), 0)
+            if i < idx_current:
+                status = "done"
+        phase_data = {
+            "id": p["id"], "name": p["name"], "pattern_id": p.get("pattern_id", ""),
+            "gate": p.get("gate", ""), "description": p.get("description", ""),
+            "agents": p.get("agents", []), "leader": p.get("leader", ""),
+            "deliverables": p.get("deliverables", []), "status": status,
+            "color": phase_colors[i % len(phase_colors)],
+        }
+        phases.append(phase_data)
+        if status == "active":
+            current_phase = phase_data
+
+    if not current_phase and phases:
+        current_phase = phases[0]
+        current_phase["status"] = "active"
+        current_phase_idx = 0
+
+    # Build phase agents
+    phase_agents = []
+    if current_phase:
+        for aid in current_phase["agents"]:
+            a = agent_store.get(aid)
+            if a:
+                jpg = avatar_dir / f"{a.id}.jpg"
+                svg_f = avatar_dir / f"{a.id}.svg"
+                avatar_url = f"/static/avatars/{a.id}.jpg" if jpg.exists() else (f"/static/avatars/{a.id}.svg" if svg_f.exists() else "")
+                phase_agents.append({
+                    "id": a.id, "name": a.name, "role": a.role,
+                    "avatar_url": avatar_url,
+                    "color": a.color or "#7c3aed",
+                    "is_leader": aid == current_phase.get("leader"),
+                    "status": "idle",
+                })
+
+    # Deliverables for current phase
+    deliverables = []
+    if current_phase:
+        for d in current_phase.get("deliverables", []):
+            deliverables.append({"label": d, "done": False})
+
+    # Messages from session
+    messages = []
+    agent_names = {}
+    if session:
+        all_msgs = session_store.get_messages(session.id, limit=100)
+        for msg in all_msgs:
+            if msg.from_agent == "system":
+                continue
+            if msg.from_agent not in agent_names:
+                a = agent_store.get(msg.from_agent)
+                if a:
+                    jpg = avatar_dir / f"{a.id}.jpg"
+                    svg_f = avatar_dir / f"{a.id}.svg"
+                    agent_names[msg.from_agent] = {
+                        "name": a.name,
+                        "avatar_url": f"/static/avatars/{a.id}.jpg" if jpg.exists() else (f"/static/avatars/{a.id}.svg" if svg_f.exists() else ""),
+                    }
+                else:
+                    agent_names[msg.from_agent] = {"name": msg.from_agent, "avatar_url": ""}
+            info = agent_names.get(msg.from_agent, {"name": msg.from_agent, "avatar_url": ""})
+            action = None
+            content = msg.content or ""
+            if "[DELEGATE" in content:
+                action = "delegate"
+            elif "[VETO" in content:
+                action = "veto"
+            elif "[APPROVE" in content:
+                action = "approve"
+            messages.append({
+                "from_name": info["name"],
+                "avatar_url": info["avatar_url"],
+                "content": content[:500],
+                "time": (msg.timestamp or "")[:16],
+                "action": action,
+            })
+
+    # Build graph nodes with positions
+    graph_nodes_cfg = graph_cfg.get("nodes", [])
+    graph_edges_cfg = graph_cfg.get("edges", [])
+
+    # Map node positions — remap Y to fit phase bands
+    phase_y_bands = {"p1-cadrage": 55, "p2-architecture": 145, "p3-sprint-setup": 240, "p4-delivery": 335}
+    node_positions = {}
+    graph_nodes = []
+    for n in graph_nodes_cfg:
+        node_phases = (n.get("phase") or "").split(",")
+        primary_phase = node_phases[0] if node_phases else ""
+        phase_color = "#7c3aed"
+        y = n.get("y", 100)
+        if primary_phase in phase_y_bands:
+            y = phase_y_bands[primary_phase]
+            idx = list(phase_y_bands.keys()).index(primary_phase)
+            phase_color = phase_colors[idx % len(phase_colors)]
+        # Scale x to fit 850px viewbox
+        x = max(40, min(810, n.get("x", 400)))
+
+        a = agent_store.get(n.get("agent_id", ""))
+        avatar_url = ""
+        if a:
+            jpg = avatar_dir / f"{a.id}.jpg"
+            svg_f = avatar_dir / f"{a.id}.svg"
+            avatar_url = f"/static/avatars/{a.id}.jpg" if jpg.exists() else (f"/static/avatars/{a.id}.svg" if svg_f.exists() else "")
+
+        is_active = current_phase and n.get("agent_id") in current_phase.get("agents", [])
+        node_positions[n["id"]] = (x, y)
+        graph_nodes.append({
+            "id": n["id"], "agent_id": n.get("agent_id", ""),
+            "x": x, "y": y, "label": n.get("label", ""),
+            "phase_color": phase_color, "avatar_url": avatar_url,
+            "is_active": is_active,
+        })
+
+    # Build graph edges
+    graph_edges = []
+    for e in graph_edges_cfg:
+        from_pos = node_positions.get(e["from"])
+        to_pos = node_positions.get(e["to"])
+        if from_pos and to_pos:
+            graph_edges.append({
+                "x1": from_pos[0], "y1": from_pos[1],
+                "x2": to_pos[0], "y2": to_pos[1],
+                "color": e.get("color", "#7c3aed"),
+            })
+
+    # All agents JSON for popover
+    all_agents_json = {}
+    for a in agent_store.list_all():
+        jpg = avatar_dir / f"{a.id}.jpg"
+        svg_f = avatar_dir / f"{a.id}.svg"
+        avatar_url = f"/static/avatars/{a.id}.jpg" if jpg.exists() else (f"/static/avatars/{a.id}.svg" if svg_f.exists() else "")
+        all_agents_json[a.id] = {
+            "name": a.name, "role": a.role,
+            "avatar_url": avatar_url,
+            "color": a.color or "#7c3aed",
+            "description": a.description or "",
+            "tagline": a.tagline or "",
+            "persona": a.persona or "",
+            "motivation": a.motivation or "",
+            "skills": a.skills or [],
+            "tools": a.tools or [],
+        }
+
+    return _templates(request).TemplateResponse("dsi_workflow.html", {
+        "request": request, "page_title": f"DSI — {wf.name}",
+        "workflow": wf,
+        "phases": phases,
+        "current_phase": current_phase,
+        "current_phase_idx": current_phase_idx,
+        "phase_agents": phase_agents,
+        "deliverables": deliverables,
+        "messages": messages,
+        "graph_nodes": graph_nodes,
+        "graph_edges": graph_edges,
+        "session": session,
+        "session_id": session.id if session else None,
+        "all_agents_json": all_agents_json,
+    })
+
+
+@router.post("/api/dsi/workflow/{workflow_id}/start", response_class=HTMLResponse)
+async def dsi_workflow_start(request: Request, workflow_id: str):
+    """Start phase 1 of a DSI workflow — creates session and launches agents."""
+    from ..workflows.store import get_workflow_store
+    from ..sessions.store import get_session_store, SessionDef
+    from ..agents.loop import get_loop_manager
+    from ..a2a.bus import get_bus
+    import uuid
+
+    wf_store = get_workflow_store()
+    wf = wf_store.get(workflow_id)
+    if not wf:
+        return HTMLResponse("Workflow introuvable", 404)
+
+    cfg = wf.config or {}
+    phases = cfg.get("phases", [])
+    if not phases:
+        return HTMLResponse("Pas de phases", 400)
+
+    phase1 = phases[0]
+    project_id = cfg.get("project_id", "")
+
+    # Create session
+    session_store = get_session_store()
+    session = SessionDef(
+        name=f"{wf.name} — {phase1['name']}",
+        description=wf.description,
+        project_id=project_id,
+        status="active",
+        goal=phase1.get("description", ""),
+        config={
+            "workflow_id": workflow_id,
+            "current_phase": phase1["id"],
+            "phase_statuses": {phase1["id"]: "active"},
+        },
+    )
+    session = session_store.create_session(session)
+
+    # Start agent loops for phase 1
+    manager = get_loop_manager()
+    bus = get_bus()
+    for aid in phase1.get("agents", []):
+        await manager.start_loop(session.id, aid)
+
+    # Send kickoff message to the leader
+    leader = phase1.get("leader", phase1["agents"][0] if phase1["agents"] else "")
+    if leader:
+        # Load project VISION if exists
+        from ..projects.manager import get_project_store
+        project = get_project_store().get(project_id)
+        vision = ""
+        if project and project.path:
+            import os
+            vision_path = os.path.join(project.path, "VISION.md")
+            if os.path.exists(vision_path):
+                with open(vision_path, "r") as f:
+                    vision = f.read()[:3000]
+
+        kickoff = f"""🚀 **Phase 1 : {phase1['name']}**
+
+**Objectif:** {phase1.get('description', '')}
+
+**Livrables attendus:** {', '.join(phase1.get('deliverables', []))}
+
+**Équipe:** {', '.join(phase1.get('agents', []))}
+
+**Pattern:** {phase1.get('pattern_id', 'hierarchical')}
+
+{f'**VISION du projet:**{chr(10)}{vision}' if vision else ''}
+
+En tant que leader de cette phase, analysez la situation, consultez votre équipe, et produisez les livrables. Utilisez [DELEGATE:agent_id] pour assigner des tâches et [APPROVE]/[VETO] pour valider."""
+
+        from ..models import A2AMessage, MessageType
+        msg = A2AMessage(
+            id=str(uuid.uuid4()),
+            session_id=session.id,
+            from_agent="user",
+            to_agent=leader,
+            type=MessageType.REQUEST,
+            content=kickoff,
+        )
+        await bus.publish(msg)
+
+    from starlette.responses import RedirectResponse
+    return RedirectResponse(f"/dsi/workflow/{workflow_id}", status_code=303)
+
+
+@router.post("/api/dsi/workflow/{workflow_id}/next-phase", response_class=HTMLResponse)
+async def dsi_workflow_next_phase(request: Request, workflow_id: str):
+    """Advance to next phase in workflow."""
+    from ..workflows.store import get_workflow_store
+    from ..sessions.store import get_session_store
+    from ..agents.loop import get_loop_manager
+    from ..a2a.bus import get_bus
+    import uuid
+
+    form = await request.form()
+    session_id = form.get("session_id", "")
+
+    wf_store = get_workflow_store()
+    session_store = get_session_store()
+    wf = wf_store.get(workflow_id)
+    session = session_store.get_session(session_id)
+    if not wf or not session:
+        return HTMLResponse("Not found", 404)
+
+    cfg = wf.config or {}
+    phases = cfg.get("phases", [])
+    s_cfg = session.config or {}
+    current_phase_id = s_cfg.get("current_phase", "")
+    phase_statuses = s_cfg.get("phase_statuses", {})
+
+    # Find next phase
+    current_idx = next((i for i, p in enumerate(phases) if p["id"] == current_phase_id), 0)
+    if current_idx >= len(phases) - 1:
+        from starlette.responses import RedirectResponse
+        return RedirectResponse(f"/dsi/workflow/{workflow_id}", status_code=303)
+
+    # Mark current as done, advance
+    phase_statuses[current_phase_id] = "done"
+    next_phase = phases[current_idx + 1]
+    phase_statuses[next_phase["id"]] = "active"
+    s_cfg["current_phase"] = next_phase["id"]
+    s_cfg["phase_statuses"] = phase_statuses
+
+    # Update session
+    from ..db.migrations import get_db
+    import json
+    db = get_db()
+    db.execute("UPDATE sessions SET config_json=?, name=? WHERE id=?",
+               (json.dumps(s_cfg), f"{wf.name} — {next_phase['name']}", session_id))
+    db.commit()
+
+    # Stop old loops, start new ones
+    manager = get_loop_manager()
+    await manager.stop_session(session_id)
+    for aid in next_phase.get("agents", []):
+        await manager.start_loop(session_id, aid)
+
+    # Send kickoff to new phase leader
+    leader = next_phase.get("leader", next_phase["agents"][0] if next_phase["agents"] else "")
+    if leader:
+        kickoff = f"""🚀 **Phase {current_idx + 2} : {next_phase['name']}**
+
+**Objectif:** {next_phase.get('description', '')}
+
+**Livrables attendus:** {', '.join(next_phase.get('deliverables', []))}
+
+**Équipe:** {', '.join(next_phase.get('agents', []))}
+
+La phase précédente est terminée. Prenez le relais et produisez les livrables de cette phase.
+Utilisez [DELEGATE:agent_id] pour assigner des tâches."""
+
+        from ..models import A2AMessage, MessageType
+        msg = A2AMessage(
+            id=str(uuid.uuid4()),
+            session_id=session_id,
+            from_agent="user",
+            to_agent=leader,
+            type=MessageType.REQUEST,
+            content=kickoff,
+        )
+        bus = get_bus()
+        await bus.publish(msg)
+
+    from starlette.responses import RedirectResponse
+    return RedirectResponse(f"/dsi/workflow/{workflow_id}", status_code=303)
+
+
 # ── Vue Métier ───────────────────────────────────────────────────
 
 @router.get("/metier", response_class=HTMLResponse)

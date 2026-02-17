@@ -1,8 +1,15 @@
 {% extends "base.html" %}
 
 {% block topbar_actions %}
-<a href="/missions?action=new" class="btn btn-primary">
-    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Nouvelle Mission
+{% for sp in system_patterns %}
+{% if sp.id.startswith('dsi-') %}
+<a href="/dsi/workflow/{{ sp.id }}" class="btn btn-primary" style="margin-right:0.4rem">
+    <svg class="icon icon-sm"><use href="#icon-workflow"/></svg> {{ sp.name[:25] }}
+</a>
+{% endif %}
+{% endfor %}
+<a href="/missions?action=new" class="btn btn-ghost">
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Mission
 </a>
 {% endblock %}
 
