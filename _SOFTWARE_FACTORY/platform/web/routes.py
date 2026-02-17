@@ -3214,13 +3214,13 @@ async def dsi_workflow_start(request: Request, workflow_id: str):
             "phase_statuses": {phase1["id"]: "active"},
         },
     )
-    session = session_store.create_session(session)
+    session = session_store.create(session)
 
     # Start agent loops for phase 1
     manager = get_loop_manager()
     bus = get_bus()
     for aid in phase1.get("agents", []):
-        await manager.start_loop(session.id, aid)
+        await manager.start_agent(aid, session.id, project_id=project_id)
 
     # Send kickoff message to the leader
     leader = phase1.get("leader", phase1["agents"][0] if phase1["agents"] else "")
@@ -3315,7 +3315,7 @@ async def dsi_workflow_next_phase(request: Request, workflow_id: str):
     manager = get_loop_manager()
     await manager.stop_session(session_id)
     for aid in next_phase.get("agents", []):
-        await manager.start_loop(session_id, aid)
+        await manager.start_agent(aid, session_id)
 
     # Send kickoff to new phase leader
     leader = next_phase.get("leader", next_phase["agents"][0] if next_phase["agents"] else "")
