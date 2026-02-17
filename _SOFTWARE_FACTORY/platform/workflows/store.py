@@ -528,6 +528,69 @@ class WorkflowStore:
                 },
             ),
         ]
+        # ── Ideation → Production Pipeline ──
+        builtins.append(
+            WorkflowDef(
+                id="ideation-to-prod",
+                name="Ideation → Production",
+                description="Pipeline complet agentic: Architecture → Codegen (devs ecrivent le code) → Build & Test → Deploy Azure. Les agents utilisent leurs tools (code_write, build, docker_build, deploy_azure).",
+                icon="rocket", is_builtin=True,
+                phases=[
+                    WorkflowPhase(id="architecture", pattern_id="hierarchical",
+                                  name="Architecture & Design",
+                                  description="L'architecte conçoit l'architecture technique: choix de stack, structure du projet, API design, modèle de données. Le Lead Dev valide la faisabilité et propose les patterns. L'UX Designer définit les écrans principaux. Produisez un document d'architecture avec la liste des fichiers à créer.",
+                                  gate="always",
+                                  config={"agents": ["enterprise_architect", "lead_dev", "ux_designer"]}),
+                    WorkflowPhase(id="codegen", pattern_id="hierarchical",
+                                  name="Code Generation",
+                                  description="Le Lead Dev distribue les tâches. Les devs ÉCRIVENT LE CODE avec l'outil code_write: fichiers source, templates HTML, CSS, API endpoints, Dockerfile. Chaque dev crée les fichiers dans le répertoire du projet. Le code doit être COMPLET et FONCTIONNEL, pas de placeholder. Incluez requirements.txt/package.json, un Dockerfile, et des données de démo.",
+                                  gate="always",
+                                  config={"agents": ["lead_dev", "dev_frontend", "dev_backend"]}),
+                    WorkflowPhase(id="quality", pattern_id="sequential",
+                                  name="Build & Quality Gate",
+                                  description="Le QA valide le code: vérifie que tous les fichiers existent, que le code est cohérent. Le dev committe avec git_commit. Le QA lance le build avec l'outil build (docker build). Si le build échoue, le dev corrige.",
+                                  gate="always",
+                                  config={"agents": ["qa_lead", "dev_backend", "lead_dev"]}),
+                    WorkflowPhase(id="deploy", pattern_id="sequential",
+                                  name="Deploy Azure VM",
+                                  description="Le DevOps construit l'image Docker avec docker_build, puis déploie sur la VM Azure avec deploy_azure. L'outil deploy_azure transfère l'image et lance le container. Le SRE vérifie le health check. Annoncez l'URL publique de l'application déployée.",
+                                  gate="all_approved",
+                                  config={"agents": ["devops", "sre"]}),
+                ],
+                config={
+                    "graph": {
+                        "pattern": "hierarchical",
+                        "nodes": [
+                            {"id": "n1", "agent_id": "enterprise_architect", "x": 400, "y": 20, "label": "Architecte"},
+                            {"id": "n2", "agent_id": "lead_dev", "x": 250, "y": 130, "label": "Lead Dev"},
+                            {"id": "n3", "agent_id": "ux_designer", "x": 550, "y": 130, "label": "UX Designer"},
+                            {"id": "n4", "agent_id": "dev_frontend", "x": 150, "y": 260, "label": "Dev Frontend"},
+                            {"id": "n5", "agent_id": "dev_backend", "x": 350, "y": 260, "label": "Dev Backend"},
+                            {"id": "n6", "agent_id": "qa_lead", "x": 550, "y": 260, "label": "QA Lead"},
+                            {"id": "n7", "agent_id": "devops", "x": 250, "y": 380, "label": "DevOps"},
+                            {"id": "n8", "agent_id": "sre", "x": 450, "y": 380, "label": "SRE"},
+                        ],
+                        "edges": [
+                            {"from": "n1", "to": "n2", "label": "archi", "color": "#a855f7"},
+                            {"from": "n1", "to": "n3", "label": "UX specs", "color": "#a855f7"},
+                            {"from": "n2", "to": "n4", "label": "stories", "color": "#f59e0b"},
+                            {"from": "n2", "to": "n5", "label": "stories", "color": "#f59e0b"},
+                            {"from": "n4", "to": "n6", "label": "code", "color": "#10b981"},
+                            {"from": "n5", "to": "n6", "label": "code", "color": "#10b981"},
+                            {"from": "n6", "to": "n7", "label": "GO build", "color": "#3b82f6"},
+                            {"from": "n7", "to": "n8", "label": "deploy", "color": "#ef4444"},
+                        ],
+                    },
+                    "agents_permissions": {
+                        "enterprise_architect": {"can_veto": True, "veto_level": "STRONG"},
+                        "lead_dev": {"can_delegate": True, "can_veto": True, "veto_level": "STRONG"},
+                        "qa_lead": {"can_veto": True, "veto_level": "ABSOLUTE"},
+                        "devops": {"can_approve": True},
+                        "sre": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                    },
+                },
+            ),
+        )
         for w in builtins:
             self.create(w)
 

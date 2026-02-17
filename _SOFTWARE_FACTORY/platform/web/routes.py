@@ -3864,7 +3864,7 @@ async def ideation_create_epic(request: Request):
         "tech_debt": "debt", "migration": "migration", "security_audit": "security",
     }
     workflow_map = {
-        "new_project": "feature-request", "new_feature": "feature-request",
+        "new_project": "ideation-to-prod", "new_feature": "feature-request",
         "bug_fix": "sf-pipeline", "tech_debt": "tech-debt-reduction",
         "migration": "migration-sharelook", "security_audit": "review-cycle",
     }
@@ -3970,6 +3970,44 @@ async def ideation_create_epic(request: Request):
     except Exception as e:
         logger.warning("Memory auto-populate: %s", e)
 
+    # ── Step 8: Auto-launch workflow (agents take over) ──
+    session_id_live = None
+    try:
+        from ..sessions.store import get_session_store, SessionDef, MessageDef
+        from ..workflows.store import get_workflow_store
+
+        wf_store = get_workflow_store()
+        wf = wf_store.get(workflow_id)
+        if wf:
+            session_store = get_session_store()
+            session = SessionDef(
+                name=f"{mission.name}",
+                goal=mission.goal or mission.description or "",
+                project_id=project_id,
+                status="active",
+                config={"workflow_id": workflow_id, "mission_id": mission.id},
+            )
+            session = session_store.create(session)
+            session_store.add_message(MessageDef(
+                session_id=session.id,
+                from_agent="system",
+                message_type="system",
+                content=f"Workflow **{wf.name}** lancé pour l'epic **{mission.name}**.\nStack: {', '.join(stack)}\nGoal: {mission.goal or 'N/A'}",
+            ))
+            task_desc = (
+                f"Projet: {project_name}\n"
+                f"Epic: {mission.name}\n"
+                f"Goal: {mission.goal or mission.description}\n"
+                f"Stack: {', '.join(stack)}\n"
+                f"Features: {', '.join(f.get('name','') for f in features_data)}\n"
+                f"Répertoire projet: {str(FACTORY_ROOT.parent / project_id)}"
+            )
+            asyncio.create_task(_run_workflow_background(wf, session.id, task_desc, project_id))
+            session_id_live = session.id
+            logger.info("Auto-launched workflow %s for project %s (session %s)", workflow_id, project_id, session.id)
+    except Exception as e:
+        logger.warning("Auto-launch workflow: %s", e)
+
     return JSONResponse({
         "project_id": project_id,
         "project_name": project_name,
@@ -3980,7 +4018,8 @@ async def ideation_create_epic(request: Request):
         "features": created_features,
         "team": team_data,
         "stack": stack,
-        "redirect": f"/projects/{project_id}/overview",
+        "session_id": session_id_live,
+        "redirect": f"/sessions/{session_id_live}/live" if session_id_live else f"/projects/{project_id}/overview",
     })
 
 

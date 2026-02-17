@@ -68,6 +68,12 @@ def _get_tool_registry():
         register_web_tools(reg)
     except Exception:
         pass
+    # Deploy tools (docker build + Azure VM)
+    try:
+        from ..tools.deploy_tools import register_deploy_tools
+        register_deploy_tools(reg)
+    except Exception:
+        pass
     return reg
 
 
@@ -243,6 +249,52 @@ def _get_tool_schemas() -> list[dict]:
                         "max_iterations": {"type": "integer", "description": "Max RLM iterations (default 3, max 3). Higher = deeper but slower."},
                     },
                     "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "docker_build",
+                "description": "Build a Docker image from a project directory containing a Dockerfile.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "cwd": {"type": "string", "description": "Project directory containing the Dockerfile"},
+                        "image_name": {"type": "string", "description": "Name for the Docker image (e.g. 'macaron-iot-dashboard')"},
+                    },
+                    "required": ["cwd", "image_name"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "deploy_azure",
+                "description": "Deploy a Docker image to the Azure VM (4.233.64.30). Saves the image, transfers via SCP, loads and runs on the VM. Returns the public URL.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "image_name": {"type": "string", "description": "Docker image name to deploy (must be built first)"},
+                        "container_port": {"type": "integer", "description": "Port the app listens on inside the container (e.g. 8080)"},
+                        "host_port": {"type": "integer", "description": "Port to expose on the VM (0 = auto-assign)"},
+                    },
+                    "required": ["image_name", "container_port"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "git_commit",
+                "description": "Stage all changes and commit to git.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "cwd": {"type": "string", "description": "Working directory"},
+                        "message": {"type": "string", "description": "Commit message"},
+                    },
+                    "required": ["message"],
                 },
             },
         },
@@ -434,8 +486,8 @@ class AgentExecutor:
 
         # ── Resolve paths: project_path is the default for all file/git tools ──
         if ctx.project_path:
-            # Git/build tools: inject cwd
-            if name in ("git_status", "git_log", "git_diff", "git_commit", "build", "test", "lint"):
+            # Git/build/deploy tools: inject cwd
+            if name in ("git_status", "git_log", "git_diff", "git_commit", "build", "test", "lint", "docker_build"):
                 if "cwd" not in args:
                     args["cwd"] = ctx.project_path
             # File tools: resolve relative paths to project root
