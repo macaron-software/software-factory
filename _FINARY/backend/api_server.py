@@ -2123,6 +2123,182 @@ def get_patrimoine_projection():
     }
 
 
+# ─── Fundamentals / Watchlist (FMP API) ───────────────────────────────────────
+
+FMP_API_KEY = "3I1hxJ9b0MCbGXqzgFvnhYLMeYP4akC5"
+FMP_BASE = "https://financialmodelingprep.com/stable"
+_fmp_cache: dict[str, tuple[float, dict]] = {}  # ticker → (timestamp, data)
+FMP_CACHE_TTL = 12 * 3600  # 12h
+
+WATCHLIST_TICKERS = {
+    # Mag 7
+    "AAPL": "Apple", "AMZN": "Amazon", "META": "Meta",
+    "MSFT": "Microsoft", "GOOGL": "Alphabet", "NVDA": "Nvidia", "TSLA": "Tesla",
+    # EU blue chips (FMP supports these US-listed ADRs/tickers)
+    "ASML": "ASML", "SAP": "SAP", "NVO": "Novo Nordisk",
+    # Portfolio positions (US-listed only — FMP free tier)
+    "STM": "STMicroelectronics", "MRNA": "Moderna", "O": "Realty Income",
+    "XOM": "Exxon Mobil", "ISRG": "Intuitive Surgical", "JNJ": "Johnson & Johnson",
+    "ENPH": "Enphase Energy", "PLUG": "Plug Power",
+    "MELI": "MercadoLibre", "SE": "Sea Ltd", "INTU": "Intuit",
+}
+
+
+def _fetch_fmp_ratios(ticker: str) -> dict | None:
+    """Fetch key ratios from FMP API with caching."""
+    import requests
+    now = time.time()
+    if ticker in _fmp_cache:
+        ts, data = _fmp_cache[ticker]
+        if now - ts < FMP_CACHE_TTL:
+            return data
+
+    fmp_ticker = ticker
+    try:
+        resp = requests.get(
+            f"{FMP_BASE}/ratios",
+            params={"symbol": fmp_ticker, "period": "annual", "limit": 5, "apikey": FMP_API_KEY},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return None
+        rows = resp.json()
+        if not isinstance(rows, list) or not rows:
+            return None
+
+        latest = rows[0]
+        # Compute 5-year averages for comparison (filter out negative/outlier values)
+        pe_vals = [r.get("priceToEarningsRatio") for r in rows if r.get("priceToEarningsRatio") and r["priceToEarningsRatio"] > 0]
+        pocf_vals = [r.get("priceToOperatingCashFlowRatio") for r in rows if r.get("priceToOperatingCashFlowRatio") and r["priceToOperatingCashFlowRatio"] > 0]
+        eveb_vals = [r.get("enterpriseValueMultiple") for r in rows if r.get("enterpriseValueMultiple") and r["enterpriseValueMultiple"] > 0]
+
+        data = {
+            "ticker": ticker,
+            "name": WATCHLIST_TICKERS.get(ticker, ticker),
+            "date": latest.get("date"),
+            "pe": latest.get("priceToEarningsRatio"),
+            "peg": latest.get("priceToEarningsGrowthRatio"),
+            "fwd_peg": latest.get("forwardPriceToEarningsGrowthRatio"),
+            "p_ocf": latest.get("priceToOperatingCashFlowRatio"),
+            "ev_ebitda": latest.get("enterpriseValueMultiple"),
+            "p_fcf": latest.get("priceToFreeCashFlowRatio"),
+            "p_sales": latest.get("priceToSalesRatio"),
+            "p_book": latest.get("priceToBookRatio"),
+            "div_yield": latest.get("dividendYieldPercentage"),
+            "roe": latest.get("returnOnEquityRatio"),
+            # 5-year averages
+            "pe_5y_avg": round(sum(pe_vals) / len(pe_vals), 1) if pe_vals else None,
+            "p_ocf_5y_avg": round(sum(pocf_vals) / len(pocf_vals), 1) if pocf_vals else None,
+            "ev_ebitda_5y_avg": round(sum(eveb_vals) / len(eveb_vals), 1) if eveb_vals else None,
+        }
+
+        # Signal scoring: compare current to 5yr avg
+        signals = []
+        if data["pe"] and data["pe_5y_avg"] and data["pe_5y_avg"] > 0:
+            ratio = data["pe"] / data["pe_5y_avg"]
+            if ratio < 0.8:
+                signals.append({"metric": "PE", "signal": "buy", "reason": f"PE {data['pe']:.0f} vs avg {data['pe_5y_avg']:.0f} (-{(1-ratio)*100:.0f}%)"})
+            elif ratio > 1.3:
+                signals.append({"metric": "PE", "signal": "sell", "reason": f"PE {data['pe']:.0f} vs avg {data['pe_5y_avg']:.0f} (+{(ratio-1)*100:.0f}%)"})
+            else:
+                signals.append({"metric": "PE", "signal": "hold", "reason": f"PE {data['pe']:.0f} ~= avg {data['pe_5y_avg']:.0f}"})
+
+        if data["p_ocf"] and data["p_ocf_5y_avg"] and data["p_ocf_5y_avg"] > 0:
+            ratio = data["p_ocf"] / data["p_ocf_5y_avg"]
+            if ratio < 0.8:
+                signals.append({"metric": "P/OCF", "signal": "buy", "reason": f"P/OCF {data['p_ocf']:.0f} vs avg {data['p_ocf_5y_avg']:.0f}"})
+            elif ratio > 1.3:
+                signals.append({"metric": "P/OCF", "signal": "sell", "reason": f"P/OCF {data['p_ocf']:.0f} vs avg {data['p_ocf_5y_avg']:.0f}"})
+            else:
+                signals.append({"metric": "P/OCF", "signal": "hold", "reason": f"P/OCF {data['p_ocf']:.0f} ~= avg {data['p_ocf_5y_avg']:.0f}"})
+
+        peg = data.get("fwd_peg") or data.get("peg")
+        if peg and 0 < peg < 50:
+            if peg < 1:
+                signals.append({"metric": "PEG", "signal": "buy", "reason": f"PEG {peg:.2f} < 1 (Peter Lynch zone)"})
+            elif peg > 2:
+                signals.append({"metric": "PEG", "signal": "sell", "reason": f"PEG {peg:.2f} > 2 (trop cher pour la croissance)"})
+            else:
+                signals.append({"metric": "PEG", "signal": "hold", "reason": f"PEG {peg:.2f} (fair value)"})
+
+        # Overall signal
+        buy_count = sum(1 for s in signals if s["signal"] == "buy")
+        sell_count = sum(1 for s in signals if s["signal"] == "sell")
+        if buy_count >= 2 or (buy_count >= 1 and sell_count == 0):
+            data["overall"] = "buy"
+        elif sell_count >= 2:
+            data["overall"] = "sell"
+        else:
+            data["overall"] = "hold"
+
+        data["signals"] = signals
+        _fmp_cache[ticker] = (now, data)
+        return data
+    except Exception as e:
+        print(f"[FMP] Error fetching {ticker}: {e}")
+        return None
+
+
+@app.get("/api/v1/market/fundamentals/{ticker}")
+def get_fundamentals(ticker: str):
+    """Get fundamental ratios for a single ticker."""
+    data = _fetch_fmp_ratios(ticker.upper())
+    if not data:
+        return {"error": f"No data for {ticker}"}
+    return data
+
+
+@app.get("/api/v1/market/signals")
+def get_market_signals():
+    """Get signals for all watchlist tickers + portfolio positions."""
+    results = []
+    # Determine which tickers are in portfolio
+    portfolio_tickers = set()
+    for p in build_positions():
+        t = p.get("ticker", "").upper()
+        if t:
+            portfolio_tickers.add(t)
+    # IBKR positions
+    ibkr = P.get("ibkr", {})
+    for p in ibkr.get("positions", []):
+        sym = p.get("symbol", "")
+        if sym:
+            portfolio_tickers.add(sym)
+    # Also add from latest IBKR scrape
+    ibkr_files = sorted(DATA_DIR.glob("ibkr_2*.json"), reverse=True)
+    if ibkr_files:
+        try:
+            ibkr_data = json.load(open(ibkr_files[0]))
+            for p in ibkr_data.get("positions", []):
+                sym = p.get("symbol", "")
+                if sym:
+                    portfolio_tickers.add(sym)
+        except Exception:
+            pass
+
+    all_tickers = set(WATCHLIST_TICKERS.keys()) | portfolio_tickers
+    for ticker in sorted(all_tickers):
+        data = _fetch_fmp_ratios(ticker)
+        if data:
+            data["in_portfolio"] = ticker in portfolio_tickers
+            results.append(data)
+        time.sleep(0.2)  # Rate limiting
+
+    # Sort: buy first, then hold, then sell
+    order = {"buy": 0, "hold": 1, "sell": 2}
+    results.sort(key=lambda x: (order.get(x.get("overall", "hold"), 1), x.get("ticker", "")))
+
+    # Top 3 opportunities for dashboard
+    top3 = [r for r in results if r.get("overall") == "buy"][:3]
+
+    return {
+        "signals": results,
+        "top_opportunities": top3,
+        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "portfolio_tickers": sorted(portfolio_tickers),
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

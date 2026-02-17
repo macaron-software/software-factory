@@ -210,3 +210,23 @@ export function useAlerts() {
     queryFn: api.getAlerts,
   });
 }
+
+// ─── Market Signals / Watchlist ───
+
+export function useMarketSignals() {
+  return useQuery({
+    queryKey: ["market", "signals"],
+    queryFn: api.getMarketSignals,
+    staleTime: 30 * 60 * 1000, // 30min
+    refetchInterval: 60 * 60 * 1000, // 1h
+  });
+}
+
+export function useFundamentals(ticker: string) {
+  return useQuery({
+    queryKey: ["market", "fundamentals", ticker],
+    queryFn: () => api.getFundamentals(ticker),
+    enabled: !!ticker,
+    staleTime: 60 * 60 * 1000, // 1h
+  });
+}

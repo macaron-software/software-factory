@@ -1,14 +1,15 @@
 "use client";
 
 import { useMemo } from "react";
-import { usePortfolio, useSparklines } from "@/lib/hooks/useApi";
+import { usePortfolio, useSparklines, useMarketSignals } from "@/lib/hooks/useApi";
 import { formatEUR, formatCurrency, formatPct, pnlColor } from "@/lib/utils";
 import { Sparkline } from "@/components/charts/Sparkline";
-import { Loading, ErrorState, PageHeader, Badge, SourceBadge } from "@/components/ds";
+import { Loading, ErrorState, PageHeader, Badge, Section, SourceBadge } from "@/components/ds";
 
 export default function PortfolioPage() {
   const { data: positions, isLoading, error } = usePortfolio();
   const { data: sparkData } = useSparklines();
+  const { data: signalsData } = useMarketSignals();
 
   const sparklines = useMemo(() => {
     if (!positions || !sparkData) return {};
@@ -99,6 +100,63 @@ export default function PortfolioPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Signals Section */}
+      {signalsData?.signals && signalsData.signals.filter(s => s.in_portfolio).length > 0 && (
+        <Section title="📡 Signaux fondamentaux">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {signalsData.signals.filter(s => s.in_portfolio).map((d) => {
+              const signalColors = {
+                buy: "border-green-500/30 bg-green-500/5",
+                hold: "border-bd-1 bg-bg-1",
+                sell: "border-red-500/30 bg-red-500/5",
+              };
+              const signalLabels = { buy: "ACHETER", hold: "CONSERVER", sell: "VENDRE" };
+              const signalBadge = {
+                buy: "bg-green-500/15 text-green-400",
+                hold: "bg-yellow-500/15 text-yellow-400",
+                sell: "bg-red-500/15 text-red-400",
+              };
+              return (
+                <div key={d.ticker} className={`card p-4 border ${signalColors[d.overall]}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-t-1">{d.ticker}</span>
+                    <span className={`text-[11px] px-2 py-0.5 rounded font-semibold ${signalBadge[d.overall]}`}>
+                      {signalLabels[d.overall]}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center text-caption mb-2">
+                    <div>
+                      <div className="text-t-6 text-[10px]">PE</div>
+                      <div className="tnum text-t-3">{d.pe?.toFixed(0) ?? "—"}</div>
+                      {d.pe_5y_avg && <div className="text-[9px] text-t-6">avg {d.pe_5y_avg.toFixed(0)}</div>}
+                    </div>
+                    <div>
+                      <div className="text-t-6 text-[10px]">PEG</div>
+                      <div className="tnum text-t-3">{(d.fwd_peg ?? d.peg) != null && (d.fwd_peg ?? d.peg)! > 0 && (d.fwd_peg ?? d.peg)! < 50 ? (d.fwd_peg ?? d.peg)!.toFixed(1) : "—"}</div>
+                    </div>
+                    <div>
+                      <div className="text-t-6 text-[10px]">P/OCF</div>
+                      <div className="tnum text-t-3">{d.p_ocf?.toFixed(0) ?? "—"}</div>
+                      {d.p_ocf_5y_avg && <div className="text-[9px] text-t-6">avg {d.p_ocf_5y_avg.toFixed(0)}</div>}
+                    </div>
+                  </div>
+                  <div className="space-y-0.5">
+                    {d.signals.map((s, i) => (
+                      <div key={i} className="text-[11px] text-t-5">
+                        <span className={s.signal === "buy" ? "text-green-400" : s.signal === "sell" ? "text-red-400" : "text-t-6"}>
+                          {s.signal === "buy" ? "▲" : s.signal === "sell" ? "▼" : "●"}
+                        </span>{" "}
+                        {s.reason}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+      )}
     </div>
   );
 }

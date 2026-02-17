@@ -128,4 +128,46 @@ export const api = {
     }),
   deleteAlert: (id: string) =>
     fetchApi<void>(`/api/v1/alerts/${id}`, { method: "DELETE" }),
+
+  // ─── Market Signals / Watchlist ───
+  getMarketSignals: () =>
+    fetchApi<MarketSignalsResponse>("/api/v1/market/signals"),
+  getFundamentals: (ticker: string) =>
+    fetchApi<FundamentalsData>(`/api/v1/market/fundamentals/${ticker}`),
 };
+
+// ─── Market Signals Types ───
+export interface FundamentalsSignal {
+  metric: string;
+  signal: "buy" | "hold" | "sell";
+  reason: string;
+}
+
+export interface FundamentalsData {
+  ticker: string;
+  name: string;
+  date: string;
+  pe: number | null;
+  peg: number | null;
+  fwd_peg: number | null;
+  p_ocf: number | null;
+  ev_ebitda: number | null;
+  p_fcf: number | null;
+  p_sales: number | null;
+  p_book: number | null;
+  div_yield: number | null;
+  roe: number | null;
+  pe_5y_avg: number | null;
+  p_ocf_5y_avg: number | null;
+  ev_ebitda_5y_avg: number | null;
+  overall: "buy" | "hold" | "sell";
+  signals: FundamentalsSignal[];
+  in_portfolio?: boolean;
+}
+
+export interface MarketSignalsResponse {
+  signals: FundamentalsData[];
+  top_opportunities: FundamentalsData[];
+  updated_at: string;
+  portfolio_tickers: string[];
+}

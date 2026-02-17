@@ -5,7 +5,7 @@ import { NetWorthCard } from "@/components/dashboard/NetWorthCard";
 import { BreakdownDonut } from "@/components/dashboard/BreakdownDonut";
 import { InstitutionBar } from "@/components/dashboard/InstitutionBar";
 import { NetWorthChart } from "@/components/charts/NetWorthChart";
-import { useNetWorth, useAccounts, usePatrimoineProjection } from "@/lib/hooks/useApi";
+import { useNetWorth, useAccounts, usePatrimoineProjection, useMarketSignals } from "@/lib/hooks/useApi";
 import { Loading, ErrorState, DetailSheet, Section } from "@/components/ds";
 import { formatEUR, formatEURCompact } from "@/lib/utils";
 
@@ -27,6 +27,7 @@ export default function HomePage() {
   const { data: networth, isLoading, error } = useNetWorth();
   const { data: accounts } = useAccounts();
   const { data: projection } = usePatrimoineProjection();
+  const { data: signalsData } = useMarketSignals();
   const [sheet, setSheet] = useState<SheetKind>(null);
 
   const close = useCallback(() => setSheet(null), []);
@@ -156,6 +157,43 @@ export default function HomePage() {
               <Area type="monotone" dataKey="net_real" stroke="var(--text-1)" fill="none" strokeWidth={2} strokeDasharray="5 3" />
             </AreaChart>
           </ResponsiveContainer>
+        </Section>
+      )}
+
+      {/* Top 3 Market Opportunities */}
+      {signalsData?.top_opportunities && signalsData.top_opportunities.length > 0 && (
+        <Section title="🎯 Opportunités marché">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {signalsData.top_opportunities.map((d) => (
+              <div key={d.ticker} className="card p-4 border border-green-500/20 bg-green-500/5">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-semibold text-t-1">{d.ticker}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 font-semibold">
+                    ACHETER
+                  </span>
+                </div>
+                <div className="text-label text-t-5 mb-2">{d.name}</div>
+                <div className="grid grid-cols-3 gap-1 text-center text-caption">
+                  <div>
+                    <div className="text-[10px] text-t-6">PE</div>
+                    <div className="tnum text-green-400">{d.pe?.toFixed(0) ?? "—"}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-t-6">PEG</div>
+                    <div className="tnum text-green-400">
+                      {(d.fwd_peg ?? d.peg) != null && (d.fwd_peg ?? d.peg)! > 0 && (d.fwd_peg ?? d.peg)! < 50
+                        ? (d.fwd_peg ?? d.peg)!.toFixed(1)
+                        : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-t-6">P/OCF</div>
+                    <div className="tnum text-green-400">{d.p_ocf?.toFixed(0) ?? "—"}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </Section>
       )}
 
