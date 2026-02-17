@@ -131,6 +131,34 @@ async def portfolio_page(request: Request):
     })
 
 
+@router.post("/api/strategic-committee/launch")
+async def launch_strategic_committee(request: Request):
+    """Launch a strategic committee session from the portfolio page."""
+    from ..sessions.store import get_session_store, SessionDef, MessageDef
+    from ..workflows.store import get_workflow_store
+
+    wf_store = get_workflow_store()
+    wf = wf_store.get("strategic-committee")
+    if not wf:
+        return JSONResponse({"error": "Workflow 'strategic-committee' not found"}, status_code=404)
+
+    session_store = get_session_store()
+    session = SessionDef(
+        name="Comité Stratégique",
+        goal="Revue stratégique du portfolio — arbitrages, priorités, GO/NOGO",
+        status="active",
+        config={"workflow_id": "strategic-committee"},
+    )
+    session = session_store.create(session)
+    session_store.add_message(MessageDef(
+        session_id=session.id,
+        from_agent="system",
+        message_type="system",
+        content="Comité Stratégique lancé. Les agents du comité vont débattre des priorités portfolio.",
+    ))
+    return JSONResponse({"session_id": session.id})
+
+
 @router.get("/projects", response_class=HTMLResponse)
 async def projects_page(request: Request):
     """Projects list (legacy)."""
@@ -415,6 +443,77 @@ async def create_sprint(mission_id: str):
     s = SprintDef(mission_id=mission_id, number=num, name=f"Sprint {num}")
     store.create_sprint(s)
     return JSONResponse({"ok": True})
+
+
+@router.post("/api/missions/{mission_id}/tasks")
+async def create_task(request: Request, mission_id: str):
+    """Create a task in a mission sprint (inline kanban creation)."""
+    from ..missions.store import get_mission_store, TaskDef
+    data = await request.json()
+    title = data.get("title", "").strip()
+    if not title:
+        return JSONResponse({"error": "Title required"}, status_code=400)
+    store = get_mission_store()
+    sprint_id = data.get("sprint_id", "")
+    if not sprint_id:
+        sprints = store.list_sprints(mission_id)
+        if sprints:
+            sprint_id = sprints[-1].id
+        else:
+            return JSONResponse({"error": "No sprint"}, status_code=400)
+    task = TaskDef(
+        sprint_id=sprint_id,
+        mission_id=mission_id,
+        title=title,
+        type=data.get("type", "feature"),
+        domain=data.get("domain", ""),
+        status="pending",
+    )
+    task = store.create_task(task)
+    return JSONResponse({"ok": True, "task_id": task.id})
+
+
+@router.post("/api/missions/{mission_id}/launch-workflow")
+async def launch_mission_workflow(request: Request, mission_id: str):
+    """Create a session from mission's workflow and redirect to live view."""
+    from ..missions.store import get_mission_store
+    from ..sessions.store import get_session_store, SessionDef, MessageDef
+    from ..workflows.store import get_workflow_store
+
+    mission_store = get_mission_store()
+    mission = mission_store.get_mission(mission_id)
+    if not mission:
+        return JSONResponse({"error": "Mission not found"}, status_code=404)
+
+    wf_id = mission.workflow_id
+    if not wf_id:
+        # Pick a default workflow based on project type
+        wf_id = "feature-request"
+
+    wf_store = get_workflow_store()
+    wf = wf_store.get(wf_id)
+    if not wf:
+        return JSONResponse({"error": f"Workflow '{wf_id}' not found"}, status_code=404)
+
+    session_store = get_session_store()
+    session = SessionDef(
+        name=f"{mission.name}",
+        goal=mission.goal or mission.description or "",
+        project_id=mission.project_id,
+        status="active",
+        config={
+            "workflow_id": wf_id,
+            "mission_id": mission_id,
+        },
+    )
+    session = session_store.create(session)
+    session_store.add_message(MessageDef(
+        session_id=session.id,
+        from_agent="system",
+        message_type="system",
+        content=f"Workflow \"{wf_id}\" lancé pour la mission \"{mission.name}\". Goal: {mission.goal or 'not specified'}",
+    ))
+    return JSONResponse({"session_id": session.id, "workflow_id": wf_id})
 
 
 @router.get("/api/missions/{mission_id}/board", response_class=HTMLResponse)

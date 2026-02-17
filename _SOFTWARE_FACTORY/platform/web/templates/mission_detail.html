@@ -16,6 +16,10 @@
     <a href="/missions/{{ mission.id }}/live" class="btn btn-sm btn-primary">
         <svg class="icon icon-sm"><use href="#icon-zap"/></svg> Live
     </a>
+    <button class="btn btn-sm btn-ghost" id="btnLaunchWorkflow"
+            onclick="launchWorkflow()">
+        <svg class="icon icon-sm"><use href="#icon-play"/></svg> Lancer Workflow
+    </button>
     {% endif %}
 </div>
 {% endblock %}
@@ -152,6 +156,14 @@
                 {% else %}
                 <div class="kanban-empty">—</div>
                 {% endfor %}
+                {% if col_status == 'pending' %}
+                <div class="inline-form" id="addTaskForm">
+                    <input class="inline-form__input" id="newTaskTitle" placeholder="Nouvelle tâche..." onkeydown="if(event.key==='Enter'){addTask()}">
+                    <button class="inline-form__btn" onclick="addTask()">
+                        <svg class="icon icon-xs"><use href="#icon-plus"/></svg>
+                    </button>
+                </div>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
@@ -203,4 +215,48 @@
         {% endif %}
     </aside>
 </div>
+
+<script>
+async function addTask() {
+    const input = document.getElementById('newTaskTitle');
+    const title = input.value.trim();
+    if (!title) return;
+    input.value = '';
+    try {
+        await fetch('/api/missions/{{ mission.id }}/tasks', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                title: title,
+                sprint_id: '{{ selected_sprint.id if selected_sprint else "" }}',
+            }),
+        });
+        location.reload();
+    } catch(e) { console.error('addTask error:', e); }
+}
+
+async function launchWorkflow() {
+    const btn = document.getElementById('btnLaunchWorkflow');
+    btn.disabled = true;
+    btn.textContent = 'Création...';
+    try {
+        const resp = await fetch('/api/missions/{{ mission.id }}/launch-workflow', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+        });
+        const data = await resp.json();
+        if (data.session_id) {
+            window.location.href = `/sessions/${data.session_id}/live`;
+        } else {
+            alert(data.error || 'Erreur');
+            btn.disabled = false;
+            btn.textContent = 'Lancer Workflow';
+        }
+    } catch(e) {
+        alert('Erreur: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = 'Lancer Workflow';
+    }
+}
+</script>
 {% endblock %}

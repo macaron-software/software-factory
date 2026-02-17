@@ -141,6 +141,14 @@
                         <svg><use href="#icon-chevron-down"/></svg>
                     </div>
                 </div>
+                <div class="strat-graph-actions" style="padding:0 0.85rem 0.5rem;display:flex;gap:0.5rem">
+                    <a href="/workflows/strategic-committee/edit" class="strat-graph-btn">
+                        <svg><use href="#icon-settings"/></svg> Workflow
+                    </a>
+                    <button class="strat-graph-btn" onclick="launchStrategicCommittee()" id="btnLaunchComite" style="border-color:var(--purple);color:var(--purple)">
+                        <svg><use href="#icon-play"/></svg> Lancer le Comité
+                    </button>
+                </div>
             </div>
             <div class="strat-graph-body" id="stratGraphBody">
                 <svg id="stratSvg" viewBox="0 0 820 400" xmlns="http://www.w3.org/2000/svg"></svg>
@@ -471,6 +479,27 @@ function renderStratGraph(){
         nodeG.appendChild(g);
     });
     svg.appendChild(nodeG);
+}
+
+async function launchStrategicCommittee(){
+    const btn = document.getElementById('btnLaunchComite');
+    btn.disabled = true;
+    btn.innerHTML = '<svg style="width:12px;height:12px"><use href="#icon-loader"/></svg> Création...';
+    try {
+        const resp = await fetch('/api/strategic-committee/launch', {method:'POST', headers:{'Content-Type':'application/json'}});
+        const data = await resp.json();
+        if(data.session_id){
+            window.location.href = `/sessions/${data.session_id}/live`;
+        } else {
+            alert(data.error || 'Erreur');
+            btn.disabled = false;
+            btn.innerHTML = '<svg style="width:12px;height:12px"><use href="#icon-play"/></svg> Lancer le Comité';
+        }
+    } catch(e){
+        alert('Erreur: ' + e.message);
+        btn.disabled = false;
+        btn.innerHTML = '<svg style="width:12px;height:12px"><use href="#icon-play"/></svg> Lancer le Comité';
+    }
 }
 </script>
 {% endblock %}
