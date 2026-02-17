@@ -218,6 +218,74 @@ async def project_git_status(project_id: str):
     return HTMLResponse("\n".join(parts))
 
 
+@router.get("/projects/{project_id}/overview", response_class=HTMLResponse)
+async def project_overview(request: Request, project_id: str):
+    """Project overview page — created from ideation, shows epic/features/team."""
+    from ..projects.manager import get_project_store
+    from ..missions.store import get_mission_store
+    from ..missions.product import get_product_backlog
+    from ..agents.store import get_agent_store
+
+    proj_store = get_project_store()
+    project = proj_store.get(project_id)
+    if not project:
+        return HTMLResponse("<h2>Project not found</h2>", status_code=404)
+
+    mission_store = get_mission_store()
+    epics = mission_store.list_missions(project_id=project_id)
+
+    backlog = get_product_backlog()
+    agent_store = get_agent_store()
+
+    epics_enriched = []
+    for ep in epics:
+        features = backlog.list_features(ep.id)
+        features_enriched = []
+        for f in features:
+            stories = backlog.list_stories(f.id)
+            features_enriched.append({
+                "id": f.id, "name": f.name, "description": f.description,
+                "acceptance_criteria": f.acceptance_criteria,
+                "story_points": f.story_points, "status": f.status,
+                "stories": [{"id": s.id, "title": s.title,
+                             "story_points": s.story_points, "status": s.status,
+                             "acceptance_criteria": s.acceptance_criteria}
+                            for s in stories],
+            })
+        team_data = (ep.config or {}).get("team", [])
+        stack = (ep.config or {}).get("stack", [])
+        epics_enriched.append({
+            "id": ep.id, "name": ep.name, "description": ep.description,
+            "goal": ep.goal, "status": ep.status,
+            "features": features_enriched,
+            "team": team_data, "stack": stack,
+        })
+
+    # Resolve team agents with photos
+    team_agents = []
+    if epics_enriched:
+        for t in epics_enriched[0].get("team", []):
+            role = t.get("role", "")
+            agent = agent_store.get(role)
+            avatar_dir = Path(__file__).parent / "static" / "avatars"
+            avatar_url = ""
+            if agent and (avatar_dir / f"{agent.id}.jpg").exists():
+                avatar_url = f"/static/avatars/{agent.id}.jpg"
+            team_agents.append({
+                "role": role, "label": t.get("label", role),
+                "name": agent.name if agent else t.get("label", role),
+                "avatar_url": avatar_url,
+                "persona": (agent.persona or "") if agent else "",
+            })
+
+    return _templates(request).TemplateResponse("project_overview.html", {
+        "request": request, "page_title": f"Projet: {project.name}",
+        "project": project,
+        "epics": epics_enriched,
+        "team_agents": team_agents,
+    })
+
+
 @router.get("/projects/{project_id}", response_class=HTMLResponse)
 async def project_detail(request: Request, project_id: str):
     """Single project detail view with vision, agents, sessions."""
@@ -2643,9 +2711,11 @@ _IDEATION_SYSTEM = """Tu participes à un atelier d'idéation multi-agents.
 Pour chaque idée soumise, tu dois analyser sous ton angle d'expertise et produire:
 1. Un avis structuré (opportunités, risques, questions)
 2. Des suggestions concrètes
+3. Une classification du type de demande
 
 Réponds en JSON:
 {{
+  "request_type": "new_project|new_feature|bug_fix|tech_debt|migration|security_audit",
   "messages": [
     {{"agent_id": "metier", "agent_name": "Camille Durand", "content": "...", "color": "#2563eb"}},
     {{"agent_id": "architecte", "agent_name": "Pierre Duval", "content": "...", "color": "#0891b2"}},
@@ -2655,15 +2725,38 @@ Réponds en JSON:
   ],
   "findings": [
     {{"type": "opportunity|risk|question|decision|feature", "text": "..."}}
-  ]
+  ],
+  "po_proposal": {{
+    "epic_name": "Titre court de l'epic",
+    "stack": "Technologies recommandées (ex: SvelteKit + Rust + PostgreSQL)",
+    "workflow": "feature-request|tech-debt-reduction|sf-pipeline",
+    "team": [
+      {{"role": "Lead Dev", "justification": "Coordination technique"}},
+      {{"role": "Dev Frontend", "justification": "UI/UX implementation"}},
+      {{"role": "Dev Backend", "justification": "API + DB"}},
+      {{"role": "QA", "justification": "Tests E2E + regression"}},
+      {{"role": "DevOps", "justification": "CI/CD + deploy"}},
+      {{"role": "Sécurité", "justification": "Audit OWASP"}}
+    ],
+    "priority_wsjf": 15,
+    "estimated_sprints": 3
+  }}
 }}
+
+Règles de classification request_type:
+- "new_project": aucun projet existant, on part de zéro
+- "new_feature": ajout de fonctionnalité sur un projet existant
+- "bug_fix": correction de bug ou incident
+- "tech_debt": refactoring, mise à jour, nettoyage
+- "migration": changement de framework ou version majeure
+- "security_audit": audit sécurité, OWASP, RGPD
 
 Chaque agent doit avoir un avis DIFFÉRENT et complémentaire.
 Camille Durand (Business Analyst) challenge la valeur métier.
 Pierre Duval (Architecte) propose l'approche technique et les risques techniques.
 Chloé Bertrand (UX Designer) pense utilisateur, parcours, accessibilité.
 Nadia Benali (Expert Sécurité) identifie les menaces (OWASP, RGPD).
-Alexandre Faure (Product Manager) priorise et synthétise en features actionnables.
+Alexandre Faure (Product Manager) priorise, synthétise, et structure la proposition PO (po_proposal).
 
 Réponds UNIQUEMENT avec le JSON, rien d'autre."""
 
@@ -2672,6 +2765,7 @@ Réponds UNIQUEMENT avec le JSON, rien d'autre."""
 async def ideation_page(request: Request):
     """Ideation workspace — brainstorm with expert agents."""
     from ..agents.store import get_agent_store
+    from ..projects.manager import get_project_store
 
     agent_store = get_agent_store()
     all_agents = agent_store.list_all()
@@ -2703,6 +2797,7 @@ async def ideation_page(request: Request):
     return _templates(request).TemplateResponse("ideation.html", {
         "request": request, "page_title": "Idéation",
         "agents": enriched,
+        "projects": [{"id": p.id, "name": p.name} for p in get_project_store().list_all()],
     })
 
 
@@ -2721,7 +2816,6 @@ async def ideation_submit(request: Request):
         resp = await client.chat(
             messages=[LLMMessage(role="user", content=f"Idée à analyser:\n\n{prompt}")],
             system_prompt=_IDEATION_SYSTEM,
-            provider="azure",
             temperature=0.7,
             max_tokens=4096,
         )
@@ -2747,20 +2841,234 @@ async def ideation_submit(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+_PO_EPIC_SYSTEM = """Tu es Alexandre Faure, Product Owner senior.
+Tu reçois la synthèse d'un atelier d'idéation et tu dois structurer un projet complet.
+
+À partir de l'idée et des analyses des experts, produis un JSON avec:
+1. Le projet (nom, description, stack technique, factory_type)
+2. L'epic principal (nom, description, critères d'acceptation)
+3. 3 à 5 features découpées depuis l'epic
+4. 2 à 3 user stories par feature (format "En tant que... je veux... afin de...")
+5. L'équipe proposée (rôles nécessaires)
+
+Réponds UNIQUEMENT avec ce JSON:
+{
+  "project": {
+    "id": "slug-kebab-case",
+    "name": "Nom du Projet",
+    "description": "Description courte",
+    "stack": ["SvelteKit", "Rust", "PostgreSQL"],
+    "factory_type": "sf"
+  },
+  "epic": {
+    "name": "Nom de l'Epic",
+    "description": "Description détaillée de l'epic",
+    "goal": "Critères d'acceptation clairs et mesurables"
+  },
+  "features": [
+    {
+      "name": "Nom Feature",
+      "description": "Description",
+      "acceptance_criteria": "Given/When/Then",
+      "story_points": 8,
+      "stories": [
+        {
+          "title": "En tant que [persona] je veux [action] afin de [bénéfice]",
+          "description": "Détails",
+          "acceptance_criteria": "Given/When/Then",
+          "story_points": 3
+        }
+      ]
+    }
+  ],
+  "team": [
+    {"role": "lead_dev", "label": "Lead Developer"},
+    {"role": "developer", "label": "Développeur Backend"},
+    {"role": "developer", "label": "Développeur Frontend"},
+    {"role": "tester", "label": "QA Engineer"},
+    {"role": "devops", "label": "DevOps"},
+    {"role": "security", "label": "Expert Sécurité"}
+  ]
+}
+
+Sois pragmatique et concret. Les features doivent être actionnables.
+Réponds UNIQUEMENT avec le JSON, rien d'autre."""
+
+
 @router.post("/api/ideation/create-epic")
 async def ideation_create_epic(request: Request):
-    """Create a mission (epic) from ideation session."""
+    """PO agent structures project + epic + features + stories from ideation."""
+    import subprocess as _sp
+    from ..llm.client import get_llm_client, LLMMessage
     from ..missions.store import get_mission_store, MissionDef
+    from ..missions.product import get_product_backlog, FeatureDef, UserStoryDef
+    from ..projects.manager import get_project_store, Project
+    from ..config import FACTORY_ROOT
 
     data = await request.json()
+    idea = data.get("goal", "") or data.get("name", "")
+    findings = data.get("description", "")
+
+    # ── Step 1: PO agent structures via LLM ──
+    client = get_llm_client()
+    prompt = f"Idée originale:\n{idea}\n\nAnalyses des experts:\n{findings}"
+    try:
+        resp = await client.chat(
+            messages=[LLMMessage(role="user", content=prompt)],
+            system_prompt=_PO_EPIC_SYSTEM,
+            temperature=0.5,
+            max_tokens=4096,
+        )
+        raw = resp.content.strip()
+        if "```json" in raw:
+            raw = raw.split("```json", 1)[1].split("```", 1)[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```", 1)[1].split("```", 1)[0].strip()
+        plan = json.loads(raw)
+    except Exception as e:
+        logger.error("PO epic structuring failed: %s", e)
+        slug = idea[:30].lower().replace(" ", "-").replace("'", "")
+        slug = "".join(c for c in slug if c.isalnum() or c == "-").strip("-")
+        plan = {
+            "project": {"id": slug or "new-project", "name": idea[:60] or "New Project",
+                        "description": idea, "stack": [], "factory_type": "standalone"},
+            "epic": {"name": data.get("name", idea[:100]),
+                     "description": findings, "goal": idea},
+            "features": [], "team": [],
+        }
+
+    proj_data = plan.get("project", {})
+    epic_data = plan.get("epic", {})
+    features_data = plan.get("features", [])
+    team_data = plan.get("team", [])
+
+    # ── Step 2 & 3: Create project or use existing ──
+    existing_project_id = data.get("project_id", "").strip()
+    project_store = get_project_store()
+
+    if existing_project_id:
+        # Use existing project
+        project_id = existing_project_id
+        existing = project_store.get(project_id)
+        project_name = existing.name if existing else project_id
+        stack = proj_data.get("stack", [])
+    else:
+        # Create new project directory + git init
+        project_id = proj_data.get("id", "new-project")
+        project_path = str(FACTORY_ROOT.parent / project_id)
+        proj_dir = Path(project_path)
+        vision_content = ""
+
+        try:
+            proj_dir.mkdir(parents=True, exist_ok=True)
+            for d in ("src", "tests", "docs"):
+                (proj_dir / d).mkdir(exist_ok=True)
+
+            stack = proj_data.get("stack", [])
+            vision_content = f"# {proj_data.get('name', project_id)}\n\n"
+            vision_content += f"## Vision\n\n{proj_data.get('description', '')}\n\n"
+            vision_content += f"## Epic: {epic_data.get('name', '')}\n\n{epic_data.get('description', '')}\n\n"
+            vision_content += f"## Objectifs\n\n{epic_data.get('goal', '')}\n\n"
+            if features_data:
+                vision_content += "## Features\n\n"
+                for f in features_data:
+                    vision_content += f"- **{f.get('name', '')}**: {f.get('description', '')}\n"
+            vision_content += f"\n## Stack technique\n\n{', '.join(stack)}\n"
+            (proj_dir / "VISION.md").write_text(vision_content, encoding="utf-8")
+
+            readme = f"# {proj_data.get('name', project_id)}\n\n{proj_data.get('description', '')}\n\n"
+            readme += f"Stack: {', '.join(stack)}\n"
+            (proj_dir / "README.md").write_text(readme, encoding="utf-8")
+
+            if not (proj_dir / ".git").exists():
+                _sp.run(["git", "init"], cwd=str(proj_dir), capture_output=True, timeout=10)
+                _sp.run(["git", "add", "."], cwd=str(proj_dir), capture_output=True, timeout=10)
+                _sp.run(["git", "commit", "-m", "Initial commit from ideation"],
+                        cwd=str(proj_dir), capture_output=True, timeout=10)
+        except Exception as e:
+            logger.warning("Project dir creation: %s", e)
+
+        project = Project(
+            id=project_id,
+            name=proj_data.get("name", project_id),
+            path=project_path,
+            description=proj_data.get("description", ""),
+            factory_type=proj_data.get("factory_type", "standalone"),
+            domains=[s.lower() for s in stack],
+            vision=vision_content,
+            values=["quality", "feedback", "tdd"],
+            lead_agent_id="product_manager",
+            agents=[t.get("role", "") for t in team_data],
+            status="active",
+        )
+        project_store.create(project)
+        project_name = project.name
+
+    # ── Step 4: Create epic (mission) with type & workflow routing ──
+    request_type = data.get("request_type", "new_project")
+    type_map = {
+        "new_project": "epic", "new_feature": "feature", "bug_fix": "bug",
+        "tech_debt": "debt", "migration": "migration", "security_audit": "security",
+    }
+    workflow_map = {
+        "new_project": "feature-request", "new_feature": "feature-request",
+        "bug_fix": "sf-pipeline", "tech_debt": "tech-debt-reduction",
+        "migration": "migration-sharelook", "security_audit": "review-cycle",
+    }
+    mission_type = type_map.get(request_type, "epic")
+    workflow_id = workflow_map.get(request_type, "feature-request")
+    po = data.get("po_proposal", {})
+
     mission_store = get_mission_store()
     mission = MissionDef(
-        name=data.get("name", "Epic from ideation"),
-        description=data.get("description", ""),
-        goal=data.get("goal", ""),
+        name=epic_data.get("name", "Epic from ideation"),
+        description=epic_data.get("description", ""),
+        goal=epic_data.get("goal", ""),
         status="planning",
-        project_id=data.get("project_id", ""),
-        created_by="ideation",
+        type=mission_type,
+        project_id=project_id,
+        workflow_id=workflow_id,
+        wsjf_score=po.get("priority_wsjf", 0),
+        created_by="product_manager",
+        config={"team": team_data, "stack": stack, "idea": idea,
+                "request_type": request_type, "po_proposal": po},
     )
     mission = mission_store.create_mission(mission)
-    return JSONResponse({"mission_id": mission.id, "name": mission.name})
+
+    # ── Step 5: Create features + user stories ──
+    backlog = get_product_backlog()
+    created_features = []
+    for fd in features_data:
+        feat = backlog.create_feature(FeatureDef(
+            epic_id=mission.id,
+            name=fd.get("name", ""),
+            description=fd.get("description", ""),
+            acceptance_criteria=fd.get("acceptance_criteria", ""),
+            story_points=fd.get("story_points", 5),
+        ))
+        stories_out = []
+        for sd in fd.get("stories", []):
+            story = backlog.create_story(UserStoryDef(
+                feature_id=feat.id,
+                title=sd.get("title", ""),
+                description=sd.get("description", ""),
+                acceptance_criteria=sd.get("acceptance_criteria", ""),
+                story_points=sd.get("story_points", 3),
+            ))
+            stories_out.append({"id": story.id, "title": story.title,
+                                "points": story.story_points})
+        created_features.append({"id": feat.id, "name": feat.name,
+                                 "points": feat.story_points, "stories": stories_out})
+
+    return JSONResponse({
+        "project_id": project_id,
+        "project_name": project_name,
+        "mission_id": mission.id,
+        "mission_name": mission.name,
+        "type": mission_type,
+        "workflow_id": workflow_id,
+        "features": created_features,
+        "team": team_data,
+        "stack": stack,
+        "redirect": f"/projects/{project_id}/overview",
+    })

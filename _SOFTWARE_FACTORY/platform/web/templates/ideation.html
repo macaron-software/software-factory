@@ -8,6 +8,8 @@
 /* ── Ideation Workspace ── */
 .idea-layout{display:grid;grid-template-columns:1fr 340px;gap:1rem;height:calc(100vh - 70px);padding:0.5rem 0}
 @media(max-width:900px){.idea-layout{grid-template-columns:1fr;grid-template-rows:1fr auto}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.spin{animation:spin 1s linear infinite}
 
 /* Chat area */
 .idea-chat{display:flex;flex-direction:column;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
@@ -245,6 +247,26 @@
             <div class="idea-output-title">
                 <svg><use href="#icon-lightning"/></svg> Actions
             </div>
+
+            <!-- Project selector -->
+            <div style="margin-bottom:0.5rem">
+                <label style="font-size:0.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Projet</label>
+                <select id="ideaProjectSelect" class="input-agent-select" style="width:100%;margin-top:0.25rem">
+                    <option value="">Nouveau projet</option>
+                    {% for p in projects %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- PO Proposal (filled after analysis) -->
+            <div id="poProposalPanel" style="display:none;margin-bottom:0.5rem">
+                <label style="font-size:0.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:700">
+                    <svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-clipboard"/></svg> Proposition PO
+                </label>
+                <div id="poProposalContent" style="margin-top:0.25rem;padding:0.5rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;font-size:0.78rem;line-height:1.5"></div>
+            </div>
+
             <div id="ideaActions" style="display:flex;flex-direction:column;gap:0.4rem">
                 <button class="pm-filter" style="width:100%;text-align:left;opacity:.5;pointer-events:none" id="btnCreateEpic">
                     <svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-rocket"/></svg>
@@ -624,6 +646,35 @@ async function sendIdea() {
                 addFinding(f.type, f.text);
             }
 
+            // Store request_type and po_proposal for epic creation
+            lastRequestType = data.request_type || 'new_feature';
+            lastPoProposal = data.po_proposal || {};
+
+            // Show PO proposal panel
+            if (lastPoProposal.epic_name) {
+                const pp = document.getElementById('poProposalPanel');
+                const pc = document.getElementById('poProposalContent');
+                let html = `<div style="font-weight:600;color:var(--purple);margin-bottom:0.3rem">${esc(lastPoProposal.epic_name)}</div>`;
+                html += `<div style="color:var(--text-secondary);font-size:0.72rem;margin-bottom:0.3rem">Type: <span style="color:var(--purple)">${lastRequestType}</span></div>`;
+                if (lastPoProposal.stack) html += `<div style="margin-bottom:0.2rem">Stack: ${esc(lastPoProposal.stack)}</div>`;
+                if (lastPoProposal.workflow) html += `<div style="margin-bottom:0.2rem">Workflow: <span style="color:var(--blue)">${esc(lastPoProposal.workflow)}</span></div>`;
+                if (lastPoProposal.team && lastPoProposal.team.length) {
+                    html += `<div style="margin-top:0.3rem;font-weight:600;font-size:0.72rem;color:var(--text-secondary)">Équipe proposée:</div>`;
+                    lastPoProposal.team.forEach(t => {
+                        html += `<div style="font-size:0.75rem">• ${esc(t.role)}</div>`;
+                    });
+                }
+                if (lastPoProposal.estimated_sprints) html += `<div style="margin-top:0.3rem">Sprints estimés: ${lastPoProposal.estimated_sprints}</div>`;
+                pc.innerHTML = html;
+                pp.style.display = 'block';
+            }
+
+            // Auto-select project if request_type is not new_project
+            if (lastRequestType !== 'new_project') {
+                const sel = document.getElementById('ideaProjectSelect');
+                if (sel.options.length > 1) sel.selectedIndex = 1;
+            }
+
             // Enable action buttons
             document.getElementById('btnCreateEpic').style.opacity = '1';
             document.getElementById('btnCreateEpic').style.pointerEvents = 'auto';
@@ -656,33 +707,72 @@ function collectFindings() {
 
 // Collect the original prompt
 let originalPrompt = '';
+let lastRequestType = 'new_feature';
+let lastPoProposal = {};
 
-// Create epic from idea
+function esc(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+
+// Create epic from idea — PO agent structures everything
 document.getElementById('btnCreateEpic').addEventListener('click', async () => {
     if (!sessionId && !originalPrompt) return;
-    addMsg('system', 'Système', 'Création de l\'epic en cours...', 'var(--purple)', '');
+    const btn = document.getElementById('btnCreateEpic');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="icon icon-xs spin" style="vertical-align:-2px"><use href="#icon-loader"/></svg> Alexandre Faure (PO) structure le projet...';
+
+    addMsg('agent', 'Alexandre Faure', 'Je prends le relai ! Structuration du projet, epic, features et user stories en cours...', 'var(--green)',
+        igAgents.find(a=>a.id==='product_manager')?.avatar_url || '');
+
     const findings = collectFindings();
     const description = findings.map(f => `[${f.type.toUpperCase()}] ${f.text}`).join('\n');
+
+    // Collect agent messages as context
+    const msgs = document.querySelectorAll('.idea-msg');
+    let agentAnalysis = description;
+    msgs.forEach(m => {
+        const name = m.querySelector('.idea-msg-name')?.textContent || '';
+        const text = m.querySelector('.idea-msg-body')?.textContent || '';
+        if (name && text && name !== 'Système' && name !== 'Vous') {
+            agentAnalysis += `\n\n[${name}]: ${text}`;
+        }
+    });
+
     try {
         const resp = await fetch('/api/ideation/create-epic', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
-                session_id: sessionId,
                 name: originalPrompt.substring(0, 100) || 'Epic from ideation',
-                description: description,
+                description: agentAnalysis,
                 goal: originalPrompt,
+                project_id: document.getElementById('ideaProjectSelect').value,
+                request_type: lastRequestType,
+                po_proposal: lastPoProposal,
             }),
         });
         const data = await resp.json();
-        if (data.mission_id) {
-            addMsg('system', 'Système',
-                `Epic créé ! Redirection vers <a href="/missions/${data.mission_id}" style="color:var(--purple)">${data.name}</a>...`,
-                'var(--green)', '');
-            setTimeout(() => { window.location.href = `/missions/${data.mission_id}`; }, 1500);
+        if (data.redirect) {
+            const featCount = (data.features || []).length;
+            const storyCount = (data.features || []).reduce((s,f) => s + (f.stories||[]).length, 0);
+            const typeBadge = data.type ? `[${data.type.toUpperCase()}] ` : '';
+            const wfBadge = data.workflow_id ? ` → Workflow: ${data.workflow_id}` : '';
+            addMsg('agent', 'Alexandre Faure',
+                `${typeBadge}Projet <strong>${esc(data.project_name)}</strong> créé !${wfBadge}\n` +
+                `Epic: <strong>${esc(data.mission_name)}</strong>\n` +
+                `${featCount} features, ${storyCount} user stories\n` +
+                `Stack: ${(data.stack||[]).join(', ')}\n` +
+                `Redirection vers l'overview...`,
+                'var(--green)',
+                igAgents.find(a=>a.id==='product_manager')?.avatar_url || '');
+            setTimeout(() => { window.location.href = data.redirect; }, 2000);
+        } else if (data.error) {
+            addMsg('system', 'Système', 'Erreur: ' + data.error, 'var(--red)', '');
+            btn.disabled = false;
+            btn.innerHTML = '<svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-rocket"/></svg> Créer un Epic depuis cette idée';
         }
     } catch(e) {
         addMsg('system', 'Système', 'Erreur: ' + e.message, 'var(--red)', '');
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-rocket"/></svg> Créer un Epic depuis cette idée';
     }
 });
 
