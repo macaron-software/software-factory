@@ -16,10 +16,11 @@ def init_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
 
     schema = SCHEMA_PATH.read_text()
     conn.executescript(schema)
+
+    conn.execute("PRAGMA foreign_keys=ON")
 
     # Migrations — add columns safely
     _migrate(conn)
