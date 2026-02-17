@@ -11,24 +11,38 @@
 /* ── Portfolio Dashboard ── */
 .portfolio-grid{display:grid;grid-template-columns:1fr;gap:1.5rem;padding:0.5rem 0}
 
-/* Strategic agent cards — rich design matching graph tooltip */
-.portfolio-strategy{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.85rem;margin-bottom:1.5rem}
-.strat-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;transition:border-color .15s,box-shadow .15s;cursor:default}
+/* Strategic agent cards — compact, clickable */
+.portfolio-strategy{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.75rem;margin-bottom:1.5rem;position:relative}
+.strat-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.85rem 1rem;display:flex;align-items:center;gap:0.7rem;cursor:pointer;transition:border-color .15s,box-shadow .15s}
 .strat-card:hover{border-color:var(--purple);box-shadow:0 4px 16px rgba(124,58,237,.12)}
-.strat-header{display:flex;align-items:center;gap:0.7rem;margin-bottom:0.55rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border)}
-.strat-photo{width:44px;height:44px;border-radius:50%;flex-shrink:0;object-fit:cover;border:2px solid var(--border)}
-.strat-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.strat-avatar svg{width:22px;height:22px}
+.strat-card.active{border-color:var(--purple);box-shadow:0 4px 16px rgba(124,58,237,.2)}
+.strat-photo{width:42px;height:42px;border-radius:50%;flex-shrink:0;object-fit:cover;border:2px solid var(--border)}
+.strat-avatar{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.strat-avatar svg{width:20px;height:20px}
 .strat-info{flex:1;min-width:0}
-.strat-name{font-size:0.88rem;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.strat-role{font-size:0.72rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.strat-tagline{font-size:0.72rem;color:var(--text-secondary);font-style:italic;line-height:1.3;margin-bottom:0.4rem}
-.strat-persona{font-size:0.72rem;color:var(--text-secondary);line-height:1.35;opacity:.8;max-height:2.7em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.strat-section-title{font-size:0.65rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-top:0.5rem;margin-bottom:0.2rem;display:flex;align-items:center;gap:0.25rem}
-.strat-tags{display:flex;flex-wrap:wrap;gap:0.2rem}
-.strat-tag{display:inline-block;padding:0.1rem 0.4rem;border-radius:4px;font-size:0.65rem;background:var(--bg-tertiary);border:1px solid var(--border)}
-.strat-tag--skill{border-color:rgba(124,58,237,.35);color:var(--purple)}
-.strat-tag--tool{border-color:rgba(16,185,129,.3);color:var(--green)}
+.strat-name{font-size:0.85rem;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strat-role{font-size:0.68rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Popover fiche — same design as graph tooltip */
+.agent-popover{position:absolute;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:10px;padding:0.75rem 0.85rem;font-size:0.78rem;color:var(--text-primary);width:300px;box-shadow:0 6px 24px rgba(0,0,0,.55);pointer-events:auto;z-index:20;display:none;word-break:break-word}
+.agent-popover.visible{display:block}
+.agent-popover-close{position:absolute;top:0.35rem;right:0.5rem;background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.85rem;padding:0.2rem}
+.agent-popover-close:hover{color:var(--text-primary)}
+.ap-header{display:flex;align-items:center;gap:0.6rem;margin-bottom:0.5rem;padding-bottom:0.45rem;border-bottom:1px solid var(--border)}
+.ap-photo{width:44px;height:44px;border-radius:50%;flex-shrink:0;object-fit:cover;border:2px solid var(--border)}
+.ap-info{flex:1}
+.ap-name{font-weight:700;font-size:0.88rem}
+.ap-role{font-size:0.72rem;color:var(--text-secondary)}
+.ap-tagline{font-size:0.72rem;color:var(--text-secondary);font-style:italic;line-height:1.3;margin-bottom:0.35rem}
+.ap-desc{font-size:0.72rem;color:var(--text-secondary);line-height:1.35;margin-top:0.35rem}
+.ap-section{margin-top:0.45rem}
+.ap-section-title{font-size:0.68rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.2rem;font-weight:600}
+.ap-tags{display:flex;flex-wrap:wrap;gap:0.25rem}
+.ap-tag{display:inline-block;padding:0.1rem 0.4rem;border-radius:4px;font-size:0.68rem;background:var(--bg-secondary);border:1px solid var(--border)}
+.ap-tag--skill{border-color:rgba(124,58,237,.35);color:var(--purple)}
+.ap-tag--tool{border-color:rgba(16,185,129,.3);color:var(--green)}
+.ap-tag--mcp{border-color:rgba(245,158,11,.3);color:var(--yellow)}
+.ap-model{display:inline-flex;align-items:center;gap:0.3rem;font-size:0.68rem;padding:0.12rem 0.4rem;border-radius:4px;background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-secondary);font-family:var(--font-mono)}
 
 .portfolio-metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem;margin-bottom:1.5rem}
 .metric-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;text-align:center}
@@ -77,38 +91,23 @@
         <div class="section-title">
             <svg class="icon icon-sm"><use href="#icon-target"/></svg> Comité Stratégique
         </div>
-        <div class="portfolio-strategy">
+        <div class="portfolio-strategy" id="stratContainer">
             {% for a in strategic_agents %}
-            <div class="strat-card">
-                <div class="strat-header">
-                    {% if a.avatar_url %}
-                    <img class="strat-photo" src="{{ a.avatar_url }}" alt="{{ a.name }}">
-                    {% else %}
-                    <div class="strat-avatar" style="background:{{ a.color }}20;border:2px solid {{ a.color }}">
-                        <svg style="color:{{ a.color }}"><use href="#icon-{{ a.avatar }}"/></svg>
-                    </div>
-                    {% endif %}
-                    <div class="strat-info">
-                        <div class="strat-name">{{ a.name }}</div>
-                        <div class="strat-role">{{ a.role }}</div>
-                    </div>
-                </div>
-                {% if a.tagline %}<div class="strat-tagline">{{ a.tagline }}</div>{% endif %}
-                {% if a.persona %}<div class="strat-persona">{{ a.persona }}</div>{% endif %}
-                {% if a.skills %}
-                <div class="strat-section-title"><svg class="icon icon-xs"><use href="#icon-layers"/></svg> Skills</div>
-                <div class="strat-tags">
-                    {% for s in a.skills[:6] %}<span class="strat-tag strat-tag--skill">{{ s }}</span>{% endfor %}
+            <div class="strat-card" data-agent="{{ loop.index0 }}" onclick="togglePopover(this, {{ loop.index0 }})">
+                {% if a.avatar_url %}
+                <img class="strat-photo" src="{{ a.avatar_url }}" alt="{{ a.name }}">
+                {% else %}
+                <div class="strat-avatar" style="background:{{ a.color }}20;border:2px solid {{ a.color }}">
+                    <svg style="color:{{ a.color }}"><use href="#icon-{{ a.avatar }}"/></svg>
                 </div>
                 {% endif %}
-                {% if a.tools %}
-                <div class="strat-section-title"><svg class="icon icon-xs"><use href="#icon-settings"/></svg> Tools</div>
-                <div class="strat-tags">
-                    {% for t in a.tools[:4] %}<span class="strat-tag strat-tag--tool">{{ t }}</span>{% endfor %}
+                <div class="strat-info">
+                    <div class="strat-name">{{ a.name }}</div>
+                    <div class="strat-role">{{ a.role }}</div>
                 </div>
-                {% endif %}
             </div>
             {% endfor %}
+            <div class="agent-popover" id="agentPopover"></div>
         </div>
     </div>
 
@@ -198,4 +197,108 @@
         </div>
     </div>
 </div>
+
+<script>
+const agents = {{ strategic_agents | tojson }};
+let activeCard = null;
+
+function esc(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
+function closePopover(){
+    document.getElementById('agentPopover').classList.remove('visible');
+    if(activeCard){ activeCard.classList.remove('active'); activeCard=null; }
+}
+
+function togglePopover(card, idx){
+    const pop = document.getElementById('agentPopover');
+    if(activeCard === card){ closePopover(); return; }
+    if(activeCard) activeCard.classList.remove('active');
+    activeCard = card;
+    card.classList.add('active');
+
+    const a = agents[idx];
+    const photo = a.avatar_url
+        ? `<img class="ap-photo" src="${a.avatar_url}" alt="${esc(a.name)}">`
+        : `<div class="strat-avatar" style="background:${a.color}20;border:2px solid ${a.color}"><svg style="color:${a.color};width:20px;height:20px"><use href="#icon-${a.avatar}"/></svg></div>`;
+
+    let skillsHtml = '';
+    if(a.skills && a.skills.length){
+        skillsHtml = `<div class="ap-section">
+            <div class="ap-section-title"><svg class="icon icon-xs"><use href="#icon-layers"/></svg> Skills</div>
+            <div class="ap-tags">${a.skills.map(s=>`<span class="ap-tag ap-tag--skill">${esc(s)}</span>`).join('')}</div>
+        </div>`;
+    }
+    let toolsHtml = '';
+    if(a.tools && a.tools.length){
+        toolsHtml = `<div class="ap-section">
+            <div class="ap-section-title"><svg class="icon icon-xs"><use href="#icon-settings"/></svg> Tools</div>
+            <div class="ap-tags">${a.tools.map(t=>`<span class="ap-tag ap-tag--tool">${esc(t)}</span>`).join('')}</div>
+        </div>`;
+    }
+    let mcpsHtml = '';
+    if(a.mcps && a.mcps.length){
+        mcpsHtml = `<div class="ap-section">
+            <div class="ap-section-title"><svg class="icon icon-xs"><use href="#icon-plug"/></svg> MCPs</div>
+            <div class="ap-tags">${a.mcps.map(m=>`<span class="ap-tag ap-tag--mcp">${esc(m)}</span>`).join('')}</div>
+        </div>`;
+    }
+    let modelHtml = '';
+    if(a.model || a.provider){
+        modelHtml = `<div class="ap-section">
+            <div class="ap-section-title"><svg class="icon icon-xs"><use href="#icon-brain"/></svg> LLM</div>
+            <span class="ap-model">${esc(a.provider||'')} ${esc(a.model||'default')}</span>
+        </div>`;
+    }
+    let personaHtml = '';
+    if(a.persona){
+        personaHtml = `<div class="ap-section">
+            <div class="ap-section-title"><svg class="icon icon-xs"><use href="#icon-user"/></svg> Persona</div>
+            <div class="ap-desc" style="white-space:pre-line">${esc(a.persona)}</div>
+        </div>`;
+    }
+    let descHtml = '';
+    if(a.description){
+        descHtml = `<div class="ap-desc">${esc(a.description)}</div>`;
+    }
+
+    pop.innerHTML = `
+        <button class="agent-popover-close" onclick="event.stopPropagation();closePopover()"><svg class="icon icon-xs"><use href="#icon-x"/></svg></button>
+        <div class="ap-header">
+            ${photo}
+            <div class="ap-info">
+                <div class="ap-name">${esc(a.name)}</div>
+                <div class="ap-role">${esc(a.role)}</div>
+            </div>
+        </div>
+        ${a.tagline ? `<div class="ap-tagline">${esc(a.tagline)}</div>` : ''}
+        ${descHtml}
+        ${personaHtml}
+        ${skillsHtml}
+        ${toolsHtml}
+        ${mcpsHtml}
+        ${modelHtml}
+    `;
+
+    // Position popover below the card
+    const rect = card.getBoundingClientRect();
+    const container = document.getElementById('stratContainer').getBoundingClientRect();
+    let left = rect.left - container.left;
+    let top = rect.bottom - container.top + 6;
+    // Clamp to container width
+    if(left + 300 > container.width) left = container.width - 310;
+    if(left < 0) left = 0;
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+    pop.classList.add('visible');
+}
+
+// Close on outside click
+document.addEventListener('click', function(e){
+    if(!e.target.closest('.strat-card') && !e.target.closest('.agent-popover')){
+        closePopover();
+    }
+});
+// Close on Escape
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') closePopover(); });
+</script>
 {% endblock %}

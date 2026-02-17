@@ -45,9 +45,11 @@ async def portfolio_page(request: Request):
             "id": a.id, "name": a.name, "role": a.role,
             "avatar": a.avatar or a.icon or "bot", "color": a.color or "#7c3aed",
             "avatar_url": avatar_url,
-            "tagline": a.tagline or "", "persona": (a.persona or "")[:200],
-            "description": (a.description or "")[:120],
+            "tagline": a.tagline or "", "persona": a.persona or "",
+            "description": a.description or "",
             "skills": a.skills or [], "tools": a.tools or [],
+            "mcps": a.mcps or [],
+            "model": getattr(a, "model", "") or "", "provider": getattr(a, "provider", "") or "",
         })
 
     # Build project cards with missions
