@@ -1624,7 +1624,7 @@ migrate sharelook status --rollback-safe
 
 ## MACARON AGENT PLATFORM (Web Multi-Agent)
 
-**Location:** `_SOFTWARE_FACTORY/platform/` | **Port:** 8090
+**Location:** `_SOFTWARE_FACTORY/platform/` | **Port:** 8099
 **Stack:** FastAPI + HTMX + Jinja2 + SSE + SQLite | Dark purple/indigo theme
 
 ### VISION: Real Agentic ≠ Workflow Automation
@@ -1781,5 +1781,45 @@ Lead →[INFORM]→ CDP "phase 2 complete, next phase 3"
 ```bash
 cd _SOFTWARE_FACTORY && rm -f data/platform.db
 AZURE_OPENAI_API_KEY=dummy AZURE_AI_API_KEY=dummy \
-python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
+python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8099
 ```
+
+### DASHBOARD VIEWS (4 profiles)
+
+| Vue | Route | Contenu |
+|-----|-------|---------|
+| **DSI/CTO** | `/dsi` | Comité stratégique IA, carte systèmes/patterns, intelligence score, métriques |
+| **Métier** | `/metier` | Flux processus métier par département, productivité agents, calendrier activité |
+| **Portefeuille** | `/` | Projets sidebar, graph stratégique, épics progression table, Gantt milestones |
+| **Projet Board** | `/projects/{id}/board` | Kanban 4 colonnes, backlog/PRs, flux agents projet |
+
+Tabs conditionnels: DSI=décisions/metrics, Métier=flux/KPI, Dev=agents/skills/MCP
+
+### IDEATION FLOW
+
+```
+/ideation → saisie idée → LLM meeting-style → Brief → Analyse → Synthèse
+```
+
+- 5 agents: Camille (BA), Pierre (Archi), Chloé (UX), Nadia (Sécu), Alexandre (PM)
+- @mentions + roles + direction (→ @Pierre)
+- Graph SVG: edges light up FROM speaker TO target
+- Phase headers: 📋 Brief → 🔍 Analyse → 📊 Synthèse
+- Persistence: sessions+messages+findings SQLite, sidebar historique
+- "Créer Epic" → PO prend le relai, crée projet+git
+
+### MEMORY & RETROSPECTIVES
+
+```
+Memory 4-layer: session → pattern → project → global (FTS5)
+```
+
+- `/memory` wiki-like: categories (architecture, vision, team, process, backlog)
+- Confidence bars + occurrence counts + category badges
+- Auto-population: epic creation → stack/vision/team/features stored
+- Retrospectives: POST `/api/retrospectives/generate` → LLM analyze → lessons → memory_global
+- Recursive self-improvement: lessons feed back into global memory
+
+### DB MIGRATIONS
+- `platform/db/migrations.py` — ALTER TABLE safe (PRAGMA table_info check)
+- Colonnes ajoutées: agents(avatar,tagline,motivation), ideation_messages(role,target)
