@@ -156,6 +156,15 @@ async def launch_strategic_committee(request: Request):
         message_type="system",
         content="Comité Stratégique lancé. Les agents du comité vont débattre des priorités portfolio.",
     ))
+
+    # Auto-start workflow — agents debate autonomously
+    import asyncio
+    asyncio.create_task(_run_workflow_background(
+        wf, session.id,
+        "Revue stratégique du portfolio — arbitrages, priorités, GO/NOGO sur les projets en cours",
+        "",
+    ))
+
     return JSONResponse({"session_id": session.id})
 
 
@@ -513,6 +522,12 @@ async def launch_mission_workflow(request: Request, mission_id: str):
         message_type="system",
         content=f"Workflow \"{wf_id}\" lancé pour la mission \"{mission.name}\". Goal: {mission.goal or 'not specified'}",
     ))
+
+    # Auto-start workflow execution — agents will dialogue via patterns
+    import asyncio
+    task_desc = mission.goal or mission.description or mission.name
+    asyncio.create_task(_run_workflow_background(wf, session.id, task_desc, mission.project_id or ""))
+
     return JSONResponse({"session_id": session.id, "workflow_id": wf_id})
 
 
