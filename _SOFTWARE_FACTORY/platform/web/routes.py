@@ -91,10 +91,38 @@ async def portfolio_page(request: Request):
             "total_tasks": p_total, "done_tasks": p_done,
         })
 
+    # Load strategic committee graph from workflow
+    strat_graph = {"nodes": [], "edges": []}
+    try:
+        from ..workflows.store import get_workflow_store
+        wf_store = get_workflow_store()
+        strat_wf = wf_store.get("strategic-committee")
+        if strat_wf and strat_wf.config:
+            sg = strat_wf.config.get("graph", {})
+            if sg.get("nodes"):
+                agent_map = {a.id: a for a in all_agents}
+                for n in sg["nodes"]:
+                    aid = n.get("agent_id", "")
+                    a = agent_map.get(aid)
+                    jpg = avatar_dir / f"{aid}.jpg"
+                    svg_f = avatar_dir / f"{aid}.svg"
+                    av_url = f"/static/avatars/{aid}.jpg" if jpg.exists() else (f"/static/avatars/{aid}.svg" if svg_f.exists() else "")
+                    strat_graph["nodes"].append({
+                        "id": n["id"], "agent_id": aid,
+                        "label": n.get("label", a.name if a else aid),
+                        "x": n.get("x", 0), "y": n.get("y", 0),
+                        "color": a.color if a else "#7c3aed",
+                        "avatar_url": av_url,
+                    })
+                strat_graph["edges"] = sg.get("edges", [])
+    except Exception:
+        pass
+
     return _templates(request).TemplateResponse("portfolio.html", {
         "request": request, "page_title": "Portfolio",
         "projects": projects_data,
         "strategic_agents": strategic,
+        "strat_graph": strat_graph,
         "total_missions": len(all_missions),
         "active_missions": active_count,
         "total_tasks": total_tasks,
@@ -2145,3 +2173,441 @@ async def remove_github_skill_source(request: Request):
     if repo:
         get_skill_library().remove_github_source(repo)
     return HTMLResponse("")
+
+
+# ── Team Generator ───────────────────────────────────────────────
+
+@router.get("/generate", response_class=HTMLResponse)
+async def generate_page(request: Request):
+    """Team & Workflow Generator page."""
+    return _templates(request).TemplateResponse("generate.html", {
+        "request": request,
+        "page_title": "Team Generator",
+    })
+
+
+@router.post("/api/generate-team")
+async def generate_team(request: Request):
+    """Generate team + workflow from natural language prompt, launch it."""
+    from ..generators.team import TeamGenerator
+
+    form = await request.form()
+    prompt = str(form.get("prompt", "")).strip()
+    if not prompt:
+        return HTMLResponse('<div class="msg-system-text">❌ Prompt requis</div>', status_code=400)
+
+    try:
+        gen = TeamGenerator()
+        result = await gen.generate(prompt)
+
+        # Launch workflow in background
+        from ..workflows.store import get_workflow_store, run_workflow
+        wf = get_workflow_store().get(result["workflow_id"])
+        if wf:
+            asyncio.create_task(_run_workflow_background(
+                wf, result["session_id"],
+                result["spec"].mission_goal,
+                "",
+            ))
+
+        return JSONResponse({
+            "session_id": result["session_id"],
+            "workflow_id": result["workflow_id"],
+            "team_size": result["team_size"],
+            "agents": result["agents"],
+            "redirect": f"/sessions/{result['session_id']}/live",
+        })
+    except Exception as e:
+        logger.error("Team generation failed: %s", e, exc_info=True)
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# ── DORA Metrics ─────────────────────────────────────────────────
+
+@router.get("/metrics", response_class=HTMLResponse)
+async def dora_dashboard_page(request: Request):
+    """DORA Metrics dashboard page."""
+    from ..metrics.dora import get_dora_metrics
+    from ..projects.manager import get_project_store
+
+    projects = get_project_store().list_all()
+    project_id = request.query_params.get("project", "")
+    period = int(request.query_params.get("period", "30"))
+
+    dora = get_dora_metrics()
+    summary = dora.summary(project_id, period)
+    trend = dora.trend(project_id, weeks=12)
+
+    return _templates(request).TemplateResponse("dora_dashboard.html", {
+        "request": request,
+        "page_title": "DORA Metrics",
+        "projects": projects,
+        "selected_project": project_id,
+        "period": period,
+        "dora": summary,
+        "trend": trend,
+    })
+
+
+@router.get("/api/metrics/dora/{project_id}")
+async def dora_api(request: Request, project_id: str):
+    """DORA metrics JSON API."""
+    from ..metrics.dora import get_dora_metrics
+    period = int(request.query_params.get("period", "30"))
+    pid = "" if project_id == "all" else project_id
+    return JSONResponse(get_dora_metrics().summary(pid, period))
+
+
+# ── RBAC ─────────────────────────────────────────────────────────
+
+@router.get("/api/rbac/agent/{agent_id}")
+async def rbac_agent_permissions(agent_id: str):
+    """Get RBAC permissions for an agent."""
+    from ..rbac import agent_permissions_summary, get_agent_category
+    return JSONResponse({
+        "agent_id": agent_id,
+        "category": get_agent_category(agent_id),
+        "permissions": agent_permissions_summary(agent_id),
+    })
+
+
+@router.get("/api/rbac/check")
+async def rbac_check(request: Request):
+    """Check a specific permission. Query: ?actor=agent_id&type=agent&artifact=code&action=create"""
+    from ..rbac import check_agent_permission, check_human_permission
+    actor = request.query_params.get("actor", "")
+    actor_type = request.query_params.get("type", "agent")
+    artifact = request.query_params.get("artifact", "")
+    action = request.query_params.get("action", "")
+
+    if actor_type == "agent":
+        ok, reason = check_agent_permission(actor, artifact, action)
+    else:
+        ok, reason = check_human_permission(actor, artifact, action)
+
+    return JSONResponse({"allowed": ok, "reason": reason})
+
+
+# ── DSI Board ────────────────────────────────────────────────────
+
+@router.get("/dsi", response_class=HTMLResponse)
+async def dsi_board_page(request: Request):
+    """DSI strategic dashboard — kanban pipeline + KPIs."""
+    from ..projects.manager import get_project_store
+    from ..agents.store import get_agent_store
+    from ..missions.store import get_mission_store
+
+    project_store = get_project_store()
+    agent_store = get_agent_store()
+    mission_store = get_mission_store()
+
+    all_projects = project_store.list_all()
+    all_agents = agent_store.list_all()
+    all_missions = mission_store.list_missions()
+
+    # KPIs
+    active_missions = sum(1 for m in all_missions if m.status == "active")
+    blocked_missions = sum(1 for m in all_missions if m.status == "blocked")
+    total_tasks = 0
+    total_done = 0
+    for m in all_missions:
+        stats = mission_store.mission_stats(m.id)
+        total_tasks += stats.get("total", 0)
+        total_done += stats.get("done", 0)
+
+    # Pipeline kanban columns
+    project_names = {p.id: p.name for p in all_projects}
+    statuses = [
+        ("backlog", "Backlog", "planning"),
+        ("planning", "Planning", "planning"),
+        ("active", "En cours", "active"),
+        ("review", "Review", "completed"),
+        ("completed", "Terminé", "completed"),
+    ]
+    pipeline = []
+    for status_key, label, match_status in statuses:
+        col_missions = []
+        # "backlog" = missions in planning with no sprint
+        if status_key == "backlog":
+            for m in all_missions:
+                if m.status == "planning":
+                    sprints = mission_store.list_sprints(m.id)
+                    if not sprints:
+                        stats = mission_store.mission_stats(m.id)
+                        col_missions.append({
+                            "id": m.id, "name": m.name,
+                            "project_name": project_names.get(m.project_id, m.project_id),
+                            "wsjf": m.wsjf_score, "total": stats.get("total", 0),
+                            "done": stats.get("done", 0),
+                        })
+        elif status_key == "planning":
+            for m in all_missions:
+                if m.status == "planning":
+                    sprints = mission_store.list_sprints(m.id)
+                    if sprints:
+                        stats = mission_store.mission_stats(m.id)
+                        col_missions.append({
+                            "id": m.id, "name": m.name,
+                            "project_name": project_names.get(m.project_id, m.project_id),
+                            "wsjf": m.wsjf_score, "total": stats.get("total", 0),
+                            "done": stats.get("done", 0),
+                        })
+        elif status_key == "review":
+            # Missions with status "completed" but also any "review" sprints
+            for m in all_missions:
+                sprints = mission_store.list_sprints(m.id)
+                if any(s.status == "review" for s in sprints) and m.status == "active":
+                    stats = mission_store.mission_stats(m.id)
+                    col_missions.append({
+                        "id": m.id, "name": m.name,
+                        "project_name": project_names.get(m.project_id, m.project_id),
+                        "wsjf": m.wsjf_score, "total": stats.get("total", 0),
+                        "done": stats.get("done", 0),
+                    })
+        else:
+            for m in all_missions:
+                if m.status == match_status:
+                    # Skip those already in backlog/planning/review
+                    if status_key == "active":
+                        sprints = mission_store.list_sprints(m.id)
+                        if any(s.status == "review" for s in sprints):
+                            continue
+                    stats = mission_store.mission_stats(m.id)
+                    col_missions.append({
+                        "id": m.id, "name": m.name,
+                        "project_name": project_names.get(m.project_id, m.project_id),
+                        "wsjf": m.wsjf_score, "total": stats.get("total", 0),
+                        "done": stats.get("done", 0),
+                    })
+        pipeline.append({"status": status_key, "label": label, "missions": col_missions})
+
+    # Resource allocation per project
+    resources = []
+    project_colors = ["var(--purple)", "var(--blue)", "var(--green)", "var(--yellow)", "var(--red)", "#06b6d4", "#8b5cf6"]
+    for i, p in enumerate(all_projects):
+        p_missions = [m for m in all_missions if m.project_id == p.id]
+        p_active = sum(1 for m in p_missions if m.status == "active")
+        if p_missions:
+            resources.append({
+                "name": p.name,
+                "total": len(p_missions),
+                "active": p_active,
+                "pct": round(p_active / max(len(p_missions), 1) * 100),
+                "color": project_colors[i % len(project_colors)],
+            })
+
+    # Strategic agents
+    avatar_dir = Path(__file__).parent / "static" / "avatars"
+    strategic = []
+    for a in all_agents:
+        if any(t == "strategy" for t in (a.tags or [])):
+            jpg = avatar_dir / f"{a.id}.jpg"
+            svg_f = avatar_dir / f"{a.id}.svg"
+            avatar_url = f"/static/avatars/{a.id}.jpg" if jpg.exists() else (f"/static/avatars/{a.id}.svg" if svg_f.exists() else "")
+            strategic.append({
+                "id": a.id, "name": a.name, "role": a.role,
+                "avatar": a.avatar or a.icon or "bot", "color": a.color or "#7c3aed",
+                "avatar_url": avatar_url,
+            })
+
+    return _templates(request).TemplateResponse("dsi.html", {
+        "request": request, "page_title": "DSI Board",
+        "total_missions": len(all_missions),
+        "active_missions": active_missions,
+        "blocked_missions": blocked_missions,
+        "total_tasks": total_tasks,
+        "total_done": total_done,
+        "total_agents": len(all_agents),
+        "pipeline": pipeline,
+        "resources": resources,
+        "strategic_agents": strategic,
+    })
+
+
+# ── Product Management ───────────────────────────────────────────
+
+@router.get("/product", response_class=HTMLResponse)
+async def product_page(request: Request):
+    """Product backlog — Epic → Feature → User Story hierarchy."""
+    from ..missions.store import get_mission_store
+    from ..missions.product import get_product_backlog
+    from ..projects.manager import get_project_store
+
+    mission_store = get_mission_store()
+    backlog = get_product_backlog()
+    project_store = get_project_store()
+
+    all_projects = project_store.list_all()
+    all_missions = mission_store.list_missions()
+    filter_project = request.query_params.get("project", "")
+
+    if filter_project:
+        all_missions = [m for m in all_missions if m.project_id == filter_project]
+
+    project_names = {p.id: p.name for p in all_projects}
+
+    # Build epic → features → stories tree
+    epics = []
+    total_features = 0
+    total_stories = 0
+    total_points = 0
+    total_done_stories = 0
+
+    for m in all_missions:
+        features = backlog.list_features(m.id)
+        epic_features = []
+        epic_points = 0
+        epic_stories = 0
+        epic_done = 0
+
+        for f in features:
+            stories = backlog.list_stories(f.id)
+            f_points = f.story_points or sum(s.story_points for s in stories)
+            epic_points += f_points
+            epic_stories += len(stories)
+            epic_done += sum(1 for s in stories if s.status == "done")
+            total_stories += len(stories)
+            total_points += f_points
+
+            epic_features.append({
+                "id": f.id, "name": f.name, "status": f.status,
+                "story_points": f_points, "assigned_to": f.assigned_to,
+                "stories": [{"id": s.id, "title": s.title, "status": s.status,
+                             "story_points": s.story_points} for s in stories],
+            })
+
+        total_features += len(features)
+        total_done_stories += epic_done
+
+        epics.append({
+            "id": m.id, "name": m.name, "status": m.status,
+            "project_name": project_names.get(m.project_id, m.project_id),
+            "features": epic_features,
+            "total_points": epic_points,
+            "total_stories": epic_stories,
+            "done_pct": round(epic_done / max(epic_stories, 1) * 100),
+        })
+
+    done_pct = round(total_done_stories / max(total_stories, 1) * 100)
+
+    return _templates(request).TemplateResponse("product.html", {
+        "request": request, "page_title": "Product",
+        "epics": epics,
+        "projects": all_projects,
+        "filter_project": filter_project,
+        "summary": {
+            "epics": len(epics),
+            "features": total_features,
+            "stories": total_stories,
+            "total_points": total_points,
+            "done_pct": done_pct,
+        },
+    })
+
+
+# ── Ideation Workspace ───────────────────────────────────────────
+
+_IDEATION_AGENTS = [
+    {"id": "metier", "name": "Business Analyst", "short_role": "Métier", "color": "#2563eb"},
+    {"id": "architecte", "name": "Architecte", "short_role": "Architecture", "color": "#0891b2"},
+    {"id": "ux_designer", "name": "UX Designer", "short_role": "UX/UI", "color": "#8b5cf6"},
+    {"id": "securite", "name": "Expert Sécurité", "short_role": "Sécurité", "color": "#dc2626"},
+    {"id": "product_manager", "name": "Product Manager", "short_role": "Produit", "color": "#16a34a"},
+]
+
+_IDEATION_SYSTEM = """Tu participes à un atelier d'idéation multi-agents.
+Pour chaque idée soumise, tu dois analyser sous ton angle d'expertise et produire:
+1. Un avis structuré (opportunités, risques, questions)
+2. Des suggestions concrètes
+
+Réponds en JSON:
+{{
+  "messages": [
+    {{"agent_id": "metier", "agent_name": "Business Analyst", "content": "...", "color": "#2563eb"}},
+    {{"agent_id": "architecte", "agent_name": "Architecte", "content": "...", "color": "#0891b2"}},
+    {{"agent_id": "ux_designer", "agent_name": "UX Designer", "content": "...", "color": "#8b5cf6"}},
+    {{"agent_id": "securite", "agent_name": "Expert Sécurité", "content": "...", "color": "#dc2626"}},
+    {{"agent_id": "product_manager", "agent_name": "Product Manager", "content": "...", "color": "#16a34a"}}
+  ],
+  "findings": [
+    {{"type": "opportunity|risk|question|decision|feature", "text": "..."}}
+  ]
+}}
+
+Chaque agent doit avoir un avis DIFFÉRENT et complémentaire.
+Le Business Analyst challenge la valeur métier.
+L'Architecte propose l'approche technique et les risques techniques.
+L'UX Designer pense utilisateur, parcours, accessibilité.
+L'Expert Sécurité identifie les menaces (OWASP, RGPD).
+Le Product Manager priorise et synthétise en features actionnables.
+
+Réponds UNIQUEMENT avec le JSON, rien d'autre."""
+
+
+@router.get("/ideation", response_class=HTMLResponse)
+async def ideation_page(request: Request):
+    """Ideation workspace — brainstorm with expert agents."""
+    return _templates(request).TemplateResponse("ideation.html", {
+        "request": request, "page_title": "Idéation",
+        "agents": _IDEATION_AGENTS,
+    })
+
+
+@router.post("/api/ideation")
+async def ideation_submit(request: Request):
+    """Process ideation prompt through multi-agent LLM analysis."""
+    from ..llm.client import get_llm_client, LLMMessage
+
+    data = await request.json()
+    prompt = data.get("prompt", "").strip()
+    if not prompt:
+        return JSONResponse({"error": "Prompt requis"}, status_code=400)
+
+    client = get_llm_client()
+    try:
+        resp = await client.chat(
+            messages=[LLMMessage(role="user", content=f"Idée à analyser:\n\n{prompt}")],
+            system_prompt=_IDEATION_SYSTEM,
+            provider="azure",
+            temperature=0.7,
+            max_tokens=4096,
+        )
+
+        raw = resp.content.strip()
+        if "```json" in raw:
+            raw = raw.split("```json", 1)[1].split("```", 1)[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```", 1)[1].split("```", 1)[0].strip()
+
+        result = json.loads(raw)
+        result["session_id"] = data.get("session_id", "")
+        return JSONResponse(result)
+    except json.JSONDecodeError:
+        return JSONResponse({
+            "messages": [{"agent_id": "system", "agent_name": "Système",
+                          "content": resp.content[:500], "color": "#6b7280"}],
+            "findings": [],
+            "session_id": data.get("session_id", ""),
+        })
+    except Exception as e:
+        logger.error("Ideation error: %s", e)
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.post("/api/ideation/create-epic")
+async def ideation_create_epic(request: Request):
+    """Create a mission (epic) from ideation session."""
+    from ..missions.store import get_mission_store, MissionDef
+
+    data = await request.json()
+    mission_store = get_mission_store()
+    mission = MissionDef(
+        name=data.get("name", "Epic from ideation"),
+        description=data.get("description", ""),
+        goal=data.get("goal", ""),
+        status="planning",
+        project_id=data.get("project_id", ""),
+        created_by="ideation",
+    )
+    mission = mission_store.create_mission(mission)
+    return JSONResponse({"mission_id": mission.id, "name": mission.name})

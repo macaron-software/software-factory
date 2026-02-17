@@ -461,6 +461,72 @@ class WorkflowStore:
                     },
                 },
             ),
+            # ── Comité Stratégique ──
+            WorkflowDef(
+                id="strategic-committee",
+                name="Comite Strategique",
+                description="Gouvernance portfolio: arbitrage investissements, alignement strategie-execution, GO/NOGO initiatives.",
+                icon="target", is_builtin=True,
+                phases=[
+                    WorkflowPhase(id="p1-intake", pattern_id="network", name="Instruction du Dossier",
+                                  description="CPO presente la demande, CTO evalue faisabilite, Portfolio analyse capacite et WSJF.",
+                                  gate="always",
+                                  config={"agents": ["strat-cpo", "strat-cto", "strat-portfolio", "lean_portfolio_manager"]}),
+                    WorkflowPhase(id="p2-debate", pattern_id="network", name="Debat & Arbitrage",
+                                  description="Debat ouvert: impact budget, dette technique, alignement roadmap. Dir Programme evalue charge.",
+                                  gate="always",
+                                  config={"agents": ["dsi", "strat-cpo", "strat-cto", "strat-portfolio", "strat-dirprog", "lean_portfolio_manager"]}),
+                    WorkflowPhase(id="p3-decision", pattern_id="hierarchical", name="Decision GO / NOGO",
+                                  description="DSI rend la decision finale. GO = lancement projet. NOGO = retour backlog. PIVOT = reformulation.",
+                                  gate="all_approved",
+                                  config={"agents": ["dsi", "strat-cpo", "strat-cto"]}),
+                ],
+                config={
+                    "graph": {
+                        "nodes": [
+                            {"id": "n1", "agent_id": "dsi", "x": 400, "y": 20, "label": "DSI"},
+                            {"id": "n2", "agent_id": "strat-cpo", "x": 200, "y": 140, "label": "Julie - CPO"},
+                            {"id": "n3", "agent_id": "strat-cto", "x": 600, "y": 140, "label": "Karim - CTO"},
+                            {"id": "n4", "agent_id": "strat-portfolio", "x": 120, "y": 280, "label": "Sofia - Portfolio"},
+                            {"id": "n5", "agent_id": "strat-dirprog", "x": 680, "y": 280, "label": "Thomas - Dir Programme"},
+                            {"id": "n6", "agent_id": "lean_portfolio_manager", "x": 400, "y": 330, "label": "Lean Portfolio Mgr"},
+                        ],
+                        "edges": [
+                            # DSI ↔ CPO/CTO: arbitrage stratégique
+                            {"from": "n1", "to": "n2", "label": "vision produit", "color": "#a855f7"},
+                            {"from": "n1", "to": "n3", "label": "vision tech", "color": "#a855f7"},
+                            {"from": "n2", "to": "n1", "label": "proposition", "color": "#8b5cf6"},
+                            {"from": "n3", "to": "n1", "label": "faisabilite", "color": "#8b5cf6"},
+                            # CPO ↔ CTO: produit vs technique
+                            {"from": "n2", "to": "n3", "label": "feature vs dette", "color": "#f59e0b"},
+                            {"from": "n3", "to": "n2", "label": "contraintes archi", "color": "#f59e0b"},
+                            # Portfolio ↔ CPO: priorisation WSJF
+                            {"from": "n4", "to": "n2", "label": "WSJF scoring", "color": "#10b981"},
+                            {"from": "n2", "to": "n4", "label": "valeur business", "color": "#10b981"},
+                            # Portfolio ↔ Lean: budget & capacity
+                            {"from": "n4", "to": "n6", "label": "metriques flux", "color": "#06b6d4"},
+                            {"from": "n6", "to": "n4", "label": "budget lean", "color": "#06b6d4"},
+                            # CTO ↔ Dir Programme: charge & planning
+                            {"from": "n3", "to": "n5", "label": "complexite", "color": "#ef4444"},
+                            {"from": "n5", "to": "n3", "label": "capacite equipes", "color": "#ef4444"},
+                            # Dir Programme ↔ Lean: staffing
+                            {"from": "n5", "to": "n6", "label": "plan staffing", "color": "#d946ef"},
+                            {"from": "n6", "to": "n5", "label": "guardrails", "color": "#d946ef"},
+                            # DSI ↔ Lean: alignement strategique
+                            {"from": "n1", "to": "n6", "label": "themes strat", "color": "#64748b"},
+                            {"from": "n6", "to": "n1", "label": "portfolio health", "color": "#64748b"},
+                        ],
+                    },
+                    "agents_permissions": {
+                        "dsi": {"can_veto": True, "veto_level": "ABSOLUTE", "can_delegate": True, "can_approve": True},
+                        "strat-cpo": {"can_veto": True, "veto_level": "STRONG", "can_delegate": True, "can_approve": True},
+                        "strat-cto": {"can_veto": True, "veto_level": "STRONG", "can_delegate": True, "can_approve": True},
+                        "strat-portfolio": {"can_veto": False, "can_approve": True},
+                        "strat-dirprog": {"can_veto": False, "can_approve": True},
+                        "lean_portfolio_manager": {"can_veto": True, "veto_level": "ADVISORY", "can_approve": True},
+                    },
+                },
+            ),
         ]
         for w in builtins:
             self.create(w)
