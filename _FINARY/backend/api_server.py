@@ -2042,7 +2042,8 @@ def get_patrimoine_projection():
 
     # Current values
     sca = P.get("sca_la_desirade", {})
-    property_val = sca.get("property", {}).get("bourso_estimate", 0) * sca.get("ownership_pct", 50.633) / 100
+    # bourso_estimate is already YOUR property value (lot A, 114m²), not the full SCA
+    property_val = sca.get("property", {}).get("bourso_estimate", 0)
     investments = sum(p["value_eur"] for p in build_positions())
     cash = sum(a["balance"] for a in ACCOUNTS if a["account_type"] in ("checking", "savings") and not a.get("excluded"))
     loans_data = get_loans()
