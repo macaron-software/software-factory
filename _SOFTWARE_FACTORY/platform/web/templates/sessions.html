@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+{% include "partials/view_switcher.html" %}
+<a href="/sessions/new" class="btn btn-primary">
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> New
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="item-grid" data-view-grid data-view="card">
+    {% for s in sessions %}
+    <a href="/sessions/{{ s.session.id }}" class="item-card">
+        <div class="item-icon">
+            <span class="status-dot {% if s.session.status == 'active' %}active{% elif s.session.status == 'completed' %}done{% else %}idle{% endif %}"></span>
+        </div>
+        <div class="item-main">
+            <div class="item-title">{{ s.session.name }}</div>
+            <div class="item-subtitle">{{ s.session.status }}{% if s.project_name %} · {{ s.project_name }}{% endif %}</div>
+            <div class="item-detail">
+                {% if s.session.goal %}
+                <p class="item-desc">{{ s.session.goal[:140] }}{% if s.session.goal|length > 140 %}…{% endif %}</p>
+                {% endif %}
+                <div class="item-tags">
+                    {% if s.pattern_name %}
+                    <span class="item-tag">{{ s.pattern_name }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="item-meta">
+            <span class="item-badge">{{ s.message_count }} msg</span>
+            <span class="item-badge muted">{{ s.session.created_at[:16].replace('T', ' ') }}</span>
+        </div>
+    </a>
+    {% else %}
+    <div class="empty-state">
+        <p>No sessions yet.</p>
+        <a href="/sessions/new" class="btn btn-primary">Start</a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

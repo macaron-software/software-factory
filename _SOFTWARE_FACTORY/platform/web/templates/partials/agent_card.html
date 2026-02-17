@@ -1,0 +1,11 @@
+<!-- Agent card partial — used in agent sidebar & monitoring -->
+<div class="agent-mini-card {{ agent.status.value if agent.status else 'idle' }}">
+    <span class="status-dot {{ agent.status.value if agent.status else 'idle' }}"></span>
+    <div class="agent-info">
+        <strong>{{ agent.role_id | replace('_', ' ') | title }}</strong>
+        <span class="agent-status-text">{{ agent.status.value if agent.status else 'idle' }}</span>
+    </div>
+    {% if agent.current_task %}
+    <div class="agent-task">{{ agent.current_task[:40] }}...</div>
+    {% endif %}
+</div>

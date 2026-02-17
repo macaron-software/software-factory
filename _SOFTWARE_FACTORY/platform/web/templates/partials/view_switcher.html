@@ -1,0 +1,40 @@
+{# View mode switcher — include in any list page #}
+{# Usage: {% include "partials/view_switcher.html" %} #}
+<div class="view-switcher" data-page="{{ page_title|lower|replace(' ','_') }}">
+    <button class="vs-btn active" data-mode="card" title="Cards">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+    </button>
+    <button class="vs-btn" data-mode="card-simple" title="Simplified">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="2.5"/><rect x="9" y="1" width="6" height="6" rx="2.5"/><rect x="1" y="9" width="6" height="6" rx="2.5"/><rect x="9" y="9" width="6" height="6" rx="2.5"/></svg>
+    </button>
+    <button class="vs-btn" data-mode="list" title="List">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1.5" width="14" height="3" rx="1"/><rect x="1" y="6.5" width="14" height="3" rx="1"/><rect x="1" y="11.5" width="14" height="3" rx="1"/></svg>
+    </button>
+    <button class="vs-btn" data-mode="list-compact" title="Compact">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2" rx="0.5"/><rect x="1" y="5.5" width="14" height="2" rx="0.5"/><rect x="1" y="9" width="14" height="2" rx="0.5"/><rect x="1" y="12.5" width="14" height="2" rx="0.5"/></svg>
+    </button>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const sw = document.querySelector('.view-switcher');
+  if (!sw) return;
+  const page = sw.dataset.page;
+  const key = 'macaron_view_' + page;
+  const saved = localStorage.getItem(key) || 'card';
+  const grid = document.querySelector('[data-view-grid]');
+  if (!grid) return;
+
+  function setMode(mode) {
+    grid.setAttribute('data-view', mode);
+    sw.querySelectorAll('.vs-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    localStorage.setItem(key, mode);
+  }
+
+  sw.addEventListener('click', e => {
+    const btn = e.target.closest('.vs-btn');
+    if (btn) setMode(btn.dataset.mode);
+  });
+
+  setMode(saved);
+});
+</script>

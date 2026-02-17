@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<a href="/mcps/new" class="btn btn-primary">
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Add MCP
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="mcps-grid">
+    {% for mcp in mcps %}
+    <div class="mcp-card" data-id="{{ mcp.id }}">
+        <div class="mcp-card-header">
+            <svg class="icon icon-lg" style="color: var(--green)"><use href="#icon-plug"/></svg>
+            <div>
+                <h3>{{ mcp.name }}</h3>
+                <span class="badge {% if mcp.status == 'running' %}badge-green{% else %}badge-yellow{% endif %}">{{ mcp.status }}</span>
+            </div>
+        </div>
+        <p class="agent-desc">{{ mcp.description }}</p>
+        <div class="agent-meta">
+            <code class="tag">{{ mcp.command }}</code>
+            {% if mcp.tools %}
+            <span class="tag">{{ mcp.tools | length }} tools</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if not mcps %}
+    <div class="empty-state">
+        <svg class="icon icon-xl"><use href="#icon-plug"/></svg>
+        <h3>No MCPs configured</h3>
+        <p>MCP servers provide tools to agents (git, Playwright, Jira, Figma...).</p>
+        <a href="/mcps/new" class="btn btn-primary">
+            <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Add MCP Server
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

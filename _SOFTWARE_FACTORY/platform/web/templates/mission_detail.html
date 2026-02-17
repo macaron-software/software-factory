@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<div style="display:flex;align-items:center;gap:12px;">
+    <span class="badge {% if mission.status == 'active' %}badge-green{% elif mission.status == 'completed' %}badge-blue{% elif mission.status == 'blocked' or mission.status == 'failed' %}badge-red{% else %}badge-yellow{% endif %}">
+        {{ mission.status }}
+    </span>
+    {% if mission.status == 'planning' %}
+    <button class="btn btn-sm btn-primary"
+            hx-post="/api/missions/{{ mission.id }}/start"
+            hx-swap="none"
+            hx-on::after-request="location.reload()">
+        <svg class="icon icon-sm"><use href="#icon-play"/></svg> Lancer
+    </button>
+    {% elif mission.status == 'active' %}
+    <a href="/missions/{{ mission.id }}/live" class="btn btn-sm btn-primary">
+        <svg class="icon icon-sm"><use href="#icon-zap"/></svg> Live
+    </a>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.mission-layout{display:grid;grid-template-columns:1fr 320px;gap:1.25rem;height:calc(100vh - 56px);overflow:hidden}
+@media(max-width:900px){.mission-layout{grid-template-columns:1fr;height:auto;overflow:auto}}
+
+/* ── Left: Timeline + Board ── */
+.mission-main{overflow-y:auto;padding:0.5rem 0}
+
+.mission-header{margin-bottom:1.25rem}
+.mission-name{font-size:1.3rem;font-weight:700;color:var(--text-primary);margin:0}
+.mission-project{font-size:0.82rem;color:var(--text-secondary);margin-top:0.2rem}
+.mission-goal{font-size:0.85rem;color:var(--text-secondary);margin-top:0.5rem;padding:0.75rem;background:var(--bg-secondary);border-left:3px solid var(--purple);border-radius:0 6px 6px 0}
+
+/* Sprint timeline */
+.sprint-timeline{display:flex;gap:0.5rem;margin-bottom:1.5rem;overflow-x:auto;padding-bottom:0.3rem}
+.sprint-chip{display:flex;align-items:center;gap:0.4rem;padding:0.45rem 0.85rem;border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);white-space:nowrap;text-decoration:none}
+.sprint-chip:hover{border-color:var(--purple);color:var(--text-primary)}
+.sprint-chip.active-sprint{background:var(--purple);color:#fff;border-color:var(--purple)}
+.sprint-chip.completed{background:rgba(52,211,153,.1);color:#34d399;border-color:rgba(52,211,153,.3)}
+.sprint-chip.selected{box-shadow:0 0 0 2px var(--purple)}
+.sprint-chip .sprint-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sprint-chip .sprint-dot.active{background:var(--green);box-shadow:0 0 5px var(--green)}
+.sprint-chip .sprint-dot.planning{background:var(--yellow)}
+.sprint-chip .sprint-dot.completed{background:var(--green)}
+.sprint-chip .sprint-dot.review{background:var(--blue)}
+
+/* Kanban board */
+.kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;min-height:300px}
+@media(max-width:1100px){.kanban{grid-template-columns:repeat(2,1fr)}}
+.kanban-col{background:var(--bg-secondary);border-radius:var(--radius);padding:0.75rem;border:1px solid var(--border)}
+.kanban-col-title{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);margin-bottom:0.65rem;display:flex;align-items:center;justify-content:space-between}
+.kanban-col-count{background:var(--bg-tertiary);padding:0.1rem 0.4rem;border-radius:4px;font-size:0.65rem}
+.kanban-task{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:0.6rem;margin-bottom:0.5rem;transition:border-color .15s}
+.kanban-task:hover{border-color:var(--purple)}
+.kanban-task-title{font-size:0.8rem;font-weight:600;color:var(--text-primary);margin-bottom:0.25rem}
+.kanban-task-meta{display:flex;align-items:center;gap:0.4rem;font-size:0.68rem;color:var(--text-secondary)}
+.kanban-task-type{padding:0.1rem 0.35rem;border-radius:3px;font-size:0.62rem;font-weight:600}
+.kanban-task-type.feature{background:rgba(168,85,247,.15);color:#a855f7}
+.kanban-task-type.fix{background:rgba(248,113,113,.15);color:#f87171}
+.kanban-task-type.refactor{background:rgba(96,165,250,.15);color:#60a5fa}
+.kanban-task-type.test{background:rgba(52,211,153,.15);color:#34d399}
+.kanban-task-type.security{background:rgba(251,191,36,.15);color:#fbbf24}
+.kanban-task-agent{display:flex;align-items:center;gap:0.25rem}
+.kanban-empty{font-size:0.75rem;color:var(--text-secondary);font-style:italic;text-align:center;padding:1rem 0}
+
+/* ── Right sidebar ── */
+.mission-sidebar{overflow-y:auto;border-left:1px solid var(--border);padding:0.75rem}
+.ms-section{margin-bottom:1.25rem}
+.ms-section h4{font-size:0.78rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin:0 0 0.5rem}
+.ms-stat{display:flex;justify-content:space-between;padding:0.3rem 0;font-size:0.82rem;border-bottom:1px solid rgba(255,255,255,.03)}
+.ms-stat-label{color:var(--text-secondary)}
+.ms-stat-value{color:var(--text-primary);font-weight:600}
+.ms-agent{display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0}
+.ms-agent-avatar{font-size:1.1rem}
+.ms-agent-info{flex:1}
+.ms-agent-name{font-size:0.8rem;font-weight:600;color:var(--text-primary)}
+.ms-agent-role{font-size:0.68rem;color:var(--text-secondary)}
+</style>
+
+<div class="mission-layout">
+    <!-- Main area: timeline + board -->
+    <div class="mission-main">
+        <div class="mission-header">
+            <h1 class="mission-name">{{ mission.name }}</h1>
+            <div class="mission-project">
+                <span class="project-type-dot {{ project.factory_type if project else '' }}"></span>
+                {{ project.name if project else mission.project_id }}
+                {% if mission.wsjf_score > 0 %} · WSJF {{ mission.wsjf_score|round(1) }}{% endif %}
+                {% if mission.created_by %} · Créée par {{ mission.created_by }}{% endif %}
+            </div>
+            {% if mission.goal %}
+            <div class="mission-goal"><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-target"/></svg>{{ mission.goal }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Sprint timeline -->
+        {% if sprints %}
+        <div class="sprint-timeline">
+            {% for s in sprints %}
+            <a href="/missions/{{ mission.id }}?sprint={{ s.id }}" class="sprint-chip {{ s.status }}{% if s.status == 'active' %} active-sprint{% endif %}{% if selected_sprint and selected_sprint.id == s.id %} selected{% endif %}">
+                <span class="sprint-dot {{ s.status }}"></span>
+                Sprint {{ s.number }}{% if s.name %}: {{ s.name }}{% endif %}
+            </a>
+            {% endfor %}
+            {% if mission.status in ('planning', 'active') %}
+            <button class="sprint-chip" style="border-style:dashed"
+                    hx-post="/api/missions/{{ mission.id }}/sprints"
+                    hx-swap="none"
+                    hx-on::after-request="location.reload()">
+                <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Sprint
+            </button>
+            {% endif %}
+        </div>
+        {% else %}
+        <div style="text-align:center;padding:2rem;color:var(--text-secondary)">
+            <p>Aucun sprint — créez le premier pour démarrer.</p>
+            <button class="btn btn-primary"
+                    hx-post="/api/missions/{{ mission.id }}/sprints"
+                    hx-swap="none"
+                    hx-on::after-request="location.reload()">
+                <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Créer Sprint 1
+            </button>
+        </div>
+        {% endif %}
+
+        <!-- Kanban board (for selected sprint) -->
+        {% if selected_sprint %}
+        <div class="kanban"
+             hx-get="/api/missions/{{ mission.id }}/board?sprint={{ selected_sprint.id }}"
+             hx-trigger="every 10s"
+             hx-swap="innerHTML">
+            {% set cols = [('pending', 'Backlog', 'clipboard'), ('in_progress', 'In Progress', 'zap'), ('review', 'Review', 'eye'), ('done', 'Done', 'check')] %}
+            {% for col_status, col_name, col_icon in cols %}
+            <div class="kanban-col">
+                <div class="kanban-col-title">
+                    <svg class="icon icon-xs"><use href="#icon-{{ col_icon }}"/></svg> {{ col_name }}
+                    <span class="kanban-col-count">{{ tasks_by_status.get(col_status, [])|length }}</span>
+                </div>
+                {% for t in tasks_by_status.get(col_status, []) %}
+                <div class="kanban-task">
+                    <div class="kanban-task-title">{{ t.title }}</div>
+                    <div class="kanban-task-meta">
+                        <span class="kanban-task-type {{ t.type }}">{{ t.type }}</span>
+                        {% if t.domain %}<span>{{ t.domain }}</span>{% endif %}
+                        {% if t.assigned_to %}
+                        <span class="kanban-task-agent"><svg class="icon icon-xs"><use href="#icon-user"/></svg> {{ t.assigned_to }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="kanban-empty">—</div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right sidebar: stats + team -->
+    <aside class="mission-sidebar">
+        <div class="ms-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-chart"/></svg> Progression</h4>
+            <div class="ms-stat"><span class="ms-stat-label">Sprints</span><span class="ms-stat-value">{{ sprints|length }}</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">Tasks total</span><span class="ms-stat-value">{{ stats.get('total', 0) }}</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">Done</span><span class="ms-stat-value" style="color:var(--green)">{{ stats.get('done', 0) }}</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">In Progress</span><span class="ms-stat-value" style="color:var(--yellow)">{{ stats.get('in_progress', 0) }}</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">Failed</span><span class="ms-stat-value" style="color:var(--red)">{{ stats.get('failed', 0) }}</span></div>
+        </div>
+
+        {% if team_agents %}
+        <div class="ms-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-users"/></svg> Équipe</h4>
+            {% for a in team_agents %}
+            <div class="ms-agent">
+                <span class="ms-agent-avatar" style="background:{{ a.color }}20;border-color:{{ a.color }}">
+                    <svg class="icon icon-xs" style="color:{{ a.color }}"><use href="#icon-{{ a.avatar or a.icon or 'bot' }}"/></svg>
+                </span>
+                <div class="ms-agent-info">
+                    <div class="ms-agent-name">{{ a.name }}</div>
+                    <div class="ms-agent-role">{{ a.role }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if mission.workflow_id %}
+        <div class="ms-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-zap"/></svg> Workflow</h4>
+            <a href="/workflows/{{ mission.workflow_id }}/edit" class="btn btn-sm btn-ghost" style="width:100%">
+                {{ mission.workflow_id }}
+            </a>
+        </div>
+        {% endif %}
+
+        {% if selected_sprint and selected_sprint.goal %}
+        <div class="ms-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-target"/></svg> Sprint Goal</h4>
+            <p style="font-size:0.82rem;color:var(--text-secondary)">{{ selected_sprint.goal }}</p>
+        </div>
+        {% endif %}
+    </aside>
+</div>
+{% endblock %}

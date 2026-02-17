@@ -20,9 +20,75 @@ def _templates(request: Request):
 # ── Pages ────────────────────────────────────────────────────────
 
 @router.get("/", response_class=HTMLResponse)
+async def portfolio_page(request: Request):
+    """Portfolio dashboard — tour de contrôle DSI."""
+    from ..projects.manager import get_project_store
+    from ..agents.store import get_agent_store
+    from ..missions.store import get_mission_store
+
+    project_store = get_project_store()
+    agent_store = get_agent_store()
+    mission_store = get_mission_store()
+
+    all_projects = project_store.list_all()
+    all_agents = agent_store.list_all()
+    all_missions = mission_store.list_missions()
+
+    strategic = [a for a in all_agents if any(t == 'strategy' for t in (a.tags or []))]
+
+    # Build project cards with missions
+    projects_data = []
+    total_tasks = 0
+    total_done = 0
+    active_count = 0
+    for p in all_projects:
+        p_missions = [m for m in all_missions if m.project_id == p.id]
+        p_agents = [a for a in all_agents
+                    if a.id.startswith(p.id[:4] + '-') or a.id.startswith(p.id + '-')]
+        team_avatars = [{"name": a.name, "icon": a.avatar or a.icon or "bot"} for a in p_agents[:8]]
+
+        p_total = 0
+        p_done = 0
+        p_active = 0
+        mission_cards = []
+        for m in p_missions:
+            stats = mission_store.mission_stats(m.id)
+            t_total = stats.get("total", 0)
+            t_done = stats.get("done", 0)
+            p_total += t_total
+            p_done += t_done
+            if m.status == "active":
+                p_active += 1
+            progress = f"{t_done}/{t_total}" if t_total > 0 else ""
+            mission_cards.append({"name": m.name, "status": m.status, "task_progress": progress})
+        total_tasks += p_total
+        total_done += p_done
+        active_count += p_active
+
+        projects_data.append({
+            "id": p.id, "name": p.name, "factory_type": p.factory_type,
+            "description": p.description or (p.vision or "")[:100],
+            "missions": mission_cards, "mission_count": len(p_missions),
+            "active_mission_count": p_active,
+            "team_avatars": team_avatars,
+            "total_tasks": p_total, "done_tasks": p_done,
+        })
+
+    return _templates(request).TemplateResponse("portfolio.html", {
+        "request": request, "page_title": "Portfolio",
+        "projects": projects_data,
+        "strategic_agents": strategic,
+        "total_missions": len(all_missions),
+        "active_missions": active_count,
+        "total_tasks": total_tasks,
+        "total_tasks_done": total_done,
+        "total_agents": len(all_agents),
+    })
+
+
 @router.get("/projects", response_class=HTMLResponse)
-async def index(request: Request):
-    """Projects dashboard — main page."""
+async def projects_page(request: Request):
+    """Projects list (legacy)."""
     from ..projects.manager import get_project_store
     store = get_project_store()
     projects = store.list_all()
@@ -135,6 +201,14 @@ async def project_detail(request: Request, project_id: str):
             memory_files = pmem.files
         except Exception:
             pass
+    # Load missions for this project
+    project_missions = []
+    try:
+        from ..missions.store import get_mission_store
+        m_store = get_mission_store()
+        project_missions = m_store.list_missions(project_id=project_id)
+    except Exception:
+        pass
     return _templates(request).TemplateResponse("project_detail.html", {
         "request": request,
         "page_title": project.name,
@@ -152,7 +226,188 @@ async def project_detail(request: Request, project_id: str):
         "messages": messages,
         "memory_files": memory_files,
         "workflows": workflows,
+        "missions": project_missions,
     })
+
+
+# ── Missions ─────────────────────────────────────────────────────
+
+@router.get("/missions", response_class=HTMLResponse)
+async def missions_page(request: Request):
+    """List all missions with filters."""
+    from ..missions.store import get_mission_store
+    from ..projects.manager import get_project_store
+
+    mission_store = get_mission_store()
+    project_store = get_project_store()
+
+    filter_status = request.query_params.get("status")
+    filter_project = request.query_params.get("project")
+    show_new = request.query_params.get("action") == "new"
+
+    all_missions = mission_store.list_missions()
+    all_projects = project_store.list_all()
+    project_ids = [p.id for p in all_projects]
+    project_names = {p.id: p.name for p in all_projects}
+
+    # Apply filters
+    filtered = all_missions
+    if filter_status:
+        filtered = [m for m in filtered if m.status == filter_status]
+    if filter_project:
+        filtered = [m for m in filtered if m.project_id == filter_project]
+
+    # Enrich with stats
+    mission_cards = []
+    for m in filtered:
+        stats = mission_store.mission_stats(m.id)
+        sprints = mission_store.list_sprints(m.id)
+        current = next((s.number for s in sprints if s.status == "active"), len(sprints))
+        total_t = stats.get("total", 0)
+        done_t = stats.get("done", 0)
+        mission_cards.append({
+            "mission": m,
+            "project_name": project_names.get(m.project_id, m.project_id),
+            "sprint_count": len(sprints),
+            "current_sprint": current,
+            "total_tasks": total_t,
+            "done_tasks": done_t,
+            "progress_pct": round(done_t / total_t * 100) if total_t > 0 else 0,
+        })
+
+    return _templates(request).TemplateResponse("missions.html", {
+        "request": request, "page_title": "Missions",
+        "missions": mission_cards,
+        "project_ids": project_ids,
+        "filter_status": filter_status,
+        "filter_project": filter_project,
+        "show_new_form": show_new,
+    })
+
+
+@router.get("/missions/{mission_id}", response_class=HTMLResponse)
+async def mission_detail_page(request: Request, mission_id: str):
+    """Mission cockpit — sprints, board, team."""
+    from ..missions.store import get_mission_store
+    from ..projects.manager import get_project_store
+    from ..agents.store import get_agent_store
+
+    mission_store = get_mission_store()
+    mission = mission_store.get_mission(mission_id)
+    if not mission:
+        return RedirectResponse("/missions", status_code=303)
+
+    project = get_project_store().get(mission.project_id)
+    sprints = mission_store.list_sprints(mission_id)
+    stats = mission_store.mission_stats(mission_id)
+
+    # Selected sprint (from query or active or last)
+    sel_id = request.query_params.get("sprint")
+    selected_sprint = None
+    if sel_id:
+        selected_sprint = mission_store.get_sprint(sel_id)
+    if not selected_sprint:
+        selected_sprint = next((s for s in sprints if s.status == "active"), None)
+    if not selected_sprint and sprints:
+        selected_sprint = sprints[-1]
+
+    # Tasks by status for kanban
+    tasks_by_status = {}
+    if selected_sprint:
+        tasks = mission_store.list_tasks(sprint_id=selected_sprint.id)
+        for t in tasks:
+            col = t.status if t.status in ("pending", "in_progress", "review", "done") else "pending"
+            tasks_by_status.setdefault(col, []).append(t)
+
+    # Team agents
+    agent_store = get_agent_store()
+    prefix = mission.project_id[:4] if len(mission.project_id) >= 4 else mission.project_id
+    all_agents = agent_store.list_all()
+    team_agents = [a for a in all_agents if a.id.startswith(prefix + '-') or a.id.startswith(mission.project_id + '-')]
+
+    return _templates(request).TemplateResponse("mission_detail.html", {
+        "request": request, "page_title": "Mission",
+        "mission": mission, "project": project,
+        "sprints": sprints, "stats": stats,
+        "selected_sprint": selected_sprint,
+        "tasks_by_status": tasks_by_status,
+        "team_agents": team_agents,
+    })
+
+
+@router.post("/api/missions")
+async def create_mission(request: Request):
+    """Create a new mission."""
+    from ..missions.store import get_mission_store, MissionDef
+    form = await request.form()
+    m = MissionDef(
+        project_id=form.get("project_id", ""),
+        name=form.get("name", "Nouvelle mission"),
+        goal=form.get("goal", ""),
+        wsjf_score=float(form.get("wsjf_score", 0)),
+        created_by="user",
+    )
+    mission_store = get_mission_store()
+    m = mission_store.create_mission(m)
+    return RedirectResponse(f"/missions/{m.id}", status_code=303)
+
+
+@router.post("/api/missions/{mission_id}/start")
+async def start_mission(mission_id: str):
+    """Activate a mission."""
+    from ..missions.store import get_mission_store
+    get_mission_store().update_mission_status(mission_id, "active")
+    return JSONResponse({"ok": True})
+
+
+@router.post("/api/missions/{mission_id}/sprints")
+async def create_sprint(mission_id: str):
+    """Add a sprint to a mission."""
+    from ..missions.store import get_mission_store, SprintDef
+    store = get_mission_store()
+    existing = store.list_sprints(mission_id)
+    num = len(existing) + 1
+    s = SprintDef(mission_id=mission_id, number=num, name=f"Sprint {num}")
+    store.create_sprint(s)
+    return JSONResponse({"ok": True})
+
+
+@router.get("/api/missions/{mission_id}/board", response_class=HTMLResponse)
+async def mission_board_partial(request: Request, mission_id: str):
+    """HTMX partial — kanban board for a sprint."""
+    from ..missions.store import get_mission_store
+    store = get_mission_store()
+    sprint_id = request.query_params.get("sprint")
+    if not sprint_id:
+        return HTMLResponse("")
+    tasks = store.list_tasks(sprint_id=sprint_id)
+    tasks_by_status = {}
+    for t in tasks:
+        col = t.status if t.status in ("pending", "in_progress", "review", "done") else "pending"
+        tasks_by_status.setdefault(col, []).append(t)
+
+    cols = [("pending", "Backlog", "clipboard"), ("in_progress", "In Progress", "zap"),
+            ("review", "Review", "eye"), ("done", "Done", "check")]
+    html_parts = []
+    for col_status, col_name, col_icon in cols:
+        col_tasks = tasks_by_status.get(col_status, [])
+        cards = ""
+        for t in col_tasks:
+            agent = f'<span class="kanban-task-agent"><svg class="icon icon-xs"><use href="#icon-user"/></svg> {t.assigned_to}</span>' if t.assigned_to else ""
+            domain = f"<span>{t.domain}</span>" if t.domain else ""
+            cards += f'''<div class="kanban-task">
+                <div class="kanban-task-title">{t.title}</div>
+                <div class="kanban-task-meta">
+                    <span class="kanban-task-type {t.type}">{t.type}</span>
+                    {domain}{agent}
+                </div></div>'''
+        if not cards:
+            cards = '<div class="kanban-empty">—</div>'
+        html_parts.append(f'''<div class="kanban-col">
+            <div class="kanban-col-title"><svg class="icon icon-xs"><use href="#icon-{col_icon}"/></svg> {col_name}
+                <span class="kanban-col-count">{len(col_tasks)}</span>
+            </div>{cards}</div>''')
+    return HTMLResponse("".join(html_parts))
 
 
 # ── Agents ───────────────────────────────────────────────────────
@@ -565,7 +820,7 @@ async def session_live_page(request: Request, session_id: str):
         agents.append({
             "id": a.id, "name": a.name, "role": a.role,
             "icon": a.icon, "color": a.color,
-            "avatar": getattr(a, "avatar", "") or "🤖",
+            "avatar": getattr(a, "avatar", "") or "bot",
             "avatar_url": avatar_url,
             "status": loop.status.value if loop else "idle",
             "description": a.description,
@@ -578,170 +833,160 @@ async def session_live_page(request: Request, session_id: str):
             "persona": getattr(a, "persona", "") or "",
         })
 
-    # Build unified team graph from actual messages
-    # One network: agents as nodes, communication channels as edges
+    # Build graph from workflow/pattern definition (structure defined BEFORE execution)
+    # Then enrich edges with live message activity counts
     graph = {"nodes": [], "edges": []}
     wf_id = (session.config or {}).get("workflow_id", "")
+    wf_graph_loaded = False
 
-    # Valid agent IDs for filtering corrupt to_agent values
-    valid_agent_ids = {a.id for a in all_agents} | {"all", "session", "user", "system"}
-    non_agent_ids = {"all", "session", "user", "system"}
-
-    # Extract agent communications from messages
-    import re
-    phase_agents = set()          # all agents in phases
-    edge_data = {}                # (from, to) → {count, types: set, patterns: set}
-
-    # Pre-compute: for each message index, which pattern is active
-    msg_pattern = {}  # msg index → pattern name
-    current_pat = ""
-    for i, m in enumerate(messages):
-        content = m.content or ""
-        if m.from_agent == "system":
-            match = re.search(r'started \((\w+)\)', content)
-            if match:
-                current_pat = match.group(1)
-        msg_pattern[i] = current_pat
-
-    for i, m in enumerate(messages):
-        if m.from_agent in ("system", "user"):
-            continue
-
-        # Get metadata for pattern_id
-        meta = {}
-        if hasattr(m, "metadata") and m.metadata:
-            meta = m.metadata if isinstance(m.metadata, dict) else {}
-        elif hasattr(m, "metadata_json") and m.metadata_json:
-            import json as _json
-            try:
-                meta = _json.loads(m.metadata_json)
-            except Exception:
-                pass
-
-        phase_agents.add(m.from_agent)
-        to = getattr(m, "to_agent", "") or ""
-        if to not in valid_agent_ids or to in non_agent_ids:
-            to = "all"
-
-        pat = msg_pattern.get(i, "")
-
-        if to == "all":
-            pass
-        else:
-            phase_agents.add(to)
-            key = (m.from_agent, to)
-            if key not in edge_data:
-                edge_data[key] = {"count": 0, "types": set(), "patterns": set()}
-            edge_data[key]["count"] += 1
-            edge_data[key]["types"].add(m.message_type)
-            if pat:
-                edge_data[key]["patterns"].add(pat)
-
-    # Resolve broadcasts: for each agent that broadcast, create edges to all other agents
-    # Re-scan messages for broadcasts
-    pattern_members = {}  # pattern_id → set of agent_ids
-    for m in messages:
-        if m.from_agent in ("system", "user"):
-            continue
-        meta = {}
-        if hasattr(m, "metadata") and m.metadata:
-            meta = m.metadata if isinstance(m.metadata, dict) else {}
-        elif hasattr(m, "metadata_json") and m.metadata_json:
-            import json as _json
-            try:
-                meta = _json.loads(m.metadata_json)
-            except Exception:
-                pass
-        pid = meta.get("pattern_id", "")
-        if pid:
-            if pid not in pattern_members:
-                pattern_members[pid] = set()
-            pattern_members[pid].add(m.from_agent)
-            to = getattr(m, "to_agent", "") or ""
-            if to in valid_agent_ids and to not in non_agent_ids:
-                pattern_members[pid].add(to)
-
-    for i, m in enumerate(messages):
-        if m.from_agent in ("system", "user"):
-            continue
-        to = getattr(m, "to_agent", "") or ""
-        if to not in valid_agent_ids or to in non_agent_ids:
-            # This was a broadcast
-            meta = {}
-            if hasattr(m, "metadata") and m.metadata:
-                meta = m.metadata if isinstance(m.metadata, dict) else {}
-            elif hasattr(m, "metadata_json") and m.metadata_json:
-                import json as _json
-                try:
-                    meta = _json.loads(m.metadata_json)
-                except Exception:
-                    pass
-            pid = meta.get("pattern_id", "")
-            pat = msg_pattern.get(i, "")
-            targets = pattern_members.get(pid, set()) - {m.from_agent}
-            for t in targets:
-                key = (m.from_agent, t)
-                if key not in edge_data:
-                    edge_data[key] = {"count": 0, "types": set(), "patterns": set()}
-                edge_data[key]["count"] += 1
-                edge_data[key]["types"].add(m.message_type)
-                if pat:
-                    edge_data[key]["patterns"].add(pat)
-
-    # Build graph nodes
-    for aid in phase_agents:
-        a = agent_map.get(aid)
-        graph["nodes"].append({
-            "id": aid,
-            "agent_id": aid,
-            "label": a.name if a else aid,
-            "hierarchy_rank": a.hierarchy_rank if a else 50,
-        })
-
-    # Infer parallel relationships: workers in same hierarchical phase work simultaneously
+    # 1) Try loading graph from workflow config (primary source)
     if wf_id:
         from platform.workflows.store import WorkflowStore
         wf_store = WorkflowStore()
         wf = wf_store.get(wf_id)
-        if wf and wf.phases:
-            for phase in wf.phases:
-                ptype = phase.pattern_id or ""
-                agents_in_phase = (phase.config or {}).get("agents", [])
-                if ptype == "hierarchical" and len(agents_in_phase) >= 3:
-                    workers = agents_in_phase[1:]
-                    for i, w1 in enumerate(workers):
-                        for w2 in workers[i+1:]:
-                            if w1 in phase_agents and w2 in phase_agents:
-                                key = (w1, w2)
-                                if key not in edge_data:
-                                    edge_data[key] = {"count": 0, "types": set(), "patterns": set()}
-                                edge_data[key]["patterns"].add("parallel")
-                                if edge_data[key]["count"] == 0:
-                                    edge_data[key]["count"] = 1
-                                    edge_data[key]["types"].add("collab")
+        if wf:
+            wf_config = wf.config if isinstance(wf.config, dict) else {}
+            wf_graph = wf_config.get("graph", {})
+            if wf_graph.get("nodes"):
+                # Resolve node IDs (n1, n2...) to agent_ids
+                node_id_to_agent = {}
+                for n in wf_graph["nodes"]:
+                    aid = n.get("agent_id", "")
+                    a = agent_map.get(aid)
+                    node_id_to_agent[n["id"]] = aid
+                    graph["nodes"].append({
+                        "id": aid,
+                        "agent_id": aid,
+                        "label": n.get("label") or (a.name if a else aid),
+                        "x": n.get("x"),
+                        "y": n.get("y"),
+                        "hierarchy_rank": a.hierarchy_rank if a else 50,
+                    })
+                for e in wf_graph.get("edges", []):
+                    f_agent = node_id_to_agent.get(e["from"], e["from"])
+                    t_agent = node_id_to_agent.get(e["to"], e["to"])
+                    graph["edges"].append({
+                        "from": f_agent, "to": t_agent,
+                        "count": 0,
+                        "label": e.get("label", ""),
+                        "types": [e.get("type", "sequential")],
+                        "patterns": [e.get("type", "sequential")],
+                        "color": e.get("color"),
+                    })
+                wf_graph_loaded = True
 
-    # Build graph edges with counts, type info, and patterns
-    for (f, t), info in edge_data.items():
-        types = sorted(info["types"])
-        patterns = sorted(info.get("patterns", set()))
-        graph["edges"].append({
-            "from": f, "to": t,
-            "count": info["count"],
-            "types": types,
-            "patterns": patterns,
-        })
+            # Fallback: build graph from workflow phases if no explicit graph config
+            if not wf_graph_loaded and wf.phases:
+                seen_agents = set()
+                for phase in wf.phases:
+                    phase_agent_ids = (phase.config or {}).get("agents", [])
+                    for aid in phase_agent_ids:
+                        if aid not in seen_agents:
+                            seen_agents.add(aid)
+                            a = agent_map.get(aid)
+                            graph["nodes"].append({
+                                "id": aid, "agent_id": aid,
+                                "label": a.name if a else aid,
+                                "hierarchy_rank": a.hierarchy_rank if a else 50,
+                            })
+                    # Infer edges from phase pattern type + agent list
+                    ptype = phase.pattern_id or "sequential"
+                    if len(phase_agent_ids) >= 2:
+                        if ptype == "sequential":
+                            for j in range(len(phase_agent_ids) - 1):
+                                graph["edges"].append({
+                                    "from": phase_agent_ids[j], "to": phase_agent_ids[j + 1],
+                                    "count": 0, "types": ["sequential"], "patterns": ["sequential"],
+                                })
+                        elif ptype == "hierarchical":
+                            mgr = phase_agent_ids[0]
+                            for w in phase_agent_ids[1:]:
+                                graph["edges"].append({
+                                    "from": mgr, "to": w,
+                                    "count": 0, "types": ["hierarchical"], "patterns": ["hierarchical"],
+                                })
+                        elif ptype == "parallel":
+                            dispatcher = phase_agent_ids[0]
+                            for w in phase_agent_ids[1:]:
+                                graph["edges"].append({
+                                    "from": dispatcher, "to": w,
+                                    "count": 0, "types": ["parallel"], "patterns": ["parallel"],
+                                })
+                        elif ptype == "network":
+                            for j, a1 in enumerate(phase_agent_ids):
+                                for a2 in phase_agent_ids[j + 1:]:
+                                    graph["edges"].append({
+                                        "from": a1, "to": a2,
+                                        "count": 0, "types": ["network"], "patterns": ["network"],
+                                    })
+                wf_graph_loaded = bool(seen_agents)
+
+    # 2) Fallback: build from session pattern if no workflow
+    if not wf_graph_loaded and session.pattern_id:
+        from platform.patterns.store import get_pattern_store
+        pat = get_pattern_store().get(session.pattern_id)
+        if pat and pat.agents:
+            nid_to_aid = {}
+            for n in pat.agents:
+                aid = n.get("agent_id", "")
+                nid_to_aid[n["id"]] = aid
+                a = agent_map.get(aid)
+                graph["nodes"].append({
+                    "id": aid, "agent_id": aid,
+                    "label": n.get("label") or (a.name if a else aid),
+                    "x": n.get("x"), "y": n.get("y"),
+                    "hierarchy_rank": a.hierarchy_rank if a else 50,
+                })
+            for e in (pat.edges or []):
+                f_agent = nid_to_aid.get(e.get("from", ""), e.get("from", ""))
+                t_agent = nid_to_aid.get(e.get("to", ""), e.get("to", ""))
+                graph["edges"].append({
+                    "from": f_agent, "to": t_agent,
+                    "count": 0,
+                    "types": [e.get("type", "sequential")],
+                    "patterns": [e.get("type", "sequential")],
+                })
+
+    # 3) Enrich edges with live message activity (counts, veto/approve types)
+    edge_index = {}
+    for i, e in enumerate(graph["edges"]):
+        edge_index[(e["from"], e["to"])] = i
+
+    for m in messages:
+        if m.from_agent in ("system", "user"):
+            continue
+        to = getattr(m, "to_agent", "") or ""
+        if not to or to in ("all", "system", "user", "session"):
+            continue
+        key = (m.from_agent, to)
+        if key in edge_index:
+            graph["edges"][edge_index[key]]["count"] += 1
+            if m.message_type in ("veto", "approve"):
+                types_list = graph["edges"][edge_index[key]]["types"]
+                if m.message_type not in types_list:
+                    types_list.append(m.message_type)
 
     # Serialize messages for template
     msg_list = []
     for m in messages:
         a = agent_map.get(m.from_agent)
+        # Extract tool activity from metadata
+        meta = m.metadata if isinstance(m.metadata, dict) else {}
+        tcs = meta.get("tool_calls") or []
+        edit_count = sum(1 for tc in tcs if isinstance(tc, dict) and tc.get("name") in ("code_edit", "code_write"))
+        read_count = sum(1 for tc in tcs if isinstance(tc, dict) and tc.get("name") in ("code_read", "code_search", "list_files"))
+        shell_count = sum(1 for tc in tcs if isinstance(tc, dict) and tc.get("name") in ("shell", "git_status", "git_log"))
         msg_list.append({
             "id": m.id, "from_agent": m.from_agent, "to_agent": getattr(m, "to_agent", ""),
             "type": m.message_type, "content": m.content,
             "timestamp": m.timestamp if isinstance(m.timestamp, str) else m.timestamp.isoformat() if hasattr(m.timestamp, "isoformat") else str(m.timestamp),
             "from_name": a.name if a else m.from_agent,
             "from_color": a.color if a else "#6b7280",
-            "from_avatar": getattr(a, "avatar", "🤖") if a else "💬",
+            "from_avatar": getattr(a, "avatar", "bot") if a else "message-circle",
+            "edits": edit_count,
+            "reads": read_count,
+            "shells": shell_count,
+            "tool_count": len(tcs),
         })
 
     # Load memory for this session
@@ -788,7 +1033,7 @@ async def session_live_page(request: Request, session_id: str):
                 "title": title,
                 "agent": agent_name,
                 "agent_id": m.from_agent,
-                "icon": "🚫" if m.message_type == "veto" else "✅",
+                "icon": "x-circle" if m.message_type == "veto" else "check-circle",
             })
         elif any(kw in content[:200].lower() for kw in ("rapport", "audit", "analyse", "synthèse", "conclusion", "décomposition")):
             meta = {}
@@ -800,7 +1045,7 @@ async def session_live_page(request: Request, session_id: str):
                 "title": title,
                 "agent": agent_name,
                 "agent_id": m.from_agent,
-                "icon": "🔧" if has_tools else "📄",
+                "icon": "wrench" if has_tools else "file-text",
             })
 
     memory_data = {"session": [], "project": [], "shared": [], "artifacts": artifacts, "prs": pr_list}
@@ -1004,7 +1249,7 @@ async def run_session_pattern(request: Request, session_id: str):
         session_id=session_id,
         from_agent="user",
         message_type="text",
-        content=f"🚀 Run pattern **{pattern.name}**: {task}",
+        content=f"Run pattern **{pattern.name}**: {task}",
     ))
 
     # Run pattern asynchronously (agents will post messages to the session)
@@ -1304,20 +1549,41 @@ async def run_session_workflow(request: Request, session_id: str):
     if not wf:
         return HTMLResponse(f'<div class="msg-system-text">Workflow {workflow_id} not found.</div>')
 
+    # User message targets the workflow leader (first agent of first phase)
+    leader = ""
+    if wf.phases:
+        first_agents = wf.phases[0].config.get("agents", [])
+        if first_agents:
+            leader = first_agents[0]
+
     store.add_message(MessageDef(
         session_id=session_id,
         from_agent="user",
-        to_agent="all",
+        to_agent=leader or "all",
         message_type="text",
-        content=f"🔄 Run workflow **{wf.name}**: {task}",
+        content=f"Run workflow **{wf.name}**: {task}",
     ))
+
+    # Save workflow_id in session config (needed for graph rendering)
+    from ..sessions.store import get_db
+    import json as _json
+    db = get_db()
+    try:
+        existing_config = session.config if isinstance(session.config, dict) else {}
+        existing_config["workflow_id"] = workflow_id
+        if leader:
+            existing_config["lead_agent"] = leader
+        db.execute("UPDATE sessions SET config_json=? WHERE id=?",
+                   (_json.dumps(existing_config), session_id))
+        db.commit()
+    finally:
+        db.close()
 
     # Resolve project_id: from session, or from workflow config
     project_id = session.project_id or ""
     if not project_id and wf.config:
         project_id = wf.config.get("project_ref", "")
     if project_id and not session.project_id:
-        from ..sessions.store import get_db
         db = get_db()
         try:
             db.execute("UPDATE sessions SET project_id=? WHERE id=?", (project_id, session_id))
@@ -1484,7 +1750,7 @@ async def project_chat(request: Request, project_id: str):
         elif hasattr(agent_msg, "metadata") and agent_msg.metadata:
             tool_calls = agent_msg.metadata.get("tool_calls")
         if tool_calls:
-            pills = "".join(f'<span class="chat-tool-pill">🔧 {html_mod.escape(str(tc.get("name", tc) if isinstance(tc, dict) else tc))}</span>' for tc in tool_calls)
+            pills = "".join(f'<span class="chat-tool-pill"><svg class="icon icon-xs"><use href="#icon-wrench"/></svg> {html_mod.escape(str(tc.get("name", tc) if isinstance(tc, dict) else tc))}</span>' for tc in tool_calls)
             tools_html = f'<div class="chat-msg-tools">{pills}</div>'
         # Render markdown to HTML
         rendered = md_lib.markdown(str(agent_content), extensions=["fenced_code", "tables", "nl2br"])
@@ -1611,15 +1877,15 @@ async def project_chat_stream(request: Request, project_id: str):
                     await progress_queue.put(("status", name, label))
                     return
                 labels = {
-                    "deep_search": "🔬 Deep search…",
-                    "code_read": "📄 Reading files…",
-                    "code_search": "🔍 Searching code…",
-                    "git_log": "📋 Checking git…",
-                    "git_diff": "📋 Checking diff…",
+                    "deep_search": "Deep search…",
+                    "code_read": "Reading files…",
+                    "code_search": "Searching code…",
+                    "git_log": "Checking git…",
+                    "git_diff": "Checking diff…",
                     "memory_search": "Searching memory…",
                     "memory_store": "Storing to memory…",
                 }
-                label = labels.get(name, f"🔧 {name}…")
+                label = labels.get(name, f"{name}…")
                 await progress_queue.put(("tool", name, label))
 
             ctx.on_tool_call = on_tool_call
@@ -1828,10 +2094,10 @@ async def add_github_skill_source(request: Request):
     if result.get("errors"):
         errs = "; ".join(result["errors"])
         return HTMLResponse(
-            f'<div class="gh-sync-result error">⚠️ {repo}: {errs}</div>'
+            f'<div class="gh-sync-result error"><svg class="icon icon-xs"><use href="#icon-alert-triangle"/></svg> {repo}: {errs}</div>'
         )
     return HTMLResponse(
-        f'<div class="gh-sync-result success">✅ {repo}: {result["fetched"]} skills fetched</div>'
+        f'<div class="gh-sync-result success"><svg class="icon icon-xs"><use href="#icon-check"/></svg> {repo}: {result["fetched"]} skills fetched</div>'
     )
 
 
@@ -1846,10 +2112,10 @@ async def sync_github_skills():
     errors = [e for r in results for e in r.get("errors", [])]
     if errors:
         return HTMLResponse(
-            f'<div class="gh-sync-result">🔄 Synced {total} skills, {len(errors)} errors</div>'
+            f'<div class="gh-sync-result">Synced {total} skills, {len(errors)} errors</div>'
         )
     return HTMLResponse(
-        f'<div class="gh-sync-result success">✅ Synced {total} skills from {len(results)} repos</div>'
+        f'<div class="gh-sync-result success"><svg class="icon icon-xs"><use href="#icon-check"/></svg> Synced {total} skills from {len(results)} repos</div>'
     )
 
 

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+{% include "partials/view_switcher.html" %}
+<a href="/patterns/new" class="btn btn-primary">
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> New
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="item-grid" data-view-grid data-view="card">
+    {% for pattern in patterns %}
+    <a href="/patterns/{{ pattern.id }}/edit" class="item-card" data-id="{{ pattern.id }}">
+        <div class="item-icon">
+            <svg class="icon icon-md" style="color:var(--accent)"><use href="#icon-{{ pattern.icon }}"/></svg>
+        </div>
+        <div class="item-main">
+            <div class="item-title">{{ pattern.name }}</div>
+            <div class="item-subtitle">{{ pattern.type }}</div>
+            <div class="item-detail">
+                <p class="item-desc">{{ pattern.description }}</p>
+                <div class="item-tags">
+                    <span class="item-tag">{{ pattern.agents | length }} agents</span>
+                    <span class="item-tag">{{ pattern.edges | length }} edges</span>
+                </div>
+            </div>
+        </div>
+        <div class="item-meta">
+            {% if pattern.is_builtin %}
+            <span class="item-badge muted">built-in</span>
+            {% endif %}
+        </div>
+    </a>
+    {% endfor %}
+    {% if not patterns %}
+    <div class="empty-state">
+        <p>No patterns yet.</p>
+        <a href="/patterns/new" class="btn btn-primary">Create Pattern</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

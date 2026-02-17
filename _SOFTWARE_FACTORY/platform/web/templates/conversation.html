@@ -117,7 +117,7 @@
                 <svg class="icon icon-sm"><use href="#icon-rocket"/></svg>
             </button>
             <div id="msg-loading" class="htmx-indicator msg-loading-indicator">
-                <span class="loading-dots">🤖 Agent réfléchit<span>.</span><span>.</span><span>.</span></span>
+                <span class="loading-dots"><svg class="icon icon-xs"><use href="#icon-bot"/></svg> Agent réfléchit<span>.</span><span>.</span><span>.</span></span>
             </div>
         </form>
         {% else %}
@@ -251,7 +251,7 @@ if (ml) observer.observe(ml, {childList: true});
                 } else if (data.type === 'pattern_start' || data.type === 'pattern_end') {
                     // Add log entry
                     addLogEntry(data.type === 'pattern_start'
-                        ? '▶ ' + (data.pattern_name || 'Pattern') + ' started'
+                        ? '> ' + (data.pattern_name || 'Pattern') + ' started'
                         : (data.success ? '<svg class="icon icon-xs"><use href="#icon-check"/></svg> Pattern completed' : '<svg class="icon icon-xs"><use href="#icon-stop"/></svg> Pattern failed'));
                 }
             } catch(err) {}

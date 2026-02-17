@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Optional
@@ -22,7 +23,22 @@ from ..agents.store import AgentDef
 logger = logging.getLogger(__name__)
 
 # Max tool-calling rounds to prevent infinite loops
-MAX_TOOL_ROUNDS = 8
+MAX_TOOL_ROUNDS = 15
+
+# Regex to strip raw MiniMax/internal tool-call tokens from LLM output
+_RAW_TOKEN_RE = re.compile(
+    r'<\|(?:tool_calls_section_begin|tool_calls_section_end|tool_call_begin|tool_call_end|'
+    r'tool_call_argument_begin|tool_call_argument_end|tool_sep|im_end|im_start)\|>'
+)
+
+def _strip_raw_tokens(text: str) -> str:
+    """Remove raw model tokens that leak into content (e.g. MiniMax format)."""
+    if '<|' not in text:
+        return text
+    cleaned = _RAW_TOKEN_RE.sub('', text)
+    # Also remove raw function call lines like "functions.code_read:0"
+    cleaned = re.sub(r'^functions\.\w+:\d+$', '', cleaned, flags=re.MULTILINE)
+    return cleaned.strip()
 
 
 def _get_tool_registry():
@@ -339,6 +355,13 @@ class AgentExecutor:
                     if tc.function_name == "deep_search":
                         deep_search_used = True
 
+                    # Track code changes as artifacts
+                    if tc.function_name in ("code_write", "code_edit") and not result.startswith("Error"):
+                        try:
+                            self._record_artifact(ctx, tc, result)
+                        except Exception:
+                            pass
+
                     # Notify UI via callback
                     if ctx.on_tool_call:
                         try:
@@ -349,7 +372,7 @@ class AgentExecutor:
                     # Add tool result to conversation
                     messages.append(LLMMessage(
                         role="tool",
-                        content=result[:8000],
+                        content=result[:4000],
                         tool_call_id=tc.id,
                         name=tc.function_name,
                     ))
@@ -360,7 +383,7 @@ class AgentExecutor:
                     # Notify: agent is now synthesizing
                     if ctx.on_tool_call:
                         try:
-                            await ctx.on_tool_call("deep_search", {"status": "✨ Generating response…"}, "")
+                            await ctx.on_tool_call("deep_search", {"status": "Generating response…"}, "")
                         except Exception:
                             pass
 
@@ -378,6 +401,8 @@ class AgentExecutor:
                 content = llm_resp.content or "(Max tool rounds reached)"
 
             elapsed = int((time.monotonic() - t0) * 1000)
+            # Strip raw MiniMax tool-call tokens that leak into content
+            content = _strip_raw_tokens(content)
             delegations = self._parse_delegations(content)
 
             return ExecutionResult(
@@ -407,12 +432,19 @@ class AgentExecutor:
         name = tc.function_name
         args = dict(tc.arguments)
 
-        # Inject project path as default cwd for git/build tools
-        if ctx.project_path and "cwd" not in args:
+        # ── Resolve paths: project_path is the default for all file/git tools ──
+        if ctx.project_path:
+            # Git/build tools: inject cwd
             if name in ("git_status", "git_log", "git_diff", "git_commit", "build", "test", "lint"):
-                args["cwd"] = ctx.project_path
-        if ctx.project_path and name == "code_search" and "path" not in args:
-            args["path"] = ctx.project_path
+                if "cwd" not in args:
+                    args["cwd"] = ctx.project_path
+            # File tools: resolve relative paths to project root
+            if name in ("code_read", "code_search", "code_write", "code_edit", "list_files"):
+                path = args.get("path", "")
+                if not path or path == ".":
+                    args["path"] = ctx.project_path
+                elif not os.path.isabs(path):
+                    args["path"] = os.path.join(ctx.project_path, path)
 
         # Handle built-in tools that don't go through registry
         if name == "list_files":
@@ -423,12 +455,6 @@ class AgentExecutor:
             return await self._tool_memory_store(args, ctx)
         if name == "deep_search":
             return await self._tool_deep_search(args, ctx)
-
-        # Inject project path for code_read relative paths
-        if ctx.project_path and name == "code_read":
-            path = args.get("path", "")
-            if path and not os.path.isabs(path):
-                args["path"] = os.path.join(ctx.project_path, path)
 
         # Registry tools
         tool = self._registry.get(name)
@@ -527,8 +553,28 @@ class AgentExecutor:
         )
 
         print(f"[EXECUTOR] deep_search done: {result.iterations} iters, {result.total_queries} queries, {len(result.answer)} chars", flush=True)
-        header = f"🔬 RLM Deep Search ({result.iterations} iterations, {result.total_queries} queries)\n\n"
+        header = f"RLM Deep Search ({result.iterations} iterations, {result.total_queries} queries)\n\n"
         return header + result.answer
+
+    def _record_artifact(self, ctx: ExecutionContext, tc: LLMToolCall, result: str):
+        """Record a code_write/code_edit as an artifact in the DB."""
+        import uuid
+        from ..db.migrations import get_db
+        path = tc.arguments.get("path", "unknown")
+        art_type = "edit" if tc.function_name == "code_edit" else "create"
+        content = tc.arguments.get("content", "") or f"Edit: {tc.arguments.get('old_str', '')[:100]} → {tc.arguments.get('new_str', '')[:100]}"
+        lang = os.path.splitext(path)[1].lstrip(".")
+        db = get_db()
+        try:
+            db.execute(
+                "INSERT INTO artifacts (id, session_id, type, name, content, language, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (str(uuid.uuid4())[:8], ctx.session_id, art_type, f"[{art_type.upper()}] {path}", content[:2000], lang, ctx.agent.id),
+            )
+            db.commit()
+        except Exception as e:
+            logger.warning("Failed to record artifact: %s", e)
+        finally:
+            db.close()
 
     def _build_system_prompt(self, ctx: ExecutionContext) -> str:
         """Compose the full system prompt from agent config + skills + context."""
@@ -537,6 +583,9 @@ class AgentExecutor:
 
         if agent.system_prompt:
             parts.append(agent.system_prompt)
+
+        if agent.persona:
+            parts.append(f"\n## Persona & Character\n{agent.persona}")
 
         parts.append(f"\nYou are {agent.name}, role: {agent.role}.")
         if agent.description:

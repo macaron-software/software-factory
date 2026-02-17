@@ -152,6 +152,18 @@ class SessionStore:
         finally:
             db.close()
 
+    def mark_orphaned_sessions(self) -> int:
+        """Mark active sessions as 'interrupted' on startup (no running task)."""
+        db = get_db()
+        try:
+            cur = db.execute(
+                "UPDATE sessions SET status = 'interrupted' WHERE status = 'active'"
+            )
+            db.commit()
+            return cur.rowcount
+        finally:
+            db.close()
+
     # ── Messages ─────────────────────────────────────────────────
 
     def get_messages(self, session_id: str, limit: int = 100) -> list[MessageDef]:

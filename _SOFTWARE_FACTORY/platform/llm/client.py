@@ -1,20 +1,22 @@
 """LLM Client — unified async interface for all providers.
 
 All providers use OpenAI-compatible chat/completions API:
-- MiniMax (api.minimaxi.chat)
-- NVIDIA/Kimi (integrate.api.nvidia.com)
-- Local GLM (mlx_lm.server)
-- Azure OpenAI (castudioia*.openai.azure.com) — when VPN available
+- Azure AI Foundry GPT-5.2 (swedencentral) — leaders, control, architecture
+- NVIDIA/Kimi K2 (integrate.api.nvidia.com) — fast production workers
+- MiniMax M2.5 (api.minimaxi.chat) — fallback, thinking model
+- Claude CLI / Copilot CLI — offline headless (slow, 10-12s)
 
 Streaming supported via SSE (text/event-stream).
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import AsyncIterator, Optional
 
 import httpx
@@ -23,64 +25,41 @@ logger = logging.getLogger(__name__)
 
 # Provider configs — OpenAI-compatible endpoints
 _PROVIDERS = {
-    "azure": {
-        "name": "Azure OpenAI (GPT-5.2)",
-        "base_url": os.environ.get("AZURE_OPENAI_ENDPOINT", "https://castudioiatestopenai.openai.azure.com/").rstrip("/"),
-        "key_env": "AZURE_OPENAI_API_KEY",
-        "models": ["gpt-5.2", "gpt-5.1", "gpt-5.1-codex", "gpt-5.1-codex-mini"],
+    "azure-ai": {
+        "name": "Azure AI Foundry (GPT-5.2)",
+        "base_url": os.environ.get("AZURE_AI_ENDPOINT", "https://swedencentral.api.cognitive.microsoft.com").rstrip("/"),
+        "key_env": "AZURE_AI_API_KEY",
+        "models": ["gpt-5.2"],
         "default": "gpt-5.2",
         "auth_header": "api-key",
         "auth_prefix": "",
         "azure_api_version": "2024-10-21",
-        "azure_deployment_map": {"gpt-5.2": "gpt-52", "gpt-5.1": "gpt-51", "gpt-5.1-codex": "gpt-51-codex", "gpt-5.1-codex-mini": "gpt-51-codex-mini"},
+        "azure_deployment_map": {"gpt-5.2": "gpt-52"},
         "max_tokens_param": {"gpt-5.2": "max_completion_tokens"},
     },
-    "azure-ai": {
-        "name": "Azure AI Foundry",
-        "base_url": os.environ.get("AZURE_AI_ENDPOINT", "https://swedencentral.api.cognitive.microsoft.com/").rstrip("/"),
-        "key_env": "AZURE_AI_API_KEY",
-        "models": ["DeepSeek-R1-0528", "gpt-5.2", "claude-sonnet-4-5"],
-        "default": "DeepSeek-R1-0528",
-        "auth_header": "api-key",
-        "auth_prefix": "",
-        "azure_api_version": "2024-10-21",
-        "azure_deployment_map": {
-            "DeepSeek-R1-0528": "deepseek-r1",
-            "gpt-5.2": "gpt-52",
-            "claude-sonnet-4-5": "claude-sonnet-45",
-        },
+    "nvidia": {
+        "name": "NVIDIA (Kimi K2)",
+        "base_url": "https://integrate.api.nvidia.com/v1",
+        "key_env": "NVIDIA_API_KEY",
+        "models": ["moonshotai/kimi-k2-instruct"],
+        "default": "moonshotai/kimi-k2-instruct",
+        "auth_header": "Authorization",
+        "auth_prefix": "Bearer ",
     },
     "minimax": {
         "name": "MiniMax",
         "base_url": "https://api.minimaxi.chat/v1",
         "key_env": "MINIMAX_API_KEY",
-        "models": ["MiniMax-M2.5", "MiniMax-M2.1", "MiniMax-M2", "MiniMax-M1-80k"],
+        "models": ["MiniMax-M2.5", "MiniMax-M2.1"],
         "default": "MiniMax-M2.5",
         "auth_header": "Authorization",
         "auth_prefix": "Bearer ",
     },
-    "nvidia": {
-        "name": "NVIDIA (Kimi)",
-        "base_url": "https://integrate.api.nvidia.com/v1",
-        "key_env": "NVIDIA_API_KEY",
-        "models": ["moonshotai/kimi-k2-instruct", "moonshotai/kimi-k2.5-instruct"],
-        "default": "moonshotai/kimi-k2-instruct",
-        "auth_header": "Authorization",
-        "auth_prefix": "Bearer ",
-    },
-    "local": {
-        "name": "Local (MLX)",
-        "base_url": "http://127.0.0.1:8081/v1",
-        "key_env": "",
-        "models": ["mlx-community/GLM-4.7-Flash-4bit"],
-        "default": "mlx-community/GLM-4.7-Flash-4bit",
-        "auth_header": "",
-        "auth_prefix": "",
-    },
 }
 
-# Fallback chain: Azure first (most capable), then MiniMax, NVIDIA, local
-_FALLBACK_CHAIN = ["azure", "azure-ai", "minimax", "nvidia", "local"]
+# Fallback: MiniMax (reliable, fast) → Azure GPT-5.2 (powerful but rate-limited)
+# NVIDIA Kimi K2 disabled — API endpoint unreachable/timing out
+_FALLBACK_CHAIN = ["minimax", "azure-ai"]
 
 
 @dataclass
@@ -125,6 +104,8 @@ class LLMClient:
     def __init__(self):
         self._http: Optional[httpx.AsyncClient] = None
         self._stats = {"calls": 0, "tokens_in": 0, "tokens_out": 0, "errors": 0}
+        # Cooldown: provider → timestamp when it becomes available again
+        self._provider_cooldown: dict[str, float] = {}
 
     async def _get_http(self) -> httpx.AsyncClient:
         if self._http is None or self._http.is_closed:
@@ -140,7 +121,21 @@ class LLMClient:
 
     def _get_api_key(self, pcfg: dict) -> str:
         env = pcfg.get("key_env", "")
-        return os.environ.get(env, "") if env else "no-key"
+        if not env:
+            return "no-key"
+        key = os.environ.get(env, "")
+        if key:
+            return key
+        # Fallback: read from ~/.config/factory/<name>.key
+        key_file = pcfg.get("key_file") or ""
+        if not key_file:
+            # Derive from env var name: NVIDIA_API_KEY → nvidia.key
+            name = env.replace("_API_KEY", "").replace("_", "-").lower()
+            key_file = os.path.expanduser(f"~/.config/factory/{name}.key")
+        try:
+            return Path(key_file).read_text().strip()
+        except (OSError, FileNotFoundError):
+            return ""
 
     def _build_url(self, pcfg: dict, model: str) -> str:
         base = pcfg["base_url"].rstrip("/")
@@ -172,21 +167,37 @@ class LLMClient:
         providers_to_try = [provider] + [p for p in _FALLBACK_CHAIN if p != provider]
 
         for prov in providers_to_try:
+            # Skip providers in cooldown (rate-limited recently)
+            now = time.monotonic()
+            cooldown_until = self._provider_cooldown.get(prov, 0)
+            if cooldown_until > now:
+                remaining = int(cooldown_until - now)
+                logger.warning("LLM %s in cooldown (%ds left), skipping → fallback", prov, remaining)
+                continue
+
             pcfg = self._get_provider_config(prov)
             key = self._get_api_key(pcfg)
-            if not key or key == "no-key" and pcfg.get("key_env"):
+            if not key or key == "no-key":
+                logger.warning("LLM %s skipped (no API key)", prov)
                 continue
 
             use_model = model if (prov == provider and model) else pcfg["default"]
+            logger.warning("LLM trying %s/%s ...", prov, use_model)
             try:
                 result = await self._do_chat(pcfg, prov, use_model, messages, temperature, max_tokens, system_prompt, tools)
                 self._stats["calls"] += 1
                 self._stats["tokens_in"] += result.tokens_in
                 self._stats["tokens_out"] += result.tokens_out
+                logger.warning("LLM %s/%s OK (%d in, %d out tokens)", prov, use_model, result.tokens_in, result.tokens_out)
                 return result
             except Exception as exc:
-                logger.warning("LLM %s/%s failed: %s — trying next", prov, use_model, exc)
+                err_str = repr(exc)
+                logger.warning("LLM %s/%s failed: %s — trying next", prov, use_model, err_str)
                 self._stats["errors"] += 1
+                # On 429, put provider in cooldown for 90s
+                if "429" in err_str or "RateLimitReached" in err_str:
+                    self._provider_cooldown[prov] = time.monotonic() + 90
+                    logger.warning("LLM %s → cooldown 90s (rate limited)", prov)
                 continue
 
         raise RuntimeError(f"All LLM providers failed for {provider}/{model}")
@@ -205,6 +216,10 @@ class LLMClient:
             msgs.append({"role": "system", "content": system_prompt})
         for m in messages:
             d = {"role": m.role, "content": m.content or ""}
+            # MiniMax rejects system messages after position 0
+            if d["role"] == "system" and provider == "minimax" and msgs:
+                d["role"] = "user"
+                d["content"] = f"[System instruction]: {d['content']}"
             if m.name:
                 d["name"] = m.name
             if m.tool_call_id:
@@ -228,7 +243,18 @@ class LLMClient:
             body["tool_choice"] = "auto"
 
         t0 = time.monotonic()
-        resp = await http.post(url, json=body, headers=headers)
+
+        # Retry loop for 429 rate limits (2 attempts, then fallback to next provider)
+        for attempt in range(2):
+            resp = await http.post(url, json=body, headers=headers)
+            if resp.status_code != 429:
+                break
+            retry_after = int(resp.headers.get("Retry-After", 2 ** attempt * 5))
+            retry_after = min(retry_after, 30)
+            logger.warning("LLM %s/%s rate-limited (429), retry in %ds (attempt %d/2)",
+                           provider, model, retry_after, attempt + 1)
+            await asyncio.sleep(retry_after)
+
         elapsed = int((time.monotonic() - t0) * 1000)
 
         if resp.status_code != 200:
@@ -245,7 +271,7 @@ class LLMClient:
 
         # Parse tool calls from response
         parsed_tool_calls = []
-        raw_tool_calls = msg.get("tool_calls", [])
+        raw_tool_calls = msg.get("tool_calls") or []
         for tc in raw_tool_calls:
             fn = tc.get("function", {})
             try:

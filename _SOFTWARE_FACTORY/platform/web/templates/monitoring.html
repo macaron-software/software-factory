@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="monitoring-page">
+    <!-- Live metrics (SSE) -->
+    <div class="metrics-bar"
+         hx-ext="sse"
+         sse-connect="/sse/monitoring"
+         sse-swap="message">
+        <div class="metric">
+            <span class="metric-label">Active Agents</span>
+            <span class="metric-value" id="metric-agents">0</span>
+        </div>
+        <div class="metric">
+            <span class="metric-label">Messages</span>
+            <span class="metric-value" id="metric-messages">0</span>
+        </div>
+        <div class="metric">
+            <span class="metric-label">Sessions</span>
+            <span class="metric-value" id="metric-sessions">0</span>
+        </div>
+    </div>
+
+    <!-- Agent status grid -->
+    <section class="monitor-section">
+        <h3>Agent Status</h3>
+        <div id="monitor-agents"
+             hx-get="/api/agents/status"
+             hx-trigger="load, every 5s"
+             hx-swap="innerHTML">
+            <p>Loading...</p>
+        </div>
+    </section>
+
+    <!-- Activity log -->
+    <section class="monitor-section">
+        <h3>Activity Log</h3>
+        <div id="activity-log" class="log-area">
+            <p class="empty-state">Activity will appear here when agents start working.</p>
+        </div>
+    </section>
+</div>
+{% endblock %}

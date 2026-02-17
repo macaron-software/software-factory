@@ -48,6 +48,13 @@ async def lifespan(app: FastAPI):
     from .projects.manager import get_project_store
     get_project_store().seed_from_registry()
 
+    # Mark orphaned "active" sessions as interrupted (no running task after restart)
+    from .sessions.store import get_session_store
+    _ss = get_session_store()
+    _orphaned = _ss.mark_orphaned_sessions()
+    if _orphaned:
+        logger.info("Marked %d orphaned active sessions as interrupted", _orphaned)
+
     yield
 
     # Cleanup LLM client
@@ -74,6 +81,11 @@ def create_app() -> FastAPI:
 
     # Templates
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+    # Add markdown filter for chat rendering
+    import markdown as _md_lib
+    templates.env.filters["markdown"] = lambda text: _md_lib.markdown(
+        str(text or ""), extensions=["fenced_code", "tables", "nl2br"]
+    )
     app.state.templates = templates
 
     # Routes

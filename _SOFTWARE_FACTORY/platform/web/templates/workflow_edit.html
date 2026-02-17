@@ -32,9 +32,9 @@
     </div>
     <div class="ge-topbar-right">
       {% if workflow %}
-      <button class="ge-btn ge-btn-danger" onclick="if(confirm('Delete?')) fetch('/api/workflows/{{ workflow.id }}/delete',{method:'POST'}).then(()=>location='/workflows')">🗑</button>
+      <button class="ge-btn ge-btn-danger" onclick="if(confirm('Delete?')) fetch('/api/workflows/{{ workflow.id }}/delete',{method:'POST'}).then(()=>location='/workflows')"><svg class="icon icon-xs"><use href="#icon-trash"/></svg></button>
       {% endif %}
-      <button class="ge-btn ge-btn-primary" id="btnSave">💾 Save</button>
+      <button class="ge-btn ge-btn-primary" id="btnSave"><svg class="icon icon-xs"><use href="#icon-save"/></svg> Save</button>
     </div>
   </header>
 
@@ -122,7 +122,7 @@
           <span class="ge-toggle-track"><span class="ge-toggle-thumb"></span></span>
         </label>
 
-        <button class="ge-btn ge-btn-danger ge-btn-block" style="margin-top:1.2rem" id="btnRemoveNode">🗑 Supprimer Agent</button>
+        <button class="ge-btn ge-btn-danger ge-btn-block" style="margin-top:1.2rem" id="btnRemoveNode"><svg class="icon icon-xs"><use href="#icon-trash"/></svg> Supprimer Agent</button>
       </div>
     </aside>
 

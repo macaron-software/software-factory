@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  platform:
+    build:
+      context: /opt/macaron
+      dockerfile: platform/deploy/Dockerfile
+    expose:
+      - "8090"
+    environment:
+      - FOUNDRY_PROJECT_ENDPOINT=${FOUNDRY_PROJECT_ENDPOINT:-}
+      - FOUNDRY_MODEL_DEPLOYMENT_NAME=${FOUNDRY_MODEL_DEPLOYMENT_NAME:-gpt-4o}
+      - SF_ROOT=/app
+      - MF_ROOT=/app/mf_projects
+    volumes:
+      - platform-data:/app/data
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx-vm.conf:/etc/nginx/conf.d/default.conf:ro
+      - /opt/macaron/.htpasswd:/etc/nginx/.htpasswd:ro
+    depends_on:
+      - platform
+    restart: unless-stopped
+
+volumes:
+  platform-data:

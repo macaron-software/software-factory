@@ -66,6 +66,10 @@
 .thread-badge--delegate,.thread-badge--request{background:var(--yellow);color:#111}
 .thread-badge--negotiate{background:var(--blue);color:#fff}
 .thread-badge--human_request,.thread-badge--human_response{background:var(--purple);color:#fff}
+.thread-activity{font-size:0.62rem;padding:0.1rem 0.4rem;border-radius:4px;font-weight:600;letter-spacing:0.02em;display:inline-flex;align-items:center;gap:3px}
+.thread-activity--code{background:#16a34a22;color:#16a34a;border:1px solid #16a34a44}
+.thread-activity--read{background:#2563eb22;color:#2563eb;border:1px solid #2563eb44}
+.thread-activity--talk{background:var(--bg-tertiary);color:var(--text-secondary);opacity:0.6}
 .thread-arrow{color:var(--text-secondary);font-size:0.75rem}
 .thread-target{font-size:0.78rem;color:var(--text-secondary)}
 .thread-time{font-size:0.7rem;color:var(--text-secondary);margin-left:auto;white-space:nowrap}
@@ -115,8 +119,8 @@
 
 /* ── Graph mode ── */
 .graph-split{display:grid;grid-template-columns:1fr 240px;grid-template-rows:1fr 200px;height:100%;flex:1;min-height:0}
-.graph-canvas{position:relative;overflow:hidden;background:var(--bg-primary);grid-row:1;grid-column:1}
-.graph-canvas svg#liveSvg{width:100%;height:100%}
+.graph-canvas{position:relative;overflow:auto;background:var(--bg-primary);grid-row:1;grid-column:1}
+.graph-canvas svg#liveSvg{width:100%;min-height:100%}
 .graph-memory{grid-row:1/3;grid-column:2;border-left:1px solid var(--border);background:var(--bg-secondary);overflow-y:auto;padding:0.5rem 0.6rem;font-size:0.75rem}
 .graph-memory-title{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);margin:0.6rem 0 0.3rem;display:flex;align-items:center;gap:0.3rem}
 .graph-memory-title:first-child{margin-top:0}
@@ -125,6 +129,12 @@
 .graph-memory-val{color:var(--text-secondary);font-size:0.68rem;line-height:1.35;word-break:break-word;white-space:pre-wrap;max-height:4rem;overflow:hidden}
 .graph-memory-meta{font-size:0.6rem;color:var(--text-secondary);margin-top:0.15rem;opacity:0.7}
 .graph-memory-empty{color:var(--text-secondary);font-style:italic;font-size:0.68rem;padding:0.5rem 0}
+.pr-item{display:flex;align-items:flex-start;gap:0.4rem;padding:0.3rem 0.4rem;margin-bottom:0.25rem;border-radius:5px;background:var(--bg-tertiary);border:1px solid var(--border);font-size:0.7rem}
+.pr-item.pr-done{opacity:0.6}.pr-item.pr-done .pr-title{text-decoration:line-through}
+.pr-check{font-size:0.8rem;flex-shrink:0;margin-top:1px}
+.pr-title{color:var(--text-primary);font-weight:500;flex:1;line-height:1.3}
+.pr-agent{color:var(--text-secondary);font-size:0.6rem;margin-top:0.1rem}
+.pr-counter{font-size:0.62rem;color:var(--text-secondary);font-weight:400;margin-left:auto}
 .graph-log{border-top:1px solid var(--border);overflow-y:auto;padding:0.5rem 0.75rem;background:var(--bg-secondary);position:relative;grid-row:2;grid-column:1}
 .graph-log-line{display:flex;align-items:baseline;gap:0.5rem;padding:0.2rem 0;font-size:0.78rem}
 .graph-log-time{color:var(--text-secondary);font-size:0.7rem;font-family:'SF Mono',monospace;white-space:nowrap;flex-shrink:0}
@@ -143,18 +153,28 @@
 .live-node-bg{rx:12;ry:12;fill:var(--bg-secondary);stroke:var(--border);stroke-width:1.2;transition:stroke .2s,filter .15s}
 .live-node.highlight .live-node-bg{stroke:var(--purple);stroke-width:2.5}
 .live-node-bar{stroke-linecap:round}
-.live-node-name{fill:var(--text-primary);font-size:11.5px;font-weight:700;font-family:inherit}
-.live-node-role{fill:var(--text-secondary);font-size:9px;font-family:inherit}
+.live-node-name{fill:var(--text-primary);font-size:12.5px;font-weight:700;font-family:inherit}
+.live-node-role{fill:var(--text-secondary);font-size:9.5px;font-family:inherit}
+.live-node-tagline{fill:var(--text-secondary);font-size:8px;font-family:inherit;opacity:0.65;font-style:italic}
 .live-node-emoji{font-size:20px}
 .live-node-skill-tag{fill:var(--text-secondary);font-size:7.5px;font-family:inherit}
+.live-node-status-label{fill:var(--text-secondary);font-size:7px;font-family:inherit}
+.live-node-meta{fill:var(--text-secondary);font-size:7.5px;font-family:inherit}
 .node-status{transition:fill .3s}
 .node-status--idle{fill:#6b7280}
 .node-status--thinking{fill:var(--yellow);animation:pulse 1s infinite}
 .node-status--acting{fill:var(--green)}
 .node-status--error{fill:var(--red)}
 .node-status--done{fill:var(--green)}
-.edge-line{fill:none;stroke:var(--purple);stroke-width:1.8;opacity:0.45;marker-end:url(#liveArrow)}
-.edge-active{stroke-dasharray:8 4;animation:dash 0.6s linear infinite;opacity:0.85;stroke-width:2.2}
+.edge-line{fill:none;stroke:var(--purple);stroke-width:1.8;opacity:0.45;marker-end:url(#arrow-default);transition:stroke-width .2s,opacity .2s}
+.edge-active{stroke-dasharray:8 4;animation:dash 0.6s linear infinite;opacity:0.85!important;stroke-width:2.5px!important}
+.edge-count{fill:var(--text-secondary);font-size:9px;font-family:'SF Mono',monospace;text-anchor:middle;pointer-events:none}
+.graph-legend{position:absolute;bottom:12px;left:12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:8px 12px;z-index:10;min-width:140px}
+.graph-legend-title{font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);margin-bottom:6px}
+.graph-legend-items{display:flex;flex-direction:column;gap:5px}
+.graph-legend-item{display:flex;align-items:center;gap:8px;font-size:0.72rem;color:var(--text-primary)}
+.graph-legend-line{width:32px;height:0;border:none;flex-shrink:0}
+.graph-legend-icon{font-size:0.8rem;width:16px;text-align:center}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes dash{to{stroke-dashoffset:-12}}
 
@@ -213,6 +233,15 @@
               <span class="thread-name">{{ agent.name if agent else msg.from_agent }}</span>
               {% if agent and agent.role %}<span class="thread-role">{{ agent.role }}</span>{% endif %}
               <span class="thread-badge thread-badge--{{ msg.type }}">{{ msg.type }}</span>
+              {% if msg.edits and msg.edits > 0 %}
+              <span class="thread-activity thread-activity--code"><svg class="icon icon-xs"><use href="#icon-edit"/></svg> {{ msg.edits }} edit{{ 's' if msg.edits > 1 else '' }}</span>
+              {% endif %}
+              {% if msg.reads and msg.reads > 0 %}
+              <span class="thread-activity thread-activity--read"><svg class="icon icon-xs"><use href="#icon-eye"/></svg> {{ msg.reads }} read{{ 's' if msg.reads > 1 else '' }}</span>
+              {% endif %}
+              {% if not msg.edits and not msg.reads and msg.from_agent not in ('system', 'user') %}
+              <span class="thread-activity thread-activity--talk"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> talk</span>
+              {% endif %}
               <span class="thread-arrow">→</span>
               {% set target = agents | selectattr('id', 'equalto', msg.to_agent) | first %}
               <span class="thread-target">{{ target.name if target else (msg.to_agent or 'all') }}</span>
@@ -260,18 +289,74 @@
         <div class="graph-canvas" id="graphCanvas">
           <svg id="liveSvg" xmlns="http://www.w3.org/2000/svg">
             <defs>
-              <marker id="liveArrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-                <path d="M0,0 L10,5 L0,10 z" fill="var(--purple)" opacity="0.6"/>
+              <marker id="arrow-sequential" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#3b82f6" opacity="0.8"/>
+              </marker>
+              <marker id="arrow-hierarchical" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b" opacity="0.8"/>
+              </marker>
+              <marker id="arrow-parallel" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#10b981" opacity="0.8"/>
+              </marker>
+              <marker id="arrow-loop" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#ec4899" opacity="0.8"/>
+              </marker>
+              <marker id="arrow-network" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#8b5cf6" opacity="0.8"/>
+              </marker>
+              <marker id="arrow-report" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#ef4444" opacity="0.8"/>
+              </marker>
+              <marker id="arrow-default" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#6b7280" opacity="0.6"/>
               </marker>
             </defs>
+            <g id="livePhases"></g>
             <g id="liveEdges"></g>
             <g id="liveNodes"></g>
           </svg>
+          <!-- Pattern Legend -->
+          <div class="graph-legend" id="graphLegend">
+            <div class="graph-legend-title">Patterns</div>
+            <div class="graph-legend-items"></div>
+          </div>
           <div class="node-tooltip" id="nodeTooltip"></div>
         </div>
         <!-- Memory sidebar -->
         <div class="graph-memory" id="memoryPanel">
-          <div class="graph-memory-title"><svg class="icon icon-xs"><use href="#icon-database"/></svg> Session Memory</div>
+          <!-- PR List -->
+          <div class="graph-memory-title">
+            <svg class="icon icon-xs"><use href="#icon-git-pull-request"/></svg> PRs & Deliverables
+            {% if memory.prs %}<span class="pr-counter">{{ memory.prs|selectattr('done')|list|length }}/{{ memory.prs|length }}</span>{% endif %}
+          </div>
+          {% if memory.prs %}
+            {% for pr in memory.prs %}
+            <div class="pr-item {% if pr.done %}pr-done{% endif %}">
+              <span class="pr-check">{% if pr.done %}<svg class="icon icon-xs" style="color:var(--green)"><use href="#icon-check"/></svg>{% else %}<svg class="icon icon-xs" style="opacity:.3"><use href="#icon-circle"/></svg>{% endif %}</span>
+              <div>
+                <div class="pr-title">{{ pr.title[:70] }}{% if pr.title|length > 70 %}…{% endif %}</div>
+                <div class="pr-agent">{{ pr.agent }}</div>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="graph-memory-empty">No PRs yet — agents will produce [PR] items</div>
+          {% endif %}
+
+          <!-- Artifacts: decisions, reports -->
+          <div class="graph-memory-title" style="margin-top:10px"><svg class="icon icon-xs"><use href="#icon-file-text"/></svg> Artifacts & Decisions</div>
+          {% if memory.artifacts %}
+            {% for a in memory.artifacts %}
+            <div class="graph-memory-entry" style="border-left:3px solid {% if a.type == 'veto' %}var(--red){% elif a.type == 'approve' %}var(--green){% else %}var(--purple){% endif %};padding-left:8px">
+              <div class="graph-memory-key">{{ a.icon }} {{ a.title[:50] }}{% if a.title|length > 50 %}…{% endif %}</div>
+              <div class="graph-memory-meta">{{ a.agent }} · {{ a.type }}</div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="graph-memory-empty">No artifacts yet</div>
+          {% endif %}
+
+          <div class="graph-memory-title" style="margin-top:12px"><svg class="icon icon-xs"><use href="#icon-database"/></svg> Session Memory</div>
           {% if memory.session %}
             {% for m in memory.session %}
             <div class="graph-memory-entry">
@@ -350,7 +435,7 @@
 const SESSION_ID = {{ session.id | tojson }};
 const AGENTS = {{ agents | tojson }};
 const GRAPH  = {{ graph | tojson if graph else '{"nodes":[],"edges":[]}' }};
-const NODE_W = 180, NODE_H = 90;
+const NODE_W = 230, NODE_H = 110;
 
 function agentById(id){ return AGENTS.find(a=>a.id===id) || null; }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
@@ -419,7 +504,7 @@ btnSend.addEventListener('click', sendMessage);
 msgInput.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }});
 
 /* ── SSE Connection ── */
-const es = new EventSource(`/sse/session/${SESSION_ID}`);
+const es = new EventSource(`/api/sessions/${SESSION_ID}/sse`);
 es.addEventListener('message', e=>{
   try{
     const data = JSON.parse(e.data);
@@ -454,6 +539,9 @@ function appendThread(data){
         <span class="thread-name">${esc(agent?agent.name:data.from_agent)}</span>
         ${agent&&agent.role?`<span class="thread-role">${esc(agent.role)}</span>`:''}
         <span class="thread-badge thread-badge--${data.msg_type||data.type||'inform'}">${esc(data.msg_type||data.type||'inform')}</span>
+        ${data.edits>0?`<span class="thread-activity thread-activity--code"><svg class="icon icon-xs"><use href="#icon-edit"/></svg> ${data.edits} edit${data.edits>1?'s':''}</span>`:''}
+        ${data.reads>0?`<span class="thread-activity thread-activity--read"><svg class="icon icon-xs"><use href="#icon-eye"/></svg> ${data.reads} read${data.reads>1?'s':''}</span>`:''}
+        ${!data.edits&&!data.reads&&data.from_agent!=='system'&&data.from_agent!=='user'?'<span class="thread-activity thread-activity--talk"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> talk</span>':''}
         <span class="thread-arrow">→</span>
         <span class="thread-target">${esc(target?target.name:(data.to_agent||'all'))}</span>
         ${target&&target.role?`<span class="thread-role">${esc(target.role)}</span>`:''}
@@ -570,12 +658,17 @@ function renderGraph(){
   const canvas = document.getElementById('graphCanvas');
   const svgEl = document.getElementById('liveSvg');
   const W = canvas.clientWidth || 800;
-  const H = canvas.clientHeight || 500;
+  const baseH = canvas.clientHeight || 500;
+  if(graphNodes.length && graphNodes[0].x == null) autoLayoutGraph(W, baseH);
+
+  // Compute actual height from node positions
+  let maxY = baseH;
+  graphNodes.forEach(n => { if(n.y != null) maxY = Math.max(maxY, n.y + NODE_H + 40); });
+  const H = maxY;
   svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svgEl.style.height = H + 'px';
 
-  // Auto-layout if no positions
-  if(graphNodes.length && graphNodes[0].x == null) autoLayoutGraph(W, H);
-
+  document.getElementById('livePhases').innerHTML = '';
   renderLiveEdges(W, H);
   renderLiveNodes();
 }
@@ -583,38 +676,152 @@ function renderGraph(){
 function autoLayoutGraph(W, H){
   const N = graphNodes.length;
   if(!N) return;
-  if(N === 1){
-    graphNodes[0].x = W/2 - NODE_W/2;
-    graphNodes[0].y = H/2 - NODE_H/2;
-    return;
-  }
-  // Tree layout: first node top-center, rest spread below
-  graphNodes[0].x = W/2 - NODE_W/2;
-  graphNodes[0].y = 40;
-  const children = graphNodes.slice(1);
-  const gap = Math.min(190, (W - NODE_W) / (children.length || 1));
-  const startX = Math.max(20, (W - gap*(children.length-1) - NODE_W) / 2);
-  children.forEach((n,i)=>{ n.x = startX + i*gap; n.y = 180; });
+
+  // Sort by hierarchy_rank (lower = higher in org chart)
+  const sorted = graphNodes.slice().sort((a,b)=> (a.hierarchy_rank||50) - (b.hierarchy_rank||50));
+
+  // Group into layers by rank
+  const layerMap = new Map();
+  sorted.forEach(n => {
+    const rank = n.hierarchy_rank || 50;
+    if(!layerMap.has(rank)) layerMap.set(rank, []);
+    layerMap.get(rank).push(n);
+  });
+  const layers = [...layerMap.values()];
+
+  // Position each layer
+  const layerGap = Math.min(160, (H - 80) / (layers.length || 1));
+  layers.forEach((layer, li)=>{
+    const y = 30 + li * layerGap;
+    const gap = Math.min(210, (W - 40) / (layer.length || 1));
+    const startX = Math.max(20, (W - gap*(layer.length-1) - NODE_W) / 2);
+    layer.forEach((n, i)=>{
+      n.x = startX + i * gap;
+      n.y = y;
+    });
+  });
 }
 
 function renderLiveEdges(W, H){
   const el = document.getElementById('liveEdges');
   el.innerHTML = '';
+
+  // Pattern colors and styles (matching the Agentic Architectures reference)
+  const PATTERN_STYLES = {
+    sequential:   {color:'#3b82f6', dash:'',          icon:'→',  label:'Sequential'},
+    hierarchical: {color:'#f59e0b', dash:'',          icon:'⬡',  label:'Hierarchical'},
+    parallel:     {color:'#10b981', dash:'6 3',       icon:'⇉',  label:'Parallel'},
+    loop:         {color:'#ec4899', dash:'4 4',       icon:'↻',  label:'Loop'},
+    network:      {color:'#8b5cf6', dash:'2 4 8 4',   icon:'⬡',  label:'Network'},
+    report:       {color:'#ef4444', dash:'3 3',       icon:'↩',  label:'Report'},
+  };
+  const DEFAULT_STYLE = {color:'#6b7280', dash:'', icon:'·', label:'Unknown'};
+
+  // Track which patterns are active (for legend)
+  const activePatterns = new Set();
+
   graphEdges.forEach(e=>{
-    const fn = graphNodes.find(n=>(n.id||n.agent_id)===e.from);
-    const tn = graphNodes.find(n=>(n.id||n.agent_id)===e.to);
-    if(!fn||!tn) return;
-    const x1=fn.x+NODE_W/2, y1=fn.y+NODE_H;
-    const x2=tn.x+NODE_W/2, y2=tn.y;
-    const off = Math.max(40, Math.abs(y2-y1)*0.45);
-    const d = `M${x1},${y1} C${x1},${y1+off} ${x2},${y2-off} ${x2},${y2}`;
+    const fn = graphNodes.find(n=> n.agent_id===e.from);
+    const tn = graphNodes.find(n=> n.agent_id===e.to);
+    if(!fn || !tn) return;
+
+    const x1 = fn.x + NODE_W/2, y1_base = fn.y + NODE_H;
+    const x2 = tn.x + NODE_W/2, y2_base = tn.y;
+
+    // Check if reverse edge exists (bidirectional)
+    const hasReverse = graphEdges.some(re=> re.from===e.to && re.to===e.from);
+    const offset = hasReverse ? 12 : 0;
+
+    // Determine start/end points based on relative position
+    let x1f, y1f, x2f, y2f;
+    const dy = tn.y - fn.y;
+    const dx = tn.x - fn.x;
+
+    if(Math.abs(dy) < NODE_H * 0.8){
+      if(dx > 0){
+        x1f = fn.x + NODE_W; y1f = fn.y + NODE_H/2 - offset;
+        x2f = tn.x;           y2f = tn.y + NODE_H/2 + offset;
+      } else {
+        x1f = fn.x;           y1f = fn.y + NODE_H/2 - offset;
+        x2f = tn.x + NODE_W;  y2f = tn.y + NODE_H/2 + offset;
+      }
+      const midY = Math.min(y1f, y2f) - 40;
+      var d = `M${x1f},${y1f} C${x1f},${midY} ${x2f},${midY} ${x2f},${y2f}`;
+    } else if(dy > 0){
+      x1f = x1 + offset; y1f = y1_base;
+      x2f = x2 - offset; y2f = y2_base;
+      const curveOff = Math.max(30, Math.abs(y2f-y1f)*0.3);
+      var d = `M${x1f},${y1f} C${x1f},${y1f+curveOff} ${x2f},${y2f-curveOff} ${x2f},${y2f}`;
+    } else {
+      x1f = x1 - offset; y1f = fn.y;
+      x2f = x2 + offset; y2f = tn.y + NODE_H;
+      const curveOff = Math.max(30, Math.abs(y2f-y1f)*0.3);
+      var d = `M${x1f},${y1f} C${x1f},${y1f-curveOff} ${x2f},${y2f+curveOff} ${x2f},${y2f}`;
+    }
+
+    // Determine pattern style — use dominant pattern (first one)
+    const mainPattern = (e.patterns && e.patterns[0]) || '';
+    const style = PATTERN_STYLES[mainPattern] || DEFAULT_STYLE;
+    if(mainPattern) activePatterns.add(mainPattern);
+    // Use explicit color from workflow config if provided
+    const edgeColor = e.color || style.color;
+
     const path = document.createElementNS('http://www.w3.org/2000/svg','path');
     path.setAttribute('d', d);
     path.setAttribute('class','edge-line');
+    path.style.stroke = edgeColor;
+    path.style.markerEnd = `url(#arrow-${mainPattern || 'default'})`;
+    if(style.dash) path.style.strokeDasharray = style.dash;
+    // Brighter when messages have flowed, dimmer when no activity yet
+    path.style.opacity = e.count > 0 ? Math.min(0.9, 0.5 + e.count * 0.1).toFixed(2) : '0.35';
+    path.style.strokeWidth = e.count > 0 ? Math.min(3.5, 1.5 + e.count * 0.3).toFixed(1) + 'px' : '1.2px';
     path.dataset.from = e.from;
     path.dataset.to = e.to;
+    path.dataset.pattern = mainPattern;
     el.appendChild(path);
+
+    // Label or count badge at midpoint
+    const mx = (x1f + x2f) / 2;
+    const my = (y1f + y2f) / 2 - 6;
+    const badge = document.createElementNS('http://www.w3.org/2000/svg','text');
+    badge.setAttribute('class','edge-count');
+    badge.setAttribute('x', mx);
+    badge.setAttribute('y', my);
+    badge.style.fill = edgeColor;
+    const typeIcons = (e.types||[]).map(t=> t==='veto'?'✗':t==='approve'?'✓':'').filter(Boolean).join('');
+    const label = e.label || '';
+    badge.textContent = e.count > 0
+      ? `${label?label+' ':''}×${e.count}${typeIcons?' '+typeIcons:''}`
+      : label || '';
+    el.appendChild(badge);
   });
+
+  // Build legend from active patterns
+  const legendItems = document.querySelector('.graph-legend-items');
+  if(legendItems){
+    legendItems.innerHTML = '';
+    const patternsToShow = activePatterns.size > 0
+      ? [...activePatterns]
+      : Object.keys(PATTERN_STYLES);
+    patternsToShow.forEach(p => {
+      const s = PATTERN_STYLES[p];
+      if(!s) return;
+      const item = document.createElement('div');
+      item.className = 'graph-legend-item';
+      item.innerHTML = `
+        <span class="graph-legend-icon">${s.icon}</span>
+        <svg width="36" height="12" class="graph-legend-line">
+          <line x1="0" y1="6" x2="26" y2="6" stroke="${s.color}" stroke-width="2.5"
+                ${s.dash ? `stroke-dasharray="${s.dash}"` : ''}/>
+          <polygon points="26,2 34,6 26,10" fill="${s.color}" opacity="0.8"/>
+        </svg>
+        <span>${s.label}</span>
+      `;
+      legendItems.appendChild(item);
+    });
+    // Show legend only if there are patterns
+    document.getElementById('graphLegend').style.display = patternsToShow.length ? '' : 'none';
+  }
 }
 
 function renderLiveNodes(){
@@ -641,25 +848,32 @@ function renderLiveNodes(){
     if(agent && agent.skills && agent.skills.length > 0){
       const shown = agent.skills.slice(0,3);
       const more = agent.skills.length > 3 ? ` +${agent.skills.length-3}` : '';
-      skillTags = shown.map((s,i)=>`<text class="live-node-skill-tag" x="${14 + i*52}" y="${75}">${esc(s.substring(0,8))}</text>`).join('');
-      if(more) skillTags += `<text class="live-node-skill-tag" x="${14 + shown.length*52}" y="${75}">${more}</text>`;
+      skillTags = shown.map((s,i)=>`<text class="live-node-skill-tag" x="${14 + i*58}" y="${NODE_H-18}">${esc(s.substring(0,8))}</text>`).join('');
+      if(more) skillTags += `<text class="live-node-skill-tag" x="${14 + shown.length*58}" y="${NODE_H-18}">${more}</text>`;
     }
 
     const avatarUrl = agent ? agent.avatar_url : '';
+    const avatarR = 20;
+    const avatarCx = 28, avatarCy = 36;
     const avatarSvg = avatarUrl
-      ? `<clipPath id="clip-${n.id}"><circle cx="22" cy="24" r="14"/></clipPath>
-         <image href="${avatarUrl}" x="8" y="10" width="28" height="28" clip-path="url(#clip-${n.id})"/>`
-      : `<text class="live-node-emoji" x="12" y="32">${emoji}</text>`;
+      ? `<clipPath id="clip-${n.id}"><circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}"/></clipPath>
+         <image href="${avatarUrl}" x="${avatarCx-avatarR}" y="${avatarCy-avatarR}" width="${avatarR*2}" height="${avatarR*2}" clip-path="url(#clip-${n.id})"/>`
+      : `<circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}" fill="${col}" opacity="0.25"/>
+         <text x="${avatarCx}" y="${avatarCy+5}" text-anchor="middle" style="font-size:16px;fill:${col};font-weight:700">${emoji||name.substring(0,2)}</text>`;
+
+    const tagline = agent ? (agent.tagline || agent.description || '') : '';
+    const textX = avatarCx + avatarR + 12;
 
     g.innerHTML = `
       <rect class="live-node-bg" width="${NODE_W}" height="${NODE_H}" ${sel?`style="stroke:${col};stroke-width:2.5"`:''} />
-      <line class="live-node-bar" x1="0" y1="0" x2="${NODE_W}" y2="0" stroke="${col}" stroke-width="3"/>
+      <line class="live-node-bar" x1="0" y1="0" x2="${NODE_W}" y2="0" stroke="${col}" stroke-width="4"/>
       ${avatarSvg}
-      <text class="live-node-name" x="40" y="28">${name.length>14?name.substring(0,13)+'…':name}</text>
-      <text class="live-node-role" x="40" y="42">${role.length>20?role.substring(0,19)+'…':role}</text>
-      <circle class="node-status node-status--${status}" cx="${NODE_W-14}" cy="16" r="5"/>
-      <text class="live-node-skill-tag" x="${NODE_W-14}" y="42" text-anchor="end">${status}</text>
-      ${skillCount||toolCount ? `<text class="live-node-skill-tag" x="14" y="${NODE_H-8}">${toolCount}T ${skillCount}S</text>` : ''}
+      <text class="live-node-name" x="${textX}" y="26">${name.length>18?name.substring(0,17)+'…':name}</text>
+      <text class="live-node-role" x="${textX}" y="40">${role.length>24?role.substring(0,23)+'…':role}</text>
+      ${tagline ? `<text class="live-node-tagline" x="${textX}" y="54">${esc(tagline.substring(0,30))}${tagline.length>30?'…':''}</text>` : ''}
+      <circle class="node-status node-status--${status}" cx="${NODE_W-16}" cy="18" r="5"/>
+      <text class="live-node-status-label" x="${NODE_W-16}" y="36" text-anchor="middle">${status}</text>
+      ${skillCount||toolCount ? `<text class="live-node-meta" x="14" y="${NODE_H-10}">${toolCount}T ${skillCount}S</text>` : ''}
       ${skillTags}
     `;
     g.addEventListener('click', (e)=> { e.stopPropagation(); onNodeClick(n, g); });
@@ -726,7 +940,7 @@ function onNodeClick(node, gEl){
     ? `<img src="${agent.avatar_url}" style="width:40px;height:40px;border-radius:50%;flex-shrink:0">`
     : `<span class="node-tooltip-avatar">${agent?agent.avatar:''}</span>`;
   tooltip.innerHTML = `
-    <button class="node-tooltip-close" onclick="document.getElementById('nodeTooltip').classList.remove('visible');highlightedNode=null;renderLiveNodes();">✕</button>
+    <button class="node-tooltip-close" onclick="document.getElementById('nodeTooltip').classList.remove('visible');highlightedNode=null;renderLiveNodes();"><svg class="icon icon-xs"><use href="#icon-x"/></svg></button>
     <div class="node-tooltip-header">
       ${tooltipAvatar}
       <div class="node-tooltip-info">
@@ -736,6 +950,10 @@ function onNodeClick(node, gEl){
       <span class="node-tooltip-status">${statusDot} ${status}</span>
     </div>
     ${agent && agent.tagline ? `<div class="node-tooltip-desc" style="font-style:italic;margin-bottom:0.3rem">${esc(agent.tagline)}</div>` : ''}
+    ${agent && agent.persona ? `<div class="node-tooltip-section">
+      <div class="node-tooltip-section-title"><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.2rem"><use href="#icon-user"/></svg> Persona</div>
+      <div class="node-tooltip-desc" style="white-space:pre-line;max-height:120px;overflow-y:auto">${esc(agent.persona.substring(0, 300))}${agent.persona.length > 300 ? '…' : ''}</div>
+    </div>` : ''}
     ${descHtml}
     ${skillsHtml}
     ${toolsHtml}

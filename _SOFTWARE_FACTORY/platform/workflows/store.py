@@ -2,6 +2,7 @@
 
 A Workflow is a sequence of phases. Each phase runs a pattern.
 Phases can have gates (conditions to proceed) and shared context.
+The RTE (Release Train Engineer) agent facilitates transitions via LLM.
 """
 from __future__ import annotations
 
@@ -14,7 +15,7 @@ from typing import Optional
 
 from ..db.migrations import get_db
 from ..patterns.store import get_pattern_store, PatternDef
-from ..patterns.engine import run_pattern
+from ..patterns.engine import run_pattern, _push_sse
 from ..sessions.store import get_session_store, SessionDef, MessageDef
 
 logger = logging.getLogger(__name__)
@@ -170,53 +171,74 @@ class WorkflowStore:
             WorkflowDef(
                 id="migration-sharelook",
                 name="Migration Sharelook Angular 16→17",
-                description="Migration ISO 100% Angular 16.2→17.3. CDP orchestre, Lead décompose, Devs codemods, QA golden files (0% diff), Security audit.",
+                description="Migration ISO 100% Angular 16.2→17.3 — SAFe PI: Planning→Sprint→Review→Retro→Release.",
                 icon="rocket", is_builtin=True,
                 phases=[
-                    WorkflowPhase(id="p1-deps", pattern_id="sequential",
-                                  name="Phase 1: Dependencies & Audit",
-                                  description="Update Angular deps, npm audit, Security CVE check.",
-                                  gate="no_veto",
-                                  config={"agents": ["chef_projet", "lead_dev", "securite"]}),
-                    WorkflowPhase(id="p2-pilot", pattern_id="hierarchical",
-                                  name="Phase 2: Pilot (ai12-reporting)",
-                                  description="Migrate small app (10 modules). Lead→Dev→QA golden.",
-                                  gate="no_veto",
-                                  config={"agents": ["lead_dev", "dev_frontend", "qa_lead"]}),
-                    WorkflowPhase(id="p3-main", pattern_id="hierarchical",
-                                  name="Phase 3: Main App (ai08-admin)",
-                                  description="Migrate large app (38 modules). Multi-dev, QA validates.",
-                                  gate="no_veto",
+                    # ── PI Planning: Vision, scope, risques ──
+                    WorkflowPhase(id="pi-planning", pattern_id="sequential",
+                                  name="PI Planning",
+                                  description="CP présente vision migration. Lead+QA+Sécu définissent scope, risques, acceptance criteria.",
+                                  gate="always",
+                                  config={"agents": ["chef_projet", "lead_dev", "qa_lead", "securite"]}),
+                    # ── Sprint Planning: Lead décompose en stories pour les devs ──
+                    WorkflowPhase(id="sprint-planning", pattern_id="hierarchical",
+                                  name="Sprint Planning",
+                                  description="Lead décompose migration en user stories. Assigne aux devs selon expertise (pilot vs main app).",
+                                  gate="always",
+                                  config={"agents": ["lead_dev", "dev_frontend", "dev_fullstack"]}),
+                    # ── Dev Sprint: Devs codent, Lead review complétude ──
+                    WorkflowPhase(id="dev-sprint", pattern_id="hierarchical",
+                                  name="Dev Sprint",
+                                  description="Devs exécutent migration en //. Lead vérifie complétude. Inner loop jusqu'à COMPLETE.",
+                                  gate="always",
                                   config={"agents": ["lead_dev", "dev_frontend", "dev_fullstack", "qa_lead"]}),
-                    WorkflowPhase(id="p4-deploy", pattern_id="sequential",
-                                  name="Phase 4: Deploy Canary",
-                                  description="Staging→E2E→canary 1%→100%. Rollback si régression.",
+                    # ── Sprint Review: QA valide, Sécu audite, CP GO/NOGO ──
+                    WorkflowPhase(id="sprint-review", pattern_id="sequential",
+                                  name="Sprint Review",
+                                  description="Lead présente travail. QA valide ISO 100% (golden files). Sécu audit CVE. CP décide GO/NOGO.",
+                                  gate="no_veto",
+                                  config={"agents": ["lead_dev", "qa_lead", "securite", "chef_projet"]}),
+                    # ── Retrospective: Tous débattent améliorations ──
+                    WorkflowPhase(id="retrospective", pattern_id="network",
+                                  name="Retrospective",
+                                  description="Équipe entière débat: ce qui a marché, ce qui a échoué, améliorations process.",
+                                  gate="always",
+                                  config={"agents": ["lead_dev", "dev_frontend", "dev_fullstack", "qa_lead", "chef_projet"]}),
+                    # ── Release: DevOps deploy, QA smoke, CP valide ──
+                    WorkflowPhase(id="release", pattern_id="sequential",
+                                  name="Release",
+                                  description="DevOps deploy staging→canary. QA smoke test. CP valide mise en prod.",
                                   gate="all_approved",
-                                  config={"agents": ["chef_projet", "qa_lead", "securite", "devops"]}),
+                                  config={"agents": ["devops", "qa_lead", "chef_projet"]}),
                 ],
                 config={
                     "graph": {
                         "pattern": "hierarchical",
                         "nodes": [
-                            {"id": "n1", "agent_id": "chef_projet", "x": 400, "y": 50, "label": "Chef de Projet Migration"},
-                            {"id": "n2", "agent_id": "lead_dev", "x": 200, "y": 200, "label": "Lead Dev Angular"},
-                            {"id": "n3", "agent_id": "securite", "x": 600, "y": 200, "label": "Security Audit"},
-                            {"id": "n4", "agent_id": "qa_lead", "x": 400, "y": 200, "label": "QA Migration (ISO 100%)"},
-                            {"id": "n5", "agent_id": "dev_frontend", "x": 100, "y": 380, "label": "Dev Frontend (Pilot)"},
-                            {"id": "n6", "agent_id": "dev_fullstack", "x": 300, "y": 380, "label": "Dev Frontend (Main)"},
-                            {"id": "n7", "agent_id": "devops", "x": 500, "y": 380, "label": "DevOps Deploy"},
+                            {"id": "n1", "agent_id": "chef_projet", "x": 400, "y": 30, "label": "Chef de Projet"},
+                            {"id": "n2", "agent_id": "lead_dev", "x": 250, "y": 170, "label": "Lead Dev Angular"},
+                            {"id": "n3", "agent_id": "securite", "x": 550, "y": 170, "label": "Security Audit"},
+                            {"id": "n4", "agent_id": "qa_lead", "x": 400, "y": 170, "label": "QA Lead (ISO 100%)"},
+                            {"id": "n5", "agent_id": "dev_frontend", "x": 150, "y": 340, "label": "Dev Frontend"},
+                            {"id": "n6", "agent_id": "dev_fullstack", "x": 350, "y": 340, "label": "Dev Fullstack"},
+                            {"id": "n7", "agent_id": "devops", "x": 550, "y": 340, "label": "DevOps"},
                         ],
                         "edges": [
-                            {"from": "n1", "to": "n2", "label": "decompose"},
-                            {"from": "n1", "to": "n3", "label": "audit"},
-                            {"from": "n1", "to": "n4", "label": "validate"},
-                            {"from": "n2", "to": "n5", "label": "pilot"},
-                            {"from": "n2", "to": "n6", "label": "main"},
-                            {"from": "n5", "to": "n4", "label": "golden"},
-                            {"from": "n6", "to": "n4", "label": "golden"},
-                            {"from": "n4", "to": "n1", "label": "GO/NOGO"},
-                            {"from": "n3", "to": "n1", "label": "report"},
-                            {"from": "n1", "to": "n7", "label": "deploy"},
+                            # PI Planning: CP briefs everyone
+                            {"from": "n1", "to": "n2", "label": "brief", "type": "sequential", "color": "#3b82f6"},
+                            {"from": "n1", "to": "n4", "label": "criteria", "type": "sequential", "color": "#3b82f6"},
+                            {"from": "n1", "to": "n3", "label": "audit", "type": "sequential", "color": "#3b82f6"},
+                            # Sprint: Lead delegates to devs
+                            {"from": "n2", "to": "n5", "label": "stories", "type": "parallel", "color": "#f59e0b"},
+                            {"from": "n2", "to": "n6", "label": "stories", "type": "parallel", "color": "#f59e0b"},
+                            # Review: Devs report to QA
+                            {"from": "n5", "to": "n4", "label": "validate", "type": "sequential", "color": "#10b981"},
+                            {"from": "n6", "to": "n4", "label": "validate", "type": "sequential", "color": "#10b981"},
+                            # Feedback: QA reports to CP
+                            {"from": "n4", "to": "n1", "label": "GO/NOGO", "type": "report", "color": "#ef4444"},
+                            {"from": "n3", "to": "n1", "label": "report", "type": "report", "color": "#ef4444"},
+                            # Release: CP triggers deploy
+                            {"from": "n1", "to": "n7", "label": "deploy", "type": "sequential", "color": "#8b5cf6"},
                         ],
                     },
                     "project_ref": "sharelook",
@@ -258,6 +280,82 @@ def get_workflow_store() -> WorkflowStore:
     return _store
 
 
+# ── RTE Facilitator ──────────────────────────────────────────────
+
+_RTE_AGENT_ID = "release_train_engineer"
+
+async def _rte_facilitate(
+    session_id: str,
+    prompt: str,
+    to_agent: str = "",
+    project_id: str = "",
+) -> str:
+    """Call the RTE agent via LLM to facilitate a workflow transition.
+    Returns the RTE's message content."""
+    from ..agents.store import get_agent_store
+    from ..agents.executor import get_executor, ExecutionContext
+
+    store = get_session_store()
+    agent_store = get_agent_store()
+    rte = agent_store.get(_RTE_AGENT_ID)
+    if not rte:
+        # Fallback to system message if RTE agent not found
+        store.add_message(MessageDef(
+            session_id=session_id,
+            from_agent="system", to_agent=to_agent or "all",
+            message_type="system", content=prompt,
+        ))
+        return prompt
+
+    # Push thinking status
+    await _push_sse(session_id, {
+        "type": "agent_status",
+        "agent_id": rte.id,
+        "status": "thinking",
+    })
+
+    ctx = ExecutionContext(
+        agent=rte,
+        session_id=session_id,
+        project_id=project_id,
+        tools_enabled=False,  # RTE doesn't need tools, just speaks
+    )
+
+    executor = get_executor()
+    result = await executor.run(ctx, prompt)
+
+    msg = MessageDef(
+        session_id=session_id,
+        from_agent=rte.id,
+        to_agent=to_agent or "all",
+        message_type="text",
+        content=result.content,
+        metadata={
+            "model": result.model,
+            "provider": result.provider,
+            "tokens_in": result.tokens_in,
+            "tokens_out": result.tokens_out,
+            "duration_ms": result.duration_ms,
+            "role": "rte_facilitation",
+        },
+    )
+    store.add_message(msg)
+    await _push_sse(session_id, {
+        "type": "message",
+        "from_agent": rte.id,
+        "to_agent": to_agent or "all",
+        "content": result.content,
+        "message_type": "text",
+    })
+    await _push_sse(session_id, {
+        "type": "agent_status",
+        "agent_id": rte.id,
+        "status": "idle",
+    })
+
+    return result.content
+
+
 # ── Workflow Engine ──────────────────────────────────────────────
 
 async def run_workflow(
@@ -266,7 +364,7 @@ async def run_workflow(
     initial_task: str,
     project_id: str = "",
 ) -> WorkflowRun:
-    """Execute a workflow — run each phase's pattern sequentially."""
+    """Execute a workflow — RTE facilitates each phase transition."""
     run = WorkflowRun(
         workflow=workflow,
         session_id=session_id,
@@ -276,81 +374,145 @@ async def run_workflow(
     store = get_session_store()
     pattern_store = get_pattern_store()
 
-    store.add_message(MessageDef(
-        session_id=session_id,
-        from_agent="system",
-        message_type="system",
-        content=f"🔄 Workflow **{workflow.name}** started — {len(workflow.phases)} phases",
-    ))
+    # Workflow leader = first agent of first phase (typically CP)
+    leader = ""
+    if workflow.phases:
+        first_agents = workflow.phases[0].config.get("agents", [])
+        if first_agents:
+            leader = first_agents[0]
+
+    # RTE kicks off the sprint
+    ceremony_names = [p.name for p in workflow.phases]
+    await _rte_facilitate(
+        session_id,
+        f"Tu lances le sprint **{workflow.name}** — {len(workflow.phases)} cérémonies: {', '.join(ceremony_names)}.\n"
+        f"Objectif du sprint: {initial_task}\n\n"
+        f"Annonce le démarrage à l'équipe. Le Scrum Master facilite, le CP priorise, l'équipe s'organise.",
+        to_agent=leader,
+        project_id=project_id,
+    )
 
     task = initial_task
+    accumulated_context = []
     for i, phase in enumerate(workflow.phases):
         run.current_phase = i
 
-        store.add_message(MessageDef(
-            session_id=session_id,
-            from_agent="system",
-            message_type="system",
-            content=f"📌 Phase {i+1}/{len(workflow.phases)}: **{phase.name}** — {phase.description}",
-        ))
+        phase_agents = phase.config.get("agents", [])
+        phase_leader = phase_agents[0] if phase_agents else leader or "all"
+
+        # RTE facilitates ceremony transition
+        prev_summary = ""
+        if accumulated_context:
+            prev_summary = "\n".join(f"- {c}" for c in accumulated_context[-3:])
+        await _rte_facilitate(
+            session_id,
+            f"**{phase.name}**\n"
+            f"{phase.description}\n"
+            f"Participants: {', '.join(phase_agents)}\n"
+            f"{f'Contexte:{chr(10)}{prev_summary}' if prev_summary else ''}\n\n"
+            f"Facilite la cérémonie. Donne la parole à {phase_leader}.",
+            to_agent=phase_leader,
+            project_id=project_id,
+        )
 
         pattern = pattern_store.get(phase.pattern_id)
         if not pattern:
-            store.add_message(MessageDef(
-                session_id=session_id,
-                from_agent="system",
-                message_type="system",
-                content=f"⚠️ Pattern '{phase.pattern_id}' not found, skipping phase.",
-            ))
+            await _rte_facilitate(
+                session_id,
+                f"Le pattern '{phase.pattern_id}' n'existe pas. On passe à la phase suivante.",
+                to_agent=phase_leader,
+                project_id=project_id,
+            )
             continue
 
+        # Override pattern agents with the phase's workflow agents
+        if phase_agents:
+            from ..patterns.store import PatternDef as PD
+            pattern = PD(
+                id=f"{workflow.id}-{phase.id}",
+                name=f"{phase.name}",
+                description=phase.description,
+                type=pattern.type,
+                agents=[{"id": f"n{j}", "agent_id": aid} for j, aid in enumerate(phase_agents)],
+                edges=[],
+                config=pattern.config,
+                icon=pattern.icon,
+            )
+
+        # Build ceremony-specific task with accumulated context
+        phase_task = f"## {phase.name}\n{phase.description}\n\n"
+        if accumulated_context:
+            phase_task += "## Previous phases summary:\n"
+            for ctx in accumulated_context[-3:]:
+                phase_task += f"- {ctx}\n"
+            phase_task += "\n"
+        phase_task += f"## Original goal:\n{initial_task}"
+
         try:
-            result = await run_pattern(pattern, session_id, task, project_id)
+            result = await run_pattern(pattern, session_id, phase_task, project_id)
             run.phase_results.append({
                 "phase": phase.name,
                 "success": result.success,
                 "error": result.error,
             })
 
-            # Check gate
-            if phase.gate == "no_veto" and not result.success:
+            # RTE reacts to gate results
+            if phase.gate == "all_approved" and not result.success:
                 run.status = "gated"
-                store.add_message(MessageDef(
-                    session_id=session_id,
-                    from_agent="system",
-                    message_type="system",
-                    content=f"🚫 Workflow gated at phase '{phase.name}' — pattern had vetoes/failures.",
-                ))
+                await _rte_facilitate(
+                    session_id,
+                    f"La phase **{phase.name}** n'a pas obtenu l'approbation de tous. "
+                    f"Des vetos non résolus subsistent après les boucles de correction. "
+                    f"Le workflow est bloqué. Synthétise la situation et propose les prochaines étapes.",
+                    to_agent=leader,
+                    project_id=project_id,
+                )
                 break
+            elif phase.gate == "no_veto" and not result.success:
+                await _rte_facilitate(
+                    session_id,
+                    f"La phase **{phase.name}** a eu des retours mais on continue. "
+                    f"Le feedback a été adressé dans la boucle. On passe à la suite.",
+                    to_agent=phase_leader,
+                    project_id=project_id,
+                )
 
-            # Use last agent output as context for next phase
-            last_msgs = store.get_messages(session_id, limit=3)
+            # Accumulate context from this phase's output
+            last_msgs = store.get_messages(session_id, limit=5)
             for m in reversed(last_msgs):
-                if m.from_agent not in ("system", "user"):
-                    task = f"[Previous phase output from {m.from_agent}]:\n{m.content[:2000]}\n\n[Original task]:\n{initial_task}"
+                if m.from_agent not in ("system", "user", _RTE_AGENT_ID):
+                    summary = (m.content or "")[:300].replace("\n", " ")
+                    accumulated_context.append(f"[{phase.name}] {m.from_agent}: {summary}")
                     break
 
         except Exception as e:
             run.status = "failed"
             run.error = str(e)
             logger.error("Workflow phase %s failed: %s", phase.name, e)
-            store.add_message(MessageDef(
-                session_id=session_id,
-                from_agent="system",
-                message_type="system",
-                content=f"❌ Phase '{phase.name}' error: {e}",
-            ))
+            await _rte_facilitate(
+                session_id,
+                f"Erreur technique sur la phase **{phase.name}**: {e}\n"
+                f"Annonce l'erreur à l'équipe et propose un plan de recovery.",
+                to_agent=leader,
+                project_id=project_id,
+            )
             break
 
     if run.status == "running":
         run.status = "completed"
 
-    status_emoji = {"completed": "✅", "failed": "❌", "gated": "🚫"}.get(run.status, "⏹")
-    store.add_message(MessageDef(
-        session_id=session_id,
-        from_agent="system",
-        message_type="system",
-        content=f"{status_emoji} Workflow **{workflow.name}** {run.status}",
-    ))
+    # RTE closes the workflow
+    status_emoji = {"completed": "[OK]", "failed": "[FAIL]", "gated": "[BLOCKED]"}.get(run.status, "[DONE]")
+    phase_summary = "\n".join(
+        f"- {r['phase']}: {'[OK]' if r['success'] else '[FAIL]'}" for r in run.phase_results
+    )
+    await _rte_facilitate(
+        session_id,
+        f"{status_emoji} Le workflow **{workflow.name}** est terminé ({run.status}).\n"
+        f"Bilan des phases:\n{phase_summary}\n\n"
+        f"Fais la synthèse finale pour l'équipe. Mets en avant les livrables et les prochaines étapes.",
+        to_agent=leader,
+        project_id=project_id,
+    )
 
     return run

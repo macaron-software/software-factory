@@ -47,7 +47,7 @@
         <div class="msg-tools">
             {% for tc in msg.metadata['tool_calls'][:5] %}
             <div class="msg-tool-call">
-                <span class="msg-tool-icon">🔧</span>
+                <span class="msg-tool-icon"><svg class="icon icon-xs"><use href="#icon-wrench"/></svg></span>
                 <span class="msg-tool-name">{{ tc.get('name','?') }}</span>
                 <span class="msg-tool-result">{{ tc.get('result','')[:120] }}</span>
             </div>

@@ -1,0 +1,858 @@
+"""Pattern Execution Engine — runs pattern graphs with real agents.
+
+Takes a PatternDef (graph of agent nodes + edges), resolves agents,
+and executes them according to the pattern type (sequential, parallel,
+loop, hierarchical, network/debate).
+
+All agent execution goes through the existing AgentExecutor + LLMClient.
+Messages are stored in the session for WhatsApp-style display.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Optional
+
+from ..agents.store import get_agent_store, AgentDef
+from ..agents.executor import get_executor, ExecutionContext, ExecutionResult
+from ..sessions.store import get_session_store, SessionDef, MessageDef
+from ..projects.manager import get_project_store
+from ..memory.manager import get_memory_manager
+from ..skills.library import get_skill_library
+from .store import PatternDef
+
+logger = logging.getLogger(__name__)
+
+
+class NodeStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    VETOED = "vetoed"
+    FAILED = "failed"
+
+
+@dataclass
+class NodeState:
+    node_id: str
+    agent_id: str
+    agent: Optional[AgentDef] = None
+    status: NodeStatus = NodeStatus.PENDING
+    result: Optional[ExecutionResult] = None
+    output: str = ""
+
+
+@dataclass
+class PatternRun:
+    """Runtime state of a pattern execution."""
+    pattern: PatternDef
+    session_id: str
+    project_id: str = ""
+    nodes: dict[str, NodeState] = field(default_factory=dict)
+    iteration: int = 0
+    max_iterations: int = 5
+    finished: bool = False
+    success: bool = False
+    error: str = ""
+
+
+# SSE push (import from runner to share the same queues)
+from ..sessions.runner import _push_sse
+
+# Protocol that makes agents produce trackable PRs/deliverables
+_PR_PROTOCOL = """[IMPORTANT — Team Protocol]
+You are part of a team working together. Address your colleague directly.
+When you produce deliverables or action items, list them as:
+- [PR] Short title — description
+Example: [PR] Update Angular deps — Upgrade @angular/core from 16.2 to 17.3
+Each [PR] will be tracked in the project dashboard."""
+
+# Execution protocol for worker agents — they must USE tools to actually do the work
+_EXEC_PROTOCOL = """[EXECUTION MODE — MANDATORY: You MUST produce REAL code changes]
+
+CRITICAL RULE: You are a DEVELOPER, not a consultant. Your job is to WRITE CODE, not reports.
+If your response contains NO code_write or code_edit calls, YOU HAVE FAILED your task.
+
+Available tools: list_files, code_read, code_search, code_edit, code_write, git_status.
+
+MANDATORY WORKFLOW (all steps required):
+1. EXPLORE: Use list_files and code_read to understand the current codebase
+2. PLAN: Identify exactly what files need to change (1-2 sentences max)
+3. EXECUTE: Use code_edit (for modifications) or code_write (for new files) — THIS IS THE MAIN STEP
+4. VERIFY: Use code_read to confirm your changes are correct
+5. REPORT: List each change as [PR] with the actual file path you modified
+
+RULES:
+- You MUST call code_write or code_edit at least once. Describing changes without making them = FAILURE.
+- Use relative paths (e.g. "src/app/auth/auth.component.ts"), they are resolved automatically.
+- For new files: code_write with full content.
+- For modifications: code_edit with old_str (exact match) and new_str.
+- Each [PR] MUST reference a file you actually changed with code_write/code_edit.
+- Do NOT say "here's what should be done" — DO IT."""
+
+# Validation protocol for QA agents
+_QA_PROTOCOL = """[VALIDATION MODE — Verify changes are correct]
+Your job is to VERIFY that changes are correct, not to describe what should be tested.
+
+MANDATORY WORKFLOW:
+1. READ the changed files (code_read) — verify the modifications
+2. SEARCH for regressions (code_search) — check no broken references
+3. CHECK consistency — imports, types, configs must be coherent
+4. VERDICT — MUST end with EXACTLY one of these tags:
+   - [APPROVE] if all changes are correct and complete
+   - [VETO] if ANY issue found — list specific problems
+
+IMPORTANT: You MUST include [APPROVE] or [VETO] in your response. No other verdict format accepted.
+If stories are not delivered or code is incomplete → [VETO]
+Be concrete: cite file names, line numbers, specific problems."""
+
+# Review protocol for lead agents
+_REVIEW_PROTOCOL = """[REVIEW MODE — Quality gate]
+Review the work done by your team. Use tools to verify claims.
+
+MANDATORY:
+1. READ the actual code changes (code_read, code_search) — don't trust descriptions blindly
+2. CHECK completeness — are all subtasks addressed?
+3. CHECK quality — no shortcuts, no skipped validations
+4. VERDICT — MUST end with EXACTLY one of these tags:
+   - [APPROVE] if all work is complete and verified
+   - [VETO] if ANY deliverable is missing or broken
+5. SYNTHESIZE: consolidated status with specific file references
+
+IMPORTANT: You MUST include [APPROVE] or [VETO] in your response. The workflow will be blocked if you VETO."""
+
+
+def _build_team_context(run: PatternRun, current_node: str, to_agent_id: str) -> str:
+    """Build team awareness: who's on the team, what's the communication flow."""
+    parts = []
+    current = run.nodes.get(current_node)
+    if not current or not current.agent:
+        return ""
+
+    # List team members
+    team = []
+    for nid, ns in run.nodes.items():
+        if ns.agent and nid != current_node:
+            status = ""
+            if ns.status == NodeStatus.COMPLETED and ns.output:
+                status = " (has already contributed)"
+            team.append(f"  - {ns.agent.name} ({ns.agent.role}){status}")
+    if team:
+        parts.append(f"[Your team]:\n" + "\n".join(team))
+
+    # Who are you addressing?
+    if to_agent_id and to_agent_id not in ("all", "session"):
+        target = None
+        for ns in run.nodes.values():
+            if ns.agent and ns.agent.id == to_agent_id:
+                target = ns.agent
+                break
+        if target:
+            parts.append(f"[You are addressing]: {target.name} ({target.role})")
+
+    return "\n".join(parts)
+
+
+async def run_pattern(
+    pattern: PatternDef,
+    session_id: str,
+    initial_task: str,
+    project_id: str = "",
+) -> PatternRun:
+    """Execute a pattern graph in a session. Returns the run state."""
+    run = PatternRun(
+        pattern=pattern,
+        session_id=session_id,
+        project_id=project_id,
+        max_iterations=pattern.config.get("max_iterations", 5),
+    )
+
+    # Resolve agents for each node
+    agent_store = get_agent_store()
+    for node in pattern.agents:
+        nid = node["id"]
+        agent_id = node.get("agent_id") or ""
+        agent = agent_store.get(agent_id) if agent_id else None
+        run.nodes[nid] = NodeState(node_id=nid, agent_id=agent_id, agent=agent)
+
+    # Determine pattern leader (first agent in the pattern)
+    first_node = pattern.agents[0] if pattern.agents else None
+    pattern_leader = (first_node.get("agent_id") or "") if first_node else ""
+
+    # Log pattern start — target the leader, not broadcast
+    store = get_session_store()
+    store.add_message(MessageDef(
+        session_id=session_id,
+        from_agent="system",
+        to_agent=pattern_leader or "all",
+        message_type="system",
+        content=f"Pattern **{pattern.name}** started ({pattern.type})",
+    ))
+    await _push_sse(session_id, {
+        "type": "pattern_start",
+        "pattern_id": pattern.id,
+        "pattern_name": pattern.name,
+    })
+
+    try:
+        ptype = pattern.type
+        if ptype == "solo":
+            await _run_solo(run, initial_task)
+        elif ptype == "sequential":
+            await _run_sequential(run, initial_task)
+        elif ptype == "parallel":
+            await _run_parallel(run, initial_task)
+        elif ptype == "loop":
+            await _run_loop(run, initial_task)
+        elif ptype == "hierarchical":
+            await _run_hierarchical(run, initial_task)
+        elif ptype == "network":
+            await _run_network(run, initial_task)
+        else:
+            await _run_sequential(run, initial_task)
+
+        run.finished = True
+        has_vetoes = any(n.status == NodeStatus.VETOED for n in run.nodes.values())
+        all_ok = all(
+            n.status in (NodeStatus.COMPLETED, NodeStatus.PENDING)
+            for n in run.nodes.values()
+        )
+        run.success = all_ok and not has_vetoes
+    except Exception as e:
+        run.finished = True
+        run.error = str(e)
+        has_vetoes = False
+        logger.error("Pattern %s failed: %s", pattern.name, e)
+
+    # Log pattern end
+    if run.success:
+        status = "COMPLETED"
+    elif has_vetoes:
+        status = "NOGO — vetoes non résolus"
+    else:
+        status = f"FAILED: {run.error}"
+    store.add_message(MessageDef(
+        session_id=session_id,
+        from_agent="system",
+        to_agent=pattern_leader or "all",
+        message_type="system",
+        content=f"Pattern **{pattern.name}** {status}",
+    ))
+    await _push_sse(session_id, {
+        "type": "pattern_end",
+        "success": run.success,
+        "error": run.error,
+    })
+
+    return run
+
+
+async def _execute_node(
+    run: PatternRun, node_id: str, task: str,
+    context_from: str = "", to_agent_id: str = "",
+) -> str:
+    """Execute a single node: call its agent with the task, store messages."""
+    state = run.nodes.get(node_id)
+    if not state or not state.agent:
+        return f"[Node {node_id} has no agent assigned]"
+
+    state.status = NodeStatus.RUNNING
+    agent = state.agent
+    store = get_session_store()
+
+    # Push thinking status
+    await _push_sse(run.session_id, {
+        "type": "agent_status",
+        "agent_id": agent.id,
+        "node_id": node_id,
+        "status": "thinking",
+    })
+
+    # Build context
+    ctx = await _build_node_context(agent, run)
+
+    # Build team-aware context
+    team_info = _build_team_context(run, node_id, to_agent_id)
+    full_task = ""
+    if team_info:
+        full_task += f"{team_info}\n\n"
+    if context_from:
+        full_task += f"[Message from colleague]:\n{context_from}\n\n"
+    full_task += f"[Your task]:\n{task}\n\n"
+
+    # Inject role-based execution protocol
+    role_lower = (agent.role or "").lower()
+    rank = getattr(agent, "hierarchy_rank", 50)
+    if rank >= 40 or "dev" in role_lower:
+        # Workers: must execute with tools
+        full_task += _EXEC_PROTOCOL
+    elif "qa" in role_lower or "test" in role_lower:
+        full_task += _QA_PROTOCOL
+    elif "lead" in role_lower:
+        full_task += _REVIEW_PROTOCOL
+    full_task += "\n\n" + _PR_PROTOCOL
+
+    # Execute
+    executor = get_executor()
+    result = await executor.run(ctx, full_task)
+    state.result = result
+    state.output = result.content
+
+    # Store as message in conversation — detect VETO/NOGO/APPROVE
+    msg_type = "text"
+    content_upper = (result.content or "").upper()
+    is_veto = (
+        "[VETO]" in result.content
+        or "NOGO" in content_upper
+        or "NO-GO" in content_upper
+        or "STATUT: NOGO" in content_upper
+        or "STATUT : NOGO" in content_upper
+    )
+    is_approve = (
+        "[APPROVE]" in result.content
+        or "STATUT: GO" in content_upper
+        or "STATUT : GO" in content_upper
+    )
+    # Avoid false positive: "NOGO" in approve context
+    if is_approve and not is_veto:
+        msg_type = "approve"
+        state.status = NodeStatus.COMPLETED
+    elif is_veto:
+        msg_type = "veto"
+        state.status = NodeStatus.VETOED
+        logger.warning("VETO detected from %s: %s", agent.id, result.content[:200])
+    elif result.error:
+        msg_type = "system"
+        state.status = NodeStatus.FAILED
+    else:
+        state.status = NodeStatus.COMPLETED
+
+    store.add_message(MessageDef(
+        session_id=run.session_id,
+        from_agent=agent.id,
+        to_agent=to_agent_id or "all",
+        message_type=msg_type,
+        content=result.content,
+        metadata={
+            "model": result.model,
+            "provider": result.provider,
+            "tokens_in": result.tokens_in,
+            "tokens_out": result.tokens_out,
+            "duration_ms": result.duration_ms,
+            "node_id": node_id,
+            "pattern_id": run.pattern.id,
+            "tool_calls": result.tool_calls if result.tool_calls else None,
+        },
+    ))
+
+    # Compute activity counts for UI badges
+    tcs = result.tool_calls or []
+    edit_count = sum(1 for tc in tcs if tc.get("name") in ("code_edit", "code_write"))
+    read_count = sum(1 for tc in tcs if tc.get("name") in ("code_read", "code_search", "list_files"))
+
+    await _push_sse(run.session_id, {
+        "type": "message",
+        "from_agent": agent.id,
+        "to_agent": to_agent_id or "all",
+        "content": result.content,
+        "message_type": msg_type,
+        "node_id": node_id,
+        "edits": edit_count,
+        "reads": read_count,
+        "tool_count": len(tcs),
+    })
+
+    await _push_sse(run.session_id, {
+        "type": "agent_status",
+        "agent_id": agent.id,
+        "status": "idle",
+    })
+
+    return result.content
+
+
+async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionContext:
+    """Build execution context for a node's agent."""
+    store = get_session_store()
+    history = store.get_messages(run.session_id, limit=30)
+    history_dicts = [{"from_agent": m.from_agent, "content": m.content,
+                      "message_type": m.message_type} for m in history]
+
+    project_context = ""
+    vision = ""
+    project_path = ""
+    if run.project_id:
+        try:
+            proj_store = get_project_store()
+            project = proj_store.get(run.project_id)
+            if project:
+                vision = project.vision[:3000] if project.vision else ""
+                project_path = getattr(project, "path", "") or ""
+                mem = get_memory_manager()
+                entries = mem.project_get(run.project_id, limit=10)
+                if entries:
+                    project_context = "\n".join(
+                        f"[{e['category']}] {e['key']}: {e['value'][:200]}"
+                        for e in entries
+                    )
+        except Exception:
+            pass
+
+    skills_prompt = ""
+    if agent.skills:
+        try:
+            lib = get_skill_library()
+            parts = []
+            for sid in agent.skills[:5]:
+                skill = lib.get(sid)
+                if skill and skill.get("content"):
+                    parts.append(f"### {skill['name']}\n{skill['content'][:1500]}")
+            skills_prompt = "\n\n".join(parts)
+        except Exception:
+            pass
+
+    return ExecutionContext(
+        agent=agent,
+        session_id=run.session_id,
+        project_id=run.project_id,
+        project_path=project_path,
+        history=history_dicts,
+        project_context=project_context,
+        skills_prompt=skills_prompt,
+        vision=vision,
+    )
+
+
+# ── Pattern Runners ─────────────────────────────────────────────
+
+def _ordered_nodes(pattern: PatternDef) -> list[str]:
+    """Return node IDs in topological order based on edges."""
+    node_ids = [n["id"] for n in pattern.agents]
+    # Build adjacency from sequential/parallel edges
+    incoming = {nid: set() for nid in node_ids}
+    for edge in pattern.edges:
+        if edge.get("type") in ("sequential", "parallel"):
+            incoming[edge["to"]].add(edge["from"])
+
+    ordered = []
+    remaining = set(node_ids)
+    while remaining:
+        # Find nodes with no unresolved incoming
+        ready = [n for n in remaining if not (incoming[n] - set(ordered))]
+        if not ready:
+            # Cycle detected, just add remaining
+            ordered.extend(remaining)
+            break
+        ordered.extend(sorted(ready))
+        remaining -= set(ready)
+    return ordered
+
+
+def _node_agent_id(run: PatternRun, node_id: str) -> str:
+    """Get the agent ID assigned to a node."""
+    state = run.nodes.get(node_id)
+    return state.agent.id if state and state.agent else node_id
+
+
+async def _run_solo(run: PatternRun, task: str):
+    """Single agent execution."""
+    nodes = list(run.nodes.keys())
+    if nodes:
+        await _execute_node(run, nodes[0], task)
+
+
+async def _run_sequential(run: PatternRun, task: str):
+    """Execute nodes in sequence, passing output forward.
+    Last agent reports back to the first (hierarchy leader), not 'all'."""
+    order = _ordered_nodes(run.pattern)
+    prev_output = ""
+    prev_agent = ""
+    first_agent = _node_agent_id(run, order[0]) if order else "all"
+    for i, nid in enumerate(order):
+        if i + 1 < len(order):
+            to = _node_agent_id(run, order[i + 1])
+        else:
+            # Last agent reports to the first (CP/leader), not broadcast
+            to = first_agent
+        output = await _execute_node(
+            run, nid, task, context_from=prev_output, to_agent_id=to,
+        )
+        prev_output = output
+        prev_agent = _node_agent_id(run, nid)
+
+
+async def _run_parallel(run: PatternRun, task: str):
+    """Find dispatcher, fan out to workers, then aggregate."""
+    order = _ordered_nodes(run.pattern)
+    if not order:
+        return
+
+    dispatcher_id = order[0]
+    dispatcher_agent = _node_agent_id(run, dispatcher_id)
+
+    # Find parallel targets and aggregator
+    parallel_targets = []
+    agg_node = None
+    for edge in run.pattern.edges:
+        if edge["from"] == dispatcher_id and edge.get("type") == "parallel":
+            parallel_targets.append(edge["to"])
+    for node in run.pattern.agents:
+        nid = node["id"]
+        if nid != dispatcher_id and nid not in parallel_targets:
+            agg_node = nid
+
+    # Dispatcher sends to workers (first worker as target for display)
+    first_worker = _node_agent_id(run, parallel_targets[0]) if parallel_targets else "all"
+    dispatcher_output = await _execute_node(
+        run, dispatcher_id, task, to_agent_id=first_worker,
+    )
+
+    # Fan out — each worker reports to aggregator (or dispatcher)
+    agg_agent = _node_agent_id(run, agg_node) if agg_node else dispatcher_agent
+    if parallel_targets:
+        tasks = [
+            _execute_node(run, nid, task, context_from=dispatcher_output, to_agent_id=agg_agent)
+            for nid in parallel_targets
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Aggregate — aggregator reports to dispatcher
+        if agg_node:
+            combined = "\n\n".join(
+                f"[Worker {parallel_targets[i]}]: {r if isinstance(r, str) else str(r)}"
+                for i, r in enumerate(results)
+            )
+            await _execute_node(
+                run, agg_node, task, context_from=combined, to_agent_id=dispatcher_agent,
+            )
+
+
+async def _run_loop(run: PatternRun, task: str):
+    """Loop between writer and reviewer until approval or max iterations."""
+    nodes = _ordered_nodes(run.pattern)
+    if len(nodes) < 2:
+        return await _run_sequential(run, task)
+
+    writer_id = nodes[0]
+    reviewer_id = nodes[1]
+    writer_agent = _node_agent_id(run, writer_id)
+    reviewer_agent = _node_agent_id(run, reviewer_id)
+
+    prev_output = ""
+    for i in range(run.max_iterations):
+        run.iteration = i + 1
+
+        # Writer produces → sends to reviewer
+        writer_output = await _execute_node(
+            run, writer_id, task, context_from=prev_output,
+            to_agent_id=reviewer_agent,
+        )
+
+        # Reviewer evaluates → sends to writer
+        review_output = await _execute_node(
+            run, reviewer_id,
+            f"Review the following work and either APPROVE or provide specific feedback:\n{writer_output}",
+            to_agent_id=writer_agent,
+        )
+
+        # Check for approval or veto
+        state = run.nodes[reviewer_id]
+        if state.status == NodeStatus.VETOED:
+            prev_output = f"[Reviewer feedback, iteration {i+1}]:\n{review_output}"
+            state.status = NodeStatus.PENDING
+            run.nodes[writer_id].status = NodeStatus.PENDING
+        else:
+            break
+
+
+def _classify_agents(run: PatternRun, node_ids: list[str]) -> dict:
+    """Classify nodes by role: manager, workers, qa, based on agent role/rank."""
+    classified = {"manager": None, "workers": [], "qa": []}
+    for nid in node_ids:
+        ns = run.nodes.get(nid)
+        if not ns or not ns.agent:
+            continue
+        role = (ns.agent.role or "").lower()
+        rank = getattr(ns.agent, "hierarchy_rank", 50)
+        if "qa" in role or "test" in role:
+            classified["qa"].append(nid)
+        elif "lead" in role or rank <= 20:
+            # First lead/manager found — if we already have one, second is worker
+            if classified["manager"] is None:
+                classified["manager"] = nid
+            else:
+                classified["workers"].append(nid)
+        elif "dev" in role or rank >= 40:
+            classified["workers"].append(nid)
+        else:
+            # Chef de projet, securite, etc. — treat as manager or worker
+            if classified["manager"] is None:
+                classified["manager"] = nid
+            else:
+                classified["workers"].append(nid)
+    return classified
+
+
+async def _run_hierarchical(run: PatternRun, task: str):
+    """Real team flow with inner dev loop and outer QA validation loop.
+
+    Flow:
+      1. Manager (lead_dev) decomposes work into sub-tasks for devs
+      2. INNER LOOP: Devs execute in parallel → Manager reviews completeness
+         - If incomplete: manager re-briefs devs with what's missing → devs continue
+         - If complete: proceed to QA
+      3. QA validates the completed work
+      4. OUTER LOOP: If QA VETOs → Manager gets feedback → back to inner loop
+      Max 3 outer iterations.
+    """
+    nodes = _ordered_nodes(run.pattern)
+    if len(nodes) < 2:
+        return await _run_sequential(run, task)
+
+    roles = _classify_agents(run, nodes)
+    manager_id = roles["manager"] or nodes[0]
+    worker_ids = roles["workers"]
+    qa_ids = roles["qa"]
+
+    # Fallback: if no workers found, all non-manager non-qa are workers
+    if not worker_ids:
+        worker_ids = [n for n in nodes if n != manager_id and n not in qa_ids]
+    if not worker_ids:
+        return await _run_sequential(run, task)
+
+    manager_agent = _node_agent_id(run, manager_id)
+
+    # Build team roster
+    worker_roster = []
+    for wid in worker_ids:
+        ws = run.nodes.get(wid)
+        if ws and ws.agent:
+            worker_roster.append(f"- {ws.agent.name} ({ws.agent.role})")
+
+    max_outer = 3   # QA validation retries
+    max_inner = 2   # Dev completeness retries
+    veto_feedback = ""
+
+    for outer in range(max_outer):
+        # ── Reset statuses ──
+        if outer > 0:
+            for nid in nodes:
+                run.nodes[nid].status = NodeStatus.PENDING
+            store = get_session_store()
+            store.add_message(MessageDef(
+                session_id=run.session_id,
+                from_agent="system", to_agent=manager_agent,
+                message_type="system",
+                content=f"QA loop {outer + 1}/{max_outer} — addressing VETO feedback",
+            ))
+            await _push_sse(run.session_id, {
+                "type": "system",
+                "content": f"QA validation loop {outer + 1}/{max_outer}",
+            })
+
+        # ── Step 1: Manager decomposes ──
+        if outer == 0:
+            decompose_prompt = (
+                f"You are the tech lead. Decompose this work for your dev team.\n\n"
+                f"Your team:\n" + "\n".join(worker_roster) + "\n\n"
+                f"Create specific, actionable sub-tasks. Each dev should work on "
+                f"complementary parts (NO overlap). Format: [SUBTASK N]: description\n\n"
+                f"They must use code_edit/code_write to make REAL changes.\n\n{task}"
+            )
+        else:
+            decompose_prompt = (
+                f"QA REJECTED the work (iteration {outer + 1}).\n\n"
+                f"## QA Feedback:\n{veto_feedback}\n\n"
+                f"Your team:\n" + "\n".join(worker_roster) + "\n\n"
+                f"Re-assign CORRECTIVE tasks based on QA's specific issues. "
+                f"Each dev must fix the problems QA found in their area. "
+                f"Format: [SUBTASK N]: description\n\n{task}"
+            )
+
+        # Build targeted routing
+        worker_agents = [_node_agent_id(run, w) for w in worker_ids]
+        # For messages addressing multiple workers, use first worker (UI shows conversation)
+        workers_target = worker_agents[0] if len(worker_agents) == 1 else ",".join(worker_agents)
+        qa_agents = [_node_agent_id(run, q) for q in qa_ids]
+
+        manager_output = await _execute_node(
+            run, manager_id, decompose_prompt, to_agent_id=workers_target,
+        )
+
+        # Parse subtasks
+        subtasks = _parse_subtasks(manager_output)
+        if not subtasks:
+            subtasks = [task] * len(worker_ids)
+
+        # ── Step 2: INNER LOOP — Devs work until lead says complete ──
+        all_dev_work = ""
+        for inner in range(max_inner):
+            # Workers execute in parallel
+            worker_tasks = []
+            for i, wid in enumerate(worker_ids):
+                st = subtasks[i] if i < len(subtasks) else subtasks[-1]
+                if inner > 0:
+                    st = (
+                        f"INCOMPLETE — Your lead reviewed and needs more work:\n"
+                        f"{all_dev_work}\n\nContinue your task:\n{st}"
+                    )
+                elif outer > 0:
+                    st = f"QA CORRECTION (round {outer + 1}):\n{veto_feedback}\n\nYour task:\n{st}"
+                worker_tasks.append(
+                    _execute_node(run, wid, st, context_from=manager_output, to_agent_id=manager_agent)
+                )
+            results = await asyncio.gather(*worker_tasks, return_exceptions=True)
+
+            # Collect worker outputs
+            combined_parts = []
+            for i, r in enumerate(results):
+                ws = run.nodes.get(worker_ids[i])
+                name = ws.agent.name if ws and ws.agent else worker_ids[i]
+                combined_parts.append(f"[{name}]:\n{r if isinstance(r, str) else str(r)}")
+            all_dev_work = "\n\n---\n\n".join(combined_parts)
+
+            # Manager reviews completeness — sends to QA if done, workers if not
+            run.nodes[manager_id].status = NodeStatus.PENDING
+            qa_target = qa_agents[0] if qa_agents else manager_agent
+            review_output = await _execute_node(
+                run, manager_id,
+                f"Review your team's work for COMPLETENESS (not quality — QA does that).\n\n"
+                f"Check: Did each dev complete their assigned subtask? Are there unfinished items?\n\n"
+                f"If complete: say [COMPLETE] and produce a consolidated [PR] list.\n"
+                f"If NOT complete: say [INCOMPLETE] with what's missing — devs will continue.\n\n"
+                f"Work submitted:\n{all_dev_work}",
+                context_from=all_dev_work, to_agent_id=qa_target,
+            )
+
+            if "[INCOMPLETE]" in review_output.upper():
+                # Re-parse manager's updated subtasks for next inner iteration
+                new_subtasks = _parse_subtasks(review_output)
+                if new_subtasks:
+                    subtasks = new_subtasks
+                for wid in worker_ids:
+                    run.nodes[wid].status = NodeStatus.PENDING
+                logger.warning("Inner loop: lead says INCOMPLETE, iteration %d", inner + 1)
+                continue
+            else:
+                # Lead says complete — move to QA
+                break
+
+        # ── Step 3: QA validates ──
+        if not qa_ids:
+            # No QA agent — phase done
+            return
+
+        for qid in qa_ids:
+            run.nodes[qid].status = NodeStatus.PENDING
+            await _execute_node(
+                run, qid,
+                f"Validate ALL the work completed by the dev team.\n\n"
+                f"Lead's consolidated review:\n{review_output}\n\n"
+                f"Dev work:\n{all_dev_work}",
+                context_from=review_output, to_agent_id=manager_agent,
+            )
+
+        # ── Step 4: Check QA verdicts ──
+        vetoes = []
+        for qid in qa_ids:
+            ns = run.nodes[qid]
+            if ns.status == NodeStatus.VETOED:
+                agent_name = ns.agent.name if ns.agent else qid
+                vetoes.append(f"[VETO by {agent_name}]: {(ns.output or '')[:500]}")
+
+        if not vetoes:
+            # QA approved — phase done
+            return
+
+        # QA rejected — build feedback for outer loop
+        veto_feedback = "\n\n".join(vetoes)
+        logger.warning("QA VETO at outer iteration %d: %d veto(s)", outer + 1, len(vetoes))
+
+        store = get_session_store()
+        store.add_message(MessageDef(
+            session_id=run.session_id,
+            from_agent="system", to_agent=manager_agent,
+            message_type="system",
+            content=f"QA rejected — {len(vetoes)} VETO(s). Feedback loop — re-assign corrections.",
+        ))
+        await _push_sse(run.session_id, {
+            "type": "message",
+            "from_agent": "system",
+            "content": f"{len(vetoes)} VETO(s) — correction loop {outer + 1}/{max_outer}",
+            "message_type": "system",
+        })
+
+    # Exhausted retries
+    logger.warning("Hierarchical phase exhausted %d QA iterations with unresolved VETOs", max_outer)
+
+
+def _parse_subtasks(text: str) -> list[str]:
+    """Extract [SUBTASK N] items from manager output."""
+    subtasks = []
+    for line in text.split("\n"):
+        if "[SUBTASK" in line.upper():
+            subtask = line.split("]", 1)[-1].strip() if "]" in line else line
+            if subtask:
+                subtasks.append(subtask)
+    return subtasks
+
+
+async def _run_network(run: PatternRun, task: str):
+    """Debate/network: agents discuss in rounds, judge decides."""
+    nodes = _ordered_nodes(run.pattern)
+    if len(nodes) < 2:
+        return await _run_sequential(run, task)
+
+    max_rounds = run.pattern.config.get("max_rounds", 3)
+
+    # Find judge (node with only incoming "report" edges, or last node)
+    judge_id = None
+    debaters = []
+    for node in run.pattern.agents:
+        nid = node["id"]
+        has_report_to = any(
+            e["from"] == nid and e.get("type") == "report"
+            for e in run.pattern.edges
+        )
+        has_bidirectional = any(
+            (e["from"] == nid or e["to"] == nid) and e.get("type") == "bidirectional"
+            for e in run.pattern.edges
+        )
+        if has_bidirectional:
+            debaters.append(nid)
+        elif not has_bidirectional and has_report_to:
+            debaters.append(nid)
+        else:
+            judge_id = nid
+
+    if not judge_id and nodes:
+        judge_id = nodes[-1]
+    if not debaters:
+        debaters = [n for n in nodes if n != judge_id]
+
+    # Debate rounds — debaters talk to each other
+    prev_round = ""
+    for rnd in range(max_rounds):
+        run.iteration = rnd + 1
+        round_outputs = []
+        other_debaters = debaters.copy()
+        for did in debaters:
+            # Each debater addresses the other debaters
+            peers = [d for d in other_debaters if d != did]
+            to = _node_agent_id(run, peers[0]) if len(peers) == 1 else "all"
+            prompt = task if rnd == 0 else f"{task}\n\n[Previous round]:\n{prev_round}"
+            output = await _execute_node(
+                run, did, prompt, context_from=prev_round, to_agent_id=to,
+            )
+            round_outputs.append(f"[{did}]: {output}")
+        prev_round = "\n\n".join(round_outputs)
+
+    # Judge decides — reports to all
+    if judge_id:
+        await _execute_node(
+            run, judge_id,
+            f"Based on the debate, make a final decision:\n{prev_round}",
+            to_agent_id="all",
+        )

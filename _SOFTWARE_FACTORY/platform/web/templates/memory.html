@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="memory-dashboard">
+    <div class="memory-stats">
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.global_count }}</div>
+            <div class="stat-label">Global Memories</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.project_count }}</div>
+            <div class="stat-label">Project Memories</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.session_count }}</div>
+            <div class="stat-label">Session Archives</div>
+        </div>
+    </div>
+
+    <div class="panel" style="margin-top: 16px">
+        <div class="panel-header">
+            <h3>Search Memory</h3>
+        </div>
+        <div class="panel-body">
+            <form hx-get="/api/memory/search" hx-target="#memory-results" class="search-form">
+                <input type="text" name="q" placeholder="Search across all memory layers..." class="search-input">
+                <button type="submit" class="btn btn-primary">
+                    <svg class="icon icon-sm"><use href="#icon-eye"/></svg> Search
+                </button>
+            </form>
+            <div id="memory-results"></div>
+        </div>
+    </div>
+
+    <div class="panel" style="margin-top: 16px">
+        <div class="panel-header"><h3>Recent Global Learnings</h3></div>
+        <div class="panel-body">
+            {% for mem in recent_global %}
+            <div class="memory-entry">
+                <span class="badge badge-blue">{{ mem.category }}</span>
+                <strong>{{ mem.key }}</strong>
+                <p>{{ mem.value }}</p>
+                <span class="text-muted">Confidence: {{ "%.0f" | format(mem.confidence * 100) }}% | {{ mem.occurrences }} occurrences</span>
+            </div>
+            {% else %}
+            <div class="empty-state">No global memories yet. They'll be created as agents learn.</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

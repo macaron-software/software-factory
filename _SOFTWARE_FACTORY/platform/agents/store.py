@@ -32,6 +32,8 @@ class AgentDef:
     color: str = "#f78166"
     avatar: str = ""       # emoji or URL to profile image
     tagline: str = ""      # short personality subtitle
+    persona: str = ""      # personality traits, motivations, character
+    hierarchy_rank: int = 50  # org hierarchy: 0=CEO, 10=director, 20=lead, 30=senior, 40=mid, 50=junior
     is_builtin: bool = False
     created_at: str = ""
     updated_at: str = ""
@@ -58,6 +60,8 @@ def _row_to_agent(row) -> AgentDef:
         color=row["color"] or "#f78166",
         avatar=row["avatar"] if "avatar" in keys else "",
         tagline=row["tagline"] if "tagline" in keys else "",
+        persona=row["persona"] if "persona" in keys else "",
+        hierarchy_rank=row["hierarchy_rank"] if "hierarchy_rank" in keys else 50,
         is_builtin=bool(row["is_builtin"]),
         created_at=row["created_at"] or "",
         updated_at=row["updated_at"] or "",
@@ -95,14 +99,15 @@ class AgentStore:
                 """INSERT INTO agents (id, name, role, description, system_prompt,
                    provider, model, temperature, max_tokens, skills_json, tools_json,
                    mcps_json, permissions_json, tags_json, icon, color, avatar, tagline,
+                   persona, hierarchy_rank,
                    is_builtin, created_at, updated_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (agent.id, agent.name, agent.role, agent.description, agent.system_prompt,
                  agent.provider, agent.model, agent.temperature, agent.max_tokens,
                  json.dumps(agent.skills), json.dumps(agent.tools),
                  json.dumps(agent.mcps), json.dumps(agent.permissions),
                  json.dumps(agent.tags), agent.icon, agent.color,
-                 agent.avatar, agent.tagline,
+                 agent.avatar, agent.tagline, agent.persona, agent.hierarchy_rank,
                  int(agent.is_builtin), agent.created_at, agent.updated_at),
             )
             db.commit()
@@ -118,14 +123,15 @@ class AgentStore:
                 """UPDATE agents SET name=?, role=?, description=?, system_prompt=?,
                    provider=?, model=?, temperature=?, max_tokens=?, skills_json=?,
                    tools_json=?, mcps_json=?, permissions_json=?, tags_json=?,
-                   icon=?, color=?, avatar=?, tagline=?, updated_at=?
+                   icon=?, color=?, avatar=?, tagline=?, persona=?, hierarchy_rank=?,
+                   updated_at=?
                    WHERE id=?""",
                 (agent.name, agent.role, agent.description, agent.system_prompt,
                  agent.provider, agent.model, agent.temperature, agent.max_tokens,
                  json.dumps(agent.skills), json.dumps(agent.tools),
                  json.dumps(agent.mcps), json.dumps(agent.permissions),
                  json.dumps(agent.tags), agent.icon, agent.color,
-                 agent.avatar, agent.tagline,
+                 agent.avatar, agent.tagline, agent.persona, agent.hierarchy_rank,
                  agent.updated_at, agent.id),
             )
             db.commit()

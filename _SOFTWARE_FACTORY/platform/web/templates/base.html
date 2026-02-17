@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title }} — Macaron Agent Platform</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/agents.css">
+    <link rel="stylesheet" href="/static/css/projects.css">
+    <script src="/static/js/htmx.min.js"></script>
+    <script src="/static/js/sse.js" defer></script>
+</head>
+<body>
+    {% include "partials/svg_sprites.html" %}
+    <div class="layout">
+        <!-- Sidebar (icon-only) -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="logo"><svg class="icon icon-logo"><use href="#icon-macaron"/></svg></h1>
+            </div>
+
+            <div class="sidebar-section">
+                <ul class="nav-links">
+                    <li><a href="/" data-tooltip="Portfolio" class="{% if page_title == 'Portfolio' or page_title == 'Projects' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-home"/></svg>
+                    </a></li>
+                    <li><a href="/missions" data-tooltip="Missions" class="{% if page_title == 'Missions' or page_title == 'Mission' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-rocket"/></svg>
+                    </a></li>
+                    <li><a href="/workflows" data-tooltip="Workflows" class="{% if page_title == 'Workflows' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-workflow"/></svg>
+                    </a></li>
+                    <li><a href="/patterns" data-tooltip="Patterns" class="{% if page_title == 'Patterns' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-layers"/></svg>
+                    </a></li>
+                    <li><a href="/agents" data-tooltip="Équipe" class="{% if page_title == 'Agents' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-bot"/></svg>
+                    </a></li>
+                    <li><a href="/skills" data-tooltip="Skills" class="{% if page_title == 'Skills' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-target"/></svg>
+                    </a></li>
+                    <li><a href="/memory" data-tooltip="Memory" class="{% if page_title == 'Memory' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-brain"/></svg>
+                    </a></li>
+                    <li><a href="/mcps" data-tooltip="MCPs" class="{% if page_title == 'MCPs' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-plug"/></svg>
+                    </a></li>
+                </ul>
+            </div>
+
+            <div class="sidebar-section" style="margin-top: auto">
+                <ul class="nav-links">
+                    <li><a href="/settings" data-tooltip="Settings" class="{% if page_title == 'Settings' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-settings"/></svg>
+                    </a></li>
+                </ul>
+            </div>
+
+            <div class="sidebar-footer">
+                <span class="status-dot active"></span>
+            </div>
+        </nav>
+
+        <!-- Main content -->
+        <main class="content">
+            <header class="topbar">
+                <h2>{{ page_title }}</h2>
+                <div class="topbar-right">
+                    {% block topbar_actions %}{% endblock %}
+                    <button class="topbar-bell">
+                        <svg class="icon icon-sm"><use href="#icon-activity"/></svg>
+                    </button>
+                    <div class="topbar-avatar">S</div>
+                </div>
+            </header>
+            <div class="main-area">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/workspace.js" defer></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
