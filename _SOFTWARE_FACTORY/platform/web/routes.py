@@ -2408,6 +2408,15 @@ async def dsi_board_page(request: Request):
                 "id": a.id, "name": a.name, "role": a.role,
                 "avatar": a.avatar or a.icon or "bot", "color": a.color or "#7c3aed",
                 "avatar_url": avatar_url,
+                "description": a.description or "",
+                "tagline": a.tagline or "",
+                "persona": a.persona or "",
+                "motivation": a.motivation or "",
+                "skills": a.skills or [],
+                "tools": a.tools or [],
+                "mcps": a.mcps or [],
+                "model": a.model or "",
+                "provider": getattr(a, "provider", "") or "",
             })
 
     return _templates(request).TemplateResponse("dsi.html", {
