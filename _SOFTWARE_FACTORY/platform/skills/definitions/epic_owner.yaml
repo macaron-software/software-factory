@@ -1,5 +1,7 @@
 id: epic_owner
-name: "Epic Owner"
+name: "Olivier Girard"
+avatar: "OG"
+role: "Epic Owner"
 version: "1.0"
 
 persona:

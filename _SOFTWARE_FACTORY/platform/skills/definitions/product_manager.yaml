@@ -1,5 +1,7 @@
 id: product_manager
-name: "Product Manager"
+name: "Alexandre Faure"
+avatar: "AF"
+role: "Product Manager"
 version: "1.0"
 
 persona:

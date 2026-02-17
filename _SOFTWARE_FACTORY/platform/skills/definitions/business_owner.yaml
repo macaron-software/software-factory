@@ -1,5 +1,7 @@
 id: business_owner
-name: "Business Owner"
+name: "Isabelle Fournier"
+avatar: "IF"
+role: "Business Owner"
 version: "1.0"
 
 persona:

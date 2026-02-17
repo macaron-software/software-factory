@@ -2617,11 +2617,11 @@ async def product_page(request: Request):
 # ── Ideation Workspace ───────────────────────────────────────────
 
 _IDEATION_AGENTS = [
-    {"id": "metier", "name": "Business Analyst", "short_role": "Métier", "color": "#2563eb"},
-    {"id": "architecte", "name": "Architecte", "short_role": "Architecture", "color": "#0891b2"},
-    {"id": "ux_designer", "name": "UX Designer", "short_role": "UX/UI", "color": "#8b5cf6"},
-    {"id": "securite", "name": "Expert Sécurité", "short_role": "Sécurité", "color": "#dc2626"},
-    {"id": "product_manager", "name": "Product Manager", "short_role": "Produit", "color": "#16a34a"},
+    {"id": "metier", "name": "Camille Durand", "short_role": "Business Analyst", "color": "#2563eb"},
+    {"id": "architecte", "name": "Pierre Duval", "short_role": "Solution Architect", "color": "#0891b2"},
+    {"id": "ux_designer", "name": "Chloé Bertrand", "short_role": "UX Designer", "color": "#8b5cf6"},
+    {"id": "securite", "name": "Nadia Benali", "short_role": "Sécurité", "color": "#dc2626"},
+    {"id": "product_manager", "name": "Alexandre Faure", "short_role": "Product Manager", "color": "#16a34a"},
 ]
 
 _IDEATION_SYSTEM = """Tu participes à un atelier d'idéation multi-agents.
@@ -2632,11 +2632,11 @@ Pour chaque idée soumise, tu dois analyser sous ton angle d'expertise et produi
 Réponds en JSON:
 {{
   "messages": [
-    {{"agent_id": "metier", "agent_name": "Business Analyst", "content": "...", "color": "#2563eb"}},
-    {{"agent_id": "architecte", "agent_name": "Architecte", "content": "...", "color": "#0891b2"}},
-    {{"agent_id": "ux_designer", "agent_name": "UX Designer", "content": "...", "color": "#8b5cf6"}},
-    {{"agent_id": "securite", "agent_name": "Expert Sécurité", "content": "...", "color": "#dc2626"}},
-    {{"agent_id": "product_manager", "agent_name": "Product Manager", "content": "...", "color": "#16a34a"}}
+    {{"agent_id": "metier", "agent_name": "Camille Durand", "content": "...", "color": "#2563eb"}},
+    {{"agent_id": "architecte", "agent_name": "Pierre Duval", "content": "...", "color": "#0891b2"}},
+    {{"agent_id": "ux_designer", "agent_name": "Chloé Bertrand", "content": "...", "color": "#8b5cf6"}},
+    {{"agent_id": "securite", "agent_name": "Nadia Benali", "content": "...", "color": "#dc2626"}},
+    {{"agent_id": "product_manager", "agent_name": "Alexandre Faure", "content": "...", "color": "#16a34a"}}
   ],
   "findings": [
     {{"type": "opportunity|risk|question|decision|feature", "text": "..."}}
@@ -2644,11 +2644,11 @@ Réponds en JSON:
 }}
 
 Chaque agent doit avoir un avis DIFFÉRENT et complémentaire.
-Le Business Analyst challenge la valeur métier.
-L'Architecte propose l'approche technique et les risques techniques.
-L'UX Designer pense utilisateur, parcours, accessibilité.
-L'Expert Sécurité identifie les menaces (OWASP, RGPD).
-Le Product Manager priorise et synthétise en features actionnables.
+Camille Durand (Business Analyst) challenge la valeur métier.
+Pierre Duval (Architecte) propose l'approche technique et les risques techniques.
+Chloé Bertrand (UX Designer) pense utilisateur, parcours, accessibilité.
+Nadia Benali (Expert Sécurité) identifie les menaces (OWASP, RGPD).
+Alexandre Faure (Product Manager) priorise et synthétise en features actionnables.
 
 Réponds UNIQUEMENT avec le JSON, rien d'autre."""
 

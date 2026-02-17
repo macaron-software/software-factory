@@ -168,35 +168,35 @@ class AgentStore:
 
     def _seed_hardcoded(self):
         builtins = [
-            AgentDef(id="brain", name="Brain", role="brain",
+            AgentDef(id="brain", name="Gabriel Mercier", role="Strategic Orchestrator",
                      description="Strategic orchestrator. Deep recursive analysis, task decomposition, WSJF prioritization.",
                      provider="azure", model="gpt-5.2",
                      temperature=0.3, max_tokens=8192,
                      icon="brain", color="#bc8cff",
-                     avatar="brain", tagline="I see the big picture",
+                     avatar="GM", tagline="I see the big picture",
                      is_builtin=True, tags=["orchestrator", "planning"],
                      system_prompt="You are the Brain — strategic orchestrator of the Software Factory.\n"
                      "Your role: analyze codebases deeply, decompose into atomic tasks (FRACTAL),\n"
                      "prioritize by WSJF, and coordinate workers. Use CoVe (Chain-of-Verification)\n"
                      "to validate every claim before acting. Never hallucinate — verify with tools."),
 
-            AgentDef(id="worker", name="TDD Worker", role="worker",
+            AgentDef(id="worker", name="Yann Lefevre", role="TDD Worker",
                      description="Writes code following strict TDD: Red → Green → Refactor. Atomic, KISS.",
                      provider="minimax", model="MiniMax-M2.5",
                      temperature=0.4, max_tokens=4096,
                      icon="code", color="#58a6ff",
-                     avatar="hardhat", tagline="Test first, code second",
+                     avatar="YL", tagline="Test first, code second",
                      is_builtin=True, tags=["coding", "tdd"],
                      system_prompt="You are a TDD Worker. Write code following strict Red-Green-Refactor.\n"
                      "Each task is atomic and KISS. Write the test FIRST, then minimal code to pass.\n"
                      "Never skip tests. Never use .unwrap() in Rust. Handle all errors explicitly."),
 
-            AgentDef(id="code-critic", name="Code Critic", role="critic",
+            AgentDef(id="code-critic", name="Diane Moreau", role="Code Critic",
                      description="Reviews code for quality: SLOP detection, API misuse, syntax/logic errors.",
                      provider="minimax", model="MiniMax-M2.5",
                      temperature=0.2, max_tokens=4096,
                      icon="eye", color="#d29922",
-                     avatar="eye", tagline="Nothing escapes my review",
+                     avatar="DM", tagline="Nothing escapes my review",
                      is_builtin=True, tags=["review", "quality"],
                      permissions={"can_veto": True, "veto_level": "absolute"},
                      system_prompt="You are the Code Critic. Review code for:\n"
@@ -206,12 +206,12 @@ class AgentStore:
                      "- API misuse (wrong extractors, missing FromRow derives)\n"
                      "Use CoVe: Draft assessment → Verify claims → Final decision."),
 
-            AgentDef(id="security-critic", name="Security Critic", role="critic",
+            AgentDef(id="security-critic", name="Tariq Haddad", role="Security Critic",
                      description="OWASP Top 10, secrets detection, SQL injection, XSS analysis.",
                      provider="minimax", model="MiniMax-M2.5",
                      temperature=0.1, max_tokens=4096,
                      icon="shield", color="#f85149",
-                     avatar="shield", tagline="Zero vulnerabilities tolerated",
+                     avatar="TH", tagline="Zero vulnerabilities tolerated",
                      is_builtin=True, tags=["security", "owasp"],
                      permissions={"can_veto": True, "veto_level": "absolute"},
                      system_prompt="You are the Security Critic (cognitive diversity: different LLM provider).\n"
@@ -219,12 +219,12 @@ class AgentStore:
                      "secrets in code (not in fixtures/tests), insecure auth, CSRF.\n"
                      "Secrets in test fixtures are OK. CLI print() is OK. Focus on REAL vulnerabilities."),
 
-            AgentDef(id="arch-critic", name="Architect", role="critic",
+            AgentDef(id="arch-critic", name="Sylvie Dumont", role="Architecture Critic",
                      description="Reviews RBAC, input validation, error handling, API design patterns.",
                      provider="azure-ai", model="DeepSeek-R1-0528",
                      temperature=0.3, max_tokens=4096,
                      icon="building", color="#bc8cff",
-                     avatar="building", tagline="Clean architecture, strong foundations",
+                     avatar="SD", tagline="Clean architecture, strong foundations",
                      is_builtin=True, tags=["architecture", "design"],
                      permissions={"can_veto": True, "veto_level": "strong"},
                      system_prompt="You are the Architecture Critic. Review for:\n"
@@ -242,20 +242,20 @@ class AgentStore:
                      avatar="KD", tagline="CI/CD, Docker, déploiement canary, monitoring",
                      is_builtin=True, tags=["deploy", "infra", "ci-cd"]),
 
-            AgentDef(id="product", name="Product Owner", role="product",
+            AgentDef(id="product", name="Laura Vidal", role="Product Owner",
                      description="Business value, user stories, acceptance criteria. WSJF prioritization.",
                      provider="azure", model="gpt-5.2",
                      temperature=0.5, max_tokens=4096,
                      icon="clipboard", color="#f78166",
-                     avatar="clipboard", tagline="Value over features",
+                     avatar="LV", tagline="Value over features",
                      is_builtin=True, tags=["product", "business"]),
 
-            AgentDef(id="tester", name="QA Engineer", role="tester",
+            AgentDef(id="tester", name="Éric Fontaine", role="QA Engineer",
                      description="E2E tests, smoke tests, regression. Playwright specialist.",
                      provider="minimax", model="MiniMax-M2.5",
                      temperature=0.3, max_tokens=4096,
                      icon="flask", color="#a371f7",
-                     avatar="flask", tagline="If it's not tested, it's broken",
+                     avatar="EF", tagline="If it's not tested, it's broken",
                      is_builtin=True, tags=["testing", "e2e", "qa"]),
         ]
 

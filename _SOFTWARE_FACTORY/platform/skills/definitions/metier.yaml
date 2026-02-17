@@ -1,5 +1,7 @@
 id: metier
-name: "Product Owner / Business Analyst"
+name: "Camille Durand"
+avatar: "CD"
+role: "Business Analyst"
 version: "1.0"
 
 persona:

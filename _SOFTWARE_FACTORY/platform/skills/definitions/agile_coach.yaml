@@ -1,5 +1,7 @@
 id: agile_coach
-name: "Agile Coach"
+name: "Marc Lefèvre"
+avatar: "ML"
+role: "Agile Coach"
 version: "1.0"
 
 persona:

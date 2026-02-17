@@ -103,7 +103,16 @@
 .ig-node-dot{r:4}
 /* Edges */
 .ig-edge{fill:none;stroke-width:1.8;opacity:0.6}
+.ig-edge.active{opacity:1;stroke-width:2.5;filter:drop-shadow(0 0 4px currentColor)}
 .ig-edge-label{font-size:8px;fill:var(--text-secondary);text-anchor:middle}
+/* Node active state */
+.ig-node.active .ig-node-bg{filter:brightness(1.3);stroke:var(--purple);stroke-width:2}
+.ig-node.active .ig-node-dot{r:6;filter:drop-shadow(0 0 6px currentColor)}
+@keyframes igPulse{0%,100%{opacity:1}50%{opacity:.3}}
+.ig-node.thinking .ig-node-dot{animation:igPulse 1s infinite;fill:var(--yellow) !important}
+/* Edge flow animation */
+@keyframes igFlowDash{to{stroke-dashoffset:-20}}
+.ig-edge.flowing{animation:igFlowDash .8s linear infinite;stroke-dasharray:6 4;opacity:1;stroke-width:2.5}
 /* Popover */
 .ig-popover-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.3);display:none}
 .ig-popover-overlay.visible{display:block}
@@ -373,6 +382,7 @@ function renderIdeaGraph(){
             <circle class="ig-node-dot" cx="${IG_NW-12}" cy="14" fill="${col}" opacity="0.6"/>
         `;
         g.addEventListener('click', (ev)=>{ ev.stopPropagation(); showIgPopover(n.id, ev); });
+        g.dataset.agent = n.id;
         nodesG.appendChild(g);
     });
 
@@ -506,9 +516,46 @@ function addFinding(type, text) {
 }
 
 function setAgentStatus(agentId, status) {
+    // Roster dot
     const dot = document.getElementById('dot-' + agentId);
     if (dot) { dot.className = 'idea-agent-dot ' + status; }
+    // Graph node
+    const nodeG = document.querySelector(`.ig-node[data-agent="${agentId}"]`);
+    if(nodeG){
+        nodeG.classList.remove('active','thinking');
+        if(status === 'thinking') nodeG.classList.add('thinking');
+        else if(status === 'speaking') nodeG.classList.add('active');
+    }
 }
+
+function setEdgeActive(fromId, toId, active){
+    document.querySelectorAll('#ideaEdges .ig-edge').forEach(p=>{
+        if(p.dataset.from===fromId && p.dataset.to===toId){
+            p.classList.toggle('flowing', active);
+            p.classList.toggle('active', active);
+        }
+    });
+}
+
+function resetGraphState(){
+    document.querySelectorAll('.ig-node').forEach(n=> n.classList.remove('active','thinking'));
+    document.querySelectorAll('.ig-edge').forEach(e=> e.classList.remove('active','flowing'));
+    document.querySelectorAll('.idea-agent-dot').forEach(d => d.className = 'idea-agent-dot idle');
+}
+
+// Flow order: PM briefs → experts think in parallel → experts report back → PM synthesizes
+const FLOW_SEQUENCE = [
+    {phase:'brief', agents:['product_manager'], edges:[
+        ['product_manager','metier'],['product_manager','architecte'],
+        ['product_manager','ux_designer'],['product_manager','securite']
+    ]},
+    {phase:'analyze', agents:['metier','architecte','ux_designer','securite'], edges:[
+        ['metier','architecte'],['architecte','securite'],['ux_designer','metier']
+    ]},
+    {phase:'report', agents:['product_manager'], edges:[
+        ['metier','product_manager'],['securite','product_manager']
+    ]},
+];
 
 async function sendIdea() {
     const text = inputEl.value.trim();
@@ -519,6 +566,18 @@ async function sendIdea() {
     addMsg('user', 'Vous', text, '', '');
     originalPrompt = originalPrompt || text;
 
+    // Phase 1: PM briefs — all dots thinking
+    setAgentStatus('product_manager', 'speaking');
+    addMsg('agent', 'Product Manager', 'Je lance le brief auprès de l\'équipe...', '#16a34a',
+        igAgent('product_manager')?.avatar_url || '');
+    FLOW_SEQUENCE[0].edges.forEach(([f,t])=> setEdgeActive(f,t,true));
+    await sleep(600);
+
+    // Phase 2: All experts thinking
+    ['metier','architecte','ux_designer','securite'].forEach(id=> setAgentStatus(id, 'thinking'));
+    FLOW_SEQUENCE[0].edges.forEach(([f,t])=> setEdgeActive(f,t,false));
+    FLOW_SEQUENCE[1].edges.forEach(([f,t])=> setEdgeActive(f,t,true));
+
     try {
         const resp = await fetch('/api/ideation', {
             method: 'POST',
@@ -527,29 +586,63 @@ async function sendIdea() {
         });
         const data = await resp.json();
         if (data.error) {
+            resetGraphState();
             addMsg('system', 'Système', data.error, 'var(--red)', '');
         } else {
             sessionId = data.session_id || sessionId;
-            for (const msg of (data.messages || [])) {
-                addMsg('agent', msg.agent_name, msg.content, msg.color || '', msg.avatar_url || '');
-                if (msg.agent_id) setAgentStatus(msg.agent_id, 'speaking');
+            const messages = data.messages || [];
+
+            // Animate messages one by one with graph activation
+            FLOW_SEQUENCE[1].edges.forEach(([f,t])=> setEdgeActive(f,t,false));
+
+            for (let i = 0; i < messages.length; i++) {
+                const msg = messages[i];
+                const agentId = msg.agent_id;
+                const agent = igAgent(agentId);
+
+                // Light up edges TO this agent, set thinking→speaking
+                setAgentStatus(agentId, 'speaking');
+                // Find edges going to this agent and light them
+                igEdges.filter(e=> e.to === agentId).forEach(e=> setEdgeActive(e.from, e.to, true));
+
+                addMsg('agent', msg.agent_name, msg.content, msg.color || '',
+                    agent?.avatar_url || msg.avatar_url || '');
+
+                await sleep(800);
+
+                // Turn off edges, set to idle (next agent takes over)
+                igEdges.filter(e=> e.to === agentId).forEach(e=> setEdgeActive(e.from, e.to, false));
+                if(i < messages.length - 1) setAgentStatus(agentId, 'idle');
             }
+
+            // Phase 3: Report edges light up briefly
+            FLOW_SEQUENCE[2].edges.forEach(([f,t])=> setEdgeActive(f,t,true));
+            await sleep(500);
+            FLOW_SEQUENCE[2].edges.forEach(([f,t])=> setEdgeActive(f,t,false));
+
             for (const f of (data.findings || [])) {
                 addFinding(f.type, f.text);
             }
+
             // Enable action buttons
             document.getElementById('btnCreateEpic').style.opacity = '1';
             document.getElementById('btnCreateEpic').style.pointerEvents = 'auto';
             document.getElementById('btnGenerateTeam').style.opacity = '1';
             document.getElementById('btnGenerateTeam').style.pointerEvents = 'auto';
+
+            // Final: all agents speaking (done)
+            igAgents.forEach(a=> setAgentStatus(a.id, 'speaking'));
+            await sleep(1500);
+            resetGraphState();
         }
     } catch (e) {
+        resetGraphState();
         addMsg('system', 'Système', 'Erreur de connexion: ' + e.message, 'var(--red)', '');
     }
     sendBtn.disabled = false;
-    // Reset agent dots
-    document.querySelectorAll('.idea-agent-dot').forEach(d => d.className = 'idea-agent-dot idle');
 }
+
+function sleep(ms){ return new Promise(r=> setTimeout(r, ms)); }
 
 // Collect findings from the panel
 function collectFindings() {
