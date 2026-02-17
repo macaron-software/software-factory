@@ -24,7 +24,12 @@ CREATE TABLE IF NOT EXISTS agents (
     color TEXT DEFAULT '#f78166',
     is_builtin INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    avatar TEXT DEFAULT '',
+    tagline TEXT DEFAULT '',
+    persona TEXT DEFAULT '',
+    motivation TEXT DEFAULT '',
+    hierarchy_rank INTEGER DEFAULT 50
 );
 
 CREATE INDEX IF NOT EXISTS idx_agents_role ON agents(role);

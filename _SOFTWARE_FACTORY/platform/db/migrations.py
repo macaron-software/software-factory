@@ -36,6 +36,8 @@ def _migrate(conn: sqlite3.Connection):
         conn.execute("ALTER TABLE agents ADD COLUMN avatar TEXT DEFAULT ''")
     if "tagline" not in cols:
         conn.execute("ALTER TABLE agents ADD COLUMN tagline TEXT DEFAULT ''")
+    if "motivation" not in cols:
+        conn.execute("ALTER TABLE agents ADD COLUMN motivation TEXT DEFAULT ''")
 
 
 def get_db(db_path: Path = DB_PATH) -> sqlite3.Connection:

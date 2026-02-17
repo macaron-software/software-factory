@@ -23,8 +23,8 @@
 .strat-name{font-size:0.85rem;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .strat-role{font-size:0.68rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* Popover fiche — same design as graph tooltip */
-.agent-popover{position:absolute;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:10px;padding:0.75rem 0.85rem;font-size:0.78rem;color:var(--text-primary);width:300px;box-shadow:0 6px 24px rgba(0,0,0,.55);pointer-events:auto;z-index:20;display:none;word-break:break-word}
+/* Popover fiche — fixed position to avoid container clipping */
+.agent-popover{position:fixed;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:10px;padding:0.75rem 0.85rem;font-size:0.78rem;color:var(--text-primary);width:320px;max-height:70vh;overflow-y:auto;box-shadow:0 6px 24px rgba(0,0,0,.55);pointer-events:auto;z-index:1000;display:none;word-break:break-word}
 .agent-popover.visible{display:block}
 .agent-popover-close{position:absolute;top:0.35rem;right:0.5rem;background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.85rem;padding:0.2rem}
 .agent-popover-close:hover{color:var(--text-primary)}
@@ -107,9 +107,11 @@
                 </div>
             </div>
             {% endfor %}
-            <div class="agent-popover" id="agentPopover"></div>
         </div>
     </div>
+
+    <!-- Popover fiche — rendered as fixed overlay -->
+    <div class="agent-popover" id="agentPopover"></div>
 
     <!-- Portfolio metrics -->
     <div>
@@ -256,6 +258,13 @@ function togglePopover(card, idx){
             <div class="ap-desc" style="white-space:pre-line">${esc(a.persona)}</div>
         </div>`;
     }
+    let motivHtml = '';
+    if(a.motivation){
+        motivHtml = `<div class="ap-section">
+            <div class="ap-section-title"><svg class="icon icon-xs"><use href="#icon-zap"/></svg> Motivation</div>
+            <div class="ap-desc" style="white-space:pre-line">${esc(a.motivation)}</div>
+        </div>`;
+    }
     let descHtml = '';
     if(a.description){
         descHtml = `<div class="ap-desc">${esc(a.description)}</div>`;
@@ -273,20 +282,21 @@ function togglePopover(card, idx){
         ${a.tagline ? `<div class="ap-tagline">${esc(a.tagline)}</div>` : ''}
         ${descHtml}
         ${personaHtml}
+        ${motivHtml}
         ${skillsHtml}
         ${toolsHtml}
         ${mcpsHtml}
         ${modelHtml}
     `;
 
-    // Position popover below the card
+    // Position popover below the card (fixed positioning)
     const rect = card.getBoundingClientRect();
-    const container = document.getElementById('stratContainer').getBoundingClientRect();
-    let left = rect.left - container.left;
-    let top = rect.bottom - container.top + 6;
-    // Clamp to container width
-    if(left + 300 > container.width) left = container.width - 310;
-    if(left < 0) left = 0;
+    let left = rect.left;
+    let top = rect.bottom + 6;
+    // Clamp to viewport
+    if(left + 320 > window.innerWidth) left = window.innerWidth - 330;
+    if(left < 10) left = 10;
+    if(top + 400 > window.innerHeight) top = rect.top - pop.offsetHeight - 6; // flip above
     pop.style.left = left + 'px';
     pop.style.top = top + 'px';
     pop.classList.add('visible');

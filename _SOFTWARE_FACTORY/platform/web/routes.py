@@ -47,6 +47,7 @@ async def portfolio_page(request: Request):
             "avatar_url": avatar_url,
             "tagline": a.tagline or "", "persona": a.persona or "",
             "description": a.description or "",
+            "motivation": a.motivation or "",
             "skills": a.skills or [], "tools": a.tools or [],
             "mcps": a.mcps or [],
             "model": getattr(a, "model", "") or "", "provider": getattr(a, "provider", "") or "",
