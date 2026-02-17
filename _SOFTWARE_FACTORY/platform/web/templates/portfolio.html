@@ -98,6 +98,28 @@
 
 .section-title{font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:0.75rem;display:flex;align-items:center;gap:0.5rem}
 .section-title svg{width:16px;height:16px}
+
+/* Epics table */
+.epics-table{width:100%;border-collapse:collapse;font-size:0.78rem}
+.epics-table th{text-align:left;padding:0.5rem 0.6rem;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);border-bottom:1px solid var(--border)}
+.epics-table td{padding:0.45rem 0.6rem;border-bottom:1px solid var(--border-light,rgba(255,255,255,.04))}
+.epics-table tr:hover td{background:var(--bg-tertiary)}
+.epic-name{font-weight:600;color:var(--text-primary)}
+.epic-project{font-size:0.68rem;color:var(--text-secondary)}
+.epic-status{font-size:0.62rem;padding:0.1rem 0.4rem;border-radius:4px;font-weight:600}
+.epic-status.active{background:rgba(52,211,153,.15);color:var(--green)}
+.epic-status.planning{background:rgba(251,191,36,.15);color:var(--yellow)}
+.epic-status.completed{background:rgba(96,165,250,.15);color:var(--blue)}
+.epic-status.backlog{background:var(--bg-tertiary);color:var(--text-secondary)}
+.epic-bar{width:100px;height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden;display:inline-block;vertical-align:middle}
+.epic-bar-fill{height:100%;border-radius:3px;background:var(--green);transition:width .3s}
+
+/* Gantt milestones */
+.gantt-wrap{overflow-x:auto;padding:0.5rem 0}
+.gantt-row{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem}
+.gantt-label{width:140px;flex-shrink:0;font-size:0.72rem;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;padding-right:0.4rem}
+.gantt-track{flex:1;height:18px;background:var(--bg-tertiary);border-radius:3px;position:relative;min-width:300px}
+.gantt-bar{position:absolute;height:100%;border-radius:3px;top:0;font-size:0.58rem;display:flex;align-items:center;padding:0 0.3rem;color:#fff;font-weight:600;white-space:nowrap;overflow:hidden}
 </style>
 
 <div class="portfolio-grid">
@@ -236,6 +258,60 @@
             {% endfor %}
         </div>
     </div>
+
+    <!-- Epics Progression -->
+    {% if epics %}
+    <div>
+        <div class="section-title">
+            <svg class="icon icon-sm"><use href="#icon-rocket"/></svg> Épics & Progression
+        </div>
+        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+            <table class="epics-table">
+                <thead><tr>
+                    <th>Epic</th><th>Projet</th><th>Statut</th><th>Progression</th><th>WSJF</th>
+                </tr></thead>
+                <tbody>
+                {% for e in epics %}
+                <tr>
+                    <td><a href="/missions/{{ e.id }}" class="epic-name" style="text-decoration:none;color:inherit">{{ e.name }}</a></td>
+                    <td class="epic-project">{{ e.project_name }}</td>
+                    <td><span class="epic-status {{ e.status }}">{{ e.status }}</span></td>
+                    <td>
+                        <div class="epic-bar"><div class="epic-bar-fill" style="width:{{ e.pct }}%"></div></div>
+                        <span style="font-size:0.65rem;color:var(--text-secondary);margin-left:0.3rem">{{ e.done }}/{{ e.total }}</span>
+                    </td>
+                    <td>{% if e.wsjf > 0 %}<span style="font-size:0.65rem;background:rgba(124,58,237,.15);color:var(--purple);padding:0.1rem 0.3rem;border-radius:3px;font-weight:600">{{ e.wsjf|round(1) }}</span>{% endif %}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Milestones Gantt -->
+    {% if epics %}
+    <div>
+        <div class="section-title">
+            <svg class="icon icon-sm"><use href="#icon-calendar"/></svg> Milestones
+        </div>
+        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.8rem 1rem">
+            <div class="gantt-wrap">
+                {% set colors = ['var(--purple)', 'var(--blue)', 'var(--green)', 'var(--yellow)', '#f472b6', '#06b6d4'] %}
+                {% for e in epics[:8] %}
+                <div class="gantt-row">
+                    <div class="gantt-label" title="{{ e.name }}">{{ e.name[:20] }}{% if e.name|length > 20 %}…{% endif %}</div>
+                    <div class="gantt-track">
+                        <div class="gantt-bar" style="left:{{ (loop.index0 * 8)|int }}%;width:{{ e.pct|int + 15 }}%;background:{{ colors[loop.index0 % 6] }}">
+                            {{ e.pct }}%
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <script>

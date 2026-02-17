@@ -139,6 +139,7 @@ async def portfolio_page(request: Request):
         "projects": projects_data,
         "strategic_agents": strategic,
         "strat_graph": strat_graph,
+        "epics": epics_data,
         "total_missions": len(all_missions),
         "active_missions": active_count,
         "total_tasks": total_tasks,
