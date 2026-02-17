@@ -36,7 +36,7 @@ class AgentAction:
 
 # Regex patterns for action tags in LLM output
 _ACTION_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("delegate", re.compile(r"\[DELEGATE:([^\]]+)\](.*)$",  re.MULTILINE)),
+    ("delegate", re.compile(r"\[DELEGATE:([^\]]+)\]\s*(.*?)(?=\[DELEGATE:|\[VETO|\[APPROVE\]|\[ASK:|\[ESCALATE|\Z)",  re.MULTILINE | re.DOTALL)),
     ("veto",     re.compile(r"\[VETO:([^\]]*)\]",           re.MULTILINE)),
     ("approve",  re.compile(r"\[APPROVE\]",                  re.MULTILINE)),
     ("ask",      re.compile(r"\[ASK:([^\]:]+):([^\]]*)\]",   re.MULTILINE)),
@@ -56,7 +56,8 @@ class AgentLoop:
         session_id: str,
         project_id: str = "",
         project_path: str = "",
-        think_timeout: float = 120.0,
+        think_timeout: float = 300.0,
+        max_rounds: int = 10,
     ):
         from .store import AgentDef as _AD  # noqa: F811 — type hint only
 
@@ -65,6 +66,7 @@ class AgentLoop:
         self.project_id = project_id
         self.project_path = project_path
         self.think_timeout = think_timeout
+        self.max_rounds = max_rounds
         self.status: AgentStatus = AgentStatus.IDLE
 
         self.instance = AgentInstance(
@@ -76,6 +78,7 @@ class AgentLoop:
         self._task: asyncio.Task | None = None
         self._inbox: asyncio.Queue[A2AMessage] = asyncio.Queue(maxsize=100)
         self._stop_event = asyncio.Event()
+        self._rounds = 0
 
         # Lazy — initialised in start()
         self._executor: "AgentExecutor | None" = None  # type: ignore[name-defined]
@@ -86,7 +89,7 @@ class AgentLoop:
     # ------------------------------------------------------------------
 
     async def start(self) -> None:
-        """Register on the bus and launch the run-loop task."""
+        """Register on the bus, replay pending messages, and launch the run-loop task."""
         from .executor import get_executor
         from ..a2a.bus import get_bus
 
@@ -95,11 +98,46 @@ class AgentLoop:
 
         self._bus.register_agent(self.agent.id, handler=self._handle_message)
         self._stop_event.clear()
+
+        # Replay unprocessed messages from DB for this agent in this session
+        await self._replay_pending_messages()
+
         self._task = asyncio.create_task(
             self._run_loop(),
             name=f"agent-loop:{self.session_id}:{self.agent.id}",
         )
         logger.info("AgentLoop started  agent=%s session=%s", self.agent.id, self.session_id)
+
+    async def _replay_pending_messages(self) -> None:
+        """Load recent messages from DB and enqueue ones addressed to this agent."""
+        if not self._bus or not self._bus.db:
+            return
+        try:
+            rows = self._bus.db.execute(
+                """SELECT id, session_id, from_agent, to_agent, message_type,
+                          content, metadata_json, parent_id, timestamp
+                   FROM messages
+                   WHERE session_id = ? AND (to_agent = ? OR to_agent IS NULL)
+                     AND message_type != 'system' AND LENGTH(content) > 0
+                     AND from_agent != ?
+                   ORDER BY timestamp DESC LIMIT 5""",
+                (self.session_id, self.agent.id, self.agent.id),
+            ).fetchall()
+            for row in reversed(rows):  # oldest first
+                msg = A2AMessage(
+                    id=row[0], session_id=row[1], from_agent=row[2],
+                    to_agent=row[3], message_type=MessageType(row[4]),
+                    content=row[5], parent_id=row[7],
+                )
+                try:
+                    self._inbox.put_nowait(msg)
+                except asyncio.QueueFull:
+                    break
+            if rows:
+                logger.info("Replayed %d messages for agent=%s session=%s",
+                            len(rows), self.agent.id, self.session_id)
+        except Exception as exc:
+            logger.debug("Replay failed for agent=%s: %s", self.agent.id, exc)
 
     async def stop(self) -> None:
         """Signal stop, cancel task, unregister from bus."""
@@ -131,6 +169,18 @@ class AgentLoop:
                 msg = await asyncio.wait_for(self._inbox.get(), timeout=1.0)
             except asyncio.TimeoutError:
                 continue
+
+            # Skip messages that agents shouldn't process
+            if self._should_skip(msg):
+                continue
+
+            # Round limit to prevent infinite loops
+            self._rounds += 1
+            if self._rounds > self.max_rounds:
+                logger.warning("Agent %s hit max rounds (%d), pausing  session=%s",
+                               self.agent.id, self.max_rounds, self.session_id)
+                await self._set_status(AgentStatus.IDLE)
+                break
 
             t0 = time.monotonic()
             try:
@@ -172,7 +222,7 @@ class AgentLoop:
                 if actions:
                     await self._set_status(AgentStatus.ACTING)
                     for action in actions:
-                        await self._execute_action(action, parent_id=msg.id)
+                        await self._execute_action(action, parent_id=msg.id, full_context=result.content)
                 else:
                     # No structured actions — send plain response
                     await self.send_message(
@@ -205,11 +255,31 @@ class AgentLoop:
 
     async def _handle_message(self, msg: A2AMessage) -> None:
         """Enqueue incoming message (called by bus handler)."""
+        # Only accept messages for our session
+        if msg.session_id != self.session_id:
+            return
         try:
             self._inbox.put_nowait(msg)
         except asyncio.QueueFull:
             logger.warning("Inbox full  agent=%s session=%s, dropping message %s",
                            self.agent.id, self.session_id, msg.id)
+
+    # ------------------------------------------------------------------
+    # Message filtering
+    # ------------------------------------------------------------------
+
+    def _should_skip(self, msg: A2AMessage) -> bool:
+        """Filter out messages that agents shouldn't LLM-process."""
+        # Skip SYSTEM status events (they're for SSE/UI only)
+        if msg.message_type == MessageType.SYSTEM:
+            return True
+        # Skip empty content (bus noise)
+        if not msg.content or not msg.content.strip():
+            return True
+        # Skip own messages (echo prevention)
+        if msg.from_agent == self.agent.id:
+            return True
+        return False
 
     # ------------------------------------------------------------------
     # Context builder
@@ -337,7 +407,7 @@ class AgentLoop:
     # Action execution
     # ------------------------------------------------------------------
 
-    async def _execute_action(self, action: AgentAction, parent_id: str = "") -> None:
+    async def _execute_action(self, action: AgentAction, parent_id: str = "", full_context: str = "") -> None:
         """Route a parsed action through the message bus."""
         type_map = {
             "delegate": MessageType.DELEGATE,
@@ -348,6 +418,10 @@ class AgentLoop:
         }
         msg_type = type_map.get(action.type, MessageType.INFORM)
         content = action.content or action.reason or ""
+
+        # For delegations with minimal content, include the full context
+        if action.type == "delegate" and len(content.strip()) < 20 and full_context:
+            content = f"Tâche déléguée par {self.agent.name}:\n\n{full_context}"
 
         await self.send_message(
             to=action.target or None,
@@ -394,11 +468,12 @@ class AgentLoop:
     # ------------------------------------------------------------------
 
     async def _set_status(self, status: AgentStatus) -> None:
-        """Update status and publish a system event via the bus."""
+        """Update status and notify SSE listeners (not other agents)."""
         self.status = status
         self.instance.status = status
         self.instance.last_active = datetime.utcnow()
 
+        # Only notify SSE listeners — do NOT publish to bus (avoids flooding agents)
         if self._bus:
             event_msg = A2AMessage(
                 session_id=self.session_id,
@@ -411,7 +486,10 @@ class AgentLoop:
                     "agent_id": self.agent.id,
                 },
             )
-            await self._bus.publish(event_msg)
+            # Persist for history but don't route to agents
+            if self._bus.db:
+                self._bus._persist_message(event_msg)
+            await self._bus._notify_sse(event_msg)
 
     def get_status(self) -> dict:
         """Return current status and metrics."""

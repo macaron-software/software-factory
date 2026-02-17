@@ -3193,7 +3193,16 @@ async def dsi_workflow_start(request: Request, workflow_id: str):
         return HTMLResponse("Workflow introuvable", 404)
 
     cfg = wf.config or {}
-    phases = cfg.get("phases", [])
+    # Read phases from wf.phases (WorkflowPhase objects), fallback to config
+    if wf.phases:
+        phases = []
+        for p in wf.phases:
+            pd = {"id": p.id, "name": p.name, "description": p.description,
+                  "pattern_id": p.pattern_id, "gate": p.gate}
+            pd.update(p.config or {})
+            phases.append(pd)
+    else:
+        phases = cfg.get("phases", [])
     if not phases:
         return HTMLResponse("Pas de phases", 400)
 
@@ -3219,15 +3228,17 @@ async def dsi_workflow_start(request: Request, workflow_id: str):
     # Start agent loops for phase 1
     manager = get_loop_manager()
     bus = get_bus()
+    # Load project for path
+    from ..projects.manager import get_project_store
+    project = get_project_store().get(project_id)
+    project_path = project.path if project and project.path else ""
     for aid in phase1.get("agents", []):
-        await manager.start_agent(aid, session.id, project_id=project_id)
+        await manager.start_agent(aid, session.id, project_id=project_id, project_path=project_path)
 
     # Send kickoff message to the leader
     leader = phase1.get("leader", phase1["agents"][0] if phase1["agents"] else "")
     if leader:
         # Load project VISION if exists
-        from ..projects.manager import get_project_store
-        project = get_project_store().get(project_id)
         vision = ""
         if project and project.path:
             import os
@@ -3242,13 +3253,21 @@ async def dsi_workflow_start(request: Request, workflow_id: str):
 
 **Livrables attendus:** {', '.join(phase1.get('deliverables', []))}
 
-**Équipe:** {', '.join(phase1.get('agents', []))}
+**Équipe disponible:** {', '.join(phase1.get('agents', []))}
 
 **Pattern:** {phase1.get('pattern_id', 'hierarchical')}
 
 {f'**VISION du projet:**{chr(10)}{vision}' if vision else ''}
 
-En tant que leader de cette phase, analysez la situation, consultez votre équipe, et produisez les livrables. Utilisez [DELEGATE:agent_id] pour assigner des tâches et [APPROVE]/[VETO] pour valider."""
+**INSTRUCTIONS:**
+1. Vous êtes le leader de cette phase. Coordonnez votre équipe.
+2. Utilisez `[DELEGATE:agent_id] instruction` pour assigner des tâches aux membres de l'équipe.
+3. Utilisez les outils `deep_search` et `code_read` pour analyser le code source du projet.
+4. Produisez chaque livrable de façon concrète et détaillée.
+5. Quand tous les livrables sont prêts, utilisez `[APPROVE]` pour valider la phase.
+6. Si un problème bloque, utilisez `[ESCALATE]` pour remonter.
+
+Commencez par analyser la situation et déléguer les premières tâches."""
 
         from ..models import A2AMessage, MessageType
         msg = A2AMessage(
@@ -3256,7 +3275,7 @@ En tant que leader de cette phase, analysez la situation, consultez votre équip
             session_id=session.id,
             from_agent="user",
             to_agent=leader,
-            type=MessageType.REQUEST,
+            message_type=MessageType.REQUEST,
             content=kickoff,
         )
         await bus.publish(msg)
@@ -3288,7 +3307,16 @@ async def dsi_workflow_next_phase(request: Request, workflow_id: str):
         return HTMLResponse("Not found", 404)
 
     cfg = wf.config or {}
-    phases = cfg.get("phases", [])
+    # Read phases from wf.phases (WorkflowPhase objects), fallback to config
+    if wf.phases:
+        phases = []
+        for p in wf.phases:
+            pd = {"id": p.id, "name": p.name, "description": p.description,
+                  "pattern_id": p.pattern_id, "gate": p.gate}
+            pd.update(p.config or {})
+            phases.append(pd)
+    else:
+        phases = cfg.get("phases", [])
     s_cfg = session.config or {}
     current_phase_id = s_cfg.get("current_phase", "")
     phase_statuses = s_cfg.get("phase_statuses", {})
@@ -3317,8 +3345,12 @@ async def dsi_workflow_next_phase(request: Request, workflow_id: str):
     # Stop old loops, start new ones
     manager = get_loop_manager()
     await manager.stop_session(session_id)
+    project_id = cfg.get("project_id", "")
+    from ..projects.manager import get_project_store
+    project = get_project_store().get(project_id) if project_id else None
+    project_path = project.path if project and project.path else ""
     for aid in next_phase.get("agents", []):
-        await manager.start_agent(aid, session_id)
+        await manager.start_agent(aid, session_id, project_id=project_id, project_path=project_path)
 
     # Send kickoff to new phase leader
     leader = next_phase.get("leader", next_phase["agents"][0] if next_phase["agents"] else "")
@@ -3340,7 +3372,7 @@ Utilisez [DELEGATE:agent_id] pour assigner des tâches."""
             session_id=session_id,
             from_agent="user",
             to_agent=leader,
-            type=MessageType.REQUEST,
+            message_type=MessageType.REQUEST,
             content=kickoff,
         )
         bus = get_bus()

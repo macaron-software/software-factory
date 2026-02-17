@@ -111,11 +111,10 @@ class MessageBus:
             self._dead_letter_add(message)
 
     async def _broadcast(self, message: A2AMessage):
-        """Broadcast to all agents in the same session."""
+        """Broadcast to all agents in the same session (session-scoped)."""
         targets = set()
 
-        # All agents with queues (session filtering done by agents themselves)
-        for agent_id in self._agent_queues:
+        for agent_id, handler in self._handlers.items():
             if agent_id != message.from_agent:
                 targets.add(agent_id)
 

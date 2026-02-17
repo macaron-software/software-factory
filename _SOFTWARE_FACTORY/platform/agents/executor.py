@@ -377,6 +377,17 @@ class AgentExecutor:
                 total_tokens_in += llm_resp.tokens_in
                 total_tokens_out += llm_resp.tokens_out
 
+                # Parse XML tool calls from content (MiniMax sometimes returns these)
+                if not llm_resp.tool_calls and llm_resp.content:
+                    xml_tcs = self._parse_xml_tool_calls(llm_resp.content)
+                    if xml_tcs:
+                        llm_resp = LLMResponse(
+                            content="", model=llm_resp.model, provider=llm_resp.provider,
+                            tokens_in=llm_resp.tokens_in, tokens_out=llm_resp.tokens_out,
+                            duration_ms=llm_resp.duration_ms, finish_reason="tool_calls",
+                            tool_calls=xml_tcs,
+                        )
+
                 # No tool calls → final response
                 if not llm_resp.tool_calls:
                     content = llm_resp.content
@@ -471,13 +482,40 @@ class AgentExecutor:
 
         except Exception as exc:
             elapsed = int((time.monotonic() - t0) * 1000)
-            logger.error("Agent %s execution failed: %s", agent.id, exc)
+            logger.error("Agent %s execution failed: %s", agent.id, exc, exc_info=True)
             return ExecutionResult(
                 content=f"Error: {exc}",
                 agent_id=agent.id,
                 duration_ms=elapsed,
                 error=str(exc),
             )
+
+    @staticmethod
+    def _parse_xml_tool_calls(content: str) -> list:
+        """Parse MiniMax XML-format tool calls from content."""
+        from ..llm.client import LLMToolCall as _TC
+        import uuid as _uuid
+
+        calls = []
+        # Match <invoke name="tool_name"><parameter name="key">value</parameter>...</invoke>
+        invoke_re = re.compile(
+            r'<invoke\s+name="([^"]+)">(.*?)</invoke>', re.DOTALL
+        )
+        param_re = re.compile(
+            r'<parameter\s+name="([^"]+)">(.*?)</parameter>', re.DOTALL
+        )
+        for m in invoke_re.finditer(content):
+            fn_name = m.group(1)
+            body = m.group(2)
+            args = {}
+            for pm in param_re.finditer(body):
+                args[pm.group(1)] = pm.group(2).strip()
+            calls.append(_TC(
+                id=f"call_{_uuid.uuid4().hex[:12]}",
+                function_name=fn_name,
+                arguments=args,
+            ))
+        return calls
 
     async def _execute_tool(self, tc: LLMToolCall, ctx: ExecutionContext) -> str:
         """Execute a single tool call and return string result."""
@@ -522,7 +560,7 @@ class AgentExecutor:
         """List directory contents."""
         import os
         path = args.get("path", ".")
-        depth = args.get("depth", 2)
+        depth = int(args.get("depth", 2))
         if not os.path.isdir(path):
             return f"Error: not a directory: {path}"
         lines = []
@@ -587,7 +625,7 @@ class AgentExecutor:
         if not rlm:
             return f"Error: could not initialize RLM for project {ctx.project_id}"
 
-        max_iter = args.get("max_iterations", 3)
+        max_iter = int(args.get("max_iterations", 3))
 
         # Forward progress to the tool_call callback
         async def rlm_progress(label: str):

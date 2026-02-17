@@ -19,8 +19,8 @@ class AgentDef:
     role: str = "worker"
     description: str = ""
     system_prompt: str = ""
-    provider: str = "azure"
-    model: str = "gpt-5.2"
+    provider: str = "minimax"
+    model: str = "MiniMax-M2.5"
     temperature: float = 0.7
     max_tokens: int = 4096
     skills: list[str] = field(default_factory=list)
@@ -49,7 +49,7 @@ def _row_to_agent(row) -> AgentDef:
         description=row["description"] or "",
         system_prompt=row["system_prompt"] or "",
         provider=row["provider"] or "minimax",
-        model=row["model"] or "claude-sonnet-4-20250514",
+        model=row["model"] or "MiniMax-M2.5",
         temperature=row["temperature"],
         max_tokens=row["max_tokens"],
         skills=json.loads(row["skills_json"] or "[]"),
@@ -170,7 +170,7 @@ class AgentStore:
         builtins = [
             AgentDef(id="brain", name="Gabriel Mercier", role="Strategic Orchestrator",
                      description="Strategic orchestrator. Deep recursive analysis, task decomposition, WSJF prioritization.",
-                     provider="azure", model="gpt-5.2",
+                     provider="minimax", model="MiniMax-M2.5",
                      temperature=0.3, max_tokens=8192,
                      icon="brain", color="#bc8cff",
                      avatar="GM", tagline="I see the big picture",
@@ -221,7 +221,7 @@ class AgentStore:
 
             AgentDef(id="arch-critic", name="Sylvie Dumont", role="Architecture Critic",
                      description="Reviews RBAC, input validation, error handling, API design patterns.",
-                     provider="azure-ai", model="DeepSeek-R1-0528",
+                     provider="minimax", model="MiniMax-M2.5",
                      temperature=0.3, max_tokens=4096,
                      icon="building", color="#bc8cff",
                      avatar="SD", tagline="Clean architecture, strong foundations",
@@ -236,7 +236,7 @@ class AgentStore:
 
             AgentDef(id="devops", name="Karim Diallo", role="DevOps / SRE",
                      description="Build, deploy, infrastructure. Docker, CI/CD, monitoring.",
-                     provider="azure", model="gpt-5.1",
+                     provider="minimax", model="MiniMax-M2.5",
                      temperature=0.3, max_tokens=4096,
                      icon="rocket", color="#3fb950",
                      avatar="KD", tagline="CI/CD, Docker, déploiement canary, monitoring",
@@ -244,7 +244,7 @@ class AgentStore:
 
             AgentDef(id="product", name="Laura Vidal", role="Product Owner",
                      description="Business value, user stories, acceptance criteria. WSJF prioritization.",
-                     provider="azure", model="gpt-5.2",
+                     provider="minimax", model="MiniMax-M2.5",
                      temperature=0.5, max_tokens=4096,
                      icon="clipboard", color="#f78166",
                      avatar="LV", tagline="Value over features",
@@ -321,8 +321,8 @@ class AgentStore:
                     role=raw.get("role", raw.get("id", "worker")),
                     description=persona_desc,
                     system_prompt=raw.get("system_prompt", ""),
-                    provider=raw.get("llm", {}).get("provider", "azure") if isinstance(raw.get("llm"), dict) else "azure",
-                    model=raw.get("llm", {}).get("model", "gpt-5.1") if isinstance(raw.get("llm"), dict) else "gpt-5.1",
+                    provider=raw.get("llm", {}).get("provider", "minimax") if isinstance(raw.get("llm"), dict) else "minimax",
+                    model=raw.get("llm", {}).get("model", "MiniMax-M2.5") if isinstance(raw.get("llm"), dict) else "MiniMax-M2.5",
                     temperature=raw.get("llm", {}).get("temperature", 0.7) if isinstance(raw.get("llm"), dict) else 0.7,
                     max_tokens=raw.get("llm", {}).get("max_tokens", 4096) if isinstance(raw.get("llm"), dict) else 4096,
                     skills=raw.get("skills", []),

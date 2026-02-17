@@ -37,6 +37,17 @@ _PROVIDERS = {
         "azure_deployment_map": {"gpt-5.2": "gpt-52"},
         "max_tokens_param": {"gpt-5.2": "max_completion_tokens"},
     },
+    "azure-openai": {
+        "name": "Azure OpenAI (GPT-4o)",
+        "base_url": os.environ.get("AZURE_OPENAI_ENDPOINT", "https://castudioiadevelopopenai.openai.azure.com").rstrip("/"),
+        "key_env": "AZURE_OPENAI_API_KEY",
+        "models": ["gpt-4o"],
+        "default": "gpt-4o",
+        "auth_header": "api-key",
+        "auth_prefix": "",
+        "azure_api_version": "2024-10-21",
+        "azure_deployment_map": {"gpt-4o": "gpt-4o"},
+    },
     "nvidia": {
         "name": "NVIDIA (Kimi K2)",
         "base_url": "https://integrate.api.nvidia.com/v1",
@@ -59,7 +70,7 @@ _PROVIDERS = {
 
 # Fallback: MiniMax (reliable, fast) → Azure GPT-5.2 (powerful but rate-limited)
 # NVIDIA Kimi K2 disabled — API endpoint unreachable/timing out
-_FALLBACK_CHAIN = ["minimax", "azure-ai"]
+_FALLBACK_CHAIN = ["minimax", "azure-openai", "azure-ai"]
 
 
 @dataclass
@@ -109,7 +120,7 @@ class LLMClient:
 
     async def _get_http(self) -> httpx.AsyncClient:
         if self._http is None or self._http.is_closed:
-            self._http = httpx.AsyncClient(timeout=120.0)
+            self._http = httpx.AsyncClient(timeout=300.0)
         return self._http
 
     async def close(self):
@@ -117,7 +128,7 @@ class LLMClient:
             await self._http.aclose()
 
     def _get_provider_config(self, provider: str) -> dict:
-        return _PROVIDERS.get(provider, _PROVIDERS["minimax"])
+        return _PROVIDERS.get(provider, _PROVIDERS.get("minimax", {}))
 
     def _get_api_key(self, pcfg: dict) -> str:
         env = pcfg.get("key_env", "")
@@ -167,6 +178,11 @@ class LLMClient:
         providers_to_try = [provider] + [p for p in _FALLBACK_CHAIN if p != provider]
 
         for prov in providers_to_try:
+            # Skip unknown providers
+            if prov not in _PROVIDERS:
+                logger.warning("LLM %s skipped (unknown provider)", prov)
+                continue
+
             # Skip providers in cooldown (rate-limited recently)
             now = time.monotonic()
             cooldown_until = self._provider_cooldown.get(prov, 0)
@@ -181,22 +197,30 @@ class LLMClient:
                 logger.warning("LLM %s skipped (no API key)", prov)
                 continue
 
-            use_model = model if (prov == provider and model) else pcfg["default"]
+            use_model = model if (prov == provider and model and model in pcfg.get("models", [])) else pcfg["default"]
             logger.warning("LLM trying %s/%s ...", prov, use_model)
-            try:
-                result = await self._do_chat(pcfg, prov, use_model, messages, temperature, max_tokens, system_prompt, tools)
-                self._stats["calls"] += 1
-                self._stats["tokens_in"] += result.tokens_in
-                self._stats["tokens_out"] += result.tokens_out
-                logger.warning("LLM %s/%s OK (%d in, %d out tokens)", prov, use_model, result.tokens_in, result.tokens_out)
-                return result
-            except Exception as exc:
-                err_str = repr(exc)
-                logger.warning("LLM %s/%s failed: %s — trying next", prov, use_model, err_str)
-                self._stats["errors"] += 1
-                # On 429, put provider in cooldown for 90s
-                if "429" in err_str or "RateLimitReached" in err_str:
-                    self._provider_cooldown[prov] = time.monotonic() + 90
+            last_exc = None
+            for attempt in range(3):
+                try:
+                    result = await self._do_chat(pcfg, prov, use_model, messages, temperature, max_tokens, system_prompt, tools)
+                    self._stats["calls"] += 1
+                    self._stats["tokens_in"] += result.tokens_in
+                    self._stats["tokens_out"] += result.tokens_out
+                    logger.warning("LLM %s/%s OK (%d in, %d out tokens)", prov, use_model, result.tokens_in, result.tokens_out)
+                    return result
+                except Exception as exc:
+                    last_exc = exc
+                    err_str = repr(exc)
+                    # Retry on transient network errors
+                    if attempt < 2 and ("ReadError" in err_str or "ConnectError" in err_str or "RemoteProtocolError" in err_str):
+                        logger.warning("LLM %s/%s transient error (attempt %d): %s — retrying in 3s", prov, use_model, attempt+1, err_str)
+                        await asyncio.sleep(3)
+                        continue
+                    logger.warning("LLM %s/%s failed: %s — trying next", prov, use_model, err_str)
+                    self._stats["errors"] += 1
+                    # On 429, put provider in cooldown for 90s
+                    if "429" in err_str or "RateLimitReached" in err_str:
+                        self._provider_cooldown[prov] = time.monotonic() + 90
                     logger.warning("LLM %s → cooldown 90s (rate limited)", prov)
                 continue
 
@@ -234,9 +258,13 @@ class LLMClient:
             "messages": msgs,
             "temperature": temperature,
         }
+        # MiniMax uses <think> blocks that consume tokens — boost limit
+        effective_max = max_tokens
+        if provider == "minimax":
+            effective_max = max(max_tokens, 16000)
         # Some models (gpt-5.2) use max_completion_tokens instead of max_tokens
         mt_param = pcfg.get("max_tokens_param", {}).get(model, "max_tokens")
-        body[mt_param] = max_tokens
+        body[mt_param] = effective_max
 
         if tools:
             body["tools"] = tools
@@ -267,7 +295,19 @@ class LLMClient:
         # Strip <think> blocks from MiniMax
         if "<think>" in content and "</think>" in content:
             idx = content.index("</think>") + len("</think>")
-            content = content[idx:].strip()
+            after_think = content[idx:].strip()
+            if after_think:
+                content = after_think
+            else:
+                # finish_reason=length: think block consumed all tokens
+                # Extract useful reasoning from think block as fallback
+                think_start = content.index("<think>") + len("<think>")
+                think_end = content.index("</think>")
+                content = content[think_start:think_end].strip()
+        elif "<think>" in content and "</think>" not in content:
+            # Incomplete think block (truncated by max_tokens)
+            think_start = content.index("<think>") + len("<think>")
+            content = content[think_start:].strip()
 
         # Parse tool calls from response
         parsed_tool_calls = []
