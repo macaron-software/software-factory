@@ -1967,6 +1967,30 @@ async def _run_workflow_background(wf, session_id: str, task: str, project_id: s
         ))
 
 
+# ── Workflow Resume ───────────────────────────────────────────────
+
+@router.post("/api/workflow/{session_id}/resume")
+async def workflow_resume(session_id: str):
+    """Resume a workflow that was interrupted (e.g. server crash)."""
+    from ..sessions.store import get_session_store
+    from ..workflows.store import get_workflow_store
+    store = get_session_store()
+    sess = store.get(session_id)
+    if not sess:
+        return {"error": "Session not found"}
+    config = sess.config or {}
+    wf_id = config.get("workflow_id")
+    if not wf_id:
+        return {"error": "No workflow_id in session config"}
+    wf = get_workflow_store().get(wf_id)
+    if not wf:
+        return {"error": f"Workflow {wf_id} not found"}
+    task = sess.goal or sess.name
+    project_id = sess.project_id or ""
+    asyncio.create_task(_run_workflow_background(wf, session_id, task, project_id))
+    return {"status": "resumed", "session_id": session_id, "workflow_id": wf_id}
+
+
 # ── Monitoring / Settings ────────────────────────────────────────
 
 @router.get("/monitoring", response_class=HTMLResponse)
@@ -3062,37 +3086,55 @@ async def dsi_workflow_page(request: Request, workflow_id: str):
     # Messages from session
     messages = []
     agent_names = {}
+    def _resolve_agent(aid):
+        if aid and aid not in agent_names:
+            a = agent_store.get(aid)
+            if a:
+                jpg = avatar_dir / f"{a.id}.jpg"
+                svg_f = avatar_dir / f"{a.id}.svg"
+                agent_names[aid] = {
+                    "name": a.name,
+                    "avatar_url": f"/static/avatars/{a.id}.jpg" if jpg.exists() else (f"/static/avatars/{a.id}.svg" if svg_f.exists() else ""),
+                }
+            else:
+                agent_names[aid] = {"name": aid, "avatar_url": ""}
+        return agent_names.get(aid, {"name": aid or "?", "avatar_url": ""})
+
     if session:
         all_msgs = session_store.get_messages(session.id, limit=100)
         for msg in all_msgs:
-            if msg.from_agent == "system":
+            if msg.message_type == "system" or msg.from_agent == "system":
                 continue
-            if msg.from_agent not in agent_names:
-                a = agent_store.get(msg.from_agent)
-                if a:
-                    jpg = avatar_dir / f"{a.id}.jpg"
-                    svg_f = avatar_dir / f"{a.id}.svg"
-                    agent_names[msg.from_agent] = {
-                        "name": a.name,
-                        "avatar_url": f"/static/avatars/{a.id}.jpg" if jpg.exists() else (f"/static/avatars/{a.id}.svg" if svg_f.exists() else ""),
-                    }
-                else:
-                    agent_names[msg.from_agent] = {"name": msg.from_agent, "avatar_url": ""}
-            info = agent_names.get(msg.from_agent, {"name": msg.from_agent, "avatar_url": ""})
+            content = (msg.content or "").strip()
+            if not content:
+                continue
+            from_info = _resolve_agent(msg.from_agent)
+            to_info = _resolve_agent(msg.to_agent) if msg.to_agent else None
             action = None
-            content = msg.content or ""
             if "[DELEGATE" in content:
                 action = "delegate"
             elif "[VETO" in content:
                 action = "veto"
             elif "[APPROVE" in content:
                 action = "approve"
+            # Clean action tags from display content
+            import re as _re
+            display = _re.sub(r'\[DELEGATE:[^\]]*\]\s*', '', content)
+            display = _re.sub(r'\[VETO[^\]]*\]\s*', '', display)
+            display = _re.sub(r'\[APPROVE\]\s*', '', display)
+            display = _re.sub(r'\[ASK:[^\]]*\]\s*', '', display)
+            display = _re.sub(r'\[ESCALATE[^\]]*\]\s*', '', display)
+            display = display.strip()[:800]
             messages.append({
-                "from_name": info["name"],
-                "avatar_url": info["avatar_url"],
-                "content": content[:500],
+                "from_name": from_info["name"],
+                "from_id": msg.from_agent,
+                "avatar_url": from_info["avatar_url"],
+                "to_name": to_info["name"] if to_info else None,
+                "to_id": msg.to_agent,
+                "content": display,
                 "time": (msg.timestamp or "")[:16],
                 "action": action,
+                "message_type": msg.message_type,
             })
 
     # Build graph nodes with positions

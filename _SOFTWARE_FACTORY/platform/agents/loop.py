@@ -79,6 +79,7 @@ class AgentLoop:
         self._inbox: asyncio.Queue[A2AMessage] = asyncio.Queue(maxsize=100)
         self._stop_event = asyncio.Event()
         self._rounds = 0
+        self._pair_counts: dict[str, int] = {}  # track msg counts per conversation partner
 
         # Lazy — initialised in start()
         self._executor: "AgentExecutor | None" = None  # type: ignore[name-defined]
@@ -279,6 +280,14 @@ class AgentLoop:
         # Skip own messages (echo prevention)
         if msg.from_agent == self.agent.id:
             return True
+        # Limit exchanges with same agent (prevent ping-pong loops)
+        partner = msg.from_agent or ""
+        if partner:
+            self._pair_counts[partner] = self._pair_counts.get(partner, 0) + 1
+            if self._pair_counts[partner] > 3:
+                logger.info("Pair limit reached  agent=%s partner=%s count=%d, skipping",
+                           self.agent.id, partner, self._pair_counts[partner])
+                return True
         return False
 
     # ------------------------------------------------------------------

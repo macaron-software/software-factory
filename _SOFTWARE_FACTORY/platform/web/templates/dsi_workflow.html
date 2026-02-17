@@ -210,8 +210,11 @@
                         {% if msg.action %}
                         <span class="wf-msg-action {{ msg.action }}">{{ msg.action|upper }}</span>
                         {% endif %}
+                        {% if msg.to_name %}
+                        <span style="font-size:0.62rem;color:var(--text-muted)">→ {{ msg.to_name }}</span>
+                        {% endif %}
                     </div>
-                    <div class="wf-msg-text collapsed" onclick="this.classList.toggle('collapsed')">{{ msg.content }}</div>
+                    <div class="wf-msg-text collapsed" onclick="this.classList.toggle('collapsed')">{{ msg.content | markdown | safe }}</div>
                     <div class="wf-msg-time">{{ msg.time }}</div>
                 </div>
             </div>

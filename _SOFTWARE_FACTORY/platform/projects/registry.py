@@ -41,22 +41,30 @@ class ProjectInfo:
 
 
 _MANUAL_PROJECTS: list[dict] = [
-    {
-        "id": "finary",
-        "name": "Finary",
-        "path": "/Users/sylvain/_MACARON-SOFTWARE/_FINARY",
-        "factory_type": "standalone",
-        "domains": ["python", "typescript"],
-        "description": "Personal finance tracker — scrapers + API + frontend",
-    },
-    {
-        "id": "lpd",
-        "name": "LPD",
-        "path": "/Users/sylvain/_LAPOSTE/_LPD",
-        "factory_type": "standalone",
-        "domains": ["rust"],
-        "description": "La Poste Distribution",
-    },
+    {"id": "factory", "name": "Software Factory (Self)", "path": "", "factory_type": "sf",
+     "domains": ["python"], "description": "Self-improving software factory"},
+    {"id": "fervenza", "name": "Fervenza IoT Platform", "path": "", "factory_type": "sf",
+     "domains": ["rust", "typescript"], "description": "IoT sensor platform"},
+    {"id": "finary", "name": "Finary", "path": "", "factory_type": "standalone",
+     "domains": ["python", "typescript"], "description": "Personal finance tracker"},
+    {"id": "logs-facteur", "name": "Logs Facteur - Support N1 La Poste", "path": "", "factory_type": "sf",
+     "domains": ["rust"], "description": "Mail carrier support tool"},
+    {"id": "lpd", "name": "LPD", "path": "", "factory_type": "standalone",
+     "domains": ["rust"], "description": "La Poste Distribution"},
+    {"id": "popinz", "name": "Popinz SaaS", "path": "", "factory_type": "sf",
+     "domains": ["rust", "svelte", "swift", "kotlin"], "description": "Event discovery SaaS platform"},
+    {"id": "psy", "name": "Macaron-Software PSY Platform", "path": "", "factory_type": "sf",
+     "domains": ["rust", "svelte"], "description": "PSY consultation platform"},
+    {"id": "sharelook", "name": "Sharelook Platform", "path": "", "factory_type": "sf",
+     "domains": ["java", "angular"], "description": "Video collaboration platform"},
+    {"id": "sharelook-2", "name": "Sharelook 2.0", "path": "", "factory_type": "sf",
+     "domains": ["java", "angular"], "description": "Next-gen Sharelook platform"},
+    {"id": "solaris", "name": "Solaris Design System (La Poste)", "path": "", "factory_type": "sf",
+     "domains": ["svelte"], "description": "La Poste design system"},
+    {"id": "veligo", "name": "Veligo Platform", "path": "", "factory_type": "sf",
+     "domains": ["rust", "svelte"], "description": "Bike sharing platform"},
+    {"id": "yolonow", "name": "YoloNow - Event Discovery Platform", "path": "", "factory_type": "sf",
+     "domains": ["rust", "svelte", "swift", "kotlin"], "description": "Event discovery app"},
 ]
 
 
