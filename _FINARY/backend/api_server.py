@@ -2172,6 +2172,17 @@ def _fetch_fmp_ratios(ticker: str) -> dict | None:
         pocf_vals = [r.get("priceToOperatingCashFlowRatio") for r in rows if r.get("priceToOperatingCashFlowRatio") and r["priceToOperatingCashFlowRatio"] > 0]
         eveb_vals = [r.get("enterpriseValueMultiple") for r in rows if r.get("enterpriseValueMultiple") and r["enterpriseValueMultiple"] > 0]
 
+        # Build 5-year history (oldest→newest) for trend sparklines
+        history = []
+        for r in reversed(rows):
+            history.append({
+                "year": r.get("date", "")[:4],
+                "pe": r.get("priceToEarningsRatio") if r.get("priceToEarningsRatio") and r["priceToEarningsRatio"] > 0 else None,
+                "p_ocf": r.get("priceToOperatingCashFlowRatio") if r.get("priceToOperatingCashFlowRatio") and r["priceToOperatingCashFlowRatio"] > 0 else None,
+                "ev_ebitda": r.get("enterpriseValueMultiple") if r.get("enterpriseValueMultiple") and r["enterpriseValueMultiple"] > 0 else None,
+                "peg": r.get("priceToEarningsGrowthRatio") if r.get("priceToEarningsGrowthRatio") and 0 < r.get("priceToEarningsGrowthRatio", 0) < 50 else None,
+            })
+
         data = {
             "ticker": ticker,
             "name": WATCHLIST_TICKERS.get(ticker, ticker),
@@ -2190,6 +2201,7 @@ def _fetch_fmp_ratios(ticker: str) -> dict | None:
             "pe_5y_avg": round(sum(pe_vals) / len(pe_vals), 1) if pe_vals else None,
             "p_ocf_5y_avg": round(sum(pocf_vals) / len(pocf_vals), 1) if pocf_vals else None,
             "ev_ebitda_5y_avg": round(sum(eveb_vals) / len(eveb_vals), 1) if eveb_vals else None,
+            "history": history,
         }
 
         # Signal scoring: compare current to 5yr avg

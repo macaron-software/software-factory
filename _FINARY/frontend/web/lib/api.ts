@@ -163,6 +163,7 @@ export interface FundamentalsData {
   overall: "buy" | "hold" | "sell";
   signals: FundamentalsSignal[];
   in_portfolio?: boolean;
+  history?: { year: string; pe: number | null; p_ocf: number | null; ev_ebitda: number | null; peg: number | null }[];
 }
 
 export interface MarketSignalsResponse {
