@@ -306,11 +306,20 @@ class AgentStore:
                 if perms.get("can_delegate"):
                     perm_dict["can_delegate"] = True
 
+                # Extract persona text from traits or top-level field
+                persona_obj = raw.get("persona", {})
+                persona_desc = ""
+                if isinstance(persona_obj, dict):
+                    persona_desc = persona_obj.get("description", "").strip()
+                    traits = persona_obj.get("traits", [])
+                    if traits:
+                        persona_desc += " " + ". ".join(str(t) for t in traits) + "."
+
                 agent = AgentDef(
                     id=agent_id,
                     name=raw.get("name", agent_id),
                     role=raw.get("role", raw.get("id", "worker")),
-                    description=raw.get("persona", {}).get("description", "").strip() if isinstance(raw.get("persona"), dict) else "",
+                    description=persona_desc,
                     system_prompt=raw.get("system_prompt", ""),
                     provider=raw.get("llm", {}).get("provider", "azure") if isinstance(raw.get("llm"), dict) else "azure",
                     model=raw.get("llm", {}).get("model", "gpt-5.1") if isinstance(raw.get("llm"), dict) else "gpt-5.1",
@@ -324,6 +333,9 @@ class AgentStore:
                     color=color,
                     avatar=raw.get("avatar", ""),
                     tagline=raw.get("tagline", ""),
+                    persona=persona_desc,
+                    motivation=raw.get("motivation", "").strip() if raw.get("motivation") else "",
+                    hierarchy_rank=raw.get("hierarchy_rank", 50),
                     is_builtin=True,
                 )
                 self.create(agent)
