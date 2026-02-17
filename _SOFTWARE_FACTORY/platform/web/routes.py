@@ -2973,8 +2973,20 @@ async def dsi_workflow_page(request: Request, workflow_id: str):
         return HTMLResponse("<h2>Workflow introuvable</h2>", 404)
 
     cfg = wf.config or {}
-    phases_cfg = cfg.get("phases", [])
     graph_cfg = cfg.get("graph", {})
+    # Phases from WorkflowPhase objects (phases_json) or fallback to config
+    if wf.phases:
+        phases_cfg = []
+        for wp in wf.phases:
+            pc = wp.config or {}
+            phases_cfg.append({
+                "id": wp.id, "name": wp.name, "pattern_id": wp.pattern_id,
+                "gate": wp.gate, "description": wp.description,
+                "agents": pc.get("agents", []), "leader": pc.get("leader", ""),
+                "deliverables": pc.get("deliverables", []),
+            })
+    else:
+        phases_cfg = cfg.get("phases", [])
     avatar_dir = Path(__file__).parent / "static" / "avatars"
 
     # Find active session for this workflow
