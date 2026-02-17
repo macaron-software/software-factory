@@ -10,15 +10,25 @@
 <style>
 /* ── Portfolio Dashboard ── */
 .portfolio-grid{display:grid;grid-template-columns:1fr;gap:1.5rem;padding:0.5rem 0}
-.portfolio-strategy{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.75rem;margin-bottom:1.5rem}
-.strat-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;display:flex;align-items:center;gap:0.75rem;transition:border-color .15s}
-.strat-card:hover{border-color:var(--purple)}
-.strat-avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.strat-avatar svg{width:20px;height:20px}
-.strat-info{min-width:0}
-.strat-name{font-size:0.82rem;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.strat-role{font-size:0.68rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.strat-tagline{font-size:0.65rem;color:var(--text-secondary);opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Strategic agent cards — rich design matching graph tooltip */
+.portfolio-strategy{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.85rem;margin-bottom:1.5rem}
+.strat-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;transition:border-color .15s,box-shadow .15s;cursor:default}
+.strat-card:hover{border-color:var(--purple);box-shadow:0 4px 16px rgba(124,58,237,.12)}
+.strat-header{display:flex;align-items:center;gap:0.7rem;margin-bottom:0.55rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border)}
+.strat-photo{width:44px;height:44px;border-radius:50%;flex-shrink:0;object-fit:cover;border:2px solid var(--border)}
+.strat-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.strat-avatar svg{width:22px;height:22px}
+.strat-info{flex:1;min-width:0}
+.strat-name{font-size:0.88rem;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strat-role{font-size:0.72rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strat-tagline{font-size:0.72rem;color:var(--text-secondary);font-style:italic;line-height:1.3;margin-bottom:0.4rem}
+.strat-persona{font-size:0.72rem;color:var(--text-secondary);line-height:1.35;opacity:.8;max-height:2.7em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.strat-section-title{font-size:0.65rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-top:0.5rem;margin-bottom:0.2rem;display:flex;align-items:center;gap:0.25rem}
+.strat-tags{display:flex;flex-wrap:wrap;gap:0.2rem}
+.strat-tag{display:inline-block;padding:0.1rem 0.4rem;border-radius:4px;font-size:0.65rem;background:var(--bg-tertiary);border:1px solid var(--border)}
+.strat-tag--skill{border-color:rgba(124,58,237,.35);color:var(--purple)}
+.strat-tag--tool{border-color:rgba(16,185,129,.3);color:var(--green)}
 
 .portfolio-metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem;margin-bottom:1.5rem}
 .metric-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;text-align:center}
@@ -70,14 +80,33 @@
         <div class="portfolio-strategy">
             {% for a in strategic_agents %}
             <div class="strat-card">
-                <div class="strat-avatar" style="background:{{ a.color }}20;border:2px solid {{ a.color }}">
-                    <svg style="color:{{ a.color }}"><use href="#icon-{{ a.avatar or a.icon or 'bot' }}"/></svg>
+                <div class="strat-header">
+                    {% if a.avatar_url %}
+                    <img class="strat-photo" src="{{ a.avatar_url }}" alt="{{ a.name }}">
+                    {% else %}
+                    <div class="strat-avatar" style="background:{{ a.color }}20;border:2px solid {{ a.color }}">
+                        <svg style="color:{{ a.color }}"><use href="#icon-{{ a.avatar }}"/></svg>
+                    </div>
+                    {% endif %}
+                    <div class="strat-info">
+                        <div class="strat-name">{{ a.name }}</div>
+                        <div class="strat-role">{{ a.role }}</div>
+                    </div>
                 </div>
-                <div class="strat-info">
-                    <div class="strat-name">{{ a.name }}</div>
-                    <div class="strat-role">{{ a.role }}</div>
-                    {% if a.tagline %}<div class="strat-tagline">{{ a.tagline }}</div>{% endif %}
+                {% if a.tagline %}<div class="strat-tagline">{{ a.tagline }}</div>{% endif %}
+                {% if a.persona %}<div class="strat-persona">{{ a.persona }}</div>{% endif %}
+                {% if a.skills %}
+                <div class="strat-section-title"><svg class="icon icon-xs"><use href="#icon-layers"/></svg> Skills</div>
+                <div class="strat-tags">
+                    {% for s in a.skills[:6] %}<span class="strat-tag strat-tag--skill">{{ s }}</span>{% endfor %}
                 </div>
+                {% endif %}
+                {% if a.tools %}
+                <div class="strat-section-title"><svg class="icon icon-xs"><use href="#icon-settings"/></svg> Tools</div>
+                <div class="strat-tags">
+                    {% for t in a.tools[:4] %}<span class="strat-tag strat-tag--tool">{{ t }}</span>{% endfor %}
+                </div>
+                {% endif %}
             </div>
             {% endfor %}
         </div>

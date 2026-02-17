@@ -34,7 +34,21 @@ async def portfolio_page(request: Request):
     all_agents = agent_store.list_all()
     all_missions = mission_store.list_missions()
 
-    strategic = [a for a in all_agents if any(t == 'strategy' for t in (a.tags or []))]
+    strategic_raw = [a for a in all_agents if any(t == 'strategy' for t in (a.tags or []))]
+    avatar_dir = Path(__file__).parent / "static" / "avatars"
+    strategic = []
+    for a in strategic_raw:
+        jpg = avatar_dir / f"{a.id}.jpg"
+        svg = avatar_dir / f"{a.id}.svg"
+        avatar_url = f"/static/avatars/{a.id}.jpg" if jpg.exists() else (f"/static/avatars/{a.id}.svg" if svg.exists() else "")
+        strategic.append({
+            "id": a.id, "name": a.name, "role": a.role,
+            "avatar": a.avatar or a.icon or "bot", "color": a.color or "#7c3aed",
+            "avatar_url": avatar_url,
+            "tagline": a.tagline or "", "persona": (a.persona or "")[:200],
+            "description": (a.description or "")[:120],
+            "skills": a.skills or [], "tools": a.tools or [],
+        })
 
     # Build project cards with missions
     projects_data = []
