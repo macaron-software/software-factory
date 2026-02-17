@@ -53,8 +53,7 @@
 .strat-graph-toggle{font-size:0.68rem;color:var(--text-secondary);display:flex;align-items:center;gap:0.3rem}
 .strat-graph-toggle svg{width:12px;height:12px;transition:transform .2s}
 .strat-graph-toggle.open svg{transform:rotate(180deg)}
-.strat-graph-body{padding:0 0.5rem 0.5rem;display:none}
-.strat-graph-body.visible{display:block}
+.strat-graph-body{padding:0 0.5rem 0.5rem}
 .strat-graph-body svg{width:100%;height:auto}
 .strat-graph-actions{display:flex;gap:0.5rem;align-items:center}
 .strat-graph-btn{font-size:0.68rem;padding:0.2rem 0.6rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-secondary);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:0.3rem;transition:all .15s}
@@ -129,20 +128,12 @@
         <!-- Strategic committee graph -->
         {% if strat_graph and strat_graph.nodes %}
         <div class="strat-graph-wrap">
-            <div class="strat-graph-header" onclick="toggleStratGraph()">
+            <div class="strat-graph-header">
                 <div class="strat-graph-title">
-                    <svg><use href="#icon-share"/></svg> Flux de gouvernance
+                    <svg><use href="#icon-git-merge"/></svg> Flux de gouvernance
                 </div>
                 <div class="strat-graph-actions">
                     <a href="/workflows/strategic-committee/edit" class="strat-graph-btn" onclick="event.stopPropagation()">
-                        <svg><use href="#icon-settings"/></svg> Editer
-                    </a>
-                    <div class="strat-graph-toggle" id="stratGraphToggle">
-                        <svg><use href="#icon-chevron-down"/></svg>
-                    </div>
-                </div>
-                <div class="strat-graph-actions" style="padding:0 0.85rem 0.5rem;display:flex;gap:0.5rem">
-                    <a href="/workflows/strategic-committee/edit" class="strat-graph-btn">
                         <svg><use href="#icon-settings"/></svg> Workflow
                     </a>
                     <button class="strat-graph-btn" onclick="launchStrategicCommittee()" id="btnLaunchComite" style="border-color:var(--purple);color:var(--purple)">
@@ -358,20 +349,8 @@ document.addEventListener('click', function(e){
 // Close on Escape
 document.addEventListener('keydown', function(e){ if(e.key==='Escape') closePopover(); });
 
-// ── Strategic committee graph ──
+// ── Strategic committee graph — render on load ──
 const STRAT_GRAPH = {{ strat_graph | tojson if strat_graph else '{"nodes":[],"edges":[]}' }};
-
-function toggleStratGraph(){
-    const body = document.getElementById('stratGraphBody');
-    const toggle = document.getElementById('stratGraphToggle');
-    if(!body) return;
-    const open = body.classList.toggle('visible');
-    toggle.classList.toggle('open', open);
-    if(open && !body.dataset.rendered){
-        renderStratGraph();
-        body.dataset.rendered = '1';
-    }
-}
 
 function renderStratGraph(){
     const svg = document.getElementById('stratSvg');
@@ -501,5 +480,8 @@ async function launchStrategicCommittee(){
         btn.innerHTML = '<svg style="width:12px;height:12px"><use href="#icon-play"/></svg> Lancer le Comité';
     }
 }
+
+// Auto-render graph on page load
+if(STRAT_GRAPH.nodes && STRAT_GRAPH.nodes.length) renderStratGraph();
 </script>
 {% endblock %}
