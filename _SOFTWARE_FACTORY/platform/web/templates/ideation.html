@@ -79,6 +79,52 @@
 
 .section-title{font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:0.75rem;display:flex;align-items:center;gap:0.5rem}
 .section-title svg{width:16px;height:16px}
+
+/* ── Ideation Graph ── */
+.idea-graph{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.idea-graph-header{display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0.6rem;cursor:pointer;user-select:none}
+.idea-graph-header:hover{background:var(--bg-tertiary)}
+.idea-graph-title{font-size:0.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:0.4rem}
+.idea-graph-title svg{width:14px;height:14px}
+.idea-graph-toggle{width:16px;height:16px;color:var(--text-secondary);transition:transform .2s}
+.idea-graph-toggle.open{transform:rotate(180deg)}
+.idea-graph-canvas{height:320px;position:relative;overflow:hidden;cursor:grab;background:var(--bg-primary);border-top:1px solid var(--border)}
+.idea-graph-canvas.panning{cursor:grabbing}
+.idea-graph-canvas svg{width:100%;height:100%}
+.idea-graph-legend{display:flex;gap:0.75rem;padding:0.35rem 0.6rem;border-top:1px solid var(--border);flex-wrap:wrap}
+.idea-graph-legend-item{display:flex;align-items:center;gap:0.3rem;font-size:0.65rem;color:var(--text-secondary)}
+/* Nodes */
+.ig-node{cursor:pointer}
+.ig-node:hover .ig-node-bg{filter:brightness(1.15)}
+.ig-node-bg{fill:var(--bg-secondary);stroke:var(--border);stroke-width:1;rx:8;ry:8}
+.ig-node-bar{stroke-linecap:round}
+.ig-node-name{font-size:11px;fill:var(--text-primary);font-weight:600}
+.ig-node-role{font-size:9px;fill:var(--text-secondary)}
+.ig-node-dot{r:4}
+/* Edges */
+.ig-edge{fill:none;stroke-width:1.8;opacity:0.6}
+.ig-edge-label{font-size:8px;fill:var(--text-secondary);text-anchor:middle}
+/* Popover */
+.ig-popover-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.3);display:none}
+.ig-popover-overlay.visible{display:block}
+.ig-popover{position:fixed;z-index:501;width:320px;max-height:70vh;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 12px 40px rgba(0,0,0,.4);overflow-y:auto;display:none}
+.ig-popover.visible{display:block}
+.ig-popover-header{display:flex;align-items:center;gap:0.6rem;padding:0.75rem;border-bottom:1px solid var(--border)}
+.ig-popover-avatar{width:40px;height:40px;border-radius:50%;flex-shrink:0;object-fit:cover}
+.ig-popover-avatar-fallback{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;color:#fff;flex-shrink:0}
+.ig-popover-info{flex:1;min-width:0}
+.ig-popover-name{font-size:0.88rem;font-weight:700;color:var(--text-primary)}
+.ig-popover-role{font-size:0.72rem;color:var(--text-secondary)}
+.ig-popover-close{background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:0.25rem}
+.ig-popover-close:hover{color:var(--text-primary)}
+.ig-popover-body{padding:0.6rem 0.75rem;display:flex;flex-direction:column;gap:0.5rem}
+.ig-popover-section-title{font-size:0.68rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;gap:0.3rem;margin-bottom:0.2rem}
+.ig-popover-section-title svg{width:12px;height:12px}
+.ig-popover-text{font-size:0.78rem;color:var(--text-primary);line-height:1.5;white-space:pre-line}
+.ig-popover-tags{display:flex;flex-wrap:wrap;gap:0.3rem}
+.ig-popover-tag{font-size:0.68rem;padding:0.15rem 0.4rem;border-radius:4px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary)}
+.ig-popover-tag.skill{border-color:rgba(139,92,246,.3);color:#a78bfa}
+.ig-popover-tag.tool{border-color:rgba(16,185,129,.3);color:#34d399}
 </style>
 
 <div class="idea-layout">
@@ -113,6 +159,53 @@
 
     <!-- Right panel -->
     <div class="idea-panel">
+
+        <!-- Agent Graph -->
+        <div class="idea-graph">
+            <div class="idea-graph-header" onclick="toggleIdeaGraph()">
+                <div class="idea-graph-title">
+                    <svg><use href="#icon-git-branch"/></svg> Organisation &amp; Flow
+                </div>
+                <svg class="idea-graph-toggle open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+            <div class="idea-graph-canvas" id="ideaGraphCanvas">
+                <svg id="ideaGraphSvg" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <marker id="ig-arrow-network" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M0,0 L10,5 L0,10 z" fill="#8b5cf6" opacity="0.8"/>
+                        </marker>
+                        <marker id="ig-arrow-sequential" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M0,0 L10,5 L0,10 z" fill="#3b82f6" opacity="0.8"/>
+                        </marker>
+                        <marker id="ig-arrow-report" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M0,0 L10,5 L0,10 z" fill="#ef4444" opacity="0.8"/>
+                        </marker>
+                        <marker id="ig-arrow-hierarchical" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b" opacity="0.8"/>
+                        </marker>
+                    </defs>
+                    <g id="ideaEdges"></g>
+                    <g id="ideaNodes"></g>
+                </svg>
+            </div>
+            <div class="idea-graph-legend" id="ideaGraphLegend"></div>
+        </div>
+
+        <!-- Popover overlay -->
+        <div class="ig-popover-overlay" id="igOverlay" onclick="closeIgPopover()"></div>
+        <div class="ig-popover" id="igPopover">
+            <div class="ig-popover-header">
+                <div id="igPopAvatar"></div>
+                <div class="ig-popover-info">
+                    <div class="ig-popover-name" id="igPopName"></div>
+                    <div class="ig-popover-role" id="igPopRole"></div>
+                </div>
+                <button class="ig-popover-close" onclick="closeIgPopover()">
+                    <svg class="icon icon-sm"><use href="#icon-x"/></svg>
+                </button>
+            </div>
+            <div class="ig-popover-body" id="igPopBody"></div>
+        </div>
 
         <!-- Agent roster -->
         <div class="idea-agents">
@@ -158,6 +251,215 @@
 </div>
 
 <script>
+/* ── Ideation Graph Data ── */
+const igAgents = {{ agents | tojson }};
+const IG_NW = 130, IG_NH = 56;
+
+// Graph layout: Product Manager at top (orchestrator), 4 experts below in a network
+const igNodes = [
+    {id: 'product_manager', x: 130, y: 10, rank: 0},
+    {id: 'metier',          x: 10,  y: 110, rank: 1},
+    {id: 'architecte',      x: 90,  y: 200, rank: 1},
+    {id: 'ux_designer',     x: 180, y: 110, rank: 1},
+    {id: 'securite',        x: 260, y: 200, rank: 1},
+];
+const igEdges = [
+    {from: 'product_manager', to: 'metier',      pattern: 'hierarchical', label: 'brief'},
+    {from: 'product_manager', to: 'architecte',   pattern: 'hierarchical', label: 'brief'},
+    {from: 'product_manager', to: 'ux_designer',  pattern: 'hierarchical', label: 'brief'},
+    {from: 'product_manager', to: 'securite',     pattern: 'hierarchical', label: 'brief'},
+    {from: 'metier',          to: 'architecte',   pattern: 'network',      label: 'challenge'},
+    {from: 'architecte',      to: 'securite',     pattern: 'network',      label: 'review'},
+    {from: 'ux_designer',     to: 'metier',       pattern: 'network',      label: 'feedback'},
+    {from: 'metier',          to: 'product_manager', pattern: 'report',    label: 'synthèse'},
+    {from: 'securite',        to: 'product_manager', pattern: 'report',    label: 'risques'},
+];
+
+const IG_PATTERNS = {
+    network:      {color:'#8b5cf6', dash:'2 4 8 4', label:'Network'},
+    hierarchical: {color:'#f59e0b', dash:'',         label:'Hierarchical'},
+    sequential:   {color:'#3b82f6', dash:'',         label:'Sequential'},
+    report:       {color:'#ef4444', dash:'3 3',       label:'Report'},
+};
+
+function igAgent(id){ return igAgents.find(a=>a.id===id); }
+function igEsc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function renderIdeaGraph(){
+    const svg = document.getElementById('ideaGraphSvg');
+    const W = 400, H = 280;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+    // Edges
+    const edgesG = document.getElementById('ideaEdges');
+    edgesG.innerHTML = '';
+    const activePatterns = new Set();
+    igEdges.forEach(e=>{
+        const fn = igNodes.find(n=>n.id===e.from);
+        const tn = igNodes.find(n=>n.id===e.to);
+        if(!fn||!tn) return;
+        const style = IG_PATTERNS[e.pattern] || IG_PATTERNS.network;
+        activePatterns.add(e.pattern);
+
+        const x1 = fn.x + IG_NW/2, y1 = fn.y + IG_NH;
+        const x2 = tn.x + IG_NW/2, y2 = tn.y;
+        const dy = tn.y - fn.y, dx = tn.x - fn.x;
+
+        let d, mx, my;
+        if(Math.abs(dy) < IG_NH * 0.8){
+            // Horizontal connection
+            const lx = dx>0 ? fn.x+IG_NW : fn.x;
+            const ly = fn.y+IG_NH/2;
+            const rx = dx>0 ? tn.x : tn.x+IG_NW;
+            const ry = tn.y+IG_NH/2;
+            const mid = Math.min(ly, ry) - 25;
+            d = `M${lx},${ly} C${lx},${mid} ${rx},${mid} ${rx},${ry}`;
+            mx = (lx+rx)/2; my = (ly+ry)/2 - 8;
+        } else if(dy > 0){
+            const co = Math.max(20, Math.abs(dy)*0.35);
+            d = `M${x1},${y1} C${x1},${y1+co} ${x2},${y2-co} ${x2},${y2}`;
+            mx = (x1+x2)/2; my = (y1+y2)/2 - 4;
+        } else {
+            const co = Math.max(20, Math.abs(dy)*0.35);
+            d = `M${x1},${fn.y} C${x1},${fn.y-co} ${x2},${tn.y+IG_NH+co} ${x2},${tn.y+IG_NH}`;
+            mx = (x1+x2)/2; my = (fn.y+tn.y+IG_NH)/2 - 4;
+        }
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+        path.setAttribute('d', d);
+        path.setAttribute('class','ig-edge');
+        path.style.stroke = style.color;
+        path.style.markerEnd = `url(#ig-arrow-${e.pattern})`;
+        if(style.dash) path.style.strokeDasharray = style.dash;
+        edgesG.appendChild(path);
+
+        if(e.label){
+            const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+            lbl.setAttribute('class','ig-edge-label');
+            lbl.setAttribute('x', mx); lbl.setAttribute('y', my);
+            lbl.style.fill = style.color;
+            lbl.textContent = e.label;
+            edgesG.appendChild(lbl);
+        }
+    });
+
+    // Nodes
+    const nodesG = document.getElementById('ideaNodes');
+    nodesG.innerHTML = '';
+    igNodes.forEach(n=>{
+        const agent = igAgent(n.id);
+        const col = agent ? agent.color : '#7c3aed';
+        const name = agent ? agent.name : n.id;
+        const role = agent ? agent.short_role : '';
+        const avatarUrl = agent ? agent.avatar_url : '';
+
+        const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+        g.setAttribute('class','ig-node');
+        g.setAttribute('transform',`translate(${n.x},${n.y})`);
+
+        const avatarR = 14, avatarCx = 20, avatarCy = IG_NH/2;
+        const avatarSvg = avatarUrl
+            ? `<clipPath id="ig-clip-${n.id}"><circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}"/></clipPath>
+               <image href="${avatarUrl}" x="${avatarCx-avatarR}" y="${avatarCy-avatarR}" width="${avatarR*2}" height="${avatarR*2}" clip-path="url(#ig-clip-${n.id})"/>`
+            : `<circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}" fill="${col}" opacity="0.25"/>
+               <text x="${avatarCx}" y="${avatarCy+4}" text-anchor="middle" style="font-size:10px;fill:${col};font-weight:700">${igEsc(name.substring(0,2))}</text>`;
+
+        g.innerHTML = `
+            <rect class="ig-node-bg" width="${IG_NW}" height="${IG_NH}"/>
+            <line class="ig-node-bar" x1="0" y1="0" x2="${IG_NW}" y2="0" stroke="${col}" stroke-width="3"/>
+            ${avatarSvg}
+            <text class="ig-node-name" x="40" y="22">${igEsc(name.length>14?name.substring(0,13)+'…':name)}</text>
+            <text class="ig-node-role" x="40" y="36">${igEsc(role)}</text>
+            <circle class="ig-node-dot" cx="${IG_NW-12}" cy="14" fill="${col}" opacity="0.6"/>
+        `;
+        g.addEventListener('click', (ev)=>{ ev.stopPropagation(); showIgPopover(n.id, ev); });
+        nodesG.appendChild(g);
+    });
+
+    // Legend
+    const legendEl = document.getElementById('ideaGraphLegend');
+    legendEl.innerHTML = '';
+    activePatterns.forEach(p=>{
+        const s = IG_PATTERNS[p]; if(!s) return;
+        const item = document.createElement('div');
+        item.className = 'idea-graph-legend-item';
+        item.innerHTML = `
+            <svg width="28" height="10"><line x1="0" y1="5" x2="20" y2="5" stroke="${s.color}" stroke-width="2" ${s.dash?`stroke-dasharray="${s.dash}"`:''}/><polygon points="20,1 28,5 20,9" fill="${s.color}" opacity="0.8"/></svg>
+            <span>${s.label}</span>`;
+        legendEl.appendChild(item);
+    });
+}
+
+function toggleIdeaGraph(){
+    const canvas = document.getElementById('ideaGraphCanvas');
+    const legend = document.getElementById('ideaGraphLegend');
+    const toggle = document.querySelector('.idea-graph-toggle');
+    const hidden = canvas.style.display === 'none';
+    canvas.style.display = hidden ? '' : 'none';
+    legend.style.display = hidden ? '' : 'none';
+    toggle.classList.toggle('open', hidden);
+}
+
+function showIgPopover(agentId, ev){
+    const agent = igAgent(agentId); if(!agent) return;
+    const overlay = document.getElementById('igOverlay');
+    const pop = document.getElementById('igPopover');
+
+    // Avatar
+    const avatarEl = document.getElementById('igPopAvatar');
+    if(agent.avatar_url){
+        avatarEl.innerHTML = `<img class="ig-popover-avatar" src="${agent.avatar_url}" alt="${igEsc(agent.name)}">`;
+    } else {
+        avatarEl.innerHTML = `<div class="ig-popover-avatar-fallback" style="background:${agent.color}">${igEsc(agent.name.substring(0,2))}</div>`;
+    }
+    document.getElementById('igPopName').textContent = agent.name;
+    document.getElementById('igPopRole').textContent = agent.short_role || '';
+
+    // Body
+    let html = '';
+    if(agent.tagline) html += `<div class="ig-popover-text" style="font-style:italic;font-size:0.75rem;color:var(--text-secondary)">${igEsc(agent.tagline)}</div>`;
+    if(agent.persona){
+        html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-user"/></svg> Persona</div>
+                  <div class="ig-popover-text">${igEsc(agent.persona.substring(0,300))}${agent.persona.length>300?'…':''}</div></div>`;
+    }
+    if(agent.motivation){
+        html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-zap"/></svg> Motivation</div>
+                  <div class="ig-popover-text">${igEsc(agent.motivation)}</div></div>`;
+    }
+    if(agent.skills && agent.skills.length){
+        html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-layers"/></svg> Skills (${agent.skills.length})</div>
+                  <div class="ig-popover-tags">${agent.skills.map(s=>`<span class="ig-popover-tag skill">${igEsc(s)}</span>`).join('')}</div></div>`;
+    }
+    if(agent.tools && agent.tools.length){
+        html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-settings"/></svg> Tools (${agent.tools.length})</div>
+                  <div class="ig-popover-tags">${agent.tools.map(t=>`<span class="ig-popover-tag tool">${igEsc(t)}</span>`).join('')}</div></div>`;
+    }
+    if(agent.model || agent.provider){
+        html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-brain"/></svg> LLM</div>
+                  <span class="ig-popover-tag">${igEsc((agent.provider||'')+' '+(agent.model||'default'))}</span></div>`;
+    }
+    document.getElementById('igPopBody').innerHTML = html;
+
+    // Position near click
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let left = ev.clientX + 12, top = ev.clientY - 20;
+    if(left + 330 > vw) left = vw - 340;
+    if(top + 350 > vh) top = Math.max(10, vh - 400);
+    pop.style.left = left + 'px'; pop.style.top = top + 'px';
+
+    overlay.classList.add('visible');
+    pop.classList.add('visible');
+}
+function closeIgPopover(){
+    document.getElementById('igOverlay').classList.remove('visible');
+    document.getElementById('igPopover').classList.remove('visible');
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeIgPopover(); });
+
+// Render on load
+document.addEventListener('DOMContentLoaded', renderIdeaGraph);
+
+/* ── Ideation Chat ── */
 const messagesEl = document.getElementById('ideaMessages');
 const inputEl = document.getElementById('ideaInput');
 const sendBtn = document.getElementById('ideaSend');

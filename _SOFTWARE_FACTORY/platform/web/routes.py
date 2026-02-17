@@ -2656,9 +2656,38 @@ Réponds UNIQUEMENT avec le JSON, rien d'autre."""
 @router.get("/ideation", response_class=HTMLResponse)
 async def ideation_page(request: Request):
     """Ideation workspace — brainstorm with expert agents."""
+    from ..agents.store import get_agent_store
+
+    agent_store = get_agent_store()
+    all_agents = agent_store.list_all()
+    avatar_dir = Path(__file__).parent / "static" / "avatars"
+
+    # Map DB agents by id for enrichment
+    db_map = {a.id: a for a in all_agents}
+
+    enriched = []
+    for ia in _IDEATION_AGENTS:
+        a = db_map.get(ia["id"])
+        jpg = avatar_dir / f"{ia['id']}.jpg"
+        svg_f = avatar_dir / f"{ia['id']}.svg"
+        avatar_url = f"/static/avatars/{ia['id']}.jpg" if jpg.exists() else (f"/static/avatars/{ia['id']}.svg" if svg_f.exists() else "")
+        enriched.append({
+            **ia,
+            "avatar_url": avatar_url,
+            "description": (a.description or "") if a else "",
+            "tagline": (a.tagline or "") if a else "",
+            "persona": (a.persona or "") if a else "",
+            "motivation": (a.motivation or "") if a else "",
+            "skills": (a.skills or []) if a else [],
+            "tools": (a.tools or []) if a else [],
+            "mcps": (a.mcps or []) if a else [],
+            "model": (a.model or "") if a else "",
+            "provider": (getattr(a, "provider", "") or "") if a else "",
+        })
+
     return _templates(request).TemplateResponse("ideation.html", {
         "request": request, "page_title": "Idéation",
-        "agents": _IDEATION_AGENTS,
+        "agents": enriched,
     })
 
 
