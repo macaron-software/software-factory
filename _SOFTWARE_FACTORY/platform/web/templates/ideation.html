@@ -136,12 +136,64 @@
 .ig-popover-tag{font-size:0.68rem;padding:0.15rem 0.4rem;border-radius:4px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary)}
 .ig-popover-tag.skill{border-color:rgba(139,92,246,.3);color:#a78bfa}
 .ig-popover-tag.tool{border-color:rgba(16,185,129,.3);color:#34d399}
+/* History sidebar */
+.idea-history-btn{position:absolute;top:0.5rem;left:0.5rem;z-index:10;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0.3rem 0.5rem;cursor:pointer;color:var(--text-secondary);font-size:0.7rem;display:flex;align-items:center;gap:0.3rem;transition:color 0.15s}
+.idea-history-btn:hover{color:var(--text-primary);border-color:var(--purple)}
+.idea-history-btn svg{width:14px;height:14px}
+.idea-sidebar{position:absolute;top:0;left:0;width:260px;height:100%;background:var(--bg-secondary);border-right:1px solid var(--border);z-index:9;transform:translateX(-100%);transition:transform 0.2s;overflow-y:auto;display:flex;flex-direction:column}
+.idea-sidebar.open{transform:translateX(0)}
+.idea-sidebar-header{padding:0.5rem 0.6rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.idea-sidebar-title{font-size:0.75rem;font-weight:600;color:var(--text-secondary)}
+.idea-sidebar-close{background:none;border:none;color:var(--text-tertiary);cursor:pointer;padding:0.2rem}
+.idea-sidebar-list{flex:1;overflow-y:auto;padding:0.4rem}
+.idea-sidebar-item{padding:0.4rem 0.5rem;border-radius:var(--radius-sm);cursor:pointer;margin-bottom:0.2rem;transition:background 0.15s;border:1px solid transparent}
+.idea-sidebar-item:hover{background:var(--bg-tertiary);border-color:var(--border)}
+.idea-sidebar-item-title{font-size:0.72rem;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.idea-sidebar-item-meta{font-size:0.6rem;color:var(--text-tertiary);display:flex;align-items:center;gap:0.3rem;margin-top:0.1rem}
+.idea-sidebar-badge{font-size:0.55rem;padding:0.05rem 0.3rem;border-radius:99px;font-weight:600}
+.idea-sidebar-badge.draft{background:var(--bg-tertiary);color:var(--text-secondary)}
+.idea-sidebar-badge.analyzed{background:rgba(88,166,255,0.15);color:var(--blue)}
+.idea-sidebar-badge.epic_created{background:rgba(63,185,80,0.15);color:var(--green)}
+.idea-sidebar-footer{padding:0.4rem 0.6rem;border-top:1px solid var(--border)}
 </style>
 
 <div class="idea-layout">
 
     <!-- Chat area -->
-    <div class="idea-chat">
+    <div class="idea-chat" style="position:relative;overflow:hidden">
+
+        <!-- History toggle -->
+        <button class="idea-history-btn" onclick="toggleSidebar()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+            {{ past_sessions|length if past_sessions else 0 }}
+        </button>
+
+        <!-- History sidebar -->
+        <div class="idea-sidebar" id="ideaSidebar">
+            <div class="idea-sidebar-header">
+                <span class="idea-sidebar-title">Historique</span>
+                <button class="idea-sidebar-close" onclick="toggleSidebar()">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="idea-sidebar-list" id="ideaSidebarList">
+                {% for s in past_sessions %}
+                <div class="idea-sidebar-item" onclick="loadPastSession('{{ s.id }}')">
+                    <div class="idea-sidebar-item-title">{{ s.title or 'Sans titre' }}</div>
+                    <div class="idea-sidebar-item-meta">
+                        <span class="idea-sidebar-badge {{ s.status }}">{{ s.status }}</span>
+                        <span>{{ s.created_at[:10] if s.created_at else '' }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+                {% if not past_sessions %}
+                <div style="text-align:center;padding:1rem;font-size:0.7rem;color:var(--text-tertiary)">Aucun historique</div>
+                {% endif %}
+            </div>
+            <div class="idea-sidebar-footer">
+                <a href="/ideation/history" style="font-size:0.7rem;color:var(--purple);text-decoration:none">Voir tout l'historique</a>
+            </div>
+        </div>
         <div class="idea-messages" id="ideaMessages">
             <div class="idea-empty" id="ideaPlaceholder">
                 <svg><use href="#icon-compass"/></svg>
@@ -741,12 +793,10 @@ document.getElementById('btnCreateEpic').addEventListener('click', async () => {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
+                session_id: sessionId,
                 name: originalPrompt.substring(0, 100) || 'Epic from ideation',
                 description: agentAnalysis,
                 goal: originalPrompt,
-                project_id: document.getElementById('ideaProjectSelect').value,
-                request_type: lastRequestType,
-                po_proposal: lastPoProposal,
             }),
         });
         const data = await resp.json();
@@ -787,5 +837,72 @@ inputEl.addEventListener('input', () => {
     inputEl.style.height = 'auto';
     inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
 });
+
+// ── Sidebar & History ──
+function toggleSidebar() {
+    document.getElementById('ideaSidebar').classList.toggle('open');
+}
+
+async function loadPastSession(id) {
+    toggleSidebar();
+    try {
+        const resp = await fetch(`/api/ideation/sessions/${id}`);
+        const data = await resp.json();
+        if (data.error) return;
+
+        // Update session state
+        sessionId = data.id;
+        originalPrompt = data.prompt;
+
+        // Clear and show messages
+        const placeholder = document.getElementById('ideaPlaceholder');
+        if (placeholder) placeholder.style.display = 'none';
+        const msgEl = document.getElementById('ideaMessages');
+        // Clear existing messages (keep placeholder hidden)
+        msgEl.querySelectorAll('.idea-msg').forEach(m => m.remove());
+
+        // Replay messages
+        for (const m of data.messages || []) {
+            if (m.agent_id === 'user') {
+                addMsg('user', 'Vous', m.content, '', '');
+            } else {
+                const agent = igAgents.find(a => a.id === m.agent_id);
+                addMsg('agent', m.agent_name, m.content, m.color || '',
+                    agent?.avatar_url || m.avatar_url || '');
+            }
+        }
+
+        // Replay findings
+        const findingsEl = document.getElementById('ideaFindings');
+        if (findingsEl) findingsEl.innerHTML = '';
+        for (const f of data.findings || []) {
+            addFinding(f.type, f.text);
+        }
+
+        // Enable buttons if session was analyzed
+        if (data.status === 'analyzed' || data.status === 'epic_created') {
+            document.getElementById('btnCreateEpic').style.opacity = '1';
+            document.getElementById('btnCreateEpic').style.pointerEvents = 'auto';
+            document.getElementById('btnGenerateTeam').style.opacity = '1';
+            document.getElementById('btnGenerateTeam').style.pointerEvents = 'auto';
+        }
+
+        // If epic already created, show info
+        if (data.status === 'epic_created' && data.project_id) {
+            addMsg('system', 'Système',
+                `Epic déjà créé → <a href="/projects/${data.project_id}/overview" style="color:var(--purple)">Voir le projet</a>`,
+                'var(--green)', '');
+        }
+    } catch(e) {
+        addMsg('system', 'Système', 'Erreur chargement: ' + e.message, 'var(--red)', '');
+    }
+}
+
+// Check URL for session param (from history page "Reprendre")
+const urlParams = new URLSearchParams(window.location.search);
+const resumeSession = urlParams.get('session');
+if (resumeSession) {
+    loadPastSession(resumeSession);
+}
 </script>
 {% endblock %}

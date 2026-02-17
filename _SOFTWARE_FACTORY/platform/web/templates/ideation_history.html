@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+.ih-layout{max-width:900px;margin:0 auto;padding:1.5rem 1rem}
+.ih-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}
+.ih-title{font-size:1.3rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:0.5rem}
+.ih-title svg{width:22px;height:22px;color:var(--purple)}
+.ih-list{display:flex;flex-direction:column;gap:0.5rem}
+.ih-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem 1rem;cursor:pointer;transition:border-color 0.15s;text-decoration:none;color:inherit;display:block}
+.ih-card:hover{border-color:var(--purple)}
+.ih-card-top{display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-bottom:0.3rem}
+.ih-card-title{font-size:0.85rem;font-weight:600;color:var(--text-primary);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ih-card-date{font-size:0.65rem;color:var(--text-tertiary);flex-shrink:0}
+.ih-card-prompt{font-size:0.75rem;color:var(--text-secondary);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ih-card-footer{display:flex;align-items:center;gap:0.75rem;margin-top:0.4rem;font-size:0.65rem;color:var(--text-tertiary)}
+.ih-badge{padding:0.1rem 0.45rem;border-radius:99px;font-size:0.6rem;font-weight:600;text-transform:uppercase}
+.ih-badge.draft{background:var(--bg-tertiary);color:var(--text-secondary)}
+.ih-badge.analyzed{background:rgba(88,166,255,0.15);color:var(--blue)}
+.ih-badge.epic_created{background:rgba(63,185,80,0.15);color:var(--green)}
+.ih-empty{text-align:center;padding:3rem;color:var(--text-tertiary);font-size:0.85rem}
+
+/* Detail panel (slide-in) */
+.ih-detail{position:fixed;top:0;right:-500px;width:480px;max-width:90vw;height:100vh;background:var(--bg-secondary);border-left:1px solid var(--border);z-index:200;transition:right 0.25s;display:flex;flex-direction:column;box-shadow:-4px 0 20px rgba(0,0,0,0.3)}
+.ih-detail.open{right:0}
+.ih-detail-header{padding:1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.ih-detail-title{font-size:0.9rem;font-weight:600;color:var(--text-primary)}
+.ih-detail-close{background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:0.3rem}
+.ih-detail-body{flex:1;overflow-y:auto;padding:1rem}
+.ih-detail-section{margin-bottom:1rem}
+.ih-detail-section-title{font-size:0.7rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:0.5rem}
+.ih-msg{padding:0.5rem;border-radius:var(--radius-sm);margin-bottom:0.4rem;font-size:0.8rem;line-height:1.5}
+.ih-msg-name{font-weight:600;font-size:0.7rem;margin-bottom:0.15rem}
+.ih-msg-body{color:var(--text-secondary)}
+.ih-finding{font-size:0.75rem;padding:0.3rem 0.5rem;border-radius:var(--radius-sm);background:var(--bg-tertiary);margin-bottom:0.3rem;display:flex;align-items:start;gap:0.4rem}
+.ih-finding-type{font-size:0.6rem;font-weight:600;text-transform:uppercase;padding:0.05rem 0.3rem;border-radius:99px;flex-shrink:0}
+.ih-finding-type.opportunity{background:rgba(63,185,80,0.15);color:var(--green)}
+.ih-finding-type.risk{background:rgba(248,81,73,0.15);color:var(--red)}
+.ih-finding-type.question{background:rgba(88,166,255,0.15);color:var(--blue)}
+.ih-finding-type.decision{background:rgba(188,140,255,0.15);color:var(--purple)}
+.ih-finding-type.feature{background:rgba(210,153,34,0.15);color:var(--yellow)}
+.ih-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:199;display:none}
+.ih-overlay.open{display:block}
+</style>
+
+<div class="ih-layout">
+    <div class="ih-header">
+        <div class="ih-title">
+            <svg><use href="#icon-clock"/></svg>
+            Historique des Idéations
+        </div>
+        <a href="/ideation" class="btn btn-primary btn-sm">
+            <svg class="icon icon-xs"><use href="#icon-lightning"/></svg> Nouvelle Idéation
+        </a>
+    </div>
+
+    <div class="ih-list">
+        {% for s in sessions %}
+        <div class="ih-card" onclick="loadSession('{{ s.id }}')">
+            <div class="ih-card-top">
+                <span class="ih-card-title">{{ s.title or 'Sans titre' }}</span>
+                <span class="ih-card-date">{{ s.created_at[:16].replace('T', ' ') if s.created_at else '' }}</span>
+            </div>
+            <div class="ih-card-prompt">{{ s.prompt }}</div>
+            <div class="ih-card-footer">
+                <span class="ih-badge {{ s.status }}">{{ s.status }}</span>
+                <span>{{ s.msg_count }} messages</span>
+                <span>{{ s.finding_count }} findings</span>
+                {% if s.project_id %}
+                <a href="/projects/{{ s.project_id }}/overview" style="color:var(--purple)" onclick="event.stopPropagation()">
+                    Projet: {{ s.project_id }}
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if not sessions %}
+        <div class="ih-empty">
+            <svg class="icon" style="width:40px;height:40px;color:var(--text-tertiary);margin-bottom:0.5rem"><use href="#icon-lightning"/></svg>
+            <div>Aucune idéation pour l'instant</div>
+            <a href="/ideation" style="color:var(--purple);font-size:0.8rem">Lancer une première idéation</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Detail panel -->
+<div class="ih-overlay" id="ihOverlay" onclick="closeDetail()"></div>
+<div class="ih-detail" id="ihDetail">
+    <div class="ih-detail-header">
+        <span class="ih-detail-title" id="ihDetailTitle">Session</span>
+        <button class="ih-detail-close" onclick="closeDetail()">
+            <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+    </div>
+    <div class="ih-detail-body" id="ihDetailBody">
+        <div style="text-align:center;padding:2rem;color:var(--text-tertiary)">Chargement...</div>
+    </div>
+</div>
+
+<script>
+async function loadSession(id) {
+    document.getElementById('ihOverlay').classList.add('open');
+    document.getElementById('ihDetail').classList.add('open');
+    document.getElementById('ihDetailBody').innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-tertiary)">Chargement...</div>';
+
+    try {
+        const resp = await fetch(`/api/ideation/sessions/${id}`);
+        const data = await resp.json();
+        if (data.error) { closeDetail(); return; }
+
+        document.getElementById('ihDetailTitle').textContent = data.title || 'Session';
+        let html = '';
+
+        // Prompt
+        html += `<div class="ih-detail-section">
+            <div class="ih-detail-section-title">Idée soumise</div>
+            <div style="font-size:0.8rem;color:var(--text-primary);padding:0.5rem;background:var(--bg-tertiary);border-radius:var(--radius-sm);line-height:1.5">${esc(data.prompt)}</div>
+        </div>`;
+
+        // Status + links
+        html += `<div class="ih-detail-section" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+            <span class="ih-badge ${data.status}">${data.status}</span>
+            <span style="font-size:0.65rem;color:var(--text-tertiary)">${data.created_at?.substring(0,16)?.replace('T',' ') || ''}</span>`;
+        if (data.project_id) {
+            html += ` <a href="/projects/${data.project_id}/overview" class="btn btn-sm" style="font-size:0.65rem;border:1px solid var(--border);padding:0.15rem 0.4rem">Projet: ${esc(data.project_id)}</a>`;
+        }
+        html += `</div>`;
+
+        // Messages
+        if (data.messages?.length) {
+            html += `<div class="ih-detail-section">
+                <div class="ih-detail-section-title">Conversation (${data.messages.length})</div>`;
+            for (const m of data.messages) {
+                const bg = m.agent_id === 'user' ? 'var(--bg-tertiary)' : 'transparent';
+                const nameColor = m.color || 'var(--text-primary)';
+                html += `<div class="ih-msg" style="background:${bg}">
+                    <div class="ih-msg-name" style="color:${nameColor}">${esc(m.agent_name)}</div>
+                    <div class="ih-msg-body">${esc(m.content)}</div>
+                </div>`;
+            }
+            html += `</div>`;
+        }
+
+        // Findings
+        if (data.findings?.length) {
+            html += `<div class="ih-detail-section">
+                <div class="ih-detail-section-title">Findings (${data.findings.length})</div>`;
+            for (const f of data.findings) {
+                html += `<div class="ih-finding">
+                    <span class="ih-finding-type ${f.type}">${f.type}</span>
+                    <span>${esc(f.text)}</span>
+                </div>`;
+            }
+            html += `</div>`;
+        }
+
+        // Action: reopen in ideation
+        html += `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border)">
+            <a href="/ideation?session=${data.id}" class="btn btn-sm" style="border:1px solid var(--border);font-size:0.75rem">
+                <svg class="icon icon-xs"><use href="#icon-lightning"/></svg> Reprendre cette idéation
+            </a>
+        </div>`;
+
+        document.getElementById('ihDetailBody').innerHTML = html;
+    } catch(e) {
+        document.getElementById('ihDetailBody').innerHTML =
+            `<div style="color:var(--red);padding:1rem">Erreur: ${e.message}</div>`;
+    }
+}
+
+function closeDetail() {
+    document.getElementById('ihOverlay').classList.remove('open');
+    document.getElementById('ihDetail').classList.remove('open');
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+</script>
+{% endblock %}

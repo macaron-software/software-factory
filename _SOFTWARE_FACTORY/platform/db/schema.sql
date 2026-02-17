@@ -338,3 +338,39 @@ CREATE TABLE IF NOT EXISTS skill_github_sources (
     branch TEXT DEFAULT 'main',
     added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ============================================================================
+-- IDEATION SESSIONS (persistent brainstorming history)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ideation_sessions (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL DEFAULT '',
+    prompt TEXT NOT NULL DEFAULT '',
+    status TEXT DEFAULT 'draft',          -- draft | analyzed | epic_created
+    mission_id TEXT DEFAULT '',           -- FK → missions.id (when epic created)
+    project_id TEXT DEFAULT '',           -- FK → projects.id (when project created)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ideation_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL REFERENCES ideation_sessions(id),
+    agent_id TEXT NOT NULL DEFAULT 'system',
+    agent_name TEXT NOT NULL DEFAULT '',
+    content TEXT NOT NULL DEFAULT '',
+    color TEXT DEFAULT '',
+    avatar_url TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ideation_msgs_session ON ideation_messages(session_id);
+
+CREATE TABLE IF NOT EXISTS ideation_findings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL REFERENCES ideation_sessions(id),
+    type TEXT NOT NULL DEFAULT 'opportunity',   -- opportunity | risk | question | decision | feature
+    text TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_ideation_findings_session ON ideation_findings(session_id);
