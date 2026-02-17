@@ -205,7 +205,7 @@
         </div>
         <div class="dsi-agents">
             {% for a in strategic_agents %}
-            <div class="dsi-agent" onclick="showAgentPopover(event, {{ a | tojson }})" >
+            <div class="dsi-agent" data-agent-idx="{{ loop.index0 }}" onclick="showAgentPopover(event, {{ loop.index0 }})">
                 {% if a.avatar_url %}
                 <img class="dsi-agent-photo" src="{{ a.avatar_url }}" alt="{{ a.name }}">
                 {% else %}
@@ -234,16 +234,16 @@
 </div>
 
 <script>
+const agents = {{ strategic_agents | tojson }};
 function esc(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
 
-function showAgentPopover(ev, agent) {
+function showAgentPopover(ev, idx) {
     ev.stopPropagation();
+    const a = agents[idx];
     const pop = document.getElementById('agentPopover');
     const overlay = document.getElementById('agentOverlay');
     const header = document.getElementById('popHeader');
     const body = document.getElementById('popBody');
-
-    const a = agent;
     const photo = a.avatar_url
         ? `<img class="agent-popover-photo" src="${a.avatar_url}" alt="${esc(a.name)}">`
         : `<div class="agent-popover-avatar" style="background:${a.color}20;border:2px solid ${a.color}">
