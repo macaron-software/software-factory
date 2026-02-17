@@ -590,6 +590,8 @@ class WorkflowStore:
                     },
                 },
             ),
+        )
+        builtins.append(
             WorkflowDef(
                 id="dsi-sharelook-2",
                 name="DSI Sharelook 2.0 — Phases",
