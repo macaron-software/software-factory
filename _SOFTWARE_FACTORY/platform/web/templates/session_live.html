@@ -1189,6 +1189,10 @@ function onNodeClick(node, gEl){
       <div class="node-tooltip-section-title"><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.2rem"><use href="#icon-user"/></svg> Persona</div>
       <div class="node-tooltip-desc" style="white-space:pre-line;max-height:120px;overflow-y:auto">${esc(agent.persona.substring(0, 300))}${agent.persona.length > 300 ? '…' : ''}</div>
     </div>` : ''}
+    ${agent && agent.motivation ? `<div class="node-tooltip-section">
+      <div class="node-tooltip-section-title"><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.2rem"><use href="#icon-zap"/></svg> Motivation</div>
+      <div class="node-tooltip-desc" style="white-space:pre-line;max-height:80px;overflow-y:auto">${esc(agent.motivation)}</div>
+    </div>` : ''}
     ${descHtml}
     ${skillsHtml}
     ${toolsHtml}

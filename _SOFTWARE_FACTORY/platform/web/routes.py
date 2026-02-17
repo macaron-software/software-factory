@@ -975,6 +975,7 @@ async def session_live_page(request: Request, session_id: str):
             "provider": getattr(a, "provider", "") or "",
             "tagline": getattr(a, "tagline", "") or "",
             "persona": getattr(a, "persona", "") or "",
+            "motivation": getattr(a, "motivation", "") or "",
         })
 
     # Build graph from workflow/pattern definition (structure defined BEFORE execution)
