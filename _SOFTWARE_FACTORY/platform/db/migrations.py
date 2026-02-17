@@ -40,6 +40,15 @@ def _migrate(conn: sqlite3.Connection):
     if "motivation" not in cols:
         conn.execute("ALTER TABLE agents ADD COLUMN motivation TEXT DEFAULT ''")
 
+    # Ideation messages: add role + target columns
+    try:
+        im_cols = {r[1] for r in conn.execute("PRAGMA table_info(ideation_messages)").fetchall()}
+        if im_cols and "role" not in im_cols:
+            conn.execute("ALTER TABLE ideation_messages ADD COLUMN role TEXT DEFAULT ''")
+        if im_cols and "target" not in im_cols:
+            conn.execute("ALTER TABLE ideation_messages ADD COLUMN target TEXT DEFAULT ''")
+    except Exception:
+        pass
 
 def get_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
     """Get a database connection."""

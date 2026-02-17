@@ -556,9 +556,10 @@ function setPrompt(text) {
     inputEl.focus();
 }
 
-function addMsg(agent, name, content, color, avatarUrl) {
+function addMsg(agent, name, content, color, avatarUrl, role, targetAgent) {
     if (placeholder) placeholder.style.display = 'none';
     const isUser = agent === 'user';
+    const isSystem = agent === 'system';
     const div = document.createElement('div');
     div.className = 'idea-msg ' + (isUser ? 'user' : 'agent');
 
@@ -567,15 +568,36 @@ function addMsg(agent, name, content, color, avatarUrl) {
         : name.charAt(0);
     const bgColor = isUser ? 'var(--user-bubble)' : (color || 'var(--bg-tertiary)');
 
+    // Role badge + direction indicator
+    const roleHtml = role && !isUser && !isSystem
+        ? `<span style="font-size:0.6rem;padding:0.08rem 0.35rem;border-radius:3px;background:${bgColor}20;color:${color || 'var(--text-secondary)'};font-weight:600;margin-left:0.3rem">${role}</span>`
+        : '';
+    const targetHtml = targetAgent && !isUser
+        ? `<span style="font-size:0.6rem;color:var(--text-muted);margin-left:0.3rem">→ @${targetAgent}</span>`
+        : '';
+
+    // Highlight @mentions in content
+    const rendered = content.replace(/@(\w[\w\s]*?)(?=[\s,.:!?]|$)/g,
+        '<span style="color:var(--purple);font-weight:600">@$1</span>');
+
     div.innerHTML = `
         <div class="idea-msg-avatar" style="background:${bgColor}20;border:2px solid ${bgColor}">${avatarHtml}</div>
         <div>
-            <div class="idea-msg-name">${name}</div>
+            <div class="idea-msg-name">${name}${roleHtml}${targetHtml}</div>
             <div class="idea-msg-bubble ${isUser ? '' : 'agent'}">
-                <div class="idea-msg-content">${content}</div>
+                <div class="idea-msg-content">${rendered}</div>
             </div>
         </div>
     `;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function addPhaseHeader(title, subtitle) {
+    const div = document.createElement('div');
+    div.style.cssText = 'text-align:center;margin:0.8rem 0 0.4rem;padding:0.3rem 0';
+    div.innerHTML = `<div style="font-size:0.7rem;font-weight:700;color:var(--purple);letter-spacing:.5px">${title}</div>
+        <div style="font-size:0.6rem;color:var(--text-muted)">${subtitle}</div>`;
     messagesEl.appendChild(div);
     messagesEl.scrollTop = messagesEl.scrollHeight;
 }
@@ -640,17 +662,29 @@ async function sendIdea() {
     addMsg('user', 'Vous', text, '', '');
     originalPrompt = originalPrompt || text;
 
-    // Phase 1: PM briefs — all dots thinking
-    setAgentStatus('product_manager', 'speaking');
-    addMsg('agent', 'Product Manager', 'Je lance le brief auprès de l\'équipe...', '#16a34a',
-        igAgent('product_manager')?.avatar_url || '');
-    FLOW_SEQUENCE[0].edges.forEach(([f,t])=> setEdgeActive(f,t,true));
-    await sleep(600);
+    // Agent role map for display
+    const ROLES = {
+        product_manager: 'Product Owner',
+        metier: 'Business Analyst',
+        architecte: 'Architecte',
+        ux_designer: 'UX Designer',
+        securite: 'Expert Sécurité',
+    };
 
-    // Phase 2: All experts thinking
+    // Phase 1: PM briefs the team
+    addPhaseHeader('📋 Phase 1 — Brief', 'Le Product Owner cadre l\'idée et briefe l\'équipe');
+    setAgentStatus('product_manager', 'speaking');
+    FLOW_SEQUENCE[0].edges.forEach(([f,t])=> setEdgeActive(f,t,true));
+    addMsg('agent', 'Alexandre Faure',
+        'Je prends en charge cette idée. Je briefe l\'équipe pour analyse.\n@Camille — évalue la valeur métier\n@Pierre — propose l\'architecture\n@Chloé — pense UX et parcours\n@Nadia — identifie les risques sécurité',
+        '#16a34a', igAgent('product_manager')?.avatar_url || '', 'Product Owner', 'Équipe');
+    await sleep(800);
+
+    // Phase 2: Experts thinking
     ['metier','architecte','ux_designer','securite'].forEach(id=> setAgentStatus(id, 'thinking'));
     FLOW_SEQUENCE[0].edges.forEach(([f,t])=> setEdgeActive(f,t,false));
     FLOW_SEQUENCE[1].edges.forEach(([f,t])=> setEdgeActive(f,t,true));
+    addPhaseHeader('🔍 Phase 2 — Analyse', 'Chaque expert analyse sous son angle');
 
     try {
         const resp = await fetch('/api/ideation', {
@@ -669,29 +703,61 @@ async function sendIdea() {
             // Animate messages one by one with graph activation
             FLOW_SEQUENCE[1].edges.forEach(([f,t])=> setEdgeActive(f,t,false));
 
-            for (let i = 0; i < messages.length; i++) {
-                const msg = messages[i];
+            // Map agent names to IDs for edge direction
+            const NAME_TO_ID = {
+                'Camille': 'metier', 'Pierre': 'architecte',
+                'Chloé': 'ux_designer', 'Nadia': 'securite',
+                'Alexandre': 'product_manager', 'Comité': null,
+            };
+
+            // Show expert messages (everything except PM synthesis)
+            const expertMsgs = messages.filter(m => m.agent_id !== 'product_manager');
+            const pmMsgs = messages.filter(m => m.agent_id === 'product_manager');
+
+            for (let i = 0; i < expertMsgs.length; i++) {
+                const msg = expertMsgs[i];
                 const agentId = msg.agent_id;
                 const agent = igAgent(agentId);
+                const targetName = msg.target || 'Alexandre';
+                const targetId = NAME_TO_ID[targetName] || null;
 
-                // Light up edges TO this agent, set thinking→speaking
                 setAgentStatus(agentId, 'speaking');
-                // Find edges going to this agent and light them
-                igEdges.filter(e=> e.to === agentId).forEach(e=> setEdgeActive(e.from, e.to, true));
+                // Light up edge FROM speaker TO target (if specific)
+                if (targetId) {
+                    setEdgeActive(agentId, targetId, true);
+                } else {
+                    // Broadcasting to comité: light up all outgoing edges
+                    igEdges.filter(e=> e.from === agentId).forEach(e=> setEdgeActive(e.from, e.to, true));
+                }
 
                 addMsg('agent', msg.agent_name, msg.content, msg.color || '',
-                    agent?.avatar_url || msg.avatar_url || '');
+                    agent?.avatar_url || msg.avatar_url || '',
+                    ROLES[agentId] || msg.role || '', targetName);
 
-                await sleep(800);
-
-                // Turn off edges, set to idle (next agent takes over)
-                igEdges.filter(e=> e.to === agentId).forEach(e=> setEdgeActive(e.from, e.to, false));
-                if(i < messages.length - 1) setAgentStatus(agentId, 'idle');
+                await sleep(900);
+                // Turn off edges
+                if (targetId) {
+                    setEdgeActive(agentId, targetId, false);
+                } else {
+                    igEdges.filter(e=> e.from === agentId).forEach(e=> setEdgeActive(e.from, e.to, false));
+                }
+                if(i < expertMsgs.length - 1) setAgentStatus(agentId, 'idle');
             }
 
-            // Phase 3: Report edges light up briefly
+            // Phase 3: PM synthesizes
             FLOW_SEQUENCE[2].edges.forEach(([f,t])=> setEdgeActive(f,t,true));
-            await sleep(500);
+            addPhaseHeader('📊 Phase 3 — Synthèse', 'Le PO consolide et propose');
+
+            for (const msg of pmMsgs) {
+                const agent = igAgent('product_manager');
+                setAgentStatus('product_manager', 'speaking');
+                addMsg('agent', msg.agent_name, msg.content, msg.color || '',
+                    agent?.avatar_url || msg.avatar_url || '',
+                    'Product Owner', 'Comité');
+                await sleep(600);
+            }
+
+            await sleep(400);
             FLOW_SEQUENCE[2].edges.forEach(([f,t])=> setEdgeActive(f,t,false));
 
             for (const f of (data.findings || [])) {
@@ -868,7 +934,8 @@ async function loadPastSession(id) {
             } else {
                 const agent = igAgents.find(a => a.id === m.agent_id);
                 addMsg('agent', m.agent_name, m.content, m.color || '',
-                    agent?.avatar_url || m.avatar_url || '');
+                    agent?.avatar_url || m.avatar_url || '',
+                    m.role || '', m.target || '');
             }
         }
 

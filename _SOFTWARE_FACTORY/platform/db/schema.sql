@@ -358,6 +358,8 @@ CREATE TABLE IF NOT EXISTS ideation_messages (
     session_id TEXT NOT NULL REFERENCES ideation_sessions(id),
     agent_id TEXT NOT NULL DEFAULT 'system',
     agent_name TEXT NOT NULL DEFAULT '',
+    role TEXT DEFAULT '',
+    target TEXT DEFAULT '',
     content TEXT NOT NULL DEFAULT '',
     color TEXT DEFAULT '',
     avatar_url TEXT DEFAULT '',
@@ -374,3 +376,18 @@ CREATE TABLE IF NOT EXISTS ideation_findings (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ideation_findings_session ON ideation_findings(session_id);
+
+-- ── Retrospectives (self-improvement feedback loop) ──
+CREATE TABLE IF NOT EXISTS retrospectives (
+    id TEXT PRIMARY KEY,
+    scope TEXT NOT NULL DEFAULT 'session',  -- session | sprint | project | global
+    scope_id TEXT DEFAULT '',               -- session_id, sprint_id, project_id
+    successes TEXT DEFAULT '[]',            -- JSON array of success items
+    failures TEXT DEFAULT '[]',             -- JSON array of failure items
+    lessons TEXT DEFAULT '[]',              -- JSON array of lessons learned
+    improvements TEXT DEFAULT '[]',         -- JSON array of suggested improvements
+    metrics_json TEXT DEFAULT '{}',         -- metrics snapshot (duration, tokens, tool_calls)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_retro_scope ON retrospectives(scope, scope_id);

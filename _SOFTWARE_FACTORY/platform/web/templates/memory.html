@@ -1,6 +1,41 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+.mem-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem}
+@media(max-width:900px){.mem-grid{grid-template-columns:1fr}}
+.mem-panel{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.mem-panel-header{display:flex;align-items:center;justify-content:space-between;padding:0.6rem 0.8rem;border-bottom:1px solid var(--border)}
+.mem-panel-title{font-size:0.78rem;font-weight:700;display:flex;align-items:center;gap:0.4rem}
+.mem-panel-title svg{width:14px;height:14px;color:var(--purple)}
+.mem-panel-body{padding:0.6rem 0.8rem;max-height:400px;overflow-y:auto}
+.mem-entry{padding:0.4rem 0;border-bottom:1px solid var(--border-light,rgba(255,255,255,.04));font-size:0.76rem}
+.mem-entry:last-child{border-bottom:none}
+.mem-key{font-weight:600;color:var(--text-primary)}
+.mem-val{color:var(--text-secondary);margin-top:0.15rem;line-height:1.4}
+.mem-meta{font-size:0.62rem;color:var(--text-muted);margin-top:0.1rem;display:flex;gap:0.5rem}
+.mem-badge{font-size:0.6rem;padding:0.08rem 0.3rem;border-radius:3px;font-weight:600}
+.mem-badge.architecture{background:rgba(59,130,246,.15);color:var(--blue)}
+.mem-badge.vision{background:rgba(124,58,237,.15);color:var(--purple)}
+.mem-badge.team{background:rgba(52,211,153,.15);color:var(--green)}
+.mem-badge.process{background:rgba(245,158,11,.15);color:var(--yellow)}
+.mem-badge.backlog{background:rgba(6,182,212,.15);color:#06b6d4}
+.mem-badge.risk{background:rgba(248,113,113,.15);color:var(--red)}
+.mem-badge.opportunity{background:rgba(52,211,153,.15);color:var(--green)}
+.mem-badge.decision{background:rgba(124,58,237,.15);color:var(--purple)}
+.mem-badge.lesson{background:rgba(251,191,36,.15);color:var(--yellow)}
+.mem-badge.improvement{background:rgba(16,185,129,.15);color:var(--green)}
+.mem-confidence{display:inline-flex;align-items:center;gap:0.2rem}
+.mem-confidence-bar{width:40px;height:4px;background:var(--bg-tertiary);border-radius:2px;overflow:hidden}
+.mem-confidence-fill{height:100%;background:var(--green);border-radius:2px}
+.retro-item{padding:0.3rem 0.5rem;margin-bottom:0.2rem;border-radius:4px;font-size:0.75rem;display:flex;align-items:flex-start;gap:0.3rem}
+.retro-item.success{background:rgba(52,211,153,.08);color:var(--green)}
+.retro-item.failure{background:rgba(248,113,113,.08);color:var(--red)}
+.retro-item.lesson{background:rgba(251,191,36,.08);color:var(--yellow)}
+.retro-item.improvement{background:rgba(59,130,246,.08);color:var(--blue)}
+.retro-icon{flex-shrink:0;font-size:0.7rem}
+</style>
+
 <div class="memory-dashboard">
     <div class="memory-stats">
         <div class="stat-card">
@@ -14,6 +49,10 @@
         <div class="stat-card">
             <div class="stat-number">{{ stats.session_count }}</div>
             <div class="stat-label">Session Archives</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="retroCount">—</div>
+            <div class="stat-label">Rétrospectives</div>
         </div>
     </div>
 
@@ -32,20 +71,79 @@
         </div>
     </div>
 
-    <div class="panel" style="margin-top: 16px">
-        <div class="panel-header"><h3>Recent Global Learnings</h3></div>
-        <div class="panel-body">
-            {% for mem in recent_global %}
-            <div class="memory-entry">
-                <span class="badge badge-blue">{{ mem.category }}</span>
-                <strong>{{ mem.key }}</strong>
-                <p>{{ mem.value }}</p>
-                <span class="text-muted">Confidence: {{ "%.0f" | format(mem.confidence * 100) }}% | {{ mem.occurrences }} occurrences</span>
+    <div class="mem-grid">
+        <!-- Left: Global Learnings (wiki-like) -->
+        <div class="mem-panel">
+            <div class="mem-panel-header">
+                <div class="mem-panel-title"><svg><use href="#icon-book-open"/></svg> Knowledge Base</div>
             </div>
-            {% else %}
-            <div class="empty-state">No global memories yet. They'll be created as agents learn.</div>
-            {% endfor %}
+            <div class="mem-panel-body">
+                {% for mem in recent_global %}
+                <div class="mem-entry">
+                    <div><span class="mem-badge {{ mem.category }}">{{ mem.category }}</span> <span class="mem-key">{{ mem.key }}</span></div>
+                    <div class="mem-val">{{ mem.value[:200] }}{% if mem.value|length > 200 %}…{% endif %}</div>
+                    <div class="mem-meta">
+                        <span class="mem-confidence">
+                            <span class="mem-confidence-bar"><span class="mem-confidence-fill" style="width:{{ (mem.confidence * 100)|int }}%"></span></span>
+                            {{ "%.0f"|format(mem.confidence * 100) }}%
+                        </span>
+                        <span>{{ mem.occurrences }}×</span>
+                    </div>
+                </div>
+                {% else %}
+                <div style="text-align:center;padding:1.5rem;font-size:0.75rem;color:var(--text-muted)">
+                    Les mémoires se rempliront automatiquement via l'idéation et les épics.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Right: Retrospectives + Self-Improvement -->
+        <div class="mem-panel">
+            <div class="mem-panel-header">
+                <div class="mem-panel-title"><svg><use href="#icon-refresh-cw"/></svg> Rétrospectives & Auto-amélioration</div>
+                <button class="btn btn-primary" style="font-size:0.68rem;padding:0.2rem 0.5rem" onclick="generateRetro()">
+                    <svg class="icon icon-xs"><use href="#icon-zap"/></svg> Générer
+                </button>
+            </div>
+            <div class="mem-panel-body" id="retroPanel">
+                <div style="text-align:center;padding:1.5rem;font-size:0.75rem;color:var(--text-muted)" id="retroEmpty">
+                    Cliquez "Générer" pour lancer une rétrospective automatique.<br>
+                    Les leçons apprises alimenteront la mémoire globale.
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+async function generateRetro() {
+    const panel = document.getElementById('retroPanel');
+    const empty = document.getElementById('retroEmpty');
+    if (empty) empty.innerHTML = '<div style="text-align:center;padding:1rem"><span class="spin" style="display:inline-block">⟳</span> Analyse en cours...</div>';
+
+    try {
+        const resp = await fetch('/api/retrospectives/generate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({scope: 'global', scope_id: ''}),
+        });
+        const data = await resp.json();
+        let html = '';
+        for (const s of data.successes || []) html += `<div class="retro-item success"><span class="retro-icon">✅</span> ${s}</div>`;
+        for (const f of data.failures || []) html += `<div class="retro-item failure"><span class="retro-icon">❌</span> ${f}</div>`;
+        for (const l of data.lessons || []) html += `<div class="retro-item lesson"><span class="retro-icon">💡</span> ${l}</div>`;
+        for (const i of data.improvements || []) html += `<div class="retro-item improvement"><span class="retro-icon">🔧</span> ${i}</div>`;
+        html += `<div style="margin-top:0.5rem;font-size:0.6rem;color:var(--text-muted);text-align:right">Leçons → mémoire globale ✓</div>`;
+        panel.innerHTML = html;
+    } catch(e) {
+        panel.innerHTML = `<div class="retro-item failure"><span class="retro-icon">❌</span> Erreur: ${e.message}</div>`;
+    }
+}
+
+// Load retro count
+fetch('/api/retrospectives').then(r=>r.json()).then(d=>{
+    document.getElementById('retroCount').textContent = d.length || 0;
+}).catch(()=>{});
+</script>
 {% endblock %}

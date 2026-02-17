@@ -2372,6 +2372,177 @@ async def global_memory(category: str = ""):
     return JSONResponse(entries)
 
 
+# ── Retrospectives & Self-Improvement ────────────────────────────
+
+@router.get("/api/retrospectives")
+async def list_retrospectives(scope: str = "", limit: int = 20):
+    """List retrospectives, optionally filtered by scope."""
+    from ..db.migrations import get_db
+    db = get_db()
+    try:
+        if scope:
+            rows = db.execute(
+                "SELECT * FROM retrospectives WHERE scope=? ORDER BY created_at DESC LIMIT ?",
+                (scope, limit),
+            ).fetchall()
+        else:
+            rows = db.execute(
+                "SELECT * FROM retrospectives ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return JSONResponse([{
+            "id": r["id"], "scope": r["scope"], "scope_id": r["scope_id"],
+            "successes": json.loads(r["successes"] or "[]"),
+            "failures": json.loads(r["failures"] or "[]"),
+            "lessons": json.loads(r["lessons"] or "[]"),
+            "improvements": json.loads(r["improvements"] or "[]"),
+            "metrics": json.loads(r["metrics_json"] or "{}"),
+            "created_at": r["created_at"] or "",
+        } for r in rows])
+    except Exception:
+        return JSONResponse([])
+    finally:
+        db.close()
+
+
+@router.post("/api/retrospectives/generate")
+async def generate_retrospective(request: Request):
+    """Auto-generate a retrospective from session/ideation data using LLM."""
+    from ..db.migrations import get_db
+    from ..llm.client import get_llm_client, LLMMessage
+    from ..memory.manager import get_memory_manager
+    import uuid
+
+    data = await request.json()
+    scope = data.get("scope", "session")
+    scope_id = data.get("scope_id", "")
+
+    db = get_db()
+    context_parts = []
+    try:
+        # Gather context based on scope
+        if scope == "ideation" and scope_id:
+            msgs = db.execute(
+                "SELECT agent_name, role, content FROM ideation_messages WHERE session_id=? ORDER BY created_at",
+                (scope_id,),
+            ).fetchall()
+            findings = db.execute(
+                "SELECT type, text FROM ideation_findings WHERE session_id=?",
+                (scope_id,),
+            ).fetchall()
+            context_parts.append(f"Ideation session {scope_id}:")
+            for m in msgs:
+                role_str = f" ({m['role']})" if "role" in m.keys() and m["role"] else ""
+                context_parts.append(f"  {m['agent_name']}{role_str}: {m['content'][:200]}")
+            for f in findings:
+                context_parts.append(f"  Finding [{f['type']}]: {f['text']}")
+
+        elif scope == "project" and scope_id:
+            # Gather tool calls, sessions, and mission data
+            tool_rows = db.execute(
+                "SELECT tool_name, success, result FROM tool_calls WHERE session_id IN "
+                "(SELECT id FROM sessions WHERE id LIKE ?) ORDER BY created_at DESC LIMIT 50",
+                (f"%{scope_id}%",),
+            ).fetchall()
+            for t in tool_rows:
+                status = "✅" if t["success"] else "❌"
+                context_parts.append(f"  Tool {t['tool_name']}: {status} {(t['result'] or '')[:100]}")
+
+        elif scope == "global":
+            # Aggregate all recent tool calls + sessions
+            tool_rows = db.execute(
+                "SELECT tool_name, success, COUNT(*) as cnt FROM tool_calls "
+                "GROUP BY tool_name, success ORDER BY cnt DESC LIMIT 30"
+            ).fetchall()
+            for t in tool_rows:
+                status = "✅" if t["success"] else "❌"
+                context_parts.append(f"  Tool {t['tool_name']}: {status} × {t['cnt']}")
+    except Exception:
+        pass
+    finally:
+        db.close()
+
+    if not context_parts:
+        context_parts = ["No detailed data available — generate a general retrospective about the platform usage."]
+
+    context = "\n".join(context_parts)
+
+    # LLM generates the retrospective
+    retro_prompt = f"""Analyse cette activité et génère une rétrospective structurée.
+
+Contexte:
+{context}
+
+Produis un JSON:
+{{
+  "successes": ["Ce qui a bien fonctionné (3-5 items)"],
+  "failures": ["Ce qui a échoué ou peut être amélioré (2-4 items)"],
+  "lessons": ["Leçons apprises, patterns identifiés (3-5 items)"],
+  "improvements": ["Actions concrètes d'amélioration pour la prochaine itération (2-4 items)"]
+}}
+
+Sois CONCRET et ACTIONNABLE. Pas de généralités.
+Réponds UNIQUEMENT avec le JSON."""
+
+    client = get_llm_client()
+    try:
+        resp = await client.chat(
+            messages=[LLMMessage(role="user", content=retro_prompt)],
+            system_prompt="Tu es un coach Agile expert en rétrospectives SAFe.",
+            temperature=0.5, max_tokens=2048,
+        )
+        raw = resp.content.strip()
+        if "```json" in raw:
+            raw = raw.split("```json", 1)[1].split("```", 1)[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```", 1)[1].split("```", 1)[0].strip()
+
+        retro_data = json.loads(raw)
+    except Exception as e:
+        retro_data = {
+            "successes": ["Retrospective generation completed"],
+            "failures": [f"LLM parsing issue: {str(e)[:100]}"],
+            "lessons": ["Auto-retrospective needs more structured data"],
+            "improvements": ["Add more instrumentation to sessions"],
+        }
+
+    retro_id = str(uuid.uuid4())[:8]
+    db = get_db()
+    try:
+        db.execute(
+            "INSERT INTO retrospectives (id, scope, scope_id, successes, failures, lessons, improvements) VALUES (?,?,?,?,?,?,?)",
+            (retro_id, scope, scope_id,
+             json.dumps(retro_data.get("successes", []), ensure_ascii=False),
+             json.dumps(retro_data.get("failures", []), ensure_ascii=False),
+             json.dumps(retro_data.get("lessons", []), ensure_ascii=False),
+             json.dumps(retro_data.get("improvements", []), ensure_ascii=False)),
+        )
+        db.commit()
+
+        # Feed lessons into global memory for recursive self-improvement
+        mem = get_memory_manager()
+        for lesson in retro_data.get("lessons", []):
+            mem.global_store(
+                key=f"lesson:{scope}:{scope_id}",
+                value=lesson,
+                category="lesson",
+                project_id=scope_id if scope == "project" else "",
+                confidence=0.7,
+            )
+        for improvement in retro_data.get("improvements", []):
+            mem.global_store(
+                key=f"improvement:{scope}:{scope_id}",
+                value=improvement,
+                category="improvement",
+                project_id=scope_id if scope == "project" else "",
+                confidence=0.8,
+            )
+    finally:
+        db.close()
+
+    return JSONResponse({"id": retro_id, **retro_data})
+
+
 @router.get("/api/projects/{project_id}/git", response_class=HTMLResponse)
 async def api_project_git(request: Request, project_id: str):
     """Git panel partial (HTMX)."""
@@ -2942,57 +3113,64 @@ _IDEATION_AGENTS = [
     {"id": "product_manager", "name": "Alexandre Faure", "short_role": "Product Manager", "color": "#16a34a"},
 ]
 
-_IDEATION_SYSTEM = """Tu participes à un atelier d'idéation multi-agents.
-Pour chaque idée soumise, tu dois analyser sous ton angle d'expertise et produire:
-1. Un avis structuré (opportunités, risques, questions)
-2. Des suggestions concrètes
-3. Une classification du type de demande
+_IDEATION_SYSTEM = """Tu simules un atelier d'idéation sous forme de RÉUNION multi-agents.
+Les agents doivent avoir une conversation NATURELLE de type réunion, en s'adressant les uns aux autres avec des @mentions.
+
+Chaque message a:
+- "agent_id": identifiant technique
+- "agent_name": prénom nom
+- "role": rôle affiché (Business Analyst, Architecte, etc.)
+- "target": à qui l'agent s'adresse ("Alexandre", "Camille", "Pierre", "Chloé", "Nadia", "Comité")
+- "content": message naturel avec @mentions (ex: "@Pierre, je pense que...")
+- "color": couleur hex
+
+IMPORTANT: Les agents doivent SE RÉPONDRE entre eux, se challenger, poser des questions croisées.
+- Camille peut interpeller Pierre sur un risque technique
+- Pierre peut questionner Nadia sur la sécurité d'une techno
+- Chloé peut challenger Camille sur l'expérience utilisateur
+- Nadia peut alerter Pierre sur une faille dans son architecture
+- Alexandre synthétise EN DERNIER en citant les contributions de chacun
+
+Produis 6-8 messages pour simuler une vraie réunion (pas juste des avis isolés).
 
 Réponds en JSON:
 {{
   "request_type": "new_project|new_feature|bug_fix|tech_debt|migration|security_audit",
   "messages": [
-    {{"agent_id": "metier", "agent_name": "Camille Durand", "content": "...", "color": "#2563eb"}},
-    {{"agent_id": "architecte", "agent_name": "Pierre Duval", "content": "...", "color": "#0891b2"}},
-    {{"agent_id": "ux_designer", "agent_name": "Chloé Bertrand", "content": "...", "color": "#8b5cf6"}},
-    {{"agent_id": "securite", "agent_name": "Nadia Benali", "content": "...", "color": "#dc2626"}},
-    {{"agent_id": "product_manager", "agent_name": "Alexandre Faure", "content": "...", "color": "#16a34a"}}
+    {{"agent_id": "metier", "agent_name": "Camille Durand", "role": "Business Analyst", "target": "Comité", "content": "Analyse métier avec @mentions vers d'autres agents...", "color": "#2563eb"}},
+    {{"agent_id": "architecte", "agent_name": "Pierre Duval", "role": "Architecte", "target": "Camille", "content": "@Camille, sur le plan technique...", "color": "#0891b2"}},
+    {{"agent_id": "securite", "agent_name": "Nadia Benali", "role": "Expert Sécurité", "target": "Pierre", "content": "@Pierre, attention au choix de...", "color": "#dc2626"}},
+    {{"agent_id": "ux_designer", "agent_name": "Chloé Bertrand", "role": "UX Designer", "target": "Camille", "content": "@Camille, côté utilisateur...", "color": "#8b5cf6"}},
+    {{"agent_id": "architecte", "agent_name": "Pierre Duval", "role": "Architecte", "target": "Nadia", "content": "@Nadia, bonne remarque, on pourrait...", "color": "#0891b2"}},
+    {{"agent_id": "product_manager", "agent_name": "Alexandre Faure", "role": "Product Owner", "target": "Comité", "content": "Synthèse: @Camille a soulevé... @Pierre propose... @Nadia alerte sur... @Chloé recommande...", "color": "#16a34a"}}
   ],
   "findings": [
     {{"type": "opportunity|risk|question|decision|feature", "text": "..."}}
   ],
   "po_proposal": {{
     "epic_name": "Titre court de l'epic",
-    "stack": "Technologies recommandées (ex: SvelteKit + Rust + PostgreSQL)",
+    "stack": "Technologies recommandées",
     "workflow": "feature-request|tech-debt-reduction|sf-pipeline",
     "team": [
-      {{"role": "Lead Dev", "justification": "Coordination technique"}},
-      {{"role": "Dev Frontend", "justification": "UI/UX implementation"}},
-      {{"role": "Dev Backend", "justification": "API + DB"}},
-      {{"role": "QA", "justification": "Tests E2E + regression"}},
-      {{"role": "DevOps", "justification": "CI/CD + deploy"}},
-      {{"role": "Sécurité", "justification": "Audit OWASP"}}
+      {{"role": "Lead Dev", "justification": "..."}},
+      {{"role": "Dev Frontend", "justification": "..."}},
+      {{"role": "Dev Backend", "justification": "..."}},
+      {{"role": "QA", "justification": "..."}},
+      {{"role": "DevOps", "justification": "..."}}
     ],
     "priority_wsjf": 15,
     "estimated_sprints": 3
   }}
 }}
 
-Règles de classification request_type:
-- "new_project": aucun projet existant, on part de zéro
-- "new_feature": ajout de fonctionnalité sur un projet existant
-- "bug_fix": correction de bug ou incident
-- "tech_debt": refactoring, mise à jour, nettoyage
-- "migration": changement de framework ou version majeure
-- "security_audit": audit sécurité, OWASP, RGPD
+Règles:
+- Camille Durand (Business Analyst): valeur métier, ROI, personas, KPIs
+- Pierre Duval (Architecte): stack technique, patterns, scalabilité, risques techniques
+- Chloé Bertrand (UX Designer): parcours utilisateur, accessibilité WCAG, design system
+- Nadia Benali (Expert Sécurité): OWASP, RGPD, menaces, chiffrement
+- Alexandre Faure (Product Owner): priorisation WSJF, épic, features, synthèse (TOUJOURS en dernier)
 
-Chaque agent doit avoir un avis DIFFÉRENT et complémentaire.
-Camille Durand (Business Analyst) challenge la valeur métier.
-Pierre Duval (Architecte) propose l'approche technique et les risques techniques.
-Chloé Bertrand (UX Designer) pense utilisateur, parcours, accessibilité.
-Nadia Benali (Expert Sécurité) identifie les menaces (OWASP, RGPD).
-Alexandre Faure (Product Manager) priorise, synthétise, et structure la proposition PO (po_proposal).
-
+Les experts DOIVENT se challenger mutuellement. Alexandre synthétise.
 Réponds UNIQUEMENT avec le JSON, rien d'autre."""
 
 
@@ -3106,8 +3284,9 @@ async def ideation_submit(request: Request):
         try:
             for msg in result.get("messages", []):
                 db.execute(
-                    "INSERT INTO ideation_messages (session_id, agent_id, agent_name, content, color, avatar_url) VALUES (?,?,?,?,?,?)",
+                    "INSERT INTO ideation_messages (session_id, agent_id, agent_name, role, target, content, color, avatar_url) VALUES (?,?,?,?,?,?,?,?)",
                     (session_id, msg.get("agent_id", ""), msg.get("agent_name", ""),
+                     msg.get("role", ""), msg.get("target", ""),
                      msg.get("content", ""), msg.get("color", ""), msg.get("avatar_url", "")),
                 )
             for f in result.get("findings", []):
@@ -3369,6 +3548,47 @@ async def ideation_create_epic(request: Request):
         finally:
             db.close()
 
+    # ── Step 7: Populate project memory (wiki-like knowledge) ──
+    try:
+        from ..memory.manager import get_memory_manager
+        mem = get_memory_manager()
+        if stack:
+            mem.project_store(project_id, "stack", ", ".join(stack),
+                              category="architecture", source="ideation", confidence=0.9)
+        mem.project_store(project_id, "epic", epic_data.get("name", ""),
+                          category="vision", source="ideation", confidence=0.9)
+        if epic_data.get("goal"):
+            mem.project_store(project_id, "goal", epic_data["goal"],
+                              category="vision", source="ideation", confidence=0.9)
+        for t in team_data:
+            mem.project_store(project_id, f"team:{t.get('role','')}",
+                              t.get("justification", ""),
+                              category="team", source="ideation", confidence=0.8)
+        mem.project_store(project_id, "workflow", workflow_id,
+                          category="process", source="ideation", confidence=0.85)
+        for fd in features_data:
+            mem.project_store(project_id, f"feature:{fd.get('name','')}",
+                              fd.get("description", ""),
+                              category="backlog", source="ideation", confidence=0.85)
+        if ideation_sid:
+            from ..db.migrations import get_db as _gdb2
+            _db2 = _gdb2()
+            try:
+                findings_rows = _db2.execute(
+                    "SELECT type, text FROM ideation_findings WHERE session_id=?",
+                    (ideation_sid,),
+                ).fetchall()
+                for fr in findings_rows:
+                    cat = "risk" if fr["type"] == "risk" else "opportunity" if fr["type"] == "opportunity" else "decision"
+                    mem.project_store(project_id, f"{fr['type']}:{fr['text'][:50]}",
+                                      fr["text"], category=cat, source="ideation", confidence=0.75)
+            except Exception:
+                pass
+            finally:
+                _db2.close()
+    except Exception as e:
+        logger.warning("Memory auto-populate: %s", e)
+
     return JSONResponse({
         "project_id": project_id,
         "project_name": project_name,
@@ -3428,6 +3648,8 @@ async def ideation_session_detail(session_id: str):
             "project_id": sess["project_id"] or "",
             "created_at": sess["created_at"] or "",
             "messages": [{"agent_id": m["agent_id"], "agent_name": m["agent_name"],
+                          "role": m["role"] if "role" in m.keys() else "",
+                          "target": m["target"] if "target" in m.keys() else "",
                           "content": m["content"], "color": m["color"],
                           "avatar_url": m["avatar_url"] or "",
                           "created_at": m["created_at"] or ""} for m in messages],
