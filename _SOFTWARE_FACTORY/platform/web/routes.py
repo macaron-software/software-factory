@@ -3178,7 +3178,7 @@ async def dsi_workflow_page(request: Request, workflow_id: str):
     })
 
 
-@router.post("/api/dsi/workflow/{workflow_id}/start", response_class=HTMLResponse)
+@router.api_route("/api/dsi/workflow/{workflow_id}/start", methods=["GET", "POST"], response_class=HTMLResponse)
 async def dsi_workflow_start(request: Request, workflow_id: str):
     """Start phase 1 of a DSI workflow — creates session and launches agents."""
     from ..workflows.store import get_workflow_store
@@ -3265,7 +3265,7 @@ En tant que leader de cette phase, analysez la situation, consultez votre équip
     return RedirectResponse(f"/dsi/workflow/{workflow_id}", status_code=303)
 
 
-@router.post("/api/dsi/workflow/{workflow_id}/next-phase", response_class=HTMLResponse)
+@router.api_route("/api/dsi/workflow/{workflow_id}/next-phase", methods=["GET", "POST"], response_class=HTMLResponse)
 async def dsi_workflow_next_phase(request: Request, workflow_id: str):
     """Advance to next phase in workflow."""
     from ..workflows.store import get_workflow_store
@@ -3274,8 +3274,11 @@ async def dsi_workflow_next_phase(request: Request, workflow_id: str):
     from ..a2a.bus import get_bus
     import uuid
 
-    form = await request.form()
-    session_id = form.get("session_id", "")
+    if request.method == "POST":
+        form = await request.form()
+        session_id = form.get("session_id", "")
+    else:
+        session_id = request.query_params.get("session_id", "")
 
     wf_store = get_workflow_store()
     session_store = get_session_store()
