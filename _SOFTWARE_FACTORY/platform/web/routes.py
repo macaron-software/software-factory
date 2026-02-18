@@ -1266,12 +1266,12 @@ async def session_live_page(request: Request, session_id: str):
     # Get running loop statuses
     mgr = get_loop_manager()
 
-    # Build agent list with status
+    # Build agent list with status — filtered after graph is built
     import os
     avatar_dir = Path(__file__).parent / "static" / "avatars"
-    agents = []
-    for a in all_agents:
-        loop = mgr.get_loop(a.id, session_id)
+
+    def _build_agent_entry(a, mgr_ref, session_id_ref):
+        loop = mgr_ref.get_loop(a.id, session_id_ref)
         avatar_jpg = avatar_dir / f"{a.id}.jpg"
         avatar_svg = avatar_dir / f"{a.id}.svg"
         avatar_url = ""
@@ -1279,7 +1279,7 @@ async def session_live_page(request: Request, session_id: str):
             avatar_url = f"/static/avatars/{a.id}.jpg"
         elif avatar_svg.exists():
             avatar_url = f"/static/avatars/{a.id}.svg"
-        agents.append({
+        return {
             "id": a.id, "name": a.name, "role": a.role,
             "icon": a.icon, "color": a.color,
             "avatar": getattr(a, "avatar", "") or "bot",
@@ -1294,7 +1294,7 @@ async def session_live_page(request: Request, session_id: str):
             "tagline": getattr(a, "tagline", "") or "",
             "persona": getattr(a, "persona", "") or "",
             "motivation": getattr(a, "motivation", "") or "",
-        })
+        }
 
     # Build graph from workflow/pattern definition (structure defined BEFORE execution)
     # Then enrich edges with live message activity counts
@@ -1361,12 +1361,12 @@ async def session_live_page(request: Request, session_id: str):
                                     "from": phase_agent_ids[j], "to": phase_agent_ids[j + 1],
                                     "count": 0, "types": ["sequential"], "patterns": ["sequential"],
                                 })
-                        elif ptype == "hierarchical":
-                            mgr = phase_agent_ids[0]
+                        elif ptype in ("hierarchical", "adversarial-cascade"):
+                            leader = phase_agent_ids[0]
                             for w in phase_agent_ids[1:]:
                                 graph["edges"].append({
-                                    "from": mgr, "to": w,
-                                    "count": 0, "types": ["hierarchical"], "patterns": ["hierarchical"],
+                                    "from": leader, "to": w,
+                                    "count": 0, "types": [ptype], "patterns": [ptype],
                                 })
                         elif ptype == "parallel":
                             dispatcher = phase_agent_ids[0]
@@ -1375,12 +1375,12 @@ async def session_live_page(request: Request, session_id: str):
                                     "from": dispatcher, "to": w,
                                     "count": 0, "types": ["parallel"], "patterns": ["parallel"],
                                 })
-                        elif ptype == "network":
+                        elif ptype in ("network", "adversarial-pair", "debate"):
                             for j, a1 in enumerate(phase_agent_ids):
                                 for a2 in phase_agent_ids[j + 1:]:
                                     graph["edges"].append({
                                         "from": a1, "to": a2,
-                                        "count": 0, "types": ["network"], "patterns": ["network"],
+                                        "count": 0, "types": [ptype], "patterns": [ptype],
                                     })
                 wf_graph_loaded = bool(seen_agents)
 
@@ -1428,6 +1428,28 @@ async def session_live_page(request: Request, session_id: str):
                 types_list = graph["edges"][edge_index[key]]["types"]
                 if m.message_type not in types_list:
                     types_list.append(m.message_type)
+
+    # 4) Fallback: if graph still empty, build from message participants
+    if not graph["nodes"]:
+        seen = set()
+        for m in messages:
+            if m.from_agent in ("system", "user"):
+                continue
+            if m.from_agent not in seen:
+                seen.add(m.from_agent)
+                a = agent_map.get(m.from_agent)
+                graph["nodes"].append({
+                    "id": m.from_agent, "agent_id": m.from_agent,
+                    "label": a.name if a else m.from_agent,
+                    "hierarchy_rank": a.hierarchy_rank if a else 50,
+                })
+
+    # Filter agents to only those in the graph (or all if no graph)
+    graph_agent_ids = {n["agent_id"] for n in graph["nodes"]}
+    if graph_agent_ids:
+        agents = [_build_agent_entry(a, mgr, session_id) for a in all_agents if a.id in graph_agent_ids]
+    else:
+        agents = [_build_agent_entry(a, mgr, session_id) for a in all_agents]
 
     # Serialize messages for template
     msg_list = []

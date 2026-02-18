@@ -85,7 +85,7 @@ test.describe('Epic & Project Flow', () => {
     const count = await msgs.count();
     if (count > 0) {
       // Verify unified structure
-      await expect(msgs.first().locator('.mu__avatar, .mu__body')).toBeVisible();
+      await expect(msgs.first().locator('.mu__avatar, .mu__body').first()).toBeVisible();
     }
   });
 
