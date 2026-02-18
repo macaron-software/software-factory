@@ -4643,6 +4643,9 @@ async def mission_control_page(request: Request, mission_id: str):
     """Mission Control dashboard — pipeline visualization + CDP activity."""
     from ..missions.store import get_mission_run_store
     from ..agents.store import get_agent_store
+    from ..workflows.store import get_workflow_store
+    from ..sessions.store import get_session_store
+    from ..memory.manager import get_memory_manager
 
     run_store = get_mission_run_store()
     mission = run_store.get(mission_id)
@@ -4651,11 +4654,54 @@ async def mission_control_page(request: Request, mission_id: str):
     agents = get_agent_store().list_all()
     agent_map = _agent_map_for_template(agents)
 
+    # Build phase→agents mapping from workflow config
+    phase_agents = {}
+    wf = get_workflow_store().get(mission.workflow_id)
+    if wf:
+        for wp in wf.phases:
+            cfg = wp.config or {}
+            aids = cfg.get("agent_ids", cfg.get("agents", []))
+            phase_agents[wp.id] = [
+                {"id": a,
+                 "name": agent_map[a]["name"] if a in agent_map else a,
+                 "role": agent_map[a]["role"] if a in agent_map else "",
+                 "avatar": agent_map[a]["avatar_url"] if a in agent_map else ""}
+                for a in aids
+            ]
+
+    # Session messages for discussions
+    messages = []
+    if mission.session_id:
+        session_store = get_session_store()
+        msgs = session_store.list_messages(mission.session_id)
+        for m in msgs:
+            ag = agent_map.get(m.from_agent)
+            messages.append({
+                "from_agent": m.from_agent,
+                "from_name": ag["name"] if ag else m.from_agent,
+                "from_avatar": ag["avatar_url"] if ag else "",
+                "from_role": ag["role"] if ag else "",
+                "content": m.content,
+                "message_type": m.message_type,
+                "created_at": m.created_at if hasattr(m, "created_at") else "",
+            })
+
+    # Memory entries
+    memories = []
+    try:
+        mem_mgr = get_memory_manager()
+        memories = mem_mgr.search("", limit=20) or []
+    except Exception:
+        pass
+
     return _templates(request).TemplateResponse("mission_control.html", {
         "request": request,
         "page_title": f"Mission Control — {mission.workflow_name}",
         "mission": mission,
         "agent_map": agent_map,
+        "phase_agents": phase_agents,
+        "messages": messages,
+        "memories": memories,
         "session_id": mission.session_id or "",
     })
 
