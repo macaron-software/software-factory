@@ -115,7 +115,7 @@ export default function StocksPage() {
           </div>
           <div className="flex items-end gap-px h-8 mt-2">
             {Array.from({ length: 12 }, (_, i) => {
-              const h = 20 + Math.random() * 80;
+              const h = 20 + ((i * 41 + 17) % 80);
               return <div key={i} className="flex-1 rounded-sm" style={{ height: `${h}%`, background: CHART_COLORS[4], opacity: 0.6 }} />;
             })}
           </div>

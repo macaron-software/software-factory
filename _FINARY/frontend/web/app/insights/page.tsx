@@ -342,7 +342,7 @@ export default function InsightsPage() {
             </div>
             <div className="flex items-end gap-1 h-16 mt-2">
               {["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"].map((m, i) => {
-                const h = 10 + Math.random() * 50;
+                const h = 10 + ((i * 37 + 13) % 50);
                 return (
                   <div key={m} className="flex-1 flex flex-col items-center gap-1">
                     <div className="w-full rounded-sm" style={{ height: `${h}%`, background: CHART_COLORS[i % 10], opacity: 0.7 }} />

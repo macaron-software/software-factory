@@ -47,7 +47,7 @@ export default function WealthStatementPage() {
         <p className="text-label font-medium uppercase mb-2 text-t-5">
           Déclaration de patrimoine
         </p>
-        <p className="text-[22px] font-light text-t-1">
+        <p className="text-[22px] font-light text-t-1" suppressHydrationWarning>
           État au {new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
         </p>
       </div>
