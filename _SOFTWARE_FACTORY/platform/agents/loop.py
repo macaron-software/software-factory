@@ -193,10 +193,12 @@ class AgentLoop:
 
                 # 4. Run executor with timeout
                 try:
+                    logger.warning("LOOP calling executor for agent=%s", self.agent.id)
                     result = await asyncio.wait_for(
                         self._executor.run(ctx, msg.content),
                         timeout=self.think_timeout,
                     )
+                    logger.warning("LOOP executor returned for agent=%s content_len=%d", self.agent.id, len(result.content or ""))
                 except asyncio.TimeoutError:
                     logger.error(
                         "Executor timeout  agent=%s session=%s timeout=%.0fs",
@@ -220,6 +222,7 @@ class AgentLoop:
 
                 # 6. Parse and execute actions
                 actions = self._parse_actions(result.content)
+                logger.warning("LOOP parsed %d actions for agent=%s", len(actions), self.agent.id)
                 if actions:
                     await self._set_status(AgentStatus.ACTING)
                     for action in actions:
@@ -362,6 +365,8 @@ class AgentLoop:
             except Exception:
                 pass
 
+        # Disable tools for strategic/management agents (they think, not code)
+        agent_tools_enabled = self.agent.hierarchy_rank >= 30
         return ExecutionContext(
             agent=self.agent,
             session_id=self.session_id,
@@ -372,6 +377,7 @@ class AgentLoop:
             project_memory=project_memory_str,
             skills_prompt=skills_prompt,
             vision=vision,
+            tools_enabled=agent_tools_enabled,
         )
 
     # ------------------------------------------------------------------

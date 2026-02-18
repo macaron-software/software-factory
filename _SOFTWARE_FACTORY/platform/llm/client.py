@@ -239,17 +239,30 @@ class LLMClient:
         if system_prompt:
             msgs.append({"role": "system", "content": system_prompt})
         for m in messages:
-            d = {"role": m.role, "content": m.content or ""}
+            # Accept both LLMMessage objects and plain dicts
+            if isinstance(m, dict):
+                role = m.get("role", "user")
+                content = m.get("content", "")
+                name = m.get("name")
+                tool_call_id = m.get("tool_call_id")
+                tool_calls = m.get("tool_calls")
+            else:
+                role = m.role
+                content = m.content or ""
+                name = m.name
+                tool_call_id = m.tool_call_id
+                tool_calls = m.tool_calls
+            d = {"role": role, "content": content}
             # MiniMax rejects system messages after position 0
             if d["role"] == "system" and provider == "minimax" and msgs:
                 d["role"] = "user"
                 d["content"] = f"[System instruction]: {d['content']}"
-            if m.name:
-                d["name"] = m.name
-            if m.tool_call_id:
-                d["tool_call_id"] = m.tool_call_id
-            if m.tool_calls:
-                d["tool_calls"] = m.tool_calls
+            if name:
+                d["name"] = name
+            if tool_call_id:
+                d["tool_call_id"] = tool_call_id
+            if tool_calls:
+                d["tool_calls"] = tool_calls
                 d.pop("content", None)  # assistant tool_call msgs may have no content
             msgs.append(d)
 
@@ -345,12 +358,45 @@ class LLMClient:
         max_tokens: int = 4096,
         system_prompt: str = "",
     ) -> AsyncIterator[LLMStreamChunk]:
-        """Stream chat completion response."""
-        pcfg = self._get_provider_config(provider)
-        use_model = model or pcfg["default"]
+        """Stream chat completion response with provider fallback."""
+        providers_to_try = [provider] + [p for p in _FALLBACK_CHAIN if p != provider]
+
+        for prov in providers_to_try:
+            if prov not in _PROVIDERS:
+                continue
+            now = time.monotonic()
+            cooldown_until = self._provider_cooldown.get(prov, 0)
+            if cooldown_until > now:
+                continue
+            pcfg = self._get_provider_config(prov)
+            key = self._get_api_key(pcfg)
+            if not key or key == "no-key":
+                continue
+            use_model = model if (prov == provider and model and model in pcfg.get("models", [])) else pcfg["default"]
+            try:
+                async for chunk in self._do_stream(pcfg, prov, use_model, messages, temperature, max_tokens, system_prompt):
+                    yield chunk
+                return
+            except Exception as exc:
+                logger.warning("LLM stream %s/%s failed: %s — trying next", prov, use_model, exc)
+                if "429" in repr(exc):
+                    self._provider_cooldown[prov] = time.monotonic() + 90
+                continue
+
+        raise RuntimeError(f"All LLM providers failed for streaming {provider}/{model}")
+
+    async def _do_stream(
+        self,
+        pcfg: dict, provider: str, model: str,
+        messages: list[LLMMessage],
+        temperature: float, max_tokens: int,
+        system_prompt: str,
+    ) -> AsyncIterator[LLMStreamChunk]:
+        """Single-provider streaming attempt."""
         http = await self._get_http()
-        url = self._build_url(pcfg, use_model)
+        url = self._build_url(pcfg, model)
         headers = self._build_headers(pcfg)
+        logger.warning("LLM stream trying %s/%s ...", provider, model)
 
         msgs = []
         if system_prompt:
@@ -361,36 +407,47 @@ class LLMClient:
                 d["name"] = m.name
             msgs.append(d)
 
+        effective_max = max_tokens
+        if provider == "minimax":
+            effective_max = max(max_tokens, 16000)
+
         body = {
-            "model": use_model,
+            "model": model,
             "messages": msgs,
             "temperature": temperature,
-            "max_tokens": max_tokens,
+            "max_tokens": effective_max,
             "stream": True,
         }
 
-        async with http.stream("POST", url, json=body, headers=headers) as resp:
-            if resp.status_code != 200:
-                text = await resp.aread()
-                raise RuntimeError(f"HTTP {resp.status_code}: {text[:200]}")
-            async for line in resp.aiter_lines():
-                if not line.startswith("data: "):
-                    continue
-                payload = line[6:]
-                if payload.strip() == "[DONE]":
-                    yield LLMStreamChunk(delta="", done=True, model=use_model)
-                    break
-                try:
-                    data = json.loads(payload)
-                    delta = data.get("choices", [{}])[0].get("delta", {})
-                    content = delta.get("content", "")
-                    finish = data.get("choices", [{}])[0].get("finish_reason")
-                    if content:
-                        yield LLMStreamChunk(delta=content, model=use_model)
-                    if finish:
-                        yield LLMStreamChunk(delta="", done=True, model=use_model, finish_reason=finish)
-                except json.JSONDecodeError:
-                    continue
+        # Use a separate client for streaming to avoid blocking the shared client
+        stream_http = httpx.AsyncClient(timeout=120.0)
+        try:
+            async with stream_http.stream("POST", url, json=body, headers=headers) as resp:
+                if resp.status_code != 200:
+                    text = await resp.aread()
+                    raise RuntimeError(f"HTTP {resp.status_code}: {text[:200]}")
+                logger.warning("LLM stream %s/%s connected", provider, model)
+                async for line in resp.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    payload = line[6:]
+                    if payload.strip() == "[DONE]":
+                        yield LLMStreamChunk(delta="", done=True, model=model)
+                        return
+                    try:
+                        data = json.loads(payload)
+                        delta = data.get("choices", [{}])[0].get("delta", {})
+                        content = delta.get("content", "")
+                        finish = data.get("choices", [{}])[0].get("finish_reason")
+                        if content:
+                            yield LLMStreamChunk(delta=content, model=model)
+                        if finish:
+                            yield LLMStreamChunk(delta="", done=True, model=model, finish_reason=finish)
+                            return  # MiniMax doesn't send [DONE], exit on finish_reason
+                    except json.JSONDecodeError:
+                        continue
+        finally:
+            await stream_http.aclose()
 
     def available_providers(self) -> list[dict]:
         """List providers with availability status."""

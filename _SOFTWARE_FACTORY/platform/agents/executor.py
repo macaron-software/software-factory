@@ -23,7 +23,7 @@ from ..agents.store import AgentDef
 logger = logging.getLogger(__name__)
 
 # Max tool-calling rounds to prevent infinite loops
-MAX_TOOL_ROUNDS = 15
+MAX_TOOL_ROUNDS = 5
 
 # Regex to strip raw MiniMax/internal tool-call tokens from LLM output
 _RAW_TOKEN_RE = re.compile(
@@ -526,7 +526,7 @@ class AgentExecutor:
         if ctx.project_path:
             # Git/build/deploy tools: inject cwd
             if name in ("git_status", "git_log", "git_diff", "git_commit", "build", "test", "lint", "docker_build"):
-                if "cwd" not in args:
+                if "cwd" not in args or args["cwd"] in (".", "", "./"):
                     args["cwd"] = ctx.project_path
             # File tools: resolve relative paths to project root
             if name in ("code_read", "code_search", "code_write", "code_edit", "list_files"):
@@ -683,6 +683,8 @@ class AgentExecutor:
 
         if ctx.tools_enabled:
             parts.append("\nYou have access to tools. Use them to read files, search code, check git status, and access project memory. Call tools when you need concrete information rather than guessing.")
+        else:
+            parts.append("\nYou do NOT have tools. Do NOT write [TOOL_CALL] or attempt to use tools. Focus on analysis, synthesis, and delegation to your team.")
 
         if ctx.skills_prompt:
             parts.append(f"\n## Skills\n{ctx.skills_prompt}")
@@ -701,7 +703,17 @@ class AgentExecutor:
 
         perms = agent.permissions or {}
         if perms.get("can_delegate"):
-            parts.append("\nYou CAN delegate tasks to other agents by writing: [DELEGATE:agent_id] task description")
+            parts.append("""
+## Delegation (IMPORTANT)
+You MUST delegate tasks to your team using this exact format on separate lines:
+[DELEGATE:agent_id] clear task description
+
+Example:
+[DELEGATE:strat-cpo] Analyser la vision produit et valider les objectifs business
+[DELEGATE:strat-cto] Évaluer la faisabilité technique et recommander le stack
+
+As a leader, your job is to DELEGATE to team members, then SYNTHESIZE their responses.
+Do NOT try to do everything yourself — leverage your team.""")
         if perms.get("can_veto"):
             parts.append("\nYou CAN veto decisions by writing: [VETO] reason")
         if perms.get("can_approve"):

@@ -1800,6 +1800,46 @@ async def send_to_agent(request: Request, session_id: str, agent_id: str):
     return JSONResponse({"sent": True, "to": agent_id})
 
 
+@router.post("/api/sessions/{session_id}/conversation")
+async def start_conversation(request: Request, session_id: str):
+    """Start a real multi-agent conversation with streaming.
+
+    Each agent is called individually with its own persona/LLM,
+    sees the full conversation history, and responds in real-time via SSE.
+    """
+    from ..sessions.runner import run_conversation
+
+    form = await request.form()
+    message = str(form.get("message", "")).strip()
+    agent_ids_raw = str(form.get("agent_ids", ""))
+    agent_ids = [a.strip() for a in agent_ids_raw.split(",") if a.strip()]
+    lead = str(form.get("lead_agent", ""))
+    max_rounds = int(form.get("max_rounds", 6))
+
+    if not message:
+        return JSONResponse({"error": "message required"}, status_code=400)
+    if not agent_ids:
+        return JSONResponse({"error": "agent_ids required"}, status_code=400)
+
+    # Run in background — SSE will stream the conversation
+    async def _run_conv():
+        try:
+            await run_conversation(
+                session_id=session_id,
+                initial_message=message,
+                agent_ids=agent_ids,
+                max_rounds=max_rounds,
+                lead_agent_id=lead,
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error("Conversation failed: %s", exc, exc_info=True)
+
+    asyncio.create_task(_run_conv())
+
+    return JSONResponse({"status": "started", "agents": agent_ids, "max_rounds": max_rounds})
+
+
 @router.get("/api/sessions/{session_id}/sse")
 async def session_sse(request: Request, session_id: str):
     """SSE endpoint for real-time session updates."""
@@ -3440,6 +3480,37 @@ Commencez par analyser la situation et déléguer les premières tâches."""
 
     from starlette.responses import RedirectResponse
     return RedirectResponse(f"/dsi/workflow/{workflow_id}", status_code=303)
+
+
+@router.get("/api/debug/agents")
+async def debug_agents():
+    """Debug endpoint: show running agent loops and their status."""
+    from ..agents.loop import get_loop_manager
+    manager = get_loop_manager()
+    import asyncio
+    result = []
+    for key, loop in manager._loops.items():
+        task_done = loop._task.done() if loop._task else True
+        task_exception = None
+        if task_done and loop._task:
+            try:
+                exc = loop._task.exception()
+                task_exception = str(exc) if exc else None
+            except (asyncio.CancelledError, asyncio.InvalidStateError):
+                pass
+        result.append({
+            "key": key,
+            "agent_id": loop.agent.id,
+            "session_id": loop.session_id,
+            "status": loop.status.value,
+            "task_done": task_done,
+            "task_exception": task_exception,
+            "inbox_size": loop._inbox.qsize(),
+            "messages_sent": loop.instance.messages_sent,
+            "messages_received": loop.instance.messages_received,
+            "tokens_used": loop.instance.tokens_used,
+        })
+    return JSONResponse(result)
 
 
 @router.api_route("/api/dsi/workflow/{workflow_id}/next-phase", methods=["GET", "POST"], response_class=HTMLResponse)
