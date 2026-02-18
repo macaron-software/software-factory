@@ -1574,80 +1574,80 @@ async def session_live_page(request: Request, session_id: str):
         if _wf2:
             _WORKFLOW_SUGGESTIONS = {
                 "strategic-committee": [
-                    ("📊", "Arbitrage portfolio", "Analysez le portfolio actuel et recommandez les arbitrages d'investissement pour le trimestre"),
-                    ("🎯", "Priorisation WSJF", "Priorisez les initiatives en cours avec la méthode WSJF et identifiez les quick wins"),
-                    ("⚖️", "GO/NOGO projet", "Évaluez la faisabilité et décidez GO ou NOGO pour les projets en attente"),
-                    ("💰", "Revue budget", "Passez en revue les budgets par projet et identifiez les dépassements potentiels"),
+                    ("bar-chart-2", "Arbitrage portfolio", "Analysez le portfolio actuel et recommandez les arbitrages d'investissement pour le trimestre"),
+                    ("target", "Priorisation WSJF", "Priorisez les initiatives en cours avec la méthode WSJF et identifiez les quick wins"),
+                    ("check-circle", "GO/NOGO projet", "Évaluez la faisabilité et décidez GO ou NOGO pour les projets en attente"),
+                    ("dollar-sign", "Revue budget", "Passez en revue les budgets par projet et identifiez les dépassements potentiels"),
                 ],
                 "sf-pipeline": [
-                    ("🧠", "Analyse codebase", "Analysez la codebase et décomposez les prochaines tâches de développement"),
-                    ("🐛", "Fix bugs critiques", "Identifiez et corrigez les bugs critiques en production"),
-                    ("🔒", "Audit sécurité", "Lancez un audit de sécurité OWASP sur le code actuel"),
-                    ("📈", "Optimisation perf", "Analysez les performances et proposez des optimisations"),
+                    ("cpu", "Analyse codebase", "Analysez la codebase et décomposez les prochaines tâches de développement"),
+                    ("alert-triangle", "Fix bugs critiques", "Identifiez et corrigez les bugs critiques en production"),
+                    ("shield", "Audit sécurité", "Lancez un audit de sécurité OWASP sur le code actuel"),
+                    ("trending-up", "Optimisation perf", "Analysez les performances et proposez des optimisations"),
                 ],
                 "migration-sharelook": [
-                    ("🔄", "Démarrer migration", "Lancez la migration Angular 16→17 en commençant par l'inventaire des modules"),
-                    ("✅", "Vérifier golden files", "Comparez les golden files legacy vs migration pour valider l'ISO 100%"),
-                    ("📦", "Migrer module", "Migrez le prochain module standalone avec les codemods"),
-                    ("🧪", "Tests de régression", "Exécutez les tests de régression post-migration"),
+                    ("refresh-cw", "Démarrer migration", "Lancez la migration Angular 16→17 en commençant par l'inventaire des modules"),
+                    ("check-square", "Vérifier golden files", "Comparez les golden files legacy vs migration pour valider l'ISO 100%"),
+                    ("package", "Migrer module", "Migrez le prochain module standalone avec les codemods"),
+                    ("activity", "Tests de régression", "Exécutez les tests de régression post-migration"),
                 ],
                 "review-cycle": [
-                    ("👀", "Review derniers commits", "Passez en revue les derniers commits et identifiez les problèmes"),
-                    ("🔍", "Analyse qualité", "Analysez la qualité du code : complexité, duplication, couverture"),
-                    ("🛡️", "Audit sécurité", "Vérifiez les vulnérabilités de sécurité dans le code récent"),
+                    ("eye", "Review derniers commits", "Passez en revue les derniers commits et identifiez les problèmes"),
+                    ("search", "Analyse qualité", "Analysez la qualité du code : complexité, duplication, couverture"),
+                    ("shield", "Audit sécurité", "Vérifiez les vulnérabilités de sécurité dans le code récent"),
                 ],
                 "debate-decide": [
-                    ("💡", "Proposition technique", "Débattez des options d'architecture pour la prochaine feature"),
-                    ("⚡", "Choix de stack", "Comparez les stacks techniques et décidez la meilleure approche"),
+                    ("zap", "Proposition technique", "Débattez des options d'architecture pour la prochaine feature"),
+                    ("layers", "Choix de stack", "Comparez les stacks techniques et décidez la meilleure approche"),
                 ],
                 "ideation-to-prod": [
-                    ("💡", "Nouvelle idée", "Explorons une nouvelle idée de produit — de l'idéation jusqu'au MVP"),
-                    ("🏗️", "Architecture MVP", "Définissez l'architecture du MVP et les composants nécessaires"),
-                    ("🚀", "Sprint dev", "Lancez un sprint de développement sur les user stories prioritaires"),
+                    ("compass", "Nouvelle idée", "Explorons une nouvelle idée de produit — de l'idéation jusqu'au MVP"),
+                    ("box", "Architecture MVP", "Définissez l'architecture du MVP et les composants nécessaires"),
+                    ("play", "Sprint dev", "Lancez un sprint de développement sur les user stories prioritaires"),
                 ],
                 "feature-request": [
-                    ("📝", "Nouveau besoin", "J'ai un besoin métier à exprimer pour challenge et implémentation"),
-                    ("🎯", "User story", "Transformez ce besoin en user stories priorisées"),
+                    ("file-text", "Nouveau besoin", "J'ai un besoin métier à exprimer pour challenge et implémentation"),
+                    ("target", "User story", "Transformez ce besoin en user stories priorisées"),
                 ],
                 "tech-debt-reduction": [
-                    ("🔧", "Audit dette", "Lancez un audit cross-projet de la dette technique"),
-                    ("📊", "Prioriser fixes", "Priorisez les corrections de dette par impact WSJF"),
+                    ("tool", "Audit dette", "Lancez un audit cross-projet de la dette technique"),
+                    ("bar-chart-2", "Prioriser fixes", "Priorisez les corrections de dette par impact WSJF"),
                 ],
                 "tma-maintenance": [
-                    ("🐛", "Triage incidents", "Triez les incidents ouverts par sévérité et assignez les correctifs"),
-                    ("🔍", "Diagnostic bug", "Diagnostiquez le bug suivant avec analyse root cause et impact"),
-                    ("🩹", "Hotfix urgent", "Lancez un correctif hotfix P0 avec deploy express"),
-                    ("📊", "Bilan TMA", "Faites un bilan des SLA, incidents résolus et dette technique restante"),
+                    ("alert-triangle", "Triage incidents", "Triez les incidents ouverts par sévérité et assignez les correctifs"),
+                    ("search", "Diagnostic bug", "Diagnostiquez le bug suivant avec analyse root cause et impact"),
+                    ("zap", "Hotfix urgent", "Lancez un correctif hotfix P0 avec deploy express"),
+                    ("bar-chart-2", "Bilan TMA", "Faites un bilan des SLA, incidents résolus et dette technique restante"),
                 ],
                 "test-campaign": [
-                    ("📋", "Plan de test", "Définissez la matrice de couverture et les parcours critiques à tester"),
-                    ("🤖", "Automatiser tests", "Écrivez les tests E2E Playwright pour les parcours identifiés"),
-                    ("▶️", "Lancer campagne", "Exécutez la campagne complète: E2E, API, smoke, performance"),
-                    ("📊", "Rapport qualité", "Consolidez les résultats et décidez GO/NOGO pour la release"),
+                    ("clipboard", "Plan de test", "Définissez la matrice de couverture et les parcours critiques à tester"),
+                    ("terminal", "Automatiser tests", "Écrivez les tests E2E Playwright pour les parcours identifiés"),
+                    ("play-circle", "Lancer campagne", "Exécutez la campagne complète: E2E, API, smoke, performance"),
+                    ("bar-chart-2", "Rapport qualité", "Consolidez les résultats et décidez GO/NOGO pour la release"),
                 ],
                 "cicd-pipeline": [
-                    ("⚙️", "Setup pipeline", "Configurez le pipeline CI/CD GitHub Actions pour le projet"),
-                    ("🔄", "Optimiser CI", "Analysez et optimisez les temps de build du pipeline actuel"),
-                    ("🛡️", "Quality gates", "Configurez les quality gates: couverture, sécurité, performance"),
-                    ("🚀", "Deploy canary", "Lancez un déploiement canary avec monitoring et rollback automatique"),
+                    ("settings", "Setup pipeline", "Configurez le pipeline CI/CD GitHub Actions pour le projet"),
+                    ("refresh-cw", "Optimiser CI", "Analysez et optimisez les temps de build du pipeline actuel"),
+                    ("shield", "Quality gates", "Configurez les quality gates: couverture, sécurité, performance"),
+                    ("upload-cloud", "Deploy canary", "Lancez un déploiement canary avec monitoring et rollback automatique"),
                 ],
                 "product-lifecycle": [
-                    ("💡", "Nouvelle idée produit", "J'ai une idée de produit à explorer — lancez l'idéation avec le métier, l'UX et l'architecte"),
-                    ("🏛️", "Cycle complet depuis un besoin", "Voici un besoin métier — faites-le passer par le cycle complet: idéation → comité strat → dev → CICD → QA → prod → TMA"),
-                    ("🔄", "Reprendre au sprint dev", "Le comité stratégique a validé le GO — lancez les sprints de développement"),
-                    ("🧪", "Lancer la campagne QA", "Le code est prêt — lancez la campagne de tests QA complète avant le deploy"),
+                    ("compass", "Nouvelle idée produit", "J'ai une idée de produit à explorer — lancez l'idéation avec le métier, l'UX et l'architecte"),
+                    ("git-merge", "Cycle complet depuis un besoin", "Voici un besoin métier — faites-le passer par le cycle complet: idéation → comité strat → dev → CICD → QA → prod → TMA"),
+                    ("refresh-cw", "Reprendre au sprint dev", "Le comité stratégique a validé le GO — lancez les sprints de développement"),
+                    ("activity", "Lancer la campagne QA", "Le code est prêt — lancez la campagne de tests QA complète avant le deploy"),
                 ],
             }
             suggestions = _WORKFLOW_SUGGESTIONS.get(wf_id, [])
             if not suggestions and _wf2.description:
                 suggestions = [
-                    ("🚀", "Démarrer", f"Démarrons : {_wf2.description}"),
-                    ("❓", "État des lieux", "Faites un état des lieux avant de commencer"),
+                    ("play", "Démarrer", f"Démarrons : {_wf2.description}"),
+                    ("help-circle", "État des lieux", "Faites un état des lieux avant de commencer"),
                 ]
     if not suggestions and session.goal:
         suggestions = [
-            ("🚀", "Démarrer", f"Commençons : {session.goal}"),
-            ("📋", "Plan d'action", f"Proposez un plan d'action pour : {session.goal}"),
+            ("play", "Démarrer", f"Commençons : {session.goal}"),
+            ("clipboard", "Plan d'action", f"Proposez un plan d'action pour : {session.goal}"),
         ]
 
     return _templates(request).TemplateResponse("session_live.html", {
@@ -4527,3 +4527,199 @@ async def ideation_history_page(request: Request):
         "request": request, "page_title": "Historique Idéation",
         "sessions": sessions,
     })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  MISSION CONTROL — CDP orchestrator dashboard
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/missions", response_class=HTMLResponse)
+async def missions_list_page(request: Request):
+    """List all mission runs."""
+    from ..missions.store import get_mission_run_store
+    store = get_mission_run_store()
+    runs = store.list_runs(limit=50)
+    return _templates(request).TemplateResponse("missions.html", {
+        "request": request, "page_title": "Mission Control",
+        "runs": runs,
+    })
+
+
+@router.get("/missions/start/{workflow_id}", response_class=HTMLResponse)
+async def mission_start_page(request: Request, workflow_id: str):
+    """Start a new mission — show brief form."""
+    from ..workflows.store import get_workflow_store
+    wf = get_workflow_store().get(workflow_id)
+    if not wf:
+        return RedirectResponse("/missions", status_code=302)
+    return _templates(request).TemplateResponse("mission_start.html", {
+        "request": request, "page_title": f"New Mission — {wf.name}",
+        "workflow": wf,
+    })
+
+
+@router.post("/api/missions/start")
+async def api_mission_start(request: Request):
+    """Create a mission run and start the CDP agent."""
+    from ..missions.store import get_mission_run_store
+    from ..workflows.store import get_workflow_store
+    from ..sessions.store import get_session_store, SessionDef, MessageDef
+    from ..agents.loop import get_loop_manager
+    from ..agents.store import get_agent_store
+    from ..models import PhaseRun, PhaseStatus, MissionRun, MissionStatus
+    import uuid
+    from datetime import datetime
+
+    form = await request.form()
+    workflow_id = str(form.get("workflow_id", ""))
+    brief = str(form.get("brief", "")).strip()
+    project_id = str(form.get("project_id", ""))
+
+    wf = get_workflow_store().get(workflow_id)
+    if not wf:
+        return JSONResponse({"error": "Workflow not found"}, status_code=404)
+    if not brief:
+        return JSONResponse({"error": "Brief is required"}, status_code=400)
+
+    # Build phase runs from workflow
+    phases = []
+    for wp in wf.phases:
+        phases.append(PhaseRun(
+            phase_id=wp.id,
+            phase_name=wp.name,
+            pattern_id=wp.pattern_id,
+            status=PhaseStatus.PENDING,
+        ))
+
+    mission_id = uuid.uuid4().hex[:8]
+    mission = MissionRun(
+        id=mission_id,
+        workflow_id=workflow_id,
+        workflow_name=wf.name,
+        brief=brief,
+        status=MissionStatus.RUNNING,
+        phases=phases,
+        project_id=project_id or None,
+        created_at=datetime.utcnow(),
+    )
+
+    run_store = get_mission_run_store()
+    run_store.create(mission)
+
+    # Create a session for the CDP agent
+    session_store = get_session_store()
+    session_id = uuid.uuid4().hex[:8]
+    session_store.create(SessionDef(
+        id=session_id,
+        name=f"Mission: {wf.name}",
+        workflow_id=workflow_id,
+        project_id=project_id or None,
+        status="active",
+    ))
+    # Update mission with session_id
+    mission.session_id = session_id
+    run_store.update(mission)
+
+    # Send the brief as initial message
+    session_store.add_message(MessageDef(
+        session_id=session_id,
+        from_agent="user",
+        to_agent="chef_de_programme",
+        message_type="request",
+        content=brief,
+    ))
+
+    # Start the CDP agent loop
+    mgr = get_loop_manager()
+    try:
+        await mgr.start_agent("chef_de_programme", session_id, project_id or "", "")
+    except Exception as e:
+        logger.error("Failed to start CDP agent: %s", e)
+
+    return JSONResponse({"mission_id": mission_id, "session_id": session_id,
+                         "redirect": f"/missions/{mission_id}/control"})
+
+
+@router.get("/missions/{mission_id}/control", response_class=HTMLResponse)
+async def mission_control_page(request: Request, mission_id: str):
+    """Mission Control dashboard — pipeline visualization + CDP activity."""
+    from ..missions.store import get_mission_run_store
+    from ..agents.store import get_agent_store
+
+    run_store = get_mission_run_store()
+    mission = run_store.get(mission_id)
+    if not mission:
+        return RedirectResponse("/missions", status_code=302)
+
+    # Build agent map for avatars
+    agents = get_agent_store().list()
+    agent_map = _agent_map_for_template(agents)
+
+    return _templates(request).TemplateResponse("mission_control.html", {
+        "request": request,
+        "page_title": f"Mission Control — {mission.workflow_name}",
+        "mission": mission,
+        "agent_map": agent_map,
+        "session_id": mission.session_id or "",
+    })
+
+
+@router.get("/api/missions/{mission_id}")
+async def api_mission_status(request: Request, mission_id: str):
+    """Get mission status as JSON."""
+    from ..missions.store import get_mission_run_store
+    store = get_mission_run_store()
+    mission = store.get(mission_id)
+    if not mission:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    return JSONResponse(mission.model_dump(mode="json"))
+
+
+@router.post("/api/missions/{mission_id}/validate")
+async def api_mission_validate(request: Request, mission_id: str):
+    """Human validates a checkpoint (GO/NOGO/PIVOT)."""
+    from ..missions.store import get_mission_run_store
+    from ..sessions.store import get_session_store, MessageDef
+    from ..a2a.bus import get_bus
+    from ..models import A2AMessage, MessageType, PhaseStatus
+
+    form = await request.form()
+    decision = str(form.get("decision", "GO")).upper()
+
+    run_store = get_mission_run_store()
+    mission = run_store.get(mission_id)
+    if not mission:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    # Update phase status
+    if mission.current_phase:
+        for p in mission.phases:
+            if p.phase_id == mission.current_phase and p.status == PhaseStatus.WAITING_VALIDATION:
+                p.status = PhaseStatus.DONE if decision == "GO" else PhaseStatus.FAILED
+        run_store.update(mission)
+
+    # Send decision to CDP agent via bus
+    if mission.session_id:
+        session_store = get_session_store()
+        session_store.add_message(MessageDef(
+            session_id=mission.session_id,
+            from_agent="user",
+            to_agent="chef_de_programme",
+            message_type="response",
+            content=f"DECISION: {decision}",
+        ))
+        # Also publish to bus for agent loop
+        bus = get_bus()
+        import uuid
+        from datetime import datetime
+        await bus.publish(A2AMessage(
+            id=uuid.uuid4().hex[:8],
+            session_id=mission.session_id,
+            from_agent="user",
+            to_agent="chef_de_programme",
+            message_type=MessageType.RESPONSE,
+            content=f"DECISION: {decision}",
+            timestamp=datetime.utcnow(),
+        ))
+
+    return JSONResponse({"decision": decision, "phase": mission.current_phase})

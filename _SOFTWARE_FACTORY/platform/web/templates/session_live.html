@@ -36,10 +36,13 @@
 .session-status .dot--error{background:var(--red)}
 /* ── Streaming ── */
 .mu--streaming{border-left-width:3px;animation:stream-pulse 1.5s ease-in-out infinite}
-.mu__typing{font-size:0.65rem;color:var(--purple-light);margin-left:0.5rem;font-style:italic}
-.mu__dots{animation:dots-blink 1.2s steps(3) infinite}
+.mu__typing{font-size:0.72rem;color:var(--purple-light);margin-left:0.5rem;display:inline-flex;align-items:center;gap:3px}
+.mu__dots{display:inline-flex;gap:3px;margin-left:2px}
+.mu__dots span{width:5px;height:5px;border-radius:50%;background:var(--purple-light);animation:dotPulse 1.4s infinite both}
+.mu__dots span:nth-child(2){animation-delay:0.2s}
+.mu__dots span:nth-child(3){animation-delay:0.4s}
+@keyframes dotPulse{0%,80%,100%{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
 @keyframes stream-pulse{0%,100%{opacity:1}50%{opacity:.7}}
-@keyframes dots-blink{0%{content:''}33%{content:'.'}66%{content:'..'}100%{content:'...'}}
 .mu__stream-content{min-height:1.2em}
 .session-tabs{display:flex;gap:0}
 .session-tab{background:none;border:none;color:var(--text-secondary);padding:0.45rem 1rem;font-size:0.82rem;cursor:pointer;border-radius:6px;transition:all .15s;display:flex;align-items:center;gap:0.35rem}
@@ -57,7 +60,7 @@
 .suggestion-badge{display:flex;align-items:center;gap:.4rem;padding:.5rem 1rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:20px;cursor:pointer;font-size:.8rem;color:var(--text-primary);transition:all .15s;font-family:inherit}
 .suggestion-badge:hover{border-color:var(--purple);background:rgba(124,58,237,.1);transform:translateY(-1px);box-shadow:0 4px 12px rgba(124,58,237,.15)}
 .suggestion-badge:active{transform:translateY(0)}
-.suggestion-icon{font-size:1rem}
+.suggestion-icon{width:14px;height:14px;color:var(--purple-light);flex-shrink:0}
 .suggestion-label{font-weight:500}
 
 /* ── Bottom input bar ── */
@@ -303,7 +306,7 @@
           <div class="suggestions-grid">
             {% for icon, label, prompt in suggestions %}
             <button class="suggestion-badge" data-prompt="{{ prompt }}" onclick="useSuggestion(this)">
-              <span class="suggestion-icon">{{ icon }}</span>
+              <svg class="icon icon-sm suggestion-icon"><use href="#icon-{{ icon }}"/></svg>
               <span class="suggestion-label">{{ label }}</span>
             </button>
             {% endfor %}
@@ -591,7 +594,23 @@ const NODE_W = 230, NODE_H = 110;
 
 function agentById(id){ return AGENTS.find(a=>a.id===id) || null; }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function cleanLLM(s){
+  // Strip <think>...</think> blocks (MiniMax reasoning)
+  s = s.replace(/<think>[\s\S]*?<\/think>/g, '');
+  // Strip incomplete <think> at end (still streaming)
+  s = s.replace(/<think>[\s\S]*$/, '');
+  // Strip [TOOL_CALL]...[/TOOL_CALL] blocks
+  s = s.replace(/\[TOOL_CALL\][\s\S]*?\[\/TOOL_CALL\]/g, '');
+  // Strip incomplete [TOOL_CALL] at end
+  s = s.replace(/\[TOOL_CALL\][\s\S]*$/, '');
+  // Strip [DELEGATE:...] [VETO:...] [APPROVE] action tags
+  s = s.replace(/\[(DELEGATE|VETO|APPROVE|ASK|ESCALATE)[^\]]*\]/g, '');
+  return s.trim();
+}
+
 function md(s){
+  s = cleanLLM(s);
+  if (!s) return '';
   // Lightweight markdown: bold, italic, code, headers, lists, links, tables
   let h = esc(s);
   h = h.replace(/^### (.+)$/gm, '<h4>$1</h4>');
@@ -728,7 +747,7 @@ function handleStreamStart(data){
       <div class="mu__meta">
         <span class="mu__name" style="color:${color}">${esc(name)}</span>
         ${agent&&agent.role ? `<span class="mu__role">${esc(agent.role)}</span>` : ''}
-        <span class="mu__typing">typing<span class="mu__dots">...</span></span>
+        <span class="mu__typing"><span class="mu__dots"><span></span><span></span><span></span></span></span>
       </div>
       ${metaHtml}
       <div class="mu__content md-rendered mu__stream-content"></div>

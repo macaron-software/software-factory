@@ -95,10 +95,19 @@ def create_app() -> FastAPI:
 
     # Templates
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-    # Add markdown filter for chat rendering
+    # Add markdown filter for chat rendering (with LLM artifact stripping)
     import markdown as _md_lib
+    import re as _re
+    def _clean_llm(text: str) -> str:
+        t = str(text or "")
+        t = _re.sub(r'<think>[\s\S]*?</think>', '', t)
+        t = _re.sub(r'<think>[\s\S]*$', '', t)
+        t = _re.sub(r'\[TOOL_CALL\][\s\S]*?\[/TOOL_CALL\]', '', t)
+        t = _re.sub(r'\[TOOL_CALL\][\s\S]*$', '', t)
+        t = _re.sub(r'\[(DELEGATE|VETO|APPROVE|ASK|ESCALATE)[^\]]*\]', '', t)
+        return t.strip()
     templates.env.filters["markdown"] = lambda text: _md_lib.markdown(
-        str(text or ""), extensions=["fenced_code", "tables", "nl2br"]
+        _clean_llm(text), extensions=["fenced_code", "tables", "nl2br"]
     )
     app.state.templates = templates
 

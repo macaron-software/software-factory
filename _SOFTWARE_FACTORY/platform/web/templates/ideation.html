@@ -572,7 +572,17 @@ let sessionId = '';
 
 // Lightweight markdown renderer (same as session_live.html)
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function cleanLLM(s){
+  s = s.replace(/<think>[\s\S]*?<\/think>/g, '');
+  s = s.replace(/<think>[\s\S]*$/, '');
+  s = s.replace(/\[TOOL_CALL\][\s\S]*?\[\/TOOL_CALL\]/g, '');
+  s = s.replace(/\[TOOL_CALL\][\s\S]*$/, '');
+  s = s.replace(/\[(DELEGATE|VETO|APPROVE|ASK|ESCALATE)[^\]]*\]/g, '');
+  return s.trim();
+}
 function md(s){
+  s = cleanLLM(s);
+  if (!s) return '';
   let h = esc(s);
   h = h.replace(/^### (.+)$/gm, '<h4>$1</h4>');
   h = h.replace(/^## (.+)$/gm, '<h3>$1</h3>');
