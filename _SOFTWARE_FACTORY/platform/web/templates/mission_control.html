@@ -216,6 +216,11 @@
             </div>
             <span class="mc-cdp-status active" id="mc-cdp-status">● Pilotage actif</span>
         </div>
+        <div style="padding:0.4rem 0.75rem;border-bottom:1px solid var(--border)">
+            <button id="mc-run-btn" onclick="startMissionExecution()" style="width:100%;padding:0.45rem;border:none;border-radius:6px;background:var(--purple);color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.4rem;transition:opacity .15s">
+                ▶ Démarrer le Mega-Workflow
+            </button>
+        </div>
         <div class="mc-activity" id="mc-activity">
             <div class="mc-msg system"><div class="mc-msg-content">🚀 Mission démarrée — {{ mission.brief[:200] }}</div></div>
             <div class="mc-msg tool"><div class="mc-msg-time">{{ "now" }}</div><div class="mc-msg-content">📋 {{ mission.phases|length }} phases à orchestrer • Pattern: mega-workflow lifecycle</div></div>
@@ -489,6 +494,17 @@ async function validateMission(decision) {
         await fetch(`/api/missions/${MISSION_ID}/validate`, {method:'POST', body: fd});
         document.querySelectorAll('.mc-checkpoint').forEach(el => el.remove());
         addActivity(`🏁 Décision: ${decision}`, 'system');
+    } catch(err) { console.error(err); }
+}
+
+async function startMissionExecution() {
+    const btn = document.getElementById('mc-run-btn');
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Exécution en cours…';
+    btn.style.opacity = '0.6';
+    addActivity('🚀 Lancement du mega-workflow par le CDP…', 'system');
+    try {
+        await fetch(`/api/missions/${MISSION_ID}/run`, {method:'POST'});
     } catch(err) { console.error(err); }
 }
 

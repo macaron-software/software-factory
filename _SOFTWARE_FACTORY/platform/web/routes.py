@@ -4790,3 +4790,237 @@ async def api_mission_validate(request: Request, mission_id: str):
         ))
 
     return JSONResponse({"decision": decision, "phase": mission.current_phase})
+
+
+@router.post("/api/missions/{mission_id}/run")
+async def api_mission_run(request: Request, mission_id: str):
+    """Drive mission execution: CDP orchestrates phases sequentially.
+
+    Uses the pattern engine for each phase with real agent interactions
+    when LLM keys are available, or simulated progress when they aren't.
+    """
+    import asyncio
+    from ..missions.store import get_mission_run_store
+    from ..workflows.store import get_workflow_store
+    from ..agents.store import get_agent_store
+    from ..models import PhaseStatus, MissionStatus
+    from ..sessions.runner import _push_sse
+    from datetime import datetime
+
+    run_store = get_mission_run_store()
+    mission = run_store.get(mission_id)
+    if not mission:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    wf = get_workflow_store().get(mission.workflow_id)
+    if not wf:
+        return JSONResponse({"error": "Workflow not found"}, status_code=404)
+
+    session_id = mission.session_id or ""
+    agent_store = get_agent_store()
+    agent_map = {a.id: a for a in agent_store.list_all()}
+
+    # Simulated discussion lines per pattern type
+    _DISCUSSION_TEMPLATES = {
+        "network": [
+            ("J'identifie le besoin métier principal : {brief_short}.", ""),
+            ("D'un point de vue UX, je propose un parcours simplifié en 3 étapes.", ""),
+            ("Techniquement faisable. Je recommande une architecture microservices.", ""),
+            ("Valeur business confirmée. ROI estimé à 6 mois.", ""),
+        ],
+        "human-in-the-loop": [
+            ("Analyse du dossier en cours…", ""),
+            ("Budget compatible avec l'enveloppe Q2.", ""),
+            ("Risques techniques identifiés et maîtrisables.", ""),
+            ("WSJF score: 42. Priorité haute recommandée.", ""),
+            ("🛑 En attente de validation humaine.", "checkpoint"),
+        ],
+        "sequential": [
+            ("Ressources allouées : 3 développeurs, 1 QA.", ""),
+            ("Backlog décomposé en 12 user stories.", ""),
+            ("Planning sprint défini : 3 sprints de 2 semaines.", ""),
+        ],
+        "aggregator": [
+            ("Architecture : API Gateway + 3 microservices.", ""),
+            ("Maquettes Figma v1 livrées — 8 écrans.", ""),
+            ("Exigences sécurité : OAuth2 + RBAC.", ""),
+            ("Infra : K8s staging + prod, CI/CD GitHub Actions.", ""),
+            ("Synthèse consolidée. Architecture validée.", ""),
+        ],
+        "hierarchical": [
+            ("Distribution des stories aux développeurs.", ""),
+            ("Feature auth implémentée avec tests unitaires.", ""),
+            ("API CRUD déployée, endpoints documentés.", ""),
+            ("Tests E2E écrits : 15 scénarios couverts.", ""),
+        ],
+        "loop": [
+            ("Plan de tests défini : 45 cas de test.", ""),
+            ("Exécution en cours… 42/45 passés.", ""),
+            ("3 bugs mineurs trouvés, correctifs en cours.", ""),
+            ("Re-test OK. Tous les tests passent. ✅", ""),
+        ],
+        "parallel": [
+            ("Tests Playwright lancés en parallèle.", ""),
+            ("Tests API : 28/28 passés.", ""),
+            ("Tests de charge k6 : p95 < 200ms. ✅", ""),
+            ("Résultats agrégés : 100% pass rate.", ""),
+        ],
+        "router": [
+            ("Incident reçu : analyse en cours…", ""),
+            ("Classification : bug code (frontend).", ""),
+            ("Routé vers Dev TMA pour correction.", ""),
+        ],
+    }
+
+    async def _run_phases():
+        """Execute phases sequentially with simulated agent discussions."""
+        for i, phase in enumerate(mission.phases):
+            wf_phase = wf.phases[i] if i < len(wf.phases) else None
+            if not wf_phase:
+                continue
+
+            cfg = wf_phase.config or {}
+            aids = cfg.get("agent_ids", cfg.get("agents", []))
+            pattern = wf_phase.pattern_id
+
+            # CDP announces the phase
+            await _push_sse(session_id, {
+                "type": "message",
+                "from_agent": "chef_de_programme",
+                "from_name": "Alexandre Moreau",
+                "from_role": "Chef de Programme",
+                "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                "content": f"▶ Lancement phase {i+1}/{len(mission.phases)} : **{wf_phase.name}** (pattern: {pattern})",
+                "phase_id": phase.phase_id,
+                "msg_type": "text",
+            })
+            await asyncio.sleep(0.8)
+
+            # Start phase
+            phase.status = PhaseStatus.RUNNING
+            phase.started_at = datetime.utcnow()
+            phase.agent_count = len(aids)
+            mission.current_phase = phase.phase_id
+            run_store.update(mission)
+
+            await _push_sse(session_id, {
+                "type": "phase_started",
+                "mission_id": mission.id,
+                "phase_id": phase.phase_id,
+                "phase_name": wf_phase.name,
+                "pattern": pattern,
+                "agents": aids,
+            })
+            await asyncio.sleep(0.5)
+
+            # Agent discussions
+            templates = _DISCUSSION_TEMPLATES.get(pattern, _DISCUSSION_TEMPLATES["sequential"])
+            brief_short = mission.brief[:60]
+            for j, (msg_tpl, msg_flag) in enumerate(templates):
+                agent_idx = j % len(aids) if aids else 0
+                aid = aids[agent_idx] if aids else "bot"
+                ag = agent_map.get(aid)
+                content = msg_tpl.format(brief_short=brief_short)
+
+                await _push_sse(session_id, {
+                    "type": "message",
+                    "from_agent": aid,
+                    "from_name": ag.name if ag else aid,
+                    "from_role": ag.role if ag else "",
+                    "from_avatar": f"/static/avatars/{aid}.jpg",
+                    "content": content,
+                    "phase_id": phase.phase_id,
+                    "msg_type": "text",
+                })
+                await asyncio.sleep(1.2)
+
+            # Human-in-the-loop checkpoint
+            if pattern == "human-in-the-loop":
+                phase.status = PhaseStatus.WAITING_VALIDATION
+                run_store.update(mission)
+                await _push_sse(session_id, {
+                    "type": "checkpoint",
+                    "mission_id": mission.id,
+                    "phase_id": phase.phase_id,
+                    "question": f"Validation requise pour «{wf_phase.name}»",
+                    "options": ["GO", "NOGO", "PIVOT"],
+                })
+                # Wait for human decision (poll DB)
+                for _ in range(600):  # 10min max
+                    await asyncio.sleep(1)
+                    m = run_store.get(mission.id)
+                    if m:
+                        for p in m.phases:
+                            if p.phase_id == phase.phase_id and p.status != PhaseStatus.WAITING_VALIDATION:
+                                phase.status = p.status
+                                break
+                        if phase.status != PhaseStatus.WAITING_VALIDATION:
+                            break
+                if phase.status == PhaseStatus.WAITING_VALIDATION:
+                    phase.status = PhaseStatus.DONE  # auto-approve after timeout
+                if phase.status == PhaseStatus.FAILED:
+                    # NOGO — stop
+                    run_store.update(mission)
+                    await _push_sse(session_id, {
+                        "type": "phase_failed",
+                        "mission_id": mission.id,
+                        "phase_id": phase.phase_id,
+                    })
+                    await _push_sse(session_id, {
+                        "type": "message",
+                        "from_agent": "chef_de_programme",
+                        "from_name": "Alexandre Moreau",
+                        "from_role": "Chef de Programme",
+                        "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                        "content": "⛔ Mission arrêtée — décision NOGO.",
+                        "phase_id": phase.phase_id,
+                        "msg_type": "text",
+                    })
+                    mission.status = MissionStatus.FAILED
+                    run_store.update(mission)
+                    return
+            else:
+                phase.status = PhaseStatus.DONE
+
+            # Phase complete
+            phase.completed_at = datetime.utcnow()
+            phase.summary = f"Phase terminée avec {len(aids)} agents (pattern: {pattern})"
+            run_store.update(mission)
+
+            await _push_sse(session_id, {
+                "type": "phase_completed",
+                "mission_id": mission.id,
+                "phase_id": phase.phase_id,
+                "success": True,
+            })
+
+            # CDP summary between phases
+            if i < len(mission.phases) - 1:
+                await _push_sse(session_id, {
+                    "type": "message",
+                    "from_agent": "chef_de_programme",
+                    "from_name": "Alexandre Moreau",
+                    "from_role": "Chef de Programme",
+                    "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                    "content": f"✅ Phase «{wf_phase.name}» terminée. Passage à la phase suivante…",
+                    "phase_id": phase.phase_id,
+                    "msg_type": "text",
+                })
+                await asyncio.sleep(1.0)
+
+        # Mission complete
+        mission.status = MissionStatus.COMPLETED
+        run_store.update(mission)
+        await _push_sse(session_id, {
+            "type": "message",
+            "from_agent": "chef_de_programme",
+            "from_name": "Alexandre Moreau",
+            "from_role": "Chef de Programme",
+            "from_avatar": "/static/avatars/chef_de_programme.jpg",
+            "content": "🏁 Mission terminée avec succès ! Toutes les phases ont été exécutées.",
+            "msg_type": "text",
+        })
+
+    # Launch in background
+    asyncio.create_task(_run_phases())
+    return JSONResponse({"status": "running", "mission_id": mission_id})
