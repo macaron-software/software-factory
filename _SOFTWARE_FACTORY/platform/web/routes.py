@@ -5114,6 +5114,7 @@ async def api_mission_run(request: Request, mission_id: str):
                     phase_pattern, session_id, phase_task,
                     project_id=mission.project_id,
                     project_path=mission.workspace_path,
+                    phase_id=phase.phase_id,
                 )
                 phase_success = result.success
                 if not phase_success:

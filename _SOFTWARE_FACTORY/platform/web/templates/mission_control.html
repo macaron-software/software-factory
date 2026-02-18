@@ -305,6 +305,7 @@ const PHASE_GRAPHS = {{ phase_graphs | tojson }};
 
 /* ── Agent name lookup (from phase_agents data) ── */
 const AGENT_INFO = {};
+const AGENT_PHASE = {};  // agent_id → phase_id (for routing SSE events)
 for (const [pid, agents] of Object.entries(PHASE_AGENTS)) {
     for (const a of agents) {
         if (a.id && !AGENT_INFO[a.id]) {
@@ -315,6 +316,7 @@ for (const [pid, agents] of Object.entries(PHASE_AGENTS)) {
                 color: a.color || '#8b949e'
             };
         }
+        if (a.id) AGENT_PHASE[a.id] = pid;  // last phase wins (agent may appear in multiple)
     }
 }
 
@@ -537,7 +539,7 @@ function handleSSE(d) {
         if (d.msg_type === 'tool_result') addActivity(d.content?.substring(0, 200), 'tool');
     }
     else if (d.type === 'stream_start') {
-        const phaseId = currentRunningPhase();
+        const phaseId = d.phase_id || currentRunningPhase();
         if (phaseId) {
             const container = document.getElementById(`discuss-${phaseId}`);
             if (container) {
@@ -588,7 +590,7 @@ function handleSSE(d) {
     }
     else if (d.type === 'stream_delta') {
         // Streaming text chunk from agent
-        const phaseId = currentRunningPhase();
+        const phaseId = d.phase_id || currentRunningPhase();
         if (phaseId) {
             const container = document.getElementById(`discuss-${phaseId}`);
             if (container) {
@@ -605,7 +607,7 @@ function handleSSE(d) {
     }
     else if (d.type === 'stream_thinking') {
         // Agent is in <think> mode — pulse the indicator
-        const phaseId = currentRunningPhase();
+        const phaseId = d.phase_id || currentRunningPhase();
         if (phaseId) {
             const container = document.getElementById(`discuss-${phaseId}`);
             if (container) {
@@ -615,6 +617,7 @@ function handleSSE(d) {
         }
     }
     else if (d.type === 'agent_status') {
+        const phaseId = d.phase_id || currentRunningPhase();
         if (d.status === 'thinking') {
             addActivity(`${d.agent_id} analyse…`, 'tool');
         }

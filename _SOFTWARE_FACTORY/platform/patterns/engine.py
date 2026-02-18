@@ -51,6 +51,7 @@ class PatternRun:
     session_id: str
     project_id: str = ""
     project_path: str = ""  # workspace filesystem path for tools
+    phase_id: str = ""  # mission phase_id for SSE routing
     nodes: dict[str, NodeState] = field(default_factory=dict)
     iteration: int = 0
     max_iterations: int = 5
@@ -62,6 +63,13 @@ class PatternRun:
 
 # SSE push (import from runner to share the same queues)
 from ..sessions.runner import _push_sse
+
+
+async def _sse(run: PatternRun, event: dict):
+    """Push SSE event with automatic phase_id injection."""
+    if run.phase_id and "phase_id" not in event:
+        event["phase_id"] = run.phase_id
+    await _sse(run, event)
 
 # Protocol that makes agents produce trackable PRs/deliverables
 _PR_PROTOCOL = """[IMPORTANT — Team Protocol]
@@ -177,6 +185,7 @@ async def run_pattern(
     initial_task: str,
     project_id: str = "",
     project_path: str = "",
+    phase_id: str = "",
 ) -> PatternRun:
     """Execute a pattern graph in a session. Returns the run state."""
     run = PatternRun(
@@ -184,6 +193,7 @@ async def run_pattern(
         session_id=session_id,
         project_id=project_id,
         project_path=project_path,
+        phase_id=phase_id,
         max_iterations=pattern.config.get("max_iterations", 5),
     )
 
@@ -208,7 +218,7 @@ async def run_pattern(
         message_type="system",
         content=f"Pattern **{pattern.name}** started ({pattern.type})",
     ))
-    await _push_sse(session_id, {
+    await _sse(run, {
         "type": "pattern_start",
         "pattern_id": pattern.id,
         "pattern_name": pattern.name,
@@ -264,7 +274,7 @@ async def run_pattern(
         message_type="system",
         content=f"Pattern **{pattern.name}** {status}",
     ))
-    await _push_sse(session_id, {
+    await _sse(run, {
         "type": "pattern_end",
         "success": run.success,
         "error": run.error,
@@ -287,7 +297,7 @@ async def _execute_node(
     store = get_session_store()
 
     # Push thinking status
-    await _push_sse(run.session_id, {
+    await _sse(run, {
         "type": "agent_status",
         "agent_id": agent.id,
         "node_id": node_id,
@@ -326,7 +336,7 @@ async def _execute_node(
     executor = get_executor()
     result = None
 
-    await _push_sse(run.session_id, {
+    await _sse(run, {
         "type": "stream_start",
         "agent_id": agent.id,
         "agent_name": agent.name,
@@ -361,12 +371,12 @@ async def _execute_node(
                     think_chunks += 1
                     # Send heartbeat every 20 think chunks so frontend knows agent is alive
                     if think_chunks % 20 == 0:
-                        await _push_sse(run.session_id, {
+                        await _sse(run, {
                             "type": "stream_thinking",
                             "agent_id": agent.id,
                         })
                 elif not in_tool_call:
-                    await _push_sse(run.session_id, {
+                    await _sse(run, {
                         "type": "stream_delta",
                         "agent_id": agent.id,
                         "delta": delta,
@@ -451,7 +461,7 @@ async def _execute_node(
     edit_count = sum(1 for tc in tcs if tc.get("name") in ("code_edit", "code_write"))
     read_count = sum(1 for tc in tcs if tc.get("name") in ("code_read", "code_search", "list_files"))
 
-    await _push_sse(run.session_id, {
+    await _sse(run, {
         "type": "stream_end",
         "agent_id": agent.id,
         "content": content,
@@ -460,7 +470,7 @@ async def _execute_node(
         "flow_step": run.flow_step,
     })
 
-    await _push_sse(run.session_id, {
+    await _sse(run, {
         "type": "message",
         "from_agent": agent.id,
         "to_agent": to_agent_id or "all",
@@ -473,7 +483,7 @@ async def _execute_node(
         "tool_count": len(tcs),
     })
 
-    await _push_sse(run.session_id, {
+    await _sse(run, {
         "type": "agent_status",
         "agent_id": agent.id,
         "status": "idle",
@@ -494,7 +504,7 @@ async def _execute_node(
                 category=run.pattern.type,
                 source=agent.id,
             )
-            await _push_sse(run.session_id, {
+            await _sse(run, {
                 "type": "memory_stored",
                 "category": run.pattern.type,
                 "key": f"{agent.name}: {run.pattern.type}",
@@ -788,7 +798,7 @@ async def _run_hierarchical(run: PatternRun, task: str):
                 message_type="system",
                 content=f"QA loop {outer + 1}/{max_outer} — addressing VETO feedback",
             ))
-            await _push_sse(run.session_id, {
+            await _sse(run, {
                 "type": "system",
                 "content": f"QA validation loop {outer + 1}/{max_outer}",
             })
@@ -918,7 +928,7 @@ async def _run_hierarchical(run: PatternRun, task: str):
             message_type="system",
             content=f"QA rejected — {len(vetoes)} VETO(s). Feedback loop — re-assign corrections.",
         ))
-        await _push_sse(run.session_id, {
+        await _sse(run, {
             "type": "message",
             "from_agent": "system",
             "content": f"{len(vetoes)} VETO(s) — correction loop {outer + 1}/{max_outer}",
@@ -1186,7 +1196,7 @@ async def _run_human_in_the_loop(run: PatternRun, task: str):
                 content=f"**🔔 CHECKPOINT HUMAIN**\n\n{checkpoint_msg}\n\n"
                         f"_Résumé du travail effectué :_\n{prev_output[:500]}",
             ))
-            await _push_sse(run.session_id, {
+            await _sse(run, {
                 "type": "checkpoint",
                 "content": checkpoint_msg,
                 "requires_input": True,
@@ -1216,7 +1226,7 @@ async def _run_human_in_the_loop(run: PatternRun, task: str):
                         f"L'agent a terminé son travail. Validez ou demandez des corrections.\n\n"
                         f"_Résultat :_\n{output[:500]}",
             ))
-            await _push_sse(run.session_id, {
+            await _sse(run, {
                 "type": "checkpoint",
                 "content": "Validation humaine requise",
                 "requires_input": True,
