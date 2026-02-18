@@ -368,6 +368,13 @@ function renderPhaseGraphs() {
         container.style.minHeight = H + 'px';
         let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="min-height:${H}px">`;
 
+        // Generate per-color arrow markers
+        const edgeColors = new Set(edges.map(e => e.color || pStyle.color));
+        edgeColors.forEach(c => {
+            const id = c.replace('#','');
+            svg += `<defs><marker id="mc-arrow-${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="${c}"/></marker></defs>`;
+        });
+
         // Edges with bezier curves
         edges.forEach(e => {
             const fn = nodeById[e.from], tn = nodeById[e.to];
@@ -400,7 +407,7 @@ function renderPhaseGraphs() {
                 const co = Math.max(25, Math.abs(y2f-y1f)*0.3);
                 d = `M${x1f},${y1f} C${x1f},${y1f-co} ${x2f},${y2f+co} ${x2f},${y2f}`;
             }
-            svg += `<path d="${d}" class="mc-edge-line" style="stroke:${eColor};marker-end:url(#mc-arrow-${patternId.trim()||'default'})${eDash?`;stroke-dasharray:${eDash}`:''}"/>`;
+            svg += `<path d="${d}" class="mc-edge-line" style="stroke:${eColor};marker-end:url(#mc-arrow-${eColor.replace('#','')})${eDash?`;stroke-dasharray:${eDash}`:''}"/>`;
             if (e.label) {
                 const mx = (x1f+x2f)/2, my = (y1f+y2f)/2 - 5;
                 svg += `<text x="${mx}" y="${my}" class="mc-edge-count" style="fill:${eColor}">${esc(e.label)}</text>`;
@@ -436,8 +443,18 @@ function renderPhaseGraphs() {
             svg += `</g>`;
         });
 
-        // Legend for pattern
-        svg += `<g transform="translate(8,${H-20})"><text style="font-size:8px;fill:var(--text-secondary)">${pStyle.icon} ${patternId}</text></g>`;
+        // Legend — show all unique edge colors with labels
+        const colorToPattern = {};
+        Object.entries(MC_PATTERN_STYLES).forEach(([k,v]) => { colorToPattern[v.color] = `${v.icon} ${k}`; });
+        let legendX = 8;
+        svg += `<g transform="translate(0,${H-18})">`;
+        edgeColors.forEach(c => {
+            const lbl = colorToPattern[c] || c;
+            svg += `<line x1="${legendX}" y1="5" x2="${legendX+14}" y2="5" stroke="${c}" stroke-width="2"/>`;
+            svg += `<text x="${legendX+18}" y="9" style="font-size:8px;fill:${c}">${esc(lbl)}</text>`;
+            legendX += lbl.length * 5 + 30;
+        });
+        svg += `</g>`;
 
         svg += `</svg>`;
         container.innerHTML = svg;
