@@ -4611,7 +4611,6 @@ async def api_mission_start(request: Request):
     session_store.create(SessionDef(
         id=session_id,
         name=f"Mission: {wf.name}",
-        workflow_id=workflow_id,
         project_id=project_id or None,
         status="active",
     ))
@@ -4624,7 +4623,7 @@ async def api_mission_start(request: Request):
         session_id=session_id,
         from_agent="user",
         to_agent="chef_de_programme",
-        message_type="request",
+        message_type="instruction",
         content=brief,
     ))
 
