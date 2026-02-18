@@ -4682,17 +4682,31 @@ async def mission_control_page(request: Request, mission_id: str):
         all_edges = global_graph.get("edges", [])
         nid_to_agent = {n["id"]: n.get("agent_id", "") for n in all_nodes}
 
+        # Pre-fetch full agent defs for enriching phase_agents
+        agent_defs = {a.id: a for a in agents}
+
         for wp in wf.phases:
             cfg = wp.config or {}
             aids = cfg.get("agent_ids", cfg.get("agents", []))
-            phase_agents[wp.id] = [
-                {"id": a,
-                 "name": agent_map[a]["name"] if a in agent_map else a,
-                 "role": agent_map[a]["role"] if a in agent_map else "",
-                 "avatar": agent_map[a]["avatar_url"] if a in agent_map else "",
-                 "color": agent_map[a]["color"] if a in agent_map else "#8b949e"}
-                for a in aids
-            ]
+            entries = []
+            for a in aids:
+                adef = agent_defs.get(a)
+                am = agent_map.get(a, {})
+                entries.append({
+                    "id": a,
+                    "name": am.get("name", a),
+                    "role": am.get("role", ""),
+                    "avatar_url": am.get("avatar_url", ""),
+                    "color": am.get("color", "#8b949e"),
+                    "tagline": getattr(adef, "tagline", "") or "" if adef else "",
+                    "persona": getattr(adef, "persona", "") or "" if adef else "",
+                    "motivation": getattr(adef, "motivation", "") or "" if adef else "",
+                    "skills": getattr(adef, "skills", []) or [] if adef else [],
+                    "tools": getattr(adef, "tools", []) or [] if adef else [],
+                    "model": getattr(adef, "model", "") or "" if adef else "",
+                    "provider": getattr(adef, "provider", "") or "" if adef else "",
+                })
+            phase_agents[wp.id] = entries
             # Extract sub-graph: nodes in this phase + edges between them
             agent_set = set(aids)
             p_nodes = [n for n in all_nodes if n.get("agent_id") in agent_set]

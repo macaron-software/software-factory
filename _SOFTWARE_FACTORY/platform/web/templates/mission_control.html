@@ -115,6 +115,30 @@
 
 /* Checkpoint */
 .mc-checkpoint{background:rgba(234,179,8,.08);border-top:1px solid var(--yellow);padding:0.6rem 0.75rem}
+
+/* Agent popover */
+.mc-popover-overlay{position:fixed;inset:0;z-index:999;display:none}
+.mc-popover-overlay.open{display:block}
+.mc-popover{position:fixed;z-index:1000;width:340px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius,10px);box-shadow:0 12px 40px rgba(0,0,0,.45);overflow:hidden;display:none;animation:mcPopIn .15s ease}
+.mc-popover.open{display:block}
+@keyframes mcPopIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.mc-popover-header{padding:0.85rem;display:flex;align-items:center;gap:0.75rem;border-bottom:1px solid var(--border)}
+.mc-popover-photo{width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--purple);flex-shrink:0}
+.mc-popover-photo-fallback{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;color:#fff;flex-shrink:0}
+.mc-popover-name{font-size:0.95rem;font-weight:700;color:var(--text-primary)}
+.mc-popover-role{font-size:0.72rem;color:var(--text-secondary)}
+.mc-popover-tagline{font-size:0.7rem;color:var(--purple);font-style:italic;margin-top:2px}
+.mc-popover-body{padding:0.7rem 0.85rem;font-size:0.76rem;color:var(--text-secondary);line-height:1.5;max-height:340px;overflow-y:auto}
+.mc-popover-section{margin-top:0.5rem}
+.mc-popover-section-title{font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);margin-bottom:0.25rem}
+.mc-popover-text{font-size:0.76rem;color:var(--text-primary);line-height:1.5;white-space:pre-line}
+.mc-popover-tags{display:flex;flex-wrap:wrap;gap:3px}
+.mc-popover-tag{padding:0.12rem 0.4rem;border-radius:4px;font-size:0.62rem;background:var(--bg-tertiary);color:var(--text-secondary)}
+.mc-popover-tag.skill{background:rgba(124,58,237,.12);color:var(--purple,#a78bfa)}
+.mc-popover-tag.tool{background:rgba(59,130,246,.12);color:var(--blue,#60a5fa)}
+.mc-popover-model{display:flex;align-items:center;gap:0.4rem;margin-top:0.5rem;padding:0.35rem 0.55rem;background:var(--bg-tertiary);border-radius:6px;font-size:0.68rem;color:var(--text-secondary)}
+.mc-popover-close{position:absolute;top:0.4rem;right:0.5rem;background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:0.3rem;font-size:0.9rem;line-height:1}
+.mc-popover-close:hover{color:var(--text-primary)}
 .mc-checkpoint h4{color:var(--yellow);font-size:0.8rem;margin:0 0 0.4rem}
 .mc-checkpoint-actions{display:flex;gap:0.5rem}
 .mc-checkpoint-actions button{padding:0.25rem 0.7rem;border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;border:none;transition:opacity .15s}
@@ -200,7 +224,7 @@
                         <span class="mc-phase-name">{{ phase.phase_name }}</span>
                         <div class="mc-phase-avatars">
                             {% for a in pa[:4] %}
-                            <img src="{{ a.avatar }}" title="{{ a.name }} — {{ a.role }}" onerror="this.style.display='none'">
+                            <img src="{{ a.avatar_url }}" title="{{ a.name }} — {{ a.role }}" onclick="showMcPopover('{{ a.id }}',event);event.stopPropagation()" style="cursor:pointer" onerror="this.style.display='none'">
                             {% endfor %}
                             {% if pa|length > 4 %}<span class="more">+{{ pa|length - 4 }}</span>{% endif %}
                         </div>
@@ -300,6 +324,14 @@
     </div>
 </div>
 
+<!-- Agent Popover -->
+<div class="mc-popover-overlay" id="mcPopoverOverlay" onclick="closeMcPopover()"></div>
+<div class="mc-popover" id="mcPopover">
+    <button class="mc-popover-close" onclick="closeMcPopover()">✕</button>
+    <div class="mc-popover-header" id="mcPopHeader"></div>
+    <div class="mc-popover-body" id="mcPopBody"></div>
+</div>
+
 <script>
 const MISSION_ID = "{{ mission.id }}";
 const SESSION_ID = "{{ session_id }}";
@@ -315,11 +347,18 @@ for (const [pid, agents] of Object.entries(PHASE_AGENTS)) {
             AGENT_INFO[a.id] = {
                 name: a.name || a.id,
                 role: a.role || '',
-                avatar: a.avatar_url || a.avatar || `/static/avatars/${a.id}.jpg`,
-                color: a.color || '#8b949e'
+                avatar: a.avatar_url || `/static/avatars/${a.id}.jpg`,
+                color: a.color || '#8b949e',
+                tagline: a.tagline || '',
+                persona: a.persona || '',
+                motivation: a.motivation || '',
+                skills: a.skills || [],
+                tools: a.tools || [],
+                model: a.model || '',
+                provider: a.provider || '',
             };
         }
-        if (a.id) AGENT_PHASE[a.id] = pid;  // last phase wins (agent may appear in multiple)
+        if (a.id) AGENT_PHASE[a.id] = pid;
     }
 }
 
@@ -464,7 +503,7 @@ function renderPhaseGraphs() {
                 : `<circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}" fill="${col}" opacity="0.25"/>
                    <text x="${avatarCx}" y="${avatarCy+4}" text-anchor="middle" style="font-size:13px;fill:${col};font-weight:700">${esc(name.substring(0,2))}</text>`;
 
-            svg += `<g class="mc-live-node" transform="translate(${n.x},${n.y})">`;
+            svg += `<g class="mc-live-node" transform="translate(${n.x},${n.y})" onclick="showMcPopover('${esc(n.agent_id||n.id)}',event)">`;
             svg += `<rect class="mc-live-node-bg" width="${MC_NW}" height="${MC_NH}"/>`;
             svg += `<line class="mc-live-node-bar" x1="0" y1="0" x2="${MC_NW}" y2="0" stroke="${col}" stroke-width="3"/>`;
             svg += avatarSvg;
@@ -822,6 +861,46 @@ async function resetMission() {
 }
 
 function esc(t) { return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ── Agent Popover ── */
+function showMcPopover(agentId, ev) {
+    ev && ev.stopPropagation();
+    const a = AGENT_INFO[agentId];
+    if (!a) return;
+    const pop = document.getElementById('mcPopover');
+    const overlay = document.getElementById('mcPopoverOverlay');
+    const photo = a.avatar
+        ? `<img class="mc-popover-photo" src="${a.avatar}" alt="${esc(a.name)}" onerror="this.outerHTML='<div class=mc-popover-photo-fallback style=background:${a.color}>${esc(a.name.substring(0,2))}</div>'">`
+        : `<div class="mc-popover-photo-fallback" style="background:${a.color}">${esc(a.name.substring(0,2))}</div>`;
+    document.getElementById('mcPopHeader').innerHTML = `${photo}<div>
+        <div class="mc-popover-name">${esc(a.name)}</div>
+        <div class="mc-popover-role">${esc(a.role)}</div>
+        ${a.tagline ? `<div class="mc-popover-tagline">${esc(a.tagline)}</div>` : ''}
+    </div>`;
+    let html = '';
+    if (a.persona) html += `<div class="mc-popover-section"><div class="mc-popover-section-title">👤 Persona</div><div class="mc-popover-text">${esc(a.persona.substring(0,400))}${a.persona.length>400?'…':''}</div></div>`;
+    if (a.motivation) html += `<div class="mc-popover-section"><div class="mc-popover-section-title">⚡ Motivation</div><div class="mc-popover-text">${esc(a.motivation)}</div></div>`;
+    if (a.skills?.length) html += `<div class="mc-popover-section"><div class="mc-popover-section-title">🎯 Skills (${a.skills.length})</div><div class="mc-popover-tags">${a.skills.map(s=>`<span class="mc-popover-tag skill">${esc(s)}</span>`).join('')}</div></div>`;
+    if (a.tools?.length) html += `<div class="mc-popover-section"><div class="mc-popover-section-title">🔧 Tools (${a.tools.length})</div><div class="mc-popover-tags">${a.tools.map(t=>`<span class="mc-popover-tag tool">${esc(t)}</span>`).join('')}</div></div>`;
+    if (a.model || a.provider) html += `<div class="mc-popover-model">🧠 ${esc(a.provider||'')} ${esc(a.model||'default')}</div>`;
+    document.getElementById('mcPopBody').innerHTML = html;
+    // Position near click
+    const x = ev ? ev.clientX : window.innerWidth/2;
+    const y = ev ? ev.clientY : window.innerHeight/2;
+    let top = y + 10, left = x - 170;
+    if (top + 380 > window.innerHeight) top = y - 390;
+    if (left + 340 > window.innerWidth) left = window.innerWidth - 350;
+    if (left < 10) left = 10;
+    pop.style.top = Math.max(10, top) + 'px';
+    pop.style.left = Math.max(10, left) + 'px';
+    pop.classList.add('open');
+    overlay.classList.add('open');
+}
+function closeMcPopover() {
+    document.getElementById('mcPopover').classList.remove('open');
+    document.getElementById('mcPopoverOverlay').classList.remove('open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMcPopover(); });
 
 function cleanLLM(s){
   s = s.replace(/<think>[\s\S]*?<\/think>/g, '');
