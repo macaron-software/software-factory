@@ -99,7 +99,7 @@
     {% if meta.get('tool_calls') %}
     <div class="mu__tools">
       {% for tc in meta['tool_calls'][:5] %}
-      <div class="mu__tool"><span class="mu__tool-name">⚙ {{ tc.get('name','?') }}</span></div>
+      <div class="mu__tool"><span class="mu__tool-name"><svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-settings"/></svg> {{ tc.get('name','?') }}</span></div>
       {% endfor %}
     </div>
     {% endif %}
@@ -186,7 +186,7 @@
     <div class="mu__tools">
       {% for tc in meta['tool_calls'][:5] %}
       <div class="mu__tool">
-        <span class="mu__tool-name">⚙ {{ tc.get('name','?') }}</span>
+        <span class="mu__tool-name"><svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-settings"/></svg> {{ tc.get('name','?') }}</span>
         {% if tc.get('result') %}<span class="mu__tool-result">{{ tc.get('result','')[:120] }}</span>{% endif %}
       </div>
       {% endfor %}

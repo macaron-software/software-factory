@@ -162,14 +162,14 @@ async function generateRetro() {
         });
         const data = await resp.json();
         let html = '';
-        for (const s of data.successes || []) html += `<div class="retro-item success"><span class="retro-icon">✅</span> ${s}</div>`;
-        for (const f of data.failures || []) html += `<div class="retro-item failure"><span class="retro-icon">❌</span> ${f}</div>`;
-        for (const l of data.lessons || []) html += `<div class="retro-item lesson"><span class="retro-icon">💡</span> ${l}</div>`;
-        for (const i of data.improvements || []) html += `<div class="retro-item improvement"><span class="retro-icon">🔧</span> ${i}</div>`;
+        for (const s of data.successes || []) html += `<div class="retro-item success"><span class="retro-icon">+</span> ${s}</div>`;
+        for (const f of data.failures || []) html += `<div class="retro-item failure"><span class="retro-icon">−</span> ${f}</div>`;
+        for (const l of data.lessons || []) html += `<div class="retro-item lesson"><span class="retro-icon">·</span> ${l}</div>`;
+        for (const i of data.improvements || []) html += `<div class="retro-item improvement"><span class="retro-icon">·</span> ${i}</div>`;
         html += `<div style="margin-top:0.5rem;font-size:0.6rem;color:var(--text-muted);text-align:right">Leçons → mémoire globale ✓</div>`;
         panel.innerHTML = html;
     } catch(e) {
-        panel.innerHTML = `<div class="retro-item failure"><span class="retro-icon">❌</span> Erreur: ${e.message}</div>`;
+        panel.innerHTML = `<div class="retro-item failure"><span class="retro-icon">−</span> Erreur: ${e.message}</div>`;
     }
 }
 

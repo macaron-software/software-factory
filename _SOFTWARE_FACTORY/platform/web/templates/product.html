@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<a href="/missions?action=new" class="btn btn-primary">
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Nouvel Epic
+</a>
+{% endblock %}
+
+{% block content %}
+<style>
+/* ── Product Management ── */
+.pm-grid{display:grid;grid-template-columns:1fr;gap:1.5rem;padding:0.5rem 0}
+
+/* Filters */
+.pm-filters{display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem}
+.pm-filter{padding:0.35rem 0.7rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);font-size:0.78rem;cursor:pointer;text-decoration:none;transition:all .15s}
+.pm-filter:hover,.pm-filter.active{border-color:var(--purple);color:var(--purple);background:rgba(124,58,237,.08)}
+
+/* Epic cards */
+.pm-epics{display:grid;gap:0.75rem}
+.pm-epic{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color .15s}
+.pm-epic:hover{border-color:var(--purple)}
+.pm-epic-header{padding:0.85rem 1rem;display:flex;align-items:center;gap:0.75rem;cursor:pointer}
+.pm-epic-header:hover{background:var(--bg-tertiary)}
+.pm-epic-chevron{width:16px;height:16px;color:var(--text-secondary);transition:transform .2s;flex-shrink:0}
+.pm-epic.open .pm-epic-chevron{transform:rotate(90deg)}
+.pm-epic-title{font-size:0.92rem;font-weight:700;flex:1;color:var(--text-primary)}
+.pm-epic-project{font-size:0.7rem;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.1rem 0.4rem;border-radius:4px}
+.pm-epic-stats{display:flex;gap:0.5rem;align-items:center}
+.pm-epic-stat{font-size:0.7rem;color:var(--text-secondary);display:flex;align-items:center;gap:0.2rem}
+.pm-epic-stat svg{width:12px;height:12px}
+.pm-epic-progress{width:60px;height:4px;background:var(--bg-tertiary);border-radius:2px;overflow:hidden}
+.pm-epic-progress-fill{height:100%;background:var(--green);border-radius:2px}
+.pm-epic-status{font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:4px;font-weight:600;text-transform:uppercase}
+.pm-epic-status.planning{background:rgba(251,191,36,.15);color:#fbbf24}
+.pm-epic-status.active{background:rgba(52,211,153,.15);color:#34d399}
+.pm-epic-status.completed{background:rgba(96,165,250,.15);color:#60a5fa}
+.pm-epic-status.blocked{background:rgba(248,113,113,.15);color:#f87171}
+
+/* Features list (inside epic) */
+.pm-features{border-top:1px solid var(--border);display:none}
+.pm-epic.open .pm-features{display:block}
+.pm-feat{display:grid;grid-template-columns:auto 1fr auto auto auto;align-items:center;gap:0.6rem;padding:0.55rem 1rem 0.55rem 2rem;border-bottom:1px solid rgba(255,255,255,.04);font-size:0.82rem}
+.pm-feat:last-child{border-bottom:none}
+.pm-feat:hover{background:rgba(255,255,255,.02)}
+.pm-feat-icon{width:14px;height:14px;color:var(--text-secondary)}
+.pm-feat-name{color:var(--text-primary);font-weight:500}
+.pm-feat-points{font-size:0.7rem;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.1rem 0.35rem;border-radius:4px;min-width:30px;text-align:center}
+.pm-feat-assignee{font-size:0.7rem;color:var(--text-secondary)}
+.pm-feat-status{font-size:0.65rem;padding:0.1rem 0.35rem;border-radius:4px;font-weight:600}
+.pm-feat-status.backlog{background:rgba(107,114,128,.15);color:#9ca3af}
+.pm-feat-status.ready{background:rgba(251,191,36,.15);color:#fbbf24}
+.pm-feat-status.in_progress{background:rgba(59,130,246,.15);color:#60a5fa}
+.pm-feat-status.done{background:rgba(52,211,153,.15);color:#34d399}
+.pm-feat-status.blocked{background:rgba(248,113,113,.15);color:#f87171}
+
+/* Stories (nested under feature) */
+.pm-stories{padding:0.25rem 0 0.25rem 3.5rem}
+.pm-story{display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0;font-size:0.78rem;color:var(--text-secondary)}
+.pm-story-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.pm-story-dot.backlog{background:#6b7280}
+.pm-story-dot.ready{background:var(--yellow)}
+.pm-story-dot.in_progress{background:var(--blue)}
+.pm-story-dot.done{background:var(--green)}
+.pm-story-title{flex:1}
+.pm-story-sp{font-size:0.68rem;background:var(--bg-tertiary);padding:0.05rem 0.3rem;border-radius:3px}
+
+/* Summary row */
+.pm-summary{display:flex;gap:1.5rem;flex-wrap:wrap;padding:0.5rem 0;margin-bottom:0.5rem}
+.pm-summary-item{display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;color:var(--text-secondary)}
+.pm-summary-item svg{width:14px;height:14px}
+.pm-summary-value{font-weight:700;color:var(--text-primary)}
+
+/* No data */
+.pm-empty{text-align:center;padding:3rem;color:var(--text-secondary);font-size:0.85rem}
+.pm-empty svg{width:48px;height:48px;margin-bottom:1rem;opacity:.3}
+
+.section-title{font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:0.75rem;display:flex;align-items:center;gap:0.5rem}
+.section-title svg{width:16px;height:16px}
+</style>
+
+<div class="pm-grid">
+
+    <!-- Summary stats -->
+    <div class="pm-summary">
+        <div class="pm-summary-item">
+            <svg><use href="#icon-rocket"/></svg>
+            <span class="pm-summary-value">{{ summary.epics }}</span> Epics
+        </div>
+        <div class="pm-summary-item">
+            <svg><use href="#icon-layers"/></svg>
+            <span class="pm-summary-value">{{ summary.features }}</span> Features
+        </div>
+        <div class="pm-summary-item">
+            <svg><use href="#icon-file-text"/></svg>
+            <span class="pm-summary-value">{{ summary.stories }}</span> User Stories
+        </div>
+        <div class="pm-summary-item">
+            <svg><use href="#icon-target"/></svg>
+            <span class="pm-summary-value">{{ summary.total_points }}</span> Story Points
+        </div>
+        <div class="pm-summary-item">
+            <svg><use href="#icon-check"/></svg>
+            <span class="pm-summary-value">{{ summary.done_pct }}%</span> Terminé
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="pm-filters">
+        <a href="/product" class="pm-filter {% if not filter_project %}active{% endif %}">Tous</a>
+        {% for p in projects %}
+        <a href="/product?project={{ p.id }}" class="pm-filter {% if filter_project == p.id %}active{% endif %}">{{ p.name }}</a>
+        {% endfor %}
+    </div>
+
+    <!-- Epics (missions) + features + stories -->
+    <div>
+        <div class="section-title">
+            <svg class="icon icon-sm"><use href="#icon-rocket"/></svg> Backlog Produit
+        </div>
+
+        {% if not epics %}
+        <div class="pm-empty">
+            <svg><use href="#icon-layers"/></svg>
+            <div>Aucun epic. Créez une mission pour commencer.</div>
+        </div>
+        {% endif %}
+
+        <div class="pm-epics">
+            {% for e in epics %}
+            <div class="pm-epic" id="epic-{{ e.id }}">
+                <div class="pm-epic-header" onclick="toggleEpic('{{ e.id }}')">
+                    <svg class="pm-epic-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    <div class="pm-epic-title">{{ e.name }}</div>
+                    <span class="pm-epic-project">{{ e.project_name }}</span>
+                    <div class="pm-epic-stats">
+                        <span class="pm-epic-stat">
+                            <svg><use href="#icon-layers"/></svg>
+                            {{ e.features|length }}
+                        </span>
+                        <span class="pm-epic-stat">
+                            <svg><use href="#icon-target"/></svg>
+                            {{ e.total_points }} pts
+                        </span>
+                        {% if e.total_stories > 0 %}
+                        <div class="pm-epic-progress">
+                            <div class="pm-epic-progress-fill" style="width:{{ e.done_pct }}%"></div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <span class="pm-epic-status {{ e.status }}">{{ e.status }}</span>
+                </div>
+
+                <div class="pm-features">
+                    {% for f in e.features %}
+                    <div class="pm-feat">
+                        <svg class="pm-feat-icon"><use href="#icon-layers"/></svg>
+                        <span class="pm-feat-name">{{ f.name }}</span>
+                        <span class="pm-feat-points">{{ f.story_points }} pts</span>
+                        <span class="pm-feat-assignee">{{ f.assigned_to or '—' }}</span>
+                        <span class="pm-feat-status {{ f.status }}">{{ f.status }}</span>
+                    </div>
+                    {% if f.stories %}
+                    <div class="pm-stories">
+                        {% for s in f.stories %}
+                        <div class="pm-story">
+                            <span class="pm-story-dot {{ s.status }}"></span>
+                            <span class="pm-story-title">{{ s.title }}</span>
+                            {% if s.story_points %}<span class="pm-story-sp">{{ s.story_points }} pts</span>{% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <div class="pm-feat" style="justify-content:center;grid-template-columns:1fr">
+                        <span style="color:var(--text-secondary);font-size:0.78rem;font-style:italic">Aucune feature — décomposez cet epic</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleEpic(id) {
+    document.getElementById('epic-' + id).classList.toggle('open');
+}
+</script>
+{% endblock %}

@@ -49,7 +49,7 @@
     {% set st = run.status.value %}
     <a href="/missions/{{ run.id }}/control" class="mission-card">
         <div class="mission-status-icon {{ st }}">
-            {% if st == 'running' %}⚡{% elif st == 'completed' %}✅{% elif st == 'failed' %}❌{% else %}⏸️{% endif %}
+            {% if st == 'running' %}<svg class="icon icon-xs"><use href="#icon-activity"/></svg>{% elif st == 'completed' %}<svg class="icon icon-xs"><use href="#icon-check"/></svg>{% elif st == 'failed' %}<svg class="icon icon-xs"><use href="#icon-x"/></svg>{% else %}<svg class="icon icon-xs"><use href="#icon-pause"/></svg>{% endif %}
         </div>
         <div class="mission-body">
             <div class="mission-title">
@@ -72,7 +72,7 @@
 </div>
 {% else %}
 <div class="empty-state" style="text-align:center;padding:3rem;">
-    <p style="font-size:2.5rem;margin-bottom:0.5rem">🚀</p>
+    <p style="margin-bottom:0.5rem"><svg class="icon" style="width:2.5rem;height:2.5rem"><use href="#icon-rocket"/></svg></p>
     <h3 style="color:var(--text-primary);margin-bottom:0.3rem">Aucune mission</h3>
     <p style="color:var(--text-secondary);font-size:0.88rem;margin-bottom:1rem">Lancez une mission pour orchestrer le cycle de vie produit complet.</p>
     <a href="/workflows" class="btn btn-ghost">Parcourir les workflows</a>

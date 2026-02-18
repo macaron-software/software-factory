@@ -1144,7 +1144,7 @@ async def _run_human_in_the_loop(run: PatternRun, task: str):
         if ns and not ns.agent_id:
             checkpoint_msg = run.pattern.config.get(
                 "checkpoint_message",
-                "⏸️ Point de contrôle — En attente de votre validation."
+                "Point de contrôle — En attente de votre validation."
             )
             store.add_message(MessageDef(
                 session_id=run.session_id,

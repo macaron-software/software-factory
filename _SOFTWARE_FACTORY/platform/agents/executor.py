@@ -1005,7 +1005,7 @@ class AgentExecutor:
                 "success": pattern_run.success,
             })
 
-            status = "✅ DONE" if pattern_run.success else "❌ FAILED"
+            status = "DONE" if pattern_run.success else "FAILED"
             return f"Phase '{wf_phase.name}' {status}\n\n{phase_run.summary[:2000]}"
 
         except Exception as e:
@@ -1082,8 +1082,8 @@ class AgentExecutor:
 
         lines = [f"Mission: {mission.workflow_name} ({mission.status.value})\n"]
         status_icons = {
-            "pending": "⏳", "running": "🔄", "done": "✅",
-            "failed": "❌", "skipped": "⏭️", "waiting_validation": "🛑",
+            "pending": "·", "running": "~", "done": "✓",
+            "failed": "✗", "skipped": "-", "waiting_validation": "?",
         }
         for i, p in enumerate(mission.phases, 1):
             icon = status_icons.get(p.status.value, "•")
@@ -1117,7 +1117,7 @@ class AgentExecutor:
             from_agent=ctx.agent.id,
             to_agent="human",
             message_type="system",
-            content=f"🛑 **CHECKPOINT** — {question}\n\nOptions: {options}",
+            content=f"**CHECKPOINT** — {question}\n\nOptions: {options}",
         ))
 
         # SSE event for Mission Control UI
@@ -1130,7 +1130,7 @@ class AgentExecutor:
             "requires_input": True,
         })
 
-        return f"🛑 CHECKPOINT: Waiting for human validation.\nQuestion: {question}\nOptions: {options}\n\n(The user will respond via Mission Control UI)"
+        return f"CHECKPOINT: Waiting for human validation.\nQuestion: {question}\nOptions: {options}\n\n(The user will respond via Mission Control UI)"
 
     async def _tool_get_project_context(self, args: dict, ctx: ExecutionContext) -> str:
         """Get project context for the CDP."""

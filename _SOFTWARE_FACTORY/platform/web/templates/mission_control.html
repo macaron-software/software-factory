@@ -60,20 +60,31 @@
 .mc-phase-chevron{font-size:0.65rem;color:var(--text-secondary);transition:transform .2s}
 .mc-phase.open .mc-phase-chevron{transform:rotate(90deg)}
 
-/* Accordion body: flow graph + discussion */
+/* Accordion body: graph row + discussion row */
 .mc-phase-body{display:none;border-top:1px solid var(--border)}
-.mc-phase.open .mc-phase-body{display:grid;grid-template-columns:220px 1fr;min-height:180px}
+.mc-phase.open .mc-phase-body{display:flex;flex-direction:column}
 
-/* Mini flow graph (SVG) */
-.mc-phase-graph{background:var(--bg-primary);border-right:1px solid var(--border);padding:0.3rem;display:flex;align-items:center;justify-content:center;overflow:hidden}
+/* Full flow graph (SVG) — session_live style */
+.mc-phase-graph{background:var(--bg-primary);border-bottom:1px solid var(--border);padding:0.4rem;position:relative;overflow:hidden;min-height:200px}
 .mc-phase-graph svg{width:100%;height:100%}
-.mc-graph-node{cursor:default}
-.mc-graph-node circle{fill:var(--bg-tertiary);stroke:var(--purple);stroke-width:1.5}
-.mc-graph-node image{clip-path:circle(13px)}
-.mc-graph-node text{fill:var(--text-primary);font-size:8px;font-weight:600;text-anchor:middle;pointer-events:none}
-.mc-graph-node .g-role{fill:var(--text-secondary);font-size:6px;font-weight:400}
-.mc-graph-edge{fill:none;stroke:var(--purple);stroke-width:1.2;opacity:0.5;marker-end:url(#mc-arrow)}
-.mc-graph-edge-label{fill:var(--text-secondary);font-size:6.5px;text-anchor:middle}
+.mc-live-node{cursor:pointer}
+.mc-live-node:hover .mc-live-node-bg{filter:brightness(1.15)}
+.mc-live-node-bg{rx:10;ry:10;fill:var(--bg-secondary);stroke:var(--border);stroke-width:1.2;transition:stroke .2s,filter .15s}
+.mc-live-node-bar{stroke-linecap:round}
+.mc-live-node-name{fill:var(--text-primary);font-size:11.5px;font-weight:700;font-family:inherit}
+.mc-live-node-role{fill:var(--text-secondary);font-size:8.5px;font-family:inherit}
+.mc-live-node-status{fill:var(--text-secondary);font-size:7px;font-family:inherit;text-anchor:middle}
+.mc-node-status--idle{fill:#6b7280}
+.mc-node-status--thinking{fill:var(--yellow);animation:statusPulse 1.2s ease-in-out infinite}
+.mc-node-status--acting{fill:var(--green);animation:statusPulse 2s ease-in-out infinite}
+.mc-node-status--done{fill:var(--green)}
+.mc-node-status--error{fill:var(--red)}
+@keyframes statusPulse{0%,100%{r:5}50%{r:7}}
+.mc-pulse-ring{fill:none;stroke-width:2;opacity:0;animation:mcPulseRing 2s ease-out infinite}
+@keyframes mcPulseRing{0%{r:14;opacity:.6}100%{r:28;opacity:0}}
+.mc-edge-line{fill:none;stroke:var(--purple);stroke-width:1.6;opacity:0.45;transition:stroke-width .2s,opacity .2s}
+.mc-edge-count{fill:var(--text-secondary);font-size:8px;font-family:'SF Mono',monospace;text-anchor:middle;pointer-events:none}
+.mc-graph-legend{position:absolute;bottom:6px;left:8px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:4px 8px;display:flex;gap:8px;align-items:center;font-size:0.62rem;color:var(--text-secondary)}
 
 /* Discussion */
 .mc-phase-discuss{padding:0.5rem 0.6rem;overflow-y:auto;max-height:400px;display:flex;flex-direction:column;gap:0.35rem}
@@ -182,7 +193,7 @@
                         </div>
                         <span class="mc-phase-pattern">{{ phase.pattern_id }}</span>
                         <span class="mc-phase-status-badge {{ phase.status.value }}">{{ phase.status.value }}</span>
-                        <span class="mc-phase-chevron">▶</span>
+                        <span class="mc-phase-chevron"><svg class="icon icon-xs mc-phase-chevron-icon"><use href="#icon-chevron-right"/></svg></span>
                     </div>
                     <div class="mc-phase-body">
                         <!-- Mini flow graph -->
@@ -194,11 +205,11 @@
                     </div>
                     {% if phase.status.value == 'waiting_validation' %}
                     <div class="mc-checkpoint">
-                        <h4>🛑 Checkpoint — Validation requise</h4>
+                        <h4>Checkpoint — Validation requise</h4>
                         <div class="mc-checkpoint-actions">
-                            <button class="mc-btn-go" onclick="validateMission('GO')">✅ GO</button>
-                            <button class="mc-btn-nogo" onclick="validateMission('NOGO')">❌ NOGO</button>
-                            <button class="mc-btn-pivot" onclick="validateMission('PIVOT')">🔄 PIVOT</button>
+                            <button class="mc-btn-go" onclick="validateMission('GO')">GO</button>
+                            <button class="mc-btn-nogo" onclick="validateMission('NOGO')">NOGO</button>
+                            <button class="mc-btn-pivot" onclick="validateMission('PIVOT')">PIVOT</button>
                         </div>
                     </div>
                     {% endif %}
@@ -227,17 +238,17 @@
         </div>
         <div style="padding:0.4rem 0.75rem;border-bottom:1px solid var(--border)">
             <button id="mc-run-btn" onclick="startMissionExecution()" style="width:100%;padding:0.45rem;border:none;border-radius:6px;background:var(--purple);color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.4rem;transition:opacity .15s">
-                ▶ Démarrer le Mega-Workflow
+                <svg class="icon icon-xs"><use href="#icon-play"/></svg> Démarrer le Mega-Workflow
             </button>
         </div>
         <div class="mc-activity" id="mc-activity">
-            <div class="mc-msg system"><div class="mc-msg-content">🚀 Mission démarrée — {{ mission.brief[:200] }}</div></div>
-            <div class="mc-msg tool"><div class="mc-msg-time">{{ "now" }}</div><div class="mc-msg-content">📋 {{ mission.phases|length }} phases à orchestrer • Pattern: mega-workflow lifecycle</div></div>
+            <div class="mc-msg system"><div class="mc-msg-content">Mission démarrée — {{ mission.brief[:200] }}</div></div>
+            <div class="mc-msg tool"><div class="mc-msg-time">{{ "now" }}</div><div class="mc-msg-content">{{ mission.phases|length }} phases à orchestrer • Pattern: mega-workflow lifecycle</div></div>
         </div>
 
         <!-- Memory -->
         <div class="mc-side-section">
-            <div class="mc-side-title">🧠 Mémoire</div>
+            <div class="mc-side-title">Mémoire</div>
             <div id="mc-memory">
                 {% if memories %}
                     {% for mem in memories[:8] %}
@@ -383,22 +394,22 @@ function handleSSE(d) {
     if (d.type === 'phase_started') {
         updatePhaseStatus(d.phase_id, 'running');
         openPhase(d.phase_id);
-        addActivity(`🔄 Phase «${d.phase_name}» démarrée (${d.pattern})`, 'tool');
+        addActivity(`Phase «${d.phase_name}» démarrée (${d.pattern})`, 'tool');
     }
     else if (d.type === 'phase_completed') {
         updatePhaseStatus(d.phase_id, d.success ? 'done' : 'failed');
-        addActivity(`${d.success ? '✅' : '❌'} Phase terminée`, 'tool');
+        addActivity(`${d.success ? '✓' : '✗'} Phase terminée`, 'tool');
         updateStats();
     }
     else if (d.type === 'phase_failed') {
         updatePhaseStatus(d.phase_id, 'failed');
-        addActivity('❌ Phase échouée', 'system');
+        addActivity('Phase échouée', 'system');
     }
     else if (d.type === 'checkpoint') {
         updatePhaseStatus(d.phase_id, 'waiting_validation');
         openPhase(d.phase_id);
         showCheckpoint(d.phase_id, d.question);
-        addActivity(`🛑 CHECKPOINT: ${d.question}`, 'system');
+        addActivity(`CHECKPOINT: ${d.question}`, 'system');
     }
     else if (d.type === 'message') {
         if (d.from_agent === 'chef_de_programme') addActivity(d.content, '');
@@ -430,7 +441,7 @@ function handleSSE(d) {
             }
         }
         const info = AGENT_INFO[d.agent_id] || {};
-        addActivity(`🧠 ${d.agent_name || info.name || d.agent_id} réfléchit…`, 'tool');
+        addActivity(`${d.agent_name || info.name || d.agent_id} réfléchit…`, 'tool');
     }
     else if (d.type === 'stream_delta') {
         // Streaming text chunk from agent
@@ -462,7 +473,7 @@ function handleSSE(d) {
     }
     else if (d.type === 'agent_status') {
         if (d.status === 'thinking') {
-            addActivity(`🧠 ${d.agent_id} analyse…`, 'tool');
+            addActivity(`${d.agent_id} analyse…`, 'tool');
         }
     }
     else if (d.type === 'agent_message' || d.type === 'agent_response') {
@@ -477,10 +488,10 @@ function handleSSE(d) {
         }
     }
     else if (d.type === 'pattern_start') {
-        addActivity(`⚡ Pattern «${d.pattern_name}» lancé`, 'tool');
+        addActivity(`Pattern «${d.pattern_name}» lancé`, 'tool');
     }
     else if (d.type === 'pattern_end') {
-        addActivity(`${d.success ? '✅' : '❌'} Pattern terminé${d.error ? ': '+d.error : ''}`, d.success ? 'tool' : 'system');
+        addActivity(`${d.success ? '✓' : '✗'} Pattern terminé${d.error ? ': '+d.error : ''}`, d.success ? 'tool' : 'system');
     }
     if (d.type === 'commit') addCommit(d);
     if (d.type === 'memory_stored') addMemory(d);
@@ -542,11 +553,11 @@ function showCheckpoint(phaseId, question) {
     el.querySelector('.mc-checkpoint')?.remove();
     const cp = document.createElement('div');
     cp.className = 'mc-checkpoint';
-    cp.innerHTML = `<h4>🛑 ${esc(question||'Validation requise')}</h4>
+    cp.innerHTML = `<h4>${esc(question||'Validation requise')}</h4>
         <div class="mc-checkpoint-actions">
-            <button class="mc-btn-go" onclick="validateMission('GO')">✅ GO</button>
-            <button class="mc-btn-nogo" onclick="validateMission('NOGO')">❌ NOGO</button>
-            <button class="mc-btn-pivot" onclick="validateMission('PIVOT')">🔄 PIVOT</button>
+            <button class="mc-btn-go" onclick="validateMission('GO')">GO</button>
+            <button class="mc-btn-nogo" onclick="validateMission('NOGO')">NOGO</button>
+            <button class="mc-btn-pivot" onclick="validateMission('PIVOT')">PIVOT</button>
         </div>`;
     el.appendChild(cp);
 }
@@ -590,16 +601,16 @@ async function validateMission(decision) {
     try {
         await fetch(`/api/missions/${MISSION_ID}/validate`, {method:'POST', body: fd});
         document.querySelectorAll('.mc-checkpoint').forEach(el => el.remove());
-        addActivity(`🏁 Décision: ${decision}`, 'system');
+        addActivity(`Décision: ${decision}`, 'system');
     } catch(err) { console.error(err); }
 }
 
 async function startMissionExecution() {
     const btn = document.getElementById('mc-run-btn');
     btn.disabled = true;
-    btn.innerHTML = '⏳ Exécution en cours…';
+    btn.innerHTML = 'Exécution en cours…';
     btn.style.opacity = '0.6';
-    addActivity('🚀 Lancement du mega-workflow par le CDP…', 'system');
+    addActivity('Lancement du mega-workflow par le CDP…', 'system');
     try {
         await fetch(`/api/missions/${MISSION_ID}/run`, {method:'POST'});
     } catch(err) { console.error(err); }
