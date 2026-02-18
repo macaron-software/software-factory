@@ -2798,7 +2798,7 @@ async def generate_retrospective(request: Request):
                 (f"%{scope_id}%",),
             ).fetchall()
             for t in tool_rows:
-                status = "✅" if t["success"] else "❌"
+                status = "OK" if t["success"] else "FAIL"
                 context_parts.append(f"  Tool {t['tool_name']}: {status} {(t['result'] or '')[:100]}")
 
         elif scope == "global":
@@ -2808,7 +2808,7 @@ async def generate_retrospective(request: Request):
                 "GROUP BY tool_name, success ORDER BY cnt DESC LIMIT 30"
             ).fetchall()
             for t in tool_rows:
-                status = "✅" if t["success"] else "❌"
+                status = "OK" if t["success"] else "FAIL"
                 context_parts.append(f"  Tool {t['tool_name']}: {status} × {t['cnt']}")
     except Exception:
         pass
@@ -3028,7 +3028,7 @@ async def generate_team(request: Request):
     form = await request.form()
     prompt = str(form.get("prompt", "")).strip()
     if not prompt:
-        return HTMLResponse('<div class="msg-system-text">❌ Prompt requis</div>', status_code=400)
+        return HTMLResponse('<div class="msg-system-text">Prompt requis</div>', status_code=400)
 
     try:
         gen = TeamGenerator()
@@ -3637,7 +3637,7 @@ async def dsi_workflow_start(request: Request, workflow_id: str):
                 with open(vision_path, "r") as f:
                     vision = f.read()[:3000]
 
-        kickoff = f"""🚀 **Phase 1 : {phase1['name']}**
+        kickoff = f"""**Phase 1 : {phase1['name']}**
 
 **Objectif:** {phase1.get('description', '')}
 
@@ -3776,7 +3776,7 @@ async def dsi_workflow_next_phase(request: Request, workflow_id: str):
     # Send kickoff to new phase leader
     leader = next_phase.get("leader", next_phase["agents"][0] if next_phase["agents"] else "")
     if leader:
-        kickoff = f"""🚀 **Phase {current_idx + 2} : {next_phase['name']}**
+        kickoff = f"""**Phase {current_idx + 2} : {next_phase['name']}**
 
 **Objectif:** {next_phase.get('description', '')}
 
@@ -4805,7 +4805,7 @@ async def api_mission_run(request: Request, mission_id: str):
     from ..agents.store import get_agent_store
     from ..models import PhaseStatus, MissionStatus
     from ..sessions.runner import _push_sse
-    from ..patterns.engine import run_pattern
+    from ..patterns.engine import run_pattern, NodeStatus
     from ..patterns.store import PatternDef
     from datetime import datetime
 
@@ -4823,6 +4823,9 @@ async def api_mission_run(request: Request, mission_id: str):
 
     async def _run_phases():
         """Execute phases sequentially using the real pattern engine."""
+        phases_done = 0
+        phases_failed = 0
+
         for i, phase in enumerate(mission.phases):
             wf_phase = wf.phases[i] if i < len(wf.phases) else None
             if not wf_phase:
@@ -4839,7 +4842,7 @@ async def api_mission_run(request: Request, mission_id: str):
                 "from_name": "Alexandre Moreau",
                 "from_role": "Chef de Programme",
                 "from_avatar": "/static/avatars/chef_de_programme.jpg",
-                "content": f"▶ Lancement phase {i+1}/{len(mission.phases)} : **{wf_phase.name}** (pattern: {pattern_type})",
+                "content": f"Lancement phase {i+1}/{len(mission.phases)} : **{wf_phase.name}** (pattern: {pattern_type})",
                 "phase_id": phase.phase_id,
                 "msg_type": "text",
             })
@@ -4899,13 +4902,31 @@ async def api_mission_run(request: Request, mission_id: str):
             # Build the task prompt for this phase
             phase_task = _build_phase_prompt(wf_phase.name, pattern_type, mission.brief, i, len(mission.phases))
 
-            # Run the real pattern engine
+            # Run the real pattern engine — NO fake success on error
+            phase_success = False
+            phase_error = ""
             try:
                 result = await run_pattern(phase_pattern, session_id, phase_task)
                 phase_success = result.success
+                if not phase_success:
+                    # Collect error details from failed nodes
+                    failed_nodes = [
+                        n for n in result.nodes.values()
+                        if n.status not in (NodeStatus.COMPLETED, NodeStatus.PENDING)
+                    ]
+                    if result.error:
+                        phase_error = result.error
+                    elif failed_nodes:
+                        errors = []
+                        for fn in failed_nodes:
+                            err = (fn.result.error if fn.result else "") or fn.output or ""
+                            errors.append(f"{fn.agent_id}: {err[:100]}")
+                        phase_error = "; ".join(errors)
+                    else:
+                        phase_error = "Pattern returned success=False"
             except Exception as exc:
-                logger.error("Phase %s pattern failed: %s", phase.phase_id, exc)
-                phase_success = True  # Don't block pipeline on LLM errors
+                logger.error("Phase %s pattern crashed: %s", phase.phase_id, exc)
+                phase_error = str(exc)
 
             # Human-in-the-loop checkpoint after pattern completes
             if pattern_type == "human-in-the-loop":
@@ -4918,8 +4939,7 @@ async def api_mission_run(request: Request, mission_id: str):
                     "question": f"Validation requise pour «{wf_phase.name}»",
                     "options": ["GO", "NOGO", "PIVOT"],
                 })
-                # Wait for human decision (poll DB)
-                for _ in range(600):  # 10min max
+                for _ in range(600):
                     await asyncio.sleep(1)
                     m = run_store.get(mission.id)
                     if m:
@@ -4930,7 +4950,7 @@ async def api_mission_run(request: Request, mission_id: str):
                         if phase.status != PhaseStatus.WAITING_VALIDATION:
                             break
                 if phase.status == PhaseStatus.WAITING_VALIDATION:
-                    phase.status = PhaseStatus.DONE  # auto-approve after timeout
+                    phase.status = PhaseStatus.DONE
                 if phase.status == PhaseStatus.FAILED:
                     run_store.update(mission)
                     await _push_sse(session_id, {
@@ -4954,34 +4974,48 @@ async def api_mission_run(request: Request, mission_id: str):
             else:
                 phase.status = PhaseStatus.DONE if phase_success else PhaseStatus.FAILED
 
-            # Phase complete
+            # Phase complete — real status
             phase.completed_at = datetime.utcnow()
-            phase.summary = f"Phase terminée avec {len(aids)} agents (pattern: {pattern_type})"
+            if phase_success:
+                phase.summary = f"Phase réussie — {len(aids)} agents ont contribué (pattern: {pattern_type})"
+                phases_done += 1
+            else:
+                phase.summary = f"Phase échouée — {phase_error[:200]}"
+                phases_failed += 1
             run_store.update(mission)
 
             await _push_sse(session_id, {
                 "type": "phase_completed",
                 "mission_id": mission.id,
                 "phase_id": phase.phase_id,
-                "success": phase.status == PhaseStatus.DONE,
+                "success": phase_success,
             })
 
-            # CDP summary between phases
+            # CDP announces result honestly
             if i < len(mission.phases) - 1:
+                if phase_success:
+                    cdp_msg = f"Phase «{wf_phase.name}» réussie. Passage à la phase suivante…"
+                else:
+                    cdp_msg = f"Phase «{wf_phase.name}» échouée ({phase_error[:100]}). Passage à la phase suivante malgré les erreurs…"
                 await _push_sse(session_id, {
                     "type": "message",
                     "from_agent": "chef_de_programme",
                     "from_name": "Alexandre Moreau",
                     "from_role": "Chef de Programme",
                     "from_avatar": "/static/avatars/chef_de_programme.jpg",
-                    "content": f"✅ Phase «{wf_phase.name}» terminée. Passage à la phase suivante…",
+                    "content": cdp_msg,
                     "phase_id": phase.phase_id,
                     "msg_type": "text",
                 })
                 await asyncio.sleep(0.8)
 
-        # Mission complete
-        mission.status = MissionStatus.COMPLETED
+        # Mission complete — real summary
+        if phases_failed == 0:
+            mission.status = MissionStatus.COMPLETED
+            final_msg = f"Mission terminée avec succès — {phases_done}/{phases_done + phases_failed} phases réussies."
+        else:
+            mission.status = MissionStatus.COMPLETED if phases_done > 0 else MissionStatus.FAILED
+            final_msg = f"Mission terminée — {phases_done} réussies, {phases_failed} échouées sur {phases_done + phases_failed} phases."
         run_store.update(mission)
         await _push_sse(session_id, {
             "type": "message",
@@ -4989,7 +5023,7 @@ async def api_mission_run(request: Request, mission_id: str):
             "from_name": "Alexandre Moreau",
             "from_role": "Chef de Programme",
             "from_avatar": "/static/avatars/chef_de_programme.jpg",
-            "content": "🏁 Mission terminée avec succès ! Toutes les phases ont été exécutées.",
+            "content": final_msg,
             "msg_type": "text",
         })
 
