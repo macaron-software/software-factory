@@ -930,7 +930,8 @@ class WorkflowStore:
                                   description="Le Lead Dev distribue les stories. Les devs frontend et backend codent en TDD. Le Test Automation écrit les tests E2E en parallèle. Le Lead fait la code review. Boucle interne: si incomplet, le Lead re-distribue.",
                                   gate="always",
                                   config={"agents": ["lead_dev", "dev_frontend", "dev_backend", "test_automation"],
-                                          "leader": "lead_dev"}),
+                                          "leader": "lead_dev",
+                                          "max_iterations": 3}),
                     # ── Phase 6: CICD (SEQUENTIAL — Pipeline Engineer lance la chaîne) ──
                     WorkflowPhase(id="cicd", pattern_id="sequential",
                                   name="Pipeline CI/CD",

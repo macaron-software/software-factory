@@ -11,9 +11,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
+
+# Prevent RecursionError in deep async pattern chains
+sys.setrecursionlimit(max(sys.getrecursionlimit(), 5000))
 
 from ..agents.store import get_agent_store, AgentDef
 from ..agents.executor import get_executor, ExecutionContext, ExecutionResult
@@ -581,7 +585,7 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
     # Ideation/research/comité agents should stream directly without tool round overhead
     rank = getattr(agent, "hierarchy_rank", 50)
     role_lower = (agent.role or "").lower()
-    is_dev_agent = rank >= 40 or any(k in role_lower for k in ("dev", "qa", "test", "devops", "pipeline"))
+    is_dev_agent = rank >= 40 or any(k in role_lower for k in ("dev", "qa", "test", "devops", "pipeline", "sre", "secur", "secu"))
     tools_for_agent = has_project and bool(project_path) and is_dev_agent
 
     return ExecutionContext(

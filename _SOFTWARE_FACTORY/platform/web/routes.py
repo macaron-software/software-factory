@@ -5216,37 +5216,89 @@ async def api_mission_run(request: Request, mission_id: str):
             # Build the task prompt for this phase
             phase_task = _build_phase_prompt(wf_phase.name, pattern_type, mission.brief, i, len(mission.phases))
 
+            # Sprint loop — dev-sprint runs multiple iterations (sprints)
+            phase_key_check = wf_phase.name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
+            max_sprints = wf_phase.config.get("max_iterations", 3) if "sprint" in phase_key_check or "dev" in phase_key_check else 1
+
             # Run the real pattern engine — NO fake success on error
             phase_success = False
             phase_error = ""
-            try:
-                result = await run_pattern(
-                    phase_pattern, session_id, phase_task,
-                    project_id=mission.project_id,
-                    project_path=mission.workspace_path,
-                    phase_id=phase.phase_id,
-                )
-                phase_success = result.success
-                if not phase_success:
-                    # Collect error details from failed nodes
-                    failed_nodes = [
-                        n for n in result.nodes.values()
-                        if n.status not in (NodeStatus.COMPLETED, NodeStatus.PENDING)
-                    ]
-                    if result.error:
-                        phase_error = result.error
-                    elif failed_nodes:
-                        errors = []
-                        for fn in failed_nodes:
-                            err = (fn.result.error if fn.result else "") or fn.output or ""
-                            errors.append(f"{fn.agent_id}: {err[:100]}")
-                        phase_error = "; ".join(errors)
+
+            for sprint_num in range(1, max_sprints + 1):
+                sprint_label = f"Sprint {sprint_num}/{max_sprints}" if max_sprints > 1 else ""
+
+                if max_sprints > 1:
+                    # Announce sprint start
+                    await _push_sse(session_id, {
+                        "type": "message",
+                        "from_agent": "chef_de_programme",
+                        "from_name": "Alexandre Moreau",
+                        "from_role": "Chef de Programme",
+                        "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                        "content": f"🏃 Lancement {sprint_label} pour «{wf_phase.name}»",
+                        "phase_id": phase.phase_id,
+                        "msg_type": "text",
+                    })
+                    await asyncio.sleep(0.5)
+                    # Update prompt with sprint context
+                    phase_task = _build_phase_prompt(wf_phase.name, pattern_type, mission.brief, i, len(mission.phases))
+                    phase_task += (
+                        f"\n\n--- {sprint_label} ---\n"
+                        f"C'est le sprint {sprint_num} sur {max_sprints} prévus.\n"
+                    )
+                    if sprint_num == 1:
+                        phase_task += "Focus: mise en place structure projet, première feature MVP.\n"
+                    elif sprint_num < max_sprints:
+                        phase_task += "Focus: itérez sur les features suivantes du backlog, utilisez le code existant.\n"
                     else:
-                        phase_error = "Pattern returned success=False"
-            except Exception as exc:
-                import traceback
-                logger.error("Phase %s pattern crashed: %s\n%s", phase.phase_id, exc, traceback.format_exc())
-                phase_error = str(exc)
+                        phase_task += "Focus: sprint final — finalisez, nettoyez, préparez le handoff CI/CD.\n"
+
+                try:
+                    result = await run_pattern(
+                        phase_pattern, session_id, phase_task,
+                        project_id=mission.project_id,
+                        project_path=mission.workspace_path,
+                        phase_id=phase.phase_id,
+                    )
+                    phase_success = result.success
+                    if not phase_success:
+                        # Collect error details from failed nodes
+                        failed_nodes = [
+                            n for n in result.nodes.values()
+                            if n.status not in (NodeStatus.COMPLETED, NodeStatus.PENDING)
+                        ]
+                        if result.error:
+                            phase_error = result.error
+                        elif failed_nodes:
+                            errors = []
+                            for fn in failed_nodes:
+                                err = (fn.result.error if fn.result else "") or fn.output or ""
+                                errors.append(f"{fn.agent_id}: {err[:100]}")
+                            phase_error = "; ".join(errors)
+                        else:
+                            phase_error = "Pattern returned success=False"
+                except Exception as exc:
+                    import traceback
+                    logger.error("Phase %s pattern crashed: %s\n%s", phase.phase_id, exc, traceback.format_exc())
+                    phase_error = str(exc)
+
+                # If sprint failed, break sprint loop — don't continue to next sprint
+                if not phase_success:
+                    break
+
+                # Announce sprint completion (only for multi-sprint phases)
+                if max_sprints > 1 and sprint_num < max_sprints:
+                    await _push_sse(session_id, {
+                        "type": "message",
+                        "from_agent": "chef_de_programme",
+                        "from_name": "Alexandre Moreau",
+                        "from_role": "Chef de Programme",
+                        "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                        "content": f"✅ {sprint_label} terminé. Passage au sprint suivant…",
+                        "phase_id": phase.phase_id,
+                        "msg_type": "text",
+                    })
+                    await asyncio.sleep(0.8)
 
             # Human-in-the-loop checkpoint after pattern completes
             if pattern_type == "human-in-the-loop":
@@ -5544,17 +5596,22 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
         ),
         "qa-campaign": (
             f"Campagne de tests QA pour «{brief}».\n"
-            "- QA Lead : plan de tests, stratégie, couverture\n"
-            "- QA Engineer : cas de test, critères d'acceptation\n"
-            "Définissez le plan de test complet."
+            "UTILISEZ VOS OUTILS pour créer les tests dans le workspace :\n"
+            "- QA Lead : créez le plan de test (tests/PLAN.md) avec code_write\n"
+            "- QA Engineer : écrivez les tests Playwright E2E (tests/e2e/) avec code_write\n"
+            "  Créez tests/e2e/smoke.spec.ts et tests/e2e/journey.spec.ts\n"
+            "- Lancez les tests avec build_tool ou test_tool\n"
+            "Utilisez git_commit pour committer les fichiers de test.\n"
+            "IMPORTANT: Écrivez du VRAI code de test exécutable."
         ),
         "qa-execution": (
             f"Exécution des tests pour «{brief}».\n"
-            "- QA fonctionnel : tests E2E, scénarios utilisateur\n"
-            "- QA technique : tests API, performance, charge\n"
-            "- Expert Sécurité : tests de pénétration\n"
-            "- QA Lead : synthèse résultats, rapport\n"
-            "Exécutez et reportez les résultats."
+            "UTILISEZ VOS OUTILS pour exécuter et valider :\n"
+            "- QA fonctionnel : lancez `npx playwright test` avec build_tool, reportez les résultats\n"
+            "- QA technique : lancez les tests API et perf avec build_tool\n"
+            "- Expert Sécurité : auditez avec code_read, vérifiez les failles OWASP\n"
+            "- QA Lead : consolidez les résultats, créez tests/REPORT.md avec code_write\n"
+            "IMPORTANT: Exécutez les commandes réelles, ne simulez pas."
         ),
         "deploy-prod": (
             f"Déploiement production pour «{brief}».\n"

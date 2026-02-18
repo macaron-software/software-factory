@@ -569,7 +569,7 @@ function renderPhaseGraphs() {
                 : `<circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}" fill="${col}" opacity="0.25"/>
                    <text x="${avatarCx}" y="${avatarCy+4}" text-anchor="middle" style="font-size:13px;fill:${col};font-weight:700">${esc(name.substring(0,2))}</text>`;
 
-            svg += `<g class="mc-live-node" transform="translate(${n.x},${n.y})" onclick="showMcPopover('${esc(n.agent_id||n.id)}',event)">`;
+            svg += `<g class="mc-live-node" data-agent-id="${esc(n.agent_id||n.id)}" transform="translate(${n.x},${n.y})" style="cursor:pointer">`;
             svg += `<rect class="mc-live-node-bg" width="${MC_NW}" height="${MC_NH}"/>`;
             svg += `<line class="mc-live-node-bar" x1="0" y1="0" x2="${MC_NW}" y2="0" stroke="${col}" stroke-width="3"/>`;
             svg += avatarSvg;
@@ -1064,6 +1064,25 @@ function md(s){
 
 /* Init */
 renderPhaseGraphs();
+
+/* Event delegation for agent popover clicks on SVG graph nodes */
+document.querySelectorAll('.mc-phase-graph').forEach(container => {
+    container.addEventListener('click', e => {
+        let el = e.target;
+        /* Walk up to find mc-live-node group (works in both HTML and SVG namespaces) */
+        while (el && el !== container) {
+            if (el.classList && el.classList.contains('mc-live-node')) {
+                const agentId = el.getAttribute('data-agent-id');
+                if (agentId) {
+                    e.stopPropagation();
+                    showMcPopover(agentId, e);
+                }
+                return;
+            }
+            el = el.parentElement || el.parentNode;
+        }
+    });
+});
 
 /* Poll fallback */
 setInterval(async () => {
