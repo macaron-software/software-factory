@@ -3775,66 +3775,6 @@ _IDEATION_AGENTS = [
     {"id": "product_manager", "name": "Alexandre Faure", "short_role": "Product Manager", "color": "#16a34a"},
 ]
 
-_IDEATION_SYSTEM = """Tu simules un atelier d'idéation sous forme de RÉUNION multi-agents.
-Les agents doivent avoir une conversation NATURELLE de type réunion, en s'adressant les uns aux autres avec des @mentions.
-
-Chaque message a:
-- "agent_id": identifiant technique
-- "agent_name": prénom nom
-- "role": rôle affiché (Business Analyst, Architecte, etc.)
-- "target": à qui l'agent s'adresse ("Alexandre", "Camille", "Pierre", "Chloé", "Nadia", "Comité")
-- "content": message naturel avec @mentions (ex: "@Pierre, je pense que...")
-- "color": couleur hex
-
-IMPORTANT: Les agents doivent SE RÉPONDRE entre eux, se challenger, poser des questions croisées.
-- Camille peut interpeller Pierre sur un risque technique
-- Pierre peut questionner Nadia sur la sécurité d'une techno
-- Chloé peut challenger Camille sur l'expérience utilisateur
-- Nadia peut alerter Pierre sur une faille dans son architecture
-- Alexandre synthétise EN DERNIER en citant les contributions de chacun
-
-Produis 6-8 messages pour simuler une vraie réunion (pas juste des avis isolés).
-
-Réponds en JSON:
-{{
-  "request_type": "new_project|new_feature|bug_fix|tech_debt|migration|security_audit",
-  "messages": [
-    {{"agent_id": "metier", "agent_name": "Camille Durand", "role": "Business Analyst", "target": "Comité", "content": "Analyse métier avec @mentions vers d'autres agents...", "color": "#2563eb"}},
-    {{"agent_id": "architecte", "agent_name": "Pierre Duval", "role": "Architecte", "target": "Camille", "content": "@Camille, sur le plan technique...", "color": "#0891b2"}},
-    {{"agent_id": "securite", "agent_name": "Nadia Benali", "role": "Expert Sécurité", "target": "Pierre", "content": "@Pierre, attention au choix de...", "color": "#dc2626"}},
-    {{"agent_id": "ux_designer", "agent_name": "Chloé Bertrand", "role": "UX Designer", "target": "Camille", "content": "@Camille, côté utilisateur...", "color": "#8b5cf6"}},
-    {{"agent_id": "architecte", "agent_name": "Pierre Duval", "role": "Architecte", "target": "Nadia", "content": "@Nadia, bonne remarque, on pourrait...", "color": "#0891b2"}},
-    {{"agent_id": "product_manager", "agent_name": "Alexandre Faure", "role": "Product Owner", "target": "Comité", "content": "Synthèse: @Camille a soulevé... @Pierre propose... @Nadia alerte sur... @Chloé recommande...", "color": "#16a34a"}}
-  ],
-  "findings": [
-    {{"type": "opportunity|risk|question|decision|feature", "text": "..."}}
-  ],
-  "po_proposal": {{
-    "epic_name": "Titre court de l'epic",
-    "stack": "Technologies recommandées",
-    "workflow": "feature-request|tech-debt-reduction|sf-pipeline",
-    "team": [
-      {{"role": "Lead Dev", "justification": "..."}},
-      {{"role": "Dev Frontend", "justification": "..."}},
-      {{"role": "Dev Backend", "justification": "..."}},
-      {{"role": "QA", "justification": "..."}},
-      {{"role": "DevOps", "justification": "..."}}
-    ],
-    "priority_wsjf": 15,
-    "estimated_sprints": 3
-  }}
-}}
-
-Règles:
-- Camille Durand (Business Analyst): valeur métier, ROI, personas, KPIs
-- Pierre Duval (Architecte): stack technique, patterns, scalabilité, risques techniques
-- Chloé Bertrand (UX Designer): parcours utilisateur, accessibilité WCAG, design system
-- Nadia Benali (Expert Sécurité): OWASP, RGPD, menaces, chiffrement
-- Alexandre Faure (Product Owner): priorisation WSJF, épic, features, synthèse (TOUJOURS en dernier)
-
-Les experts DOIVENT se challenger mutuellement. Alexandre synthétise.
-Réponds UNIQUEMENT avec le JSON, rien d'autre."""
-
 
 @router.get("/ideation", response_class=HTMLResponse)
 async def ideation_page(request: Request):
