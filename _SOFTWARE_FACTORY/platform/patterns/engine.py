@@ -225,6 +225,12 @@ async def run_pattern(
             await _run_hierarchical(run, initial_task)
         elif ptype == "network":
             await _run_network(run, initial_task)
+        elif ptype == "router":
+            await _run_router(run, initial_task)
+        elif ptype == "aggregator":
+            await _run_aggregator(run, initial_task)
+        elif ptype == "human-in-the-loop":
+            await _run_human_in_the_loop(run, initial_task)
         else:
             await _run_sequential(run, initial_task)
 
@@ -239,7 +245,7 @@ async def run_pattern(
         run.finished = True
         run.error = str(e)
         has_vetoes = False
-        logger.error("Pattern %s failed: %s", pattern.name, e)
+        logger.error("Pattern %s failed: %s", pattern.name, e, exc_info=True)
 
     # Log pattern end
     if run.success:
@@ -995,3 +1001,182 @@ async def _run_network(run: PatternRun, task: str):
             f"Contributions :\n{prev_round}",
             to_agent_id="all",
         )
+
+
+async def _run_router(run: PatternRun, task: str):
+    """Router: first agent analyzes input and routes to the best specialist.
+
+    Flow: Router classifies → picks one specialist → specialist executes → reports back.
+    """
+    nodes = _ordered_nodes(run.pattern)
+    if len(nodes) < 2:
+        return await _run_sequential(run, task)
+
+    router_id = nodes[0]
+    specialist_ids = nodes[1:]
+    router_agent = _node_agent_id(run, router_id)
+
+    # Build specialist roster
+    specialist_roster = []
+    for sid in specialist_ids:
+        ns = run.nodes.get(sid)
+        if ns and ns.agent:
+            specialist_roster.append(f"- [{sid}] {ns.agent.name} ({ns.agent.role})")
+        else:
+            specialist_roster.append(f"- [{sid}] (unknown)")
+    roster_text = "\n".join(specialist_roster)
+
+    # Router classifies and picks
+    run.flow_step = "Routing"
+    router_output = await _execute_node(
+        run, router_id,
+        f"Analyse la demande et choisis le spécialiste le plus qualifié.\n\n"
+        f"Spécialistes disponibles :\n{roster_text}\n\n"
+        f"Réponds avec exactement [ROUTE: <node_id>] pour indiquer ton choix, "
+        f"puis explique brièvement pourquoi.\n\n"
+        f"Demande :\n{task}",
+        to_agent_id="all",
+    )
+
+    # Parse route decision
+    chosen_id = None
+    for sid in specialist_ids:
+        if f"[ROUTE: {sid}]" in router_output or f"[ROUTE:{sid}]" in router_output:
+            chosen_id = sid
+            break
+    if not chosen_id:
+        chosen_id = specialist_ids[0]
+
+    # Execute chosen specialist
+    run.flow_step = f"Exécution ({chosen_id})"
+    await _execute_node(
+        run, chosen_id, task, context_from=router_output,
+        to_agent_id=router_agent,
+    )
+
+
+async def _run_aggregator(run: PatternRun, task: str):
+    """Aggregator: multiple agents work in parallel, one aggregator consolidates.
+
+    Unlike parallel (dispatcher → workers → aggregator), aggregator has NO dispatcher.
+    Workers start independently, then the aggregator synthesizes all results.
+    """
+    nodes = _ordered_nodes(run.pattern)
+    if len(nodes) < 2:
+        return await _run_sequential(run, task)
+
+    # Find aggregator (node that receives "aggregate" edges)
+    agg_id = None
+    worker_ids = []
+    agg_targets = set()
+    for edge in run.pattern.edges:
+        if edge.get("type") == "aggregate":
+            agg_targets.add(edge["to"])
+    if agg_targets:
+        agg_id = list(agg_targets)[0]
+        worker_ids = [n for n in nodes if n != agg_id]
+    else:
+        agg_id = nodes[-1]
+        worker_ids = nodes[:-1]
+
+    agg_agent = _node_agent_id(run, agg_id)
+
+    # Workers execute in parallel
+    run.flow_step = "Analyse parallèle"
+    worker_tasks = [
+        _execute_node(run, wid, task, to_agent_id=agg_agent)
+        for wid in worker_ids
+    ]
+    results = await asyncio.gather(*worker_tasks, return_exceptions=True)
+
+    # Build consolidated input
+    combined_parts = []
+    for i, r in enumerate(results):
+        ns = run.nodes.get(worker_ids[i])
+        name = ns.agent.name if ns and ns.agent else worker_ids[i]
+        combined_parts.append(f"[{name}]:\n{r if isinstance(r, str) else str(r)}")
+    combined = "\n\n---\n\n".join(combined_parts)
+
+    # Aggregator synthesizes
+    run.flow_step = "Consolidation"
+    await _execute_node(
+        run, agg_id,
+        f"Consolide les analyses de tous les experts en une synthèse actionable.\n\n"
+        f"1. Résume les contributions clés de chaque expert\n"
+        f"2. Identifie les points de convergence et de divergence\n"
+        f"3. Propose un plan d'action consolidé avec priorités\n\n"
+        f"Contributions :\n{combined}",
+        context_from=combined, to_agent_id="all",
+    )
+
+
+async def _run_human_in_the_loop(run: PatternRun, task: str):
+    """Human-in-the-loop: agents work, with human validation checkpoints.
+
+    Checkpoint edges mark where human validation is required.
+    Inserts a system message and SSE event for the UI to show a validation prompt.
+    """
+    nodes = _ordered_nodes(run.pattern)
+    if not nodes:
+        return
+
+    store = get_session_store()
+
+    # Find checkpoint edges
+    checkpoint_sources = {
+        e["from"] for e in run.pattern.edges if e.get("type") == "checkpoint"
+    }
+
+    prev_output = ""
+    for i, nid in enumerate(nodes):
+        ns = run.nodes.get(nid)
+
+        # Skip "human" placeholder nodes (no agent_id)
+        if ns and not ns.agent_id:
+            checkpoint_msg = run.pattern.config.get(
+                "checkpoint_message",
+                "⏸️ Point de contrôle — En attente de votre validation."
+            )
+            store.add_message(MessageDef(
+                session_id=run.session_id,
+                from_agent="system",
+                to_agent="user",
+                message_type="system",
+                content=f"**🔔 CHECKPOINT HUMAIN**\n\n{checkpoint_msg}\n\n"
+                        f"_Résumé du travail effectué :_\n{prev_output[:500]}",
+            ))
+            await _push_sse(run.session_id, {
+                "type": "checkpoint",
+                "content": checkpoint_msg,
+                "requires_input": True,
+            })
+            run.flow_step = "Checkpoint humain"
+            continue
+
+        to_agent = "all"
+        if i + 1 < len(nodes):
+            next_ns = run.nodes.get(nodes[i + 1])
+            if next_ns and next_ns.agent_id:
+                to_agent = next_ns.agent_id
+
+        output = await _execute_node(
+            run, nid, task, context_from=prev_output, to_agent_id=to_agent,
+        )
+        prev_output = output
+
+        # Insert checkpoint after this node if it has a checkpoint edge
+        if nid in checkpoint_sources:
+            store.add_message(MessageDef(
+                session_id=run.session_id,
+                from_agent="system",
+                to_agent="user",
+                message_type="system",
+                content=f"**🔔 VALIDATION REQUISE**\n\n"
+                        f"L'agent a terminé son travail. Validez ou demandez des corrections.\n\n"
+                        f"_Résultat :_\n{output[:500]}",
+            ))
+            await _push_sse(run.session_id, {
+                "type": "checkpoint",
+                "content": "Validation humaine requise",
+                "requires_input": True,
+            })

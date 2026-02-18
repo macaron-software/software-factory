@@ -870,10 +870,13 @@ async function sendIdea() {
             }
         };
 
-        es.onerror = function() {
-            es.close();
-            resetGraphState();
-            sendBtn.disabled = false;
+        es.onerror = function(e) {
+            // SSE auto-reconnects by default; only close if readyState is CLOSED
+            if (es.readyState === EventSource.CLOSED) {
+                resetGraphState();
+                sendBtn.disabled = false;
+            }
+            // Otherwise let browser auto-reconnect
         };
 
     } catch (e) {

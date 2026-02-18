@@ -33,7 +33,7 @@ _sse_queues: dict[str, list[asyncio.Queue]] = {}
 
 def add_sse_listener(session_id: str) -> asyncio.Queue:
     """Register a queue to receive live events for a session."""
-    q: asyncio.Queue = asyncio.Queue(maxsize=200)
+    q: asyncio.Queue = asyncio.Queue(maxsize=2000)
     _sse_queues.setdefault(session_id, []).append(q)
     return q
 
@@ -54,7 +54,7 @@ async def _push_sse(session_id: str, event: dict):
         try:
             q.put_nowait(event)
         except asyncio.QueueFull:
-            pass
+            logger.warning("SSE queue full for session %s, dropping %s event", session_id, event.get("type"))
 
 
 async def handle_user_message(session_id: str, content: str, to_agent: str = "") -> Optional[MessageDef]:
