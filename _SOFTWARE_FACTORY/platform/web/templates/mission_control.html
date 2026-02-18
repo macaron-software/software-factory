@@ -257,6 +257,9 @@
         <div class="mc-activity" id="mc-activity">
             <div class="mc-msg system"><div class="mc-msg-content">Mission démarrée — {{ mission.brief[:200] }}</div></div>
             <div class="mc-msg tool"><div class="mc-msg-time">{{ "now" }}</div><div class="mc-msg-content">{{ mission.phases|length }} phases à orchestrer • Pattern: mega-workflow lifecycle</div></div>
+            {% if mission.workspace_path %}
+            <div class="mc-msg tool"><div class="mc-msg-content">📁 Workspace: <code>{{ mission.workspace_path }}</code></div></div>
+            {% endif %}
         </div>
 
         <!-- Memory -->

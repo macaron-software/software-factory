@@ -321,6 +321,7 @@ class MissionRun(BaseModel):
     session_id: str = ""
     cdp_agent_id: str = "chef_de_programme"
     project_id: str = ""
+    workspace_path: str = ""  # filesystem path for agent tools (code_write, git, docker)
     status: MissionStatus = MissionStatus.PENDING
     current_phase: str = ""
     phases: list[PhaseRun] = Field(default_factory=list)

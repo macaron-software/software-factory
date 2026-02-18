@@ -450,6 +450,7 @@ CREATE TABLE IF NOT EXISTS mission_runs (
     session_id TEXT DEFAULT '',
     cdp_agent_id TEXT DEFAULT 'chef_de_programme',
     project_id TEXT DEFAULT '',
+    workspace_path TEXT DEFAULT '',
     status TEXT DEFAULT 'pending',
     current_phase TEXT DEFAULT '',
     phases_json TEXT DEFAULT '[]',

@@ -60,6 +60,14 @@ def _migrate(conn: sqlite3.Connection):
     except Exception:
         pass
 
+    # Mission runs: add workspace_path
+    try:
+        mr_cols = {r[1] for r in conn.execute("PRAGMA table_info(mission_runs)").fetchall()}
+        if mr_cols and "workspace_path" not in mr_cols:
+            conn.execute("ALTER TABLE mission_runs ADD COLUMN workspace_path TEXT DEFAULT ''")
+    except Exception:
+        pass
+
 def get_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
     """Get a database connection."""
     if not db_path.exists():

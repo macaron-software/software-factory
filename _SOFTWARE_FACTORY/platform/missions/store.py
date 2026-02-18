@@ -387,6 +387,12 @@ from ..models import MissionRun, MissionStatus, PhaseRun, PhaseStatus
 
 def _row_to_mission_run(row) -> MissionRun:
     phases = json.loads(row["phases_json"]) if row["phases_json"] else []
+    # Safe access for workspace_path (may not exist in older DBs)
+    wp = ""
+    try:
+        wp = row["workspace_path"] or ""
+    except (IndexError, KeyError):
+        pass
     return MissionRun(
         id=row["id"],
         workflow_id=row["workflow_id"],
@@ -394,6 +400,7 @@ def _row_to_mission_run(row) -> MissionRun:
         session_id=row["session_id"] or "",
         cdp_agent_id=row["cdp_agent_id"] or "chef_de_programme",
         project_id=row["project_id"] or "",
+        workspace_path=wp,
         status=MissionStatus(row["status"]),
         current_phase=row["current_phase"] or "",
         phases=[PhaseRun(**p) for p in phases],
@@ -412,11 +419,11 @@ class MissionRunStore:
         try:
             db.execute(
                 """INSERT INTO mission_runs (id, workflow_id, workflow_name, session_id,
-                   cdp_agent_id, project_id, status, current_phase, phases_json, brief,
-                   created_at, updated_at, completed_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   cdp_agent_id, project_id, workspace_path, status, current_phase,
+                   phases_json, brief, created_at, updated_at, completed_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (run.id, run.workflow_id, run.workflow_name, run.session_id,
-                 run.cdp_agent_id, run.project_id, run.status.value,
+                 run.cdp_agent_id, run.project_id, run.workspace_path, run.status.value,
                  run.current_phase, json.dumps([p.model_dump() for p in run.phases]),
                  run.brief, run.created_at.isoformat(), run.updated_at.isoformat(),
                  run.completed_at.isoformat() if run.completed_at else None),
@@ -457,10 +464,10 @@ class MissionRunStore:
         try:
             cur = db.execute(
                 """UPDATE mission_runs SET status=?, current_phase=?, phases_json=?,
-                   session_id=?, updated_at=?, completed_at=? WHERE id=?""",
+                   session_id=?, workspace_path=?, updated_at=?, completed_at=? WHERE id=?""",
                 (run.status.value, run.current_phase,
                  json.dumps([p.model_dump() for p in run.phases], default=str),
-                 run.session_id or "",
+                 run.session_id or "", run.workspace_path or "",
                  run.updated_at.isoformat(),
                  run.completed_at.isoformat() if run.completed_at else None,
                  run.id),

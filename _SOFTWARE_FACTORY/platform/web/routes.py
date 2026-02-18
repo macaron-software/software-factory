@@ -4594,6 +4594,20 @@ async def api_mission_start(request: Request):
         ))
 
     mission_id = uuid.uuid4().hex[:8]
+
+    # Create workspace directory for agent tools (code, git, docker)
+    import subprocess
+    from pathlib import Path
+    workspace_root = Path(__file__).resolve().parent.parent.parent / "data" / "workspaces" / mission_id
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    # Init git repo + README with brief
+    subprocess.run(["git", "init"], cwd=str(workspace_root), capture_output=True)
+    readme = workspace_root / "README.md"
+    readme.write_text(f"# {wf.name}\n\n{brief}\n\nMission ID: {mission_id}\n")
+    subprocess.run(["git", "add", "."], cwd=str(workspace_root), capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial commit — mission workspace"], cwd=str(workspace_root), capture_output=True)
+    workspace_path = str(workspace_root)
+
     mission = MissionRun(
         id=mission_id,
         workflow_id=workflow_id,
@@ -4601,7 +4615,8 @@ async def api_mission_start(request: Request):
         brief=brief,
         status=MissionStatus.RUNNING,
         phases=phases,
-        project_id=project_id or "",
+        project_id=project_id or mission_id,
+        workspace_path=workspace_path,
     )
 
     run_store = get_mission_run_store()
@@ -4613,7 +4628,7 @@ async def api_mission_start(request: Request):
     session_store.create(SessionDef(
         id=session_id,
         name=f"Mission: {wf.name}",
-        project_id=project_id or None,
+        project_id=mission.project_id or None,
         status="active",
     ))
     # Update mission with session_id
@@ -4629,10 +4644,10 @@ async def api_mission_start(request: Request):
         content=brief,
     ))
 
-    # Start the CDP agent loop
+    # Start the CDP agent loop with workspace path
     mgr = get_loop_manager()
     try:
-        await mgr.start_agent("chef_de_programme", session_id, project_id or "", "")
+        await mgr.start_agent("chef_de_programme", session_id, mission.project_id, workspace_path)
     except Exception as e:
         logger.error("Failed to start CDP agent: %s", e)
 
@@ -5041,7 +5056,11 @@ async def api_mission_run(request: Request, mission_id: str):
             phase_success = False
             phase_error = ""
             try:
-                result = await run_pattern(phase_pattern, session_id, phase_task)
+                result = await run_pattern(
+                    phase_pattern, session_id, phase_task,
+                    project_id=mission.project_id,
+                    project_path=mission.workspace_path,
+                )
                 phase_success = result.success
                 if not phase_success:
                     # Collect error details from failed nodes
@@ -5114,6 +5133,11 @@ async def api_mission_run(request: Request, mission_id: str):
             if phase_success:
                 phase.summary = f"Phase réussie — {len(aids)} agents ont contribué (pattern: {pattern_type})"
                 phases_done += 1
+
+                # Post-phase CI/CD hooks — run real commands in workspace
+                await _run_post_phase_hooks(
+                    phase.phase_id, wf_phase.name, mission, session_id, _push_sse
+                )
             else:
                 phase.summary = f"Phase échouée — {phase_error[:200]}"
                 phases_failed += 1
@@ -5166,6 +5190,108 @@ async def api_mission_run(request: Request, mission_id: str):
     return JSONResponse({"status": "running", "mission_id": mission_id})
 
 
+async def _run_post_phase_hooks(
+    phase_id: str, phase_name: str, mission, session_id: str, push_sse
+):
+    """Run real CI/CD actions after phase completion based on phase type."""
+    import subprocess
+    from pathlib import Path
+
+    workspace = mission.workspace_path
+    if not workspace or not Path(workspace).is_dir():
+        return
+
+    phase_key = phase_name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
+
+    # After dev sprint: auto-commit any uncommitted code
+    if "dev" in phase_key or "sprint" in phase_key:
+        try:
+            result = subprocess.run(
+                ["git", "add", "-A"], cwd=workspace, capture_output=True, text=True, timeout=10
+            )
+            status = subprocess.run(
+                ["git", "status", "--porcelain"], cwd=workspace, capture_output=True, text=True, timeout=10
+            )
+            if status.stdout.strip():
+                subprocess.run(
+                    ["git", "commit", "-m", f"feat: sprint deliverables — {phase_name}"],
+                    cwd=workspace, capture_output=True, text=True, timeout=10
+                )
+                await push_sse(session_id, {
+                    "type": "message",
+                    "from_agent": "system",
+                    "from_name": "CI/CD",
+                    "from_role": "Pipeline",
+                    "content": f"✅ Code commité dans le workspace ({status.stdout.strip().count(chr(10)) + 1} fichiers)",
+                    "phase_id": phase_id,
+                    "msg_type": "text",
+                })
+        except Exception as e:
+            logger.error("Post-phase git commit failed: %s", e)
+
+    # After CI/CD phase: run build if package.json or Dockerfile exists
+    if "cicd" in phase_key or "pipeline" in phase_key:
+        ws = Path(workspace)
+        try:
+            if (ws / "package.json").exists():
+                result = subprocess.run(
+                    ["npm", "install"], cwd=workspace, capture_output=True, text=True, timeout=120
+                )
+                build_msg = "✅ npm install réussi" if result.returncode == 0 else f"❌ npm install échoué: {result.stderr[:200]}"
+                await push_sse(session_id, {
+                    "type": "message",
+                    "from_agent": "system",
+                    "from_name": "CI/CD",
+                    "from_role": "Pipeline",
+                    "content": build_msg,
+                    "phase_id": phase_id,
+                    "msg_type": "text",
+                })
+            if (ws / "Dockerfile").exists():
+                result = subprocess.run(
+                    ["docker", "build", "-t", f"mission-{mission.id}", "."],
+                    cwd=workspace, capture_output=True, text=True, timeout=300
+                )
+                build_msg = f"✅ Docker image mission-{mission.id} construite" if result.returncode == 0 else f"❌ Docker build échoué: {result.stderr[:200]}"
+                await push_sse(session_id, {
+                    "type": "message",
+                    "from_agent": "system",
+                    "from_name": "CI/CD",
+                    "from_role": "Pipeline",
+                    "content": build_msg,
+                    "phase_id": phase_id,
+                    "msg_type": "text",
+                })
+        except Exception as e:
+            logger.error("Post-phase build failed: %s", e)
+
+    # After deploy phase: list workspace files as proof
+    if "deploy" in phase_key:
+        ws = Path(workspace)
+        try:
+            files = list(ws.rglob("*"))
+            real_files = [f.relative_to(ws) for f in files if f.is_file() and ".git" not in str(f)]
+            git_log = subprocess.run(
+                ["git", "log", "--oneline", "-10"], cwd=workspace, capture_output=True, text=True, timeout=10
+            )
+            summary = f"📦 Workspace: {len(real_files)} fichiers\n"
+            if real_files:
+                summary += "```\n" + "\n".join(str(f) for f in sorted(real_files)[:20]) + "\n```\n"
+            if git_log.stdout:
+                summary += f"\n📝 Git log:\n```\n{git_log.stdout.strip()}\n```"
+            await push_sse(session_id, {
+                "type": "message",
+                "from_agent": "system",
+                "from_name": "CI/CD",
+                "from_role": "Pipeline",
+                "content": summary,
+                "phase_id": phase_id,
+                "msg_type": "text",
+            })
+        except Exception as e:
+            logger.error("Post-phase deploy summary failed: %s", e)
+
+
 def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, total: int) -> str:
     """Build a contextual task prompt for each lifecycle phase."""
     prompts = {
@@ -5207,18 +5333,23 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
         ),
         "dev-sprint": (
             f"Sprint de développement pour «{brief}».\n"
-            "- Lead Dev : distribution des stories, code review\n"
-            "- Développeur Backend : API, business logic, tests\n"
-            "- Développeur Frontend : UI, intégration API, tests\n"
-            "- QA : tests en continu, bugs remontés\n"
-            "Implémentez les features prioritaires avec TDD."
+            "VOUS DEVEZ UTILISER VOS OUTILS pour écrire du VRAI code dans le workspace du projet.\n"
+            "- Lead Dev : créez la structure projet (index.html, style.css, app.js, package.json, Dockerfile)\n"
+            "  Utilisez l'outil code_write pour créer chaque fichier.\n"
+            "- Développeur Backend : écrivez le code serveur/API avec code_write\n"
+            "- Développeur Frontend : écrivez le HTML/CSS/JS avec code_write\n"
+            "- QA : écrivez les tests avec code_write\n"
+            "Après avoir écrit le code, utilisez git_commit pour committer.\n"
+            "IMPORTANT: Ne discutez pas du code. ÉCRIVEZ-LE avec code_write."
         ),
         "cicd": (
             f"Pipeline CI/CD pour «{brief}».\n"
-            "- DevOps : pipeline build/test/deploy, Docker, K8s\n"
-            "- Lead Dev : quality gates, linting, coverage\n"
-            "- Expert Sécurité : scan SAST/DAST, secrets management\n"
-            "Configurez le pipeline complet avec quality gates."
+            "UTILISEZ VOS OUTILS pour configurer le pipeline dans le workspace :\n"
+            "- DevOps : créez le Dockerfile, docker-compose.yml, .github/workflows/ci.yml avec code_write\n"
+            "- Lead Dev : créez les scripts de build/test dans package.json ou Makefile\n"
+            "- Expert Sécurité : ajoutez les checks sécurité dans le pipeline\n"
+            "Utilisez build_tool pour vérifier que le build passe.\n"
+            "Utilisez git_commit pour committer les fichiers de CI/CD."
         ),
         "qa-campaign": (
             f"Campagne de tests QA pour «{brief}».\n"
@@ -5236,11 +5367,12 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
         ),
         "deploy-prod": (
             f"Déploiement production pour «{brief}».\n"
-            "- DevOps : canary deploy, monitoring, rollback plan\n"
-            "- QA : smoke tests post-deploy\n"
-            "- Expert Sécurité : checklist sécurité production\n"
-            "- CDP : validation finale GO/NOGO\n"
-            "Préparez et validez le déploiement."
+            "UTILISEZ VOS OUTILS pour déployer depuis le workspace :\n"
+            "- DevOps : utilisez docker_build pour construire l'image, puis deploy_azure pour déployer\n"
+            "- QA : utilisez build_tool pour lancer les smoke tests post-deploy\n"
+            "- Expert Sécurité : vérifiez la checklist sécurité\n"
+            "- CDP : validation finale\n"
+            "IMPORTANT: Exécutez les commandes réelles, ne simulez pas."
         ),
         "tma-routing": (
             f"Routage incidents TMA pour «{brief}».\n"

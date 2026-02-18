@@ -50,6 +50,7 @@ class PatternRun:
     pattern: PatternDef
     session_id: str
     project_id: str = ""
+    project_path: str = ""  # workspace filesystem path for tools
     nodes: dict[str, NodeState] = field(default_factory=dict)
     iteration: int = 0
     max_iterations: int = 5
@@ -175,12 +176,14 @@ async def run_pattern(
     session_id: str,
     initial_task: str,
     project_id: str = "",
+    project_path: str = "",
 ) -> PatternRun:
     """Execute a pattern graph in a session. Returns the run state."""
     run = PatternRun(
         pattern=pattern,
         session_id=session_id,
         project_id=project_id,
+        project_path=project_path,
         max_iterations=pattern.config.get("max_iterations", 5),
     )
 
@@ -530,6 +533,10 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
                     )
         except Exception:
             pass
+
+    # Fallback: use workspace_path from mission if project_path not found from registry
+    if not project_path and run.project_path:
+        project_path = run.project_path
 
     skills_prompt = ""
     if agent.skills:
