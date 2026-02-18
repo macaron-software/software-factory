@@ -1,37 +1,81 @@
 {% extends "base.html" %}
-{% block content %}
-<div class="page-header">
-    <h1>🚀 Mission Control</h1>
-    <p class="text-muted">Product lifecycle missions — CDP orchestrated</p>
-</div>
 
-<div style="display:flex;gap:1rem;margin-bottom:1.5rem;">
-    <a href="/missions/start/product-lifecycle" class="btn btn-primary">+ New Mission</a>
-</div>
+{% block topbar_actions %}
+<a href="/missions/start/product-lifecycle" class="btn btn-primary">
+    <svg class="icon icon-sm"><use href="#icon-play"/></svg> Nouvelle Mission
+</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.mission-list{display:flex;flex-direction:column;gap:0.75rem}
+.mission-card{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;text-decoration:none;transition:border-color .15s,box-shadow .15s}
+.mission-card:hover{border-color:var(--purple-dim);box-shadow:0 2px 12px rgba(124,58,237,.08)}
+
+.mission-status-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.mission-status-icon.running{background:rgba(124,58,237,.15);color:var(--purple)}
+.mission-status-icon.completed{background:rgba(34,197,94,.12);color:var(--green)}
+.mission-status-icon.failed{background:rgba(239,68,68,.12);color:var(--red)}
+.mission-status-icon.paused,.mission-status-icon.pending{background:var(--bg-tertiary);color:var(--text-secondary)}
+
+.mission-body{min-width:0}
+.mission-title{font-size:0.92rem;font-weight:600;color:var(--text-primary);margin-bottom:0.2rem;display:flex;align-items:center;gap:0.5rem}
+.mission-brief{font-size:0.8rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:500px;margin-bottom:0.45rem}
+
+.mission-progress-row{display:flex;align-items:center;gap:0.6rem}
+.mission-progress-bar{flex:1;max-width:220px;height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden}
+.mission-progress-fill{height:100%;border-radius:3px;transition:width .3s}
+.mission-progress-fill.running{background:var(--purple)}
+.mission-progress-fill.completed{background:var(--green)}
+.mission-progress-fill.failed{background:var(--red)}
+.mission-progress-fill.pending{background:var(--text-secondary)}
+.mission-progress-label{font-size:0.72rem;font-weight:600;color:var(--text-secondary);min-width:60px}
+
+.mission-meta{display:flex;flex-direction:column;align-items:flex-end;gap:0.3rem;flex-shrink:0}
+.mission-date{font-size:0.72rem;color:var(--text-secondary)}
+.mission-badge{font-size:0.68rem;padding:0.15rem 0.5rem;border-radius:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em}
+.mission-badge.running{background:rgba(124,58,237,.15);color:var(--purple)}
+.mission-badge.completed{background:rgba(34,197,94,.12);color:var(--green)}
+.mission-badge.failed{background:rgba(239,68,68,.12);color:var(--red)}
+.mission-badge.paused,.mission-badge.pending{background:var(--bg-tertiary);color:var(--text-secondary)}
+</style>
 
 {% if runs %}
-<div class="card-grid" style="gap:1rem;">
+<div class="mission-list">
     {% for run in runs %}
-    <a href="/missions/{{ run.id }}/control" class="card" style="text-decoration:none;padding:1rem;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-            <strong>{{ run.workflow_name or run.workflow_id }}</strong>
-            <span class="badge badge-{% if run.status.value == 'completed' %}success{% elif run.status.value == 'running' %}info{% elif run.status.value == 'failed' %}danger{% else %}ghost{% endif %}">
-                {{ run.status.value }}
-            </span>
+    {% set done_count = run.phases|selectattr('status.value','equalto','done')|list|length %}
+    {% set total = run.phases|length %}
+    {% set pct = ((done_count / total) * 100)|round|int if total > 0 else 0 %}
+    {% set st = run.status.value %}
+    <a href="/missions/{{ run.id }}/control" class="mission-card">
+        <div class="mission-status-icon {{ st }}">
+            {% if st == 'running' %}⚡{% elif st == 'completed' %}✅{% elif st == 'failed' %}❌{% else %}⏸️{% endif %}
         </div>
-        <p class="text-muted" style="font-size:0.85rem;margin:0;">{{ run.brief[:120] }}{% if run.brief|length > 120 %}…{% endif %}</p>
-        <div style="display:flex;gap:1rem;margin-top:0.5rem;font-size:0.8rem;color:var(--text-muted);">
-            <span>📅 {{ run.created_at.strftime('%d/%m %H:%M') }}</span>
-            <span>📊 {{ run.phases|selectattr('status.value','equalto','done')|list|length }}/{{ run.phases|length }} phases</span>
+        <div class="mission-body">
+            <div class="mission-title">
+                {{ run.workflow_name or run.workflow_id }}
+            </div>
+            <div class="mission-brief">{{ run.brief[:140] }}</div>
+            <div class="mission-progress-row">
+                <div class="mission-progress-bar">
+                    <div class="mission-progress-fill {{ st }}" style="width:{{ pct }}%"></div>
+                </div>
+                <span class="mission-progress-label">{{ done_count }}/{{ total }} phases</span>
+            </div>
+        </div>
+        <div class="mission-meta">
+            <span class="mission-badge {{ st }}">{{ st }}</span>
+            <span class="mission-date">{{ run.created_at[:16].replace('T',' ') if run.created_at is string else run.created_at.strftime('%d/%m %H:%M') }}</span>
         </div>
     </a>
     {% endfor %}
 </div>
 {% else %}
 <div class="empty-state" style="text-align:center;padding:3rem;">
-    <p style="font-size:2rem;">🚀</p>
-    <p>No missions yet. Launch one from a workflow with phases.</p>
-    <a href="/workflows" class="btn btn-ghost">Browse Workflows</a>
+    <p style="font-size:2.5rem;margin-bottom:0.5rem">🚀</p>
+    <h3 style="color:var(--text-primary);margin-bottom:0.3rem">Aucune mission</h3>
+    <p style="color:var(--text-secondary);font-size:0.88rem;margin-bottom:1rem">Lancez une mission pour orchestrer le cycle de vie produit complet.</p>
+    <a href="/workflows" class="btn btn-ghost">Parcourir les workflows</a>
 </div>
 {% endif %}
 {% endblock %}
