@@ -4683,6 +4683,43 @@ async def mission_control_page(request: Request, mission_id: str):
             p_nodes = [n for n in all_nodes if n.get("agent_id") in agent_set]
             p_node_ids = {n["id"] for n in p_nodes}
             p_edges = [e for e in all_edges if e["from"] in p_node_ids and e["to"] in p_node_ids]
+
+            # Auto-generate pattern-specific edges to show topology
+            pattern_id = wp.pattern_id or ""
+            if len(p_nodes) >= 2:
+                pids = [n["id"] for n in p_nodes]
+                pcolors = {"network": "#3b82f6", "loop": "#a855f7", "parallel": "#10b981",
+                           "sequential": "#f59e0b", "hierarchical": "#ef4444",
+                           "aggregator": "#06b6d4", "router": "#f59e0b",
+                           "human-in-the-loop": "#d946ef", "adversarial-pair": "#ef4444"}
+                pc = pcolors.get(pattern_id, "#8b949e")
+                if pattern_id == "network":
+                    # Mesh: bidirectional between all nodes
+                    for i, a in enumerate(pids):
+                        for b in pids[i+1:]:
+                            if not any(e["from"] == a and e["to"] == b for e in p_edges):
+                                p_edges.append({"from": a, "to": b, "color": pc})
+                            if not any(e["from"] == b and e["to"] == a for e in p_edges):
+                                p_edges.append({"from": b, "to": a, "color": pc})
+                elif pattern_id == "loop":
+                    # Circular: A→B→C→A
+                    for i in range(len(pids)):
+                        f, t = pids[i], pids[(i+1) % len(pids)]
+                        if not any(e["from"] == f and e["to"] == t for e in p_edges):
+                            p_edges.append({"from": f, "to": t, "color": pc})
+                elif pattern_id == "parallel":
+                    # Fan-out from first node to all others
+                    hub = pids[0]
+                    for t in pids[1:]:
+                        if not any(e["from"] == hub and e["to"] == t for e in p_edges):
+                            p_edges.append({"from": hub, "to": t, "color": pc, "label": "parallel"})
+                elif pattern_id == "sequential":
+                    # Chain: A→B→C
+                    for i in range(len(pids) - 1):
+                        f, t = pids[i], pids[i+1]
+                        if not any(e["from"] == f and e["to"] == t for e in p_edges):
+                            p_edges.append({"from": f, "to": t, "color": pc})
+
             # Enrich nodes with agent info
             enriched_nodes = []
             for n in p_nodes:
@@ -4714,11 +4751,14 @@ async def mission_control_page(request: Request, mission_id: str):
                 "created_at": m.created_at if hasattr(m, "created_at") else "",
             })
 
-    # Memory entries
+    # Memory entries — try project-specific first, then global
     memories = []
     try:
         mem_mgr = get_memory_manager()
-        memories = mem_mgr.search("", limit=20) or []
+        if mission.project_id:
+            memories = mem_mgr.project_get(mission.project_id, limit=20) or []
+        if not memories:
+            memories = mem_mgr.search("", limit=20) or []
     except Exception:
         pass
 

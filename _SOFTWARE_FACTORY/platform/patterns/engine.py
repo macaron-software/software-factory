@@ -476,6 +476,31 @@ async def _execute_node(
         "status": "idle",
     })
 
+    # Store key insights in project memory + notify frontend
+    if run.project_id and content and not result.error:
+        try:
+            mem = get_memory_manager()
+            # Extract a short summary (first 200 chars of clean content)
+            import re as _re2
+            clean = _re2.sub(r'\[.*?\]', '', content).strip()
+            summary = clean[:200] + ('…' if len(clean) > 200 else '')
+            mem.project_store(
+                run.project_id,
+                key=f"phase:{run.pattern.type}:{agent.id}",
+                value=summary,
+                category=run.pattern.type,
+                source=agent.id,
+            )
+            await _push_sse(run.session_id, {
+                "type": "memory_stored",
+                "category": run.pattern.type,
+                "key": f"{agent.name}: {run.pattern.type}",
+                "value": summary,
+                "agent_id": agent.id,
+            })
+        except Exception:
+            pass
+
     return content
 
 
