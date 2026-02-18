@@ -608,6 +608,16 @@ function handleSSE(d) {
             }
         }
     }
+    else if (d.type === 'stream_end') {
+        // Streaming finished — remove bubble, final message will arrive via 'message' event
+        const phaseId = d.phase_id || currentRunningPhase();
+        if (phaseId) {
+            const container = document.getElementById(`discuss-${phaseId}`);
+            if (container) {
+                container.querySelector(`.mc-stream-bubble[data-agent="${d.agent_id}"]`)?.remove();
+            }
+        }
+    }
     else if (d.type === 'stream_thinking') {
         // Agent is in <think> mode — pulse the indicator
         const phaseId = d.phase_id || currentRunningPhase();
@@ -692,7 +702,7 @@ function addDiscussionMsg(phaseId, d) {
     }
 
     // Render markdown content
-    const rendered = md((d.content||'').substring(0, 3000));
+    const rendered = md(d.content || '');
 
     const div = document.createElement('div');
     div.className = 'mu mu--chat mu--agent';
