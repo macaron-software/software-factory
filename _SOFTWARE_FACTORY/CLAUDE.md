@@ -1677,6 +1677,101 @@ Azure OpenAI / MiniMax / Foundry (llm/client.py)
 
 **Conflicts:** Negotiation (propose→counter→vote), Veto 3 niveaux (ABSOLUTE/STRONG/ADVISORY)
 
+### DUAL SSE SYSTEM (CRITICAL)
+
+**Deux systèmes SSE coexistent — les deux doivent livrer au frontend:**
+
+```
+_push_sse(session_id, dict)          → _sse_queues (runner.py L51)
+                                     → AUSSI bus._sse_listeners (broadcast)
+bus.publish(A2AMessage)              → bus._sse_listeners (bus.py L143)
+                                     → via _notify_sse()
+SSE endpoint /sse/session/{id}       → bus.add_sse_listener() (ws.py L38)
+                                     → filtre par session_id (dict ou A2AMessage)
+```
+
+**`_push_sse()` enrichit dict avec session_id + push aux DEUX systèmes.**
+Sans ça: events mission control jamais reçus par frontend (bug fixé).
+
+### PATTERN ENGINE (patterns/engine.py)
+
+**8 patterns implémentés — TOUS avec vrai LLM streaming:**
+
+```
+run_pattern(PatternDef, session_id, task) → PatternRun
+    ↓
+_execute_node(run, node_id, task) → agent LLM call
+    ↓ SSE events:
+    agent_status(thinking) → stream_start(agent_name) → stream_thinking(heartbeat)
+    → stream_delta(chunk) → stream_end(content) → message(final) → agent_status(idle)
+```
+
+| Pattern | Impl | Flow |
+|---------|------|------|
+| `solo` | 1 agent | task → response |
+| `sequential` | chain | A→B→C, output forwards |
+| `parallel` | concurrent | all agents //, results merged |
+| `loop` | iterate | repeat until convergence/max |
+| `hierarchical` | tree | leader delegates to subordinates |
+| `network` | mesh | brief→analyse→débat rounds→synthèse (judge) |
+| `router` | dispatch | classifier routes to specialist |
+| `aggregator` | merge | all contribute → last agent synthesizes |
+| `human-in-the-loop` | gate | agents analyze → checkpoint GO/NOGO/PIVOT |
+
+**Streaming dans _execute_node:**
+- `<think>` blocks filtré (heartbeat every 20 chunks)
+- `<tool_call>` artifacts strippé
+- VETO/APPROVE détecté dans content
+- Tools: code_edit, code_read, code_search, git, deploy, memory
+
+### MISSION CONTROL (Mega-Workflow Lifecycle)
+
+**CDP (Alexandre Moreau) orchestre 11 phases product lifecycle:**
+
+```
+GET  /mission-control                    → liste missions
+GET  /missions/start/{workflow_id}       → form brief + lancement
+POST /api/missions/start                 → crée mission + session + CDP agent
+GET  /missions/{id}/control              → dashboard mission control
+POST /api/missions/{id}/run              → exécute phases via pattern engine
+POST /api/missions/{id}/validate         → GO/NOGO/PIVOT checkpoint
+```
+
+**Pipeline 11 phases (product-lifecycle workflow):**
+
+```
+1. Idéation (network) — BA+UX+Archi+PM débattent
+2. Comité Stratégique (human-in-the-loop) — CPO+CTO+Portfolio+Lean+DSI → GO/NOGO
+3. Constitution Projet (sequential) — Scrum+RH+Lead+PO
+4. Architecture & Design (aggregator) — Archi+UX+Sécu+DevOps+Lead
+5. Sprints Dev (hierarchical) — Lead→Backend+Frontend+QA
+6. Pipeline CI/CD (sequential) — DevOps+Lead+Sécu
+7. Campagne Tests QA (loop) — QA Lead+QA Engineer
+8. Tests Parallèles (parallel) — QA fonc+tech+sécu+lead
+9. Deploy Prod (human-in-the-loop) — DevOps+QA+Sécu+CDP → GO/NOGO
+10. Routage TMA (router) — Support N1→N2+QA+Lead
+11. Correctif TMA (loop) — Dev TMA+QA
+```
+
+**Chaque phase = run_pattern() réel:**
+- PatternDef construit depuis workflow config (agents + edges)
+- Prompt contextuel par phase (`_build_phase_prompt()`)
+- Agents LLM streaming: thinking indicator → text delta → final message
+- Checkpoints phases 2+9: pause + boutons GO/NOGO/PIVOT
+
+**Template mission_control.html:**
+- Timeline pipeline vertical (dots pulse par status)
+- Accordion par phase: SVG flow graph (gauche) + discussions agents (droite)
+- Streaming: `stream_start` → bubble "réfléchit…" + cursor ▊ → `stream_delta` text
+- Sidebar: CDP activity feed + Mémoire + Git graph
+- `AGENT_INFO` lookup: résout nom/role/avatar depuis PHASE_AGENTS
+- `PHASE_GRAPHS` per-phase: sub-graph extrait du graph global (27 nodes, 34 edges)
+
+**Workflow config** (workflows/store.py L894-1068):
+- 11 phases avec pattern_id, agents, config
+- Graph global: 27 nodes + 34 edges avec colors + labels
+- Phase→agents mapping pour sub-graph extraction
+
 ### LIVE IHM — 3 Modes Switchables
 
 ```
@@ -1685,6 +1780,15 @@ session_live.html — SSE /sse/session/{id}
 ├── Chat+Panel (💬) — 1:1 gauche + activité inter-agents droite
 └── Graph Live (🔮) — SVG animé (nodes pulsent = thinking) + message log
 ```
+
+**Graph Live (session_live.html):**
+- NODE_W=230, NODE_H=110 — full agent cards (avatar, name, role, tagline, skills, status)
+- autoLayoutGraph: layers par hierarchy_rank
+- renderLiveEdges: pattern-colored (sequential=blue, hierarchical=amber, loop=pink, network=purple)
+- renderLiveNodes: avatar clipPath, pulse ring (thinking/acting), skill tags, tool counts
+- Pan+Zoom: wheel zoom, mouse drag, fit button, minimap
+- Legend: active patterns auto-detected
+- Focus mode: click node → dim unconnected
 
 ### ROUTES LIVE
 ```
@@ -1699,68 +1803,70 @@ GET  /sse/session/{id}                → SSE filtered par session_id
 ```
 platform/
 ├── server.py                    # FastAPI app factory + lifespan
-├── models.py                    # Pydantic: A2AMessage, AgentStatus, MessageType
+├── models.py                    # Pydantic: A2AMessage, AgentStatus, MessageType, PhaseStatus, MissionStatus
 ├── llm/client.py                # Multi-provider (Azure/MiniMax/NVIDIA), fallback, streaming
 ├── a2a/
-│   ├── bus.py                   # MessageBus singleton, SSE bridge, dead letter
+│   ├── bus.py                   # MessageBus singleton, SSE bridge (add_sse_listener), dead letter
 │   ├── protocol.py              # Message types, priority, permissions
 │   ├── negotiation.py           # Proposal→counter→vote cycle
 │   └── veto.py                  # 3 niveaux, cooldown, override
 ├── agents/
 │   ├── loop.py                  # AgentLoop autonome + AgentLoopManager
-│   ├── executor.py              # LLM + 8 rounds tool calling
+│   ├── executor.py              # LLM + 8 rounds tool calling + _tool_run_phase
 │   └── store.py                 # SQLite CRUD + YAML seed (48 agents)
-├── orchestrator/patterns.py     # 8 patterns (Parallel/Sequential/Loop/Router/...)
+├── patterns/
+│   ├── engine.py                # run_pattern() + _execute_node() streaming + 8 pattern impls
+│   └── store.py                 # PatternDef, PatternRun, NodeState, NodeStatus
+├── missions/
+│   ├── store.py                 # MissionRunStore CRUD (~L407), MissionRun, PhaseRun
+│   └── product.py               # Product lifecycle config
 ├── sessions/
 │   ├── store.py                 # SessionDef + MessageDef
-│   └── runner.py                # Context builder, history compression
+│   └── runner.py                # _push_sse() dual SSE (queues + bus), context builder
 ├── memory/manager.py            # 4 layers, FTS5 search
+├── workflows/store.py           # WorkflowDef + product-lifecycle (27 nodes, 34 edges, 11 phases)
 ├── skills/
 │   ├── library.py               # Scan local + GitHub (1200+ skills)
 │   └── definitions/*.yaml       # 42 YAML agents SAFe
+├── tools/                       # code_tools, git_tools, deploy_tools, memory_tools, phase_tools, etc.
 ├── web/
-│   ├── routes.py                # Toutes routes (~1600 lignes)
-│   ├── ws.py                    # SSE endpoints (session/agents/monitoring)
+│   ├── routes.py                # Toutes routes (~5100 lignes)
+│   ├── ws.py                    # SSE endpoints (bus.add_sse_listener, dict+A2AMessage filter)
 │   └── templates/
 │       ├── base.html            # Layout + sidebar nav
-│       ├── session_live.html    # 3-mode live view (Thread/Chat/Graph)
+│       ├── mission_control.html # CDP mega-workflow dashboard (accordion+streaming+SVG graphs)
+│       ├── mission_control_list.html # Liste missions
+│       ├── mission_start.html   # Form lancement mission
+│       ├── session_live.html    # 3-mode live view (Thread/Chat/Graph) pan+zoom
 │       ├── conversation.html    # Session classique + bouton "Go Live"
 │       ├── workflow_edit.html   # Éditeur SVG graphe d'agents
-│       └── skills.html          # 50/page, search, filtres source
+│       ├── ideation.html        # 5-agent network ideation
+│       ├── dsi.html             # Dashboard DSI/CTO
+│       ├── metier.html          # Dashboard Métier
+│       ├── portfolio.html       # Vue portefeuille
+│       ├── project_board.html   # Kanban 4 colonnes
+│       ├── skills.html          # 50/page, search, filtres source
+│       └── memory.html          # Wiki-like, FTS5
 └── data/
-    ├── platform.db              # SQLite (rm pour re-seed)
+    ├── platform.db              # SQLite (rm pour re-seed, 48 agents + 4 workflows)
     └── github_skills/           # Cache 1156 skills .md
 ```
 
 ### WORKFLOWS BUILTIN
 
+**Product Lifecycle** (id=`product-lifecycle`):
+```
+11 phases, 27 agents, 34 edges
+CDP Alexandre Moreau orchestre séquentiellement
+Patterns: network → human-in-the-loop → sequential → aggregator → hierarchical
+          → sequential → loop → parallel → human-in-the-loop → router → loop
+```
+
 **Migration Sharelook Angular 16→17** (id=`migration-sharelook`):
 ```
-Pattern: Hierarchical + Network hybride
 7 agents, 4 phases, 10 edges
-
-👔 CDP Migration (orchestrateur, GO/NOGO)
-├── 🏗️ Lead Dev Angular (décompose, priorise, VETO STRONG)
-│   ├── 👨‍💻 Dev Frontend Pilot (ai12-reporting, codemods)
-│   └── 👨‍💻 Dev Frontend Main (ai08-admin, 38 modules)
-├── 🧪 QA Migration ISO 100% (golden files, VETO ABSOLU si diff>0%)
-├── 🔒 Security Audit (npm audit, CVE, VETO ABSOLU)
-└── 🚀 DevOps Deploy (staging→canary 1%→100%)
-
-Phases:
-1. Dependencies & Audit (sequential) → CDP + Lead + Security
-2. Pilot ai12-reporting (hierarchical) → Lead + Dev + QA
-3. Main ai08-admin (hierarchical) → Lead + 2 Devs + QA
-4. Deploy Canary (sequential, gate=all_approved) → CDP + QA + Security + DevOps
-
-Communication inter-agents (bus A2A):
-CDP →[DELEGATE]→ Lead "migrer module auth"
-Lead →[DELEGATE]→ Dev "appliquer codemod standalone.ts"
-Lead →[DELEGATE]→ QA "capturer golden files avant migration"
-Dev →[INFORM]→ Lead "AuthModule migré ✅"
-QA →[APPROVE]→ Lead "golden diff 0% ✅"  OU  QA →[VETO]→ "régression screenshot 3px"
-Security →[INFORM]→ CDP "0 CVE critical, GO ✅"
-Lead →[INFORM]→ CDP "phase 2 complete, next phase 3"
+Hierarchical + Network hybride
+CDP Migration → Lead Dev → Dev Pilot + Dev Main + QA + Security + DevOps
 ```
 
 ### DB PATH
@@ -1775,13 +1881,16 @@ Lead →[INFORM]→ CDP "phase 2 complete, next phase 3"
 - Skills GitHub: git clone shallow (pas API rate-limited)
 - Theme: CSS vars `--bg-primary:#0f0d1a` `--purple:#7c3aed`
 - Views: 4 modes display (card/compact/list/list-compact)
-- SSE: bus.add_sse_listener() + filter session_id, keepalive 30s
+- SSE: `_push_sse()` → dual delivery (queues + bus), `bus.add_sse_listener()` → filter session_id, keepalive 30s
+- `_agent_map_for_template(agents)` → returns dicts (access `a["name"]` NOT `a.name`)
+- `MissionRunStore.update()` persists session_id (was bug, fixed)
+- `SessionStore.get_messages()` (NOT `list_messages`)
 
 ### START
 ```bash
-cd _SOFTWARE_FACTORY && rm -f data/platform.db
-AZURE_OPENAI_API_KEY=dummy AZURE_AI_API_KEY=dummy \
-python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8099
+cd _SOFTWARE_FACTORY && rm -f data/platform.db data/platform.db-wal data/platform.db-shm
+MINIMAX_API_KEY=dummy AZURE_OPENAI_API_KEY=dummy AZURE_AI_API_KEY=dummy \
+python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8099 --ws none --log-level warning
 ```
 
 ### DASHBOARD VIEWS (4 profiles)
@@ -1802,6 +1911,7 @@ Tabs conditionnels: DSI=décisions/metrics, Métier=flux/KPI, Dev=agents/skills/
 ```
 
 - 5 agents: Camille (BA), Pierre (Archi), Chloé (UX), Nadia (Sécu), Alexandre (PM)
+- Uses run_pattern(network) → real LLM streaming with debate rounds
 - @mentions + roles + direction (→ @Pierre)
 - Graph SVG: edges light up FROM speaker TO target
 - Phase headers: 📋 Brief → 🔍 Analyse → 📊 Synthèse
@@ -1823,3 +1933,10 @@ Memory 4-layer: session → pattern → project → global (FTS5)
 ### DB MIGRATIONS
 - `platform/db/migrations.py` — ALTER TABLE safe (PRAGMA table_info check)
 - Colonnes ajoutées: agents(avatar,tagline,motivation), ideation_messages(role,target)
+
+### BUGS CONNUS FIXÉS
+- `_push_sse()` ne livrait PAS au SSE endpoint → ajout broadcast bus._sse_listeners
+- `MissionRunStore.update()` perdait session_id → ajouté dans UPDATE SQL
+- `list_messages` n'existe pas → c'est `get_messages`
+- `PatternDef` dans `patterns/store.py` (PAS `patterns/models.py`)
+- Mission phases utilisaient mock templates → remplacé par vrai `run_pattern()`
