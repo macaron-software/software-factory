@@ -131,7 +131,7 @@ class MessageBus:
 
     def add_sse_listener(self) -> asyncio.Queue[A2AMessage]:
         """Add a SSE listener (for web UI real-time updates)."""
-        queue: asyncio.Queue[A2AMessage] = asyncio.Queue(maxsize=200)
+        queue: asyncio.Queue[A2AMessage] = asyncio.Queue(maxsize=5000)
         self._sse_listeners.append(queue)
         return queue
 
@@ -142,14 +142,12 @@ class MessageBus:
 
     async def _notify_sse(self, message: A2AMessage):
         """Push message to all SSE listeners."""
-        dead = []
         for q in self._sse_listeners:
             try:
                 q.put_nowait(message)
             except asyncio.QueueFull:
-                dead.append(q)
-        for q in dead:
-            self._sse_listeners.remove(q)
+                # Drop event but keep listener alive — streaming produces many deltas
+                pass
 
     # ── Dead Letter ───────────────────────────────────────────────────
 
