@@ -2025,6 +2025,29 @@ async def start_conversation(request: Request, session_id: str):
     return JSONResponse({"status": "started", "agents": agent_ids, "max_rounds": max_rounds})
 
 
+@router.get("/api/sessions/{session_id}/messages/json")
+async def session_messages_json(session_id: str):
+    """JSON list of all agent messages for a session (for fallback on pattern_end)."""
+    from ..sessions.store import get_session_store
+    from ..agents.store import get_agent_store
+    store = get_session_store()
+    msgs = store.get_messages(session_id)
+    agents = {a.id: a for a in get_agent_store().list_all()}
+    result = []
+    for m in msgs:
+        if m.from_agent in ("system", "user"):
+            continue
+        a = agents.get(m.from_agent)
+        result.append({
+            "agent_id": m.from_agent,
+            "agent_name": a.name if a else m.from_agent,
+            "role": a.role if a else "",
+            "content": m.content,
+            "to_agent": m.to_agent,
+        })
+    return JSONResponse(result)
+
+
 @router.get("/api/sessions/{session_id}/sse")
 async def session_sse(request: Request, session_id: str):
     """SSE endpoint for real-time session updates."""

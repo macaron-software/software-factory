@@ -337,6 +337,7 @@ async def _execute_node(
     import re as _re
     in_think = False
     in_tool_call = False
+    think_chunks = 0
     try:
         async for kind, value in executor.run_streaming(ctx, full_task):
             if kind == "delta":
@@ -353,7 +354,15 @@ async def _execute_node(
                 if "</minimax:tool_call>" in delta or "</tool_call>" in delta:
                     in_tool_call = False
                     continue
-                if not in_think and not in_tool_call:
+                if in_think:
+                    think_chunks += 1
+                    # Send heartbeat every 20 think chunks so frontend knows agent is alive
+                    if think_chunks % 20 == 0:
+                        await _push_sse(run.session_id, {
+                            "type": "stream_thinking",
+                            "agent_id": agent.id,
+                        })
+                elif not in_tool_call:
                     await _push_sse(run.session_id, {
                         "type": "stream_delta",
                         "agent_id": agent.id,

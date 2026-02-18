@@ -451,7 +451,7 @@ class LLMClient:
         }
 
         # Use a separate client for streaming to avoid blocking the shared client
-        stream_http = httpx.AsyncClient(timeout=120.0)
+        stream_http = httpx.AsyncClient(timeout=httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0))
         try:
             async with stream_http.stream("POST", url, json=body, headers=headers) as resp:
                 if resp.status_code != 200:

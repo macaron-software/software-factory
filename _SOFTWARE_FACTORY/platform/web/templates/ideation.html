@@ -853,6 +853,10 @@ async function sendIdea() {
                     if (findings) findings.innerHTML = `<div class="md-rendered">${md(evt.content)}</div>`;
                 }
             }
+            // stream_thinking: agent is in <think> phase, keep typing indicator alive
+            else if (evt.type === 'stream_thinking' && evt.agent_id) {
+                // noop — just keeps SSE alive and confirms agent is working
+            }
             // message events are handled by stream_start/delta/end above
             // Only create bubble for non-streamed messages (errors, system)
             else if (evt.type === 'message' && evt.from_agent && evt.from_agent !== 'user' && evt.from_agent !== 'system') {
@@ -860,9 +864,31 @@ async function sendIdea() {
             }
             else if (evt.type === 'pattern_end') {
                 es.close();
+                // Fetch all messages to fill any missed during streaming
+                try {
+                    const resp = await fetch(`/api/sessions/${sessionId}/messages/json`);
+                    if (resp.ok) {
+                        const msgs = await resp.json();
+                        // Find the last message from product_manager as synthesis
+                        const synthesis = [...msgs].reverse().find(m => m.agent_id === 'product_manager');
+                        if (synthesis) {
+                            const findings = document.getElementById('ideaFindings');
+                            if (findings) findings.innerHTML = `<div class="md-rendered">${md(synthesis.content)}</div>`;
+                        }
+                        // Fill any streaming bubbles still showing "..."
+                        for (const m of msgs) {
+                            const bubbleId = window._streamBubbles?.[m.agent_id];
+                            if (bubbleId) {
+                                const el = document.getElementById(`content-${bubbleId}`);
+                                if (el && (!el.textContent || el.querySelector('.typing-indicator'))) {
+                                    el.innerHTML = md(m.content);
+                                }
+                            }
+                        }
+                    }
+                } catch(e) { /* best-effort */ }
                 resetGraphState();
                 sendBtn.disabled = false;
-                // Enable action buttons
                 document.getElementById('btnCreateEpic').style.opacity = '1';
                 document.getElementById('btnCreateEpic').style.pointerEvents = 'auto';
                 document.getElementById('btnGenerateTeam').style.opacity = '1';
