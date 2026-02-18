@@ -1382,6 +1382,26 @@ async def session_live_page(request: Request, session_id: str):
                                         "from": a1, "to": a2,
                                         "count": 0, "types": [ptype], "patterns": [ptype],
                                     })
+                        elif ptype == "router":
+                            router = phase_agent_ids[0]
+                            for w in phase_agent_ids[1:]:
+                                graph["edges"].append({
+                                    "from": router, "to": w,
+                                    "count": 0, "types": ["route"], "patterns": ["router"],
+                                })
+                        elif ptype == "aggregator":
+                            agg = phase_agent_ids[-1]
+                            for w in phase_agent_ids[:-1]:
+                                graph["edges"].append({
+                                    "from": w, "to": agg,
+                                    "count": 0, "types": ["aggregate"], "patterns": ["aggregator"],
+                                })
+                        elif ptype == "human-in-the-loop":
+                            for j in range(len(phase_agent_ids) - 1):
+                                graph["edges"].append({
+                                    "from": phase_agent_ids[j], "to": phase_agent_ids[j + 1],
+                                    "count": 0, "types": ["checkpoint"], "patterns": ["human-in-the-loop"],
+                                })
                 wf_graph_loaded = bool(seen_agents)
 
     # 2) Fallback: build from session pattern if no workflow
@@ -1610,6 +1630,12 @@ async def session_live_page(request: Request, session_id: str):
                     ("🔄", "Optimiser CI", "Analysez et optimisez les temps de build du pipeline actuel"),
                     ("🛡️", "Quality gates", "Configurez les quality gates: couverture, sécurité, performance"),
                     ("🚀", "Deploy canary", "Lancez un déploiement canary avec monitoring et rollback automatique"),
+                ],
+                "product-lifecycle": [
+                    ("💡", "Nouvelle idée produit", "J'ai une idée de produit à explorer — lancez l'idéation avec le métier, l'UX et l'architecte"),
+                    ("🏛️", "Cycle complet depuis un besoin", "Voici un besoin métier — faites-le passer par le cycle complet: idéation → comité strat → dev → CICD → QA → prod → TMA"),
+                    ("🔄", "Reprendre au sprint dev", "Le comité stratégique a validé le GO — lancez les sprints de développement"),
+                    ("🧪", "Lancer la campagne QA", "Le code est prêt — lancez la campagne de tests QA complète avant le deploy"),
                 ],
             }
             suggestions = _WORKFLOW_SUGGESTIONS.get(wf_id, [])

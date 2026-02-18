@@ -248,6 +248,56 @@ class PatternStore:
                 ],
                 config={"max_rounds": 5},
             ),
+            # ── Router: single agent routes to specialist based on input analysis ──
+            PatternDef(
+                id="router", name="Router", type="router",
+                description="Un agent routeur analyse l'entrée et dirige vers le spécialiste approprié.",
+                icon="git-branch", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "brain", "label": "Router", "x": 300, "y": 80},
+                    {"id": "n2", "agent_id": "worker", "label": "Spécialiste A", "x": 100, "y": 280},
+                    {"id": "n3", "agent_id": "code-critic", "label": "Spécialiste B", "x": 300, "y": 280},
+                    {"id": "n4", "agent_id": "security-critic", "label": "Spécialiste C", "x": 500, "y": 280},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "route"},
+                    {"from": "n1", "to": "n3", "type": "route"},
+                    {"from": "n1", "to": "n4", "type": "route"},
+                ],
+            ),
+            # ── Aggregator: multiple inputs → single aggregator → output ──
+            PatternDef(
+                id="aggregator", name="Agrégateur", type="aggregator",
+                description="Plusieurs agents travaillent en parallèle, un agrégateur consolide les résultats.",
+                icon="layers", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "worker", "label": "Analyse A", "x": 100, "y": 80},
+                    {"id": "n2", "agent_id": "code-critic", "label": "Analyse B", "x": 300, "y": 80},
+                    {"id": "n3", "agent_id": "security-critic", "label": "Analyse C", "x": 500, "y": 80},
+                    {"id": "n4", "agent_id": "brain", "label": "Agrégateur", "x": 300, "y": 280},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n4", "type": "aggregate"},
+                    {"from": "n2", "to": "n4", "type": "aggregate"},
+                    {"from": "n3", "to": "n4", "type": "aggregate"},
+                ],
+            ),
+            # ── Human-in-the-loop: agents work, human validates at checkpoints ──
+            PatternDef(
+                id="human-in-the-loop", name="Human-in-the-Loop", type="human-in-the-loop",
+                description="Les agents travaillent, l'humain valide aux points de contrôle (GO/NOGO).",
+                icon="user-check", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "brain", "label": "Agent", "x": 100, "y": 200},
+                    {"id": "n2", "agent_id": "worker", "label": "Exécuteur", "x": 300, "y": 200},
+                    {"id": "n3", "agent_id": "", "label": "Humain ✋", "x": 500, "y": 200},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "sequential"},
+                    {"from": "n2", "to": "n3", "type": "checkpoint"},
+                ],
+                config={"checkpoint_message": "En attente de validation humaine..."},
+            ),
         ]
 
         for p in builtins:

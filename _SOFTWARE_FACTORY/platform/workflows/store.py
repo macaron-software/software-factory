@@ -888,6 +888,185 @@ class WorkflowStore:
                 },
             ),
         )
+        # ── Cycle de Vie Produit Complet: Idéation → Comité Strat → Réal → CICD → QA → TMA ──
+        builtins.append(
+            WorkflowDef(
+                id="product-lifecycle",
+                name="Cycle de Vie Produit Complet",
+                description="Pipeline bout en bout: idéation → comité stratégique GO/NOGO → architecture → sprints dev → CI/CD pipeline → campagne QA → deploy prod → TMA maintenance.",
+                icon="rocket", is_builtin=True,
+                phases=[
+                    # ── Phase 1: Idéation (NETWORK — brainstorming libre, tout le monde parle) ──
+                    WorkflowPhase(id="ideation", pattern_id="network",
+                                  name="Idéation",
+                                  description="Le métier exprime un besoin. L'UX Designer explore les parcours utilisateur. L'Architecte évalue la faisabilité technique. Le Product Manager challenge la valeur business. Brainstorming libre, toutes les idées sont les bienvenues.",
+                                  gate="always",
+                                  config={"agents": ["metier", "ux_designer", "architecte", "product_manager"]}),
+                    # ── Phase 2: Comité Stratégique (HUMAN-IN-THE-LOOP — DSI arbitre avec GO/NOGO humain) ──
+                    WorkflowPhase(id="strategic-committee", pattern_id="human-in-the-loop",
+                                  name="Comité Stratégique GO/NOGO",
+                                  description="Le DSI préside. La CPO défend la valeur produit. Le CTO évalue la faisabilité et les risques techniques. Le Portfolio Manager analyse la capacité et le WSJF. Débat contradictoire. CHECKPOINT: le DSI attend la décision humaine GO, NOGO ou PIVOT.",
+                                  gate="all_approved",
+                                  config={"agents": ["strat-cpo", "strat-cto", "strat-portfolio", "lean_portfolio_manager", "dsi"]}),
+                    # ── Phase 3: Constitution Projet (SEQUENTIAL — chaque rôle passe le relai) ──
+                    WorkflowPhase(id="project-setup", pattern_id="sequential",
+                                  name="Constitution du Projet",
+                                  description="Le Dir. Programme alloue les ressources → le Product Manager décompose en épics → le Chef de Projet planifie les sprints → le Scrum Master configure les cérémonies. Chaque sortie alimente l'entrée du suivant.",
+                                  gate="always",
+                                  config={"agents": ["strat-dirprog", "product_manager", "chef_projet", "scrum_master"]}),
+                    # ── Phase 4: Architecture (AGGREGATOR — analyses parallèles → architecte consolide) ──
+                    WorkflowPhase(id="architecture", pattern_id="aggregator",
+                                  name="Architecture & Design",
+                                  description="En parallèle: le Lead Dev analyse la faisabilité, l'UX crée les maquettes, la Sécurité définit les exigences, le DevOps planifie l'infra. L'Architecte agrège toutes les analyses en un document d'architecture consolidé.",
+                                  gate="no_veto",
+                                  config={"agents": ["lead_dev", "ux_designer", "securite", "devops", "architecte"]}),
+                    # ── Phase 5: Sprints Dev (HIERARCHICAL — Lead distribue, devs codent, QA inner loop) ──
+                    WorkflowPhase(id="dev-sprint", pattern_id="hierarchical",
+                                  name="Sprints de Développement",
+                                  description="Le Lead Dev distribue les stories. Les devs frontend et backend codent en TDD. Le Test Automation écrit les tests E2E en parallèle. Le Lead fait la code review. Boucle interne: si incomplet, le Lead re-distribue.",
+                                  gate="always",
+                                  config={"agents": ["lead_dev", "dev_frontend", "dev_backend", "test_automation"]}),
+                    # ── Phase 6: CICD (SEQUENTIAL — pipeline lint → build → test → scan) ──
+                    WorkflowPhase(id="cicd", pattern_id="sequential",
+                                  name="Pipeline CI/CD",
+                                  description="Le Pipeline Engineer configure le pipeline: lint → build → unit tests → integration → E2E. Le DevSecOps intègre les scans SAST/DAST. Le DevOps configure les environments staging et prod.",
+                                  gate="always",
+                                  config={"agents": ["pipeline_engineer", "devsecops", "devops"]}),
+                    # ── Phase 7: QA (LOOP — Test Manager planifie, exécution, si KO → reboucle) ──
+                    WorkflowPhase(id="qa-campaign", pattern_id="loop",
+                                  name="Campagne de Tests QA",
+                                  description="Le Test Manager planifie et lance la campagne. Le QA Lead exécute les suites (E2E, API, perf). Si VETO (bugs trouvés): boucle retour au Test Manager qui re-planifie les corrections. Itère jusqu'à APPROVE ou max 5 itérations.",
+                                  gate="all_approved",
+                                  config={"agents": ["test_manager", "qa_lead"], "max_iterations": 5}),
+                    # ── Phase 8: QA Détaillée (PARALLEL — tests en parallèle) ──
+                    WorkflowPhase(id="qa-execution", pattern_id="parallel",
+                                  name="Exécution Tests Parallèle",
+                                  description="Le QA Lead dispatche. En parallèle: le Test Automation lance Playwright, le Testeur fait les tests API, le Perf Engineer lance k6. Le QA Lead agrège les résultats.",
+                                  gate="all_approved",
+                                  config={"agents": ["qa_lead", "test_automation", "testeur", "performance_engineer"]}),
+                    # ── Phase 9: Deploy (HUMAN-IN-THE-LOOP — canary + validation humaine avant 100%) ──
+                    WorkflowPhase(id="deploy-prod", pattern_id="human-in-the-loop",
+                                  name="Deploy Production",
+                                  description="Le DevOps déploie en canary (1%). Le SRE monitore les métriques. Le Pipeline Engineer prépare le rollback. CHECKPOINT: le Chef de Projet valide le GO pour 100% après vérification humaine des métriques.",
+                                  gate="all_approved",
+                                  config={"agents": ["devops", "sre", "pipeline_engineer", "chef_projet"]}),
+                    # ── Phase 10: Incident Router (ROUTER — TMA route chaque incident au bon spécialiste) ──
+                    WorkflowPhase(id="tma-router", pattern_id="router",
+                                  name="Routage Incidents TMA",
+                                  description="Le Responsable TMA reçoit les incidents. Il analyse la nature (bug code, perf, infra, sécu) et route vers le spécialiste approprié: Dev TMA pour les bugs, SRE pour l'infra, Test Automation pour les régressions.",
+                                  gate="always",
+                                  config={"agents": ["responsable_tma", "dev_tma", "sre", "test_automation"]}),
+                    # ── Phase 11: Fix & Validate (LOOP — Dev TMA corrige, QA valide, reboucle si KO) ──
+                    WorkflowPhase(id="tma-fix", pattern_id="loop",
+                                  name="Correctif & Validation TMA",
+                                  description="Le Dev TMA écrit le correctif avec test de non-régression. Le QA Lead valide. Si VETO: boucle retour au Dev TMA avec le feedback. Itère jusqu'à APPROVE.",
+                                  gate="no_veto",
+                                  config={"agents": ["dev_tma", "qa_lead"], "max_iterations": 3}),
+                ],
+                config={
+                    "graph": {
+                        "pattern": "hierarchical",
+                        "nodes": [
+                            # Row 1: Idéation
+                            {"id": "n1", "agent_id": "metier", "x": 100, "y": 20, "label": "Métier / PO"},
+                            {"id": "n2", "agent_id": "ux_designer", "x": 280, "y": 20, "label": "UX Designer"},
+                            {"id": "n3", "agent_id": "product_manager", "x": 460, "y": 20, "label": "Product Manager"},
+                            {"id": "n4", "agent_id": "architecte", "x": 640, "y": 20, "label": "Architecte"},
+                            # Row 2: Comité stratégique
+                            {"id": "n5", "agent_id": "dsi", "x": 370, "y": 120, "label": "DSI"},
+                            {"id": "n6", "agent_id": "strat-cpo", "x": 200, "y": 120, "label": "CPO"},
+                            {"id": "n7", "agent_id": "strat-cto", "x": 540, "y": 120, "label": "CTO"},
+                            {"id": "n8", "agent_id": "strat-portfolio", "x": 700, "y": 120, "label": "Portfolio"},
+                            # Row 3: Constitution projet
+                            {"id": "n9", "agent_id": "strat-dirprog", "x": 100, "y": 220, "label": "Dir Programme"},
+                            {"id": "n10", "agent_id": "chef_projet", "x": 300, "y": 220, "label": "Chef de Projet"},
+                            {"id": "n11", "agent_id": "scrum_master", "x": 500, "y": 220, "label": "Scrum Master"},
+                            # Row 4: Architecture + Dev
+                            {"id": "n12", "agent_id": "lead_dev", "x": 200, "y": 320, "label": "Lead Dev"},
+                            {"id": "n13", "agent_id": "securite", "x": 400, "y": 320, "label": "Sécurité"},
+                            {"id": "n14", "agent_id": "devops", "x": 600, "y": 320, "label": "DevOps"},
+                            # Row 5: Devs + Test Automation
+                            {"id": "n15", "agent_id": "dev_frontend", "x": 100, "y": 420, "label": "Dev Frontend"},
+                            {"id": "n16", "agent_id": "dev_backend", "x": 300, "y": 420, "label": "Dev Backend"},
+                            {"id": "n17", "agent_id": "test_automation", "x": 500, "y": 420, "label": "Test Automation"},
+                            # Row 6: CICD
+                            {"id": "n18", "agent_id": "pipeline_engineer", "x": 400, "y": 520, "label": "Pipeline Eng."},
+                            {"id": "n19", "agent_id": "devsecops", "x": 600, "y": 520, "label": "DevSecOps"},
+                            # Row 7: QA Campaign
+                            {"id": "n20", "agent_id": "test_manager", "x": 200, "y": 620, "label": "Test Manager"},
+                            {"id": "n21", "agent_id": "qa_lead", "x": 400, "y": 620, "label": "QA Lead"},
+                            {"id": "n22", "agent_id": "testeur", "x": 550, "y": 620, "label": "Testeur"},
+                            {"id": "n23", "agent_id": "performance_engineer", "x": 700, "y": 620, "label": "Perf Eng."},
+                            # Row 8: Deploy + SRE
+                            {"id": "n24", "agent_id": "sre", "x": 500, "y": 720, "label": "SRE"},
+                            # Row 9: TMA
+                            {"id": "n25", "agent_id": "responsable_tma", "x": 200, "y": 820, "label": "Resp. TMA"},
+                            {"id": "n26", "agent_id": "dev_tma", "x": 400, "y": 820, "label": "Dev TMA"},
+                            {"id": "n27", "agent_id": "lean_portfolio_manager", "x": 100, "y": 120, "label": "Lean Portfolio"},
+                        ],
+                        "edges": [
+                            # Idéation → Comité Strat
+                            {"from": "n1", "to": "n3", "label": "besoin", "color": "#3b82f6"},
+                            {"from": "n2", "to": "n3", "label": "UX", "color": "#3b82f6"},
+                            {"from": "n4", "to": "n3", "label": "faisabilité", "color": "#3b82f6"},
+                            {"from": "n3", "to": "n5", "label": "dossier", "color": "#a855f7"},
+                            # Comité Strat interne
+                            {"from": "n6", "to": "n5", "label": "avis CPO", "color": "#d946ef"},
+                            {"from": "n7", "to": "n5", "label": "avis CTO", "color": "#d946ef"},
+                            {"from": "n8", "to": "n5", "label": "WSJF", "color": "#10b981"},
+                            {"from": "n27", "to": "n8", "label": "lean", "color": "#06b6d4"},
+                            # GO → Constitution
+                            {"from": "n5", "to": "n9", "label": "GO", "color": "#10b981"},
+                            {"from": "n9", "to": "n10", "label": "staffing", "color": "#8b5cf6"},
+                            {"from": "n10", "to": "n11", "label": "planning", "color": "#8b5cf6"},
+                            # Architecture
+                            {"from": "n10", "to": "n12", "label": "specs", "color": "#f59e0b"},
+                            {"from": "n4", "to": "n12", "label": "archi", "color": "#a855f7"},
+                            {"from": "n12", "to": "n13", "label": "review sécu", "color": "#ef4444"},
+                            {"from": "n12", "to": "n14", "label": "infra", "color": "#8b5cf6"},
+                            # Dev Sprint
+                            {"from": "n12", "to": "n15", "label": "stories", "color": "#f59e0b"},
+                            {"from": "n12", "to": "n16", "label": "stories", "color": "#f59e0b"},
+                            {"from": "n12", "to": "n17", "label": "tests E2E", "color": "#3b82f6"},
+                            # CICD
+                            {"from": "n14", "to": "n18", "label": "pipeline", "color": "#8b5cf6"},
+                            {"from": "n18", "to": "n19", "label": "scans sécu", "color": "#ef4444"},
+                            {"from": "n17", "to": "n18", "label": "tests CI", "color": "#3b82f6"},
+                            # QA Campaign
+                            {"from": "n18", "to": "n20", "label": "build OK", "color": "#10b981"},
+                            {"from": "n20", "to": "n21", "label": "plan test", "color": "#a855f7"},
+                            {"from": "n21", "to": "n22", "label": "API tests", "color": "#3b82f6"},
+                            {"from": "n21", "to": "n17", "label": "E2E tests", "color": "#3b82f6"},
+                            {"from": "n23", "to": "n20", "label": "perf OK", "color": "#10b981"},
+                            {"from": "n22", "to": "n20", "label": "résultats", "color": "#10b981"},
+                            # Deploy
+                            {"from": "n20", "to": "n10", "label": "GO/NOGO", "color": "#ef4444"},
+                            {"from": "n14", "to": "n24", "label": "canary", "color": "#8b5cf6"},
+                            {"from": "n24", "to": "n10", "label": "prod OK", "color": "#10b981"},
+                            # TMA Handover
+                            {"from": "n12", "to": "n25", "label": "transfert", "color": "#d946ef"},
+                            {"from": "n25", "to": "n26", "label": "assigner", "color": "#f59e0b"},
+                            {"from": "n20", "to": "n25", "label": "tests régression", "color": "#3b82f6"},
+                            {"from": "n26", "to": "n24", "label": "hotfix", "color": "#ef4444"},
+                        ],
+                    },
+                    "agents_permissions": {
+                        "dsi": {"can_veto": True, "veto_level": "ABSOLUTE", "can_delegate": True, "can_approve": True},
+                        "strat-cpo": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                        "strat-cto": {"can_veto": True, "veto_level": "STRONG"},
+                        "qa_lead": {"can_veto": True, "veto_level": "ABSOLUTE"},
+                        "securite": {"can_veto": True, "veto_level": "ABSOLUTE"},
+                        "test_manager": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                        "responsable_tma": {"can_veto": True, "veto_level": "STRONG", "can_delegate": True},
+                        "lead_dev": {"can_delegate": True, "can_veto": True, "veto_level": "STRONG"},
+                        "chef_projet": {"can_delegate": True, "can_approve": True},
+                        "devops": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                        "sre": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                        "pipeline_engineer": {"can_veto": True, "veto_level": "STRONG"},
+                    },
+                },
+            ),
+        )
         for w in builtins:
             self.create(w)
 
