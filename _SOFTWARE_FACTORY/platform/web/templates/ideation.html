@@ -865,17 +865,14 @@ async function sendIdea() {
             else if (evt.type === 'pattern_end') {
                 es.close();
                 // Fetch all messages to fill any missed during streaming
-                try {
-                    const resp = await fetch(`/api/sessions/${sessionId}/messages/json`);
-                    if (resp.ok) {
-                        const msgs = await resp.json();
-                        // Find the last message from product_manager as synthesis
+                fetch(`/api/sessions/${sessionId}/messages/json`)
+                    .then(r => r.ok ? r.json() : [])
+                    .then(msgs => {
                         const synthesis = [...msgs].reverse().find(m => m.agent_id === 'product_manager');
                         if (synthesis) {
                             const findings = document.getElementById('ideaFindings');
                             if (findings) findings.innerHTML = `<div class="md-rendered">${md(synthesis.content)}</div>`;
                         }
-                        // Fill any streaming bubbles still showing "..."
                         for (const m of msgs) {
                             const bubbleId = window._streamBubbles?.[m.agent_id];
                             if (bubbleId) {
@@ -885,8 +882,7 @@ async function sendIdea() {
                                 }
                             }
                         }
-                    }
-                } catch(e) { /* best-effort */ }
+                    }).catch(() => {});
                 resetGraphState();
                 sendBtn.disabled = false;
                 document.getElementById('btnCreateEpic').style.opacity = '1';
