@@ -439,6 +439,7 @@ async def _execute_node(
         "content": content,
         "message_type": msg_type,
         "to_agent": to_agent_id or "all",
+        "flow_step": run.flow_step,
     })
 
     await _push_sse(run.session_id, {

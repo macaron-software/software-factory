@@ -847,6 +847,11 @@ async function sendIdea() {
                 }
                 if (window._streamBuffers) delete window._streamBuffers[evt.agent_id];
                 if (window._streamBubbles) delete window._streamBubbles[evt.agent_id];
+                // Populate synthesis panel when PO finishes the synthesis step
+                if (evt.flow_step === 'Synthèse' && evt.content) {
+                    const findings = document.getElementById('ideaFindings');
+                    if (findings) findings.innerHTML = `<div class="md-rendered">${md(evt.content)}</div>`;
+                }
             }
             // message events are handled by stream_start/delta/end above
             // Only create bubble for non-streamed messages (errors, system)
