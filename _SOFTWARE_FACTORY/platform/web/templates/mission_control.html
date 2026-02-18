@@ -90,6 +90,20 @@
 .mc-phase-discuss{padding:0.75rem;overflow-y:auto;max-height:500px;display:flex;flex-direction:column;gap:0.6rem}
 .mc-discuss-empty{font-size:0.72rem;color:var(--text-secondary);font-style:italic;padding:1.5rem 0.8rem;text-align:center}
 
+/* Rendered markdown in discussions */
+.md-rendered table{width:100%;border-collapse:collapse;margin:0.5rem 0;font-size:0.75rem}
+.md-rendered th,.md-rendered td{border:1px solid rgba(255,255,255,.08);padding:0.3rem 0.5rem;text-align:left}
+.md-rendered th{background:rgba(124,58,237,.1);font-weight:600;color:var(--text-primary)}
+.md-rendered td{color:var(--text-secondary)}
+.md-rendered h2,.md-rendered h3,.md-rendered h4{margin:0.5rem 0 0.3rem;color:var(--text-primary)}
+.md-rendered pre{background:rgba(0,0,0,.3);border-radius:6px;padding:0.5rem;overflow-x:auto;font-size:0.7rem;margin:0.4rem 0}
+.md-rendered code{background:rgba(124,58,237,.15);padding:0.1rem 0.3rem;border-radius:3px;font-size:0.72rem}
+.md-rendered pre code{background:none;padding:0}
+.md-rendered ul{margin:0.3rem 0;padding-left:1.2rem}
+.md-rendered li{margin:0.15rem 0;color:var(--text-secondary)}
+.md-rendered hr{border:none;border-top:1px solid rgba(255,255,255,.08);margin:0.5rem 0}
+.md-rendered a{color:var(--purple);text-decoration:underline}
+
 /* Streaming bubble — uses mu__ layout */
 .mc-streaming .mu__bubble--agent{border-left:2px solid var(--purple);animation:stream-pulse 2s ease-in-out infinite}
 @keyframes stream-pulse{0%,100%{border-left-color:var(--purple)}50%{border-left-color:rgba(124,58,237,.3)}}
@@ -493,10 +507,17 @@ function handleSSE(d) {
                 const role = info.role || '';
                 const patternType = d.pattern_type || '';
                 const toAgent = d.to_agent || 'all';
-                const toInfo = toAgent !== 'all' ? AGENT_INFO[toAgent] : null;
-                const targetHtml = toInfo
-                    ? `<span class="mu__arrow">→</span><span class="mu__target">@${esc(toInfo.name)}</span>`
-                    : (toAgent !== 'all' ? `<span class="mu__arrow">→</span><span class="mu__target">@${esc(toAgent)}</span>` : '');
+                let targetHtml = '';
+                if (toAgent === 'all' || toAgent === 'session') {
+                    targetHtml = '<span class="mu__arrow">→</span><span class="mu__target">Équipe</span>';
+                } else {
+                    const targets = toAgent.split(',').map(t => t.trim()).filter(Boolean);
+                    const parts = targets.map(t => {
+                        const ti = AGENT_INFO[t];
+                        return ti ? `<span class="mu__target" style="color:${ti.color||'var(--text-secondary)'}">@${esc(ti.name)}</span>` : `<span class="mu__target">@${esc(t)}</span>`;
+                    });
+                    if (parts.length) targetHtml = '<span class="mu__arrow">→</span>' + parts.join(' ');
+                }
 
                 const div = document.createElement('div');
                 div.className = 'mu mu--chat mu--agent mc-stream-bubble';
@@ -607,16 +628,22 @@ function addDiscussionMsg(phaseId, d) {
     const role = d.from_role || info.role || '';
     const patternType = d.pattern_type || '';
     const toAgent = d.to_agent || '';
-    const toInfo = (toAgent && toAgent !== 'all') ? AGENT_INFO[toAgent] : null;
-    const targetHtml = toInfo
-        ? `<span class="mu__arrow">→</span><img src="${toInfo.avatar || `/static/avatars/${toAgent}.jpg`}" class="mu__target-photo" onerror="this.style.display='none'"><span class="mu__target">@${esc(toInfo.name)}</span><span class="mu__target-role">${esc(toInfo.role||'')}</span>`
-        : (toAgent && toAgent !== 'all') ? `<span class="mu__arrow">→</span><span class="mu__target">@${esc(toAgent)}</span>` : '';
 
-    // Render markdown-like content with @mentions
-    let rendered = esc((d.content||'').substring(0, 2000));
-    rendered = rendered.replace(/@(\w[\w\s]*?)(?=[\s,.:!?]|$)/g, '<span style="color:var(--purple);font-weight:600">@$1</span>');
-    rendered = rendered.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    rendered = rendered.replace(/\n/g, '<br>');
+    // Build target(s) — can be "all", single agent, or comma-separated
+    let targetHtml = '';
+    if (toAgent === 'all' || toAgent === 'session') {
+        targetHtml = '<span class="mu__arrow">→</span><span class="mu__target">Équipe</span>';
+    } else if (toAgent) {
+        const targets = toAgent.split(',').map(t => t.trim()).filter(Boolean);
+        const parts = targets.map(t => {
+            const ti = AGENT_INFO[t];
+            return ti ? `<span class="mu__target" style="color:${ti.color||'var(--text-secondary)'}">@${esc(ti.name)}</span>` : `<span class="mu__target">@${esc(t)}</span>`;
+        });
+        if (parts.length) targetHtml = '<span class="mu__arrow">→</span>' + parts.join(' ');
+    }
+
+    // Render markdown content
+    const rendered = md((d.content||'').substring(0, 3000));
 
     const div = document.createElement('div');
     div.className = 'mu mu--chat mu--agent';
@@ -718,6 +745,43 @@ async function startMissionExecution() {
 }
 
 function esc(t) { return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function cleanLLM(s){
+  s = s.replace(/<think>[\s\S]*?<\/think>/g, '');
+  s = s.replace(/<think>[\s\S]*$/, '');
+  s = s.replace(/\[TOOL_CALL\][\s\S]*?\[\/TOOL_CALL\]/g, '');
+  s = s.replace(/\[TOOL_CALL\][\s\S]*$/, '');
+  s = s.replace(/\[(DELEGATE|VETO|APPROVE|ASK|ESCALATE)[^\]]*\]/g, '');
+  return s.trim();
+}
+function md(s){
+  s = cleanLLM(s);
+  if (!s) return '';
+  let h = esc(s);
+  h = h.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+  h = h.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+  h = h.replace(/^# (.+)$/gm, '<h2>$1</h2>');
+  h = h.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+  h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  h = h.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  h = h.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  h = h.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)*)/gm, (m, hdr, sep, body)=>{
+    const th = hdr.split('|').filter(c=>c.trim()).map(c=>`<th>${c.trim()}</th>`).join('');
+    const rows = body.trim().split('\n').map(r=>{
+      const cells = r.split('|').filter(c=>c.trim()).map(c=>`<td>${c.trim()}</td>`).join('');
+      return `<tr>${cells}</tr>`;
+    }).join('');
+    return `<table><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table>`;
+  });
+  h = h.replace(/^---$/gm, '<hr>');
+  h = h.replace(/^- (.+)$/gm, '<li>$1</li>');
+  h = h.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
+  h = h.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+  h = h.replace(/@(\w[\w\s]*?)(?=[\s,.:!?<]|$)/g, '<span style="color:var(--purple);font-weight:600">@$1</span>');
+  h = h.replace(/\n/g, '<br>');
+  return h;
+}
 
 /* Init */
 renderPhaseGraphs();
