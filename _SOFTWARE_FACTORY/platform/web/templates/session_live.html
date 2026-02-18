@@ -49,6 +49,17 @@
 .session-pane{display:none;height:100%;width:100%}
 .session-pane.active{display:flex;flex-direction:column}
 
+/* ── Suggestion badges ── */
+.session-suggestions{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:2rem 1.5rem;min-height:200px}
+.suggestions-goal{font-size:.85rem;color:var(--text-secondary);display:flex;align-items:center;gap:.5rem;background:var(--bg-tertiary);padding:.6rem 1rem;border-radius:10px;border:1px solid var(--border);max-width:500px;text-align:center;line-height:1.4}
+.suggestions-label{font-size:.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:.5rem}
+.suggestions-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:.5rem;max-width:600px}
+.suggestion-badge{display:flex;align-items:center;gap:.4rem;padding:.5rem 1rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:20px;cursor:pointer;font-size:.8rem;color:var(--text-primary);transition:all .15s;font-family:inherit}
+.suggestion-badge:hover{border-color:var(--purple);background:rgba(124,58,237,.1);transform:translateY(-1px);box-shadow:0 4px 12px rgba(124,58,237,.15)}
+.suggestion-badge:active{transform:translateY(0)}
+.suggestion-icon{font-size:1rem}
+.suggestion-label{font-weight:500}
+
 /* ── Bottom input bar ── */
 .session-input{display:flex;align-items:center;gap:0.5rem;padding:0.6rem 1rem;border-top:1px solid var(--border);background:var(--bg-secondary);flex-shrink:0}
 .input-agent-select{background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.78rem;outline:none;cursor:pointer;min-width:120px}
@@ -278,6 +289,28 @@
     <!-- MODE 1: Thread -->
     <div class="session-pane active" id="pane-thread">
       <div class="thread-feed" id="threadFeed">
+        {% set has_agent_msgs = messages | selectattr('from_agent', 'ne', 'user') | selectattr('from_agent', 'ne', 'system') | selectattr('type', 'ne', 'system') | list | length > 0 %}
+        {% if (not has_agent_msgs) or session.status in ('completed', 'failed', 'interrupted') %}
+        <div class="session-suggestions" id="suggestionsPanel">
+          {% if session.goal %}
+          <div class="suggestions-goal">
+            <svg class="icon icon-sm" style="color:var(--purple)"><use href="#icon-target"/></svg>
+            {{ session.goal }}
+          </div>
+          {% endif %}
+          {% if suggestions %}
+          <div class="suggestions-label">Démarrez la conversation :</div>
+          <div class="suggestions-grid">
+            {% for icon, label, prompt in suggestions %}
+            <button class="suggestion-badge" data-prompt="{{ prompt }}" onclick="useSuggestion(this)">
+              <span class="suggestion-icon">{{ icon }}</span>
+              <span class="suggestion-label">{{ label }}</span>
+            </button>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
         {% set msg_mode = 'thread' %}
         {% for msg in messages %}
         {% include "partials/msg_unified.html" %}
@@ -291,11 +324,28 @@
         <div class="chat-main">
           <div class="chat-selector">
             <label style="font-size:0.78rem;color:var(--text-secondary);margin-right:0.4rem">Chat with:</label>
-            <select id="chatAgentSelect">
-              {% for a in agents %}
-              <option value="{{ a.id }}">{{ a.avatar }} {{ a.name }}</option>
-              {% endfor %}
-            </select>
+            <div class="agent-dropdown" id="chatAgentDropdown">
+              <button type="button" class="agent-dropdown__trigger" id="chatAgentTrigger">
+                {% if agents %}
+                {% set first = agents[0] %}
+                {% if first.avatar_url %}<img src="{{ first.avatar_url }}" alt="" class="agent-dropdown__photo">{% endif %}
+                <span class="agent-dropdown__name">{{ first.name }}</span>
+                <span class="agent-dropdown__role">{{ first.role }}</span>
+                {% endif %}
+                <svg class="icon icon-xs agent-dropdown__chevron"><use href="#icon-chevron-down"/></svg>
+              </button>
+              <input type="hidden" id="chatAgentSelect" value="{{ agents[0].id if agents else '' }}">
+              <div class="agent-dropdown__menu" id="chatAgentMenu">
+                {% for a in agents %}
+                <div class="agent-dropdown__item{% if loop.first %} active{% endif %}" data-value="{{ a.id }}">
+                  {% if a.avatar_url %}<img src="{{ a.avatar_url }}" alt="" class="agent-dropdown__photo">
+                  {% else %}<span class="agent-dropdown__initials" style="background:{{ a.color }}20;color:{{ a.color }}">{{ a.avatar[:2] }}</span>{% endif %}
+                  <span class="agent-dropdown__name">{{ a.name }}</span>
+                  <span class="agent-dropdown__role">{{ a.role }}</span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
           </div>
           <div class="chat-messages" id="chatMessages"></div>
         </div>
@@ -483,13 +533,30 @@
 
   <!-- Bottom input bar -->
   <div class="session-input">
-    <select id="targetAgent" class="input-agent-select">
-      <option value="">All agents</option>
-      {% for n in graph.nodes %}
+    <div class="agent-dropdown agent-dropdown--compact" id="targetAgentDropdown">
+      <button type="button" class="agent-dropdown__trigger agent-dropdown__trigger--compact" id="targetAgentTrigger">
+        <svg class="icon icon-xs" style="color:var(--text-secondary)"><use href="#icon-users"/></svg>
+        <span class="agent-dropdown__name">All agents</span>
+        <svg class="icon icon-xs agent-dropdown__chevron"><use href="#icon-chevron-down"/></svg>
+      </button>
+      <input type="hidden" id="targetAgent" value="">
+      <div class="agent-dropdown__menu agent-dropdown__menu--up" id="targetAgentMenu">
+        <div class="agent-dropdown__item active" data-value="">
+          <svg class="icon icon-xs" style="color:var(--text-secondary)"><use href="#icon-users"/></svg>
+          <span class="agent-dropdown__name">All agents</span>
+          <span class="agent-dropdown__role"></span>
+        </div>
+        {% for n in graph.nodes %}
         {% set a = agents | selectattr('id', 'equalto', n.agent_id) | first %}
-        <option value="{{ n.agent_id }}">{{ a.avatar if a else '' }} {{ a.name if a else n.label }}</option>
-      {% endfor %}
-    </select>
+        <div class="agent-dropdown__item" data-value="{{ n.agent_id }}">
+          {% if a and a.avatar_url %}<img src="{{ a.avatar_url }}" alt="" class="agent-dropdown__photo">
+          {% else %}<span class="agent-dropdown__initials" style="background:{{ a.color if a else '#6b7280' }}20;color:{{ a.color if a else '#6b7280' }}">{{ a.avatar[:2] if a else '??' }}</span>{% endif %}
+          <span class="agent-dropdown__name">{{ a.name if a else n.label }}</span>
+          <span class="agent-dropdown__role">{{ a.role if a else '' }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
     <input type="text" id="msgInput" class="input-text" placeholder="{% if session.status == 'completed' %}Session terminée — écris un message pour reprendre...{% else %}Send a message...{% endif %}" autocomplete="off">
     <button id="btnConversation" class="input-conv" title="Lancer une conversation multi-agents (les agents discutent entre eux)">🗣️</button>
     <button id="btnSend" class="input-send"><svg class="icon icon-xs"><use href="#icon-send"/></svg></button>
@@ -497,6 +564,22 @@
 </div>
 
 <script>
+/* ── Suggestion badge click → fill input + send ── */
+function useSuggestion(btn) {
+  const prompt = btn.dataset.prompt;
+  const input = document.getElementById('msgInput');
+  const sendBtn = document.getElementById('btnSend');
+  if (input && prompt) {
+    input.value = prompt;
+    input.focus();
+    // Auto-send after a short delay so user sees what's being sent
+    setTimeout(() => { if (sendBtn) sendBtn.click(); }, 150);
+    // Hide suggestions panel
+    const panel = document.getElementById('suggestionsPanel');
+    if (panel) panel.style.display = 'none';
+  }
+}
+
 (function(){
 "use strict";
 
@@ -822,10 +905,60 @@ document.querySelectorAll('.panel-filter').forEach(btn=>{
   });
 });
 
-/* ── Chat agent selector ── */
-document.getElementById('chatAgentSelect').addEventListener('change', ()=>{
+/* ── Agent Dropdown (custom selects with photos) ── */
+function initAgentDropdown(dropdownId, triggerId, menuId, hiddenId, onChange) {
+  const dropdown = document.getElementById(dropdownId);
+  const trigger = document.getElementById(triggerId);
+  const menu = document.getElementById(menuId);
+  const hidden = document.getElementById(hiddenId);
+  if (!dropdown || !trigger || !menu) return;
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // Close other dropdowns
+    document.querySelectorAll('.agent-dropdown.open').forEach(d => {
+      if (d !== dropdown) d.classList.remove('open');
+    });
+    dropdown.classList.toggle('open');
+  });
+
+  menu.querySelectorAll('.agent-dropdown__item').forEach(item => {
+    item.addEventListener('click', () => {
+      const val = item.dataset.value;
+      if (hidden) hidden.value = val;
+      // Update trigger content from selected item
+      const photo = item.querySelector('.agent-dropdown__photo');
+      const initials = item.querySelector('.agent-dropdown__initials');
+      const name = item.querySelector('.agent-dropdown__name');
+      const role = item.querySelector('.agent-dropdown__role');
+      const icon = item.querySelector('.icon');
+      let triggerHTML = '';
+      if (photo) triggerHTML += `<img src="${photo.src}" alt="" class="agent-dropdown__photo">`;
+      else if (initials) triggerHTML += initials.outerHTML;
+      else if (icon) triggerHTML += icon.outerHTML;
+      triggerHTML += `<span class="agent-dropdown__name">${name ? name.textContent : ''}</span>`;
+      if (role && role.textContent.trim()) triggerHTML += `<span class="agent-dropdown__role">${role.textContent}</span>`;
+      triggerHTML += `<svg class="icon icon-xs agent-dropdown__chevron"><use href="#icon-chevron-down"/></svg>`;
+      trigger.innerHTML = triggerHTML;
+      // Mark active
+      menu.querySelectorAll('.agent-dropdown__item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+      dropdown.classList.remove('open');
+      if (onChange) onChange(val);
+    });
+  });
+}
+
+// Close dropdowns on outside click
+document.addEventListener('click', () => {
+  document.querySelectorAll('.agent-dropdown.open').forEach(d => d.classList.remove('open'));
+});
+
+// Init both dropdowns
+initAgentDropdown('chatAgentDropdown', 'chatAgentTrigger', 'chatAgentMenu', 'chatAgentSelect', () => {
   document.getElementById('chatMessages').innerHTML = '';
 });
+initAgentDropdown('targetAgentDropdown', 'targetAgentTrigger', 'targetAgentMenu', 'targetAgent');
 
 /* ── Graph rendering ── */
 let graphNodes = GRAPH.nodes || [];

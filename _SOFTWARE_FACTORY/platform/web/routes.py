@@ -1545,6 +1545,67 @@ async def session_live_page(request: Request, session_id: str):
         pass
 
     agent_map_dict = _agent_map_for_template(agents)
+
+    # Build prompt suggestions based on workflow/session goal
+    suggestions = []
+    if wf_id:
+        from platform.workflows.store import WorkflowStore as _WS2
+        _wf2 = _WS2().get(wf_id)
+        if _wf2:
+            _WORKFLOW_SUGGESTIONS = {
+                "strategic-committee": [
+                    ("📊", "Arbitrage portfolio", "Analysez le portfolio actuel et recommandez les arbitrages d'investissement pour le trimestre"),
+                    ("🎯", "Priorisation WSJF", "Priorisez les initiatives en cours avec la méthode WSJF et identifiez les quick wins"),
+                    ("⚖️", "GO/NOGO projet", "Évaluez la faisabilité et décidez GO ou NOGO pour les projets en attente"),
+                    ("💰", "Revue budget", "Passez en revue les budgets par projet et identifiez les dépassements potentiels"),
+                ],
+                "sf-pipeline": [
+                    ("🧠", "Analyse codebase", "Analysez la codebase et décomposez les prochaines tâches de développement"),
+                    ("🐛", "Fix bugs critiques", "Identifiez et corrigez les bugs critiques en production"),
+                    ("🔒", "Audit sécurité", "Lancez un audit de sécurité OWASP sur le code actuel"),
+                    ("📈", "Optimisation perf", "Analysez les performances et proposez des optimisations"),
+                ],
+                "migration-sharelook": [
+                    ("🔄", "Démarrer migration", "Lancez la migration Angular 16→17 en commençant par l'inventaire des modules"),
+                    ("✅", "Vérifier golden files", "Comparez les golden files legacy vs migration pour valider l'ISO 100%"),
+                    ("📦", "Migrer module", "Migrez le prochain module standalone avec les codemods"),
+                    ("🧪", "Tests de régression", "Exécutez les tests de régression post-migration"),
+                ],
+                "review-cycle": [
+                    ("👀", "Review derniers commits", "Passez en revue les derniers commits et identifiez les problèmes"),
+                    ("🔍", "Analyse qualité", "Analysez la qualité du code : complexité, duplication, couverture"),
+                    ("🛡️", "Audit sécurité", "Vérifiez les vulnérabilités de sécurité dans le code récent"),
+                ],
+                "debate-decide": [
+                    ("💡", "Proposition technique", "Débattez des options d'architecture pour la prochaine feature"),
+                    ("⚡", "Choix de stack", "Comparez les stacks techniques et décidez la meilleure approche"),
+                ],
+                "ideation-to-prod": [
+                    ("💡", "Nouvelle idée", "Explorons une nouvelle idée de produit — de l'idéation jusqu'au MVP"),
+                    ("🏗️", "Architecture MVP", "Définissez l'architecture du MVP et les composants nécessaires"),
+                    ("🚀", "Sprint dev", "Lancez un sprint de développement sur les user stories prioritaires"),
+                ],
+                "feature-request": [
+                    ("📝", "Nouveau besoin", "J'ai un besoin métier à exprimer pour challenge et implémentation"),
+                    ("🎯", "User story", "Transformez ce besoin en user stories priorisées"),
+                ],
+                "tech-debt-reduction": [
+                    ("🔧", "Audit dette", "Lancez un audit cross-projet de la dette technique"),
+                    ("📊", "Prioriser fixes", "Priorisez les corrections de dette par impact WSJF"),
+                ],
+            }
+            suggestions = _WORKFLOW_SUGGESTIONS.get(wf_id, [])
+            if not suggestions and _wf2.description:
+                suggestions = [
+                    ("🚀", "Démarrer", f"Démarrons : {_wf2.description}"),
+                    ("❓", "État des lieux", "Faites un état des lieux avant de commencer"),
+                ]
+    if not suggestions and session.goal:
+        suggestions = [
+            ("🚀", "Démarrer", f"Commençons : {session.goal}"),
+            ("📋", "Plan d'action", f"Proposez un plan d'action pour : {session.goal}"),
+        ]
+
     return _templates(request).TemplateResponse("session_live.html", {
         "request": request,
         "page_title": f"Live: {session.name}",
@@ -1556,6 +1617,7 @@ async def session_live_page(request: Request, session_id: str):
         "messages": msg_list,
         "graph": graph,
         "memory": memory_data,
+        "suggestions": suggestions,
     })
 
 
