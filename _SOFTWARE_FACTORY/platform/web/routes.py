@@ -2705,6 +2705,20 @@ async def global_memory(category: str = ""):
     return JSONResponse(entries)
 
 
+@router.post("/api/memory/global")
+async def global_memory_store(request: Request):
+    """Store a global memory entry."""
+    from ..memory.manager import get_memory_manager
+    data = await request.json()
+    cat = data.get("category", "general")
+    key = data.get("key", "")
+    val = data.get("value", "")
+    if not key or not val:
+        return JSONResponse({"error": "key and value required"}, status_code=400)
+    get_memory_manager().global_store(key, val, category=cat, confidence=data.get("confidence", 0.8))
+    return JSONResponse({"ok": True})
+
+
 @router.get("/api/memory/search")
 async def memory_search(q: str = ""):
     """Search across all memory layers."""
@@ -4871,16 +4885,45 @@ async def mission_control_page(request: Request, mission_id: str):
                 "created_at": m.created_at if hasattr(m, "created_at") else "",
             })
 
-    # Memory entries — try project-specific first, then global
+    # Memory entries — global knowledge base + project-specific
     memories = []
     try:
         mem_mgr = get_memory_manager()
+        # Global knowledge (architecture, vision, conventions) — always useful
+        global_mems = mem_mgr.global_get(limit=20) or []
+        memories.extend(global_mems)
+        # Project-specific — only if semantic categories (skip pattern-name categories)
         if mission.project_id:
-            memories = mem_mgr.project_get(mission.project_id, limit=20) or []
-        if not memories:
-            memories = mem_mgr.search("", limit=20) or []
+            proj_mems = mem_mgr.project_get(mission.project_id, limit=20) or []
+            pattern_cats = {"sequential", "parallel", "loop", "hierarchical", "network", "router", "aggregator", "human-in-the-loop", "solo"}
+            for pm in proj_mems:
+                if isinstance(pm, dict) and pm.get("category", "") not in pattern_cats:
+                    memories.append(pm)
     except Exception:
         pass
+
+    # Pull requests — scan workspace git branches for PR-like branches
+    pull_requests = []
+    if mission.workspace_path:
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["git", "branch", "-a", "--format=%(refname:short)"],
+                cwd=mission.workspace_path, capture_output=True, text=True, timeout=5
+            )
+            branches = [b.strip() for b in result.stdout.strip().split("\n") if b.strip() and b.strip() != "master" and b.strip() != "main"]
+            for i, branch in enumerate(branches[:10]):
+                status = "Open"
+                # Check if branch is merged into master/main
+                merged = subprocess.run(
+                    ["git", "branch", "--merged", "HEAD", "--format=%(refname:short)"],
+                    cwd=mission.workspace_path, capture_output=True, text=True, timeout=5
+                )
+                if branch in merged.stdout:
+                    status = "Merged"
+                pull_requests.append({"number": i + 1, "title": branch, "status": status})
+        except Exception:
+            pass
 
     return _templates(request).TemplateResponse("mission_control.html", {
         "request": request,
@@ -4891,6 +4934,7 @@ async def mission_control_page(request: Request, mission_id: str):
         "phase_graphs": phase_graphs,
         "messages": messages,
         "memories": memories,
+        "pull_requests": pull_requests,
         "session_id": mission.session_id or "",
     })
 

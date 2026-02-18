@@ -514,15 +514,15 @@ async def _execute_node(
             summary = clean[:200] + ('…' if len(clean) > 200 else '')
             mem.project_store(
                 run.project_id,
-                key=f"phase:{run.pattern.type}:{agent.id}",
+                key=f"agent:{agent.id}:{run.pattern.type}",
                 value=summary,
-                category=run.pattern.type,
+                category="decisions",
                 source=agent.id,
             )
             await _sse(run, {
                 "type": "memory_stored",
-                "category": run.pattern.type,
-                "key": f"{agent.name}: {run.pattern.type}",
+                "category": "decisions",
+                "key": f"{agent.name}: contribution",
                 "value": summary,
                 "agent_id": agent.id,
             })

@@ -166,13 +166,27 @@
 .mc-msg-time{font-size:0.55rem;color:var(--text-secondary);margin-bottom:0.1rem}
 .mc-msg-content{white-space:pre-wrap;word-break:break-word}
 
-/* Memory */
-.mc-mem-entry{background:var(--bg-tertiary);border-radius:5px;padding:0.3rem 0.45rem;margin-bottom:0.25rem;font-size:0.7rem}
-.mc-mem-key{font-weight:600;color:var(--text-primary);font-size:0.65rem}
-.mc-mem-val{color:var(--text-secondary);font-size:0.62rem;line-height:1.25;max-height:2.2rem;overflow:hidden}
-.mc-mem-cat{font-size:0.55rem;color:var(--purple);font-weight:600;text-transform:uppercase}
+/* Memory — mini wiki */
+.mc-mem-search{width:100%;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-tertiary);color:var(--text-primary);font-size:0.68rem;margin-bottom:0.4rem;outline:none}
+.mc-mem-search:focus{border-color:var(--purple)}
+.mc-mem-group{margin-bottom:0.45rem}
+.mc-mem-group-title{font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--purple);cursor:pointer;display:flex;align-items:center;gap:0.3rem;padding:0.15rem 0;user-select:none}
+.mc-mem-group-title:hover{color:#a78bfa}
+.mc-mem-group-count{font-size:0.52rem;color:var(--text-secondary);font-weight:400}
+.mc-mem-group-items{padding-left:0.1rem}
+.mc-mem-entry{background:var(--bg-tertiary);border-radius:5px;padding:0.3rem 0.5rem;margin-bottom:0.2rem;font-size:0.7rem;cursor:pointer;transition:background .15s;border-left:2px solid transparent}
+.mc-mem-entry:hover{background:rgba(124,58,237,.06);border-left-color:var(--purple)}
+.mc-mem-key{font-weight:600;color:var(--text-primary);font-size:0.66rem}
+.mc-mem-val{color:var(--text-secondary);font-size:0.62rem;line-height:1.3}
+.mc-mem-meta{display:flex;align-items:center;gap:0.3rem;margin-top:0.15rem}
+.mc-mem-confidence{height:3px;width:40px;background:var(--bg-tertiary);border-radius:2px;overflow:hidden}
+.mc-mem-confidence-bar{height:100%;background:var(--purple);border-radius:2px}
+.mc-mem-occurrences{font-size:0.5rem;color:var(--text-secondary)}
+.mc-mem-add{width:100%;padding:0.25rem;border:1px dashed var(--border);border-radius:5px;background:transparent;color:var(--text-secondary);font-size:0.65rem;cursor:pointer;margin-top:0.3rem;transition:all .15s}
+.mc-mem-add:hover{border-color:var(--purple);color:var(--purple)}
+.mc-mem-empty{font-size:0.7rem;color:var(--text-secondary);font-style:italic;padding:0.3rem 0}
 
-/* Git */
+/* Git + PRs */
 .mc-git-graph{display:grid;grid-template-columns:repeat(14,1fr);gap:2px;margin-bottom:0.5rem}
 .mc-git-cell{aspect-ratio:1;border-radius:2px;background:var(--bg-tertiary)}
 .mc-git-cell.l1{background:rgba(124,58,237,.2)}
@@ -184,6 +198,17 @@
 .mc-commit-hash{color:var(--purple);font-family:var(--font-mono,monospace);font-size:0.62rem;flex-shrink:0}
 .mc-commit-msg{color:var(--text-secondary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mc-commit-time{color:var(--text-secondary);font-size:0.58rem;flex-shrink:0;opacity:.7}
+.mc-pr{display:flex;align-items:center;gap:0.35rem;padding:0.25rem 0;border-bottom:1px solid var(--border);font-size:0.68rem}
+.mc-pr:last-child{border-bottom:none}
+.mc-pr-icon{color:#3fb950;flex-shrink:0}
+.mc-pr-icon.merged{color:#a371f7}
+.mc-pr-icon.closed{color:#f85149}
+.mc-pr-title{color:var(--text-primary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.mc-pr-status{font-size:0.58rem;padding:0.1rem 0.35rem;border-radius:3px;font-weight:600}
+.mc-pr-status.open{background:rgba(63,185,80,.12);color:#3fb950}
+.mc-pr-status.merged{background:rgba(163,113,247,.12);color:#a371f7}
+.mc-pr-status.closed{background:rgba(248,81,73,.12);color:#f85149}
+.mc-pr-empty{font-size:0.7rem;color:var(--text-secondary);font-style:italic;padding:0.3rem 0}
 
 @media(max-width:900px){.mc-layout{grid-template-columns:1fr;height:auto}.mc-sidebar{border-left:none;border-top:1px solid var(--border)}}
 </style>
@@ -289,32 +314,73 @@
             {% endif %}
         </div>
 
-        <!-- Memory -->
+        <!-- Memory — Mini Wiki -->
         <div class="mc-side-section">
-            <div class="mc-side-title">Mémoire</div>
+            <div class="mc-side-title">
+                <svg class="icon icon-xs"><use href="#icon-book-open"/></svg> Contexte Projet
+            </div>
+            <input type="text" class="mc-mem-search" id="mc-mem-search" placeholder="Rechercher…" oninput="filterMemory(this.value)">
             <div id="mc-memory">
                 {% if memories %}
-                    {% for mem in memories[:8] %}
-                    <div class="mc-mem-entry">
+                    {% set ns = namespace(cats={}) %}
+                    {% for mem in memories %}
                         {% if mem is mapping %}
-                        <div class="mc-mem-cat">{{ mem.get('category','') }}</div>
-                        <div class="mc-mem-key">{{ mem.get('key','') }}</div>
-                        <div class="mc-mem-val">{{ mem.get('value','')[:120] }}</div>
-                        {% else %}
-                        <div class="mc-mem-val">{{ (mem|string)[:120] }}</div>
+                            {% set cat = mem.get('category','general') %}
+                            {% if cat not in ns.cats %}
+                                {% set _ = ns.cats.update({cat: []}) %}
+                            {% endif %}
+                            {% set _ = ns.cats[cat].append(mem) %}
                         {% endif %}
+                    {% endfor %}
+                    {% for cat, entries in ns.cats.items() %}
+                    <div class="mc-mem-group" data-cat="{{ cat }}">
+                        <div class="mc-mem-group-title" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+                            ▸ {{ cat }} <span class="mc-mem-group-count">({{ entries|length }})</span>
+                        </div>
+                        <div class="mc-mem-group-items">
+                            {% for mem in entries %}
+                            <div class="mc-mem-entry" data-key="{{ mem.get('key','') }}" title="{{ mem.get('value','') }}">
+                                <div class="mc-mem-key">{{ mem.get('key','') }}</div>
+                                <div class="mc-mem-val">{{ mem.get('value','')[:160] }}{% if mem.get('value','')|length > 160 %}…{% endif %}</div>
+                                {% if mem.get('confidence') or mem.get('occurrences') %}
+                                <div class="mc-mem-meta">
+                                    {% if mem.get('confidence') %}
+                                    <div class="mc-mem-confidence"><div class="mc-mem-confidence-bar" style="width:{{ (mem.confidence * 100)|int }}%"></div></div>
+                                    {% endif %}
+                                    {% if mem.get('occurrences',0) > 1 %}
+                                    <span class="mc-mem-occurrences">×{{ mem.occurrences }}</span>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
                     </div>
                     {% endfor %}
                 {% else %}
-                <div style="font-size:0.7rem;color:var(--text-secondary);font-style:italic;padding:0.3rem 0">Aucune mémoire enregistrée</div>
+                <div class="mc-mem-empty">Aucun contexte enregistré — les agents alimenteront cette base de connaissances</div>
                 {% endif %}
             </div>
+            <button class="mc-mem-add" onclick="addMemoryEntry()">+ Ajouter une entrée</button>
         </div>
 
-        <!-- Git -->
+        <!-- Git + PRs -->
         <div class="mc-side-section">
             <div class="mc-side-title">
-                <svg class="icon icon-xs"><use href="#icon-git-branch"/></svg> Git
+                <svg class="icon icon-xs"><use href="#icon-git-branch"/></svg> Git & PRs
+            </div>
+            <div id="mc-prs">
+                {% if pull_requests %}
+                    {% for pr in pull_requests %}
+                    <div class="mc-pr">
+                        <span class="mc-pr-icon {{ pr.status|lower }}"><svg class="icon icon-xs"><use href="#icon-git-pull-request"/></svg></span>
+                        <span class="mc-pr-title" title="{{ pr.title }}">#{{ pr.number }} {{ pr.title[:30] }}{% if pr.title|length > 30 %}…{% endif %}</span>
+                        <span class="mc-pr-status {{ pr.status|lower }}">{{ pr.status }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="mc-pr-empty">Aucune PR — les agents créeront des branches</div>
+                {% endif %}
             </div>
             <div class="mc-git-graph" id="mc-git-graph"></div>
             <div id="mc-commits">
@@ -699,6 +765,7 @@ function handleSSE(d) {
     }
     if (d.type === 'commit') addCommit(d);
     if (d.type === 'memory_stored') addMemory(d);
+    if (d.type === 'pr' || d.type === 'pull_request') addPR(d);
 }
 
 function currentRunningPhase() {
@@ -809,12 +876,68 @@ function addCommit(d) {
 
 function addMemory(d) {
     const m = document.getElementById('mc-memory');
+    const cat = d.category || 'general';
+    let group = m.querySelector(`.mc-mem-group[data-cat="${cat}"]`);
+    if (!group) {
+        group = document.createElement('div');
+        group.className = 'mc-mem-group';
+        group.dataset.cat = cat;
+        group.innerHTML = `<div class="mc-mem-group-title" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">▸ ${esc(cat)} <span class="mc-mem-group-count">(1)</span></div><div class="mc-mem-group-items"></div>`;
+        m.prepend(group);
+        m.querySelector('.mc-mem-empty')?.remove();
+    } else {
+        const cnt = group.querySelector('.mc-mem-group-count');
+        cnt.textContent = `(${group.querySelectorAll('.mc-mem-entry').length + 1})`;
+    }
+    const items = group.querySelector('.mc-mem-group-items');
     const div = document.createElement('div');
     div.className = 'mc-mem-entry';
-    div.innerHTML = `<div class="mc-mem-cat">${esc(d.category||'')}</div>
-        <div class="mc-mem-key">${esc(d.key||'')}</div>
-        <div class="mc-mem-val">${esc((d.value||'').substring(0,120))}</div>`;
-    m.prepend(div);
+    div.dataset.key = d.key || '';
+    const conf = d.confidence ? `<div class="mc-mem-meta"><div class="mc-mem-confidence"><div class="mc-mem-confidence-bar" style="width:${Math.round((d.confidence||0)*100)}%"></div></div></div>` : '';
+    div.innerHTML = `<div class="mc-mem-key">${esc(d.key||'')}</div><div class="mc-mem-val">${esc((d.value||'').substring(0,160))}</div>${conf}`;
+    items.prepend(div);
+}
+
+function filterMemory(q) {
+    const entries = document.querySelectorAll('.mc-mem-entry');
+    const groups = document.querySelectorAll('.mc-mem-group');
+    const ql = q.toLowerCase();
+    entries.forEach(e => {
+        const match = !q || (e.dataset.key||'').toLowerCase().includes(ql) || e.textContent.toLowerCase().includes(ql);
+        e.style.display = match ? '' : 'none';
+    });
+    groups.forEach(g => {
+        const visible = g.querySelectorAll('.mc-mem-entry:not([style*="display: none"])').length;
+        g.style.display = visible ? '' : 'none';
+    });
+}
+
+async function addMemoryEntry() {
+    const cat = prompt('Catégorie (architecture, vision, team, process, backlog):', 'vision');
+    if (!cat) return;
+    const key = prompt('Clé:', '');
+    if (!key) return;
+    const val = prompt('Valeur:', '');
+    if (!val) return;
+    try {
+        await fetch('/api/memory/global', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({category: cat, key: key, value: val})
+        });
+        addMemory({category: cat, key: key, value: val, confidence: 0.8});
+    } catch(e) { console.error('Memory add failed', e); }
+}
+
+function addPR(d) {
+    const c = document.getElementById('mc-prs');
+    c.querySelector('.mc-pr-empty')?.remove();
+    const div = document.createElement('div');
+    div.className = 'mc-pr';
+    const status = (d.status||'open').toLowerCase();
+    div.innerHTML = `<span class="mc-pr-icon ${status}"><svg class="icon icon-xs"><use href="#icon-git-pull-request"/></svg></span>
+        <span class="mc-pr-title" title="${esc(d.title||'')}">#${d.number||'?'} ${esc((d.title||'').substring(0,30))}</span>
+        <span class="mc-pr-status ${status}">${esc(d.status||'Open')}</span>`;
+    c.prepend(div);
 }
 
 function updateStats() {
