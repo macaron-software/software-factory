@@ -1486,7 +1486,7 @@ async def session_live_page(request: Request, session_id: str):
     except Exception:
         pass
 
-    agent_map_dict = {a.id: {"name": a.name, "icon": getattr(a, "icon", "bot"), "color": getattr(a, "color", "#8b949e"), "role": getattr(a, "role", ""), "avatar": getattr(a, "avatar", "bot")} for a in agents}
+    agent_map_dict = {a["id"]: {"name": a["name"], "icon": a.get("icon", "bot"), "color": a.get("color", "#8b949e"), "role": a.get("role", ""), "avatar": a.get("avatar", "bot")} for a in agents}
     return _templates(request).TemplateResponse("session_live.html", {
         "request": request,
         "page_title": f"Live: {session.name}",
@@ -1596,16 +1596,16 @@ async def send_message(request: Request, session_id: str):
     agent_map = {a.id: {"name": a.name, "icon": a.icon, "color": a.color, "role": a.role} for a in agents}
 
     # Render user bubble
-    user_html = _templates(request).TemplateResponse("partials/message_bubble.html", {
-        "request": request, "msg": user_msg, "agent_map": agent_map,
+    user_html = _templates(request).TemplateResponse("partials/msg_unified.html", {
+        "request": request, "msg": user_msg, "agent_map": agent_map, "msg_mode": "chat",
     }).body.decode()
 
     # Call agent (async LLM)
     agent_msg = await handle_user_message(session_id, content, to_agent or "")
 
     if agent_msg:
-        agent_html = _templates(request).TemplateResponse("partials/message_bubble.html", {
-            "request": request, "msg": agent_msg, "agent_map": agent_map,
+        agent_html = _templates(request).TemplateResponse("partials/msg_unified.html", {
+            "request": request, "msg": agent_msg, "agent_map": agent_map, "msg_mode": "chat",
         }).body.decode()
         return HTMLResponse(user_html + agent_html)
 
@@ -1627,10 +1627,11 @@ async def poll_messages(request: Request, session_id: str, after: str = ""):
     agent_map = {a.id: {"name": a.name, "icon": a.icon, "color": a.color, "role": a.role} for a in agents}
     html_parts = []
     for msg in messages:
-        html_parts.append(_templates(request).TemplateResponse("partials/message_bubble.html", {
+        html_parts.append(_templates(request).TemplateResponse("partials/msg_unified.html", {
             "request": request,
             "msg": msg,
             "agent_map": agent_map,
+            "msg_mode": "chat",
         }).body.decode())
     return HTMLResponse("".join(html_parts))
 

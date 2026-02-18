@@ -38,7 +38,8 @@
         <div id="message-list" class="conv-messages">
             <div class="conv-date-separator"><span>Today</span></div>
             {% for msg in messages %}
-            {% include "partials/message_bubble.html" %}
+            {% set msg_mode = 'chat' %}
+            {% include "partials/msg_unified.html" %}
             {% endfor %}
         </div>
 

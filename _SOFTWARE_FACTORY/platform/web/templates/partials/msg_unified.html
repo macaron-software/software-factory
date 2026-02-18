@@ -1,0 +1,162 @@
+{#
+  Unified Message Component — used across all views
+  
+  Usage:
+    {% include "partials/msg_unified.html" %}
+  
+  Context variables:
+    msg          — dict with: id, from_agent, to_agent, message_type, content, timestamp, metadata
+    agent_map    — dict[agent_id] → {name, role, color, avatar, icon}
+    msg_mode     — "thread" (default) | "compact" | "chat"
+    msg_index    — optional loop index for streaming target
+#}
+{% set mode = msg_mode | default('thread') %}
+{% set from_id = msg.from_agent | default(msg.get('from_id', '')) if msg is mapping else msg.from_agent | default('') %}
+{% set to_id = msg.to_agent | default(msg.get('to_id', '')) if msg is mapping else msg.to_agent | default('') %}
+{% set mtype = msg.message_type | default(msg.get('type', msg.get('action', 'response'))) if msg is mapping else msg.message_type | default('response') %}
+{% set content = msg.content | default('') %}
+{% set ts = msg.timestamp | default(msg.get('time', '')) if msg is mapping else msg.timestamp | default('') %}
+{% set meta = msg.metadata if msg.metadata is defined and msg.metadata is mapping else {} %}
+{% set is_user = from_id in ('user', 'human') %}
+{% set is_system = from_id == 'system' or mtype == 'system' %}
+{% set from_ag = agent_map.get(from_id, {}) if agent_map is defined and agent_map is mapping else {} %}
+{% set to_ag = agent_map.get(to_id, {}) if agent_map is defined and agent_map is mapping else {} %}
+{% set from_name = from_ag.get('name', from_id | replace('_', ' ') | title) if not is_user else 'You' %}
+{% set from_color = from_ag.get('color', '#8b949e') %}
+{% set from_role = from_ag.get('role', '') %}
+{% set from_avatar = from_ag.get('avatar', from_ag.get('icon', 'bot')) %}
+{% set to_name = to_ag.get('name', to_id | replace('_', ' ') | title) %}
+{% set to_color = to_ag.get('color', '#6e6e6e') %}
+
+{# Border color by message type #}
+{% set type_border = {
+  'request': 'var(--yellow)', 'delegate': 'var(--yellow)', 'delegation': 'var(--yellow)',
+  'response': 'var(--green)', 'approve': 'var(--green)', 'approval': 'var(--green)',
+  'veto': 'var(--red)',
+  'negotiate': 'var(--blue)',
+  'inform': '#6b7280', 'system': '#6b7280',
+  'human_request': 'var(--purple)', 'human_response': 'var(--purple)',
+  'code': 'var(--blue)', 'artifact': 'var(--blue)',
+  'instruction': 'var(--yellow)'
+}.get(mtype, 'transparent') %}
+
+{# Badge color by message type #}
+{% set badge_colors = {
+  'delegate': 'background:rgba(59,130,246,.15);color:var(--blue)',
+  'delegation': 'background:rgba(59,130,246,.15);color:var(--blue)',
+  'veto': 'background:var(--red);color:#fff',
+  'approve': 'background:var(--green);color:#fff',
+  'approval': 'background:var(--green);color:#fff',
+  'request': 'background:var(--yellow);color:#111',
+  'negotiate': 'background:var(--blue);color:#fff',
+  'human_request': 'background:var(--purple);color:#fff',
+  'human_response': 'background:var(--purple);color:#fff'
+} %}
+
+{# ─── SYSTEM MESSAGE ─── #}
+{% if is_system %}
+<div class="mu mu--system" data-msg-id="{{ msg.id | default('') }}">
+  <div class="mu__sys-text">{{ content }}</div>
+</div>
+
+{# ─── CHAT MODE (WhatsApp-style) ─── #}
+{% elif mode == 'chat' %}
+<div class="mu mu--chat {% if is_user %}mu--user{% else %}mu--agent{% endif %}" data-msg-id="{{ msg.id | default('') }}">
+  {% if not is_user %}
+  <div class="mu__avatar" style="background:{{ from_color }}20;border-color:{{ from_color }}">
+    <svg class="icon icon-sm" style="color:{{ from_color }}"><use href="#icon-{{ from_avatar }}"/></svg>
+  </div>
+  {% endif %}
+  <div class="mu__bubble {% if is_user %}mu__bubble--user{% else %}mu__bubble--agent{% endif %}" style="border-left:3px solid {{ type_border }}">
+    {% if not is_user %}
+    <div class="mu__sender">
+      <span class="mu__name" style="color:{{ from_color }}">{{ from_name }}</span>
+      {% if to_id and to_id not in ('user', 'session', '') %}
+      <span class="mu__arrow">→</span>
+      <span class="mu__target" style="color:{{ to_color }}">{{ to_name }}</span>
+      {% endif %}
+      {% if from_role %}<span class="mu__role">{{ from_role }}</span>{% endif %}
+      {% if mtype not in ('response', 'inform', '') %}
+      <span class="mu__badge" style="{{ badge_colors.get(mtype, '') }}">{{ mtype | upper }}</span>
+      {% endif %}
+    </div>
+    {% endif %}
+    <div class="mu__content md-rendered">{{ content | markdown | safe }}</div>
+    {% if meta.get('tool_calls') %}
+    <div class="mu__tools">
+      {% for tc in meta['tool_calls'][:5] %}
+      <div class="mu__tool"><span class="mu__tool-name">⚙ {{ tc.get('name','?') }}</span></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="mu__footer">
+      <span class="mu__time">{{ ts[11:16] if ts|length > 16 else ts }}</span>
+      {% if meta.get('model') %}<span class="mu__model">{{ meta['model'] }}</span>{% endif %}
+      {% if is_user %}
+      <svg class="mu__checks" width="16" height="10" viewBox="0 0 16 10"><path d="M1 5l3 3L9 2" stroke="#7c8aff" stroke-width="1.5" fill="none"/><path d="M5 5l3 3L13 2" stroke="#7c8aff" stroke-width="1.5" fill="none"/></svg>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# ─── COMPACT MODE (DSI workflow) ─── #}
+{% elif mode == 'compact' %}
+<div class="mu mu--compact" data-msg-id="{{ msg.id | default('') }}">
+  <div class="mu__avatar mu__avatar--sm" style="background:{{ from_color }}20;border-color:{{ from_color }}">
+    <svg class="icon icon-xs" style="color:{{ from_color }}"><use href="#icon-{{ from_avatar }}"/></svg>
+  </div>
+  <div class="mu__body">
+    <div class="mu__meta">
+      <span class="mu__name mu__name--sm" style="color:{{ from_color }}">{{ from_name }}</span>
+      {% if mtype not in ('response', 'inform', '') %}
+      <span class="mu__badge mu__badge--sm" style="{{ badge_colors.get(mtype, '') }}">{{ mtype | upper }}</span>
+      {% endif %}
+      {% if to_id and to_id not in ('user', 'session', '') %}
+      <span class="mu__arrow">→</span>
+      <span class="mu__target mu__target--sm" style="color:{{ to_color }}">{{ to_name }}</span>
+      {% endif %}
+      <span class="mu__time mu__time--right">{{ ts[11:16] if ts|length > 16 else ts }}</span>
+    </div>
+    <div class="mu__text mu__text--collapse" onclick="this.classList.toggle('mu__text--collapse')">
+      {{ content | markdown | safe }}
+    </div>
+  </div>
+</div>
+
+{# ─── THREAD MODE (default — session_live) ─── #}
+{% else %}
+<div class="mu mu--thread" data-msg-id="{{ msg.id | default('') }}" style="border-left-color:{{ type_border }}">
+  {% if is_user %}
+  <div class="mu__avatar mu__avatar--user">You</div>
+  {% else %}
+  <div class="mu__avatar" style="background:{{ from_color }}20;border-color:{{ from_color }}">
+    <svg class="icon icon-sm" style="color:{{ from_color }}"><use href="#icon-{{ from_avatar }}"/></svg>
+  </div>
+  {% endif %}
+  <div class="mu__body">
+    <div class="mu__meta">
+      <span class="mu__name" style="color:{% if is_user %}var(--green){% else %}{{ from_color }}{% endif %}">{{ from_name }}</span>
+      {% if from_role %}<span class="mu__role">{{ from_role }}</span>{% endif %}
+      {% if mtype not in ('response', 'inform', '') %}
+      <span class="mu__badge" style="{{ badge_colors.get(mtype, '') }}">{{ mtype | upper }}</span>
+      {% endif %}
+      {% if to_id and to_id not in ('user', 'session', '') %}
+      <span class="mu__arrow">→</span>
+      <span class="mu__target" style="color:{{ to_color }}">{{ to_name }}</span>
+      {% endif %}
+      <span class="mu__time mu__time--right">{{ ts[11:16] if ts|length > 16 else ts }}</span>
+    </div>
+    <div class="mu__content md-rendered">{{ content | markdown | safe }}</div>
+    {% if meta.get('tool_calls') %}
+    <div class="mu__tools">
+      {% for tc in meta['tool_calls'][:5] %}
+      <div class="mu__tool">
+        <span class="mu__tool-name">⚙ {{ tc.get('name','?') }}</span>
+        {% if tc.get('result') %}<span class="mu__tool-result">{{ tc.get('result','')[:120] }}</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

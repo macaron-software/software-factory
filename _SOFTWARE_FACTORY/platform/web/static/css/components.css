@@ -150,3 +150,89 @@
 .text-muted{color:var(--text-secondary)}.text-purple{color:var(--purple)}
 .truncate{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .font-bold{font-weight:700}.font-mono{font-family:'JetBrains Mono',monospace}
+
+/* ═══════════════════════════════════════════════════════
+   UNIFIED MESSAGE COMPONENT — .mu (msg-unified)
+   3 modes: thread (default), compact, chat
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Base ── */
+.mu{position:relative}
+.mu[data-msg-id]{scroll-margin-top:1rem}
+
+/* ── System message ── */
+.mu--system{text-align:center;padding:.25rem .75rem}
+.mu__sys-text{font-size:.72rem;color:var(--text-secondary);font-style:italic}
+
+/* ── Avatar ── */
+.mu__avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:2px solid;font-size:.82rem;font-weight:600;color:#fff}
+.mu__avatar--sm{width:28px;height:28px}
+.mu__avatar--user{background:var(--user-bubble);border-color:var(--user-bubble-border);font-size:.65rem}
+.mu__avatar img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+
+/* ── Sender meta row ── */
+.mu__meta{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-bottom:.2rem}
+.mu__sender{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-bottom:.2rem}
+.mu__name{font-size:.8rem;font-weight:600}
+.mu__name--sm{font-size:.7rem}
+.mu__role{font-size:.65rem;color:var(--text-secondary);font-style:italic;opacity:.7}
+.mu__arrow{font-size:.7rem;color:var(--text-secondary)}
+.mu__target{font-size:.75rem;font-weight:500}
+.mu__target--sm{font-size:.68rem}
+
+/* ── Badge ── */
+.mu__badge{display:inline-block;padding:.1rem .4rem;border-radius:4px;font-size:.6rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;background:var(--bg-tertiary);color:var(--text-secondary)}
+.mu__badge--sm{font-size:.55rem;padding:.05rem .3rem}
+
+/* ── Content ── */
+.mu__content{font-size:.84rem;color:var(--text-primary);line-height:1.55;word-break:break-word}
+.mu__content:not(.md-rendered){white-space:pre-wrap}
+.mu__content pre{background:var(--bg-primary);padding:.6rem .75rem;border-radius:6px;overflow-x:auto;margin:.4rem 0;font-size:.78rem}
+.mu__content code{font-family:'JetBrains Mono','SF Mono',monospace;font-size:.82em}
+.mu__content p{margin:.3rem 0}
+.mu__content ul,.mu__content ol{padding-left:1.2rem;margin:.3rem 0}
+.mu__content table{border-collapse:collapse;width:100%;margin:.4rem 0;font-size:.78rem}
+.mu__content th,.mu__content td{border:1px solid var(--border);padding:.3rem .5rem;text-align:left}
+.mu__content th{background:var(--bg-tertiary)}
+.mu__content h1,.mu__content h2,.mu__content h3{font-size:.9rem;margin:.5rem 0 .2rem;color:var(--purple)}
+.mu__content blockquote{border-left:3px solid var(--purple);padding-left:.75rem;margin:.3rem 0;color:var(--text-secondary)}
+
+/* ── Collapsible text (compact mode) ── */
+.mu__text{font-size:.75rem;color:var(--text-secondary);line-height:1.45;cursor:pointer;word-break:break-word}
+.mu__text.mu__text--collapse{max-height:3.6em;overflow:hidden}
+.mu__text pre{background:var(--bg-primary);padding:.5rem;border-radius:4px;font-size:.72rem}
+.mu__text p{margin:.2rem 0}
+
+/* ── Tools ── */
+.mu__tools{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.3rem;padding-top:.3rem;border-top:1px solid rgba(255,255,255,.04)}
+.mu__tool{display:flex;align-items:center;gap:.25rem;font-size:.68rem;color:var(--text-secondary);background:var(--bg-primary);padding:.15rem .4rem;border-radius:4px}
+.mu__tool-name{font-weight:600;color:var(--blue)}
+.mu__tool-result{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.7}
+
+/* ── Footer / time ── */
+.mu__footer{display:flex;align-items:center;justify-content:flex-end;gap:.3rem;margin-top:.15rem}
+.mu__time{font-size:.65rem;color:var(--text-secondary);white-space:nowrap}
+.mu__time--right{margin-left:auto}
+.mu__model{font-size:.6rem;padding:.05rem .3rem;background:var(--bg-primary);color:var(--text-secondary);border-radius:3px}
+.mu__checks{opacity:.7}
+
+/* ── Bubble (chat mode) ── */
+.mu__bubble{padding:.5rem .75rem;border-radius:12px;min-width:80px}
+.mu__bubble--agent{background:var(--bg-secondary);border:1px solid var(--border);border-top-left-radius:4px}
+.mu__bubble--user{background:var(--user-bubble);border:1px solid var(--user-bubble-border);border-top-right-radius:4px}
+
+/* ═══════ THREAD MODE ═══════ */
+.mu--thread{display:flex;gap:.75rem;padding:.55rem 0;padding-left:.75rem;border-left:3px solid transparent;transition:background .1s}
+.mu--thread:hover{background:rgba(255,255,255,.02)}
+
+/* ═══════ COMPACT MODE ═══════ */
+.mu--compact{display:flex;gap:.5rem;padding:.4rem 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.mu--compact:last-child{border-bottom:none}
+
+/* ═══════ CHAT MODE ═══════ */
+.mu--chat{display:flex;gap:.5rem;max-width:80%;align-self:flex-start}
+.mu--user{align-self:flex-end;flex-direction:row-reverse}
+
+/* ── Streaming cursor ── */
+.mu__content.mu--streaming::after{content:'▌';animation:mu-blink .8s infinite;color:var(--purple)}
+@keyframes mu-blink{0%,100%{opacity:1}50%{opacity:0}}

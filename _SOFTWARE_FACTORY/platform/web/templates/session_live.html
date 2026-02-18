@@ -45,42 +45,8 @@
 .input-send:active{transform:scale(0.97)}
 
 /* ── Thread mode ── */
-.thread-feed{overflow-y:auto;height:100%;padding:1rem 1.25rem}
-.thread-msg{display:flex;gap:0.75rem;padding:0.65rem 0;border-left:3px solid transparent;padding-left:0.75rem;transition:background .1s}
-.thread-msg:hover{background:rgba(255,255,255,.02)}
-.thread-msg--request,.thread-msg--delegate{border-left-color:var(--yellow)}
-.thread-msg--response,.thread-msg--approve{border-left-color:var(--green)}
-.thread-msg--veto{border-left-color:var(--red)}
-.thread-msg--inform,.thread-msg--system{border-left-color:#6b7280}
-.thread-msg--negotiate{border-left-color:var(--blue)}
-.thread-msg--human_request,.thread-msg--human_response{border-left-color:var(--purple)}
-.thread-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;color:#fff;font-weight:600}
-.thread-avatar-img{width:36px;height:36px;border-radius:50%;flex-shrink:0;object-fit:cover}
-.thread-body{flex:1;min-width:0}
-.thread-meta{display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;margin-bottom:0.2rem}
-.thread-name{font-size:0.82rem;font-weight:600;color:var(--text-primary)}
-.thread-role{font-size:0.68rem;color:var(--text-secondary);font-style:italic;opacity:.7}
-.thread-badge{font-size:0.62rem;padding:0.1rem 0.4rem;border-radius:4px;text-transform:uppercase;font-weight:700;letter-spacing:0.03em;background:var(--bg-tertiary);color:var(--text-secondary)}
-.thread-badge--veto{background:var(--red);color:#fff}
-.thread-badge--approve{background:var(--green);color:#fff}
-.thread-badge--delegate,.thread-badge--request{background:var(--yellow);color:#111}
-.thread-badge--negotiate{background:var(--blue);color:#fff}
-.thread-badge--human_request,.thread-badge--human_response{background:var(--purple);color:#fff}
-.thread-activity{font-size:0.62rem;padding:0.1rem 0.4rem;border-radius:4px;font-weight:600;letter-spacing:0.02em;display:inline-flex;align-items:center;gap:3px}
-.thread-activity--code{background:#16a34a22;color:#16a34a;border:1px solid #16a34a44}
-.thread-activity--read{background:#2563eb22;color:#2563eb;border:1px solid #2563eb44}
-.thread-activity--talk{background:var(--bg-tertiary);color:var(--text-secondary);opacity:0.6}
-.thread-arrow{color:var(--text-secondary);font-size:0.75rem}
-.thread-target{font-size:0.78rem;color:var(--text-secondary)}
-.thread-time{font-size:0.7rem;color:var(--text-secondary);margin-left:auto;white-space:nowrap}
-.thread-content{font-size:0.84rem;color:var(--text-primary);line-height:1.55;word-break:break-word}
-.thread-content:not(.md-rendered){white-space:pre-wrap}
-.thread-content table{border-collapse:collapse;margin:0.4rem 0;font-size:0.78rem;width:100%}
-.thread-content th,.thread-content td{border:1px solid var(--border);padding:0.25rem 0.5rem;text-align:left}
-.thread-content th{background:var(--bg-tertiary);font-weight:600}
-.thread-content code{background:var(--bg-tertiary);padding:0.1rem 0.3rem;border-radius:3px;font-size:0.78rem;font-family:'SF Mono',monospace}
-.thread-content h2,.thread-content h3,.thread-content h4{margin:0.4rem 0 0.2rem;font-size:0.88rem}
-.thread-content ul{margin:0.2rem 0;padding-left:1.2rem}
+.thread-feed{overflow-y:auto;height:100%;padding:1rem 1.25rem;display:flex;flex-direction:column;gap:0}
+/* Thread message CSS is now in components.css (.mu--thread) */
 
 /* ── Chat mode ── */
 .chat-split{display:grid;grid-template-columns:1fr 300px;height:100%}
@@ -293,37 +259,9 @@
     <!-- MODE 1: Thread -->
     <div class="session-pane active" id="pane-thread">
       <div class="thread-feed" id="threadFeed">
+        {% set msg_mode = 'thread' %}
         {% for msg in messages %}
-        <div class="thread-msg thread-msg--{{ msg.type }}" data-id="{{ msg.id }}">
-          {% set agent = agents | selectattr('id', 'equalto', msg.from_agent) | first %}
-          {% if agent and agent.avatar_url %}
-          <img class="thread-avatar-img" src="{{ agent.avatar_url }}" alt="{{ agent.name }}">
-          {% else %}
-          <div class="thread-avatar" style="background:{{ agent.color if agent else '#6b7280' }}">{{ agent.avatar if agent else '?' }}</div>
-          {% endif %}
-          <div class="thread-body">
-            <div class="thread-meta">
-              <span class="thread-name">{{ agent.name if agent else msg.from_agent }}</span>
-              {% if agent and agent.role %}<span class="thread-role">{{ agent.role }}</span>{% endif %}
-              <span class="thread-badge thread-badge--{{ msg.type }}">{{ msg.type }}</span>
-              {% if msg.edits and msg.edits > 0 %}
-              <span class="thread-activity thread-activity--code"><svg class="icon icon-xs"><use href="#icon-edit"/></svg> {{ msg.edits }} edit{{ 's' if msg.edits > 1 else '' }}</span>
-              {% endif %}
-              {% if msg.reads and msg.reads > 0 %}
-              <span class="thread-activity thread-activity--read"><svg class="icon icon-xs"><use href="#icon-eye"/></svg> {{ msg.reads }} read{{ 's' if msg.reads > 1 else '' }}</span>
-              {% endif %}
-              {% if not msg.edits and not msg.reads and msg.from_agent not in ('system', 'user') %}
-              <span class="thread-activity thread-activity--talk"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> talk</span>
-              {% endif %}
-              <span class="thread-arrow">→</span>
-              {% set target = agents | selectattr('id', 'equalto', msg.to_agent) | first %}
-              <span class="thread-target">{{ target.name if target else (msg.to_agent or 'all') }}</span>
-              {% if target and target.role %}<span class="thread-role">{{ target.role }}</span>{% endif %}
-              <span class="thread-time">{{ msg.timestamp }}</span>
-            </div>
-            <div class="thread-content md-rendered">{{ msg.content | markdown | safe }}</div>
-          </div>
-        </div>
+        {% include "partials/msg_unified.html" %}
         {% endfor %}
       </div>
     </div>
@@ -634,32 +572,47 @@ function appendMessage(data){
   appendChatBubble(data);
 }
 
-/* Thread mode */
+/* Thread mode — unified component */
 function appendThread(data){
   const feed = document.getElementById('threadFeed');
   const agent = agentById(data.from_agent);
   const target = agentById(data.to_agent);
+  const mtype = data.msg_type||data.type||'inform';
+  const isUser = data.from_agent === 'user' || data.from_agent === 'human';
+  const isSystem = data.from_agent === 'system' || mtype === 'system';
+  const borderColors = {request:'var(--yellow)',delegate:'var(--yellow)',delegation:'var(--yellow)',response:'var(--green)',approve:'var(--green)',veto:'var(--red)',negotiate:'var(--blue)',inform:'#6b7280',system:'#6b7280',human_request:'var(--purple)',human_response:'var(--purple)'};
+  const badgeStyles = {delegate:'background:rgba(59,130,246,.15);color:var(--blue)',veto:'background:var(--red);color:#fff',approve:'background:var(--green);color:#fff',request:'background:var(--yellow);color:#111',negotiate:'background:var(--blue);color:#fff'};
+  const color = agent ? agent.color : '#8b949e';
+  const icon = agent ? (agent.icon || 'bot') : 'bot';
+  const name = isUser ? 'You' : (agent ? agent.name : data.from_agent);
+  const targetName = target ? target.name : (data.to_agent || 'all');
+
+  if (isSystem) {
+    const d = document.createElement('div');
+    d.className = 'mu mu--system';
+    d.innerHTML = `<div class="mu__sys-text">${esc(data.content)}</div>`;
+    feed.appendChild(d);
+    return;
+  }
+
   const div = document.createElement('div');
-  div.className = `thread-msg thread-msg--${data.msg_type||data.type||'inform'}`;
-  const avatarHtml = agent && agent.avatar_url
-    ? `<img class="thread-avatar-img" src="${agent.avatar_url}" alt="${esc(agent.name)}">`
-    : `<div class="thread-avatar" style="background:${agent?agent.color:'#6b7280'}">${agent?agent.avatar:'?'}</div>`;
+  div.className = 'mu mu--thread';
+  div.style.borderLeftColor = borderColors[mtype] || 'transparent';
+  const avatarHtml = isUser
+    ? `<div class="mu__avatar mu__avatar--user">You</div>`
+    : `<div class="mu__avatar" style="background:${color}20;border-color:${color}"><svg class="icon icon-sm" style="color:${color}"><use href="#icon-${icon}"/></svg></div>`;
+  const badgeHtml = !['response','inform',''].includes(mtype) ? `<span class="mu__badge" style="${badgeStyles[mtype]||''}">${esc(mtype.toUpperCase())}</span>` : '';
+  const roleHtml = agent && agent.role ? `<span class="mu__role">${esc(agent.role)}</span>` : '';
+  const targetHtml = data.to_agent && !['user','session',''].includes(data.to_agent) ? `<span class="mu__arrow">→</span><span class="mu__target" style="color:${target?target.color:'#6e6e6e'}">${esc(targetName)}</span>` : '';
   div.innerHTML = `
     ${avatarHtml}
-    <div class="thread-body">
-      <div class="thread-meta">
-        <span class="thread-name">${esc(agent?agent.name:data.from_agent)}</span>
-        ${agent&&agent.role?`<span class="thread-role">${esc(agent.role)}</span>`:''}
-        <span class="thread-badge thread-badge--${data.msg_type||data.type||'inform'}">${esc(data.msg_type||data.type||'inform')}</span>
-        ${data.edits>0?`<span class="thread-activity thread-activity--code"><svg class="icon icon-xs"><use href="#icon-edit"/></svg> ${data.edits} edit${data.edits>1?'s':''}</span>`:''}
-        ${data.reads>0?`<span class="thread-activity thread-activity--read"><svg class="icon icon-xs"><use href="#icon-eye"/></svg> ${data.reads} read${data.reads>1?'s':''}</span>`:''}
-        ${!data.edits&&!data.reads&&data.from_agent!=='system'&&data.from_agent!=='user'?'<span class="thread-activity thread-activity--talk"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> talk</span>':''}
-        <span class="thread-arrow">→</span>
-        <span class="thread-target">${esc(target?target.name:(data.to_agent||'all'))}</span>
-        ${target&&target.role?`<span class="thread-role">${esc(target.role)}</span>`:''}
-        <span class="thread-time">now</span>
+    <div class="mu__body">
+      <div class="mu__meta">
+        <span class="mu__name" style="color:${isUser?'var(--green)':color}">${esc(name)}</span>
+        ${roleHtml}${badgeHtml}${targetHtml}
+        <span class="mu__time mu__time--right">now</span>
       </div>
-      <div class="thread-content md-rendered">${md(data.content)}</div>
+      <div class="mu__content md-rendered">${md(data.content)}</div>
     </div>`;
   feed.appendChild(div);
   feed.scrollTop = feed.scrollHeight;
