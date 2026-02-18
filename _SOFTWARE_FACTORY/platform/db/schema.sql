@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS agents (
     description TEXT DEFAULT '',
     system_prompt TEXT DEFAULT '',
     provider TEXT DEFAULT 'anthropic',
-    model TEXT DEFAULT 'claude-sonnet-4-20250514',
+    model TEXT DEFAULT 'MiniMax-M2.5',
     temperature REAL DEFAULT 0.7,
     max_tokens INTEGER DEFAULT 4096,
     skills_json TEXT DEFAULT '[]',

@@ -34,10 +34,10 @@ tools:
   - code_search
 
 llm:
-  model: claude-sonnet-4
+  model: MiniMax-M2.5
   temperature: 0.3
   max_tokens: 8000
-  fallback_model: gpt-5.1
+  fallback_model: MiniMax-M2.5
 
 permissions:
   can_veto: true

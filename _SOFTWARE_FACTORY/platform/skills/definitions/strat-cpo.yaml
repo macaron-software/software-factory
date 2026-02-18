@@ -42,7 +42,7 @@ tools:
   - memory_search
 
 llm:
-  model: gpt-5.1
+  model: MiniMax-M2.5
   temperature: 0.5
   max_tokens: 8000
 

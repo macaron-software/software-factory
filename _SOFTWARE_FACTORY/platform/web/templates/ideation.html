@@ -53,6 +53,11 @@
 .idea-agent-dot.thinking{background:var(--yellow);animation:pulse 1.5s infinite}
 .idea-agent-dot.speaking{background:var(--green)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes typingPulse{0%{opacity:.2}20%{opacity:1}100%{opacity:.2}}
+.typing-indicator{display:inline-flex;gap:3px;padding:4px 0}
+.typing-indicator span{width:6px;height:6px;border-radius:50%;background:var(--text-secondary);animation:typingPulse 1.4s infinite}
+.typing-indicator span:nth-child(2){animation-delay:.2s}
+.typing-indicator span:nth-child(3){animation-delay:.4s}
 .idea-agent-label{font-size:0.78rem;flex:1}
 .idea-agent-role{font-size:0.68rem;color:var(--text-secondary)}
 
@@ -543,6 +548,36 @@ const placeholder = document.getElementById('ideaPlaceholder');
 const findingsEl = document.getElementById('ideaFindings');
 let sessionId = '';
 
+// Lightweight markdown renderer (same as session_live.html)
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function md(s){
+  let h = esc(s);
+  h = h.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+  h = h.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+  h = h.replace(/^# (.+)$/gm, '<h2>$1</h2>');
+  h = h.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+  h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  h = h.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  h = h.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  h = h.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)*)/gm, (m, hdr, sep, body)=>{
+    const th = hdr.split('|').filter(c=>c.trim()).map(c=>`<th>${c.trim()}</th>`).join('');
+    const rows = body.trim().split('\n').map(r=>{
+      const cells = r.split('|').filter(c=>c.trim()).map(c=>`<td>${c.trim()}</td>`).join('');
+      return `<tr>${cells}</tr>`;
+    }).join('');
+    return `<table><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table>`;
+  });
+  h = h.replace(/^---$/gm, '<hr>');
+  h = h.replace(/^- (.+)$/gm, '<li>$1</li>');
+  h = h.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
+  h = h.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+  // @mentions
+  h = h.replace(/@(\w[\w\s]*?)(?=[\s,.:!?<]|$)/g, '<span style="color:var(--purple);font-weight:600">@$1</span>');
+  h = h.replace(/\n/g, '<br>');
+  return h;
+}
+
 function setPrompt(text) {
     inputEl.value = text;
     inputEl.focus();
@@ -665,7 +700,7 @@ async function sendIdea() {
         product_manager: '#16a34a',
     };
 
-    addPhaseHeader('🔍 Idéation en cours', 'Les agents analysent votre idée en temps réel...');
+    addPhaseHeader('Idéation en cours', 'Les agents analysent votre idée en temps réel…');
 
     try {
         // Start the real pattern engine
@@ -720,7 +755,7 @@ async function sendIdea() {
                             <span class="mu__role">${ROLES[evt.agent_id] || ''}</span>
                         </div>
                         <div class="mu__content md-rendered" id="stream-content-${evt.agent_id}">
-                            <span class="typing-indicator">●●●</span>
+                            <span class="typing-indicator"><span></span><span></span><span></span></span>
                         </div>
                     </div>`;
                 messagesEl.appendChild(div);

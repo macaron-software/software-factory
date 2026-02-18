@@ -43,10 +43,10 @@ tools:
   - lint
 
 llm:
-  model: gpt-5.1-codex
+  model: MiniMax-M2.5
   temperature: 0.3
   max_tokens: 12000
-  fallback_model: gpt-5.1
+  fallback_model: MiniMax-M2.5
 
 permissions:
   can_veto: false

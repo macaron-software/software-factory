@@ -37,10 +37,10 @@ tools:
   - test
 
 llm:
-  model: gpt-5.1
+  model: MiniMax-M2.5
   temperature: 0.3
   max_tokens: 8000
-  fallback_model: gpt-5.1-codex
+  fallback_model: MiniMax-M2.5
 
 permissions:
   can_veto: false

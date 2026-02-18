@@ -39,10 +39,10 @@ tools:
   - git_status
 
 llm:
-  model: gpt-5.1
+  model: MiniMax-M2.5
   temperature: 0.5
   max_tokens: 4096
-  fallback_model: gpt-5.1-codex-mini
+  fallback_model: MiniMax-M2.5-mini
 
 permissions:
   can_veto: false

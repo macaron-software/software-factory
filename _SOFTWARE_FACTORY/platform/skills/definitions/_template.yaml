@@ -25,10 +25,10 @@ tools:
   - code_search
 
 llm:
-  model: gpt-5.1
+  model: MiniMax-M2.5
   temperature: 0.7
   max_tokens: 4096
-  fallback_model: gpt-5.1-codex
+  fallback_model: MiniMax-M2.5
 
 permissions:
   can_veto: false
