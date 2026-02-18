@@ -5017,28 +5017,82 @@ async def api_mission_run(request: Request, mission_id: str):
             # Build PatternDef for this phase
             agent_nodes = [{"id": aid, "agent_id": aid} for aid in aids]
 
-            # Build edges based on pattern type
+            # Resolve leader: workflow config > hierarchy_rank > first agent
+            leader = cfg.get("leader", "")
+            if not leader and aids:
+                ranked = sorted(aids, key=lambda a: agent_store.get(a).hierarchy_rank if agent_store.get(a) else 50)
+                leader = ranked[0]
+
+            # Build edges — multi-pattern: leader structures + peer collaboration
             edges = []
+            others = [a for a in aids if a != leader] if leader else aids
+
             if pattern_type == "network":
-                for idx_a, a in enumerate(aids):
-                    for b in aids[idx_a+1:]:
+                # Leader briefs team (hierarchical), debaters discuss (network mesh), report back
+                if leader:
+                    for o in others:
+                        edges.append({"from": leader, "to": o, "type": "delegate"})
+                for idx_a, a in enumerate(others):
+                    for b in others[idx_a+1:]:
                         edges.append({"from": a, "to": b, "type": "bidirectional"})
+                if leader:
+                    for o in others:
+                        edges.append({"from": o, "to": leader, "type": "report"})
+
             elif pattern_type == "sequential":
                 for idx_a in range(len(aids) - 1):
                     edges.append({"from": aids[idx_a], "to": aids[idx_a+1], "type": "sequential"})
-            elif pattern_type == "hierarchical" and aids:
-                leader = aids[0]
-                for sub in aids[1:]:
+                # Feedback loop from last to first
+                if len(aids) > 2:
+                    edges.append({"from": aids[-1], "to": aids[0], "type": "feedback"})
+
+            elif pattern_type == "hierarchical" and leader:
+                for sub in others:
                     edges.append({"from": leader, "to": sub, "type": "delegate"})
+                # Peer collaboration between workers
+                workers = [a for a in others if (agent_store.get(a) or type('',(),{'hierarchy_rank':50})).hierarchy_rank >= 40]
+                for idx_a, a in enumerate(workers):
+                    for b in workers[idx_a+1:]:
+                        edges.append({"from": a, "to": b, "type": "bidirectional"})
+                # Review loops back to leader
+                for sub in others:
+                    edges.append({"from": sub, "to": leader, "type": "report"})
+
             elif pattern_type == "aggregator" and aids:
-                aggregator_id = aids[-1] if len(aids) > 1 else aids[0]
-                for a in aids:
-                    if a != aggregator_id:
-                        edges.append({"from": a, "to": aggregator_id, "type": "report"})
+                aggregator_id = leader or (aids[-1] if len(aids) > 1 else aids[0])
+                contributors = [a for a in aids if a != aggregator_id]
+                for a in contributors:
+                    edges.append({"from": a, "to": aggregator_id, "type": "report"})
+                # Cross-review between contributors
+                for idx_a, a in enumerate(contributors):
+                    for b in contributors[idx_a+1:]:
+                        edges.append({"from": a, "to": b, "type": "bidirectional"})
+
             elif pattern_type == "router" and aids:
-                router_id = aids[0]
-                for a in aids[1:]:
+                router_id = leader or aids[0]
+                specialists = [a for a in aids if a != router_id]
+                for a in specialists:
                     edges.append({"from": router_id, "to": a, "type": "route"})
+                    edges.append({"from": a, "to": router_id, "type": "report"})
+
+            elif pattern_type == "human-in-the-loop" and aids:
+                # Leader (DSI/CDP) receives from advisors, cross-debate between them
+                for o in others:
+                    edges.append({"from": o, "to": leader, "type": "report"})
+                for idx_a, a in enumerate(others):
+                    for b in others[idx_a+1:]:
+                        edges.append({"from": a, "to": b, "type": "bidirectional"})
+
+            elif pattern_type == "loop" and len(aids) >= 2:
+                edges.append({"from": aids[0], "to": aids[1], "type": "sequential"})
+                edges.append({"from": aids[1], "to": aids[0], "type": "feedback"})
+
+            elif pattern_type == "parallel" and aids:
+                dispatcher = leader or aids[0]
+                workers = [a for a in aids if a != dispatcher]
+                for w in workers:
+                    edges.append({"from": dispatcher, "to": w, "type": "delegate"})
+                    edges.append({"from": w, "to": dispatcher, "type": "report"})
 
             phase_pattern = PatternDef(
                 id=f"mission-{mission.id}-phase-{phase.phase_id}",

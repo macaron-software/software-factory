@@ -896,66 +896,75 @@ class WorkflowStore:
                 description="Pipeline bout en bout: idéation → comité stratégique GO/NOGO → architecture → sprints dev → CI/CD pipeline → campagne QA → deploy prod → TMA maintenance.",
                 icon="rocket", is_builtin=True,
                 phases=[
-                    # ── Phase 1: Idéation (NETWORK — brainstorming libre, tout le monde parle) ──
+                    # ── Phase 1: Idéation (NETWORK — PO briefe, experts débattent, PO synthétise) ──
                     WorkflowPhase(id="ideation", pattern_id="network",
                                   name="Idéation",
-                                  description="Le métier exprime un besoin. L'UX Designer explore les parcours utilisateur. L'Architecte évalue la faisabilité technique. Le Product Manager challenge la valeur business. Brainstorming libre, toutes les idées sont les bienvenues.",
+                                  description="Le Product Manager cadre le sujet et briefe l'équipe. Le métier exprime le besoin. L'UX Designer explore les parcours utilisateur. L'Architecte évalue la faisabilité technique. Débat structuré puis synthèse par le PO.",
                                   gate="always",
-                                  config={"agents": ["metier", "ux_designer", "architecte", "product_manager"]}),
+                                  config={"agents": ["metier", "ux_designer", "architecte", "product_manager"],
+                                          "leader": "product_manager"}),
                     # ── Phase 2: Comité Stratégique (HUMAN-IN-THE-LOOP — DSI arbitre avec GO/NOGO humain) ──
                     WorkflowPhase(id="strategic-committee", pattern_id="human-in-the-loop",
                                   name="Comité Stratégique GO/NOGO",
                                   description="Le DSI préside. La CPO défend la valeur produit. Le CTO évalue la faisabilité et les risques techniques. Le Portfolio Manager analyse la capacité et le WSJF. Débat contradictoire. CHECKPOINT: le DSI attend la décision humaine GO, NOGO ou PIVOT.",
                                   gate="all_approved",
-                                  config={"agents": ["strat-cpo", "strat-cto", "strat-portfolio", "lean_portfolio_manager", "dsi"]}),
-                    # ── Phase 3: Constitution Projet (SEQUENTIAL — chaque rôle passe le relai) ──
+                                  config={"agents": ["strat-cpo", "strat-cto", "strat-portfolio", "lean_portfolio_manager", "dsi"],
+                                          "leader": "dsi"}),
+                    # ── Phase 3: Constitution Projet (SEQUENTIAL — Dir Programme lance la chaîne) ──
                     WorkflowPhase(id="project-setup", pattern_id="sequential",
                                   name="Constitution du Projet",
                                   description="Le Dir. Programme alloue les ressources → le Product Manager décompose en épics → le Chef de Projet planifie les sprints → le Scrum Master configure les cérémonies. Chaque sortie alimente l'entrée du suivant.",
                                   gate="always",
-                                  config={"agents": ["strat-dirprog", "product_manager", "chef_projet", "scrum_master"]}),
+                                  config={"agents": ["strat-dirprog", "product_manager", "chef_projet", "scrum_master"],
+                                          "leader": "strat-dirprog"}),
                     # ── Phase 4: Architecture (AGGREGATOR — analyses parallèles → architecte consolide) ──
                     WorkflowPhase(id="architecture", pattern_id="aggregator",
                                   name="Architecture & Design",
                                   description="En parallèle: le Lead Dev analyse la faisabilité, l'UX crée les maquettes, la Sécurité définit les exigences, le DevOps planifie l'infra. L'Architecte agrège toutes les analyses en un document d'architecture consolidé.",
                                   gate="no_veto",
-                                  config={"agents": ["lead_dev", "ux_designer", "securite", "devops", "architecte"]}),
+                                  config={"agents": ["lead_dev", "ux_designer", "securite", "devops", "architecte"],
+                                          "leader": "architecte"}),
                     # ── Phase 5: Sprints Dev (HIERARCHICAL — Lead distribue, devs codent, QA inner loop) ──
                     WorkflowPhase(id="dev-sprint", pattern_id="hierarchical",
                                   name="Sprints de Développement",
                                   description="Le Lead Dev distribue les stories. Les devs frontend et backend codent en TDD. Le Test Automation écrit les tests E2E en parallèle. Le Lead fait la code review. Boucle interne: si incomplet, le Lead re-distribue.",
                                   gate="always",
-                                  config={"agents": ["lead_dev", "dev_frontend", "dev_backend", "test_automation"]}),
-                    # ── Phase 6: CICD (SEQUENTIAL — pipeline lint → build → test → scan) ──
+                                  config={"agents": ["lead_dev", "dev_frontend", "dev_backend", "test_automation"],
+                                          "leader": "lead_dev"}),
+                    # ── Phase 6: CICD (SEQUENTIAL — Pipeline Engineer lance la chaîne) ──
                     WorkflowPhase(id="cicd", pattern_id="sequential",
                                   name="Pipeline CI/CD",
                                   description="Le Pipeline Engineer configure le pipeline: lint → build → unit tests → integration → E2E. Le DevSecOps intègre les scans SAST/DAST. Le DevOps configure les environments staging et prod.",
                                   gate="always",
-                                  config={"agents": ["pipeline_engineer", "devsecops", "devops"]}),
+                                  config={"agents": ["pipeline_engineer", "devsecops", "devops"],
+                                          "leader": "pipeline_engineer"}),
                     # ── Phase 7: QA (LOOP — Test Manager planifie, exécution, si KO → reboucle) ──
                     WorkflowPhase(id="qa-campaign", pattern_id="loop",
                                   name="Campagne de Tests QA",
                                   description="Le Test Manager planifie et lance la campagne. Le QA Lead exécute les suites (E2E, API, perf). Si VETO (bugs trouvés): boucle retour au Test Manager qui re-planifie les corrections. Itère jusqu'à APPROVE ou max 5 itérations.",
                                   gate="all_approved",
                                   config={"agents": ["test_manager", "qa_lead"], "max_iterations": 5}),
-                    # ── Phase 8: QA Détaillée (PARALLEL — tests en parallèle) ──
+                    # ── Phase 8: QA Détaillée (PARALLEL — QA Lead dispatche) ──
                     WorkflowPhase(id="qa-execution", pattern_id="parallel",
                                   name="Exécution Tests Parallèle",
                                   description="Le QA Lead dispatche. En parallèle: le Test Automation lance Playwright, le Testeur fait les tests API, le Perf Engineer lance k6. Le QA Lead agrège les résultats.",
                                   gate="all_approved",
-                                  config={"agents": ["qa_lead", "test_automation", "testeur", "performance_engineer"]}),
-                    # ── Phase 9: Deploy (HUMAN-IN-THE-LOOP — canary + validation humaine avant 100%) ──
+                                  config={"agents": ["qa_lead", "test_automation", "testeur", "performance_engineer"],
+                                          "leader": "qa_lead"}),
+                    # ── Phase 9: Deploy (HUMAN-IN-THE-LOOP — Chef Projet valide) ──
                     WorkflowPhase(id="deploy-prod", pattern_id="human-in-the-loop",
                                   name="Deploy Production",
                                   description="Le DevOps déploie en canary (1%). Le SRE monitore les métriques. Le Pipeline Engineer prépare le rollback. CHECKPOINT: le Chef de Projet valide le GO pour 100% après vérification humaine des métriques.",
                                   gate="all_approved",
-                                  config={"agents": ["devops", "sre", "pipeline_engineer", "chef_projet"]}),
-                    # ── Phase 10: Incident Router (ROUTER — TMA route chaque incident au bon spécialiste) ──
+                                  config={"agents": ["devops", "sre", "pipeline_engineer", "chef_projet"],
+                                          "leader": "chef_projet"}),
+                    # ── Phase 10: Incident Router (ROUTER — Resp TMA triage) ──
                     WorkflowPhase(id="tma-router", pattern_id="router",
                                   name="Routage Incidents TMA",
                                   description="Le Responsable TMA reçoit les incidents. Il analyse la nature (bug code, perf, infra, sécu) et route vers le spécialiste approprié: Dev TMA pour les bugs, SRE pour l'infra, Test Automation pour les régressions.",
                                   gate="always",
-                                  config={"agents": ["responsable_tma", "dev_tma", "sre", "test_automation"]}),
+                                  config={"agents": ["responsable_tma", "dev_tma", "sre", "test_automation"],
+                                          "leader": "responsable_tma"}),
                     # ── Phase 11: Fix & Validate (LOOP — Dev TMA corrige, QA valide, reboucle si KO) ──
                     WorkflowPhase(id="tma-fix", pattern_id="loop",
                                   name="Correctif & Validation TMA",
