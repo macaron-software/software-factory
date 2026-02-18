@@ -3394,7 +3394,7 @@ async def dsi_workflow_start(request: Request, workflow_id: str):
         await manager.start_agent(aid, session.id, project_id=project_id, project_path=project_path)
 
     # Send kickoff message to the leader
-    leader = phase1.get("leader", phase1["agents"][0] if phase1["agents"] else "")
+    leader = phase1.get("leader", phase1.get("agents", [""])[0] if phase1.get("agents") else "")
     if leader:
         # Load project VISION if exists
         vision = ""

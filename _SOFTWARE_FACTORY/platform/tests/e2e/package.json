@@ -1,0 +1,15 @@
+{
+  "name": "macaron-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "npx playwright test",
+    "test:ideation": "npx playwright test ideation",
+    "test:epic": "npx playwright test epic",
+    "test:migration": "npx playwright test migration",
+    "report": "npx playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0"
+  }
+}
