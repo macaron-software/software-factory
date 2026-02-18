@@ -5186,7 +5186,8 @@ async def api_mission_run(request: Request, mission_id: str):
                     else:
                         phase_error = "Pattern returned success=False"
             except Exception as exc:
-                logger.error("Phase %s pattern crashed: %s", phase.phase_id, exc)
+                import traceback
+                logger.error("Phase %s pattern crashed: %s\n%s", phase.phase_id, exc, traceback.format_exc())
                 phase_error = str(exc)
 
             # Human-in-the-loop checkpoint after pattern completes

@@ -69,7 +69,7 @@ async def _sse(run: PatternRun, event: dict):
     """Push SSE event with automatic phase_id injection."""
     if run.phase_id and "phase_id" not in event:
         event["phase_id"] = run.phase_id
-    await _sse(run, event)
+    await _push_sse(run.session_id, event)
 
 # Protocol that makes agents produce trackable PRs/deliverables
 _PR_PROTOCOL = """[IMPORTANT — Team Protocol]
