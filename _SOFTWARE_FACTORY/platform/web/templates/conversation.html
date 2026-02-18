@@ -15,6 +15,13 @@
             hx-on::after-request="location.reload()">
         <svg class="icon icon-sm"><use href="#icon-stop"/></svg> Stop
     </button>
+    {% elif session.status in ('completed', 'failed', 'interrupted') %}
+    <button class="btn btn-sm" style="background:var(--purple);color:#fff;"
+            hx-post="/api/sessions/{{ session.id }}/resume"
+            hx-swap="none"
+            hx-on::after-request="location.reload()">
+        <svg class="icon icon-sm"><use href="#icon-play"/></svg> Reprendre
+    </button>
     {% endif %}
     <button class="btn btn-sm btn-danger"
             hx-delete="/api/sessions/{{ session.id }}"
