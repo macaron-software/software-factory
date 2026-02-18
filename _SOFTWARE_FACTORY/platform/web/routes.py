@@ -5236,6 +5236,10 @@ async def api_mission_run(request: Request, mission_id: str):
             else:
                 phase.status = PhaseStatus.DONE if phase_success else PhaseStatus.FAILED
 
+            # For HITL phases, the human decision overrides pattern success
+            # (user clicked GO = success, even if some LLM nodes had issues)
+            phase_success = (phase.status == PhaseStatus.DONE)
+
             # Phase complete — real status
             phase.completed_at = datetime.utcnow()
             if phase_success:

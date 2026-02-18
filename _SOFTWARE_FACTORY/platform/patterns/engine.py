@@ -414,20 +414,30 @@ async def _execute_node(
     state.result = result
     state.output = content
 
-    # Detect VETO/NOGO/APPROVE
+    # Detect VETO/NOGO/APPROVE — must be explicit decisions, not mentions
     msg_type = "text"
     content_upper = content.upper()
+    # Only detect NOGO as explicit status declarations, not mentions in text
     is_veto = (
         "[VETO]" in content
-        or "NOGO" in content_upper
-        or "NO-GO" in content_upper
+        or "[NOGO]" in content_upper
         or "STATUT: NOGO" in content_upper
         or "STATUT : NOGO" in content_upper
+        or "DÉCISION: NOGO" in content_upper
+        or "DÉCISION : NOGO" in content_upper
+        or "DECISION: NOGO" in content_upper
+        or "DECISION : NOGO" in content_upper
+        or "\nNOGO\n" in content_upper
+        or content_upper.strip() == "NOGO"
     )
     is_approve = (
         "[APPROVE]" in content
         or "STATUT: GO" in content_upper
         or "STATUT : GO" in content_upper
+        or "DÉCISION: GO" in content_upper
+        or "DÉCISION : GO" in content_upper
+        or "DECISION: GO" in content_upper
+        or "DECISION : GO" in content_upper
     )
     if is_approve and not is_veto:
         msg_type = "approve"
