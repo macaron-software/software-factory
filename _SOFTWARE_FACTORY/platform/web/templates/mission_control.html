@@ -84,6 +84,15 @@
 .mc-discuss-from{font-size:0.67rem;font-weight:600;color:var(--text-primary)}
 .mc-discuss-role{font-size:0.6rem;color:var(--purple);font-weight:500;margin-left:0.3rem}
 
+/* Streaming bubble */
+.mc-streaming{border-left:2px solid var(--purple);animation:stream-pulse 2s ease-in-out infinite}
+@keyframes stream-pulse{0%,100%{border-left-color:var(--purple)}50%{border-left-color:rgba(124,58,237,.3)}}
+.mc-stream-content{white-space:pre-wrap;word-break:break-word}
+.mc-typing-cursor{color:var(--purple);animation:blink-cursor .7s step-end infinite;font-weight:700}
+@keyframes blink-cursor{0%,100%{opacity:1}50%{opacity:0}}
+.mc-thinking-badge{font-size:0.58rem;color:var(--purple);font-weight:600;animation:think-pulse 1.5s ease-in-out infinite}
+@keyframes think-pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
 /* Checkpoint */
 .mc-checkpoint{background:rgba(234,179,8,.08);border-top:1px solid var(--yellow);padding:0.6rem 0.75rem}
 .mc-checkpoint h4{color:var(--yellow);font-size:0.8rem;margin:0 0 0.4rem}
@@ -267,6 +276,16 @@ const SESSION_ID = "{{ session_id }}";
 const PHASE_AGENTS = {{ phase_agents | tojson }};
 const PHASE_GRAPHS = {{ phase_graphs | tojson }};
 
+/* ── Agent name lookup (from phase_agents data) ── */
+const AGENT_INFO = {};
+for (const [pid, agents] of Object.entries(PHASE_AGENTS)) {
+    for (const a of agents) {
+        if (a.id && !AGENT_INFO[a.id]) {
+            AGENT_INFO[a.id] = { name: a.name || a.id, role: a.role || '', avatar: a.avatar_url || `/static/avatars/${a.id}.jpg` };
+        }
+    }
+}
+
 /* ── Render mini flow graphs per phase ── */
 function renderPhaseGraphs() {
     for (const [phaseId, graph] of Object.entries(PHASE_GRAPHS)) {
@@ -387,9 +406,81 @@ function handleSSE(d) {
         if (phaseId) addDiscussionMsg(phaseId, d);
         if (d.msg_type === 'tool_result') addActivity(d.content?.substring(0, 200), 'tool');
     }
+    else if (d.type === 'stream_start') {
+        // Agent starts thinking — show typing indicator
+        const phaseId = currentRunningPhase();
+        if (phaseId) {
+            const container = document.getElementById(`discuss-${phaseId}`);
+            if (container) {
+                container.querySelector('.mc-discuss-empty')?.remove();
+                container.querySelector(`.mc-stream-bubble[data-agent="${d.agent_id}"]`)?.remove();
+                const div = document.createElement('div');
+                div.className = 'mc-discuss-msg mc-stream-bubble';
+                div.dataset.agent = d.agent_id;
+                const info = AGENT_INFO[d.agent_id] || {};
+                const avatar = info.avatar || `/static/avatars/${d.agent_id}.jpg`;
+                const name = d.agent_name || info.name || d.agent_id;
+                div.innerHTML = `<img class="mc-discuss-avatar" src="${avatar}" onerror="this.style.display='none'" alt="">
+                    <div class="mc-discuss-bubble mc-streaming">
+                        <div class="mc-discuss-from">${esc(name)}<span class="mc-discuss-role mc-thinking-badge">réfléchit…</span></div>
+                        <span class="mc-stream-content"></span><span class="mc-typing-cursor">▊</span>
+                    </div>`;
+                container.appendChild(div);
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+        const info = AGENT_INFO[d.agent_id] || {};
+        addActivity(`🧠 ${d.agent_name || info.name || d.agent_id} réfléchit…`, 'tool');
+    }
+    else if (d.type === 'stream_delta') {
+        // Streaming text chunk from agent
+        const phaseId = currentRunningPhase();
+        if (phaseId) {
+            const container = document.getElementById(`discuss-${phaseId}`);
+            if (container) {
+                const bubble = container.querySelector(`.mc-stream-bubble[data-agent="${d.agent_id}"] .mc-stream-content`);
+                if (bubble) {
+                    bubble.textContent += d.delta;
+                    container.scrollTop = container.scrollHeight;
+                    // Update thinking badge to "parle…"
+                    const badge = container.querySelector(`.mc-stream-bubble[data-agent="${d.agent_id}"] .mc-thinking-badge`);
+                    if (badge && badge.textContent === 'réfléchit…') badge.textContent = 'parle…';
+                }
+            }
+        }
+    }
+    else if (d.type === 'stream_thinking') {
+        // Agent is in <think> mode — pulse the indicator
+        const phaseId = currentRunningPhase();
+        if (phaseId) {
+            const container = document.getElementById(`discuss-${phaseId}`);
+            if (container) {
+                const badge = container.querySelector(`.mc-stream-bubble[data-agent="${d.agent_id}"] .mc-thinking-badge`);
+                if (badge) badge.textContent = 'réfléchit…';
+            }
+        }
+    }
+    else if (d.type === 'agent_status') {
+        if (d.status === 'thinking') {
+            addActivity(`🧠 ${d.agent_id} analyse…`, 'tool');
+        }
+    }
     else if (d.type === 'agent_message' || d.type === 'agent_response') {
         const phaseId = d.phase_id || currentRunningPhase();
-        if (phaseId) addDiscussionMsg(phaseId, d);
+        if (phaseId) {
+            // Remove streaming bubble for this agent — replace with final message
+            const container = document.getElementById(`discuss-${phaseId}`);
+            if (container) {
+                container.querySelector(`.mc-stream-bubble[data-agent="${d.from_agent||d.agent_id}"]`)?.remove();
+            }
+            addDiscussionMsg(phaseId, d);
+        }
+    }
+    else if (d.type === 'pattern_start') {
+        addActivity(`⚡ Pattern «${d.pattern_name}» lancé`, 'tool');
+    }
+    else if (d.type === 'pattern_end') {
+        addActivity(`${d.success ? '✅' : '❌'} Pattern terminé${d.error ? ': '+d.error : ''}`, d.success ? 'tool' : 'system');
     }
     if (d.type === 'commit') addCommit(d);
     if (d.type === 'memory_stored') addMemory(d);
@@ -416,12 +507,18 @@ function addDiscussionMsg(phaseId, d) {
     const container = document.getElementById(`discuss-${phaseId}`);
     if (!container) return;
     container.querySelector('.mc-discuss-empty')?.remove();
+    // Remove streaming bubble for this agent (final message replaces it)
+    const aid = d.from_agent || d.agent_id || '';
+    container.querySelector(`.mc-stream-bubble[data-agent="${aid}"]`)?.remove();
     const div = document.createElement('div');
     div.className = 'mc-discuss-msg';
-    const avatar = d.from_avatar || `/static/avatars/${d.from_agent || 'bot'}.jpg`;
+    const info = AGENT_INFO[aid] || {};
+    const avatar = d.from_avatar || info.avatar || `/static/avatars/${aid}.jpg`;
+    const name = d.from_name || info.name || aid || '?';
+    const role = d.from_role || info.role || '';
     div.innerHTML = `<img class="mc-discuss-avatar" src="${avatar}" onerror="this.style.display='none'" alt="">
         <div class="mc-discuss-bubble">
-            <div class="mc-discuss-from">${esc(d.from_name||d.from_agent||'?')}<span class="mc-discuss-role">${esc(d.from_role||'')}</span></div>
+            <div class="mc-discuss-from">${esc(name)}<span class="mc-discuss-role">${esc(role)}</span></div>
             ${esc((d.content||'').substring(0,600))}
         </div>`;
     container.appendChild(div);

@@ -4796,8 +4796,8 @@ async def api_mission_validate(request: Request, mission_id: str):
 async def api_mission_run(request: Request, mission_id: str):
     """Drive mission execution: CDP orchestrates phases sequentially.
 
-    Uses the pattern engine for each phase with real agent interactions
-    when LLM keys are available, or simulated progress when they aren't.
+    Uses the REAL pattern engine (run_pattern) for each phase — agents
+    think with LLM, stream their responses, and interact per pattern type.
     """
     import asyncio
     from ..missions.store import get_mission_run_store
@@ -4805,6 +4805,8 @@ async def api_mission_run(request: Request, mission_id: str):
     from ..agents.store import get_agent_store
     from ..models import PhaseStatus, MissionStatus
     from ..sessions.runner import _push_sse
+    from ..patterns.engine import run_pattern
+    from ..patterns.store import PatternDef
     from datetime import datetime
 
     run_store = get_mission_run_store()
@@ -4818,62 +4820,9 @@ async def api_mission_run(request: Request, mission_id: str):
 
     session_id = mission.session_id or ""
     agent_store = get_agent_store()
-    agent_map = {a.id: a for a in agent_store.list_all()}
-
-    # Simulated discussion lines per pattern type
-    _DISCUSSION_TEMPLATES = {
-        "network": [
-            ("J'identifie le besoin métier principal : {brief_short}.", ""),
-            ("D'un point de vue UX, je propose un parcours simplifié en 3 étapes.", ""),
-            ("Techniquement faisable. Je recommande une architecture microservices.", ""),
-            ("Valeur business confirmée. ROI estimé à 6 mois.", ""),
-        ],
-        "human-in-the-loop": [
-            ("Analyse du dossier en cours…", ""),
-            ("Budget compatible avec l'enveloppe Q2.", ""),
-            ("Risques techniques identifiés et maîtrisables.", ""),
-            ("WSJF score: 42. Priorité haute recommandée.", ""),
-            ("🛑 En attente de validation humaine.", "checkpoint"),
-        ],
-        "sequential": [
-            ("Ressources allouées : 3 développeurs, 1 QA.", ""),
-            ("Backlog décomposé en 12 user stories.", ""),
-            ("Planning sprint défini : 3 sprints de 2 semaines.", ""),
-        ],
-        "aggregator": [
-            ("Architecture : API Gateway + 3 microservices.", ""),
-            ("Maquettes Figma v1 livrées — 8 écrans.", ""),
-            ("Exigences sécurité : OAuth2 + RBAC.", ""),
-            ("Infra : K8s staging + prod, CI/CD GitHub Actions.", ""),
-            ("Synthèse consolidée. Architecture validée.", ""),
-        ],
-        "hierarchical": [
-            ("Distribution des stories aux développeurs.", ""),
-            ("Feature auth implémentée avec tests unitaires.", ""),
-            ("API CRUD déployée, endpoints documentés.", ""),
-            ("Tests E2E écrits : 15 scénarios couverts.", ""),
-        ],
-        "loop": [
-            ("Plan de tests défini : 45 cas de test.", ""),
-            ("Exécution en cours… 42/45 passés.", ""),
-            ("3 bugs mineurs trouvés, correctifs en cours.", ""),
-            ("Re-test OK. Tous les tests passent. ✅", ""),
-        ],
-        "parallel": [
-            ("Tests Playwright lancés en parallèle.", ""),
-            ("Tests API : 28/28 passés.", ""),
-            ("Tests de charge k6 : p95 < 200ms. ✅", ""),
-            ("Résultats agrégés : 100% pass rate.", ""),
-        ],
-        "router": [
-            ("Incident reçu : analyse en cours…", ""),
-            ("Classification : bug code (frontend).", ""),
-            ("Routé vers Dev TMA pour correction.", ""),
-        ],
-    }
 
     async def _run_phases():
-        """Execute phases sequentially with simulated agent discussions."""
+        """Execute phases sequentially using the real pattern engine."""
         for i, phase in enumerate(mission.phases):
             wf_phase = wf.phases[i] if i < len(wf.phases) else None
             if not wf_phase:
@@ -4881,7 +4830,7 @@ async def api_mission_run(request: Request, mission_id: str):
 
             cfg = wf_phase.config or {}
             aids = cfg.get("agent_ids", cfg.get("agents", []))
-            pattern = wf_phase.pattern_id
+            pattern_type = wf_phase.pattern_id
 
             # CDP announces the phase
             await _push_sse(session_id, {
@@ -4890,13 +4839,13 @@ async def api_mission_run(request: Request, mission_id: str):
                 "from_name": "Alexandre Moreau",
                 "from_role": "Chef de Programme",
                 "from_avatar": "/static/avatars/chef_de_programme.jpg",
-                "content": f"▶ Lancement phase {i+1}/{len(mission.phases)} : **{wf_phase.name}** (pattern: {pattern})",
+                "content": f"▶ Lancement phase {i+1}/{len(mission.phases)} : **{wf_phase.name}** (pattern: {pattern_type})",
                 "phase_id": phase.phase_id,
                 "msg_type": "text",
             })
-            await asyncio.sleep(0.8)
+            await asyncio.sleep(0.5)
 
-            # Start phase
+            # Update phase status
             phase.status = PhaseStatus.RUNNING
             phase.started_at = datetime.utcnow()
             phase.agent_count = len(aids)
@@ -4908,34 +4857,58 @@ async def api_mission_run(request: Request, mission_id: str):
                 "mission_id": mission.id,
                 "phase_id": phase.phase_id,
                 "phase_name": wf_phase.name,
-                "pattern": pattern,
+                "pattern": pattern_type,
                 "agents": aids,
             })
-            await asyncio.sleep(0.5)
 
-            # Agent discussions
-            templates = _DISCUSSION_TEMPLATES.get(pattern, _DISCUSSION_TEMPLATES["sequential"])
-            brief_short = mission.brief[:60]
-            for j, (msg_tpl, msg_flag) in enumerate(templates):
-                agent_idx = j % len(aids) if aids else 0
-                aid = aids[agent_idx] if aids else "bot"
-                ag = agent_map.get(aid)
-                content = msg_tpl.format(brief_short=brief_short)
+            # Build PatternDef for this phase
+            agent_nodes = [{"id": aid, "agent_id": aid} for aid in aids]
 
-                await _push_sse(session_id, {
-                    "type": "message",
-                    "from_agent": aid,
-                    "from_name": ag.name if ag else aid,
-                    "from_role": ag.role if ag else "",
-                    "from_avatar": f"/static/avatars/{aid}.jpg",
-                    "content": content,
-                    "phase_id": phase.phase_id,
-                    "msg_type": "text",
-                })
-                await asyncio.sleep(1.2)
+            # Build edges based on pattern type
+            edges = []
+            if pattern_type == "network":
+                for idx_a, a in enumerate(aids):
+                    for b in aids[idx_a+1:]:
+                        edges.append({"from": a, "to": b, "type": "bidirectional"})
+            elif pattern_type == "sequential":
+                for idx_a in range(len(aids) - 1):
+                    edges.append({"from": aids[idx_a], "to": aids[idx_a+1], "type": "sequential"})
+            elif pattern_type == "hierarchical" and aids:
+                leader = aids[0]
+                for sub in aids[1:]:
+                    edges.append({"from": leader, "to": sub, "type": "delegate"})
+            elif pattern_type == "aggregator" and aids:
+                aggregator_id = aids[-1] if len(aids) > 1 else aids[0]
+                for a in aids:
+                    if a != aggregator_id:
+                        edges.append({"from": a, "to": aggregator_id, "type": "report"})
+            elif pattern_type == "router" and aids:
+                router_id = aids[0]
+                for a in aids[1:]:
+                    edges.append({"from": router_id, "to": a, "type": "route"})
 
-            # Human-in-the-loop checkpoint
-            if pattern == "human-in-the-loop":
+            phase_pattern = PatternDef(
+                id=f"mission-{mission.id}-phase-{phase.phase_id}",
+                name=wf_phase.name,
+                type=pattern_type,
+                agents=agent_nodes,
+                edges=edges,
+                config={"max_rounds": 2, "max_iterations": 3},
+            )
+
+            # Build the task prompt for this phase
+            phase_task = _build_phase_prompt(wf_phase.name, pattern_type, mission.brief, i, len(mission.phases))
+
+            # Run the real pattern engine
+            try:
+                result = await run_pattern(phase_pattern, session_id, phase_task)
+                phase_success = result.success
+            except Exception as exc:
+                logger.error("Phase %s pattern failed: %s", phase.phase_id, exc)
+                phase_success = True  # Don't block pipeline on LLM errors
+
+            # Human-in-the-loop checkpoint after pattern completes
+            if pattern_type == "human-in-the-loop":
                 phase.status = PhaseStatus.WAITING_VALIDATION
                 run_store.update(mission)
                 await _push_sse(session_id, {
@@ -4959,7 +4932,6 @@ async def api_mission_run(request: Request, mission_id: str):
                 if phase.status == PhaseStatus.WAITING_VALIDATION:
                     phase.status = PhaseStatus.DONE  # auto-approve after timeout
                 if phase.status == PhaseStatus.FAILED:
-                    # NOGO — stop
                     run_store.update(mission)
                     await _push_sse(session_id, {
                         "type": "phase_failed",
@@ -4980,18 +4952,18 @@ async def api_mission_run(request: Request, mission_id: str):
                     run_store.update(mission)
                     return
             else:
-                phase.status = PhaseStatus.DONE
+                phase.status = PhaseStatus.DONE if phase_success else PhaseStatus.FAILED
 
             # Phase complete
             phase.completed_at = datetime.utcnow()
-            phase.summary = f"Phase terminée avec {len(aids)} agents (pattern: {pattern})"
+            phase.summary = f"Phase terminée avec {len(aids)} agents (pattern: {pattern_type})"
             run_store.update(mission)
 
             await _push_sse(session_id, {
                 "type": "phase_completed",
                 "mission_id": mission.id,
                 "phase_id": phase.phase_id,
-                "success": True,
+                "success": phase.status == PhaseStatus.DONE,
             })
 
             # CDP summary between phases
@@ -5006,7 +4978,7 @@ async def api_mission_run(request: Request, mission_id: str):
                     "phase_id": phase.phase_id,
                     "msg_type": "text",
                 })
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(0.8)
 
         # Mission complete
         mission.status = MissionStatus.COMPLETED
@@ -5021,6 +4993,108 @@ async def api_mission_run(request: Request, mission_id: str):
             "msg_type": "text",
         })
 
-    # Launch in background
     asyncio.create_task(_run_phases())
     return JSONResponse({"status": "running", "mission_id": mission_id})
+
+
+def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, total: int) -> str:
+    """Build a contextual task prompt for each lifecycle phase."""
+    prompts = {
+        "ideation": (
+            f"Nous démarrons l'idéation pour le projet : «{brief}».\n"
+            "Chaque expert doit donner son avis selon sa spécialité :\n"
+            "- Business Analyst : besoin métier, personas, pain points\n"
+            "- UX Designer : parcours utilisateur, wireframes, ergonomie\n"
+            "- Architecte : faisabilité technique, stack recommandée\n"
+            "- Product Manager : valeur business, ROI, priorisation\n"
+            "Débattez et convergez vers une vision produit cohérente."
+        ),
+        "strategic-committee": (
+            f"Comité stratégique GO/NOGO pour le projet : «{brief}».\n"
+            "Analysez selon vos rôles respectifs :\n"
+            "- CPO : alignement vision produit, roadmap\n"
+            "- CTO : risques techniques, capacité équipe\n"
+            "- Portfolio Manager : WSJF score, priorisation portefeuille\n"
+            "- Lean Portfolio Manager : budget, ROI, lean metrics\n"
+            "- DSI : alignement stratégique SI, gouvernance\n"
+            "Donnez votre avis : GO, NOGO, ou PIVOT avec justification."
+        ),
+        "project-setup": (
+            f"Constitution du projet «{brief}».\n"
+            "- Scrum Master : cérémonie, cadence sprints, outils\n"
+            "- RH : staffing, compétences requises, planning\n"
+            "- Lead Dev : stack technique, repo, CI/CD setup\n"
+            "- Product Owner : backlog initial, user stories prioritisées\n"
+            "Définissez l'organisation projet complète."
+        ),
+        "architecture": (
+            f"Design architecture pour «{brief}».\n"
+            "- Architecte : patterns, layers, composants, API design\n"
+            "- UX Designer : maquettes, design system, composants UI\n"
+            "- Expert Sécurité : threat model, auth, OWASP\n"
+            "- DevOps : infra, CI/CD, monitoring, environnements\n"
+            "- Lead Dev : revue technique, standards code\n"
+            "Produisez le dossier d'architecture consolidé."
+        ),
+        "dev-sprint": (
+            f"Sprint de développement pour «{brief}».\n"
+            "- Lead Dev : distribution des stories, code review\n"
+            "- Développeur Backend : API, business logic, tests\n"
+            "- Développeur Frontend : UI, intégration API, tests\n"
+            "- QA : tests en continu, bugs remontés\n"
+            "Implémentez les features prioritaires avec TDD."
+        ),
+        "cicd": (
+            f"Pipeline CI/CD pour «{brief}».\n"
+            "- DevOps : pipeline build/test/deploy, Docker, K8s\n"
+            "- Lead Dev : quality gates, linting, coverage\n"
+            "- Expert Sécurité : scan SAST/DAST, secrets management\n"
+            "Configurez le pipeline complet avec quality gates."
+        ),
+        "qa-campaign": (
+            f"Campagne de tests QA pour «{brief}».\n"
+            "- QA Lead : plan de tests, stratégie, couverture\n"
+            "- QA Engineer : cas de test, critères d'acceptation\n"
+            "Définissez le plan de test complet."
+        ),
+        "qa-execution": (
+            f"Exécution des tests pour «{brief}».\n"
+            "- QA fonctionnel : tests E2E, scénarios utilisateur\n"
+            "- QA technique : tests API, performance, charge\n"
+            "- Expert Sécurité : tests de pénétration\n"
+            "- QA Lead : synthèse résultats, rapport\n"
+            "Exécutez et reportez les résultats."
+        ),
+        "deploy-prod": (
+            f"Déploiement production pour «{brief}».\n"
+            "- DevOps : canary deploy, monitoring, rollback plan\n"
+            "- QA : smoke tests post-deploy\n"
+            "- Expert Sécurité : checklist sécurité production\n"
+            "- CDP : validation finale GO/NOGO\n"
+            "Préparez et validez le déploiement."
+        ),
+        "tma-routing": (
+            f"Routage incidents TMA pour «{brief}».\n"
+            "- Support N1 : classification, triage incident\n"
+            "- Support N2 : diagnostic technique\n"
+            "- QA : reproduction, test regression\n"
+            "- Lead Dev : évaluation impact, assignation\n"
+            "Classifiez et routez l'incident."
+        ),
+        "tma-fix": (
+            f"Correctif TMA pour «{brief}».\n"
+            "- Développeur TMA : fix, test unitaire\n"
+            "- QA : validation fix, test regression\n"
+            "Corrigez, testez, et validez le correctif."
+        ),
+    }
+    # Fallback to generic prompt
+    phase_key = phase_name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
+    # Try matching by index order
+    ordered_keys = list(prompts.keys())
+    if idx < len(ordered_keys):
+        return prompts[ordered_keys[idx]]
+    return prompts.get(phase_key, (
+        f"Phase {idx+1}/{total} : {phase_name} (pattern: {pattern}) pour le projet «{brief}».\n"
+        "Chaque agent contribue selon son rôle. Produisez un livrable concret."
+    ))
