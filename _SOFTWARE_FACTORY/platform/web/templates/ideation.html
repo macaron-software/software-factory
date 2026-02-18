@@ -755,6 +755,7 @@ async function sendIdea() {
         let currentStreamAgent = null;
         let streamBuffer = '';
         let currentPatternType = '';
+        let msgCounter = 0;  // unique ID per bubble (agents can speak multiple times)
 
         es.onmessage = function(event) {
             const evt = JSON.parse(event.data);
@@ -765,19 +766,22 @@ async function sendIdea() {
                 setAgentStatus(evt.agent_id, status);
             }
             else if (evt.type === 'stream_start') {
+                const bubbleId = `stream-${evt.agent_id}-${++msgCounter}`;
                 currentStreamAgent = evt.agent_id;
-                streamBuffer = '';
                 currentPatternType = evt.pattern_type || '';
+                // Track per-agent buffer for parallel streams
+                if (!window._streamBuffers) window._streamBuffers = {};
+                window._streamBuffers[evt.agent_id] = '';
+                window._streamBubbles = window._streamBubbles || {};
+                window._streamBubbles[evt.agent_id] = bubbleId;
                 setAgentStatus(evt.agent_id, 'speaking');
-                // Light up edges from this agent
                 igEdges.filter(e => e.from === evt.agent_id).forEach(e => setEdgeActive(e.from, e.to, true));
-                // Create a streaming bubble
                 const agentName = evt.agent_name || ROLES[evt.agent_id] || evt.agent_id;
                 const color = COLORS[evt.agent_id] || '#8b949e';
                 const agent = igAgent(evt.agent_id);
                 const div = document.createElement('div');
                 div.className = 'mu mu--chat mu--agent';
-                div.id = `stream-${evt.agent_id}`;
+                div.id = bubbleId;
                 const icon = agent?.avatar_url
                     ? `<img src="${agent.avatar_url}" alt="${agentName}">`
                     : `<svg class="icon icon-sm" style="color:${color}"><use href="#icon-bot"/></svg>`;
@@ -789,7 +793,7 @@ async function sendIdea() {
                             <span class="mu__role">${ROLES[evt.agent_id] || ''}</span>
                         </div>
                         ${metaTags(evt)}
-                        <div class="mu__content md-rendered" id="stream-content-${evt.agent_id}">
+                        <div class="mu__content md-rendered" id="content-${bubbleId}">
                             <span class="typing-indicator"><span></span><span></span><span></span></span>
                         </div>
                     </div>`;
@@ -797,16 +801,21 @@ async function sendIdea() {
                 messagesEl.scrollTop = messagesEl.scrollHeight;
             }
             else if (evt.type === 'stream_delta' && evt.agent_id) {
-                streamBuffer += evt.delta;
-                let el = document.getElementById(`stream-content-${evt.agent_id}`);
+                if (!window._streamBuffers) window._streamBuffers = {};
+                window._streamBuffers[evt.agent_id] = (window._streamBuffers[evt.agent_id] || '') + evt.delta;
+                const bubbleId = (window._streamBubbles || {})[evt.agent_id];
+                let el = bubbleId ? document.getElementById(`content-${bubbleId}`) : null;
                 if (!el) {
                     // stream_start was missed — create container now
+                    const fallbackId = `stream-${evt.agent_id}-${++msgCounter}`;
+                    window._streamBubbles = window._streamBubbles || {};
+                    window._streamBubbles[evt.agent_id] = fallbackId;
                     const agentName = ROLES[evt.agent_id] || evt.agent_id;
                     const color = COLORS[evt.agent_id] || '#8b949e';
                     const agent = igAgent(evt.agent_id);
                     const div = document.createElement('div');
                     div.className = 'mu mu--chat mu--agent';
-                    div.id = `stream-${evt.agent_id}`;
+                    div.id = fallbackId;
                     const icon = agent?.avatar_url
                         ? `<img src="${agent.avatar_url}" alt="${agentName}">`
                         : `<svg class="icon icon-sm" style="color:${color}"><use href="#icon-bot"/></svg>`;
@@ -818,55 +827,31 @@ async function sendIdea() {
                                 <span class="mu__role">${ROLES[evt.agent_id] || ''}</span>
                             </div>
                             ${metaTags(evt)}
-                            <div class="mu__content md-rendered" id="stream-content-${evt.agent_id}"></div>
+                            <div class="mu__content md-rendered" id="content-${fallbackId}"></div>
                         </div>`;
                     messagesEl.appendChild(div);
-                    el = div.querySelector(`#stream-content-${evt.agent_id}`);
+                    el = div.querySelector(`#content-${fallbackId}`);
                 }
                 if (el) {
-                    el.innerHTML = md(streamBuffer);
+                    el.innerHTML = md(window._streamBuffers[evt.agent_id]);
                     messagesEl.scrollTop = messagesEl.scrollHeight;
                 }
             }
             else if (evt.type === 'stream_end' && evt.agent_id) {
-                // Turn off edges
                 igEdges.filter(e => e.from === evt.agent_id).forEach(e => setEdgeActive(e.from, e.to, false));
                 setAgentStatus(evt.agent_id, 'idle');
-                // Finalize content
-                const el = document.getElementById(`stream-content-${evt.agent_id}`);
+                const bubbleId = (window._streamBubbles || {})[evt.agent_id];
+                const el = bubbleId ? document.getElementById(`content-${bubbleId}`) : null;
                 if (el && evt.content) {
                     el.innerHTML = md(evt.content);
                 }
-                currentStreamAgent = null;
-                streamBuffer = '';
+                if (window._streamBuffers) delete window._streamBuffers[evt.agent_id];
+                if (window._streamBubbles) delete window._streamBubbles[evt.agent_id];
             }
-            // Handle complete message events (fallback if streaming missed)
+            // message events are handled by stream_start/delta/end above
+            // Only create bubble for non-streamed messages (errors, system)
             else if (evt.type === 'message' && evt.from_agent && evt.from_agent !== 'user' && evt.from_agent !== 'system') {
-                const aid = evt.from_agent;
-                if (!document.getElementById(`stream-${aid}`)) {
-                    const agentName = ROLES[aid] || aid;
-                    const color = COLORS[aid] || '#8b949e';
-                    const agent = igAgent(aid);
-                    const div = document.createElement('div');
-                    div.className = 'mu mu--chat mu--agent';
-                    div.id = `stream-${aid}`;
-                    const icon = agent?.avatar_url
-                        ? `<img src="${agent.avatar_url}" alt="${agentName}">`
-                        : `<svg class="icon icon-sm" style="color:${color}"><use href="#icon-bot"/></svg>`;
-                    const rendered = md(evt.content || '');
-                    div.innerHTML = `
-                        <div class="mu__avatar" style="background:${color}20;border-color:${color}">${icon}</div>
-                        <div class="mu__bubble mu__bubble--agent">
-                            <div class="mu__sender">
-                                <span class="mu__name" style="color:${color}">${agentName}</span>
-                                <span class="mu__role">${ROLES[aid] || ''}</span>
-                            </div>
-                            ${metaTags(evt)}
-                            <div class="mu__content md-rendered">${rendered}</div>
-                        </div>`;
-                    messagesEl.appendChild(div);
-                    messagesEl.scrollTop = messagesEl.scrollHeight;
-                }
+                // noop — streaming already rendered this
             }
             else if (evt.type === 'pattern_end') {
                 es.close();

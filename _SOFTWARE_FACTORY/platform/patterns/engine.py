@@ -949,32 +949,36 @@ async def _run_network(run: PatternRun, task: str):
         run.nodes[judge_id].status = NodeStatus.PENDING
 
     # ── Step 2: Debate rounds (network) ──
-    # Experts discuss, react to each other, build on the brief
+    # Experts discuss IN PARALLEL — like a real meeting
     prev_round = leader_brief
     for rnd in range(max_rounds):
         run.iteration = rnd + 1
-        run.flow_step = f"Analyse" if rnd == 0 else f"Débat round {rnd + 1}"
-        round_outputs = []
-        for did in debaters:
+        run.flow_step = "Analyse" if rnd == 0 else f"Débat round {rnd + 1}"
+
+        if rnd == 0:
+            prompt_tpl = (
+                "Ton responsable a briefé l'équipe (ci-dessous). "
+                "Réponds à ce qui te concerne, pose des questions aux collègues (@mention), "
+                "et donne ton analyse d'expert.\n\n"
+                f"Sujet : {task}"
+            )
+        else:
+            prompt_tpl = (
+                "Poursuis la discussion. Réagis aux points soulevés par tes collègues, "
+                "réponds à leurs questions, challenge leurs propositions.\n\n"
+                f"Sujet : {task}\n\n[Échanges précédents]:\n{prev_round}"
+            )
+
+        # All debaters respond in parallel (like a real meeting)
+        async def _run_debater(did, prompt, context):
             peers = [d for d in debaters if d != did]
             to = _node_agent_id(run, peers[0]) if len(peers) == 1 else "all"
-            if rnd == 0:
-                prompt = (
-                    f"Ton responsable a briefé l'équipe (ci-dessous). "
-                    f"Réponds à ce qui te concerne, pose des questions aux collègues (@mention), "
-                    f"et donne ton analyse d'expert.\n\n"
-                    f"Sujet : {task}"
-                )
-            else:
-                prompt = (
-                    f"Poursuis la discussion. Réagis aux points soulevés par tes collègues, "
-                    f"réponds à leurs questions, challenge leurs propositions.\n\n"
-                    f"Sujet : {task}\n\n[Échanges précédents]:\n{prev_round}"
-                )
-            output = await _execute_node(
-                run, did, prompt, context_from=prev_round, to_agent_id=to,
-            )
-            round_outputs.append(f"[{did}]: {output}")
+            output = await _execute_node(run, did, prompt, context_from=context, to_agent_id=to)
+            return f"[{did}]: {output}"
+
+        tasks = [_run_debater(did, prompt_tpl, prev_round) for did in debaters]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        round_outputs = [r if isinstance(r, str) else f"[error]: {r}" for r in results]
         prev_round = "\n\n".join(round_outputs)
 
     # ── Step 3: Judge synthesis ──
