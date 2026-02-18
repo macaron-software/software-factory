@@ -4648,7 +4648,7 @@ async def mission_control_page(request: Request, mission_id: str):
     mission = run_store.get(mission_id)
     if not mission:
         return RedirectResponse("/mission-control", status_code=302)
-    agents = get_agent_store().list()
+    agents = get_agent_store().list_all()
     agent_map = _agent_map_for_template(agents)
 
     return _templates(request).TemplateResponse("mission_control.html", {
