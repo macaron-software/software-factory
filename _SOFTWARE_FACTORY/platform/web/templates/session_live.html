@@ -702,18 +702,27 @@ function appendThread(data){
   const div = document.createElement('div');
   div.className = 'mu mu--thread';
   div.style.borderLeftColor = borderColors[mtype] || 'transparent';
+  const avatarInner = agent && agent.avatar_url
+    ? `<img src="${agent.avatar_url}" alt="${esc(name)}" class="mu__photo">`
+    : `<svg class="icon icon-sm" style="color:${color}"><use href="#icon-${icon}"/></svg>`;
   const avatarHtml = isUser
     ? `<div class="mu__avatar mu__avatar--user">You</div>`
-    : `<div class="mu__avatar" style="background:${color}20;border-color:${color}"><svg class="icon icon-sm" style="color:${color}"><use href="#icon-${icon}"/></svg></div>`;
+    : `<div class="mu__avatar" style="background:${color}20;border-color:${color}">${avatarInner}</div>`;
   const badgeHtml = !['response','inform',''].includes(mtype) ? `<span class="mu__badge" style="${badgeStyles[mtype]||''}">${esc(mtype.toUpperCase())}</span>` : '';
   const roleHtml = agent && agent.role ? `<span class="mu__role">${esc(agent.role)}</span>` : '';
-  const targetHtml = data.to_agent && !['user','session',''].includes(data.to_agent) ? `<span class="mu__arrow">→</span><span class="mu__target" style="color:${target?target.color:'#6e6e6e'}">${esc(targetName)}</span>` : '';
+  const patternHtml = data.pattern_type ? `<span class="mu__pattern">(${esc(data.pattern_type)})</span>` : '';
+  let targetHtml = '';
+  if (data.to_agent && !['user','session',''].includes(data.to_agent)) {
+    const tPhoto = target && target.avatar_url ? `<img src="${target.avatar_url}" alt="${esc(targetName)}" class="mu__target-photo">` : '';
+    const tRole = target && target.role ? `<span class="mu__target-role">${esc(target.role)}</span>` : '';
+    targetHtml = `<span class="mu__arrow">→</span>${tPhoto}<span class="mu__target" style="color:${target?target.color:'#6e6e6e'}">${esc(targetName)}</span>${tRole}`;
+  }
   div.innerHTML = `
     ${avatarHtml}
     <div class="mu__body">
       <div class="mu__meta">
         <span class="mu__name" style="color:${isUser?'var(--green)':color}">${esc(name)}</span>
-        ${roleHtml}${badgeHtml}${targetHtml}
+        ${roleHtml}${badgeHtml}${patternHtml}${targetHtml}
         <span class="mu__time mu__time--right">now</span>
       </div>
       <div class="mu__content md-rendered">${md(data.content)}</div>

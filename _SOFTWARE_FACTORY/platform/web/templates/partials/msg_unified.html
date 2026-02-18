@@ -30,6 +30,7 @@
 {% set to_color = to_ag.get('color', '#6e6e6e') %}
 {% set to_role = to_ag.get('role', '') %}
 {% set to_avatar_url = to_ag.get('avatar_url', '') %}
+{% set pattern_type = meta.get('pattern_type', '') %}
 
 {# Border color by message type #}
 {% set type_border = {
@@ -82,11 +83,15 @@
       {% if mtype not in ('response', 'inform', '') %}
       <span class="mu__badge" style="{{ badge_colors.get(mtype, '') }}">{{ mtype | upper }}</span>
       {% endif %}
+      {% if pattern_type %}<span class="mu__pattern">({{ pattern_type }})</span>{% endif %}
       {% if to_id and to_id not in ('user', 'session', '', 'All') %}
       <span class="mu__arrow">→</span>
       {% if to_avatar_url %}<img src="{{ to_avatar_url }}" alt="{{ to_name }}" class="mu__target-photo">{% endif %}
       <span class="mu__target" style="color:{{ to_color }}">{{ to_name }}</span>
       {% if to_role %}<span class="mu__target-role">{{ to_role }}</span>{% endif %}
+      {% elif to_id == 'All' or (to_id and to_id in ('all',)) %}
+      <span class="mu__arrow">→</span>
+      <span class="mu__target" style="color:var(--text-secondary)">All</span>
       {% endif %}
     </div>
     {% endif %}
@@ -125,11 +130,15 @@
       {% if mtype not in ('response', 'inform', '') %}
       <span class="mu__badge mu__badge--sm" style="{{ badge_colors.get(mtype, '') }}">{{ mtype | upper }}</span>
       {% endif %}
+      {% if pattern_type %}<span class="mu__pattern mu__pattern--sm">({{ pattern_type }})</span>{% endif %}
       {% if to_id and to_id not in ('user', 'session', '', 'All') %}
       <span class="mu__arrow">→</span>
       {% if to_avatar_url %}<img src="{{ to_avatar_url }}" alt="{{ to_name }}" class="mu__target-photo mu__target-photo--sm">{% endif %}
       <span class="mu__target mu__target--sm" style="color:{{ to_color }}">{{ to_name }}</span>
       {% if to_role %}<span class="mu__target-role mu__target-role--sm">{{ to_role }}</span>{% endif %}
+      {% elif to_id == 'All' or (to_id and to_id in ('all',)) %}
+      <span class="mu__arrow">→</span>
+      <span class="mu__target mu__target--sm" style="color:var(--text-secondary)">All</span>
       {% endif %}
       <span class="mu__time mu__time--right">{{ ts[11:16] if ts|length > 16 else ts }}</span>
     </div>
@@ -160,11 +169,15 @@
       {% if mtype not in ('response', 'inform', '') %}
       <span class="mu__badge" style="{{ badge_colors.get(mtype, '') }}">{{ mtype | upper }}</span>
       {% endif %}
+      {% if pattern_type %}<span class="mu__pattern">({{ pattern_type }})</span>{% endif %}
       {% if to_id and to_id not in ('user', 'session', '', 'All') %}
       <span class="mu__arrow">→</span>
       {% if to_avatar_url %}<img src="{{ to_avatar_url }}" alt="{{ to_name }}" class="mu__target-photo">{% endif %}
       <span class="mu__target" style="color:{{ to_color }}">{{ to_name }}</span>
       {% if to_role %}<span class="mu__target-role">{{ to_role }}</span>{% endif %}
+      {% elif to_id == 'All' or (to_id and to_id in ('all',)) %}
+      <span class="mu__arrow">→</span>
+      <span class="mu__target" style="color:var(--text-secondary)">All</span>
       {% endif %}
       <span class="mu__time mu__time--right">{{ ts[11:16] if ts|length > 16 else ts }}</span>
     </div>

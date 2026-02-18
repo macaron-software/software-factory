@@ -183,6 +183,9 @@
 .mu__target-photo{width:18px;height:18px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:-2px}
 .mu__target-photo--sm{width:14px;height:14px}
 .mu__target-role{font-size:.6rem;color:var(--text-secondary);font-style:italic;opacity:.6}
+.mu__target-role--sm{font-size:.55rem}
+.mu__pattern{font-size:.6rem;color:var(--purple, #7c3aed);opacity:.7;font-style:italic}
+.mu__pattern--sm{font-size:.55rem}
 
 /* ── Badge ── */
 .mu__badge{display:inline-block;padding:.1rem .4rem;border-radius:4px;font-size:.6rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;background:var(--bg-tertiary);color:var(--text-secondary)}

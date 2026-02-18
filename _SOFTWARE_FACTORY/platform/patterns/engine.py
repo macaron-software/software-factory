@@ -56,6 +56,7 @@ class PatternRun:
     finished: bool = False
     success: bool = False
     error: str = ""
+    flow_step: str = ""
 
 
 # SSE push (import from runner to share the same queues)
@@ -321,6 +322,10 @@ async def _execute_node(
         "agent_id": agent.id,
         "agent_name": agent.name,
         "node_id": node_id,
+        "pattern_type": run.pattern.type,
+        "to_agent": to_agent_id or "all",
+        "iteration": run.iteration,
+        "flow_step": run.flow_step,
     })
 
     import re as _re
@@ -433,6 +438,7 @@ async def _execute_node(
         "agent_id": agent.id,
         "content": content,
         "message_type": msg_type,
+        "to_agent": to_agent_id or "all",
     })
 
     await _push_sse(run.session_id, {
@@ -441,6 +447,7 @@ async def _execute_node(
         "to_agent": to_agent_id or "all",
         "content": content,
         "message_type": msg_type,
+        "pattern_type": run.pattern.type,
         "node_id": node_id,
         "edits": edit_count,
         "reads": read_count,
