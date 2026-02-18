@@ -158,27 +158,60 @@ class OrgStore:
     # ── Full tree ────────────────────────────────────────────────
 
     def get_org_tree(self) -> list[dict]:
-        """Return full org tree: portfolios → arts → teams with agents."""
+        """Return full org tree: portfolios → arts → teams with agents (enriched)."""
+        # Pre-load all agents for enrichment
+        agents_map: dict[str, dict] = {}
+        db = get_db()
+        try:
+            for r in db.execute("SELECT id, name, role, avatar, tagline, icon, color FROM agents").fetchall():
+                agents_map[r["id"]] = dict(r)
+        finally:
+            db.close()
+
+        def _agent_display(agent_id: str) -> str:
+            a = agents_map.get(agent_id)
+            return a["name"] if a else agent_id
+
         tree = []
         for portfolio in self.list_portfolios():
             p_node = {
                 "type": "portfolio", "id": portfolio.id, "name": portfolio.name,
-                "lead": portfolio.lead_agent_id, "budget": portfolio.budget_allocated,
+                "lead": _agent_display(portfolio.lead_agent_id),
+                "lead_agent": agents_map.get(portfolio.lead_agent_id, {}),
+                "budget": portfolio.budget_allocated,
                 "budget_consumed": portfolio.budget_consumed,
                 "children": [],
             }
             for art in self.list_arts(portfolio.id):
+                lead_info = agents_map.get(art.lead_agent_id, {})
                 a_node = {
                     "type": "art", "id": art.id, "name": art.name,
-                    "lead": art.lead_agent_id, "pi_cadence": art.pi_cadence_weeks,
+                    "lead": _agent_display(art.lead_agent_id),
+                    "lead_agent": lead_info,
+                    "pi_cadence": art.pi_cadence_weeks,
                     "children": [],
                 }
                 for team in self.list_teams(art.id):
+                    # Enrich each member with full agent data
+                    enriched = []
+                    for m in team.members:
+                        aid = m.get("agent_id", "")
+                        agent = agents_map.get(aid, {})
+                        enriched.append({
+                            "agent_id": aid,
+                            "role": m.get("role", "member"),
+                            "name": agent.get("name", m.get("name", aid)),
+                            "avatar": agent.get("avatar", ""),
+                            "tagline": agent.get("tagline", ""),
+                            "color": agent.get("color", ""),
+                            "icon": agent.get("icon", ""),
+                        })
+                    sm = agents_map.get(team.scrum_master_id, {})
                     t_node = {
                         "type": "team", "id": team.id, "name": team.name,
-                        "scrum_master": team.scrum_master_id,
+                        "scrum_master": sm.get("name", team.scrum_master_id),
                         "capacity": team.capacity, "wip_limit": team.wip_limit,
-                        "members": team.members,
+                        "members": enriched,
                     }
                     a_node["children"].append(t_node)
                 p_node["children"].append(a_node)
@@ -227,61 +260,72 @@ class OrgStore:
             pi_cadence_weeks=10,
         ))
 
-        # Teams
+        # Teams — using real agent IDs matching skills/definitions/*.yaml
         platform_teams = [
             Team(id="team-factory", name="Team Factory", art_id="art-platform",
                  description="Software Factory self-improvement", scrum_master_id="scrum_master",
                  members=[
-                     {"agent_id": "lead-dev", "role": "lead"},
-                     {"agent_id": "dev-senior-1", "role": "senior"},
-                     {"agent_id": "dev-backend", "role": "member"},
-                     {"agent_id": "qa-lead", "role": "qa"},
+                     {"agent_id": "lead_dev", "role": "lead"},
+                     {"agent_id": "dev_backend", "role": "backend"},
+                     {"agent_id": "dev_fullstack", "role": "fullstack"},
+                     {"agent_id": "qa_lead", "role": "qa"},
+                     {"agent_id": "sre", "role": "sre"},
                  ]),
             Team(id="team-platform", name="Team Platform", art_id="art-platform",
                  description="Macaron Agent Platform development", scrum_master_id="scrum_master",
                  members=[
-                     {"agent_id": "lead-dev", "role": "lead"},
-                     {"agent_id": "dev-fullstack", "role": "member"},
-                     {"agent_id": "dev-frontend", "role": "member"},
+                     {"agent_id": "lead_dev", "role": "lead"},
+                     {"agent_id": "dev_fullstack", "role": "fullstack"},
+                     {"agent_id": "dev_frontend", "role": "frontend"},
                      {"agent_id": "devops", "role": "devops"},
+                     {"agent_id": "testeur", "role": "qa"},
                  ]),
             Team(id="team-design", name="Team Design System", art_id="art-platform",
                  description="Solaris Design System for La Poste", scrum_master_id="scrum_master",
                  members=[
-                     {"agent_id": "ux-designer", "role": "lead"},
-                     {"agent_id": "dev-frontend", "role": "member"},
-                     {"agent_id": "accessibility", "role": "a11y"},
+                     {"agent_id": "ux_designer", "role": "lead"},
+                     {"agent_id": "dev_frontend", "role": "frontend"},
+                     {"agent_id": "accessibility_expert", "role": "a11y"},
+                     {"agent_id": "tech_writer", "role": "docs"},
                  ]),
         ]
         product_teams = [
             Team(id="team-popinz", name="Team Popinz", art_id="art-products",
-                 description="Popinz SaaS", scrum_master_id="scrum_master",
+                 description="Popinz SaaS — événementiel & ticketing", scrum_master_id="agile_coach",
                  members=[
-                     {"agent_id": "lead-dev", "role": "lead"},
-                     {"agent_id": "dev-mobile", "role": "mobile"},
-                     {"agent_id": "dev-backend", "role": "backend"},
+                     {"agent_id": "lead_dev", "role": "lead"},
+                     {"agent_id": "dev_mobile", "role": "mobile"},
+                     {"agent_id": "dev_backend", "role": "backend"},
+                     {"agent_id": "tech_lead_mobile", "role": "tech-lead"},
+                     {"agent_id": "qa_lead", "role": "qa"},
                  ]),
             Team(id="team-veligo", name="Team Veligo", art_id="art-products",
-                 description="Veligo Platform", scrum_master_id="scrum_master",
+                 description="Veligo Platform — mobilité douce", scrum_master_id="scrum_master",
                  members=[
-                     {"agent_id": "lead-dev", "role": "lead"},
-                     {"agent_id": "dev-fullstack", "role": "member"},
-                     {"agent_id": "qa-lead", "role": "qa"},
+                     {"agent_id": "lead_dev", "role": "lead"},
+                     {"agent_id": "dev_fullstack", "role": "fullstack"},
+                     {"agent_id": "dev_frontend", "role": "frontend"},
+                     {"agent_id": "qa_lead", "role": "qa"},
+                     {"agent_id": "data_analyst", "role": "data"},
                  ]),
         ]
         service_teams = [
             Team(id="team-sharelook", name="Team Sharelook", art_id="art-services",
-                 description="Sharelook & Migrations", scrum_master_id="scrum_master",
+                 description="Sharelook — formation & partage vidéo", scrum_master_id="scrum_master",
                  members=[
-                     {"agent_id": "lead-dev", "role": "lead"},
-                     {"agent_id": "dev-frontend", "role": "frontend"},
+                     {"agent_id": "lead_dev", "role": "lead"},
+                     {"agent_id": "dev_frontend", "role": "frontend"},
                      {"agent_id": "devsecops", "role": "security"},
+                     {"agent_id": "testeur", "role": "qa"},
                  ]),
             Team(id="team-services", name="Team Services", art_id="art-services",
-                 description="LPD, Logs Facteur, Fervenza IoT", scrum_master_id="scrum_master",
+                 description="LPD, Logs Facteur, Fervenza IoT", scrum_master_id="agile_coach",
                  members=[
-                     {"agent_id": "dev-backend", "role": "backend"},
+                     {"agent_id": "dev_backend", "role": "backend"},
                      {"agent_id": "devops", "role": "devops"},
+                     {"agent_id": "cloud_architect", "role": "cloud"},
+                     {"agent_id": "data_engineer", "role": "data"},
+                     {"agent_id": "dba", "role": "dba"},
                  ]),
         ]
         for t in platform_teams + product_teams + service_teams:
