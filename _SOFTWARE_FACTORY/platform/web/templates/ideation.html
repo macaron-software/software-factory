@@ -74,6 +74,12 @@
 .mu__content pre code{background:none;padding:0}
 .mu__content hr{border:none;border-top:1px solid var(--border);margin:0.6em 0}
 .mu__content strong{color:var(--text-primary)}
+/* Metadata tags (pattern, flow, recipient) */
+.mu__meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px;padding:0 2px}
+.mu__tag{font-size:0.68rem;padding:1px 7px;border-radius:10px;font-weight:500;line-height:1.4}
+.mu__tag--pattern{background:var(--purple);color:#fff;opacity:.85}
+.mu__tag--flow{background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)}
+.mu__tag--to{background:transparent;color:var(--purple-light);font-weight:600}
 .idea-agent-label{font-size:0.78rem;flex:1}
 .idea-agent-role{font-size:0.68rem;color:var(--text-secondary)}
 
@@ -705,18 +711,26 @@ async function sendIdea() {
     originalPrompt = originalPrompt || text;
 
     // Agent role map for display
-    const ROLES = {
-        product_manager: 'Product Owner',
-        metier: 'Business Analyst',
-        architecte: 'Architecte',
-        ux_designer: 'UX Designer',
-        securite: 'Expert Sécurité',
-    };
-    const COLORS = {
-        metier: '#2563eb', architecte: '#0891b2',
-        ux_designer: '#8b5cf6', securite: '#dc2626',
-        product_manager: '#16a34a',
-    };
+    // Build from DB data — no hardcoding
+    const ROLES = {}; const COLORS = {};
+    igAgents.forEach(a => { ROLES[a.id] = a.short_role || a.role || a.id; COLORS[a.id] = a.color || '#8b949e'; });
+
+    // Build metadata tags for bubble header
+    function metaTags(evt) {
+        const parts = [];
+        if (evt.pattern_type) parts.push(`<span class="mu__tag mu__tag--pattern">${evt.pattern_type}</span>`);
+        if (evt.flow_step) parts.push(`<span class="mu__tag mu__tag--flow">${evt.flow_step}</span>`);
+        if (evt.to_agent && evt.to_agent !== 'all') {
+            const names = evt.to_agent.split(',').map(id => {
+                const a = igAgents.find(x => x.id === id.trim());
+                return a ? a.name.split(' ')[0] : id;
+            });
+            parts.push(`<span class="mu__tag mu__tag--to">→ ${names.join(', ')}</span>`);
+        } else if (evt.to_agent === 'all') {
+            parts.push(`<span class="mu__tag mu__tag--to">→ Équipe</span>`);
+        }
+        return parts.length ? `<div class="mu__meta">${parts.join(' ')}</div>` : '';
+    }
 
     addPhaseHeader('Idéation en cours', 'Les agents analysent votre idée en temps réel…');
 
@@ -761,7 +775,6 @@ async function sendIdea() {
                 const agentName = evt.agent_name || ROLES[evt.agent_id] || evt.agent_id;
                 const color = COLORS[evt.agent_id] || '#8b949e';
                 const agent = igAgent(evt.agent_id);
-                const patternTag = currentPatternType ? `<span class="mu__pattern">(${currentPatternType})</span>` : '';
                 const div = document.createElement('div');
                 div.className = 'mu mu--chat mu--agent';
                 div.id = `stream-${evt.agent_id}`;
@@ -774,10 +787,8 @@ async function sendIdea() {
                         <div class="mu__sender">
                             <span class="mu__name" style="color:${color}">${agentName}</span>
                             <span class="mu__role">${ROLES[evt.agent_id] || ''}</span>
-                            ${patternTag}
-                            <span class="mu__arrow">→</span>
-                            <span class="mu__target" style="color:var(--text-secondary)">All</span>
                         </div>
+                        ${metaTags(evt)}
                         <div class="mu__content md-rendered" id="stream-content-${evt.agent_id}">
                             <span class="typing-indicator"><span></span><span></span><span></span></span>
                         </div>
@@ -793,7 +804,6 @@ async function sendIdea() {
                     const agentName = ROLES[evt.agent_id] || evt.agent_id;
                     const color = COLORS[evt.agent_id] || '#8b949e';
                     const agent = igAgent(evt.agent_id);
-                    const patternTag = currentPatternType ? `<span class="mu__pattern">(${currentPatternType})</span>` : '';
                     const div = document.createElement('div');
                     div.className = 'mu mu--chat mu--agent';
                     div.id = `stream-${evt.agent_id}`;
@@ -806,10 +816,8 @@ async function sendIdea() {
                             <div class="mu__sender">
                                 <span class="mu__name" style="color:${color}">${agentName}</span>
                                 <span class="mu__role">${ROLES[evt.agent_id] || ''}</span>
-                                ${patternTag}
-                                <span class="mu__arrow">→</span>
-                                <span class="mu__target" style="color:var(--text-secondary)">All</span>
                             </div>
+                            ${metaTags(evt)}
                             <div class="mu__content md-rendered" id="stream-content-${evt.agent_id}"></div>
                         </div>`;
                     messagesEl.appendChild(div);
@@ -839,8 +847,6 @@ async function sendIdea() {
                     const agentName = ROLES[aid] || aid;
                     const color = COLORS[aid] || '#8b949e';
                     const agent = igAgent(aid);
-                    const pType = evt.pattern_type || currentPatternType || '';
-                    const patternTag = pType ? `<span class="mu__pattern">(${pType})</span>` : '';
                     const div = document.createElement('div');
                     div.className = 'mu mu--chat mu--agent';
                     div.id = `stream-${aid}`;
@@ -854,10 +860,8 @@ async function sendIdea() {
                             <div class="mu__sender">
                                 <span class="mu__name" style="color:${color}">${agentName}</span>
                                 <span class="mu__role">${ROLES[aid] || ''}</span>
-                                ${patternTag}
-                                <span class="mu__arrow">→</span>
-                                <span class="mu__target" style="color:var(--text-secondary)">All</span>
                             </div>
+                            ${metaTags(evt)}
                             <div class="mu__content md-rendered">${rendered}</div>
                         </div>`;
                     messagesEl.appendChild(div);

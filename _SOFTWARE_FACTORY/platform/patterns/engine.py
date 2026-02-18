@@ -936,6 +936,7 @@ async def _run_network(run: PatternRun, task: str):
     team_list = ", ".join(debater_names) if debater_names else "l'équipe"
 
     if judge_id:
+        run.flow_step = "Brief"
         leader_brief = await _execute_node(
             run, judge_id,
             f"Tu diriges cette session d'analyse. Voici ton équipe : {team_list}.\n\n"
@@ -952,6 +953,7 @@ async def _run_network(run: PatternRun, task: str):
     prev_round = leader_brief
     for rnd in range(max_rounds):
         run.iteration = rnd + 1
+        run.flow_step = f"Analyse" if rnd == 0 else f"Débat round {rnd + 1}"
         round_outputs = []
         for did in debaters:
             peers = [d for d in debaters if d != did]
@@ -978,6 +980,7 @@ async def _run_network(run: PatternRun, task: str):
     # ── Step 3: Judge synthesis ──
     # PO consolidates all contributions into a decision
     if judge_id:
+        run.flow_step = "Synthèse"
         await _execute_node(
             run, judge_id,
             f"Synthétise toutes les contributions de ton équipe.\n\n"
