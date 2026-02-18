@@ -290,7 +290,7 @@ class PatternStore:
                 agents=[
                     {"id": "n1", "agent_id": "brain", "label": "Agent", "x": 100, "y": 200},
                     {"id": "n2", "agent_id": "worker", "label": "Exécuteur", "x": 300, "y": 200},
-                    {"id": "n3", "agent_id": "", "label": "Humain ✋", "x": 500, "y": 200},
+                    {"id": "n3", "agent_id": "", "label": "Humain", "x": 500, "y": 200},
                 ],
                 edges=[
                     {"from": "n1", "to": "n2", "type": "sequential"},

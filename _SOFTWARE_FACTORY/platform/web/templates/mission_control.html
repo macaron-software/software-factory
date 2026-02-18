@@ -310,7 +310,7 @@
             <div class="mc-msg system"><div class="mc-msg-content">Mission démarrée — {{ mission.brief[:200] }}</div></div>
             <div class="mc-msg tool"><div class="mc-msg-time">{{ "now" }}</div><div class="mc-msg-content">{{ mission.phases|length }} phases à orchestrer • Pattern: mega-workflow lifecycle</div></div>
             {% if mission.workspace_path %}
-            <div class="mc-msg tool"><div class="mc-msg-content">📁 Workspace: <code>{{ mission.workspace_path }}</code></div></div>
+            <div class="mc-msg tool"><div class="mc-msg-content">Workspace: <code>{{ mission.workspace_path }}</code></div></div>
             {% endif %}
         </div>
 
@@ -438,7 +438,7 @@ const MC_PATTERN_STYLES = {
     network:      {color:'#8b5cf6', dash:'2 4 8 4', icon:'⬡'},
     router:       {color:'#f97316', dash:'',        icon:'⬢'},
     aggregator:   {color:'#06b6d4', dash:'3 3',     icon:'◈'},
-    'human-in-the-loop': {color:'#eab308', dash:'6 2', icon:'👤'},
+    'human-in-the-loop': {color:'#eab308', dash:'6 2', icon:'H'},
 };
 /* Edge color → dash style mapping (multi-pattern edges) */
 const MC_EDGE_DASHES = {
@@ -632,13 +632,13 @@ function handleSSE(d) {
     }
     else if (d.type === 'phase_failed') {
         updatePhaseStatus(d.phase_id, 'failed');
-        addActivity('⛔ Phase échouée', 'system');
+        addActivity('Phase échouée', 'system');
     }
     else if (d.type === 'mission_failed') {
-        addActivity('⛔ Mission arrêtée — phase échouée', 'system');
+        addActivity('Mission arrêtée — phase échouée', 'system');
         // Disable run button, show reset
         const runBtn = document.querySelector('.mc-run-btn');
-        if (runBtn) { runBtn.disabled = true; runBtn.textContent = '⛔ Mission échouée'; }
+        if (runBtn) { runBtn.disabled = true; runBtn.textContent = 'Mission échouée'; }
     }
     else if (d.type === 'checkpoint') {
         updatePhaseStatus(d.phase_id, 'waiting_validation');
@@ -1001,11 +1001,11 @@ function showMcPopover(agentId, ev) {
         ${a.tagline ? `<div class="mc-popover-tagline">${esc(a.tagline)}</div>` : ''}
     </div>`;
     let html = '';
-    if (a.persona) html += `<div class="mc-popover-section"><div class="mc-popover-section-title">👤 Persona</div><div class="mc-popover-text">${esc(a.persona.substring(0,400))}${a.persona.length>400?'…':''}</div></div>`;
-    if (a.motivation) html += `<div class="mc-popover-section"><div class="mc-popover-section-title">⚡ Motivation</div><div class="mc-popover-text">${esc(a.motivation)}</div></div>`;
-    if (a.skills?.length) html += `<div class="mc-popover-section"><div class="mc-popover-section-title">🎯 Skills (${a.skills.length})</div><div class="mc-popover-tags">${a.skills.map(s=>`<span class="mc-popover-tag skill">${esc(s)}</span>`).join('')}</div></div>`;
-    if (a.tools?.length) html += `<div class="mc-popover-section"><div class="mc-popover-section-title">🔧 Tools (${a.tools.length})</div><div class="mc-popover-tags">${a.tools.map(t=>`<span class="mc-popover-tag tool">${esc(t)}</span>`).join('')}</div></div>`;
-    if (a.model || a.provider) html += `<div class="mc-popover-model">🧠 ${esc(a.provider||'')} ${esc(a.model||'default')}</div>`;
+    if (a.persona) html += `<div class="mc-popover-section"><div class="mc-popover-section-title">Persona</div><div class="mc-popover-text">${esc(a.persona.substring(0,400))}${a.persona.length>400?'…':''}</div></div>`;
+    if (a.motivation) html += `<div class="mc-popover-section"><div class="mc-popover-section-title">Motivation</div><div class="mc-popover-text">${esc(a.motivation)}</div></div>`;
+    if (a.skills?.length) html += `<div class="mc-popover-section"><div class="mc-popover-section-title">Skills (${a.skills.length})</div><div class="mc-popover-tags">${a.skills.map(s=>`<span class="mc-popover-tag skill">${esc(s)}</span>`).join('')}</div></div>`;
+    if (a.tools?.length) html += `<div class="mc-popover-section"><div class="mc-popover-section-title">Tools (${a.tools.length})</div><div class="mc-popover-tags">${a.tools.map(t=>`<span class="mc-popover-tag tool">${esc(t)}</span>`).join('')}</div></div>`;
+    if (a.model || a.provider) html += `<div class="mc-popover-model">${esc(a.provider||'')} ${esc(a.model||'default')}</div>`;
     document.getElementById('mcPopBody').innerHTML = html;
     // Position near click
     const x = ev ? ev.clientX : window.innerWidth/2;

@@ -5040,7 +5040,7 @@ async def api_mission_reset(request: Request, mission_id: str):
             from_agent="system",
             to_agent="all",
             message_type="system",
-            content="🔄 Mission réinitialisée — prête pour une nouvelle exécution.",
+            content="Mission réinitialisée — prête pour une nouvelle exécution.",
         ))
 
         # Notify frontend
@@ -5235,7 +5235,7 @@ async def api_mission_run(request: Request, mission_id: str):
                         "from_name": "Alexandre Moreau",
                         "from_role": "Chef de Programme",
                         "from_avatar": "/static/avatars/chef_de_programme.jpg",
-                        "content": f"🏃 Lancement {sprint_label} pour «{wf_phase.name}»",
+                        "content": f"Lancement {sprint_label} pour «{wf_phase.name}»",
                         "phase_id": phase.phase_id,
                         "msg_type": "text",
                     })
@@ -5294,7 +5294,7 @@ async def api_mission_run(request: Request, mission_id: str):
                         "from_name": "Alexandre Moreau",
                         "from_role": "Chef de Programme",
                         "from_avatar": "/static/avatars/chef_de_programme.jpg",
-                        "content": f"✅ {sprint_label} terminé. Passage au sprint suivant…",
+                        "content": f"{sprint_label} terminé. Passage au sprint suivant…",
                         "phase_id": phase.phase_id,
                         "msg_type": "text",
                     })
@@ -5336,7 +5336,7 @@ async def api_mission_run(request: Request, mission_id: str):
                         "from_name": "Alexandre Moreau",
                         "from_role": "Chef de Programme",
                         "from_avatar": "/static/avatars/chef_de_programme.jpg",
-                        "content": "⛔ Mission arrêtée — décision NOGO.",
+                        "content": "Mission arrêtée — décision NOGO.",
                         "phase_id": phase.phase_id,
                         "msg_type": "text",
                     })
@@ -5390,7 +5390,7 @@ async def api_mission_run(request: Request, mission_id: str):
                 else:
                     # Phase failed — STOP mission, don't continue blindly
                     short_err = phase_error[:200] if phase_error else "erreur inconnue"
-                    cdp_msg = f"⛔ Phase «{wf_phase.name}» échouée ({short_err}). Mission arrêtée — corrigez puis relancez via le bouton Réinitialiser."
+                    cdp_msg = f"Phase «{wf_phase.name}» échouée ({short_err}). Mission arrêtée — corrigez puis relancez via le bouton Réinitialiser."
                     await _push_sse(session_id, {
                         "type": "message",
                         "from_agent": "chef_de_programme",
@@ -5465,7 +5465,7 @@ async def _run_post_phase_hooks(
                     "from_agent": "system",
                     "from_name": "CI/CD",
                     "from_role": "Pipeline",
-                    "content": f"✅ Code commité dans le workspace ({status.stdout.strip().count(chr(10)) + 1} fichiers)",
+                    "content": f"Code commité dans le workspace ({status.stdout.strip().count(chr(10)) + 1} fichiers)",
                     "phase_id": phase_id,
                     "msg_type": "text",
                 })
@@ -5480,7 +5480,7 @@ async def _run_post_phase_hooks(
                 result = subprocess.run(
                     ["npm", "install"], cwd=workspace, capture_output=True, text=True, timeout=120
                 )
-                build_msg = "✅ npm install réussi" if result.returncode == 0 else f"❌ npm install échoué: {result.stderr[:200]}"
+                build_msg = "npm install réussi" if result.returncode == 0 else f"npm install échoué: {result.stderr[:200]}"
                 await push_sse(session_id, {
                     "type": "message",
                     "from_agent": "system",
@@ -5495,7 +5495,7 @@ async def _run_post_phase_hooks(
                     ["docker", "build", "-t", f"mission-{mission.id}", "."],
                     cwd=workspace, capture_output=True, text=True, timeout=300
                 )
-                build_msg = f"✅ Docker image mission-{mission.id} construite" if result.returncode == 0 else f"❌ Docker build échoué: {result.stderr[:200]}"
+                build_msg = f"Docker image mission-{mission.id} construite" if result.returncode == 0 else f"Docker build échoué: {result.stderr[:200]}"
                 await push_sse(session_id, {
                     "type": "message",
                     "from_agent": "system",
@@ -5517,11 +5517,11 @@ async def _run_post_phase_hooks(
             git_log = subprocess.run(
                 ["git", "log", "--oneline", "-10"], cwd=workspace, capture_output=True, text=True, timeout=10
             )
-            summary = f"📦 Workspace: {len(real_files)} fichiers\n"
+            summary = f"Workspace: {len(real_files)} fichiers\n"
             if real_files:
                 summary += "```\n" + "\n".join(str(f) for f in sorted(real_files)[:20]) + "\n```\n"
             if git_log.stdout:
-                summary += f"\n📝 Git log:\n```\n{git_log.stdout.strip()}\n```"
+                summary += f"\nGit log:\n```\n{git_log.stdout.strip()}\n```"
             await push_sse(session_id, {
                 "type": "message",
                 "from_agent": "system",

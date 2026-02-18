@@ -1218,7 +1218,7 @@ async def _run_human_in_the_loop(run: PatternRun, task: str):
                 from_agent="system",
                 to_agent="user",
                 message_type="system",
-                content=f"**🔔 CHECKPOINT HUMAIN**\n\n{checkpoint_msg}\n\n"
+                content=f"**CHECKPOINT HUMAIN**\n\n{checkpoint_msg}\n\n"
                         f"_Résumé du travail effectué :_\n{prev_output[:500]}",
             ))
             await _sse(run, {
@@ -1247,7 +1247,7 @@ async def _run_human_in_the_loop(run: PatternRun, task: str):
                 from_agent="system",
                 to_agent="user",
                 message_type="system",
-                content=f"**🔔 VALIDATION REQUISE**\n\n"
+                content=f"**VALIDATION REQUISE**\n\n"
                         f"L'agent a terminé son travail. Validez ou demandez des corrections.\n\n"
                         f"_Résultat :_\n{output[:500]}",
             ))
