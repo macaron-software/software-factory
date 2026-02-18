@@ -4654,10 +4654,17 @@ async def mission_control_page(request: Request, mission_id: str):
     agents = get_agent_store().list_all()
     agent_map = _agent_map_for_template(agents)
 
-    # Build phase→agents mapping from workflow config
+    # Build phase→agents mapping + per-phase sub-graphs from workflow config
     phase_agents = {}
+    phase_graphs = {}  # phase_id → {nodes:[], edges:[]}
     wf = get_workflow_store().get(mission.workflow_id)
     if wf:
+        # Global graph from workflow config
+        global_graph = (wf.config or {}).get("graph", {})
+        all_nodes = global_graph.get("nodes", [])
+        all_edges = global_graph.get("edges", [])
+        nid_to_agent = {n["id"]: n.get("agent_id", "") for n in all_nodes}
+
         for wp in wf.phases:
             cfg = wp.config or {}
             aids = cfg.get("agent_ids", cfg.get("agents", []))
@@ -4668,6 +4675,23 @@ async def mission_control_page(request: Request, mission_id: str):
                  "avatar": agent_map[a]["avatar_url"] if a in agent_map else ""}
                 for a in aids
             ]
+            # Extract sub-graph: nodes in this phase + edges between them
+            agent_set = set(aids)
+            p_nodes = [n for n in all_nodes if n.get("agent_id") in agent_set]
+            p_node_ids = {n["id"] for n in p_nodes}
+            p_edges = [e for e in all_edges if e["from"] in p_node_ids and e["to"] in p_node_ids]
+            # Enrich nodes with agent info
+            enriched_nodes = []
+            for n in p_nodes:
+                aid = n.get("agent_id", "")
+                am = agent_map.get(aid, {})
+                enriched_nodes.append({
+                    "id": n["id"], "agent_id": aid,
+                    "label": am.get("name", n.get("label", aid)),
+                    "role": am.get("role", ""),
+                    "avatar": am.get("avatar_url", ""),
+                })
+            phase_graphs[wp.id] = {"nodes": enriched_nodes, "edges": p_edges}
 
     # Session messages for discussions
     messages = []
@@ -4700,6 +4724,7 @@ async def mission_control_page(request: Request, mission_id: str):
         "mission": mission,
         "agent_map": agent_map,
         "phase_agents": phase_agents,
+        "phase_graphs": phase_graphs,
         "messages": messages,
         "memories": memories,
         "session_id": mission.session_id or "",

@@ -8,8 +8,8 @@
 
 {% block content %}
 <style>
-.mc-layout{display:grid;grid-template-columns:1fr 360px;gap:0;height:calc(100vh - 80px)}
-.mc-main{overflow-y:auto;padding:0 0.75rem 1rem 0}
+.mc-layout{display:grid;grid-template-columns:1fr 340px;gap:0;height:calc(100vh - 80px)}
+.mc-main{overflow-y:auto;padding:0 0.75rem 2rem 0}
 .mc-sidebar{overflow-y:auto;border-left:1px solid var(--border);background:var(--bg-secondary)}
 
 /* Stats bar */
@@ -21,17 +21,11 @@
 
 /* Timeline pipeline */
 .mc-pipeline{display:flex;flex-direction:column;gap:0;position:relative}
-
-/* Each phase = timeline row */
 .mc-phase{display:flex;align-items:stretch;gap:0;position:relative}
-
-/* Timeline line (left side) */
 .mc-phase-line{width:32px;display:flex;flex-direction:column;align-items:center;flex-shrink:0}
 .mc-phase-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border);background:var(--bg-tertiary);z-index:1;flex-shrink:0;margin-top:0.75rem}
 .mc-phase-connector{width:2px;flex:1;background:var(--border)}
 .mc-phase:last-child .mc-phase-connector{display:none}
-
-/* Status dot colors */
 .mc-phase[data-status="done"] .mc-phase-dot{background:var(--green);border-color:var(--green)}
 .mc-phase[data-status="running"] .mc-phase-dot{background:var(--purple);border-color:var(--purple);animation:pulse-dot 1.5s ease-in-out infinite}
 .mc-phase[data-status="failed"] .mc-phase-dot{background:var(--red);border-color:var(--red)}
@@ -40,14 +34,14 @@
 .mc-phase[data-status="running"] .mc-phase-connector{background:var(--purple)}
 @keyframes pulse-dot{0%,100%{transform:scale(1)}50%{transform:scale(1.3)}}
 
-/* Phase card (right of timeline) */
+/* Phase card */
 .mc-phase-card{flex:1;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;margin-bottom:0.5rem;overflow:hidden;transition:border-color .2s}
 .mc-phase[data-status="running"] .mc-phase-card{border-color:var(--purple)}
 .mc-phase[data-status="done"] .mc-phase-card{border-color:var(--green)}
 .mc-phase[data-status="failed"] .mc-phase-card{border-color:var(--red)}
 .mc-phase[data-status="waiting_validation"] .mc-phase-card{border-color:var(--yellow)}
 
-/* Phase header (clickable accordion) */
+/* Phase header */
 .mc-phase-header{display:flex;align-items:center;gap:0.5rem;padding:0.55rem 0.75rem;cursor:pointer;user-select:none;transition:background .15s}
 .mc-phase-header:hover{background:var(--bg-tertiary)}
 .mc-phase-num{font-size:0.65rem;color:var(--text-secondary);font-weight:700;min-width:1.2rem}
@@ -66,26 +60,29 @@
 .mc-phase-chevron{font-size:0.65rem;color:var(--text-secondary);transition:transform .2s}
 .mc-phase.open .mc-phase-chevron{transform:rotate(90deg)}
 
-/* Accordion body (discussion + agents) */
+/* Accordion body: flow graph + discussion */
 .mc-phase-body{display:none;border-top:1px solid var(--border)}
-.mc-phase.open .mc-phase-body{display:grid;grid-template-columns:1fr 170px;min-height:100px}
+.mc-phase.open .mc-phase-body{display:grid;grid-template-columns:220px 1fr;min-height:180px}
 
-/* Phase discussions */
-.mc-phase-discuss{padding:0.5rem 0.6rem;overflow-y:auto;max-height:280px;display:flex;flex-direction:column;gap:0.35rem}
-.mc-discuss-empty{font-size:0.72rem;color:var(--text-secondary);font-style:italic;padding:0.8rem;text-align:center}
+/* Mini flow graph (SVG) */
+.mc-phase-graph{background:var(--bg-primary);border-right:1px solid var(--border);padding:0.3rem;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.mc-phase-graph svg{width:100%;height:100%}
+.mc-graph-node{cursor:default}
+.mc-graph-node circle{fill:var(--bg-tertiary);stroke:var(--purple);stroke-width:1.5}
+.mc-graph-node image{clip-path:circle(13px)}
+.mc-graph-node text{fill:var(--text-primary);font-size:8px;font-weight:600;text-anchor:middle;pointer-events:none}
+.mc-graph-node .g-role{fill:var(--text-secondary);font-size:6px;font-weight:400}
+.mc-graph-edge{fill:none;stroke:var(--purple);stroke-width:1.2;opacity:0.5;marker-end:url(#mc-arrow)}
+.mc-graph-edge-label{fill:var(--text-secondary);font-size:6.5px;text-anchor:middle}
+
+/* Discussion */
+.mc-phase-discuss{padding:0.5rem 0.6rem;overflow-y:auto;max-height:400px;display:flex;flex-direction:column;gap:0.35rem}
+.mc-discuss-empty{font-size:0.72rem;color:var(--text-secondary);font-style:italic;padding:1.5rem 0.8rem;text-align:center}
 .mc-discuss-msg{display:flex;gap:0.35rem;align-items:flex-start}
-.mc-discuss-avatar{width:20px;height:20px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:0.15rem}
-.mc-discuss-bubble{background:var(--bg-tertiary);border-radius:6px;padding:0.3rem 0.5rem;font-size:0.72rem;color:var(--text-secondary);line-height:1.35;min-width:0;flex:1}
-.mc-discuss-from{font-size:0.65rem;font-weight:600;color:var(--text-primary)}
-.mc-discuss-role{font-size:0.58rem;color:var(--purple);font-weight:500;margin-left:0.3rem}
-
-/* Phase agent list (mini sidebar) */
-.mc-phase-agents{border-left:1px solid var(--border);padding:0.4rem;display:flex;flex-direction:column;gap:0.15rem;background:var(--bg-primary);overflow-y:auto}
-.mc-mini-agent{display:flex;align-items:center;gap:0.25rem;padding:0.2rem 0.3rem;border-radius:5px;font-size:0.65rem}
-.mc-mini-agent:hover{background:var(--bg-tertiary)}
-.mc-mini-agent img{width:16px;height:16px;border-radius:50%;object-fit:cover;flex-shrink:0}
-.mc-mini-agent .a-name{font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mc-mini-agent .a-role{font-size:0.58rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mc-discuss-avatar{width:22px;height:22px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:0.15rem}
+.mc-discuss-bubble{background:var(--bg-tertiary);border-radius:6px;padding:0.35rem 0.55rem;font-size:0.73rem;color:var(--text-secondary);line-height:1.4;min-width:0;flex:1}
+.mc-discuss-from{font-size:0.67rem;font-weight:600;color:var(--text-primary)}
+.mc-discuss-role{font-size:0.6rem;color:var(--purple);font-weight:500;margin-left:0.3rem}
 
 /* Checkpoint */
 .mc-checkpoint{background:rgba(234,179,8,.08);border-top:1px solid var(--yellow);padding:0.6rem 0.75rem}
@@ -101,12 +98,15 @@
 .mc-side-section{padding:0.6rem 0.75rem;border-bottom:1px solid var(--border)}
 .mc-side-title{font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);margin-bottom:0.45rem;display:flex;align-items:center;gap:0.3rem}
 
-/* CDP activity */
+/* CDP header + activity */
 .mc-cdp-header{display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0.75rem;border-bottom:1px solid var(--border);background:var(--bg-tertiary)}
-.mc-cdp-avatar{width:26px;height:26px;border-radius:50%;object-fit:cover}
-.mc-cdp-info h3{font-size:0.8rem;margin:0;color:var(--text-primary)}
-.mc-cdp-info small{font-size:0.62rem;color:var(--text-secondary)}
-.mc-activity{display:flex;flex-direction:column;gap:0.3rem;padding:0.5rem 0.75rem;max-height:220px;overflow-y:auto}
+.mc-cdp-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover}
+.mc-cdp-info h3{font-size:0.82rem;margin:0;color:var(--text-primary)}
+.mc-cdp-info small{font-size:0.64rem;color:var(--text-secondary)}
+.mc-cdp-status{margin-left:auto;font-size:0.6rem;padding:0.15rem 0.4rem;border-radius:4px;font-weight:600}
+.mc-cdp-status.active{background:rgba(124,58,237,.15);color:var(--purple);animation:pulse-dot 2s ease-in-out infinite}
+.mc-cdp-status.idle{background:var(--bg-tertiary);color:var(--text-secondary)}
+.mc-activity{display:flex;flex-direction:column;gap:0.3rem;padding:0.5rem 0.75rem;max-height:240px;overflow-y:auto}
 .mc-msg{background:var(--bg-tertiary);border-radius:6px;padding:0.3rem 0.5rem;font-size:0.7rem;color:var(--text-secondary);line-height:1.3}
 .mc-msg.tool{border-left:2px solid var(--purple);font-family:var(--font-mono,monospace);font-size:0.65rem}
 .mc-msg.system{border-left:2px solid var(--yellow)}
@@ -135,6 +135,15 @@
 @media(max-width:900px){.mc-layout{grid-template-columns:1fr;height:auto}.mc-sidebar{border-left:none;border-top:1px solid var(--border)}}
 </style>
 
+<!-- SVG defs for arrow markers -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <marker id="mc-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="var(--purple)" opacity="0.6"/>
+    </marker>
+  </defs>
+</svg>
+
 <div class="mc-layout">
     <!-- ====== MAIN: Timeline + Accordions ====== -->
     <div class="mc-main">
@@ -148,12 +157,10 @@
             {% for phase in mission.phases %}
             {% set pa = phase_agents.get(phase.phase_id, []) %}
             <div class="mc-phase{% if phase.status.value == 'running' %} open{% endif %}" data-phase-id="{{ phase.phase_id }}" data-status="{{ phase.status.value }}">
-                <!-- Timeline line -->
                 <div class="mc-phase-line">
                     <div class="mc-phase-dot"></div>
                     <div class="mc-phase-connector"></div>
                 </div>
-                <!-- Card with accordion -->
                 <div class="mc-phase-card">
                     <div class="mc-phase-header" onclick="togglePhase(this)">
                         <span class="mc-phase-num">{{ loop.index }}</span>
@@ -168,21 +175,12 @@
                         <span class="mc-phase-status-badge {{ phase.status.value }}">{{ phase.status.value }}</span>
                         <span class="mc-phase-chevron">▶</span>
                     </div>
-                    <!-- Accordion body: discussions + agent list -->
                     <div class="mc-phase-body">
+                        <!-- Mini flow graph -->
+                        <div class="mc-phase-graph" id="graph-{{ phase.phase_id }}"></div>
+                        <!-- Discussion -->
                         <div class="mc-phase-discuss" id="discuss-{{ phase.phase_id }}">
                             <div class="mc-discuss-empty">En attente d'exécution…</div>
-                        </div>
-                        <div class="mc-phase-agents">
-                            {% for a in pa %}
-                            <div class="mc-mini-agent">
-                                <img src="{{ a.avatar }}" onerror="this.style.display='none'" alt="">
-                                <div style="min-width:0">
-                                    <div class="a-name">{{ a.name }}</div>
-                                    <div class="a-role">{{ a.role }}</div>
-                                </div>
-                            </div>
-                            {% endfor %}
                         </div>
                     </div>
                     {% if phase.status.value == 'waiting_validation' %}
@@ -216,9 +214,11 @@
                 <h3>{{ cdp['name'] if cdp else 'CDP' }}</h3>
                 <small>Chef de Programme</small>
             </div>
+            <span class="mc-cdp-status active" id="mc-cdp-status">● Pilotage actif</span>
         </div>
         <div class="mc-activity" id="mc-activity">
-            <div class="mc-msg system"><div class="mc-msg-content">🚀 {{ mission.brief[:200] }}</div></div>
+            <div class="mc-msg system"><div class="mc-msg-content">🚀 Mission démarrée — {{ mission.brief[:200] }}</div></div>
+            <div class="mc-msg tool"><div class="mc-msg-time">{{ "now" }}</div><div class="mc-msg-content">📋 {{ mission.phases|length }} phases à orchestrer • Pattern: mega-workflow lifecycle</div></div>
         </div>
 
         <!-- Memory -->
@@ -260,8 +260,80 @@
 const MISSION_ID = "{{ mission.id }}";
 const SESSION_ID = "{{ session_id }}";
 const PHASE_AGENTS = {{ phase_agents | tojson }};
+const PHASE_GRAPHS = {{ phase_graphs | tojson }};
 
-/* Generate git contribution graph */
+/* ── Render mini flow graphs per phase ── */
+function renderPhaseGraphs() {
+    for (const [phaseId, graph] of Object.entries(PHASE_GRAPHS)) {
+        const container = document.getElementById(`graph-${phaseId}`);
+        if (!container || !graph.nodes.length) continue;
+
+        const W = 210, NR = 15;
+        const nodes = graph.nodes;
+        const edges = graph.edges;
+        const N = nodes.length;
+
+        // Auto-layout: force-directed simple — arrange in rows
+        const cols = Math.min(N, 3);
+        const rows = Math.ceil(N / cols);
+        const gapX = W / (cols + 1);
+        const gapY = (rows > 1) ? 55 : 40;
+        const H = rows * gapY + 40;
+
+        nodes.forEach((n, i) => {
+            const row = Math.floor(i / cols);
+            const col = i % cols;
+            const rowCount = (row === rows - 1) ? (N - row * cols) : cols;
+            const rowStartX = (W - rowCount * gapX) / 2 + gapX / 2;
+            n.cx = rowStartX + col * gapX;
+            n.cy = 22 + row * gapY;
+        });
+
+        const nodeById = {};
+        nodes.forEach(n => { nodeById[n.id] = n; });
+
+        let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}">`;
+        svg += `<defs><marker id="ma-${phaseId}" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto"><path d="M0,0 L6,2.5 L0,5" fill="var(--purple)" opacity="0.5"/></marker></defs>`;
+
+        // Edges
+        edges.forEach(e => {
+            const fn = nodeById[e.from], tn = nodeById[e.to];
+            if (!fn || !tn) return;
+            const dx = tn.cx - fn.cx, dy = tn.cy - fn.cy;
+            const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+            const x1 = fn.cx + (dx/dist)*NR, y1 = fn.cy + (dy/dist)*NR;
+            const x2 = tn.cx - (dx/dist)*(NR+4), y2 = tn.cy - (dy/dist)*(NR+4);
+            const color = e.color || 'var(--purple)';
+            svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="1.2" opacity="0.45" marker-end="url(#ma-${phaseId})"/>`;
+            if (e.label) {
+                const mx = (x1+x2)/2, my = (y1+y2)/2 - 3;
+                svg += `<text x="${mx}" y="${my}" class="mc-graph-edge-label">${esc(e.label)}</text>`;
+            }
+        });
+
+        // Nodes
+        nodes.forEach(n => {
+            svg += `<g class="mc-graph-node" transform="translate(${n.cx},${n.cy})">`;
+            svg += `<circle r="${NR}" fill="var(--bg-tertiary)" stroke="var(--purple)" stroke-width="1.5"/>`;
+            if (n.avatar) {
+                svg += `<clipPath id="clip-${n.id}"><circle r="${NR-1.5}"/></clipPath>`;
+                svg += `<image href="${esc(n.avatar)}" x="-${NR-1.5}" y="-${NR-1.5}" width="${(NR-1.5)*2}" height="${(NR-1.5)*2}" clip-path="url(#clip-${n.id})" preserveAspectRatio="xMidYMid slice"/>`;
+            }
+            const label = (n.label || '').length > 14 ? (n.label||'').substring(0,12)+'…' : (n.label||'');
+            svg += `<text y="${NR + 10}" class="mc-graph-node-label">${esc(label)}</text>`;
+            if (n.role) {
+                const role = n.role.length > 18 ? n.role.substring(0,16)+'…' : n.role;
+                svg += `<text y="${NR + 18}" class="g-role">${esc(role)}</text>`;
+            }
+            svg += `</g>`;
+        });
+
+        svg += `</svg>`;
+        container.innerHTML = svg;
+    }
+}
+
+/* ── Git contribution graph cells ── */
 (function(){
     const g = document.getElementById('mc-git-graph');
     for(let i=0;i<56;i++){
@@ -271,12 +343,13 @@ const PHASE_AGENTS = {{ phase_agents | tojson }};
     }
 })();
 
-/* Accordion toggle */
+/* ── Accordion toggle ── */
 function togglePhase(header) {
-    header.closest('.mc-phase-card').closest('.mc-phase').classList.toggle('open');
+    const phase = header.closest('.mc-phase');
+    phase.classList.toggle('open');
 }
 
-/* SSE */
+/* ── SSE ── */
 if (SESSION_ID) {
     const es = new EventSource(`/sse/session/${SESSION_ID}`);
     es.onmessage = e => { try { handleSSE(JSON.parse(e.data)); } catch(err){} };
@@ -286,7 +359,7 @@ function handleSSE(d) {
     if (d.type === 'phase_started') {
         updatePhaseStatus(d.phase_id, 'running');
         openPhase(d.phase_id);
-        addActivity(`🔄 Phase «${d.phase_name}» (${d.pattern})`, 'tool');
+        addActivity(`🔄 Phase «${d.phase_name}» démarrée (${d.pattern})`, 'tool');
     }
     else if (d.type === 'phase_completed') {
         updatePhaseStatus(d.phase_id, d.success ? 'done' : 'failed');
@@ -344,7 +417,7 @@ function addDiscussionMsg(phaseId, d) {
     div.innerHTML = `<img class="mc-discuss-avatar" src="${avatar}" onerror="this.style.display='none'" alt="">
         <div class="mc-discuss-bubble">
             <div class="mc-discuss-from">${esc(d.from_name||d.from_agent||'?')}<span class="mc-discuss-role">${esc(d.from_role||'')}</span></div>
-            ${esc((d.content||'').substring(0,400))}
+            ${esc((d.content||'').substring(0,600))}
         </div>`;
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
@@ -385,7 +458,6 @@ function addCommit(d) {
         <span class="mc-commit-msg">${esc(d.message||'')}</span>
         <span class="mc-commit-time">${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</span>`;
     c.prepend(div);
-    // Light up a git cell
     const cells = document.querySelectorAll('.mc-git-cell:not(.l1):not(.l2):not(.l3):not(.l4)');
     if (cells.length) cells[Math.floor(Math.random()*cells.length)].classList.add(['l1','l2','l3','l4'][Math.floor(Math.random()*4)]);
 }
@@ -420,7 +492,10 @@ async function validateMission(decision) {
     } catch(err) { console.error(err); }
 }
 
-function esc(t) { return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(t) { return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* Init */
+renderPhaseGraphs();
 
 /* Poll fallback */
 setInterval(async () => {
