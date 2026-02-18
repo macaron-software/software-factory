@@ -176,9 +176,13 @@
 .mu__name{font-size:.8rem;font-weight:600}
 .mu__name--sm{font-size:.7rem}
 .mu__role{font-size:.65rem;color:var(--text-secondary);font-style:italic;opacity:.7}
+.mu__role--sm{font-size:.58rem}
 .mu__arrow{font-size:.7rem;color:var(--text-secondary)}
 .mu__target{font-size:.75rem;font-weight:500}
 .mu__target--sm{font-size:.68rem}
+.mu__target-photo{width:18px;height:18px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:-2px}
+.mu__target-photo--sm{width:14px;height:14px}
+.mu__target-role{font-size:.6rem;color:var(--text-secondary);font-style:italic;opacity:.6}
 
 /* ── Badge ── */
 .mu__badge{display:inline-block;padding:.1rem .4rem;border-radius:4px;font-size:.6rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;background:var(--bg-tertiary);color:var(--text-secondary)}

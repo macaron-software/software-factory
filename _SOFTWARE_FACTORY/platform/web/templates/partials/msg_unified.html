@@ -25,8 +25,11 @@
 {% set from_color = from_ag.get('color', '#8b949e') %}
 {% set from_role = from_ag.get('role', '') %}
 {% set from_avatar = from_ag.get('avatar', from_ag.get('icon', 'bot')) %}
+{% set from_avatar_url = from_ag.get('avatar_url', '') %}
 {% set to_name = to_ag.get('name', to_id | replace('_', ' ') | title) %}
 {% set to_color = to_ag.get('color', '#6e6e6e') %}
+{% set to_role = to_ag.get('role', '') %}
+{% set to_avatar_url = to_ag.get('avatar_url', '') %}
 
 {# Border color by message type #}
 {% set type_border = {
@@ -64,20 +67,26 @@
 <div class="mu mu--chat {% if is_user %}mu--user{% else %}mu--agent{% endif %}" data-msg-id="{{ msg.id | default('') }}">
   {% if not is_user %}
   <div class="mu__avatar" style="background:{{ from_color }}20;border-color:{{ from_color }}">
+    {% if from_avatar_url %}
+    <img src="{{ from_avatar_url }}" alt="{{ from_name }}" class="mu__photo">
+    {% else %}
     <svg class="icon icon-sm" style="color:{{ from_color }}"><use href="#icon-{{ from_avatar }}"/></svg>
+    {% endif %}
   </div>
   {% endif %}
   <div class="mu__bubble {% if is_user %}mu__bubble--user{% else %}mu__bubble--agent{% endif %}" style="border-left:3px solid {{ type_border }}">
     {% if not is_user %}
     <div class="mu__sender">
       <span class="mu__name" style="color:{{ from_color }}">{{ from_name }}</span>
-      {% if to_id and to_id not in ('user', 'session', '') %}
-      <span class="mu__arrow">→</span>
-      <span class="mu__target" style="color:{{ to_color }}">{{ to_name }}</span>
-      {% endif %}
       {% if from_role %}<span class="mu__role">{{ from_role }}</span>{% endif %}
       {% if mtype not in ('response', 'inform', '') %}
       <span class="mu__badge" style="{{ badge_colors.get(mtype, '') }}">{{ mtype | upper }}</span>
+      {% endif %}
+      {% if to_id and to_id not in ('user', 'session', '', 'All') %}
+      <span class="mu__arrow">→</span>
+      {% if to_avatar_url %}<img src="{{ to_avatar_url }}" alt="{{ to_name }}" class="mu__target-photo">{% endif %}
+      <span class="mu__target" style="color:{{ to_color }}">{{ to_name }}</span>
+      {% if to_role %}<span class="mu__target-role">{{ to_role }}</span>{% endif %}
       {% endif %}
     </div>
     {% endif %}
@@ -103,17 +112,24 @@
 {% elif mode == 'compact' %}
 <div class="mu mu--compact" data-msg-id="{{ msg.id | default('') }}">
   <div class="mu__avatar mu__avatar--sm" style="background:{{ from_color }}20;border-color:{{ from_color }}">
+    {% if from_avatar_url %}
+    <img src="{{ from_avatar_url }}" alt="{{ from_name }}" class="mu__photo mu__photo--sm">
+    {% else %}
     <svg class="icon icon-xs" style="color:{{ from_color }}"><use href="#icon-{{ from_avatar }}"/></svg>
+    {% endif %}
   </div>
   <div class="mu__body">
     <div class="mu__meta">
       <span class="mu__name mu__name--sm" style="color:{{ from_color }}">{{ from_name }}</span>
+      {% if from_role %}<span class="mu__role mu__role--sm">{{ from_role }}</span>{% endif %}
       {% if mtype not in ('response', 'inform', '') %}
       <span class="mu__badge mu__badge--sm" style="{{ badge_colors.get(mtype, '') }}">{{ mtype | upper }}</span>
       {% endif %}
-      {% if to_id and to_id not in ('user', 'session', '') %}
+      {% if to_id and to_id not in ('user', 'session', '', 'All') %}
       <span class="mu__arrow">→</span>
+      {% if to_avatar_url %}<img src="{{ to_avatar_url }}" alt="{{ to_name }}" class="mu__target-photo mu__target-photo--sm">{% endif %}
       <span class="mu__target mu__target--sm" style="color:{{ to_color }}">{{ to_name }}</span>
+      {% if to_role %}<span class="mu__target-role mu__target-role--sm">{{ to_role }}</span>{% endif %}
       {% endif %}
       <span class="mu__time mu__time--right">{{ ts[11:16] if ts|length > 16 else ts }}</span>
     </div>
@@ -130,7 +146,11 @@
   <div class="mu__avatar mu__avatar--user">You</div>
   {% else %}
   <div class="mu__avatar" style="background:{{ from_color }}20;border-color:{{ from_color }}">
+    {% if from_avatar_url %}
+    <img src="{{ from_avatar_url }}" alt="{{ from_name }}" class="mu__photo">
+    {% else %}
     <svg class="icon icon-sm" style="color:{{ from_color }}"><use href="#icon-{{ from_avatar }}"/></svg>
+    {% endif %}
   </div>
   {% endif %}
   <div class="mu__body">
@@ -140,9 +160,11 @@
       {% if mtype not in ('response', 'inform', '') %}
       <span class="mu__badge" style="{{ badge_colors.get(mtype, '') }}">{{ mtype | upper }}</span>
       {% endif %}
-      {% if to_id and to_id not in ('user', 'session', '') %}
+      {% if to_id and to_id not in ('user', 'session', '', 'All') %}
       <span class="mu__arrow">→</span>
+      {% if to_avatar_url %}<img src="{{ to_avatar_url }}" alt="{{ to_name }}" class="mu__target-photo">{% endif %}
       <span class="mu__target" style="color:{{ to_color }}">{{ to_name }}</span>
+      {% if to_role %}<span class="mu__target-role">{{ to_role }}</span>{% endif %}
       {% endif %}
       <span class="mu__time mu__time--right">{{ ts[11:16] if ts|length > 16 else ts }}</span>
     </div>

@@ -17,6 +17,42 @@ def _templates(request: Request):
     return request.app.state.templates
 
 
+_AVATAR_DIR = Path(__file__).parent / "static" / "avatars"
+
+
+def _avatar_url(agent_id: str) -> str:
+    """Get avatar photo URL for an agent, or empty string."""
+    jpg = _AVATAR_DIR / f"{agent_id}.jpg"
+    if jpg.exists():
+        return f"/static/avatars/{agent_id}.jpg"
+    svg = _AVATAR_DIR / f"{agent_id}.svg"
+    if svg.exists():
+        return f"/static/avatars/{agent_id}.svg"
+    return ""
+
+
+def _agent_map_for_template(agents) -> dict:
+    """Build agent_map dict suitable for msg_unified.html, including avatar_url."""
+    m = {}
+    for a in agents:
+        if hasattr(a, 'id'):  # AgentDef dataclass
+            m[a.id] = {
+                "name": a.name, "icon": a.icon or "bot",
+                "color": a.color or "#8b949e", "role": a.role or "",
+                "avatar": getattr(a, "avatar", "") or "bot",
+                "avatar_url": _avatar_url(a.id),
+            }
+        elif isinstance(a, dict):  # already a dict
+            aid = a.get("id", "")
+            m[aid] = {
+                "name": a.get("name", ""), "icon": a.get("icon", "bot"),
+                "color": a.get("color", "#8b949e"), "role": a.get("role", ""),
+                "avatar": a.get("avatar", "bot"),
+                "avatar_url": a.get("avatar_url", "") or _avatar_url(aid),
+            }
+    return m
+
+
 # ── Pages ────────────────────────────────────────────────────────
 
 @router.get("/", response_class=HTMLResponse)
@@ -1486,7 +1522,7 @@ async def session_live_page(request: Request, session_id: str):
     except Exception:
         pass
 
-    agent_map_dict = {a["id"]: {"name": a["name"], "icon": a.get("icon", "bot"), "color": a.get("color", "#8b949e"), "role": a.get("role", ""), "avatar": a.get("avatar", "bot")} for a in agents}
+    agent_map_dict = _agent_map_for_template(agents)
     return _templates(request).TemplateResponse("session_live.html", {
         "request": request,
         "page_title": f"Live: {session.name}",
@@ -1513,7 +1549,7 @@ async def session_page(request: Request, session_id: str):
         return HTMLResponse("<h2>Session not found</h2>", status_code=404)
     messages = store.get_messages(session_id)
     agents = get_agent_store().list_all()
-    agent_map = {a.id: {"name": a.name, "icon": a.icon, "color": a.color, "role": a.role} for a in agents}
+    agent_map = _agent_map_for_template(agents)
     pattern_name = ""
     if session.pattern_id:
         pat = get_pattern_store().get(session.pattern_id)
@@ -1596,7 +1632,7 @@ async def send_message(request: Request, session_id: str):
 
     # Get agent map for rendering
     agents = get_agent_store().list_all()
-    agent_map = {a.id: {"name": a.name, "icon": a.icon, "color": a.color, "role": a.role} for a in agents}
+    agent_map = _agent_map_for_template(agents)
 
     # Render user bubble
     user_html = _templates(request).TemplateResponse("partials/msg_unified.html", {
@@ -1627,7 +1663,7 @@ async def poll_messages(request: Request, session_id: str, after: str = ""):
     if not messages:
         return HTMLResponse("")
     agents = get_agent_store().list_all()
-    agent_map = {a.id: {"name": a.name, "icon": a.icon, "color": a.color, "role": a.role} for a in agents}
+    agent_map = _agent_map_for_template(agents)
     html_parts = []
     for msg in messages:
         html_parts.append(_templates(request).TemplateResponse("partials/msg_unified.html", {
@@ -3255,7 +3291,7 @@ async def dsi_workflow_page(request: Request, workflow_id: str):
                     "name": a.name,
                     "avatar_url": f"/static/avatars/{a.id}.jpg" if jpg.exists() else (f"/static/avatars/{a.id}.svg" if svg_f.exists() else ""),
                 }
-                dsi_agent_map[aid] = {"name": a.name, "icon": a.icon or "bot", "color": a.color or "#8b949e", "role": a.role or "", "avatar": getattr(a, "avatar", "bot")}
+                dsi_agent_map[aid] = {"name": a.name, "icon": a.icon or "bot", "color": a.color or "#8b949e", "role": a.role or "", "avatar": getattr(a, "avatar", "bot"), "avatar_url": _avatar_url(a.id)}
             else:
                 agent_names[aid] = {"name": aid, "avatar_url": ""}
         return agent_names.get(aid, {"name": aid or "?", "avatar_url": ""})
