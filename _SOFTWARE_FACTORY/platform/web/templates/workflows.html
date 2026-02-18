@@ -34,6 +34,9 @@
         </div>
         <div class="item-actions">
             <a href="/workflows/{{ wf.id }}/edit" class="btn btn-sm btn-ghost"><svg class="icon icon-xs"><use href="#icon-edit"/></svg></a>
+            {% if wf.phases|length > 3 %}
+            <a href="/missions/start/{{ wf.id }}" class="btn btn-sm btn-ghost" title="Mission Control">🚀</a>
+            {% endif %}
             <a href="/sessions/new?workflow_id={{ wf.id }}" class="btn btn-sm btn-primary">Use</a>
         </div>
     </div>

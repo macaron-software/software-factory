@@ -40,6 +40,9 @@
                     <li><a href="/missions" data-tooltip="Missions" data-views="dsi,product,all" class="{% if page_title == 'Missions' or page_title == 'Mission' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-rocket"/></svg>
                     </a></li>
+                    <li><a href="/mission-control" data-tooltip="Mission Control" data-views="engineering,all" class="{% if 'Mission Control' in (page_title or '') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-target"/></svg>
+                    </a></li>
                     <li><a href="/workflows" data-tooltip="Workflows" data-views="engineering" class="{% if page_title == 'Workflows' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-workflow"/></svg>
                     </a></li>

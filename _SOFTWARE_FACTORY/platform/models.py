@@ -276,3 +276,55 @@ class AgentMetrics(BaseModel):
     success_rate: float = 0
     period_start: datetime = Field(default_factory=datetime.utcnow)
     period_end: Optional[datetime] = None
+
+
+# ============================================================================
+# MISSION CONTROL
+# ============================================================================
+
+class PhaseStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    WAITING_VALIDATION = "waiting_validation"
+
+
+class PhaseRun(BaseModel):
+    """Tracks execution of a single phase within a mission."""
+    phase_id: str
+    phase_name: str
+    pattern_id: str = ""
+    status: PhaseStatus = PhaseStatus.PENDING
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    agent_count: int = 0
+    summary: str = ""
+    error: str = ""
+    iteration: int = 0
+
+
+class MissionStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    PAUSED = "paused"
+
+
+class MissionRun(BaseModel):
+    """Tracks execution of a full mega-workflow (multi-phase mission)."""
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex[:8])
+    workflow_id: str
+    workflow_name: str = ""
+    session_id: str = ""
+    cdp_agent_id: str = "chef_de_programme"
+    project_id: str = ""
+    status: MissionStatus = MissionStatus.PENDING
+    current_phase: str = ""
+    phases: list[PhaseRun] = Field(default_factory=list)
+    brief: str = ""
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = None

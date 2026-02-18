@@ -411,7 +411,22 @@ class AgentLoop:
                 pass
 
         # Disable tools for strategic/management agents (they think, not code)
-        agent_tools_enabled = self.agent.hierarchy_rank >= 30
+        # BUT enable for agents with explicit tools (like CDP with phase tools)
+        agent_tools_enabled = self.agent.hierarchy_rank >= 30 or bool(self.agent.tools)
+
+        # Resolve mission_run_id for CDP agent
+        mission_run_id = None
+        if self.agent.id == "chef_de_programme":
+            try:
+                from ..missions.store import get_mission_run_store
+                runs = get_mission_run_store().list_runs(limit=10)
+                for mr in runs:
+                    if mr.session_id == self.session_id:
+                        mission_run_id = mr.id
+                        break
+            except Exception:
+                pass
+
         return ExecutionContext(
             agent=self.agent,
             session_id=self.session_id,
@@ -423,6 +438,7 @@ class AgentLoop:
             skills_prompt=skills_prompt,
             vision=vision,
             tools_enabled=agent_tools_enabled,
+            mission_run_id=mission_run_id,
         )
 
     # ------------------------------------------------------------------

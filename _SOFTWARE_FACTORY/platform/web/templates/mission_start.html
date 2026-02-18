@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+.ms-container{max-width:640px;margin:0 auto}
+.ms-header{margin-bottom:1.5rem}
+.ms-header h2{font-size:1.2rem;color:var(--text-primary);margin:0 0 0.3rem}
+.ms-header p{color:var(--text-secondary);font-size:0.85rem;margin:0}
+.ms-phases{display:flex;flex-wrap:wrap;gap:0.4rem;margin:1rem 0}
+.ms-phase{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:0.3rem 0.6rem;font-size:0.72rem;color:var(--text-secondary)}
+.ms-phase .pat{color:var(--purple);font-weight:600}
+.ms-form{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem}
+.ms-field{margin-bottom:1rem}
+.ms-field label{display:block;font-size:0.78rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.3rem}
+.ms-field textarea{width:100%;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.75rem;font-size:0.85rem;font-family:inherit;outline:none;resize:vertical;min-height:100px}
+.ms-field textarea:focus{border-color:var(--purple)}
+.ms-actions{display:flex;gap:0.5rem;justify-content:flex-end}
+</style>
+
+<div class="ms-container">
+    <div class="ms-header">
+        <h2>🚀 {{ workflow.name }}</h2>
+        <p>{{ workflow.description[:200] }}</p>
+    </div>
+
+    <div class="ms-phases">
+        {% for p in workflow.phases %}
+        <div class="ms-phase">{{ loop.index }}. {{ p.name }} <span class="pat">({{ p.pattern_id }})</span></div>
+        {% endfor %}
+    </div>
+
+    <form class="ms-form" id="missionForm">
+        <input type="hidden" name="workflow_id" value="{{ workflow.id }}">
+        <div class="ms-field">
+            <label>Brief de la mission</label>
+            <textarea name="brief" placeholder="Décrivez le besoin métier, le contexte projet, et les objectifs à atteindre..." required></textarea>
+        </div>
+        <div class="ms-actions">
+            <a href="/missions" class="btn btn-ghost">Annuler</a>
+            <button type="submit" class="btn btn-primary">
+                <svg class="icon icon-sm"><use href="#icon-play"/></svg> Lancer la Mission
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+document.getElementById('missionForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = e.target.querySelector('[type=submit]');
+    btn.disabled = true;
+    btn.textContent = 'Lancement...';
+    try {
+        const r = await fetch('/api/missions/start', {method:'POST', body: fd});
+        const j = await r.json();
+        if (j.redirect) location.href = j.redirect;
+        else alert(j.error || 'Error');
+    } catch(err) { alert(err); }
+    btn.disabled = false;
+    btn.textContent = 'Lancer la Mission';
+});
+</script>
+{% endblock %}

@@ -9,6 +9,7 @@ This is the runtime loop that makes agents actually work. It:
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -72,6 +73,12 @@ def _get_tool_registry():
     try:
         from ..tools.deploy_tools import register_deploy_tools
         register_deploy_tools(reg)
+    except Exception:
+        pass
+    # Phase orchestration tools (mission control)
+    try:
+        from ..tools.phase_tools import register_phase_tools
+        register_phase_tools(reg)
     except Exception:
         pass
     return reg
@@ -298,6 +305,73 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+        # ── Phase orchestration tools (CDP Mission Control) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "run_phase",
+                "description": "Launch a phase of the product lifecycle mission. Runs a multi-agent pattern (network, hierarchical, loop, etc.) with the phase's team. Returns a summary of results.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "phase_id": {"type": "string", "description": "Phase ID (e.g. 'ideation', 'dev-sprint', 'qa-campaign')"},
+                        "brief": {"type": "string", "description": "Context/brief to pass to the phase agents"},
+                    },
+                    "required": ["phase_id", "brief"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_phase_status",
+                "description": "Get the current status of a specific phase.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "phase_id": {"type": "string", "description": "Phase ID to check"},
+                    },
+                    "required": ["phase_id"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "list_phases",
+                "description": "List all phases of the current mission with their status, pattern, and agents.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "request_validation",
+                "description": "Request human validation at a checkpoint. Sends a question and waits for GO/NOGO.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "question": {"type": "string", "description": "Question to ask the human decision-maker"},
+                        "options": {"type": "string", "description": "Available options, comma-separated (default: GO,NOGO,PIVOT)"},
+                    },
+                    "required": ["question"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_project_context",
+                "description": "Get full project context (vision, architecture, current state, memory).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
+        },
     ]
     _TOOL_SCHEMAS = schemas
     return schemas
@@ -324,6 +398,8 @@ class ExecutionContext:
     tools_enabled: bool = True
     # Callback for SSE tool events
     on_tool_call: Optional[object] = None  # async callable(tool_name, args, result)
+    # Mission run ID (for CDP phase tools)
+    mission_run_id: Optional[str] = None
 
 
 @dataclass
@@ -695,6 +771,17 @@ class AgentExecutor:
             return await self._tool_memory_store(args, ctx)
         if name == "deep_search":
             return await self._tool_deep_search(args, ctx)
+        # Phase orchestration tools (mission control)
+        if name == "run_phase":
+            return await self._tool_run_phase(args, ctx)
+        if name == "get_phase_status":
+            return await self._tool_get_phase_status(args, ctx)
+        if name == "list_phases":
+            return await self._tool_list_phases(args, ctx)
+        if name == "request_validation":
+            return await self._tool_request_validation(args, ctx)
+        if name == "get_project_context":
+            return await self._tool_get_project_context(args, ctx)
 
         # Registry tools
         tool = self._registry.get(name)
@@ -795,6 +882,282 @@ class AgentExecutor:
         print(f"[EXECUTOR] deep_search done: {result.iterations} iters, {result.total_queries} queries, {len(result.answer)} chars", flush=True)
         header = f"RLM Deep Search ({result.iterations} iterations, {result.total_queries} queries)\n\n"
         return header + result.answer
+
+        print(f"[EXECUTOR] deep_search done: {result.iterations} iters, {result.total_queries} queries, {len(result.answer)} chars", flush=True)
+        header = f"RLM Deep Search ({result.iterations} iterations, {result.total_queries} queries)\n\n"
+        return header + result.answer
+
+    # ── Phase orchestration tools (Mission Control) ──
+
+    async def _tool_run_phase(self, args: dict, ctx: ExecutionContext) -> str:
+        """Run a mission phase via pattern engine."""
+        from ..missions.store import get_mission_run_store
+        from ..workflows.store import get_workflow_store
+        from ..patterns.store import get_pattern_store
+        from ..patterns.engine import run_pattern
+        from ..models import PhaseStatus
+        from datetime import datetime
+
+        phase_id = args.get("phase_id", "")
+        brief = args.get("brief", "")
+        if not phase_id:
+            return "Error: phase_id is required"
+
+        run_store = get_mission_run_store()
+        mission = run_store.get(ctx.mission_run_id) if ctx.mission_run_id else None
+        if not mission:
+            return "Error: no active mission. Start a mission first."
+
+        # Find the phase
+        phase_run = None
+        for p in mission.phases:
+            if p.phase_id == phase_id:
+                phase_run = p
+                break
+        if not phase_run:
+            return f"Error: phase '{phase_id}' not found in mission"
+
+        if phase_run.status == PhaseStatus.RUNNING:
+            return f"Phase '{phase_id}' is already running"
+
+        # Get workflow to find phase config
+        wf_store = get_workflow_store()
+        workflow = wf_store.get(mission.workflow_id)
+        if not workflow:
+            return f"Error: workflow '{mission.workflow_id}' not found"
+
+        wf_phase = None
+        for wp in workflow.phases:
+            if wp.id == phase_id:
+                wf_phase = wp
+                break
+        if not wf_phase:
+            return f"Error: phase '{phase_id}' not in workflow"
+
+        # Build pattern from phase config
+        pat_store = get_pattern_store()
+        base_pattern = pat_store.get(wf_phase.pattern_id)
+        if not base_pattern:
+            return f"Error: pattern '{wf_phase.pattern_id}' not found"
+
+        # Build agents list from phase config
+        agent_ids = wf_phase.config.get("agents", [])
+        agents = [{"id": f"ph-{i}", "agent_id": aid, "label": aid} for i, aid in enumerate(agent_ids)]
+        # Build edges based on pattern type
+        edges = self._build_phase_edges(base_pattern.type, agents)
+
+        from ..patterns.store import PatternDef
+        phase_pattern = PatternDef(
+            id=f"mission-{mission.id}-{phase_id}",
+            name=f"{wf_phase.name}",
+            type=base_pattern.type,
+            agents=agents,
+            edges=edges,
+            config=wf_phase.config,
+        )
+
+        # Update phase status
+        phase_run.status = PhaseStatus.RUNNING
+        phase_run.started_at = datetime.utcnow()
+        phase_run.iteration += 1
+        phase_run.agent_count = len(agent_ids)
+        mission.current_phase = phase_id
+        mission.status = "running"
+        run_store.update(mission)
+
+        # Push SSE event
+        await self._push_mission_sse(ctx.session_id, {
+            "type": "phase_started",
+            "mission_id": mission.id,
+            "phase_id": phase_id,
+            "phase_name": wf_phase.name,
+            "pattern": base_pattern.type,
+            "agents": agent_ids,
+        })
+
+        try:
+            print(f"[MISSION] Running phase '{phase_id}' ({base_pattern.type}) with {len(agent_ids)} agents", flush=True)
+            pattern_run = await run_pattern(
+                phase_pattern,
+                session_id=ctx.session_id,
+                initial_task=brief,
+                project_id=ctx.project_id or "",
+            )
+
+            # Gather results from node outputs
+            summaries = []
+            for nid, node in pattern_run.nodes.items():
+                if node.output:
+                    agent_label = node.agent.name if node.agent else nid
+                    summaries.append(f"**{agent_label}**: {node.output[:500]}")
+
+            phase_run.status = PhaseStatus.DONE if pattern_run.success else PhaseStatus.FAILED
+            phase_run.completed_at = datetime.utcnow()
+            phase_run.summary = "\n\n".join(summaries)[:3000]
+            if not pattern_run.success:
+                phase_run.error = "Phase ended with vetoes or failures"
+            run_store.update(mission)
+
+            await self._push_mission_sse(ctx.session_id, {
+                "type": "phase_completed" if pattern_run.success else "phase_failed",
+                "mission_id": mission.id,
+                "phase_id": phase_id,
+                "success": pattern_run.success,
+            })
+
+            status = "✅ DONE" if pattern_run.success else "❌ FAILED"
+            return f"Phase '{wf_phase.name}' {status}\n\n{phase_run.summary[:2000]}"
+
+        except Exception as e:
+            phase_run.status = PhaseStatus.FAILED
+            phase_run.error = str(e)
+            run_store.update(mission)
+            return f"Phase '{phase_id}' error: {e}"
+
+    def _build_phase_edges(self, pattern_type: str, agents: list[dict]) -> list[dict]:
+        """Build edges for a phase pattern based on type."""
+        edges = []
+        ids = [a["id"] for a in agents]
+        if not ids:
+            return edges
+        if pattern_type in ("sequential",):
+            for i in range(len(ids) - 1):
+                edges.append({"from": ids[i], "to": ids[i + 1], "type": "then"})
+        elif pattern_type in ("hierarchical",):
+            for worker in ids[1:]:
+                edges.append({"from": ids[0], "to": worker, "type": "delegate"})
+        elif pattern_type in ("parallel", "aggregator"):
+            for worker in ids[:-1]:
+                edges.append({"from": worker, "to": ids[-1], "type": "aggregate"})
+        elif pattern_type in ("loop",):
+            if len(ids) >= 2:
+                edges.append({"from": ids[0], "to": ids[1], "type": "review"})
+                edges.append({"from": ids[1], "to": ids[0], "type": "feedback"})
+        elif pattern_type in ("network",):
+            for i, a in enumerate(ids):
+                for b in ids[i + 1:]:
+                    edges.append({"from": a, "to": b, "type": "discuss"})
+        elif pattern_type in ("router",):
+            for specialist in ids[1:]:
+                edges.append({"from": ids[0], "to": specialist, "type": "route"})
+        elif pattern_type in ("human-in-the-loop",):
+            for i in range(len(ids) - 1):
+                edges.append({"from": ids[i], "to": ids[i + 1], "type": "then"})
+        return edges
+
+    async def _tool_get_phase_status(self, args: dict, ctx: ExecutionContext) -> str:
+        """Get status of a specific phase."""
+        from ..missions.store import get_mission_run_store
+
+        phase_id = args.get("phase_id", "")
+        run_store = get_mission_run_store()
+        mission = run_store.get(ctx.mission_run_id) if ctx.mission_run_id else None
+        if not mission:
+            return "Error: no active mission"
+
+        for p in mission.phases:
+            if p.phase_id == phase_id:
+                lines = [
+                    f"Phase: {p.phase_name} ({p.phase_id})",
+                    f"Status: {p.status.value}",
+                    f"Pattern: {p.pattern_id}",
+                    f"Agents: {p.agent_count}",
+                    f"Iteration: {p.iteration}",
+                ]
+                if p.summary:
+                    lines.append(f"Summary: {p.summary[:500]}")
+                if p.error:
+                    lines.append(f"Error: {p.error}")
+                return "\n".join(lines)
+        return f"Phase '{phase_id}' not found"
+
+    async def _tool_list_phases(self, args: dict, ctx: ExecutionContext) -> str:
+        """List all phases with status."""
+        from ..missions.store import get_mission_run_store
+
+        run_store = get_mission_run_store()
+        mission = run_store.get(ctx.mission_run_id) if ctx.mission_run_id else None
+        if not mission:
+            return "Error: no active mission"
+
+        lines = [f"Mission: {mission.workflow_name} ({mission.status.value})\n"]
+        status_icons = {
+            "pending": "⏳", "running": "🔄", "done": "✅",
+            "failed": "❌", "skipped": "⏭️", "waiting_validation": "🛑",
+        }
+        for i, p in enumerate(mission.phases, 1):
+            icon = status_icons.get(p.status.value, "•")
+            current = " ← CURRENT" if p.phase_id == mission.current_phase else ""
+            lines.append(f"{i}. {icon} {p.phase_name} [{p.pattern_id}] — {p.status.value}{current}")
+        return "\n".join(lines)
+
+    async def _tool_request_validation(self, args: dict, ctx: ExecutionContext) -> str:
+        """Request human validation — emit SSE checkpoint event."""
+        from ..missions.store import get_mission_run_store
+        from ..sessions.store import get_session_store, MessageDef
+        from ..models import PhaseStatus
+
+        question = args.get("question", "Proceed?")
+        options = args.get("options", "GO,NOGO,PIVOT")
+
+        run_store = get_mission_run_store()
+        mission = run_store.get(ctx.mission_run_id) if ctx.mission_run_id else None
+
+        # Update current phase to waiting
+        if mission and mission.current_phase:
+            for p in mission.phases:
+                if p.phase_id == mission.current_phase:
+                    p.status = PhaseStatus.WAITING_VALIDATION
+            run_store.update(mission)
+
+        # Store as system message
+        store = get_session_store()
+        store.add_message(MessageDef(
+            session_id=ctx.session_id,
+            from_agent=ctx.agent.id,
+            to_agent="human",
+            message_type="system",
+            content=f"🛑 **CHECKPOINT** — {question}\n\nOptions: {options}",
+        ))
+
+        # SSE event for Mission Control UI
+        await self._push_mission_sse(ctx.session_id, {
+            "type": "checkpoint",
+            "mission_id": mission.id if mission else "",
+            "phase_id": mission.current_phase if mission else "",
+            "question": question,
+            "options": options.split(","),
+            "requires_input": True,
+        })
+
+        return f"🛑 CHECKPOINT: Waiting for human validation.\nQuestion: {question}\nOptions: {options}\n\n(The user will respond via Mission Control UI)"
+
+    async def _tool_get_project_context(self, args: dict, ctx: ExecutionContext) -> str:
+        """Get project context for the CDP."""
+        parts = []
+        if ctx.vision:
+            parts.append(f"## Vision\n{ctx.vision[:2000]}")
+        if ctx.project_context:
+            parts.append(f"## Project Context\n{ctx.project_context[:2000]}")
+        if ctx.project_memory:
+            parts.append(f"## Project Memory\n{ctx.project_memory[:1000]}")
+        if not parts:
+            return "No project context available. This mission is running without a project."
+        return "\n\n".join(parts)
+
+    async def _push_mission_sse(self, session_id: str, data: dict):
+        """Push a mission control SSE event via the A2A bus SSE listeners."""
+        from ..a2a.bus import get_bus
+        data["session_id"] = session_id
+        bus = get_bus()
+        dead = []
+        for q in bus._sse_listeners:
+            try:
+                q.put_nowait(data)
+            except asyncio.QueueFull:
+                dead.append(q)
+        for q in dead:
+            bus._sse_listeners.remove(q)
 
     def _record_artifact(self, ctx: ExecutionContext, tc: LLMToolCall, result: str):
         """Record a code_write/code_edit as an artifact in the DB."""

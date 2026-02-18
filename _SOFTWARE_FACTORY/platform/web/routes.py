@@ -4533,13 +4533,13 @@ async def ideation_history_page(request: Request):
 #  MISSION CONTROL — CDP orchestrator dashboard
 # ══════════════════════════════════════════════════════════════════════════════
 
-@router.get("/missions", response_class=HTMLResponse)
+@router.get("/mission-control", response_class=HTMLResponse)
 async def missions_list_page(request: Request):
     """List all mission runs."""
     from ..missions.store import get_mission_run_store
     store = get_mission_run_store()
     runs = store.list_runs(limit=50)
-    return _templates(request).TemplateResponse("missions.html", {
+    return _templates(request).TemplateResponse("mission_control_list.html", {
         "request": request, "page_title": "Mission Control",
         "runs": runs,
     })
@@ -4551,7 +4551,7 @@ async def mission_start_page(request: Request, workflow_id: str):
     from ..workflows.store import get_workflow_store
     wf = get_workflow_store().get(workflow_id)
     if not wf:
-        return RedirectResponse("/missions", status_code=302)
+        return RedirectResponse("/mission-control", status_code=302)
     return _templates(request).TemplateResponse("mission_start.html", {
         "request": request, "page_title": f"New Mission — {wf.name}",
         "workflow": wf,
@@ -4599,8 +4599,7 @@ async def api_mission_start(request: Request):
         brief=brief,
         status=MissionStatus.RUNNING,
         phases=phases,
-        project_id=project_id or None,
-        created_at=datetime.utcnow(),
+        project_id=project_id or "",
     )
 
     run_store = get_mission_run_store()
@@ -4649,9 +4648,7 @@ async def mission_control_page(request: Request, mission_id: str):
     run_store = get_mission_run_store()
     mission = run_store.get(mission_id)
     if not mission:
-        return RedirectResponse("/missions", status_code=302)
-
-    # Build agent map for avatars
+        return RedirectResponse("/mission-control", status_code=302)
     agents = get_agent_store().list()
     agent_map = _agent_map_for_template(agents)
 

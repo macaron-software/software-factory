@@ -376,3 +376,128 @@ def get_mission_store() -> MissionStore:
     if _store is None:
         _store = MissionStore()
     return _store
+
+
+# ============================================================================
+# MISSION RUNS (lifecycle orchestration)
+# ============================================================================
+
+from ..models import MissionRun, MissionStatus, PhaseRun, PhaseStatus
+
+
+def _row_to_mission_run(row) -> MissionRun:
+    phases = json.loads(row["phases_json"]) if row["phases_json"] else []
+    return MissionRun(
+        id=row["id"],
+        workflow_id=row["workflow_id"],
+        workflow_name=row["workflow_name"] or "",
+        session_id=row["session_id"] or "",
+        cdp_agent_id=row["cdp_agent_id"] or "chef_de_programme",
+        project_id=row["project_id"] or "",
+        status=MissionStatus(row["status"]),
+        current_phase=row["current_phase"] or "",
+        phases=[PhaseRun(**p) for p in phases],
+        brief=row["brief"] or "",
+        created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else datetime.utcnow(),
+        updated_at=datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else datetime.utcnow(),
+        completed_at=datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None,
+    )
+
+
+class MissionRunStore:
+    """CRUD for mission lifecycle runs."""
+
+    def create(self, run: MissionRun) -> MissionRun:
+        db = get_db()
+        try:
+            db.execute(
+                """INSERT INTO mission_runs (id, workflow_id, workflow_name, session_id,
+                   cdp_agent_id, project_id, status, current_phase, phases_json, brief,
+                   created_at, updated_at, completed_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (run.id, run.workflow_id, run.workflow_name, run.session_id,
+                 run.cdp_agent_id, run.project_id, run.status.value,
+                 run.current_phase, json.dumps([p.model_dump() for p in run.phases]),
+                 run.brief, run.created_at.isoformat(), run.updated_at.isoformat(),
+                 run.completed_at.isoformat() if run.completed_at else None),
+            )
+            db.commit()
+        finally:
+            db.close()
+        return run
+
+    def get(self, run_id: str) -> Optional[MissionRun]:
+        db = get_db()
+        try:
+            row = db.execute("SELECT * FROM mission_runs WHERE id = ?", (run_id,)).fetchone()
+            return _row_to_mission_run(row) if row else None
+        finally:
+            db.close()
+
+    def list_runs(self, project_id: str = "", limit: int = 20) -> list[MissionRun]:
+        db = get_db()
+        try:
+            if project_id:
+                rows = db.execute(
+                    "SELECT * FROM mission_runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ?",
+                    (project_id, limit),
+                ).fetchall()
+            else:
+                rows = db.execute(
+                    "SELECT * FROM mission_runs ORDER BY created_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+            return [_row_to_mission_run(r) for r in rows]
+        finally:
+            db.close()
+
+    def update(self, run: MissionRun) -> bool:
+        run.updated_at = datetime.utcnow()
+        db = get_db()
+        try:
+            cur = db.execute(
+                """UPDATE mission_runs SET status=?, current_phase=?, phases_json=?,
+                   updated_at=?, completed_at=? WHERE id=?""",
+                (run.status.value, run.current_phase,
+                 json.dumps([p.model_dump() for p in run.phases], default=str),
+                 run.updated_at.isoformat(),
+                 run.completed_at.isoformat() if run.completed_at else None,
+                 run.id),
+            )
+            db.commit()
+            return cur.rowcount > 0
+        finally:
+            db.close()
+
+    def update_phase(self, run_id: str, phase_id: str, **kwargs) -> Optional[MissionRun]:
+        """Update a specific phase within a mission run."""
+        run = self.get(run_id)
+        if not run:
+            return None
+        for p in run.phases:
+            if p.phase_id == phase_id:
+                for k, v in kwargs.items():
+                    if hasattr(p, k):
+                        setattr(p, k, v)
+                break
+        self.update(run)
+        return run
+
+    def delete(self, run_id: str) -> bool:
+        db = get_db()
+        try:
+            cur = db.execute("DELETE FROM mission_runs WHERE id = ?", (run_id,))
+            db.commit()
+            return cur.rowcount > 0
+        finally:
+            db.close()
+
+
+_run_store: Optional[MissionRunStore] = None
+
+
+def get_mission_run_store() -> MissionRunStore:
+    global _run_store
+    if _run_store is None:
+        _run_store = MissionRunStore()
+    return _run_store

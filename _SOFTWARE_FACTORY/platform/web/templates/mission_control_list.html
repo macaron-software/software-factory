@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-header">
+    <h1>🚀 Mission Control</h1>
+    <p class="text-muted">Product lifecycle missions — CDP orchestrated</p>
+</div>
+
+<div style="display:flex;gap:1rem;margin-bottom:1.5rem;">
+    <a href="/missions/start/product-lifecycle" class="btn btn-primary">+ New Mission</a>
+</div>
+
+{% if runs %}
+<div class="card-grid" style="gap:1rem;">
+    {% for run in runs %}
+    <a href="/missions/{{ run.id }}/control" class="card" style="text-decoration:none;padding:1rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+            <strong>{{ run.workflow_name or run.workflow_id }}</strong>
+            <span class="badge badge-{% if run.status.value == 'completed' %}success{% elif run.status.value == 'running' %}info{% elif run.status.value == 'failed' %}danger{% else %}ghost{% endif %}">
+                {{ run.status.value }}
+            </span>
+        </div>
+        <p class="text-muted" style="font-size:0.85rem;margin:0;">{{ run.brief[:120] }}{% if run.brief|length > 120 %}…{% endif %}</p>
+        <div style="display:flex;gap:1rem;margin-top:0.5rem;font-size:0.8rem;color:var(--text-muted);">
+            <span>📅 {{ run.created_at.strftime('%d/%m %H:%M') }}</span>
+            <span>📊 {{ run.phases|selectattr('status.value','equalto','done')|list|length }}/{{ run.phases|length }} phases</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state" style="text-align:center;padding:3rem;">
+    <p style="font-size:2rem;">🚀</p>
+    <p>No missions yet. Launch one from a workflow with phases.</p>
+    <a href="/workflows" class="btn btn-ghost">Browse Workflows</a>
+</div>
+{% endif %}
+{% endblock %}

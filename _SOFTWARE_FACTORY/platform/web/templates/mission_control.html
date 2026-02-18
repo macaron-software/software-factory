@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<span class="badge" style="background:var(--purple);color:#fff;font-size:0.72rem;padding:0.2rem 0.6rem;border-radius:4px">
+    {{ mission.status.value|upper }}
+</span>
+{% endblock %}
+
+{% block content %}
+<style>
+.mc-layout{display:grid;grid-template-columns:1fr 380px;gap:1rem;height:calc(100vh - 80px)}
+.mc-main{overflow-y:auto;padding-right:0.5rem}
+.mc-sidebar{overflow-y:auto;border-left:1px solid var(--border);padding-left:1rem}
+
+/* Pipeline */
+.mc-pipeline{display:flex;flex-direction:column;gap:0}
+.mc-phase{display:flex;align-items:stretch;gap:0;position:relative}
+.mc-phase-line{width:28px;display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+.mc-phase-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border);background:var(--bg-tertiary);z-index:1;flex-shrink:0;margin-top:0.7rem}
+.mc-phase-connector{width:2px;flex:1;background:var(--border)}
+.mc-phase:last-child .mc-phase-connector{display:none}
+.mc-phase-card{flex:1;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.8rem;margin-bottom:0.5rem;transition:all .2s}
+.mc-phase-card:hover{border-color:var(--purple-dim)}
+
+/* Phase status colors */
+.mc-phase[data-status="done"] .mc-phase-dot{background:var(--green);border-color:var(--green)}
+.mc-phase[data-status="running"] .mc-phase-dot{background:var(--purple);border-color:var(--purple);animation:pulse-dot 1.5s ease-in-out infinite}
+.mc-phase[data-status="failed"] .mc-phase-dot{background:var(--red);border-color:var(--red)}
+.mc-phase[data-status="waiting_validation"] .mc-phase-dot{background:var(--yellow);border-color:var(--yellow);animation:pulse-dot 1s ease-in-out infinite}
+.mc-phase[data-status="done"] .mc-phase-connector{background:var(--green)}
+.mc-phase[data-status="running"] .mc-phase-connector{background:var(--purple)}
+
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.3)}}
+
+.mc-phase-head{display:flex;align-items:center;gap:0.5rem}
+.mc-phase-num{font-size:0.65rem;color:var(--text-secondary);font-weight:700;min-width:1.4rem}
+.mc-phase-name{font-size:0.82rem;font-weight:600;color:var(--text-primary);flex:1}
+.mc-phase-pattern{font-size:0.65rem;color:var(--purple);background:var(--bg-tertiary);padding:0.1rem 0.4rem;border-radius:4px;font-weight:600}
+.mc-phase-status{font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:4px;font-weight:600}
+.mc-phase-status.pending{color:var(--text-secondary);background:var(--bg-tertiary)}
+.mc-phase-status.running{color:var(--purple);background:rgba(124,58,237,.15)}
+.mc-phase-status.done{color:var(--green);background:rgba(34,197,94,.12)}
+.mc-phase-status.failed{color:var(--red);background:rgba(239,68,68,.12)}
+.mc-phase-status.waiting_validation{color:var(--yellow);background:rgba(234,179,8,.12)}
+
+.mc-phase-agents{display:flex;gap:0.3rem;margin-top:0.3rem;flex-wrap:wrap}
+.mc-agent-chip{display:flex;align-items:center;gap:0.25rem;background:var(--bg-tertiary);border-radius:10px;padding:0.15rem 0.4rem 0.15rem 0.15rem;font-size:0.68rem;color:var(--text-secondary)}
+.mc-agent-chip img{width:16px;height:16px;border-radius:50%;object-fit:cover}
+
+.mc-phase-summary{font-size:0.75rem;color:var(--text-secondary);margin-top:0.4rem;line-height:1.4;max-height:60px;overflow:hidden}
+
+/* Checkpoint */
+.mc-checkpoint{background:rgba(234,179,8,.08);border:1px solid var(--yellow);border-radius:8px;padding:0.8rem;margin:0.5rem 0}
+.mc-checkpoint h4{color:var(--yellow);font-size:0.85rem;margin:0 0 0.5rem}
+.mc-checkpoint p{color:var(--text-secondary);font-size:0.8rem;margin:0 0 0.6rem}
+.mc-checkpoint-actions{display:flex;gap:0.5rem}
+.mc-checkpoint-actions button{padding:0.3rem 0.8rem;border-radius:6px;font-size:0.78rem;font-weight:600;cursor:pointer;border:none}
+.mc-btn-go{background:var(--green);color:#fff}
+.mc-btn-nogo{background:var(--red);color:#fff}
+.mc-btn-pivot{background:var(--yellow);color:#000}
+
+/* Sidebar: CDP Activity */
+.mc-cdp-header{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.8rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border)}
+.mc-cdp-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover}
+.mc-cdp-info h3{font-size:0.9rem;margin:0;color:var(--text-primary)}
+.mc-cdp-info small{font-size:0.7rem;color:var(--text-secondary)}
+
+.mc-activity{display:flex;flex-direction:column;gap:0.5rem}
+.mc-msg{background:var(--bg-tertiary);border-radius:8px;padding:0.5rem 0.7rem;font-size:0.78rem;color:var(--text-secondary);line-height:1.4}
+.mc-msg.tool{border-left:2px solid var(--purple);font-family:monospace;font-size:0.72rem}
+.mc-msg.system{border-left:2px solid var(--yellow);color:var(--yellow)}
+.mc-msg .mc-msg-time{font-size:0.62rem;color:var(--text-secondary);margin-bottom:0.2rem}
+.mc-msg .mc-msg-content{white-space:pre-wrap;word-break:break-word}
+
+.mc-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;margin-bottom:1rem}
+.mc-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;padding:0.5rem;text-align:center}
+.mc-stat .val{font-size:1.1rem;font-weight:700;color:var(--text-primary)}
+.mc-stat .lbl{font-size:0.65rem;color:var(--text-secondary)}
+
+@media(max-width:900px){.mc-layout{grid-template-columns:1fr;height:auto}.mc-sidebar{border-left:none;border-top:1px solid var(--border);padding-left:0;padding-top:1rem}}
+</style>
+
+<div class="mc-layout">
+    <!-- Main: Pipeline -->
+    <div class="mc-main">
+        <div class="mc-stats">
+            <div class="mc-stat">
+                <div class="val" id="mc-done-count">{{ mission.phases|selectattr('status.value','equalto','done')|list|length }}</div>
+                <div class="lbl">Phases terminées</div>
+            </div>
+            <div class="mc-stat">
+                <div class="val">{{ mission.phases|length }}</div>
+                <div class="lbl">Phases totales</div>
+            </div>
+            <div class="mc-stat">
+                <div class="val" id="mc-progress">{{ ((mission.phases|selectattr('status.value','equalto','done')|list|length / mission.phases|length) * 100)|round|int if mission.phases|length > 0 else 0 }}%</div>
+                <div class="lbl">Progression</div>
+            </div>
+        </div>
+
+        <div class="mc-pipeline" id="mc-pipeline">
+            {% for phase in mission.phases %}
+            <div class="mc-phase" data-phase-id="{{ phase.phase_id }}" data-status="{{ phase.status.value }}">
+                <div class="mc-phase-line">
+                    <div class="mc-phase-dot"></div>
+                    <div class="mc-phase-connector"></div>
+                </div>
+                <div class="mc-phase-card">
+                    <div class="mc-phase-head">
+                        <span class="mc-phase-num">{{ loop.index }}</span>
+                        <span class="mc-phase-name">{{ phase.phase_name }}</span>
+                        <span class="mc-phase-pattern">{{ phase.pattern_id }}</span>
+                        <span class="mc-phase-status {{ phase.status.value }}">{{ phase.status.value }}</span>
+                    </div>
+                    {% if phase.agent_count > 0 %}
+                    <div class="mc-phase-agents">
+                        <!-- Agents will be populated by SSE or initial data -->
+                    </div>
+                    {% endif %}
+                    {% if phase.summary %}
+                    <div class="mc-phase-summary">{{ phase.summary[:200] }}</div>
+                    {% endif %}
+                    {% if phase.status.value == 'waiting_validation' %}
+                    <div class="mc-checkpoint">
+                        <h4>🛑 Checkpoint — Validation requise</h4>
+                        <p>Le CDP attend votre décision pour continuer.</p>
+                        <div class="mc-checkpoint-actions">
+                            <button class="mc-btn-go" onclick="validateMission('GO')">✅ GO</button>
+                            <button class="mc-btn-nogo" onclick="validateMission('NOGO')">❌ NOGO</button>
+                            <button class="mc-btn-pivot" onclick="validateMission('PIVOT')">🔄 PIVOT</button>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Sidebar: CDP Activity -->
+    <div class="mc-sidebar">
+        <div class="mc-cdp-header">
+            {% if agent_map.get('chef_de_programme') %}
+            <img class="mc-cdp-avatar" src="{{ agent_map['chef_de_programme'].avatar_url or '/static/avatars/chef_de_programme.jpg' }}" alt="">
+            {% endif %}
+            <div class="mc-cdp-info">
+                <h3>Alexandre Moreau</h3>
+                <small>Chef de Programme — CDP</small>
+            </div>
+        </div>
+
+        <div class="mc-activity" id="mc-activity">
+            <div class="mc-msg system">
+                <div class="mc-msg-content">Mission démarrée — {{ mission.brief[:200] }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const MISSION_ID = "{{ mission.id }}";
+const SESSION_ID = "{{ session_id }}";
+
+// SSE for live updates
+if (SESSION_ID) {
+    const es = new EventSource(`/sse/session/${SESSION_ID}`);
+    es.onmessage = e => {
+        try {
+            const d = JSON.parse(e.data);
+            handleSSE(d);
+        } catch(err) {}
+    };
+}
+
+function handleSSE(d) {
+    const activity = document.getElementById('mc-activity');
+
+    if (d.type === 'phase_started') {
+        updatePhaseStatus(d.phase_id, 'running');
+        addActivity(`🔄 Phase "${d.phase_name}" démarrée (${d.pattern}) avec ${d.agents?.length || 0} agents`, 'tool');
+    }
+    else if (d.type === 'phase_completed') {
+        updatePhaseStatus(d.phase_id, d.success ? 'done' : 'failed');
+        const icon = d.success ? '✅' : '❌';
+        addActivity(`${icon} Phase terminée`, 'tool');
+        updateStats();
+    }
+    else if (d.type === 'phase_failed') {
+        updatePhaseStatus(d.phase_id, 'failed');
+        addActivity(`❌ Phase échouée`, 'system');
+    }
+    else if (d.type === 'checkpoint') {
+        updatePhaseStatus(d.phase_id, 'waiting_validation');
+        showCheckpoint(d.phase_id, d.question, d.options);
+        addActivity(`🛑 CHECKPOINT: ${d.question}`, 'system');
+    }
+    else if (d.type === 'message' && d.from_agent === 'chef_de_programme') {
+        addActivity(d.content, '');
+    }
+    else if (d.type === 'message' && d.msg_type === 'tool_result') {
+        addActivity(d.content?.substring(0, 300), 'tool');
+    }
+}
+
+function updatePhaseStatus(phaseId, status) {
+    const el = document.querySelector(`.mc-phase[data-phase-id="${phaseId}"]`);
+    if (!el) return;
+    el.dataset.status = status;
+    const badge = el.querySelector('.mc-phase-status');
+    if (badge) { badge.className = `mc-phase-status ${status}`; badge.textContent = status; }
+}
+
+function addActivity(text, cls) {
+    if (!text) return;
+    const div = document.createElement('div');
+    div.className = `mc-msg ${cls || ''}`;
+    const time = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    div.innerHTML = `<div class="mc-msg-time">${time}</div><div class="mc-msg-content">${escapeHtml(text.substring(0, 500))}</div>`;
+    const act = document.getElementById('mc-activity');
+    act.appendChild(div);
+    act.scrollTop = act.scrollHeight;
+}
+
+function showCheckpoint(phaseId, question, options) {
+    const el = document.querySelector(`.mc-phase[data-phase-id="${phaseId}"] .mc-phase-card`);
+    if (!el) return;
+    // Remove existing checkpoint
+    el.querySelector('.mc-checkpoint')?.remove();
+    const cp = document.createElement('div');
+    cp.className = 'mc-checkpoint';
+    cp.innerHTML = `
+        <h4>🛑 Checkpoint — ${escapeHtml(question)}</h4>
+        <div class="mc-checkpoint-actions">
+            <button class="mc-btn-go" onclick="validateMission('GO')">✅ GO</button>
+            <button class="mc-btn-nogo" onclick="validateMission('NOGO')">❌ NOGO</button>
+            <button class="mc-btn-pivot" onclick="validateMission('PIVOT')">🔄 PIVOT</button>
+        </div>
+    `;
+    el.appendChild(cp);
+}
+
+function updateStats() {
+    const phases = document.querySelectorAll('.mc-phase');
+    let done = 0;
+    phases.forEach(p => { if (p.dataset.status === 'done') done++; });
+    document.getElementById('mc-done-count').textContent = done;
+    document.getElementById('mc-progress').textContent = Math.round(done / phases.length * 100) + '%';
+}
+
+async function validateMission(decision) {
+    const fd = new FormData();
+    fd.set('decision', decision);
+    try {
+        await fetch(`/api/missions/${MISSION_ID}/validate`, {method:'POST', body: fd});
+        document.querySelectorAll('.mc-checkpoint').forEach(el => el.remove());
+        addActivity(`🏁 Décision humaine: ${decision}`, 'system');
+    } catch(err) { console.error(err); }
+}
+
+function escapeHtml(t) {
+    if (!t) return '';
+    return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Poll mission status every 10s for robustness
+setInterval(async () => {
+    try {
+        const r = await fetch(`/api/missions/${MISSION_ID}`);
+        const m = await r.json();
+        if (m.phases) {
+            m.phases.forEach(p => updatePhaseStatus(p.phase_id, p.status));
+            updateStats();
+        }
+    } catch(err) {}
+}, 10000);
+</script>
+{% endblock %}

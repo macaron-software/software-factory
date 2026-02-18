@@ -441,3 +441,23 @@ CREATE TABLE IF NOT EXISTS org_team_members (
 );
 
 CREATE INDEX IF NOT EXISTS idx_team_members_agent ON org_team_members(agent_id);
+
+-- Mission Control: lifecycle runs with phase tracking
+CREATE TABLE IF NOT EXISTS mission_runs (
+    id TEXT PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    workflow_name TEXT DEFAULT '',
+    session_id TEXT DEFAULT '',
+    cdp_agent_id TEXT DEFAULT 'chef_de_programme',
+    project_id TEXT DEFAULT '',
+    status TEXT DEFAULT 'pending',
+    current_phase TEXT DEFAULT '',
+    phases_json TEXT DEFAULT '[]',
+    brief TEXT DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    completed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_mission_runs_project ON mission_runs(project_id);
+CREATE INDEX IF NOT EXISTS idx_mission_runs_status ON mission_runs(status);
