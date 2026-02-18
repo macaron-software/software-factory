@@ -225,6 +225,11 @@ async def run_pattern(
     })
 
     try:
+        import sys
+        # Prevent recursion errors from deep async/httpx stacks during concurrent LLM calls
+        if sys.getrecursionlimit() < 3000:
+            sys.setrecursionlimit(3000)
+
         ptype = pattern.type
         if ptype == "solo":
             await _run_solo(run, initial_task)

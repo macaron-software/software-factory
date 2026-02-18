@@ -253,6 +253,9 @@
             <button id="mc-run-btn" onclick="startMissionExecution()" style="width:100%;padding:0.45rem;border:none;border-radius:6px;background:var(--purple);color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.4rem;transition:opacity .15s">
                 <svg class="icon icon-xs"><use href="#icon-play"/></svg> Démarrer le Mega-Workflow
             </button>
+            <button id="mc-reset-btn" onclick="resetMission()" style="width:100%;padding:0.45rem;border:none;border-radius:6px;background:transparent;color:var(--text-secondary);font-size:0.72rem;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.4rem;margin-top:0.3rem;border:1px solid var(--border-color);transition:all .15s" onmouseover="this.style.borderColor='var(--purple)';this.style.color='var(--purple)'" onmouseout="this.style.borderColor='var(--border-color)';this.style.color='var(--text-secondary)'">
+                ↺ Réinitialiser la mission
+            </button>
         </div>
         <div class="mc-activity" id="mc-activity">
             <div class="mc-msg system"><div class="mc-msg-content">Mission démarrée — {{ mission.brief[:200] }}</div></div>
@@ -788,6 +791,18 @@ async function startMissionExecution() {
     try {
         await fetch(`/api/missions/${MISSION_ID}/run`, {method:'POST'});
     } catch(err) { console.error(err); }
+}
+
+async function resetMission() {
+    if (!confirm('Réinitialiser la mission ? Toutes les discussions seront effacées.')) return;
+    try {
+        const resp = await fetch(`/api/missions/${MISSION_ID}/reset`, {method:'POST'});
+        if (resp.ok) {
+            window.location.reload();
+        } else {
+            alert('Erreur lors de la réinitialisation');
+        }
+    } catch(err) { console.error(err); alert('Erreur réseau'); }
 }
 
 function esc(t) { return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }

@@ -4942,6 +4942,58 @@ async def api_mission_validate(request: Request, mission_id: str):
     return JSONResponse({"decision": decision, "phase": mission.current_phase})
 
 
+@router.post("/api/missions/{mission_id}/reset")
+async def api_mission_reset(request: Request, mission_id: str):
+    """Reset a mission: all phases back to pending, clear messages, ready to re-run."""
+    from ..missions.store import get_mission_run_store
+    from ..sessions.store import get_session_store, MessageDef
+    from ..models import PhaseStatus, MissionStatus
+    from ..sessions.runner import _push_sse
+
+    run_store = get_mission_run_store()
+    mission = run_store.get(mission_id)
+    if not mission:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    # Reset all phases to pending
+    for p in mission.phases:
+        p.status = PhaseStatus.PENDING
+        p.started_at = None
+        p.completed_at = None
+        p.summary = ""
+        p.agent_count = 0
+
+    mission.status = MissionStatus.RUNNING
+    mission.current_phase = ""
+    run_store.update(mission)
+
+    # Clear session messages (keep the session itself)
+    if mission.session_id:
+        from ..db.migrations import get_db
+        conn = get_db()
+        conn.execute("DELETE FROM messages WHERE session_id = ?", (mission.session_id,))
+        conn.commit()
+        conn.close()
+
+        # Add reset marker
+        store = get_session_store()
+        store.add_message(MessageDef(
+            session_id=mission.session_id,
+            from_agent="system",
+            to_agent="all",
+            message_type="system",
+            content="🔄 Mission réinitialisée — prête pour une nouvelle exécution.",
+        ))
+
+        # Notify frontend
+        await _push_sse(mission.session_id, {
+            "type": "mission_reset",
+            "mission_id": mission_id,
+        })
+
+    return JSONResponse({"status": "reset", "mission_id": mission_id})
+
+
 @router.post("/api/missions/{mission_id}/run")
 async def api_mission_run(request: Request, mission_id: str):
     """Drive mission execution: CDP orchestrates phases sequentially.
