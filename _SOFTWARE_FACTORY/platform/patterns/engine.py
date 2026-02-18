@@ -124,27 +124,18 @@ MANDATORY:
 IMPORTANT: You MUST include [APPROVE] or [VETO] in your response. The workflow will be blocked if you VETO."""
 
 # Research protocol for ideation/discussion — agents can READ docs, search memory, but NOT write code
-_RESEARCH_PROTOCOL = """[RESEARCH & ANALYSIS MODE]
+_RESEARCH_PROTOCOL = """[DISCUSSION MODE]
 
-You are an EXPERT contributing to a collaborative analysis session.
-Your job is to provide deep, informed insights from your domain of expertise.
+You are an EXPERT in a collaborative team discussion.
+Respond DIRECTLY with your analysis — do NOT use tools or write code.
 
-AVAILABLE TOOLS (use them to gather real data):
-- memory_search: Search project knowledge base, past decisions, stored context
-- memory_store: Store important findings or decisions for future reference
-- code_read: Read documents, specs, config files to base your analysis on facts
-- code_search: Search for relevant patterns, references, or prior art
-- list_files: Browse project structure to understand what exists
-- deep_search: Deep recursive exploration of a codebase or knowledge base
-
-DO NOT use: code_write, code_edit, git_commit, docker_build, deploy_azure.
-Your role is to ANALYZE and RECOMMEND, not to write code.
-
-RESPOND WITH:
-1. Your expert analysis grounded in real data (cite sources when using tools)
-2. Concrete risks, opportunities, or recommendations
-3. Questions for other team members (@mention them)
-4. Actionable next steps from your domain perspective"""
+RULES:
+- Speak naturally as a domain expert in a meeting
+- @mention colleagues when addressing them or asking questions
+- React to what others have said, don't repeat
+- Be concise: 150-300 words max
+- Give concrete recommendations, not generic advice
+- Challenge ideas constructively when you disagree"""
 
 
 def _build_team_context(run: PatternRun, current_node: str, to_agent_id: str) -> str:
@@ -427,6 +418,7 @@ async def _execute_node(
             "duration_ms": result.duration_ms,
             "node_id": node_id,
             "pattern_id": run.pattern.id,
+            "pattern_type": run.pattern.type,
             "tool_calls": result.tool_calls if result.tool_calls else None,
         },
     ))
@@ -504,6 +496,8 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         except Exception:
             pass
 
+    has_project = bool(run.project_id)
+
     return ExecutionContext(
         agent=agent,
         session_id=run.session_id,
@@ -513,6 +507,7 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         project_context=project_context,
         skills_prompt=skills_prompt,
         vision=vision,
+        tools_enabled=has_project,
     )
 
 
@@ -923,27 +918,65 @@ async def _run_network(run: PatternRun, task: str):
     if not debaters:
         debaters = [n for n in nodes if n != judge_id]
 
-    # Debate rounds — debaters talk to each other
-    prev_round = ""
+    # ── Step 1: Leader brief (hierarchical) ──
+    # The judge/PO frames the discussion and assigns each expert
+    leader_brief = ""
+    debater_names = []
+    for did in debaters:
+        ns = run.nodes.get(did)
+        if ns and ns.agent:
+            debater_names.append(f"@{ns.agent.name} ({ns.agent.role or did})")
+    team_list = ", ".join(debater_names) if debater_names else "l'équipe"
+
+    if judge_id:
+        leader_brief = await _execute_node(
+            run, judge_id,
+            f"Tu diriges cette session d'analyse. Voici ton équipe : {team_list}.\n\n"
+            f"1. Cadre le sujet en 2-3 phrases\n"
+            f"2. Assigne à CHAQUE expert (@mention) ce que tu attends de lui\n"
+            f"3. Pose 1-2 questions clés pour orienter la discussion\n\n"
+            f"Sujet soumis par le client :\n{task}",
+            to_agent_id="all",
+        )
+        run.nodes[judge_id].status = NodeStatus.PENDING
+
+    # ── Step 2: Debate rounds (network) ──
+    # Experts discuss, react to each other, build on the brief
+    prev_round = leader_brief
     for rnd in range(max_rounds):
         run.iteration = rnd + 1
         round_outputs = []
-        other_debaters = debaters.copy()
         for did in debaters:
-            # Each debater addresses the other debaters
-            peers = [d for d in other_debaters if d != did]
+            peers = [d for d in debaters if d != did]
             to = _node_agent_id(run, peers[0]) if len(peers) == 1 else "all"
-            prompt = task if rnd == 0 else f"{task}\n\n[Previous round]:\n{prev_round}"
+            if rnd == 0:
+                prompt = (
+                    f"Ton responsable a briefé l'équipe (ci-dessous). "
+                    f"Réponds à ce qui te concerne, pose des questions aux collègues (@mention), "
+                    f"et donne ton analyse d'expert.\n\n"
+                    f"Sujet : {task}"
+                )
+            else:
+                prompt = (
+                    f"Poursuis la discussion. Réagis aux points soulevés par tes collègues, "
+                    f"réponds à leurs questions, challenge leurs propositions.\n\n"
+                    f"Sujet : {task}\n\n[Échanges précédents]:\n{prev_round}"
+                )
             output = await _execute_node(
                 run, did, prompt, context_from=prev_round, to_agent_id=to,
             )
             round_outputs.append(f"[{did}]: {output}")
         prev_round = "\n\n".join(round_outputs)
 
-    # Judge decides — reports to all
+    # ── Step 3: Judge synthesis ──
+    # PO consolidates all contributions into a decision
     if judge_id:
         await _execute_node(
             run, judge_id,
-            f"Based on the debate, make a final decision:\n{prev_round}",
+            f"Synthétise toutes les contributions de ton équipe.\n\n"
+            f"1. Résume les points clés de chaque expert\n"
+            f"2. Identifie les consensus et les points de désaccord\n"
+            f"3. Propose une décision et les prochaines étapes\n\n"
+            f"Contributions :\n{prev_round}",
             to_agent_id="all",
         )
