@@ -934,8 +934,20 @@ document.getElementById('btnCreateEpic').addEventListener('click', async () => {
     btn.disabled = true;
     btn.innerHTML = '<svg class="icon icon-xs spin" style="vertical-align:-2px"><use href="#icon-loader"/></svg> Alexandre Faure (PO) structure le projet...';
 
-    addMsg('agent', 'Alexandre Faure', 'Je prends le relai ! Structuration du projet, epic, features et user stories en cours...', 'var(--green)',
-        igAgents.find(a=>a.id==='product_manager')?.avatar_url || '');
+    const poAvatar = igAgents.find(a=>a.id==='product_manager')?.avatar_url || '';
+    addMsg('agent', 'Alexandre Faure', 'Je prends le relai ! Structuration du projet, epic, features et user stories en cours...', 'var(--green)', poAvatar);
+
+    // Progress messages while LLM works
+    const progressMsgs = [
+        {t: 8000,  txt: 'Analyse des contributions de l\'équipe...'},
+        {t: 20000, txt: 'Structuration de l\'epic et des features...'},
+        {t: 35000, txt: 'Rédaction des user stories...'},
+        {t: 50000, txt: 'Finalisation du backlog...'},
+    ];
+    let epicDone = false;
+    const progressTimers = progressMsgs.map(p => setTimeout(() => {
+        if (!epicDone) addMsg('agent', 'Alexandre Faure', p.txt, 'var(--green)', poAvatar);
+    }, p.t));
 
     const findings = collectFindings();
     const description = findings.map(f => `[${f.type.toUpperCase()}] ${f.text}`).join('\n');
@@ -963,6 +975,8 @@ document.getElementById('btnCreateEpic').addEventListener('click', async () => {
             }),
         });
         const data = await resp.json();
+        epicDone = true;
+        progressTimers.forEach(clearTimeout);
         if (data.redirect) {
             const featCount = (data.features || []).length;
             const storyCount = (data.features || []).reduce((s,f) => s + (f.stories||[]).length, 0);
@@ -983,6 +997,8 @@ document.getElementById('btnCreateEpic').addEventListener('click', async () => {
             btn.innerHTML = '<svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-rocket"/></svg> Créer un Epic depuis cette idée';
         }
     } catch(e) {
+        epicDone = true;
+        progressTimers.forEach(clearTimeout);
         addMsg('system', 'Système', 'Erreur: ' + e.message, 'var(--red)', '');
         btn.disabled = false;
         btn.innerHTML = '<svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-rocket"/></svg> Créer un Epic depuis cette idée';
