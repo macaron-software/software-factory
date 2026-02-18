@@ -701,27 +701,41 @@ function handleStreamStart(data){
   const agent = agentById(data.agent_id);
   const name = agent ? agent.name : data.agent_name || data.agent_id;
   const color = agent ? agent.color : '#8b949e';
-  const icon = agent ? (agent.icon || 'bot') : 'bot';
+  const avatarUrl = agent ? agent.avatar_url : '';
+  if (!window._streamCounter) window._streamCounter = 0;
+  const bubbleId = `stream-${data.agent_id}-${++window._streamCounter}`;
   const div = document.createElement('div');
   div.className = 'mu mu--thread mu--streaming';
-  div.id = `stream-${data.agent_id}`;
+  div.id = bubbleId;
   div.style.borderLeftColor = color;
+  const avatarHtml = avatarUrl
+    ? `<img src="${avatarUrl}" alt="${esc(name)}" style="width:24px;height:24px;border-radius:50%">`
+    : `<div style="width:24px;height:24px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff">${esc(name.substring(0,2))}</div>`;
+  // Build metadata tags
+  const metaParts = [];
+  if(data.pattern_type) metaParts.push(`<span class="mu__tag mu__tag--pattern">${data.pattern_type}</span>`);
+  if(data.flow_step) metaParts.push(`<span class="mu__tag mu__tag--flow">${data.flow_step}</span>`);
+  if(data.to_agent && data.to_agent !== 'all') {
+    const toNames = data.to_agent.split(',').map(id => { const a = agentById(id.trim()); return a ? a.name.split(' ')[0] : id; });
+    metaParts.push(`<span class="mu__tag mu__tag--to">→ ${toNames.join(', ')}</span>`);
+  } else if(data.to_agent === 'all') {
+    metaParts.push(`<span class="mu__tag mu__tag--to">→ Équipe</span>`);
+  }
+  const metaHtml = metaParts.length ? `<div class="mu__tags">${metaParts.join(' ')}</div>` : '';
   div.innerHTML = `
-    <div class="mu__avatar" style="background:${color}20;border-color:${color}">
-      <svg class="icon icon-sm" style="color:${color}"><use href="#icon-${icon}"/></svg>
-    </div>
+    <div class="mu__avatar" style="background:${color}20;border-color:${color}">${avatarHtml}</div>
     <div class="mu__body">
       <div class="mu__meta">
         <span class="mu__name" style="color:${color}">${esc(name)}</span>
         ${agent&&agent.role ? `<span class="mu__role">${esc(agent.role)}</span>` : ''}
         <span class="mu__typing">typing<span class="mu__dots">...</span></span>
       </div>
+      ${metaHtml}
       <div class="mu__content md-rendered mu__stream-content"></div>
     </div>`;
   feed.appendChild(div);
   feed.scrollTop = feed.scrollHeight;
-  _streamBuffers[data.agent_id] = {div, content: ''};
-  // Pulse the graph node
+  _streamBuffers[data.agent_id] = {div, content: '', bubbleId};
   updateNodeStatus({from_agent: data.agent_id, type: 'thinking'});
 }
 
@@ -1227,7 +1241,7 @@ function renderLiveNodes(){
     const agent = agentById(agId);
     const col = (agent && agent.color) || 'var(--purple)';
     const name = esc(agent ? agent.name : (n.label || n.id));
-    const emoji = agent ? agent.avatar : '';
+    const emoji = '';  // Use initials, not emoji
     const role = esc(agent ? agent.role : (n.role || ''));
     const status = (agent && agent.status) || n.status || 'idle';
     const sel = agId === highlightedNode;
