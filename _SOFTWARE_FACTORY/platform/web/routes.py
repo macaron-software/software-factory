@@ -4674,7 +4674,8 @@ async def mission_control_page(request: Request, mission_id: str):
                 {"id": a,
                  "name": agent_map[a]["name"] if a in agent_map else a,
                  "role": agent_map[a]["role"] if a in agent_map else "",
-                 "avatar": agent_map[a]["avatar_url"] if a in agent_map else ""}
+                 "avatar": agent_map[a]["avatar_url"] if a in agent_map else "",
+                 "color": agent_map[a]["color"] if a in agent_map else "#8b949e"}
                 for a in aids
             ]
             # Extract sub-graph: nodes in this phase + edges between them
