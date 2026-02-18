@@ -1888,10 +1888,13 @@ CDP Migration → Lead Dev → Dev Pilot + Dev Main + QA + Security + DevOps
 
 ### START
 ```bash
-cd _SOFTWARE_FACTORY && rm -f data/platform.db data/platform.db-wal data/platform.db-shm
-MINIMAX_API_KEY=dummy AZURE_OPENAI_API_KEY=dummy AZURE_AI_API_KEY=dummy \
+cd _SOFTWARE_FACTORY
 python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8099 --ws none --log-level warning
 ```
+
+### ⚠️ CRITICAL RULES — DO NOT BREAK
+1. **NEVER `rm -f data/platform.db`** — The DB is persistent. It contains user missions, sessions, messages, memory. Deleting it destroys all user work. `init_db()` handles migrations idempotently (CREATE IF NOT EXISTS + ALTER TABLE safe).
+2. **NEVER set `MINIMAX_API_KEY=dummy`** (or any `*_API_KEY=dummy`) — API keys are loaded from `~/.config/factory/*.key` files automatically. Setting dummy env vars overrides real keys and breaks all LLM calls. Just start the server without any env var overrides.
 
 ### DASHBOARD VIEWS (4 profiles)
 
