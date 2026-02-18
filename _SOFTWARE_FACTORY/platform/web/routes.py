@@ -3900,9 +3900,10 @@ async def ideation_submit(request: Request):
         config={"max_rounds": 2},
     )
 
-    # Launch pattern in background — agents will stream via SSE
+    # Launch pattern in background — small delay lets SSE connect first
     async def _run_ideation():
         try:
+            await asyncio.sleep(0.5)  # Let frontend SSE connect before first events
             await run_pattern(pattern, session_id, prompt)
         except Exception as e:
             logger.error("Ideation pattern failed: %s", e)

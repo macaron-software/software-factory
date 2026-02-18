@@ -123,6 +123,29 @@ MANDATORY:
 
 IMPORTANT: You MUST include [APPROVE] or [VETO] in your response. The workflow will be blocked if you VETO."""
 
+# Research protocol for ideation/discussion — agents can READ docs, search memory, but NOT write code
+_RESEARCH_PROTOCOL = """[RESEARCH & ANALYSIS MODE]
+
+You are an EXPERT contributing to a collaborative analysis session.
+Your job is to provide deep, informed insights from your domain of expertise.
+
+AVAILABLE TOOLS (use them to gather real data):
+- memory_search: Search project knowledge base, past decisions, stored context
+- memory_store: Store important findings or decisions for future reference
+- code_read: Read documents, specs, config files to base your analysis on facts
+- code_search: Search for relevant patterns, references, or prior art
+- list_files: Browse project structure to understand what exists
+- deep_search: Deep recursive exploration of a codebase or knowledge base
+
+DO NOT use: code_write, code_edit, git_commit, docker_build, deploy_azure.
+Your role is to ANALYZE and RECOMMEND, not to write code.
+
+RESPOND WITH:
+1. Your expert analysis grounded in real data (cite sources when using tools)
+2. Concrete risks, opportunities, or recommendations
+3. Questions for other team members (@mention them)
+4. Actionable next steps from your domain perspective"""
+
 
 def _build_team_context(run: PatternRun, current_node: str, to_agent_id: str) -> str:
     """Build team awareness: who's on the team, what's the communication flow."""
@@ -282,7 +305,7 @@ async def _execute_node(
         full_task += f"[Message from colleague]:\n{context_from}\n\n"
     full_task += f"[Your task]:\n{task}\n\n"
 
-    # Inject role-based execution protocol (only for project-bound sessions)
+    # Inject role-based execution protocol
     role_lower = (agent.role or "").lower()
     rank = getattr(agent, "hierarchy_rank", 50)
     has_project = bool(run.project_id)
@@ -295,8 +318,8 @@ async def _execute_node(
             full_task += _REVIEW_PROTOCOL
         full_task += "\n\n" + _PR_PROTOCOL
     else:
-        # Ideation / discussion — no tools, just analysis
-        full_task += "\n\n[DISCUSSION MODE] Respond with your expert analysis. Do NOT use tools or write code. Focus on insights, risks, recommendations, and actionable points for your domain of expertise.\n"
+        # Ideation / research — read tools OK, no code writing
+        full_task += _RESEARCH_PROTOCOL
 
     # Execute with streaming SSE
     executor = get_executor()
@@ -311,16 +334,24 @@ async def _execute_node(
 
     import re as _re
     in_think = False
+    in_tool_call = False
     try:
         async for kind, value in executor.run_streaming(ctx, full_task):
             if kind == "delta":
                 delta = value
+                # Filter <think> blocks
                 if "<think>" in delta:
                     in_think = True
                 if "</think>" in delta:
                     in_think = False
                     continue
-                if not in_think:
+                # Filter <minimax:tool_call> artifacts
+                if "<minimax:tool_call>" in delta or "<tool_call>" in delta:
+                    in_tool_call = True
+                if "</minimax:tool_call>" in delta or "</tool_call>" in delta:
+                    in_tool_call = False
+                    continue
+                if not in_think and not in_tool_call:
                     await _push_sse(run.session_id, {
                         "type": "stream_delta",
                         "agent_id": agent.id,
@@ -335,10 +366,14 @@ async def _execute_node(
     if result is None:
         result = await executor.run(ctx, full_task)
 
-    # Strip <think> blocks from final content
+    # Strip <think> and tool-call artifacts from final content
     content = result.content or ""
     if "<think>" in content:
         content = _re.sub(r"<think>.*?</think>\s*", "", content, flags=_re.DOTALL).strip()
+    if "<minimax:tool_call>" in content or "<tool_call>" in content:
+        content = _re.sub(r"<minimax:tool_call>.*?</minimax:tool_call>\s*", "", content, flags=_re.DOTALL).strip()
+        content = _re.sub(r"<tool_call>.*?</tool_call>\s*", "", content, flags=_re.DOTALL).strip()
+    if content != (result.content or ""):
         result = ExecutionResult(
             content=content, agent_id=result.agent_id, model=result.model,
             provider=result.provider, tokens_in=result.tokens_in,
@@ -469,9 +504,6 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         except Exception:
             pass
 
-    # Disable tools when no project (ideation/discussion mode)
-    has_tools = bool(project_path)
-
     return ExecutionContext(
         agent=agent,
         session_id=run.session_id,
@@ -481,7 +513,6 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         project_context=project_context,
         skills_prompt=skills_prompt,
         vision=vision,
-        tools_enabled=has_tools,
     )
 
 

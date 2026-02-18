@@ -38,13 +38,16 @@ test.describe('Ideation Flow', () => {
     // User message should appear immediately
     await expect(page.locator('.mu--chat, .idea-msg').first()).toBeVisible({ timeout: 5_000 });
 
-    // Wait for agent responses (LLM call, up to 60s)
+    // Wait for "Idéation en cours" status to confirm pattern started
+    await expect(page.getByText('Idéation en cours')).toBeVisible({ timeout: 5_000 });
+
+    // Wait for agent responses (LLM + tool calls, up to 120s)
     // At least one agent message should appear
-    await expect(page.locator('.mu--agent, .idea-msg.agent').first()).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator('.mu--agent, .idea-msg.agent').first()).toBeVisible({ timeout: 120_000 });
 
     // Verify response has meaningful content (> 50 chars)
     const firstAgent = page.locator('.mu--agent .mu__content, .idea-msg.agent .mu__content').first();
-    await expect(firstAgent).toBeVisible({ timeout: 60_000 });
+    await expect(firstAgent).toBeVisible({ timeout: 120_000 });
     const text = await firstAgent.textContent();
     expect(text?.length).toBeGreaterThan(50);
   });
