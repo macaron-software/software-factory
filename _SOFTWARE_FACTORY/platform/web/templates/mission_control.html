@@ -527,7 +527,13 @@ function handleSSE(d) {
     }
     else if (d.type === 'phase_failed') {
         updatePhaseStatus(d.phase_id, 'failed');
-        addActivity('Phase échouée', 'system');
+        addActivity('⛔ Phase échouée', 'system');
+    }
+    else if (d.type === 'mission_failed') {
+        addActivity('⛔ Mission arrêtée — phase échouée', 'system');
+        // Disable run button, show reset
+        const runBtn = document.querySelector('.mc-run-btn');
+        if (runBtn) { runBtn.disabled = true; runBtn.textContent = '⛔ Mission échouée'; }
     }
     else if (d.type === 'checkpoint') {
         updatePhaseStatus(d.phase_id, 'waiting_validation');

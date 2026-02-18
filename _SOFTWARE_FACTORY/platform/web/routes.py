@@ -5262,19 +5262,40 @@ async def api_mission_run(request: Request, mission_id: str):
             if i < len(mission.phases) - 1:
                 if phase_success:
                     cdp_msg = f"Phase «{wf_phase.name}» réussie. Passage à la phase suivante…"
+                    await _push_sse(session_id, {
+                        "type": "message",
+                        "from_agent": "chef_de_programme",
+                        "from_name": "Alexandre Moreau",
+                        "from_role": "Chef de Programme",
+                        "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                        "content": cdp_msg,
+                        "phase_id": phase.phase_id,
+                        "msg_type": "text",
+                    })
+                    await asyncio.sleep(0.8)
                 else:
-                    cdp_msg = f"Phase «{wf_phase.name}» échouée ({phase_error[:100]}). Passage à la phase suivante malgré les erreurs…"
-                await _push_sse(session_id, {
-                    "type": "message",
-                    "from_agent": "chef_de_programme",
-                    "from_name": "Alexandre Moreau",
-                    "from_role": "Chef de Programme",
-                    "from_avatar": "/static/avatars/chef_de_programme.jpg",
-                    "content": cdp_msg,
-                    "phase_id": phase.phase_id,
-                    "msg_type": "text",
-                })
-                await asyncio.sleep(0.8)
+                    # Phase failed — STOP mission, don't continue blindly
+                    short_err = phase_error[:200] if phase_error else "erreur inconnue"
+                    cdp_msg = f"⛔ Phase «{wf_phase.name}» échouée ({short_err}). Mission arrêtée — corrigez puis relancez via le bouton Réinitialiser."
+                    await _push_sse(session_id, {
+                        "type": "message",
+                        "from_agent": "chef_de_programme",
+                        "from_name": "Alexandre Moreau",
+                        "from_role": "Chef de Programme",
+                        "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                        "content": cdp_msg,
+                        "phase_id": phase.phase_id,
+                        "msg_type": "text",
+                    })
+                    mission.status = MissionStatus.FAILED
+                    run_store.update(mission)
+                    await _push_sse(session_id, {
+                        "type": "mission_failed",
+                        "mission_id": mission.id,
+                        "phase_id": phase.phase_id,
+                        "error": short_err,
+                    })
+                    return
 
         # Mission complete — real summary
         if phases_failed == 0:
