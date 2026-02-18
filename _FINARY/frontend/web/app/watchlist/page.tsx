@@ -162,7 +162,6 @@ export default function WatchlistPage() {
     <div className="space-y-8">
       <PageHeader
         label="Watchlist & Signaux"
-        value={0}
         right={
           <div className="flex items-center gap-3">
             <span className="text-t-3 font-medium">{signals.length} titres</span>
