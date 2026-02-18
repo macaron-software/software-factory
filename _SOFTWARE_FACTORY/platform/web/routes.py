@@ -41,6 +41,7 @@ def _agent_map_for_template(agents) -> dict:
                 "color": a.color or "#8b949e", "role": a.role or "",
                 "avatar": getattr(a, "avatar", "") or "bot",
                 "avatar_url": _avatar_url(a.id),
+                "hierarchy_rank": getattr(a, "hierarchy_rank", 50),
             }
         elif isinstance(a, dict):  # already a dict
             aid = a.get("id", "")
@@ -49,6 +50,7 @@ def _agent_map_for_template(agents) -> dict:
                 "color": a.get("color", "#8b949e"), "role": a.get("role", ""),
                 "avatar": a.get("avatar", "bot"),
                 "avatar_url": a.get("avatar_url", "") or _avatar_url(aid),
+                "hierarchy_rank": a.get("hierarchy_rank", 50),
             }
     return m
 
@@ -4690,6 +4692,7 @@ async def mission_control_page(request: Request, mission_id: str):
                     "label": am.get("name", n.get("label", aid)),
                     "role": am.get("role", ""),
                     "avatar": am.get("avatar_url", ""),
+                    "hierarchy_rank": am.get("hierarchy_rank", 50),
                 })
             phase_graphs[wp.id] = {"nodes": enriched_nodes, "edges": p_edges}
 

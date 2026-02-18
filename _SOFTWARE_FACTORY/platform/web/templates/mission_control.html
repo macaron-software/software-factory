@@ -87,7 +87,7 @@
 .mc-graph-legend{position:absolute;bottom:6px;left:8px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:4px 8px;display:flex;gap:8px;align-items:center;font-size:0.62rem;color:var(--text-secondary)}
 
 /* Discussion */
-.mc-phase-discuss{padding:0.5rem 0.6rem;overflow-y:auto;max-height:400px;display:flex;flex-direction:column;gap:0.35rem}
+.mc-phase-discuss{padding:0.5rem 0.6rem;overflow-y:auto;max-height:350px;display:flex;flex-direction:column;gap:0.35rem}
 .mc-discuss-empty{font-size:0.72rem;color:var(--text-secondary);font-style:italic;padding:1.5rem 0.8rem;text-align:center}
 .mc-discuss-msg{display:flex;gap:0.35rem;align-items:flex-start}
 .mc-discuss-avatar{width:22px;height:22px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:0.15rem}
@@ -155,12 +155,16 @@
 @media(max-width:900px){.mc-layout{grid-template-columns:1fr;height:auto}.mc-sidebar{border-left:none;border-top:1px solid var(--border)}}
 </style>
 
-<!-- SVG defs for arrow markers -->
+<!-- SVG defs for pattern-colored arrow markers -->
 <svg width="0" height="0" style="position:absolute">
   <defs>
-    <marker id="mc-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-      <path d="M0,0 L8,3 L0,6" fill="var(--purple)" opacity="0.6"/>
-    </marker>
+    <marker id="mc-arrow-sequential" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3b82f6" opacity="0.8"/></marker>
+    <marker id="mc-arrow-hierarchical" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#f59e0b" opacity="0.8"/></marker>
+    <marker id="mc-arrow-parallel" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#10b981" opacity="0.8"/></marker>
+    <marker id="mc-arrow-loop" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ec4899" opacity="0.8"/></marker>
+    <marker id="mc-arrow-network" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b5cf6" opacity="0.8"/></marker>
+    <marker id="mc-arrow-router" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#06b6d4" opacity="0.8"/></marker>
+    <marker id="mc-arrow-default" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280" opacity="0.6"/></marker>
   </defs>
 </svg>
 
@@ -196,9 +200,9 @@
                         <span class="mc-phase-chevron"><svg class="icon icon-xs mc-phase-chevron-icon"><use href="#icon-chevron-right"/></svg></span>
                     </div>
                     <div class="mc-phase-body">
-                        <!-- Mini flow graph -->
+                        <!-- Full flow graph -->
                         <div class="mc-phase-graph" id="graph-{{ phase.phase_id }}"></div>
-                        <!-- Discussion -->
+                        <!-- Discussion below graph -->
                         <div class="mc-phase-discuss" id="discuss-{{ phase.phase_id }}">
                             <div class="mc-discuss-empty">En attente d'exécution…</div>
                         </div>
@@ -297,71 +301,129 @@ for (const [pid, agents] of Object.entries(PHASE_AGENTS)) {
     }
 }
 
-/* ── Render mini flow graphs per phase ── */
+/* ── Render session_live style flow graphs per phase ── */
+const MC_NW = 200, MC_NH = 80;
+const MC_PATTERN_STYLES = {
+    sequential:   {color:'#3b82f6', dash:'',        icon:'→'},
+    hierarchical: {color:'#f59e0b', dash:'',        icon:'⬡'},
+    parallel:     {color:'#10b981', dash:'6 3',     icon:'⇉'},
+    loop:         {color:'#ec4899', dash:'4 4',     icon:'↻'},
+    network:      {color:'#8b5cf6', dash:'2 4 8 4', icon:'⬡'},
+    router:       {color:'#06b6d4', dash:'',        icon:'⬡'},
+    aggregator:   {color:'#f97316', dash:'3 3',     icon:'⬡'},
+    'human-in-the-loop': {color:'#eab308', dash:'6 2', icon:'👤'},
+};
+
 function renderPhaseGraphs() {
     for (const [phaseId, graph] of Object.entries(PHASE_GRAPHS)) {
         const container = document.getElementById(`graph-${phaseId}`);
         if (!container || !graph.nodes.length) continue;
-
-        const W = 210, NR = 15;
-        const nodes = graph.nodes;
-        const edges = graph.edges;
+        const nodes = graph.nodes.map(n => ({...n}));
+        const edges = graph.edges || [];
         const N = nodes.length;
 
-        // Auto-layout: force-directed simple — arrange in rows
-        const cols = Math.min(N, 3);
-        const rows = Math.ceil(N / cols);
-        const gapX = W / (cols + 1);
-        const gapY = (rows > 1) ? 55 : 40;
-        const H = rows * gapY + 40;
+        // Get phase pattern
+        const phaseEl = container.closest('.mc-phase');
+        const patternId = phaseEl ? (phaseEl.querySelector('.mc-phase-pattern')?.textContent || '') : '';
+        const pStyle = MC_PATTERN_STYLES[patternId.trim()] || MC_PATTERN_STYLES['sequential'];
 
-        nodes.forEach((n, i) => {
-            const row = Math.floor(i / cols);
-            const col = i % cols;
-            const rowCount = (row === rows - 1) ? (N - row * cols) : cols;
-            const rowStartX = (W - rowCount * gapX) / 2 + gapX / 2;
-            n.cx = rowStartX + col * gapX;
-            n.cy = 22 + row * gapY;
+        // Auto-layout: organize by hierarchy_rank
+        const sorted = nodes.slice().sort((a,b)=> (a.hierarchy_rank||50) - (b.hierarchy_rank||50));
+        const layerMap = new Map();
+        sorted.forEach(n => {
+            const rank = n.hierarchy_rank || 50;
+            if(!layerMap.has(rank)) layerMap.set(rank, []);
+            layerMap.get(rank).push(n);
+        });
+        const layers = [...layerMap.values()];
+        const layerGap = Math.max(MC_NH + 30, 110);
+        const maxCols = Math.max(...layers.map(l=>l.length));
+        const W = Math.max(maxCols * (MC_NW + 20) + 40, 500);
+        const H = layers.length * layerGap + 40;
+
+        layers.forEach((layer, li) => {
+            const y = 20 + li * layerGap;
+            const gap = Math.min(MC_NW + 30, (W - 40) / (layer.length || 1));
+            const startX = Math.max(10, (W - gap*(layer.length-1) - MC_NW) / 2);
+            layer.forEach((n, i) => { n.x = startX + i * gap; n.y = y; });
         });
 
         const nodeById = {};
         nodes.forEach(n => { nodeById[n.id] = n; });
 
-        let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}">`;
-        svg += `<defs><marker id="ma-${phaseId}" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto"><path d="M0,0 L6,2.5 L0,5" fill="var(--purple)" opacity="0.5"/></marker></defs>`;
+        container.style.minHeight = H + 'px';
+        let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="min-height:${H}px">`;
 
-        // Edges
+        // Edges with bezier curves
         edges.forEach(e => {
             const fn = nodeById[e.from], tn = nodeById[e.to];
             if (!fn || !tn) return;
-            const dx = tn.cx - fn.cx, dy = tn.cy - fn.cy;
-            const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-            const x1 = fn.cx + (dx/dist)*NR, y1 = fn.cy + (dy/dist)*NR;
-            const x2 = tn.cx - (dx/dist)*(NR+4), y2 = tn.cy - (dy/dist)*(NR+4);
-            const color = e.color || 'var(--purple)';
-            svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="1.2" opacity="0.45" marker-end="url(#ma-${phaseId})"/>`;
+            const eColor = e.color || pStyle.color;
+            const eDash = pStyle.dash || '';
+            const hasReverse = edges.some(re => re.from===e.to && re.to===e.from);
+            const offset = hasReverse ? 10 : 0;
+            let x1f, y1f, x2f, y2f, d;
+            const dy = tn.y - fn.y, dx = tn.x - fn.x;
+
+            if(Math.abs(dy) < MC_NH * 0.8){
+                if(dx > 0){
+                    x1f = fn.x + MC_NW; y1f = fn.y + MC_NH/2 - offset;
+                    x2f = tn.x;          y2f = tn.y + MC_NH/2 + offset;
+                } else {
+                    x1f = fn.x;          y1f = fn.y + MC_NH/2 - offset;
+                    x2f = tn.x + MC_NW;  y2f = tn.y + MC_NH/2 + offset;
+                }
+                const midY = Math.min(y1f, y2f) - 30;
+                d = `M${x1f},${y1f} C${x1f},${midY} ${x2f},${midY} ${x2f},${y2f}`;
+            } else if(dy > 0){
+                x1f = fn.x + MC_NW/2 + offset; y1f = fn.y + MC_NH;
+                x2f = tn.x + MC_NW/2 - offset; y2f = tn.y;
+                const co = Math.max(25, Math.abs(y2f-y1f)*0.3);
+                d = `M${x1f},${y1f} C${x1f},${y1f+co} ${x2f},${y2f-co} ${x2f},${y2f}`;
+            } else {
+                x1f = fn.x + MC_NW/2 - offset; y1f = fn.y;
+                x2f = tn.x + MC_NW/2 + offset; y2f = tn.y + MC_NH;
+                const co = Math.max(25, Math.abs(y2f-y1f)*0.3);
+                d = `M${x1f},${y1f} C${x1f},${y1f-co} ${x2f},${y2f+co} ${x2f},${y2f}`;
+            }
+            svg += `<path d="${d}" class="mc-edge-line" style="stroke:${eColor};marker-end:url(#mc-arrow-${patternId.trim()||'default'})${eDash?`;stroke-dasharray:${eDash}`:''}"/>`;
             if (e.label) {
-                const mx = (x1+x2)/2, my = (y1+y2)/2 - 3;
-                svg += `<text x="${mx}" y="${my}" class="mc-graph-edge-label">${esc(e.label)}</text>`;
+                const mx = (x1f+x2f)/2, my = (y1f+y2f)/2 - 5;
+                svg += `<text x="${mx}" y="${my}" class="mc-edge-count" style="fill:${eColor}">${esc(e.label)}</text>`;
             }
         });
 
-        // Nodes
+        // Nodes as full cards
         nodes.forEach(n => {
-            svg += `<g class="mc-graph-node" transform="translate(${n.cx},${n.cy})">`;
-            svg += `<circle r="${NR}" fill="var(--bg-tertiary)" stroke="var(--purple)" stroke-width="1.5"/>`;
-            if (n.avatar) {
-                svg += `<clipPath id="clip-${n.id}"><circle r="${NR-1.5}"/></clipPath>`;
-                svg += `<image href="${esc(n.avatar)}" x="-${NR-1.5}" y="-${NR-1.5}" width="${(NR-1.5)*2}" height="${(NR-1.5)*2}" clip-path="url(#clip-${n.id})" preserveAspectRatio="xMidYMid slice"/>`;
-            }
-            const label = (n.label || '').length > 14 ? (n.label||'').substring(0,12)+'…' : (n.label||'');
-            svg += `<text y="${NR + 10}" class="mc-graph-node-label">${esc(label)}</text>`;
-            if (n.role) {
-                const role = n.role.length > 18 ? n.role.substring(0,16)+'…' : n.role;
-                svg += `<text y="${NR + 18}" class="g-role">${esc(role)}</text>`;
-            }
+            const aid = n.agent_id || n.id;
+            const info = AGENT_INFO[aid] || {};
+            const col = pStyle.color;
+            const name = info.name || n.label || n.id;
+            const role = info.role || n.role || '';
+            const avatar = info.avatar || n.avatar || '';
+            const status = 'idle';
+            const avatarR = 16, avatarCx = 24, avatarCy = 30;
+            const textX = avatarCx + avatarR + 10;
+
+            const avatarSvg = avatar
+                ? `<clipPath id="mcclip-${phaseId}-${n.id}"><circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}"/></clipPath>
+                   <image href="${esc(avatar)}" x="${avatarCx-avatarR}" y="${avatarCy-avatarR}" width="${avatarR*2}" height="${avatarR*2}" clip-path="url(#mcclip-${phaseId}-${n.id})" preserveAspectRatio="xMidYMid slice"/>`
+                : `<circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}" fill="${col}" opacity="0.25"/>
+                   <text x="${avatarCx}" y="${avatarCy+4}" text-anchor="middle" style="font-size:13px;fill:${col};font-weight:700">${esc(name.substring(0,2))}</text>`;
+
+            svg += `<g class="mc-live-node" transform="translate(${n.x},${n.y})">`;
+            svg += `<rect class="mc-live-node-bg" width="${MC_NW}" height="${MC_NH}"/>`;
+            svg += `<line class="mc-live-node-bar" x1="0" y1="0" x2="${MC_NW}" y2="0" stroke="${col}" stroke-width="3"/>`;
+            svg += avatarSvg;
+            svg += `<text class="mc-live-node-name" x="${textX}" y="24">${esc(name.length>20?name.substring(0,19)+'…':name)}</text>`;
+            svg += `<text class="mc-live-node-role" x="${textX}" y="36">${esc(role.length>25?role.substring(0,24)+'…':role)}</text>`;
+            svg += `<circle class="mc-node-status--${status}" cx="${MC_NW-14}" cy="16" r="5"/>`;
+            svg += `<text class="mc-live-node-status" x="${MC_NW-14}" y="30">${status}</text>`;
             svg += `</g>`;
         });
+
+        // Legend for pattern
+        svg += `<g transform="translate(8,${H-20})"><text style="font-size:8px;fill:var(--text-secondary)">${pStyle.icon} ${patternId}</text></g>`;
 
         svg += `</svg>`;
         container.innerHTML = svg;
