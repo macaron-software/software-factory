@@ -8,8 +8,10 @@ services:
     expose:
       - "8090"
     environment:
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
       - FOUNDRY_PROJECT_ENDPOINT=${FOUNDRY_PROJECT_ENDPOINT:-}
       - FOUNDRY_MODEL_DEPLOYMENT_NAME=${FOUNDRY_MODEL_DEPLOYMENT_NAME:-gpt-4o}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-dummy}
       - SF_ROOT=/app
       - MF_ROOT=/app/mf_projects
     volumes:
