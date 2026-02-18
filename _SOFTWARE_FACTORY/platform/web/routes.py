@@ -4697,7 +4697,7 @@ async def mission_control_page(request: Request, mission_id: str):
     messages = []
     if mission.session_id:
         session_store = get_session_store()
-        msgs = session_store.list_messages(mission.session_id)
+        msgs = session_store.get_messages(mission.session_id)
         for m in msgs:
             ag = agent_map.get(m.from_agent)
             messages.append({
