@@ -690,6 +690,204 @@ class WorkflowStore:
                 },
             ),
         )
+        # ── TMA Maintenance: Triage → Diagnostic → Fix → Validate ──
+        builtins.append(
+            WorkflowDef(
+                id="tma-maintenance",
+                name="TMA — Maintenance Applicative",
+                description="Triage incidents → diagnostic root cause → correctif TDD → tests de non-régression → hotfix deploy.",
+                icon="tool", is_builtin=True,
+                phases=[
+                    WorkflowPhase(id="triage", pattern_id="hierarchical",
+                                  name="Triage & Priorisation",
+                                  description="Le Responsable TMA trie les incidents entrants par sévérité (P0-P4). Le QA Lead fournit les logs et steps de reproduction. Le Chef de Projet valide les SLA.",
+                                  gate="always",
+                                  config={"agents": ["responsable_tma", "qa_lead", "chef_projet"]}),
+                    WorkflowPhase(id="diagnostic", pattern_id="parallel",
+                                  name="Diagnostic Root Cause",
+                                  description="Le Dev TMA analyse le code et reproduit le bug. Le Lead Dev évalue l'impact sur les modules adjacents. Le DBA vérifie les données et les requêtes.",
+                                  gate="always",
+                                  config={"agents": ["dev_tma", "lead_dev", "dba"]}),
+                    WorkflowPhase(id="fix", pattern_id="hierarchical",
+                                  name="Correctif TDD",
+                                  description="Le Dev TMA écrit le test de non-régression (RED), puis le correctif (GREEN), puis refactorise. Le Lead Dev review le code. Le Test Automation ajoute le test E2E si nécessaire.",
+                                  gate="no_veto",
+                                  config={"agents": ["dev_tma", "lead_dev", "test_automation"]}),
+                    WorkflowPhase(id="validate", pattern_id="sequential",
+                                  name="Validation & Deploy",
+                                  description="Le Test Manager lance la campagne de non-régression. Le QA valide les tests. Le Pipeline Engineer vérifie le pipeline CI. Le DevOps déploie le hotfix. Le Responsable TMA confirme la résolution.",
+                                  gate="all_approved",
+                                  config={"agents": ["test_manager", "qa_lead", "pipeline_engineer", "devops", "responsable_tma"]}),
+                ],
+                config={
+                    "graph": {
+                        "pattern": "hierarchical",
+                        "nodes": [
+                            {"id": "n1", "agent_id": "responsable_tma", "x": 400, "y": 20, "label": "Resp. TMA"},
+                            {"id": "n2", "agent_id": "qa_lead", "x": 250, "y": 120, "label": "QA Lead"},
+                            {"id": "n3", "agent_id": "chef_projet", "x": 550, "y": 120, "label": "Chef de Projet"},
+                            {"id": "n4", "agent_id": "dev_tma", "x": 200, "y": 240, "label": "Dev TMA"},
+                            {"id": "n5", "agent_id": "lead_dev", "x": 400, "y": 240, "label": "Lead Dev"},
+                            {"id": "n6", "agent_id": "dba", "x": 600, "y": 240, "label": "DBA"},
+                            {"id": "n7", "agent_id": "test_automation", "x": 150, "y": 360, "label": "Test Automation"},
+                            {"id": "n8", "agent_id": "test_manager", "x": 350, "y": 360, "label": "Test Manager"},
+                            {"id": "n9", "agent_id": "pipeline_engineer", "x": 550, "y": 360, "label": "Pipeline Eng."},
+                            {"id": "n10", "agent_id": "devops", "x": 400, "y": 460, "label": "DevOps"},
+                        ],
+                        "edges": [
+                            {"from": "n1", "to": "n2", "label": "triage", "color": "#ef4444"},
+                            {"from": "n1", "to": "n3", "label": "SLA", "color": "#ef4444"},
+                            {"from": "n1", "to": "n4", "label": "assigner", "color": "#f59e0b"},
+                            {"from": "n4", "to": "n5", "label": "impact?", "color": "#3b82f6"},
+                            {"from": "n4", "to": "n6", "label": "query?", "color": "#3b82f6"},
+                            {"from": "n5", "to": "n4", "label": "review", "color": "#10b981"},
+                            {"from": "n4", "to": "n7", "label": "test E2E", "color": "#8b5cf6"},
+                            {"from": "n7", "to": "n8", "label": "résultats", "color": "#10b981"},
+                            {"from": "n8", "to": "n9", "label": "GO CI", "color": "#10b981"},
+                            {"from": "n9", "to": "n10", "label": "deploy", "color": "#8b5cf6"},
+                            {"from": "n10", "to": "n1", "label": "confirmé", "color": "#10b981"},
+                        ],
+                    },
+                    "agents_permissions": {
+                        "responsable_tma": {"can_veto": True, "veto_level": "STRONG", "can_delegate": True},
+                        "qa_lead": {"can_veto": True, "veto_level": "ABSOLUTE"},
+                        "test_manager": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                        "lead_dev": {"can_veto": True, "veto_level": "STRONG"},
+                    },
+                },
+            ),
+        )
+        # ── Test Campaign: Plan → Automate → Execute → Report ──
+        builtins.append(
+            WorkflowDef(
+                id="test-campaign",
+                name="Campagne de Tests E2E",
+                description="Plan de test → écriture des tests automatisés → exécution → rapport qualité → GO/NOGO release.",
+                icon="clipboard", is_builtin=True,
+                phases=[
+                    WorkflowPhase(id="plan", pattern_id="hierarchical",
+                                  name="Plan de Test",
+                                  description="Le Test Manager définit la matrice de couverture. Le QA Lead identifie les parcours critiques. Le métier fournit les scénarios fonctionnels.",
+                                  gate="always",
+                                  config={"agents": ["test_manager", "qa_lead", "metier"]}),
+                    WorkflowPhase(id="automate", pattern_id="hierarchical",
+                                  name="Automatisation",
+                                  description="Le Test Automation écrit les tests Playwright E2E. Le testeur écrit les tests d'API. Le Lead Dev fournit les fixtures et helpers.",
+                                  gate="always",
+                                  config={"agents": ["test_automation", "testeur", "lead_dev"]}),
+                    WorkflowPhase(id="execute", pattern_id="parallel",
+                                  name="Exécution",
+                                  description="Exécution en parallèle: tests E2E IHM (Playwright), tests API (fetch), tests smoke, tests de performance. Collecte des résultats.",
+                                  gate="always",
+                                  config={"agents": ["test_automation", "testeur", "performance_engineer"]}),
+                    WorkflowPhase(id="report", pattern_id="sequential",
+                                  name="Rapport & GO/NOGO",
+                                  description="Le Test Manager consolide les résultats. Le QA Lead valide la couverture. Le Chef de Projet décide GO/NOGO release.",
+                                  gate="all_approved",
+                                  config={"agents": ["test_manager", "qa_lead", "chef_projet"]}),
+                ],
+                config={
+                    "graph": {
+                        "pattern": "hierarchical",
+                        "nodes": [
+                            {"id": "n1", "agent_id": "test_manager", "x": 400, "y": 20, "label": "Test Manager"},
+                            {"id": "n2", "agent_id": "qa_lead", "x": 250, "y": 130, "label": "QA Lead"},
+                            {"id": "n3", "agent_id": "metier", "x": 550, "y": 130, "label": "Métier"},
+                            {"id": "n4", "agent_id": "test_automation", "x": 200, "y": 260, "label": "Test Automation"},
+                            {"id": "n5", "agent_id": "testeur", "x": 400, "y": 260, "label": "Testeur"},
+                            {"id": "n6", "agent_id": "lead_dev", "x": 600, "y": 260, "label": "Lead Dev"},
+                            {"id": "n7", "agent_id": "performance_engineer", "x": 300, "y": 370, "label": "Perf Engineer"},
+                            {"id": "n8", "agent_id": "chef_projet", "x": 500, "y": 370, "label": "Chef de Projet"},
+                        ],
+                        "edges": [
+                            {"from": "n1", "to": "n2", "label": "matrice", "color": "#a855f7"},
+                            {"from": "n1", "to": "n3", "label": "scénarios", "color": "#a855f7"},
+                            {"from": "n2", "to": "n4", "label": "E2E specs", "color": "#3b82f6"},
+                            {"from": "n2", "to": "n5", "label": "API specs", "color": "#3b82f6"},
+                            {"from": "n6", "to": "n4", "label": "fixtures", "color": "#f59e0b"},
+                            {"from": "n4", "to": "n1", "label": "résultats E2E", "color": "#10b981"},
+                            {"from": "n5", "to": "n1", "label": "résultats API", "color": "#10b981"},
+                            {"from": "n7", "to": "n1", "label": "résultats perf", "color": "#10b981"},
+                            {"from": "n1", "to": "n8", "label": "GO/NOGO", "color": "#ef4444"},
+                        ],
+                    },
+                    "agents_permissions": {
+                        "test_manager": {"can_veto": True, "veto_level": "ABSOLUTE", "can_delegate": True, "can_approve": True},
+                        "qa_lead": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                        "chef_projet": {"can_approve": True},
+                    },
+                },
+            ),
+        )
+        # ── CICD Pipeline: Setup → Build → Quality → Deploy ──
+        builtins.append(
+            WorkflowDef(
+                id="cicd-pipeline",
+                name="Pipeline CI/CD",
+                description="Configuration pipeline → build & tests → quality gates → déploiement canary → monitoring.",
+                icon="zap", is_builtin=True,
+                phases=[
+                    WorkflowPhase(id="setup", pattern_id="hierarchical",
+                                  name="Setup Pipeline",
+                                  description="Le Pipeline Engineer conçoit le workflow GitHub Actions/GitLab CI. Le DevOps définit les environments (staging, canary, prod). Le DevSecOps configure les scans de sécurité.",
+                                  gate="always",
+                                  config={"agents": ["pipeline_engineer", "devops", "devsecops"]}),
+                    WorkflowPhase(id="build-test", pattern_id="sequential",
+                                  name="Build & Tests",
+                                  description="Le Pipeline Engineer configure les jobs: lint → build → unit tests → integration tests. Le Test Automation intègre les tests E2E. Le Lead Dev valide les configurations.",
+                                  gate="always",
+                                  config={"agents": ["pipeline_engineer", "test_automation", "lead_dev"]}),
+                    WorkflowPhase(id="quality-gates", pattern_id="parallel",
+                                  name="Quality Gates",
+                                  description="En parallèle: le QA valide la couverture (≥80%), la Sécurité lance le SAST/DAST, le Perf Engineer configure les benchmarks. Tous les gates doivent passer.",
+                                  gate="all_approved",
+                                  config={"agents": ["qa_lead", "securite", "performance_engineer", "pipeline_engineer"]}),
+                    WorkflowPhase(id="deploy", pattern_id="sequential",
+                                  name="Deploy Canary → Prod",
+                                  description="Le DevOps déploie en canary (1%→10%→50%→100%). Le SRE monitore les métriques. Rollback automatique si error_rate > baseline+5%. Le Chef de Projet valide le GO prod.",
+                                  gate="all_approved",
+                                  config={"agents": ["devops", "sre", "pipeline_engineer", "chef_projet"]}),
+                ],
+                config={
+                    "graph": {
+                        "pattern": "sequential",
+                        "nodes": [
+                            {"id": "n1", "agent_id": "pipeline_engineer", "x": 400, "y": 20, "label": "Pipeline Engineer"},
+                            {"id": "n2", "agent_id": "devops", "x": 250, "y": 130, "label": "DevOps"},
+                            {"id": "n3", "agent_id": "devsecops", "x": 550, "y": 130, "label": "DevSecOps"},
+                            {"id": "n4", "agent_id": "test_automation", "x": 200, "y": 260, "label": "Test Automation"},
+                            {"id": "n5", "agent_id": "lead_dev", "x": 400, "y": 260, "label": "Lead Dev"},
+                            {"id": "n6", "agent_id": "qa_lead", "x": 150, "y": 370, "label": "QA Lead"},
+                            {"id": "n7", "agent_id": "securite", "x": 350, "y": 370, "label": "Sécurité"},
+                            {"id": "n8", "agent_id": "performance_engineer", "x": 550, "y": 370, "label": "Perf Engineer"},
+                            {"id": "n9", "agent_id": "sre", "x": 300, "y": 480, "label": "SRE"},
+                            {"id": "n10", "agent_id": "chef_projet", "x": 500, "y": 480, "label": "Chef de Projet"},
+                        ],
+                        "edges": [
+                            {"from": "n1", "to": "n2", "label": "environments", "color": "#a855f7"},
+                            {"from": "n1", "to": "n3", "label": "scans sécu", "color": "#a855f7"},
+                            {"from": "n1", "to": "n4", "label": "tests E2E", "color": "#3b82f6"},
+                            {"from": "n1", "to": "n5", "label": "config", "color": "#3b82f6"},
+                            {"from": "n4", "to": "n6", "label": "couverture", "color": "#10b981"},
+                            {"from": "n3", "to": "n7", "label": "SAST/DAST", "color": "#ef4444"},
+                            {"from": "n5", "to": "n8", "label": "benchmarks", "color": "#f59e0b"},
+                            {"from": "n6", "to": "n1", "label": "GO QA", "color": "#10b981"},
+                            {"from": "n7", "to": "n1", "label": "GO sécu", "color": "#10b981"},
+                            {"from": "n8", "to": "n1", "label": "GO perf", "color": "#10b981"},
+                            {"from": "n2", "to": "n9", "label": "canary", "color": "#8b5cf6"},
+                            {"from": "n9", "to": "n10", "label": "GO prod", "color": "#ef4444"},
+                        ],
+                    },
+                    "agents_permissions": {
+                        "pipeline_engineer": {"can_veto": True, "veto_level": "STRONG", "can_delegate": True},
+                        "devops": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                        "qa_lead": {"can_veto": True, "veto_level": "ABSOLUTE"},
+                        "securite": {"can_veto": True, "veto_level": "ABSOLUTE"},
+                        "sre": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                    },
+                },
+            ),
+        )
         for w in builtins:
             self.create(w)
 
@@ -759,39 +957,60 @@ async def _rte_facilitate(
         tools_enabled=False,  # RTE doesn't need tools, just speaks
     )
 
+    # Stream the RTE response via SSE
+    await _push_sse(session_id, {
+        "type": "stream_start",
+        "agent_id": rte.id,
+        "agent_name": rte.name,
+        "node_id": rte.id,
+        "pattern_type": "workflow",
+        "to_agent": to_agent or "all",
+        "flow_step": "Facilitation",
+        "iteration": 0,
+    })
+
     executor = get_executor()
-    result = await executor.run(ctx, prompt)
+    accumulated = ""
+    try:
+        async for kind, value in executor.run_streaming(ctx, prompt):
+            if kind == "delta" and value:
+                accumulated += value
+                await _push_sse(session_id, {
+                    "type": "stream_delta",
+                    "agent_id": rte.id,
+                    "delta": value,
+                })
+            elif kind == "result":
+                accumulated = value.content or accumulated
+    except Exception as e:
+        logger.error("RTE streaming failed: %s", e)
+        # Fallback to non-streaming
+        result = await executor.run(ctx, prompt)
+        accumulated = result.content
+
+    await _push_sse(session_id, {
+        "type": "stream_end",
+        "agent_id": rte.id,
+        "content": accumulated,
+        "message_type": "text",
+        "to_agent": to_agent or "all",
+    })
 
     msg = MessageDef(
         session_id=session_id,
         from_agent=rte.id,
         to_agent=to_agent or "all",
         message_type="text",
-        content=result.content,
-        metadata={
-            "model": result.model,
-            "provider": result.provider,
-            "tokens_in": result.tokens_in,
-            "tokens_out": result.tokens_out,
-            "duration_ms": result.duration_ms,
-            "role": "rte_facilitation",
-        },
+        content=accumulated,
     )
     store.add_message(msg)
-    await _push_sse(session_id, {
-        "type": "message",
-        "from_agent": rte.id,
-        "to_agent": to_agent or "all",
-        "content": result.content,
-        "message_type": "text",
-    })
     await _push_sse(session_id, {
         "type": "agent_status",
         "agent_id": rte.id,
         "status": "idle",
     })
 
-    return result.content
+    return accumulated
 
 
 # ── Workflow Engine ──────────────────────────────────────────────

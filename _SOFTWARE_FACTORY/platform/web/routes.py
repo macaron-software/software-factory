@@ -1593,6 +1593,24 @@ async def session_live_page(request: Request, session_id: str):
                     ("🔧", "Audit dette", "Lancez un audit cross-projet de la dette technique"),
                     ("📊", "Prioriser fixes", "Priorisez les corrections de dette par impact WSJF"),
                 ],
+                "tma-maintenance": [
+                    ("🐛", "Triage incidents", "Triez les incidents ouverts par sévérité et assignez les correctifs"),
+                    ("🔍", "Diagnostic bug", "Diagnostiquez le bug suivant avec analyse root cause et impact"),
+                    ("🩹", "Hotfix urgent", "Lancez un correctif hotfix P0 avec deploy express"),
+                    ("📊", "Bilan TMA", "Faites un bilan des SLA, incidents résolus et dette technique restante"),
+                ],
+                "test-campaign": [
+                    ("📋", "Plan de test", "Définissez la matrice de couverture et les parcours critiques à tester"),
+                    ("🤖", "Automatiser tests", "Écrivez les tests E2E Playwright pour les parcours identifiés"),
+                    ("▶️", "Lancer campagne", "Exécutez la campagne complète: E2E, API, smoke, performance"),
+                    ("📊", "Rapport qualité", "Consolidez les résultats et décidez GO/NOGO pour la release"),
+                ],
+                "cicd-pipeline": [
+                    ("⚙️", "Setup pipeline", "Configurez le pipeline CI/CD GitHub Actions pour le projet"),
+                    ("🔄", "Optimiser CI", "Analysez et optimisez les temps de build du pipeline actuel"),
+                    ("🛡️", "Quality gates", "Configurez les quality gates: couverture, sécurité, performance"),
+                    ("🚀", "Deploy canary", "Lancez un déploiement canary avec monitoring et rollback automatique"),
+                ],
             }
             suggestions = _WORKFLOW_SUGGESTIONS.get(wf_id, [])
             if not suggestions and _wf2.description:
