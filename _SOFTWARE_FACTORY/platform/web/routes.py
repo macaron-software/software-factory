@@ -4684,41 +4684,132 @@ async def mission_control_page(request: Request, mission_id: str):
             p_node_ids = {n["id"] for n in p_nodes}
             p_edges = [e for e in all_edges if e["from"] in p_node_ids and e["to"] in p_node_ids]
 
-            # Auto-generate pattern-specific edges to show topology
+            # Auto-generate rich multi-pattern edges reflecting real organizational topology
             pattern_id = wp.pattern_id or ""
             if len(p_nodes) >= 2:
                 pids = [n["id"] for n in p_nodes]
-                pcolors = {"network": "#3b82f6", "loop": "#a855f7", "parallel": "#10b981",
-                           "sequential": "#f59e0b", "hierarchical": "#ef4444",
-                           "aggregator": "#06b6d4", "router": "#f59e0b",
-                           "human-in-the-loop": "#d946ef", "adversarial-pair": "#ef4444"}
-                pc = pcolors.get(pattern_id, "#8b949e")
+                aids_list = [n.get("agent_id", "") for n in p_nodes]
+                aid_to_nid = {n.get("agent_id", ""): n["id"] for n in p_nodes}
+                # Sort by hierarchy_rank to identify leaders
+                ranked = sorted(p_nodes, key=lambda n: agent_map.get(n.get("agent_id",""), {}).get("hierarchy_rank", 50))
+                leader_nid = ranked[0]["id"]  # Lowest rank = leader
+                # Color palette for multi-pattern layers
+                C_HIER   = "#f59e0b"  # hierarchical delegation
+                C_NET    = "#8b5cf6"  # network discussion
+                C_SEQ    = "#3b82f6"  # sequential flow
+                C_LOOP   = "#ec4899"  # loop/feedback
+                C_PAR    = "#10b981"  # parallel execution
+                C_GATE   = "#ef4444"  # gate/veto/checkpoint
+                C_AGG    = "#06b6d4"  # aggregation
+                C_ROUTE  = "#f97316"  # routing
+
+                def _add(f, t, **kw):
+                    if not any(e["from"] == f and e["to"] == t for e in p_edges):
+                        p_edges.append({"from": f, "to": t, **kw})
+
                 if pattern_id == "network":
-                    # Mesh: bidirectional between all nodes
+                    # Network brainstorming: mesh discussion + facilitator synthesis
                     for i, a in enumerate(pids):
                         for b in pids[i+1:]:
-                            if not any(e["from"] == a and e["to"] == b for e in p_edges):
-                                p_edges.append({"from": a, "to": b, "color": pc})
-                            if not any(e["from"] == b and e["to"] == a for e in p_edges):
-                                p_edges.append({"from": b, "to": a, "color": pc})
+                            _add(a, b, color=C_NET, label="")
+                            _add(b, a, color=C_NET, label="")
+                    # Leader acts as facilitator — receives summaries
+                    others = [p for p in pids if p != leader_nid]
+                    for a in others:
+                        _add(a, leader_nid, color=C_AGG, label="synthèse")
+
+                elif pattern_id == "human-in-the-loop":
+                    # Decision body: leader at center, advisors report + debate
+                    advisors = [p for p in pids if p != leader_nid]
+                    # Advisors → Leader (recommendations)
+                    for a in advisors:
+                        _add(a, leader_nid, color=C_HIER, label="avis")
+                    # Cross-debate between advisors (network layer)
+                    for i, a in enumerate(advisors):
+                        for b in advisors[i+1:]:
+                            _add(a, b, color=C_NET, label="débat")
+                            _add(b, a, color=C_NET, label="")
+                    # Leader → checkpoint gate
+                    if advisors:
+                        _add(leader_nid, advisors[0], color=C_GATE, label="GO/NOGO")
+
+                elif pattern_id == "sequential":
+                    # Chain flow + feedback arrows for rework
+                    for i in range(len(pids) - 1):
+                        _add(pids[i], pids[i+1], color=C_SEQ, label="")
+                    # Feedback loop: last → first for iterations
+                    if len(pids) >= 3:
+                        _add(pids[-1], pids[0], color=C_LOOP, label="feedback")
+
+                elif pattern_id == "aggregator":
+                    # All contribute → last agent aggregates + cross-review
+                    # Aggregator = last agent in list (by convention)
+                    aggregator = pids[-1]
+                    contributors = [p for p in pids if p != aggregator]
+                    # Contributors → Aggregator
+                    for a in contributors:
+                        _add(a, aggregator, color=C_AGG, label="")
+                    # Aggregator → Contributors (feedback/validation)
+                    for a in contributors:
+                        _add(aggregator, a, color=C_LOOP, label="review")
+                    # Cross-review between contributors
+                    for i, a in enumerate(contributors):
+                        for b in contributors[i+1:]:
+                            _add(a, b, color=C_NET, label="")
+
+                elif pattern_id == "hierarchical":
+                    # Leader (highest rank) delegates + team collaborates + review loop
+                    team = [p for p in pids if p != leader_nid]
+                    # Leader → team (delegation)
+                    for t in team:
+                        _add(leader_nid, t, color=C_HIER, label="")
+                    # Team → Leader (report back / PR review)
+                    for t in team:
+                        _add(t, leader_nid, color=C_LOOP, label="review")
+                    # Peer collaboration among team members
+                    for i, a in enumerate(team):
+                        for b in team[i+1:]:
+                            _add(a, b, color=C_NET, label="")
+
+                elif pattern_id == "parallel":
+                    # Fan-out → parallel execution → fan-in aggregation
+                    workers = [p for p in pids if p != leader_nid]
+                    # Dispatch from leader
+                    for w in workers:
+                        _add(leader_nid, w, color=C_PAR, label="")
+                    # Results back to leader
+                    for w in workers:
+                        _add(w, leader_nid, color=C_AGG, label="résultat")
+                    # Workers can cross-communicate
+                    for i, a in enumerate(workers):
+                        for b in workers[i+1:]:
+                            _add(a, b, color=C_NET, label="")
+
                 elif pattern_id == "loop":
-                    # Circular: A→B→C→A
+                    # Bidirectional iteration loop + escalation
                     for i in range(len(pids)):
                         f, t = pids[i], pids[(i+1) % len(pids)]
-                        if not any(e["from"] == f and e["to"] == t for e in p_edges):
-                            p_edges.append({"from": f, "to": t, "color": pc})
-                elif pattern_id == "parallel":
-                    # Fan-out from first node to all others
-                    hub = pids[0]
-                    for t in pids[1:]:
-                        if not any(e["from"] == hub and e["to"] == t for e in p_edges):
-                            p_edges.append({"from": hub, "to": t, "color": pc, "label": "parallel"})
-                elif pattern_id == "sequential":
-                    # Chain: A→B→C
+                        _add(f, t, color=C_LOOP, label="")
+                        _add(t, f, color=C_LOOP, label="feedback")
+
+                elif pattern_id == "router":
+                    # Hub routes to specialists + specialists can cross-consult
+                    specialists = [p for p in pids if p != leader_nid]
+                    # Router → each specialist
+                    for s in specialists:
+                        _add(leader_nid, s, color=C_ROUTE, label="route")
+                    # Specialists report back
+                    for s in specialists:
+                        _add(s, leader_nid, color=C_AGG, label="résolu")
+                    # Cross-consultation between specialists
+                    for i, a in enumerate(specialists):
+                        for b in specialists[i+1:]:
+                            _add(a, b, color=C_NET, label="")
+
+                else:
+                    # Fallback: simple chain
                     for i in range(len(pids) - 1):
-                        f, t = pids[i], pids[i+1]
-                        if not any(e["from"] == f and e["to"] == t for e in p_edges):
-                            p_edges.append({"from": f, "to": t, "color": pc})
+                        _add(pids[i], pids[i+1], color="#8b949e")
 
             # Enrich nodes with agent info
             enriched_nodes = []
