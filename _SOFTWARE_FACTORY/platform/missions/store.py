@@ -457,9 +457,10 @@ class MissionRunStore:
         try:
             cur = db.execute(
                 """UPDATE mission_runs SET status=?, current_phase=?, phases_json=?,
-                   updated_at=?, completed_at=? WHERE id=?""",
+                   session_id=?, updated_at=?, completed_at=? WHERE id=?""",
                 (run.status.value, run.current_phase,
                  json.dumps([p.model_dump() for p in run.phases], default=str),
+                 run.session_id or "",
                  run.updated_at.isoformat(),
                  run.completed_at.isoformat() if run.completed_at else None,
                  run.id),

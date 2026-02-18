@@ -49,12 +49,31 @@ def remove_sse_listener(session_id: str, q: asyncio.Queue):
 
 
 async def _push_sse(session_id: str, event: dict):
-    """Push an event to all SSE listeners for this session."""
+    """Push an event to all SSE listeners for this session.
+
+    Delivers to both the runner's per-session queues AND the bus's global SSE listeners
+    so that the /sse/session/{id} endpoint picks up mission control events.
+    """
+    # Runner queues (per-session, used by conversation pages)
     for q in _sse_queues.get(session_id, []):
         try:
             q.put_nowait(event)
         except asyncio.QueueFull:
             logger.warning("SSE queue full for session %s, dropping %s event", session_id, event.get("type"))
+
+    # Bus SSE listeners (global, used by /sse/session/{id} endpoint)
+    try:
+        from ..a2a.bus import get_bus
+        bus = get_bus()
+        # Inject session_id into dict so the SSE filter in ws.py can match
+        enriched = {**event, "session_id": session_id}
+        for q in bus._sse_listeners:
+            try:
+                q.put_nowait(enriched)
+            except asyncio.QueueFull:
+                pass
+    except Exception:
+        pass
 
 
 async def handle_user_message(session_id: str, content: str, to_agent: str = "") -> Optional[MessageDef]:
