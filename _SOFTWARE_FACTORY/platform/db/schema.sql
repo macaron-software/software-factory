@@ -392,3 +392,52 @@ CREATE TABLE IF NOT EXISTS retrospectives (
 );
 
 CREATE INDEX IF NOT EXISTS idx_retro_scope ON retrospectives(scope, scope_id);
+
+-- ============================================================================
+-- ORG TREE (SAFe hierarchy: Portfolio → ART → Team)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS org_portfolios (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    lead_agent_id TEXT DEFAULT '',
+    budget_allocated REAL DEFAULT 0,
+    budget_consumed REAL DEFAULT 0,
+    fiscal_year INTEGER DEFAULT 2025,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS org_arts (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    portfolio_id TEXT NOT NULL DEFAULT '',
+    description TEXT DEFAULT '',
+    lead_agent_id TEXT DEFAULT '',
+    pi_cadence_weeks INTEGER DEFAULT 10,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_arts_portfolio ON org_arts(portfolio_id);
+
+CREATE TABLE IF NOT EXISTS org_teams (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    art_id TEXT NOT NULL DEFAULT '',
+    description TEXT DEFAULT '',
+    scrum_master_id TEXT DEFAULT '',
+    capacity INTEGER DEFAULT 5,
+    wip_limit INTEGER DEFAULT 3,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_teams_art ON org_teams(art_id);
+
+CREATE TABLE IF NOT EXISTS org_team_members (
+    team_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    role TEXT DEFAULT 'member',
+    PRIMARY KEY (team_id, agent_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_team_members_agent ON org_team_members(agent_id);

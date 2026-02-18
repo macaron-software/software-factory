@@ -190,6 +190,12 @@ class MemoryManager:
                 result[f"{label}_count"] = row["c"]
             except Exception:
                 result[f"{label}_count"] = 0
+        # Session archives count (used by template)
+        try:
+            row = conn.execute("SELECT COUNT(*) as c FROM sessions").fetchone()
+            result["session_count"] = row["c"]
+        except Exception:
+            result["session_count"] = 0
         conn.close()
         return result
 

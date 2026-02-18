@@ -726,6 +726,30 @@ async def launch_mission_workflow(request: Request, mission_id: str):
     return JSONResponse({"session_id": session.id, "workflow_id": wf_id})
 
 
+@router.post("/api/missions/{mission_id}/wsjf")
+async def compute_wsjf(mission_id: str, request: Request):
+    """Compute and store WSJF score from components."""
+    from ..missions.store import get_mission_store
+    from ..db.migrations import get_db as _gdb
+    data = await request.json()
+    bv = float(data.get("business_value", 0))
+    tc = float(data.get("time_criticality", 0))
+    rr = float(data.get("risk_reduction", 0))
+    jd = max(float(data.get("job_duration", 1)), 0.1)
+    cost_of_delay = bv + tc + rr
+    wsjf = round(cost_of_delay / jd, 1)
+    # Update mission
+    db = _gdb()
+    try:
+        db.execute(
+            "UPDATE missions SET wsjf_score=?, business_value=?, time_criticality=?, risk_reduction=?, job_duration=? WHERE id=?",
+            (wsjf, bv, tc, rr, jd, mission_id))
+        db.commit()
+    finally:
+        db.close()
+    return JSONResponse({"wsjf": wsjf, "cost_of_delay": cost_of_delay, "job_duration": jd})
+
+
 @router.get("/api/missions/{mission_id}/board", response_class=HTMLResponse)
 async def mission_board_partial(request: Request, mission_id: str):
     """HTMX partial — kanban board for a sprint."""
@@ -1047,20 +1071,68 @@ async def mcps_page(request: Request):
     })
 
 
+# ── Org Tree ─────────────────────────────────────────────────────
+
+@router.get("/org", response_class=HTMLResponse)
+async def org_page(request: Request):
+    """SAFe Org Tree — Portfolio → ART → Team."""
+    from ..agents.org import get_org_store
+    org = get_org_store()
+    tree = org.get_org_tree()
+    portfolios = org.list_portfolios()
+    all_arts = org.list_arts()
+    all_teams = org.list_teams()
+    total_members = sum(len(t.members) for t in all_teams)
+
+    return _templates(request).TemplateResponse("org.html", {
+        "request": request,
+        "page_title": "Organisation SAFe",
+        "org_tree": tree,
+        "portfolios": portfolios,
+        "total_arts": len(all_arts),
+        "total_teams": len(all_teams),
+        "total_members": total_members,
+    })
+
+
+@router.get("/api/org/tree")
+async def org_tree_api():
+    """JSON org tree for programmatic access."""
+    from ..agents.org import get_org_store
+    return JSONResponse(get_org_store().get_org_tree())
+
+
 # ── Memory ───────────────────────────────────────────────────────
 
 @router.get("/memory", response_class=HTMLResponse)
 async def memory_page(request: Request):
     """Memory dashboard."""
     from ..memory.manager import get_memory_manager
+    from ..projects.manager import get_project_store
     mem = get_memory_manager()
     stats = mem.stats()
     recent_global = mem.global_get(limit=20)
+
+    # Project memories grouped by project
+    project_store = get_project_store()
+    projects = project_store.list_all()
+    project_memories = []
+    for p in projects:
+        entries = mem.project_get(p.id, limit=10)
+        if entries:
+            project_memories.append({
+                "project_id": p.id,
+                "project_name": p.name,
+                "entries": entries,
+                "count": len(entries),
+            })
+
     return _templates(request).TemplateResponse("memory.html", {
         "request": request,
         "page_title": "Memory",
         "stats": stats,
         "recent_global": recent_global,
+        "project_memories": project_memories,
     })
 
 
@@ -1414,6 +1486,7 @@ async def session_live_page(request: Request, session_id: str):
     except Exception:
         pass
 
+    agent_map_dict = {a.id: {"name": a.name, "icon": getattr(a, "icon", "bot"), "color": getattr(a, "color", "#8b949e"), "role": getattr(a, "role", ""), "avatar": getattr(a, "avatar", "bot")} for a in agents}
     return _templates(request).TemplateResponse("session_live.html", {
         "request": request,
         "page_title": f"Live: {session.name}",
@@ -1421,6 +1494,7 @@ async def session_live_page(request: Request, session_id: str):
                      "status": session.status, "pattern": getattr(session, "pattern_id", ""),
                      "project_id": session.project_id},
         "agents": agents,
+        "agent_map": agent_map_dict,
         "messages": msg_list,
         "graph": graph,
         "memory": memory_data,
@@ -2396,6 +2470,28 @@ async def global_memory(category: str = ""):
     return JSONResponse(entries)
 
 
+@router.get("/api/memory/search")
+async def memory_search(q: str = ""):
+    """Search across all memory layers."""
+    from ..memory.manager import get_memory_manager
+    if not q:
+        return HTMLResponse('<div style="color:var(--text-muted);font-size:0.75rem;padding:0.5rem">Tapez une requête…</div>')
+    mem = get_memory_manager()
+    results = mem.global_search(q, limit=20)
+    if not results:
+        return HTMLResponse(f'<div style="color:var(--text-muted);font-size:0.75rem;padding:0.5rem">Aucun résultat pour "{q}"</div>')
+    html = ""
+    for r in results:
+        cat = r.get("category", "")
+        conf = r.get("confidence", 0)
+        html += f'''<div class="mem-entry">
+            <div><span class="mem-badge {cat}">{cat}</span> <span class="mem-key">{r.get("key","")}</span></div>
+            <div class="mem-val">{str(r.get("value",""))[:300]}</div>
+            <div class="mem-meta"><span>{int(conf*100)}% confidence</span></div>
+        </div>'''
+    return HTMLResponse(html)
+
+
 # ── Retrospectives & Self-Improvement ────────────────────────────
 
 @router.get("/api/retrospectives")
@@ -2961,6 +3057,17 @@ async def dsi_board_page(request: Request):
             "edge_count": len(edges),
         })
 
+    # DORA metrics
+    from ..metrics.dora import get_dora_metrics
+    dora = get_dora_metrics().summary(period_days=30)
+
+    # Org summary
+    from ..agents.org import get_org_store
+    org = get_org_store()
+    org_portfolios = org.list_portfolios()
+    org_arts = org.list_arts()
+    org_teams = org.list_teams()
+
     return _templates(request).TemplateResponse("dsi.html", {
         "request": request, "page_title": "Vue DSI",
         "total_missions": len(all_missions),
@@ -2975,6 +3082,10 @@ async def dsi_board_page(request: Request):
         "strategic_agents": strategic,
         "decisions": decisions,
         "system_patterns": system_patterns,
+        "dora": dora,
+        "org_portfolios": len(org_portfolios),
+        "org_arts": len(org_arts),
+        "org_teams": len(org_teams),
     })
 
 
@@ -3086,6 +3197,8 @@ async def dsi_workflow_page(request: Request, workflow_id: str):
     # Messages from session
     messages = []
     agent_names = {}
+    # Build agent_map for unified message component
+    dsi_agent_map = {}
     def _resolve_agent(aid):
         if aid and aid not in agent_names:
             a = agent_store.get(aid)
@@ -3096,6 +3209,7 @@ async def dsi_workflow_page(request: Request, workflow_id: str):
                     "name": a.name,
                     "avatar_url": f"/static/avatars/{a.id}.jpg" if jpg.exists() else (f"/static/avatars/{a.id}.svg" if svg_f.exists() else ""),
                 }
+                dsi_agent_map[aid] = {"name": a.name, "icon": a.icon or "bot", "color": a.color or "#8b949e", "role": a.role or "", "avatar": getattr(a, "avatar", "bot")}
             else:
                 agent_names[aid] = {"name": aid, "avatar_url": ""}
         return agent_names.get(aid, {"name": aid or "?", "avatar_url": ""})
@@ -3212,6 +3326,7 @@ async def dsi_workflow_page(request: Request, workflow_id: str):
         "phase_agents": phase_agents,
         "deliverables": deliverables,
         "messages": messages,
+        "agent_map": dsi_agent_map,
         "graph_nodes": graph_nodes,
         "graph_edges": graph_edges,
         "session": session,

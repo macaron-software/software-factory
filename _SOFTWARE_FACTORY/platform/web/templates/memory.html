@@ -98,8 +98,40 @@
             </div>
         </div>
 
-        <!-- Right: Retrospectives + Self-Improvement -->
+        <!-- Right: Project Memories -->
         <div class="mem-panel">
+            <div class="mem-panel-header">
+                <div class="mem-panel-title"><svg><use href="#icon-folder"/></svg> Mémoires Projets</div>
+            </div>
+            <div class="mem-panel-body">
+                {% for pm in project_memories %}
+                <div style="margin-bottom:0.6rem">
+                    <div style="font-size:0.72rem;font-weight:700;color:var(--purple);margin-bottom:0.2rem">{{ pm.project_name }} <span style="font-weight:400;color:var(--text-muted)">({{ pm.count }})</span></div>
+                    {% for mem in pm.entries[:5] %}
+                    <div class="mem-entry">
+                        <div><span class="mem-badge {{ mem.category }}">{{ mem.category }}</span> <span class="mem-key">{{ mem.key }}</span></div>
+                        <div class="mem-val">{{ mem.value[:150] }}{% if mem.value|length > 150 %}…{% endif %}</div>
+                        <div class="mem-meta">
+                            <span class="mem-confidence">
+                                <span class="mem-confidence-bar"><span class="mem-confidence-fill" style="width:{{ (mem.confidence * 100)|int }}%"></span></span>
+                                {{ "%.0f"|format(mem.confidence * 100) }}%
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div style="text-align:center;padding:1.5rem;font-size:0.75rem;color:var(--text-muted)">
+                    Aucune mémoire projet. Les agents rempliront cette section lors de l'analyse des codebases.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Retrospectives -->
+    <div class="mem-grid" style="margin-top:1rem">
+        <div class="mem-panel" style="grid-column: span 2">
             <div class="mem-panel-header">
                 <div class="mem-panel-title"><svg><use href="#icon-refresh-cw"/></svg> Rétrospectives & Auto-amélioration</div>
                 <button class="btn btn-primary" style="font-size:0.68rem;padding:0.2rem 0.5rem" onclick="generateRetro()">

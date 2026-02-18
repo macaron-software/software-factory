@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+.org-tree{display:flex;flex-direction:column;gap:1.2rem;margin-top:1rem}
+.org-portfolio{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.org-portfolio-header{display:flex;align-items:center;justify-content:space-between;padding:0.7rem 1rem;background:rgba(124,58,237,.08);border-bottom:1px solid var(--border)}
+.org-portfolio-title{font-size:0.85rem;font-weight:700;display:flex;align-items:center;gap:0.5rem}
+.org-portfolio-title svg{width:16px;height:16px;color:var(--purple)}
+.org-budget{font-size:0.7rem;display:flex;gap:1rem;align-items:center}
+.org-budget-bar{width:120px;height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden}
+.org-budget-fill{height:100%;border-radius:3px;transition:width .3s}
+.org-arts{padding:0.5rem 0.8rem}
+.org-art{margin-bottom:0.8rem;padding:0.5rem 0.7rem;background:var(--bg-tertiary);border-radius:8px;border-left:3px solid var(--blue)}
+.org-art-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem}
+.org-art-title{font-size:0.78rem;font-weight:600;color:var(--blue)}
+.org-art-meta{font-size:0.62rem;color:var(--text-muted)}
+.org-teams{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.5rem;margin-top:0.4rem}
+.org-team{padding:0.5rem;background:var(--bg-secondary);border-radius:6px;border:1px solid var(--border)}
+.org-team-name{font-size:0.73rem;font-weight:600;color:var(--text-primary);margin-bottom:0.2rem}
+.org-team-meta{font-size:0.6rem;color:var(--text-muted);margin-bottom:0.3rem}
+.org-member{display:flex;align-items:center;gap:0.3rem;font-size:0.65rem;padding:0.1rem 0}
+.org-member-avatar{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.5rem;font-weight:700;color:#fff;flex-shrink:0}
+.org-member-role{font-size:0.55rem;color:var(--text-muted);margin-left:auto}
+.org-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:0.8rem;margin-bottom:1rem}
+@media(max-width:700px){.org-kpis{grid-template-columns:1fr 1fr}}
+.org-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.6rem 0.8rem;text-align:center}
+.org-stat .num{font-size:1.3rem;font-weight:800;color:var(--purple)}
+.org-stat .lbl{font-size:0.65rem;color:var(--text-muted);margin-top:0.1rem}
+</style>
+
+<!-- KPIs -->
+<div class="org-kpis">
+    <div class="org-stat"><div class="num">{{ portfolios|length }}</div><div class="lbl">Portfolios</div></div>
+    <div class="org-stat"><div class="num">{{ total_arts }}</div><div class="lbl">ARTs</div></div>
+    <div class="org-stat"><div class="num">{{ total_teams }}</div><div class="lbl">Teams</div></div>
+    <div class="org-stat"><div class="num">{{ total_members }}</div><div class="lbl">Agents Affectés</div></div>
+</div>
+
+<!-- Org Tree -->
+<div class="org-tree">
+{% for p in org_tree %}
+    <div class="org-portfolio">
+        <div class="org-portfolio-header">
+            <div class="org-portfolio-title">
+                <svg><use href="#icon-briefcase"/></svg>
+                {{ p.name }}
+                {% if p.lead %}<span style="font-weight:400;font-size:0.68rem;color:var(--text-muted)">— {{ p.lead }}</span>{% endif %}
+            </div>
+            <div class="org-budget">
+                {% set pct = ((p.budget_consumed / p.budget)|int) if p.budget > 0 else 0 %}
+                <span>{{ "%.0f"|format(p.budget_consumed/1000) }}k / {{ "%.0f"|format(p.budget/1000) }}k €</span>
+                <div class="org-budget-bar">
+                    <div class="org-budget-fill" style="width:{{ pct }}%;background:{% if pct > 80 %}var(--red){% elif pct > 60 %}var(--yellow){% else %}var(--green){% endif %}"></div>
+                </div>
+            </div>
+        </div>
+        <div class="org-arts">
+        {% for art in p.children %}
+            <div class="org-art">
+                <div class="org-art-header">
+                    <div class="org-art-title">🚂 {{ art.name }}</div>
+                    <div class="org-art-meta">PI {{ art.pi_cadence }}w · {{ art.children|length }} teams</div>
+                </div>
+                <div class="org-teams">
+                {% for team in art.children %}
+                    <div class="org-team">
+                        <div class="org-team-name">{{ team.name }}</div>
+                        <div class="org-team-meta">WIP {{ team.wip_limit }} · Cap {{ team.capacity }}</div>
+                        {% for m in team.members %}
+                        <div class="org-member">
+                            <div class="org-member-avatar" style="background:{% if m.role == 'lead' %}var(--purple){% elif m.role == 'qa' %}var(--yellow){% elif m.role == 'devops' or m.role == 'security' %}var(--red){% else %}var(--blue){% endif %}">
+                                {{ m.name[:1]|upper if m.name else '?' }}
+                            </div>
+                            <span>{{ m.name }}</span>
+                            <span class="org-member-role">{{ m.role }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+{% else %}
+    <div style="text-align:center;padding:2rem;color:var(--text-muted);font-size:0.8rem">
+        Aucune structure organisationnelle définie.<br>
+        L'org tree SAFe sera peuplé automatiquement au démarrage.
+    </div>
+{% endfor %}
+</div>
+{% endblock %}

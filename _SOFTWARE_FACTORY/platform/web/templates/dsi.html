@@ -153,6 +153,64 @@
     </div>
 </div>
 
+<!-- DORA Metrics + Org Summary -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.2rem">
+    <div class="dsi-panel">
+        <div class="dsi-panel-header">
+            <div class="dsi-panel-title"><svg><use href="#icon-chart"/></svg> DORA Metrics (30j)</div>
+            <span class="dsi-decision-badge" style="background:{% if dora.overall_level == 'elite' %}rgba(52,211,153,.15);color:var(--green){% elif dora.overall_level == 'high' %}rgba(59,130,246,.15);color:var(--blue){% elif dora.overall_level == 'medium' %}rgba(245,158,11,.15);color:var(--yellow){% else %}rgba(248,113,113,.15);color:var(--red){% endif %}">{{ dora.overall_level|upper }}</span>
+        </div>
+        <div class="dsi-panel-body" style="max-height:200px">
+            <div class="dsi-chart-row">
+                <div class="dsi-chart-label">Deploy</div>
+                <div class="dsi-chart-bar"><div class="dsi-chart-fill" style="width:{{ [dora.deployment_frequency.per_day * 100, 100]|min }}%;background:var(--green)"></div></div>
+                <div class="dsi-chart-value">{{ dora.deployment_frequency.per_day }}/j</div>
+            </div>
+            <div class="dsi-chart-row">
+                <div class="dsi-chart-label">Lead</div>
+                <div class="dsi-chart-bar"><div class="dsi-chart-fill" style="width:{{ [100 - dora.lead_time.median_hours, 0]|max }}%;background:var(--blue)"></div></div>
+                <div class="dsi-chart-value">{{ dora.lead_time.median_hours }}h</div>
+            </div>
+            <div class="dsi-chart-row">
+                <div class="dsi-chart-label">Fail%</div>
+                <div class="dsi-chart-bar"><div class="dsi-chart-fill" style="width:{{ dora.change_failure_rate.rate_pct }}%;background:var(--red)"></div></div>
+                <div class="dsi-chart-value">{{ dora.change_failure_rate.rate_pct }}%</div>
+            </div>
+            <div class="dsi-chart-row">
+                <div class="dsi-chart-label">MTTR</div>
+                <div class="dsi-chart-bar"><div class="dsi-chart-fill" style="width:{{ [100 - dora.mttr.median_hours, 0]|max }}%;background:var(--yellow)"></div></div>
+                <div class="dsi-chart-value">{{ dora.mttr.median_hours }}h</div>
+            </div>
+        </div>
+    </div>
+    <div class="dsi-panel">
+        <div class="dsi-panel-header">
+            <div class="dsi-panel-title"><svg><use href="#icon-users"/></svg> Organisation SAFe</div>
+            <a href="/org" class="btn btn-ghost" style="font-size:0.65rem;padding:0.15rem 0.4rem">Détails →</a>
+        </div>
+        <div class="dsi-panel-body" style="max-height:200px">
+            <div style="display:flex;gap:1.5rem;justify-content:center;padding:0.5rem 0">
+                <div style="text-align:center">
+                    <div style="font-size:1.5rem;font-weight:800;color:var(--purple)">{{ org_portfolios }}</div>
+                    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Portfolios</div>
+                </div>
+                <div style="text-align:center">
+                    <div style="font-size:1.5rem;font-weight:800;color:var(--blue)">{{ org_arts }}</div>
+                    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">ARTs</div>
+                </div>
+                <div style="text-align:center">
+                    <div style="font-size:1.5rem;font-weight:800;color:var(--green)">{{ org_teams }}</div>
+                    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Teams</div>
+                </div>
+                <div style="text-align:center">
+                    <div style="font-size:1.5rem;font-weight:800;color:var(--yellow)">{{ total_agents }}</div>
+                    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Agents</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Top: Decisions + System Map -->
 <div class="dsi-top">
     <!-- Left: Comité Stratégique decisions -->

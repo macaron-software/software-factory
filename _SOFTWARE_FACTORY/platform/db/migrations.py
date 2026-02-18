@@ -50,6 +50,16 @@ def _migrate(conn: sqlite3.Connection):
     except Exception:
         pass
 
+    # Missions: add WSJF component fields
+    try:
+        m_cols = {r[1] for r in conn.execute("PRAGMA table_info(missions)").fetchall()}
+        for col, default in [("business_value", "0"), ("time_criticality", "0"),
+                             ("risk_reduction", "0"), ("job_duration", "1")]:
+            if col not in m_cols:
+                conn.execute(f"ALTER TABLE missions ADD COLUMN {col} REAL DEFAULT {default}")
+    except Exception:
+        pass
+
 def get_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
     """Get a database connection."""
     if not db_path.exists():

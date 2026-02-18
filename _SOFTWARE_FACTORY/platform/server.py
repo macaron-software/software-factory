@@ -52,6 +52,16 @@ async def lifespan(app: FastAPI):
     from .projects.manager import get_project_store
     get_project_store().seed_from_registry()
 
+    # Seed memory (global knowledge + project files)
+    from .memory.seeder import seed_all as seed_memories
+    n_mem = seed_memories()
+    if n_mem:
+        logger.info("Seeded %d memories", n_mem)
+
+    # Seed org tree (Portfolio → ART → Team)
+    from .agents.org import get_org_store
+    get_org_store().seed_default()
+
     # Mark orphaned "active" sessions as interrupted (no running task after restart)
     from .sessions.store import get_session_store
     _ss = get_session_store()
