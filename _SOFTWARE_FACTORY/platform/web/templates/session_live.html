@@ -5,12 +5,21 @@
     <span class="badge {% if session.status == 'active' %}badge-green{% elif session.status == 'completed' %}badge-blue{% elif session.status == 'failed' %}badge-red{% else %}badge-yellow{% endif %}">
         {{ session.status }}
     </span>
+    {% if session.status == 'active' %}
     <button class="btn btn-sm btn-danger"
             hx-post="/api/sessions/{{ session.id }}/stop"
             hx-swap="none"
             hx-on::after-request="location.reload()">
         <svg class="icon icon-sm"><use href="#icon-stop"/></svg> Stop
     </button>
+    {% elif session.status == 'completed' or session.status == 'failed' %}
+    <button class="btn btn-sm" style="background:var(--purple);color:#fff;"
+            hx-post="/api/sessions/{{ session.id }}/resume"
+            hx-swap="none"
+            hx-on::after-request="location.reload()">
+        <svg class="icon icon-sm"><use href="#icon-play"/></svg> Reprendre
+    </button>
+    {% endif %}
 </div>
 {% endblock %}
 
@@ -25,6 +34,13 @@
 .session-status .dot--active{background:var(--green);box-shadow:0 0 6px var(--green)}
 .session-status .dot--thinking{background:var(--yellow);animation:pulse 1s infinite}
 .session-status .dot--error{background:var(--red)}
+/* ── Streaming ── */
+.mu--streaming{border-left-width:3px;animation:stream-pulse 1.5s ease-in-out infinite}
+.mu__typing{font-size:0.65rem;color:var(--purple-light);margin-left:0.5rem;font-style:italic}
+.mu__dots{animation:dots-blink 1.2s steps(3) infinite}
+@keyframes stream-pulse{0%,100%{opacity:1}50%{opacity:.7}}
+@keyframes dots-blink{0%{content:''}33%{content:'.'}66%{content:'..'}100%{content:'...'}}
+.mu__stream-content{min-height:1.2em}
 .session-tabs{display:flex;gap:0}
 .session-tab{background:none;border:none;color:var(--text-secondary);padding:0.45rem 1rem;font-size:0.82rem;cursor:pointer;border-radius:6px;transition:all .15s;display:flex;align-items:center;gap:0.35rem}
 .session-tab:hover{background:var(--bg-tertiary);color:var(--text-primary)}
@@ -43,6 +59,9 @@
 .input-send{background:var(--purple);color:#fff;border:none;border-radius:8px;padding:0.55rem 1rem;font-size:0.85rem;cursor:pointer;font-weight:600;transition:background .15s}
 .input-send:hover{background:#6d28d9}
 .input-send:active{transform:scale(0.97)}
+.input-conv{background:rgba(168,85,247,.12);color:var(--purple-light);border:1px solid rgba(168,85,247,.25);border-radius:8px;padding:0.45rem 0.7rem;font-size:1rem;cursor:pointer;transition:all .15s;line-height:1}
+.input-conv:hover{background:rgba(168,85,247,.25);border-color:var(--purple)}
+.input-conv.active{background:var(--purple);color:#fff}
 
 /* ── Thread mode ── */
 .thread-feed{overflow-y:auto;height:100%;padding:1rem 1.25rem;display:flex;flex-direction:column;gap:0}
@@ -471,7 +490,8 @@
         <option value="{{ n.agent_id }}">{{ a.avatar if a else '' }} {{ a.name if a else n.label }}</option>
       {% endfor %}
     </select>
-    <input type="text" id="msgInput" class="input-text" placeholder="Send a message..." autocomplete="off">
+    <input type="text" id="msgInput" class="input-text" placeholder="{% if session.status == 'completed' %}Session terminée — écris un message pour reprendre...{% else %}Send a message...{% endif %}" autocomplete="off">
+    <button id="btnConversation" class="input-conv" title="Lancer une conversation multi-agents (les agents discutent entre eux)">🗣️</button>
     <button id="btnSend" class="input-send"><svg class="icon icon-xs"><use href="#icon-send"/></svg></button>
   </div>
 </div>
@@ -552,17 +572,101 @@ async function sendMessage(){
 btnSend.addEventListener('click', sendMessage);
 msgInput.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }});
 
+/* ── Multi-agent conversation ── */
+const btnConv = document.getElementById('btnConversation');
+btnConv.addEventListener('click', async ()=>{
+  const content = msgInput.value.trim();
+  if(!content){ msgInput.placeholder = 'Écris un sujet de discussion pour les agents...'; return; }
+  // Gather all agent IDs from the graph
+  const agentIds = GRAPH.nodes.map(n => n.agent_id).filter(Boolean);
+  if(agentIds.length < 2){
+    alert('Il faut au moins 2 agents dans le workflow pour une conversation.');
+    return;
+  }
+  btnConv.disabled = true;
+  btnConv.classList.add('active');
+  msgInput.value = '';
+  try{
+    await fetch(`/api/sessions/${SESSION_ID}/conversation`, {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:`message=${encodeURIComponent(content)}&agent_ids=${agentIds.join(',')}&max_rounds=6`
+    });
+  } finally { btnConv.disabled = false; btnConv.classList.remove('active'); }
+});
+
 /* ── SSE Connection ── */
 const es = new EventSource(`/api/sessions/${SESSION_ID}/sse`);
+const _streamBuffers = {}; // agent_id → {div, content}
 es.addEventListener('message', e=>{
   try{
     const data = JSON.parse(e.data);
+    if(data.type === 'stream_start') { handleStreamStart(data); return; }
+    if(data.type === 'stream_delta') { handleStreamDelta(data); return; }
+    if(data.type === 'stream_end')   { handleStreamEnd(data); return; }
+    if(data.type === 'conversation_end') { return; }
     appendMessage(data);
     updateNodeStatus(data);
     routeToAgentChat(data);
   }catch(err){ console.error('SSE parse error', err); }
 });
 es.addEventListener('error', ()=>{ console.warn('SSE connection lost, will retry...'); });
+
+/* ── Streaming handlers ── */
+function handleStreamStart(data){
+  const feed = document.getElementById('threadFeed');
+  const agent = agentById(data.agent_id);
+  const name = agent ? agent.name : data.agent_name || data.agent_id;
+  const color = agent ? agent.color : '#8b949e';
+  const icon = agent ? (agent.icon || 'bot') : 'bot';
+  const div = document.createElement('div');
+  div.className = 'mu mu--thread mu--streaming';
+  div.id = `stream-${data.agent_id}`;
+  div.style.borderLeftColor = color;
+  div.innerHTML = `
+    <div class="mu__avatar" style="background:${color}20;border-color:${color}">
+      <svg class="icon icon-sm" style="color:${color}"><use href="#icon-${icon}"/></svg>
+    </div>
+    <div class="mu__body">
+      <div class="mu__meta">
+        <span class="mu__name" style="color:${color}">${esc(name)}</span>
+        ${agent&&agent.role ? `<span class="mu__role">${esc(agent.role)}</span>` : ''}
+        <span class="mu__typing">typing<span class="mu__dots">...</span></span>
+      </div>
+      <div class="mu__content md-rendered mu__stream-content"></div>
+    </div>`;
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
+  _streamBuffers[data.agent_id] = {div, content: ''};
+  // Pulse the graph node
+  updateNodeStatus({from_agent: data.agent_id, type: 'thinking'});
+}
+
+function handleStreamDelta(data){
+  const buf = _streamBuffers[data.agent_id];
+  if(!buf) return;
+  buf.content += data.delta;
+  buf.div.querySelector('.mu__stream-content').innerHTML = md(buf.content);
+  const feed = document.getElementById('threadFeed');
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function handleStreamEnd(data){
+  const buf = _streamBuffers[data.agent_id];
+  if(buf && data.content) {
+    buf.div.querySelector('.mu__stream-content').innerHTML = md(data.content);
+    const typing = buf.div.querySelector('.mu__typing');
+    if(typing) typing.remove();
+    buf.div.classList.remove('mu--streaming');
+  }
+  delete _streamBuffers[data.agent_id];
+  // Also push to other views
+  if(data.content) {
+    appendChatPanel({from_agent: data.agent_id, content: data.content, msg_type: 'text', type: 'text'});
+    appendGraphLog({from_agent: data.agent_id, content: data.content, type: 'text'});
+  }
+  updateNodeStatus({from_agent: data.agent_id, type: 'idle'});
+}
 
 /* ── Append message to all modes ── */
 function appendMessage(data){

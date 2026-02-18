@@ -659,23 +659,16 @@ async function sendIdea() {
         ux_designer: 'UX Designer',
         securite: 'Expert Sécurité',
     };
+    const COLORS = {
+        metier: '#2563eb', architecte: '#0891b2',
+        ux_designer: '#8b5cf6', securite: '#dc2626',
+        product_manager: '#16a34a',
+    };
 
-    // Phase 1: PM briefs the team
-    addPhaseHeader('📋 Phase 1 — Brief', 'Le Product Owner cadre l\'idée et briefe l\'équipe');
-    setAgentStatus('product_manager', 'speaking');
-    FLOW_SEQUENCE[0].edges.forEach(([f,t])=> setEdgeActive(f,t,true));
-    addMsg('agent', 'Alexandre Faure',
-        'Je prends en charge cette idée. Je briefe l\'équipe pour analyse.\n@Camille — évalue la valeur métier\n@Pierre — propose l\'architecture\n@Chloé — pense UX et parcours\n@Nadia — identifie les risques sécurité',
-        '#16a34a', igAgent('product_manager')?.avatar_url || '', 'Product Owner', 'Équipe');
-    await sleep(800);
-
-    // Phase 2: Experts thinking
-    ['metier','architecte','ux_designer','securite'].forEach(id=> setAgentStatus(id, 'thinking'));
-    FLOW_SEQUENCE[0].edges.forEach(([f,t])=> setEdgeActive(f,t,false));
-    FLOW_SEQUENCE[1].edges.forEach(([f,t])=> setEdgeActive(f,t,true));
-    addPhaseHeader('🔍 Phase 2 — Analyse', 'Chaque expert analyse sous son angle');
+    addPhaseHeader('🔍 Idéation en cours', 'Les agents analysent votre idée en temps réel...');
 
     try {
+        // Start the real pattern engine
         const resp = await fetch('/api/ideation', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -683,121 +676,104 @@ async function sendIdea() {
         });
         const data = await resp.json();
         if (data.error) {
-            resetGraphState();
             addMsg('system', 'Système', data.error, 'var(--red)', '');
-        } else {
-            sessionId = data.session_id || sessionId;
-            const messages = data.messages || [];
-
-            // Animate messages one by one with graph activation
-            FLOW_SEQUENCE[1].edges.forEach(([f,t])=> setEdgeActive(f,t,false));
-
-            // Map agent names to IDs for edge direction
-            const NAME_TO_ID = {
-                'Camille': 'metier', 'Pierre': 'architecte',
-                'Chloé': 'ux_designer', 'Nadia': 'securite',
-                'Alexandre': 'product_manager', 'Comité': null,
-            };
-
-            // Show expert messages (everything except PM synthesis)
-            const expertMsgs = messages.filter(m => m.agent_id !== 'product_manager');
-            const pmMsgs = messages.filter(m => m.agent_id === 'product_manager');
-
-            for (let i = 0; i < expertMsgs.length; i++) {
-                const msg = expertMsgs[i];
-                const agentId = msg.agent_id;
-                const agent = igAgent(agentId);
-                const targetName = msg.target || 'Alexandre';
-                const targetId = NAME_TO_ID[targetName] || null;
-
-                setAgentStatus(agentId, 'speaking');
-                // Light up edge FROM speaker TO target (if specific)
-                if (targetId) {
-                    setEdgeActive(agentId, targetId, true);
-                } else {
-                    // Broadcasting to comité: light up all outgoing edges
-                    igEdges.filter(e=> e.from === agentId).forEach(e=> setEdgeActive(e.from, e.to, true));
-                }
-
-                addMsg('agent', msg.agent_name, msg.content, msg.color || '',
-                    agent?.avatar_url || msg.avatar_url || '',
-                    ROLES[agentId] || msg.role || '', targetName);
-
-                await sleep(900);
-                // Turn off edges
-                if (targetId) {
-                    setEdgeActive(agentId, targetId, false);
-                } else {
-                    igEdges.filter(e=> e.from === agentId).forEach(e=> setEdgeActive(e.from, e.to, false));
-                }
-                if(i < expertMsgs.length - 1) setAgentStatus(agentId, 'idle');
-            }
-
-            // Phase 3: PM synthesizes
-            FLOW_SEQUENCE[2].edges.forEach(([f,t])=> setEdgeActive(f,t,true));
-            addPhaseHeader('📊 Phase 3 — Synthèse', 'Le PO consolide et propose');
-
-            for (const msg of pmMsgs) {
-                const agent = igAgent('product_manager');
-                setAgentStatus('product_manager', 'speaking');
-                addMsg('agent', msg.agent_name, msg.content, msg.color || '',
-                    agent?.avatar_url || msg.avatar_url || '',
-                    'Product Owner', 'Comité');
-                await sleep(600);
-            }
-
-            await sleep(400);
-            FLOW_SEQUENCE[2].edges.forEach(([f,t])=> setEdgeActive(f,t,false));
-
-            for (const f of (data.findings || [])) {
-                addFinding(f.type, f.text);
-            }
-
-            // Store request_type and po_proposal for epic creation
-            lastRequestType = data.request_type || 'new_feature';
-            lastPoProposal = data.po_proposal || {};
-
-            // Show PO proposal panel
-            if (lastPoProposal.epic_name) {
-                const pp = document.getElementById('poProposalPanel');
-                const pc = document.getElementById('poProposalContent');
-                let html = `<div style="font-weight:600;color:var(--purple);margin-bottom:0.3rem">${esc(lastPoProposal.epic_name)}</div>`;
-                html += `<div style="color:var(--text-secondary);font-size:0.72rem;margin-bottom:0.3rem">Type: <span style="color:var(--purple)">${lastRequestType}</span></div>`;
-                if (lastPoProposal.stack) html += `<div style="margin-bottom:0.2rem">Stack: ${esc(lastPoProposal.stack)}</div>`;
-                if (lastPoProposal.workflow) html += `<div style="margin-bottom:0.2rem">Workflow: <span style="color:var(--blue)">${esc(lastPoProposal.workflow)}</span></div>`;
-                if (lastPoProposal.team && lastPoProposal.team.length) {
-                    html += `<div style="margin-top:0.3rem;font-weight:600;font-size:0.72rem;color:var(--text-secondary)">Équipe proposée:</div>`;
-                    lastPoProposal.team.forEach(t => {
-                        html += `<div style="font-size:0.75rem">• ${esc(t.role)}</div>`;
-                    });
-                }
-                if (lastPoProposal.estimated_sprints) html += `<div style="margin-top:0.3rem">Sprints estimés: ${lastPoProposal.estimated_sprints}</div>`;
-                pc.innerHTML = html;
-                pp.style.display = 'block';
-            }
-
-            // Auto-select project if request_type is not new_project
-            if (lastRequestType !== 'new_project') {
-                const sel = document.getElementById('ideaProjectSelect');
-                if (sel.options.length > 1) sel.selectedIndex = 1;
-            }
-
-            // Enable action buttons
-            document.getElementById('btnCreateEpic').style.opacity = '1';
-            document.getElementById('btnCreateEpic').style.pointerEvents = 'auto';
-            document.getElementById('btnGenerateTeam').style.opacity = '1';
-            document.getElementById('btnGenerateTeam').style.pointerEvents = 'auto';
-
-            // Final: all agents speaking (done)
-            igAgents.forEach(a=> setAgentStatus(a.id, 'speaking'));
-            await sleep(1500);
-            resetGraphState();
+            sendBtn.disabled = false;
+            return;
         }
+
+        sessionId = data.session_id;
+
+        // Connect to SSE — receive REAL streaming from pattern engine
+        const es = new EventSource(`/api/sessions/${sessionId}/sse`);
+        let currentStreamAgent = null;
+        let streamBuffer = '';
+
+        es.onmessage = function(event) {
+            const evt = JSON.parse(event.data);
+
+            if (evt.type === 'agent_status') {
+                const status = evt.status === 'thinking' ? 'thinking'
+                    : evt.status === 'idle' ? 'idle' : 'speaking';
+                setAgentStatus(evt.agent_id, status);
+            }
+            else if (evt.type === 'stream_start') {
+                currentStreamAgent = evt.agent_id;
+                streamBuffer = '';
+                setAgentStatus(evt.agent_id, 'speaking');
+                // Light up edges from this agent
+                igEdges.filter(e => e.from === evt.agent_id).forEach(e => setEdgeActive(e.from, e.to, true));
+                // Create a streaming bubble
+                const agentName = evt.agent_name || ROLES[evt.agent_id] || evt.agent_id;
+                const color = COLORS[evt.agent_id] || '#8b949e';
+                const agent = igAgent(evt.agent_id);
+                const div = document.createElement('div');
+                div.className = 'mu mu--chat mu--agent';
+                div.id = `stream-${evt.agent_id}`;
+                const icon = agent?.avatar_url
+                    ? `<img src="${agent.avatar_url}" alt="${agentName}">`
+                    : `<svg class="icon icon-sm" style="color:${color}"><use href="#icon-bot"/></svg>`;
+                div.innerHTML = `
+                    <div class="mu__avatar" style="background:${color}20;border-color:${color}">${icon}</div>
+                    <div class="mu__bubble mu__bubble--agent">
+                        <div class="mu__sender">
+                            <span class="mu__name" style="color:${color}">${agentName}</span>
+                            <span class="mu__role">${ROLES[evt.agent_id] || ''}</span>
+                        </div>
+                        <div class="mu__content md-rendered" id="stream-content-${evt.agent_id}">
+                            <span class="typing-indicator">●●●</span>
+                        </div>
+                    </div>`;
+                messagesEl.appendChild(div);
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
+            else if (evt.type === 'stream_delta' && evt.agent_id) {
+                streamBuffer += evt.delta;
+                const el = document.getElementById(`stream-content-${evt.agent_id}`);
+                if (el) {
+                    // Highlight @mentions
+                    const rendered = streamBuffer.replace(/@(\w[\w\s]*?)(?=[\s,.:!?]|$)/g,
+                        '<span style="color:var(--purple);font-weight:600">@$1</span>');
+                    el.innerHTML = rendered;
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                }
+            }
+            else if (evt.type === 'stream_end' && evt.agent_id) {
+                // Turn off edges
+                igEdges.filter(e => e.from === evt.agent_id).forEach(e => setEdgeActive(e.from, e.to, false));
+                setAgentStatus(evt.agent_id, 'idle');
+                // Finalize content
+                const el = document.getElementById(`stream-content-${evt.agent_id}`);
+                if (el && evt.content) {
+                    const rendered = evt.content.replace(/@(\w[\w\s]*?)(?=[\s,.:!?]|$)/g,
+                        '<span style="color:var(--purple);font-weight:600">@$1</span>');
+                    el.innerHTML = rendered;
+                }
+                currentStreamAgent = null;
+                streamBuffer = '';
+            }
+            else if (evt.type === 'pattern_end') {
+                es.close();
+                resetGraphState();
+                sendBtn.disabled = false;
+                // Enable action buttons
+                document.getElementById('btnCreateEpic').style.opacity = '1';
+                document.getElementById('btnCreateEpic').style.pointerEvents = 'auto';
+                document.getElementById('btnGenerateTeam').style.opacity = '1';
+                document.getElementById('btnGenerateTeam').style.pointerEvents = 'auto';
+            }
+        };
+
+        es.onerror = function() {
+            es.close();
+            resetGraphState();
+            sendBtn.disabled = false;
+        };
+
     } catch (e) {
         resetGraphState();
         addMsg('system', 'Système', 'Erreur de connexion: ' + e.message, 'var(--red)', '');
+        sendBtn.disabled = false;
     }
-    sendBtn.disabled = false;
 }
 
 function sleep(ms){ return new Promise(r=> setTimeout(r, ms)); }

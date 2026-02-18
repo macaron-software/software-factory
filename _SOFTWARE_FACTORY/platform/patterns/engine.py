@@ -294,35 +294,80 @@ async def _execute_node(
         full_task += _REVIEW_PROTOCOL
     full_task += "\n\n" + _PR_PROTOCOL
 
-    # Execute
+    # Execute with streaming SSE
     executor = get_executor()
-    result = await executor.run(ctx, full_task)
-    state.result = result
-    state.output = result.content
+    result = None
 
-    # Store as message in conversation — detect VETO/NOGO/APPROVE
+    await _push_sse(run.session_id, {
+        "type": "stream_start",
+        "agent_id": agent.id,
+        "agent_name": agent.name,
+        "node_id": node_id,
+    })
+
+    import re as _re
+    in_think = False
+    try:
+        async for kind, value in executor.run_streaming(ctx, full_task):
+            if kind == "delta":
+                delta = value
+                if "<think>" in delta:
+                    in_think = True
+                if "</think>" in delta:
+                    in_think = False
+                    continue
+                if not in_think:
+                    await _push_sse(run.session_id, {
+                        "type": "stream_delta",
+                        "agent_id": agent.id,
+                        "delta": delta,
+                    })
+            elif kind == "result":
+                result = value
+    except Exception as exc:
+        logger.error("Streaming failed for %s, falling back: %s", agent.id, exc)
+        result = await executor.run(ctx, full_task)
+
+    if result is None:
+        result = await executor.run(ctx, full_task)
+
+    # Strip <think> blocks from final content
+    content = result.content or ""
+    if "<think>" in content:
+        content = _re.sub(r"<think>.*?</think>\s*", "", content, flags=_re.DOTALL).strip()
+        result = ExecutionResult(
+            content=content, agent_id=result.agent_id, model=result.model,
+            provider=result.provider, tokens_in=result.tokens_in,
+            tokens_out=result.tokens_out, duration_ms=result.duration_ms,
+            tool_calls=result.tool_calls, delegations=result.delegations,
+            error=result.error,
+        )
+
+    state.result = result
+    state.output = content
+
+    # Detect VETO/NOGO/APPROVE
     msg_type = "text"
-    content_upper = (result.content or "").upper()
+    content_upper = content.upper()
     is_veto = (
-        "[VETO]" in result.content
+        "[VETO]" in content
         or "NOGO" in content_upper
         or "NO-GO" in content_upper
         or "STATUT: NOGO" in content_upper
         or "STATUT : NOGO" in content_upper
     )
     is_approve = (
-        "[APPROVE]" in result.content
+        "[APPROVE]" in content
         or "STATUT: GO" in content_upper
         or "STATUT : GO" in content_upper
     )
-    # Avoid false positive: "NOGO" in approve context
     if is_approve and not is_veto:
         msg_type = "approve"
         state.status = NodeStatus.COMPLETED
     elif is_veto:
         msg_type = "veto"
         state.status = NodeStatus.VETOED
-        logger.warning("VETO detected from %s: %s", agent.id, result.content[:200])
+        logger.warning("VETO detected from %s: %s", agent.id, content[:200])
     elif result.error:
         msg_type = "system"
         state.status = NodeStatus.FAILED
@@ -334,7 +379,7 @@ async def _execute_node(
         from_agent=agent.id,
         to_agent=to_agent_id or "all",
         message_type=msg_type,
-        content=result.content,
+        content=content,
         metadata={
             "model": result.model,
             "provider": result.provider,
@@ -353,10 +398,17 @@ async def _execute_node(
     read_count = sum(1 for tc in tcs if tc.get("name") in ("code_read", "code_search", "list_files"))
 
     await _push_sse(run.session_id, {
+        "type": "stream_end",
+        "agent_id": agent.id,
+        "content": content,
+        "message_type": msg_type,
+    })
+
+    await _push_sse(run.session_id, {
         "type": "message",
         "from_agent": agent.id,
         "to_agent": to_agent_id or "all",
-        "content": result.content,
+        "content": content,
         "message_type": msg_type,
         "node_id": node_id,
         "edits": edit_count,
@@ -370,7 +422,7 @@ async def _execute_node(
         "status": "idle",
     })
 
-    return result.content
+    return content
 
 
 async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionContext:

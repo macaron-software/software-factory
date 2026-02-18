@@ -1577,6 +1577,9 @@ async def send_message(request: Request, session_id: str):
     session = store.get(session_id)
     if not session:
         return HTMLResponse("Session not found", status_code=404)
+    # Auto-resume if stopped
+    if session.status in ("completed", "failed"):
+        store.update_status(session_id, "active")
     content = str(form.get("content", "")).strip()
     if not content:
         return HTMLResponse("")
@@ -1641,12 +1644,30 @@ async def stop_session(session_id: str):
     """Stop an active session."""
     from ..sessions.store import get_session_store, MessageDef
     store = get_session_store()
+    session = store.get(session_id)
+    if session and session.status == "completed":
+        return HTMLResponse("")  # already stopped
     store.update_status(session_id, "completed")
     store.add_message(MessageDef(
         session_id=session_id,
         from_agent="system",
         message_type="system",
         content="Session stopped by user.",
+    ))
+    return HTMLResponse("")
+
+
+@router.post("/api/sessions/{session_id}/resume")
+async def resume_session(session_id: str):
+    """Resume a completed/stopped session back to active."""
+    from ..sessions.store import get_session_store, MessageDef
+    store = get_session_store()
+    store.update_status(session_id, "active")
+    store.add_message(MessageDef(
+        session_id=session_id,
+        from_agent="system",
+        message_type="system",
+        content="Session resumed.",
     ))
     return HTMLResponse("")
 

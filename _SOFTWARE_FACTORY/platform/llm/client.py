@@ -399,13 +399,44 @@ class LLMClient:
         logger.warning("LLM stream trying %s/%s ...", provider, model)
 
         msgs = []
-        if system_prompt:
-            msgs.append({"role": "system", "content": system_prompt})
+        sys_content = system_prompt or ""
         for m in messages:
-            d = {"role": m.role, "content": m.content}
+            d = {"role": m.role, "content": m.content or ""}
             if m.name:
                 d["name"] = m.name
+            if provider == "minimax":
+                # MiniMax rejects system role in streaming
+                if d["role"] == "system":
+                    if not msgs:
+                        sys_content = (sys_content + "\n\n" + d["content"]).strip() if sys_content else d["content"]
+                    else:
+                        d["role"] = "user"
+                        d["content"] = f"[System instruction]: {d['content']}"
+                        msgs.append(d)
+                    continue
+                # MiniMax rejects tool messages — skip tool results and assistant tool_call messages
+                if d["role"] == "tool":
+                    continue
+                if d["role"] == "assistant" and getattr(m, "tool_calls", None):
+                    continue
+            else:
+                if m.tool_call_id:
+                    d["tool_call_id"] = m.tool_call_id
+                if m.tool_calls:
+                    d["tool_calls"] = m.tool_calls
+                    d.pop("content", None)
             msgs.append(d)
+        # Inject system prompt
+        if sys_content:
+            if provider == "minimax":
+                for i, m in enumerate(msgs):
+                    if m["role"] == "user":
+                        msgs[i]["content"] = f"[System instructions]:\n{sys_content}\n\n[User message]:\n{m['content']}"
+                        break
+                else:
+                    msgs.insert(0, {"role": "user", "content": sys_content})
+            else:
+                msgs.insert(0, {"role": "system", "content": sys_content})
 
         effective_max = max_tokens
         if provider == "minimax":

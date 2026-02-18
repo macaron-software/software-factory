@@ -254,6 +254,36 @@ if (ml) observer.observe(ml, {childList: true});
                     addLogEntry(data.type === 'pattern_start'
                         ? '> ' + (data.pattern_name || 'Pattern') + ' started'
                         : (data.success ? '<svg class="icon icon-xs"><use href="#icon-check"/></svg> Pattern completed' : '<svg class="icon icon-xs"><use href="#icon-stop"/></svg> Pattern failed'));
+                } else if (data.type === 'stream_start') {
+                    hideTyping();
+                    // Create streaming bubble
+                    const name = agentMap[data.agent_id]?.name || data.agent_name || data.agent_id;
+                    const color = agentMap[data.agent_id]?.color || '#8b949e';
+                    const div = document.createElement('div');
+                    div.className = 'mu mu--chat mu--agent';
+                    div.id = 'stream-' + data.agent_id;
+                    div.innerHTML = '<div class="mu__avatar" style="background:' + color + '20;border-color:' + color + '">' +
+                        '<svg class="icon icon-sm" style="color:' + color + '"><use href="#icon-bot"/></svg></div>' +
+                        '<div class="mu__bubble mu__bubble--agent"><div class="mu__sender">' +
+                        '<span class="mu__name" style="color:' + color + '">' + name + '</span></div>' +
+                        '<div class="mu__content md-rendered" id="stream-content-' + data.agent_id + '">●●●</div></div>';
+                    document.getElementById('message-list').appendChild(div);
+                    scrollMessages();
+                } else if (data.type === 'stream_delta' && data.agent_id) {
+                    const el = document.getElementById('stream-content-' + data.agent_id);
+                    if (el) {
+                        if (el.textContent === '●●●') el.textContent = '';
+                        el.textContent += data.delta;
+                        scrollMessages();
+                    }
+                } else if (data.type === 'stream_end' && data.agent_id) {
+                    hideTyping();
+                    const el = document.getElementById('stream-content-' + data.agent_id);
+                    if (el && data.content) {
+                        el.innerHTML = data.content.replace(/@(\w[\w\s]*?)(?=[\s,.:!?]|$)/g,
+                            '<span style="color:var(--purple);font-weight:600">@$1</span>');
+                    }
+                    scrollMessages();
                 }
             } catch(err) {}
         };
