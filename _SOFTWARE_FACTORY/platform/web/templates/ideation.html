@@ -728,9 +728,31 @@ async function sendIdea() {
             }
             else if (evt.type === 'stream_delta' && evt.agent_id) {
                 streamBuffer += evt.delta;
-                const el = document.getElementById(`stream-content-${evt.agent_id}`);
+                let el = document.getElementById(`stream-content-${evt.agent_id}`);
+                if (!el) {
+                    // stream_start was missed — create container now
+                    const agentName = ROLES[evt.agent_id] || evt.agent_id;
+                    const color = COLORS[evt.agent_id] || '#8b949e';
+                    const agent = igAgent(evt.agent_id);
+                    const div = document.createElement('div');
+                    div.className = 'mu mu--chat mu--agent';
+                    div.id = `stream-${evt.agent_id}`;
+                    const icon = agent?.avatar_url
+                        ? `<img src="${agent.avatar_url}" alt="${agentName}">`
+                        : `<svg class="icon icon-sm" style="color:${color}"><use href="#icon-bot"/></svg>`;
+                    div.innerHTML = `
+                        <div class="mu__avatar" style="background:${color}20;border-color:${color}">${icon}</div>
+                        <div class="mu__bubble mu__bubble--agent">
+                            <div class="mu__sender">
+                                <span class="mu__name" style="color:${color}">${agentName}</span>
+                                <span class="mu__role">${ROLES[evt.agent_id] || ''}</span>
+                            </div>
+                            <div class="mu__content md-rendered" id="stream-content-${evt.agent_id}"></div>
+                        </div>`;
+                    messagesEl.appendChild(div);
+                    el = div.querySelector(`#stream-content-${evt.agent_id}`);
+                }
                 if (el) {
-                    // Highlight @mentions
                     const rendered = streamBuffer.replace(/@(\w[\w\s]*?)(?=[\s,.:!?]|$)/g,
                         '<span style="color:var(--purple);font-weight:600">@$1</span>');
                     el.innerHTML = rendered;
@@ -750,6 +772,34 @@ async function sendIdea() {
                 }
                 currentStreamAgent = null;
                 streamBuffer = '';
+            }
+            // Handle complete message events (fallback if streaming missed)
+            else if (evt.type === 'message' && evt.from_agent && evt.from_agent !== 'user' && evt.from_agent !== 'system') {
+                const aid = evt.from_agent;
+                if (!document.getElementById(`stream-${aid}`)) {
+                    const agentName = ROLES[aid] || aid;
+                    const color = COLORS[aid] || '#8b949e';
+                    const agent = igAgent(aid);
+                    const div = document.createElement('div');
+                    div.className = 'mu mu--chat mu--agent';
+                    div.id = `stream-${aid}`;
+                    const icon = agent?.avatar_url
+                        ? `<img src="${agent.avatar_url}" alt="${agentName}">`
+                        : `<svg class="icon icon-sm" style="color:${color}"><use href="#icon-bot"/></svg>`;
+                    const rendered = (evt.content || '').replace(/@(\w[\w\s]*?)(?=[\s,.:!?]|$)/g,
+                        '<span style="color:var(--purple);font-weight:600">@$1</span>');
+                    div.innerHTML = `
+                        <div class="mu__avatar" style="background:${color}20;border-color:${color}">${icon}</div>
+                        <div class="mu__bubble mu__bubble--agent">
+                            <div class="mu__sender">
+                                <span class="mu__name" style="color:${color}">${agentName}</span>
+                                <span class="mu__role">${ROLES[aid] || ''}</span>
+                            </div>
+                            <div class="mu__content md-rendered">${rendered}</div>
+                        </div>`;
+                    messagesEl.appendChild(div);
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                }
             }
             else if (evt.type === 'pattern_end') {
                 es.close();

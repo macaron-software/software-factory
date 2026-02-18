@@ -282,17 +282,21 @@ async def _execute_node(
         full_task += f"[Message from colleague]:\n{context_from}\n\n"
     full_task += f"[Your task]:\n{task}\n\n"
 
-    # Inject role-based execution protocol
+    # Inject role-based execution protocol (only for project-bound sessions)
     role_lower = (agent.role or "").lower()
     rank = getattr(agent, "hierarchy_rank", 50)
-    if rank >= 40 or "dev" in role_lower:
-        # Workers: must execute with tools
-        full_task += _EXEC_PROTOCOL
-    elif "qa" in role_lower or "test" in role_lower:
-        full_task += _QA_PROTOCOL
-    elif "lead" in role_lower:
-        full_task += _REVIEW_PROTOCOL
-    full_task += "\n\n" + _PR_PROTOCOL
+    has_project = bool(run.project_id)
+    if has_project:
+        if rank >= 40 or "dev" in role_lower:
+            full_task += _EXEC_PROTOCOL
+        elif "qa" in role_lower or "test" in role_lower:
+            full_task += _QA_PROTOCOL
+        elif "lead" in role_lower:
+            full_task += _REVIEW_PROTOCOL
+        full_task += "\n\n" + _PR_PROTOCOL
+    else:
+        # Ideation / discussion — no tools, just analysis
+        full_task += "\n\n[DISCUSSION MODE] Respond with your expert analysis. Do NOT use tools or write code. Focus on insights, risks, recommendations, and actionable points for your domain of expertise.\n"
 
     # Execute with streaming SSE
     executor = get_executor()
@@ -465,6 +469,9 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         except Exception:
             pass
 
+    # Disable tools when no project (ideation/discussion mode)
+    has_tools = bool(project_path)
+
     return ExecutionContext(
         agent=agent,
         session_id=run.session_id,
@@ -474,6 +481,7 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         project_context=project_context,
         skills_prompt=skills_prompt,
         vision=vision,
+        tools_enabled=has_tools,
     )
 
 
