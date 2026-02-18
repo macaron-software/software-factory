@@ -343,6 +343,28 @@ function addStreamTool(bubbleId, name) {
     }
 }
 
+const _streamAccum = {};
+function streamChunk(bubbleId, text) {
+    if (!_streamAccum[bubbleId]) _streamAccum[bubbleId] = '';
+    _streamAccum[bubbleId] += text;
+    const bubble = document.getElementById(bubbleId);
+    if (!bubble) return;
+    // Hide status, show text area
+    const status = bubble.querySelector('.chat-stream-status');
+    if (status) status.style.display = 'none';
+    const el = bubble.querySelector('.chat-msg-text');
+    if (el) {
+        el.style.display = '';
+        // Render markdown if available, else show as pre-formatted text
+        if (typeof marked !== 'undefined') {
+            el.innerHTML = marked.parse(_streamAccum[bubbleId]);
+        } else {
+            el.textContent = _streamAccum[bubbleId];
+        }
+    }
+    scrollChat();
+}
+
 function finalizeStream(bubbleId, html) {
     const bubble = document.getElementById(bubbleId);
     if (!bubble) return;
@@ -431,6 +453,8 @@ async function sendChat() {
                         } else if (eventType === 'tool') {
                             addStreamTool(bubbleId, data.name || 'tool');
                             updateStreamStatus(bubbleId, data.label || 'Working…');
+                        } else if (eventType === 'chunk') {
+                            streamChunk(bubbleId, data.text || '');
                         } else if (eventType === 'done') {
                             finalizeStream(bubbleId, data.html || '');
                         } else if (eventType === 'error') {

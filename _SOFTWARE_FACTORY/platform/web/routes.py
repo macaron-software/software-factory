@@ -2384,34 +2384,18 @@ async def project_chat_stream(request: Request, project_id: str):
 
             ctx.on_tool_call = on_tool_call
 
-            # Run executor in background task
-            result_holder = {}
-            async def run_agent():
-                executor = get_executor()
-                result_holder["result"] = await executor.run(ctx, content)
+            # Run executor with streaming
+            executor = get_executor()
+            result = None
+            accumulated_content = ""
 
-            task = asyncio.create_task(run_agent())
+            async for event_type_s, data_s in executor.run_streaming(ctx, content):
+                if event_type_s == "delta":
+                    accumulated_content += data_s
+                    yield sse("chunk", {"text": data_s})
+                elif event_type_s == "result":
+                    result = data_s
 
-            # Yield progress events while agent is working
-            while not task.done():
-                try:
-                    kind, name, label = await asyncio.wait_for(
-                        progress_queue.get(), timeout=0.5
-                    )
-                    event_type = "status" if kind == "status" else "tool"
-                    yield sse(event_type, {"name": name, "label": label})
-                except asyncio.TimeoutError:
-                    pass
-
-            # Drain any remaining events
-            while not progress_queue.empty():
-                kind, name, label = progress_queue.get_nowait()
-                event_type = "status" if kind == "status" else "tool"
-                yield sse(event_type, {"name": name, "label": label})
-
-            # Wait for result
-            await task
-            result = result_holder.get("result")
             if not result:
                 yield sse("error", {"message": "No response from agent"})
                 return
@@ -3888,9 +3872,15 @@ async def ideation_page(request: Request):
 
 @router.post("/api/ideation")
 async def ideation_submit(request: Request):
-    """Process ideation prompt through multi-agent LLM analysis + persist."""
-    from ..llm.client import get_llm_client, LLMMessage
-    from ..db.migrations import get_db
+    """Launch a REAL multi-agent ideation via the pattern engine (network pattern).
+
+    Creates a session, builds a network pattern with the 5 ideation agents,
+    launches run_pattern() in background. The frontend listens via SSE.
+    Returns the session_id immediately so the frontend can connect to SSE.
+    """
+    from ..sessions.store import get_session_store, SessionDef, MessageDef
+    from ..patterns.engine import run_pattern
+    from ..patterns.store import PatternDef
     import uuid
 
     data = await request.json()
@@ -3898,76 +3888,77 @@ async def ideation_submit(request: Request):
     if not prompt:
         return JSONResponse({"error": "Prompt requis"}, status_code=400)
 
-    # Create or reuse ideation session
     session_id = data.get("session_id", "") or str(uuid.uuid4())[:8]
-    db = get_db()
-    try:
-        existing = db.execute("SELECT id FROM ideation_sessions WHERE id=?", (session_id,)).fetchone()
-        if not existing:
-            db.execute(
-                "INSERT INTO ideation_sessions (id, title, prompt, status) VALUES (?,?,?,?)",
-                (session_id, prompt[:100], prompt, "draft"),
-            )
-            db.commit()
-        # Save user message
-        db.execute(
-            "INSERT INTO ideation_messages (session_id, agent_id, agent_name, content, color) VALUES (?,?,?,?,?)",
-            (session_id, "user", "Vous", prompt, ""),
+
+    # Create a real session
+    session_store = get_session_store()
+    existing = session_store.get(session_id)
+    if not existing:
+        session = SessionDef(
+            id=session_id,
+            name=f"Idéation: {prompt[:60]}",
+            goal=prompt,
+            status="active",
+            config={"type": "ideation", "pattern": "network"},
         )
-        db.commit()
-    finally:
-        db.close()
+        session = session_store.create(session)
+    else:
+        session = existing
 
-    client = get_llm_client()
-    try:
-        resp = await client.chat(
-            messages=[LLMMessage(role="user", content=f"Idée à analyser:\n\n{prompt}")],
-            system_prompt=_IDEATION_SYSTEM,
-            temperature=0.7,
-            max_tokens=4096,
-        )
+    # Store user message
+    session_store.add_message(MessageDef(
+        session_id=session_id,
+        from_agent="user",
+        message_type="delegate",
+        content=prompt,
+    ))
 
-        raw = resp.content.strip()
-        if "```json" in raw:
-            raw = raw.split("```json", 1)[1].split("```", 1)[0].strip()
-        elif "```" in raw:
-            raw = raw.split("```", 1)[1].split("```", 1)[0].strip()
+    # Build a network pattern with the 5 ideation agents
+    agent_nodes = []
+    agent_ids = []
+    for ia in _IDEATION_AGENTS:
+        agent_nodes.append({"id": ia["id"], "agent_id": ia["id"]})
+        agent_ids.append(ia["id"])
 
-        result = json.loads(raw)
-        result["session_id"] = session_id
+    # Build bidirectional edges between all debaters + report edges to PO
+    edges = []
+    debaters = [a for a in agent_ids if a != "product_manager"]
+    for i, a in enumerate(debaters):
+        for b in debaters[i+1:]:
+            edges.append({"from": a, "to": b, "type": "bidirectional"})
+    # All debaters report to product_manager (judge)
+    for a in debaters:
+        edges.append({"from": a, "to": "product_manager", "type": "report"})
 
-        # Persist agent messages + findings
-        db = get_db()
+    pattern = PatternDef(
+        id=f"ideation-{session_id}",
+        name="Idéation multi-expert",
+        type="network",
+        agents=agent_nodes,
+        edges=edges,
+        config={"max_rounds": 2},
+    )
+
+    # Launch pattern in background — agents will stream via SSE
+    async def _run_ideation():
         try:
-            for msg in result.get("messages", []):
-                db.execute(
-                    "INSERT INTO ideation_messages (session_id, agent_id, agent_name, role, target, content, color, avatar_url) VALUES (?,?,?,?,?,?,?,?)",
-                    (session_id, msg.get("agent_id", ""), msg.get("agent_name", ""),
-                     msg.get("role", ""), msg.get("target", ""),
-                     msg.get("content", ""), msg.get("color", ""), msg.get("avatar_url", "")),
-                )
-            for f in result.get("findings", []):
-                db.execute(
-                    "INSERT INTO ideation_findings (session_id, type, text) VALUES (?,?,?)",
-                    (session_id, f.get("type", "opportunity"), f.get("text", "")),
-                )
-            db.execute("UPDATE ideation_sessions SET status='analyzed' WHERE id=?", (session_id,))
-            db.commit()
-        finally:
-            db.close()
+            await run_pattern(pattern, session_id, prompt)
+        except Exception as e:
+            logger.error("Ideation pattern failed: %s", e)
+            session_store.add_message(MessageDef(
+                session_id=session_id,
+                from_agent="system",
+                message_type="system",
+                content=f"Erreur idéation: {e}",
+            ))
 
-        return JSONResponse(result)
-    except json.JSONDecodeError:
-        fallback = {
-            "messages": [{"agent_id": "system", "agent_name": "Système",
-                          "content": resp.content[:500], "color": "#6b7280"}],
-            "findings": [],
-            "session_id": session_id,
-        }
-        return JSONResponse(fallback)
-    except Exception as e:
-        logger.error("Ideation error: %s", e)
-        return JSONResponse({"error": str(e)}, status_code=500)
+    asyncio.create_task(_run_ideation())
+
+    return JSONResponse({
+        "session_id": session_id,
+        "status": "started",
+        "sse_url": f"/api/sessions/{session_id}/sse",
+    })
 
 
 _PO_EPIC_SYSTEM = """Tu es Alexandre Faure, Product Owner senior.

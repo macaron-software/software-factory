@@ -15,7 +15,7 @@ import os
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import AsyncIterator, Optional
 
 from ..llm.client import LLMClient, LLMMessage, LLMResponse, LLMToolCall, get_llm_client
 from ..agents.store import AgentDef
@@ -489,6 +489,156 @@ class AgentExecutor:
                 duration_ms=elapsed,
                 error=str(exc),
             )
+
+    async def run_streaming(
+        self, ctx: ExecutionContext, user_message: str
+    ) -> AsyncIterator[tuple[str, str | ExecutionResult]]:
+        """Run agent with streaming — yields ("delta", text) chunks then ("result", ExecutionResult).
+
+        For agents without tools: streams the entire response token-by-token.
+        For agents with tools: runs tool rounds non-streaming, then streams final response.
+        """
+        t0 = time.monotonic()
+        agent = ctx.agent
+        total_tokens_in = 0
+        total_tokens_out = 0
+        all_tool_calls = []
+
+        try:
+            system = self._build_system_prompt(ctx)
+            messages = self._build_messages(ctx, user_message)
+            tools = _get_tool_schemas() if ctx.tools_enabled else None
+
+            # Tool-calling rounds (non-streaming) — same as run()
+            deep_search_used = False
+            final_content = ""
+
+            for round_num in range(MAX_TOOL_ROUNDS):
+                is_last_possible = (round_num >= MAX_TOOL_ROUNDS - 1) or tools is None
+
+                # On last round or no tools: use streaming
+                if is_last_possible or not ctx.tools_enabled:
+                    # Stream the final response
+                    accumulated = ""
+                    async for chunk in self._llm.stream(
+                        messages=messages,
+                        provider=agent.provider,
+                        model=agent.model,
+                        temperature=agent.temperature,
+                        max_tokens=agent.max_tokens,
+                        system_prompt=system if round_num == 0 else "",
+                    ):
+                        if chunk.delta:
+                            accumulated += chunk.delta
+                            yield ("delta", chunk.delta)
+                        if chunk.done:
+                            break
+                    final_content = accumulated
+                    break
+
+                # Non-streaming tool round
+                llm_resp = await self._llm.chat(
+                    messages=messages,
+                    provider=agent.provider,
+                    model=agent.model,
+                    temperature=agent.temperature,
+                    max_tokens=agent.max_tokens,
+                    system_prompt=system if round_num == 0 else "",
+                    tools=tools,
+                )
+
+                total_tokens_in += llm_resp.tokens_in
+                total_tokens_out += llm_resp.tokens_out
+
+                # Parse XML tool calls
+                if not llm_resp.tool_calls and llm_resp.content:
+                    xml_tcs = self._parse_xml_tool_calls(llm_resp.content)
+                    if xml_tcs:
+                        llm_resp = LLMResponse(
+                            content="", model=llm_resp.model, provider=llm_resp.provider,
+                            tokens_in=llm_resp.tokens_in, tokens_out=llm_resp.tokens_out,
+                            duration_ms=llm_resp.duration_ms, finish_reason="tool_calls",
+                            tool_calls=xml_tcs,
+                        )
+
+                # No tool calls → stream remaining content
+                if not llm_resp.tool_calls:
+                    final_content = llm_resp.content
+                    # Emit any content from this non-streamed response as a single delta
+                    if final_content:
+                        yield ("delta", final_content)
+                    break
+
+                # Process tool calls (same as run())
+                tc_msg_data = [{
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {"name": tc.function_name, "arguments": json.dumps(tc.arguments)},
+                } for tc in llm_resp.tool_calls]
+
+                messages.append(LLMMessage(
+                    role="assistant",
+                    content=llm_resp.content or "",
+                    tool_calls=tc_msg_data,
+                ))
+
+                for tc in llm_resp.tool_calls:
+                    result = await self._execute_tool(tc, ctx)
+                    all_tool_calls.append({
+                        "name": tc.function_name,
+                        "args": tc.arguments,
+                        "result": result[:500],
+                    })
+                    if tc.function_name == "deep_search":
+                        deep_search_used = True
+                    if ctx.on_tool_call:
+                        try:
+                            await ctx.on_tool_call(tc.function_name, tc.arguments, result)
+                        except Exception:
+                            pass
+                    messages.append(LLMMessage(
+                        role="tool",
+                        content=result[:4000],
+                        tool_call_id=tc.id,
+                        name=tc.function_name,
+                    ))
+
+                if deep_search_used:
+                    tools = None
+                if round_num >= MAX_TOOL_ROUNDS - 2 and tools is not None:
+                    tools = None
+                    messages.append(LLMMessage(
+                        role="system",
+                        content="You have used many tool calls. Now synthesize your findings and respond to the user. Do not call more tools.",
+                    ))
+            else:
+                final_content = final_content or "(Max tool rounds reached)"
+
+            elapsed = int((time.monotonic() - t0) * 1000)
+            final_content = _strip_raw_tokens(final_content)
+            delegations = self._parse_delegations(final_content)
+
+            yield ("result", ExecutionResult(
+                content=final_content,
+                agent_id=agent.id,
+                model=agent.model,
+                provider=agent.provider,
+                tokens_in=total_tokens_in,
+                tokens_out=total_tokens_out,
+                duration_ms=elapsed,
+                tool_calls=all_tool_calls,
+                delegations=delegations,
+            ))
+
+        except Exception as exc:
+            elapsed = int((time.monotonic() - t0) * 1000)
+            logger.error("Agent %s streaming failed: %s", agent.id, exc, exc_info=True)
+            yield ("result", ExecutionResult(
+                content=f"Error: {exc}",
+                agent_id=agent.id,
+                duration_ms=elapsed,
+                error=str(exc),
+            ))
 
     @staticmethod
     def _parse_xml_tool_calls(content: str) -> list:

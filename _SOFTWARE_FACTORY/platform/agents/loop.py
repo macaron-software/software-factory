@@ -191,13 +191,58 @@ class AgentLoop:
                 # 3. Build execution context
                 ctx = await self._build_context()
 
-                # 4. Run executor with timeout
+                # 4. Run executor with streaming
                 try:
                     logger.warning("LOOP calling executor for agent=%s", self.agent.id)
-                    result = await asyncio.wait_for(
-                        self._executor.run(ctx, msg.content),
+                    result = None
+                    stream_started = False
+
+                    async def _run_streaming():
+                        nonlocal result, stream_started
+                        from .executor import ExecutionResult
+                        from ..sessions.runner import _push_sse
+
+                        in_think = False
+                        async for event_type, data in self._executor.run_streaming(ctx, msg.content):
+                            if event_type == "delta":
+                                # Filter out <think> blocks (MiniMax internal reasoning)
+                                if "<think>" in data:
+                                    in_think = True
+                                if "</think>" in data:
+                                    in_think = False
+                                    continue
+                                if in_think:
+                                    continue
+
+                                if not stream_started:
+                                    stream_started = True
+                                    await _push_sse(self.session_id, {
+                                        "type": "stream_start",
+                                        "agent_id": self.agent.id,
+                                        "agent_name": self.agent.name,
+                                    })
+                                await _push_sse(self.session_id, {
+                                    "type": "stream_delta",
+                                    "agent_id": self.agent.id,
+                                    "delta": data,
+                                })
+                            elif event_type == "result":
+                                if stream_started:
+                                    await _push_sse(self.session_id, {
+                                        "type": "stream_end",
+                                        "agent_id": self.agent.id,
+                                        "content": data.content,
+                                    })
+                                result = data
+
+                    await asyncio.wait_for(
+                        _run_streaming(),
                         timeout=self.think_timeout,
                     )
+                    if result is None:
+                        logger.error("Executor returned no result agent=%s", self.agent.id)
+                        await self._set_status(AgentStatus.ERROR)
+                        continue
                     logger.warning("LOOP executor returned for agent=%s content_len=%d", self.agent.id, len(result.content or ""))
                 except asyncio.TimeoutError:
                     logger.error(
