@@ -1308,12 +1308,15 @@ class AgentExecutor:
                             tool_calls=xml_tcs,
                         )
 
-                # No tool calls → stream remaining content
+                # No tool calls → stream remaining content in chunks
                 if not llm_resp.tool_calls:
-                    final_content = llm_resp.content
-                    # Emit any content from this non-streamed response as a single delta
+                    final_content = llm_resp.content or ""
                     if final_content:
-                        yield ("delta", final_content)
+                        # Emit in small chunks for streaming UX
+                        chunk_size = 12
+                        for ci in range(0, len(final_content), chunk_size):
+                            yield ("delta", final_content[ci:ci + chunk_size])
+                            await asyncio.sleep(0.01)
                     break
 
                 # Process tool calls (same as run())
