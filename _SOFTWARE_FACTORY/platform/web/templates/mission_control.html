@@ -335,6 +335,17 @@
 .mc-guard-detail{font-size:0.62rem;color:var(--text-secondary);margin-top:0.15rem;padding:0.2rem 0.4rem;background:rgba(248,81,73,.04);border-radius:3px;display:none}
 .mc-guard-detail.show{display:block}
 
+/* Result banner */
+.mc-result-banner{background:var(--bg-tertiary);border:1px solid color-mix(in srgb,var(--green) 30%,var(--border));border-radius:8px;padding:0.6rem 0.85rem;margin-bottom:0.5rem}
+.mc-result-header{display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap}
+.mc-result-link{font-size:0.78rem;color:var(--green);text-decoration:none;font-weight:600}
+.mc-result-link:hover{text-decoration:underline}
+.mc-result-cmd{font-size:0.72rem;color:var(--text-primary);background:var(--bg-primary);padding:0.2rem 0.5rem;border-radius:4px;border:1px solid var(--border);cursor:pointer;transition:border-color .2s;font-family:var(--font-mono)}
+.mc-result-cmd:hover{border-color:var(--purple)}
+.mc-result-shots{display:flex;gap:0.5rem;margin-top:0.5rem;overflow-x:auto;padding-bottom:0.3rem}
+.mc-result-shots img{height:120px;border-radius:6px;border:1px solid var(--border);cursor:pointer;transition:transform .2s;object-fit:cover;flex-shrink:0}
+.mc-result-shots img:hover{transform:scale(1.05);border-color:var(--purple)}
+
 @media(max-width:900px){.mc-layout{grid-template-columns:1fr;height:auto}.mc-sidebar{border-left:none;border-top:1px solid var(--border)}}
 </style>
 
@@ -358,6 +369,31 @@
         <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.85rem;margin-bottom:0.5rem;display:flex;align-items:baseline;gap:0.5rem">
             <span style="font-size:0.7rem;color:var(--purple);font-weight:700;white-space:nowrap">DEMANDE</span>
             <span style="font-size:0.82rem;color:var(--text-primary);line-height:1.4">{{ mission.brief }}</span>
+        </div>
+        {% endif %}
+
+        {# ── Result Banner: screenshots + build/run + deploy URL ── #}
+        {% if result_screenshots or result_build_cmd or result_deploy_url %}
+        <div class="mc-result-banner">
+            <div class="mc-result-header">
+                <span style="font-size:0.7rem;color:var(--green);font-weight:700">RÉSULTAT</span>
+                {% if result_deploy_url %}
+                <a href="{{ result_deploy_url }}" target="_blank" class="mc-result-link">🌐 {{ result_deploy_url }}</a>
+                {% endif %}
+                {% if result_run_cmd %}
+                <code class="mc-result-cmd" title="Copier" onclick="navigator.clipboard.writeText(this.textContent.trim());this.style.borderColor='var(--green)';setTimeout(()=>this.style.borderColor='',1000)">{{ result_run_cmd }}</code>
+                {% endif %}
+                {% if result_build_cmd and result_build_cmd != result_run_cmd %}
+                <code class="mc-result-cmd" title="Build" onclick="navigator.clipboard.writeText(this.textContent.trim());this.style.borderColor='var(--green)';setTimeout(()=>this.style.borderColor='',1000)" style="color:var(--text-secondary)">{{ result_build_cmd }}</code>
+                {% endif %}
+            </div>
+            {% if result_screenshots %}
+            <div class="mc-result-shots">
+                {% for s in result_screenshots %}
+                <img src="/workspace/{{ mission.id }}/{{ s }}" alt="{{ s }}" loading="lazy" onclick="window.open(this.src)" onerror="this.style.display='none'">
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
         {% endif %}
         <div class="mc-stats">
