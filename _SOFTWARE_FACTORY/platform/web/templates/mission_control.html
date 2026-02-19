@@ -492,6 +492,17 @@
 .mc-projet-imgs img:hover{transform:scale(1.05);border-color:var(--purple)}
 .mc-projet-file-tree{max-height:300px;overflow-y:auto}
 
+/* ====== TAB AGENT CARD (compact) ====== */
+.mc-tab-agent{display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0.6rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;margin-bottom:0.6rem}
+.mc-tab-agent-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid var(--purple);flex-shrink:0}
+.mc-tab-agent-info{flex:1;min-width:0}
+.mc-tab-agent-name{font-size:0.75rem;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mc-tab-agent-role{font-size:0.62rem;color:var(--purple-light)}
+.mc-tab-agent-tagline{font-size:0.6rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mc-tab-agent-chat{background:var(--purple);color:#fff;border:none;border-radius:6px;padding:0.3rem 0.6rem;font-size:0.65rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:0.25rem;white-space:nowrap;transition:background .15s;font-family:inherit}
+.mc-tab-agent-chat:hover{background:var(--purple-light)}
+.mc-tab-agent-chat .icon{width:12px;height:12px}
+
 @media(max-width:900px){.mc-layout{grid-template-columns:1fr;height:auto}.mc-sidebar{border-left:none;border-top:1px solid var(--border)}.mc-dev-grid{grid-template-columns:1fr}.mc-kanban{flex-direction:column}}
 </style>
 
@@ -645,6 +656,20 @@
 
         <!-- Tab: Dev -->
         <div class="mc-tab-panel" data-tab="dev">
+            {% set dev_agent = agent_map.get('lead_dev') or agent_map.get('dev_backend') %}
+            {% if dev_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ dev_agent['avatar_url'] or '' }}" alt="" onerror="this.src='/static/avatars/lead_dev.jpg'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ dev_agent['name'] }}</div>
+                    <div class="mc-tab-agent-role">{{ dev_agent['role'] }}</div>
+                    {% if dev_agent.get('tagline') %}<div class="mc-tab-agent-tagline">{{ dev_agent['tagline'] }}</div>{% endif %}
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ dev_agent['id'] }}','{{ dev_agent['name'] }}','{{ dev_agent['role'] }}','{{ dev_agent['avatar_url'] or '' }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
             <div class="mc-dev-grid">
                 <div class="mc-dev-commits">
                     <h4>Commits</h4>
@@ -682,6 +707,20 @@
 
         <!-- Tab: PO -->
         <div class="mc-tab-panel" data-tab="po">
+            {% set po_agent = agent_map.get('product_owner') or agent_map.get('product_manager') or agent_map.get('chef_projet') %}
+            {% if po_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ po_agent['avatar_url'] or '' }}" alt="" onerror="this.src='/static/avatars/product_owner.jpg'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ po_agent['name'] }}</div>
+                    <div class="mc-tab-agent-role">{{ po_agent['role'] }}</div>
+                    {% if po_agent.get('tagline') %}<div class="mc-tab-agent-tagline">{{ po_agent['tagline'] }}</div>{% endif %}
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ po_agent['id'] }}','{{ po_agent['name'] }}','{{ po_agent['role'] }}','{{ po_agent['avatar_url'] or '' }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
             <div class="mc-kanban">
                 <div class="mc-kanban-col" data-col="backlog">
                     <div class="mc-kanban-col-header"><span class="mc-kanban-dot backlog"></span> Backlog <span class="mc-kanban-count">{{ po_backlog|length }}</span></div>
@@ -720,6 +759,20 @@
 
         <!-- Tab: QA -->
         <div class="mc-tab-panel" data-tab="qa">
+            {% set qa_agent = agent_map.get('qa_lead') or agent_map.get('test_manager') or agent_map.get('test_automation') %}
+            {% if qa_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ qa_agent['avatar_url'] or '' }}" alt="" onerror="this.src='/static/avatars/qa_lead.jpg'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ qa_agent['name'] }}</div>
+                    <div class="mc-tab-agent-role">{{ qa_agent['role'] }}</div>
+                    {% if qa_agent.get('tagline') %}<div class="mc-tab-agent-tagline">{{ qa_agent['tagline'] }}</div>{% endif %}
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ qa_agent['id'] }}','{{ qa_agent['name'] }}','{{ qa_agent['role'] }}','{{ qa_agent['avatar_url'] or '' }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
             <div class="mc-qa">
 
                 <!-- Section 1: Tests unitaires & E2E trouvés dans le workspace -->
@@ -807,6 +860,20 @@
 
         <!-- Tab: Architecture -->
         <div class="mc-tab-panel" data-tab="archi">
+            {% set archi_agent = agent_map.get('architecte') or agent_map.get('lead_dev') %}
+            {% if archi_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ archi_agent['avatar_url'] or '' }}" alt="" onerror="this.src='/static/avatars/architecte.jpg'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ archi_agent['name'] }}</div>
+                    <div class="mc-tab-agent-role">{{ archi_agent['role'] }}</div>
+                    {% if archi_agent.get('tagline') %}<div class="mc-tab-agent-tagline">{{ archi_agent['tagline'] }}</div>{% endif %}
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ archi_agent['id'] }}','{{ archi_agent['name'] }}','{{ archi_agent['role'] }}','{{ archi_agent['avatar_url'] or '' }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
             <div class="mc-archi">
                 {% if archi_content %}
                 <div class="mc-archi-doc">
@@ -849,6 +916,20 @@
 
         <!-- Tab: Wiki -->
         <div class="mc-tab-panel" data-tab="wiki">
+            {% set wiki_agent = agent_map.get('tech_writer') or agent_map.get('lead_dev') %}
+            {% if wiki_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ wiki_agent['avatar_url'] or '' }}" alt="" onerror="this.src='/static/avatars/tech_writer.jpg'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ wiki_agent['name'] }}</div>
+                    <div class="mc-tab-agent-role">{{ wiki_agent['role'] }}</div>
+                    {% if wiki_agent.get('tagline') %}<div class="mc-tab-agent-tagline">{{ wiki_agent['tagline'] }}</div>{% endif %}
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ wiki_agent['id'] }}','{{ wiki_agent['name'] }}','{{ wiki_agent['role'] }}','{{ wiki_agent['avatar_url'] or '' }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
             <div class="mc-wiki">
                 {% if wiki_pages %}
                 {% for page in wiki_pages %}
@@ -1148,25 +1229,25 @@
     <div class="mc-popover-body" id="mcPopBody"></div>
 </div>
 
-<!-- CDP Chat Modal -->
+<!-- Agent Chat Modal (generic — works for CDP + tab agents) -->
 <div class="mc-chat-overlay" id="mcChatOverlay" onclick="if(event.target===this)closeCdpChat()">
     <div class="mc-chat-modal">
         <div class="mc-chat-head">
-            <img class="mc-chat-head-avatar" src="{{ cdp['avatar_url'] if cdp else '/static/avatars/chef_de_programme.jpg' }}" alt=""
+            <img class="mc-chat-head-avatar" id="mcChatAvatar" src="{{ cdp['avatar_url'] if cdp else '/static/avatars/chef_de_programme.jpg' }}" alt=""
                  onerror="this.src='/static/avatars/chef_de_programme.jpg'">
             <div class="mc-chat-head-info">
-                <h3>{{ cdp['name'] if cdp else 'Chef de Programme' }}</h3>
-                <small>{{ cdp['role'] if cdp else 'Chef de Programme' }} &mdash; {{ mission.brief[:60] }}{% if mission.brief|length > 60 %}...{% endif %}</small>
+                <h3 id="mcChatName">{{ cdp['name'] if cdp else 'Chef de Programme' }}</h3>
+                <small id="mcChatRole">{{ cdp['role'] if cdp else 'Chef de Programme' }} &mdash; {{ mission.brief[:60] }}{% if mission.brief|length > 60 %}...{% endif %}</small>
             </div>
             <button class="mc-chat-close" onclick="closeCdpChat()">✕</button>
         </div>
         <div class="mc-chat-msgs" id="mcChatMsgs">
             <div class="mc-chat-msg system">
-                <div class="mc-chat-bubble">Discutez avec le CDP. Il peut chercher dans le code, les conversations des agents, le git, la memoire, les PRs et les features.</div>
+                <div class="mc-chat-bubble" id="mcChatWelcome">Discutez avec le CDP. Il peut chercher dans le code, les conversations des agents, le git, la memoire, les PRs et les features.</div>
             </div>
         </div>
         <div class="mc-chat-input-row">
-            <textarea class="mc-chat-input" id="mcChatInput" placeholder="Posez une question au CDP..." rows="1"
+            <textarea class="mc-chat-input" id="mcChatInput" placeholder="Posez une question..." rows="1"
                       onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCdpMessage()}"></textarea>
             <button class="mc-chat-send" id="mcChatSend" onclick="sendCdpMessage()">Envoyer</button>
         </div>
@@ -1267,10 +1348,14 @@ for (const [pid, agents] of Object.entries(PHASE_AGENTS)) {
     }
 }
 
-/* ── CDP Chat Modal ── */
+/* ── Agent Chat Modal (generic — CDP + tab agents) ── */
 const CDP_AVATAR = '{{ cdp["avatar_url"] if cdp else "/static/avatars/chef_de_programme.jpg" }}' || '/static/avatars/chef_de_programme.jpg';
 const CDP_NAME = '{{ cdp["name"] if cdp else "Chef de Programme" }}';
 const CDP_ROLE = '{{ cdp["role"] if cdp else "Chef de Programme" }}';
+let _chatAgentId = 'chef_de_programme';
+let _chatAgentName = CDP_NAME;
+let _chatAgentRole = CDP_ROLE;
+let _chatAgentAvatar = CDP_AVATAR;
 
 function miniMarkdown(s) {
     if (!s) return '';
@@ -1290,9 +1375,23 @@ function miniMarkdown(s) {
         .replace(/\n/g, '<br>');
     return h;
 }
+function openAgentChat(agentId, name, role, avatarUrl) {
+    _chatAgentId = agentId || 'chef_de_programme';
+    _chatAgentName = name || CDP_NAME;
+    _chatAgentRole = role || CDP_ROLE;
+    _chatAgentAvatar = avatarUrl || CDP_AVATAR;
+    const el = id => document.getElementById(id);
+    el('mcChatAvatar').src = _chatAgentAvatar;
+    el('mcChatName').textContent = _chatAgentName;
+    el('mcChatRole').textContent = _chatAgentRole;
+    el('mcChatWelcome').textContent = 'Discutez avec ' + _chatAgentName + '. Il peut chercher dans le code, les conversations des agents, le git, la memoire, les PRs et les features.';
+    const msgs = el('mcChatMsgs');
+    while (msgs.children.length > 1) msgs.removeChild(msgs.lastChild);
+    el('mcChatOverlay').classList.add('open');
+    el('mcChatInput').focus();
+}
 function openCdpChat() {
-    document.getElementById('mcChatOverlay').classList.add('open');
-    document.getElementById('mcChatInput').focus();
+    openAgentChat('chef_de_programme', CDP_NAME, CDP_ROLE, CDP_AVATAR);
 }
 function closeCdpChat() {
     document.getElementById('mcChatOverlay').classList.remove('open');
@@ -1311,7 +1410,7 @@ function _addChatMsg(type, content, opts = {}) {
     if (type === 'agent') {
         const av = document.createElement('img');
         av.className = 'mc-chat-msg-avatar';
-        av.src = CDP_AVATAR;
+        av.src = _chatAgentAvatar;
         av.onerror = function(){ this.src = '/static/avatars/chef_de_programme.jpg'; };
         wrapper.appendChild(av);
     } else if (type === 'user') {
@@ -1327,7 +1426,7 @@ function _addChatMsg(type, content, opts = {}) {
     if (type === 'agent') {
         const sender = document.createElement('div');
         sender.className = 'mu__sender';
-        sender.innerHTML = `<span class="mu__name">${CDP_NAME}</span><span class="mu__role">${CDP_ROLE}</span>`;
+        sender.innerHTML = `<span class="mu__name">${_chatAgentName}</span><span class="mu__role">${_chatAgentRole}</span>`;
         bubble.appendChild(sender);
     }
 
@@ -1380,6 +1479,7 @@ async function sendCdpMessage() {
         const fd = new FormData();
         fd.append('content', content);
         fd.append('session_id', SESSION_ID);
+        fd.append('agent_id', _chatAgentId);
         const resp = await fetch(`/api/missions/${MISSION_ID}/chat/stream`, {method:'POST', body:fd});
         if (!resp.ok) throw new Error(resp.statusText);
 

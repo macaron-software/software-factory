@@ -62,6 +62,7 @@ def _agent_map_for_template(agents) -> dict:
     for a in agents:
         if hasattr(a, 'id'):  # AgentDef dataclass
             m[a.id] = {
+                "id": a.id,
                 "name": a.name, "icon": a.icon or "bot",
                 "color": a.color or "#8b949e", "role": a.role or "",
                 "avatar": getattr(a, "avatar", "") or "bot",
@@ -76,6 +77,7 @@ def _agent_map_for_template(agents) -> dict:
         elif isinstance(a, dict):  # already a dict
             aid = a.get("id", "")
             m[aid] = {
+                "id": aid,
                 "name": a.get("name", ""), "icon": a.get("icon", "bot"),
                 "color": a.get("color", "#8b949e"), "role": a.get("role", ""),
                 "avatar": a.get("avatar", "bot"),
@@ -4823,7 +4825,10 @@ async def mission_chat_stream(request: Request, mission_id: str):
         return HTMLResponse("Session not found", status_code=404)
 
     agent_store = get_agent_store()
-    agent = agent_store.get("chef_de_programme")
+    agent_id = str(form.get("agent_id", "")).strip() or "chef_de_programme"
+    agent = agent_store.get(agent_id)
+    if not agent:
+        agent = agent_store.get("chef_de_programme")
     if not agent:
         agents = agent_store.list_all()
         agent = agents[0] if agents else None
@@ -4833,7 +4838,7 @@ async def mission_chat_stream(request: Request, mission_id: str):
     # Store user message
     sess_store.add_message(MessageDef(
         session_id=session_id, from_agent="user",
-        to_agent="chef_de_programme", message_type="text", content=content,
+        to_agent=agent_id, message_type="text", content=content,
     ))
 
     # Build mission-specific context summary
@@ -5872,6 +5877,7 @@ async def api_mission_run(request: Request, mission_id: str):
 
     async def _run_phases():
         """Execute phases sequentially using the real pattern engine."""
+        workspace = mission.workspace_path or ""
         phases_done = 0
         phases_failed = 0
         phase_summaries = []  # accumulated phase results for cross-phase context
