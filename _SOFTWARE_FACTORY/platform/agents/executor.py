@@ -87,6 +87,12 @@ def _get_tool_registry():
         register_test_tools(reg)
     except Exception:
         pass
+    # Platform introspection tools (agents, missions, memory, metrics)
+    try:
+        from ..tools.platform_tools import register_platform_tools
+        register_platform_tools(reg)
+    except Exception:
+        pass
     return reg
 
 
@@ -834,6 +840,78 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+        # ── Platform introspection tools (self-aware) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "platform_agents",
+                "description": "List all platform agents or get details of one (id, name, role, skills, persona).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "agent_id": {"type": "string", "description": "Agent ID to get details. Omit to list all."},
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "platform_missions",
+                "description": "List all missions/epics or get details including phase statuses.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "mission_id": {"type": "string", "description": "Mission ID. Omit to list all."},
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "platform_memory_search",
+                "description": "Search platform memory (project or global). FTS5 full-text search across all knowledge entries.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Search query"},
+                        "project_id": {"type": "string", "description": "Project/mission ID for project-specific memory"},
+                        "category": {"type": "string", "description": "Filter: architecture, vision, team, process, backlog"},
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "platform_metrics",
+                "description": "Get platform statistics: agent count, missions, sessions, messages.",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "platform_sessions",
+                "description": "List recent sessions/ceremonies or get messages from a specific session.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "session_id": {"type": "string", "description": "Session ID to get messages. Omit to list recent sessions."},
+                        "limit": {"type": "integer", "description": "Max messages (default 30)"},
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "platform_workflows",
+                "description": "List available ceremony templates (workflows) with their phases and patterns.",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        },
     ]
     _TOOL_SCHEMAS = schemas
     return schemas
@@ -906,6 +984,14 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "jira_search",
     ],
 }
+
+# Platform introspection tools — available to ALL agent roles
+_PLATFORM_TOOLS = [
+    "platform_agents", "platform_missions", "platform_memory_search",
+    "platform_metrics", "platform_sessions", "platform_workflows",
+]
+for _role_key in ROLE_TOOL_MAP:
+    ROLE_TOOL_MAP[_role_key].extend(_PLATFORM_TOOLS)
 
 
 def _classify_agent_role(agent: "AgentDef") -> str:

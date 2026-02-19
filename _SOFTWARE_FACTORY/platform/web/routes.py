@@ -4918,12 +4918,16 @@ Answer in the same language as the user. Be precise and data-driven."""
             ctx.mission_run_id = mission_id
             ctx.tools_enabled = True
             # Base tools for all agents
+            _platform_tools = [
+                "platform_agents", "platform_missions", "platform_memory_search",
+                "platform_metrics", "platform_sessions", "platform_workflows",
+            ]
             base_tools = [
                 "memory_search", "memory_store",
                 "code_read", "code_search", "list_files",
                 "git_log", "git_status", "git_diff",
                 "get_project_context",
-            ]
+            ] + _platform_tools
             # CDP gets orchestration tools
             if agent_id in ("chef_de_programme", "chef_projet"):
                 ctx.allowed_tools = base_tools + [
@@ -4976,6 +4980,12 @@ Answer in the same language as the user. Be precise and data-driven."""
                         "git_diff": "Diff Git",
                         "git_commit": "Commit Git",
                         "get_project_context": "Contexte projet",
+                        "platform_agents": "Agents plateforme",
+                        "platform_missions": "Missions/Epics",
+                        "platform_memory_search": "Mémoire plateforme",
+                        "platform_metrics": "Métriques",
+                        "platform_sessions": "Cérémonies",
+                        "platform_workflows": "Templates workflow",
                     }
                     label = tool_labels.get(data_s, f"🔧 {data_s}")
                     yield sse("tool", {"name": data_s, "label": label})
