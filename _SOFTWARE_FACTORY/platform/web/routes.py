@@ -189,6 +189,7 @@ async def portfolio_page(request: Request):
 
     return _templates(request).TemplateResponse("portfolio.html", {
         "request": request, "page_title": "Portfolio",
+        "active_tab": request.query_params.get("tab", "overview"),
         "projects": projects_data,
         "strategic_agents": strategic,
         "strat_graph": strat_graph,
@@ -200,6 +201,58 @@ async def portfolio_page(request: Request):
         "total_agents": len(all_agents),
     })
 
+
+# ── SAFe consolidated pages (tabbed) ─────────────────────────────
+
+@router.get("/backlog", response_class=HTMLResponse)
+async def backlog_page(request: Request, tab: str = "backlog"):
+    """Backlog — Product + Discovery (ideation) in tabs."""
+    return _templates(request).TemplateResponse("backlog.html", {
+        "request": request, "page_title": "Backlog",
+        "active_tab": tab, "tab_content": "",
+    })
+
+@router.get("/pi", response_class=HTMLResponse)
+async def pi_board_page(request: Request):
+    """PI Board — redirect to missions list."""
+    from starlette.responses import RedirectResponse
+    return RedirectResponse("/missions", status_code=302)
+
+@router.get("/ceremonies", response_class=HTMLResponse)
+async def ceremonies_page(request: Request, tab: str = "templates"):
+    """Ceremonies — Workflow templates + Patterns in tabs."""
+    return _templates(request).TemplateResponse("ceremonies.html", {
+        "request": request, "page_title": "Ceremonies",
+        "active_tab": tab, "tab_content": "",
+    })
+
+@router.get("/live", response_class=HTMLResponse)
+async def live_page(request: Request):
+    """Live — redirect to sessions list."""
+    from starlette.responses import RedirectResponse
+    return RedirectResponse("/sessions", status_code=302)
+
+@router.get("/live/{session_id}", response_class=HTMLResponse)
+async def live_session_page(request: Request, session_id: str):
+    """Live ceremony — redirect to session live view."""
+    from starlette.responses import RedirectResponse
+    return RedirectResponse(f"/sessions/{session_id}/live", status_code=302)
+
+@router.get("/art", response_class=HTMLResponse)
+async def art_page(request: Request, tab: str = "agents"):
+    """ART — Agents + Organisation + Generator in tabs."""
+    return _templates(request).TemplateResponse("art.html", {
+        "request": request, "page_title": "ART",
+        "active_tab": tab, "tab_content": "",
+    })
+
+@router.get("/toolbox", response_class=HTMLResponse)
+async def toolbox_page(request: Request, tab: str = "skills"):
+    """Toolbox — Skills + Memory + MCPs in tabs."""
+    return _templates(request).TemplateResponse("toolbox.html", {
+        "request": request, "page_title": "Toolbox",
+        "active_tab": tab, "tab_content": "",
+    })
 
 @router.post("/api/strategic-committee/launch")
 async def launch_strategic_committee(request: Request):
@@ -606,7 +659,7 @@ async def missions_page(request: Request):
         })
 
     return _templates(request).TemplateResponse("missions.html", {
-        "request": request, "page_title": "Missions",
+        "request": request, "page_title": "PI Board",
         "missions": mission_cards,
         "project_ids": project_ids,
         "filter_status": filter_status,
@@ -656,7 +709,7 @@ async def mission_detail_page(request: Request, mission_id: str):
     team_agents = [a for a in all_agents if a.id.startswith(prefix + '-') or a.id.startswith(mission.project_id + '-')]
 
     return _templates(request).TemplateResponse("mission_detail.html", {
-        "request": request, "page_title": "Mission",
+        "request": request, "page_title": "PI",
         "mission": mission, "project": project,
         "sprints": sprints, "stats": stats,
         "selected_sprint": selected_sprint,
@@ -1225,7 +1278,7 @@ async def sessions_page(request: Request):
         })
     return _templates(request).TemplateResponse("sessions.html", {
         "request": request,
-        "page_title": "Sessions",
+        "page_title": "Live",
         "sessions": sessions,
     })
 
@@ -4571,7 +4624,7 @@ async def missions_list_page(request: Request):
     store = get_mission_run_store()
     runs = store.list_runs(limit=50)
     return _templates(request).TemplateResponse("mission_control_list.html", {
-        "request": request, "page_title": "Mission Control",
+        "request": request, "page_title": "PI Control",
         "runs": runs,
     })
 

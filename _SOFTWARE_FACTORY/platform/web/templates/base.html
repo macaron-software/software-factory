@@ -22,55 +22,28 @@
 
             <div class="sidebar-section">
                 <ul class="nav-links">
-                    <li><a href="/" data-tooltip="Portfolio" data-views="all" class="{% if page_title == 'Portfolio' or page_title == 'Projects' %}active{% endif %}">
+                    <li><a href="/" data-tooltip="Portfolio" data-views="strategy,all" class="{% if page_title in ('Portfolio', 'Projects', 'DSI Board', 'Vue Métier') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-home"/></svg>
                     </a></li>
-                    <li><a href="/dsi" data-tooltip="DSI Board" data-views="dsi,all" class="{% if page_title == 'DSI Board' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-kanban"/></svg>
-                    </a></li>
-                    <li><a href="/metier" data-tooltip="Vue Métier" data-views="dsi,product,all" class="{% if page_title == 'Vue Métier' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-git-merge"/></svg>
-                    </a></li>
-                    <li><a href="/product" data-tooltip="Product" data-views="product,all" class="{% if page_title == 'Product' %}active{% endif %}">
+                    <li><a href="/backlog" data-tooltip="Backlog" data-views="strategy,all" class="{% if page_title in ('Backlog', 'Product', 'Idéation') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-layers"/></svg>
                     </a></li>
-                    <li><a href="/ideation" data-tooltip="Idéation" data-views="product,all" class="{% if page_title == 'Idéation' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-lightbulb"/></svg>
-                    </a></li>
-                    <li><a href="/missions" data-tooltip="Missions" data-views="dsi,product,all" class="{% if page_title == 'Missions' or page_title == 'Mission' %}active{% endif %}">
+                    <li><a href="/pi" data-tooltip="PI Board" data-views="strategy,all" class="{% if page_title in ('PI Board', 'Program Increment', 'Missions', 'Mission', 'Mission Control') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-rocket"/></svg>
                     </a></li>
-                    <li><a href="/mission-control" data-tooltip="Mission Control" data-views="engineering,all" class="{% if 'Mission Control' in (page_title or '') %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-target"/></svg>
-                    </a></li>
-                    <li><a href="/workflows" data-tooltip="Workflows" data-views="engineering" class="{% if page_title == 'Workflows' %}active{% endif %}">
+                    <li><a href="/ceremonies" data-tooltip="Ceremonies" data-views="engineering,all" class="{% if page_title in ('Ceremonies', 'Workflows', 'Patterns') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-workflow"/></svg>
                     </a></li>
-                    <li><a href="/patterns" data-tooltip="Patterns" data-views="engineering" class="{% if page_title == 'Patterns' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-clipboard"/></svg>
-                    </a></li>
-                    <li><a href="/sessions" data-tooltip="Sessions" data-views="engineering,all" class="{% if page_title == 'Sessions' %}active{% endif %}">
+                    <li><a href="/live" data-tooltip="Live" data-views="engineering,all" class="{% if page_title in ('Live', 'Sessions') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-message-circle"/></svg>
                     </a></li>
-                    <li><a href="/agents" data-tooltip="Équipe" data-views="engineering" class="{% if page_title == 'Agents' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-bot"/></svg>
-                    </a></li>
-                    <li><a href="/org" data-tooltip="Organisation SAFe" data-views="dsi,all" class="{% if page_title == 'Organisation SAFe' %}active{% endif %}">
+                    <li><a href="/art" data-tooltip="ART" data-views="engineering,all" class="{% if page_title in ('ART', 'Agents', 'Organisation SAFe', 'Team Generator') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-users"/></svg>
                     </a></li>
-                    <li><a href="/skills" data-tooltip="Skills" data-views="engineering" class="{% if page_title == 'Skills' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-target"/></svg>
-                    </a></li>
-                    <li><a href="/memory" data-tooltip="Memory" data-views="engineering" class="{% if page_title == 'Memory' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-brain"/></svg>
-                    </a></li>
-                    <li><a href="/mcps" data-tooltip="MCPs" data-views="engineering" class="{% if page_title == 'MCPs' %}active{% endif %}">
+                    <li><a href="/toolbox" data-tooltip="Toolbox" data-views="engineering" class="{% if page_title in ('Toolbox', 'Skills', 'Memory', 'MCPs') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-plug"/></svg>
                     </a></li>
-                    <li><a href="/generate" data-tooltip="Team Generator" data-views="dsi,product,all" class="{% if page_title == 'Team Generator' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-lightning"/></svg>
-                    </a></li>
-                    <li><a href="/metrics" data-tooltip="DORA Metrics" data-views="dsi,all" class="{% if page_title == 'DORA Metrics' %}active{% endif %}">
+                    <li><a href="/metrics" data-tooltip="Metrics" data-views="strategy,all" class="{% if page_title == 'Metrics' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-chart"/></svg>
                     </a></li>
                 </ul>
@@ -79,16 +52,13 @@
             <div class="sidebar-section" style="margin-top: auto">
                 <!-- View mode switcher -->
                 <div class="sidebar-view-switch">
-                    <button class="view-switch-btn" data-mode="all" title="Tous les outils">
+                    <button class="view-switch-btn" data-mode="all" title="All">
                         <svg class="icon icon-xs"><use href="#icon-grid"/></svg>
                     </button>
-                    <button class="view-switch-btn" data-mode="dsi" title="Vue DSI">
-                        <svg class="icon icon-xs"><use href="#icon-kanban"/></svg>
-                    </button>
-                    <button class="view-switch-btn" data-mode="product" title="Vue Product">
+                    <button class="view-switch-btn" data-mode="strategy" title="Strategy">
                         <svg class="icon icon-xs"><use href="#icon-layers"/></svg>
                     </button>
-                    <button class="view-switch-btn" data-mode="engineering" title="Vue Engineering">
+                    <button class="view-switch-btn" data-mode="engineering" title="Engineering">
                         <svg class="icon icon-xs"><use href="#icon-settings"/></svg>
                     </button>
                 </div>
@@ -133,11 +103,14 @@
     (function(){
       // Auto-detect view from current page
       const PAGE_VIEW_MAP = {
-        'DSI Board': 'dsi',
-        'DORA Metrics': 'dsi',
-        'Product': 'product',
-        'Idéation': 'product',
-        'Historique Idéation': 'product',
+        'Portfolio': 'strategy',
+        'Backlog': 'strategy',
+        'PI Board': 'strategy',
+        'Metrics': 'strategy',
+        'Ceremonies': 'engineering',
+        'Live': 'engineering',
+        'ART': 'engineering',
+        'Toolbox': 'engineering',
       };
       const pageTitle = document.querySelector('.topbar h2')?.textContent?.trim() || '';
       const autoView = PAGE_VIEW_MAP[pageTitle] || null;

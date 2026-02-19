@@ -2,11 +2,18 @@
 
 {% block topbar_actions %}
 <a href="/missions?action=new" class="btn btn-primary">
-    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Nouvelle Mission
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> New Epic
 </a>
 {% endblock %}
 
 {% block content %}
+<div class="tabs">
+    <button class="tab {% if active_tab == 'overview' %}active{% endif %}" hx-get="/?tab=overview" hx-select="#portfolio-inner" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/" onclick="switchTab(this)">Overview</button>
+    <button class="tab {% if active_tab == 'dsi' %}active{% endif %}" hx-get="/dsi" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/?tab=dsi" onclick="switchTab(this)">DSI</button>
+    <button class="tab {% if active_tab == 'metier' %}active{% endif %}" hx-get="/metier" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/?tab=metier" onclick="switchTab(this)">Business</button>
+</div>
+<div id="tab-content">
+<div id="portfolio-inner">
 <style>
 /* ── Portfolio Dashboard ── */
 .portfolio-grid{display:grid;grid-template-columns:1fr;gap:1.5rem;padding:0.5rem 0}
@@ -559,5 +566,13 @@ async function launchStrategicCommittee(){
 
 // Auto-render graph on page load
 if(STRAT_GRAPH.nodes && STRAT_GRAPH.nodes.length) renderStratGraph();
+</script>
+</div><!-- /portfolio-inner -->
+</div><!-- /tab-content -->
+<script>
+function switchTab(btn){
+    document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.remove('active'));
+    btn.classList.add('active');
+}
 </script>
 {% endblock %}
