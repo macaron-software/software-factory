@@ -4894,50 +4894,38 @@ Answer in the same language as the user. Be precise and data-driven."""
             if mission.workspace_path:
                 ctx.project_path = mission.workspace_path
             ctx.mission_run_id = mission_id
-
-            async def on_tool_call(name, args, result):
-                labels = {
-                    "deep_search": "Recherche approfondie...",
-                    "code_read": "Lecture fichiers...",
-                    "code_search": "Recherche code...",
-                    "git_log": "Historique git...",
-                    "git_diff": "Diff git...",
-                    "git_status": "Statut git...",
-                    "memory_search": "Recherche memoire...",
-                    "list_files": "Liste fichiers...",
-                }
-                if name == "deep_search" and isinstance(args, dict) and "status" in args:
-                    await progress_queue.put(("status", name, args["status"]))
-                    return
-                label = labels.get(name, f"{name}...")
-                await progress_queue.put(("tool", name, label))
-
-            progress_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
-            ctx.on_tool_call = on_tool_call
+            # Disable tools for conversational chat — context already injected
+            ctx.tools_enabled = False
 
             executor = get_executor()
             accumulated = ""
             llm_error = ""
+            _in_think = False
 
             async for evt, data_s in executor.run_streaming(ctx, content):
                 if evt == "delta":
                     accumulated += data_s
+                    # Filter <think> blocks from streaming output
+                    if '<think>' in data_s:
+                        _in_think = True
+                    if _in_think:
+                        if '</think>' in data_s:
+                            _in_think = False
+                            # Send text after </think>
+                            after = data_s.split('</think>', 1)[1]
+                            if after.strip():
+                                yield sse("chunk", {"text": after})
+                        continue
                     yield sse("chunk", {"text": data_s})
-                elif evt == "tool":
-                    yield sse("tool", {"name": data_s, "label": f"{data_s}..."})
                 elif evt == "result":
                     if hasattr(data_s, "error") and data_s.error:
                         llm_error = data_s.error
                     elif hasattr(data_s, "content") and data_s.content and not accumulated:
                         accumulated = data_s.content
 
-            # Drain progress queue
-            while not progress_queue.empty():
-                try:
-                    ptype, pname, plabel = progress_queue.get_nowait()
-                    yield sse(ptype, {"name": pname, "label": plabel})
-                except Exception:
-                    break
+            # Strip <think> blocks from accumulated content
+            import re as _re
+            accumulated = _re.sub(r'<think>[\s\S]*?</think>\s*', '', accumulated).strip()
 
             # If LLM failed and no real content, send error
             if llm_error and not accumulated:
