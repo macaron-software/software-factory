@@ -4927,18 +4927,18 @@ Answer in the same language as the user. Be precise and data-driven."""
                 elif evt == "tool":
                     # Tool being called — show in UI
                     tool_labels = {
-                        "memory_search": "🔍 Recherche mémoire",
-                        "get_phase_status": "📊 Statut des phases",
-                        "list_phases": "📋 Liste des phases",
-                        "run_phase": "🚀 Lancement de phase",
-                        "request_validation": "✅ Demande de validation",
-                        "code_read": "📄 Lecture de code",
-                        "code_search": "🔎 Recherche dans le code",
-                        "list_files": "📂 Liste des fichiers",
-                        "git_log": "📜 Historique Git",
-                        "git_status": "📋 Statut Git",
-                        "git_diff": "📝 Diff Git",
-                        "get_project_context": "🏗️ Contexte projet",
+                        "memory_search": "Recherche mémoire",
+                        "get_phase_status": "Statut des phases",
+                        "list_phases": "Liste des phases",
+                        "run_phase": "Lancement de phase",
+                        "request_validation": "Demande de validation",
+                        "code_read": "Lecture de code",
+                        "code_search": "Recherche dans le code",
+                        "list_files": "Liste des fichiers",
+                        "git_log": "Historique Git",
+                        "git_status": "Statut Git",
+                        "git_diff": "Diff Git",
+                        "get_project_context": "Contexte projet",
                     }
                     label = tool_labels.get(data_s, f"🔧 {data_s}")
                     yield sse("tool", {"name": data_s, "label": label})
