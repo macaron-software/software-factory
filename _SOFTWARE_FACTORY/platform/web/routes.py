@@ -67,6 +67,11 @@ def _agent_map_for_template(agents) -> dict:
                 "avatar": getattr(a, "avatar", "") or "bot",
                 "avatar_url": _avatar_url(a.id),
                 "hierarchy_rank": getattr(a, "hierarchy_rank", 50),
+                "tagline": getattr(a, "tagline", "") or "",
+                "skills": getattr(a, "skills", []) or [],
+                "tools": getattr(a, "tools", []) or [],
+                "persona": getattr(a, "persona", "") or "",
+                "motivation": getattr(a, "motivation", "") or "",
             }
         elif isinstance(a, dict):  # already a dict
             aid = a.get("id", "")
@@ -76,6 +81,11 @@ def _agent_map_for_template(agents) -> dict:
                 "avatar": a.get("avatar", "bot"),
                 "avatar_url": a.get("avatar_url", "") or _avatar_url(aid),
                 "hierarchy_rank": a.get("hierarchy_rank", 50),
+                "tagline": a.get("tagline", ""),
+                "skills": a.get("skills", []),
+                "tools": a.get("tools", []),
+                "persona": a.get("persona", ""),
+                "motivation": a.get("motivation", ""),
             }
     return m
 
@@ -4784,6 +4794,163 @@ async def api_mission_start(request: Request):
 
     return JSONResponse({"mission_id": mission_id, "session_id": session_id,
                          "redirect": f"/missions/{mission_id}/control"})
+
+
+@router.post("/api/missions/{mission_id}/chat/stream")
+async def mission_chat_stream(request: Request, mission_id: str):
+    """Stream a conversation with the CDP agent in mission context."""
+    from ..missions.store import get_mission_run_store
+    from ..sessions.store import get_session_store, MessageDef
+    from ..agents.store import get_agent_store
+    from ..agents.executor import get_executor, ExecutionContext
+    from ..sessions.runner import _build_context
+    from ..memory.manager import get_memory_manager
+
+    form = await request.form()
+    content = str(form.get("content", "")).strip()
+    if not content:
+        return HTMLResponse("")
+
+    run_store = get_mission_run_store()
+    mission = run_store.get(mission_id)
+    if not mission:
+        return HTMLResponse("Mission not found", status_code=404)
+
+    session_id = str(form.get("session_id", "")).strip() or mission.session_id
+    sess_store = get_session_store()
+    session = sess_store.get(session_id) if session_id else None
+    if not session:
+        return HTMLResponse("Session not found", status_code=404)
+
+    agent_store = get_agent_store()
+    agent = agent_store.get("chef_de_programme")
+    if not agent:
+        agents = agent_store.list_all()
+        agent = agents[0] if agents else None
+    if not agent:
+        return HTMLResponse("No agent", status_code=500)
+
+    # Store user message
+    sess_store.add_message(MessageDef(
+        session_id=session_id, from_agent="user",
+        to_agent="chef_de_programme", message_type="text", content=content,
+    ))
+
+    # Build mission-specific context summary
+    phase_summary = []
+    if mission.phases:
+        for p in mission.phases:
+            phase_summary.append(f"- {p.phase_id}: {p.status.value if hasattr(p.status, 'value') else p.status}")
+    phases_str = "\n".join(phase_summary) if phase_summary else "No phases yet"
+
+    # Gather memory
+    mem_ctx = ""
+    try:
+        mem = get_memory_manager()
+        entries = mem.project_get(mission_id, limit=20)
+        if entries:
+            mem_ctx = "\n".join(f"[{e['category']}] {e['key']}: {e['value'][:200]}" for e in entries)
+    except Exception:
+        pass
+
+    # Gather recent agent messages from this session
+    recent = sess_store.get_messages(session_id, limit=30)
+    agent_msgs = []
+    for m in recent:
+        if m.from_agent not in ("user", "system") and m.content:
+            agent_msgs.append(f"[{m.from_agent}] {m.content[:300]}")
+    agent_conv = "\n".join(agent_msgs[-10:]) if agent_msgs else "No agent conversations yet"
+
+    mission_context = f"""MISSION BRIEF: {mission.brief or 'N/A'}
+MISSION STATUS: {mission.status.value if hasattr(mission.status, 'value') else mission.status}
+WORKSPACE: {mission.workspace_path or 'N/A'}
+
+PHASES STATUS:
+{phases_str}
+
+PROJECT MEMORY (knowledge from agents):
+{mem_ctx or 'No memory entries yet'}
+
+RECENT AGENT CONVERSATIONS (last 10):
+{agent_conv}
+
+Answer the user's question about this mission with concrete data.
+If they ask about PRs, features, sprints, git — use the appropriate tools to search.
+Answer in the same language as the user. Be precise and data-driven."""
+
+    async def event_generator():
+        import html as html_mod
+        import markdown as md_lib
+
+        def sse(event: str, data: dict) -> str:
+            return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+        yield sse("status", {"label": "Analyse en cours..."})
+
+        try:
+            ctx = await _build_context(agent, session)
+            # Inject mission context into project_context
+            ctx.project_context = mission_context + "\n\n" + (ctx.project_context or "")
+            if mission.workspace_path:
+                ctx.project_path = mission.workspace_path
+            ctx.mission_run_id = mission_id
+
+            async def on_tool_call(name, args, result):
+                labels = {
+                    "deep_search": "Recherche approfondie...",
+                    "code_read": "Lecture fichiers...",
+                    "code_search": "Recherche code...",
+                    "git_log": "Historique git...",
+                    "git_diff": "Diff git...",
+                    "git_status": "Statut git...",
+                    "memory_search": "Recherche memoire...",
+                    "list_files": "Liste fichiers...",
+                }
+                if name == "deep_search" and isinstance(args, dict) and "status" in args:
+                    await progress_queue.put(("status", name, args["status"]))
+                    return
+                label = labels.get(name, f"{name}...")
+                await progress_queue.put(("tool", name, label))
+
+            progress_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+            ctx.on_tool_call = on_tool_call
+
+            executor = get_executor()
+            accumulated = ""
+
+            async for evt, data_s in executor.run_streaming(ctx, content):
+                if evt == "delta":
+                    accumulated += data_s
+                    yield sse("chunk", {"text": data_s})
+                elif evt == "tool":
+                    yield sse("tool", {"name": data_s, "label": f"{data_s}..."})
+
+            # Drain progress queue
+            while not progress_queue.empty():
+                try:
+                    ptype, pname, plabel = progress_queue.get_nowait()
+                    yield sse(ptype, {"name": pname, "label": plabel})
+                except Exception:
+                    break
+
+            # Store agent response
+            sess_store.add_message(MessageDef(
+                session_id=session_id, from_agent="chef_de_programme",
+                to_agent="user", message_type="text", content=accumulated,
+            ))
+
+            rendered = md_lib.markdown(accumulated, extensions=["fenced_code", "tables", "nl2br"])
+            yield sse("done", {"html": rendered})
+
+        except Exception as exc:
+            logger.exception("Mission chat stream error")
+            yield sse("error", {"message": str(exc)[:200]})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/missions/{mission_id}/control", response_class=HTMLResponse)
