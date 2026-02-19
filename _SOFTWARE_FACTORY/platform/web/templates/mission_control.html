@@ -265,7 +265,7 @@
                         <span class="mc-phase-status-badge {{ phase.status.value }}">{{ phase.status.value }}</span>
                         <span class="mc-phase-chevron"><svg class="icon icon-xs mc-phase-chevron-icon"><use href="#icon-chevron-right"/></svg></span>
                     </div>
-                    <div class="mc-phase-summary" id="summary-{{ phase.phase_id }}"></div>
+                    <div class="mc-phase-summary" id="summary-{{ phase.phase_id }}">{% if phase.summary %}<div class="mc-summary-line"><span class="mc-summary-text">{{ phase.summary[:300] }}</span></div>{% endif %}</div>
                     <div class="mc-phase-body">
                         <!-- Full flow graph -->
                         <div class="mc-phase-graph" id="graph-{{ phase.phase_id }}"></div>
@@ -1078,9 +1078,8 @@ function md(s){
 }
 
 function generatePhaseSummary(phaseId) {
-    const container = document.getElementById(`discuss-${phaseId}`);
     const summaryEl = document.getElementById(`summary-${phaseId}`);
-    if (!container || !summaryEl) return;
+    if (!summaryEl || summaryEl.innerHTML.trim()) return; // DB summary already rendered
 
     const msgs = container.querySelectorAll('.mu--chat');
     if (msgs.length === 0) return;
