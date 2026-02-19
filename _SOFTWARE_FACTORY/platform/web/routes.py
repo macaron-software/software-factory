@@ -6289,13 +6289,12 @@ async def api_mission_run(request: Request, mission_id: str):
             # Phase complete — real status
             phase.completed_at = datetime.utcnow()
             if phase_success:
-                # Build LLM summary from agent messages in this phase
+                # Build LLM summary from agent messages (with timeout)
                 try:
                     from ..sessions.store import get_session_store
                     from ..llm.client import get_llm_client, LLMMessage
                     ss = get_session_store()
                     phase_msgs = ss.get_messages(session_id)
-                    # Collect messages produced during THIS phase (after snapshot)
                     convo = []
                     for m in phase_msgs[_pre_phase_msg_count:]:
                         txt = (getattr(m, 'content', '') or '').strip()
@@ -6307,11 +6306,11 @@ async def api_mission_run(request: Request, mission_id: str):
                         name = getattr(m, 'from_name', '') or agent
                         convo.append(f"{name}: {txt[:500]}")
                     if convo:
-                        transcript = "\n\n".join(convo[-15:])  # last 15 messages max
+                        transcript = "\n\n".join(convo[-15:])
                         llm = get_llm_client()
-                        resp = await llm.chat([
+                        resp = await asyncio.wait_for(llm.chat([
                             LLMMessage(role="user", content=f"Summarize this team discussion in 2-3 sentences. Focus on decisions made, key proposals, and conclusions. Be factual and specific. Answer in the same language as the discussion.\n\n{transcript[:4000]}")
-                        ], max_tokens=200, temperature=0.3)
+                        ], max_tokens=200, temperature=0.3), timeout=45)
                         phase.summary = (resp.content or "").strip()[:500]
                     if not getattr(phase, 'summary', None):
                         phase.summary = f"{len(aids)} agents, pattern: {pattern_type}"
@@ -6319,12 +6318,10 @@ async def api_mission_run(request: Request, mission_id: str):
                     phase.summary = f"{len(aids)} agents, pattern: {pattern_type}"
                 phases_done += 1
 
-                # Generate cross-phase summary for next phases
                 summary_text = f"[{wf_phase.name}] terminée"
                 if mission.workspace_path:
                     try:
                         import subprocess as _sp
-                        # Get files changed during this phase
                         diff_stat = _sp.run(
                             ["git", "diff", "--stat", "HEAD~1"],
                             cwd=mission.workspace_path, capture_output=True, text=True, timeout=5
@@ -6333,7 +6330,6 @@ async def api_mission_run(request: Request, mission_id: str):
                             summary_text += f" | Fichiers: {diff_stat.stdout.strip().split(chr(10))[-1]}"
                     except Exception:
                         pass
-                # Store decisions from agent messages in memory
                 try:
                     from ..memory.manager import get_memory_manager
                     mem = get_memory_manager()
@@ -6348,16 +6344,12 @@ async def api_mission_run(request: Request, mission_id: str):
                 except Exception:
                     pass
                 phase_summaries.append(f"## {wf_phase.name}\n{summary_text[:200]}")
-
-                # Post-phase CI/CD hooks — run real commands in workspace
-                await _run_post_phase_hooks(
-                    phase.phase_id, wf_phase.name, mission, session_id, _push_sse
-                )
             else:
                 phase.summary = f"Phase échouée — {phase_error[:200]}"
                 phases_failed += 1
             run_store.update(mission)
 
+            # Send phase_completed SSE IMMEDIATELY (before slow hooks)
             await _push_sse(session_id, {
                 "type": "phase_completed",
                 "mission_id": mission.id,
@@ -6412,9 +6404,9 @@ async def api_mission_run(request: Request, mission_id: str):
                                 from ..llm.client import get_llm_client, LLMMessage
                                 llm = get_llm_client()
                                 transcript = "\n\n".join(convo[-10:])
-                                resp = await llm.chat([
+                                resp = await asyncio.wait_for(llm.chat([
                                     LLMMessage(role="user", content=f"Résume cette discussion d'équipe en 2-3 phrases. Focus sur les décisions et conclusions. Même langue que la discussion.\n\n{transcript[:3000]}")
-                                ], max_tokens=200, temperature=0.3)
+                                ], max_tokens=200, temperature=0.3), timeout=45)
                                 new_summary = (resp.content or "").strip()[:500]
                                 if new_summary and len(new_summary) > 20:
                                     phase.summary = new_summary
@@ -6446,6 +6438,19 @@ async def api_mission_run(request: Request, mission_id: str):
                         return
                     else:
                         await asyncio.sleep(0.8)
+
+            # Post-phase hooks (non-blocking — don't block pipeline)
+            if phase_success:
+                async def _safe_hooks():
+                    try:
+                        await asyncio.wait_for(
+                            _run_post_phase_hooks(
+                                phase.phase_id, wf_phase.name, mission, session_id, _push_sse
+                            ), timeout=90
+                        )
+                    except Exception as hook_err:
+                        logger.warning("Post-phase hooks timeout/error for %s: %s", phase.phase_id, hook_err)
+                asyncio.create_task(_safe_hooks())
 
         # Mission complete — real summary
         if phases_failed == 0:
@@ -6843,11 +6848,11 @@ Genere un Architecture.md complet et a jour avec:
 
 Reponds UNIQUEMENT avec le contenu Markdown du fichier."""
 
-        resp = await client.chat(
+        resp = await asyncio.wait_for(client.chat(
             messages=[LLMMessage(role="user", content=archi_prompt)],
             system_prompt="Architecte logiciel senior. Documentation technique concise et precise.",
             temperature=0.3, max_tokens=2000,
-        )
+        ), timeout=60)
         archi_text = resp.content.strip()
         # Strip markdown fences if present
         if archi_text.startswith("```"):
@@ -6889,11 +6894,11 @@ Genere un README.md a jour avec:
 
 Reponds UNIQUEMENT avec le contenu Markdown du fichier."""
 
-        resp = await client.chat(
+        resp = await asyncio.wait_for(client.chat(
             messages=[LLMMessage(role="user", content=readme_prompt)],
             system_prompt="Technical writer. Documentation claire et actionnable.",
             temperature=0.3, max_tokens=1500,
-        )
+        ), timeout=60)
         readme_text = resp.content.strip()
         if readme_text.startswith("```"):
             readme_text = readme_text.split("\n", 1)[1] if "\n" in readme_text else readme_text
