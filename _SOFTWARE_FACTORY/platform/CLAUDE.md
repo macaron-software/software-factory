@@ -83,46 +83,17 @@ NOTE: DB tables/code keep current names (missions, sessions, workflows) — rena
 
 ---
 
-## NAV (sidebar — target: 8 entries, grouped)
+## NAV (sidebar — 8 entries, DONE)
 
-### Current (17 entries — TOO MANY, vocabulary mess)
-Portfolio `/` → DSI Board `/dsi` → Vue Métier `/metier` → Product `/product` → Idéation `/ideation` → Missions `/missions` → Mission Control `/mission-control` → Workflows `/workflows` → Patterns `/patterns` → Sessions `/sessions` → Équipe `/agents` → Org SAFe `/org` → Skills `/skills` → Memory `/memory` → MCPs `/mcps` → Generator `/generate` → DORA `/metrics`
-
-### Target (8 entries — SAFe-aligned, clean groups)
 ```
-STRATÉGIE
-  Portfolio ........... Epics stratégiques + DSI + vue métier (3 onglets)
-  Backlog ............. Epics → Features → Stories + Discovery (idéation)
-
-EXÉCUTION
-  PI Board ............ Program Increments en cours + contrôle
-  Ceremonies .......... Templates (workflow + patterns), catalogue
-  Live ................ Cérémonies actives (sessions en cours)
-
-ÉQUIPE
-  ART ................. Agents, org SAFe, générateur d'équipe
-  Toolbox ............. Skills, MCPs, Memory (3 onglets)
-  Metrics ............. DORA + vélocité + throughput
+STRATEGY                              ENGINEERING
+  Portfolio /    (tabs: overview/dsi/metier)  Ceremonies /ceremonies (tabs: templates/patterns)
+  Backlog /backlog (tabs: backlog/discovery)  Live /live → /sessions
+  PI Board /pi   (tabs: epics/control)        ART /art (tabs: agents/org/generator)
+  Metrics /metrics                            Toolbox /toolbox (tabs: skills/memory/mcps)
 ```
-
-### View switcher (3 modes, bottom sidebar)
-| Mode | Shows |
-|------|-------|
-| **all** | 8 items |
-| **strategy** | Portfolio, Backlog, Metrics |
-| **engineering** | Ceremonies, Live, ART, Toolbox |
-
-### Page consolidation map
-| New page | Merges | URL |
-|----------|--------|-----|
-| Portfolio | portfolio + dsi + metier (3 tabs) | `/` |
-| Backlog | product + ideation (2 tabs: Backlog, Discovery) | `/backlog` |
-| PI Board | missions + mission-control (list + control) | `/pi` |
-| Ceremonies | workflows + patterns (2 tabs: Templates, Patterns) | `/ceremonies` |
-| Live | sessions list + session_live | `/live` |
-| ART | agents + org + generate (3 tabs: Agents, Org, Generator) | `/art` |
-| Toolbox | skills + memory + mcps (3 tabs) | `/toolbox` |
-| Metrics | dora_dashboard | `/metrics` |
+View switcher: all (8) | strategy (4) | engineering (4). localStorage persist.
+Old routes preserved for HTMX tab content loading. Tabbed pages use hx-trigger="click, load".
 
 ---
 
@@ -298,7 +269,28 @@ Roles: DSI, architects, devs (back/front/full/mobile), QA, devops, SRE, DBA, SM,
 ## PATTERNS (23)
 
 ### Core (8 types)
-solo-chat, sequential, parallel, adversarial-pair, adversarial-cascade, hierarchical, debate, sf-tdd
+solo-chat, sequential, parallel, adversarial-pair, adversarial-cascade, hierarchical, network, human-in-the-loop, wave
+
+### Pattern-based protocol (NO rank gating)
+```
+Pattern type determines agent behavior, NOT hierarchy_rank.
+All agents keep their configured tools (search, read, memory, etc.)
+
+DISCUSSION patterns (network, human-in-the-loop):
+  → Everyone gets RESEARCH_PROTOCOL
+  → Can read/search, MUST NOT write code
+  → Must deliver analysis/verdict immediately (no "let me check first")
+
+EXECUTION patterns (hierarchical, sequential, parallel, loop, wave, etc.):
+  → Role-based: dev→EXEC_PROTOCOL, qa→QA_PROTOCOL, lead→REVIEW_PROTOCOL
+  → Others (scrum, PM)→RESEARCH_PROTOCOL
+  → All get PR_PROTOCOL for commit conventions
+```
+
+### Phase summary
+LLM-generated from actual agent conversation (not regex/template).
+Prompt: "Summarize decisions, proposals, conclusions in 2-3 sentences."
+Stored in `phase.summary`, rendered in accordion when collapsed.
 
 ### Project-specific (15)
 Per-project: *-pi (planning), *-sprint (dev), *-release, *-retro
@@ -393,6 +385,7 @@ platform/
 │   │   ├── base.html (sidebar view-switch)
 │   │   ├── portfolio.html, dsi.html, metier.html, product.html
 │   │   ├── ideation.html, ideation_history.html
+│   │   ├── backlog.html, ceremonies.html, art.html, toolbox.html, pi_board.html (tabbed pages)
 │   │   ├── missions.html, mission_detail.html, mission_control.html, mission_control_list.html, mission_start.html
 │   │   ├── session_live.html (~1700L, graph+chat+thread)
 │   │   ├── conversation.html, workflows.html, workflow_edit.html
