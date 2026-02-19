@@ -214,9 +214,10 @@ async def backlog_page(request: Request, tab: str = "backlog"):
 
 @router.get("/pi", response_class=HTMLResponse)
 async def pi_board_page(request: Request):
-    """PI Board — redirect to missions list."""
-    from starlette.responses import RedirectResponse
-    return RedirectResponse("/missions", status_code=302)
+    """PI Board — Epics + Control in tabs."""
+    return _templates(request).TemplateResponse("pi_board.html", {
+        "request": request, "page_title": "PI Board",
+    })
 
 @router.get("/ceremonies", response_class=HTMLResponse)
 async def ceremonies_page(request: Request, tab: str = "templates"):
@@ -4624,7 +4625,7 @@ async def missions_list_page(request: Request):
     store = get_mission_run_store()
     runs = store.list_runs(limit=50)
     return _templates(request).TemplateResponse("mission_control_list.html", {
-        "request": request, "page_title": "PI Control",
+        "request": request, "page_title": "Epic Control",
         "runs": runs,
     })
 
@@ -4635,9 +4636,9 @@ async def mission_start_page(request: Request, workflow_id: str):
     from ..workflows.store import get_workflow_store
     wf = get_workflow_store().get(workflow_id)
     if not wf:
-        return RedirectResponse("/mission-control", status_code=302)
+        return RedirectResponse("/pi", status_code=302)
     return _templates(request).TemplateResponse("mission_start.html", {
-        "request": request, "page_title": f"Nouvelle Epic — {wf.name}",
+        "request": request, "page_title": f"New Epic — {wf.name}",
         "workflow": wf,
     })
 
@@ -4749,7 +4750,7 @@ async def mission_control_page(request: Request, mission_id: str):
     run_store = get_mission_run_store()
     mission = run_store.get(mission_id)
     if not mission:
-        return RedirectResponse("/mission-control", status_code=302)
+        return RedirectResponse("/pi", status_code=302)
     agents = get_agent_store().list_all()
     agent_map = _agent_map_for_template(agents)
 
