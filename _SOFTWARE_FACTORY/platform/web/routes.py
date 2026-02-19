@@ -4894,8 +4894,15 @@ Answer in the same language as the user. Be precise and data-driven."""
             if mission.workspace_path:
                 ctx.project_path = mission.workspace_path
             ctx.mission_run_id = mission_id
-            # Disable tools for conversational chat — context already injected
-            ctx.tools_enabled = False
+            # Enable read-only + phase tools for CDP interaction
+            ctx.tools_enabled = True
+            ctx.allowed_tools = [
+                "memory_search", "get_phase_status", "list_phases",
+                "run_phase", "request_validation",
+                "code_read", "code_search", "list_files",
+                "git_log", "git_status", "git_diff",
+                "get_project_context",
+            ]
 
             executor = get_executor()
             raw_accumulated = ""
@@ -4917,6 +4924,24 @@ Answer in the same language as the user. Be precise and data-driven."""
                         new_text = clean[_sent_count:]
                         _sent_count = len(clean)
                         yield sse("chunk", {"text": new_text})
+                elif evt == "tool":
+                    # Tool being called — show in UI
+                    tool_labels = {
+                        "memory_search": "🔍 Recherche mémoire",
+                        "get_phase_status": "📊 Statut des phases",
+                        "list_phases": "📋 Liste des phases",
+                        "run_phase": "🚀 Lancement de phase",
+                        "request_validation": "✅ Demande de validation",
+                        "code_read": "📄 Lecture de code",
+                        "code_search": "🔎 Recherche dans le code",
+                        "list_files": "📂 Liste des fichiers",
+                        "git_log": "📜 Historique Git",
+                        "git_status": "📋 Statut Git",
+                        "git_diff": "📝 Diff Git",
+                        "get_project_context": "🏗️ Contexte projet",
+                    }
+                    label = tool_labels.get(data_s, f"🔧 {data_s}")
+                    yield sse("tool", {"name": data_s, "label": label})
                 elif evt == "result":
                     if hasattr(data_s, "error") and data_s.error:
                         llm_error = data_s.error

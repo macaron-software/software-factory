@@ -1244,6 +1244,7 @@ class AgentExecutor:
                 ))
 
                 for tc in llm_resp.tool_calls:
+                    yield ("tool", tc.function_name)
                     result = await self._execute_tool(tc, ctx)
                     logger.warning("TOOL_EXEC agent=%s tool=%s args=%s result=%s",
                                    agent.id, tc.function_name,
@@ -1274,9 +1275,11 @@ class AgentExecutor:
                 if deep_search_used:
                     tools = None
                 # Nudge: if round 2+ and no code_write yet, inject urgent reminder
+                # Only nudge if write tools are available (not for read-only contexts like CDP chat)
                 write_count = sum(1 for tc_rec in all_tool_calls if tc_rec["name"] in ("code_write", "code_edit", "fractal_code"))
                 has_written = write_count > 0
-                if round_num >= 1 and not has_written and tools is not None:
+                has_write_tools = any(t.get("function", {}).get("name") in ("code_write", "code_edit", "fractal_code") for t in (tools or []))
+                if round_num >= 1 and not has_written and tools is not None and has_write_tools:
                     # Strip read-only tools — force write
                     write_only_tools = [t for t in tools if t.get("function", {}).get("name") in ("code_write", "code_edit", "fractal_code", "git_commit")]
                     if write_only_tools:
