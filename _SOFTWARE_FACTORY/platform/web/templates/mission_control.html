@@ -172,20 +172,26 @@
 /* CDP Agent Card */
 .mc-cdp-card{padding:0.75rem;border-bottom:1px solid var(--border);background:var(--bg-secondary)}
 .mc-cdp-card-inner{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius,10px);overflow:hidden}
-.mc-cdp-banner{height:48px;background:linear-gradient(135deg,rgba(124,58,237,.25),rgba(59,130,246,.15));position:relative}
-.mc-cdp-avatar-wrap{position:absolute;bottom:-28px;left:16px}
-.mc-cdp-avatar{width:56px;height:56px;border-radius:50%;object-fit:cover;border:3px solid var(--bg-tertiary);box-shadow:0 2px 8px rgba(0,0,0,.3)}
-.mc-cdp-body{padding:2rem 0.85rem 0.65rem}
-.mc-cdp-name{font-size:0.92rem;font-weight:700;color:var(--text-primary);margin:0;line-height:1.2}
+.mc-cdp-banner{height:56px;background:linear-gradient(135deg,rgba(124,58,237,.3),rgba(59,130,246,.18));position:relative}
+.mc-cdp-avatar-wrap{position:absolute;bottom:-32px;left:16px}
+.mc-cdp-avatar{width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid var(--bg-tertiary);box-shadow:0 4px 12px rgba(0,0,0,.35)}
+.mc-cdp-body{padding:2.2rem 0.85rem 0.5rem}
+.mc-cdp-name{font-size:0.95rem;font-weight:700;color:var(--text-primary);margin:0;line-height:1.2}
 .mc-cdp-role{font-size:0.68rem;color:var(--text-secondary);margin-top:0.1rem}
-.mc-cdp-tagline{font-size:0.66rem;color:var(--purple);font-style:italic;margin-top:0.3rem;line-height:1.4}
-.mc-cdp-status-row{display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem}
+.mc-cdp-tagline{font-size:0.66rem;color:var(--purple);font-style:italic;margin-top:0.25rem;line-height:1.4}
+.mc-cdp-status-row{display:flex;align-items:center;gap:0.5rem;margin-top:0.4rem}
 .mc-cdp-status{font-size:0.58rem;padding:0.15rem 0.45rem;border-radius:4px;font-weight:600}
 .mc-cdp-status.active{background:rgba(124,58,237,.15);color:var(--purple);animation:pulse-dot 2s ease-in-out infinite}
 .mc-cdp-status.idle{background:var(--bg-tertiary);color:var(--text-secondary)}
-.mc-cdp-skills{display:flex;flex-wrap:wrap;gap:3px;margin-top:0.45rem}
-.mc-cdp-skill{padding:0.1rem 0.35rem;border-radius:4px;font-size:0.58rem;background:rgba(124,58,237,.1);color:var(--purple)}
-.mc-cdp-actions{display:flex;gap:0.4rem;margin-top:0.65rem}
+.mc-cdp-section{margin-top:0.55rem}
+.mc-cdp-section-title{font-size:0.56rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);margin-bottom:0.2rem}
+.mc-cdp-persona{font-size:0.65rem;color:var(--text-secondary);line-height:1.45}
+.mc-cdp-motivation{font-size:0.65rem;color:var(--text-primary);line-height:1.45;padding:0.3rem 0.5rem;background:rgba(124,58,237,.06);border-radius:6px;border-left:2px solid var(--purple)}
+.mc-cdp-tags{display:flex;flex-wrap:wrap;gap:3px}
+.mc-cdp-tag{padding:0.1rem 0.35rem;border-radius:4px;font-size:0.58rem}
+.mc-cdp-tag.skill{background:rgba(124,58,237,.1);color:var(--purple)}
+.mc-cdp-tag.tool{background:rgba(59,130,246,.1);color:var(--blue,#3b82f6)}
+.mc-cdp-actions{display:flex;gap:0.4rem;margin-top:0.6rem}
 .mc-cdp-btn{flex:1;padding:0.4rem;border:none;border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.3rem;transition:opacity .15s}
 .mc-cdp-btn:hover{opacity:.85}
 .mc-cdp-btn-chat{background:var(--purple);color:#fff}
@@ -398,13 +404,43 @@
                     <div class="mc-cdp-status-row">
                         <span class="mc-cdp-status active" id="mc-cdp-status">Pilotage actif</span>
                     </div>
-                    {% if cdp and cdp.get('skills') %}
-                    <div class="mc-cdp-skills">
-                        {% for s in cdp['skills'][:6] %}
-                        <span class="mc-cdp-skill">{{ s }}</span>
-                        {% endfor %}
+
+                    {% if cdp and cdp.get('persona') %}
+                    <div class="mc-cdp-section">
+                        <div class="mc-cdp-section-title">Persona</div>
+                        <div class="mc-cdp-persona">{{ cdp['persona'][:250] }}{% if cdp['persona']|length > 250 %}...{% endif %}</div>
                     </div>
                     {% endif %}
+
+                    {% if cdp and cdp.get('motivation') %}
+                    <div class="mc-cdp-section">
+                        <div class="mc-cdp-section-title">Motivation</div>
+                        <div class="mc-cdp-motivation">{{ cdp['motivation'][:200] }}{% if cdp['motivation']|length > 200 %}...{% endif %}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if cdp and cdp.get('skills') %}
+                    <div class="mc-cdp-section">
+                        <div class="mc-cdp-section-title">Skills</div>
+                        <div class="mc-cdp-tags">
+                            {% for s in cdp['skills'][:8] %}
+                            <span class="mc-cdp-tag skill">{{ s }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if cdp and cdp.get('tools') %}
+                    <div class="mc-cdp-section">
+                        <div class="mc-cdp-section-title">Tools</div>
+                        <div class="mc-cdp-tags">
+                            {% for t in cdp['tools'][:10] %}
+                            <span class="mc-cdp-tag tool">{{ t }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <div class="mc-cdp-actions">
                         <button class="mc-cdp-btn mc-cdp-btn-chat" onclick="openCdpChat()">
                             <svg class="icon icon-xs"><use href="#icon-message-square"/></svg> Discuter
