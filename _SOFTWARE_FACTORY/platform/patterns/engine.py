@@ -465,69 +465,125 @@ async def _execute_node(
     else:
         state.status = NodeStatus.COMPLETED
 
-    # ── Adversarial Guard: check for slop, hallucination, mock, lies ──
+    # ── Adversarial Guard with retry loop ──
+    # If rejected, re-run agent with feedback (max 2 retries)
+    MAX_ADVERSARIAL_RETRIES = 2
     guard_result = None
     if content and not result.error and state.status == NodeStatus.COMPLETED:
-        try:
-            from ..agents.adversarial import run_guard
-            guard_result = await run_guard(
-                content=content,
-                task=task,
-                agent_role=agent.role or "",
-                agent_name=agent.name,
-                tool_calls=result.tool_calls or [],
-                pattern_type=run.pattern.type,
-                enable_l1=True,
-            )
-            if not guard_result.passed:
-                state.status = NodeStatus.FAILED
-                msg_type = "system"
-                # Prepend rejection reason to content
-                rejection = (
-                    f"[ADVERSARIAL REJECT — {guard_result.level}] "
-                    f"Score: {guard_result.score}/10\n"
-                    + "\n".join(f"- {i}" for i in guard_result.issues[:5])
-                    + "\n\n--- Original output ---\n"
+        for _adv_attempt in range(MAX_ADVERSARIAL_RETRIES + 1):
+            try:
+                from ..agents.adversarial import run_guard
+                guard_result = await run_guard(
+                    content=content,
+                    task=task,
+                    agent_role=agent.role or "",
+                    agent_name=agent.name,
+                    tool_calls=result.tool_calls or [],
+                    pattern_type=run.pattern.type,
+                    enable_l1=True,
                 )
-                content = rejection + content
-                logger.warning(
-                    "ADVERSARIAL REJECT [%s] score=%d: %s",
-                    agent.name, guard_result.score,
-                    "; ".join(guard_result.issues[:3]),
-                )
-                # Track rejection in agent scores
-                try:
-                    from ..db.migrations import get_db
-                    db = get_db()
-                    db.execute(
-                        """INSERT INTO agent_scores (agent_id, epic_id, rejected, iterations)
-                           VALUES (?, ?, 1, 1)
-                           ON CONFLICT(agent_id, epic_id)
-                           DO UPDATE SET rejected = rejected + 1, iterations = iterations + 1""",
-                        (agent.id, run.project_id or ""),
-                    )
-                    db.commit()
-                    db.close()
-                except Exception:
-                    pass
-            else:
-                # L0 warnings (below threshold) — log but don't reject
+            except Exception as guard_err:
+                logger.warning("Adversarial guard error: %s", guard_err)
+                break  # on error, don't block
+
+            if guard_result.passed:
                 if guard_result.issues:
                     logger.info(
                         "ADVERSARIAL WARN [%s] score=%d: %s",
                         agent.name, guard_result.score,
                         "; ".join(guard_result.issues[:3]),
                     )
-        except Exception as guard_err:
-            logger.warning("Adversarial guard error: %s", guard_err)
+                break  # approved
 
-    # Push guard result to frontend
-    if guard_result:
+            # Rejected — retry with feedback if attempts remain
+            logger.warning(
+                "ADVERSARIAL REJECT [%s] attempt=%d score=%d: %s",
+                agent.name, _adv_attempt + 1, guard_result.score,
+                "; ".join(guard_result.issues[:3]),
+            )
+            await _sse(run, {
+                "type": "adversarial",
+                "agent_id": agent.id,
+                "agent_name": agent.name,
+                "passed": False,
+                "score": guard_result.score,
+                "level": guard_result.level,
+                "issues": guard_result.issues[:5],
+                "node_id": node_id,
+                "retry": _adv_attempt + 1,
+            })
+
+            if _adv_attempt < MAX_ADVERSARIAL_RETRIES:
+                # Re-run agent with rejection feedback
+                feedback = "\n".join(f"- {i}" for i in guard_result.issues[:5])
+                retry_task = (
+                    f"[ADVERSARIAL FEEDBACK — ton output précédent a été REJETÉ]\n"
+                    f"Problèmes:\n{feedback}\n\n"
+                    f"Corrige ces problèmes. Même tâche:\n{task}"
+                )
+                if protocol_override:
+                    retry_task += "\n\n" + protocol_override
+
+                await _sse(run, {
+                    "type": "agent_status",
+                    "agent_id": agent.id,
+                    "node_id": node_id,
+                    "status": "thinking",
+                })
+
+                try:
+                    retry_result = await executor.run(ctx, retry_task)
+                    retry_content = retry_result.content or ""
+                    # Strip think/tool artifacts
+                    if "<think>" in retry_content:
+                        retry_content = _re.sub(r"<think>.*?</think>\s*", "", retry_content, flags=_re.DOTALL).strip()
+                    if "<minimax:tool_call>" in retry_content or "<tool_call>" in retry_content:
+                        retry_content = _re.sub(r"<minimax:tool_call>.*?</minimax:tool_call>\s*", "", retry_content, flags=_re.DOTALL).strip()
+                        retry_content = _re.sub(r"<tool_call>.*?</tool_call>\s*", "", retry_content, flags=_re.DOTALL).strip()
+                    # Use retry output
+                    result = retry_result
+                    content = retry_content
+                    state.result = result
+                    state.output = content
+                    # Merge tool_calls from retry
+                    logger.info("ADVERSARIAL RETRY [%s] attempt=%d — re-running agent", agent.name, _adv_attempt + 2)
+                except Exception as retry_err:
+                    logger.error("Adversarial retry failed for %s: %s", agent.id, retry_err)
+                    break
+            else:
+                # Final rejection — mark as failed
+                state.status = NodeStatus.FAILED
+                msg_type = "system"
+                rejection = (
+                    f"[ADVERSARIAL REJECT — {guard_result.level}] "
+                    f"Score: {guard_result.score}/10 (after {MAX_ADVERSARIAL_RETRIES + 1} attempts)\n"
+                    + "\n".join(f"- {i}" for i in guard_result.issues[:5])
+                    + "\n\n--- Original output ---\n"
+                )
+                content = rejection + content
+                # Track rejection in agent scores
+                try:
+                    from ..db.migrations import get_db
+                    db = get_db()
+                    db.execute(
+                        """INSERT INTO agent_scores (agent_id, epic_id, rejected, iterations)
+                           VALUES (?, ?, 1, ?)
+                           ON CONFLICT(agent_id, epic_id)
+                           DO UPDATE SET rejected = rejected + 1, iterations = iterations + ?""",
+                        (agent.id, run.project_id or "", MAX_ADVERSARIAL_RETRIES + 1, MAX_ADVERSARIAL_RETRIES + 1),
+                    )
+                    db.commit()
+                    db.close()
+                except Exception:
+                    pass
+
+    # Push final guard result to frontend
+    if guard_result and guard_result.passed:
         await _sse(run, {
             "type": "adversarial",
             "agent_id": agent.id,
             "agent_name": agent.name,
-            "passed": guard_result.passed,
+            "passed": True,
             "score": guard_result.score,
             "level": guard_result.level,
             "issues": guard_result.issues[:5],
