@@ -60,6 +60,14 @@
 .mc-phase-chevron{font-size:0.65rem;color:var(--text-secondary);transition:transform .2s}
 .mc-phase.open .mc-phase-chevron{transform:rotate(90deg)}
 
+/* Phase summary preview — visible when collapsed */
+.mc-phase-summary{display:none;padding:0.4rem 0.75rem 0.35rem 2.2rem;font-size:0.72rem;color:var(--text-secondary);line-height:1.45;border-top:1px solid var(--border);background:var(--bg-secondary)}
+.mc-phase-summary .mc-summary-line{display:flex;gap:0.4rem;align-items:baseline;margin-bottom:0.15rem}
+.mc-phase-summary .mc-summary-agent{font-weight:600;color:var(--text-primary);white-space:nowrap;min-width:0;flex-shrink:0}
+.mc-phase-summary .mc-summary-text{color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.mc-phase:not(.open) .mc-phase-summary{display:block}
+.mc-phase.open .mc-phase-summary{display:none}
+
 /* Accordion body: graph row + discussion row */
 .mc-phase-body{display:none;border-top:1px solid var(--border)}
 .mc-phase.open .mc-phase-body{display:flex;flex-direction:column}
@@ -257,6 +265,7 @@
                         <span class="mc-phase-status-badge {{ phase.status.value }}">{{ phase.status.value }}</span>
                         <span class="mc-phase-chevron"><svg class="icon icon-xs mc-phase-chevron-icon"><use href="#icon-chevron-right"/></svg></span>
                     </div>
+                    <div class="mc-phase-summary" id="summary-{{ phase.phase_id }}"></div>
                     <div class="mc-phase-body">
                         <!-- Full flow graph -->
                         <div class="mc-phase-graph" id="graph-{{ phase.phase_id }}"></div>
@@ -629,6 +638,7 @@ function handleSSE(d) {
         updatePhaseStatus(d.phase_id, d.success ? 'done' : 'failed');
         addActivity(`${d.success ? '✓' : '✗'} Phase terminée`, 'tool');
         updateStats();
+        generatePhaseSummary(d.phase_id);
     }
     else if (d.type === 'phase_failed') {
         updatePhaseStatus(d.phase_id, 'failed');
@@ -1067,8 +1077,49 @@ function md(s){
   return h;
 }
 
+function generatePhaseSummary(phaseId) {
+    const container = document.getElementById(`discuss-${phaseId}`);
+    const summaryEl = document.getElementById(`summary-${phaseId}`);
+    if (!container || !summaryEl) return;
+
+    // Collect all discussion messages for this phase
+    const msgs = container.querySelectorAll('.mu--chat');
+    if (msgs.length === 0) return;
+
+    const lines = [];
+    msgs.forEach(msg => {
+        const nameEl = msg.querySelector('.mu__name');
+        const contentEl = msg.querySelector('.mu__content');
+        if (!nameEl || !contentEl) return;
+        const name = nameEl.textContent.trim();
+        // Get plain text, strip HTML
+        const text = contentEl.textContent.trim();
+        if (!text) return;
+        // Extract first substantive sentence (skip very short fragments)
+        const sentences = text.split(/[.\n]/).map(s => s.trim()).filter(s => s.length > 20);
+        const excerpt = sentences[0] || text.substring(0, 120);
+        lines.push({ name, excerpt: excerpt.substring(0, 150) });
+    });
+
+    if (lines.length === 0) return;
+
+    // Deduplicate by agent name (keep last contribution)
+    const byAgent = new Map();
+    lines.forEach(l => byAgent.set(l.name, l.excerpt));
+
+    let html = '';
+    byAgent.forEach((excerpt, name) => {
+        html += `<div class="mc-summary-line"><span class="mc-summary-agent">${esc(name)}:</span><span class="mc-summary-text">${esc(excerpt)}</span></div>`;
+    });
+    summaryEl.innerHTML = html;
+}
+
 /* Init */
 renderPhaseGraphs();
+// Generate summaries for already-completed phases
+document.querySelectorAll('.mc-phase[data-status="done"], .mc-phase[data-status="failed"]').forEach(el => {
+    generatePhaseSummary(el.dataset.phaseId);
+});
 
 /* Event delegation for agent popover clicks on SVG graph nodes */
 document.querySelectorAll('.mc-phase-graph').forEach(container => {
