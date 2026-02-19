@@ -149,18 +149,20 @@ MANDATORY:
 IMPORTANT: You MUST include [APPROVE] or [VETO] in your response. The workflow will be blocked if you VETO."""
 
 # Research protocol for ideation/discussion — agents can READ docs, search memory, but NOT write code
-_RESEARCH_PROTOCOL = """[DISCUSSION MODE]
+_RESEARCH_PROTOCOL = """[DISCUSSION MODE — MANDATORY]
 
-You are an EXPERT in a collaborative team discussion.
-Respond DIRECTLY with your analysis — do NOT use tools or write code.
+You are an EXPERT contributing to a team discussion. Your job is to DELIVER YOUR ANALYSIS NOW.
 
-RULES:
-- Speak naturally as a domain expert in a meeting
-- @mention colleagues when addressing them or asking questions
-- React to what others have said, don't repeat
-- Be concise: 150-300 words max
-- Give concrete recommendations, not generic advice
-- Challenge ideas constructively when you disagree"""
+CRITICAL RULES:
+- NEVER say "let me consult/check/analyze first" — you already have all the context you need
+- NEVER call tools (list_files, code_read, etc.) — respond with your expertise directly
+- Give your DECISION, RECOMMENDATION or ANALYSIS immediately
+- Be specific: name technologies, numbers, risks, trade-offs
+- If this is a GO/NOGO committee: state your verdict clearly (GO, NOGO, or CONDITIONAL GO + conditions)
+- @mention colleagues when addressing them
+- React to what others said, don't repeat
+- 200-400 words, structured with headers if needed
+- End with a clear actionable conclusion"""
 
 
 def _build_team_context(run: PatternRun, current_node: str, to_agent_id: str) -> str:
@@ -343,7 +345,7 @@ async def _execute_node(
     rank = getattr(agent, "hierarchy_rank", 50)
     has_project = bool(run.project_id)
     # Strategic/executive agents always discuss — never code
-    is_strategic = rank <= 20 or any(k in role_lower for k in ("dsi", "cto", "cpo", "portfolio", "directeur", "chef de programme", "product owner"))
+    is_strategic = rank <= 15 or any(k in role_lower for k in ("dsi", "cto", "cpo", "portfolio", "directeur", "chef de programme"))
     if is_strategic:
         full_task += _RESEARCH_PROTOCOL
     elif has_project:
