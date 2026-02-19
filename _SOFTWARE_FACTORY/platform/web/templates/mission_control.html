@@ -743,6 +743,24 @@ const CDP_AVATAR = '{{ cdp["avatar_url"] if cdp else "/static/avatars/chef_de_pr
 const CDP_NAME = '{{ cdp["name"] if cdp else "Chef de Programme" }}';
 const CDP_ROLE = '{{ cdp["role"] if cdp else "Chef de Programme" }}';
 
+function miniMarkdown(s) {
+    if (!s) return '';
+    let h = s
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        .replace(/^\- (.+)$/gm, '<li>$1</li>')
+        .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+        .replace(/<\/ul>\s*<ul>/g, '')
+        .replace(/\n/g, '<br>');
+    return h;
+}
 function openCdpChat() {
     document.getElementById('mcChatOverlay').classList.add('open');
     document.getElementById('mcChatInput').focus();
@@ -842,6 +860,7 @@ async function sendCdpMessage() {
         let buf = '';
         let agentMsg = null; // { wrapper, bubble, contentDiv }
         let toolsDiv = null;
+        let evtType = null;
 
         while (true) {
             const {done, value} = await reader.read();
@@ -849,7 +868,6 @@ async function sendCdpMessage() {
             buf += decoder.decode(value, {stream: true});
             const lines = buf.split('\n');
             buf = lines.pop() || '';
-            let evtType = null;
             for (const line of lines) {
                 if (line.startsWith('event: ')) {
                     evtType = line.slice(7).trim();
