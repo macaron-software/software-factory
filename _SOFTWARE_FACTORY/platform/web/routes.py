@@ -4898,34 +4898,33 @@ Answer in the same language as the user. Be precise and data-driven."""
             ctx.tools_enabled = False
 
             executor = get_executor()
-            accumulated = ""
+            raw_accumulated = ""
             llm_error = ""
-            _in_think = False
+            _sent_count = 0
 
             async for evt, data_s in executor.run_streaming(ctx, content):
                 if evt == "delta":
-                    accumulated += data_s
-                    # Filter <think> blocks from streaming output
-                    if '<think>' in data_s:
-                        _in_think = True
-                    if _in_think:
-                        if '</think>' in data_s:
-                            _in_think = False
-                            # Send text after </think>
-                            after = data_s.split('</think>', 1)[1]
-                            if after.strip():
-                                yield sse("chunk", {"text": after})
-                        continue
-                    yield sse("chunk", {"text": data_s})
+                    raw_accumulated += data_s
+                    # Strip all <think>...</think> blocks from accumulated so far
+                    import re as _re
+                    clean = _re.sub(r'<think>[\s\S]*?</think>\s*', '', raw_accumulated)
+                    # If still inside an unclosed <think>, don't send yet
+                    if '<think>' in clean and '</think>' not in clean.split('<think>')[-1]:
+                        clean = clean[:clean.rfind('<think>')]
+                    clean = clean.strip()
+                    # Send only newly revealed characters
+                    if len(clean) > _sent_count:
+                        new_text = clean[_sent_count:]
+                        _sent_count = len(clean)
+                        yield sse("chunk", {"text": new_text})
                 elif evt == "result":
                     if hasattr(data_s, "error") and data_s.error:
                         llm_error = data_s.error
-                    elif hasattr(data_s, "content") and data_s.content and not accumulated:
-                        accumulated = data_s.content
+                    elif hasattr(data_s, "content") and data_s.content and not raw_accumulated:
+                        raw_accumulated = data_s.content
 
-            # Strip <think> blocks from accumulated content
             import re as _re
-            accumulated = _re.sub(r'<think>[\s\S]*?</think>\s*', '', accumulated).strip()
+            accumulated = _re.sub(r'<think>[\s\S]*?</think>\s*', '', raw_accumulated).strip()
 
             # If LLM failed and no real content, send error
             if llm_error and not accumulated:
