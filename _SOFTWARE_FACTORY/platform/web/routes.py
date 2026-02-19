@@ -5424,9 +5424,31 @@ async def api_mission_run(request: Request, mission_id: str):
                     logger.error("Phase %s pattern crashed: %s\n%s", phase.phase_id, exc, traceback.format_exc())
                     phase_error = str(exc)
 
-                # If sprint failed, break sprint loop — don't continue to next sprint
+                # Sprint iteration handling:
+                # - Success → continue to next sprint (more features)
+                # - Failure/VETO in dev sprints → remediation: retry with feedback
+                # - Failure in non-dev phases → break immediately
                 if not phase_success:
-                    break
+                    if max_sprints > 1 and sprint_num < max_sprints:
+                        # Dev sprint: inject veto feedback and retry
+                        remediation_msg = f"{sprint_label} terminé avec des vetoes. Relance avec feedback correctif…"
+                        await _push_sse(session_id, {
+                            "type": "message",
+                            "from_agent": "chef_de_programme",
+                            "from_name": "Alexandre Moreau",
+                            "from_role": "Chef de Programme",
+                            "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                            "content": remediation_msg,
+                            "phase_id": phase.phase_id,
+                            "msg_type": "text",
+                        })
+                        await asyncio.sleep(0.8)
+                        # Add veto feedback to next sprint prompt
+                        prev_context += f"\n- VETO sprint {sprint_num}: {phase_error[:300]}"
+                        phase_error = ""  # reset for next attempt
+                        continue
+                    else:
+                        break  # Last sprint or single-iteration phase: stop
 
                 # Announce sprint completion (only for multi-sprint phases)
                 if max_sprints > 1 and sprint_num < max_sprints:
@@ -5587,9 +5609,18 @@ async def api_mission_run(request: Request, mission_id: str):
                     })
                     await asyncio.sleep(0.8)
                 else:
-                    # Phase failed — STOP mission, don't continue blindly
+                    # Phase failed — check if it's a blocking phase
+                    # Dev sprints and CI/CD can fail without killing the entire mission
+                    # Only strategic gates (committees, deploy-prod) are mission-critical
+                    blocking = pattern_type in ("human-in-the-loop",) or "deploy" in phase.phase_id
                     short_err = phase_error[:200] if phase_error else "erreur inconnue"
-                    cdp_msg = f"Phase «{wf_phase.name}» échouée ({short_err}). Epic arrêtée — corrigez puis relancez via le bouton Réinitialiser."
+                    if blocking:
+                        cdp_msg = f"Phase «{wf_phase.name}» échouée ({short_err}). Epic arrêtée — corrigez puis relancez via le bouton Réinitialiser."
+                    else:
+                        cdp_msg = f"Phase «{wf_phase.name}» terminée avec des problèmes ({short_err}). Passage à la phase suivante malgré tout…"
+                        phase.status = PhaseStatus.DONE  # downgrade to done with issues
+                        phases_done += 1
+                        phases_failed -= 1  # undo the +1 from above
                     await _push_sse(session_id, {
                         "type": "message",
                         "from_agent": "chef_de_programme",
@@ -5600,15 +5631,18 @@ async def api_mission_run(request: Request, mission_id: str):
                         "phase_id": phase.phase_id,
                         "msg_type": "text",
                     })
-                    mission.status = MissionStatus.FAILED
-                    run_store.update(mission)
-                    await _push_sse(session_id, {
-                        "type": "mission_failed",
-                        "mission_id": mission.id,
-                        "phase_id": phase.phase_id,
-                        "error": short_err,
-                    })
-                    return
+                    if blocking:
+                        mission.status = MissionStatus.FAILED
+                        run_store.update(mission)
+                        await _push_sse(session_id, {
+                            "type": "mission_failed",
+                            "mission_id": mission.id,
+                            "phase_id": phase.phase_id,
+                            "error": short_err,
+                        })
+                        return
+                    else:
+                        await asyncio.sleep(0.8)
 
         # Mission complete — real summary
         if phases_failed == 0:

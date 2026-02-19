@@ -126,11 +126,11 @@ MANDATORY WORKFLOW:
 2. SEARCH for regressions (code_search) — check no broken references
 3. CHECK consistency — imports, types, configs must be coherent
 4. VERDICT — MUST end with EXACTLY one of these tags:
-   - [APPROVE] if all changes are correct and complete
-   - [VETO] if ANY issue found — list specific problems
+   - [APPROVE] if the sprint delivered working code, even if partial
+   - [VETO] ONLY if code is broken, has critical bugs, or zero value was delivered
 
-IMPORTANT: You MUST include [APPROVE] or [VETO] in your response. No other verdict format accepted.
-If stories are not delivered or code is incomplete → [VETO]
+IMPORTANT: Sprints are INCREMENTAL. Code being incomplete is NOT a reason to VETO.
+VETO = code doesn't compile/run or has critical bugs. NOT = "features are missing".
 Be concrete: cite file names, line numbers, specific problems."""
 
 # Review protocol for lead agents
@@ -139,14 +139,15 @@ Review the work done by your team. Use tools to verify claims.
 
 MANDATORY:
 1. READ the actual code changes (code_read, code_search) — don't trust descriptions blindly
-2. CHECK completeness — are all subtasks addressed?
+2. CHECK progress — what was delivered vs what was planned for THIS sprint
 3. CHECK quality — no shortcuts, no skipped validations
 4. VERDICT — MUST end with EXACTLY one of these tags:
-   - [APPROVE] if all work is complete and verified
-   - [VETO] if ANY deliverable is missing or broken
+   - [APPROVE] if the sprint delivered working code (even partially)
+   - [VETO] ONLY if zero working code was produced or critical errors exist
 5. SYNTHESIZE: consolidated status with specific file references
 
-IMPORTANT: You MUST include [APPROVE] or [VETO] in your response. The workflow will be blocked if you VETO."""
+IMPORTANT: Sprints are INCREMENTAL. Incomplete features are NORMAL — they continue in next sprint.
+VETO = nothing works or critical quality issue. NOT = "not all features done yet"."""
 
 # Research protocol for ideation/discussion — agents can READ docs, search memory, but NOT write code
 _RESEARCH_PROTOCOL = """[DISCUSSION MODE — MANDATORY]
