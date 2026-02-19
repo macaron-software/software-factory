@@ -354,18 +354,8 @@
             <input type="text" class="mc-mem-search" id="mc-mem-search" placeholder="Rechercher…" oninput="filterMemory(this.value)">
             <div id="mc-memory">
                 {% if memories %}
-                    {% set cat_labels = {'phase-summary':'Phases','product':'Produit','architecture':'Architecture','security':'Securite','development':'Developpement','quality':'Qualite','vision':'Vision','convention':'Conventions','team':'Equipe','decisions':'Decisions'} %}
-                    {% set ns = namespace(cats={}) %}
-                    {% for mem in memories %}
-                        {% if mem is mapping %}
-                            {% set cat = mem.get('category','general') %}
-                            {% if cat not in ns.cats %}
-                                {% set _ = ns.cats.update({cat: []}) %}
-                            {% endif %}
-                            {% set _ = ns.cats[cat].append(mem) %}
-                        {% endif %}
-                    {% endfor %}
-                    {% for cat, entries in ns.cats.items() %}
+                    {% set cat_labels = {'phase-summary':'Phases','product':'Produit','architecture':'Architecture','security':'Securite','development':'Developpement','quality':'Qualite','vision':'Vision','convention':'Conventions','team':'Equipe','decisions':'Decisions','infrastructure':'Infrastructure'} %}
+                    {% for cat, entries in memory_groups.items() %}
                     <div class="mc-mem-group" data-cat="{{ cat }}">
                         <div class="mc-mem-group-title" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
                             {{ cat_labels.get(cat, cat) }} <span class="mc-mem-group-count">({{ entries|length }})</span>
@@ -374,7 +364,7 @@
                             {% for mem in entries %}
                             <div class="mc-mem-entry" data-key="{{ mem.get('key','') }}" title="{{ mem.get('value','') }}">
                                 <div class="mc-mem-key">{{ mem.get('key','') }}</div>
-                                <div class="mc-mem-val">{{ mem.get('value','')[:200] }}{% if mem.get('value','')|length > 200 %}…{% endif %}</div>
+                                <div class="mc-mem-val">{{ mem.get('value','')[:200] }}{% if mem.get('value','')|length > 200 %}...{% endif %}</div>
                             </div>
                             {% endfor %}
                         </div>
@@ -430,6 +420,21 @@
         </div>
         {% endif %}
 
+        <!-- Features / Deliverables -->
+        {% if features %}
+        <div class="mc-side-section">
+            <div class="mc-side-title">
+                <svg class="icon icon-xs"><use href="#icon-check-circle"/></svg> Livrables ({{ features|length }})
+            </div>
+            {% for f in features[:15] %}
+            <div style="display:flex;align-items:flex-start;gap:0.4rem;padding:0.2rem 0;font-size:0.72rem">
+                <span style="color:var(--green);flex-shrink:0;margin-top:1px">&#9679;</span>
+                <span style="color:var(--text-secondary)">{{ f[:80] }}{% if f|length > 80 %}…{% endif %}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         <!-- Git + PRs -->
         <div class="mc-side-section">
             <div class="mc-side-title">
@@ -445,19 +450,19 @@
                     </div>
                     {% endfor %}
                 {% else %}
-                <div class="mc-pr-empty">Aucune branche — les agents creeront des branches</div>
+                <div class="mc-pr-empty">Aucune PR detectee</div>
                 {% endif %}
             </div>
             <div id="mc-commits">
                 {% if workspace_commits %}
-                    {% for c in workspace_commits %}
+                    {% for c in workspace_commits[:15] %}
                     <div class="mc-commit">
                         <code class="mc-commit-hash">{{ c.hash[:7] }}</code>
                         <span class="mc-commit-msg">{{ c.message[:60] }}{% if c.message|length > 60 %}…{% endif %}</span>
                     </div>
                     {% endfor %}
                 {% else %}
-                <div style="font-size:0.7rem;color:var(--text-secondary);font-style:italic;padding:0.3rem 0">Aucun commit dans le workspace</div>
+                <div style="font-size:0.7rem;color:var(--text-secondary);font-style:italic;padding:0.3rem 0">Aucun commit detecte</div>
                 {% endif %}
             </div>
         </div>

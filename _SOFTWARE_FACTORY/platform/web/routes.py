@@ -5023,26 +5023,68 @@ async def mission_control_page(request: Request, mission_id: str):
 
     # Memory entries — project-specific only, filtered to meaningful content
     memories = []
-    _useful_cats = {"product", "architecture", "security", "development", "quality", "phase-summary", "vision", "convention", "team"}
+    _useful_cats = {"product", "architecture", "security", "development", "quality",
+                    "phase-summary", "vision", "convention", "team",
+                    "decisions", "infrastructure"}
     try:
         mem_mgr = get_memory_manager()
         # Use mission.id as memory scope — each epic has its own memory
-        proj_mems = mem_mgr.project_get(mission.id, limit=50) or []
+        proj_mems = mem_mgr.project_get(mission.id, limit=80) or []
         for pm in proj_mems:
             if not isinstance(pm, dict):
                 continue
             cat = pm.get("category", "")
             key = pm.get("key", "")
-            if key.startswith("phase:") or key.startswith("agent:"):
+            if key.startswith("agent:"):
                 continue
             if cat in _useful_cats:
                 memories.append(pm)
     except Exception:
         pass
 
-    # Pull requests — scan workspace git branches
-    pull_requests = []
-    workspace_commits = []
+    # Group memories by category for template rendering
+    memory_groups: dict = {}
+    for pm in memories:
+        c = pm.get("category", "general")
+        memory_groups.setdefault(c, []).append(pm)
+
+    # Extract tool calls from session messages for Git & Features panels
+    tool_commits = []
+    tool_prs = []
+    tool_features = []
+    try:
+        session_store = get_session_store()
+        all_msgs = session_store.get_messages(mission.session_id) if mission.session_id else []
+        for m in all_msgs:
+            content = m.content or ""
+            # Extract git commits from tool calls
+            if "git_commit" in content or "[TOOL_CALL]" in content:
+                import re as _re_tc
+                for match in _re_tc.finditer(r'(?:git_commit|git commit)[^\n]*?["\']([^"\']{5,80})["\']', content):
+                    tool_commits.append({"hash": f"{hash(match.group(1)) & 0xfffffff:07x}", "message": match.group(1)})
+                # Also catch commit-like patterns
+                for match in _re_tc.finditer(r'(?:feat|fix|chore|refactor|test|docs)\([^)]+\):\s*(.{10,80})', content):
+                    msg = match.group(0)
+                    if msg not in [c["message"] for c in tool_commits]:
+                        tool_commits.append({"hash": f"{hash(msg) & 0xfffffff:07x}", "message": msg})
+            # Extract PRs
+            if "create_pull_request" in content.lower() or "[PR]" in content:
+                import re as _re_pr
+                for match in _re_pr.finditer(r'\[PR\]\s*(.{5,80})', content):
+                    tool_prs.append({"number": len(tool_prs) + 1, "title": match.group(1).strip(), "status": "Open"})
+            # Extract features/deliverables
+            if any(kw in content.lower() for kw in ("implement", "create ", "add ", "[pr]", "livrable")):
+                import re as _re_ft
+                for match in _re_ft.finditer(r'\[PR\]\s*(.{5,100})', content):
+                    feat = match.group(1).strip()
+                    if feat not in tool_features:
+                        tool_features.append(feat)
+    except Exception:
+        pass
+
+    # Pull requests — scan workspace git branches + merge tool-extracted PRs
+    pull_requests = list(tool_prs)
+    workspace_commits = list(tool_commits)
     if mission.workspace_path:
         import subprocess
         try:
@@ -5108,10 +5150,12 @@ async def mission_control_page(request: Request, mission_id: str):
         "messages": messages,
         "phase_messages": phase_messages,
         "memories": memories,
+        "memory_groups": memory_groups,
         "pull_requests": pull_requests,
         "workspace_commits": workspace_commits,
         "si_blueprint": si_blueprint,
         "lessons": lessons,
+        "features": tool_features,
         "session_id": mission.session_id or "",
     })
 
