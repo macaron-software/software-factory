@@ -346,7 +346,86 @@
 .mc-result-shots img{height:120px;border-radius:6px;border:1px solid var(--border);cursor:pointer;transition:transform .2s;object-fit:cover;flex-shrink:0}
 .mc-result-shots img:hover{transform:scale(1.05);border-color:var(--purple)}
 
-@media(max-width:900px){.mc-layout{grid-template-columns:1fr;height:auto}.mc-sidebar{border-left:none;border-top:1px solid var(--border)}}
+/* ====== TAB BAR ====== */
+.mc-tabs{display:flex;gap:2px;margin-bottom:0.75rem;padding:0}
+.mc-tab-btn{display:inline-flex;align-items:center;gap:0.3rem;padding:0.35rem 0.7rem;border:none;border-radius:6px;background:transparent;color:var(--text-secondary);font-size:0.72rem;font-weight:600;cursor:pointer;transition:background .15s,color .15s;font-family:inherit}
+.mc-tab-btn:hover{background:var(--bg-tertiary);color:var(--text-primary)}
+.mc-tab-btn.active{background:var(--purple);color:#fff}
+.mc-tab-btn .icon{width:13px;height:13px}
+.mc-tab-panel[data-tab]{display:none}
+.mc-tab-panel[data-tab="phases"]{display:block}
+
+/* ====== DEV TAB ====== */
+.mc-dev-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
+.mc-dev-commits,.mc-dev-prs{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.75rem}
+.mc-dev-commits h4,.mc-dev-prs h4,.mc-dev-files h4{font-size:0.78rem;color:var(--text-primary);margin:0 0 0.5rem;font-weight:700}
+.mc-dev-commit{display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0;position:relative;padding-left:1.2rem;border-left:2px solid var(--border);margin-left:0.35rem}
+.mc-dev-commit-dot{position:absolute;left:-5px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;background:var(--purple);border:2px solid var(--bg-secondary)}
+.mc-dev-commit-hash{font-size:0.65rem;color:var(--purple);background:rgba(124,58,237,.08);padding:0.1rem 0.3rem;border-radius:3px;flex-shrink:0}
+.mc-dev-commit-msg{font-size:0.72rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mc-dev-pr{display:flex;align-items:center;gap:0.4rem;padding:0.35rem 0.5rem;border-bottom:1px solid var(--border);font-size:0.72rem}
+.mc-dev-pr:last-child{border-bottom:none}
+.mc-dev-pr-icon{color:#3fb950;flex-shrink:0}
+.mc-dev-pr-num{color:var(--text-secondary);font-size:0.65rem;flex-shrink:0}
+.mc-dev-pr-title{color:var(--text-primary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.mc-dev-pr-status{font-size:0.58rem;padding:0.1rem 0.35rem;border-radius:3px;font-weight:600}
+.mc-dev-pr-status.open{background:rgba(63,185,80,.12);color:#3fb950}
+.mc-dev-pr-status.merged{background:rgba(163,113,247,.12);color:#a371f7}
+.mc-dev-pr-status.closed{background:rgba(248,81,73,.12);color:#f85149}
+.mc-dev-empty{font-size:0.72rem;color:var(--text-secondary);font-style:italic;padding:0.5rem 0}
+.mc-dev-files{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.75rem}
+.mc-dev-file-tree{max-height:300px;overflow-y:auto}
+.mc-dev-file{font-size:0.7rem;color:var(--text-secondary);padding:0.15rem 0;display:flex;align-items:center;gap:0.3rem}
+.mc-dev-file-icon{flex-shrink:0;font-size:0.75rem}
+
+/* ====== PO TAB (Kanban) ====== */
+.mc-kanban{display:flex;gap:0.75rem;min-height:300px}
+.mc-kanban-col{flex:1;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.5rem;display:flex;flex-direction:column;gap:0.4rem}
+.mc-kanban-col-header{display:flex;align-items:center;gap:0.4rem;font-size:0.72rem;font-weight:700;color:var(--text-primary);padding:0.3rem 0.4rem;margin-bottom:0.2rem}
+.mc-kanban-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.mc-kanban-dot.backlog{background:var(--text-secondary)}
+.mc-kanban-dot.sprint{background:var(--purple)}
+.mc-kanban-dot.done{background:var(--green)}
+.mc-kanban-count{font-size:0.6rem;color:var(--text-secondary);font-weight:400;margin-left:auto}
+.mc-kanban-card{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:0.5rem;border-left:3px solid var(--border)}
+.mc-kanban-card.done{opacity:.7}
+.mc-kanban-card-title{font-size:0.75rem;font-weight:600;color:var(--text-primary);margin-bottom:0.2rem}
+.mc-kanban-card-criteria{font-size:0.65rem;color:var(--text-secondary);line-height:1.4;margin-bottom:0.25rem}
+.mc-kanban-card-assignee{font-size:0.62rem;color:var(--purple);margin-bottom:0.2rem}
+.mc-kanban-card-meta{display:flex;gap:0.4rem;align-items:center}
+.mc-kanban-sp{font-size:0.6rem;color:var(--text-secondary);background:var(--bg-secondary);padding:0.08rem 0.3rem;border-radius:3px}
+.mc-kanban-priority{font-size:0.58rem;font-weight:700;padding:0.08rem 0.3rem;border-radius:3px}
+.mc-kanban-priority.p0,.mc-kanban-priority.p1{background:rgba(248,81,73,.12);color:#f85149}
+.mc-kanban-priority.p2{background:rgba(234,179,8,.12);color:var(--yellow)}
+.mc-kanban-priority.p3,.mc-kanban-priority.p4{background:rgba(63,185,80,.12);color:#3fb950}
+
+/* ====== QA TAB ====== */
+.mc-qa-scores h4{font-size:0.78rem;color:var(--text-primary);margin:0 0 0.6rem;font-weight:700}
+.mc-qa-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.6rem;margin-bottom:1rem}
+.mc-qa-agent-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.6rem}
+.mc-qa-agent-name{font-size:0.75rem;font-weight:600;color:var(--text-primary);margin-bottom:0.3rem}
+.mc-qa-agent-bar{height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden;margin-bottom:0.3rem}
+.mc-qa-bar-fill{height:100%;border-radius:3px;transition:width .4s}
+.mc-qa-agent-stats{display:flex;gap:0.5rem;font-size:0.62rem}
+.mc-qa-ok{color:var(--green)}
+.mc-qa-ko{color:var(--red)}
+.mc-qa-total{color:var(--text-secondary)}
+.mc-qa-metrics{display:flex;gap:1rem;flex-wrap:wrap}
+.mc-qa-metric{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.6rem 1rem;text-align:center;flex:1;min-width:120px}
+.mc-qa-metric-val{display:block;font-size:1.4rem;font-weight:700;color:var(--purple)}
+.mc-qa-metric-label{display:block;font-size:0.65rem;color:var(--text-secondary);margin-top:0.15rem}
+
+/* ====== PROJET TAB ====== */
+.mc-projet-url,.mc-projet-build,.mc-projet-gallery,.mc-projet-files{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin-bottom:0.6rem}
+.mc-projet-url h4,.mc-projet-build h4,.mc-projet-gallery h4,.mc-projet-files h4{font-size:0.78rem;color:var(--text-primary);margin:0 0 0.4rem;font-weight:700}
+.mc-projet-url a{color:var(--purple);font-size:0.82rem;word-break:break-all}
+.mc-projet-build code{display:block;font-size:0.72rem;color:var(--text-primary);background:var(--bg-primary);padding:0.35rem 0.6rem;border-radius:4px;border:1px solid var(--border);margin-bottom:0.3rem;font-family:var(--font-mono)}
+.mc-projet-imgs{display:flex;flex-wrap:wrap;gap:0.5rem}
+.mc-projet-imgs img{height:140px;border-radius:6px;border:1px solid var(--border);cursor:pointer;transition:transform .2s;object-fit:cover}
+.mc-projet-imgs img:hover{transform:scale(1.05);border-color:var(--purple)}
+.mc-projet-file-tree{max-height:300px;overflow-y:auto}
+
+@media(max-width:900px){.mc-layout{grid-template-columns:1fr;height:auto}.mc-sidebar{border-left:none;border-top:1px solid var(--border)}.mc-dev-grid{grid-template-columns:1fr}.mc-kanban{flex-direction:column}}
 </style>
 
 <!-- SVG defs for pattern-colored arrow markers -->
@@ -402,6 +481,17 @@
             <div class="mc-stat-item"><span class="val" id="mc-progress">{{ ((mission.phases|selectattr('status.value','equalto','done')|list|length / mission.phases|length) * 100)|round|int if mission.phases|length > 0 else 0 }}%</span></div>
         </div>
 
+        <!-- Tab bar -->
+        <div class="mc-tabs">
+            <button class="mc-tab-btn active" data-tab="phases" onclick="switchTab('phases')"><svg class="icon"><use href="#icon-list"/></svg> Phases</button>
+            <button class="mc-tab-btn" data-tab="dev" onclick="switchTab('dev')"><svg class="icon"><use href="#icon-git-branch"/></svg> Dev</button>
+            <button class="mc-tab-btn" data-tab="po" onclick="switchTab('po')"><svg class="icon"><use href="#icon-clipboard"/></svg> PO</button>
+            <button class="mc-tab-btn" data-tab="qa" onclick="switchTab('qa')"><svg class="icon"><use href="#icon-check"/></svg> QA</button>
+            <button class="mc-tab-btn" data-tab="projet" onclick="switchTab('projet')"><svg class="icon"><use href="#icon-code"/></svg> Projet</button>
+        </div>
+
+        <!-- Tab: Phases (default) -->
+        <div class="mc-tab-panel" data-tab="phases" style="display:block">
         <div class="mc-pipeline" id="mc-pipeline">
             {% for phase in mission.phases %}
             {% set pa = phase_agents.get(phase.phase_id, []) %}
@@ -467,6 +557,152 @@
                 </div>
             </div>
             {% endfor %}
+        </div>
+        </div>{# end tab: phases #}
+
+        <!-- Tab: Dev -->
+        <div class="mc-tab-panel" data-tab="dev">
+            <div class="mc-dev-grid">
+                <div class="mc-dev-commits">
+                    <h4>Commits</h4>
+                    {% for c in workspace_commits %}
+                    <div class="mc-dev-commit">
+                        <div class="mc-dev-commit-dot"></div>
+                        <code class="mc-dev-commit-hash">{{ c.hash[:7] }}</code>
+                        <span class="mc-dev-commit-msg">{{ c.message[:80] }}</span>
+                    </div>
+                    {% endfor %}
+                    {% if not workspace_commits %}<div class="mc-dev-empty">Aucun commit</div>{% endif %}
+                </div>
+                <div class="mc-dev-prs">
+                    <h4>Pull Requests</h4>
+                    {% for pr in pull_requests %}
+                    <div class="mc-dev-pr {{ pr.status|lower }}">
+                        <span class="mc-dev-pr-icon"><svg class="icon icon-xs"><use href="#icon-git-pull-request"/></svg></span>
+                        <span class="mc-dev-pr-num">#{{ pr.number }}</span>
+                        <span class="mc-dev-pr-title">{{ pr.title[:60] }}</span>
+                        <span class="mc-dev-pr-status {{ pr.status|lower }}">{{ pr.status }}</span>
+                    </div>
+                    {% endfor %}
+                    {% if not pull_requests %}<div class="mc-dev-empty">Aucune PR</div>{% endif %}
+                </div>
+            </div>
+            <div class="mc-dev-files">
+                <h4>Fichiers ({{ workspace_files|length if workspace_files else 0 }})</h4>
+                <div class="mc-dev-file-tree">
+                    {% for f in workspace_files or [] %}
+                    <div class="mc-dev-file"><span class="mc-dev-file-icon">{{ '📁' if f.is_dir else '📄' }}</span>{{ f.path }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: PO -->
+        <div class="mc-tab-panel" data-tab="po">
+            <div class="mc-kanban">
+                <div class="mc-kanban-col" data-col="backlog">
+                    <div class="mc-kanban-col-header"><span class="mc-kanban-dot backlog"></span> Backlog <span class="mc-kanban-count">{{ po_backlog|length }}</span></div>
+                    {% for f in po_backlog %}
+                    <div class="mc-kanban-card">
+                        <div class="mc-kanban-card-title">{{ f.name }}</div>
+                        {% if f.acceptance_criteria %}<div class="mc-kanban-card-criteria">{{ f.acceptance_criteria[:100] }}</div>{% endif %}
+                        {% if f.assigned_to %}<div class="mc-kanban-card-assignee">{{ f.assigned_to }}</div>{% endif %}
+                        <div class="mc-kanban-card-meta">
+                            {% if f.story_points %}<span class="mc-kanban-sp">{{ f.story_points }} SP</span>{% endif %}
+                            <span class="mc-kanban-priority p{{ f.priority }}">P{{ f.priority }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mc-kanban-col" data-col="sprint">
+                    <div class="mc-kanban-col-header"><span class="mc-kanban-dot sprint"></span> En cours <span class="mc-kanban-count">{{ po_sprint|length }}</span></div>
+                    {% for f in po_sprint %}
+                    <div class="mc-kanban-card">
+                        <div class="mc-kanban-card-title">{{ f.name }}</div>
+                        {% if f.acceptance_criteria %}<div class="mc-kanban-card-criteria">{{ f.acceptance_criteria[:100] }}</div>{% endif %}
+                        {% if f.assigned_to %}<div class="mc-kanban-card-assignee">{{ f.assigned_to }}</div>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mc-kanban-col" data-col="done">
+                    <div class="mc-kanban-col-header"><span class="mc-kanban-dot done"></span> Terminé <span class="mc-kanban-count">{{ po_done|length }}</span></div>
+                    {% for f in po_done %}
+                    <div class="mc-kanban-card done">
+                        <div class="mc-kanban-card-title">{{ f.name }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: QA -->
+        <div class="mc-tab-panel" data-tab="qa">
+            <div class="mc-qa">
+                <div class="mc-qa-scores">
+                    <h4>Adversarial Guard — Scores Agents</h4>
+                    <div class="mc-qa-grid">
+                        {% for s in agent_scores %}
+                        <div class="mc-qa-agent-card">
+                            <div class="mc-qa-agent-name">{{ s.agent_id }}</div>
+                            <div class="mc-qa-agent-bar">
+                                <div class="mc-qa-bar-fill" style="width:{{ (s.accepted / s.iterations * 100)|round if s.iterations > 0 else 0 }}%;background:{{ 'var(--green)' if s.accepted > s.rejected else 'var(--red)' }}"></div>
+                            </div>
+                            <div class="mc-qa-agent-stats">
+                                <span class="mc-qa-ok">✓ {{ s.accepted }}</span>
+                                <span class="mc-qa-ko">✗ {{ s.rejected }}</span>
+                                <span class="mc-qa-total">{{ s.iterations }} iter</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="mc-qa-metrics">
+                    <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_pass_rate }}%</span><span class="mc-qa-metric-label">Pass Rate</span></div>
+                    <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_iterations }}</span><span class="mc-qa-metric-label">Iterations</span></div>
+                    <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_accepted }}</span><span class="mc-qa-metric-label">Accepted</span></div>
+                    <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_rejected }}</span><span class="mc-qa-metric-label">Rejected</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Projet -->
+        <div class="mc-tab-panel" data-tab="projet">
+            <div class="mc-projet">
+                {% if result_deploy_url %}
+                <div class="mc-projet-url">
+                    <h4>🌐 Application</h4>
+                    <a href="{{ result_deploy_url }}" target="_blank">{{ result_deploy_url }}</a>
+                </div>
+                {% endif %}
+                {% if result_build_cmd %}
+                <div class="mc-projet-build">
+                    <h4>🔧 Build & Run</h4>
+                    <code>{{ result_build_cmd }}</code>
+                    {% if result_run_cmd %}<code>{{ result_run_cmd }}</code>{% endif %}
+                </div>
+                {% endif %}
+                {% if result_screenshots %}
+                <div class="mc-projet-gallery">
+                    <h4>📸 Screenshots</h4>
+                    <div class="mc-projet-imgs">
+                        {% for s in result_screenshots %}
+                        <img src="/workspace/{{ mission.id }}/{{ s }}" alt="{{ s }}" loading="lazy" onclick="window.open(this.src)" onerror="this.style.display='none'">
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                <div class="mc-projet-files">
+                    <h4>📁 Workspace</h4>
+                    <div class="mc-projet-file-tree">
+                        {% for f in workspace_files or [] %}
+                        <div class="mc-dev-file"><span class="mc-dev-file-icon">{{ '📁' if f.is_dir else '📄' }}</span>{{ f.path }}</div>
+                        {% endfor %}
+                    </div>
+                    {% if mission.workspace_path %}
+                    <code class="mc-result-cmd" style="margin-top:0.5rem;display:inline-block" onclick="navigator.clipboard.writeText(this.textContent.trim())">cd {{ mission.workspace_path }}</code>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 
@@ -713,6 +949,15 @@ const MISSION_ID = "{{ mission.id }}";
 const SESSION_ID = "{{ session_id }}";
 const PHASE_AGENTS = {{ phase_agents | tojson }};
 const PHASE_GRAPHS = {{ phase_graphs | tojson }};
+
+/* ── Tab switching ── */
+function switchTab(tab) {
+    document.querySelectorAll('.mc-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    document.querySelectorAll('.mc-tab-panel').forEach(p => p.style.display = p.dataset.tab === tab ? '' : 'none');
+    // Ensure selected tab is visible (block display)
+    const active = document.querySelector(`.mc-tab-panel[data-tab="${tab}"]`);
+    if (active) active.style.display = 'block';
+}
 
 /* ── Agent name lookup (from phase_agents data) ── */
 const AGENT_INFO = {};

@@ -5384,6 +5384,66 @@ async def mission_control_page(request: Request, mission_id: str):
                     except Exception:
                         pass
 
+    # ── Tab data: Workspace files, PO kanban, QA scores ──
+    import os
+    workspace_files = []
+    if ws_path:
+        ws = Path(ws_path)
+        if ws.exists():
+            for root, dirs, files in os.walk(ws):
+                level = root.replace(str(ws), "").count(os.sep)
+                if level >= 3:
+                    dirs.clear()
+                    continue
+                rel = os.path.relpath(root, ws)
+                if rel == ".":
+                    rel = ""
+                # Skip hidden dirs
+                dirs[:] = [d for d in sorted(dirs) if not d.startswith(".")][:20]
+                for f in sorted(files)[:30]:
+                    fpath = os.path.join(rel, f) if rel else f
+                    workspace_files.append({"path": fpath, "is_dir": False})
+            workspace_files = workspace_files[:100]
+
+    # PO Kanban: features from DB or extracted from tool_features
+    po_backlog, po_sprint, po_done = [], [], []
+    try:
+        from ..db.migrations import get_db
+        db = get_db()
+        rows = db.execute("SELECT name, description, acceptance_criteria, priority, status, story_points, assigned_to FROM features WHERE epic_id=?", (mission_id,)).fetchall()
+        for r in rows:
+            feat = {"name": r[0], "description": r[1] or "", "acceptance_criteria": r[2] or "", "priority": r[3] or 5, "story_points": r[5] or 0, "assigned_to": r[6] or ""}
+            if r[4] == "done":
+                po_done.append(feat)
+            elif r[4] in ("in_progress", "sprint"):
+                po_sprint.append(feat)
+            else:
+                po_backlog.append(feat)
+    except Exception:
+        pass
+    # Fallback: use tool_features if no DB features
+    if not po_backlog and not po_sprint and not po_done and tool_features:
+        for f in tool_features:
+            po_done.append({"name": f, "description": "", "acceptance_criteria": "", "priority": 5, "story_points": 0, "assigned_to": ""})
+
+    # QA: Agent adversarial scores
+    agent_scores = []
+    qa_total_accepted = 0
+    qa_total_rejected = 0
+    qa_total_iterations = 0
+    try:
+        from ..db.migrations import get_db as _gdb_qa
+        db = _gdb_qa()
+        rows = db.execute("SELECT agent_id, accepted, rejected, iterations, quality_score FROM agent_scores WHERE epic_id=?", (mission_id,)).fetchall()
+        for r in rows:
+            agent_scores.append({"agent_id": r[0], "accepted": r[1], "rejected": r[2], "iterations": r[3], "quality_score": r[4]})
+            qa_total_accepted += r[1]
+            qa_total_rejected += r[2]
+            qa_total_iterations += r[3]
+    except Exception:
+        pass
+    qa_pass_rate = round(qa_total_accepted / qa_total_iterations * 100) if qa_total_iterations > 0 else 0
+
     return _templates(request).TemplateResponse("mission_control.html", {
         "request": request,
         "page_title": f"Epic Control — {mission.workflow_name}",
@@ -5406,6 +5466,15 @@ async def mission_control_page(request: Request, mission_id: str):
         "result_build_cmd": result_build_cmd,
         "result_run_cmd": result_run_cmd,
         "result_deploy_url": result_deploy_url,
+        "workspace_files": workspace_files,
+        "po_backlog": po_backlog,
+        "po_sprint": po_sprint,
+        "po_done": po_done,
+        "agent_scores": agent_scores,
+        "qa_pass_rate": qa_pass_rate,
+        "qa_total_accepted": qa_total_accepted,
+        "qa_total_rejected": qa_total_rejected,
+        "qa_total_iterations": qa_total_iterations,
     })
 
 
