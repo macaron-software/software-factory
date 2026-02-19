@@ -996,7 +996,6 @@ function switchTab(tab) {
 }
 
 /* ── Execute command in workspace ── */
-const MISSION_ID = "{{ mission.id }}";
 document.querySelectorAll('.mc-exec-btn').forEach(btn => {
     btn.addEventListener('click', async function() {
         // Extract raw command (strip emoji prefix)
