@@ -152,14 +152,15 @@ def check_l0(content: str, agent_role: str = "", tool_calls: list = None) -> Gua
         score += 4
 
     # Check for suspicious repeated blocks (copy-paste slop)
+    # Use higher threshold for structured content (tables, org charts)
     lines = [l.strip() for l in content.split('\n') if len(l.strip()) > 20]
-    if len(lines) > 5:
+    if len(lines) > 10:
         seen = {}
         for l in lines:
             seen[l] = seen.get(l, 0) + 1
-        repeated = sum(1 for c in seen.values() if c > 2)
-        if repeated > 3:
-            issues.append(f"REPETITION: {repeated} lines repeated >2 times")
+        repeated = sum(1 for c in seen.values() if c > 3)
+        if repeated > 5:
+            issues.append(f"REPETITION: {repeated} lines repeated >3 times")
             score += 3
 
     threshold = 5  # reject if score >= threshold
@@ -280,10 +281,14 @@ async def run_guard(
         logger.info(f"GUARD L0 REJECT [{agent_name}]: {l0.summary}")
         return l0
 
-    # L1: Semantic LLM check — only for execution patterns
+    # L1: Semantic LLM check — only for execution patterns AND dev/ops roles
     # Discussion patterns (network, human-in-the-loop) are debating, not producing code
+    # Strategic/business/management roles produce analysis, not code — skip L1
     execution_patterns = {"sequential", "hierarchical", "parallel", "loop", "aggregator"}
-    if enable_l1 and pattern_type in execution_patterns:
+    _non_dev_roles = {"strat", "dirprog", "product", "metier", "business", "portfolio", "lean", "scrum", "rh", "programme"}
+    role_lower = (agent_role or "").lower()
+    is_dev_role = not any(nr in role_lower for nr in _non_dev_roles)
+    if enable_l1 and pattern_type in execution_patterns and is_dev_role:
         l1 = await check_l1(content, task, agent_role, agent_name, tool_calls)
         if not l1.passed:
             logger.info(f"GUARD L1 REJECT [{agent_name}]: {l1.summary}")
