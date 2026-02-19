@@ -5303,6 +5303,22 @@ async def api_mission_run(request: Request, mission_id: str):
                     else:
                         phase_task += "Focus: sprint final — finalisez, nettoyez, préparez le handoff CI/CD.\n"
 
+                    # Inject backlog from earlier phases (architecture, project-setup)
+                    if mission.project_id:
+                        try:
+                            from ..memory.manager import get_memory_manager
+                            mem = get_memory_manager()
+                            backlog_items = mem.project_get(mission.project_id, category="product")
+                            arch_items = mem.project_get(mission.project_id, category="architecture")
+                            if backlog_items or arch_items:
+                                phase_task += "\n\n--- Backlog et architecture (phases précédentes) ---\n"
+                                for item in (backlog_items or [])[:5]:
+                                    phase_task += f"- [Backlog] {item.get('key', '')}: {item.get('value', '')[:200]}\n"
+                                for item in (arch_items or [])[:5]:
+                                    phase_task += f"- [Archi] {item.get('key', '')}: {item.get('value', '')[:200]}\n"
+                        except Exception:
+                            pass
+
                 try:
                     result = await run_pattern(
                         phase_pattern, session_id, phase_task,
@@ -5526,7 +5542,7 @@ async def _run_post_phase_hooks(
 
     phase_key = phase_name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
 
-    # After dev sprint: auto-commit any uncommitted code
+    # After dev sprint: auto-commit any uncommitted code + auto screenshots
     if "dev" in phase_key or "sprint" in phase_key:
         try:
             result = subprocess.run(
@@ -5549,8 +5565,49 @@ async def _run_post_phase_hooks(
                     "phase_id": phase_id,
                     "msg_type": "text",
                 })
+
+            # Auto-screenshot: check if any HTML files exist and take screenshots
+            ws = Path(workspace)
+            html_files = list(ws.glob("*.html")) + list(ws.glob("public/*.html")) + list(ws.glob("src/*.html"))
+            if html_files:
+                screenshots_dir = ws / "screenshots"
+                screenshots_dir.mkdir(exist_ok=True)
+                # Take a screenshot of each HTML file using a file:// URL
+                shot_paths = []
+                for hf in html_files[:3]:  # max 3 screenshots
+                    fname = f"{hf.stem}.png"
+                    shot_script = f"""
+const {{ chromium }} = require('playwright');
+(async () => {{
+    const browser = await chromium.launch();
+    const page = await browser.newPage({{ viewport: {{ width: 1280, height: 720 }} }});
+    await page.goto('file://{hf}', {{ waitUntil: 'load', timeout: 10000 }});
+    await page.screenshot({{ path: '{screenshots_dir / fname}' }});
+    await browser.close();
+}})();
+"""
+                    r = subprocess.run(
+                        ["node", "-e", shot_script],
+                        capture_output=True, text=True, cwd=workspace, timeout=30
+                    )
+                    if r.returncode == 0 and (screenshots_dir / fname).exists():
+                        shot_paths.append(f"screenshots/{fname}")
+
+                if shot_paths:
+                    shot_content = "Screenshots automatiques du workspace :\n" + "\n".join(
+                        f"[SCREENSHOT:{p}]" for p in shot_paths
+                    )
+                    await push_sse(session_id, {
+                        "type": "message",
+                        "from_agent": "system",
+                        "from_name": "CI/CD",
+                        "from_role": "Pipeline",
+                        "content": shot_content,
+                        "phase_id": phase_id,
+                        "msg_type": "text",
+                    })
         except Exception as e:
-            logger.error("Post-phase git commit failed: %s", e)
+            logger.error("Post-phase git commit/screenshot failed: %s", e)
 
     # After CI/CD phase: run build if package.json or Dockerfile exists
     if "cicd" in phase_key or "pipeline" in phase_key:
