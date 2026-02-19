@@ -178,6 +178,7 @@ async def check_l1(
     agent_role: str = "",
     agent_name: str = "",
     tool_calls: list = None,
+    pattern_type: str = "",
 ) -> GuardResult:
     """L1: Semantic LLM check using a DIFFERENT model than the producer.
 
@@ -200,6 +201,26 @@ async def check_l1(
                 evidence_lines.append(f"- {name}: {result_preview}")
             evidence = "\n".join(evidence_lines)
 
+        # Pattern-aware context for multi-agent patterns
+        pattern_context = ""
+        if pattern_type in ("aggregator", "parallel"):
+            pattern_context = (
+                f"\n- MULTI-AGENT PATTERN ({pattern_type}): This agent covers ONLY their role ({agent_role}). "
+                "Other agents cover other roles. Do NOT reject for 'incomplete' if agent addressed their own expertise."
+            )
+        elif pattern_type == "hierarchical":
+            pattern_context = (
+                f"\n- HIERARCHICAL PATTERN: This agent ({agent_role}) may be a manager/coordinator OR a worker."
+                " Managers DECOMPOSE work into subtasks — they do NOT write code themselves."
+                " Workers execute subtasks. A manager referencing files in the workspace is VALID (other agents wrote them)."
+                " Do NOT reject managers for 'hallucination' about existing files."
+            )
+        elif pattern_type == "sequential":
+            pattern_context = (
+                "\n- SEQUENTIAL PATTERN: This agent covers ONE step in a chain. "
+                "Do NOT reject for 'incomplete' if agent addressed their own role contribution."
+            )
+
         prompt = f"""Evaluate this agent output for quality. Score 0-10 (0=excellent, 10=garbage).
 
 AGENT: {agent_name} ({agent_role})
@@ -214,7 +235,7 @@ AGENT OUTPUT:
 IMPORTANT CONTEXT:
 - If the agent used code_write/code_edit tools, the REAL work is in the tool calls, not the text.
 - A short text response is FINE if code_write was actually called with real content.
-- Only flag HALLUCINATION if claims are NOT visible in tool evidence above.
+- Only flag HALLUCINATION if claims are NOT visible in tool evidence above.{pattern_context}
 
 Check for:
 1. SLOP: Generic filler, placeholder text, no real substance
@@ -222,7 +243,7 @@ Check for:
 3. MOCK: Fake implementations (TODO, pass, NotImplementedError, dummy data)
 4. LIES: Invented file paths, URLs, results not in tool output
 5. ECHO: Just rephrasing the task without doing real work
-6. COMPLETENESS: Did the agent actually address the task? (via tools OR text)
+6. COMPLETENESS: Did the agent address THEIR ROLE's part of the task? (via tools OR text)
 
 Respond ONLY with JSON:
 {{"score": <0-10>, "issues": ["issue1", "issue2"], "verdict": "APPROVE" or "REJECT"}}"""
@@ -289,7 +310,7 @@ async def run_guard(
     role_lower = (agent_role or "").lower()
     is_dev_role = not any(nr in role_lower for nr in _non_dev_roles)
     if enable_l1 and pattern_type in execution_patterns and is_dev_role:
-        l1 = await check_l1(content, task, agent_role, agent_name, tool_calls)
+        l1 = await check_l1(content, task, agent_role, agent_name, tool_calls, pattern_type)
         if not l1.passed:
             logger.info(f"GUARD L1 REJECT [{agent_name}]: {l1.summary}")
             # Merge L0 warnings with L1 issues

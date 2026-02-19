@@ -467,7 +467,9 @@ async def _execute_node(
 
     # ── Adversarial Guard with retry loop ──
     # If rejected, re-run agent with feedback (max 2 retries)
+    # Coordinators (decompose protocol) skip L1 — they manage, don't code
     MAX_ADVERSARIAL_RETRIES = 2
+    is_coordinator = protocol_override and "DECOMPOSE" in protocol_override
     guard_result = None
     if content and not result.error and state.status == NodeStatus.COMPLETED:
         for _adv_attempt in range(MAX_ADVERSARIAL_RETRIES + 1):
@@ -480,7 +482,7 @@ async def _execute_node(
                     agent_name=agent.name,
                     tool_calls=result.tool_calls or [],
                     pattern_type=run.pattern.type,
-                    enable_l1=True,
+                    enable_l1=not is_coordinator,
                 )
             except Exception as guard_err:
                 logger.warning("Adversarial guard error: %s", guard_err)
