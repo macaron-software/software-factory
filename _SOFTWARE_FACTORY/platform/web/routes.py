@@ -6538,7 +6538,7 @@ async def _auto_qa_screenshots(ws: "Path", platform_type: str) -> list[str]:
 
 
 async def _qa_screenshots_macos(ws: "Path", shots_dir: "Path") -> list[str]:
-    """Build Swift app, run it, screenshot the window, kill it."""
+    """Build Swift app → launch → AppleScript navigation → multi-step screenshots."""
     import subprocess
     import asyncio as _aio
 
@@ -6625,7 +6625,10 @@ async def _qa_screenshots_macos(ws: "Path", shots_dir: "Path") -> list[str]:
         results.append("screenshots/02_no_binary.png")
         return results
 
-    # 4. Launch, screenshot, kill
+    # 4. Discover views/screens from source code for journey steps
+    views = _discover_macos_views(ws)
+
+    # 5. Launch app + multi-step screenshots via AppleScript
     proc = None
     try:
         proc = subprocess.Popen(
@@ -6635,24 +6638,32 @@ async def _qa_screenshots_macos(ws: "Path", shots_dir: "Path") -> list[str]:
         )
         await _aio.sleep(3)
 
-        # Full screen capture (most reliable)
-        subprocess.run(
-            ["screencapture", "-x", str(shots_dir / "02_app_launch.png")],
-            timeout=10, capture_output=True,
-        )
-        results.append("screenshots/02_app_launch.png")
+        app_name = binary.name
 
-        # Try window-specific capture
-        _capture_app_window(binary.name, shots_dir / "03_main_window.png")
-        if (shots_dir / "03_main_window.png").exists():
-            results.append("screenshots/03_main_window.png")
+        # Step 1: Initial launch
+        _capture_app_screenshot(app_name, shots_dir / "02_launch.png")
+        if (shots_dir / "02_launch.png").exists():
+            results.append("screenshots/02_launch.png")
 
-        await _aio.sleep(2)
-        subprocess.run(
-            ["screencapture", "-x", str(shots_dir / "04_app_loaded.png")],
-            timeout=10, capture_output=True,
-        )
-        results.append("screenshots/04_app_loaded.png")
+        # Step 2: Interact with each discovered view/tab via keyboard/menu
+        step = 3
+        for view in views[:8]:
+            await _aio.sleep(1)
+            # Try navigating via menu or keyboard shortcut
+            _applescript_navigate(app_name, view)
+            await _aio.sleep(1.5)
+            fname = f"{step:02d}_{view['id']}.png"
+            _capture_app_screenshot(app_name, shots_dir / fname)
+            if (shots_dir / fname).exists():
+                results.append(f"screenshots/{fname}")
+            step += 1
+
+        # Step N: Final state
+        await _aio.sleep(1)
+        _capture_app_screenshot(app_name, shots_dir / f"{step:02d}_final_state.png")
+        if (shots_dir / f"{step:02d}_final_state.png").exists():
+            results.append(f"screenshots/{step:02d}_final_state.png")
+
     except Exception as e:
         _write_status_png(shots_dir / "02_launch_error.png", "LAUNCH FAILED",
                           str(e)[:500], bg_color=(40, 10, 10))
@@ -6668,6 +6679,116 @@ async def _qa_screenshots_macos(ws: "Path", shots_dir: "Path") -> list[str]:
                 except Exception:
                     pass
     return results
+
+
+def _discover_macos_views(ws: "Path") -> list[dict]:
+    """Scan Swift sources to discover views/screens for screenshot journey."""
+    views = []
+    seen = set()
+    for sf in sorted(ws.rglob("*.swift")):
+        try:
+            code = sf.read_text(errors="ignore")
+        except Exception:
+            continue
+        name = sf.stem
+        # Detect SwiftUI views
+        if ": View" in code and "var body" in code and name not in seen:
+            view_type = "tab"
+            if "TabView" in code:
+                view_type = "tabview"
+            elif "NavigationView" in code or "NavigationStack" in code:
+                view_type = "navigation"
+            elif "Sheet" in code or ".sheet" in code:
+                view_type = "sheet"
+            elif "Menu" in code or "MenuBar" in code:
+                view_type = "menu"
+            # Extract keyboard shortcut if any
+            shortcut = None
+            import re
+            ks = re.search(r'\.keyboardShortcut\("(\w)"', code)
+            if ks:
+                shortcut = ks.group(1)
+            views.append({"id": name.lower(), "name": name, "type": view_type, "shortcut": shortcut})
+            seen.add(name)
+    return views
+
+
+def _capture_app_screenshot(app_name: str, output_path: "Path"):
+    """Capture app window screenshot via screencapture -l (window ID)."""
+    import subprocess
+    try:
+        # Get window ID via AppleScript
+        script = (
+            'tell application "System Events"\n'
+            f'  set appProc to first process whose name contains "{app_name}"\n'
+            '  set wID to id of first window of appProc\n'
+            '  return wID\n'
+            'end tell'
+        )
+        r = subprocess.run(["osascript", "-e", script],
+                           capture_output=True, text=True, timeout=10)
+        if r.returncode == 0 and r.stdout.strip():
+            subprocess.run(["screencapture", "-l", r.stdout.strip(), str(output_path)],
+                           timeout=10, capture_output=True)
+        else:
+            # Fallback: full screen
+            subprocess.run(["screencapture", "-x", str(output_path)],
+                           timeout=10, capture_output=True)
+    except Exception:
+        import subprocess as _sp
+        _sp.run(["screencapture", "-x", str(output_path)],
+                timeout=10, capture_output=True)
+
+
+def _applescript_navigate(app_name: str, view: dict):
+    """Navigate to a view via AppleScript (keyboard shortcuts, menu clicks, tabs)."""
+    import subprocess
+    try:
+        if view.get("shortcut"):
+            # Use keyboard shortcut
+            script = (
+                f'tell application "{app_name}" to activate\n'
+                f'tell application "System Events"\n'
+                f'  keystroke "{view["shortcut"]}" using command down\n'
+                f'end tell'
+            )
+        elif view["type"] == "menu":
+            # Click menu bar icon
+            script = (
+                f'tell application "{app_name}" to activate\n'
+                f'tell application "System Events"\n'
+                f'  click menu bar item 1 of menu bar 2 of process "{app_name}"\n'
+                f'end tell'
+            )
+        elif view["type"] == "tab" or view["type"] == "tabview":
+            # Try Tab key navigation
+            script = (
+                f'tell application "{app_name}" to activate\n'
+                f'tell application "System Events"\n'
+                f'  keystroke tab\n'
+                f'end tell'
+            )
+        elif view["type"] == "sheet":
+            # Try Cmd+N for new item (common pattern)
+            script = (
+                f'tell application "{app_name}" to activate\n'
+                f'tell application "System Events"\n'
+                f'  keystroke "n" using command down\n'
+                f'end tell'
+            )
+        elif view["type"] == "navigation":
+            # Try arrow keys to navigate list
+            script = (
+                f'tell application "{app_name}" to activate\n'
+                f'tell application "System Events"\n'
+                f'  key code 125\n'
+                f'end tell'
+            )
+        else:
+            return
+        subprocess.run(["osascript", "-e", script], capture_output=True, timeout=5)
+    except Exception:
+        pass
 
 
 async def _qa_screenshots_ios(ws: "Path", shots_dir: "Path") -> list[str]:
@@ -6720,7 +6841,7 @@ async def _qa_screenshots_ios(ws: "Path", shots_dir: "Path") -> list[str]:
 
 
 async def _qa_screenshots_web(ws: "Path", shots_dir: "Path", platform_type: str) -> list[str]:
-    """Start web server, take Playwright screenshots."""
+    """Start web server → Playwright multi-step journey screenshots (routes + interactions + RBAC)."""
     import subprocess
     import asyncio as _aio
 
@@ -6729,6 +6850,7 @@ async def _qa_screenshots_web(ws: "Path", shots_dir: "Path", platform_type: str)
     port = 18234
 
     try:
+        # Start server
         if platform_type == "web-docker":
             r = subprocess.run(
                 ["docker", "build", "-t", "qa-screenshot-app", "."],
@@ -6741,6 +6863,12 @@ async def _qa_screenshots_web(ws: "Path", shots_dir: "Path", platform_type: str)
                     cwd=str(ws), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                     start_new_session=True,
                 )
+            else:
+                build_log = (r.stdout + "\n" + r.stderr)[-1200:]
+                _write_status_png(shots_dir / "01_docker_build_failed.png",
+                                  "DOCKER BUILD FAILED ❌", build_log, bg_color=(40, 10, 10))
+                results.append("screenshots/01_docker_build_failed.png")
+                return results
         elif platform_type == "web-node":
             subprocess.run(["npm", "install"], cwd=str(ws), capture_output=True, timeout=60)
             proc = subprocess.Popen(
@@ -6759,32 +6887,36 @@ async def _qa_screenshots_web(ws: "Path", shots_dir: "Path", platform_type: str)
         if proc:
             await _aio.sleep(4)
 
-            routes = ["/"]
-            for hf in list(ws.rglob("*.html"))[:5]:
-                rel = str(hf.relative_to(ws))
-                if rel != "index.html" and not rel.startswith("."):
-                    routes.append(f"/{rel}")
+            # Discover routes from codebase
+            routes = _discover_web_routes(ws)
+            # Discover auth/RBAC users if any
+            users = _discover_web_users(ws)
 
-            for i, route in enumerate(routes[:5]):
-                fname = f"0{i+1}_{'index' if route == '/' else route.strip('/').replace('/', '_')}.png"
-                shot_script = f"""
-const {{ chromium }} = require('playwright');
-(async () => {{
-    const browser = await chromium.launch();
-    const page = await browser.newPage({{ viewport: {{ width: 1280, height: 720 }} }});
-    try {{
-        await page.goto('http://localhost:{port}{route}', {{ waitUntil: 'networkidle', timeout: 15000 }});
-        await page.screenshot({{ path: '{shots_dir / fname}', fullPage: true }});
-    }} catch(e) {{ console.error(e.message); }}
-    await browser.close();
-}})();
-"""
-                subprocess.run(["node", "-e", shot_script],
-                               capture_output=True, text=True, timeout=30)
-                if (shots_dir / fname).exists():
-                    results.append(f"screenshots/{fname}")
+            # Generate Playwright journey script
+            journey_script = _build_playwright_journey(port, routes, users, str(shots_dir))
+
+            r = subprocess.run(["node", "-e", journey_script],
+                               capture_output=True, text=True, timeout=90,
+                               cwd=str(ws))
+
+            # Collect all generated screenshots
+            if shots_dir.exists():
+                for png in sorted(shots_dir.glob("*.png")):
+                    if png.stat().st_size > 1000:
+                        results.append(f"screenshots/{png.name}")
+
+            # If no screenshots, write error
+            if not results:
+                err = (r.stderr or r.stdout or "No output")[-800:]
+                _write_status_png(shots_dir / "01_playwright_error.png",
+                                  "PLAYWRIGHT FAILED", err, bg_color=(40, 10, 10))
+                results.append("screenshots/01_playwright_error.png")
+
     except Exception as e:
         logger.error("Web screenshot pipeline failed: %s", e)
+        _write_status_png(shots_dir / "01_web_error.png", "WEB PIPELINE FAILED",
+                          str(e)[:500], bg_color=(40, 10, 10))
+        results.append("screenshots/01_web_error.png")
     finally:
         if proc:
             try:
@@ -6801,24 +6933,248 @@ const {{ chromium }} = require('playwright');
     return results
 
 
-def _capture_app_window(app_name: str, output_path: "Path"):
-    """Capture specific app window via AppleScript + screencapture."""
-    import subprocess
-    try:
-        script = (
-            'tell application "System Events"\n'
-            f'  set appProc to first process whose name contains "{app_name}"\n'
-            '  set wID to id of first window of appProc\n'
-            '  return wID\n'
-            'end tell'
-        )
-        r = subprocess.run(["osascript", "-e", script],
-                           capture_output=True, text=True, timeout=10)
-        if r.returncode == 0 and r.stdout.strip():
-            subprocess.run(["screencapture", "-l", r.stdout.strip(), str(output_path)],
-                           timeout=10, capture_output=True)
-    except Exception:
-        pass
+def _discover_web_routes(ws: "Path") -> list[dict]:
+    """Scan codebase to find web routes for screenshot journey."""
+    import re
+    routes = [{"path": "/", "label": "homepage", "actions": []}]
+    seen = {"/"}
+
+    # SvelteKit / Next.js file-based routes
+    for routes_dir in [ws / "src" / "routes", ws / "app", ws / "pages"]:
+        if routes_dir.exists():
+            for f in sorted(routes_dir.rglob("*.{svelte,tsx,jsx,vue}")):
+                rel = str(f.parent.relative_to(routes_dir)).replace("\\", "/")
+                if rel == ".":
+                    continue
+                route = "/" + rel.replace("(", "").replace(")", "").replace("[", ":").replace("]", "")
+                if route not in seen and "+page" in f.name or "index" in f.name or "page" in f.name:
+                    label = rel.strip("/").replace("/", "_").replace("-", "_")
+                    routes.append({"path": route, "label": label, "actions": []})
+                    seen.add(route)
+
+    # Express / FastAPI route decorators
+    for ext in ("*.py", "*.ts", "*.js"):
+        for f in ws.rglob(ext):
+            if "node_modules" in str(f) or ".build" in str(f):
+                continue
+            try:
+                code = f.read_text(errors="ignore")[:5000]
+            except Exception:
+                continue
+            # Python: @app.get("/path") or @router.get("/path")
+            for m in re.finditer(r'@(?:app|router)\.\w+\(["\'](/[^"\']*)["\']', code):
+                path = m.group(1)
+                if path not in seen and not re.search(r':\w+|{\w+}', path):
+                    routes.append({"path": path, "label": path.strip("/").replace("/", "_") or "root", "actions": []})
+                    seen.add(path)
+            # Express: app.get('/path', ...)
+            for m in re.finditer(r"(?:app|router)\.(?:get|post|use)\(['\"](/[^'\"]*)['\"]", code):
+                path = m.group(1)
+                if path not in seen and not re.search(r':\w+', path):
+                    routes.append({"path": path, "label": path.strip("/").replace("/", "_") or "root", "actions": []})
+                    seen.add(path)
+
+    # HTML files as fallback
+    for hf in sorted(ws.rglob("*.html"))[:10]:
+        if "node_modules" in str(hf) or ".build" in str(hf):
+            continue
+        rel = str(hf.relative_to(ws))
+        path = f"/{rel}"
+        if path not in seen:
+            routes.append({"path": path, "label": rel.replace("/", "_").replace(".html", ""), "actions": []})
+            seen.add(path)
+
+    # Discover forms/buttons for interaction steps
+    for route in routes[:10]:
+        _enrich_route_actions(ws, route)
+
+    return routes[:15]
+
+
+def _enrich_route_actions(ws: "Path", route: dict):
+    """Detect interactive elements (forms, buttons, modals) in route files."""
+    import re
+    actions = []
+    # Search for form elements, buttons, links in HTML/template files
+    for ext in ("*.html", "*.svelte", "*.tsx", "*.jsx", "*.vue"):
+        for f in ws.rglob(ext):
+            if "node_modules" in str(f):
+                continue
+            try:
+                code = f.read_text(errors="ignore")[:8000]
+            except Exception:
+                continue
+            if route["path"] != "/" and route["label"] not in str(f).lower():
+                continue
+            # Forms
+            if "<form" in code:
+                actions.append({"type": "form", "selector": "form"})
+            # Login patterns
+            if 'type="password"' in code or 'type="email"' in code:
+                actions.append({"type": "login", "selector": "form"})
+            # Buttons with text
+            for m in re.finditer(r'<button[^>]*>([^<]+)</button>', code):
+                btn_text = m.group(1).strip()
+                if len(btn_text) < 30:
+                    actions.append({"type": "click", "selector": f"button:has-text('{btn_text}')"})
+            # Navigation links
+            for m in re.finditer(r'<a[^>]+href=["\']([^"\']+)["\'][^>]*>([^<]+)</a>', code):
+                href, text = m.group(1), m.group(2).strip()
+                if href.startswith("/") and len(text) < 30:
+                    actions.append({"type": "navigate", "href": href, "text": text})
+            break  # Only check first matching file
+    route["actions"] = actions[:5]
+
+
+def _discover_web_users(ws: "Path") -> list[dict]:
+    """Scan codebase for auth/RBAC test users (env, fixtures, seed)."""
+    import re
+    users = []
+    # Check for seed/fixture files
+    for pattern in ("*seed*", "*fixture*", "*mock*", ".env*", "*test*"):
+        for f in ws.glob(pattern):
+            try:
+                code = f.read_text(errors="ignore")[:3000]
+            except Exception:
+                continue
+            # Look for user/password patterns
+            for m in re.finditer(r'(?:email|user(?:name)?)\s*[:=]\s*["\']([^"\']+)["\']', code, re.I):
+                email = m.group(1)
+                pw_match = re.search(r'(?:password|pass|pwd)\s*[:=]\s*["\']([^"\']+)["\']', code[m.start():m.start()+200], re.I)
+                if pw_match:
+                    role = "user"
+                    if "admin" in email.lower():
+                        role = "admin"
+                    elif "manager" in email.lower() or "lead" in email.lower():
+                        role = "manager"
+                    users.append({"email": email, "password": pw_match.group(1), "role": role})
+    # Deduplicate
+    seen = set()
+    unique = []
+    for u in users:
+        if u["email"] not in seen:
+            unique.append(u)
+            seen.add(u["email"])
+    return unique[:4]
+
+
+def _build_playwright_journey(port: int, routes: list, users: list, shots_dir: str) -> str:
+    """Generate a Playwright script that screenshots each route + interactions + RBAC."""
+    base = f"http://localhost:{port}"
+
+    # Build journey steps
+    steps_js = ""
+    step_num = 1
+
+    # Per-user journeys (RBAC)
+    if users:
+        for user in users[:3]:
+            role = user["role"]
+            steps_js += f"""
+    // --- RBAC Journey: {role} ({user['email']}) ---
+    console.log('Journey: {role}');
+    await page.goto('{base}/', {{ waitUntil: 'networkidle', timeout: 10000 }}).catch(() => {{}});
+    await page.screenshot({{ path: '{shots_dir}/{step_num:02d}_{role}_00_before_login.png', fullPage: true }});
+"""
+            step_num += 1
+            # Try login
+            steps_js += f"""
+    // Login attempt
+    try {{
+        const loginForm = await page.$('form');
+        if (loginForm) {{
+            const emailInput = await page.$('input[type="email"], input[name="email"], input[name="username"]');
+            const pwInput = await page.$('input[type="password"]');
+            if (emailInput && pwInput) {{
+                await emailInput.fill('{user["email"]}');
+                await pwInput.fill('{user["password"]}');
+                await page.screenshot({{ path: '{shots_dir}/{step_num:02d}_{role}_01_login_filled.png', fullPage: true }});
+                await loginForm.$('button[type="submit"], button').then(b => b && b.click()).catch(() => {{}});
+                await page.waitForTimeout(2000);
+                await page.screenshot({{ path: '{shots_dir}/{step_num:02d}_{role}_02_after_login.png', fullPage: true }});
+            }}
+        }}
+    }} catch(e) {{ console.log('Login skip:', e.message); }}
+"""
+            step_num += 2
+            # Visit each route as this user
+            for route in routes[:5]:
+                steps_js += f"""
+    await page.goto('{base}{route["path"]}', {{ waitUntil: 'networkidle', timeout: 10000 }}).catch(() => {{}});
+    await page.screenshot({{ path: '{shots_dir}/{step_num:02d}_{role}_{route["label"]}.png', fullPage: true }});
+"""
+                step_num += 1
+            # Clear session
+            steps_js += f"""
+    await context.clearCookies();
+"""
+    else:
+        # No RBAC — anonymous journey through all routes
+        for route in routes[:10]:
+            label = route["label"]
+            steps_js += f"""
+    // Route: {route['path']}
+    await page.goto('{base}{route["path"]}', {{ waitUntil: 'networkidle', timeout: 10000 }}).catch(() => {{}});
+    await page.screenshot({{ path: '{shots_dir}/{step_num:02d}_{label}.png', fullPage: true }});
+"""
+            step_num += 1
+
+            # Interactions on this page
+            for action in route.get("actions", [])[:3]:
+                if action["type"] == "click":
+                    steps_js += f"""
+    try {{
+        const btn = await page.$('{action["selector"]}');
+        if (btn) {{
+            await btn.click();
+            await page.waitForTimeout(1000);
+            await page.screenshot({{ path: '{shots_dir}/{step_num:02d}_{label}_click.png', fullPage: true }});
+        }}
+    }} catch(e) {{}}
+"""
+                    step_num += 1
+                elif action["type"] == "navigate":
+                    steps_js += f"""
+    await page.goto('{base}{action.get("href", "/")}', {{ waitUntil: 'networkidle', timeout: 10000 }}).catch(() => {{}});
+    await page.screenshot({{ path: '{shots_dir}/{step_num:02d}_{label}_nav_{action.get("text", "link")[:10]}.png', fullPage: true }});
+"""
+                    step_num += 1
+
+    # Viewport variants (mobile + desktop)
+    steps_js += f"""
+    // Mobile viewport
+    await page.setViewportSize({{ width: 375, height: 812 }});
+    await page.goto('{base}/', {{ waitUntil: 'networkidle', timeout: 10000 }}).catch(() => {{}});
+    await page.screenshot({{ path: '{shots_dir}/{step_num:02d}_mobile_home.png', fullPage: true }});
+"""
+    step_num += 1
+
+    script = f"""
+const {{ chromium }} = require('playwright');
+(async () => {{
+    const browser = await chromium.launch();
+    const context = await browser.newContext({{ viewport: {{ width: 1280, height: 720 }} }});
+    const page = await context.newPage();
+    const errors = [];
+    page.on('console', msg => {{ if (msg.type() === 'error') errors.push(msg.text()); }});
+
+    try {{
+{steps_js}
+    }} catch(e) {{
+        console.error('Journey error:', e.message);
+    }}
+
+    // Console errors summary
+    if (errors.length > 0) {{
+        const fs = require('fs');
+        fs.writeFileSync('{shots_dir}/console_errors.txt', errors.join('\\n'));
+    }}
+
+    await browser.close();
+}})();
+"""
+    return script
+
 
 
 def _write_status_png(path: "Path", title: str, body: str,
