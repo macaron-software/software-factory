@@ -265,7 +265,7 @@
 .node-tooltip-tag{display:inline-block;padding:0.1rem 0.4rem;border-radius:4px;font-size:0.68rem;background:var(--bg-secondary);border:1px solid var(--border)}
 .node-tooltip-tag--skill{border-color:rgba(124,58,237,.35);color:var(--purple)}
 .node-tooltip-tag--tool{border-color:rgba(16,185,129,.3);color:var(--green)}
-.node-tooltip-tag--mcp{border-color:rgba(245,158,11,.3);color:var(--yellow)}
+.node-tooltip-tag--mcp{border-color:rgba(34,197,94,.3);color:#22c55e}
 .node-tooltip-desc{font-size:0.72rem;color:var(--text-secondary);line-height:1.35;margin-top:0.35rem}
 .node-tooltip-close{position:absolute;top:0.35rem;right:0.5rem;background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.85rem;padding:0.2rem}
 </style>
@@ -1375,7 +1375,7 @@ function onNodeClick(node, gEl){
   if(agent && agent.tools && agent.tools.length){
     toolsHtml = `<div class="node-tooltip-section">
       <div class="node-tooltip-section-title"><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-settings"/></svg> Tools (${agent.tools.length})</div>
-      <div class="node-tooltip-tags">${agent.tools.map(t=>`<span class="node-tooltip-tag node-tooltip-tag--tool">${esc(t)}</span>`).join('')}</div>
+      <div class="node-tooltip-tags">${agent.tools.map(t=>`<span class="node-tooltip-tag ${t.startsWith('mcp:')?'node-tooltip-tag--mcp':'node-tooltip-tag--tool'}">${esc(t.startsWith('mcp:')?t.slice(4):t)}</span>`).join('')}</div>
     </div>`;
   }
 

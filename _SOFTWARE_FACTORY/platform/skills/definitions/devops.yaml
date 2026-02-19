@@ -31,6 +31,12 @@ skills:
   - smoke-testing
 
 tools:
+  - mcp:platform_agents
+  - mcp:platform_missions
+  - mcp:platform_phases
+  - mcp:platform_messages
+  - mcp:platform_memory
+  - mcp:platform_metrics
   - code_read
   - code_search
   - code_write

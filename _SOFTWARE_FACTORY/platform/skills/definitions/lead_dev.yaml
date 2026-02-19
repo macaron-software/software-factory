@@ -33,6 +33,12 @@ skills:
   - tdd-mastery
 
 tools:
+  - mcp:platform_agents
+  - mcp:platform_missions
+  - mcp:platform_phases
+  - mcp:platform_messages
+  - mcp:platform_memory
+  - mcp:platform_metrics
   - web_search
   - web_fetch
   - code_read
