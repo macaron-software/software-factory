@@ -217,6 +217,10 @@
 .mc-pr-status.merged{background:rgba(163,113,247,.12);color:#a371f7}
 .mc-pr-status.closed{background:rgba(248,81,73,.12);color:#f85149}
 .mc-pr-empty{font-size:0.7rem;color:var(--text-secondary);font-style:italic;padding:0.3rem 0}
+.mc-commit{display:flex;align-items:center;gap:0.4rem;padding:0.2rem 0;font-size:0.68rem;border-bottom:1px solid var(--border)}
+.mc-commit:last-child{border-bottom:none}
+.mc-commit-hash{color:var(--purple);font-size:0.62rem;background:rgba(124,58,237,.08);padding:0.1rem 0.3rem;border-radius:3px;flex-shrink:0}
+.mc-commit-msg{color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 @media(max-width:900px){.mc-layout{grid-template-columns:1fr;height:auto}.mc-sidebar{border-left:none;border-top:1px solid var(--border)}}
 </style>
@@ -323,7 +327,7 @@
             {% endif %}
         </div>
 
-        <!-- Memory — Mini Wiki -->
+        <!-- Memory — Project Wiki -->
         <div class="mc-side-section">
             <div class="mc-side-title">
                 <svg class="icon icon-xs"><use href="#icon-book-open"/></svg> Contexte Projet
@@ -331,6 +335,7 @@
             <input type="text" class="mc-mem-search" id="mc-mem-search" placeholder="Rechercher…" oninput="filterMemory(this.value)">
             <div id="mc-memory">
                 {% if memories %}
+                    {% set cat_labels = {'phase-summary':'Phases','product':'Produit','architecture':'Architecture','security':'Securite','development':'Developpement','quality':'Qualite','vision':'Vision','convention':'Conventions','team':'Equipe','decisions':'Decisions'} %}
                     {% set ns = namespace(cats={}) %}
                     {% for mem in memories %}
                         {% if mem is mapping %}
@@ -344,33 +349,23 @@
                     {% for cat, entries in ns.cats.items() %}
                     <div class="mc-mem-group" data-cat="{{ cat }}">
                         <div class="mc-mem-group-title" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
-                            ▸ {{ cat }} <span class="mc-mem-group-count">({{ entries|length }})</span>
+                            {{ cat_labels.get(cat, cat) }} <span class="mc-mem-group-count">({{ entries|length }})</span>
                         </div>
                         <div class="mc-mem-group-items">
                             {% for mem in entries %}
                             <div class="mc-mem-entry" data-key="{{ mem.get('key','') }}" title="{{ mem.get('value','') }}">
                                 <div class="mc-mem-key">{{ mem.get('key','') }}</div>
-                                <div class="mc-mem-val">{{ mem.get('value','')[:160] }}{% if mem.get('value','')|length > 160 %}…{% endif %}</div>
-                                {% if mem.get('confidence') or mem.get('occurrences') %}
-                                <div class="mc-mem-meta">
-                                    {% if mem.get('confidence') %}
-                                    <div class="mc-mem-confidence"><div class="mc-mem-confidence-bar" style="width:{{ (mem.confidence * 100)|int }}%"></div></div>
-                                    {% endif %}
-                                    {% if mem.get('occurrences',0) > 1 %}
-                                    <span class="mc-mem-occurrences">×{{ mem.occurrences }}</span>
-                                    {% endif %}
-                                </div>
-                                {% endif %}
+                                <div class="mc-mem-val">{{ mem.get('value','')[:200] }}{% if mem.get('value','')|length > 200 %}…{% endif %}</div>
                             </div>
                             {% endfor %}
                         </div>
                     </div>
                     {% endfor %}
                 {% else %}
-                <div class="mc-mem-empty">Aucun contexte enregistré — les agents alimenteront cette base de connaissances</div>
+                <div class="mc-mem-empty">Aucun contexte — les agents alimenteront cette base au fil des phases</div>
                 {% endif %}
             </div>
-            <button class="mc-mem-add" onclick="addMemoryEntry()">+ Ajouter une entrée</button>
+            <button class="mc-mem-add" onclick="addMemoryEntry()">+ Ajouter une entree</button>
         </div>
 
         <!-- Git + PRs -->
@@ -388,12 +383,20 @@
                     </div>
                     {% endfor %}
                 {% else %}
-                <div class="mc-pr-empty">Aucune PR — les agents créeront des branches</div>
+                <div class="mc-pr-empty">Aucune branche — les agents creeront des branches</div>
                 {% endif %}
             </div>
-            <div class="mc-git-graph" id="mc-git-graph"></div>
             <div id="mc-commits">
-                <div style="font-size:0.7rem;color:var(--text-secondary);font-style:italic">Commits apparaîtront ici…</div>
+                {% if workspace_commits %}
+                    {% for c in workspace_commits %}
+                    <div class="mc-commit">
+                        <code class="mc-commit-hash">{{ c.hash[:7] }}</code>
+                        <span class="mc-commit-msg">{{ c.message[:60] }}{% if c.message|length > 60 %}…{% endif %}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div style="font-size:0.7rem;color:var(--text-secondary);font-style:italic;padding:0.3rem 0">Aucun commit dans le workspace</div>
+                {% endif %}
             </div>
         </div>
     </div>

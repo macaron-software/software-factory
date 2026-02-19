@@ -4954,25 +4954,30 @@ async def mission_control_page(request: Request, mission_id: str):
                 "created_at": m.created_at if hasattr(m, "created_at") else "",
             })
 
-    # Memory entries — global knowledge base + project-specific
+    # Memory entries — project-specific only, filtered to meaningful content
     memories = []
+    _useful_cats = {"product", "architecture", "security", "development", "quality", "phase-summary", "vision", "convention", "team"}
     try:
         mem_mgr = get_memory_manager()
-        # Global knowledge (architecture, vision, conventions) — always useful
-        global_mems = mem_mgr.global_get(limit=20) or []
-        memories.extend(global_mems)
-        # Project-specific — only if semantic categories (skip pattern-name categories)
         if mission.project_id:
-            proj_mems = mem_mgr.project_get(mission.project_id, limit=20) or []
-            pattern_cats = {"sequential", "parallel", "loop", "hierarchical", "network", "router", "aggregator", "human-in-the-loop", "solo"}
+            proj_mems = mem_mgr.project_get(mission.project_id, limit=50) or []
             for pm in proj_mems:
-                if isinstance(pm, dict) and pm.get("category", "") not in pattern_cats:
+                if not isinstance(pm, dict):
+                    continue
+                cat = pm.get("category", "")
+                key = pm.get("key", "")
+                # Skip pattern execution traces (phase:pattern:agent, agent:name:pattern)
+                if key.startswith("phase:") or key.startswith("agent:"):
+                    continue
+                # Only keep meaningful categories
+                if cat in _useful_cats:
                     memories.append(pm)
     except Exception:
         pass
 
-    # Pull requests — scan workspace git branches for PR-like branches
+    # Pull requests — scan workspace git branches
     pull_requests = []
+    workspace_commits = []
     if mission.workspace_path:
         import subprocess
         try:
@@ -4980,10 +4985,9 @@ async def mission_control_page(request: Request, mission_id: str):
                 ["git", "branch", "-a", "--format=%(refname:short)"],
                 cwd=mission.workspace_path, capture_output=True, text=True, timeout=5
             )
-            branches = [b.strip() for b in result.stdout.strip().split("\n") if b.strip() and b.strip() != "master" and b.strip() != "main"]
+            branches = [b.strip() for b in result.stdout.strip().split("\n") if b.strip() and b.strip() not in ("master", "main")]
             for i, branch in enumerate(branches[:10]):
                 status = "Open"
-                # Check if branch is merged into master/main
                 merged = subprocess.run(
                     ["git", "branch", "--merged", "HEAD", "--format=%(refname:short)"],
                     cwd=mission.workspace_path, capture_output=True, text=True, timeout=5
@@ -4991,6 +4995,18 @@ async def mission_control_page(request: Request, mission_id: str):
                 if branch in merged.stdout:
                     status = "Merged"
                 pull_requests.append({"number": i + 1, "title": branch, "status": status})
+        except Exception:
+            pass
+        # Recent commits
+        try:
+            result = subprocess.run(
+                ["git", "log", "--oneline", "--no-decorate", "-15"],
+                cwd=mission.workspace_path, capture_output=True, text=True, timeout=5
+            )
+            for line in result.stdout.strip().split("\n"):
+                if line.strip():
+                    parts = line.strip().split(" ", 1)
+                    workspace_commits.append({"hash": parts[0], "message": parts[1] if len(parts) > 1 else ""})
         except Exception:
             pass
 
@@ -5004,6 +5020,7 @@ async def mission_control_page(request: Request, mission_id: str):
         "messages": messages,
         "memories": memories,
         "pull_requests": pull_requests,
+        "workspace_commits": workspace_commits,
         "session_id": mission.session_id or "",
     })
 
@@ -5211,6 +5228,11 @@ async def api_mission_run(request: Request, mission_id: str):
                 "msg_type": "text",
             })
             await asyncio.sleep(0.5)
+
+            # Snapshot message count before phase starts (for summary extraction)
+            from ..sessions.store import get_session_store as _get_ss
+            _ss_pre = _get_ss()
+            _pre_phase_msg_count = len(_ss_pre.list_messages(session_id))
 
             # Update phase status
             phase.status = PhaseStatus.RUNNING
@@ -5479,15 +5501,16 @@ async def api_mission_run(request: Request, mission_id: str):
                     from ..llm.client import get_llm_client, LLMMessage
                     ss = get_session_store()
                     phase_msgs = ss.list_messages(session_id)
-                    # Collect phase messages
+                    # Collect messages produced during THIS phase (after snapshot)
                     convo = []
-                    for m in phase_msgs:
-                        if getattr(m, 'phase_id', '') != phase.phase_id:
-                            continue
+                    for m in phase_msgs[_pre_phase_msg_count:]:
                         txt = (getattr(m, 'content', '') or '').strip()
                         if not txt or len(txt) < 20:
                             continue
-                        name = getattr(m, 'from_name', '') or getattr(m, 'from_agent', '') or ''
+                        agent = getattr(m, 'from_agent', '') or ''
+                        if agent in ('system', 'user', 'chef_de_programme'):
+                            continue
+                        name = getattr(m, 'from_name', '') or agent
                         convo.append(f"{name}: {txt[:500]}")
                     if convo:
                         transcript = "\n\n".join(convo[-15:])  # last 15 messages max
