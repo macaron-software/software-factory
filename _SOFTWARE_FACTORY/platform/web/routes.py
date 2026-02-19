@@ -6393,41 +6393,44 @@ async def _run_post_phase_hooks(
 
     phase_key = phase_name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
 
-    # After dev sprint: auto-commit any uncommitted code + auto screenshots
-    if "dev" in phase_key or "sprint" in phase_key:
-        try:
-            result = subprocess.run(
-                ["git", "add", "-A"], cwd=workspace, capture_output=True, text=True, timeout=10
+    # Auto-commit after EVERY phase — agents never call git_commit reliably
+    try:
+        result = subprocess.run(
+            ["git", "add", "-A"], cwd=workspace, capture_output=True, text=True, timeout=10
+        )
+        status = subprocess.run(
+            ["git", "status", "--porcelain"], cwd=workspace, capture_output=True, text=True, timeout=10
+        )
+        if status.stdout.strip():
+            file_count = status.stdout.strip().count("\n") + 1
+            commit_msg = f"chore({phase_key}): {phase_name} — {file_count} files"
+            subprocess.run(
+                ["git", "commit", "-m", commit_msg],
+                cwd=workspace, capture_output=True, text=True, timeout=10
             )
-            status = subprocess.run(
-                ["git", "status", "--porcelain"], cwd=workspace, capture_output=True, text=True, timeout=10
-            )
-            if status.stdout.strip():
-                subprocess.run(
-                    ["git", "commit", "-m", f"feat: sprint deliverables — {phase_name}"],
-                    cwd=workspace, capture_output=True, text=True, timeout=10
-                )
-                await push_sse(session_id, {
-                    "type": "message",
-                    "from_agent": "system",
-                    "from_name": "CI/CD",
-                    "from_role": "Pipeline",
-                    "content": f"Code commité dans le workspace ({status.stdout.strip().count(chr(10)) + 1} fichiers)",
-                    "phase_id": phase_id,
-                    "msg_type": "text",
-                })
+            await push_sse(session_id, {
+                "type": "message",
+                "from_agent": "system",
+                "from_name": "CI/CD",
+                "from_role": "Pipeline",
+                "content": f"Auto-commit: {file_count} fichiers ({phase_name})",
+                "phase_id": phase_id,
+                "msg_type": "text",
+            })
+    except Exception as e:
+        logger.warning("Auto-commit failed for phase %s: %s", phase_id, e)
 
-            # Auto-screenshot: check if any HTML files exist and take screenshots
-            ws = Path(workspace)
-            html_files = list(ws.glob("*.html")) + list(ws.glob("public/*.html")) + list(ws.glob("src/*.html"))
-            if html_files:
-                screenshots_dir = ws / "screenshots"
-                screenshots_dir.mkdir(exist_ok=True)
-                # Take a screenshot of each HTML file using a file:// URL
-                shot_paths = []
-                for hf in html_files[:3]:  # max 3 screenshots
-                    fname = f"{hf.stem}.png"
-                    shot_script = f"""
+    # After dev sprint: auto screenshots for HTML files
+    if "dev" in phase_key or "sprint" in phase_key:
+        ws = Path(workspace)
+        html_files = list(ws.glob("*.html")) + list(ws.glob("public/*.html")) + list(ws.glob("src/*.html"))
+        if html_files:
+            screenshots_dir = ws / "screenshots"
+            screenshots_dir.mkdir(exist_ok=True)
+            shot_paths = []
+            for hf in html_files[:3]:
+                fname = f"{hf.stem}.png"
+                shot_script = f"""
 const {{ chromium }} = require('playwright');
 (async () => {{
     const browser = await chromium.launch();
@@ -6437,28 +6440,29 @@ const {{ chromium }} = require('playwright');
     await browser.close();
 }})();
 """
+                try:
                     r = subprocess.run(
                         ["node", "-e", shot_script],
                         capture_output=True, text=True, cwd=workspace, timeout=30
                     )
                     if r.returncode == 0 and (screenshots_dir / fname).exists():
                         shot_paths.append(f"screenshots/{fname}")
+                except Exception:
+                    pass
 
-                if shot_paths:
-                    shot_content = "Screenshots automatiques du workspace :\n" + "\n".join(
-                        f"[SCREENSHOT:{p}]" for p in shot_paths
-                    )
-                    await push_sse(session_id, {
-                        "type": "message",
-                        "from_agent": "system",
-                        "from_name": "CI/CD",
-                        "from_role": "Pipeline",
-                        "content": shot_content,
-                        "phase_id": phase_id,
-                        "msg_type": "text",
-                    })
-        except Exception as e:
-            logger.error("Post-phase git commit/screenshot failed: %s", e)
+            if shot_paths:
+                shot_content = "Screenshots automatiques du workspace :\n" + "\n".join(
+                    f"[SCREENSHOT:{p}]" for p in shot_paths
+                )
+                await push_sse(session_id, {
+                    "type": "message",
+                    "from_agent": "system",
+                    "from_name": "CI/CD",
+                    "from_role": "Pipeline",
+                    "content": shot_content,
+                    "phase_id": phase_id,
+                    "msg_type": "text",
+                })
 
     # After CI/CD phase: run build if package.json or Dockerfile exists
     if "cicd" in phase_key or "pipeline" in phase_key:
