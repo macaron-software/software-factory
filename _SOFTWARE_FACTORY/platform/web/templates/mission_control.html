@@ -201,24 +201,69 @@
 /* CDP Chat Modal */
 .mc-chat-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1200;display:none;align-items:center;justify-content:center}
 .mc-chat-overlay.open{display:flex}
-.mc-chat-modal{width:540px;max-width:92vw;height:70vh;max-height:680px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius,10px);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5);animation:mcPopIn .2s ease}
+.mc-chat-modal{width:560px;max-width:92vw;height:72vh;max-height:700px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius,10px);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5);animation:mcPopIn .2s ease}
 .mc-chat-head{display:flex;align-items:center;gap:0.6rem;padding:0.65rem 0.85rem;border-bottom:1px solid var(--border);flex-shrink:0}
 .mc-chat-head-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid var(--purple)}
 .mc-chat-head-info h3{font-size:0.85rem;margin:0;color:var(--text-primary);font-weight:700}
 .mc-chat-head-info small{font-size:0.65rem;color:var(--text-secondary)}
 .mc-chat-close{margin-left:auto;background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:0.3rem;font-size:1.1rem;line-height:1;border-radius:4px}
 .mc-chat-close:hover{color:var(--text-primary);background:var(--bg-tertiary)}
-.mc-chat-msgs{flex:1;overflow-y:auto;padding:0.75rem;display:flex;flex-direction:column;gap:0.5rem}
-.mc-chat-bubble{max-width:85%;padding:0.5rem 0.7rem;border-radius:10px;font-size:0.78rem;line-height:1.5;word-break:break-word}
-.mc-chat-bubble.user{align-self:flex-end;background:var(--purple);color:#fff;border-bottom-right-radius:3px}
-.mc-chat-bubble.agent{align-self:flex-start;background:var(--bg-tertiary);color:var(--text-primary);border-bottom-left-radius:3px;border:1px solid var(--border)}
-.mc-chat-bubble.agent .md-rendered{font-size:0.78rem}
-.mc-chat-bubble.system{align-self:center;background:none;color:var(--text-secondary);font-size:0.68rem;font-style:italic;padding:0.2rem}
+.mc-chat-msgs{flex:1;overflow-y:auto;padding:0.75rem;display:flex;flex-direction:column;gap:0.6rem}
+
+/* Bubbles — reuse DS mu__ patterns */
+.mc-chat-msg{display:flex;gap:0.5rem;max-width:88%}
+.mc-chat-msg.user{align-self:flex-end;flex-direction:row-reverse}
+.mc-chat-msg.agent{align-self:flex-start}
+.mc-chat-msg.system{align-self:center;max-width:100%}
+.mc-chat-msg-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:2px}
+.mc-chat-msg-avatar.user-av{background:var(--purple);display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;color:#fff}
+.mc-chat-bubble{padding:0.5rem 0.75rem;border-radius:12px;font-size:0.82rem;line-height:1.55;word-break:break-word;overflow:hidden}
+.mc-chat-msg.user .mc-chat-bubble{background:var(--purple);color:#fff;border-top-right-radius:4px}
+.mc-chat-msg.agent .mc-chat-bubble{background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-top-left-radius:4px}
+.mc-chat-msg.system .mc-chat-bubble{background:none;color:var(--text-secondary);font-size:0.7rem;font-style:italic;padding:0.15rem 0;text-align:center}
+.mc-chat-bubble .mu__sender{display:flex;gap:0.35rem;align-items:baseline;margin-bottom:0.2rem}
+.mc-chat-bubble .mu__name{font-size:0.75rem;font-weight:600;color:var(--purple)}
+.mc-chat-bubble .mu__role{font-size:0.6rem;color:var(--text-secondary);font-style:italic}
+.mc-chat-bubble .mu__content{font-size:0.82rem;color:var(--text-primary);line-height:1.55}
+.mc-chat-bubble .mu__content.mu--streaming::after{content:'▌';animation:mu-blink .8s infinite;color:var(--purple);margin-left:1px}
+@keyframes mu-blink{0%,100%{opacity:1}50%{opacity:0}}
+.mc-chat-bubble .mu__footer{display:flex;justify-content:flex-end;margin-top:0.15rem}
+.mc-chat-bubble .mu__time{font-size:0.6rem;color:var(--text-secondary)}
+
+/* Streaming pulse on bubble border */
+.mc-chat-msg.agent .mc-chat-bubble.streaming{border-left:3px solid var(--purple);animation:mc-stream-pulse 1.5s ease-in-out infinite}
+@keyframes mc-stream-pulse{0%,100%{border-left-color:var(--purple)}50%{border-left-color:rgba(124,58,237,.3)}}
+
+/* Thinking indicator with animated dots */
+.mc-chat-thinking{display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0.6rem;align-self:flex-start}
+.mc-chat-thinking-text{font-size:0.75rem;color:var(--purple);font-style:italic}
+.mc-chat-dots{display:inline-flex;gap:3px;margin-left:2px}
+.mc-chat-dots span{width:5px;height:5px;border-radius:50%;background:var(--purple);animation:mc-dot-pulse 1.4s infinite both}
+.mc-chat-dots span:nth-child(2){animation-delay:.2s}
+.mc-chat-dots span:nth-child(3){animation-delay:.4s}
+@keyframes mc-dot-pulse{0%,80%,100%{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+
+/* Tool pills */
 .mc-chat-tools{display:flex;flex-wrap:wrap;gap:3px;margin-top:0.3rem}
 .mc-chat-tool-pill{font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:4px;background:rgba(124,58,237,.12);color:var(--purple);display:inline-flex;align-items:center;gap:2px}
-.mc-chat-thinking{align-self:flex-start;font-size:0.68rem;color:var(--purple);font-weight:600;animation:think-pulse 1.5s ease-in-out infinite;padding:0.3rem 0.5rem}
+
+/* Markdown in chat */
+.mc-chat-bubble .md-rendered{font-size:0.82rem;line-height:1.55}
+.mc-chat-bubble .md-rendered p{margin:0.2rem 0}
+.mc-chat-bubble .md-rendered ul,.mc-chat-bubble .md-rendered ol{margin:0.2rem 0;padding-left:1.2rem}
+.mc-chat-bubble .md-rendered li{margin:0.1rem 0}
+.mc-chat-bubble .md-rendered pre{background:rgba(0,0,0,.25);border-radius:6px;padding:0.4rem;overflow-x:auto;font-size:0.72rem;margin:0.3rem 0}
+.mc-chat-bubble .md-rendered code{background:rgba(124,58,237,.12);padding:0.08rem 0.25rem;border-radius:3px;font-size:0.74rem}
+.mc-chat-bubble .md-rendered pre code{background:none;padding:0}
+.mc-chat-bubble .md-rendered h1,.mc-chat-bubble .md-rendered h2,.mc-chat-bubble .md-rendered h3{margin:0.3rem 0 0.15rem;font-size:0.88rem}
+.mc-chat-bubble .md-rendered table{width:100%;border-collapse:collapse;margin:0.3rem 0;font-size:0.74rem}
+.mc-chat-bubble .md-rendered th,.mc-chat-bubble .md-rendered td{border:1px solid rgba(255,255,255,.08);padding:0.2rem 0.4rem;text-align:left}
+.mc-chat-bubble .md-rendered th{background:rgba(124,58,237,.08);font-weight:600}
+.mc-chat-bubble .md-rendered a{color:var(--purple);text-decoration:underline}
+
+/* Input row */
 .mc-chat-input-row{display:flex;gap:0.4rem;padding:0.6rem 0.75rem;border-top:1px solid var(--border);flex-shrink:0}
-.mc-chat-input{flex:1;padding:0.45rem 0.65rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-tertiary);color:var(--text-primary);font-size:0.78rem;font-family:inherit;outline:none;resize:none;min-height:38px;max-height:120px}
+.mc-chat-input{flex:1;padding:0.45rem 0.65rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-tertiary);color:var(--text-primary);font-size:0.82rem;font-family:inherit;outline:none;resize:none;min-height:38px;max-height:120px}
 .mc-chat-input:focus{border-color:var(--purple)}
 .mc-chat-send{padding:0.4rem 0.75rem;border:none;border-radius:8px;background:var(--purple);color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;transition:opacity .15s;flex-shrink:0}
 .mc-chat-send:hover{opacity:.85}
@@ -609,7 +654,9 @@
             <button class="mc-chat-close" onclick="closeCdpChat()">✕</button>
         </div>
         <div class="mc-chat-msgs" id="mcChatMsgs">
-            <div class="mc-chat-bubble system">Discutez avec le CDP de cette epic. Il peut chercher dans le code, les conversations des agents, le git, la memoire, les PRs et les features.</div>
+            <div class="mc-chat-msg system">
+                <div class="mc-chat-bubble">Discutez avec le CDP. Il peut chercher dans le code, les conversations des agents, le git, la memoire, les PRs et les features.</div>
+            </div>
         </div>
         <div class="mc-chat-input-row">
             <textarea class="mc-chat-input" id="mcChatInput" placeholder="Posez une question au CDP..." rows="1"
@@ -650,6 +697,10 @@ for (const [pid, agents] of Object.entries(PHASE_AGENTS)) {
 }
 
 /* ── CDP Chat Modal ── */
+const CDP_AVATAR = '{{ cdp["avatar_url"] if cdp else "/static/avatars/chef_de_programme.jpg" }}' || '/static/avatars/chef_de_programme.jpg';
+const CDP_NAME = '{{ cdp["name"] if cdp else "Chef de Programme" }}';
+const CDP_ROLE = '{{ cdp["role"] if cdp else "Chef de Programme" }}';
+
 function openCdpChat() {
     document.getElementById('mcChatOverlay').classList.add('open');
     document.getElementById('mcChatInput').focus();
@@ -657,6 +708,63 @@ function openCdpChat() {
 function closeCdpChat() {
     document.getElementById('mcChatOverlay').classList.remove('open');
 }
+
+function _chatTime() {
+    const d = new Date();
+    return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+}
+
+function _addChatMsg(type, content, opts = {}) {
+    const msgs = document.getElementById('mcChatMsgs');
+    const wrapper = document.createElement('div');
+    wrapper.className = `mc-chat-msg ${type}`;
+
+    if (type === 'agent') {
+        const av = document.createElement('img');
+        av.className = 'mc-chat-msg-avatar';
+        av.src = CDP_AVATAR;
+        av.onerror = function(){ this.src = '/static/avatars/chef_de_programme.jpg'; };
+        wrapper.appendChild(av);
+    } else if (type === 'user') {
+        const av = document.createElement('div');
+        av.className = 'mc-chat-msg-avatar user-av';
+        av.textContent = 'S';
+        wrapper.appendChild(av);
+    }
+
+    const bubble = document.createElement('div');
+    bubble.className = 'mc-chat-bubble';
+
+    if (type === 'agent') {
+        const sender = document.createElement('div');
+        sender.className = 'mu__sender';
+        sender.innerHTML = `<span class="mu__name">${CDP_NAME}</span><span class="mu__role">${CDP_ROLE}</span>`;
+        bubble.appendChild(sender);
+    }
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'mu__content';
+    if (opts.isMarkdown) {
+        contentDiv.classList.add('md-rendered');
+        contentDiv.innerHTML = content;
+    } else {
+        contentDiv.textContent = content;
+    }
+    bubble.appendChild(contentDiv);
+
+    if (type !== 'system') {
+        const footer = document.createElement('div');
+        footer.className = 'mu__footer';
+        footer.innerHTML = `<span class="mu__time">${_chatTime()}</span>`;
+        bubble.appendChild(footer);
+    }
+
+    wrapper.appendChild(bubble);
+    msgs.appendChild(wrapper);
+    msgs.scrollTop = msgs.scrollHeight;
+    return { wrapper, bubble, contentDiv };
+}
+
 let _cdpChatBusy = false;
 async function sendCdpMessage() {
     if (_cdpChatBusy) return;
@@ -667,19 +775,15 @@ async function sendCdpMessage() {
     input.style.height = 'auto';
     _cdpChatBusy = true;
     document.getElementById('mcChatSend').disabled = true;
-
     const msgs = document.getElementById('mcChatMsgs');
-    // User bubble
-    const ub = document.createElement('div');
-    ub.className = 'mc-chat-bubble user';
-    ub.textContent = content;
-    msgs.appendChild(ub);
-    msgs.scrollTop = msgs.scrollHeight;
 
-    // Thinking indicator
+    // User bubble
+    _addChatMsg('user', content);
+
+    // Thinking indicator with animated dots
     const think = document.createElement('div');
     think.className = 'mc-chat-thinking';
-    think.textContent = 'Analyse en cours...';
+    think.innerHTML = `<span class="mc-chat-thinking-text">Analyse en cours</span><span class="mc-chat-dots"><span></span><span></span><span></span></span>`;
     msgs.appendChild(think);
     msgs.scrollTop = msgs.scrollHeight;
 
@@ -690,19 +794,12 @@ async function sendCdpMessage() {
         const resp = await fetch(`/api/missions/${MISSION_ID}/chat/stream`, {method:'POST', body:fd});
         if (!resp.ok) throw new Error(resp.statusText);
 
-        // Agent bubble (streaming)
-        think.remove();
-        const ab = document.createElement('div');
-        ab.className = 'mc-chat-bubble agent';
-        msgs.appendChild(ab);
-        const abContent = document.createElement('div');
-        abContent.className = 'mc-chat-stream-text';
-        ab.appendChild(abContent);
-
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
         let accumulated = '';
         let buf = '';
+        let agentMsg = null; // { wrapper, bubble, contentDiv }
+        let toolsDiv = null;
 
         while (true) {
             const {done, value} = await reader.read();
@@ -710,44 +807,82 @@ async function sendCdpMessage() {
             buf += decoder.decode(value, {stream: true});
             const lines = buf.split('\n');
             buf = lines.pop() || '';
+            let evtType = null;
             for (const line of lines) {
                 if (line.startsWith('event: ')) {
-                    var evtType = line.slice(7).trim();
+                    evtType = line.slice(7).trim();
                 } else if (line.startsWith('data: ') && evtType) {
                     try {
                         const d = JSON.parse(line.slice(6));
-                        if (evtType === 'chunk') {
+                        if (evtType === 'status') {
+                            const txt = think.querySelector('.mc-chat-thinking-text');
+                            if (txt) txt.textContent = d.label || 'Analyse';
+                        } else if (evtType === 'chunk') {
+                            // First chunk: replace thinking with agent bubble
+                            if (!agentMsg) {
+                                think.remove();
+                                agentMsg = _addChatMsg('agent', '', { isMarkdown: true });
+                                agentMsg.bubble.classList.add('streaming');
+                                agentMsg.contentDiv.classList.add('mu--streaming');
+                            }
                             accumulated += d.text || '';
-                            abContent.innerHTML = miniMarkdown(accumulated) + '<span class="mc-typing-cursor">|</span>';
+                            agentMsg.contentDiv.innerHTML = miniMarkdown(accumulated);
+                            agentMsg.contentDiv.classList.add('mu--streaming');
                             msgs.scrollTop = msgs.scrollHeight;
-                        } else if (evtType === 'status') {
-                            think.textContent = d.label || 'Analyse...';
                         } else if (evtType === 'tool') {
-                            // Show tool pill
-                            let tools = ab.querySelector('.mc-chat-tools');
-                            if (!tools) { tools = document.createElement('div'); tools.className = 'mc-chat-tools'; ab.appendChild(tools); }
-                            tools.innerHTML += `<span class="mc-chat-tool-pill">${d.label||d.name||''}</span>`;
+                            // Show tool being used
+                            if (agentMsg) {
+                                if (!toolsDiv) {
+                                    toolsDiv = document.createElement('div');
+                                    toolsDiv.className = 'mc-chat-tools';
+                                    agentMsg.bubble.insertBefore(toolsDiv, agentMsg.bubble.querySelector('.mu__footer'));
+                                }
+                                toolsDiv.innerHTML += `<span class="mc-chat-tool-pill">${d.label||d.name||''}</span>`;
+                            } else {
+                                const txt = think.querySelector('.mc-chat-thinking-text');
+                                if (txt) txt.textContent = d.label || d.name || 'Outil';
+                            }
                         } else if (evtType === 'done') {
-                            abContent.innerHTML = d.html || miniMarkdown(accumulated);
+                            if (!agentMsg) {
+                                think.remove();
+                                agentMsg = _addChatMsg('agent', d.html || miniMarkdown(accumulated), { isMarkdown: true });
+                            } else {
+                                agentMsg.contentDiv.innerHTML = d.html || miniMarkdown(accumulated);
+                                agentMsg.contentDiv.classList.remove('mu--streaming');
+                                agentMsg.bubble.classList.remove('streaming');
+                            }
                         } else if (evtType === 'error') {
-                            abContent.innerHTML = `<span style="color:var(--red)">${d.message||'Erreur'}</span>`;
+                            think.remove();
+                            if (agentMsg) {
+                                agentMsg.contentDiv.innerHTML = `<span style="color:var(--red)">${d.message||'Erreur'}</span>`;
+                                agentMsg.contentDiv.classList.remove('mu--streaming');
+                                agentMsg.bubble.classList.remove('streaming');
+                            } else {
+                                _addChatMsg('system', d.message || 'Erreur');
+                            }
                         }
                     } catch(e){}
                     evtType = null;
                 }
             }
         }
-        // Remove cursor
-        const cursor = abContent.querySelector('.mc-typing-cursor');
-        if (cursor) cursor.remove();
-        if (!abContent.innerHTML.trim()) abContent.innerHTML = miniMarkdown(accumulated);
+        // End of stream: remove streaming classes
+        if (agentMsg) {
+            agentMsg.contentDiv.classList.remove('mu--streaming');
+            agentMsg.bubble.classList.remove('streaming');
+            if (!agentMsg.contentDiv.innerHTML.trim()) {
+                agentMsg.contentDiv.innerHTML = miniMarkdown(accumulated) || '<span style="color:var(--text-secondary);font-style:italic">Pas de reponse</span>';
+            }
+        }
+        // If we never got a chunk (e.g., empty response)
+        if (!agentMsg && think.parentNode) {
+            think.remove();
+            _addChatMsg('system', 'Pas de reponse');
+        }
         msgs.scrollTop = msgs.scrollHeight;
     } catch(err) {
-        think.remove();
-        const eb = document.createElement('div');
-        eb.className = 'mc-chat-bubble system';
-        eb.textContent = 'Erreur: ' + err.message;
-        msgs.appendChild(eb);
+        if (document.contains(think)) think.remove();
+        _addChatMsg('system', 'Erreur: ' + err.message);
     }
     _cdpChatBusy = false;
     document.getElementById('mcChatSend').disabled = false;
