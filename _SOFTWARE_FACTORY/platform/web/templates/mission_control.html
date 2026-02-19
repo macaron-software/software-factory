@@ -1058,6 +1058,11 @@ function md(s){
   h = h.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
   h = h.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
   h = h.replace(/@(\w[\w\s]*?)(?=[\s,.:!?<]|$)/g, '<span style="color:var(--purple);font-weight:600">@$1</span>');
+  // Render [SCREENSHOT:path] markers as images
+  h = h.replace(/\[SCREENSHOT:([^\]]+)\]/g, (m, path) => {
+    const src = `/workspace/${path.replace(/^\.?\//, '')}`;
+    return `<div class="mc-screenshot"><img src="${src}" alt="Screenshot: ${path}" loading="lazy" style="max-width:100%;border-radius:8px;margin:8px 0;border:1px solid var(--border-subtle)"><div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">${path}</div></div>`;
+  });
   h = h.replace(/\n/g, '<br>');
   return h;
 }

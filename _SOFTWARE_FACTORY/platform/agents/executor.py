@@ -81,6 +81,12 @@ def _get_tool_registry():
         register_phase_tools(reg)
     except Exception:
         pass
+    # Playwright test/screenshot tools
+    try:
+        from ..tools.test_tools import register_test_tools
+        register_test_tools(reg)
+    except Exception:
+        pass
     return reg
 
 
@@ -369,6 +375,36 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {},
+                },
+            },
+        },
+        # ── Playwright test/screenshot tools ──
+        {
+            "type": "function",
+            "function": {
+                "name": "screenshot",
+                "description": "Take a browser screenshot of a URL using Playwright headless. Saves PNG to screenshots/ dir. Returns file path with [SCREENSHOT:path] marker.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "URL to screenshot (e.g. http://localhost:3000)"},
+                        "filename": {"type": "string", "description": "Output filename (default: screenshot.png)"},
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "playwright_test",
+                "description": "Run Playwright E2E tests. Executes a test spec file, captures results and failure screenshots. Returns pass/fail with [SCREENSHOT:path] markers.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "spec": {"type": "string", "description": "Test spec file path (e.g. tests/e2e/smoke.spec.ts)"},
+                    },
+                    "required": ["spec"],
                 },
             },
         },
@@ -750,8 +786,8 @@ class AgentExecutor:
 
         # ── Resolve paths: project_path is the default for all file/git tools ──
         if ctx.project_path:
-            # Git/build/deploy tools: inject cwd
-            if name in ("git_status", "git_log", "git_diff", "git_commit", "build", "test", "lint", "docker_build"):
+            # Git/build/deploy/test tools: inject cwd
+            if name in ("git_status", "git_log", "git_diff", "git_commit", "build", "test", "lint", "docker_build", "screenshot", "playwright_test"):
                 if "cwd" not in args or args["cwd"] in (".", "", "./"):
                     args["cwd"] = ctx.project_path
             # File tools: resolve relative paths to project root

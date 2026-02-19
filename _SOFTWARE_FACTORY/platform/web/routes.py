@@ -7,10 +7,25 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, FileResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+# ── Workspace file serving (screenshots, artifacts) ──
+@router.get("/workspace/{path:path}")
+async def serve_workspace_file(path: str):
+    """Serve files from project workspaces (screenshots, artifacts)."""
+    from ..config import FACTORY_ROOT
+    # Check common workspace locations
+    for base in [FACTORY_ROOT / "data" / "workspaces", FACTORY_ROOT.parent]:
+        full_path = base / path
+        if full_path.exists() and full_path.is_file():
+            import mimetypes
+            media = mimetypes.guess_type(str(full_path))[0] or "application/octet-stream"
+            return FileResponse(str(full_path), media_type=media)
+    return JSONResponse({"error": "Not found"}, status_code=404)
 
 
 def _templates(request: Request):
@@ -5085,6 +5100,7 @@ async def api_mission_run(request: Request, mission_id: str):
         """Execute phases sequentially using the real pattern engine."""
         phases_done = 0
         phases_failed = 0
+        phase_summaries = []  # accumulated phase results for cross-phase context
 
         for i, phase in enumerate(mission.phases):
             wf_phase = wf.phases[i] if i < len(wf.phases) else None
@@ -5095,14 +5111,48 @@ async def api_mission_run(request: Request, mission_id: str):
             aids = cfg.get("agent_ids", cfg.get("agents", []))
             pattern_type = wf_phase.pattern_id
 
-            # CDP announces the phase
+            # Build CDP context: workspace state + previous phase summaries
+            cdp_context = ""
+            if mission.workspace_path:
+                try:
+                    import subprocess
+                    ws = mission.workspace_path
+                    # Workspace file count
+                    file_count = subprocess.run(
+                        ["find", ws, "-type", "f", "-not", "-path", "*/.git/*"],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    n_files = len(file_count.stdout.strip().split("\n")) if file_count.stdout.strip() else 0
+                    # Recent git log
+                    git_log = subprocess.run(
+                        ["git", "log", "--oneline", "-5"],
+                        cwd=ws, capture_output=True, text=True, timeout=5
+                    )
+                    cdp_context = f"Workspace: {n_files} fichiers"
+                    if git_log.stdout.strip():
+                        cdp_context += f" | Git: {git_log.stdout.strip().split(chr(10))[0]}"
+                except Exception:
+                    pass
+
+            # Previous phase summaries for context
+            prev_context = ""
+            if phase_summaries:
+                prev_context = "\n".join(
+                    f"- Phase {s['name']}: {s['summary']}"
+                    for s in phase_summaries[-5:]  # last 5 phases max
+                )
+
+            # CDP announces the phase with context
+            cdp_announce = f"Lancement phase {i+1}/{len(mission.phases)} : **{wf_phase.name}** (pattern: {pattern_type})"
+            if cdp_context:
+                cdp_announce += f"\n{cdp_context}"
             await _push_sse(session_id, {
                 "type": "message",
                 "from_agent": "chef_de_programme",
                 "from_name": "Alexandre Moreau",
                 "from_role": "Chef de Programme",
                 "from_avatar": "/static/avatars/chef_de_programme.jpg",
-                "content": f"Lancement phase {i+1}/{len(mission.phases)} : **{wf_phase.name}** (pattern: {pattern_type})",
+                "content": cdp_announce,
                 "phase_id": phase.phase_id,
                 "msg_type": "text",
             })
@@ -5214,7 +5264,7 @@ async def api_mission_run(request: Request, mission_id: str):
             )
 
             # Build the task prompt for this phase
-            phase_task = _build_phase_prompt(wf_phase.name, pattern_type, mission.brief, i, len(mission.phases))
+            phase_task = _build_phase_prompt(wf_phase.name, pattern_type, mission.brief, i, len(mission.phases), prev_context)
 
             # Sprint loop — dev-sprint runs multiple iterations (sprints)
             phase_key_check = wf_phase.name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
@@ -5241,7 +5291,7 @@ async def api_mission_run(request: Request, mission_id: str):
                     })
                     await asyncio.sleep(0.5)
                     # Update prompt with sprint context
-                    phase_task = _build_phase_prompt(wf_phase.name, pattern_type, mission.brief, i, len(mission.phases))
+                    phase_task = _build_phase_prompt(wf_phase.name, pattern_type, mission.brief, i, len(mission.phases), prev_context)
                     phase_task += (
                         f"\n\n--- {sprint_label} ---\n"
                         f"C'est le sprint {sprint_num} sur {max_sprints} prévus.\n"
@@ -5355,6 +5405,36 @@ async def api_mission_run(request: Request, mission_id: str):
             if phase_success:
                 phase.summary = f"Phase réussie — {len(aids)} agents ont contribué (pattern: {pattern_type})"
                 phases_done += 1
+
+                # Generate cross-phase summary for next phases
+                summary_text = f"[{wf_phase.name}] terminée"
+                if mission.workspace_path:
+                    try:
+                        import subprocess as _sp
+                        # Get files changed during this phase
+                        diff_stat = _sp.run(
+                            ["git", "diff", "--stat", "HEAD~1"],
+                            cwd=mission.workspace_path, capture_output=True, text=True, timeout=5
+                        )
+                        if diff_stat.stdout.strip():
+                            summary_text += f" | Fichiers: {diff_stat.stdout.strip().split(chr(10))[-1]}"
+                    except Exception:
+                        pass
+                # Store decisions from agent messages in memory
+                try:
+                    from ..memory.manager import get_memory_manager
+                    mem = get_memory_manager()
+                    if mission.project_id:
+                        mem.project_store(
+                            mission.project_id,
+                            key=f"phase:{wf_phase.name}",
+                            value=summary_text[:500],
+                            category="phase-summary",
+                            source="mission-control",
+                        )
+                except Exception:
+                    pass
+                phase_summaries.append({"name": wf_phase.name, "summary": summary_text[:200]})
 
                 # Post-phase CI/CD hooks — run real commands in workspace
                 await _run_post_phase_hooks(
@@ -5535,7 +5615,7 @@ async def _run_post_phase_hooks(
             logger.error("Post-phase deploy summary failed: %s", e)
 
 
-def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, total: int) -> str:
+def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, total: int, prev_context: str = "") -> str:
     """Build a contextual task prompt for each lifecycle phase."""
     prompts = {
         "ideation": (
@@ -5581,45 +5661,53 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
             "  Utilisez l'outil code_write pour créer chaque fichier.\n"
             "- Développeur Backend : écrivez le code serveur/API avec code_write\n"
             "- Développeur Frontend : écrivez le HTML/CSS/JS avec code_write\n"
-            "- QA : écrivez les tests avec code_write\n"
+            "- QA : écrivez les tests unitaires avec code_write\n"
             "Après avoir écrit le code, utilisez git_commit pour committer.\n"
-            "IMPORTANT: Ne discutez pas du code. ÉCRIVEZ-LE avec code_write."
+            "IMPORTANT: Ne discutez pas du code. ECRIVEZ-LE avec code_write."
         ),
         "cicd": (
             f"Pipeline CI/CD pour «{brief}».\n"
             "UTILISEZ VOS OUTILS pour configurer le pipeline dans le workspace :\n"
-            "- DevOps : créez le Dockerfile, docker-compose.yml, .github/workflows/ci.yml avec code_write\n"
-            "- Lead Dev : créez les scripts de build/test dans package.json ou Makefile\n"
-            "- Expert Sécurité : ajoutez les checks sécurité dans le pipeline\n"
-            "Utilisez build_tool pour vérifier que le build passe.\n"
-            "Utilisez git_commit pour committer les fichiers de CI/CD."
+            "1. Lisez d'abord le code existant avec code_read et list_files\n"
+            "2. Créez Dockerfile, docker-compose.yml, .github/workflows/ci.yml avec code_write\n"
+            "3. Créez les scripts de build/test (Makefile, scripts/)\n"
+            "4. Vérifiez que le build passe avec build_tool\n"
+            "5. Commitez avec git_commit\n"
+            "IMPORTANT: Lisez le workspace avec list_files d'abord pour voir ce qui existe."
         ),
         "qa-campaign": (
             f"Campagne de tests QA pour «{brief}».\n"
-            "UTILISEZ VOS OUTILS pour créer les tests dans le workspace :\n"
-            "- QA Lead : créez le plan de test (tests/PLAN.md) avec code_write\n"
-            "- QA Engineer : écrivez les tests Playwright E2E (tests/e2e/) avec code_write\n"
-            "  Créez tests/e2e/smoke.spec.ts et tests/e2e/journey.spec.ts\n"
-            "- Lancez les tests avec build_tool ou test_tool\n"
-            "Utilisez git_commit pour committer les fichiers de test.\n"
-            "IMPORTANT: Écrivez du VRAI code de test exécutable."
+            "UTILISEZ VOS OUTILS pour écrire et exécuter les tests :\n"
+            "1. Lisez le code existant avec list_files et code_read pour comprendre l'app\n"
+            "2. Créez le plan de test (tests/PLAN.md) avec code_write\n"
+            "3. Ecrivez les tests Playwright E2E :\n"
+            "   - tests/e2e/smoke.spec.ts : pages chargent, HTTP 200, 0 erreurs console\n"
+            "   - tests/e2e/journey.spec.ts : parcours utilisateur complets\n"
+            "4. Lancez les tests avec playwright_test\n"
+            "5. Prenez des screenshots des pages clés avec screenshot\n"
+            "6. Si des tests échouent, documentez les bugs dans tests/BUGS.md\n"
+            "7. Commitez avec git_commit\n"
+            "IMPORTANT: Exécutez les tests réellement, ne simulez pas les résultats."
         ),
         "qa-execution": (
             f"Exécution des tests pour «{brief}».\n"
             "UTILISEZ VOS OUTILS pour exécuter et valider :\n"
-            "- QA fonctionnel : lancez `npx playwright test` avec build_tool, reportez les résultats\n"
-            "- QA technique : lancez les tests API et perf avec build_tool\n"
-            "- Expert Sécurité : auditez avec code_read, vérifiez les failles OWASP\n"
-            "- QA Lead : consolidez les résultats, créez tests/REPORT.md avec code_write\n"
+            "1. Lisez les tests existants avec list_files et code_read\n"
+            "2. Lancez les tests E2E : playwright_test spec=tests/e2e/smoke.spec.ts\n"
+            "3. Lancez les tests API avec build_tool\n"
+            "4. Prenez des screenshots des pages clés : screenshot url=http://localhost:3000\n"
+            "5. Si des tests échouent, créez tests/REPORT.md avec les résultats\n"
+            "6. Expert Sécurité : auditez le code avec code_read, vérifiez OWASP\n"
             "IMPORTANT: Exécutez les commandes réelles, ne simulez pas."
         ),
         "deploy-prod": (
             f"Déploiement production pour «{brief}».\n"
             "UTILISEZ VOS OUTILS pour déployer depuis le workspace :\n"
-            "- DevOps : utilisez docker_build pour construire l'image, puis deploy_azure pour déployer\n"
-            "- QA : utilisez build_tool pour lancer les smoke tests post-deploy\n"
-            "- Expert Sécurité : vérifiez la checklist sécurité\n"
-            "- CDP : validation finale\n"
+            "1. Vérifiez l'état du workspace : list_files, git_status\n"
+            "2. docker_build pour construire l'image\n"
+            "3. deploy_azure pour déployer\n"
+            "4. screenshot pour capturer l'app déployée\n"
+            "5. Validation finale\n"
             "IMPORTANT: Exécutez les commandes réelles, ne simulez pas."
         ),
         "tma-routing": (
@@ -5632,9 +5720,12 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
         ),
         "tma-fix": (
             f"Correctif TMA pour «{brief}».\n"
-            "- Développeur TMA : fix, test unitaire\n"
-            "- QA : validation fix, test regression\n"
-            "Corrigez, testez, et validez le correctif."
+            "UTILISEZ VOS OUTILS pour corriger :\n"
+            "1. Lisez le code concerné avec code_read\n"
+            "2. Corrigez avec code_edit\n"
+            "3. Ecrivez le test de non-regression avec code_write\n"
+            "4. Lancez les tests avec playwright_test ou build_tool\n"
+            "5. Commitez avec git_commit"
         ),
     }
     # Fallback to generic prompt
@@ -5642,8 +5733,19 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
     # Try matching by index order
     ordered_keys = list(prompts.keys())
     if idx < len(ordered_keys):
-        return prompts[ordered_keys[idx]]
-    return prompts.get(phase_key, (
-        f"Phase {idx+1}/{total} : {phase_name} (pattern: {pattern}) pour le projet «{brief}».\n"
-        "Chaque agent contribue selon son rôle. Produisez un livrable concret."
-    ))
+        prompt = prompts[ordered_keys[idx]]
+    else:
+        prompt = prompts.get(phase_key, (
+            f"Phase {idx+1}/{total} : {phase_name} (pattern: {pattern}) pour le projet «{brief}».\n"
+            "Chaque agent contribue selon son rôle. Produisez un livrable concret."
+        ))
+
+    # Inject previous phase context
+    if prev_context:
+        prompt += (
+            "\n\n--- Contexte des phases précédentes ---\n"
+            f"{prev_context}\n"
+            "Utilisez ce contexte. Lisez le workspace avec list_files et code_read pour voir le travail déjà fait."
+        )
+
+    return prompt

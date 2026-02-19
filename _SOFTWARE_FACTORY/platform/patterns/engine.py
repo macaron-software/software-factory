@@ -512,22 +512,45 @@ async def _execute_node(
     if run.project_id and content and not result.error:
         try:
             mem = get_memory_manager()
-            # Extract a short summary (first 200 chars of clean content)
             import re as _re2
             clean = _re2.sub(r'\[.*?\]', '', content).strip()
-            summary = clean[:200] + ('…' if len(clean) > 200 else '')
+            # Extract structured decisions: [PR], architecture choices, tech decisions
+            decisions = []
+            for line in content.split('\n'):
+                line_s = line.strip()
+                if line_s.startswith('[PR]'):
+                    decisions.append(line_s)
+                elif any(kw in line_s.lower() for kw in ('decision:', 'choix:', 'stack:', 'architecture:')):
+                    decisions.append(line_s)
+            summary = "\n".join(decisions[:5]) if decisions else clean[:300]
+            # Use semantic category based on agent role
+            role_lower = (agent.role or "").lower()
+            if "archi" in role_lower:
+                cat = "architecture"
+            elif "qa" in role_lower or "test" in role_lower:
+                cat = "quality"
+            elif "dev" in role_lower or "lead" in role_lower:
+                cat = "development"
+            elif "secu" in role_lower:
+                cat = "security"
+            elif "devops" in role_lower or "sre" in role_lower or "pipeline" in role_lower:
+                cat = "infrastructure"
+            elif "product" in role_lower or "business" in role_lower:
+                cat = "product"
+            else:
+                cat = "decisions"
             mem.project_store(
                 run.project_id,
-                key=f"agent:{agent.id}:{run.pattern.type}",
+                key=f"{agent.name}: {run.flow_step or run.pattern.type}",
                 value=summary,
-                category="decisions",
+                category=cat,
                 source=agent.id,
             )
             await _sse(run, {
                 "type": "memory_stored",
-                "category": "decisions",
-                "key": f"{agent.name}: contribution",
-                "value": summary,
+                "category": cat,
+                "key": f"{agent.name}: {run.flow_step or 'contribution'}",
+                "value": summary[:200],
                 "agent_id": agent.id,
             })
         except Exception:
@@ -640,23 +663,23 @@ async def _run_solo(run: PatternRun, task: str):
 
 
 async def _run_sequential(run: PatternRun, task: str):
-    """Execute nodes in sequence, passing output forward.
-    Last agent reports back to the first (hierarchy leader), not 'all'."""
+    """Execute nodes in sequence, passing accumulated outputs forward."""
     order = _ordered_nodes(run.pattern)
-    prev_output = ""
-    prev_agent = ""
+    accumulated = []  # all previous outputs for full context chain
     first_agent = _node_agent_id(run, order[0]) if order else "all"
     for i, nid in enumerate(order):
         if i + 1 < len(order):
             to = _node_agent_id(run, order[i + 1])
         else:
-            # Last agent reports to the first (CP/leader), not broadcast
             to = first_agent
+        # Forward full chain: each node sees all previous contributions
+        context = "\n\n---\n\n".join(accumulated) if accumulated else ""
         output = await _execute_node(
-            run, nid, task, context_from=prev_output, to_agent_id=to,
+            run, nid, task, context_from=context, to_agent_id=to,
         )
-        prev_output = output
-        prev_agent = _node_agent_id(run, nid)
+        ns = run.nodes.get(nid)
+        label = ns.agent.name if ns and ns.agent else nid
+        accumulated.append(f"[{label}]:\n{output}")
 
 
 async def _run_parallel(run: PatternRun, task: str):
