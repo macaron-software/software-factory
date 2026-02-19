@@ -471,6 +471,7 @@ async def _execute_node(
     MAX_ADVERSARIAL_RETRIES = 2
     is_coordinator = protocol_override and "DECOMPOSE" in protocol_override
     guard_result = None
+    cumulative_tool_calls = list(result.tool_calls or [])  # accumulate across retries
     if content and not result.error and state.status == NodeStatus.COMPLETED:
         for _adv_attempt in range(MAX_ADVERSARIAL_RETRIES + 1):
             try:
@@ -480,7 +481,7 @@ async def _execute_node(
                     task=task,
                     agent_role=agent.role or "",
                     agent_name=agent.name,
-                    tool_calls=result.tool_calls or [],
+                    tool_calls=cumulative_tool_calls,
                     pattern_type=run.pattern.type,
                     enable_l1=not is_coordinator,
                 )
@@ -547,7 +548,8 @@ async def _execute_node(
                     content = retry_content
                     state.result = result
                     state.output = content
-                    # Merge tool_calls from retry
+                    # Accumulate tool_calls from retry
+                    cumulative_tool_calls.extend(retry_result.tool_calls or [])
                     logger.info("ADVERSARIAL RETRY [%s] attempt=%d — re-running agent", agent.name, _adv_attempt + 2)
                 except Exception as retry_err:
                     logger.error("Adversarial retry failed for %s: %s", agent.id, retry_err)

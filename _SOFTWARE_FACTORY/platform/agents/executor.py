@@ -24,7 +24,7 @@ from ..agents.store import AgentDef
 logger = logging.getLogger(__name__)
 
 # Max tool-calling rounds to prevent infinite loops
-MAX_TOOL_ROUNDS = 5
+MAX_TOOL_ROUNDS = 8
 
 # Regex to strip raw MiniMax/internal tool-call tokens from LLM output
 _RAW_TOKEN_RE = re.compile(

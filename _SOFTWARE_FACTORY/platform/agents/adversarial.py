@@ -235,7 +235,9 @@ AGENT OUTPUT:
 IMPORTANT CONTEXT:
 - If the agent used code_write/code_edit tools, the REAL work is in the tool calls, not the text.
 - A short text response is FINE if code_write was actually called with real content.
-- Only flag HALLUCINATION if claims are NOT visible in tool evidence above.{pattern_context}
+- Only flag HALLUCINATION if claims are NOT visible in tool evidence above.
+- Only available tools: code_read, code_write, code_edit, list_files, deep_search. Do NOT penalize for not using tools that don't exist (build_tool, git_commit, deploy, etc).
+- If files already exist in the workspace, reading them IS valid work.{pattern_context}
 
 Check for:
 1. SLOP: Generic filler, placeholder text, no real substance
@@ -243,7 +245,6 @@ Check for:
 3. MOCK: Fake implementations (TODO, pass, NotImplementedError, dummy data)
 4. LIES: Invented file paths, URLs, results not in tool output
 5. ECHO: Just rephrasing the task without doing real work
-6. COMPLETENESS: Did the agent address THEIR ROLE's part of the task? (via tools OR text)
 
 Respond ONLY with JSON:
 {{"score": <0-10>, "issues": ["issue1", "issue2"], "verdict": "APPROVE" or "REJECT"}}"""
