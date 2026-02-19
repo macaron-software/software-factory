@@ -342,7 +342,11 @@ async def _execute_node(
     role_lower = (agent.role or "").lower()
     rank = getattr(agent, "hierarchy_rank", 50)
     has_project = bool(run.project_id)
-    if has_project:
+    # Strategic/executive agents always discuss — never code
+    is_strategic = rank <= 20 or any(k in role_lower for k in ("dsi", "cto", "cpo", "portfolio", "directeur", "chef de programme", "product owner"))
+    if is_strategic:
+        full_task += _RESEARCH_PROTOCOL
+    elif has_project:
         if rank >= 40 or "dev" in role_lower:
             full_task += _EXEC_PROTOCOL
         elif "qa" in role_lower or "test" in role_lower:

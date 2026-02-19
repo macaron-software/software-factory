@@ -5473,7 +5473,35 @@ async def api_mission_run(request: Request, mission_id: str):
             # Phase complete — real status
             phase.completed_at = datetime.utcnow()
             if phase_success:
-                phase.summary = f"Phase réussie — {len(aids)} agents ont contribué (pattern: {pattern_type})"
+                # Build real summary from agent messages in this phase
+                try:
+                    from ..sessions.store import get_session_store
+                    ss = get_session_store()
+                    phase_msgs = ss.list_messages(session_id)
+                    # Filter messages for this phase, skip noise
+                    noise_pats = ("lancement phase", "workspace:", "passage à la phase", "phase réussie", "connected", "agent_status")
+                    substantive = []
+                    for m in phase_msgs:
+                        if getattr(m, 'phase_id', '') != phase.phase_id:
+                            continue
+                        txt = (getattr(m, 'content', '') or '').strip()
+                        if not txt or len(txt) < 30:
+                            continue
+                        if any(txt.lower().startswith(p) for p in noise_pats):
+                            continue
+                        agent_name = getattr(m, 'from_name', '') or getattr(m, 'from_agent', '') or ''
+                        # Take first substantive sentence
+                        for sent in txt.split('\n'):
+                            sent = sent.strip()
+                            if len(sent) > 30 and not any(sent.lower().startswith(p) for p in noise_pats):
+                                substantive.append(f"{agent_name}: {sent[:150]}")
+                                break
+                    if substantive:
+                        phase.summary = " | ".join(substantive[:4])[:500]
+                    else:
+                        phase.summary = f"{len(aids)} agents, pattern: {pattern_type}"
+                except Exception:
+                    phase.summary = f"{len(aids)} agents, pattern: {pattern_type}"
                 phases_done += 1
 
                 # Generate cross-phase summary for next phases
