@@ -1,6 +1,7 @@
 """
 Build Tools - Build, test, lint operations (bridges to Factory core).
 ======================================================================
+Uses Docker sandbox for isolation when SANDBOX_ENABLED=true.
 """
 
 from __future__ import annotations
@@ -8,6 +9,7 @@ from __future__ import annotations
 import subprocess
 from ..models import AgentInstance
 from .registry import BaseTool
+from .sandbox import get_sandbox, SANDBOX_ENABLED
 
 
 class BuildTool(BaseTool):
@@ -20,18 +22,12 @@ class BuildTool(BaseTool):
         cwd = params.get("cwd", ".")
         if not cmd:
             return "Error: build command required"
-        try:
-            r = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True,
-                cwd=cwd, timeout=300,
-            )
-            output = r.stdout[-3000:] if r.returncode == 0 else r.stderr[-3000:]
-            status = "[OK] SUCCESS" if r.returncode == 0 else f"[FAIL] FAILED (exit {r.returncode})"
-            return f"{status}\n{output}"
-        except subprocess.TimeoutExpired:
-            return "[FAIL] TIMEOUT (300s)"
-        except Exception as e:
-            return f"Error: {e}"
+        sandbox = get_sandbox(cwd)
+        result = sandbox.run(cmd, cwd=cwd, timeout=300)
+        output = result.stdout[-3000:] if result.returncode == 0 else result.stderr[-3000:]
+        status = "[OK] SUCCESS" if result.returncode == 0 else f"[FAIL] FAILED (exit {result.returncode})"
+        prefix = f"[sandbox:{result.image}] " if result.sandboxed else ""
+        return f"{prefix}{status}\n{output}"
 
 
 class TestTool(BaseTool):
@@ -44,18 +40,12 @@ class TestTool(BaseTool):
         cwd = params.get("cwd", ".")
         if not cmd:
             return "Error: test command required"
-        try:
-            r = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True,
-                cwd=cwd, timeout=300,
-            )
-            output = r.stdout[-3000:] + r.stderr[-1000:]
-            status = "[OK] PASS" if r.returncode == 0 else f"[FAIL] FAIL (exit {r.returncode})"
-            return f"{status}\n{output}"
-        except subprocess.TimeoutExpired:
-            return "[FAIL] TIMEOUT (300s)"
-        except Exception as e:
-            return f"Error: {e}"
+        sandbox = get_sandbox(cwd)
+        result = sandbox.run(cmd, cwd=cwd, timeout=300)
+        output = result.stdout[-3000:] + result.stderr[-1000:]
+        status = "[OK] PASS" if result.returncode == 0 else f"[FAIL] FAIL (exit {result.returncode})"
+        prefix = f"[sandbox:{result.image}] " if result.sandboxed else ""
+        return f"{prefix}{status}\n{output}"
 
 
 class LintTool(BaseTool):
@@ -68,16 +58,12 @@ class LintTool(BaseTool):
         cwd = params.get("cwd", ".")
         if not cmd:
             return "Error: lint command required"
-        try:
-            r = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True,
-                cwd=cwd, timeout=120,
-            )
-            output = r.stdout[-3000:] + r.stderr[-1000:]
-            status = "[OK] CLEAN" if r.returncode == 0 else "[WARN] ISSUES"
-            return f"{status}\n{output}"
-        except Exception as e:
-            return f"Error: {e}"
+        sandbox = get_sandbox(cwd)
+        result = sandbox.run(cmd, cwd=cwd, timeout=120)
+        output = result.stdout[-3000:] + result.stderr[-1000:]
+        status = "[OK] CLEAN" if result.returncode == 0 else "[WARN] ISSUES"
+        prefix = f"[sandbox:{result.image}] " if result.sandboxed else ""
+        return f"{prefix}{status}\n{output}"
 
 
 def register_build_tools(registry):

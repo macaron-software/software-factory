@@ -2791,6 +2791,53 @@ async def memory_stats():
     return JSONResponse(get_memory_manager().stats())
 
 
+# ── LLM Observability ──────────────────────────────────────────
+
+@router.get("/api/llm/stats")
+async def llm_stats(hours: int = 24, session_id: str = ""):
+    """LLM usage statistics: calls, tokens, cost, by provider/agent."""
+    from ..llm.observability import get_tracer
+    return JSONResponse(get_tracer().stats(session_id=session_id, hours=hours))
+
+
+@router.get("/api/llm/traces")
+async def llm_traces(limit: int = 50, session_id: str = ""):
+    """Recent LLM call traces."""
+    from ..llm.observability import get_tracer
+    return JSONResponse(get_tracer().recent(limit=limit, session_id=session_id))
+
+
+@router.get("/api/memory/vector/search")
+async def vector_search(scope_id: str, q: str, limit: int = 10):
+    """Semantic vector search in memory."""
+    from ..memory.manager import get_memory_manager
+    mem = get_memory_manager()
+    results = await mem.semantic_search(scope_id, q, limit=limit)
+    return JSONResponse(results)
+
+
+@router.get("/api/memory/vector/stats")
+async def vector_stats(scope_id: str = ""):
+    """Vector store statistics."""
+    from ..memory.vectors import get_vector_store
+    return JSONResponse(get_vector_store().count(scope_id))
+
+
+@router.get("/api/sandbox/status")
+async def sandbox_status():
+    """Docker sandbox status."""
+    from ..tools.sandbox import SANDBOX_ENABLED, SANDBOX_IMAGE, SANDBOX_NETWORK, SANDBOX_MEMORY
+    import shutil
+    docker_available = shutil.which("docker") is not None
+    return JSONResponse({
+        "enabled": SANDBOX_ENABLED,
+        "docker_available": docker_available,
+        "default_image": SANDBOX_IMAGE,
+        "network": SANDBOX_NETWORK,
+        "memory_limit": SANDBOX_MEMORY,
+    })
+
+
 @router.get("/api/memory/project/{project_id}")
 async def project_memory(project_id: str, q: str = "", category: str = ""):
     """Get or search project memory."""

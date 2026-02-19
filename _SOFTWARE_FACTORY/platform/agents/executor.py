@@ -1095,6 +1095,12 @@ class AgentExecutor:
         total_tokens_out = 0
         all_tool_calls = []
 
+        # Set trace context for observability
+        self._llm.set_trace_context(
+            agent_id=agent.id,
+            session_id=ctx.session_id,
+        )
+
         try:
             system = self._build_system_prompt(ctx)
             messages = self._build_messages(ctx, user_message)
@@ -1246,6 +1252,12 @@ class AgentExecutor:
         total_tokens_in = 0
         total_tokens_out = 0
         all_tool_calls = []
+
+        # Set trace context for observability
+        self._llm.set_trace_context(
+            agent_id=agent.id,
+            session_id=ctx.session_id,
+        )
 
         try:
             system = self._build_system_prompt(ctx)

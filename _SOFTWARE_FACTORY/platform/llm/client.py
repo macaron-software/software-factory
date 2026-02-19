@@ -117,6 +117,8 @@ class LLMClient:
         self._stats = {"calls": 0, "tokens_in": 0, "tokens_out": 0, "errors": 0}
         # Cooldown: provider → timestamp when it becomes available again
         self._provider_cooldown: dict[str, float] = {}
+        # Context for observability tracing (set by caller before chat())
+        self._trace_context: dict = {}  # agent_id, session_id, mission_id
 
     async def _get_http(self) -> httpx.AsyncClient:
         if self._http is None or self._http.is_closed:
@@ -207,6 +209,8 @@ class LLMClient:
                     self._stats["tokens_in"] += result.tokens_in
                     self._stats["tokens_out"] += result.tokens_out
                     logger.warning("LLM %s/%s OK (%d in, %d out tokens)", prov, use_model, result.tokens_in, result.tokens_out)
+                    # Trace for observability
+                    self._trace(result, messages)
                     return result
                 except Exception as exc:
                     last_exc = exc
@@ -479,6 +483,34 @@ class LLMClient:
                         continue
         finally:
             await stream_http.aclose()
+
+    def set_trace_context(self, agent_id: str = "", session_id: str = "", mission_id: str = ""):
+        """Set context for observability tracing on subsequent calls."""
+        self._trace_context = {"agent_id": agent_id, "session_id": session_id, "mission_id": mission_id}
+
+    def _trace(self, result: LLMResponse, messages: list[LLMMessage]):
+        """Record LLM call in observability store."""
+        try:
+            from .observability import get_tracer
+            ctx = self._trace_context
+            input_preview = ""
+            if messages:
+                last = messages[-1]
+                input_preview = (last.content if isinstance(last, LLMMessage) else last.get("content", ""))[:200]
+            get_tracer().trace_call(
+                provider=result.provider,
+                model=result.model,
+                tokens_in=result.tokens_in,
+                tokens_out=result.tokens_out,
+                duration_ms=result.duration_ms,
+                agent_id=ctx.get("agent_id", ""),
+                session_id=ctx.get("session_id", ""),
+                mission_id=ctx.get("mission_id", ""),
+                input_preview=input_preview,
+                output_preview=result.content[:200] if result.content else "",
+            )
+        except Exception as exc:
+            logger.debug("Trace recording failed: %s", exc)
 
     def available_providers(self) -> list[dict]:
         """List providers with availability status."""

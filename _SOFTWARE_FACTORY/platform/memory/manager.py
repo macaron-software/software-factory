@@ -179,6 +179,35 @@ class MemoryManager:
         conn.close()
         return [dict(r) for r in rows]
 
+    # ── Vector Search (semantic, embedding-based) ──────────────────
+
+    async def semantic_search(self, scope_id: str, query: str, limit: int = 10) -> list[dict]:
+        """Semantic search using vector embeddings. Falls back to FTS5."""
+        try:
+            from .vectors import get_vector_store
+            vs = get_vector_store()
+            results = await vs.search(scope_id, query, limit=limit)
+            if results:
+                return results
+        except Exception:
+            pass
+        # Fallback to FTS5
+        return self.project_search(scope_id, query, limit=limit)
+
+    async def store_with_embedding(self, scope_id: str, key: str, value: str,
+                                    category: str = "context") -> int:
+        """Store in both project memory (FTS5) and vector store (embeddings)."""
+        # Store in project memory (FTS5)
+        rid = self.project_store(scope_id, key, value, category=category)
+        # Also store in vector store for semantic search
+        try:
+            from .vectors import get_vector_store
+            vs = get_vector_store()
+            await vs.store(scope_id, key, value, category=category)
+        except Exception as e:
+            logger.debug("Vector store failed: %s", e)
+        return rid
+
     # ── Stats ────────────────────────────────────────────────────
 
     def stats(self) -> dict:
