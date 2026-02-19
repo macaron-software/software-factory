@@ -2,10 +2,16 @@
 
 Takes a PatternDef (graph of agent nodes + edges), resolves agents,
 and executes them according to the pattern type (sequential, parallel,
-loop, hierarchical, network/debate).
+loop, hierarchical, network/debate, wave).
 
 All agent execution goes through the existing AgentExecutor + LLMClient.
 Messages are stored in the session for WhatsApp-style display.
+
+Context Rot Mitigation: older agent outputs are compressed to key points
+to keep the context window fresh for each agent (inspired by GSD).
+
+Wave Dependencies: nodes are grouped into waves based on dependency edges.
+Agents within a wave run in parallel, waves run sequentially.
 """
 from __future__ import annotations
 
@@ -28,6 +34,11 @@ from ..skills.library import get_skill_library
 from .store import PatternDef
 
 logger = logging.getLogger(__name__)
+
+# Context rot mitigation: max chars of accumulated context per agent
+CONTEXT_BUDGET = 6000
+# Max chars to keep from each older agent's output when compressing
+COMPRESSED_OUTPUT_SIZE = 400
 
 
 class NodeStatus(str, Enum):
@@ -251,6 +262,8 @@ async def run_pattern(
             await _run_router(run, initial_task)
         elif ptype == "aggregator":
             await _run_aggregator(run, initial_task)
+        elif ptype == "wave":
+            await _run_wave(run, initial_task)
         elif ptype == "human-in-the-loop":
             await _run_human_in_the_loop(run, initial_task)
         else:
@@ -655,6 +668,119 @@ def _node_agent_id(run: PatternRun, node_id: str) -> str:
     return state.agent.id if state and state.agent else node_id
 
 
+def _compress_output(text: str, max_chars: int = COMPRESSED_OUTPUT_SIZE) -> str:
+    """Compress an agent's output to key points for context rot mitigation.
+
+    Keeps: first paragraph, lines with decisions/actions/key markers.
+    Discards: verbose analysis, repeated context, filler.
+    """
+    if len(text) <= max_chars:
+        return text
+    lines = text.split('\n')
+    kept = []
+    char_count = 0
+    # Always keep first non-empty paragraph
+    for line in lines:
+        if line.strip():
+            kept.append(line)
+            char_count += len(line)
+            break
+    # Then scan for high-signal lines
+    signal_markers = (
+        'decision', 'choix', 'stack', 'conclusion', 'recommand',
+        'action', 'verdict', 'valide', 'approve', 'reject', 'veto',
+        '[pr]', 'architecture', 'technologie', 'priorit',
+        '- ', '* ', '1.', '2.', '3.',
+    )
+    for line in lines[1:]:
+        stripped = line.strip().lower()
+        if not stripped:
+            continue
+        if any(m in stripped for m in signal_markers) or stripped.startswith('#'):
+            kept.append(line)
+            char_count += len(line)
+            if char_count >= max_chars:
+                break
+    result = '\n'.join(kept)
+    if len(result) > max_chars:
+        result = result[:max_chars] + '...'
+    return result
+
+
+def _build_compressed_context(accumulated: list[str], budget: int = CONTEXT_BUDGET) -> str:
+    """Build context string with compression for older outputs.
+
+    Last agent's output stays full. Earlier outputs are compressed
+    to fit within the budget — preventing context rot.
+    """
+    if not accumulated:
+        return ""
+    if len(accumulated) == 1:
+        return accumulated[0][:budget]
+
+    last = accumulated[-1]
+    older = accumulated[:-1]
+
+    # Reserve half budget for last output, half for compressed older
+    last_budget = budget // 2
+    older_budget = budget - last_budget
+
+    last_text = last[:last_budget]
+
+    # Compress older outputs to fit
+    per_agent = max(200, older_budget // len(older))
+    compressed = []
+    for entry in older:
+        # Entry format: "[AgentName]:\n{output}"
+        header_end = entry.find('\n')
+        if header_end > 0:
+            header = entry[:header_end]
+            body = _compress_output(entry[header_end + 1:], per_agent)
+            compressed.append(f"{header}\n{body}")
+        else:
+            compressed.append(_compress_output(entry, per_agent))
+
+    return "\n\n---\n\n".join(compressed) + "\n\n---\n\n" + last_text
+
+
+def _compute_waves(pattern: PatternDef) -> list[list[str]]:
+    """Compute dependency waves for parallel execution.
+
+    Groups nodes into waves: all nodes in a wave have their dependencies
+    satisfied by previous waves. Nodes within a wave run in parallel.
+
+    Returns: [[wave1_nodes], [wave2_nodes], ...]
+    """
+    node_ids = [n["id"] for n in pattern.agents]
+    if not node_ids:
+        return []
+
+    # Build dependency graph from edges
+    incoming = {nid: set() for nid in node_ids}
+    for edge in pattern.edges:
+        src, dst = edge.get("from"), edge.get("to")
+        if src in incoming and dst in incoming:
+            incoming[dst].add(src)
+
+    waves = []
+    done = set()
+    remaining = set(node_ids)
+
+    while remaining:
+        # Nodes whose dependencies are all in 'done'
+        wave = [n for n in remaining if incoming[n] <= done]
+        if not wave:
+            # Cycle — put all remaining in one final wave
+            waves.append(sorted(remaining))
+            break
+        wave.sort()
+        waves.append(wave)
+        done.update(wave)
+        remaining -= set(wave)
+
+    return waves
+
+
 async def _run_solo(run: PatternRun, task: str):
     """Single agent execution."""
     nodes = list(run.nodes.keys())
@@ -663,17 +789,21 @@ async def _run_solo(run: PatternRun, task: str):
 
 
 async def _run_sequential(run: PatternRun, task: str):
-    """Execute nodes in sequence, passing accumulated outputs forward."""
+    """Execute nodes in sequence, with context rot mitigation.
+
+    Each agent sees compressed older outputs + full last output,
+    keeping the context window fresh.
+    """
     order = _ordered_nodes(run.pattern)
-    accumulated = []  # all previous outputs for full context chain
+    accumulated = []
     first_agent = _node_agent_id(run, order[0]) if order else "all"
     for i, nid in enumerate(order):
         if i + 1 < len(order):
             to = _node_agent_id(run, order[i + 1])
         else:
             to = first_agent
-        # Forward full chain: each node sees all previous contributions
-        context = "\n\n---\n\n".join(accumulated) if accumulated else ""
+        # Compressed context: older outputs summarized, last one full
+        context = _build_compressed_context(accumulated) if accumulated else ""
         output = await _execute_node(
             run, nid, task, context_from=context, to_agent_id=to,
         )
@@ -1207,6 +1337,57 @@ async def _run_aggregator(run: PatternRun, task: str):
         f"Contributions :\n{combined}",
         context_from=combined, to_agent_id="all",
     )
+
+
+async def _run_wave(run: PatternRun, task: str):
+    """Wave execution: parallel within waves, sequential across waves.
+
+    Analyzes the dependency graph and groups independent nodes into waves.
+    Agents within a wave run in parallel (asyncio.gather).
+    Each wave waits for the previous wave to complete.
+    Context from previous waves is compressed to prevent context rot.
+    """
+    waves = _compute_waves(run.pattern)
+    if not waves:
+        return
+
+    accumulated = []  # compressed outputs from all previous waves
+
+    for wave_idx, wave_nodes in enumerate(waves):
+        wave_label = f"Wave {wave_idx + 1}/{len(waves)}"
+        logger.info("Wave execution: %s — %d agents in parallel", wave_label, len(wave_nodes))
+
+        # Announce wave
+        await _sse(run, {
+            "type": "message",
+            "content": f"{wave_label} — {len(wave_nodes)} agent(s) en parallele",
+            "from_agent": "system",
+        })
+
+        # Build compressed context from previous waves
+        context = _build_compressed_context(accumulated) if accumulated else ""
+
+        if len(wave_nodes) == 1:
+            # Single node — run directly
+            nid = wave_nodes[0]
+            to = "all"
+            output = await _execute_node(run, nid, task, context_from=context, to_agent_id=to)
+            ns = run.nodes.get(nid)
+            label = ns.agent.name if ns and ns.agent else nid
+            accumulated.append(f"[{label}]:\n{output}")
+        else:
+            # Multiple nodes — run in parallel
+            coros = [
+                _execute_node(run, nid, task, context_from=context, to_agent_id="all")
+                for nid in wave_nodes
+            ]
+            results = await asyncio.gather(*coros, return_exceptions=True)
+
+            for nid, result in zip(wave_nodes, results):
+                ns = run.nodes.get(nid)
+                label = ns.agent.name if ns and ns.agent else nid
+                output = result if isinstance(result, str) else str(result)
+                accumulated.append(f"[{label}]:\n{output}")
 
 
 async def _run_human_in_the_loop(run: PatternRun, task: str):

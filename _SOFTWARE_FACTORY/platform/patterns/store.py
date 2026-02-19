@@ -298,6 +298,21 @@ class PatternStore:
                 ],
                 config={"checkpoint_message": "En attente de validation humaine..."},
             ),
+            # ── Wave: parallel within waves, sequential across ──
+            PatternDef(
+                id="wave", name="Wave", type="wave",
+                description="Les agents independants s'executent en parallele par vagues. Les dependances determinent l'ordre des vagues.",
+                icon="layers", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "", "label": "Agent A", "x": 100, "y": 100},
+                    {"id": "n2", "agent_id": "", "label": "Agent B", "x": 300, "y": 100},
+                    {"id": "n3", "agent_id": "", "label": "Agent C", "x": 200, "y": 300},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n3", "type": "sequential"},
+                    {"from": "n2", "to": "n3", "type": "sequential"},
+                ],
+            ),
         ]
 
         for p in builtins:
