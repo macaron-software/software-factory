@@ -1724,6 +1724,26 @@ _execute_node(run, node_id, task) → agent LLM call
 - VETO/APPROVE détecté dans content
 - Tools: code_edit, code_read, code_search, git, deploy, memory
 
+**Adversarial Guard (dans _execute_node):**
+```
+Agent output → L0 fast (regex slop/mock/hallucination) → L1 semantic (LLM)
+    ↓ REJECT?
+Retry loop: feedback injection → re-run agent → re-check (max 2 retries)
+    ↓ still REJECT after 3 attempts?
+NodeStatus.FAILED + rejection prepended to content
+```
+- L0: slop patterns, mock/stub, hallucination claims, lies, echo, min length
+- L1: semantic LLM review (diff model than producer) — only for execution patterns
+- Skip L1 for discussion patterns (network, human-in-the-loop)
+- Skip TOO_SHORT when agent used code_write/code_edit tools
+- Non-blocking phases: FAILED → downgrade to DONE, rebuild LLM summary
+
+**Dev Sprint Protocols (compressed, télégraphique):**
+- `_EXEC_PROTOCOL`: "Round 1: list_files. Round 2+: code_write ONLY. 30+ lines per file."
+- `_DECOMPOSE_PROTOCOL`: "Split into [SUBTASK 1]...[SUBTASK N]. 1 file = 1 subtask."
+- Write-only tool stripping: after round 1 without code_write, remove read-only tools
+- Smart fallback: if lead fails to decompose, parse architecture for file paths + distribute
+
 ### MISSION CONTROL (Mega-Workflow Lifecycle)
 
 **CDP (Alexandre Moreau) orchestre 11 phases product lifecycle:**
