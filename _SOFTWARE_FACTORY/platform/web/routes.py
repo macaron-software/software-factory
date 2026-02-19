@@ -5490,7 +5490,7 @@ async def mission_control_page(request: Request, mission_id: str):
         for f in tool_features:
             po_done.append({"name": f, "description": "", "acceptance_criteria": "", "priority": 5, "story_points": 0, "assigned_to": ""})
 
-    # QA: Agent adversarial scores
+    # QA: Agent adversarial scores (moved to Phases tab as collapsible)
     agent_scores = []
     qa_total_accepted = 0
     qa_total_rejected = 0
@@ -5507,6 +5507,57 @@ async def mission_control_page(request: Request, mission_id: str):
     except Exception:
         pass
     qa_pass_rate = round(qa_total_accepted / qa_total_iterations * 100) if qa_total_iterations > 0 else 0
+
+    # QA: Test files in workspace
+    qa_test_files = []
+    if ws_path and Path(ws_path).exists():
+        ws = Path(ws_path)
+        test_globs = ["**/test_*.py", "**/*_test.py", "**/*.test.ts", "**/*.test.js",
+                      "**/*.spec.ts", "**/*.spec.js", "**/Tests/**/*.swift", "**/*Test.swift",
+                      "**/*Test.kt", "**/*Test.java", "tests/**/*", "test/**/*", "__tests__/**/*"]
+        seen = set()
+        for pat in test_globs:
+            for tf in ws.glob(pat):
+                if tf.is_file() and tf.suffix in (".py", ".ts", ".js", ".swift", ".kt", ".java") and str(tf) not in seen:
+                    seen.add(str(tf))
+                    rel = str(tf.relative_to(ws))
+                    # Determine test type from path/name
+                    ttype = "unit"
+                    lower = rel.lower()
+                    if "e2e" in lower or "integration" in lower or "journey" in lower:
+                        ttype = "e2e"
+                    elif "smoke" in lower:
+                        ttype = "smoke"
+                    elif "ui" in lower or "ihm" in lower or "browser" in lower or "spec" in lower:
+                        ttype = "e2e-ihm"
+                    qa_test_files.append({"path": rel, "type": ttype})
+        qa_test_files = sorted(qa_test_files, key=lambda x: x["type"])[:30]
+
+    # QA: Extract test results from QA/test phase messages
+    qa_phase_results = []
+    if wf:
+        for wp in wf.phases:
+            pk = wp.name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
+            if "qa" in pk or "test" in pk:
+                pmsgs = phase_messages.get(wp.id, [])
+                for m in pmsgs:
+                    content = m.get("content", "")
+                    if not content:
+                        continue
+                    # Extract test-like results from agent messages
+                    import re as _re_qa
+                    # Look for pass/fail indicators
+                    passes = len(_re_qa.findall(r'(?:✅|PASS|passed|réussi|OK)', content, _re_qa.IGNORECASE))
+                    fails = len(_re_qa.findall(r'(?:❌|FAIL|failed|échoué|ERROR|KO)', content, _re_qa.IGNORECASE))
+                    if passes or fails:
+                        agent = m.get("from_agent", "unknown")
+                        qa_phase_results.append({
+                            "phase": wp.name,
+                            "agent": agent,
+                            "passes": passes,
+                            "fails": fails,
+                            "excerpt": content[:300],
+                        })
 
     return _templates(request).TemplateResponse("mission_control.html", {
         "request": request,
@@ -5541,6 +5592,8 @@ async def mission_control_page(request: Request, mission_id: str):
         "qa_total_accepted": qa_total_accepted,
         "qa_total_rejected": qa_total_rejected,
         "qa_total_iterations": qa_total_iterations,
+        "qa_test_files": qa_test_files,
+        "qa_phase_results": qa_phase_results,
     })
 
 

@@ -400,7 +400,32 @@
 .mc-kanban-priority.p3,.mc-kanban-priority.p4{background:rgba(63,185,80,.12);color:#3fb950}
 
 /* ====== QA TAB ====== */
-.mc-qa-scores h4{font-size:0.78rem;color:var(--text-primary);margin:0 0 0.6rem;font-weight:700}
+.mc-qa-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin-bottom:0.6rem}
+.mc-qa-section h4{font-size:0.78rem;color:var(--text-primary);margin:0 0 0.6rem;font-weight:700}
+.mc-qa-empty{font-size:0.72rem;color:var(--text-secondary);font-style:italic;padding:0.5rem 0}
+.mc-qa-test-grid{display:flex;flex-direction:column;gap:0.3rem}
+.mc-qa-test-file{display:flex;align-items:center;gap:0.5rem;font-size:0.72rem;padding:0.3rem 0.5rem;background:var(--bg-tertiary);border-radius:6px}
+.mc-qa-test-path{color:var(--text-primary);font-family:var(--font-mono);font-size:0.68rem}
+.mc-qa-test-badge{font-size:0.6rem;font-weight:700;padding:2px 6px;border-radius:4px;text-transform:uppercase;white-space:nowrap}
+.mc-qa-badge-unit{background:rgba(139,92,246,.2);color:#a78bfa}
+.mc-qa-badge-e2e{background:rgba(59,130,246,.2);color:#60a5fa}
+.mc-qa-badge-e2e-ihm{background:rgba(236,72,153,.2);color:#f472b6}
+.mc-qa-badge-smoke{background:rgba(245,158,11,.2);color:#fbbf24}
+.mc-qa-results{display:flex;flex-direction:column;gap:0.5rem}
+.mc-qa-result-card{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:0.6rem;overflow:hidden}
+.mc-qa-result-header{display:flex;align-items:center;gap:0.5rem;font-size:0.7rem;margin-bottom:0.4rem;flex-wrap:wrap}
+.mc-qa-result-phase{font-weight:600;color:var(--text-primary)}
+.mc-qa-result-agent{color:var(--purple-light);font-size:0.65rem}
+.mc-qa-result-excerpt{font-size:0.68rem;color:var(--text-secondary);max-height:120px;overflow-y:auto;line-height:1.4}
+.mc-qa-result-excerpt p{margin:0.2rem 0}
+.mc-qa-screenshots-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:0.6rem}
+.mc-qa-shot-card{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.mc-qa-shot-label{padding:4px 8px;font-size:0.65rem;color:var(--text-secondary)}
+.mc-qa-adversarial-details{cursor:pointer}
+.mc-qa-adversarial-details summary{list-style:none;user-select:none}
+.mc-qa-adversarial-details summary::-webkit-details-marker{display:none}
+.mc-qa-adversarial-details summary h4::before{content:'▸ ';font-size:0.7rem}
+.mc-qa-adversarial-details[open] summary h4::before{content:'▾ '}
 .mc-qa-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.6rem;margin-bottom:1rem}
 .mc-qa-agent-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.6rem}
 .mc-qa-agent-name{font-size:0.75rem;font-weight:600;color:var(--text-primary);margin-bottom:0.3rem}
@@ -652,9 +677,66 @@
         <!-- Tab: QA -->
         <div class="mc-tab-panel" data-tab="qa">
             <div class="mc-qa">
-                <div class="mc-qa-scores">
-                    <h4>Adversarial Guard — Scores Agents</h4>
-                    <div class="mc-qa-grid">
+
+                <!-- Section 1: Tests unitaires & E2E trouvés dans le workspace -->
+                <div class="mc-qa-section">
+                    <h4>Tests — Fichiers</h4>
+                    {% if qa_test_files %}
+                    <div class="mc-qa-test-grid">
+                        {% for tf in qa_test_files %}
+                        <div class="mc-qa-test-file">
+                            <span class="mc-qa-test-badge mc-qa-badge-{{ tf.type }}">{{ tf.type }}</span>
+                            <span class="mc-qa-test-path">{{ tf.path }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="mc-qa-empty">Aucun fichier de test dans le workspace</div>
+                    {% endif %}
+                </div>
+
+                <!-- Section 2: Résultats d'exécution QA -->
+                <div class="mc-qa-section">
+                    <h4>Résultats d'exécution</h4>
+                    {% if qa_phase_results %}
+                    <div class="mc-qa-results">
+                        {% for r in qa_phase_results %}
+                        <div class="mc-qa-result-card">
+                            <div class="mc-qa-result-header">
+                                <span class="mc-qa-result-phase">{{ r.phase }}</span>
+                                <span class="mc-qa-result-agent">{{ r.agent }}</span>
+                                <span class="mc-qa-ok">{{ r.passes }} pass</span>
+                                <span class="mc-qa-ko">{{ r.fails }} fail</span>
+                            </div>
+                            <div class="mc-qa-result-excerpt">{{ r.excerpt | markdown | safe }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="mc-qa-empty">Aucun résultat de test</div>
+                    {% endif %}
+                </div>
+
+                <!-- Section 3: Screenshots parcours utilisateur -->
+                {% if result_screenshots %}
+                <div class="mc-qa-section">
+                    <h4>Parcours utilisateur — Screenshots</h4>
+                    <div class="mc-qa-screenshots-grid">
+                        {% for s in result_screenshots %}
+                        <div class="mc-qa-shot-card">
+                            <img src="/workspace/{{ mission.id }}/{{ s }}" alt="{{ s }}" loading="lazy" onclick="window.open(this.src)" onerror="this.parentElement.style.display='none'" style="width:100%;cursor:pointer;border-radius:6px">
+                            <div class="mc-qa-shot-label">{{ s.split('/')[-1] }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Section 4: Adversarial Guard (collapsible) -->
+                {% if agent_scores %}
+                <details class="mc-qa-section mc-qa-adversarial-details">
+                    <summary><h4 style="display:inline">Adversarial Guard — Code Review ({{ qa_pass_rate }}% pass)</h4></summary>
+                    <div class="mc-qa-grid" style="margin-top:0.5rem">
                         {% for s in agent_scores %}
                         <div class="mc-qa-agent-card">
                             <div class="mc-qa-agent-name">{{ s.agent_id }}</div>
@@ -662,32 +744,19 @@
                                 <div class="mc-qa-bar-fill" style="width:{{ (s.accepted / s.iterations * 100)|round if s.iterations > 0 else 0 }}%;background:{{ 'var(--green)' if s.accepted > s.rejected else 'var(--red)' }}"></div>
                             </div>
                             <div class="mc-qa-agent-stats">
-                                <span class="mc-qa-ok">✓ {{ s.accepted }}</span>
-                                <span class="mc-qa-ko">✗ {{ s.rejected }}</span>
+                                <span class="mc-qa-ok">{{ s.accepted }}</span>
+                                <span class="mc-qa-ko">{{ s.rejected }}</span>
                                 <span class="mc-qa-total">{{ s.iterations }} iter</span>
                             </div>
                         </div>
                         {% endfor %}
                     </div>
-                </div>
-                <div class="mc-qa-metrics">
-                    <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_pass_rate }}%</span><span class="mc-qa-metric-label">Pass Rate</span></div>
-                    <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_iterations }}</span><span class="mc-qa-metric-label">Iterations</span></div>
-                    <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_accepted }}</span><span class="mc-qa-metric-label">Accepted</span></div>
-                    <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_rejected }}</span><span class="mc-qa-metric-label">Rejected</span></div>
-                </div>
-                {% if result_screenshots %}
-                <div class="mc-qa-screenshots" style="margin-top:1rem">
-                    <h4>📸 QA Screenshots — Parcours Utilisateur</h4>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.75rem;margin-top:0.5rem">
-                        {% for s in result_screenshots %}
-                        <div style="background:var(--bg-tertiary);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden">
-                            <img src="/workspace/{{ mission.id }}/{{ s }}" alt="{{ s }}" loading="lazy" onclick="window.open(this.src)" onerror="this.parentElement.style.display='none'" style="width:100%;cursor:pointer">
-                            <div style="padding:6px 10px;font-size:0.7rem;color:var(--text-secondary)">{{ s.split('/')[-1] }}</div>
-                        </div>
-                        {% endfor %}
+                    <div class="mc-qa-metrics" style="margin-top:0.5rem">
+                        <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_iterations }}</span><span class="mc-qa-metric-label">Iterations</span></div>
+                        <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_accepted }}</span><span class="mc-qa-metric-label">Accepted</span></div>
+                        <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_rejected }}</span><span class="mc-qa-metric-label">Rejected</span></div>
                     </div>
-                </div>
+                </details>
                 {% endif %}
             </div>
         </div>
