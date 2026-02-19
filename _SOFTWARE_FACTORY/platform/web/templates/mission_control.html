@@ -354,6 +354,12 @@
 <div class="mc-layout">
     <!-- ====== MAIN: Timeline + Accordions ====== -->
     <div class="mc-main">
+        {% if mission.brief %}
+        <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.85rem;margin-bottom:0.5rem;display:flex;align-items:baseline;gap:0.5rem">
+            <span style="font-size:0.7rem;color:var(--purple);font-weight:700;white-space:nowrap">DEMANDE</span>
+            <span style="font-size:0.82rem;color:var(--text-primary);line-height:1.4">{{ mission.brief }}</span>
+        </div>
+        {% endif %}
         <div class="mc-stats">
             <div class="mc-stat-item"><span class="val" id="mc-done-count">{{ mission.phases|selectattr('status.value','equalto','done')|list|length }}</span>/<span>{{ mission.phases|length }}</span> phases</div>
             <div class="mc-progress-bar"><div class="mc-progress-fill" id="mc-progress-bar" style="width:{{ ((mission.phases|selectattr('status.value','equalto','done')|list|length / mission.phases|length) * 100)|round|int if mission.phases|length > 0 else 0 }}%"></div></div>
