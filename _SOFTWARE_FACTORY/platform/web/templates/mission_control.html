@@ -676,6 +676,19 @@
                     <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_accepted }}</span><span class="mc-qa-metric-label">Accepted</span></div>
                     <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_rejected }}</span><span class="mc-qa-metric-label">Rejected</span></div>
                 </div>
+                {% if result_screenshots %}
+                <div class="mc-qa-screenshots" style="margin-top:1rem">
+                    <h4>📸 QA Screenshots — Parcours Utilisateur</h4>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.75rem;margin-top:0.5rem">
+                        {% for s in result_screenshots %}
+                        <div style="background:var(--bg-tertiary);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden">
+                            <img src="/workspace/{{ mission.id }}/{{ s }}" alt="{{ s }}" loading="lazy" onclick="window.open(this.src)" onerror="this.parentElement.style.display='none'" style="width:100%;cursor:pointer">
+                            <div style="padding:6px 10px;font-size:0.7rem;color:var(--text-secondary)">{{ s.split('/')[-1] }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
 

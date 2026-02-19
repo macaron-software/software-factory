@@ -5210,6 +5210,21 @@ async def mission_control_page(request: Request, mission_id: str):
         if shots:
             phase_screenshots[pid] = shots[:6]  # max 6 thumbnails per phase
 
+    # Also scan workspace screenshots/ directory for QA/test phases
+    if mission.workspace_path:
+        _ws_shots_dir = Path(mission.workspace_path) / "screenshots"
+        if _ws_shots_dir.exists():
+            _ws_shots = sorted(
+                [f"screenshots/{f.name}" for f in _ws_shots_dir.glob("*.png")
+                 if f.stat().st_size > 1000],
+            )
+            if _ws_shots:
+                # Assign to QA phases that don't already have screenshots
+                for pid in ("qa-campaign", "qa-execution", "test"):
+                    if pid not in phase_screenshots:
+                        phase_screenshots[pid] = _ws_shots[:6]
+                        break
+
     # Memory entries — project-specific only, filtered to meaningful content
     memories = []
     _useful_cats = {"product", "architecture", "security", "development", "quality",
@@ -6473,6 +6488,401 @@ const {{ chromium }} = require('playwright');
             })
         except Exception as e:
             logger.error("Post-phase deploy summary failed: %s", e)
+
+    # After QA phases: auto-build + screenshot pipeline (deterministic, no LLM)
+    if "qa" in phase_key or "test" in phase_key:
+        ws = Path(workspace)
+        try:
+            platform_type = _detect_project_platform(str(ws))
+            screenshots = await _auto_qa_screenshots(ws, platform_type)
+            if screenshots:
+                shot_content = f"📸 QA Screenshots ({platform_type}) — {len(screenshots)} captures :\n"
+                shot_content += "\n".join(f"[SCREENSHOT:{s}]" for s in screenshots)
+                await push_sse(session_id, {
+                    "type": "message",
+                    "from_agent": "system",
+                    "from_name": "QA Pipeline",
+                    "from_role": "Automated QA",
+                    "content": shot_content,
+                    "phase_id": phase_id,
+                    "msg_type": "text",
+                })
+        except Exception as e:
+            logger.error("Post-phase QA screenshots failed: %s", e)
+
+
+async def _auto_qa_screenshots(ws: "Path", platform_type: str) -> list[str]:
+    """Deterministic screenshot pipeline — build, run, capture. No LLM."""
+    screenshots_dir = ws / "screenshots"
+    screenshots_dir.mkdir(exist_ok=True)
+
+    if platform_type == "macos-native":
+        results = await _qa_screenshots_macos(ws, screenshots_dir)
+    elif platform_type == "ios-native":
+        results = await _qa_screenshots_ios(ws, screenshots_dir)
+    elif platform_type in ("web-docker", "web-node", "web-static"):
+        results = await _qa_screenshots_web(ws, screenshots_dir, platform_type)
+    else:
+        return []
+
+    # Filter out tiny/empty screenshots
+    return [r for r in results if (ws / r).exists() and (ws / r).stat().st_size > 1000]
+
+
+async def _qa_screenshots_macos(ws: "Path", shots_dir: "Path") -> list[str]:
+    """Build Swift app, run it, screenshot the window, kill it."""
+    import subprocess
+    import asyncio as _aio
+
+    results = []
+
+    # 1. Ensure Package.swift exists
+    pkg = ws / "Package.swift"
+    if not pkg.exists() and (ws / "Sources").exists():
+        app_name = "App"
+        for sf in (ws / "Sources").rglob("*App.swift"):
+            app_name = sf.stem.replace("App", "") or "App"
+            break
+
+        # Detect duplicate filenames and .bak files to exclude
+        from collections import Counter
+        swift_files = list((ws / "Sources").rglob("*.swift"))
+        name_counts = Counter(f.name for f in swift_files)
+        excludes = []
+        seen_names = set()
+        for sf in sorted(swift_files, key=lambda f: len(str(f))):
+            rel = str(sf.relative_to(ws / "Sources"))
+            if sf.suffix == ".bak" or rel.endswith(".bak"):
+                continue
+            if sf.name in seen_names and name_counts[sf.name] > 1:
+                excludes.append(f'"{rel}"')
+            seen_names.add(sf.name)
+
+        # Also exclude .bak files
+        for sf in (ws / "Sources").rglob("*.bak"):
+            excludes.append(f'"{str(sf.relative_to(ws / "Sources"))}"')
+
+        exclude_clause = ""
+        if excludes:
+            exclude_clause = f',\n            exclude: [{", ".join(excludes)}]'
+
+        pkg.write_text(
+            f'// swift-tools-version:5.9\n'
+            f'import PackageDescription\n\n'
+            f'let package = Package(\n'
+            f'    name: "{app_name}",\n'
+            f'    platforms: [.macOS(.v14)],\n'
+            f'    targets: [\n'
+            f'        .executableTarget(\n'
+            f'            name: "{app_name}",\n'
+            f'            path: "Sources"{exclude_clause}\n'
+            f'        ),\n'
+            f'    ]\n'
+            f')\n'
+        )
+        logger.info("Auto-generated Package.swift for %s (excluding %d files)", app_name, len(excludes))
+
+    # 2. Build
+    build_result = subprocess.run(
+        ["xcrun", "swift", "build"],
+        cwd=str(ws), capture_output=True, text=True, timeout=120,
+    )
+    build_log = (build_result.stdout + "\n" + build_result.stderr)[-3000:]
+    (shots_dir / "build_log.txt").write_text(build_log)
+
+    if build_result.returncode != 0:
+        _write_status_png(shots_dir / "01_build_failed.png", "BUILD FAILED ❌",
+                          build_log[-1200:], bg_color=(40, 10, 10))
+        results.append("screenshots/01_build_failed.png")
+        return results
+
+    _write_status_png(shots_dir / "01_build_success.png", "BUILD SUCCESS ✅",
+                      build_log[-400:], bg_color=(10, 40, 10))
+    results.append("screenshots/01_build_success.png")
+
+    # 3. Find the built binary
+    binary = None
+    for d in [ws / ".build" / "debug", ws / ".build" / "release"]:
+        if d.exists():
+            for f in d.iterdir():
+                if f.is_file() and f.stat().st_mode & 0o111 and not f.suffix and f.name != "ModuleCache":
+                    binary = f
+                    break
+            if binary:
+                break
+
+    if not binary:
+        _write_status_png(shots_dir / "02_no_binary.png", "NO EXECUTABLE",
+                          "Build produced no runnable binary.", bg_color=(40, 30, 10))
+        results.append("screenshots/02_no_binary.png")
+        return results
+
+    # 4. Launch, screenshot, kill
+    proc = None
+    try:
+        proc = subprocess.Popen(
+            [str(binary)], cwd=str(ws),
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        await _aio.sleep(3)
+
+        # Full screen capture (most reliable)
+        subprocess.run(
+            ["screencapture", "-x", str(shots_dir / "02_app_launch.png")],
+            timeout=10, capture_output=True,
+        )
+        results.append("screenshots/02_app_launch.png")
+
+        # Try window-specific capture
+        _capture_app_window(binary.name, shots_dir / "03_main_window.png")
+        if (shots_dir / "03_main_window.png").exists():
+            results.append("screenshots/03_main_window.png")
+
+        await _aio.sleep(2)
+        subprocess.run(
+            ["screencapture", "-x", str(shots_dir / "04_app_loaded.png")],
+            timeout=10, capture_output=True,
+        )
+        results.append("screenshots/04_app_loaded.png")
+    except Exception as e:
+        _write_status_png(shots_dir / "02_launch_error.png", "LAUNCH FAILED",
+                          str(e)[:500], bg_color=(40, 10, 10))
+        results.append("screenshots/02_launch_error.png")
+    finally:
+        if proc:
+            try:
+                import os
+                os.killpg(os.getpgid(proc.pid), 9)
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+    return results
+
+
+async def _qa_screenshots_ios(ws: "Path", shots_dir: "Path") -> list[str]:
+    """Build iOS app for simulator, boot sim, screenshot."""
+    import subprocess
+    import asyncio as _aio
+
+    results = []
+    has_xcproj = any(ws.glob("*.xcodeproj")) or any(ws.glob("*.xcworkspace"))
+
+    if has_xcproj:
+        build_result = subprocess.run(
+            ["xcodebuild", "-scheme", "App", "-sdk", "iphonesimulator",
+             "-destination", "platform=iOS Simulator,name=iPhone 16",
+             "-derivedDataPath", str(ws / ".build"), "build"],
+            cwd=str(ws), capture_output=True, text=True, timeout=180,
+        )
+    else:
+        build_result = subprocess.run(
+            ["xcrun", "swift", "build"],
+            cwd=str(ws), capture_output=True, text=True, timeout=120,
+        )
+
+    build_log = (build_result.stdout + "\n" + build_result.stderr)[-2000:]
+    if build_result.returncode != 0:
+        _write_status_png(shots_dir / "01_ios_build_failed.png", "iOS BUILD FAILED ❌",
+                          build_log[-1000:], bg_color=(40, 10, 10))
+        results.append("screenshots/01_ios_build_failed.png")
+        return results
+
+    _write_status_png(shots_dir / "01_ios_build_success.png", "iOS BUILD ✅",
+                      build_log[-400:], bg_color=(10, 40, 10))
+    results.append("screenshots/01_ios_build_success.png")
+
+    # Boot simulator + screenshot
+    try:
+        subprocess.run(["xcrun", "simctl", "boot", "iPhone 16"],
+                       capture_output=True, timeout=30)
+        await _aio.sleep(3)
+        subprocess.run(
+            ["xcrun", "simctl", "io", "booted", "screenshot",
+             str(shots_dir / "02_simulator.png")],
+            capture_output=True, timeout=15,
+        )
+        if (shots_dir / "02_simulator.png").exists():
+            results.append("screenshots/02_simulator.png")
+    except Exception as e:
+        logger.error("iOS simulator screenshot failed: %s", e)
+    return results
+
+
+async def _qa_screenshots_web(ws: "Path", shots_dir: "Path", platform_type: str) -> list[str]:
+    """Start web server, take Playwright screenshots."""
+    import subprocess
+    import asyncio as _aio
+
+    results = []
+    proc = None
+    port = 18234
+
+    try:
+        if platform_type == "web-docker":
+            r = subprocess.run(
+                ["docker", "build", "-t", "qa-screenshot-app", "."],
+                cwd=str(ws), capture_output=True, text=True, timeout=180,
+            )
+            if r.returncode == 0:
+                proc = subprocess.Popen(
+                    ["docker", "run", "--rm", "--name", "qa-screenshot-app",
+                     "-p", f"{port}:8080", "qa-screenshot-app"],
+                    cwd=str(ws), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+        elif platform_type == "web-node":
+            subprocess.run(["npm", "install"], cwd=str(ws), capture_output=True, timeout=60)
+            proc = subprocess.Popen(
+                ["npm", "start"], cwd=str(ws),
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                start_new_session=True,
+                env={**__import__("os").environ, "PORT": str(port)},
+            )
+        elif platform_type == "web-static":
+            proc = subprocess.Popen(
+                ["python3", "-m", "http.server", str(port)],
+                cwd=str(ws), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+
+        if proc:
+            await _aio.sleep(4)
+
+            routes = ["/"]
+            for hf in list(ws.rglob("*.html"))[:5]:
+                rel = str(hf.relative_to(ws))
+                if rel != "index.html" and not rel.startswith("."):
+                    routes.append(f"/{rel}")
+
+            for i, route in enumerate(routes[:5]):
+                fname = f"0{i+1}_{'index' if route == '/' else route.strip('/').replace('/', '_')}.png"
+                shot_script = f"""
+const {{ chromium }} = require('playwright');
+(async () => {{
+    const browser = await chromium.launch();
+    const page = await browser.newPage({{ viewport: {{ width: 1280, height: 720 }} }});
+    try {{
+        await page.goto('http://localhost:{port}{route}', {{ waitUntil: 'networkidle', timeout: 15000 }});
+        await page.screenshot({{ path: '{shots_dir / fname}', fullPage: true }});
+    }} catch(e) {{ console.error(e.message); }}
+    await browser.close();
+}})();
+"""
+                subprocess.run(["node", "-e", shot_script],
+                               capture_output=True, text=True, timeout=30)
+                if (shots_dir / fname).exists():
+                    results.append(f"screenshots/{fname}")
+    except Exception as e:
+        logger.error("Web screenshot pipeline failed: %s", e)
+    finally:
+        if proc:
+            try:
+                import os
+                os.killpg(os.getpgid(proc.pid), 9)
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+            if platform_type == "web-docker":
+                subprocess.run(["docker", "rm", "-f", "qa-screenshot-app"],
+                               capture_output=True, timeout=10)
+    return results
+
+
+def _capture_app_window(app_name: str, output_path: "Path"):
+    """Capture specific app window via AppleScript + screencapture."""
+    import subprocess
+    try:
+        script = (
+            'tell application "System Events"\n'
+            f'  set appProc to first process whose name contains "{app_name}"\n'
+            '  set wID to id of first window of appProc\n'
+            '  return wID\n'
+            'end tell'
+        )
+        r = subprocess.run(["osascript", "-e", script],
+                           capture_output=True, text=True, timeout=10)
+        if r.returncode == 0 and r.stdout.strip():
+            subprocess.run(["screencapture", "-l", r.stdout.strip(), str(output_path)],
+                           timeout=10, capture_output=True)
+    except Exception:
+        pass
+
+
+def _write_status_png(path: "Path", title: str, body: str,
+                      bg_color: tuple = (26, 17, 40), width: int = 800, height: int = 400):
+    """Generate a status PNG with readable text using Pillow."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+
+        lines = body.split("\n")
+        line_h = 16
+        pad = 20
+        title_h = 36
+        img_w = max(width, 600)
+        img_h = max(height, len(lines) * line_h + pad * 2 + title_h + 20)
+
+        img = Image.new("RGB", (img_w, img_h), bg_color)
+        draw = ImageDraw.Draw(img)
+
+        # Title bar
+        draw.rectangle([0, 0, img_w, title_h], fill=(37, 26, 53))
+        draw.line([0, title_h, img_w, title_h], fill=(168, 85, 247), width=2)
+
+        # Use default font (monospace-like)
+        try:
+            font = ImageFont.truetype("/System/Library/Fonts/Menlo.ttc", 13)
+            title_font = ImageFont.truetype("/System/Library/Fonts/Menlo.ttc", 15)
+        except Exception:
+            font = ImageFont.load_default()
+            title_font = font
+
+        # Title text
+        draw.text((pad, 8), title, fill=(255, 255, 255), font=title_font)
+
+        # Body text
+        y = title_h + pad
+        for line in lines:
+            # Truncate long lines
+            if len(line) > 100:
+                line = line[:97] + "..."
+            color = (200, 200, 200)
+            if "error" in line.lower() or "failed" in line.lower():
+                color = (255, 100, 100)
+            elif "warning" in line.lower():
+                color = (255, 200, 80)
+            elif "success" in line.lower() or "✅" in line:
+                color = (100, 255, 100)
+            draw.text((pad, y), line, fill=color, font=font)
+            y += line_h
+            if y > img_h - pad:
+                draw.text((pad, y), "... (truncated)", fill=(150, 150, 150), font=font)
+                break
+
+        img.save(str(path), "PNG")
+    except ImportError:
+        # Fallback: minimal PNG without text
+        import struct, zlib
+        img_w, img_h = 400, 100
+        raw = b""
+        for y in range(img_h):
+            raw += b"\x00" + bytes(bg_color) * img_w
+        def _ch(ct, d):
+            c = ct + d
+            return struct.pack(">I", len(d)) + c + struct.pack(">I", zlib.crc32(c) & 0xffffffff)
+        ihdr = struct.pack(">IIBBBBB", img_w, img_h, 8, 2, 0, 0, 0)
+        with open(str(path), "wb") as f:
+            f.write(b"\x89PNG\r\n\x1a\n")
+            f.write(_ch(b"IHDR", ihdr))
+            f.write(_ch(b"IDAT", zlib.compress(raw)))
+            f.write(_ch(b"IEND", b""))
+
+    # Also write readable text
+    path.with_suffix(".txt").write_text(f"=== {title} ===\n\n{body}")
 
 
 def _detect_project_platform(workspace_path: str) -> str:
