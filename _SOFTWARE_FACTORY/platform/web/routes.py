@@ -5408,7 +5408,7 @@ async def mission_control_page(request: Request, mission_id: str):
                         pass
                     result_build_cmd = f"xcodegen generate && xcodebuild -scheme {scheme} -configuration Debug build"
                     result_run_cmd = f"open build/Debug/{scheme}.app"
-                    result_launch_cmd = f"open -a Simulator && open build/Debug/{scheme}.app"
+                    result_launch_cmd = f"xcodegen generate && xcodebuild -scheme {scheme} -configuration Debug build && open build/Debug/{scheme}.app"
                 else:
                     result_build_cmd = "swift build"
                     result_run_cmd = "swift run"
@@ -5715,10 +5715,16 @@ async def api_mission_exec(request: Request, mission_id: str):
     if any(b in cmd for b in blocked):
         return JSONResponse({"error": "Command blocked"}, status_code=403)
 
+    # Adaptive timeout: build commands need more time
+    timeout = 60
+    build_keywords = ("xcodebuild", "xcodegen", "gradle", "cargo build", "npm run build", "docker build", "swift build")
+    if any(bk in cmd for bk in build_keywords):
+        timeout = 300  # 5 minutes for builds
+
     try:
         result = _sp.run(
             cmd, shell=True, cwd=ws,
-            capture_output=True, text=True, timeout=60,
+            capture_output=True, text=True, timeout=timeout,
             env={**_os.environ, "TERM": "dumb"},
         )
         return JSONResponse({
@@ -5728,7 +5734,7 @@ async def api_mission_exec(request: Request, mission_id: str):
             "command": cmd,
         })
     except _sp.TimeoutExpired:
-        return JSONResponse({"error": "Timeout (60s)", "command": cmd}, status_code=408)
+        return JSONResponse({"error": f"Timeout ({timeout}s)", "command": cmd}, status_code=408)
     except Exception as e:
         return JSONResponse({"error": str(e), "command": cmd}, status_code=500)
 

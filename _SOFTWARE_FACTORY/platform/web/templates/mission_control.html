@@ -1195,7 +1195,8 @@ document.querySelectorAll('.mc-exec-btn').forEach(btn => {
         // Show terminal
         term.style.display = 'block';
         termCmd.textContent = '$ ' + rawCmd;
-        termStatus.textContent = '⏳ Running...';
+        const isBuild = /xcodebuild|gradle|cargo build|npm run build|docker build|swift build/.test(rawCmd);
+        termStatus.textContent = isBuild ? '⏳ Building... (peut prendre quelques minutes)' : '⏳ Running...';
         termStatus.style.color = 'var(--purple-light)';
         termOut.textContent = '';
 
