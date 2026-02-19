@@ -345,7 +345,8 @@ async def _execute_node(
     rank = getattr(agent, "hierarchy_rank", 50)
     has_project = bool(run.project_id)
     # Strategic/executive agents always discuss — never code
-    is_strategic = rank <= 15 or any(k in role_lower for k in ("dsi", "cto", "cpo", "portfolio", "directeur", "chef de programme"))
+    # Only C-level and portfolio roles (rank <= 10 or explicit executive titles)
+    is_strategic = rank <= 10 or any(k in role_lower for k in ("dsi", "cpo", "portfolio", "directeur", "chef de programme"))
     if is_strategic:
         full_task += _RESEARCH_PROTOCOL
     elif has_project:
@@ -623,12 +624,12 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
             pass
 
     has_project = bool(run.project_id)
-    # Enable tools only for execution phases with a real workspace AND dev-role agents
-    # Ideation/research/comite agents should stream directly without tool round overhead
+    # Enable tools for agents that actually work (dev, qa, lead, scrum, devops, security)
+    # Only disable for C-level executives (DSI, CPO, portfolio, directeur programme)
     rank = getattr(agent, "hierarchy_rank", 50)
     role_lower = (agent.role or "").lower()
-    is_dev_agent = rank >= 40 or any(k in role_lower for k in ("dev", "qa", "test", "devops", "pipeline", "sre", "secur", "secu"))
-    tools_for_agent = has_project and bool(project_path) and is_dev_agent
+    is_executive = rank <= 10 or any(k in role_lower for k in ("dsi", "cpo", "portfolio", "directeur", "chef de programme"))
+    tools_for_agent = has_project and bool(project_path) and not is_executive
 
     # Role-based tool filtering — each agent only sees tools relevant to their role
     from ..agents.executor import _get_tools_for_agent
