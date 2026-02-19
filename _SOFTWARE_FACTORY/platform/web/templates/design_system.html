@@ -67,6 +67,10 @@
         <button class="ds-nav__item" onclick="showDsPanel('atoms',this)">Atoms</button>
         <button class="ds-nav__item" onclick="showDsPanel('molecules',this)">Molecules</button>
         <button class="ds-nav__item" onclick="showDsPanel('patterns',this)">Patterns</button>
+        <button class="ds-nav__item" onclick="showDsPanel('conversation',this)">Conversation</button>
+        <button class="ds-nav__item" onclick="showDsPanel('graph',this)">Agent Graph</button>
+        <button class="ds-nav__item" onclick="showDsPanel('kanban',this)">Kanban</button>
+        <button class="ds-nav__item" onclick="showDsPanel('backlog',this)">Backlog</button>
     </nav>
 
     <!-- ═══════════ TOKENS ═══════════ -->
@@ -712,6 +716,395 @@
                     <div class="ds-token__value">{{ val }}</div>
                 </div>
                 {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ CONVERSATION TEMPLATE ═══════════ -->
+    <div id="ds-conversation" class="ds-panel">
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-message-square"/></svg> Conversation Thread</h3>
+            <p style="font-size:var(--text-base);color:var(--text-secondary);margin-bottom:1rem">Template complet d'un fil de discussion multi-agents avec les differents types de messages.</p>
+
+            <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-xl);overflow:hidden;max-width:800px">
+                <!-- Header -->
+                <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border);background:var(--bg-secondary)">
+                    <svg class="icon-sm" style="color:var(--purple)"><use href="#icon-message-square"/></svg>
+                    <span style="font-size:var(--text-lg);font-weight:600">Sprint Planning - Auth Module</span>
+                    <span class="pill pill--feature" style="margin-left:auto">network</span>
+                </div>
+
+                <!-- Messages -->
+                <div style="padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-4)">
+                    <!-- System message -->
+                    <div class="mu mu--system" style="text-align:center;padding:var(--space-2) 0">
+                        <span style="font-size:var(--text-sm);color:var(--text-muted);font-style:italic">Session demarree -- 5 agents actifs</span>
+                    </div>
+
+                    <!-- Agent: CDP brief -->
+                    <div class="mu mu--thread">
+                        <div class="mu__avatar" style="border-color:var(--purple);background:var(--bg-tertiary)">AF</div>
+                        <div style="flex:1">
+                            <div class="mu__sender">
+                                <span class="mu__name" style="color:var(--purple)">Alexandre Faure</span>
+                                <span class="mu__role">CDP</span>
+                                <span class="mu__arrow">&rarr;</span>
+                                <span class="mu__target">all</span>
+                                <span class="mu__badge">brief</span>
+                            </div>
+                            <div class="mu__content">
+                                <p style="margin:0 0 0.4rem"><strong>Objectif sprint :</strong> Implementer le module d'authentification JWT avec refresh token, RBAC et integration LDAP.</p>
+                                <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)">Priorite WSJF : 85 -- Bloque 3 epics downstream. Deadline PI 14.2.</p>
+                            </div>
+                            <div class="mu__footer"><span class="mu__time">il y a 5 min</span><span class="mu__model">azure-gpt4</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Agent: Architecte analysis -->
+                    <div class="mu mu--thread">
+                        <div class="mu__avatar" style="border-color:var(--blue);background:var(--bg-tertiary)">PD</div>
+                        <div style="flex:1">
+                            <div class="mu__sender">
+                                <span class="mu__name" style="color:var(--blue)">Pierre Duval</span>
+                                <span class="mu__role">Architecte</span>
+                                <span class="mu__arrow">&rarr;</span>
+                                <span class="mu__target">Alexandre</span>
+                            </div>
+                            <div class="mu__content">
+                                <p style="margin:0 0 0.4rem">Proposition d'architecture : service auth isole, token store Redis, middleware axum pour validation.</p>
+                                <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);font-family:var(--font-mono);font-size:var(--text-sm);margin-top:var(--space-2)">
+POST /auth/login &rarr; JWT (15min) + refresh (7d)<br>
+POST /auth/refresh &rarr; new JWT<br>
+GET /auth/me &rarr; user profile + roles
+                                </div>
+                            </div>
+                            <div class="mu__footer"><span class="mu__time">il y a 3 min</span><span class="mu__model">minimax</span><span class="mu__tokens">1.2k tokens</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Agent: Security VETO -->
+                    <div class="mu mu--thread" style="border-left:2px solid var(--red)">
+                        <div class="mu__avatar" style="border-color:var(--red);background:var(--bg-tertiary)">NB</div>
+                        <div style="flex:1">
+                            <div class="mu__sender">
+                                <span class="mu__name" style="color:var(--red)">Nadia Benali</span>
+                                <span class="mu__role">Securite</span>
+                                <span class="mu__badge" style="background:rgba(248,81,73,.15);color:var(--red)">VETO</span>
+                            </div>
+                            <div class="mu__content">
+                                <p style="margin:0"><strong>Risque :</strong> Le refresh token en Redis sans rotation expose a du token replay. Exigence : rotation obligatoire a chaque refresh + blacklist du token precedent.</p>
+                            </div>
+                            <div class="mu__footer"><span class="mu__time">il y a 2 min</span><span class="mu__model">glm-4.7</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Agent: Lead Dev delegation -->
+                    <div class="mu mu--thread">
+                        <div class="mu__avatar" style="border-color:var(--green);background:var(--bg-tertiary)">TD</div>
+                        <div style="flex:1">
+                            <div class="mu__sender">
+                                <span class="mu__name" style="color:var(--green)">Thomas Dubois</span>
+                                <span class="mu__role">Lead Dev</span>
+                                <span class="mu__badge" style="background:rgba(63,185,80,.15);color:var(--green)">APPROVE</span>
+                            </div>
+                            <div class="mu__content">
+                                <p style="margin:0 0 0.4rem">Agree avec le veto de Nadia. J'integre la rotation dans le design.</p>
+                                <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;margin-top:var(--space-2)">
+                                    <span class="pill pill--feature">auth-service</span>
+                                    <span class="pill pill--refactor">token-rotation</span>
+                                    <span class="pill pill--security">rbac-middleware</span>
+                                </div>
+                            </div>
+                            <div class="mu__footer"><span class="mu__time">il y a 1 min</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Tool call -->
+                    <div class="mu mu--thread" style="opacity:0.7">
+                        <div class="mu__avatar mu__avatar--sm" style="border-color:var(--green);background:var(--bg-tertiary)">TD</div>
+                        <div style="flex:1">
+                            <div class="msg-tools" style="border:none;padding:0">
+                                <div class="msg-tool-call">
+                                    <span class="msg-tool-icon">></span>
+                                    <span class="msg-tool-name">code_edit</span>
+                                    <span class="msg-tool-result">src/auth/middleware.rs -- Added RBAC extraction layer</span>
+                                </div>
+                                <div class="msg-tool-call">
+                                    <span class="msg-tool-icon">></span>
+                                    <span class="msg-tool-name">git_commit</span>
+                                    <span class="msg-tool-result">feat(auth): add JWT middleware with role extraction</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input bar -->
+                <div style="display:flex;gap:var(--space-2);padding:var(--space-3) var(--space-4);border-top:1px solid var(--border);background:var(--bg-secondary)">
+                    <input type="text" placeholder="Message aux agents..." style="flex:1;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-2) var(--space-3);color:var(--text-primary);font-size:var(--text-base)" disabled>
+                    <button class="btn btn-primary btn-sm" disabled>Envoyer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ AGENT GRAPH TEMPLATE ═══════════ -->
+    <div id="ds-graph" class="ds-panel">
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-share"/></svg> Agent Graph</h3>
+            <p style="font-size:var(--text-base);color:var(--text-secondary);margin-bottom:1rem">Graphe SVG interactif montrant les agents, leurs connexions et etats en temps reel.</p>
+
+            <div style="display:grid;grid-template-columns:1fr 240px;gap:0;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-xl);overflow:hidden;max-width:960px;height:480px">
+                <!-- Graph canvas -->
+                <div style="position:relative;overflow:hidden">
+                    <!-- Controls -->
+                    <div style="position:absolute;top:var(--space-3);right:var(--space-3);display:flex;gap:var(--space-1);z-index:2">
+                        <button class="btn btn-sm" style="background:var(--bg-secondary);padding:var(--space-1) var(--space-2);font-size:var(--text-sm)">+</button>
+                        <button class="btn btn-sm" style="background:var(--bg-secondary);padding:var(--space-1) var(--space-2);font-size:var(--text-sm)">-</button>
+                        <button class="btn btn-sm" style="background:var(--bg-secondary);padding:var(--space-1) var(--space-2);font-size:var(--text-sm)">Fit</button>
+                    </div>
+                    <!-- Legend -->
+                    <div style="position:absolute;bottom:var(--space-3);left:var(--space-3);background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-2) var(--space-3);font-size:var(--text-xs);display:flex;gap:var(--space-3);z-index:2">
+                        <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:2px;background:var(--blue);display:inline-block"></span> sequential</span>
+                        <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:2px;background:var(--yellow);display:inline-block"></span> hierarchical</span>
+                        <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:2px;background:var(--purple);display:inline-block"></span> network</span>
+                    </div>
+
+                    <svg viewBox="0 0 600 440" style="width:100%;height:100%">
+                        <!-- Edges -->
+                        <line x1="300" y1="80" x2="140" y2="200" stroke="var(--yellow)" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="300" y1="80" x2="300" y2="200" stroke="var(--yellow)" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="300" y1="80" x2="460" y2="200" stroke="var(--yellow)" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="140" y1="200" x2="300" y2="200" stroke="var(--purple)" stroke-width="1" opacity="0.3" stroke-dasharray="4"/>
+                        <line x1="300" y1="200" x2="460" y2="200" stroke="var(--purple)" stroke-width="1" opacity="0.3" stroke-dasharray="4"/>
+                        <line x1="140" y1="200" x2="140" y2="340" stroke="var(--blue)" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="300" y1="200" x2="300" y2="340" stroke="var(--blue)" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="460" y1="200" x2="460" y2="340" stroke="var(--blue)" stroke-width="1.5" opacity="0.5"/>
+
+                        <!-- Node: Lead (top) -->
+                        <g transform="translate(220,30)">
+                            <rect width="160" height="80" rx="10" fill="var(--bg-secondary)" stroke="var(--green)" stroke-width="2"/>
+                            <circle cx="30" cy="28" r="14" fill="var(--bg-tertiary)" stroke="var(--green)" stroke-width="1.5"/>
+                            <text x="30" y="32" text-anchor="middle" fill="var(--text-on-accent)" font-size="11" font-weight="600">TD</text>
+                            <text x="52" y="26" fill="var(--text-primary)" font-size="12" font-weight="600">Thomas Dubois</text>
+                            <text x="52" y="40" fill="var(--text-secondary)" font-size="9">Lead Dev</text>
+                            <!-- Status: thinking -->
+                            <circle cx="140" cy="16" r="5" fill="var(--yellow)">
+                                <animate attributeName="opacity" values="1;0.4;1" dur="1.5s" repeatCount="indefinite"/>
+                            </circle>
+                            <text x="16" y="68" fill="var(--text-muted)" font-size="8">code_edit  git  deploy</text>
+                        </g>
+
+                        <!-- Node: Backend -->
+                        <g transform="translate(60,170)">
+                            <rect width="160" height="70" rx="10" fill="var(--bg-secondary)" stroke="var(--blue)" stroke-width="1.5"/>
+                            <circle cx="30" cy="24" r="14" fill="var(--bg-tertiary)" stroke="var(--blue)" stroke-width="1.5"/>
+                            <text x="30" y="28" text-anchor="middle" fill="var(--text-on-accent)" font-size="11" font-weight="600">JP</text>
+                            <text x="52" y="22" fill="var(--text-primary)" font-size="12" font-weight="600">Julien Petit</text>
+                            <text x="52" y="36" fill="var(--text-secondary)" font-size="9">Backend Dev</text>
+                            <circle cx="140" cy="14" r="5" fill="var(--green)"/>
+                            <text x="16" y="60" fill="var(--text-muted)" font-size="8">code_edit  code_search</text>
+                        </g>
+
+                        <!-- Node: Frontend -->
+                        <g transform="translate(220,170)">
+                            <rect width="160" height="70" rx="10" fill="var(--bg-secondary)" stroke="var(--purple)" stroke-width="1.5"/>
+                            <circle cx="30" cy="24" r="14" fill="var(--bg-tertiary)" stroke="var(--purple)" stroke-width="1.5"/>
+                            <text x="30" y="28" text-anchor="middle" fill="var(--text-on-accent)" font-size="11" font-weight="600">LM</text>
+                            <text x="52" y="22" fill="var(--text-primary)" font-size="12" font-weight="600">Lucas Moreau</text>
+                            <text x="52" y="36" fill="var(--text-secondary)" font-size="9">Frontend Dev</text>
+                            <circle cx="140" cy="14" r="5" fill="var(--green)"/>
+                            <text x="16" y="60" fill="var(--text-muted)" font-size="8">code_edit  figma</text>
+                        </g>
+
+                        <!-- Node: QA -->
+                        <g transform="translate(380,170)">
+                            <rect width="160" height="70" rx="10" fill="var(--bg-secondary)" stroke="var(--red)" stroke-width="1.5"/>
+                            <circle cx="30" cy="24" r="14" fill="var(--bg-tertiary)" stroke="var(--red)" stroke-width="1.5"/>
+                            <text x="30" y="28" text-anchor="middle" fill="var(--text-on-accent)" font-size="11" font-weight="600">YE</text>
+                            <text x="52" y="22" fill="var(--text-primary)" font-size="12" font-weight="600">Yassine El Ouardi</text>
+                            <text x="52" y="36" fill="var(--text-secondary)" font-size="9">QA Engineer</text>
+                            <circle cx="140" cy="14" r="5" fill="var(--text-secondary)"/>
+                            <text x="16" y="60" fill="var(--text-muted)" font-size="8">code_search  security</text>
+                        </g>
+
+                        <!-- Bottom nodes (task outputs) -->
+                        <g transform="translate(80,310)">
+                            <rect width="120" height="40" rx="6" fill="var(--bg-tertiary)" stroke="var(--border)" stroke-width="1"/>
+                            <text x="60" y="24" text-anchor="middle" fill="var(--text-secondary)" font-size="10">auth-service.rs</text>
+                        </g>
+                        <g transform="translate(240,310)">
+                            <rect width="120" height="40" rx="6" fill="var(--bg-tertiary)" stroke="var(--border)" stroke-width="1"/>
+                            <text x="60" y="24" text-anchor="middle" fill="var(--text-secondary)" font-size="10">LoginPage.svelte</text>
+                        </g>
+                        <g transform="translate(400,310)">
+                            <rect width="120" height="40" rx="6" fill="var(--bg-tertiary)" stroke="var(--border)" stroke-width="1"/>
+                            <text x="60" y="24" text-anchor="middle" fill="var(--text-secondary)" font-size="10">auth.spec.ts</text>
+                        </g>
+                    </svg>
+                </div>
+
+                <!-- Memory sidebar -->
+                <div style="border-left:1px solid var(--border);background:var(--bg-secondary);padding:var(--space-3);overflow-y:auto;display:flex;flex-direction:column;gap:var(--space-3)">
+                    <div style="font-size:var(--text-lg);font-weight:600;color:var(--text-primary);margin-bottom:var(--space-1)">Memoire</div>
+
+                    <div style="padding:var(--space-2);background:var(--bg-tertiary);border-radius:var(--radius-md)">
+                        <div style="font-size:var(--text-xs);color:var(--purple);font-weight:600;margin-bottom:2px">architecture</div>
+                        <div style="font-size:var(--text-sm);color:var(--text-secondary)">JWT + Redis token store, rotation on refresh</div>
+                    </div>
+                    <div style="padding:var(--space-2);background:var(--bg-tertiary);border-radius:var(--radius-md)">
+                        <div style="font-size:var(--text-xs);color:var(--red);font-weight:600;margin-bottom:2px">securite</div>
+                        <div style="font-size:var(--text-sm);color:var(--text-secondary)">Token replay attack mitige par rotation obligatoire</div>
+                    </div>
+                    <div style="padding:var(--space-2);background:var(--bg-tertiary);border-radius:var(--radius-md)">
+                        <div style="font-size:var(--text-xs);color:var(--green);font-weight:600;margin-bottom:2px">decision</div>
+                        <div style="font-size:var(--text-sm);color:var(--text-secondary)">RBAC middleware dans axum, roles en claims JWT</div>
+                    </div>
+                    <div style="padding:var(--space-2);background:var(--bg-tertiary);border-radius:var(--radius-md)">
+                        <div style="font-size:var(--text-xs);color:var(--blue);font-weight:600;margin-bottom:2px">convention</div>
+                        <div style="font-size:var(--text-sm);color:var(--text-secondary)">Rust error types dans crates/auth-error/</div>
+                    </div>
+
+                    <div style="margin-top:auto;font-size:var(--text-xs);color:var(--text-muted)">4 entrees -- mis a jour il y a 1 min</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ KANBAN TEMPLATE ═══════════ -->
+    <div id="ds-kanban" class="ds-panel">
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-layout"/></svg> Kanban Board</h3>
+            <p style="font-size:var(--text-base);color:var(--text-secondary);margin-bottom:1rem">Board 4 colonnes avec cartes de taches, assignation agents et indicateurs de statut.</p>
+
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-3);max-width:1100px">
+                {% set kanban_cols = [
+                    ('Backlog', 'text-secondary', [
+                        ('Audit dependances', 'securite', 'NB', 'red', 'WSJF 72'),
+                        ('Refactor token store', 'refactor', 'PD', 'blue', 'WSJF 45'),
+                        ('Documentation API', 'feature', 'AF', 'purple', 'WSJF 30'),
+                    ]),
+                    ('En cours', 'blue', [
+                        ('Auth middleware RBAC', 'feature', 'TD', 'green', 'WSJF 85'),
+                        ('Login page Svelte', 'feature', 'LM', 'purple', 'WSJF 80'),
+                    ]),
+                    ('Review', 'yellow', [
+                        ('E2E tests auth flow', 'test', 'YE', 'red', 'WSJF 78'),
+                    ]),
+                    ('Done', 'green', [
+                        ('Schema migration users', 'feature', 'JP', 'blue', 'WSJF 90'),
+                        ('JWT signing service', 'feature', 'JP', 'blue', 'WSJF 88'),
+                    ]),
+                ] %}
+
+                {% for col_name, col_color, tasks in kanban_cols %}
+                <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+                    <!-- Column header -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-2) var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-lg);border:1px solid var(--border)">
+                        <div style="display:flex;align-items:center;gap:var(--space-2)">
+                            <span style="width:8px;height:8px;border-radius:var(--radius-full);background:var(--{{ col_color }})"></span>
+                            <span style="font-size:var(--text-lg);font-weight:600">{{ col_name }}</span>
+                        </div>
+                        <span style="font-size:var(--text-sm);color:var(--text-muted);background:var(--bg-tertiary);padding:1px 6px;border-radius:var(--radius-lg)">{{ tasks|length }}</span>
+                    </div>
+
+                    <!-- Task cards -->
+                    {% for title, type, initials, agent_color, wsjf in tasks %}
+                    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-3);display:flex;flex-direction:column;gap:var(--space-2);transition:border-color .15s;cursor:pointer" onmouseover="this.style.borderColor='var(--purple)'" onmouseout="this.style.borderColor='var(--border)'">
+                        <div style="display:flex;align-items:center;justify-content:space-between">
+                            <span class="pill pill--{{ type }}" style="font-size:var(--text-xs)">{{ type }}</span>
+                            <span style="font-size:var(--text-xs);color:var(--text-muted)">{{ wsjf }}</span>
+                        </div>
+                        <div style="font-size:var(--text-lg);font-weight:500;color:var(--text-primary)">{{ title }}</div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:var(--space-1)">
+                            <div style="width:24px;height:24px;border-radius:var(--radius-full);background:var(--bg-tertiary);border:1.5px solid var(--{{ agent_color }});display:flex;align-items:center;justify-content:center;font-size:var(--text-2xs);font-weight:600;color:var(--text-on-accent)">{{ initials }}</div>
+                            {% if col_name == 'En cours' %}
+                            <div style="flex:1;margin:0 var(--space-2);height:3px;background:var(--bg-tertiary);border-radius:2px;overflow:hidden">
+                                <div style="width:65%;height:100%;background:var(--purple);border-radius:2px"></div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ BACKLOG TEMPLATE ═══════════ -->
+    <div id="ds-backlog" class="ds-panel">
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-list"/></svg> Backlog Table</h3>
+            <p style="font-size:var(--text-base);color:var(--text-secondary);margin-bottom:1rem">Vue tabulaire du backlog avec tri, filtres, priorite WSJF et assignation.</p>
+
+            <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-xl);overflow:hidden;max-width:1000px">
+                <!-- Toolbar -->
+                <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border)">
+                    <input type="text" placeholder="Filtrer les taches..." style="flex:1;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--space-1) var(--space-3);color:var(--text-primary);font-size:var(--text-sm)" disabled>
+                    <div style="display:flex;gap:var(--space-1)">
+                        <button class="btn btn-sm" style="background:var(--bg-tertiary);font-size:var(--text-sm)" disabled>Type</button>
+                        <button class="btn btn-sm" style="background:var(--bg-tertiary);font-size:var(--text-sm)" disabled>Status</button>
+                        <button class="btn btn-sm" style="background:var(--bg-tertiary);font-size:var(--text-sm)" disabled>Agent</button>
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <table style="width:100%;border-collapse:collapse;font-size:var(--text-base)">
+                    <thead>
+                        <tr style="border-bottom:1px solid var(--border);background:var(--bg-tertiary)">
+                            <th style="text-align:left;padding:var(--space-2) var(--space-3);font-size:var(--text-sm);font-weight:600;color:var(--text-secondary);width:40px">WSJF</th>
+                            <th style="text-align:left;padding:var(--space-2) var(--space-3);font-size:var(--text-sm);font-weight:600;color:var(--text-secondary)">Tache</th>
+                            <th style="text-align:left;padding:var(--space-2) var(--space-3);font-size:var(--text-sm);font-weight:600;color:var(--text-secondary);width:90px">Type</th>
+                            <th style="text-align:left;padding:var(--space-2) var(--space-3);font-size:var(--text-sm);font-weight:600;color:var(--text-secondary);width:90px">Status</th>
+                            <th style="text-align:left;padding:var(--space-2) var(--space-3);font-size:var(--text-sm);font-weight:600;color:var(--text-secondary);width:120px">Agent</th>
+                            <th style="text-align:left;padding:var(--space-2) var(--space-3);font-size:var(--text-sm);font-weight:600;color:var(--text-secondary);width:80px">Domaine</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set backlog_items = [
+                            (90, 'Schema migration users table', 'feature', 'done', 'Julien Petit', 'backend', 'blue'),
+                            (88, 'JWT signing service + key rotation', 'feature', 'done', 'Julien Petit', 'backend', 'blue'),
+                            (85, 'Auth middleware RBAC extraction', 'feature', 'active', 'Thomas Dubois', 'backend', 'green'),
+                            (80, 'Login page + form validation', 'feature', 'active', 'Lucas Moreau', 'frontend', 'purple'),
+                            (78, 'E2E tests auth flow complet', 'test', 'review', 'Yassine El Ouardi', 'qa', 'red'),
+                            (72, 'Audit dependances securite', 'security', 'pending', 'Nadia Benali', 'securite', 'red'),
+                            (65, 'Rate limiting login endpoint', 'feature', 'pending', 'Non assigne', 'backend', 'text-secondary'),
+                            (45, 'Refactor token store interface', 'refactor', 'pending', 'Pierre Duval', 'backend', 'blue'),
+                            (30, 'Documentation API auth endpoints', 'feature', 'pending', 'Non assigne', 'docs', 'text-secondary'),
+                            (25, 'Smoke tests pages protegees', 'test', 'pending', 'Non assigne', 'qa', 'text-secondary'),
+                        ] %}
+
+                        {% for wsjf, title, type, status, agent, domain, color in backlog_items %}
+                        <tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='transparent'">
+                            <td style="padding:var(--space-2) var(--space-3);font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;color:{% if wsjf >= 80 %}var(--purple){% elif wsjf >= 60 %}var(--blue){% else %}var(--text-secondary){% endif %}">{{ wsjf }}</td>
+                            <td style="padding:var(--space-2) var(--space-3);font-weight:500;color:var(--text-primary)">{{ title }}</td>
+                            <td style="padding:var(--space-2) var(--space-3)"><span class="pill pill--{{ type }}">{{ type }}</span></td>
+                            <td style="padding:var(--space-2) var(--space-3)">
+                                <span style="display:inline-flex;align-items:center;gap:4px;font-size:var(--text-sm)">
+                                    <span style="width:6px;height:6px;border-radius:var(--radius-full);background:{% if status == 'done' %}var(--green){% elif status == 'active' %}var(--blue){% elif status == 'review' %}var(--yellow){% else %}var(--text-secondary){% endif %}"></span>
+                                    <span style="color:var(--text-secondary)">{{ status }}</span>
+                                </span>
+                            </td>
+                            <td style="padding:var(--space-2) var(--space-3)">
+                                <span style="display:inline-flex;align-items:center;gap:var(--space-1)">
+                                    {% if agent != 'Non assigne' %}
+                                    <span style="width:20px;height:20px;border-radius:var(--radius-full);background:var(--bg-tertiary);border:1px solid var(--{{ color }});display:inline-flex;align-items:center;justify-content:center;font-size:7px;font-weight:600;color:var(--text-on-accent)">{{ agent[:1] }}{{ agent.split(' ')[-1][:1] }}</span>
+                                    {% endif %}
+                                    <span style="font-size:var(--text-sm);color:var(--text-secondary)">{{ agent }}</span>
+                                </span>
+                            </td>
+                            <td style="padding:var(--space-2) var(--space-3);font-size:var(--text-sm);color:var(--text-muted)">{{ domain }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <!-- Footer -->
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-2) var(--space-4);background:var(--bg-tertiary);font-size:var(--text-sm);color:var(--text-muted)">
+                    <span>10 taches -- 4 types -- 5 agents</span>
+                    <span>Tri : WSJF decroissant</span>
+                </div>
             </div>
         </div>
     </div>
