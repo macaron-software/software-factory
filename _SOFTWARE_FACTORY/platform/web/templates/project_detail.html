@@ -231,7 +231,7 @@
 
         {% if missions %}
         <div class="ps-section">
-            <h4><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-rocket"/></svg> Missions</h4>
+            <h4><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-rocket"/></svg> Epics</h4>
             {% for m in missions %}
             <a href="/missions/{{ m.id }}" class="ps-workflow-card" style="text-decoration:none;display:block">
                 <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.25rem">
@@ -244,15 +244,15 @@
             </a>
             {% endfor %}
             <a href="/missions?project={{ project.id }}&action=new" class="btn btn-sm btn-ghost" style="width:100%;margin-top:0.5rem">
-                <svg class="icon icon-xs"><use href="#icon-plus"/></svg> Nouvelle Mission
+                <svg class="icon icon-xs"><use href="#icon-plus"/></svg> Nouvelle Epic
             </a>
         </div>
         {% else %}
         <div class="ps-section">
-            <h4><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-rocket"/></svg> Missions</h4>
-            <p class="ps-empty">Aucune mission</p>
+            <h4><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-rocket"/></svg> Epics</h4>
+            <p class="ps-empty">Aucune epic</p>
             <a href="/missions?project={{ project.id }}&action=new" class="btn btn-sm btn-primary" style="width:100%">
-                <svg class="icon icon-xs"><use href="#icon-plus"/></svg> Créer une mission
+                <svg class="icon icon-xs"><use href="#icon-plus"/></svg> Creer une epic
             </a>
         </div>
         {% endif %}

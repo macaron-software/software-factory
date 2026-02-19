@@ -4637,7 +4637,7 @@ async def mission_start_page(request: Request, workflow_id: str):
     if not wf:
         return RedirectResponse("/mission-control", status_code=302)
     return _templates(request).TemplateResponse("mission_start.html", {
-        "request": request, "page_title": f"New Mission — {wf.name}",
+        "request": request, "page_title": f"Nouvelle Epic — {wf.name}",
         "workflow": wf,
     })
 
@@ -4709,7 +4709,7 @@ async def api_mission_start(request: Request):
     session_id = uuid.uuid4().hex[:8]
     session_store.create(SessionDef(
         id=session_id,
-        name=f"Mission: {wf.name}",
+        name=f"Epic: {wf.name}",
         project_id=mission.project_id or None,
         status="active",
     ))
@@ -4995,7 +4995,7 @@ async def mission_control_page(request: Request, mission_id: str):
 
     return _templates(request).TemplateResponse("mission_control.html", {
         "request": request,
-        "page_title": f"Mission Control — {mission.workflow_name}",
+        "page_title": f"Epic Control — {mission.workflow_name}",
         "mission": mission,
         "agent_map": agent_map,
         "phase_agents": phase_agents,
@@ -5108,7 +5108,7 @@ async def api_mission_reset(request: Request, mission_id: str):
             from_agent="system",
             to_agent="all",
             message_type="system",
-            content="Mission réinitialisée — prête pour une nouvelle exécution.",
+            content="Epic réinitialisée — prête pour une nouvelle exécution.",
         ))
 
         # Notify frontend
@@ -5455,7 +5455,7 @@ async def api_mission_run(request: Request, mission_id: str):
                         "from_name": "Alexandre Moreau",
                         "from_role": "Chef de Programme",
                         "from_avatar": "/static/avatars/chef_de_programme.jpg",
-                        "content": "Mission arrêtée — décision NOGO.",
+                        "content": "Epic arrêtée — décision NOGO.",
                         "phase_id": phase.phase_id,
                         "msg_type": "text",
                     })
@@ -5539,7 +5539,7 @@ async def api_mission_run(request: Request, mission_id: str):
                 else:
                     # Phase failed — STOP mission, don't continue blindly
                     short_err = phase_error[:200] if phase_error else "erreur inconnue"
-                    cdp_msg = f"Phase «{wf_phase.name}» échouée ({short_err}). Mission arrêtée — corrigez puis relancez via le bouton Réinitialiser."
+                    cdp_msg = f"Phase «{wf_phase.name}» échouée ({short_err}). Epic arrêtée — corrigez puis relancez via le bouton Réinitialiser."
                     await _push_sse(session_id, {
                         "type": "message",
                         "from_agent": "chef_de_programme",
@@ -5563,10 +5563,10 @@ async def api_mission_run(request: Request, mission_id: str):
         # Mission complete — real summary
         if phases_failed == 0:
             mission.status = MissionStatus.COMPLETED
-            final_msg = f"Mission terminée avec succès — {phases_done}/{phases_done + phases_failed} phases réussies."
+            final_msg = f"Epic terminée avec succès — {phases_done}/{phases_done + phases_failed} phases réussies."
         else:
             mission.status = MissionStatus.COMPLETED if phases_done > 0 else MissionStatus.FAILED
-            final_msg = f"Mission terminée — {phases_done} réussies, {phases_failed} échouées sur {phases_done + phases_failed} phases."
+            final_msg = f"Epic terminée — {phases_done} réussies, {phases_failed} échouées sur {phases_done + phases_failed} phases."
         run_store.update(mission)
         await _push_sse(session_id, {
             "type": "message",

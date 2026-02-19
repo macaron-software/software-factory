@@ -312,11 +312,11 @@
                 <svg class="icon icon-xs"><use href="#icon-play"/></svg> Démarrer le Mega-Workflow
             </button>
             <button id="mc-reset-btn" onclick="resetMission()" style="width:100%;padding:0.45rem;border:none;border-radius:6px;background:transparent;color:var(--text-secondary);font-size:0.72rem;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.4rem;margin-top:0.3rem;border:1px solid var(--border-color);transition:all .15s" onmouseover="this.style.borderColor='var(--purple)';this.style.color='var(--purple)'" onmouseout="this.style.borderColor='var(--border-color)';this.style.color='var(--text-secondary)'">
-                ↺ Réinitialiser la mission
+                ↺ Réinitialiser l'epic
             </button>
         </div>
         <div class="mc-activity" id="mc-activity">
-            <div class="mc-msg system"><div class="mc-msg-content">Mission démarrée — {{ mission.brief[:200] }}</div></div>
+            <div class="mc-msg system"><div class="mc-msg-content">Epic démarrée — {{ mission.brief[:200] }}</div></div>
             <div class="mc-msg tool"><div class="mc-msg-time">{{ "now" }}</div><div class="mc-msg-content">{{ mission.phases|length }} phases à orchestrer • Pattern: mega-workflow lifecycle</div></div>
             {% if mission.workspace_path %}
             <div class="mc-msg tool"><div class="mc-msg-content">Workspace: <code>{{ mission.workspace_path }}</code></div></div>
@@ -645,10 +645,10 @@ function handleSSE(d) {
         addActivity('Phase échouée', 'system');
     }
     else if (d.type === 'mission_failed') {
-        addActivity('Mission arrêtée — phase échouée', 'system');
+        addActivity('Epic arrêtée — phase échouée', 'system');
         // Disable run button, show reset
         const runBtn = document.querySelector('.mc-run-btn');
-        if (runBtn) { runBtn.disabled = true; runBtn.textContent = 'Mission échouée'; }
+        if (runBtn) { runBtn.disabled = true; runBtn.textContent = 'Epic échouée'; }
     }
     else if (d.type === 'checkpoint') {
         updatePhaseStatus(d.phase_id, 'waiting_validation');
@@ -982,7 +982,7 @@ async function startMissionExecution() {
 }
 
 async function resetMission() {
-    if (!confirm('Réinitialiser la mission ? Toutes les discussions seront effacées.')) return;
+    if (!confirm('Réinitialiser l\'epic ? Toutes les discussions seront effacées.')) return;
     try {
         const resp = await fetch(`/api/missions/${MISSION_ID}/reset`, {method:'POST'});
         if (resp.ok) {
