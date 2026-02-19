@@ -440,6 +440,46 @@
 .mc-qa-metric-val{display:block;font-size:1.4rem;font-weight:700;color:var(--purple)}
 .mc-qa-metric-label{display:block;font-size:0.65rem;color:var(--text-secondary);margin-top:0.15rem}
 
+/* ====== ARCHI TAB ====== */
+.mc-archi-doc,.mc-archi-decisions,.mc-archi-stack{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin-bottom:0.6rem}
+.mc-archi-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem}
+.mc-archi-header h4{font-size:0.78rem;color:var(--text-primary);margin:0;font-weight:700}
+.mc-archi-updated{font-size:0.6rem;color:var(--text-secondary)}
+.mc-archi-body{font-size:0.72rem;color:var(--text-secondary);line-height:1.5;max-height:500px;overflow-y:auto}
+.mc-archi-body h1,.mc-archi-body h2,.mc-archi-body h3{color:var(--text-primary);font-size:0.82rem;margin:0.6rem 0 0.3rem}
+.mc-archi-body code{background:var(--bg-tertiary);padding:1px 4px;border-radius:3px;font-size:0.68rem}
+.mc-archi-body pre{background:var(--bg-primary);padding:0.5rem;border-radius:6px;overflow-x:auto;font-size:0.68rem}
+.mc-archi-body table{width:100%;border-collapse:collapse;font-size:0.68rem}
+.mc-archi-body td,.mc-archi-body th{border:1px solid var(--border);padding:4px 8px}
+.mc-archi-empty,.mc-wiki-empty{text-align:center;padding:2rem;color:var(--text-secondary);font-size:0.75rem}
+.mc-archi-hint,.mc-wiki-hint{font-size:0.65rem;font-style:italic;margin-top:0.3rem;opacity:.6}
+.mc-archi-decisions h4{font-size:0.78rem;color:var(--text-primary);margin:0 0 0.5rem;font-weight:700}
+.mc-archi-decision{background:var(--bg-tertiary);border-radius:6px;padding:0.5rem;margin-bottom:0.4rem}
+.mc-archi-decision-phase{font-size:0.62rem;color:var(--purple-light);font-weight:600;margin-bottom:0.2rem}
+.mc-archi-decision-text{font-size:0.7rem;color:var(--text-secondary);line-height:1.4}
+.mc-archi-decision-text p{margin:0.15rem 0}
+.mc-archi-stack h4{font-size:0.78rem;color:var(--text-primary);margin:0 0 0.4rem;font-weight:700}
+.mc-archi-stack-tags{display:flex;flex-wrap:wrap;gap:0.3rem}
+.mc-archi-tag{font-size:0.65rem;padding:3px 8px;background:rgba(139,92,246,.15);color:#c084fc;border-radius:4px;font-weight:500}
+
+/* ====== WIKI TAB ====== */
+.mc-wiki-page{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;margin-bottom:0.5rem;overflow:hidden}
+.mc-wiki-page-title{display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0.75rem;font-size:0.78rem;font-weight:600;color:var(--text-primary);cursor:pointer;user-select:none;list-style:none}
+.mc-wiki-page-title::-webkit-details-marker{display:none}
+.mc-wiki-page-title::before{content:'▸ ';font-size:0.7rem;color:var(--text-secondary)}
+.mc-wiki-page[open] .mc-wiki-page-title::before{content:'▾ '}
+.mc-wiki-page-date{font-size:0.6rem;color:var(--text-secondary);font-weight:400}
+.mc-wiki-page-body{padding:0 0.75rem 0.75rem;font-size:0.72rem;color:var(--text-secondary);line-height:1.5;border-top:1px solid var(--border)}
+.mc-wiki-page-body h1,.mc-wiki-page-body h2,.mc-wiki-page-body h3{color:var(--text-primary);font-size:0.8rem;margin:0.5rem 0 0.2rem}
+.mc-wiki-page-body code{background:var(--bg-tertiary);padding:1px 4px;border-radius:3px;font-size:0.68rem}
+.mc-wiki-page-body pre{background:var(--bg-primary);padding:0.5rem;border-radius:6px;overflow-x:auto;font-size:0.68rem}
+.mc-wiki-memories{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin-top:0.5rem}
+.mc-wiki-memories h4{font-size:0.78rem;color:var(--text-primary);margin:0 0 0.5rem;font-weight:700}
+.mc-wiki-memory{display:flex;gap:0.5rem;align-items:baseline;padding:0.25rem 0;border-bottom:1px solid var(--bg-tertiary);font-size:0.7rem}
+.mc-wiki-memory:last-child{border-bottom:none}
+.mc-wiki-memory-cat{font-size:0.6rem;font-weight:600;padding:2px 6px;background:rgba(59,130,246,.12);color:#60a5fa;border-radius:3px;white-space:nowrap}
+.mc-wiki-memory-text{color:var(--text-secondary);line-height:1.4}
+
 /* ====== PROJET TAB ====== */
 .mc-projet-url,.mc-projet-build,.mc-projet-gallery,.mc-projet-files{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin-bottom:0.6rem}
 .mc-projet-url h4,.mc-projet-build h4,.mc-projet-gallery h4,.mc-projet-files h4{font-size:0.78rem;color:var(--text-primary);margin:0 0 0.4rem;font-weight:700}

@@ -5559,6 +5559,83 @@ async def mission_control_page(request: Request, mission_id: str):
                             "excerpt": content[:300],
                         })
 
+    # ── Architecture tab data ──
+    archi_content = ""
+    archi_updated = ""
+    archi_decisions = []
+    archi_stack = []
+    if ws_path and Path(ws_path).exists():
+        ws = Path(ws_path)
+        for archi_name in ("Architecture.md", "ARCHITECTURE.md", "architecture.md", "docs/architecture.md"):
+            archi_file = ws / archi_name
+            if archi_file.exists():
+                try:
+                    archi_content = archi_file.read_text()[:8000]
+                    import datetime
+                    mtime = archi_file.stat().st_mtime
+                    archi_updated = datetime.datetime.fromtimestamp(mtime).strftime("%d/%m %H:%M")
+                except Exception:
+                    pass
+                break
+
+    # Extract architecture decisions from architect agent messages
+    if wf:
+        for wp in wf.phases:
+            pmsgs = phase_messages.get(wp.id, [])
+            for m in pmsgs:
+                agent = m.get("from_agent", "")
+                content = m.get("content", "")
+                if not content:
+                    continue
+                is_archi_agent = any(k in agent for k in ("architecte", "archi", "lead_dev", "sre"))
+                if is_archi_agent and len(content) > 50:
+                    import re as _re_stack
+                    for tech in _re_stack.findall(r'(?:Swift(?:UI)?|Kotlin|React|Vue|Svelte|FastAPI|Django|Node\.js|PostgreSQL|Redis|Docker|Nginx|Playwright|TypeScript|Python|Rust|Go|GraphQL|gRPC|REST|WebSocket|SSE)', content):
+                        if tech not in archi_stack:
+                            archi_stack.append(tech)
+                    if any(kw in content.lower() for kw in ("architecture", "pattern", "design", "stack", "layer", "module", "service", "composant", "structure", "choix")):
+                        archi_decisions.append({"phase": wp.name, "text": content[:400]})
+    archi_decisions = archi_decisions[:10]
+    archi_stack = archi_stack[:15]
+
+    # ── Wiki tab data ──
+    wiki_pages = []
+    wiki_memories = []
+    if ws_path and Path(ws_path).exists():
+        ws = Path(ws_path)
+        doc_patterns = [
+            ("README.md", "README"), ("SPECS.md", "Specifications"),
+            ("DesignSystem.md", "Design System"), ("API.md", "API"),
+            ("CHANGELOG.md", "Changelog"), ("docs/README.md", "Documentation"),
+        ]
+        for fname, title in doc_patterns:
+            fpath = ws / fname
+            if fpath.exists():
+                try:
+                    content = fpath.read_text()[:5000]
+                    if len(content.strip()) > 20:
+                        import datetime as _dt_wiki
+                        mtime = fpath.stat().st_mtime
+                        updated = _dt_wiki.datetime.fromtimestamp(mtime).strftime("%d/%m %H:%M")
+                        wiki_pages.append({"title": title, "content": content, "updated": updated})
+                except Exception:
+                    pass
+
+    # Project memory entries
+    try:
+        from ..memory.manager import get_memory_manager
+        mem = get_memory_manager()
+        if mission.project_id:
+            entries = mem.project_search(mission.project_id, "", limit=20)
+            for e in entries:
+                if hasattr(e, "value") and e.value:
+                    wiki_memories.append({"category": getattr(e, "category", "") or "general", "value": e.value[:200]})
+    except Exception:
+        pass
+    for lesson in lessons[:5]:
+        wiki_memories.append({"category": "lesson", "value": lesson[:200] if isinstance(lesson, str) else str(lesson)[:200]})
+    wiki_memories = wiki_memories[:20]
+
     return _templates(request).TemplateResponse("mission_control.html", {
         "request": request,
         "page_title": f"Epic Control — {mission.workflow_name}",
@@ -5594,6 +5671,12 @@ async def mission_control_page(request: Request, mission_id: str):
         "qa_total_iterations": qa_total_iterations,
         "qa_test_files": qa_test_files,
         "qa_phase_results": qa_phase_results,
+        "archi_content": archi_content,
+        "archi_updated": archi_updated,
+        "archi_decisions": archi_decisions,
+        "archi_stack": archi_stack,
+        "wiki_pages": wiki_pages,
+        "wiki_memories": wiki_memories,
     })
 
 
@@ -6473,6 +6556,9 @@ async def _run_post_phase_hooks(
     except Exception as e:
         logger.warning("Auto-commit failed for phase %s: %s", phase_id, e)
 
+    # After EVERY phase: update Architecture.md + docs via LLM (architect + tech writer)
+    await _update_docs_post_phase(phase_id, phase_name, mission, session_id, push_sse)
+
     # After dev sprint: auto screenshots for HTML files
     if "dev" in phase_key or "sprint" in phase_key:
         ws = Path(workspace)
@@ -6599,6 +6685,169 @@ const {{ chromium }} = require('playwright');
                 })
         except Exception as e:
             logger.error("Post-phase QA screenshots failed: %s", e)
+
+
+async def _update_docs_post_phase(
+    phase_id: str, phase_name: str, mission, session_id: str, push_sse
+):
+    """Call LLM to update Architecture.md and README.md after each phase."""
+    from pathlib import Path
+    import subprocess
+
+    workspace = mission.workspace_path
+    if not workspace or not Path(workspace).is_dir():
+        return
+
+    ws = Path(workspace)
+
+    # Gather context: list of files + phase summary from messages
+    try:
+        file_list = subprocess.run(
+            ["find", ".", "-type", "f", "-not", "-path", "./.git/*", "-not", "-name", "*.bak"],
+            cwd=workspace, capture_output=True, text=True, timeout=5
+        ).stdout.strip()
+    except Exception:
+        file_list = ""
+
+    # Read existing docs for incremental update
+    existing_archi = ""
+    archi_path = ws / "Architecture.md"
+    if archi_path.exists():
+        try:
+            existing_archi = archi_path.read_text()[:3000]
+        except Exception:
+            pass
+
+    existing_readme = ""
+    readme_path = ws / "README.md"
+    if readme_path.exists():
+        try:
+            existing_readme = readme_path.read_text()[:2000]
+        except Exception:
+            pass
+
+    # Read key source files for context (first 200 lines of main files)
+    code_context = ""
+    code_files = list(ws.glob("**/*.swift"))[:3] + list(ws.glob("**/*.ts"))[:3] + list(ws.glob("**/*.py"))[:3] + list(ws.glob("**/*.svelte"))[:3]
+    for cf in code_files[:4]:
+        try:
+            content = cf.read_text()[:1500]
+            code_context += f"\n--- {cf.relative_to(ws)} ---\n{content}\n"
+        except Exception:
+            pass
+
+    if not file_list and not code_context:
+        return
+
+    from ..llm.client import get_llm_client, LLMMessage
+
+    client = get_llm_client()
+
+    # 1. Architecture update (architect agent)
+    try:
+        archi_prompt = f"""Tu es l'architecte logiciel. Apres la phase "{phase_name}", mets a jour Architecture.md.
+
+Fichiers du projet:
+{file_list[:2000]}
+
+Code source principal:
+{code_context[:3000]}
+
+Architecture existante:
+{existing_archi[:2000] if existing_archi else "(aucune)"}
+
+Genere un Architecture.md complet et a jour avec:
+- Vue d'ensemble du projet
+- Stack technique (langages, frameworks, outils)
+- Structure des dossiers/modules
+- Patterns utilises (MVC, MVVM, etc.)
+- Diagramme ASCII des composants principaux
+- Decisions architecturales prises
+
+Reponds UNIQUEMENT avec le contenu Markdown du fichier."""
+
+        resp = await client.chat(
+            messages=[LLMMessage(role="user", content=archi_prompt)],
+            system_prompt="Architecte logiciel senior. Documentation technique concise et precise.",
+            temperature=0.3, max_tokens=2000,
+        )
+        archi_text = resp.content.strip()
+        # Strip markdown fences if present
+        if archi_text.startswith("```"):
+            archi_text = archi_text.split("\n", 1)[1] if "\n" in archi_text else archi_text
+        if archi_text.endswith("```"):
+            archi_text = archi_text.rsplit("```", 1)[0]
+
+        if len(archi_text) > 100:
+            archi_path.write_text(archi_text)
+            await push_sse(session_id, {
+                "type": "message",
+                "from_agent": "architecte",
+                "from_name": "Architecte",
+                "from_role": "Architecture",
+                "content": f"Architecture.md mis a jour ({len(archi_text)} chars)",
+                "phase_id": phase_id,
+                "msg_type": "text",
+            })
+    except Exception as e:
+        logger.warning("Architecture update failed: %s", e)
+
+    # 2. README update (tech writer agent)
+    try:
+        readme_prompt = f"""Tu es le tech writer. Apres la phase "{phase_name}", mets a jour README.md.
+
+Fichiers du projet:
+{file_list[:1500]}
+
+README existant:
+{existing_readme[:1500] if existing_readme else "(aucun)"}
+
+Genere un README.md a jour avec:
+- Titre et description du projet
+- Prerequis / Installation
+- Lancement (commande build et run)
+- Structure du projet
+- Technologies utilisees
+- Statut actuel
+
+Reponds UNIQUEMENT avec le contenu Markdown du fichier."""
+
+        resp = await client.chat(
+            messages=[LLMMessage(role="user", content=readme_prompt)],
+            system_prompt="Technical writer. Documentation claire et actionnable.",
+            temperature=0.3, max_tokens=1500,
+        )
+        readme_text = resp.content.strip()
+        if readme_text.startswith("```"):
+            readme_text = readme_text.split("\n", 1)[1] if "\n" in readme_text else readme_text
+        if readme_text.endswith("```"):
+            readme_text = readme_text.rsplit("```", 1)[0]
+
+        if len(readme_text) > 80:
+            readme_path.write_text(readme_text)
+            await push_sse(session_id, {
+                "type": "message",
+                "from_agent": "tech_writer",
+                "from_name": "Tech Writer",
+                "from_role": "Documentation",
+                "content": f"README.md mis a jour ({len(readme_text)} chars)",
+                "phase_id": phase_id,
+                "msg_type": "text",
+            })
+    except Exception as e:
+        logger.warning("README update failed: %s", e)
+
+    # Auto-commit docs update
+    try:
+        subprocess.run(["git", "add", "Architecture.md", "README.md"], cwd=workspace, capture_output=True, text=True, timeout=5)
+        status = subprocess.run(["git", "status", "--porcelain"], cwd=workspace, capture_output=True, text=True, timeout=5)
+        if status.stdout.strip():
+            subprocess.run(
+                ["git", "commit", "-m", f"docs({phase_name.lower().replace(' ', '-')}): update Architecture.md + README.md"],
+                cwd=workspace, capture_output=True, text=True, timeout=10
+            )
+    except Exception:
+        pass
 
 
 async def _auto_qa_screenshots(ws: "Path", platform_type: str) -> list[str]:
