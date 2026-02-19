@@ -456,18 +456,29 @@
         <div class="mc-result-banner">
             <div class="mc-result-header">
                 <span style="font-size:0.7rem;color:var(--green);font-weight:700">RÉSULTAT</span>
+                {% if result_project_type %}
+                <span style="font-size:0.65rem;background:var(--bg-tertiary);color:var(--purple-light);padding:2px 8px;border-radius:10px;border:1px solid var(--border)">{{ {'macos-native':'🖥️ macOS','ios-native':'📱 iOS','android-native':'🤖 Android','web-docker':'🐳 Docker','web-node':'⬢ Node.js','web-static':'🌐 Static'}.get(result_project_type, result_project_type) }}</span>
+                {% endif %}
                 {% if result_deploy_url %}
                 <a href="{{ result_deploy_url }}" target="_blank" class="mc-result-link">🌐 {{ result_deploy_url }}</a>
                 {% endif %}
                 {% if result_launch_cmd %}
-                <code class="mc-result-cmd" title="🚀 Lancer l'app (cliquer pour copier)" onclick="navigator.clipboard.writeText(this.textContent.trim());this.style.borderColor='var(--green)';setTimeout(()=>this.style.borderColor='',1000)" style="color:var(--green);border-color:var(--green)">🚀 {{ result_launch_cmd }}</code>
+                <code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_launch_cmd }}" title="▶ Cliquer pour exécuter" style="color:var(--green);border-color:var(--green);cursor:pointer">🚀 {{ result_launch_cmd }}</code>
                 {% endif %}
                 {% if result_run_cmd and result_run_cmd != result_launch_cmd %}
-                <code class="mc-result-cmd" title="Copier" onclick="navigator.clipboard.writeText(this.textContent.trim());this.style.borderColor='var(--green)';setTimeout(()=>this.style.borderColor='',1000)">{{ result_run_cmd }}</code>
+                <code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_run_cmd }}" title="▶ Cliquer pour exécuter" style="cursor:pointer">▶ {{ result_run_cmd }}</code>
                 {% endif %}
                 {% if result_build_cmd and result_build_cmd != result_run_cmd %}
-                <code class="mc-result-cmd" title="Build" onclick="navigator.clipboard.writeText(this.textContent.trim());this.style.borderColor='var(--green)';setTimeout(()=>this.style.borderColor='',1000)" style="color:var(--text-secondary)">{{ result_build_cmd }}</code>
+                <code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_build_cmd }}" title="▶ Cliquer pour exécuter" style="color:var(--text-secondary);cursor:pointer">🔧 {{ result_build_cmd }}</code>
                 {% endif %}
+            </div>
+            <!-- Inline terminal for command output -->
+            <div id="mc-terminal" style="display:none;background:#0a0a12;border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-top:6px;max-height:200px;overflow-y:auto;font-family:var(--font-mono);font-size:0.75rem;line-height:1.5">
+                <div id="mc-terminal-header" style="color:var(--text-secondary);margin-bottom:4px">
+                    <span id="mc-terminal-cmd" style="color:var(--purple-light)"></span>
+                    <span id="mc-terminal-status" style="float:right"></span>
+                </div>
+                <pre id="mc-terminal-output" style="margin:0;white-space:pre-wrap;color:var(--text-primary)"></pre>
             </div>
             {% if result_screenshots %}
             <div class="mc-result-shots">
@@ -674,7 +685,7 @@
                 {% if result_launch_cmd %}
                 <div class="mc-projet-url" style="border-color:var(--green)">
                     <h4>🚀 Lancer l'application</h4>
-                    <code class="mc-result-cmd" style="color:var(--green);border-color:var(--green);font-size:0.85rem" onclick="navigator.clipboard.writeText(this.textContent.trim());this.style.borderColor='#fff';setTimeout(()=>this.style.borderColor='var(--green)',1000)">{{ result_launch_cmd }}</code>
+                    <code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_launch_cmd }}" style="color:var(--green);border-color:var(--green);font-size:0.85rem;cursor:pointer" title="▶ Cliquer pour exécuter">{{ result_launch_cmd }}</code>
                 </div>
                 {% endif %}
                 {% if result_deploy_url %}
@@ -686,8 +697,8 @@
                 {% if result_build_cmd %}
                 <div class="mc-projet-build">
                     <h4>🔧 Build & Run</h4>
-                    <code>{{ result_build_cmd }}</code>
-                    {% if result_run_cmd %}<code>{{ result_run_cmd }}</code>{% endif %}
+                    <code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_build_cmd }}" style="cursor:pointer" title="▶ Cliquer pour exécuter">🔧 {{ result_build_cmd }}</code>
+                    {% if result_run_cmd %}<code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_run_cmd }}" style="cursor:pointer" title="▶ Cliquer pour exécuter">▶ {{ result_run_cmd }}</code>{% endif %}
                 </div>
                 {% endif %}
                 {% if result_screenshots %}
@@ -970,6 +981,61 @@ function switchTab(tab) {
     const active = document.querySelector(`.mc-tab-panel[data-tab="${tab}"]`);
     if (active) active.style.display = 'block';
 }
+
+/* ── Execute command in workspace ── */
+const MISSION_ID = "{{ mission.id }}";
+document.querySelectorAll('.mc-exec-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        // Extract raw command (strip emoji prefix)
+        const rawCmd = this.dataset.cmd;
+        const term = document.getElementById('mc-terminal');
+        const termCmd = document.getElementById('mc-terminal-cmd');
+        const termStatus = document.getElementById('mc-terminal-status');
+        const termOut = document.getElementById('mc-terminal-output');
+
+        // Show terminal
+        term.style.display = 'block';
+        termCmd.textContent = '$ ' + rawCmd;
+        termStatus.textContent = '⏳ Running...';
+        termStatus.style.color = 'var(--purple-light)';
+        termOut.textContent = '';
+
+        // Highlight active button
+        document.querySelectorAll('.mc-exec-btn').forEach(b => b.style.opacity = '0.5');
+        this.style.opacity = '1';
+
+        try {
+            const resp = await fetch(`/api/missions/${MISSION_ID}/exec`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({command: rawCmd})
+            });
+            const data = await resp.json();
+            if (resp.ok) {
+                const output = (data.stdout || '') + (data.stderr ? '\n' + data.stderr : '');
+                termOut.textContent = output || '(no output)';
+                if (data.returncode === 0) {
+                    termStatus.textContent = '✅ Success (exit 0)';
+                    termStatus.style.color = 'var(--green)';
+                } else {
+                    termStatus.textContent = `❌ Failed (exit ${data.returncode})`;
+                    termStatus.style.color = '#f85149';
+                }
+            } else {
+                termOut.textContent = data.error || 'Error';
+                termStatus.textContent = '❌ Error';
+                termStatus.style.color = '#f85149';
+            }
+        } catch (e) {
+            termOut.textContent = e.message;
+            termStatus.textContent = '❌ Network error';
+            termStatus.style.color = '#f85149';
+        }
+        document.querySelectorAll('.mc-exec-btn').forEach(b => b.style.opacity = '1');
+        // Auto-scroll terminal
+        term.scrollTop = term.scrollHeight;
+    });
+});
 
 /* ── Agent name lookup (from phase_agents data) ── */
 const AGENT_INFO = {};

@@ -996,6 +996,11 @@ class AgentExecutor:
         self._llm = llm or get_llm_client()
         self._registry = _get_tool_registry()
 
+    async def _push_mission_sse(self, session_id: str, event: dict):
+        """Push SSE event for mission control updates."""
+        from ..sessions.runner import _push_sse
+        await _push_sse(session_id, event)
+
     async def run(self, ctx: ExecutionContext, user_message: str) -> ExecutionResult:
         """Run the agent with tool-calling loop."""
         t0 = time.monotonic()

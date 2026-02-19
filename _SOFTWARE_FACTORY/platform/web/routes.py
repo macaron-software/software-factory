@@ -5362,13 +5362,11 @@ async def mission_control_page(request: Request, mission_id: str):
                                 result_screenshots.append(str(rel))
             result_screenshots = result_screenshots[:12]
 
-            # Auto-detect project type (EXCLUSIVE — first match wins)
-            is_swift = (ws / "Package.swift").exists() or (ws / "Sources").exists() or (ws / "project.yml").exists()
-            is_node = (ws / "package.json").exists()
-            is_docker = (ws / "Dockerfile").exists() or (ws / "docker-compose.yml").exists()
+            # Auto-detect project platform
+            detected = _detect_project_platform(ws_path)
+            result_project_type = detected
 
-            if is_swift:
-                result_project_type = "swift"
+            if detected == "macos-native" or detected == "ios-native":
                 if (ws / "Package.swift").exists():
                     result_build_cmd = "swift build"
                     result_run_cmd = "swift run"
@@ -5388,25 +5386,28 @@ async def mission_control_page(request: Request, mission_id: str):
                     result_build_cmd = "swift build"
                     result_run_cmd = "swift run"
                     result_launch_cmd = "open -a Simulator && swift run"
-            elif is_docker:
-                result_project_type = "docker"
+            elif detected == "android-native":
+                result_build_cmd = "./gradlew assembleDebug"
+                result_run_cmd = "./gradlew installDebug"
+                result_launch_cmd = "adb shell am start -n com.app/.MainActivity"
+            elif detected == "web-docker":
                 if (ws / "docker-compose.yml").exists():
                     result_build_cmd = "docker compose build"
                     result_run_cmd = "docker compose up"
                 else:
                     result_build_cmd = "docker build -t app ."
                     result_run_cmd = "docker run -p 8080:8080 app"
-            elif is_node:
-                result_project_type = "node"
+                result_deploy_url = "http://localhost:8080"
+            elif detected == "web-node":
                 result_build_cmd = "npm install && npm run build"
                 result_run_cmd = "npm start"
+                result_deploy_url = "http://localhost:3000"
             elif (ws / "Makefile").exists():
-                result_project_type = "make"
                 result_build_cmd = "make build"
                 result_run_cmd = "make run"
 
-            # Deploy URL — only for web/docker projects
-            if result_project_type in ("docker", "node", ""):
+            # Deploy URL — only for web projects (search in config files)
+            if detected.startswith("web") and not result_deploy_url:
                 for env_file in (ws / "environments.md", ws / ".env", ws / "deploy.md"):
                     if env_file.exists():
                         try:
@@ -5503,6 +5504,7 @@ async def mission_control_page(request: Request, mission_id: str):
         "result_run_cmd": result_run_cmd,
         "result_launch_cmd": result_launch_cmd,
         "result_deploy_url": result_deploy_url,
+        "result_project_type": result_project_type,
         "workspace_files": workspace_files,
         "po_backlog": po_backlog,
         "po_sprint": po_sprint,
@@ -5524,6 +5526,48 @@ async def api_mission_status(request: Request, mission_id: str):
     if not mission:
         return JSONResponse({"error": "Not found"}, status_code=404)
     return JSONResponse(mission.model_dump(mode="json"))
+
+
+@router.post("/api/missions/{mission_id}/exec")
+async def api_mission_exec(request: Request, mission_id: str):
+    """Execute a command in the mission workspace. Returns JSON {stdout, stderr, returncode}."""
+    import os as _os
+    import subprocess as _sp
+    from ..missions.store import get_mission_run_store
+    store = get_mission_run_store()
+    mission = store.get(mission_id)
+    if not mission:
+        return JSONResponse({"error": "Mission not found"}, status_code=404)
+    ws = mission.workspace_path
+    if not ws or not Path(ws).exists():
+        return JSONResponse({"error": "No workspace"}, status_code=400)
+
+    body = await request.json()
+    cmd = body.get("command", "").strip()
+    if not cmd:
+        return JSONResponse({"error": "No command"}, status_code=400)
+
+    # Security: block dangerous commands
+    blocked = ["rm -rf /", "sudo", "chmod 777", "mkfs", "dd if=", "> /dev/"]
+    if any(b in cmd for b in blocked):
+        return JSONResponse({"error": "Command blocked"}, status_code=403)
+
+    try:
+        result = _sp.run(
+            cmd, shell=True, cwd=ws,
+            capture_output=True, text=True, timeout=60,
+            env={**_os.environ, "TERM": "dumb"},
+        )
+        return JSONResponse({
+            "stdout": result.stdout[-5000:],
+            "stderr": result.stderr[-2000:],
+            "returncode": result.returncode,
+            "command": cmd,
+        })
+    except _sp.TimeoutExpired:
+        return JSONResponse({"error": "Timeout (60s)", "command": cmd}, status_code=408)
+    except Exception as e:
+        return JSONResponse({"error": str(e), "command": cmd}, status_code=500)
 
 
 @router.post("/api/missions/{mission_id}/validate")
@@ -5710,8 +5754,19 @@ async def api_mission_run(request: Request, mission_id: str):
                     for s in phase_summaries[-5:]  # last 5 phases max
                 )
 
-            # CDP announces the phase with context
+            # CDP announces the phase with context + platform detection
+            detected_platform = _detect_project_platform(workspace) if workspace else ""
+            platform_display = {
+                "macos-native": "🖥️ macOS native (Swift/SwiftUI)",
+                "ios-native": "📱 iOS native (Swift/SwiftUI)",
+                "android-native": "🤖 Android native (Kotlin)",
+                "web-docker": "🌐 Web (Docker)",
+                "web-node": "🌐 Web (Node.js)",
+                "web-static": "🌐 Web statique",
+            }.get(detected_platform, "")
             cdp_announce = f"Lancement phase {i+1}/{len(mission.phases)} : **{wf_phase.name}** (pattern: {pattern_type})"
+            if platform_display:
+                cdp_announce += f"\nPlateforme détectée : {platform_display}"
             if cdp_context:
                 cdp_announce += f"\n{cdp_context}"
             await _push_sse(session_id, {
@@ -6432,96 +6487,244 @@ const {{ chromium }} = require('playwright');
             logger.error("Post-phase deploy summary failed: %s", e)
 
 
+def _detect_project_platform(workspace_path: str) -> str:
+    """Detect project platform from workspace files.
+
+    Returns one of: macos-native, ios-native, android-native, web-docker, web-node, web-static, unknown
+    """
+    if not workspace_path:
+        return "unknown"
+    ws = Path(workspace_path)
+    if not ws.exists():
+        return "unknown"
+
+    has_swift = (ws / "Package.swift").exists() or (ws / "Sources").exists()
+    has_xcode = any(ws.glob("*.xcodeproj")) or any(ws.glob("*.xcworkspace")) or (ws / "project.yml").exists()
+    has_kotlin = (ws / "build.gradle").exists() or (ws / "build.gradle.kts").exists()
+    has_android = (ws / "app" / "build.gradle").exists() or (ws / "app" / "build.gradle.kts").exists() or (ws / "AndroidManifest.xml").exists()
+    has_node = (ws / "package.json").exists()
+    has_docker = (ws / "Dockerfile").exists() or (ws / "docker-compose.yml").exists()
+
+    # Check Swift targets: iOS vs macOS
+    if has_swift or has_xcode:
+        # Look for iOS-specific indicators
+        is_ios = False
+        for f in [ws / "Package.swift", ws / "project.yml"]:
+            if f.exists():
+                try:
+                    text = f.read_text()[:3000].lower()
+                    if "ios" in text or "uikit" in text or "iphone" in text:
+                        is_ios = True
+                except Exception:
+                    pass
+        # Check source files for UIKit/SwiftUI with iOS patterns
+        if not is_ios:
+            for src in list((ws / "Sources").rglob("*.swift"))[:20] if (ws / "Sources").exists() else []:
+                try:
+                    txt = src.read_text()[:500].lower()
+                    if "uiapplication" in txt or "uiscene" in txt or "uidevice" in txt:
+                        is_ios = True
+                        break
+                except Exception:
+                    pass
+        return "ios-native" if is_ios else "macos-native"
+
+    if has_android or (has_kotlin and not has_node):
+        return "android-native"
+
+    if has_docker:
+        return "web-docker"
+
+    if has_node:
+        return "web-node"
+
+    if (ws / "index.html").exists():
+        return "web-static"
+
+    return "unknown"
+
+
+# Platform-specific QA/deploy/CI prompts
+_PLATFORM_QA = {
+    "macos-native": {
+        "qa-campaign": (
+            "TYPE: Application macOS native (Swift/SwiftUI)\n"
+            "OUTILS QA ADAPTÉS — PAS de Playwright, PAS de Docker :\n"
+            "1. list_files + code_read pour comprendre la structure\n"
+            "2. Créez tests/PLAN.md (code_write) — plan de test macOS natif\n"
+            "3. Build: build command='swift build'\n"
+            "4. Tests unitaires: build command='swift test'\n"
+            "5. Bootez simulateur: build command='open -a Simulator'\n"
+            "6. SCREENSHOTS par parcours utilisateur (simulator_screenshot) :\n"
+            "   - simulator_screenshot filename='01_launch.png'\n"
+            "   - simulator_screenshot filename='02_main_view.png'\n"
+            "   - simulator_screenshot filename='03_feature_1.png'\n"
+            "   - simulator_screenshot filename='04_feature_2.png'\n"
+            "   - simulator_screenshot filename='05_settings.png'\n"
+            "7. Documentez bugs dans tests/BUGS.md, commitez\n"
+            "IMPORTANT: Chaque parcours DOIT avoir un screenshot réel."
+        ),
+        "qa-execution": (
+            "TYPE: Application macOS native (Swift/SwiftUI)\n"
+            "1. build command='swift test'\n"
+            "2. build command='open -a Simulator'\n"
+            "3. SCREENSHOTS: simulator_screenshot pour chaque écran\n"
+            "4. tests/REPORT.md avec résultats + screenshots\n"
+            "PAS de Playwright. PAS de Docker."
+        ),
+        "deploy-prod": (
+            "TYPE: Application macOS native — PAS de Docker/Azure\n"
+            "1. build command='swift build -c release'\n"
+            "2. Créez .app bundle ou archive\n"
+            "3. simulator_screenshot filename='release_final.png'\n"
+            "4. Documentez installation dans INSTALL.md\n"
+            "Distribution: TestFlight, .dmg, ou Mac App Store."
+        ),
+        "cicd": (
+            "TYPE: Application macOS native\n"
+            "1. Créez .github/workflows/ci.yml avec xcodebuild ou swift build\n"
+            "2. Créez scripts/build.sh + scripts/test.sh\n"
+            "3. build command='swift build && swift test'\n"
+            "4. git_commit\n"
+            "PAS de Dockerfile. PAS de docker-compose."
+        ),
+    },
+    "ios-native": {
+        "qa-campaign": (
+            "TYPE: Application iOS native (Swift/SwiftUI/UIKit)\n"
+            "OUTILS QA iOS — simulateur iPhone :\n"
+            "1. list_files + code_read\n"
+            "2. Créez tests/PLAN.md (code_write)\n"
+            "3. Build: build command='xcodebuild -scheme App -sdk iphonesimulator -destination \"platform=iOS Simulator,name=iPhone 16\" build'\n"
+            "4. Tests: build command='xcodebuild test -scheme App -sdk iphonesimulator -destination \"platform=iOS Simulator,name=iPhone 16\"'\n"
+            "5. SCREENSHOTS par parcours (simulator_screenshot) :\n"
+            "   - simulator_screenshot filename='01_splash.png'\n"
+            "   - simulator_screenshot filename='02_onboarding.png'\n"
+            "   - simulator_screenshot filename='03_main_screen.png'\n"
+            "   - simulator_screenshot filename='04_detail.png'\n"
+            "   - simulator_screenshot filename='05_profile.png'\n"
+            "6. Documentez bugs dans tests/BUGS.md\n"
+            "IMPORTANT: Screenshots RÉELS du simulateur iPhone."
+        ),
+        "qa-execution": (
+            "TYPE: Application iOS native\n"
+            "1. build command='xcodebuild test -scheme App -sdk iphonesimulator'\n"
+            "2. simulator_screenshot pour chaque écran\n"
+            "3. tests/REPORT.md\n"
+            "PAS de Playwright. PAS de Docker."
+        ),
+        "deploy-prod": (
+            "TYPE: Application iOS — TestFlight ou App Store\n"
+            "1. build command='xcodebuild archive -scheme App'\n"
+            "2. Export IPA pour TestFlight\n"
+            "3. simulator_screenshot filename='release_final.png'\n"
+            "Distribution: TestFlight → App Store Connect."
+        ),
+        "cicd": (
+            "TYPE: Application iOS native\n"
+            "1. .github/workflows/ci.yml avec xcodebuild + simulateur\n"
+            "2. Fastlane si disponible\n"
+            "3. build + test command\n"
+            "PAS de Docker."
+        ),
+    },
+    "android-native": {
+        "qa-campaign": (
+            "TYPE: Application Android native (Kotlin/Java)\n"
+            "OUTILS QA Android — émulateur :\n"
+            "1. list_files + code_read\n"
+            "2. Créez tests/PLAN.md (code_write)\n"
+            "3. Build: build command='./gradlew assembleDebug'\n"
+            "4. Tests: build command='./gradlew testDebugUnitTest'\n"
+            "5. Tests instrumentés: build command='./gradlew connectedAndroidTest'\n"
+            "6. SCREENSHOTS: build command='adb exec-out screencap -p > screenshots/NOM.png'\n"
+            "7. Documentez bugs dans tests/BUGS.md\n"
+            "IMPORTANT: Lancez l'émulateur et prenez des screenshots réels."
+        ),
+        "qa-execution": (
+            "TYPE: Application Android native\n"
+            "1. build command='./gradlew testDebugUnitTest'\n"
+            "2. build command='./gradlew connectedAndroidTest'\n"
+            "3. Screenshots via adb\n"
+            "4. tests/REPORT.md\n"
+            "PAS de Playwright."
+        ),
+        "deploy-prod": (
+            "TYPE: Application Android — Play Store\n"
+            "1. build command='./gradlew assembleRelease'\n"
+            "2. Signer l'APK/AAB\n"
+            "3. Screenshot final\n"
+            "Distribution: Google Play Console."
+        ),
+        "cicd": (
+            "TYPE: Application Android native\n"
+            "1. .github/workflows/ci.yml avec Gradle + JDK\n"
+            "2. Android SDK setup\n"
+            "3. ./gradlew build + test\n"
+            "PAS de Docker pour le build."
+        ),
+    },
+}
+
+# Web fallback (docker / node / static)
+_WEB_QA = {
+    "qa-campaign": (
+        "TYPE: Application web\n"
+        "1. list_files + code_read\n"
+        "2. Créez tests/PLAN.md (code_write)\n"
+        "3. Tests E2E Playwright :\n"
+        "   - tests/e2e/smoke.spec.ts (HTTP 200, 0 erreurs console)\n"
+        "   - tests/e2e/journey.spec.ts (parcours complets)\n"
+        "4. Lancez: playwright_test spec=tests/e2e/smoke.spec.ts\n"
+        "5. SCREENSHOTS par page/parcours :\n"
+        "   - screenshot url=http://localhost:3000 filename='01_home.png'\n"
+        "   - screenshot url=http://localhost:3000/dashboard filename='02_dashboard.png'\n"
+        "   UN SCREENSHOT PAR PAGE\n"
+        "6. tests/BUGS.md + git_commit\n"
+        "IMPORTANT: Screenshots réels, pas simulés."
+    ),
+    "qa-execution": (
+        "TYPE: Application web\n"
+        "1. playwright_test spec=tests/e2e/smoke.spec.ts\n"
+        "2. screenshot par page\n"
+        "3. tests/REPORT.md"
+    ),
+    "deploy-prod": (
+        "TYPE: Application web\n"
+        "1. docker_build pour image\n"
+        "2. deploy_azure\n"
+        "3. screenshot url=URL_DEPLOYEE filename='deploy_final.png'\n"
+        "4. Validation finale"
+    ),
+    "cicd": (
+        "TYPE: Application web\n"
+        "1. Dockerfile + docker-compose.yml\n"
+        "2. .github/workflows/ci.yml\n"
+        "3. scripts/build.sh + test.sh\n"
+        "4. build + verify"
+    ),
+}
+
+
 def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, total: int, prev_context: str = "", workspace_path: str = "") -> str:
     """Build a contextual task prompt for each lifecycle phase."""
-    # Detect project type from workspace
-    _ws = Path(workspace_path) if workspace_path else None
-    is_swift = _ws and (_ws / "Sources").exists() or (_ws and (_ws / "Package.swift").exists())
-    is_web = _ws and ((_ws / "package.json").exists() or (_ws / "docker-compose.yml").exists())
+    platform = _detect_project_platform(workspace_path)
 
-    # QA prompts adapt to project type
-    if is_swift:
-        qa_campaign_prompt = (
-            f"Campagne de tests QA pour l'app macOS native «{brief}».\n"
-            "UTILISEZ VOS OUTILS — c'est une app Swift/SwiftUI, PAS une app web :\n"
-            "1. Lisez le code existant avec list_files et code_read\n"
-            "2. Créez le plan de test (tests/PLAN.md) avec code_write\n"
-            "3. Lancez le build : build command='swift build'\n"
-            "4. Lancez les tests unitaires : build command='swift test'\n"
-            "5. Bootez le simulateur : build command='xcrun simctl boot \"iPhone 16\"'\n"
-            "6. Installez l'app sur simulateur : build command='xcrun simctl install booted .build/debug/APPNAME'\n"
-            "7. PRENEZ DES SCREENSHOTS de chaque parcours utilisateur :\n"
-            "   - simulator_screenshot filename='01_launch.png' (écran d'accueil)\n"
-            "   - simulator_screenshot filename='02_calendar_view.png' (vue calendrier)\n"
-            "   - simulator_screenshot filename='03_event_detail.png' (détail événement)\n"
-            "   - simulator_screenshot filename='04_settings.png' (paramètres)\n"
-            "8. Si des tests échouent, documentez dans tests/BUGS.md\n"
-            "9. Commitez avec git_commit\n"
-            "IMPORTANT: Chaque parcours utilisateur DOIT avoir un screenshot réel du simulateur."
-        )
-        qa_execution_prompt = (
-            f"Exécution des tests pour l'app macOS native «{brief}».\n"
-            "UTILISEZ VOS OUTILS — app Swift/SwiftUI, PAS web :\n"
-            "1. Lisez les tests existants avec list_files et code_read\n"
-            "2. Lancez swift test pour les tests unitaires\n"
-            "3. Bootez le simulateur macOS si pas déjà fait\n"
-            "4. PRENEZ UN SCREENSHOT par parcours utilisateur :\n"
-            "   - simulator_screenshot filename='parcours_accueil.png'\n"
-            "   - simulator_screenshot filename='parcours_navigation.png'\n"
-            "   - simulator_screenshot filename='parcours_fonctionnel.png'\n"
-            "5. Créez tests/REPORT.md avec résultats + références screenshots\n"
-            "IMPORTANT: Exécutez les commandes réelles. Pas de Playwright (c'est du natif)."
-        )
-        deploy_prompt = (
-            f"Livraison de l'app macOS native «{brief}».\n"
-            "C'est une app macOS native, PAS une app web :\n"
-            "1. Vérifiez l'état du workspace : list_files, git_status\n"
-            "2. Build release : build command='swift build -c release'\n"
-            "3. Créez le .app bundle si nécessaire\n"
-            "4. Prenez un screenshot final : simulator_screenshot filename='release_final.png'\n"
-            "5. Documentez l'installation dans README.md\n"
-            "PAS de Docker, PAS de deploy_azure pour du macOS natif."
-        )
-    else:
-        qa_campaign_prompt = (
-            f"Campagne de tests QA pour «{brief}».\n"
-            "UTILISEZ VOS OUTILS pour écrire et exécuter les tests :\n"
-            "1. Lisez le code existant avec list_files et code_read pour comprendre l'app\n"
-            "2. Créez le plan de test (tests/PLAN.md) avec code_write\n"
-            "3. Ecrivez les tests Playwright E2E :\n"
-            "   - tests/e2e/smoke.spec.ts : pages chargent, HTTP 200, 0 erreurs console\n"
-            "   - tests/e2e/journey.spec.ts : parcours utilisateur complets\n"
-            "4. Lancez les tests avec playwright_test\n"
-            "5. PRENEZ DES SCREENSHOTS de chaque page clé :\n"
-            "   - screenshot url=http://localhost:3000 filename='01_home.png'\n"
-            "   - screenshot url=http://localhost:3000/dashboard filename='02_dashboard.png'\n"
-            "   UN SCREENSHOT PAR PAGE/PARCOURS\n"
-            "6. Si des tests échouent, documentez les bugs dans tests/BUGS.md\n"
-            "7. Commitez avec git_commit\n"
-            "IMPORTANT: Exécutez les tests réellement et prenez des screenshots réels."
-        )
-        qa_execution_prompt = (
-            f"Exécution des tests pour «{brief}».\n"
-            "UTILISEZ VOS OUTILS pour exécuter et valider :\n"
-            "1. Lisez les tests existants avec list_files et code_read\n"
-            "2. Lancez les tests E2E : playwright_test spec=tests/e2e/smoke.spec.ts\n"
-            "3. Lancez les tests API avec build_tool\n"
-            "4. PRENEZ DES SCREENSHOTS de chaque page/parcours :\n"
-            "   - screenshot url=http://localhost:3000 filename='parcours_accueil.png'\n"
-            "   - screenshot url=http://localhost:3000/login filename='parcours_login.png'\n"
-            "5. Si des tests échouent, créez tests/REPORT.md avec les résultats\n"
-            "IMPORTANT: Exécutez les commandes réelles, ne simulez pas."
-        )
-        deploy_prompt = (
-            f"Déploiement production pour «{brief}».\n"
-            "UTILISEZ VOS OUTILS pour déployer depuis le workspace :\n"
-            "1. Vérifiez l'état du workspace : list_files, git_status\n"
-            "2. docker_build pour construire l'image\n"
-            "3. deploy_azure pour déployer\n"
-            "4. screenshot url=URL_DEPLOYEE filename='deploy_final.png' pour capturer l'app déployée\n"
-            "5. Validation finale\n"
-            "IMPORTANT: Exécutez les commandes réelles, ne simulez pas."
-        )
+    # Get platform-specific QA/deploy/cicd prompts
+    platform_prompts = _PLATFORM_QA.get(platform, {})
+
+    def _qa(key: str) -> str:
+        base = platform_prompts.get(key, _WEB_QA.get(key, ""))
+        return f"{key.replace('-', ' ').title()} pour «{brief}».\n{base}\nIMPORTANT: Commandes réelles, pas de simulation."
+
+    platform_label = {
+        "macos-native": "macOS native (Swift/SwiftUI)",
+        "ios-native": "iOS native (Swift/SwiftUI/UIKit)",
+        "android-native": "Android native (Kotlin/Java)",
+        "web-docker": "web (Docker)",
+        "web-node": "web (Node.js)",
+        "web-static": "web statique",
+    }.get(platform, "")
 
     prompts = {
         "ideation": (
@@ -6553,7 +6756,8 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
         ),
         "architecture": (
             f"Design architecture pour «{brief}».\n"
-            "- Architecte : patterns, layers, composants, API design\n"
+            + (f"PLATEFORME CIBLE: {platform_label}\n" if platform_label else "")
+            + "- Architecte : patterns, layers, composants, API design\n"
             "- UX Designer : maquettes, design system, composants UI\n"
             "- Expert Sécurité : threat model, auth, OWASP\n"
             "- DevOps : infra, CI/CD, monitoring, environnements\n"
@@ -6562,7 +6766,8 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
         ),
         "dev-sprint": (
             f"Sprint de développement pour «{brief}».\n"
-            "VOUS DEVEZ UTILISER VOS OUTILS pour écrire du VRAI code dans le workspace.\n\n"
+            + (f"PLATEFORME: {platform_label}\n" if platform_label else "")
+            + "VOUS DEVEZ UTILISER VOS OUTILS pour écrire du VRAI code dans le workspace.\n\n"
             "WORKFLOW OBLIGATOIRE:\n"
             "1. LIRE LE WORKSPACE: list_files pour voir la structure actuelle\n"
             "2. LIRE L'ARCHITECTURE: code_read sur les fichiers existants (README, Package.swift, etc.)\n"
@@ -6576,19 +6781,10 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
             "- Chaque dev DOIT appeler code_write au moins 3 fois (fichiers réels, pas du pseudo-code)\n"
             "- NE DISCUTEZ PAS du code. ECRIVEZ-LE avec code_write."
         ),
-        "cicd": (
-            f"Pipeline CI/CD pour «{brief}».\n"
-            "UTILISEZ VOS OUTILS pour configurer le pipeline dans le workspace :\n"
-            "1. Lisez d'abord le code existant avec code_read et list_files\n"
-            "2. Créez Dockerfile, docker-compose.yml, .github/workflows/ci.yml avec code_write\n"
-            "3. Créez les scripts de build/test (Makefile, scripts/)\n"
-            "4. Vérifiez que le build passe avec build_tool\n"
-            "5. Commitez avec git_commit\n"
-            "IMPORTANT: Lisez le workspace avec list_files d'abord pour voir ce qui existe."
-        ),
-        "qa-campaign": qa_campaign_prompt,
-        "qa-execution": qa_execution_prompt,
-        "deploy-prod": deploy_prompt,
+        "cicd": _qa("cicd"),
+        "qa-campaign": _qa("qa-campaign"),
+        "qa-execution": _qa("qa-execution"),
+        "deploy-prod": _qa("deploy-prod"),
         "tma-routing": (
             f"Routage incidents TMA pour «{brief}».\n"
             "- Support N1 : classification, triage incident\n"
