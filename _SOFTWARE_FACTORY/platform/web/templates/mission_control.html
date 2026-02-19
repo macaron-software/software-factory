@@ -142,8 +142,8 @@
 .mc-popover-text{font-size:0.76rem;color:var(--text-primary);line-height:1.5;white-space:pre-line}
 .mc-popover-tags{display:flex;flex-wrap:wrap;gap:3px}
 .mc-popover-tag{padding:0.12rem 0.4rem;border-radius:4px;font-size:0.62rem;background:var(--bg-tertiary);color:var(--text-secondary)}
-.mc-popover-tag.skill{background:rgba(124,58,237,.12);color:var(--purple,#a78bfa)}
-.mc-popover-tag.tool{background:rgba(59,130,246,.12);color:var(--blue,#60a5fa)}
+.mc-popover-tag.skill{background:rgba(124,58,237,.12);color:var(--purple)}
+.mc-popover-tag.tool{background:rgba(59,130,246,.12);color:var(--blue)}
 .mc-popover-model{display:flex;align-items:center;gap:0.4rem;margin-top:0.5rem;padding:0.35rem 0.55rem;background:var(--bg-tertiary);border-radius:6px;font-size:0.68rem;color:var(--text-secondary)}
 .mc-popover-close{position:absolute;top:0.4rem;right:0.5rem;background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:0.3rem;font-size:0.9rem;line-height:1}
 .mc-popover-close:hover{color:var(--text-primary)}
@@ -674,6 +674,7 @@ function renderPhaseGraphs() {
 /* ── Git contribution graph cells ── */
 (function(){
     const g = document.getElementById('mc-git-graph');
+    if (!g) return;
     for(let i=0;i<56;i++){
         const c = document.createElement('div');
         c.className = 'mc-git-cell';
@@ -1169,6 +1170,8 @@ function generatePhaseSummary(phaseId) {
     const summaryEl = document.getElementById(`summary-${phaseId}`);
     if (!summaryEl || summaryEl.innerHTML.trim()) return; // DB summary already rendered
 
+    const container = document.getElementById(`discuss-${phaseId}`);
+    if (!container) return;
     const msgs = container.querySelectorAll('.mu--chat');
     if (msgs.length === 0) return;
 

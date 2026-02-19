@@ -145,7 +145,7 @@
                         </div>
                         {% endif %}
                         <div>
-                            <div class="wf-agent-name">{{ a.name }}{% if a.is_leader %} 👑{% endif %}</div>
+                            <div class="wf-agent-name">{{ a.name }}{% if a.is_leader %} <svg class="icon-xs" style="color:var(--yellow)"><use href="#icon-star"/></svg>{% endif %}</div>
                             <div class="wf-agent-role">{{ a.role }}</div>
                         </div>
                         <div class="wf-agent-status {{ a.status or 'idle' }}"></div>
@@ -202,10 +202,10 @@
     <div class="wf-panel-header">
         <div class="wf-panel-title"><svg><use href="#icon-share"/></svg> Graphe d'Organisation</div>
         <div style="display:flex;gap:0.6rem;font-size:0.62rem;color:var(--text-secondary)">
-            <span>🟣 Cadrage</span>
-            <span>🔵 Architecture</span>
-            <span>🟡 Sprint</span>
-            <span>🟢 Delivery</span>
+            <span style="color:var(--purple)">Cadrage</span>
+            <span style="color:var(--blue)">Architecture</span>
+            <span style="color:var(--yellow)">Sprint</span>
+            <span style="color:var(--green)">Delivery</span>
         </div>
     </div>
     <div class="wf-graph-container">

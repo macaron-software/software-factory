@@ -554,8 +554,8 @@ body {
   bottom: 70px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--bg-secondary, #1e1b2e);
-  border: 1px solid var(--border-color, #3d3654);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: 8px 20px;
   font-size: 0.85rem;
