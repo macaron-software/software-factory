@@ -5719,6 +5719,31 @@ async def api_mission_run(request: Request, mission_id: str):
                         phase.status = PhaseStatus.DONE  # downgrade to done with issues
                         phases_done += 1
                         phases_failed -= 1  # undo the +1 from above
+                        # Rebuild summary from agent messages (not "Phase échouée")
+                        try:
+                            from ..sessions.store import get_session_store
+                            ss = get_session_store()
+                            phase_msgs = ss.get_messages(session_id)
+                            convo = []
+                            for pm in phase_msgs[_pre_phase_msg_count:]:
+                                txt = (getattr(pm, 'content', '') or '').strip()
+                                if not txt or len(txt) < 20:
+                                    continue
+                                agent = getattr(pm, 'from_agent', '') or ''
+                                if agent in ('system', 'user', 'chef_de_programme'):
+                                    continue
+                                name = getattr(pm, 'from_name', '') or agent
+                                convo.append(f"{name}: {txt[:300]}")
+                            if convo:
+                                from ..llm.client import get_llm_client, LLMMessage
+                                llm = get_llm_client()
+                                transcript = "\n\n".join(convo[-10:])
+                                resp = await llm.chat([
+                                    LLMMessage(role="user", content=f"Résume cette discussion d'équipe en 2-3 phrases. Focus sur les décisions et conclusions. Même langue que la discussion.\n\n{transcript[:3000]}")
+                                ], max_tokens=200, temperature=0.3)
+                                phase.summary = (resp.content or "").strip()[:500]
+                        except Exception:
+                            phase.summary = f"{len(aids)} agents, pattern: {pattern_type}"
                     await _push_sse(session_id, {
                         "type": "message",
                         "from_agent": "chef_de_programme",
