@@ -33,8 +33,11 @@ skills:
 tools:
   - code_read
   - code_search
+  - code_write
+  - code_edit
   - git_status
   - git_log
+  - git_diff
   - build
   - test
 

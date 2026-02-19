@@ -5232,7 +5232,7 @@ async def api_mission_run(request: Request, mission_id: str):
             # Snapshot message count before phase starts (for summary extraction)
             from ..sessions.store import get_session_store as _get_ss
             _ss_pre = _get_ss()
-            _pre_phase_msg_count = len(_ss_pre.list_messages(session_id))
+            _pre_phase_msg_count = len(_ss_pre.get_messages(session_id))
 
             # Update phase status
             phase.status = PhaseStatus.RUNNING
@@ -5500,7 +5500,7 @@ async def api_mission_run(request: Request, mission_id: str):
                     from ..sessions.store import get_session_store
                     from ..llm.client import get_llm_client, LLMMessage
                     ss = get_session_store()
-                    phase_msgs = ss.list_messages(session_id)
+                    phase_msgs = ss.get_messages(session_id)
                     # Collect messages produced during THIS phase (after snapshot)
                     convo = []
                     for m in phase_msgs[_pre_phase_msg_count:]:

@@ -351,6 +351,9 @@ async def _execute_node(
 
     if pattern_type in discussion_patterns or not has_project:
         full_task += _RESEARCH_PROTOCOL
+    elif "devops" in role_lower or "sre" in role_lower or "pipeline" in role_lower:
+        full_task += _EXEC_PROTOCOL
+        full_task += "\n\n" + _PR_PROTOCOL
     elif "dev" in role_lower or "fullstack" in role_lower or "backend" in role_lower or "frontend" in role_lower:
         full_task += _EXEC_PROTOCOL
         full_task += "\n\n" + _PR_PROTOCOL
