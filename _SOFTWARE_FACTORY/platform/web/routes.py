@@ -5899,7 +5899,9 @@ async def api_mission_run(request: Request, mission_id: str):
 
             # Sprint loop — dev-sprint runs multiple iterations (sprints)
             phase_key_check = wf_phase.name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
-            max_sprints = wf_phase.config.get("max_iterations", 3) if "sprint" in phase_key_check or "dev" in phase_key_check else 1
+            is_dev_phase = "sprint" in phase_key_check or "dev" in phase_key_check
+            is_retryable = is_dev_phase or "cicd" in phase_key_check or "qa" in phase_key_check or "architecture" in phase_key_check or "setup" in phase_key_check
+            max_sprints = wf_phase.config.get("max_iterations", 3) if is_dev_phase else (2 if is_retryable else 1)
 
             # Run the real pattern engine — NO fake success on error
             phase_success = False
@@ -5981,12 +5983,13 @@ async def api_mission_run(request: Request, mission_id: str):
 
                 # Sprint iteration handling:
                 # - Success → continue to next sprint (more features)
-                # - Failure/VETO in dev sprints → remediation: retry with feedback
-                # - Failure in non-dev phases → break immediately
+                # - Failure/VETO → remediation: retry with feedback (all retryable phases)
+                # - Failure in non-retryable phases → break immediately
                 if not phase_success:
-                    if max_sprints > 1 and sprint_num < max_sprints:
-                        # Dev sprint: inject veto feedback and retry
-                        remediation_msg = f"{sprint_label} terminé avec des vetoes. Relance avec feedback correctif…"
+                    if sprint_num < max_sprints:
+                        # Retry with veto/error feedback
+                        retry_label = f"Itération {sprint_num}/{max_sprints}" if not is_dev_phase else sprint_label
+                        remediation_msg = f"{retry_label} terminé avec des problèmes. Relance avec feedback correctif…"
                         await _push_sse(session_id, {
                             "type": "message",
                             "from_agent": "chef_de_programme",
@@ -5998,12 +6001,12 @@ async def api_mission_run(request: Request, mission_id: str):
                             "msg_type": "text",
                         })
                         await asyncio.sleep(0.8)
-                        # Add veto feedback to next sprint prompt
-                        prev_context += f"\n- VETO sprint {sprint_num}: {phase_error[:300]}"
+                        # Inject rejection feedback into next iteration context
+                        prev_context += f"\n- REJET itération {sprint_num}: {phase_error[:500]}"
                         phase_error = ""  # reset for next attempt
                         continue
                     else:
-                        break  # Last sprint or single-iteration phase: stop
+                        break  # Last iteration: stop
 
                 # Announce sprint completion (only for multi-sprint phases)
                 if max_sprints > 1 and sprint_num < max_sprints:
@@ -6198,9 +6201,15 @@ async def api_mission_run(request: Request, mission_id: str):
                                 resp = await llm.chat([
                                     LLMMessage(role="user", content=f"Résume cette discussion d'équipe en 2-3 phrases. Focus sur les décisions et conclusions. Même langue que la discussion.\n\n{transcript[:3000]}")
                                 ], max_tokens=200, temperature=0.3)
-                                phase.summary = (resp.content or "").strip()[:500]
+                                new_summary = (resp.content or "").strip()[:500]
+                                if new_summary and len(new_summary) > 20:
+                                    phase.summary = new_summary
+                                else:
+                                    phase.summary = f"{len(aids)} agents ont travaillé ({pattern_type}) — terminée avec avertissements"
+                            else:
+                                phase.summary = f"{len(aids)} agents, pattern: {pattern_type}"
                         except Exception:
-                            phase.summary = f"{len(aids)} agents, pattern: {pattern_type}"
+                            phase.summary = f"{len(aids)} agents ont travaillé ({pattern_type}) — terminée avec avertissements"
                     await _push_sse(session_id, {
                         "type": "message",
                         "from_agent": "chef_de_programme",
