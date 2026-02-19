@@ -18,7 +18,7 @@
 {% set ts = msg.timestamp | default(msg.get('time', '')) if msg is mapping else msg.timestamp | default('') %}
 {% set meta = msg.metadata if msg.metadata is defined and msg.metadata is mapping else {} %}
 {% set is_user = from_id in ('user', 'human') %}
-{% set is_system = from_id == 'system' or mtype == 'system' %}
+{% set is_system = from_id == 'system' and mtype == 'system' %}
 {% set from_ag = agent_map.get(from_id, {}) if agent_map is defined and agent_map is mapping else {} %}
 {% set to_ag = agent_map.get(to_id, {}) if agent_map is defined and agent_map is mapping else {} %}
 {% set from_name = from_ag.get('name', from_id | replace('_', ' ') | title) if not is_user else 'You' %}

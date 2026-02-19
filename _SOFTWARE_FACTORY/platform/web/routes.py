@@ -4999,6 +4999,10 @@ async def mission_control_page(request: Request, mission_id: str):
                         break
             if m.message_type == "system" and m.from_agent == "system":
                 continue  # skip internal system messages from display
+            # Skip raw tool call XML and empty messages
+            _c = (m.content or "").strip()
+            if not _c or _c.startswith(("<FunctionCall", "<tool_code", "[TOOL_CALL]{")):
+                continue
             ag = agent_map.get(m.from_agent)
             meta = {}
             if hasattr(m, "metadata") and m.metadata:
