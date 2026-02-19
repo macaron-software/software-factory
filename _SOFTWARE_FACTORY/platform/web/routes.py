@@ -6429,7 +6429,30 @@ async def api_mission_run(request: Request, mission_id: str):
         except Exception as retro_err:
             logger.warning(f"Auto-retrospective failed: {retro_err}")
 
-    asyncio.create_task(_run_phases())
+    async def _safe_run():
+        try:
+            await _run_phases()
+        except Exception as exc:
+            import traceback
+            logger.error("Mission %s _run_phases crashed: %s\n%s", mission_id, exc, traceback.format_exc())
+            try:
+                mission.status = MissionStatus.FAILED
+                run_store.update(mission)
+                await _push_sse(session_id, {
+                    "type": "message",
+                    "from_agent": "chef_de_programme",
+                    "from_name": "Alexandre Moreau",
+                    "from_role": "Chef de Programme",
+                    "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                    "content": f"Erreur interne: {exc}",
+                    "msg_type": "text",
+                })
+            except Exception:
+                pass
+
+    mission.status = MissionStatus.RUNNING
+    run_store.update(mission)
+    asyncio.create_task(_safe_run())
     return JSONResponse({"status": "running", "mission_id": mission_id})
 
 

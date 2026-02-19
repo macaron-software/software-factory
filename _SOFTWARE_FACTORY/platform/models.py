@@ -300,8 +300,8 @@ class PhaseRun(BaseModel):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     agent_count: int = 0
-    summary: str = ""
-    error: str = ""
+    summary: Optional[str] = ""
+    error: Optional[str] = ""
     iteration: int = 0
 
 
