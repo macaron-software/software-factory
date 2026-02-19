@@ -5334,55 +5334,76 @@ async def mission_control_page(request: Request, mission_id: str):
     result_build_cmd = ""
     result_run_cmd = ""
     result_deploy_url = ""
+    result_project_type = ""
     ws_path = mission.workspace_path or ""
     if ws_path:
         ws = Path(ws_path)
         if ws.exists():
-            # Collect screenshots from workspace (screenshots/ dir + root images)
+            # Collect REAL screenshots (skip tiny placeholders < 5KB)
             for img_dir in [ws / "screenshots", ws]:
                 if img_dir.exists():
                     for ext in ("*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp"):
                         for img in sorted(img_dir.glob(ext)):
-                            rel = img.relative_to(ws)
-                            result_screenshots.append(str(rel))
-            result_screenshots = result_screenshots[:12]  # cap
+                            if img.stat().st_size > 5000:  # skip placeholders
+                                rel = img.relative_to(ws)
+                                result_screenshots.append(str(rel))
+            result_screenshots = result_screenshots[:12]
 
-            # Auto-detect project type → build/run commands
-            if (ws / "Package.swift").exists():
-                result_build_cmd = "swift build"
-                result_run_cmd = "swift run"
-            elif (ws / "project.yml").exists():
-                result_build_cmd = "xcodegen generate && xcodebuild -scheme WebPConverter -configuration Debug build"
-                result_run_cmd = "open build/Debug/*.app"
-            elif any((ws / f).exists() for f in ("Sources",)):
-                result_build_cmd = "swift build"
-                result_run_cmd = "swift run"
-            if (ws / "docker-compose.yml").exists():
-                result_build_cmd = result_build_cmd or "docker compose build"
-                result_run_cmd = "docker compose up"
-            elif (ws / "Dockerfile").exists():
-                result_build_cmd = result_build_cmd or "docker build -t app ."
-                result_run_cmd = "docker run -p 8080:8080 app"
-            if (ws / "package.json").exists():
-                result_build_cmd = result_build_cmd or "npm install && npm run build"
+            # Auto-detect project type (EXCLUSIVE — first match wins)
+            is_swift = (ws / "Package.swift").exists() or (ws / "Sources").exists() or (ws / "project.yml").exists()
+            is_node = (ws / "package.json").exists()
+            is_docker = (ws / "Dockerfile").exists() or (ws / "docker-compose.yml").exists()
+
+            if is_swift:
+                result_project_type = "swift"
+                if (ws / "Package.swift").exists():
+                    result_build_cmd = "swift build"
+                    result_run_cmd = "swift run"
+                elif (ws / "project.yml").exists():
+                    # Extract scheme name from project.yml
+                    scheme = "App"
+                    try:
+                        import yaml as _y
+                        proj = _y.safe_load((ws / "project.yml").read_text())
+                        scheme = proj.get("name", "App")
+                    except Exception:
+                        pass
+                    result_build_cmd = f"xcodegen generate && xcodebuild -scheme {scheme} -configuration Debug build"
+                    result_run_cmd = f"open build/Debug/{scheme}.app"
+                else:
+                    result_build_cmd = "swift build"
+                    result_run_cmd = "swift run"
+            elif is_docker:
+                result_project_type = "docker"
+                if (ws / "docker-compose.yml").exists():
+                    result_build_cmd = "docker compose build"
+                    result_run_cmd = "docker compose up"
+                else:
+                    result_build_cmd = "docker build -t app ."
+                    result_run_cmd = "docker run -p 8080:8080 app"
+            elif is_node:
+                result_project_type = "node"
+                result_build_cmd = "npm install && npm run build"
                 result_run_cmd = "npm start"
-            if (ws / "Makefile").exists() and not result_build_cmd:
+            elif (ws / "Makefile").exists():
+                result_project_type = "make"
                 result_build_cmd = "make build"
                 result_run_cmd = "make run"
 
-            # Check for deploy URL in environment files
-            for env_file in (ws / "environments.md", ws / ".env", ws / "deploy.md"):
-                if env_file.exists():
-                    try:
-                        env_text = env_file.read_text()[:2000]
-                        import re as _re_url
-                        urls = _re_url.findall(r'https?://[^\s\)\"\']+', env_text)
-                        for u in urls:
-                            if any(d in u for d in ("azurewebsites", "azure", "herokuapp", "vercel", "netlify", "localhost")):
-                                result_deploy_url = u
-                                break
-                    except Exception:
-                        pass
+            # Deploy URL — only for web/docker projects
+            if result_project_type in ("docker", "node", ""):
+                for env_file in (ws / "environments.md", ws / ".env", ws / "deploy.md"):
+                    if env_file.exists():
+                        try:
+                            env_text = env_file.read_text()[:2000]
+                            import re as _re_url
+                            urls = _re_url.findall(r'https?://[^\s\)\"\']+', env_text)
+                            for u in urls:
+                                if any(d in u for d in ("azurewebsites", "azure", "herokuapp", "vercel", "netlify", "localhost")):
+                                    result_deploy_url = u
+                                    break
+                        except Exception:
+                            pass
 
     # ── Tab data: Workspace files, PO kanban, QA scores ──
     import os
