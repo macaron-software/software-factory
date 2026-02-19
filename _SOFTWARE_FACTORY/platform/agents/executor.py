@@ -1220,6 +1220,9 @@ class AgentExecutor:
 
                 for tc in llm_resp.tool_calls:
                     result = await self._execute_tool(tc, ctx)
+                    logger.warning("TOOL_EXEC agent=%s tool=%s args=%s result=%s",
+                                   agent.id, tc.function_name,
+                                   str(tc.arguments)[:200], result[:200])
                     all_tool_calls.append({
                         "name": tc.function_name,
                         "args": tc.arguments,
@@ -1241,12 +1244,29 @@ class AgentExecutor:
 
                 if deep_search_used:
                     tools = None
-                if round_num >= MAX_TOOL_ROUNDS - 2 and tools is not None:
-                    tools = None
+                # Nudge: if round 2+ and no code_write yet, inject urgent reminder
+                write_count = sum(1 for tc_rec in all_tool_calls if tc_rec["name"] in ("code_write", "code_edit", "fractal_code"))
+                has_written = write_count > 0
+                if round_num >= 1 and not has_written and tools is not None:
+                    # Strip read-only tools — force write
+                    write_only_tools = [t for t in tools if t.get("function", {}).get("name") in ("code_write", "code_edit", "fractal_code", "git_commit")]
+                    if write_only_tools:
+                        tools = write_only_tools
                     messages.append(LLMMessage(
                         role="system",
-                        content="You have used many tool calls. Now synthesize your findings and respond to the user. Do not call more tools.",
+                        content="⚠️ STOP reading. Call code_write NOW.\n"
+                                "code_write(path=\"Sources/Core/File.swift\", content=\"import Foundation\\n...\")",
                     ))
+                elif round_num >= 2 and has_written and write_count < 2 and tools is not None:
+                    messages.append(LLMMessage(
+                        role="system",
+                        content="⚠️ 1 file written. Call code_write for remaining files.",
+                    ))
+                if round_num >= MAX_TOOL_ROUNDS - 2 and tools is not None:
+                    if has_written:
+                        tools = None
+                        messages.append(LLMMessage(role="system", content="Tools done. Summarize changes."))
+                    # else: keep write-only tools — agent MUST write code
             else:
                 final_content = final_content or "(Max tool rounds reached)"
 

@@ -95,64 +95,39 @@ When you produce deliverables or action items, list them as:
 Example: [PR] Update Angular deps — Upgrade @angular/core from 16.2 to 17.3
 Each [PR] will be tracked in the project dashboard."""
 
-# Execution protocol for worker agents — they must USE tools to actually do the work
-_EXEC_PROTOCOL = """[EXECUTION MODE — MANDATORY: You MUST produce REAL code changes]
+# Decompose protocol — telegraphic
+_DECOMPOSE_PROTOCOL = """ROLE: Tech Lead. DECOMPOSE work, do NOT code.
+DO: list_files (1 round) → output [SUBTASK N] lines ONLY.
 
-CRITICAL RULE: You are a DEVELOPER, not a consultant. Your job is to WRITE CODE, not reports.
-If your response contains NO code_write or code_edit calls, YOU HAVE FAILED your task.
+FORMAT:
+[SUBTASK 1]: Create path/to/file — description
+[SUBTASK 2]: Create path/to/file — description
 
-Available tools: list_files, code_read, code_search, code_edit, code_write, git_status, git_commit, build, test, fractal_code.
+RULES: 1-2 files per subtask. Specific paths. NO code. NO veto."""
 
-MANDATORY WORKFLOW (all steps required):
-1. EXPLORE: Use list_files and code_read to understand the current codebase
-2. PLAN: Identify exactly what files need to change (1-2 sentences max)
-3. EXECUTE: Use code_edit (for modifications) or code_write (for new files)
-   - For COMPLEX tasks with multiple files: use fractal_code to delegate atomic sub-tasks
-   - fractal_code spawns a sub-agent that writes code autonomously with up to 8 tool rounds
-4. TEST: Use test tool to run tests and verify your code works
-5. COMMIT: Use git_commit to commit your changes with a descriptive message
-6. REPORT: List each change as [PR] with the actual file path you modified
+# Execution protocol — telegraphic, code_write focused
+_EXEC_PROTOCOL = """ROLE: Developer. You MUST call code_write. No code_write = FAILURE.
+
+WORKFLOW: list_files (1 round) → code_write per file → git_commit
+TOOL: code_write(path="relative/path.swift", content="full source code here")
 
 RULES:
-- You MUST call code_write/code_edit or fractal_code at least once. Describing changes = FAILURE.
-- Use relative paths (e.g. "src/auth.py"), they are resolved automatically.
-- For new files: code_write with full content.
-- For modifications: code_edit with old_str (exact match) and new_str.
-- For complex multi-file tasks: fractal_code with detailed task description.
-- Each [PR] MUST reference a file you actually changed.
-- Do NOT say "here's what should be done" — DO IT."""
+- code_write EACH file. 30+ lines per file. No stubs.
+- Relative paths (Sources/Core/File.swift). Auto-resolved.
+- Do NOT describe changes. DO them via code_write."""
 
-# Validation protocol for QA agents
-_QA_PROTOCOL = """[VALIDATION MODE — Verify changes are correct]
-Your job is to VERIFY that changes are correct, not to describe what should be tested.
+# Validation protocol — telegraphic
+_QA_PROTOCOL = """ROLE: QA. Verify code changes via tools.
 
-MANDATORY WORKFLOW:
-1. READ the changed files (code_read) — verify the modifications
-2. SEARCH for regressions (code_search) — check no broken references
-3. CHECK consistency — imports, types, configs must be coherent
-4. VERDICT — MUST end with EXACTLY one of these tags:
-   - [APPROVE] if the sprint delivered working code, even if partial
-   - [VETO] ONLY if code is broken, has critical bugs, or zero value was delivered
+DO: code_read changed files → check compiles/works → verdict.
+VERDICT: [APPROVE] if working code delivered. [VETO] only if broken/critical bugs.
+Sprints are incremental. Incomplete ≠ VETO. Broken = VETO."""
 
-IMPORTANT: Sprints are INCREMENTAL. Code being incomplete is NOT a reason to VETO.
-VETO = code doesn't compile/run or has critical bugs. NOT = "features are missing".
-Be concrete: cite file names, line numbers, specific problems."""
+# Review protocol — telegraphic
+_REVIEW_PROTOCOL = """ROLE: Reviewer. Verify claims via tools.
 
-# Review protocol for lead agents
-_REVIEW_PROTOCOL = """[REVIEW MODE — Quality gate]
-Review the work done by your team. Use tools to verify claims.
-
-MANDATORY:
-1. READ the actual code changes (code_read, code_search) — don't trust descriptions blindly
-2. CHECK progress — what was delivered vs what was planned for THIS sprint
-3. CHECK quality — no shortcuts, no skipped validations
-4. VERDICT — MUST end with EXACTLY one of these tags:
-   - [APPROVE] if the sprint delivered working code (even partially)
-   - [VETO] ONLY if zero working code was produced or critical errors exist
-5. SYNTHESIZE: consolidated status with specific file references
-
-IMPORTANT: Sprints are INCREMENTAL. Incomplete features are NORMAL — they continue in next sprint.
-VETO = nothing works or critical quality issue. NOT = "not all features done yet"."""
+DO: code_read files → code_search references → check consistency.
+VERDICT: [APPROVE] or [REQUEST_CHANGES] with specific file:line issues."""
 
 # Research protocol for ideation/discussion — agents can READ docs, search memory, but NOT write code
 _RESEARCH_PROTOCOL = """[DISCUSSION MODE — MANDATORY]
@@ -317,6 +292,7 @@ async def run_pattern(
 async def _execute_node(
     run: PatternRun, node_id: str, task: str,
     context_from: str = "", to_agent_id: str = "",
+    protocol_override: str = "",
 ) -> str:
     """Execute a single node: call its agent with the task, store messages."""
     state = run.nodes.get(node_id)
@@ -347,31 +323,32 @@ async def _execute_node(
         full_task += f"[Message from colleague]:\n{context_from}\n\n"
     full_task += f"[Your task]:\n{task}\n\n"
 
-    # Inject protocol based on PHASE PATTERN, not agent rank
-    # Discussion patterns → everyone discusses (can still use read/search tools)
-    # Execution patterns → role-based protocols (code, test, review)
-    pattern_type = run.pattern.type
-    discussion_patterns = ("network", "human-in-the-loop")
-    role_lower = (agent.role or "").lower()
-    has_project = bool(run.project_id)
-
-    if pattern_type in discussion_patterns or not has_project:
-        full_task += _RESEARCH_PROTOCOL
-    elif "devops" in role_lower or "sre" in role_lower or "pipeline" in role_lower:
-        full_task += _EXEC_PROTOCOL
-        full_task += "\n\n" + _PR_PROTOCOL
-    elif "dev" in role_lower or "fullstack" in role_lower or "backend" in role_lower or "frontend" in role_lower:
-        full_task += _EXEC_PROTOCOL
-        full_task += "\n\n" + _PR_PROTOCOL
-    elif "qa" in role_lower or "test" in role_lower:
-        full_task += _QA_PROTOCOL
-        full_task += "\n\n" + _PR_PROTOCOL
-    elif "lead" in role_lower or "architect" in role_lower:
-        full_task += _REVIEW_PROTOCOL
-        full_task += "\n\n" + _PR_PROTOCOL
+    # Inject protocol — override takes precedence over role-based detection
+    if protocol_override:
+        full_task += protocol_override
     else:
-        # Default for non-dev roles in execution phases (scrum master, PM, etc.)
-        full_task += _RESEARCH_PROTOCOL
+        # Inject protocol based on PHASE PATTERN, not agent rank
+        pattern_type = run.pattern.type
+        discussion_patterns = ("network", "human-in-the-loop")
+        role_lower = (agent.role or "").lower()
+        has_project = bool(run.project_id)
+
+        if pattern_type in discussion_patterns or not has_project:
+            full_task += _RESEARCH_PROTOCOL
+        elif "devops" in role_lower or "sre" in role_lower or "pipeline" in role_lower:
+            full_task += _EXEC_PROTOCOL
+            full_task += "\n\n" + _PR_PROTOCOL
+        elif "dev" in role_lower or "fullstack" in role_lower or "backend" in role_lower or "frontend" in role_lower:
+            full_task += _EXEC_PROTOCOL
+            full_task += "\n\n" + _PR_PROTOCOL
+        elif "qa" in role_lower or "test" in role_lower:
+            full_task += _QA_PROTOCOL
+            full_task += "\n\n" + _PR_PROTOCOL
+        elif "lead" in role_lower or "architect" in role_lower:
+            full_task += _REVIEW_PROTOCOL
+            full_task += "\n\n" + _PR_PROTOCOL
+        else:
+            full_task += _RESEARCH_PROTOCOL
 
     # Execute with streaming SSE
     executor = get_executor()
@@ -1152,21 +1129,31 @@ async def _run_hierarchical(run: PatternRun, task: str):
 
         # ── Step 1: Manager decomposes ──
         if outer == 0:
-            decompose_prompt = (
-                f"You are the tech lead. Decompose this work for your dev team.\n\n"
-                f"Your team:\n" + "\n".join(worker_roster) + "\n\n"
-                f"Create specific, actionable sub-tasks. Each dev should work on "
-                f"complementary parts (NO overlap). Format: [SUBTASK N]: description\n\n"
-                f"They must use code_edit/code_write to make REAL changes.\n\n{task}"
+            # Get previous phase summaries for context
+            prev_summaries = ""
+            try:
+                from ..missions.store import get_mission_run_store
+                if run.session_id:
+                    mr = get_mission_run_store().get(run.session_id)
+                    if mr and mr.phases:
+                        for ph in mr.phases:
+                            if ph.status == "done" and ph.summary:
+                                prev_summaries += f"- {ph.phase_name}: {ph.summary}\n"
+            except Exception:
+                pass
+
+            decompose_prompt = f"Team: {len(worker_roster)} devs. "
+            if prev_summaries:
+                decompose_prompt += f"Context:\n{prev_summaries}\n"
+            decompose_prompt += (
+                f"list_files first, then output [SUBTASK N] lines.\n"
+                f"1 subtask per dev, 1-3 files each, specific paths.\n\n"
+                f"TASK: {task}"
             )
         else:
             decompose_prompt = (
-                f"QA REJECTED the work (iteration {outer + 1}).\n\n"
-                f"## QA Feedback:\n{veto_feedback}\n\n"
-                f"Your team:\n" + "\n".join(worker_roster) + "\n\n"
-                f"Re-assign CORRECTIVE tasks based on QA's specific issues. "
-                f"Each dev must fix the problems QA found in their area. "
-                f"Format: [SUBTASK N]: description\n\n{task}"
+                f"QA REJECTED (iter {outer + 1}). Feedback:\n{veto_feedback}\n\n"
+                f"Re-assign fixes. Format: [SUBTASK N]: fix description\n\n{task}"
             )
 
         # Build targeted routing
@@ -1177,12 +1164,52 @@ async def _run_hierarchical(run: PatternRun, task: str):
 
         manager_output = await _execute_node(
             run, manager_id, decompose_prompt, to_agent_id=workers_target,
+            protocol_override=_DECOMPOSE_PROTOCOL,
         )
 
         # Parse subtasks
         subtasks = _parse_subtasks(manager_output)
-        if not subtasks:
-            subtasks = [task] * len(worker_ids)
+        if not subtasks or len(subtasks) < len(worker_ids):
+            # Smart fallback: parse architecture summary for file names
+            logger.warning("Subtask parsing got %d subtasks for %d workers — using smart fallback",
+                           len(subtasks), len(worker_ids))
+            # Extract file/module hints from architecture summary
+            import re
+            arch_text = prev_summaries + "\n" + task
+            # Find patterns like Sources/Foo/Bar.swift, src/components/Foo.tsx, etc
+            file_hints = re.findall(r'(?:Sources|src|lib|app)/[\w/]+\.(?:swift|ts|tsx|py|rs|kt)', arch_text, re.I)
+            # Also extract module/class names from parenthetical lists
+            names_in_parens = re.findall(r'\(([^)]+)\)', arch_text)
+            class_names = []
+            for group in names_in_parens:
+                for name in re.findall(r'([A-Z]\w+)', group):
+                    if name not in ("MVVM", "MVC", "API", "UI", "SPM", "NPM", "GET", "POST"):
+                        class_names.append(name)
+            # Build per-file subtask list
+            subtask_items = []
+            if file_hints:
+                for fp in file_hints:
+                    subtask_items.append(fp)
+            elif class_names:
+                for cn in class_names[:8]:
+                    subtask_items.append(cn)
+            # Distribute items across workers
+            nw = len(worker_ids)
+            subtasks = []
+            if subtask_items:
+                worker_files: dict[int, list[str]] = {i: [] for i in range(nw)}
+                for idx, item in enumerate(subtask_items):
+                    worker_files[idx % nw].append(item)
+                for wi in range(nw):
+                    files_str = ", ".join(worker_files[wi])
+                    subtasks.append(
+                        f"code_write EACH file: {files_str}\n"
+                        f"30+ lines per file. Complete implementation, no stubs."
+                    )
+            else:
+                for wi in range(nw):
+                    role = "backend/core" if wi == 0 else ("frontend/UI" if wi == 1 else "tests")
+                    subtasks.append(f"Implement {role}. code_write ALL needed files.")
 
         # ── Step 2: INNER LOOP — Devs work until lead says complete ──
         all_dev_work = ""
@@ -1192,12 +1219,9 @@ async def _run_hierarchical(run: PatternRun, task: str):
             for i, wid in enumerate(worker_ids):
                 st = subtasks[i] if i < len(subtasks) else subtasks[-1]
                 if inner > 0:
-                    st = (
-                        f"INCOMPLETE — Your lead reviewed and needs more work:\n"
-                        f"{all_dev_work}\n\nContinue your task:\n{st}"
-                    )
+                    st = f"INCOMPLETE. Lead feedback:\n{all_dev_work[:300]}\n\nContinue: {st}"
                 elif outer > 0:
-                    st = f"QA CORRECTION (round {outer + 1}):\n{veto_feedback}\n\nYour task:\n{st}"
+                    st = f"QA FIX (round {outer + 1}):\n{veto_feedback[:300]}\n\nTask: {st}"
                 worker_tasks.append(
                     _execute_node(run, wid, st, context_from=manager_output, to_agent_id=manager_agent)
                 )
@@ -1212,15 +1236,24 @@ async def _run_hierarchical(run: PatternRun, task: str):
             all_dev_work = "\n\n---\n\n".join(combined_parts)
 
             # Manager reviews completeness — sends to QA if done, workers if not
+            # Get actual file status for review context
+            workspace_status = ""
+            try:
+                workspace = run.metadata.get("workspace") if run.metadata else None
+                if workspace:
+                    import subprocess as _sp
+                    git_r = _sp.run(["git", "diff", "--stat", "HEAD"], capture_output=True, text=True, cwd=workspace, timeout=5)
+                    ls_r = _sp.run(["find", ".", "-not", "-path", "./.git/*", "-type", "f", "-name", "*.swift", "-o", "-name", "*.ts", "-o", "-name", "*.py", "-o", "-name", "*.rs"],
+                                   capture_output=True, text=True, cwd=workspace, timeout=5)
+                    workspace_status = f"\n\nACTUAL FILES in workspace:\n{ls_r.stdout[:500]}\nGit changes:\n{git_r.stdout[:500]}"
+            except Exception:
+                pass
             run.nodes[manager_id].status = NodeStatus.PENDING
             qa_target = qa_agents[0] if qa_agents else manager_agent
             review_output = await _execute_node(
                 run, manager_id,
-                f"Review your team's work for COMPLETENESS (not quality — QA does that).\n\n"
-                f"Check: Did each dev complete their assigned subtask? Are there unfinished items?\n\n"
-                f"If complete: say [COMPLETE] and produce a consolidated [PR] list.\n"
-                f"If NOT complete: say [INCOMPLETE] with what's missing — devs will continue.\n\n"
-                f"Work submitted:\n{all_dev_work}",
+                f"Review completeness. [COMPLETE] or [INCOMPLETE] + missing items.\n"
+                f"Work:\n{all_dev_work}{workspace_status}",
                 context_from=all_dev_work, to_agent_id=qa_target,
             )
 
@@ -1246,9 +1279,8 @@ async def _run_hierarchical(run: PatternRun, task: str):
             run.nodes[qid].status = NodeStatus.PENDING
             await _execute_node(
                 run, qid,
-                f"Validate ALL the work completed by the dev team.\n\n"
-                f"Lead's consolidated review:\n{review_output}\n\n"
-                f"Dev work:\n{all_dev_work}",
+                f"Validate dev work. code_read files → [APPROVE] or [VETO] + reasons.\n"
+                f"Lead review:\n{review_output[:300]}\nDev output:\n{all_dev_work[:500]}",
                 context_from=review_output, to_agent_id=manager_agent,
             )
 

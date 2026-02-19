@@ -129,6 +129,7 @@ def check_l0(content: str, agent_role: str = "", tool_calls: list = None) -> Gua
                 score += 5
 
     # Check minimum content length for execution roles
+    # SKIP if agent used write/commit tools — code is in the workspace, not in the response
     role_key = "default"
     role_lower = (agent_role or "").lower()
     for k in _MIN_CONTENT_LENGTH:
@@ -136,8 +137,8 @@ def check_l0(content: str, agent_role: str = "", tool_calls: list = None) -> Gua
             role_key = k
             break
     min_len = _MIN_CONTENT_LENGTH[role_key]
-    # Only check length for non-approve/non-veto responses
-    if not any(marker in content_lower for marker in ("[approve]", "[veto]", "go/nogo")):
+    # Only check length for non-approve/non-veto responses AND when no code was written via tools
+    if not has_write_tool and not any(marker in content_lower for marker in ("[approve]", "[veto]", "go/nogo")):
         if len(content.strip()) < min_len:
             issues.append(f"TOO_SHORT: {len(content.strip())} chars (min {min_len} for {role_key})")
             score += 2
@@ -194,7 +195,7 @@ async def check_l1(
             evidence_lines = []
             for tc in tool_calls[:10]:
                 name = tc.get("name", "?")
-                result_preview = str(tc.get("result", ""))[:100]
+                result_preview = str(tc.get("result", ""))[:200]
                 evidence_lines.append(f"- {name}: {result_preview}")
             evidence = "\n".join(evidence_lines)
 
@@ -209,13 +210,18 @@ TOOLS ACTUALLY USED:
 AGENT OUTPUT:
 {content[:2000]}
 
+IMPORTANT CONTEXT:
+- If the agent used code_write/code_edit tools, the REAL work is in the tool calls, not the text.
+- A short text response is FINE if code_write was actually called with real content.
+- Only flag HALLUCINATION if claims are NOT visible in tool evidence above.
+
 Check for:
 1. SLOP: Generic filler, placeholder text, no real substance
 2. HALLUCINATION: Claims actions not supported by tool evidence
 3. MOCK: Fake implementations (TODO, pass, NotImplementedError, dummy data)
 4. LIES: Invented file paths, URLs, results not in tool output
 5. ECHO: Just rephrasing the task without doing real work
-6. COMPLETENESS: Did the agent actually address the task?
+6. COMPLETENESS: Did the agent actually address the task? (via tools OR text)
 
 Respond ONLY with JSON:
 {{"score": <0-10>, "issues": ["issue1", "issue2"], "verdict": "APPROVE" or "REJECT"}}"""
