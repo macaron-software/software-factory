@@ -72,7 +72,7 @@ class PatternStore:
         db = get_db()
         try:
             db.execute(
-                """INSERT INTO patterns (id, name, description, type, agents_json, edges_json,
+                """INSERT OR REPLACE INTO patterns (id, name, description, type, agents_json, edges_json,
                    config_json, memory_config_json, icon, is_builtin, created_at, updated_at)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (p.id, p.name, p.description, p.type,
@@ -120,9 +120,7 @@ class PatternStore:
             db.close()
 
     def seed_builtins(self):
-        """Seed pre-built pattern templates if DB is empty."""
-        if self.count() > 0:
-            return
+        """Seed pre-built pattern templates (upsert)."""
 
         builtins = [
             PatternDef(

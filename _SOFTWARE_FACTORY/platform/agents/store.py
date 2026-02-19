@@ -161,9 +161,8 @@ class AgentStore:
             db.close()
 
     def seed_builtins(self):
-        """Seed built-in agents from hardcoded list + YAML definitions."""
-        if self.count() == 0:
-            self._seed_hardcoded()
+        """Seed built-in agents from hardcoded list + YAML definitions (upsert)."""
+        self._seed_hardcoded()
         self._seed_from_yaml()
 
     def _seed_hardcoded(self):
@@ -260,7 +259,11 @@ class AgentStore:
         ]
 
         for agent in builtins:
-            self.create(agent)
+            existing = self.get(agent.id)
+            if existing:
+                self.update(agent)
+            else:
+                self.create(agent)
 
     def _seed_from_yaml(self):
         """Load agent definitions from YAML files in platform/skills/definitions/."""
@@ -281,17 +284,12 @@ class AgentStore:
         for path in sorted(defs_dir.glob("*.yaml")):
             if path.stem.startswith("_"):
                 continue
-            # Skip if already exists in DB (from builtins or prior seed)
-            if self.get(path.stem):
-                continue
             try:
                 raw = yaml.safe_load(path.read_text(encoding="utf-8"))
                 if not raw or not isinstance(raw, dict):
                     continue
 
                 agent_id = raw.get("id", path.stem)
-                if self.get(agent_id):
-                    continue
 
                 tags = raw.get("tags", [])
                 level = next((t for t in tags if t in ROLE_STYLES), "team")
@@ -338,7 +336,11 @@ class AgentStore:
                     hierarchy_rank=raw.get("hierarchy_rank", 50),
                     is_builtin=True,
                 )
-                self.create(agent)
+                existing = self.get(agent_id)
+                if existing:
+                    self.update(agent)
+                else:
+                    self.create(agent)
             except Exception:
                 pass
 
