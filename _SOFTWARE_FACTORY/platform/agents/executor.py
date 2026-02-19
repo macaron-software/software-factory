@@ -668,12 +668,54 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+        # ── Build & Test tools ──
+        {
+            "type": "function",
+            "function": {
+                "name": "build",
+                "description": "Run a build command in the project workspace. Use to compile, install dependencies, or run any build step. Returns stdout+stderr.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {"type": "string", "description": "Build command to run. Examples: 'pip install -r requirements.txt', 'npm install && npm run build', 'cargo build', 'make'"},
+                    },
+                    "required": ["command"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "test",
+                "description": "Run tests in the project workspace. Returns test output with pass/fail results.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {"type": "string", "description": "Test command to run. Examples: 'pytest -v', 'npm test', 'cargo test', 'python -m pytest tests/'"},
+                    },
+                    "required": ["command"],
+                },
+            },
+        },
+        # ── Fractal coding tool (sub-agent spawning) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "fractal_code",
+                "description": "Spawn a focused sub-agent to complete an atomic coding task. The sub-agent gets full tool access (code_write, code_read, code_edit, test, git_commit) and runs autonomously for up to 8 tool rounds. Use this to delegate specific implementation tasks: 'write the auth module with tests', 'create the API endpoint for users', 'add unit tests for calculator'. Returns a summary of files created/modified and test results.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "task": {"type": "string", "description": "Detailed coding task. Be specific about: what files to create, what functions/classes, what tests. Example: 'Create src/auth.py with login(username, password) function and tests/test_auth.py with pytest tests for valid/invalid credentials'"},
+                        "context": {"type": "string", "description": "Additional context: existing files, architecture decisions, tech stack, conventions"},
+                    },
+                    "required": ["task"],
+                },
+            },
+        },
     ]
     _TOOL_SCHEMAS = schemas
     return schemas
-
-
-# ── Role-based tool mapping ────────────────────────────────────
 
 # Tools available to each agent role category
 ROLE_TOOL_MAP: dict[str, list[str]] = {
@@ -699,8 +741,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
     "dev": [
         "code_read", "code_write", "code_edit", "code_search",
         "git_status", "git_log", "git_diff", "git_commit",
-        "list_files", "deep_search",
+        "list_files", "deep_search", "fractal_code",
         "memory_search", "memory_store", "get_project_context",
+        "build", "test",
         "docker_build", "screenshot",
         "lrm_locate", "lrm_conventions", "lrm_build", "lrm_examples",
         "github_prs", "github_code_search",
@@ -989,6 +1032,9 @@ class AgentExecutor:
             # Tool-calling rounds (non-streaming) — same as run()
             deep_search_used = False
             final_content = ""
+            logger.warning("Agent %s: tools_enabled=%s, tools=%s, allowed=%s",
+                           agent.id, ctx.tools_enabled, "YES" if tools else "NO",
+                           ctx.allowed_tools[:3] if ctx.allowed_tools else "all")
 
             for round_num in range(MAX_TOOL_ROUNDS):
                 is_last_possible = (round_num >= MAX_TOOL_ROUNDS - 1) or tools is None
@@ -1026,6 +1072,7 @@ class AgentExecutor:
 
                 total_tokens_in += llm_resp.tokens_in
                 total_tokens_out += llm_resp.tokens_out
+                logger.warning("TOOL_DBG agent=%s round=%d tc=%d clen=%d fin=%s", agent.id, round_num, len(llm_resp.tool_calls), len(llm_resp.content or ""), llm_resp.finish_reason)
 
                 # Parse XML tool calls
                 if not llm_resp.tool_calls and llm_resp.content:
@@ -1119,12 +1166,13 @@ class AgentExecutor:
 
     @staticmethod
     def _parse_xml_tool_calls(content: str) -> list:
-        """Parse MiniMax XML-format tool calls from content."""
+        """Parse tool calls from LLM content (multiple formats)."""
         from ..llm.client import LLMToolCall as _TC
         import uuid as _uuid
 
         calls = []
-        # Match <invoke name="tool_name"><parameter name="key">value</parameter>...</invoke>
+
+        # Format 1: <invoke name="tool_name"><parameter name="key">value</parameter>...</invoke>
         invoke_re = re.compile(
             r'<invoke\s+name="([^"]+)">(.*?)</invoke>', re.DOTALL
         )
@@ -1142,6 +1190,51 @@ class AgentExecutor:
                 function_name=fn_name,
                 arguments=args,
             ))
+        if calls:
+            return calls
+
+        # Format 2: [TOOL_CALL]{ tool => 'name', args => { --KEY "value" }}[/TOOL_CALL]
+        tc_re = re.compile(
+            r'\[TOOL_CALL\]\s*\{[^}]*tool\s*=>\s*[\'"]([^\'"]+)[\'"].*?args\s*=>\s*\{(.*?)\}\s*\}?\s*\[/TOOL_CALL\]',
+            re.DOTALL
+        )
+        arg_re = re.compile(r'--(\w+)\s+"([^"]*)"')
+        for m in tc_re.finditer(content):
+            fn_name = m.group(1)
+            args_block = m.group(2)
+            args = {}
+            for am in arg_re.finditer(args_block):
+                key = am.group(1).lower()
+                # Normalize arg names to match tool schemas
+                if key == "file_path":
+                    key = "path"
+                elif key == "project_path":
+                    key = "cwd"
+                args[key] = am.group(2)
+            calls.append(_TC(
+                id=f"call_{_uuid.uuid4().hex[:12]}",
+                function_name=fn_name,
+                arguments=args,
+            ))
+        if calls:
+            return calls
+
+        # Format 3: <tool_call>{"name":"tool","arguments":{...}}</tool_call> (JSON inside XML)
+        tc_json_re = re.compile(r'<tool_call>\s*(\{.*?\})\s*</tool_call>', re.DOTALL)
+        for m in tc_json_re.finditer(content):
+            try:
+                data = json.loads(m.group(1))
+                fn_name = data.get("name", "")
+                args = data.get("arguments", {})
+                if fn_name:
+                    calls.append(_TC(
+                        id=f"call_{_uuid.uuid4().hex[:12]}",
+                        function_name=fn_name,
+                        arguments=args if isinstance(args, dict) else {},
+                    ))
+            except json.JSONDecodeError:
+                pass
+
         return calls
 
     async def _execute_tool(self, tc: LLMToolCall, ctx: ExecutionContext) -> str:
@@ -1183,6 +1276,10 @@ class AgentExecutor:
             return await self._tool_request_validation(args, ctx)
         if name == "get_project_context":
             return await self._tool_get_project_context(args, ctx)
+        if name == "fractal_code":
+            return await self._tool_fractal_code(args, ctx)
+        if name in ("build", "test"):
+            return await self._tool_build_test(name, args, ctx)
 
         # ── MCP tools: proxy to external servers ──
         if name.startswith("lrm_"):
@@ -1558,7 +1655,141 @@ class AgentExecutor:
             return "No project context available. This mission is running without a project."
         return "\n\n".join(parts)
 
-    async def _push_mission_sse(self, session_id: str, data: dict):
+    async def _tool_build_test(self, tool_name: str, args: dict, ctx: ExecutionContext) -> str:
+        """Run build or test command in workspace."""
+        command = args.get("command", "")
+        if not command:
+            return "Error: command is required"
+        workspace = ctx.project_path
+        if not workspace:
+            return "Error: no workspace available"
+        import subprocess
+        try:
+            proc = subprocess.run(
+                command, shell=True, cwd=workspace,
+                capture_output=True, text=True, timeout=120,
+            )
+            out = (proc.stdout or "") + (proc.stderr or "")
+            status = "SUCCESS" if proc.returncode == 0 else f"FAILED (exit {proc.returncode})"
+            return f"[{tool_name.upper()}] {status}\n$ {command}\n{out[-3000:]}"
+        except subprocess.TimeoutExpired:
+            return f"[{tool_name.upper()}] TIMEOUT after 120s: {command}"
+        except Exception as exc:
+            return f"[{tool_name.upper()}] ERROR: {exc}"
+
+    async def _tool_fractal_code(self, args: dict, ctx: ExecutionContext) -> str:
+        """Spawn a focused sub-agent LLM to complete an atomic coding task.
+        
+        The sub-agent runs autonomously with code tools for up to 8 rounds.
+        Like wiggum TDD from the Software Factory: write code → write tests → run → fix.
+        """
+        task = args.get("task", "")
+        extra_context = args.get("context", "")
+        if not task:
+            return "Error: task description required"
+        if not ctx.project_path:
+            return "Error: no project workspace available"
+
+        # Build a focused system prompt for the sub-agent
+        project_path = ctx.project_path
+        sub_system = f"""You are a focused coding sub-agent. Your ONLY job is to complete this atomic task by writing real code files.
+
+WORKSPACE: {project_path}
+RULES:
+- Write REAL code using code_write tool. Every file must be complete and runnable.
+- Write tests for every module you create.
+- After writing, use code_read to verify files were written correctly.
+- Use list_files to understand existing project structure BEFORE writing.
+- If a test tool is available, run tests to verify your code works.
+- Be surgical: modify only what's needed, don't overwrite unrelated files.
+- Use git_commit to commit your work when done.
+
+{f"CONTEXT: {extra_context}" if extra_context else ""}"""
+
+        # Sub-agent tools: file ops + git + build/test
+        sub_tools = _filter_schemas(_get_tool_schemas(), [
+            "code_read", "code_write", "code_edit", "code_search",
+            "list_files", "git_status", "git_diff", "git_commit",
+            "build", "test",
+        ])
+
+        messages = [LLMMessage(role="user", content=task)]
+        files_changed = []
+        MAX_SUB_ROUNDS = 8
+
+        for rnd in range(MAX_SUB_ROUNDS):
+            try:
+                llm_resp = await self._llm.chat(
+                    messages=messages,
+                    provider=ctx.agent.provider,
+                    model=ctx.agent.model,
+                    temperature=0.3,  # more deterministic for coding
+                    max_tokens=ctx.agent.max_tokens,
+                    system_prompt=sub_system if rnd == 0 else "",
+                    tools=sub_tools,
+                )
+            except Exception as exc:
+                logger.error("Fractal sub-agent LLM error round %d: %s", rnd, exc)
+                break
+
+            # Check for XML tool calls fallback
+            if not llm_resp.tool_calls and llm_resp.content:
+                xml_tcs = self._parse_xml_tool_calls(llm_resp.content)
+                if xml_tcs:
+                    llm_resp = LLMResponse(
+                        content="", model=llm_resp.model, provider=llm_resp.provider,
+                        tokens_in=llm_resp.tokens_in, tokens_out=llm_resp.tokens_out,
+                        duration_ms=llm_resp.duration_ms, finish_reason="tool_calls",
+                        tool_calls=xml_tcs,
+                    )
+
+            # No tool calls → sub-agent is done
+            if not llm_resp.tool_calls:
+                break
+
+            # Execute tool calls
+            tc_msg_data = [{
+                "id": tc.id, "type": "function",
+                "function": {"name": tc.function_name, "arguments": json.dumps(tc.arguments)},
+            } for tc in llm_resp.tool_calls]
+            messages.append(LLMMessage(role="assistant", content=llm_resp.content or "", tool_calls=tc_msg_data))
+
+            for tc in llm_resp.tool_calls:
+                result = await self._execute_tool(tc, ctx)
+                messages.append(LLMMessage(role="tool", content=result[:4000], tool_call_id=tc.id, name=tc.function_name))
+                # Track file changes
+                if tc.function_name in ("code_write", "code_edit"):
+                    path = tc.arguments.get("path", "?")
+                    if ctx.project_path and path.startswith(ctx.project_path):
+                        path = path[len(ctx.project_path):].lstrip("/")
+                    files_changed.append(f"{tc.function_name}: {path}")
+                elif tc.function_name == "git_commit":
+                    files_changed.append(f"committed: {tc.arguments.get('message', '?')[:60]}")
+
+                logger.warning("FRACTAL sub-agent round=%d tool=%s path=%s",
+                               rnd, tc.function_name, tc.arguments.get("path", "?")[:60])
+
+            # Emit progress SSE
+            if ctx.on_tool_call:
+                try:
+                    await ctx.on_tool_call("fractal_code", {"round": rnd, "tools": len(llm_resp.tool_calls)},
+                                           f"Sub-agent round {rnd+1}: {len(llm_resp.tool_calls)} tool calls")
+                except Exception:
+                    pass
+
+        # Build summary
+        summary_parts = [f"## Fractal Sub-Agent Result", f"**Task:** {task[:200]}"]
+        if files_changed:
+            summary_parts.append(f"**Changes ({len(files_changed)}):**")
+            for fc in files_changed[:20]:
+                summary_parts.append(f"- {fc}")
+        else:
+            summary_parts.append("*No file changes recorded*")
+        # Get final LLM summary
+        if llm_resp and llm_resp.content:
+            summary_parts.append(f"\n**Summary:** {llm_resp.content[:500]}")
+
+        return "\n".join(summary_parts)
         """Push a mission control SSE event via the A2A bus SSE listeners."""
         from ..a2a.bus import get_bus
         data["session_id"] = session_id

@@ -100,21 +100,25 @@ _EXEC_PROTOCOL = """[EXECUTION MODE — MANDATORY: You MUST produce REAL code ch
 CRITICAL RULE: You are a DEVELOPER, not a consultant. Your job is to WRITE CODE, not reports.
 If your response contains NO code_write or code_edit calls, YOU HAVE FAILED your task.
 
-Available tools: list_files, code_read, code_search, code_edit, code_write, git_status.
+Available tools: list_files, code_read, code_search, code_edit, code_write, git_status, git_commit, build, test, fractal_code.
 
 MANDATORY WORKFLOW (all steps required):
 1. EXPLORE: Use list_files and code_read to understand the current codebase
 2. PLAN: Identify exactly what files need to change (1-2 sentences max)
-3. EXECUTE: Use code_edit (for modifications) or code_write (for new files) — THIS IS THE MAIN STEP
-4. VERIFY: Use code_read to confirm your changes are correct
-5. REPORT: List each change as [PR] with the actual file path you modified
+3. EXECUTE: Use code_edit (for modifications) or code_write (for new files)
+   - For COMPLEX tasks with multiple files: use fractal_code to delegate atomic sub-tasks
+   - fractal_code spawns a sub-agent that writes code autonomously with up to 8 tool rounds
+4. TEST: Use test tool to run tests and verify your code works
+5. COMMIT: Use git_commit to commit your changes with a descriptive message
+6. REPORT: List each change as [PR] with the actual file path you modified
 
 RULES:
-- You MUST call code_write or code_edit at least once. Describing changes without making them = FAILURE.
-- Use relative paths (e.g. "src/app/auth/auth.component.ts"), they are resolved automatically.
+- You MUST call code_write/code_edit or fractal_code at least once. Describing changes = FAILURE.
+- Use relative paths (e.g. "src/auth.py"), they are resolved automatically.
 - For new files: code_write with full content.
 - For modifications: code_edit with old_str (exact match) and new_str.
-- Each [PR] MUST reference a file you actually changed with code_write/code_edit.
+- For complex multi-file tasks: fractal_code with detailed task description.
+- Each [PR] MUST reference a file you actually changed.
 - Do NOT say "here's what should be done" — DO IT."""
 
 # Validation protocol for QA agents

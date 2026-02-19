@@ -5176,6 +5176,13 @@ async def api_mission_run(request: Request, mission_id: str):
             if not wf_phase:
                 continue
 
+            # Skip already-completed phases (for resume/fast-forward)
+            if phase.status in (PhaseStatus.DONE, PhaseStatus.SKIPPED):
+                phases_done += 1
+                if phase.summary:
+                    phase_summaries.append(f"## {wf_phase.name}\n{phase.summary}")
+                continue
+
             cfg = wf_phase.config or {}
             aids = cfg.get("agent_ids", cfg.get("agents", []))
             pattern_type = wf_phase.pattern_id
@@ -5207,7 +5214,7 @@ async def api_mission_run(request: Request, mission_id: str):
             prev_context = ""
             if phase_summaries:
                 prev_context = "\n".join(
-                    f"- Phase {s['name']}: {s['summary']}"
+                    s if isinstance(s, str) else f"- Phase {s.get('name','?')}: {s.get('summary','')}"
                     for s in phase_summaries[-5:]  # last 5 phases max
                 )
 
@@ -5573,7 +5580,7 @@ async def api_mission_run(request: Request, mission_id: str):
                         )
                 except Exception:
                     pass
-                phase_summaries.append({"name": wf_phase.name, "summary": summary_text[:200]})
+                phase_summaries.append(f"## {wf_phase.name}\n{summary_text[:200]}")
 
                 # Post-phase CI/CD hooks — run real commands in workspace
                 await _run_post_phase_hooks(
