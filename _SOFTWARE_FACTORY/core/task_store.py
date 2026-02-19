@@ -145,7 +145,7 @@ Response:"""
             from core.llm_client import run_opencode
             returncode, output = await run_opencode(
                 prompt,
-                model="minimax/MiniMax-M2.1",
+                model="minimax/MiniMax-M2.5",
                 timeout=30,
                 fallback=False,  # Fast, no retry
             )
@@ -977,8 +977,8 @@ class TaskStore:
         return True
 
     def get_pending_tasks(self, project_id: str, limit: int = 10,
-                          domain: str = None) -> List[Task]:
-        """Get pending tasks sorted by WSJF"""
+                          domain: str = None, exclude_patterns: List[str] = None) -> List[Task]:
+        """Get pending tasks sorted by WSJF, optionally excluding files matching patterns"""
         with self._get_connection() as conn:
             query = """
                 SELECT * FROM tasks
@@ -990,6 +990,12 @@ class TaskStore:
             if domain:
                 query += " AND domain = ?"
                 params.append(domain)
+
+            # Exclude problematic file patterns (e.g., battery.rs)
+            if exclude_patterns:
+                for pattern in exclude_patterns:
+                    query += " AND description NOT LIKE ?"
+                    params.append(f"%{pattern}%")
 
             query += " ORDER BY wsjf_score DESC LIMIT ?"
             params.append(limit)
@@ -1110,13 +1116,14 @@ class TaskStore:
     def get_deployable_tasks(self, project_id: str, limit: int = 10) -> List[Task]:
         """
         Get tasks ready for deployment.
-        Includes: merged, queued_for_deploy, commit_queued, code_written
+        Only queued_for_deploy (set by cycle worker after commit).
+        NOT merged (already done), NOT code_written (cycle worker handles those).
         """
         with self._get_connection() as conn:
             rows = conn.execute("""
                 SELECT * FROM tasks
                 WHERE project_id = ?
-                AND status IN ('merged', 'queued_for_deploy', 'commit_queued', 'code_written')
+                AND status IN ('queued_for_deploy')
                 ORDER BY wsjf_score DESC, created_at ASC
                 LIMIT ?
             """, (project_id, limit)).fetchall()
@@ -1278,6 +1285,22 @@ class TaskStore:
         for issue in issue_list[:5]:  # Max 5 feedback tasks per rejection
             # Build description
             desc = f"[ADVERSARIAL FIX] {issue[:200]}"
+
+            # Filter build artifacts and protected paths (hallucination prevention)
+            PROTECTED_PATTERNS = [
+                'target/debug/',
+                'target/release/',
+                'node_modules/',
+                '.fingerprint/',
+                'build.gradle',
+                'package-lock.json',
+                'Cargo.lock',
+                '.git/',
+                'LICENSE',
+            ]
+            if any(pattern in desc or pattern in str(source_files) for pattern in PROTECTED_PATTERNS):
+                logger.warning(f"SKIP: Adversarial feedback for protected/artifact path: {desc[:80]}")
+                continue
 
             # Check for duplicates (fast fuzzy)
             candidates = dedup.find_fuzzy_duplicates(project_id, domain, desc)

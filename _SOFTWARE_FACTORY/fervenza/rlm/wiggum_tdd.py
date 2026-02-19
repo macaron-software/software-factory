@@ -4,7 +4,7 @@ Wiggum TDD - Parallel TDD Workers for RLM.
 Processes tasks from the backlog using true TDD cycle:
 RED (write failing test) → GREEN (write fix) → VERIFY (run test) → COMMIT
 
-LLM: MiniMax M2.1 via opencode
+LLM: MiniMax M2.5 via opencode
 """
 
 import asyncio
@@ -39,8 +39,8 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 BACKLOG_PATH = Path(__file__).parent / "backlog_tasks.json"
 DEPLOY_BACKLOG_PATH = Path(__file__).parent / "deploy_backlog.json"
 
-# LLM Config - MiniMax M2.1 via opencode
-OPENCODE_MODEL = os.getenv("RLM_TDD_MODEL", "minimax/MiniMax-M2.1")
+# LLM Config - MiniMax M2.5 via opencode
+OPENCODE_MODEL = os.getenv("RLM_TDD_MODEL", "minimax/MiniMax-M2.5")
 
 # TDD System Prompt
 TDD_SYSTEM_PROMPT = """Tu es un développeur TDD strict travaillant sur le projet Fervenza (wedding planning CRM).
@@ -138,7 +138,7 @@ class WiggumWorker:
     """
     A single TDD worker that processes tasks.
 
-    Uses opencode with MiniMax M2.1 to generate fixes and runs tests to verify.
+    Uses opencode with MiniMax M2.5 to generate fixes and runs tests to verify.
     """
 
     def __init__(
@@ -374,7 +374,7 @@ class WiggumWorker:
             return None
 
     async def _generate_fix(self, task: Task) -> Optional[str]:
-        """Generate fix code using opencode with MiniMax M2.1."""
+        """Generate fix code using opencode with MiniMax M2.5."""
         lang_map = {
             Domain.RUST: "rust",
             Domain.PYTHON: "python",
@@ -398,7 +398,7 @@ class WiggumWorker:
         )
 
         try:
-            # Use opencode with MiniMax M2.1
+            # Use opencode with MiniMax M2.5
             content = await self._call_opencode(prompt)
 
             if not content:
@@ -416,7 +416,7 @@ class WiggumWorker:
             return None
 
     async def _call_opencode(self, prompt: str) -> Optional[str]:
-        """Call opencode CLI with MiniMax M2.1 model."""
+        """Call opencode CLI with MiniMax M2.5 model."""
         try:
             # Write prompt to temp file
             with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
@@ -611,7 +611,7 @@ class WiggumTDD:
     """
     Wiggum TDD Manager - Orchestrates parallel workers.
 
-    LLM: MiniMax M2.1 via opencode
+    LLM: MiniMax M2.5 via opencode
 
     Usage:
         tdd = WiggumTDD(workers=10)
@@ -750,7 +750,7 @@ async def main():
     """CLI entry point for Wiggum TDD."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Wiggum TDD - Parallel TDD Workers (MiniMax M2.1)")
+    parser = argparse.ArgumentParser(description="Wiggum TDD - Parallel TDD Workers (MiniMax M2.5)")
     parser.add_argument("--workers", type=int, default=5, help="Number of workers")
     parser.add_argument("--once", action="store_true", help="Process single task")
     parser.add_argument("--task", help="Specific task ID to process")

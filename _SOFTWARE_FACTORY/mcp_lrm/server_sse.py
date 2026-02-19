@@ -158,7 +158,7 @@ class MCPLRMServer:
         """Return tool definitions for MCP"""
         return [
             {
-                "name": "lrm_locate",
+                "name": "locate",
                 "description": "Find files in project matching pattern or search query",
                 "inputSchema": {
                     "type": "object",
@@ -172,7 +172,7 @@ class MCPLRMServer:
                 },
             },
             {
-                "name": "lrm_read",
+                "name": "read",
                 "description": "Read file content",
                 "inputSchema": {
                     "type": "object",
@@ -185,7 +185,7 @@ class MCPLRMServer:
                 },
             },
             {
-                "name": "lrm_conventions",
+                "name": "conventions",
                 "description": "Get project conventions for a domain",
                 "inputSchema": {
                     "type": "object",
@@ -197,7 +197,7 @@ class MCPLRMServer:
                 },
             },
             {
-                "name": "lrm_task_read",
+                "name": "task_read",
                 "description": "Read task details by ID",
                 "inputSchema": {
                     "type": "object",
@@ -208,7 +208,7 @@ class MCPLRMServer:
                 },
             },
             {
-                "name": "lrm_task_update",
+                "name": "task_update",
                 "description": "Update task status",
                 "inputSchema": {
                     "type": "object",
@@ -220,7 +220,7 @@ class MCPLRMServer:
                 },
             },
             {
-                "name": "lrm_build",
+                "name": "build",
                 "description": "Run build or test command",
                 "inputSchema": {
                     "type": "object",
@@ -235,22 +235,24 @@ class MCPLRMServer:
         ]
 
     async def handle_tool_call(self, name: str, arguments: Dict) -> Any:
-        """Handle a tool call"""
+        """Handle a tool call - accepts with or without lrm_ prefix"""
+        # Strip any prefix variations
+        clean_name = name.replace("lrm_lrm_", "").replace("lrm_", "")
         try:
-            if name == "lrm_locate":
+            if clean_name == "locate":
                 return await self._tool_locate(arguments)
-            elif name == "lrm_read":
+            elif clean_name == "read":
                 return await self._tool_read(arguments)
-            elif name == "lrm_conventions":
+            elif clean_name == "conventions":
                 return await self._tool_conventions(arguments)
-            elif name == "lrm_task_read":
+            elif clean_name == "task_read":
                 return await self._tool_task_read(arguments)
-            elif name == "lrm_task_update":
+            elif clean_name == "task_update":
                 return await self._tool_task_update(arguments)
-            elif name == "lrm_build":
+            elif clean_name == "build":
                 return await self._tool_build(arguments)
             else:
-                return {"error": f"Unknown tool: {name}"}
+                return {"error": f"Unknown tool: {name} (cleaned: {clean_name})"}
         except Exception as e:
             log(f"Tool {name} error: {e}", "ERROR")
             return {"error": str(e)}

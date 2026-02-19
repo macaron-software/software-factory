@@ -703,3 +703,111 @@ def print_all_status(manager_status: dict):
         print(f"{icon} {d['name']}: {state} ({pid_str})")
 
     print(f"\nTotal: {manager_status['running']}/{manager_status['total']} running")
+
+
+# ============================================================================
+# ORPHAN CLEANUP WATCHDOG
+# ============================================================================
+
+async def orphan_cleanup_watchdog(
+    interval: int = 300,
+    min_age: int = 600,
+    log_fn: Optional[Callable[[str, str], None]] = None,
+):
+    """
+    Periodic cleanup of orphaned opencode processes.
+
+    Scans for opencode processes with parent=1 (reparented to init) and kills
+    them if older than min_age seconds. This prevents memory leaks from stuck
+    processes that escape the normal killpg() cleanup during fallback.
+
+    Args:
+        interval: Seconds between cleanup runs (default 5 minutes)
+        min_age: Minimum age in seconds before killing orphan (default 10 minutes)
+        log_fn: Optional log function(msg, level)
+    """
+    import asyncio
+    import signal
+
+    def log(msg: str, level: str = "INFO"):
+        if log_fn:
+            log_fn(msg, level)
+
+    log("[WATCHDOG] Orphan cleanup started (interval={}s, min_age={}s)".format(interval, min_age), "INFO")
+
+    while True:
+        await asyncio.sleep(interval)
+
+        try:
+            # Find opencode processes with parent info
+            proc = await asyncio.create_subprocess_shell(
+                "ps -eo pid,ppid,etime,command | grep 'opencode run' | grep -v grep",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            stdout, _ = await proc.communicate()
+
+            orphans = []
+            for line in stdout.decode().strip().split('\n'):
+                if not line:
+                    continue
+
+                parts = line.split(None, 3)
+                if len(parts) < 3:
+                    continue
+
+                pid, ppid = int(parts[0]), int(parts[1])
+                etime = parts[2]
+
+                if ppid == 1:  # Orphan (reparented to init)
+                    # Parse etime: "03:55:31" or "1-03:55:31" or "31" (seconds only)
+                    try:
+                        if '-' in etime:  # days-HH:MM:SS
+                            days, hms = etime.split('-')
+                            h, m, s = hms.split(':')
+                            age_sec = int(days) * 86400 + int(h) * 3600 + int(m) * 60 + int(s)
+                        elif etime.count(':') == 2:  # HH:MM:SS
+                            h, m, s = etime.split(':')
+                            age_sec = int(h) * 3600 + int(m) * 60 + int(s)
+                        elif etime.count(':') == 1:  # MM:SS
+                            m, s = etime.split(':')
+                            age_sec = int(m) * 60 + int(s)
+                        else:  # seconds only
+                            age_sec = int(etime)
+                    except (ValueError, AttributeError):
+                        continue
+
+                    # Kill if older than min_age
+                    if age_sec > min_age:
+                        orphans.append((pid, age_sec))
+
+            if orphans:
+                log(f"[WATCHDOG] Found {len(orphans)} orphan opencode processes", "WARN")
+                for pid, age in orphans:
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                        log(f"[WATCHDOG] Killed orphan PID {pid} (age {age}s)", "INFO")
+                    except ProcessLookupError:
+                        pass  # Already dead
+                    except Exception as e:
+                        log(f"[WATCHDOG] Failed to kill orphan PID {pid}: {e}", "ERROR")
+
+        except Exception as e:
+            log(f"[WATCHDOG] Cleanup error: {e}", "ERROR")
+
+
+def start_watchdog_daemon(interval: int = 300, min_age: int = 600):
+    """
+    Start orphan cleanup watchdog as background task.
+
+    Call this once at Factory startup (e.g., in cycle_worker or daemon manager).
+    """
+    from core.log import get_logger
+    logger = get_logger("watchdog")
+
+    def log_fn(msg: str, level: str):
+        getattr(logger, level.lower(), logger.info)(msg)
+
+    # Run watchdog in event loop
+    loop = asyncio.get_event_loop()
+    loop.create_task(orphan_cleanup_watchdog(interval, min_age, log_fn))

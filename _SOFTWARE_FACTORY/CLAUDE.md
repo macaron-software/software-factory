@@ -437,6 +437,43 @@ factory mcp start/stop/status/restart
 
 **Usage Brain:** `mcp.call("lrm", "context", {"category": "vision"})` → VISION.md + AO refs
 
+## MCP PLATFORM SERVER (Internal Tools)
+
+```
+MCP Platform Server (port 9501, auto-start with platform)
+    ↓ HTTP REST + SSE
+Agents / CLI / opencode / any MCP client
+```
+
+**Auto-start:** lifespan hook in `platform/server.py` → subprocess `platform.mcp_platform.server`
+**PID:** `/tmp/factory/mcp-platform.pid`
+
+**Tools:**
+| Tool | Source | Description |
+|------|--------|-------------|
+| `platform_agents` | agents/store | List/get agents (id, name, role, model, skills) |
+| `platform_missions` | missions/store | List/get missions + phase statuses |
+| `platform_phases` | missions/store | Phase details for a mission |
+| `platform_messages` | sessions/store | Agent conversations (from, to, content) |
+| `platform_memory` | memory/manager | FTS5 search project/global memory |
+| `platform_git` | subprocess | log/status/diff/show/branch on workspace |
+| `platform_code` | filesystem | read/search/list files in workspace |
+| `platform_metrics` | platform.db | Agent/mission/session/message/memory counts |
+
+**Endpoints:**
+- `GET /health` → status + tool count
+- `GET /tools` → tool names list
+- `POST /tool` → `{"name":"platform_agents","arguments":{}}` → direct REST call
+- `GET /sse` → MCP SSE session
+- `POST /message?session_id=X` → JSON-RPC MCP messages
+
+**Config opencode:**
+```json
+"mcp": {"platform": {"type": "local", "command": ["python3", ".../platform/mcp_platform/proxy.py"]}}
+```
+
+**Files:** `platform/mcp_platform/server.py` (daemon), `platform/mcp_platform/proxy.py` (stdio bridge)
+
 ## GLOBAL BUILD QUEUE (Cross-Project Singleton)
 
 **Problème:** N projets × M tests = CPU/IO saturés (vitest, gradle, pytest //)

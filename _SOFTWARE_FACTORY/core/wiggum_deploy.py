@@ -41,13 +41,16 @@ from core.llm_client import run_opencode
 from core.error_capture import ErrorCapture, ErrorType, ErrorSeverity
 from core.daemon import Daemon, DaemonManager, print_daemon_status, print_all_status
 from core.project_context import ProjectContext
+from core.subprocess_util import run_subprocess, run_subprocess_exec
+from core.log import get_logger
+
+_deploy_logger = get_logger("wiggum-deploy")
 
 
 def log(msg: str, level: str = "INFO", worker_id: str = None):
     """Log with timestamp"""
-    ts = datetime.now().strftime("%H:%M:%S")
     prefix = f"DEPLOY-{worker_id}" if worker_id else "DEPLOY"
-    print(f"[{ts}] [{prefix}] [{level}] {msg}", flush=True)
+    _deploy_logger.log(f"[{prefix}] {msg}", level)
 
 
 # ============================================================================
@@ -164,21 +167,12 @@ class E2EExecutor:
                 "BASE_URL": self.base_url or "",
             }
 
-            proc = await asyncio.create_subprocess_shell(
-                smoke_cmd,
-                cwd=str(self.project.root_path),
-                env=env,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            returncode, stdout, stderr = await run_subprocess(
+                smoke_cmd, timeout=300, cwd=str(self.project.root_path),
+                env=env, log_fn=log,
             )
 
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(),
-                timeout=300  # 5 min timeout
-            )
-
-            output = stdout.decode() + "\n" + stderr.decode()
-            returncode = proc.returncode
+            output = stdout + "\n" + stderr
 
             # Parse real Playwright output
             errors = self.error_capture.parse_e2e_output(output, test_name="smoke")
@@ -189,7 +183,9 @@ class E2EExecutor:
                 self.error_capture.clear()
 
             # Check ACTUAL exit code and output
-            if returncode == 0:
+            if returncode == -1:  # timeout
+                return False, "Smoke tests timed out (300s)", captured_tasks
+            elif returncode == 0:
                 log("Smoke tests passed ✓ (exit code 0)")
                 return True, "", captured_tasks
             else:
@@ -201,9 +197,6 @@ class E2EExecutor:
                         if len(error_summary) > 500:
                             break
                 return False, f"Smoke tests failed (exit {returncode}): {error_summary[:500]}", captured_tasks
-
-        except asyncio.TimeoutError:
-            return False, "Smoke tests timed out (300s)", captured_tasks
         except Exception as e:
             return False, f"Smoke test execution error: {str(e)}", captured_tasks
 
@@ -272,21 +265,12 @@ class E2EExecutor:
                 "BASE_URL": self.base_url or "",
             }
 
-            proc = await asyncio.create_subprocess_shell(
-                cmd,
-                cwd=str(self.project.root_path),
-                env=env,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            returncode, stdout, stderr = await run_subprocess(
+                cmd, timeout=300, cwd=str(self.project.root_path),
+                env=env, log_fn=log,
             )
 
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(),
-                timeout=300  # 5 min timeout per journey
-            )
-
-            output = stdout.decode() + "\n" + stderr.decode()
-            returncode = proc.returncode
+            output = stdout + "\n" + stderr
 
             # Parse real Playwright output
             errors = self.error_capture.parse_e2e_output(output, test_name=journey.name)
@@ -297,11 +281,12 @@ class E2EExecutor:
                 self.error_capture.clear()
 
             # Check ACTUAL exit code
-            if returncode == 0:
+            if returncode == -1:  # timeout
+                return False, f"Journey '{journey.name}' timed out (300s)", captured_tasks
+            elif returncode == 0:
                 log(f"Journey '{journey.name}' passed ✓")
                 return True, "", captured_tasks
             else:
-                # Extract failure details from Playwright output
                 error_lines = []
                 for line in output.split("\n"):
                     if any(kw in line.lower() for kw in ["fail", "error", "timeout", "assert"]):
@@ -310,9 +295,6 @@ class E2EExecutor:
                             break
                 error_summary = "\n".join(error_lines)[:1000] or f"Exit code {returncode}"
                 return False, error_summary, captured_tasks
-
-        except asyncio.TimeoutError:
-            return False, f"Journey '{journey.name}' timed out (300s)", captured_tasks
         except Exception as e:
             return False, f"Journey execution error: {str(e)}", captured_tasks
 
@@ -410,20 +392,15 @@ const {{ chromium }} = require('playwright');
 }})();
 """
         try:
-            proc = await asyncio.create_subprocess_exec(
-                "node", "-e", script,
+            timeout_sec = config.get("timeout_sec", 120)
+            returncode, stdout, stderr = await run_subprocess_exec(
+                ["node", "-e", script],
+                timeout=timeout_sec,
                 cwd=str(self.project.root_path),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                log_fn=log,
             )
 
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(),
-                timeout=config.get("timeout_sec", 120)
-            )
-
-            output = stdout.decode() + "\n" + stderr.decode()
-            returncode = proc.returncode
+            output = stdout + "\n" + stderr
 
             # Parse errors for feedback
             errors = self.error_capture.parse_e2e_output(output, test_name="console_network_check")
@@ -432,7 +409,9 @@ const {{ chromium }} = require('playwright');
                 self.captured_error_tasks.extend(captured_tasks)
                 self.error_capture.clear()
 
-            if returncode == 0:
+            if returncode == -1:  # timeout
+                return False, "Console/network check timed out", []
+            elif returncode == 0:
                 log("Console/network check passed ✓")
                 return True, "", captured_tasks
 
@@ -441,9 +420,6 @@ const {{ chromium }} = require('playwright');
             error_summary = "\n".join(error_lines)[:1000]
             log(f"Console/network check FAILED: {error_summary}", "WARN")
             return False, error_summary, captured_tasks
-
-        except asyncio.TimeoutError:
-            return False, "Console/network check timed out", []
         except Exception as e:
             log(f"Console/network check error: {e}", "WARN")
             # Non-blocking: if Playwright not available, warn but don't fail
@@ -477,7 +453,7 @@ Output "RBAC_SUCCESS" if permissions correct, or "RBAC_FAILED: <issue>" if incor
             try:
                 returncode, output = await run_opencode(
                     prompt,
-                    model="minimax/MiniMax-M2.1",
+                    model="minimax/MiniMax-M2.5",
                     cwd=str(self.project.root_path),
                     timeout=120,
                     project=self.project.name,
@@ -533,7 +509,7 @@ Output "SECURITY_SUCCESS" if secure, or "SECURITY_FAILED: <vulnerability details
             try:
                 returncode, output = await run_opencode(
                     prompt,
-                    model="minimax/MiniMax-M2.1",
+                    model="minimax/MiniMax-M2.5",
                     cwd=str(self.project.root_path),
                     timeout=120,
                     project=self.project.name,
@@ -612,7 +588,7 @@ Output "CHAOS_SUCCESS" if system resilient, or "CHAOS_FAILED: <failure mode>" if
         try:
             returncode, output = await run_opencode(
                 prompt,
-                model="minimax/MiniMax-M2.1",
+                model="minimax/MiniMax-M2.5",
                 cwd=str(self.project.root_path),
                 timeout=300,
                 project=self.project.name,
@@ -675,7 +651,7 @@ Output "LOAD_SUCCESS" with metrics summary, or "LOAD_FAILED: <performance issue>
         try:
             returncode, output = await run_opencode(
                 prompt,
-                model="minimax/MiniMax-M2.1",
+                model="minimax/MiniMax-M2.5",
                 cwd=str(self.project.root_path),
                 timeout=duration + 120,
                 project=self.project.name,
@@ -760,7 +736,7 @@ class DeployAdversarial:
         try:
             returncode, output = await run_opencode(
                 prompt,
-                model="minimax/MiniMax-M2.1",
+                model="minimax/MiniMax-M2.5",
                 cwd=str(self.project.root_path),
                 timeout=300,
                 project=self.project.name,
@@ -1044,7 +1020,7 @@ FINAL_VERDICT: <1-2 sentence summary>
         try:
             returncode, output = await run_opencode(
                 prompt,
-                model="minimax/MiniMax-M2.1",
+                model="minimax/MiniMax-M2.5",
                 cwd=str(self.project.root_path),
                 timeout=300,
                 project=self.project.name,
@@ -1258,6 +1234,22 @@ class DeployWorker:
                         result.error = output
                         continue
                     result.stages_passed.append(DeployStage.STAGING)
+
+                    # 2.25 CONTENT VERIFICATION: Use Playwright MCP to verify actual content
+                    content_ok, content_error = await self._verify_deployed_content()
+                    if not content_ok:
+                        self.log(f"Content verification failed: {content_error}", "ERROR")
+                        result.stages_failed.append("content_verification")
+                        result.error = content_error
+                        result.feedback_tasks.append({
+                            "type": "fix",
+                            "domain": "e2e",
+                            "stage": "content_verification",
+                            "description": f"Fix content issue after staging deploy: {content_error}",
+                            "source_task": task.id,
+                        })
+                        continue
+                    result.stages_passed.append("content_verification")
 
                     # 2.5 ADVERSARIAL: Review staging
                     adv_review = await self.adversarial.review_stage("staging", self.stages_outputs["staging"], task)
@@ -1636,24 +1628,12 @@ class DeployWorker:
 
         try:
             # DIRECT EXECUTION - Preserves cargo cache/fingerprints
-            # Use current environment to maintain CARGO_HOME, RUSTUP_HOME, etc.
-            env = dict(subprocess.os.environ)
-
-            proc = await asyncio.create_subprocess_shell(
-                build_cmd,
-                cwd=str(self.project.root_path),
-                env=env,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            returncode, stdout, stderr = await run_subprocess(
+                build_cmd, timeout=self.OPENCODE_TIMEOUT,
+                cwd=str(self.project.root_path), log_fn=self.log,
             )
 
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(),
-                timeout=self.OPENCODE_TIMEOUT
-            )
-
-            output = stdout.decode() + "\n" + stderr.decode()
-            returncode = proc.returncode
+            output = stdout + "\n" + stderr
 
             # 🔴 CAPTURE BUILD ERRORS (RLM feedback loop)
             errors = self.error_capture.parse_build_output(output, domain=task.domain)
@@ -1662,12 +1642,12 @@ class DeployWorker:
                 captured_tasks = self.error_capture.errors_to_tasks(errors)
                 self.error_capture.clear()
 
-            # Check ACTUAL exit code
-            if returncode == 0:
+            if returncode == -1:  # timeout
+                return False, f"Build timed out ({self.OPENCODE_TIMEOUT}s)", captured_tasks
+            elif returncode == 0:
                 self.log("Build passed ✓ (exit code 0)")
                 return True, f"BUILD_SUCCESS\n{output}", captured_tasks
             else:
-                # Extract error summary from output
                 error_lines = []
                 for line in output.split("\n"):
                     if any(kw in line.lower() for kw in ["error", "failed", "cannot find", "not found"]):
@@ -1676,62 +1656,99 @@ class DeployWorker:
                             break
                 error_summary = "\n".join(error_lines)[:1000] or f"Exit code {returncode}"
                 return False, f"BUILD_FAILED: {error_summary}", captured_tasks
-
-        except asyncio.TimeoutError:
-            return False, f"Build timed out ({self.OPENCODE_TIMEOUT}s)", captured_tasks
         except Exception as e:
             return False, str(e), captured_tasks
 
     async def _stage_staging(self, task: Task, tenant: str = None) -> Tuple[bool, str]:
-        """Deploy to staging using LLM agent with MCP tools"""
+        """Deploy to staging using DIRECT subprocess (not LLM - faster and more reliable)"""
         deploy_cmd = self.project.get_deploy_cmd("staging", tenant)
         staging_url = self.project.deploy.get("staging", {}).get("url", "")
-        self.log(f"Deploying to staging via LLM agent: {deploy_cmd}")
-
-        prompt = f"""You are a Deploy agent. Execute the STAGING DEPLOY stage.
-
-PROJECT: {self.project.name} ({self.project.display_name})
-ROOT: {self.project.root_path}
-STAGING URL: {staging_url}
-{f"TENANT: {tenant}" if tenant else ""}
-
-MCP TOOLS AVAILABLE:
-- lrm_build(domain, command): Run deploy commands
-- lrm_locate(query, scope): Find deployment files
-
-YOUR TASK:
-1. Execute the staging deploy command: {deploy_cmd}
-2. Wait for deployment to complete
-3. Verify staging is accessible at {staging_url}
-4. Report SUCCESS or FAILURE with details
-
-Execute the staging deploy now.
-Output "STAGING_SUCCESS" if successful, or "STAGING_FAILED: <reason>" if failed.
-"""
+        self.log(f"Deploying to staging DIRECTLY: {deploy_cmd}")
+        self.log(f"DEBUG staging cwd: {self.project.root_path}")
 
         try:
-            returncode, output = await run_opencode(
-                prompt,
-                model="minimax/MiniMax-M2.1",
-                cwd=str(self.project.root_path),
-                timeout=self.OPENCODE_TIMEOUT,
-                project=self.project.name,
+            returncode, stdout, stderr = await run_subprocess(
+                deploy_cmd, timeout=600, cwd=str(self.project.root_path),
+                log_fn=self.log,
             )
+            output = stdout + stderr
+            self.log(f"DEBUG staging result: exit={returncode}, output_len={len(output)}")
 
-            if returncode != 0:
-                return False, f"Staging agent failed: {output[:500]}"
-
-            if "STAGING_SUCCESS" in output:
+            if returncode == -1:  # timeout
+                return False, "Staging deploy timed out (600s)"
+            elif returncode == 0:
                 self.log("Staging deploy passed ✓")
-                return True, ""
-            elif "STAGING_FAILED" in output:
-                error = output.split("STAGING_FAILED:")[-1].strip()[:500]
-                return False, f"Staging deploy failed: {error}"
+                return True, output
             else:
-                self.log("⚠️ Staging deploy: no explicit success/failure signal — treating as FAILED", "WARN")
-                return False, "No explicit success signal from staging deploy"
+                error_msg = output[-1000:] if output else "Unknown error"
+                self.log(f"Staging deploy failed (exit {returncode})", "ERROR")
+                return False, f"Staging deploy failed (exit {returncode}): {error_msg}"
 
         except Exception as e:
+            return False, str(e)
+
+    async def _verify_deployed_content(self, url: str = None) -> Tuple[bool, str]:
+        """
+        Verify deployed content via direct curl (deterministic, no LLM).
+
+        Checks:
+        1. HTTP 200 response
+        2. Response body has content (not empty)
+        3. No error pages (500, 404, "Server Error")
+
+        Returns:
+            Tuple of (success, error_message)
+        """
+        if not url:
+            staging_config = self.project.deploy.get("staging", {})
+            url = staging_config.get("url", "")
+            if not url and hasattr(self.project, 'tenants') and self.project.tenants:
+                url = self.project.tenants[0].get("staging_url", "")
+
+        if not url:
+            self.log("No staging URL configured, skipping content verification")
+            return True, ""
+
+        self.log(f"Verifying deployed content at {url}...")
+
+        try:
+            # Direct curl - deterministic, no browser conflicts
+            proc = await asyncio.create_subprocess_shell(
+                f'curl -sL -o /dev/null -w "%{{http_code}}\\n%{{size_download}}" --max-time 15 "{url}"',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=20)
+            lines = stdout.decode().strip().split("\n")
+            status_code = int(lines[0]) if lines else 0
+            body_size = int(lines[1]) if len(lines) > 1 else 0
+
+            if status_code >= 500:
+                msg = f"Server error: HTTP {status_code}"
+                self.log(f"Content verification failed: {msg}", "ERROR")
+                return False, msg
+            if status_code == 404:
+                msg = f"Not found: HTTP 404"
+                self.log(f"Content verification failed: {msg}", "ERROR")
+                return False, msg
+            if status_code not in (200, 301, 302, 303, 307, 308):
+                msg = f"Unexpected HTTP {status_code}"
+                self.log(f"Content verification failed: {msg}", "ERROR")
+                return False, msg
+            if body_size < 100:
+                msg = f"Empty or near-empty page ({body_size} bytes)"
+                self.log(f"Content verification failed: {msg}", "ERROR")
+                return False, msg
+
+            self.log(f"Content verification passed (HTTP {status_code}, {body_size} bytes)")
+            return True, ""
+
+        except asyncio.TimeoutError:
+            msg = f"Content verification timeout (20s) for {url}"
+            self.log(msg, "ERROR")
+            return False, msg
+        except Exception as e:
+            self.log(f"Content verification error: {e}", "ERROR")
             return False, str(e)
 
     async def _stage_infra_check(self) -> Tuple[bool, str]:
@@ -1825,7 +1842,7 @@ Output "PROD_SUCCESS" if successful, or "PROD_FAILED: <reason>" if failed.
         try:
             returncode, output = await run_opencode(
                 prompt,
-                model="minimax/MiniMax-M2.1",
+                model="minimax/MiniMax-M2.5",
                 cwd=str(self.project.root_path),
                 timeout=self.OPENCODE_TIMEOUT,
                 project=self.project.name,
@@ -1876,7 +1893,7 @@ Output "VERIFY_SUCCESS" if healthy, or "VERIFY_FAILED: <reason>" if unhealthy.
         try:
             returncode, output = await run_opencode(
                 prompt,
-                model="minimax/MiniMax-M2.1",
+                model="minimax/MiniMax-M2.5",
                 cwd=str(self.project.root_path),
                 timeout=120,  # Quick verification
                 project=self.project.name,
@@ -1935,20 +1952,16 @@ Output "VERIFY_SUCCESS" if healthy, or "VERIFY_FAILED: <reason>" if unhealthy.
         if seed_cmd:
             self.log(f"🌱 E2E Prod: seeding fixtures via: {seed_cmd}")
             try:
-                proc = await asyncio.create_subprocess_shell(
-                    seed_cmd,
-                    cwd=str(self.project.root_path),
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                    env={**dict(subprocess.os.environ), "TEST_ENV": "prod", "BASE_URL": prod_url},
+                seed_env = {**dict(subprocess.os.environ), "TEST_ENV": "prod", "BASE_URL": prod_url}
+                rc, stdout, stderr = await run_subprocess(
+                    seed_cmd, timeout=120, cwd=str(self.project.root_path),
+                    env=seed_env, log_fn=self.log,
                 )
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
-                if proc.returncode != 0:
-                    output = stdout.decode() + "\n" + stderr.decode()
-                    return False, f"E2E Prod: seed failed (exit {proc.returncode}): {output[:500]}"
+                if rc == -1:
+                    return False, "E2E Prod: seed timed out (120s)"
+                if rc != 0:
+                    return False, f"E2E Prod: seed failed (exit {rc}): {(stdout + stderr)[:500]}"
                 summary_parts.append("seed: OK")
-            except asyncio.TimeoutError:
-                return False, "E2E Prod: seed timed out (120s)"
             except Exception as e:
                 return False, f"E2E Prod: seed error: {e}"
 
@@ -2026,7 +2039,7 @@ Output "ROLLBACK_SUCCESS" or "ROLLBACK_FAILED: <reason>".
         try:
             returncode, output = await run_opencode(
                 prompt,
-                model="minimax/MiniMax-M2.1",
+                model="minimax/MiniMax-M2.5",
                 cwd=str(self.project.root_path),
                 timeout=self.OPENCODE_TIMEOUT,
                 project=self.project.name,
@@ -2297,6 +2310,18 @@ class WiggumDeployDaemon(Daemon):
         if result.feedback_tasks and self.pool:
             for feedback in result.feedback_tasks:
                 try:
+                    # Filter build artifacts and protected paths
+                    desc = feedback.get("description", "")
+                    files = feedback.get("files", [])
+                    PROTECTED_PATTERNS = [
+                        'target/debug/', 'target/release/', 'node_modules/',
+                        '.fingerprint/', 'build.gradle', 'package-lock.json',
+                        'Cargo.lock', '.git/', 'LICENSE',
+                    ]
+                    if any(pat in desc or pat in str(files) for pat in PROTECTED_PATTERNS):
+                        self.log(f"SKIP: Feedback for protected/artifact path: {desc[:60]}", "WARN")
+                        continue
+
                     # Create a proper Task object for the feedback
                     import uuid
                     from datetime import datetime

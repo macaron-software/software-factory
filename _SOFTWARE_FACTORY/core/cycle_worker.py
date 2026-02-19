@@ -30,6 +30,8 @@ from typing import Dict, List, Optional
 from core.daemon import Daemon
 from core.task_store import TaskStore, TaskStatus
 from core.project_registry import ProjectConfig
+from core.subprocess_util import run_subprocess
+from core.error_patterns import classify_error, is_infra
 
 
 class CyclePhase(Enum):
@@ -122,6 +124,14 @@ class CycleWorker:
         """Main cycle loop"""
         self.log(f"Starting Cycle Worker for {self.project.name}")
         self.log(f"Config: batch={self.config.tdd_batch_size}, workers={self.config.tdd_workers}")
+
+        # Start orphan cleanup watchdog (runs in background)
+        from core.daemon import start_watchdog_daemon
+        try:
+            start_watchdog_daemon(interval=300, min_age=600)  # 5min interval, kill if >10min old
+            self.log("[WATCHDOG] Orphan cleanup watchdog started")
+        except Exception as e:
+            self.log(f"[WATCHDOG] Failed to start: {e}", "WARN")
 
         while self.running:
             try:
@@ -394,9 +404,9 @@ class CycleWorker:
         """Build all tasks for a domain via global queue (if enabled) or direct"""
         self.log(f"Building domain {domain}: {len(tasks)} tasks")
 
-        domain_config = self.project.domains.get(domain, {})
-        build_cmd = domain_config.get("build_cmd", "echo 'no build cmd'")
-        test_cmd = domain_config.get("test_cmd", "")
+        # Use get_build_cmd/get_test_cmd which respects CLI priority over legacy domain config
+        build_cmd = self.project.get_build_cmd(domain)
+        test_cmd = self.project.get_test_cmd(domain)
 
         # Check if global queue is enabled (default: True)
         raw_config = getattr(self.project, 'raw_config', None) or {}
@@ -506,100 +516,37 @@ class CycleWorker:
 
     async def _run_direct(self, cmd: str) -> tuple:
         """Run command directly (bypass queue)"""
-        # Inject project-specific env vars (e.g., VELIGO_TOKEN)
         env = os.environ.copy()
         project_env = self.project.get_env()
         if project_env:
             env.update(project_env)
 
-        proc = await asyncio.create_subprocess_shell(
+        rc, stdout, stderr = await run_subprocess(
             f"cd {self.project.root_path} && {cmd}",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=env,
-            start_new_session=True,  # Isolate process group for clean kill
+            timeout=300, env=env, log_fn=self.log,
         )
-        try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
-        except asyncio.TimeoutError:
-            # Kill entire process group (including vitest/cargo children)
-            try:
-                os.killpg(proc.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            return False, "Command timeout (300s)"
 
-        if proc.returncode == 0:
+        if rc == -1:  # timeout
+            return False, "Command timeout (300s)"
+        if rc == 0:
             return True, ""
-        else:
-            return False, stderr.decode()[:500] if stderr else "Command failed"
+        return False, stderr[:500] if stderr else "Command failed"
 
     def _create_build_feedback(self, domain: str, error: str, tasks: List):
         """Create feedback tasks from build errors - ONLY for code errors, NOT infra/CI/CD"""
-        from core.task_store import Task
-        import hashlib
+        from core.feedback import create_feedback_task
 
-        # ANTI-SLOP: Filter out infrastructure/CI/CD errors
-        # These should NOT create TDD tasks - they need factory/config fixes
-        INFRA_ERROR_PATTERNS = [
-            # CLI/command errors (NOT code issues)
-            "command not found",
-            "unrecognized subcommand",
-            "missing script",
-            "npm error",
-            "VELIGO_TOKEN",
-            "auth required",
-            "permission denied",
-
-            # Environment errors (NOT code issues)
-            "environment variable",
-            "file lock",
-            "timeout",
-            "connection refused",
-            "network error",
-
-            # NOTE: E0432/E0433 (unresolved import, failed to resolve) are CODE errors
-            # They MUST create feedback tasks — workers need to fix missing imports/types
-        ]
-
-        error_lower = error.lower()
-        is_infra_error = any(pattern.lower() in error_lower for pattern in INFRA_ERROR_PATTERNS)
-
-        if is_infra_error:
-            self.log(f"[INFRA ERROR] Skipping feedback task - not a code issue: {error[:100]}...", "WARN")
-            return  # Don't create feedback task for infra errors
-
-        # META-AWARENESS: Check for systemic/cross-project errors
-        # If detected, create a FACTORY task instead of a project task
-        try:
-            from core.meta_awareness import record_build_error
-            factory_task_id = record_build_error(self.project.id, error)
-            if factory_task_id:
-                self.log(f"[META-AWARENESS] Systemic error detected → Factory task: {factory_task_id}", "WARN")
-                # Still create project feedback for visibility, but factory will fix root cause
-        except Exception as e:
-            self.log(f"Meta-awareness check failed: {e}", "DEBUG")
-
-        # Create ONE feedback task per domain (not per task)
-        feedback_id = f"feedback-build-{domain}-{hashlib.md5(error.encode()).hexdigest()[:8]}"
-
-        feedback = Task(
-            id=feedback_id,
+        task_id = create_feedback_task(
             project_id=self.project.id,
-            type="fix",
+            source_task_id=tasks[0].id if tasks else "unknown",
+            error_text=error,
+            stage="build",
+            task_store=self.task_store,
             domain=domain,
-            description=f"[BUILD FEEDBACK] Fix build error in {domain}: {error[:200]}",
-            status=TaskStatus.PENDING.value,
-            priority=10,  # High priority
             files=[t.files[0] if t.files else "" for t in tasks[:5]],
-            context={"error": error, "related_tasks": [t.id for t in tasks]},
+            related_task_ids=[t.id for t in tasks],
+            log_fn=self.log,
         )
-
-        try:
-            self.task_store.create_task(feedback)
-            self.log(f"Created feedback task: {feedback_id}")
-        except:
-            pass  # May already exist
 
     def _check_deploy_daemon_alive(self) -> bool:
         """Check if the deploy daemon is running. Alert if dead."""
@@ -763,13 +710,7 @@ class CycleWorker:
             return result.stdout.strip() if result.returncode == 0 else None
 
         # Stage all changes
-        proc = await asyncio.create_subprocess_shell(
-            "git add -A",
-            cwd=cwd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        await proc.communicate()
+        rc, _, _ = await run_subprocess("git add -A", timeout=60, cwd=str(cwd), log_fn=self.log)
 
         # Commit
         task_ids = ", ".join([t.id for t in tasks[:5]])
@@ -777,18 +718,15 @@ class CycleWorker:
             task_ids += f" (+{len(tasks)-5} more)"
 
         commit_msg = f"feat(factory): Cycle {self.state.cycle_count} - {len(tasks)} tasks\n\nTasks: {task_ids}"
+        safe_msg = commit_msg.replace('"', '\\"')
 
-        proc = await asyncio.create_subprocess_shell(
-            f'git commit --no-verify -m "{commit_msg}"',
-            cwd=cwd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        rc, _, stderr = await run_subprocess(
+            f'git commit --no-verify -m "{safe_msg}"',
+            timeout=60, cwd=str(cwd), log_fn=self.log,
         )
-        stdout, stderr = await proc.communicate()
 
-        if proc.returncode != 0:
-            error = stderr.decode() if stderr else "Commit failed"
-            self.log(f"Commit failed: {error}", "ERROR")
+        if rc != 0:
+            self.log(f"Commit failed: {stderr}", "ERROR")
             return None
 
         # Get commit SHA
@@ -823,17 +761,10 @@ class CycleWorker:
         push_cmd = f"git push {remote} {branch}"
         self.log(f"Pushing: {push_cmd}")
 
-        proc = await asyncio.create_subprocess_shell(
-            push_cmd,
-            cwd=cwd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
+        rc, _, stderr = await run_subprocess(push_cmd, timeout=120, cwd=str(cwd), log_fn=self.log)
 
-        if proc.returncode != 0:
-            error = stderr.decode() if stderr else "Push failed"
-            self.log(f"Push failed: {error}", "ERROR")
+        if rc != 0:
+            self.log(f"Push failed: {stderr}", "ERROR")
             # Don't fail completely - commit exists locally, can be pushed manually
             self.log(f"Local commit {commit_sha[:8]} created, push manually: {push_cmd}", "WARN")
             return commit_sha  # Return sha anyway so deploy can continue

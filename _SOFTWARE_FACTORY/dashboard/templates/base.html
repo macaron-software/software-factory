@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Software Factory{% endblock %}</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- HTMX for dynamic updates -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        // Tailwind config for dark mode
+        tailwind.config = {
+            darkMode: 'media',
+            theme: {
+                extend: {
+                    colors: {
+                        factory: {
+                            50: '#f0fdf4',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+
+        /* Log container */
+        .log-container {
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        /* Pulse animation for running status */
+        @keyframes pulse-green {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse-green {
+            animation: pulse-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        /* Progress bar animation */
+        .progress-bar {
+            transition: width 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body class="h-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <!-- Navigation -->
+    <nav class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center space-x-2">
+                        <span class="text-2xl">&#127981;</span>
+                        <span class="font-bold text-xl">Software Factory</span>
+                    </a>
+                    <div class="hidden md:flex ml-10 space-x-4">
+                        <a href="/"
+                           class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700
+                                  {% if request.url.path == '/' %}bg-gray-100 dark:bg-gray-700{% endif %}">
+                            Dashboard
+                        </a>
+                        <a href="/tasks"
+                           class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700
+                                  {% if request.url.path == '/tasks' %}bg-gray-100 dark:bg-gray-700{% endif %}">
+                            Tasks
+                        </a>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="clock" class="text-sm text-gray-500 dark:text-gray-400"></span>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                        Live
+                    </span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex justify-between items-center text-sm text-gray-500 dark:text-gray-400">
+                <span>Software Factory - Team of Rivals (arXiv:2601.14351)</span>
+                <span>Auto-refresh: 30s</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Clock update
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent = now.toLocaleTimeString();
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        // Auto-refresh stats every 30 seconds
+        setInterval(() => {
+            htmx.trigger(document.body, 'refresh');
+        }, 30000);
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

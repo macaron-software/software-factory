@@ -557,7 +557,7 @@ def get_llm_config() -> Dict:
                 },
                 "minimax": {
                     "base_url": "https://api.minimax.io/anthropic/v1",
-                    "models": {"m2.1": "MiniMax-M2.1"}
+                    "models": {"m2.5": "MiniMax-M2.5", "m2.1": "MiniMax-M2.1"}
                 },
                 "local": {
                     "base_url": "http://localhost:8002/v1",
@@ -566,8 +566,8 @@ def get_llm_config() -> Dict:
             },
             "defaults": {
                 "brain": "anthropic/opus",
-                "wiggum": "minimax/m2.1",
-                "fallback_chain": ["minimax/m2.1", "local/qwen"]
+                "wiggum": "minimax/m2.5",
+                "fallback_chain": ["minimax/m2.5", "minimax/m2.1", "local/qwen"]
             }
         }
 

@@ -7,7 +7,7 @@ Config loaded from ~/.config/factory/llm.yaml
 
 Providers:
 - anthropic: Claude via `claude` CLI (Opus 4.5 for Brain)
-- minimax: MiniMax M2.1 via API (Wiggums)
+- minimax: MiniMax M2.5 via API (Wiggums)
 - local: GLM-4.7-Flash via mlx_lm.server (fallback, Apple Silicon)
 
 Usage:
@@ -34,16 +34,19 @@ except ImportError:
     yaml = None
     YAML_AVAILABLE = False
 
+from core.subprocess_util import run_subprocess_exec, run_subprocess_streaming
+from core.log import get_logger
 
 # Directories
 CONFIG_DIR = Path.home() / ".config" / "factory"
 DEFAULT_CONFIG_PATH = CONFIG_DIR / "llm.yaml"
 
+_llm_logger = get_logger("llm")
+
 
 def log(msg: str, level: str = "INFO"):
     """Log with timestamp"""
-    ts = datetime.now().strftime("%H:%M:%S")
-    print(f"[{ts}] [LLM] [{level}] {msg}", flush=True)
+    _llm_logger.log(msg, level)
 
 
 # ============================================================================
@@ -78,8 +81,8 @@ class LLMConfig:
     """Full LLM configuration"""
     providers: Dict[str, ProviderConfig] = field(default_factory=dict)
     brain_provider: str = "anthropic/opus"
-    wiggum_provider: str = "minimax/m2.1"
-    fallback_chain: List[str] = field(default_factory=lambda: ["minimax/m2.1", "local/qwen"])
+    wiggum_provider: str = "minimax/m2.5"
+    fallback_chain: List[str] = field(default_factory=lambda: ["minimax/m2.5", "minimax/m2.1", "local/qwen"])
 
 
 def _load_config(path: Path = None) -> LLMConfig:
@@ -112,8 +115,8 @@ def _load_config(path: Path = None) -> LLMConfig:
         return LLMConfig(
             providers=providers,
             brain_provider=defaults.get("brain", "anthropic/opus"),
-            wiggum_provider=defaults.get("wiggum", "minimax/m2.1"),
-            fallback_chain=defaults.get("fallback_chain", ["minimax/m2.1", "local/qwen"]),
+            wiggum_provider=defaults.get("wiggum", "minimax/m2.5"),
+            fallback_chain=defaults.get("fallback_chain", ["minimax/m2.5", "minimax/m2.1", "local/qwen"]),
         )
     except Exception as e:
         log(f"Error loading config: {e}", "ERROR")
@@ -131,7 +134,7 @@ def _default_config() -> LLMConfig:
             "minimax": ProviderConfig(
                 name="minimax",
                 base_url="https://api.minimax.io/anthropic/v1",
-                models={"m2.1": "MiniMax-M2.1"},
+                models={"m2.5": "MiniMax-M2.5", "m2.1": "MiniMax-M2.1"},
                 timeout=180,
             ),
             "local": ProviderConfig(
@@ -142,8 +145,8 @@ def _default_config() -> LLMConfig:
             ),
         },
         brain_provider="anthropic/opus",
-        wiggum_provider="minimax/m2.1",
-        fallback_chain=["minimax/m2.1", "local/glm"],
+        wiggum_provider="minimax/m2.5",
+        fallback_chain=["minimax/m2.5", "minimax/m2.1", "local/glm"],
     )
 
 
@@ -157,11 +160,11 @@ class LLMClient:
 
     Roles:
     - "brain": Claude Opus 4.5 via claude CLI (heavy analysis, vision)
-    - "wiggum": MiniMax M2.1 via API (code generation, TDD)
+    - "wiggum": MiniMax M2.5 via API (code generation, TDD)
     - "sub": Local GLM-4.7-Flash via mlx_lm (fast iteration, fallback)
 
     Direct provider access:
-    - "anthropic/opus", "minimax/m2.1", "local/glm"
+    - "anthropic/opus", "minimax/m2.5", "minimax/m2.1", "local/glm"
     """
 
     def __init__(self, config: LLMConfig = None):
@@ -296,39 +299,23 @@ class LLMClient:
         log(f"Calling Claude CLI ({model})...")
 
         try:
-            proc = await asyncio.create_subprocess_exec(
-                "claude",
-                "-p",  # Print mode (headless)
-                "--model", model,
-                "--max-turns", "3",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                stdin=asyncio.subprocess.PIPE,
-                start_new_session=True,  # Process group for cleanup
+            rc, stdout, stderr = await run_subprocess_exec(
+                ["claude", "-p", "--model", model, "--max-turns", "3"],
+                timeout=600,
+                stdin_data=prompt.encode(),
+                log_fn=log,
+                register_pgroup=True,
             )
-            try:
-                stdout, stderr = await asyncio.wait_for(
-                    proc.communicate(input=prompt.encode()),
-                    timeout=600,  # 10 min timeout for heavy analysis
-                )
-            except asyncio.TimeoutError:
-                import os
-                import signal
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                await proc.wait()
+
+            if rc == -1:  # timeout
                 log("Claude CLI timeout (10min) - killed process group", "ERROR")
                 return None
-
-            if proc.returncode == 0:
-                response = stdout.decode().strip()
+            if rc == 0:
+                response = stdout.strip()
                 log(f"Claude CLI response: {len(response)} chars")
                 return response
             else:
-                error = stderr.decode()[:500]
-                log(f"Claude CLI error: {error}", "ERROR")
+                log(f"Claude CLI error: {stderr[:500]}", "ERROR")
                 return None
         except FileNotFoundError:
             log("claude CLI not found - install with: npm i -g @anthropic-ai/claude-code", "ERROR")
@@ -479,8 +466,8 @@ def query_sync(prompt: str, role: str = "wiggum", **kwargs) -> str:
 
 # Fallback model chain for rate limits
 FALLBACK_MODELS = [
-    "minimax/MiniMax-M2.1",          # Primary (paid, fast)
-    "minimax/MiniMax-M2",            # Fallback1 (free tier M2)
+    "minimax/MiniMax-M2.5",          # Primary (paid, fast, reasoning)
+    "minimax/MiniMax-M2.1",          # Fallback1 (M2.1, cheaper)
     # Note: local/glm requires mlx_lm.server running (Apple Silicon only)
 ]
 
@@ -546,19 +533,20 @@ def _get_opencode_semaphore() -> asyncio.Semaphore:
 
 async def run_opencode(
     prompt: str,
-    model: str = "minimax/MiniMax-M2.1",
+    model: str = "minimax/MiniMax-M2.5",
     cwd: str = None,
     timeout: int = None,  # IGNORED - no timeout. Model runs until complete. Fallback only on RATE LIMIT.
     project: str = None,
     fallback: bool = True,
     project_env: Dict[str, str] = None,  # Project-specific env vars to set
+    agent: str = None,  # Custom agent name (e.g., "tdd-scoped")
 ) -> Tuple[int, str]:
     """
     Run opencode CLI with fallback chain for rate limits.
 
     Fallback chain:
-    1. MiniMax M2.1 (primary)
-    2. MiniMax M2 (free, on rate limit)
+    1. MiniMax M2.5 (primary)
+    2. MiniMax M2.1 (fallback)
     3. GLM-4.7 free (fallback)
     4. GPT-5 nano (fallback)
 
@@ -569,6 +557,7 @@ async def run_opencode(
         timeout: IGNORED - no timeout, model runs until complete
         project: Project name for MCP LRM tools
         fallback: Enable fallback chain on error
+        agent: Custom opencode agent name (from .opencode/agents/)
 
     Returns:
         Tuple of (returncode, output)
@@ -576,17 +565,18 @@ async def run_opencode(
     # CONCURRENCY LIMITER - Acquire semaphore to limit parallel opencode processes
     semaphore = _get_opencode_semaphore()
     async with semaphore:
-        return await _run_opencode_impl(prompt, model, cwd, timeout, project, fallback, project_env)
+        return await _run_opencode_impl(prompt, model, cwd, timeout, project, fallback, project_env, agent)
 
 
 async def _run_opencode_impl(
     prompt: str,
-    model: str = "minimax/MiniMax-M2.1",
+    model: str = "minimax/MiniMax-M2.5",
     cwd: str = None,
     timeout: int = None,
     project: str = None,
     fallback: bool = True,
     project_env: Dict[str, str] = None,
+    agent: str = None,
 ) -> Tuple[int, str]:
     """Internal implementation - runs under semaphore"""
     # Ensure MCP server is running before starting
@@ -626,111 +616,46 @@ async def _run_opencode_impl(
                 "run",
                 "-m", current_model,
                 "--variant", "high",  # Enable extended thinking/reasoning
-                prompt,
             ]
+            # Add agent if specified (restricts tools)
+            if agent:
+                cmd.extend(["--agent", agent])
+            cmd.append(prompt)
 
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
+            # Use unified streaming subprocess with stuck/stale detection
+            rc, output = await run_subprocess_streaming(
+                cmd,
+                timeout=900,  # 15 min max
                 cwd=cwd,
                 env=env,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,  # Merge stderr into stdout for streaming
-                start_new_session=True,  # Create process group for cleanup
+                progress_interval=60,
+                stuck_timeout=600,   # 10 min with 0 chars = rate limited
+                stale_timeout=180,   # 3 min no new output = stuck
+                log_fn=log,
             )
 
-            # Register process group for cleanup on daemon shutdown
-            from core.daemon import register_child_pgroup, unregister_child_pgroup
-            register_child_pgroup(proc.pid)
-
-            # Stream output with progress logging every 60s
-            output_chunks = []
-            last_progress_time = asyncio.get_event_loop().time()
-            last_progress_len = 0
-            last_output_time = asyncio.get_event_loop().time()  # Track when output last changed
-            PROGRESS_INTERVAL = 60  # Log progress every 60s
-            MAX_TIMEOUT = 900  # 15 min max safety timeout (was 40 min)
-            STUCK_TIMEOUT = 600  # 10 min with 0 chars = likely stuck (was 3 min, too aggressive)
-            STALE_TIMEOUT = 180  # 3 min with no NEW output = process stuck (was 10 min)
-            start_time = asyncio.get_event_loop().time()
-            stuck_triggered = False  # Track if stuck detection triggered
-
-            async def read_stream():
-                nonlocal last_progress_time, last_progress_len, stuck_triggered, last_output_time
-                while True:
-                    try:
-                        chunk = await asyncio.wait_for(proc.stdout.read(4096), timeout=PROGRESS_INTERVAL)
-                        if not chunk:
-                            break  # EOF
-                        output_chunks.append(chunk.decode(errors='replace'))
-
-                        # Progress logging
-                        now = asyncio.get_event_loop().time()
-                        current_len = sum(len(c) for c in output_chunks)
-                        elapsed = int(now - start_time)
-
-                        # Track when output was last produced
-                        if current_len > last_progress_len:
-                            last_output_time = now
-
-                        if now - last_progress_time >= PROGRESS_INTERVAL:
-                            delta = current_len - last_progress_len
-                            log(f"[STREAM] {elapsed}s | +{delta} chars | total {current_len} chars", "DEBUG")
-                            last_progress_time = now
-                            last_progress_len = current_len
-                    except asyncio.TimeoutError:
-                        # No output for 60s - check if process alive
-                        if proc.returncode is not None:
-                            break
-                        now = asyncio.get_event_loop().time()
-                        elapsed = int(now - start_time)
-                        current_len = sum(len(c) for c in output_chunks)
-                        stale_duration = int(now - last_output_time)
-                        log(f"[STREAM] {elapsed}s | waiting... | {current_len} chars so far | stale {stale_duration}s", "DEBUG")
-
-                        # STUCK DETECTION: 0 chars for 5+ min = likely rate limited
-                        if current_len == 0 and elapsed > STUCK_TIMEOUT:
-                            log(f"STUCK DETECTED: {elapsed}s with 0 chars - likely rate limited", "WARN")
-                            stuck_triggered = True
-                            raise asyncio.TimeoutError("STUCK_RATE_LIMITED")
-
-                        # STALE DETECTION: No new output for 10+ min after producing some = process stuck
-                        if current_len > 0 and stale_duration > STALE_TIMEOUT:
-                            log(f"STALE DETECTED: No new output for {stale_duration}s after producing {current_len} chars", "WARN")
-                            stuck_triggered = True
-                            raise asyncio.TimeoutError("STALE_OUTPUT")
-
-                        # Check max timeout
-                        if elapsed > MAX_TIMEOUT:
-                            raise asyncio.TimeoutError("MAX_TIMEOUT")
-
-            try:
-                await read_stream()
-                await proc.wait()
-                unregister_child_pgroup(proc.pid)  # Process exited normally
-            except asyncio.TimeoutError as te:
-                # Kill entire process group (opencode + all child processes)
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass  # Already dead
-                await proc.wait()
-                unregister_child_pgroup(proc.pid)  # Process killed
-                elapsed = int(asyncio.get_event_loop().time() - start_time)
-
-                # STUCK or STALE = likely rate limited or process hung → try fallback
-                if stuck_triggered or str(te) in ["STUCK_RATE_LIMITED", "STALE_OUTPUT"]:
-                    current_len = sum(len(c) for c in output_chunks)
-                    reason = "0 output = rate limited" if current_len == 0 else f"stale after {current_len} chars = process stuck"
-                    log(f"STUCK/STALE {elapsed}s ({current_model}) - {reason} - triggering fallback", "WARN")
-                    last_error = f"Stuck/stale {elapsed}s ({reason})"
-                    if i < len(models_to_try) - 1:
-                        continue  # Try fallback model
-                    return 1, last_error
-
-                log(f"opencode MAX TIMEOUT {elapsed}s ({current_model}) - killed process group", "ERROR")
-                return 1, f"Error: max timeout {elapsed}s (process stuck, not rate limited)"
-            
-            output = "".join(output_chunks)
+            # Handle stuck/stale → try fallback
+            if rc == -2:  # stuck (0 chars)
+                last_error = f"Stuck (0 output = rate limited)"
+                log(f"STUCK ({current_model}) - triggering fallback", "WARN")
+                # CRITICAL: Wait for process cleanup to complete before spawning fallback
+                # This prevents race condition where new process spawns before old one is dead,
+                # causing old process to be reparented to init (parent=1) as orphan.
+                await asyncio.sleep(0.5)  # 500ms grace period for killpg() verification
+                if i < len(models_to_try) - 1:
+                    continue
+                return 1, last_error
+            if rc == -3:  # stale
+                last_error = f"Stale (no new output after producing chars)"
+                log(f"STALE ({current_model}) - triggering fallback", "WARN")
+                # Same grace period for stale processes
+                await asyncio.sleep(0.5)
+                if i < len(models_to_try) - 1:
+                    continue
+                return 1, last_error
+            if rc == -1:  # max timeout
+                log(f"opencode MAX TIMEOUT ({current_model}) - killed process group", "ERROR")
+                return 1, f"Error: max timeout (process stuck, not rate limited)"
 
             # Check for rate limit in output → fallback
             # Be STRICT: only trigger on actual API rate limit errors, not code containing "rate" or "limit"
@@ -749,22 +674,18 @@ async def _run_opencode_impl(
                 text_lower = text.lower()
                 return any(pattern in text_lower for pattern in RATE_LIMIT_PATTERNS)
 
-            if proc.returncode != 0:
+            if rc != 0:
                 if is_rate_limited(output):
                     last_error = output
                     log(f"Rate limit detected ({current_model}), trying fallback...", "WARN")
                     if i < len(models_to_try) - 1:
                         continue  # Try fallback
-                return proc.returncode, output
+                return rc, output
 
-            # Check for rate limit message in success output (API returned 200 but with rate limit warning)
-            if is_rate_limited(output):
-                last_error = output
-                log(f"Rate limit in output ({current_model}), trying fallback...", "WARN")
-                if i < len(models_to_try) - 1:
-                    continue  # Try fallback
-
-            return proc.returncode, output
+            # SUCCESS (rc == 0): never fallback on success output.
+            # The generated code may contain "rate_limit" in variable names,
+            # error handlers, or middleware code — not actual API rate limits.
+            return rc, output
 
         except FileNotFoundError:
             log("opencode CLI not found", "ERROR")
@@ -784,6 +705,7 @@ async def run_claude_agent(
     cwd: str = None,
     max_turns: int = 10,
     timeout: int = 1800,
+    model: str = "claude-opus-4-5-20251101",
 ) -> Tuple[int, str]:
     """
     Run claude CLI in agent mode for complex tasks.
@@ -793,38 +715,95 @@ async def run_claude_agent(
         cwd: Working directory
         max_turns: Max agent iterations
         timeout: Timeout in seconds
+        model: Claude model (opus, sonnet, haiku)
 
     Returns:
         Tuple of (returncode, output)
     """
-    log(f"Running Claude agent (max {max_turns} turns)...")
+    log(f"Running Claude agent ({model}, max {max_turns} turns)...")
 
     try:
-        proc = await asyncio.create_subprocess_exec(
-            "claude",
-            "-p",
-            "--model", "claude-opus-4-5-20251101",
-            "--max-turns", str(max_turns),
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=cwd,
-        )
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(input=prompt.encode()),
+        rc, stdout, stderr = await run_subprocess_exec(
+            ["claude", "-p", "--model", model, "--max-turns", str(max_turns),
+             "--permission-mode", "acceptEdits"],
             timeout=timeout,
+            cwd=cwd,
+            stdin_data=prompt.encode(),
+            log_fn=log,
+            register_pgroup=True,
         )
 
-        output = stdout.decode() + stderr.decode()
-        return proc.returncode, output
+        if rc == -1:  # timeout
+            log(f"Claude agent timeout ({timeout}s)", "ERROR")
+            return 1, f"Error: timeout after {timeout}s"
+
+        return rc, stdout + stderr
     except FileNotFoundError:
         log("claude CLI not found", "ERROR")
         return 1, "Error: claude not installed"
-    except asyncio.TimeoutError:
-        log(f"Claude agent timeout ({timeout}s)", "ERROR")
-        return 1, f"Error: timeout after {timeout}s"
     except Exception as e:
         log(f"Claude agent exception: {e}", "ERROR")
+        return 1, f"Error: {e}"
+
+
+async def run_claude_haiku(
+    prompt: str,
+    cwd: str = None,
+    max_turns: int = 15,
+    timeout: int = 900,
+) -> Tuple[int, str]:
+    """
+    Run claude CLI with Haiku model for fast, cost-effective TDD tasks.
+    """
+    return await run_claude_agent(
+        prompt=prompt,
+        cwd=cwd,
+        max_turns=max_turns,
+        timeout=timeout,
+        model="haiku",  # Claude Code accepts "haiku" as shorthand
+    )
+
+
+async def run_copilot_agent(
+    prompt: str,
+    cwd: str = None,
+    model: str = "claude-sonnet-4.5",
+    timeout: int = 1800,
+) -> Tuple[int, str]:
+    """
+    Run GitHub Copilot CLI in agent mode for complex tasks.
+
+    Args:
+        prompt: Task description
+        cwd: Working directory
+        model: Model to use (claude-sonnet-4.5, claude-opus-4.5, etc.)
+        timeout: Timeout in seconds
+
+    Returns:
+        Tuple of (returncode, output)
+    """
+    log(f"Running Copilot agent with {model}...")
+
+    try:
+        rc, stdout, stderr = await run_subprocess_exec(
+            ["copilot", "--model", model, "-p", prompt,
+             "--allow-all-tools", "--allow-all-paths"],
+            timeout=timeout,
+            cwd=cwd,
+            log_fn=log,
+            register_pgroup=True,
+        )
+
+        if rc == -1:  # timeout
+            log(f"Copilot agent timeout ({timeout}s)", "ERROR")
+            return 1, f"Error: timeout after {timeout}s"
+
+        return rc, stdout + stderr
+    except FileNotFoundError:
+        log("copilot CLI not found", "ERROR")
+        return 1, "Error: copilot not installed"
+    except Exception as e:
+        log(f"Copilot agent exception: {e}", "ERROR")
         return 1, f"Error: {e}"
 
 
@@ -847,7 +826,7 @@ providers:
     base_url: https://api.minimax.io/anthropic/v1
     # API key via MINIMAX_API_KEY env var
     models:
-      m2.1: MiniMax-M2.1
+      m2.5: MiniMax-M2.5
     timeout: 180
 
   local:
@@ -859,8 +838,9 @@ providers:
 
 defaults:
   brain: anthropic/opus      # Vision LEAN, orchestration
-  wiggum: minimax/m2.1       # TDD workers
+  wiggum: minimax/m2.5       # TDD workers
   fallback_chain:
+    - minimax/m2.5
     - minimax/m2.1
     - local/glm
 """

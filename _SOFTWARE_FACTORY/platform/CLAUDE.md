@@ -13,6 +13,19 @@ python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
 # NO --reload (conflicts stdlib `platform` module)
 # --ws none mandatory (SSE not WS)
 # DB: data/platform.db (parent dir, NOT platform/data/)
+# NO dummy API keys — use real keys or omit
+```
+
+## ⚠️ COPILOT CLI — SERVER LAUNCH
+```
+ALWAYS: nohup + & (detached, survives session shutdown)
+  nohup python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8099 --ws none > /tmp/macaron-platform.log 2>&1 &
+
+NEVER: mode="async" sans detach (process killed quand session ferme → ERR_CONNECTION_REFUSED)
+NEVER: mode="sync" pour un serveur (bloque la session)
+VERIFY: curl -s -o /dev/null -w "%{http_code}" http://localhost:8099/ après lancement
+LOGS:   tail -f /tmp/macaron-platform.log
+KILL:   lsof -ti:8099 | xargs kill -9
 ```
 
 ## DEPLOY (Azure VM)

@@ -6,13 +6,13 @@ Based on MIT CSAIL arXiv:2512.24601 "Recursive Language Models"
 
 Uses MCP (Model Context Protocol) for project navigation:
 - Opus 4.5 via `claude` CLI with MCP tools
-- MiniMax M2.1 via `opencode` with MCP tools
+- MiniMax M2.5 via `opencode` with MCP tools
 - Both can navigate the codebase using lrm_* tools
 
 COST TIER ARCHITECTURE (like GPT-5 → GPT-5-mini in paper):
   depth=0: Opus 4.5 ($$$) - Strategic orchestration via `claude` + MCP
-  depth=1: MiniMax M2.1 ($$) - Deep analysis via `opencode` + MCP  
-  depth=2: MiniMax M2.1 ($) - Sub-analysis via `opencode` + MCP
+  depth=1: MiniMax M2.5 ($$) - Deep analysis via `opencode` + MCP  
+  depth=2: MiniMax M2.5 ($) - Sub-analysis via `opencode` + MCP
   depth=3: Qwen 30B local (free) - Simple queries
 
 MCP Tools available (from mcp_lrm):
@@ -45,12 +45,15 @@ from core.project_registry import get_project, ProjectConfig
 from core.task_store import TaskStore, Task
 from core.llm_client import run_opencode
 from core.project_context import ProjectContext
+from core.log import get_logger
+from core.subprocess_util import run_subprocess_exec
+
+_brain_logger = get_logger("brain")
 
 
 def log(msg: str, level: str = "INFO"):
     """Log with timestamp"""
-    ts = datetime.now().strftime("%H:%M:%S")
-    print(f"[{ts}] [BRAIN] [{level}] {msg}", flush=True)
+    _brain_logger.log(msg, level)
 
 
 # ============================================================================
@@ -270,6 +273,58 @@ DO NOT suggest deleting tests - implement the code they need!
 Task types: implement only.""",
         "task_types": ["implement"],
         "detector": "detect_missing_implementations",  # Special handler
+    },
+    "ui": {
+        "name": "UI",
+        "description": "UI/UX audit: design tokens, Figma compliance, WCAG accessibility",
+        "focus": """Focus on UI/UX QUALITY only:
+
+DESIGN SYSTEM VALIDATION:
+1. Hardcoded colors instead of CSS tokens (DSV-001)
+2. Hardcoded spacing values (DSV-002)
+3. Hardcoded fonts (DSV-003)
+4. Hardcoded border-radius (DSV-004)
+5. Hardcoded shadows (DSV-005)
+6. Tailwind arbitrary colors (DSV-006)
+
+FIGMA COMPLIANCE:
+1. Color mismatches vs Figma specs (FIG-001)
+2. Spacing mismatches (FIG-002)
+3. Font-size mismatches (FIG-003)
+4. Border-radius mismatches (FIG-004)
+5. Orphaned components not in Figma (FIG-005)
+
+WCAG 2.1 AA ACCESSIBILITY:
+1. Interactive elements without keyboard access (A11Y-001)
+2. Color contrast below 4.5:1 (A11Y-002)
+3. Icon buttons without aria-label (A11Y-003)
+4. Modals without focus trap (A11Y-004)
+5. Images without alt text (A11Y-005)
+6. Touch targets below 44px (A11Y-006)
+
+UX ANTI-PATTERNS:
+1. Forms without error states (UXF-001)
+2. Inputs without labels (UXF-002)
+3. Submit without loading state (UXF-003)
+4. Lists without empty state (UXL-001)
+5. Async content without loader (UXL-002)
+6. Missing error boundaries (UXL-003)
+
+For each issue, create a task with:
+- type: "ui-token-fix", "ui-figma-fix", "ui-a11y-fix", or "ui-ux-fix"
+- domain: svelte, php, or css depending on project frontend
+- files: Component file path
+- context.wcag_criterion: If accessibility (e.g., "2.1.1 Keyboard")
+- context.figma_node: If Figma discrepancy
+
+PRIORITY (WSJF):
+- ui-a11y-fix: 12-15 (legal risk, ADA/RGAA compliance)
+- ui-token-fix: 8-12 (design consistency)
+- ui-ux-fix: 8-11 (user experience)
+- ui-figma-fix: 6-10 (designer alignment)
+
+Task types: ui-token-fix, ui-figma-fix, ui-a11y-fix, ui-ux-fix only.""",
+        "task_types": ["ui-token-fix", "ui-figma-fix", "ui-a11y-fix", "ui-ux-fix"],
     },
 }
 
@@ -800,31 +855,34 @@ class RLMBrain:
     """
     Brain powered by Recursive Language Models (MIT CSAIL) with MCP.
 
-    Uses `claude` CLI and `opencode` with MCP tools to navigate and analyze
-    the entire project codebase.
-    
+    Uses `copilot` CLI (or `claude`) and `opencode` with MCP tools to navigate
+    and analyze the entire project codebase.
+
     COST TIER ARCHITECTURE:
-      depth=0: Opus 4.5 via `claude` + MCP ($$$)
-      depth=1-2: MiniMax M2.1 via `opencode` + MCP ($$)
+      depth=0: Sonnet 4.6 via `copilot` + MCP ($$)
+      depth=1-2: MiniMax M2.5 via `opencode` + MCP ($$)
       depth=3: Qwen 30B local (free fallback)
     """
 
-    def __init__(self, project_name: str = None):
+    def __init__(self, project_name: str = None, cli_tool: str = "copilot"):
         """
         Initialize Brain for a project.
 
         Args:
             project_name: Project name from projects/*.yaml
+            cli_tool: CLI tool to use for main analysis ("copilot" or "claude")
         """
         self.project = get_project(project_name)
         self.task_store = TaskStore()
         self.max_depth = 3
         self.current_depth = 0
+        self.cli_tool = cli_tool  # "copilot" (Sonnet 4.6) or "claude" (Opus 4.5)
 
         log(f"Brain initialized for project: {self.project.name}")
         log(f"Root: {self.project.root_path}")
         log(f"Domains: {list(self.project.domains.keys())}")
-        log(f"Cost tiers: Opus(d0) → MiniMax(d1-2) → Qwen(d3)")
+        log(f"CLI tool: {self.cli_tool} (Sonnet 4.6)" if cli_tool == "copilot" else f"CLI tool: claude (Opus 4.5)")
+        log(f"Cost tiers: {self.cli_tool}(d0) → MiniMax(d1-2) → Qwen(d3)")
 
     async def run(
         self,
@@ -832,6 +890,8 @@ class RLMBrain:
         domains: List[str] = None,
         deep_analysis: bool = True,
         mode: str = "all",
+        iterative: bool = False,
+        max_iterations: int = 30,
     ) -> List[Task]:
         """
         Run DEEP RECURSIVE Brain analysis with MCP.
@@ -905,23 +965,38 @@ class RLMBrain:
             project_context=context_summary,
         )
 
-        # 3. Run analysis with Opus via `claude` CLI
-        # Claude has access to MCP tools for project navigation
-        log("─" * 70)
-        log("🔄 Running Opus analysis via `claude` CLI + MCP...")
-        log("─" * 70)
-        
-        response = await self._call_claude(prompt)
-        
-        if not response:
-            log("❌ Claude analysis failed", "ERROR")
-            return []
+        # 3. Run analysis: iterative (RLM loop) or single-shot
+        if iterative:
+            log("─" * 70)
+            log(f"🔄 Running ITERATIVE RLM analysis (max {max_iterations} iterations)...")
+            log("─" * 70)
 
-        log(f"✅ Analysis complete: {len(response)} chars")
+            tasks = await self._run_iterative(
+                focus=combined_focus,
+                context_summary=context_summary,
+                vision_content=vision_content,
+                mode_config=mode_config,
+                domains=domains,
+                max_iterations=max_iterations,
+            )
+            log(f"Iterative analysis produced {len(tasks)} raw tasks")
+        else:
+            # Single-shot analysis via configured CLI tool (copilot or claude)
+            log("─" * 70)
+            log(f"🔄 Running analysis via `{self.cli_tool}` CLI + MCP...")
+            log("─" * 70)
 
-        # 4. Parse tasks from response
-        tasks = self._parse_tasks(response)
-        log(f"Parsed {len(tasks)} tasks")
+            response = await self._call_llm(prompt)
+
+            if not response:
+                log(f"❌ {self.cli_tool} analysis failed", "ERROR")
+                return []
+
+            log(f"✅ Analysis complete: {len(response)} chars")
+
+            # Parse tasks from response
+            tasks = self._parse_tasks(response)
+            log(f"Parsed {len(tasks)} tasks")
 
         # 5. Validate tasks
         validated_tasks = self._validate_tasks(tasks)
@@ -1185,7 +1260,7 @@ IMPORTANT:
 
 Output JSON array of tasks. Each task: {{"type": "integration", "domain": "...", "description": "[INT-xxx] ...", "files": [...], "wsjf_score": 9, "context": {{"integration_type": "..."}}}}
 """
-            output = await self._call_claude(prompt)
+            output = await self._call_llm(prompt)
             if output:
                 llm_tasks = self._parse_tasks(output)
                 if llm_tasks:
@@ -1352,46 +1427,63 @@ Output JSON array of tasks. Each task: {{"type": "integration", "domain": "...",
 
         return created_tasks
 
+    async def _call_llm(self, prompt: str, timeout: int = 1800) -> Optional[str]:
+        """
+        Call LLM via configured CLI tool (copilot or claude).
+
+        Routes to _call_copilot or _call_claude based on self.cli_tool.
+        """
+        if self.cli_tool == "copilot":
+            return await self._call_copilot(prompt, timeout)
+        else:
+            return await self._call_claude(prompt, timeout)
+
+    async def _call_copilot(self, prompt: str, timeout: int = 1800) -> Optional[str]:
+        """
+        Call Copilot CLI with Sonnet 4.6.
+
+        Copilot has access to MCP tools via ~/.copilot/mcp-config.json
+        including our mcp_lrm tools for project navigation.
+        """
+        rc, stdout, stderr = await run_subprocess_exec(
+            ["copilot", "--model", "claude-sonnet-4-6",
+             "-p", prompt, "--allow-all-tools", "--allow-all-paths"],
+            timeout=timeout,
+            cwd=str(self.project.root_path),
+            register_pgroup=True,
+            log_fn=log,
+        )
+        if rc == 0:
+            return stdout.strip()
+        if rc == -1:
+            log(f"Copilot timeout ({timeout}s)", "ERROR")
+        elif stderr:
+            log(f"Copilot error: {stderr[:500]}", "ERROR")
+        return None
+
     async def _call_claude(self, prompt: str, timeout: int = 1800) -> Optional[str]:
         """
         Call Claude Opus via `claude` CLI.
-        
+
         Claude has access to MCP tools configured in ~/.claude/settings.json
         including our mcp_lrm tools for project navigation.
         """
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                "claude",
-                "-p",  # Print mode (non-interactive)
-                "--model", "claude-opus-4-5-20251101",
-                "--max-turns", "100",  # Allow extensive MCP exploration
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=str(self.project.root_path),
-            )
-            
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(input=prompt.encode()),
-                timeout=timeout,
-            )
-            
-            if proc.returncode == 0:
-                return stdout.decode().strip()
-            else:
-                error = stderr.decode()[:500]
-                log(f"Claude error: {error}", "ERROR")
-                return None
-                
-        except asyncio.TimeoutError:
+        rc, stdout, stderr = await run_subprocess_exec(
+            ["claude", "-p", "--model", "claude-opus-4-5-20251101",
+             "--max-turns", "100"],
+            timeout=timeout,
+            cwd=str(self.project.root_path),
+            stdin_data=prompt,
+            register_pgroup=True,
+            log_fn=log,
+        )
+        if rc == 0:
+            return stdout.strip()
+        if rc == -1:
             log(f"Claude timeout ({timeout}s)", "ERROR")
-            return None
-        except FileNotFoundError:
-            log("claude CLI not found", "ERROR")
-            return None
-        except Exception as e:
-            log(f"Claude exception: {e}", "ERROR")
-            return None
+        elif stderr:
+            log(f"Claude error: {stderr[:500]}", "ERROR")
+        return None
 
     async def _call_opencode(self, prompt: str, timeout: int = 300) -> Optional[str]:
         """
@@ -1402,7 +1494,7 @@ Output JSON array of tasks. Each task: {{"type": "integration", "domain": "...",
         """
         returncode, output = await run_opencode(
             prompt,
-            model="minimax/MiniMax-M2.1",
+            model="minimax/MiniMax-M2.5",
             cwd=str(self.project.root_path),
             timeout=timeout,
             project=self.project.name,
@@ -1413,6 +1505,259 @@ Output JSON array of tasks. Each task: {{"type": "integration", "domain": "...",
         else:
             log(f"opencode failed: {output[:200]}", "WARN")
             return None
+
+    # ========================================================================
+    # RLM ITERATIVE LOOP (Write-Execute-Observe)
+    # ========================================================================
+
+    async def _run_iterative(
+        self,
+        focus: str,
+        context_summary: str,
+        vision_content: str,
+        mode_config: Dict,
+        domains: List[str] = None,
+        max_iterations: int = 30,
+    ) -> List[Dict]:
+        """
+        RLM Iterative Brain loop (arXiv:2512.24601).
+
+        Brain (Opus) orchestrates the loop:
+        - WRITE: Opus generates 1-3 exploration queries
+        - EXECUTE: MiniMax sub-agents run queries in parallel
+        - OBSERVE: Results accumulated as findings
+        - DECIDE: Opus chooses to explore more or emit FINAL_ANSWER
+
+        Returns raw task dicts (not yet validated/saved).
+        """
+        findings: List[str] = []
+
+        for i in range(max_iterations):
+            log(f"[RLM] Iteration {i + 1}/{max_iterations}")
+
+            # WRITE: Opus decides what to explore
+            iter_prompt = self._build_iteration_prompt(
+                iteration=i,
+                max_iterations=max_iterations,
+                focus=focus,
+                findings=findings,
+                context_summary=context_summary,
+                mode_config=mode_config,
+                domains=domains,
+            )
+            response = await self._call_llm(iter_prompt, timeout=300)
+            if not response:
+                log("[RLM] LLM returned empty response, stopping", "WARN")
+                break
+
+            # PARSE: Extract JSON {action, queries/tasks}
+            decision = self._parse_iteration_response(response)
+
+            # FINAL_ANSWER? -> exit loop
+            if decision["action"] == "final":
+                log(f"[RLM] FINAL_ANSWER at iteration {i + 1}")
+                return decision.get("tasks", [])
+
+            # EXECUTE: Sub-agents MiniMax in parallel (max 3)
+            queries = decision.get("queries", [])[:3]
+            if not queries:
+                log("[RLM] No queries generated, stopping", "WARN")
+                break
+
+            log(f"[RLM] Executing {len(queries)} exploration queries...")
+            results = await asyncio.gather(*[
+                self._execute_exploration(q) for q in queries
+            ])
+
+            # OBSERVE: Accumulate findings
+            for q, result in zip(queries, results):
+                query_text = q.get("query", str(q)) if isinstance(q, dict) else str(q)
+                if result:
+                    findings.append(
+                        f"[iter {i + 1}] Q: {query_text}\n"
+                        f"A: {result[:2000]}"
+                    )
+
+            total_chars = sum(len(f) for f in findings)
+            log(f"[RLM] {len(findings)} findings accumulated ({total_chars} chars)")
+
+        # Max iterations reached: force FINAL_ANSWER
+        log(f"[RLM] Max iterations reached, forcing final answer")
+        return await self._force_final_answer(findings, focus, mode_config)
+
+    async def _execute_exploration(self, query: dict) -> Optional[str]:
+        """Execute a single exploration query via MiniMax sub-agent."""
+        prompt = self._build_exploration_prompt(query)
+        return await self._call_opencode(prompt, timeout=120)
+
+    def _build_iteration_prompt(
+        self,
+        iteration: int,
+        max_iterations: int,
+        focus: str,
+        findings: List[str],
+        context_summary: str,
+        mode_config: Dict,
+        domains: List[str] = None,
+    ) -> str:
+        """Build the short prompt for Opus at each iteration turn."""
+        domains_list = domains or list(self.project.domains.keys())
+        mode_focus = mode_config.get("focus", "General analysis")
+
+        # Truncate findings to last 8K chars, prioritizing recent ones
+        findings_text = ""
+        if findings:
+            # Keep last findings verbatim, summarize older ones if over 8K
+            all_findings = "\n\n".join(findings)
+            if len(all_findings) > 8000:
+                # Keep last 5 verbatim
+                recent = "\n\n".join(findings[-5:])
+                older_summaries = [f.split("\n")[0] for f in findings[:-5]]  # Just Q: lines
+                findings_text = (
+                    "OLDER FINDINGS (summary):\n"
+                    + "\n".join(older_summaries)
+                    + "\n\nRECENT FINDINGS (full):\n"
+                    + recent
+                )
+                findings_text = findings_text[-8000:]
+            else:
+                findings_text = all_findings
+
+        context_snippet = context_summary[:3000] if context_summary else ""
+
+        return f'''You are the RLM Brain for project "{self.project.name}".
+Iteration {iteration + 1}/{max_iterations}. Root: {self.project.root_path}
+Domains: {domains_list}
+
+MODE: {mode_config.get("name", "ALL")}
+{mode_focus[:500] if mode_focus else ""}
+
+PROJECT CONTEXT (excerpt):
+{context_snippet}
+
+FINDINGS SO FAR:
+{findings_text if findings_text else "(none yet — this is the first iteration)"}
+
+YOUR TASK:
+Generate 1-3 exploration queries for MiniMax sub-agents.
+Each sub-agent has tools: Read, Grep, Glob, Bash (in the project directory).
+Sub-agents can explore files, search code, run commands.
+
+When you have gathered enough information, emit FINAL_ANSWER with tasks.
+
+Respond with ONLY valid JSON (no markdown fences):
+{{"action": "explore", "queries": [{{"query": "description of what to explore", "files": ["optional/target/files"], "reason": "why this matters"}}]}}
+
+OR when ready:
+{{"action": "final", "tasks": [{{"type": "fix|feature|refactor|test|security", "domain": "...", "description": "...", "files": ["..."], "wsjf_score": 5.0}}]}}
+'''
+
+    def _build_exploration_prompt(self, query: dict) -> str:
+        """Build the prompt for a MiniMax sub-agent exploration."""
+        if isinstance(query, str):
+            query = {"query": query}
+
+        query_text = query.get("query", "Explore the project")
+        files = query.get("files", [])
+        reason = query.get("reason", "")
+
+        files_section = f"\nTARGET FILES: {', '.join(files)}" if files else ""
+        reason_section = f"\nREASON: {reason}" if reason else ""
+
+        return f"""Project: {self.project.name} ({self.project.root_path})
+
+MISSION: {query_text}{files_section}{reason_section}
+
+Use your tools to explore FACTUALLY:
+- Read files to understand their content
+- Grep/Glob to find patterns across the codebase
+- Bash for structural commands (ls, wc, etc.)
+
+Report your findings in 500 words max. Be SPECIFIC:
+- Exact file paths and line numbers
+- Code snippets that illustrate issues
+- Concrete facts, NOT suppositions
+"""
+
+    def _parse_iteration_response(self, response: str) -> Dict:
+        """
+        Parse Opus iteration response into {action, queries/tasks}.
+
+        Expected: JSON with action "explore" or "final".
+        Fallback: treat as explore with generic query if parsing fails.
+        """
+        import re
+
+        # Try to find JSON object in response
+        # Strip markdown fences if present
+        cleaned = response.strip()
+        cleaned = re.sub(r'^```(?:json)?\s*', '', cleaned)
+        cleaned = re.sub(r'\s*```$', '', cleaned)
+
+        # Find the outermost JSON object
+        try:
+            # Try direct parse first
+            data = json.loads(cleaned)
+            if isinstance(data, dict) and "action" in data:
+                return data
+        except json.JSONDecodeError:
+            pass
+
+        # Try to extract JSON object from mixed text
+        match = re.search(r'\{[\s\S]*"action"[\s\S]*\}', response)
+        if match:
+            json_str = match.group()
+            # Balance braces
+            depth = 0
+            end = 0
+            for idx, c in enumerate(json_str):
+                if c == '{':
+                    depth += 1
+                elif c == '}':
+                    depth -= 1
+                    if depth == 0:
+                        end = idx + 1
+                        break
+            if end > 0:
+                try:
+                    data = json.loads(json_str[:end])
+                    if isinstance(data, dict) and "action" in data:
+                        return data
+                except json.JSONDecodeError:
+                    pass
+
+        # Fallback: treat entire response as a finding text, continue exploring
+        log("[RLM] Could not parse iteration JSON, using fallback explore", "WARN")
+        return {
+            "action": "explore",
+            "queries": [{"query": "Continue exploring the project for issues", "reason": "fallback"}],
+        }
+
+    async def _force_final_answer(
+        self, findings: List[str], focus: str, mode_config: Dict
+    ) -> List[Dict]:
+        """Force a FINAL_ANSWER from Opus given all accumulated findings."""
+        findings_text = "\n\n".join(findings)
+        # Truncate to fit in context
+        if len(findings_text) > 15000:
+            findings_text = findings_text[-15000:]
+
+        prompt = f'''You are the RLM Brain for project "{self.project.name}".
+Mode: {mode_config.get("name", "ALL")}
+
+You have explored the codebase over multiple iterations. Here are ALL your findings:
+
+{findings_text}
+
+PRODUCE THE FINAL TASK LIST NOW.
+
+Output ONLY a valid JSON array of tasks:
+[{{"type": "fix|feature|refactor|test|security", "domain": "...", "description": "...", "files": ["..."], "wsjf_score": 5.0}}]
+'''
+        response = await self._call_llm(prompt, timeout=300)
+        if response:
+            return self._parse_tasks(response)
+        return []
 
     async def _deep_analyze_tasks(self, tasks: List[Dict]) -> List[Dict]:
         """

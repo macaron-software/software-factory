@@ -1,0 +1,58 @@
+[     279ms] [ERROR] Failed to load resource: the server responded with a status of 405 () @ https://owner.veligo.app/api/analytics/events:0
+[     289ms] [ERROR] Failed to load resource: the server responded with a status of 405 () @ https://owner.veligo.app/api/analytics/events:0
+[     289ms] [ERROR] Failed to load resource: the server responded with a status of 405 () @ https://owner.veligo.app/api/analytics/events:0
+[     290ms] [ERROR] Failed to load resource: the server responded with a status of 405 () @ https://owner.veligo.app/api/analytics/events:0
+[     437ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://owner.veligo.app/api/admin/activity?limit=10:0
+[     437ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://owner.veligo.app/api/admin/plugins:0
+[     437ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://owner.veligo.app/api/admin/reports/types:0
+[     457ms] [ERROR] [BikeModule] Failed to load bikes: Error: Failed%20to%20list%20bikes:%20error%20returned%20from%20database:%20column%20b.current_station_id%20does%20not%20exist
+    at Object.listBikes (https://owner.veligo.app/_app/immutable/chunks/BISh3FbF.js:1:4248)
+    at async p.refresh (https://owner.veligo.app/_app/immutable/chunks/ty2gaDjQ.js:1:670)
+    at async p.init (https://owner.veligo.app/_app/immutable/chunks/ty2gaDjQ.js:1:545)
+    at async Promise.all (index 0)
+    at async lr.initAll (https://owner.veligo.app/_app/immutable/nodes/0.BBx0J5uc.js:1:32307)
+    at async ir (https://owner.veligo.app/_app/immutable/nodes/0.BBx0J5uc.js:1:32553)
+    at async https://owner.veligo.app/_app/immutable/nodes/0.BBx0J5uc.js:5:5203 @ https://owner.veligo.app/_app/immutable/chunks/ty2gaDjQ.js:0
+[     464ms] [ERROR] [SubscriptionModule] Failed to load plans: SyntaxError: Unexpected token '<', "<!doctype "... is not valid JSON @ https://owner.veligo.app/_app/immutable/chunks/ty2gaDjQ.js:0
+[   30498ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://owner.veligo.app/api/admin/activity?limit=10:0
+[   43617ms] [ERROR] Failed to load resource: the server responded with a status of 405 () @ https://owner.veligo.app/api/analytics/events:0
+[   43618ms] [ERROR] Failed to load resource: the server responded with a status of 405 () @ https://owner.veligo.app/api/analytics/events:0
+[   46011ms] [ERROR] Failed to load resource: the server responded with a status of 405 () @ https://owner.veligo.app/api/analytics/events:0
+[   46012ms] [ERROR] Failed to load resource: the server responded with a status of 405 () @ https://owner.veligo.app/api/analytics/events:0
+[   48691ms] [ERROR] Failed to load resource: the server responded with a status of 405 () @ https://owner.veligo.app/api/analytics/events:0
+[   48692ms] [ERROR] Failed to load resource: the server responded with a status of 405 () @ https://owner.veligo.app/api/analytics/events:0
+[   48695ms] [ERROR] Failed to load resource: the server responded with a status of 405 () @ https://owner.veligo.app/api/analytics/events:0
+[   48695ms] [ERROR] Failed to load resource: the server responded with a status of 405 () @ https://owner.veligo.app/api/analytics/events:0
+[   48718ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://owner.veligo.app/api/admin/activity?limit=10:0
+[   48719ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://owner.veligo.app/api/admin/plugins:0
+[   48719ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://owner.veligo.app/api/admin/reports/types:0
+[   48720ms] [ERROR] [SubscriptionModule] Failed to load plans: SyntaxError: Unexpected token '<', "<!doctype "... is not valid JSON @ https://owner.veligo.app/_app/immutable/chunks/ty2gaDjQ.js:0
+[   48792ms] [ERROR] [BikeModule] Failed to load bikes: Error: Failed%20to%20list%20bikes:%20error%20returned%20from%20database:%20column%20b.current_station_id%20does%20not%20exist
+    at Object.listBikes (https://owner.veligo.app/_app/immutable/chunks/BISh3FbF.js:1:4248)
+    at async p.refresh (https://owner.veligo.app/_app/immutable/chunks/ty2gaDjQ.js:1:670)
+    at async p.init (https://owner.veligo.app/_app/immutable/chunks/ty2gaDjQ.js:1:545)
+    at async Promise.all (index 0)
+    at async lr.initAll (https://owner.veligo.app/_app/immutable/nodes/0.BBx0J5uc.js:1:32307)
+    at async ir (https://owner.veligo.app/_app/immutable/nodes/0.BBx0J5uc.js:1:32553)
+    at async https://owner.veligo.app/_app/immutable/nodes/0.BBx0J5uc.js:5:5203 @ https://owner.veligo.app/_app/immutable/chunks/ty2gaDjQ.js:0
+[   50381ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://owner.veligo.app/api/owner/monitoring/health:0
+[   50409ms] [ERROR] Failed to load resource: the server responded with a status of 405 () @ https://owner.veligo.app/api/analytics/events:0
+[   50413ms] [ERROR] Failed to load resource: the server responded with a status of 405 () @ https://owner.veligo.app/api/analytics/events:0
+[   52078ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://owner.veligo.app/api/owner/monitoring/health:0
+[   52314ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://owner.veligo.app/api/owner/monitoring/health:0
+[   52512ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://owner.veligo.app/api/owner/monitoring/health:0
+[   52695ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://owner.veligo.app/api/owner/monitoring/health:0
+[   78709ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://owner.veligo.app/api/admin/activity?limit=10:0
+[   80370ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://owner.veligo.app/api/owner/monitoring/health:0
+[  108712ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://owner.veligo.app/api/admin/activity?limit=10:0
+[  110372ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://owner.veligo.app/api/owner/monitoring/health:0
+[  138709ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://owner.veligo.app/api/admin/activity?limit=10:0
+[  140371ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://owner.veligo.app/api/owner/monitoring/health:0
+[  168709ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://owner.veligo.app/api/admin/activity?limit=10:0
+[  170370ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://owner.veligo.app/api/owner/monitoring/health:0
+[  198709ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://owner.veligo.app/api/admin/activity?limit=10:0
+[  200371ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://owner.veligo.app/api/owner/monitoring/health:0
+[  228708ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://owner.veligo.app/api/admin/activity?limit=10:0
+[  230370ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://owner.veligo.app/api/owner/monitoring/health:0
+[  258709ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://owner.veligo.app/api/admin/activity?limit=10:0
+[  260370ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://owner.veligo.app/api/owner/monitoring/health:0

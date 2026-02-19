@@ -1,0 +1,27 @@
+{
+  "approved": false,
+  "issues": [
+    {
+      "rule": "INCOMPLET",
+      "severity": "reject",
+      "points": 5,
+      "message": "Fonction categorize() incomplète - 'eli' est une faute de frappe pour 'elif', branche COLD manquante, le code ne compile pas",
+      "line": 83
+    },
+    {
+      "rule": "LOGIQUE",
+      "severity": "warning",
+      "points": 1,
+      "message": "Mois jusqu'au mariage non borné inférieurement - months_until peut être négatif si wedding_date est passée",
+      "line": 66
+    },
+    {
+      "rule": "INCOMPLET",
+      "severity": "warning",
+      "points": 1,
+      "message": "Return implicite None dans _is_multicultural() - preferer return False explicite pour clarté",
+      "line": 95
+    }
+  ],
+  "reasoning": "Code non compilable: 'eli' est incomplet (typo pour 'elif') à la ligne 83. La fonction categorize() ne retourne rien pour les scores < 50. De plus, calculate_score() peut retourner des scores négatifs si wedding_date est passée."
+}

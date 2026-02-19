@@ -1,0 +1,82 @@
+{
+  "anti_patterns": [
+    {
+      "name": "God Class",
+      "severity": "high",
+      "line": 10,
+      "description": "AuthService handles authentication, session persistence (Keychain + UserDefaults), validation logic, and user state management - violates SRP",
+      "fix": "Split into AuthService (authentication), SessionManager (persistence), CredentialsValidator (validation), TokenStorage (keychain operations)",
+      "pattern": "Facade pattern to delegate to specialized services"
+    },
+    {
+      "name": "Feature Envy",
+      "severity": "medium",
+      "line": 35,
+      "description": "login() and verifyMagicLink() excessively use KeychainHelper and APIClient internals rather than AuthService's own state",
+      "fix": "Extract token storage into dedicated TokenService class",
+      "pattern": "Strategy pattern for token handling"
+    },
+    {
+      "name": "Shotgun Surgery",
+      "severity": "medium",
+      "line": 45,
+      "description": "Token storage scattered across login(), verifyMagicLink(), logout(), and loadSavedSession() - changing storage mechanism requires modifying 4+ locations",
+      "fix": "Create single TokenRepository abstraction with consistent save/get/clear methods",
+      "pattern": "Repository pattern"
+    },
+    {
+      "name": "Primitive Obsession",
+      "severity": "medium",
+      "line": 148,
+      "description": "Email validation uses raw regex string, password strength computed from primitive string operations",
+      "fix": "Create Email and Password value types with validation encapsulated",
+      "pattern": "Value Object pattern"
+    },
+    {
+      "name": "Data Clumps",
+      "severity": "low",
+      "line": 30,
+      "description": "email and password parameters always appear together in login(), could be bundled into Credentials struct",
+      "fix": "Create Credentials(value: Email, password: Password) value type",
+      "pattern": "Value Object pattern"
+    },
+    {
+      "name": "Divergent Change",
+      "severity": "medium",
+      "line": 10,
+      "description": "Class changed for: 1) auth business logic, 2) validation rules, 3) storage backend changes (UserDefaults/Keychain)",
+      "fix": "Separate concerns into dedicated services with single responsibility",
+      "pattern": "Single Responsibility Principle refactor"
+    },
+    {
+      "name": "Dead Code",
+      "severity": "high",
+      "line": 180,
+      "description": "passwordStrength() method incomplete - 'var score' declaration truncated, function never returns value",
+      "fix": "Complete implementation or remove unused method",
+      "pattern": null
+    },
+    {
+      "name": "Mixed Concurrency Concerns",
+      "severity": "medium",
+      "line": 10,
+      "description": "@MainActor on class but async methods perform blocking I/O (KeychainHelper, UserDefaults) without explicit off-actor work",
+      "fix": "Move storage operations to non-isolated functions or dedicated persistence layer",
+      "pattern": "Layer separation"
+    }
+  ],
+  "solid_violations": [
+    "S: AuthService violates SRP - handles auth, validation, persistence, and state management",
+    "D: High-level AuthService depends directly on low-level KeychainHelper.shared and UserDefaults.standard concrete implementations",
+    "I: CredentialsValidator extension includes methods that may not be used by consumers",
+    "O: Adding new storage mechanism requires modifying existing code (not closed for modification)"
+  ],
+  "suggested_patterns": [
+    "Factory pattern for creating authenticated sessions with different storage backends",
+    "Strategy pattern for token storage (Keychain vs UserDefaults vs secure enclave)",
+    "Repository pattern for abstracting user data persistence",
+    "Observer pattern for authentication state changes (replace @Published with event emission)",
+    "Value Object pattern for Email and Password with encapsulated validation"
+  ],
+  "priority_score": 8
+}

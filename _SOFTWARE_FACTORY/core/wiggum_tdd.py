@@ -13,7 +13,7 @@ Based on MIT CSAIL arXiv:2512.24601 "Recursive Language Models"
 6. ADVERSARIAL: Check code quality
 7. COMMIT: If all pass
 
-Uses MiniMax M2.1 via `opencode` for code generation.
+Uses MiniMax M2.5 via `opencode` for code generation.
 
 Usage:
     from core.wiggum_tdd import WiggumPool
@@ -25,6 +25,8 @@ Usage:
 
 import asyncio
 import json
+import os
+import shutil
 import subprocess
 import signal
 import sys
@@ -40,16 +42,22 @@ from core.project_registry import get_project, ProjectConfig
 from core.task_store import TaskStore, Task, TaskStatus
 from core.adversarial import AdversarialGate, CheckResult
 from core.fractal import FractalDecomposer, should_decompose
-from core.llm_client import run_opencode
+from core.llm_client import run_opencode, run_claude_haiku
 from core.error_capture import ErrorCapture, ErrorType, ErrorSeverity
 from core.daemon import Daemon, DaemonManager, print_daemon_status, print_all_status
+from core.skills import load_skills_for_task
+from core.subprocess_util import run_subprocess
+from core.log import get_logger
+from core.error_patterns import is_transient
+
+
+_module_logger = get_logger("wiggum-tdd")
 
 
 def log(msg: str, level: str = "INFO", worker_id: int = None):
     """Log with timestamp and optional worker ID"""
-    ts = datetime.now().strftime("%H:%M:%S")
     prefix = f"W{worker_id}" if worker_id is not None else "POOL"
-    print(f"[{ts}] [{prefix}] [{level}] {msg}", flush=True)
+    _module_logger.log(f"[{prefix}] {msg}", level)
 
 
 # ============================================================================
@@ -87,37 +95,7 @@ class WiggumWorker:
     MAX_ITERATIONS = 10  # Max retry iterations
     OPENCODE_TIMEOUT = 600  # 10 min - let model work. Fallback only on RATE LIMIT, not timeout.
 
-    # Transient errors that should be retried, not marked as TDD_FAILED
-    TRANSIENT_ERROR_PATTERNS = [
-        # Network/API errors
-        "Unable to connect",
-        "Invalid Tool",
-        "Server unavailable",
-        "MCP server",
-        "rate limit",
-        "Rate limit",
-        "RATE_LIMIT",
-        "connection reset",
-        "Connection reset",
-        "timeout",
-        "Timeout",
-        "ETIMEDOUT",
-        "ECONNREFUSED",
-        # Docker errors (daemon crashes, resource issues)
-        "Cannot connect to the Docker daemon",
-        "docker daemon",
-        "Docker daemon",
-        "docker.sock",
-        "No such container",
-        "container is not running",
-        "OCI runtime",
-        "failed to create shim",
-        "Error response from daemon",
-        "docker: Error",
-        "docker build failed",
-        "docker-compose",
-        "docker: command not found",
-    ]
+    # Transient error detection delegated to core.error_patterns
 
     def __init__(
         self,
@@ -139,13 +117,9 @@ class WiggumWorker:
         log(msg, level, self.worker_id)
 
     def _is_transient_error(self, output: str) -> bool:
-        """Check if the error is transient (infra issue, not code issue)"""
-        if not output:
-            return False
-        for pattern in self.TRANSIENT_ERROR_PATTERNS:
-            if pattern in output:
-                return True
-        return False
+        """Check if the error is transient/infra (not a code issue, should retry)"""
+        from core.error_patterns import is_infra
+        return is_transient(output) or is_infra(output)
 
     def _is_truncated_output(self, output: str) -> bool:
         """Detect if LLM output was truncated (hit token limit).
@@ -213,14 +187,14 @@ class WiggumWorker:
                 # Capture git status before running opencode
                 git_before = self._get_git_status()
 
-                # Run opencode with MCP LRM access
+                # Run MiniMax for TDD (prompt already enforces strict scope)
                 returncode, output = await run_opencode(
                     prompt,
-                    model="minimax/MiniMax-M2.1",
+                    model="minimax/MiniMax-M2.5",
                     cwd=str(self.project.root_path),
                     timeout=self.OPENCODE_TIMEOUT,
-                    project=self.project.name,  # Pass project for MCP LRM tools
                 )
+
 
                 if returncode != 0:
                     total_failures += 1
@@ -248,6 +222,89 @@ class WiggumWorker:
                     continue
                 else:
                     self.log(f"Detected {len(code_changes)} file changes: {list(code_changes.keys())[:3]}")
+
+                # SCOPE CHECK: Reject if files outside task scope were modified
+                if task.files:
+                    allowed_files = set(task.files)
+                    modified_files = set(code_changes.keys())
+                    # Normalize paths (remove leading ./ and trailing /)
+                    allowed_normalized = {f.strip('./').rstrip('/') for f in allowed_files}
+
+                    # Handle LLM hallucination: it creates files at wrong paths like "eligo-platform"
+                    # Strategy: delete hallucinated paths, only check real veligo-platform paths
+                    hallucinated_paths = {f for f in modified_files if f.startswith('eligo-platform/')}
+                    if hallucinated_paths:
+                        self.log(f"🗑️ Ignoring hallucinated paths: {hallucinated_paths}", "INFO")
+                        for hp in hallucinated_paths:
+                            hp_abs = os.path.join(self.project.root_path, hp)
+                            if os.path.exists(hp_abs):
+                                os.remove(hp_abs)
+                            modified_files.discard(hp)
+                            code_changes.pop(hp, None)
+                        # Clean up empty eligo-platform directory if created
+                        eligo_dir = os.path.join(self.project.root_path, 'eligo-platform')
+                        if os.path.exists(eligo_dir):
+                            shutil.rmtree(eligo_dir, ignore_errors=True)
+
+                    modified_normalized = {f.strip('./').rstrip('/') for f in modified_files}
+                    out_of_scope = modified_normalized - allowed_normalized
+                    # Filter out auto-generated files (e.g., .sqlx/, node_modules/, dist/)
+                    out_of_scope = {f for f in out_of_scope if not any(x in f for x in ['.sqlx/', 'node_modules/', 'dist/', 'target/', '.cache/'])}
+                    if out_of_scope:
+                        self.log(f"⛔ OUT OF SCOPE: Modified {out_of_scope} but task only allows {allowed_files}", "WARN")
+
+                        # CREATE FEEDBACK TASKS for out-of-scope files
+                        # The LLM clearly saw something to fix there - don't lose this insight
+                        # FILTER: Skip generated/build/archived files (LLM hallucination, not real insight)
+                        SKIP_PATTERNS = (
+                            '.svelte-kit/', '/build/', '/dist/', '/target/',
+                            'node_modules/', '__pycache__/', '.next/',
+                            '_archived', '-archived', '/build/_app/',
+                            '.class', '.pyc', '.o', '.so', '.dylib',
+                        )
+                        created_feedback = []
+                        for oos_file in out_of_scope:
+                            if any(p in oos_file for p in SKIP_PATTERNS):
+                                self.log(f"⏭️ Skipping feedback for generated/archived file: {oos_file}")
+                                continue
+                            # Find the code written to this file
+                            oos_code = code_changes.get(oos_file, "")
+                            if not oos_code:
+                                # Try with normalized path
+                                oos_code = code_changes.get(f"./{oos_file}", "")
+
+                            # Create feedback task for this file
+                            feedback_task_id = f"feedback-scope-{self.project.id}-{oos_file.replace('/', '-')[:50]}"
+                            existing = self.task_store.get_task(feedback_task_id)
+                            if not existing:
+                                # Detect domain from file extension
+                                oos_domain = self._detect_domain_from_file(oos_file)
+                                feedback_task = Task(
+                                    id=feedback_task_id,
+                                    project_id=self.project.id,
+                                    domain=oos_domain,
+                                    type="fix",
+                                    description=f"Fix issues in {oos_file} (detected during scope violation, LLM wanted to modify this)",
+                                    files=[oos_file],
+                                    wsjf_score=12.0,  # High priority - LLM clearly saw something
+                                    status="pending",
+                                    context={
+                                        "source_task": task.id,
+                                        "attempted_code": oos_code[:2000] if oos_code else None,
+                                        "reason": "scope_violation_feedback",
+                                    },
+                                )
+                                self.task_store.create_task(feedback_task, skip_dedup=True)
+                                created_feedback.append(oos_file)
+                                self.log(f"📝 Created feedback task for out-of-scope file: {oos_file}")
+
+                        feedback = (f"OUT OF SCOPE ERROR: You modified files outside your scope!\n"
+                                   f"ALLOWED: {list(allowed_files)}\n"
+                                   f"VIOLATED: {list(out_of_scope)}\n"
+                                   f"Feedback tasks created for: {created_feedback}\n"
+                                   f"ONLY modify the files in ALLOWED list. Start over.")
+                        await self._git_reset()
+                        continue
 
                 result.code_written = True
                 last_code_changes = code_changes  # Store for feedback loop
@@ -353,6 +410,29 @@ Figma tools (USE THEM):
 If you skip Figma check, the adversarial gate will REJECT your code.
 """
 
+        # Playwright MCP instructions for E2E/frontend domains
+        playwright_instructions = ""
+        if task.domain in ['e2e', 'svelte', 'frontend', 'typescript']:
+            playwright_instructions = """
+PLAYWRIGHT MCP TOOLS (use for E2E testing and content verification):
+- browser_navigate(url): Navigate to URL
+- browser_snapshot(): Get page content as accessibility tree - USE THIS to see actual content
+- browser_click(ref): Click element by ref from snapshot
+- browser_type(ref, text): Type in input field
+- browser_console_messages(): Check for console errors
+
+WHEN WRITING E2E TESTS:
+1. ALWAYS use browser_snapshot() to see actual page content BEFORE writing assertions
+2. Write assertions for SPECIFIC content (NOT just HTTP 200):
+   - expect(page.locator('h1')).toContainText('Expected Title')
+   - expect(page.locator('[data-testid="user-email"]')).toHaveText('user@example.com')
+3. NEVER just check HTTP status - verify the actual content matches expectations
+4. Check for ABSENCE of error states:
+   - expect(page.locator('.error-message')).not.toBeVisible()
+   - expect(page.locator('.loading')).not.toBeVisible() // after page loads
+5. Use browser_console_messages() to verify no JS errors
+"""
+
         # Get domain-specific stack versions and framework conventions from YAML
         stack_instructions = ""
         if self.project.raw_config:
@@ -385,53 +465,159 @@ If you skip Figma check, the adversarial gate will REJECT your code.
                             stack_instructions += f"   Example:\n{example_preview}\n"
                         stack_instructions += "\n"
 
-        prompt = f"""You are a TDD agent. Complete this task using strict TDD.
+        # Load domain-specific skills
+        task_type = task.type if hasattr(task, 'type') else ""
+        skills_prompt = load_skills_for_task(task.domain, task_type, max_chars=6000)
 
-PROJECT: {self.project.name} ({self.project.display_name})
-ROOT: {self.project.root_path}
+        # Build explicit file instruction
+        allowed_files = task.files if task.files else []
+        target_file = allowed_files[0] if allowed_files else "unknown"
 
-TASK: {task.description}
-DOMAIN: {task.domain}
-FILES: {task.files}
+        # Include FULL file content to avoid Read tool usage
+        full_file_content = self._read_full_file(target_file, max_lines=800)
 
-CONTEXT:
-{json.dumps(context, indent=2)[:3000]}
-{feedback_section}{stack_instructions}
-MCP TOOLS AVAILABLE (use these to explore the project):
-- lrm_locate(query, scope, limit): Find files matching pattern
-- lrm_summarize(files, goal): Get file summaries
-- lrm_conventions(domain): Get coding conventions for this domain
-- lrm_examples(type, domain): Get example tests/code
-- lrm_build(domain, command): Run build/test/lint commands
-{figma_instructions}
-TDD CYCLE:
-1. Use lrm_locate and lrm_summarize to understand the codebase context
-2. Use lrm_conventions to follow project patterns
-3. RED: Write a failing test that verifies the fix
-4. GREEN: Write minimal code to make the test pass
-5. VERIFY: Run ONLY your specific test using lrm_build or targeted command
+        # STRICT PROMPT - NO READ TOOL, file already provided
+        prompt = f"""⛔ SINGLE-FILE EDIT - NO READ ALLOWED ⛔
 
-RULES:
-- NO test.skip, @ts-ignore, or #[ignore]
-- NO .unwrap() abuse (max 3 per file)
-- NO TODO/FIXME in committed code
-- Complete, working code only
-- NEVER run full test suite (cargo test --workspace, npm test without filter)
-- Run ONLY your specific test: `cargo test <test_name>` or `npm test -- -t '<test>'`
-- VITEST: ALWAYS use `npx vitest run --pool=forks --poolOptions.forks.maxForks=1 <test_file>` (prevents 4GB RAM per worker)
-- NEVER run `vitest` without --pool=forks --poolOptions.forks.maxForks=1
-- NEVER create or modify .md files (README, VISION, CLAUDE, reports, analyses)
-- NEVER create _REPORT, _ANALYSIS, _REVIEW, _SUMMARY files
-- NEVER touch node_modules/, _archive/, .git/, dist/, target/
-- Write CODE only. No documentation. No reports. No summaries.
+═══════════════════════════════════════════════════════════════════════
+TARGET FILE: {target_file}
+═══════════════════════════════════════════════════════════════════════
+ISSUE: {task.description}
+═══════════════════════════════════════════════════════════════════════
 
-Start by exploring the relevant files with lrm_locate, then execute the TDD cycle.
-"""
+FULL FILE CONTENT (already loaded, DO NOT use Read tool):
+```
+{full_file_content}
+```
+
+═══════════════════════════════════════════════════════════════════════
+YOUR TASK - SINGLE EDIT ONLY:
+═══════════════════════════════════════════════════════════════════════
+1. Find the EXACT issue in the code above
+2. Use ONLY the Edit tool with old_string/new_string to fix it
+3. Make the SMALLEST possible change (ideally < 20 lines)
+
+⛔⛔⛔ FORBIDDEN ACTIONS (= IMMEDIATE FAILURE) ⛔⛔⛔
+✗ Do NOT use the Read tool (file is already above)
+✗ Do NOT modify any file except: {target_file}
+✗ Do NOT create new files
+✗ Do NOT output the entire file - use Edit with small old_string/new_string
+✗ Do NOT touch: tests/e2e/, package.json, Cargo.toml (unless it's {target_file})
+
+If output > 100 lines or wrong file touched → REJECTED + RETRY
+{feedback_section}"""
         return prompt
 
+    def _read_full_file(self, target_file: str, max_lines: int = 1500) -> str:
+        """Read full file content to include in prompt (avoids agent using Read tool)"""
+        file_path = os.path.join(self.project.root_path, target_file)
+        if not os.path.exists(file_path):
+            return f"[File not found: {target_file}]"
+
+        try:
+            with open(file_path, 'r') as f:
+                lines = f.readlines()
+
+            # Truncate if too long
+            if len(lines) > max_lines:
+                lines = lines[:max_lines]
+                lines.append(f"\n... [TRUNCATED at {max_lines} lines] ...")
+
+            # Add line numbers
+            numbered_lines = [f"{i+1:4d}| {line.rstrip()}" for i, line in enumerate(lines)]
+            return '\n'.join(numbered_lines)
+        except Exception as e:
+            return f"[Error reading file: {e}]"
+
+    def _extract_focused_section(self, target_file: str, description: str, context_lines: int = 30) -> str:
+        """Extract relevant section from file based on line number in description"""
+        import re
+
+        # Extract line number from description (e.g., "line=63", "Line 63", "line 63")
+        line_match = re.search(r'line[= ]+(\d+)', description, re.IGNORECASE)
+        target_line = int(line_match.group(1)) if line_match else 50  # Default to line 50
+
+        # Read the file
+        file_path = os.path.join(self.project.root_path, target_file)
+        if not os.path.exists(file_path):
+            return f"[File not found: {target_file}]"
+
+        try:
+            with open(file_path, 'r') as f:
+                lines = f.readlines()
+
+            # Calculate range (±context_lines around target)
+            start = max(0, target_line - context_lines - 1)
+            end = min(len(lines), target_line + context_lines)
+
+            # Build section with line numbers
+            section_lines = []
+            for i in range(start, end):
+                line_num = i + 1
+                marker = " >>> " if line_num == target_line else "     "
+                section_lines.append(f"{line_num:4d}{marker}{lines[i].rstrip()}")
+
+            return '\n'.join(section_lines)
+        except Exception as e:
+            return f"[Error reading file: {e}]"
+
+    def _detect_domain_from_file(self, file_path: str) -> str:
+        """Detect domain from file path/extension"""
+        fp = file_path.lower()
+
+        # E2E tests
+        if '.spec.ts' in fp or '.spec.js' in fp or 'tests/e2e' in fp or 'e2e/' in fp:
+            return 'e2e'
+
+        # Rust
+        if fp.endswith('.rs'):
+            return 'rust'
+
+        # Svelte
+        if fp.endswith('.svelte'):
+            return 'svelte'
+
+        # TypeScript/Frontend
+        if fp.endswith('.ts') or fp.endswith('.tsx'):
+            if 'frontend' in fp or 'src/lib' in fp or 'src/routes' in fp:
+                return 'svelte'
+            return 'typescript'
+
+        # Mobile (Swift/Kotlin)
+        if fp.endswith('.swift'):
+            return 'swift'
+        if fp.endswith('.kt') or fp.endswith('.java'):
+            return 'kotlin'
+
+        # Proto
+        if fp.endswith('.proto'):
+            return 'proto'
+
+        # Default
+        return 'unknown'
+
     def _get_git_status(self) -> set:
-        """Get set of modified files from git"""
+        """Get set of modified files from git.
+
+        Filters out build artifacts to prevent ARG_MAX overflow when passing
+        thousands of generated files to adversarial review.
+        """
         import subprocess
+
+        # Build artifacts that should NEVER be in scope (even if not gitignored)
+        BUILD_ARTIFACT_PATTERNS = (
+            'target/',           # Rust/Cargo
+            '.svelte-kit/',      # SvelteKit
+            'build/',            # Generic build
+            'dist/',             # Generic dist
+            'node_modules/',     # Node.js
+            '.next/',            # Next.js
+            '__pycache__/',      # Python
+            '.gradle/',          # Android/Gradle
+            'DerivedData/',      # Xcode iOS
+            '.build/',           # Swift Package Manager
+        )
+
         try:
             result = subprocess.run(
                 ["git", "status", "--porcelain"],
@@ -445,14 +631,18 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
                 if line.strip():
                     # Format: XY filename or XY "filename with spaces"
                     parts = line[3:].strip().strip('"')
-                    if parts:
+                    if parts and not any(p in parts for p in BUILD_ARTIFACT_PATTERNS):
                         files.add(parts)
             return files
         except Exception:
             return set()
 
     def _detect_git_changes(self, before: set) -> Dict[str, str]:
-        """Detect file changes by comparing git status before and after"""
+        """Detect file changes by comparing git status before and after.
+
+        Excludes pre-existing dirty files (submodules, build artifacts) that
+        existed BEFORE the worker started, to avoid false scope violations.
+        """
         after = self._get_git_status()
         new_changes = after - before
 
@@ -461,18 +651,20 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
             changes[f] = "modified"
 
         # Also check for modifications in existing files
+        # --ignore-submodules: avoid dirty submodules polluting scope check
         import subprocess
         try:
             result = subprocess.run(
-                ["git", "diff", "--name-only"],
+                ["git", "diff", "--name-only", "--ignore-submodules"],
                 cwd=str(self.project.root_path),
                 capture_output=True,
                 text=True,
                 timeout=10
             )
             for f in result.stdout.strip().split("\n"):
-                if f.strip():
-                    changes[f.strip()] = "modified"
+                f = f.strip()
+                if f and f not in before:
+                    changes[f] = "modified"
         except Exception:
             pass
 
@@ -640,39 +832,25 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
         self.log(f"Running tests: {test_cmd}")
 
         try:
-            proc = await asyncio.create_subprocess_shell(
-                test_cmd,
-                cwd=str(self.project.root_path),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                start_new_session=True,  # Process group for cleanup
+            rc, stdout, stderr = await run_subprocess(
+                test_cmd, timeout=120, cwd=str(self.project.root_path),
+                log_fn=self.log,
             )
-            try:
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
-            except asyncio.TimeoutError:
-                # Kill entire process group (test runner + child processes)
-                import os
-                import signal
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                await proc.wait()
+
+            if rc == -1:  # timeout
                 self.log("Tests timed out - killed process group", "WARN")
                 return False, []
 
-            # Combine output for error parsing
-            full_output = stdout.decode() + "\n" + stderr.decode()
+            full_output = stdout + "\n" + stderr
 
-            if proc.returncode == 0:
+            if rc == 0:
                 self.log("Tests passed ✓")
                 return True, []
             else:
-                self.log(f"Tests failed: {stderr.decode()[:200]}", "WARN")
+                self.log(f"Tests failed: {stderr[:200]}", "WARN")
 
                 # 🔴 CAPTURE TEST ERRORS FOR FEEDBACK LOOP
                 if capture_errors:
-                    # Parse both E2E errors and console errors
                     errors = self.error_capture.parse_e2e_output(full_output, domain)
                     if errors:
                         self.log(f"Captured {len(errors)} test errors for backlog")
@@ -697,34 +875,22 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
         self.log(f"Building: {build_cmd}")
 
         try:
-            proc = await asyncio.create_subprocess_shell(
-                build_cmd,
-                cwd=str(self.project.root_path),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                start_new_session=True,  # Process group for cleanup
+            rc, stdout, stderr = await run_subprocess(
+                build_cmd, timeout=300, cwd=str(self.project.root_path),
+                log_fn=self.log,
             )
-            try:
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
-            except asyncio.TimeoutError:
-                import os
-                import signal
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                await proc.wait()
+
+            if rc == -1:  # timeout
                 self.log("Build timed out - killed process group", "WARN")
                 return False, []
 
-            # Combine stdout and stderr for error parsing
-            full_output = stdout.decode() + "\n" + stderr.decode()
+            full_output = stdout + "\n" + stderr
 
-            if proc.returncode == 0:
+            if rc == 0:
                 self.log("Build passed ✓")
                 return True, []
             else:
-                self.log(f"Build failed: {stderr.decode()[:200]}", "WARN")
+                self.log(f"Build failed: {stderr[:200]}", "WARN")
 
                 # 🔴 CAPTURE BUILD ERRORS FOR FEEDBACK LOOP
                 if capture_errors:
@@ -732,7 +898,7 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
                     if errors:
                         self.log(f"Captured {len(errors)} build errors for backlog")
                         captured_tasks = self.error_capture.errors_to_tasks(errors)
-                        self.error_capture.clear()  # Clear for next run
+                        self.error_capture.clear()
 
                 return False, captured_tasks
         except Exception as e:
@@ -746,31 +912,20 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
         self.log(f"Linting: {lint_cmd}")
 
         try:
-            proc = await asyncio.create_subprocess_shell(
-                lint_cmd,
-                cwd=str(self.project.root_path),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                start_new_session=True,
+            rc, stdout, stderr = await run_subprocess(
+                lint_cmd, timeout=120, cwd=str(self.project.root_path),
+                log_fn=self.log,
             )
-            try:
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
-            except asyncio.TimeoutError:
-                import os
-                import signal
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                await proc.wait()
+
+            if rc == -1:  # timeout
                 self.log("Lint timed out - killed process group", "WARN")
                 return False
 
-            if proc.returncode == 0:
+            if rc == 0:
                 self.log("Lint passed ✓")
                 return True
             else:
-                self.log(f"Lint failed: {stderr.decode()[:200]}", "WARN")
+                self.log(f"Lint failed: {stderr[:200]}", "WARN")
                 return False
         except Exception as e:
             self.log(f"Lint error: {e}", "ERROR")
@@ -799,7 +954,9 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
                     feedback=feedback,
                 )
 
-        # Combine all changed files for cascade review
+        # Combine changed files for cascade review
+        # For large files (>500 lines): use git diff (avoids KISS_FILE_TOO_LARGE on pre-existing code)
+        # For small files: full content (gives L2 complete context)
         combined_code = ""
         first_file = ""
         file_type = "code"
@@ -810,8 +967,30 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
                 continue
 
             try:
-                code = full_path.read_text()[:4000]
-                combined_code += f"\n// === FILE: {file_path} ===\n{code}\n"
+                full_content = full_path.read_text()
+                line_count = full_content.count('\n')
+
+                if line_count > 500:
+                    # Large file: use git diff to only review CHANGES (not pre-existing code)
+                    import subprocess
+                    diff_result = subprocess.run(
+                        ["git", "diff", "-U20", "--", file_path],
+                        cwd=str(self.project.root_path),
+                        capture_output=True, text=True, timeout=10,
+                    )
+                    diff_text = diff_result.stdout[:30000] if diff_result.stdout else ""
+                    if diff_text:
+                        combined_code += (
+                            f"\n// === FILE: {file_path} (DIFF - {line_count} lines total, showing changes only) ===\n"
+                            f"{diff_text}\n"
+                        )
+                    else:
+                        # Fallback: read full file if diff is empty
+                        combined_code += f"\n// === FILE: {file_path} ===\n{full_content[:45000]}\n"
+                else:
+                    # Small file: full content for complete context
+                    combined_code += f"\n// === FILE: {file_path} ===\n{full_content[:45000]}\n"
+
                 if not first_file:
                     first_file = file_path
                     file_type = "rust" if file_path.endswith(".rs") else \
@@ -837,22 +1016,21 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
     async def _git_commit(self, task: Task) -> bool:
         """Commit changes to git"""
         try:
+            cwd = str(self.project.root_path)
             # Stage all changes
-            proc = await asyncio.create_subprocess_shell(
-                "git add -A",
-                cwd=str(self.project.root_path),
-            )
-            await proc.wait()
+            rc, _, _ = await run_subprocess("git add -A", timeout=60, cwd=cwd, log_fn=self.log)
+            if rc != 0:
+                self.log("Git add failed", "ERROR")
+                return False
 
-            # Commit
+            # Commit (use -- to prevent injection via task.description)
             message = f"fix({task.domain}): {task.description[:50]}\n\nTask: {task.id}"
-            proc = await asyncio.create_subprocess_shell(
-                f'git commit -m "{message}"',
-                cwd=str(self.project.root_path),
+            # Escape double quotes in message for shell safety
+            safe_msg = message.replace('"', '\\"')
+            rc, _, stderr = await run_subprocess(
+                f'git commit -m "{safe_msg}"', timeout=60, cwd=cwd, log_fn=self.log,
             )
-            await proc.wait()
-
-            return proc.returncode == 0
+            return rc == 0
 
         except Exception as e:
             self.log(f"Git commit error: {e}", "ERROR")
@@ -861,11 +1039,10 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
     async def _git_reset(self):
         """Reset git changes (revert uncommitted code)"""
         try:
-            proc = await asyncio.create_subprocess_shell(
+            rc, _, _ = await run_subprocess(
                 "git checkout -- . && git clean -fd",
-                cwd=str(self.project.root_path),
+                timeout=60, cwd=str(self.project.root_path), log_fn=self.log,
             )
-            await proc.wait()
             self.log("Git reset completed")
         except Exception as e:
             self.log(f"Git reset error: {e}", "WARN")
@@ -880,53 +1057,16 @@ Start by exploring the relevant files with lrm_locate, then execute the TDD cycl
 
         This is the RLM feedback loop:
         Build/Test Error → Capture → Parse → Create Task → Backlog → TDD Worker
-
-        Args:
-            error_tasks: List of task dicts from ErrorCapture.errors_to_tasks()
-            source_task: The task that triggered these errors
         """
-        created_count = 0
+        from core.feedback import create_feedback_tasks_from_errors
 
-        for task_dict in error_tasks:
-            try:
-                # Add source task reference
-                task_dict["context"]["source_task_id"] = source_task.id
-                task_dict["context"]["feedback_loop"] = True
-
-                # Check for duplicates (same error already in backlog)
-                error_id = task_dict["context"].get("error_id", "")
-                if error_id:
-                    existing = self.task_store.find_task_by_error_id(
-                        self.project.id,
-                        error_id
-                    )
-                    if existing:
-                        self.log(f"Skipping duplicate error task: {error_id}", "DEBUG")
-                        continue
-
-                # Create the task
-                import uuid
-                feedback_task = Task(
-                    id=f"feedback-{source_task.domain}-{uuid.uuid4().hex[:8]}",
-                    project_id=self.project.id,
-                    type=task_dict.get("type", "fix"),
-                    domain=task_dict.get("domain", source_task.domain),
-                    description=task_dict.get("description", "Fix captured error"),
-                    status="pending",
-                    files=task_dict.get("files", []),
-                    context=task_dict.get("context", {}),
-                    wsjf_score=task_dict.get("wsjf_score", 5.0),
-                )
-                self.task_store.create_task(feedback_task)
-
-                self.log(f"Created feedback task: {feedback_task.id} ({task_dict.get('description', '')[:40]}...)")
-                created_count += 1
-
-            except Exception as e:
-                self.log(f"Failed to create feedback task: {e}", "ERROR")
-
-        if created_count > 0:
-            self.log(f"🔄 Created {created_count} feedback tasks from errors (RLM loop)")
+        create_feedback_tasks_from_errors(
+            project_id=self.project.id,
+            source_task_id=source_task.id,
+            error_tasks=error_tasks,
+            task_store=self.task_store,
+            log_fn=self.log,
+        )
 
 
 # ============================================================================
@@ -998,8 +1138,11 @@ class WiggumPool:
                         log(f"🔄 Cleanup: reset {reset_count} stuck tasks")
                     last_cleanup = now
 
-                # Get pending tasks
-                pending = self.task_store.get_pending_tasks(self.project.id, limit=100)
+                # Get pending tasks (excluding problematic files that cause scope pollution)
+                exclude_patterns = self.project.raw_config.get("tdd", {}).get("exclude_patterns", [])
+                pending = self.task_store.get_pending_tasks(
+                    self.project.id, limit=100, exclude_patterns=exclude_patterns
+                )
 
                 if not pending:
                     log("No pending tasks, waiting...")

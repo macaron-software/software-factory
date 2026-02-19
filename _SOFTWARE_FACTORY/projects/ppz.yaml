@@ -154,6 +154,34 @@ domains:
     test_cmd: ppz test ios
     lint_cmd: cd ios/popinz && swiftlint 2>&1
 
+  php:
+    paths:
+      - popinz-entities/design-system/subviews/
+      - popinz-saas/application/views/
+    extensions:
+      - .php
+    conventions:
+      - name: "BEM naming"
+        rule: "All component classes MUST use .ppz-{block}[__{element}][--{modifier}] naming"
+        fix: "Rename class to .ppz-* BEM format"
+      - name: "XSS protection"
+        rule: "ALL PHP variables displayed in HTML MUST use htmlspecialchars()"
+        fix: "Wrap with htmlspecialchars($var)"
+      - name: "Design tokens"
+        rule: "NEVER hardcode hex colors or px spacing - use var(--ppz-*) tokens"
+        fix: "Replace with var(--ppz-color-*), var(--ppz-space-*), etc."
+
+  css:
+    paths:
+      - popinzdsg-design-system/
+      - popinz-static/css/
+    extensions:
+      - .css
+    conventions:
+      - name: "Token usage"
+        rule: "NEVER hardcode hex colors - use var(--ppz-color-*) tokens"
+        fix: "Replace hardcoded value with CSS variable from design system"
+
   kotlin:
     paths:
       - android/
@@ -277,3 +305,63 @@ integrator:
     - api_connection
     - proxy
     - config
+
+# Figma integration
+figma:
+  enabled: false  # Enable when Figma file_key is configured
+  mcp_server: figma
+  design_system:
+    file_key: YOUR_FIGMA_FILE_KEY
+    components_page: Components
+  validation:
+    check_colors: true
+    check_spacing: true
+    check_typography: true
+    check_border_radius: true
+    tolerance_px: 2
+
+# UI Agents (Design System + Figma + UX/A11y)
+ui_agents:
+  enabled: true
+
+  # Design System Validator config (PopinzDSG)
+  design_system:
+    tokens_file: popinzdsg-design-system/dist/popinzdsg.css
+    # Popinz uses --ppz-* prefixed tokens
+    color_tokens_prefix: "--ppz-color-"
+    spacing_tokens_prefix: "--ppz-space-"
+    radius_tokens_prefix: "--ppz-radius-"
+    shadow_tokens_prefix: "--ppz-shadow-"
+    font_tokens_prefix: "--ppz-font-"
+    # Scan PHP components + CSS
+    scan_extensions: [".php", ".css", ".scss"]
+
+  # Figma integration (uses figma: config above)
+  figma:
+    enabled: false  # Enable when Figma file_key is configured
+    tolerance_px: 2
+    required_for_php: false
+
+  # UX Pattern Enforcer config
+  ux_patterns:
+    wcag_level: "AA"
+    min_contrast: 4.5
+    min_touch_target: 44
+    require_empty_states: true
+    require_loading_states: true
+    require_error_handling: true
+
+  # Skills available for this project
+  skills:
+    - design-tokens
+    - token-validate
+    - a11y-check
+    - ux-audit
+    - wcag-report
+
+  # WSJF scoring for UI tasks
+  wsjf:
+    ui-a11y-fix: 14    # Highest: legal risk (RGAA)
+    ui-token-fix: 10   # Medium-high: design consistency
+    ui-ux-fix: 10      # Medium-high: user experience
+    ui-figma-fix: 6    # Lower: no Figma yet

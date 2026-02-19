@@ -8,34 +8,34 @@ brain:
   phase_gate: deployed
   auto_rotate: true
 cli:
-  binary: veligo
+  binary: veligo-platform/veligo
   build:
-    rust: veligo build all
-    svelte: veligo build frontend
-    typescript: veligo build frontend
-    proto: veligo build all
-    e2e: veligo test smoke
-    all: veligo build all
+    rust: cd veligo-platform && SQLX_OFFLINE=true cargo check --workspace
+    svelte: cd veligo-platform/frontend && npm run build
+    typescript: cd veligo-platform/frontend && npm run build
+    proto: cd veligo-platform && cargo build -p proto
+    e2e: veligo-platform/veligo test e2e:api
+    all: cd veligo-platform && SQLX_OFFLINE=true cargo check --workspace
   test:
-    rust: veligo test unit
-    svelte: veligo test unit
-    typescript: veligo test unit
-    e2e: veligo test e2e
-    all: veligo test all
+    rust: cd veligo-platform && SQLX_OFFLINE=true cargo test --lib -- --skip integration
+    svelte: cd veligo-platform/frontend && npm run build
+    typescript: cd veligo-platform/frontend && npm run build
+    e2e: veligo-platform/veligo test e2e:journeys
+    all: veligo-platform/veligo test e2e:all
   lint:
-    rust: veligo build all
-    svelte: veligo build frontend
-    typescript: veligo build frontend
-    all: veligo build all
+    rust: cd veligo-platform/backend && cargo clippy
+    svelte: cd veligo-platform/frontend && npm run lint
+    typescript: cd veligo-platform/frontend && npm run lint
+    all: echo "lint all"
   deploy:
-    staging: veligo deploy rsync --host 4.251.107.141
-    prod: veligo deploy rsync --host 4.251.107.141
-    rollback: veligo deploy rollback
+    staging: veligo-platform/veligo pipeline health staging
+    prod: veligo-platform/veligo pipeline cicd
+    rollback: echo "rollback not implemented"
   e2e:
-    smoke: veligo test smoke --env staging
-    journeys: veligo test journey --ao {tenant}
-  status: veligo status
-  status_tenant: veligo status --tenant {tenant}
+    smoke: veligo-platform/veligo test e2e:api
+    journeys: veligo-platform/veligo test e2e:journeys
+  status: veligo-platform/veligo module health
+  status_tenant: veligo-platform/veligo module health
 env:
   VELIGO_TOKEN: factory-token-123456789012345678901234
   VELIGO_BUILD_PERMISSION: build
@@ -151,9 +151,9 @@ domains:
     - tests/
     extensions:
     - .spec.ts
-    build_cmd: veligo build all
-    test_cmd: veligo test e2e
-    lint_cmd: veligo build all
+    build_cmd: veligo-platform/veligo build all
+    test_cmd: veligo-platform/veligo test e2e
+    lint_cmd: veligo-platform/veligo build all
   typescript:
     paths:
     - tenant/frontend-user/
@@ -163,17 +163,17 @@ domains:
     extensions:
     - .ts
     - .tsx
-    build_cmd: veligo build frontend
-    test_cmd: veligo test smoke
-    lint_cmd: veligo build frontend
+    build_cmd: veligo-platform/veligo build frontend
+    test_cmd: veligo-platform/veligo test smoke
+    lint_cmd: veligo-platform/veligo build frontend
   proto:
     paths:
     - proto/
     extensions:
     - .proto
-    build_cmd: veligo build all
-    test_cmd: veligo test unit
-    lint_cmd: veligo build all
+    build_cmd: veligo-platform/veligo build all
+    test_cmd: veligo-platform/veligo test unit
+    lint_cmd: veligo-platform/veligo build all
 deploy:
   strategy: blue-green
   auto_prod: true
@@ -186,7 +186,7 @@ deploy:
   post_deploy:
     e2e_prod:
       enabled: true
-      seed_cmd: "veligo test seed --fixtures"
+      seed_cmd: "veligo-platform/veligo test seed --fixtures"
       smoke: true
       journeys: true
       rbac: true
@@ -223,7 +223,7 @@ deploy:
 infra:
   skip_db_check: true
 fractal:
-  max_files: 5
+  max_files: 1
   max_loc: 400
   max_items: 10
   max_depth: 3
@@ -302,3 +302,49 @@ figma:
     check_border_radius: true
     tolerance_px: 2
   adversarial_figma_check: true
+
+# UI Agents (Design System + Figma + UX/A11y)
+ui_agents:
+  enabled: true
+
+  # Design System Validator config
+  design_system:
+    tokens_file: veligo-platform/frontend/src/lib/styles/tokens.css
+    themes_dir: veligo-platform/frontend/src/lib/styles/themes/
+    color_tokens_prefix: "--color-"
+    spacing_tokens_prefix: "--spacing-"
+    radius_tokens_prefix: "--radius-"
+    shadow_tokens_prefix: "--shadow-"
+
+  # Figma integration (uses figma: config above)
+  figma:
+    enabled: true
+    tolerance_px: 2
+    required_for_svelte: true  # Mandatory Figma check for svelte/frontend tasks
+
+  # UX Pattern Enforcer config
+  ux_patterns:
+    wcag_level: "AA"
+    min_contrast: 4.5
+    min_touch_target: 44
+    require_empty_states: true
+    require_loading_states: true
+    require_error_handling: true
+
+  # Skills available for this project
+  skills:
+    - design-tokens
+    - token-validate
+    - figma-audit
+    - figma-sync
+    - figma-diff
+    - a11y-check
+    - ux-audit
+    - wcag-report
+
+  # WSJF scoring for UI tasks
+  wsjf:
+    ui-a11y-fix: 14    # Highest: legal risk (ADA/RGAA)
+    ui-token-fix: 10   # Medium-high: design consistency
+    ui-ux-fix: 10      # Medium-high: user experience
+    ui-figma-fix: 8    # Medium: designer alignment

@@ -1,0 +1,56 @@
+{
+  "anti_patterns": [
+    {
+      "name": "God Class",
+      "severity": "high",
+      "line": 12,
+      "description": "ImageLoader has 5 distinct responsibilities: memory caching, disk caching, network downloading, WebP decoding, and state management. This violates SRP and makes the class 150+ lines with high cyclomatic complexity.",
+      "fix": "Extract responsibilities: ImageCache (memory), DiskImageCache, ImageDecoder (strategy pattern), NetworkImageLoader. ImageLoader becomes a thin facade coordinating these services.",
+      "pattern": "Facade + Strategy"
+    },
+    {
+      "name": "Dead Code",
+      "severity": "high",
+      "line": 88,
+      "description": "decodeWebP(data:) always returns UIImage(data: data) which does NOT properly decode WebP images. UIImage has limited native WebP support (iOS 14+ only). The isWebP() detection logic exists but decodeWebP() is a no-op placeholder that will fail on many WebP images.",
+      "fix": "Implement proper WebP decoding using a library like Kingfisher's WebP decoder or SDWebImageWebPCoder, or remove WebP support entirely if not needed.",
+      "pattern": null
+    },
+    {
+      "name": "Primitive Obsession",
+      "severity": "medium",
+      "line": 17,
+      "description": "Cache keys use raw String (url.absoluteString as NSString) with manual percent-encoding for filenames. No type safety - typos in string keys cause silent cache misses.",
+      "fix": "Create a CacheKey struct/value type that encapsulates the URL and provides proper hashing. Use it consistently for both memory and disk cache keys.",
+      "pattern": "Value Object"
+    },
+    {
+      "name": "Divergent Change",
+      "severity": "medium",
+      "line": 12,
+      "description": "To change caching strategy (e.g., use a different cache library), decoding logic (e.g., add AVIF support), or network layer (e.g., replace APIClient), you must modify the same ImageLoader class.",
+      "fix": "Inject dependencies via protocol: ImageCacheProtocol, ImageDecoderProtocol, ImageNetworkProtocol. ImageLoader depends on abstractions, not concretions.",
+      "pattern": "Strategy + Dependency Injection"
+    },
+    {
+      "name": "Feature Envy",
+      "severity": "low",
+      "line": 61,
+      "description": "The downloadImage method is more about orchestrating APIClient and cache interactions than managing ImageLoader's own state. The actual network logic lives in APIClient.shared.",
+      "fix": "Create an ImageLoadingService that encapsulates the download+cache coordination. ImageLoader delegates to this service.",
+      "pattern": "Service Layer"
+    }
+  ],
+  "solid_violations": [
+    "S: ImageLoader violates Single Responsibility Principle by combining memory caching, disk caching, network downloading, and image decoding in a single class.",
+    "O: Cannot extend image decoding behavior without modifying ImageLoader code (e.g., adding AVIF support requires changing decodeImage method).",
+    "D: ImageLoader directly depends on concrete APIClient.shared singleton, making it impossible to inject a different network layer for testing."
+  ],
+  "suggested_patterns": [
+    "Strategy for ImageDecoder - encapsulate WebP/AVIF/JPEG decoding algorithms behind a protocol",
+    "Factory for ImageLoader - separate creation logic from business logic",
+    "Facade for ImageLoader - provide simple interface coordinating Cache + Network + Decoder services",
+    "Dependency Injection - inject dependencies via protocols for testability"
+  ],
+  "priority_score": 8
+}

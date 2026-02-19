@@ -91,9 +91,9 @@ RLM (LEAN Requirements Manager) est un système autonome d'analyse, correction e
 | Agent | LLM | Outil | Responsabilité | Scope | Coût |
 |-------|-----|-------|----------------|-------|------|
 | **RLM Brain** | Claude Opus 4.5 | `claude` CLI | Vision + Valeur, cartographie repo, contrats, DoD, scoring WSJF, génération de tasks | Repo complet | $$$ |
-| **RLM local (helper)** | Qwen 30B (local) | `opencode` + `llama serve` | `locate/summarize` ciblés (conventions, exemples, points d'extension) | Dossiers / fichiers explicités par la task | Local |
+| **RLM local (helper)** | GLM-4.7-Flash (local) | `opencode` + `mlx_lm.server` | `locate/summarize` ciblés (conventions, exemples, points d'extension) | Dossiers / fichiers explicités par la task | Local |
 | **Wiggum TDD (Build)** | MiniMax M2.1 | `opencode` | Implémentation TDD en //, décomposition fractale, génération de sous-tasks si nécessaire | Périmètre borné par task | $ |
-| **Adversarial** | Qwen 30B (local) | `opencode` + `llama serve` | Gate qualité: bypass, incomplet, patterns dangereux, sécurité | Diff + fichiers touchés | Local |
+| **Adversarial** | GLM-4.7-Flash (local) | `opencode` + `mlx_lm.server` | Gate qualité: bypass, incomplet, patterns dangereux, sécurité | Diff + fichiers touchés | Local |
 | **Wiggum Deploy (Release)** | MiniMax M2.1 (ou LLM low-cost) | Shell + CLI CI/CD projet | Déploiement séquentiel, Playwright E2E/journey, perf-smoke, chaos (opt), rollback + evidence pack | Environnements (staging/prod) | $ |
 
 ---
@@ -124,15 +124,23 @@ RLM (LEAN Requirements Manager) est un système autonome d'analyse, correction e
 
 **Documentation**: https://platform.minimax.io/docs/guides/text-ai-coding-tools
 
-### 2.3 Configuration Qwen 30B (Local)
+### 2.3 Configuration GLM-4.7-Flash (Local via mlx_lm)
 
 ```bash
-# Démarrer llama serve
-llama serve qwen3-30b-a3b
+# Télécharger le modèle (une fois)
+huggingface-cli download mlx-community/GLM-4.7-Flash-4bit --local-dir ~/models/GLM-4.7-Flash-4bit
+
+# Démarrer mlx_lm server (API OpenAI-compatible)
+python -m mlx_lm.server --model mlx-community/GLM-4.7-Flash-4bit --port 8002
 
 # Utiliser via opencode
-opencode run -m qwen3-30b-a3b "prompt"
+opencode run -m local/glm "prompt"
+
+# Ou directement mlx_lm generate (sans tools)
+python -m mlx_lm generate --model ~/models/GLM-4.7-Flash-4bit --prompt "prompt" -m 2048
 ```
+
+**Performances (M5 32GB)**: 43 tok/s génération, ~800 tok/s prefill
 
 ---
 
@@ -996,7 +1004,7 @@ print(f'TOTAL: {len(tasks)}')
 |-------|--------------|-------|
 | **opencode** | `npm install -g @opencode-ai/cli` | Agents MiniMax M2.1 |
 | **claude** | `npm install -g @anthropic-ai/claude-cli` | Brain RLM + fallback |
-| **llama** | `brew install llama.cpp` | Qwen 30B local |
+| **mlx-lm** | `pip install mlx-lm>=0.30.3` | GLM-4.7-Flash local (Apple Silicon) |
 
 ### 10.2 API Keys
 
@@ -1008,11 +1016,14 @@ print(f'TOTAL: {len(tasks)}')
 ### 10.3 Serveur LLM Local (Optionnel)
 
 ```bash
-# Démarrer Qwen 30B
-llama serve qwen3-30b-a3b
+# Télécharger GLM-4.7-Flash (4-bit, rapide)
+huggingface-cli download mlx-community/GLM-4.7-Flash-4bit --local-dir ~/models/GLM-4.7-Flash-4bit
+
+# Démarrer mlx_lm server
+python -m mlx_lm.server --model mlx-community/GLM-4.7-Flash-4bit --port 8002
 
 # Vérifier
-curl http://localhost:8080/v1/models
+curl http://localhost:8002/v1/models
 ```
 
 ---

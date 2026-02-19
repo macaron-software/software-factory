@@ -526,6 +526,8 @@
             <button class="mc-tab-btn" data-tab="dev" onclick="switchTab('dev')"><svg class="icon"><use href="#icon-git-branch"/></svg> Dev</button>
             <button class="mc-tab-btn" data-tab="po" onclick="switchTab('po')"><svg class="icon"><use href="#icon-clipboard"/></svg> PO</button>
             <button class="mc-tab-btn" data-tab="qa" onclick="switchTab('qa')"><svg class="icon"><use href="#icon-check"/></svg> QA</button>
+            <button class="mc-tab-btn" data-tab="archi" onclick="switchTab('archi')"><svg class="icon"><use href="#icon-layers"/></svg> Archi</button>
+            <button class="mc-tab-btn" data-tab="wiki" onclick="switchTab('wiki')"><svg class="icon"><use href="#icon-book-open"/></svg> Wiki</button>
             <button class="mc-tab-btn" data-tab="projet" onclick="switchTab('projet')"><svg class="icon"><use href="#icon-code"/></svg> Projet</button>
         </div>
 
@@ -757,6 +759,82 @@
                         <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_rejected }}</span><span class="mc-qa-metric-label">Rejected</span></div>
                     </div>
                 </details>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Tab: Architecture -->
+        <div class="mc-tab-panel" data-tab="archi">
+            <div class="mc-archi">
+                {% if archi_content %}
+                <div class="mc-archi-doc">
+                    <div class="mc-archi-header">
+                        <h4>Architecture du projet</h4>
+                        <span class="mc-archi-updated">{{ archi_updated or '' }}</span>
+                    </div>
+                    <div class="mc-archi-body">{{ archi_content | markdown | safe }}</div>
+                </div>
+                {% else %}
+                <div class="mc-archi-empty">
+                    <svg class="icon" style="width:32px;height:32px;opacity:.3"><use href="#icon-layers"/></svg>
+                    <p>Pas encore d'architecture documentee</p>
+                    <p class="mc-archi-hint">L'architecte mettra a jour ce document apres chaque phase technique</p>
+                </div>
+                {% endif %}
+                {% if archi_decisions %}
+                <div class="mc-archi-decisions">
+                    <h4>Decisions architecturales</h4>
+                    {% for d in archi_decisions %}
+                    <div class="mc-archi-decision">
+                        <div class="mc-archi-decision-phase">{{ d.phase }}</div>
+                        <div class="mc-archi-decision-text">{{ d.text | markdown | safe }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% if archi_stack %}
+                <div class="mc-archi-stack">
+                    <h4>Stack technique</h4>
+                    <div class="mc-archi-stack-tags">
+                        {% for t in archi_stack %}
+                        <span class="mc-archi-tag">{{ t }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Tab: Wiki -->
+        <div class="mc-tab-panel" data-tab="wiki">
+            <div class="mc-wiki">
+                {% if wiki_pages %}
+                {% for page in wiki_pages %}
+                <details class="mc-wiki-page" {% if loop.first %}open{% endif %}>
+                    <summary class="mc-wiki-page-title">
+                        <span>{{ page.title }}</span>
+                        {% if page.updated %}<span class="mc-wiki-page-date">{{ page.updated }}</span>{% endif %}
+                    </summary>
+                    <div class="mc-wiki-page-body">{{ page.content | markdown | safe }}</div>
+                </details>
+                {% endfor %}
+                {% else %}
+                <div class="mc-wiki-empty">
+                    <svg class="icon" style="width:32px;height:32px;opacity:.3"><use href="#icon-book-open"/></svg>
+                    <p>Pas encore de documentation</p>
+                    <p class="mc-wiki-hint">Le tech writer mettra a jour la documentation apres chaque phase</p>
+                </div>
+                {% endif %}
+                {% if wiki_memories %}
+                <div class="mc-wiki-memories">
+                    <h4>Memoire projet</h4>
+                    {% for m in wiki_memories %}
+                    <div class="mc-wiki-memory">
+                        <span class="mc-wiki-memory-cat">{{ m.category }}</span>
+                        <span class="mc-wiki-memory-text">{{ m.value }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
                 {% endif %}
             </div>
         </div>

@@ -6,6 +6,7 @@ Runs on port 8090 (separate from Factory dashboard on 8080).
 from __future__ import annotations
 
 import logging
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -69,7 +70,29 @@ async def lifespan(app: FastAPI):
     if _orphaned:
         logger.info("Marked %d orphaned active sessions as interrupted", _orphaned)
 
+    # Start MCP Platform Server (background, port 9501)
+    _mcp_proc = None
+    try:
+        import subprocess as _sp
+        _mcp_proc = _sp.Popen(
+            [sys.executable, "-m", "platform.mcp_platform.server"],
+            cwd=str(Path(__file__).parent.parent),
+            start_new_session=True,
+            stdout=_sp.DEVNULL, stderr=_sp.DEVNULL,
+        )
+        logger.info("MCP Platform Server started (PID %d, port 9501)", _mcp_proc.pid)
+    except Exception as exc:
+        logger.warning("MCP Platform Server failed to start: %s", exc)
+
     yield
+
+    # Stop MCP Platform Server
+    if _mcp_proc and _mcp_proc.poll() is None:
+        import os as _os
+        try:
+            _os.killpg(_os.getpgid(_mcp_proc.pid), 15)
+        except Exception:
+            _mcp_proc.terminate()
 
     # Cleanup LLM client
     try:

@@ -97,22 +97,31 @@ if CLICK_AVAILABLE:
     @brain.command("run")
     @click.option("--question", "-q", help="Focus question for analysis")
     @click.option("--domain", "-d", help="Specific domain to analyze")
+    @click.option("--mode", "-m", default="all",
+                  type=click.Choice(["all", "fix", "vision", "security", "perf", "refactor", "test", "migrate", "debt", "integrator", "missing", "ui"]),
+                  help="Analysis mode (all, fix, vision, security, perf, refactor, test, migrate, debt, integrator, missing, ui)")
     @click.option("--quick", is_flag=True, help="Quick mode (less depth)")
+    @click.option("--cli", type=click.Choice(["copilot", "claude"]), default="copilot", help="CLI tool (copilot=Sonnet4.6, claude=Opus4.5)")
+    @click.option("--iterative/--no-iterative", default=False, help="Use RLM iterative write-execute-observe loop")
+    @click.option("--max-iter", default=30, type=int, help="Max iterations for iterative mode")
     @click.pass_context
-    def brain_run(ctx, question, domain, quick):
+    def brain_run(ctx, question, domain, mode, quick, cli, iterative, max_iter):
         """Run Deep Recursive RLM Brain analysis (MIT CSAIL arXiv:2512.24601)
-        
-        Cost tiers: Opus(d0) → MiniMax(d1-2) → fallback(d3)
+
+        Cost tiers: copilot/claude(d0) → MiniMax(d1-2) → fallback(d3)
         """
         project = ctx.obj.get("project")
         domains = [domain] if domain else None
 
         from core.brain import RLMBrain
-        brain = RLMBrain(project)
+        brain = RLMBrain(project, cli_tool=cli)
         tasks = asyncio.run(brain.run(
-            vision_prompt=question, 
+            vision_prompt=question,
             domains=domains,
             deep_analysis=not quick,
+            mode=mode,
+            iterative=iterative,
+            max_iterations=max_iter,
         ))
 
         click.echo(f"\n✅ Created {len(tasks)} tasks")

@@ -127,6 +127,7 @@ def analyze_complexity(
     task: Dict[str, Any],
     config: FractalConfig,
     current_depth: int = 0,
+    project_root: Path = None,
 ) -> ComplexityAnalysis:
     """
     Analyze task complexity against FRACTAL thresholds.
@@ -147,6 +148,21 @@ def analyze_complexity(
     description = task.get("description", "")
     context = task.get("context", {})
     loc_estimate = _estimate_loc(description, context)
+
+    # Check ACTUAL file size for single-file tasks (more accurate than estimation)
+    actual_file_loc = 0
+    if files_count == 1 and project_root:
+        file_path = Path(files[0])
+        if not file_path.is_absolute():
+            file_path = project_root / files[0]
+        if file_path.exists():
+            try:
+                actual_file_loc = len(file_path.read_text(errors='ignore').split('\n'))
+                # Use actual file size if larger than estimate
+                if actual_file_loc > loc_estimate:
+                    loc_estimate = actual_file_loc
+            except Exception:
+                pass
 
     # Count acceptance criteria or items
     items = (
@@ -243,6 +259,13 @@ class FractalDecomposer:
         """
         self.config = load_fractal_config(project_config)
         self.llm_client = llm_client
+        # Store project root for file access
+        self.project_root = None
+        if project_config:
+            if hasattr(project_config, 'root_path'):
+                self.project_root = Path(project_config.root_path)
+            elif isinstance(project_config, dict) and 'root_path' in project_config:
+                self.project_root = Path(project_config['root_path'])
 
     def should_decompose(
         self,
@@ -273,11 +296,11 @@ class FractalDecomposer:
 
         # Force decomposition for root tasks (depth=0) — LLM will decide how many
         if self.config.force_level1 and current_depth == 0:
-            analysis = analyze_complexity(task, self.config, current_depth)
+            analysis = analyze_complexity(task, self.config, current_depth, self.project_root)
             analysis.force_level1 = True
             return True, analysis
 
-        analysis = analyze_complexity(task, self.config, current_depth)
+        analysis = analyze_complexity(task, self.config, current_depth, self.project_root)
         return analysis.should_decompose, analysis
 
     async def decompose(
@@ -484,12 +507,19 @@ Return {{"subtasks": []}} if no decomposition needed.
         if analysis.exceeds_files:
             files = task.get("files", [])
             chunk_size = self.config.max_files
+            orig_desc = task.get("description", "")
             for i in range(0, len(files), chunk_size):
                 chunk_files = files[i:i + chunk_size]
+                # Make description SPECIFIC to this file only
+                file_specific_desc = (
+                    f"[TARGET FILE: {chunk_files[0]}] "
+                    f"Apply the following fix ONLY to this specific file. "
+                    f"Original issue: {orig_desc}"
+                )
                 subtasks.append({
                     **base_task,
                     "id": f"{parent_id}_files{i // chunk_size + 1}",
-                    "description": f"{task.get('description', '')} (files: {', '.join(chunk_files)})",
+                    "description": file_specific_desc,
                     "files": chunk_files,
                 })
             log(f"Split by files into {len(subtasks)} sub-tasks")
@@ -526,9 +556,180 @@ Return {{"subtasks": []}} if no decomposition needed.
                 log(f"Split by description into {len(subtasks)} sub-tasks")
                 return subtasks
 
+        # Strategy 4: Split by function for large single-file tasks
+        # Skip if already function-focused (prevent infinite recursion)
+        description = task.get("description", "")
+        if "[FUNCTION:" in description or "target_function" in task.get("context", {}):
+            log("Task already function-focused, skipping further decomposition")
+            return [task]
+
+        files = task.get("files", [])
+        if len(files) == 1:
+            file_path = files[0]
+            functions = self._extract_functions_from_file(file_path, task.get("domain", ""))
+            if functions:
+                # Find functions mentioned in the description or create focused subtask
+                for i, (func_name, func_lines) in enumerate(functions[:5]):  # Max 5 subtasks
+                    # Extract ONLY the function code to include in context
+                    func_code = self._extract_function_code(file_path, func_lines)
+                    subtasks.append({
+                        **base_task,
+                        "id": f"{parent_id}_fn{i + 1}",
+                        "description": (
+                            f"⚠️ SCOPE LIMIT: ONLY modify function `{func_name}` (lines {func_lines[0]}-{func_lines[1]})\n"
+                            f"📁 File: {file_path}\n"
+                            f"🎯 Task: {task.get('description', '')}\n\n"
+                            f"RULES:\n"
+                            f"1. Output ONLY the modified function code (max ~50 lines)\n"
+                            f"2. Do NOT output the entire file\n"
+                            f"3. Do NOT modify other functions\n"
+                            f"4. If function > 50 LOC, SPLIT it (KISS principle)\n"
+                            f"5. Cyclomatic complexity must stay < 10"
+                        ),
+                        "files": [file_path],
+                        "context": {
+                            **task.get("context", {}),
+                            "target_function": func_name,
+                            "target_lines": func_lines,
+                            "function_code": func_code,  # Include actual code
+                            "max_output_lines": 60,  # Soft limit hint
+                        },
+                    })
+                if subtasks:
+                    log(f"Split by function into {len(subtasks)} sub-tasks")
+                    return subtasks
+
         # No decomposition possible, return original (will be at depth limit)
         log("No decomposition strategy applicable, returning original", "WARN")
         return [task]
+
+    def _extract_functions_from_file(
+        self,
+        file_path: str,
+        domain: str,
+    ) -> List[Tuple[str, Tuple[int, int]]]:
+        """
+        Extract function/method names and line ranges from a file.
+        Returns list of (function_name, (start_line, end_line)).
+        Only returns functions from files > 300 lines.
+        """
+        try:
+            # Try to find the file
+            path = Path(file_path)
+            if not path.is_absolute():
+                # Try relative to project root first
+                if self.project_root:
+                    candidate = self.project_root / file_path
+                    if candidate.exists():
+                        path = candidate
+                # Fallback to cwd
+                if not path.exists():
+                    for root in [Path.cwd(), Path.cwd().parent]:
+                        candidate = root / file_path
+                        if candidate.exists():
+                            path = candidate
+                            break
+
+            if not path.exists():
+                log(f"File not found: {file_path} (project_root={self.project_root})", "DEBUG")
+                return []
+
+            content = path.read_text(encoding='utf-8', errors='ignore')
+            lines = content.split('\n')
+
+            # Only process large files
+            if len(lines) < 300:
+                log(f"File {file_path} has {len(lines)} lines, not splitting", "DEBUG")
+                return []
+
+            log(f"Large file detected: {file_path} ({len(lines)} lines), extracting functions")
+
+            functions = []
+
+            if domain == "rust" or file_path.endswith('.rs'):
+                # Rust: fn, pub fn, async fn, impl blocks
+                fn_pattern = re.compile(r'^\s*(pub\s+)?(async\s+)?fn\s+(\w+)')
+                impl_pattern = re.compile(r'^\s*impl\s+(?:<[^>]+>\s+)?(\w+)')
+
+                current_fn = None
+                current_start = 0
+                brace_count = 0
+
+                for i, line in enumerate(lines, 1):
+                    fn_match = fn_pattern.match(line)
+                    impl_match = impl_pattern.match(line)
+
+                    if fn_match:
+                        if current_fn and brace_count == 0:
+                            functions.append((current_fn, (current_start, i - 1)))
+                        current_fn = fn_match.group(3)
+                        current_start = i
+                        brace_count = 0
+                    elif impl_match:
+                        if current_fn and brace_count == 0:
+                            functions.append((current_fn, (current_start, i - 1)))
+                        current_fn = f"impl_{impl_match.group(1)}"
+                        current_start = i
+                        brace_count = 0
+
+                    brace_count += line.count('{') - line.count('}')
+
+                    if current_fn and brace_count == 0 and '{' in line:
+                        functions.append((current_fn, (current_start, i)))
+                        current_fn = None
+
+            elif domain in ("typescript", "svelte") or file_path.endswith(('.ts', '.tsx', '.svelte')):
+                # TypeScript: function, const = () =>, export function
+                fn_pattern = re.compile(r'^\s*(export\s+)?(async\s+)?function\s+(\w+)')
+                arrow_pattern = re.compile(r'^\s*(export\s+)?(const|let)\s+(\w+)\s*=\s*(async\s*)?\(')
+
+                for i, line in enumerate(lines, 1):
+                    fn_match = fn_pattern.match(line)
+                    arrow_match = arrow_pattern.match(line)
+
+                    if fn_match:
+                        functions.append((fn_match.group(3), (i, min(i + 50, len(lines)))))
+                    elif arrow_match:
+                        functions.append((arrow_match.group(3), (i, min(i + 50, len(lines)))))
+
+            log(f"Found {len(functions)} functions in {file_path}")
+            return functions[:10]  # Max 10 functions
+
+        except Exception as e:
+            log(f"Error extracting functions from {file_path}: {e}", "WARN")
+            return []
+
+    def _extract_function_code(
+        self,
+        file_path: str,
+        line_range: Tuple[int, int],
+    ) -> str:
+        """
+        Extract the actual code for a function given its line range.
+        Returns the function code as a string.
+        """
+        try:
+            path = Path(file_path)
+            if not path.is_absolute() and self.project_root:
+                path = self.project_root / file_path
+
+            if not path.exists():
+                return ""
+
+            content = path.read_text(encoding='utf-8', errors='ignore')
+            lines = content.split('\n')
+
+            start, end = line_range
+            # Add some context (2 lines before, ensure we don't go negative)
+            start = max(0, start - 3)
+            # Limit to ~80 lines max to keep context manageable
+            end = min(len(lines), start + 80)
+
+            func_lines = lines[start:end]
+            return '\n'.join(func_lines)
+        except Exception as e:
+            log(f"Error extracting function code: {e}", "WARN")
+            return ""
 
     def _distribute_files(self, files: List[str], ratios: List[float]) -> List[List[str]]:
         """Distribute files across chunks based on ratios"""
