@@ -1079,10 +1079,10 @@ class AgentExecutor:
                         except Exception:
                             pass
 
-                    # Add tool result to conversation
+                    # Add tool result to conversation (truncate to keep memory bounded)
                     messages.append(LLMMessage(
                         role="tool",
-                        content=result[:4000],
+                        content=result[:2000],
                         tool_call_id=tc.id,
                         name=tc.function_name,
                     ))
@@ -1099,6 +1099,10 @@ class AgentExecutor:
 
                 logger.info("Agent %s tool round %d: %d calls", agent.id, round_num + 1,
                             len(llm_resp.tool_calls))
+
+                # Limit message window to prevent OOM (keep first 2 + last 15)
+                if len(messages) > 20:
+                    messages = messages[:2] + messages[-15:]
 
                 # On penultimate round, disable tools to force synthesis next iteration
                 if round_num >= MAX_TOOL_ROUNDS - 2 and tools is not None:
@@ -1252,10 +1256,14 @@ class AgentExecutor:
                             pass
                     messages.append(LLMMessage(
                         role="tool",
-                        content=result[:4000],
+                        content=result[:2000],
                         tool_call_id=tc.id,
                         name=tc.function_name,
                     ))
+
+                # Limit message window to prevent OOM
+                if len(messages) > 20:
+                    messages = messages[:2] + messages[-15:]
 
                 if deep_search_used:
                     tools = None
