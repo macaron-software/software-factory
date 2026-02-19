@@ -4883,6 +4883,23 @@ Answer the user's question about this mission with concrete data.
 If they ask about PRs, features, sprints, git — use the appropriate tools to search.
 Answer in the same language as the user. Be precise and data-driven."""
 
+    # Role-specific tool instructions per agent type
+    _role_instructions = {
+        "lead_dev": "\n\nTu es le Lead Dev. Tu peux LIRE et MODIFIER le code du projet. Utilise code_read pour examiner les fichiers, code_write/code_edit pour les modifier, et git_commit pour committer tes changements. Quand l'utilisateur te demande de modifier quelque chose, fais-le directement avec les outils.",
+        "dev_backend": "\n\nTu es développeur backend. Tu peux LIRE et MODIFIER le code. Utilise code_read, code_write, code_edit, git_commit.",
+        "dev_frontend": "\n\nTu es développeur frontend. Tu peux LIRE et MODIFIER le code. Utilise code_read, code_write, code_edit, git_commit.",
+        "architecte": "\n\nTu es l'Architecte Solution. Tu peux LIRE et MODIFIER l'architecture du projet. Utilise code_read pour examiner les fichiers, code_write/code_edit pour modifier Architecture.md ou d'autres docs d'architecture, et git_commit pour committer. Quand l'utilisateur te demande de mettre à jour l'architecture, fais-le directement.",
+        "qa_lead": "\n\nTu es le QA Lead. Tu peux LIRE et MODIFIER les tests du projet. Utilise code_read pour examiner les tests, code_write/code_edit pour créer ou modifier des fichiers de test, et git_commit pour committer.",
+        "test_manager": "\n\nTu es le Test Manager. Tu peux LIRE et MODIFIER les tests. Utilise code_read, code_write, code_edit, git_commit.",
+        "test_automation": "\n\nTu es l'ingénieur test automation. Tu peux LIRE et ÉCRIRE des tests automatisés. Utilise code_read, code_write, code_edit, git_commit.",
+        "tech_writer": "\n\nTu es le Technical Writer. Tu peux LIRE et MODIFIER la documentation du projet (README.md, docs/, wiki). Utilise code_read pour examiner les docs, code_write/code_edit pour les mettre à jour, memory_store pour sauvegarder des connaissances, et git_commit pour committer.",
+        "product_owner": "\n\nTu es le Product Owner. Tu peux consulter le code, les features et la mémoire projet. Utilise memory_store pour sauvegarder des décisions produit.",
+        "product_manager": "\n\nTu es le Product Manager. Tu peux consulter le backlog, les features et la mémoire. Utilise memory_store pour les décisions.",
+        "chef_de_programme": "\n\nTu es le Chef de Programme (CDP). Tu orchestres le projet. Tu peux lancer des phases (run_phase), vérifier leur statut (get_phase_status), et consulter le code/git/mémoire.",
+    }
+    role_instruction = _role_instructions.get(agent_id, "\n\nTu peux LIRE et MODIFIER les fichiers du projet avec code_read, code_write, code_edit, git_commit, et sauvegarder des connaissances avec memory_store.")
+    mission_context += role_instruction
+
     async def event_generator():
         import html as html_mod
         import markdown as md_lib
@@ -4899,15 +4916,26 @@ Answer in the same language as the user. Be precise and data-driven."""
             if mission.workspace_path:
                 ctx.project_path = mission.workspace_path
             ctx.mission_run_id = mission_id
-            # Enable read-only + phase tools for CDP interaction
             ctx.tools_enabled = True
-            ctx.allowed_tools = [
-                "memory_search", "get_phase_status", "list_phases",
-                "run_phase", "request_validation",
+            # Base tools for all agents
+            base_tools = [
+                "memory_search", "memory_store",
                 "code_read", "code_search", "list_files",
                 "git_log", "git_status", "git_diff",
                 "get_project_context",
             ]
+            # CDP gets orchestration tools
+            if agent_id in ("chef_de_programme", "chef_projet"):
+                ctx.allowed_tools = base_tools + [
+                    "get_phase_status", "list_phases",
+                    "run_phase", "request_validation",
+                ]
+            else:
+                # Dev/Archi/QA/Wiki agents get write tools
+                ctx.allowed_tools = base_tools + [
+                    "code_write", "code_edit",
+                    "git_commit",
+                ]
 
             executor = get_executor()
             raw_accumulated = ""
@@ -4933,16 +4961,20 @@ Answer in the same language as the user. Be precise and data-driven."""
                     # Tool being called — show in UI
                     tool_labels = {
                         "memory_search": "Recherche mémoire",
+                        "memory_store": "Sauvegarde mémoire",
                         "get_phase_status": "Statut des phases",
                         "list_phases": "Liste des phases",
                         "run_phase": "Lancement de phase",
                         "request_validation": "Demande de validation",
                         "code_read": "Lecture de code",
+                        "code_write": "Écriture de code",
+                        "code_edit": "Modification de code",
                         "code_search": "Recherche dans le code",
                         "list_files": "Liste des fichiers",
                         "git_log": "Historique Git",
                         "git_status": "Statut Git",
                         "git_diff": "Diff Git",
+                        "git_commit": "Commit Git",
                         "get_project_context": "Contexte projet",
                     }
                     label = tool_labels.get(data_s, f"🔧 {data_s}")
