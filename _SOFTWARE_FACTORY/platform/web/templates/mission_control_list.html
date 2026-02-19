@@ -2,7 +2,7 @@
 
 {% block topbar_actions %}
 <a href="/missions/start/product-lifecycle" class="btn btn-primary">
-    <svg class="icon icon-sm"><use href="#icon-play"/></svg> Nouvelle Epic
+    <svg class="icon icon-sm"><use href="#icon-play"/></svg> Launch Epic
 </a>
 {% endblock %}
 
@@ -39,6 +39,10 @@
 .mission-badge.failed{background:rgba(239,68,68,.12);color:var(--red)}
 .mission-badge.paused,.mission-badge.pending{background:var(--bg-tertiary);color:var(--text-secondary)}
 </style>
+
+<a href="/missions/start/product-lifecycle" class="btn btn-primary" style="align-self:flex-start;margin-bottom:1rem">
+    <svg class="icon icon-sm"><use href="#icon-play"/></svg> Launch Epic
+</a>
 
 {% if runs %}
 <div class="mission-list">
