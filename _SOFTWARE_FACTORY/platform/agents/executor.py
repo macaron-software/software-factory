@@ -408,9 +408,372 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+        # ── MCP: LRM tools (project knowledge) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_locate",
+                "description": "Find files in the project matching a pattern or description via LRM server.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Pattern or description (e.g. 'auth middleware', '*.test.ts')"},
+                        "scope": {"type": "string", "description": "Limit search scope (e.g. 'src/', 'tests/')"},
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_summarize",
+                "description": "Get a summary of a file or directory from the LRM server.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string", "description": "File or directory path to summarize"},
+                        "focus": {"type": "string", "description": "What to focus on (e.g. 'API endpoints', 'data model')"},
+                    },
+                    "required": ["path"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_conventions",
+                "description": "Get coding conventions for a domain (rust, typescript, svelte, python).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "domain": {"type": "string", "description": "Domain: rust, typescript, svelte, python, kotlin, swift"},
+                    },
+                    "required": ["domain"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_examples",
+                "description": "Get code examples from the project (tests, implementations, API patterns).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "type": {"type": "string", "description": "Example type: test, implementation, api, model"},
+                        "domain": {"type": "string", "description": "Domain filter (e.g. 'auth', 'api')"},
+                    },
+                    "required": ["type"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_build",
+                "description": "Run build, test, or lint commands via the LRM server.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {"type": "string", "description": "Command type: build, test, lint, check"},
+                        "domain": {"type": "string", "description": "Target domain (e.g. 'backend', 'frontend')"},
+                    },
+                    "required": ["command"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_context",
+                "description": "Get project context via RAG: vision, architecture, data_model, api_surface, conventions.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "category": {"type": "string", "description": "Context category: vision, architecture, data_model, api_surface, conventions, all"},
+                    },
+                    "required": ["category"],
+                },
+            },
+        },
+        # ── MCP: Figma (design system) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "figma_get_node",
+                "description": "Get a Figma component node with its properties, variants, and styles.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_key": {"type": "string", "description": "Figma file key"},
+                        "node_id": {"type": "string", "description": "Node ID (e.g. '37:1201')"},
+                    },
+                    "required": ["file_key", "node_id"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "figma_get_styles",
+                "description": "Get design tokens (colors, typography, spacing) from a Figma file.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_key": {"type": "string", "description": "Figma file key"},
+                    },
+                    "required": ["file_key"],
+                },
+            },
+        },
+        # ── MCP: Solaris (WCAG/design system validation) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "solaris_wcag",
+                "description": "Get WCAG accessibility pattern for a component (accordion, button, tabs, checkbox, etc.).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "pattern": {"type": "string", "description": "WCAG pattern: accordion, button, tabs, checkbox, dialog, radio-group, switch, link"},
+                    },
+                    "required": ["pattern"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "solaris_component",
+                "description": "Get Figma component details: variants, properties, dimensions, colors.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "component": {"type": "string", "description": "Component name (e.g. 'button', 'badge', 'accordion')"},
+                    },
+                    "required": ["component"],
+                },
+            },
+        },
+        # ── MCP: GitHub ──
+        {
+            "type": "function",
+            "function": {
+                "name": "github_issues",
+                "description": "List or search issues in a GitHub repository.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "owner": {"type": "string", "description": "Repository owner"},
+                        "repo": {"type": "string", "description": "Repository name"},
+                        "state": {"type": "string", "description": "Filter: open, closed, all"},
+                        "query": {"type": "string", "description": "Search query for issue titles/body"},
+                    },
+                    "required": ["owner", "repo"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "github_prs",
+                "description": "List pull requests in a GitHub repository.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "owner": {"type": "string", "description": "Repository owner"},
+                        "repo": {"type": "string", "description": "Repository name"},
+                        "state": {"type": "string", "description": "Filter: open, closed, all"},
+                    },
+                    "required": ["owner", "repo"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "github_code_search",
+                "description": "Search code across GitHub repositories.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Code search query (e.g. 'function handleAuth language:typescript')"},
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "github_actions",
+                "description": "List workflow runs and their status for a GitHub repository.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "owner": {"type": "string", "description": "Repository owner"},
+                        "repo": {"type": "string", "description": "Repository name"},
+                        "status": {"type": "string", "description": "Filter: completed, in_progress, queued"},
+                    },
+                    "required": ["owner", "repo"],
+                },
+            },
+        },
+        # ── MCP: JIRA/Confluence (optional — needs ATLASSIAN_TOKEN) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "jira_search",
+                "description": "Search JIRA issues using JQL query.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "jql": {"type": "string", "description": "JQL query (e.g. 'project=PROJ AND status=Open')"},
+                        "max_results": {"type": "integer", "description": "Max results (default 10)"},
+                    },
+                    "required": ["jql"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "jira_create",
+                "description": "Create a JIRA issue (bug, story, task).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project": {"type": "string", "description": "Project key (e.g. 'PROJ')"},
+                        "summary": {"type": "string", "description": "Issue title"},
+                        "type": {"type": "string", "description": "Issue type: Bug, Story, Task"},
+                        "description": {"type": "string", "description": "Issue description"},
+                    },
+                    "required": ["project", "summary", "type"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "confluence_read",
+                "description": "Read a Confluence page content by title or ID.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "space": {"type": "string", "description": "Confluence space key"},
+                        "title": {"type": "string", "description": "Page title to search"},
+                        "page_id": {"type": "string", "description": "Page ID (alternative to title)"},
+                    },
+                },
+            },
+        },
     ]
     _TOOL_SCHEMAS = schemas
     return schemas
+
+
+# ── Role-based tool mapping ────────────────────────────────────
+
+# Tools available to each agent role category
+ROLE_TOOL_MAP: dict[str, list[str]] = {
+    "product": [
+        "code_read", "code_search", "list_files", "memory_search", "memory_store",
+        "get_project_context", "screenshot",
+        "github_issues", "github_prs",
+        "jira_search", "jira_create", "confluence_read",
+    ],
+    "architecture": [
+        "code_read", "code_search", "list_files", "deep_search",
+        "memory_search", "memory_store", "get_project_context",
+        "git_log", "git_diff",
+        "lrm_conventions", "lrm_context", "lrm_summarize",
+        "github_code_search",
+    ],
+    "ux": [
+        "code_read", "code_search", "list_files", "screenshot",
+        "memory_search", "memory_store", "get_project_context",
+        "figma_get_node", "figma_get_styles",
+        "solaris_wcag", "solaris_component",
+    ],
+    "dev": [
+        "code_read", "code_write", "code_edit", "code_search",
+        "git_status", "git_log", "git_diff", "git_commit",
+        "list_files", "deep_search",
+        "memory_search", "memory_store", "get_project_context",
+        "docker_build", "screenshot",
+        "lrm_locate", "lrm_conventions", "lrm_build", "lrm_examples",
+        "github_prs", "github_code_search",
+    ],
+    "qa": [
+        "code_read", "code_search", "list_files",
+        "screenshot", "playwright_test",
+        "memory_search", "memory_store", "get_project_context",
+        "git_diff", "git_log",
+        "github_issues", "github_prs",
+        "jira_search", "jira_create",
+    ],
+    "devops": [
+        "code_read", "code_write", "code_edit", "code_search",
+        "git_status", "git_log", "git_diff", "git_commit",
+        "list_files", "docker_build", "deploy_azure",
+        "memory_search", "memory_store", "get_project_context",
+        "lrm_build",
+        "github_actions", "github_prs",
+    ],
+    "security": [
+        "code_read", "code_search", "list_files", "deep_search",
+        "memory_search", "memory_store", "get_project_context",
+        "git_log", "git_diff",
+        "github_code_search", "github_issues",
+    ],
+    "cdp": [
+        "memory_search", "memory_store", "get_project_context",
+        "list_files",
+        "run_phase", "get_phase_status", "list_phases", "request_validation",
+        "github_issues", "github_prs",
+        "jira_search",
+    ],
+}
+
+
+def _classify_agent_role(agent: "AgentDef") -> str:
+    """Classify an agent into a tool-mapping role category."""
+    role = (agent.role or "").lower()
+    name = (agent.name or "").lower()
+    combined = f"{role} {name}"
+
+    if any(k in combined for k in ("product", "business", "analyste", "ba ", "fonctionnel")):
+        return "product"
+    if any(k in combined for k in ("archi", "architect")):
+        return "architecture"
+    if any(k in combined for k in ("ux", "ui", "design", "ergon")):
+        return "ux"
+    if any(k in combined for k in ("qa", "test", "qualit")):
+        return "qa"
+    if any(k in combined for k in ("devops", "sre", "pipeline", "infra", "deploy")):
+        return "devops"
+    if any(k in combined for k in ("secur", "secu", "cyber")):
+        return "security"
+    if any(k in combined for k in ("programme", "projet", "cdp", "scrum", "coach", "pm ")):
+        return "cdp"
+    if any(k in combined for k in ("dev", "lead", "engineer", "backend", "frontend", "fullstack")):
+        return "dev"
+    return "dev"  # default to dev (most permissive set)
+
+
+def _get_tools_for_agent(agent: "AgentDef") -> Optional[list[str]]:
+    """Return the list of allowed tool names for this agent, or None for all."""
+    role_cat = _classify_agent_role(agent)
+    return ROLE_TOOL_MAP.get(role_cat)
+
+
+def _filter_schemas(schemas: list[dict], allowed: Optional[list[str]]) -> list[dict]:
+    """Filter tool schemas to only include allowed tool names."""
+    if allowed is None:
+        return schemas
+    allowed_set = set(allowed)
+    return [s for s in schemas if s.get("function", {}).get("name") in allowed_set]
 
 
 @dataclass
@@ -432,6 +795,8 @@ class ExecutionContext:
     vision: str = ""
     # Enable tool-calling (default True)
     tools_enabled: bool = True
+    # Filter tools by name — only these tools are available to the agent (None = all)
+    allowed_tools: Optional[list[str]] = None
     # Callback for SSE tool events
     on_tool_call: Optional[object] = None  # async callable(tool_name, args, result)
     # Mission run ID (for CDP phase tools)
@@ -471,7 +836,7 @@ class AgentExecutor:
         try:
             system = self._build_system_prompt(ctx)
             messages = self._build_messages(ctx, user_message)
-            tools = _get_tool_schemas() if ctx.tools_enabled else None
+            tools = _filter_schemas(_get_tool_schemas(), ctx.allowed_tools) if ctx.tools_enabled else None
 
             # Tool-calling loop
             deep_search_used = False
@@ -619,7 +984,7 @@ class AgentExecutor:
         try:
             system = self._build_system_prompt(ctx)
             messages = self._build_messages(ctx, user_message)
-            tools = _get_tool_schemas() if ctx.tools_enabled else None
+            tools = _filter_schemas(_get_tool_schemas(), ctx.allowed_tools) if ctx.tools_enabled else None
 
             # Tool-calling rounds (non-streaming) — same as run()
             deep_search_used = False
@@ -818,6 +1183,18 @@ class AgentExecutor:
             return await self._tool_request_validation(args, ctx)
         if name == "get_project_context":
             return await self._tool_get_project_context(args, ctx)
+
+        # ── MCP tools: proxy to external servers ──
+        if name.startswith("lrm_"):
+            return await self._tool_mcp_lrm(name, args, ctx)
+        if name.startswith("figma_"):
+            return await self._tool_mcp_figma(name, args, ctx)
+        if name.startswith("solaris_"):
+            return await self._tool_mcp_solaris(name, args, ctx)
+        if name.startswith("github_"):
+            return await self._tool_mcp_github(name, args, ctx)
+        if name.startswith("jira_") or name == "confluence_read":
+            return await self._tool_mcp_jira(name, args, ctx)
 
         # Registry tools
         tool = self._registry.get(name)
@@ -1283,6 +1660,165 @@ Do NOT try to do everything yourself — leverage your team.""")
             ))
         messages.append(LLMMessage(role="user", content=user_message))
         return messages
+
+    # ── MCP Tool Handlers ─────────────────────────────────────────
+
+    async def _tool_mcp_lrm(self, name: str, args: dict, ctx: ExecutionContext) -> str:
+        """Proxy to LRM MCP server (localhost:9500)."""
+        import aiohttp
+        tool_name = name.replace("lrm_", "")
+        if ctx.project_id:
+            args.setdefault("project", ctx.project_id)
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"http://localhost:9500/tools/{tool_name}",
+                    json=args, timeout=aiohttp.ClientTimeout(total=60),
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        return str(data.get("result", data))[:8000]
+                    return f"LRM error {resp.status}"
+        except Exception as e:
+            return f"LRM server unavailable: {e}"
+
+    async def _tool_mcp_figma(self, name: str, args: dict, ctx: ExecutionContext) -> str:
+        """Proxy to Figma MCP (desktop or remote)."""
+        import aiohttp
+        endpoints = ["http://127.0.0.1:3845/mcp", "https://mcp.figma.com/mcp"]
+        tool_name = name.replace("figma_", "")
+        payload = {"method": tool_name, "params": args}
+        for endpoint in endpoints:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        endpoint, json=payload, timeout=aiohttp.ClientTimeout(total=30),
+                    ) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            return str(data.get("result", data))[:8000]
+            except Exception:
+                continue
+        return "Figma MCP unavailable (desktop + remote)"
+
+    async def _tool_mcp_solaris(self, name: str, args: dict, ctx: ExecutionContext) -> str:
+        """Proxy to Solaris design system tools."""
+        tool_name = name.replace("solaris_", "")
+        try:
+            if tool_name == "wcag":
+                from solaris_solaris_wcag import solaris_wcag  # type: ignore
+                return str(solaris_wcag(args.get("pattern", "")))[:8000]
+            if tool_name == "component":
+                from solaris_solaris_component import solaris_component  # type: ignore
+                return str(solaris_component(args.get("component", "")))[:8000]
+        except ImportError:
+            pass
+        # Fallback: try MCP bridge
+        return await self._tool_mcp_lrm(f"lrm_{tool_name}", args, ctx)
+
+    async def _tool_mcp_github(self, name: str, args: dict, ctx: ExecutionContext) -> str:
+        """Execute GitHub operations via gh CLI."""
+        import asyncio as _aio
+        owner = args.get("owner", "")
+        repo = args.get("repo", "")
+        try:
+            if name == "github_issues":
+                state = args.get("state", "open")
+                query = args.get("query", "")
+                cmd = f"gh issue list --repo {owner}/{repo} --state {state} --limit 20"
+                if query:
+                    cmd += f" --search '{query}'"
+                proc = await _aio.create_subprocess_shell(
+                    cmd, stdout=_aio.subprocess.PIPE, stderr=_aio.subprocess.PIPE)
+                out, err = await proc.communicate()
+                return (out or err).decode()[:6000]
+            if name == "github_prs":
+                state = args.get("state", "open")
+                cmd = f"gh pr list --repo {owner}/{repo} --state {state} --limit 20"
+                proc = await _aio.create_subprocess_shell(
+                    cmd, stdout=_aio.subprocess.PIPE, stderr=_aio.subprocess.PIPE)
+                out, err = await proc.communicate()
+                return (out or err).decode()[:6000]
+            if name == "github_code_search":
+                query = args.get("query", "")
+                cmd = f"gh search code '{query}' --limit 20"
+                proc = await _aio.create_subprocess_shell(
+                    cmd, stdout=_aio.subprocess.PIPE, stderr=_aio.subprocess.PIPE)
+                out, err = await proc.communicate()
+                return (out or err).decode()[:6000]
+            if name == "github_actions":
+                cmd = f"gh run list --repo {owner}/{repo} --limit 10"
+                status = args.get("status")
+                if status:
+                    cmd += f" --status {status}"
+                proc = await _aio.create_subprocess_shell(
+                    cmd, stdout=_aio.subprocess.PIPE, stderr=_aio.subprocess.PIPE)
+                out, err = await proc.communicate()
+                return (out or err).decode()[:6000]
+        except Exception as e:
+            return f"GitHub CLI error: {e}"
+        return f"Unknown GitHub tool: {name}"
+
+    async def _tool_mcp_jira(self, name: str, args: dict, ctx: ExecutionContext) -> str:
+        """JIRA/Confluence integration (needs ATLASSIAN_TOKEN env var)."""
+        import os
+        token = os.environ.get("ATLASSIAN_TOKEN")
+        base_url = os.environ.get("ATLASSIAN_URL", "")
+        if not token or not base_url:
+            return "JIRA/Confluence not configured. Set ATLASSIAN_TOKEN and ATLASSIAN_URL env vars."
+        import aiohttp
+        headers = {"Authorization": f"Basic {token}", "Content-Type": "application/json"}
+        try:
+            async with aiohttp.ClientSession(headers=headers) as session:
+                if name == "jira_search":
+                    jql = args.get("jql", "")
+                    max_r = args.get("max_results", 10)
+                    async with session.get(
+                        f"{base_url}/rest/api/3/search?jql={jql}&maxResults={max_r}",
+                        timeout=aiohttp.ClientTimeout(total=30),
+                    ) as resp:
+                        data = await resp.json()
+                        issues = data.get("issues", [])
+                        return "\n".join(
+                            f"[{i['key']}] {i['fields'].get('summary','')} ({i['fields'].get('status',{}).get('name','')})"
+                            for i in issues
+                        ) or "No issues found."
+                if name == "jira_create":
+                    payload = {"fields": {
+                        "project": {"key": args["project"]},
+                        "summary": args["summary"],
+                        "issuetype": {"name": args["type"]},
+                        "description": {"type": "doc", "version": 1, "content": [
+                            {"type": "paragraph", "content": [{"type": "text", "text": args.get("description", "")}]}
+                        ]},
+                    }}
+                    async with session.post(
+                        f"{base_url}/rest/api/3/issue",
+                        json=payload, timeout=aiohttp.ClientTimeout(total=30),
+                    ) as resp:
+                        data = await resp.json()
+                        return f"Created: {data.get('key', 'unknown')} — {data.get('self', '')}"
+                if name == "confluence_read":
+                    title = args.get("title", "")
+                    space = args.get("space", "")
+                    page_id = args.get("page_id", "")
+                    if page_id:
+                        url = f"{base_url}/wiki/rest/api/content/{page_id}?expand=body.storage"
+                    else:
+                        url = f"{base_url}/wiki/rest/api/content?title={title}&spaceKey={space}&expand=body.storage"
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                        data = await resp.json()
+                        if "results" in data:
+                            pages = data["results"]
+                        else:
+                            pages = [data]
+                        parts = []
+                        for p in pages[:3]:
+                            parts.append(f"# {p.get('title','')}\n{p.get('body',{}).get('storage',{}).get('value','')[:3000]}")
+                        return "\n\n".join(parts) or "No page found."
+        except Exception as e:
+            return f"JIRA/Confluence error: {e}"
+        return f"Unknown JIRA tool: {name}"
 
     def _parse_delegations(self, content: str) -> list[dict]:
         """Parse [DELEGATE:agent_id] markers from response."""

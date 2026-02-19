@@ -618,11 +618,15 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
 
     has_project = bool(run.project_id)
     # Enable tools only for execution phases with a real workspace AND dev-role agents
-    # Ideation/research/comité agents should stream directly without tool round overhead
+    # Ideation/research/comite agents should stream directly without tool round overhead
     rank = getattr(agent, "hierarchy_rank", 50)
     role_lower = (agent.role or "").lower()
     is_dev_agent = rank >= 40 or any(k in role_lower for k in ("dev", "qa", "test", "devops", "pipeline", "sre", "secur", "secu"))
     tools_for_agent = has_project and bool(project_path) and is_dev_agent
+
+    # Role-based tool filtering — each agent only sees tools relevant to their role
+    from ..agents.executor import _get_tools_for_agent
+    allowed_tools = _get_tools_for_agent(agent) if tools_for_agent else None
 
     return ExecutionContext(
         agent=agent,
@@ -634,6 +638,7 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         skills_prompt=skills_prompt,
         vision=vision,
         tools_enabled=tools_for_agent,
+        allowed_tools=allowed_tools,
     )
 
 
