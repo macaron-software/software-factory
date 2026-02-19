@@ -154,10 +154,11 @@ _RESEARCH_PROTOCOL = """[DISCUSSION MODE — MANDATORY]
 You are an EXPERT contributing to a team discussion. Your job is to DELIVER YOUR ANALYSIS NOW.
 
 CRITICAL RULES:
-- NEVER say "let me consult/check/analyze first" — you already have all the context you need
-- NEVER call tools (list_files, code_read, etc.) — respond with your expertise directly
-- Give your DECISION, RECOMMENDATION or ANALYSIS immediately
-- Be specific: name technologies, numbers, risks, trade-offs
+- NEVER say "let me consult/check/analyze first" — deliver your verdict immediately
+- You MAY use tools to read files, search the web, or query memory if it helps your analysis
+- But do NOT write code or create files — this is a discussion phase
+- Give your DECISION, RECOMMENDATION or ANALYSIS with specifics
+- Name technologies, numbers, risks, trade-offs
 - If this is a GO/NOGO committee: state your verdict clearly (GO, NOGO, or CONDITIONAL GO + conditions)
 - @mention colleagues when addressing them
 - React to what others said, don't repeat
@@ -340,25 +341,27 @@ async def _execute_node(
         full_task += f"[Message from colleague]:\n{context_from}\n\n"
     full_task += f"[Your task]:\n{task}\n\n"
 
-    # Inject role-based execution protocol
+    # Inject protocol based on PHASE PATTERN, not agent rank
+    # Discussion patterns → everyone discusses (can still use read/search tools)
+    # Execution patterns → role-based protocols (code, test, review)
+    pattern_type = run.pattern.type
+    discussion_patterns = ("network", "human-in-the-loop")
     role_lower = (agent.role or "").lower()
-    rank = getattr(agent, "hierarchy_rank", 50)
     has_project = bool(run.project_id)
-    # Strategic/executive agents always discuss — never code
-    # Only C-level and portfolio roles (rank <= 10 or explicit executive titles)
-    is_strategic = rank <= 10 or any(k in role_lower for k in ("dsi", "cpo", "portfolio", "directeur", "chef de programme"))
-    if is_strategic:
+
+    if pattern_type in discussion_patterns or not has_project:
         full_task += _RESEARCH_PROTOCOL
-    elif has_project:
-        if rank >= 40 or "dev" in role_lower:
-            full_task += _EXEC_PROTOCOL
-        elif "qa" in role_lower or "test" in role_lower:
-            full_task += _QA_PROTOCOL
-        elif "lead" in role_lower:
-            full_task += _REVIEW_PROTOCOL
+    elif "dev" in role_lower or "fullstack" in role_lower or "backend" in role_lower or "frontend" in role_lower:
+        full_task += _EXEC_PROTOCOL
+        full_task += "\n\n" + _PR_PROTOCOL
+    elif "qa" in role_lower or "test" in role_lower:
+        full_task += _QA_PROTOCOL
+        full_task += "\n\n" + _PR_PROTOCOL
+    elif "lead" in role_lower or "architect" in role_lower:
+        full_task += _REVIEW_PROTOCOL
         full_task += "\n\n" + _PR_PROTOCOL
     else:
-        # Ideation / research — read tools OK, no code writing
+        # Default for non-dev roles in execution phases (scrum master, PM, etc.)
         full_task += _RESEARCH_PROTOCOL
 
     # Execute with streaming SSE
@@ -624,12 +627,9 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
             pass
 
     has_project = bool(run.project_id)
-    # Enable tools for agents that actually work (dev, qa, lead, scrum, devops, security)
-    # Only disable for C-level executives (DSI, CPO, portfolio, directeur programme)
-    rank = getattr(agent, "hierarchy_rank", 50)
-    role_lower = (agent.role or "").lower()
-    is_executive = rank <= 10 or any(k in role_lower for k in ("dsi", "cpo", "portfolio", "directeur", "chef de programme"))
-    tools_for_agent = has_project and bool(project_path) and not is_executive
+    # Tools: every agent gets their configured tools when there's a project workspace
+    # No rank gating — a CTO can search the web, a DSI can read project files
+    tools_for_agent = has_project and bool(project_path)
 
     # Role-based tool filtering — each agent only sees tools relevant to their role
     from ..agents.executor import _get_tools_for_agent
