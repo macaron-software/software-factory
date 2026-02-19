@@ -4959,19 +4959,17 @@ async def mission_control_page(request: Request, mission_id: str):
     _useful_cats = {"product", "architecture", "security", "development", "quality", "phase-summary", "vision", "convention", "team"}
     try:
         mem_mgr = get_memory_manager()
-        if mission.project_id:
-            proj_mems = mem_mgr.project_get(mission.project_id, limit=50) or []
-            for pm in proj_mems:
-                if not isinstance(pm, dict):
-                    continue
-                cat = pm.get("category", "")
-                key = pm.get("key", "")
-                # Skip pattern execution traces (phase:pattern:agent, agent:name:pattern)
-                if key.startswith("phase:") or key.startswith("agent:"):
-                    continue
-                # Only keep meaningful categories
-                if cat in _useful_cats:
-                    memories.append(pm)
+        # Use mission.id as memory scope — each epic has its own memory
+        proj_mems = mem_mgr.project_get(mission.id, limit=50) or []
+        for pm in proj_mems:
+            if not isinstance(pm, dict):
+                continue
+            cat = pm.get("category", "")
+            key = pm.get("key", "")
+            if key.startswith("phase:") or key.startswith("agent:"):
+                continue
+            if cat in _useful_cats:
+                memories.append(pm)
     except Exception:
         pass
 
@@ -5380,12 +5378,12 @@ async def api_mission_run(request: Request, mission_id: str):
                         phase_task += "Focus: sprint final — finalisez, nettoyez, préparez le handoff CI/CD.\n"
 
                     # Inject backlog from earlier phases (architecture, project-setup)
-                    if mission.project_id:
+                    if mission.id:
                         try:
                             from ..memory.manager import get_memory_manager
                             mem = get_memory_manager()
-                            backlog_items = mem.project_get(mission.project_id, category="product")
-                            arch_items = mem.project_get(mission.project_id, category="architecture")
+                            backlog_items = mem.project_get(mission.id, category="product")
+                            arch_items = mem.project_get(mission.id, category="architecture")
                             if backlog_items or arch_items:
                                 phase_task += "\n\n--- Backlog et architecture (phases précédentes) ---\n"
                                 for item in (backlog_items or [])[:5]:
@@ -5398,7 +5396,7 @@ async def api_mission_run(request: Request, mission_id: str):
                 try:
                     result = await run_pattern(
                         phase_pattern, session_id, phase_task,
-                        project_id=mission.project_id,
+                        project_id=mission.id,
                         project_path=mission.workspace_path,
                         phase_id=phase.phase_id,
                     )
