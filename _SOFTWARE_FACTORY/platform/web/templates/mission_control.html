@@ -221,6 +221,17 @@
 .mc-commit:last-child{border-bottom:none}
 .mc-commit-hash{color:var(--purple);font-size:0.62rem;background:rgba(124,58,237,.08);padding:0.1rem 0.3rem;border-radius:3px;flex-shrink:0}
 .mc-commit-msg{color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mc-si-item{font-size:0.7rem;padding:0.15rem 0;display:flex;gap:0.3rem}
+.mc-si-label{color:var(--text-secondary);min-width:4rem;flex-shrink:0}
+.mc-si-value{color:var(--text-primary)}
+.mc-si-svc{font-size:0.65rem;padding:0.15rem 0.4rem;background:rgba(124,58,237,.06);border-radius:3px;margin:0.1rem 0}
+.mc-lesson{font-size:0.7rem;padding:0.3rem 0.4rem;margin:0.15rem 0;background:rgba(63,185,80,.06);border-left:2px solid rgba(63,185,80,.4);border-radius:0 3px 3px 0}
+.mc-lesson-cat{font-size:0.6rem;color:var(--purple);text-transform:uppercase;letter-spacing:0.03em}
+.mc-guard{display:inline-flex;align-items:center;gap:0.25rem;font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;margin-left:0.3rem;font-weight:500}
+.mc-guard.pass{background:rgba(63,185,80,.1);color:#3fb950}
+.mc-guard.fail{background:rgba(248,81,73,.1);color:#f85149}
+.mc-guard-detail{font-size:0.62rem;color:var(--text-secondary);margin-top:0.15rem;padding:0.2rem 0.4rem;background:rgba(248,81,73,.04);border-radius:3px;display:none}
+.mc-guard-detail.show{display:block}
 
 @media(max-width:900px){.mc-layout{grid-template-columns:1fr;height:auto}.mc-sidebar{border-left:none;border-top:1px solid var(--border)}}
 </style>
@@ -275,7 +286,15 @@
                         <div class="mc-phase-graph" id="graph-{{ phase.phase_id }}"></div>
                         <!-- Discussion below graph -->
                         <div class="mc-phase-discuss" id="discuss-{{ phase.phase_id }}">
-                            <div class="mc-discuss-empty">En attente d'exécution…</div>
+                            {% set pmsgs = phase_messages.get(phase.phase_id, []) %}
+                            {% if pmsgs %}
+                                {% for msg in pmsgs %}
+                                {% set msg_mode = "chat" %}
+                                {% include "partials/msg_unified.html" %}
+                                {% endfor %}
+                            {% else %}
+                                <div class="mc-discuss-empty">En attente d'exécution…</div>
+                            {% endif %}
                         </div>
                     </div>
                     {% if phase.status.value == 'waiting_validation' %}
@@ -367,6 +386,49 @@
             </div>
             <button class="mc-mem-add" onclick="addMemoryEntry()">+ Ajouter une entree</button>
         </div>
+
+        <!-- SI Blueprint -->
+        {% if si_blueprint %}
+        <div class="mc-side-section">
+            <div class="mc-side-title">
+                <svg class="icon icon-xs"><use href="#icon-server"/></svg> SI Blueprint
+            </div>
+            {% if si_blueprint.cloud %}
+            <div class="mc-si-item"><span class="mc-si-label">Cloud</span><span class="mc-si-value">{{ si_blueprint.cloud.provider | default('?') }} / {{ si_blueprint.cloud.region | default('') }}</span></div>
+            {% endif %}
+            {% if si_blueprint.compute %}
+            <div class="mc-si-item"><span class="mc-si-label">Compute</span><span class="mc-si-value">{{ si_blueprint.compute.type | default('?') }} ({{ si_blueprint.compute.size | default('') }})</span></div>
+            {% endif %}
+            {% if si_blueprint.cicd %}
+            <div class="mc-si-item"><span class="mc-si-label">CI/CD</span><span class="mc-si-value">{{ si_blueprint.cicd.provider | default('?') }}</span></div>
+            {% endif %}
+            {% if si_blueprint.databases %}
+            <div class="mc-si-item"><span class="mc-si-label">DBs</span><span class="mc-si-value">{{ si_blueprint.databases | map(attribute='type') | join(', ') }}</span></div>
+            {% endif %}
+            {% if si_blueprint.existing_services %}
+            <div style="margin-top:0.2rem">
+                {% for svc in si_blueprint.existing_services[:5] %}
+                <div class="mc-si-svc">{{ svc.name }} — {{ svc.proto | default('') }} ({{ svc.tech | default('') | truncate(30) }})</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Lessons from past epics -->
+        {% if lessons %}
+        <div class="mc-side-section">
+            <div class="mc-side-title">
+                <svg class="icon icon-xs"><use href="#icon-zap"/></svg> Lessons ({{ lessons|length }})
+            </div>
+            {% for l in lessons[:8] %}
+            <div class="mc-lesson">
+                <div class="mc-lesson-cat">{{ l.category | default('lesson') }}</div>
+                {{ l.value | default(l.get('key', '')) | truncate(120) }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
 
         <!-- Git + PRs -->
         <div class="mc-side-section">
@@ -757,6 +819,29 @@ function handleSSE(d) {
         const phaseId = d.phase_id || currentRunningPhase();
         if (d.status === 'thinking') {
             addActivity(`${d.agent_id} analyse…`, 'tool');
+        }
+    }
+    else if (d.type === 'adversarial') {
+        const icon = d.passed ? '✓' : '✗';
+        const cls = d.passed ? 'pass' : 'fail';
+        const label = d.passed ? 'APPROVED' : `REJECTED (${d.score}/10)`;
+        const name = d.agent_name || d.agent_id;
+        addActivity(`${icon} Guard ${d.level}: ${name} — ${label}`, d.passed ? 'info' : 'alert');
+        // Append guard badge to the agent's last message bubble
+        const phaseId = d.phase_id || currentRunningPhase();
+        if (phaseId && !d.passed) {
+            const container = document.getElementById(`discuss-${phaseId}`);
+            if (container) {
+                const bubbles = container.querySelectorAll(`.mc-msg`);
+                const lastBubble = bubbles[bubbles.length - 1];
+                if (lastBubble) {
+                    const detail = document.createElement('div');
+                    detail.className = 'mc-guard-detail show';
+                    detail.innerHTML = `<span class="mc-guard fail">${icon} ${label}</span> ` +
+                        (d.issues || []).map(i => `<br>• ${i}`).join('');
+                    lastBubble.appendChild(detail);
+                }
+            }
         }
     }
     else if (d.type === 'agent_message' || d.type === 'agent_response') {

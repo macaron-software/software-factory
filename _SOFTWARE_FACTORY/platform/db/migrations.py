@@ -68,6 +68,35 @@ def _migrate(conn: sqlite3.Connection):
     except Exception:
         pass
 
+    # Agent scores: performance tracking across epics
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT NOT NULL,
+            epic_id TEXT NOT NULL,
+            accepted INTEGER DEFAULT 0,
+            rejected INTEGER DEFAULT 0,
+            iterations INTEGER DEFAULT 0,
+            quality_score REAL DEFAULT 0.0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(agent_id, epic_id)
+        )
+    """)
+
+    # Retrospectives table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS retrospectives (
+            id TEXT PRIMARY KEY,
+            scope TEXT DEFAULT 'epic',
+            scope_id TEXT DEFAULT '',
+            successes TEXT DEFAULT '[]',
+            failures TEXT DEFAULT '[]',
+            lessons TEXT DEFAULT '[]',
+            improvements TEXT DEFAULT '[]',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
 def get_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
     """Get a database connection."""
     if not db_path.exists():

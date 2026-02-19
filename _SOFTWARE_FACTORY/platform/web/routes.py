@@ -2981,7 +2981,30 @@ Réponds UNIQUEMENT avec le JSON."""
     return JSONResponse({"id": retro_id, **retro_data})
 
 
-@router.get("/api/projects/{project_id}/git", response_class=HTMLResponse)
+@router.get("/api/projects/{project_id}/si-blueprint")
+async def api_get_si_blueprint(project_id: str):
+    """Read SI blueprint for a project."""
+    import yaml
+    bp_path = Path(__file__).resolve().parents[2] / "data" / "si_blueprints" / f"{project_id}.yaml"
+    if not bp_path.exists():
+        return JSONResponse({"error": "No SI blueprint found", "project_id": project_id}, status_code=404)
+    with open(bp_path) as f:
+        return JSONResponse(yaml.safe_load(f))
+
+
+@router.put("/api/projects/{project_id}/si-blueprint")
+async def api_put_si_blueprint(request: Request, project_id: str):
+    """Write SI blueprint for a project."""
+    import yaml
+    bp_dir = Path(__file__).resolve().parents[2] / "data" / "si_blueprints"
+    bp_dir.mkdir(parents=True, exist_ok=True)
+    data = await request.json()
+    data["project_id"] = project_id
+    with open(bp_dir / f"{project_id}.yaml", "w") as f:
+        yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
+    return JSONResponse({"ok": True, "project_id": project_id})
+
+
 async def api_project_git(request: Request, project_id: str):
     """Git panel partial (HTMX)."""
     from ..projects.manager import get_project_store
@@ -4939,20 +4962,45 @@ async def mission_control_page(request: Request, mission_id: str):
 
     # Session messages for discussions
     messages = []
+    phase_messages: dict[str, list] = {}  # phase_id → list of message dicts
+    # Build agent→phase mapping for fallback routing
+    _agent_to_phase: dict[str, str] = {}
+    if wf:
+        for wp in wf.phases:
+            cfg = wp.config or {}
+            for aid in cfg.get("agent_ids", cfg.get("agents", [])):
+                _agent_to_phase.setdefault(aid, wp.id)
+    # Track current phase from system messages (Pattern started)
+    _current_phase_infer = ""
     if mission.session_id:
         session_store = get_session_store()
         msgs = session_store.get_messages(mission.session_id)
         for m in msgs:
+            # Track phase transitions from system messages
+            if m.from_agent == "system" and m.content:
+                for wp in (wf.phases if wf else []):
+                    if wp.name and wp.name in m.content and "started" in m.content:
+                        _current_phase_infer = wp.id
+                        break
+            if m.message_type == "system" and m.from_agent == "system":
+                continue  # skip internal system messages from display
             ag = agent_map.get(m.from_agent)
-            messages.append({
+            meta = {}
+            if hasattr(m, "metadata") and m.metadata:
+                meta = m.metadata if isinstance(m.metadata, dict) else {}
+            msg_dict = {
                 "from_agent": m.from_agent,
-                "from_name": ag["name"] if ag else m.from_agent,
-                "from_avatar": ag["avatar_url"] if ag else "",
-                "from_role": ag["role"] if ag else "",
+                "to_agent": getattr(m, "to_agent", "") or "",
                 "content": m.content,
                 "message_type": m.message_type,
-                "created_at": m.created_at if hasattr(m, "created_at") else "",
-            })
+                "timestamp": m.created_at if hasattr(m, "created_at") else "",
+                "metadata": meta,
+            }
+            messages.append(msg_dict)
+            # Route to phase via metadata or fallback
+            pid = meta.get("phase_id", "") or _current_phase_infer or _agent_to_phase.get(m.from_agent, "")
+            if pid:
+                phase_messages.setdefault(pid, []).append(msg_dict)
 
     # Memory entries — project-specific only, filtered to meaningful content
     memories = []
@@ -5008,6 +5056,29 @@ async def mission_control_page(request: Request, mission_id: str):
         except Exception:
             pass
 
+    # SI Blueprint for the project
+    si_blueprint = None
+    try:
+        import yaml as _yaml
+        bp_path = Path(__file__).resolve().parents[2] / "data" / "si_blueprints" / f"{mission.project_id}.yaml"
+        if bp_path.exists():
+            with open(bp_path) as _f:
+                si_blueprint = _yaml.safe_load(_f)
+    except Exception:
+        pass
+
+    # Global lessons from past epics
+    lessons = []
+    try:
+        mem_mgr = get_memory_manager()
+        global_mems = mem_mgr.global_get(category="lesson", limit=20) or []
+        global_mems += mem_mgr.global_get(category="improvement", limit=10) or []
+        for gm in global_mems:
+            if isinstance(gm, dict):
+                lessons.append(gm)
+    except Exception:
+        pass
+
     return _templates(request).TemplateResponse("mission_control.html", {
         "request": request,
         "page_title": f"Epic Control — {mission.workflow_name}",
@@ -5016,9 +5087,12 @@ async def mission_control_page(request: Request, mission_id: str):
         "phase_agents": phase_agents,
         "phase_graphs": phase_graphs,
         "messages": messages,
+        "phase_messages": phase_messages,
         "memories": memories,
         "pull_requests": pull_requests,
         "workspace_commits": workspace_commits,
+        "si_blueprint": si_blueprint,
+        "lessons": lessons,
         "session_id": mission.session_id or "",
     })
 
@@ -5667,8 +5741,109 @@ async def api_mission_run(request: Request, mission_id: str):
             "msg_type": "text",
         })
 
+        # Auto-trigger retrospective on epic completion
+        try:
+            await _auto_retrospective(mission, session_id, phase_summaries, _push_sse)
+        except Exception as retro_err:
+            logger.warning(f"Auto-retrospective failed: {retro_err}")
+
     asyncio.create_task(_run_phases())
     return JSONResponse({"status": "running", "mission_id": mission_id})
+
+
+async def _auto_retrospective(mission, session_id: str, phase_summaries: list, push_sse):
+    """Auto-generate retrospective when epic completes, store lessons in global memory."""
+    from ..memory.manager import get_memory_manager
+    from ..sessions.store import get_session_store
+    from ..llm.client import get_llm_client, LLMMessage
+    import json as _json
+
+    ss = get_session_store()
+    msgs = ss.get_messages(session_id)
+
+    # Build context from phase summaries + messages
+    ctx_parts = [f"Epic: {mission.brief[:200]}"]
+    for ps in phase_summaries[-8:]:
+        ctx_parts.append(ps[:300] if isinstance(ps, str) else str(ps)[:300])
+    for m in msgs[-30:]:
+        agent = m.get("from_agent", "") if isinstance(m, dict) else getattr(m, "from_agent", "")
+        content = m.get("content", "") if isinstance(m, dict) else getattr(m, "content", "")
+        if content:
+            ctx_parts.append(f"{agent}: {content[:150]}")
+
+    context = "\n".join(ctx_parts)[:6000]
+
+    prompt = f"""Analyse cette epic terminée et génère une rétrospective.
+
+Contexte:
+{context}
+
+Produis un JSON:
+{{
+  "successes": ["Ce qui a bien fonctionné (3-5 items)"],
+  "failures": ["Ce qui a échoué ou peut être amélioré (2-4 items)"],
+  "lessons": ["Leçons techniques concrètes et actionnables (3-5 items)"],
+  "improvements": ["Actions d'amélioration pour les prochaines epics (2-4 items)"]
+}}
+
+Sois CONCRET, TECHNIQUE et ACTIONNABLE. Réponds UNIQUEMENT avec le JSON."""
+
+    client = get_llm_client()
+    try:
+        resp = await client.chat(
+            messages=[LLMMessage(role="user", content=prompt)],
+            system_prompt="Coach Agile expert en rétrospectives SAFe. Analyse factuelle.",
+            temperature=0.4, max_tokens=1500,
+        )
+        raw = resp.content.strip()
+        if "```json" in raw:
+            raw = raw.split("```json", 1)[1].split("```", 1)[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```", 1)[1].split("```", 1)[0].strip()
+        retro = _json.loads(raw)
+    except Exception:
+        retro = {
+            "successes": ["Epic completed"],
+            "lessons": ["Auto-retrospective needs LLM availability"],
+            "failures": [], "improvements": [],
+        }
+
+    # Store lessons + improvements in global memory
+    mem = get_memory_manager()
+    for lesson in retro.get("lessons", []):
+        mem.global_store(
+            key=f"lesson:epic:{mission.id}",
+            value=lesson,
+            category="lesson",
+            project_id=mission.project_id,
+            confidence=0.7,
+        )
+    for imp in retro.get("improvements", []):
+        mem.global_store(
+            key=f"improvement:epic:{mission.id}",
+            value=imp,
+            category="improvement",
+            project_id=mission.project_id,
+            confidence=0.8,
+        )
+
+    # Push retrospective as SSE message
+    retro_text = "## Rétrospective automatique\n\n"
+    if retro.get("successes"):
+        retro_text += "**Réussites:**\n" + "\n".join(f"- {s}" for s in retro["successes"]) + "\n\n"
+    if retro.get("lessons"):
+        retro_text += "**Leçons:**\n" + "\n".join(f"- {l}" for l in retro["lessons"]) + "\n\n"
+    if retro.get("improvements"):
+        retro_text += "**Améliorations:**\n" + "\n".join(f"- {i}" for i in retro["improvements"])
+
+    await push_sse(session_id, {
+        "type": "message",
+        "from_agent": "scrum_master",
+        "from_name": "Retrospective",
+        "from_role": "Scrum Master",
+        "content": retro_text,
+        "msg_type": "text",
+    })
 
 
 async def _run_post_phase_hooks(

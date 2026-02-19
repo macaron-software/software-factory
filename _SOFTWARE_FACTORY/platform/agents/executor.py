@@ -713,6 +713,112 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+        # ── Security scanning tools ──
+        {
+            "type": "function",
+            "function": {
+                "name": "sast_scan",
+                "description": "Run static application security testing (SAST) on workspace code. Uses semgrep/bandit to detect vulnerabilities, injection flaws, and insecure patterns. Returns findings with severity, file, and line number.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "cwd": {"type": "string", "description": "Workspace root directory"},
+                        "path": {"type": "string", "description": "Subdirectory or file to scan (default: whole workspace)"},
+                    },
+                    "required": ["cwd"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "dependency_audit",
+                "description": "Audit project dependencies for known CVEs. Auto-detects package.json (npm), requirements.txt (pip), Cargo.toml (cargo). Returns vulnerability list with severity.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "cwd": {"type": "string", "description": "Project root directory with dependency files"},
+                    },
+                    "required": ["cwd"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "secrets_scan",
+                "description": "Scan workspace for hardcoded secrets (API keys, tokens, passwords, private keys). Deterministic grep-based detection. Ignores test fixtures and examples.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "cwd": {"type": "string", "description": "Workspace root directory to scan"},
+                    },
+                    "required": ["cwd"],
+                },
+            },
+        },
+        # ── Chaos & Load testing tools ──
+        {
+            "type": "function",
+            "function": {
+                "name": "chaos_test",
+                "description": "Run chaos engineering test against a staging URL. Injects failures (process kill, network latency, memory pressure) and verifies recovery. Returns recovery time and health status.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "Staging URL to test"},
+                        "scenario": {"type": "string", "enum": ["kill_process", "network_latency", "memory_pressure", "cpu_stress"], "description": "Chaos scenario to run"},
+                        "timeout": {"type": "integer", "description": "Max recovery time in seconds (default: 30)"},
+                    },
+                    "required": ["url", "scenario"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "tmc_load_test",
+                "description": "Run load test (TMC) against a URL using k6. Returns p50/p95/p99 latency, throughput (rps), error rate. Scenarios: baseline (5 VUs), ramp_10x (50 VUs), spike (100 VUs).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "URL to load test"},
+                        "scenario": {"type": "string", "enum": ["baseline", "ramp_10x", "spike", "soak"], "description": "Load scenario"},
+                        "duration": {"type": "integer", "description": "Test duration in seconds (default: 30)"},
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "infra_check",
+                "description": "Verify infrastructure health: HTTP endpoints, Docker containers, port availability. Returns structured health report.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "URL to check (for site check)"},
+                        "checks": {"type": "array", "items": {"type": "string"}, "description": "Checks to run: site, docker, ports"},
+                        "port": {"type": "integer", "description": "Port to check (for ports check)"},
+                    },
+                },
+            },
+        },
+        # ── SI Blueprint tool ──
+        {
+            "type": "function",
+            "function": {
+                "name": "get_si_blueprint",
+                "description": "Get the SI (Information System) blueprint for the project. Returns infrastructure specs: cloud provider, compute type, CI/CD, databases, monitoring, existing services, and deployment conventions.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string", "description": "Project identifier"},
+                    },
+                },
+            },
+        },
     ]
     _TOOL_SCHEMAS = schemas
     return schemas
@@ -731,6 +837,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "git_log", "git_diff",
         "lrm_conventions", "lrm_context", "lrm_summarize",
         "github_code_search",
+        "get_si_blueprint",
     ],
     "ux": [
         "code_read", "code_search", "list_files", "screenshot",
@@ -755,6 +862,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "git_diff", "git_log",
         "github_issues", "github_prs",
         "jira_search", "jira_create",
+        "chaos_test", "tmc_load_test",
     ],
     "devops": [
         "code_read", "code_write", "code_edit", "code_search",
@@ -763,12 +871,16 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "memory_search", "memory_store", "get_project_context",
         "lrm_build",
         "github_actions", "github_prs",
+        "infra_check", "chaos_test", "tmc_load_test",
+        "get_si_blueprint",
     ],
     "security": [
         "code_read", "code_search", "list_files", "deep_search",
         "memory_search", "memory_store", "get_project_context",
         "git_log", "git_diff",
         "github_code_search", "github_issues",
+        "sast_scan", "dependency_audit", "secrets_scan",
+        "get_si_blueprint",
     ],
     "cdp": [
         "memory_search", "memory_store", "get_project_context",
@@ -1281,6 +1393,13 @@ class AgentExecutor:
         if name in ("build", "test"):
             return await self._tool_build_test(name, args, ctx)
 
+        # ── Security & chaos tools ──
+        if name in ("sast_scan", "dependency_audit", "secrets_scan",
+                     "chaos_test", "tmc_load_test", "infra_check"):
+            return await self._tool_security_chaos(name, args, ctx)
+        if name == "get_si_blueprint":
+            return await self._tool_si_blueprint(args, ctx)
+
         # ── MCP tools: proxy to external servers ──
         if name.startswith("lrm_"):
             return await self._tool_mcp_lrm(name, args, ctx)
@@ -1676,6 +1795,52 @@ class AgentExecutor:
             return f"[{tool_name.upper()}] TIMEOUT after 120s: {command}"
         except Exception as exc:
             return f"[{tool_name.upper()}] ERROR: {exc}"
+
+    async def _tool_security_chaos(self, name: str, args: dict, ctx: ExecutionContext) -> str:
+        """Dispatch security/chaos/TMC/infra tools to their BaseTool implementations."""
+        from ..tools.security_tools import SastScanTool, DependencyAuditTool, SecretsScanTool
+        from ..tools.chaos_tools import ChaosTestTool, TmcLoadTestTool, InfraCheckTool
+
+        _MAP = {
+            "sast_scan": SastScanTool,
+            "dependency_audit": DependencyAuditTool,
+            "secrets_scan": SecretsScanTool,
+            "chaos_test": ChaosTestTool,
+            "tmc_load_test": TmcLoadTestTool,
+            "infra_check": InfraCheckTool,
+        }
+        cls = _MAP.get(name)
+        if not cls:
+            return f"Error: unknown security tool '{name}'"
+        # Inject workspace cwd from context if not provided
+        if "cwd" not in args and ctx.workspace_path:
+            args["cwd"] = ctx.workspace_path
+        try:
+            tool = cls()
+            return await tool.execute(args)
+        except Exception as e:
+            return f"[{name}] ERROR: {e}"
+
+    async def _tool_si_blueprint(self, args: dict, ctx: ExecutionContext) -> str:
+        """Read the SI blueprint for a project."""
+        import yaml
+        project_id = args.get("project_id", "")
+        if not project_id and ctx.project_id:
+            project_id = ctx.project_id
+
+        bp_path = Path(__file__).resolve().parents[2] / "data" / "si_blueprints" / f"{project_id}.yaml"
+        if not bp_path.exists():
+                return (
+                    f"No SI blueprint found for project '{project_id}'. "
+                    f"Create one at {bp_path} with: cloud, compute, cicd, databases, "
+                    f"monitoring, existing_services, conventions."
+                )
+        try:
+            with open(bp_path) as f:
+                bp = yaml.safe_load(f)
+            return f"[SI Blueprint] {project_id}:\n{yaml.dump(bp, default_flow_style=False, allow_unicode=True)}"
+        except Exception as e:
+            return f"[SI Blueprint] Error reading: {e}"
 
     async def _tool_fractal_code(self, args: dict, ctx: ExecutionContext) -> str:
         """Spawn a focused sub-agent LLM to complete an atomic coding task.
