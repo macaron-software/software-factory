@@ -18,13 +18,23 @@ logger = logging.getLogger(__name__)
 async def serve_workspace_file(path: str):
     """Serve files from project workspaces (screenshots, artifacts)."""
     from ..config import FACTORY_ROOT
-    # Check common workspace locations
-    for base in [FACTORY_ROOT / "data" / "workspaces", FACTORY_ROOT.parent]:
+    workspaces = FACTORY_ROOT / "data" / "workspaces"
+    # Direct match: /workspace/{mission_id}/screenshots/file.png
+    for base in [workspaces, FACTORY_ROOT.parent]:
         full_path = base / path
         if full_path.exists() and full_path.is_file():
             import mimetypes
             media = mimetypes.guess_type(str(full_path))[0] or "application/octet-stream"
             return FileResponse(str(full_path), media_type=media)
+    # Fallback: search across all workspace subdirectories
+    if workspaces.exists():
+        for ws_dir in workspaces.iterdir():
+            if ws_dir.is_dir():
+                full_path = ws_dir / path
+                if full_path.exists() and full_path.is_file():
+                    import mimetypes
+                    media = mimetypes.guess_type(str(full_path))[0] or "application/octet-stream"
+                    return FileResponse(str(full_path), media_type=media)
     return JSONResponse({"error": "Not found"}, status_code=404)
 
 
@@ -5021,6 +5031,18 @@ async def mission_control_page(request: Request, mission_id: str):
             if pid:
                 phase_messages.setdefault(pid, []).append(msg_dict)
 
+    # Extract screenshot paths per phase from messages
+    import re as _re_shots
+    phase_screenshots: dict[str, list[str]] = {}
+    for pid, pmsgs in phase_messages.items():
+        shots = []
+        for m in pmsgs:
+            for match in _re_shots.finditer(r'\[SCREENSHOT:([^\]]+)\]', m.get("content", "")):
+                p = match.group(1).strip().lstrip("./")
+                shots.append(p)
+        if shots:
+            phase_screenshots[pid] = shots[:6]  # max 6 thumbnails per phase
+
     # Memory entries — project-specific only, filtered to meaningful content
     memories = []
     _useful_cats = {"product", "architecture", "security", "development", "quality",
@@ -5149,6 +5171,7 @@ async def mission_control_page(request: Request, mission_id: str):
         "phase_graphs": phase_graphs,
         "messages": messages,
         "phase_messages": phase_messages,
+        "phase_screenshots": phase_screenshots,
         "memories": memories,
         "memory_groups": memory_groups,
         "pull_requests": pull_requests,

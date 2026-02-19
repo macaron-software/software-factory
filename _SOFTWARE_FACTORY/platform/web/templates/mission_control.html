@@ -68,6 +68,16 @@
 .mc-phase:not(.open) .mc-phase-summary{display:block}
 .mc-phase.open .mc-phase-summary{display:none}
 
+/* Screenshot thumbnails in phase summary */
+.mc-phase-thumbs{display:flex;gap:0.35rem;margin-top:0.35rem;overflow-x:auto;padding-bottom:0.2rem}
+.mc-phase-thumb{width:80px;height:48px;border-radius:var(--radius-sm);border:1px solid var(--border-subtle);object-fit:cover;cursor:pointer;flex-shrink:0;transition:transform .15s,border-color .15s}
+.mc-phase-thumb:hover{transform:scale(1.15);border-color:var(--purple);z-index:1}
+
+/* Inline screenshot in messages */
+.mc-screenshot{margin:0.5rem 0}
+.mc-screenshot img{max-width:100%;border-radius:var(--radius-lg);border:1px solid var(--border-subtle);cursor:pointer;transition:transform .15s}
+.mc-screenshot img:hover{transform:scale(1.02)}
+
 /* Accordion body: graph row + discussion row */
 .mc-phase-body{display:none;border-top:1px solid var(--border)}
 .mc-phase.open .mc-phase-body{display:flex;flex-direction:column}
@@ -280,7 +290,17 @@
                         <span class="mc-phase-status-badge {{ phase.status.value }}">{{ phase.status.value }}</span>
                         <span class="mc-phase-chevron"><svg class="icon icon-xs mc-phase-chevron-icon"><use href="#icon-chevron-right"/></svg></span>
                     </div>
-                    <div class="mc-phase-summary" id="summary-{{ phase.phase_id }}">{% if phase.summary %}<div class="mc-summary-line"><span class="mc-summary-text">{{ phase.summary[:300] }}</span></div>{% endif %}</div>
+                    <div class="mc-phase-summary" id="summary-{{ phase.phase_id }}">
+                        {% if phase.summary %}<div class="mc-summary-line"><span class="mc-summary-text">{{ phase.summary[:300] }}</span></div>{% endif %}
+                        {% set shots = phase_screenshots.get(phase.phase_id, []) if phase_screenshots is defined else [] %}
+                        {% if shots %}
+                        <div class="mc-phase-thumbs">
+                            {% for s in shots %}
+                            <img class="mc-phase-thumb" src="/workspace/{{ mission.id }}/{{ s }}" alt="Screenshot" loading="lazy" onclick="window.open(this.src)" onerror="this.src='/workspace/{{ s }}'">
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
                     <div class="mc-phase-body">
                         <!-- Full flow graph -->
                         <div class="mc-phase-graph" id="graph-{{ phase.phase_id }}"></div>
@@ -1164,8 +1184,10 @@ function md(s){
   h = h.replace(/@(\w[\w\s]*?)(?=[\s,.:!?<]|$)/g, '<span style="color:var(--purple);font-weight:600">@$1</span>');
   // Render [SCREENSHOT:path] markers as images
   h = h.replace(/\[SCREENSHOT:([^\]]+)\]/g, (m, path) => {
-    const src = `/workspace/${path.replace(/^\.?\//, '')}`;
-    return `<div class="mc-screenshot"><img src="${src}" alt="Screenshot: ${path}" loading="lazy" style="max-width:100%;border-radius:8px;margin:8px 0;border:1px solid var(--border-subtle)"><div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">${path}</div></div>`;
+    const clean = path.replace(/^\.?\//, '');
+    // Try mission-scoped workspace first, then generic
+    const src = `/workspace/${MISSION_ID}/${clean}`;
+    return `<div class="mc-screenshot"><img src="${src}" alt="Screenshot" loading="lazy" onerror="this.src='/workspace/${clean}'" style="max-width:100%;border-radius:var(--radius-lg);margin:0.5rem 0;border:1px solid var(--border-subtle);cursor:pointer" onclick="window.open(this.src)"><div style="font-size:0.65rem;color:var(--text-tertiary);margin-top:2px">${clean}</div></div>`;
   });
   h = h.replace(/\n/g, '<br>');
   return h;
@@ -1212,6 +1234,17 @@ function generatePhaseSummary(phaseId) {
         html += `<div class="mc-summary-line"><span class="mc-summary-agent">${esc(name)}:</span><span class="mc-summary-text">${esc(excerpt)}</span></div>`;
     });
     if (!html) html = `<div class="mc-summary-line"><span class="mc-summary-text" style="font-style:italic">${msgs.length} messages</span></div>`;
+
+    // Collect screenshot images from phase messages
+    const screenshots = container.querySelectorAll('.mc-screenshot img');
+    if (screenshots.length > 0) {
+        html += `<div class="mc-phase-thumbs">`;
+        screenshots.forEach((img, i) => {
+            if (i < 6) html += `<img class="mc-phase-thumb" src="${img.src}" alt="Screenshot" loading="lazy" onclick="window.open(this.src)">`;
+        });
+        html += `</div>`;
+    }
+
     summaryEl.innerHTML = html;
 }
 

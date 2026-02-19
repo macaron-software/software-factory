@@ -106,9 +106,29 @@ def create_app() -> FastAPI:
         t = _re.sub(r'\[TOOL_CALL\][\s\S]*$', '', t)
         t = _re.sub(r'\[(DELEGATE|VETO|APPROVE|ASK|ESCALATE)[^\]]*\]', '', t)
         return t.strip()
-    templates.env.filters["markdown"] = lambda text: _md_lib.markdown(
-        _clean_llm(text), extensions=["fenced_code", "tables", "nl2br"]
-    )
+
+    def _render_screenshots(html: str) -> str:
+        """Convert [SCREENSHOT:path] markers to inline <img> tags."""
+        def _shot_repl(m):
+            p = m.group(1).strip().lstrip("./")
+            src = f"/workspace/{p}"
+            return (
+                f'<div class="mc-screenshot">'
+                f'<img src="{src}" alt="Screenshot" loading="lazy" '
+                f'style="max-width:100%;border-radius:var(--radius-lg);margin:0.5rem 0;border:1px solid var(--border-subtle);cursor:pointer" '
+                f'onclick="window.open(this.src)">'
+                f'<div style="font-size:0.65rem;color:var(--text-tertiary);margin-top:2px">{p}</div>'
+                f'</div>'
+            )
+        return _re.sub(r'\[SCREENSHOT:([^\]]+)\]', _shot_repl, html)
+
+    def _markdown_filter(text):
+        html = _md_lib.markdown(
+            _clean_llm(text), extensions=["fenced_code", "tables", "nl2br"]
+        )
+        return _render_screenshots(html)
+
+    templates.env.filters["markdown"] = _markdown_filter
     app.state.templates = templates
 
     # Routes

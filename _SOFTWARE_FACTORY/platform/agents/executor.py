@@ -383,14 +383,29 @@ def _get_tool_schemas() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "screenshot",
-                "description": "Take a browser screenshot of a URL using Playwright headless. Saves PNG to screenshots/ dir. Returns file path with [SCREENSHOT:path] marker.",
+                "description": "Take a browser screenshot of a URL using Playwright headless. Saves PNG to screenshots/ dir. Returns inline image with [SCREENSHOT:path] marker.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "url": {"type": "string", "description": "URL to screenshot (e.g. http://localhost:3000)"},
-                        "filename": {"type": "string", "description": "Output filename (default: screenshot.png)"},
+                        "filename": {"type": "string", "description": "Output filename (default: auto-generated timestamp)"},
                     },
                     "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "simulator_screenshot",
+                "description": "Take a screenshot of the running iOS/macOS Simulator (xcrun simctl). The simulator must be booted. Returns inline image with [SCREENSHOT:path] marker.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "device": {"type": "string", "description": "Device name or UUID (default: 'booted' = currently running)"},
+                        "app_bundle": {"type": "string", "description": "Optional: app bundle ID to launch before capturing (e.g. com.example.MyApp)"},
+                        "filename": {"type": "string", "description": "Output filename (default: auto-generated)"},
+                    },
                 },
             },
         },
