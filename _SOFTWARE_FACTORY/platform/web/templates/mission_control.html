@@ -1082,35 +1082,41 @@ function generatePhaseSummary(phaseId) {
     const summaryEl = document.getElementById(`summary-${phaseId}`);
     if (!container || !summaryEl) return;
 
-    // Collect all discussion messages for this phase
     const msgs = container.querySelectorAll('.mu--chat');
     if (msgs.length === 0) return;
 
-    const lines = [];
+    // Collect all substantive content per agent
+    const byAgent = new Map();
     msgs.forEach(msg => {
         const nameEl = msg.querySelector('.mu__name');
         const contentEl = msg.querySelector('.mu__content');
         if (!nameEl || !contentEl) return;
         const name = nameEl.textContent.trim();
-        // Get plain text, strip HTML
         const text = contentEl.textContent.trim();
         if (!text) return;
-        // Extract first substantive sentence (skip very short fragments)
-        const sentences = text.split(/[.\n]/).map(s => s.trim()).filter(s => s.length > 20);
-        const excerpt = sentences[0] || text.substring(0, 120);
-        lines.push({ name, excerpt: excerpt.substring(0, 150) });
+        if (!byAgent.has(name)) byAgent.set(name, []);
+        byAgent.get(name).push(text);
     });
 
-    if (lines.length === 0) return;
+    if (byAgent.size === 0) return;
 
-    // Deduplicate by agent name (keep last contribution)
-    const byAgent = new Map();
-    lines.forEach(l => byAgent.set(l.name, l.excerpt));
+    // Noise patterns to skip
+    const noise = /^(merci|bonjour|ok|d'accord|bien reçu|réaction de|réponse de|lancement phase|workspace:|connected|agent_status)/i;
 
     let html = '';
-    byAgent.forEach((excerpt, name) => {
+    byAgent.forEach((texts, name) => {
+        // Merge all messages, extract key sentences
+        const all = texts.join(' ');
+        const sentences = all.split(/[.!?\n]/)
+            .map(s => s.trim())
+            .filter(s => s.length > 25 && !noise.test(s));
+        if (sentences.length === 0) return;
+        // Pick most substantive (longest) sentence as summary
+        const best = sentences.reduce((a, b) => b.length > a.length ? b : a, sentences[0]);
+        const excerpt = best.length > 200 ? best.substring(0, 197) + '...' : best;
         html += `<div class="mc-summary-line"><span class="mc-summary-agent">${esc(name)}:</span><span class="mc-summary-text">${esc(excerpt)}</span></div>`;
     });
+    if (!html) html = `<div class="mc-summary-line"><span class="mc-summary-text" style="font-style:italic">${msgs.length} messages</span></div>`;
     summaryEl.innerHTML = html;
 }
 
