@@ -4917,6 +4917,7 @@ Answer in the same language as the user. Be precise and data-driven."""
 
             executor = get_executor()
             accumulated = ""
+            llm_error = ""
 
             async for evt, data_s in executor.run_streaming(ctx, content):
                 if evt == "delta":
@@ -4924,6 +4925,11 @@ Answer in the same language as the user. Be precise and data-driven."""
                     yield sse("chunk", {"text": data_s})
                 elif evt == "tool":
                     yield sse("tool", {"name": data_s, "label": f"{data_s}..."})
+                elif evt == "result":
+                    if hasattr(data_s, "error") and data_s.error:
+                        llm_error = data_s.error
+                    elif hasattr(data_s, "content") and data_s.content and not accumulated:
+                        accumulated = data_s.content
 
             # Drain progress queue
             while not progress_queue.empty():
@@ -4933,13 +4939,19 @@ Answer in the same language as the user. Be precise and data-driven."""
                 except Exception:
                     break
 
-            # Store agent response
-            sess_store.add_message(MessageDef(
-                session_id=session_id, from_agent="chef_de_programme",
-                to_agent="user", message_type="text", content=accumulated,
-            ))
+            # If LLM failed and no real content, send error
+            if llm_error and not accumulated:
+                yield sse("error", {"message": f"LLM indisponible: {llm_error[:150]}"})
+                return
 
-            rendered = md_lib.markdown(accumulated, extensions=["fenced_code", "tables", "nl2br"])
+            # Store agent response
+            if accumulated:
+                sess_store.add_message(MessageDef(
+                    session_id=session_id, from_agent="chef_de_programme",
+                    to_agent="user", message_type="text", content=accumulated,
+                ))
+
+            rendered = md_lib.markdown(accumulated, extensions=["fenced_code", "tables", "nl2br"]) if accumulated else ""
             yield sse("done", {"html": rendered})
 
         except Exception as exc:
@@ -5333,6 +5345,7 @@ async def mission_control_page(request: Request, mission_id: str):
     result_screenshots = []
     result_build_cmd = ""
     result_run_cmd = ""
+    result_launch_cmd = ""
     result_deploy_url = ""
     result_project_type = ""
     ws_path = mission.workspace_path or ""
@@ -5359,8 +5372,8 @@ async def mission_control_page(request: Request, mission_id: str):
                 if (ws / "Package.swift").exists():
                     result_build_cmd = "swift build"
                     result_run_cmd = "swift run"
+                    result_launch_cmd = "open -a Simulator && swift run"
                 elif (ws / "project.yml").exists():
-                    # Extract scheme name from project.yml
                     scheme = "App"
                     try:
                         import yaml as _y
@@ -5370,9 +5383,11 @@ async def mission_control_page(request: Request, mission_id: str):
                         pass
                     result_build_cmd = f"xcodegen generate && xcodebuild -scheme {scheme} -configuration Debug build"
                     result_run_cmd = f"open build/Debug/{scheme}.app"
+                    result_launch_cmd = f"open -a Simulator && open build/Debug/{scheme}.app"
                 else:
                     result_build_cmd = "swift build"
                     result_run_cmd = "swift run"
+                    result_launch_cmd = "open -a Simulator && swift run"
             elif is_docker:
                 result_project_type = "docker"
                 if (ws / "docker-compose.yml").exists():
@@ -5486,6 +5501,7 @@ async def mission_control_page(request: Request, mission_id: str):
         "result_screenshots": result_screenshots,
         "result_build_cmd": result_build_cmd,
         "result_run_cmd": result_run_cmd,
+        "result_launch_cmd": result_launch_cmd,
         "result_deploy_url": result_deploy_url,
         "workspace_files": workspace_files,
         "po_backlog": po_backlog,
@@ -5821,7 +5837,7 @@ async def api_mission_run(request: Request, mission_id: str):
             )
 
             # Build the task prompt for this phase
-            phase_task = _build_phase_prompt(wf_phase.name, pattern_type, mission.brief, i, len(mission.phases), prev_context)
+            phase_task = _build_phase_prompt(wf_phase.name, pattern_type, mission.brief, i, len(mission.phases), prev_context, workspace_path=workspace)
 
             # Sprint loop — dev-sprint runs multiple iterations (sprints)
             phase_key_check = wf_phase.name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
@@ -5848,7 +5864,7 @@ async def api_mission_run(request: Request, mission_id: str):
                     })
                     await asyncio.sleep(0.5)
                     # Update prompt with sprint context
-                    phase_task = _build_phase_prompt(wf_phase.name, pattern_type, mission.brief, i, len(mission.phases), prev_context)
+                    phase_task = _build_phase_prompt(wf_phase.name, pattern_type, mission.brief, i, len(mission.phases), prev_context, workspace_path=workspace)
                     phase_task += (
                         f"\n\n--- {sprint_label} ---\n"
                         f"C'est le sprint {sprint_num} sur {max_sprints} prévus.\n"
@@ -6416,8 +6432,97 @@ const {{ chromium }} = require('playwright');
             logger.error("Post-phase deploy summary failed: %s", e)
 
 
-def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, total: int, prev_context: str = "") -> str:
+def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, total: int, prev_context: str = "", workspace_path: str = "") -> str:
     """Build a contextual task prompt for each lifecycle phase."""
+    # Detect project type from workspace
+    _ws = Path(workspace_path) if workspace_path else None
+    is_swift = _ws and (_ws / "Sources").exists() or (_ws and (_ws / "Package.swift").exists())
+    is_web = _ws and ((_ws / "package.json").exists() or (_ws / "docker-compose.yml").exists())
+
+    # QA prompts adapt to project type
+    if is_swift:
+        qa_campaign_prompt = (
+            f"Campagne de tests QA pour l'app macOS native «{brief}».\n"
+            "UTILISEZ VOS OUTILS — c'est une app Swift/SwiftUI, PAS une app web :\n"
+            "1. Lisez le code existant avec list_files et code_read\n"
+            "2. Créez le plan de test (tests/PLAN.md) avec code_write\n"
+            "3. Lancez le build : build command='swift build'\n"
+            "4. Lancez les tests unitaires : build command='swift test'\n"
+            "5. Bootez le simulateur : build command='xcrun simctl boot \"iPhone 16\"'\n"
+            "6. Installez l'app sur simulateur : build command='xcrun simctl install booted .build/debug/APPNAME'\n"
+            "7. PRENEZ DES SCREENSHOTS de chaque parcours utilisateur :\n"
+            "   - simulator_screenshot filename='01_launch.png' (écran d'accueil)\n"
+            "   - simulator_screenshot filename='02_calendar_view.png' (vue calendrier)\n"
+            "   - simulator_screenshot filename='03_event_detail.png' (détail événement)\n"
+            "   - simulator_screenshot filename='04_settings.png' (paramètres)\n"
+            "8. Si des tests échouent, documentez dans tests/BUGS.md\n"
+            "9. Commitez avec git_commit\n"
+            "IMPORTANT: Chaque parcours utilisateur DOIT avoir un screenshot réel du simulateur."
+        )
+        qa_execution_prompt = (
+            f"Exécution des tests pour l'app macOS native «{brief}».\n"
+            "UTILISEZ VOS OUTILS — app Swift/SwiftUI, PAS web :\n"
+            "1. Lisez les tests existants avec list_files et code_read\n"
+            "2. Lancez swift test pour les tests unitaires\n"
+            "3. Bootez le simulateur macOS si pas déjà fait\n"
+            "4. PRENEZ UN SCREENSHOT par parcours utilisateur :\n"
+            "   - simulator_screenshot filename='parcours_accueil.png'\n"
+            "   - simulator_screenshot filename='parcours_navigation.png'\n"
+            "   - simulator_screenshot filename='parcours_fonctionnel.png'\n"
+            "5. Créez tests/REPORT.md avec résultats + références screenshots\n"
+            "IMPORTANT: Exécutez les commandes réelles. Pas de Playwright (c'est du natif)."
+        )
+        deploy_prompt = (
+            f"Livraison de l'app macOS native «{brief}».\n"
+            "C'est une app macOS native, PAS une app web :\n"
+            "1. Vérifiez l'état du workspace : list_files, git_status\n"
+            "2. Build release : build command='swift build -c release'\n"
+            "3. Créez le .app bundle si nécessaire\n"
+            "4. Prenez un screenshot final : simulator_screenshot filename='release_final.png'\n"
+            "5. Documentez l'installation dans README.md\n"
+            "PAS de Docker, PAS de deploy_azure pour du macOS natif."
+        )
+    else:
+        qa_campaign_prompt = (
+            f"Campagne de tests QA pour «{brief}».\n"
+            "UTILISEZ VOS OUTILS pour écrire et exécuter les tests :\n"
+            "1. Lisez le code existant avec list_files et code_read pour comprendre l'app\n"
+            "2. Créez le plan de test (tests/PLAN.md) avec code_write\n"
+            "3. Ecrivez les tests Playwright E2E :\n"
+            "   - tests/e2e/smoke.spec.ts : pages chargent, HTTP 200, 0 erreurs console\n"
+            "   - tests/e2e/journey.spec.ts : parcours utilisateur complets\n"
+            "4. Lancez les tests avec playwright_test\n"
+            "5. PRENEZ DES SCREENSHOTS de chaque page clé :\n"
+            "   - screenshot url=http://localhost:3000 filename='01_home.png'\n"
+            "   - screenshot url=http://localhost:3000/dashboard filename='02_dashboard.png'\n"
+            "   UN SCREENSHOT PAR PAGE/PARCOURS\n"
+            "6. Si des tests échouent, documentez les bugs dans tests/BUGS.md\n"
+            "7. Commitez avec git_commit\n"
+            "IMPORTANT: Exécutez les tests réellement et prenez des screenshots réels."
+        )
+        qa_execution_prompt = (
+            f"Exécution des tests pour «{brief}».\n"
+            "UTILISEZ VOS OUTILS pour exécuter et valider :\n"
+            "1. Lisez les tests existants avec list_files et code_read\n"
+            "2. Lancez les tests E2E : playwright_test spec=tests/e2e/smoke.spec.ts\n"
+            "3. Lancez les tests API avec build_tool\n"
+            "4. PRENEZ DES SCREENSHOTS de chaque page/parcours :\n"
+            "   - screenshot url=http://localhost:3000 filename='parcours_accueil.png'\n"
+            "   - screenshot url=http://localhost:3000/login filename='parcours_login.png'\n"
+            "5. Si des tests échouent, créez tests/REPORT.md avec les résultats\n"
+            "IMPORTANT: Exécutez les commandes réelles, ne simulez pas."
+        )
+        deploy_prompt = (
+            f"Déploiement production pour «{brief}».\n"
+            "UTILISEZ VOS OUTILS pour déployer depuis le workspace :\n"
+            "1. Vérifiez l'état du workspace : list_files, git_status\n"
+            "2. docker_build pour construire l'image\n"
+            "3. deploy_azure pour déployer\n"
+            "4. screenshot url=URL_DEPLOYEE filename='deploy_final.png' pour capturer l'app déployée\n"
+            "5. Validation finale\n"
+            "IMPORTANT: Exécutez les commandes réelles, ne simulez pas."
+        )
+
     prompts = {
         "ideation": (
             f"Nous démarrons l'idéation pour le projet : «{brief}».\n"
@@ -6481,41 +6586,9 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
             "5. Commitez avec git_commit\n"
             "IMPORTANT: Lisez le workspace avec list_files d'abord pour voir ce qui existe."
         ),
-        "qa-campaign": (
-            f"Campagne de tests QA pour «{brief}».\n"
-            "UTILISEZ VOS OUTILS pour écrire et exécuter les tests :\n"
-            "1. Lisez le code existant avec list_files et code_read pour comprendre l'app\n"
-            "2. Créez le plan de test (tests/PLAN.md) avec code_write\n"
-            "3. Ecrivez les tests Playwright E2E :\n"
-            "   - tests/e2e/smoke.spec.ts : pages chargent, HTTP 200, 0 erreurs console\n"
-            "   - tests/e2e/journey.spec.ts : parcours utilisateur complets\n"
-            "4. Lancez les tests avec playwright_test\n"
-            "5. Prenez des screenshots des pages clés avec screenshot\n"
-            "6. Si des tests échouent, documentez les bugs dans tests/BUGS.md\n"
-            "7. Commitez avec git_commit\n"
-            "IMPORTANT: Exécutez les tests réellement, ne simulez pas les résultats."
-        ),
-        "qa-execution": (
-            f"Exécution des tests pour «{brief}».\n"
-            "UTILISEZ VOS OUTILS pour exécuter et valider :\n"
-            "1. Lisez les tests existants avec list_files et code_read\n"
-            "2. Lancez les tests E2E : playwright_test spec=tests/e2e/smoke.spec.ts\n"
-            "3. Lancez les tests API avec build_tool\n"
-            "4. Prenez des screenshots des pages clés : screenshot url=http://localhost:3000\n"
-            "5. Si des tests échouent, créez tests/REPORT.md avec les résultats\n"
-            "6. Expert Sécurité : auditez le code avec code_read, vérifiez OWASP\n"
-            "IMPORTANT: Exécutez les commandes réelles, ne simulez pas."
-        ),
-        "deploy-prod": (
-            f"Déploiement production pour «{brief}».\n"
-            "UTILISEZ VOS OUTILS pour déployer depuis le workspace :\n"
-            "1. Vérifiez l'état du workspace : list_files, git_status\n"
-            "2. docker_build pour construire l'image\n"
-            "3. deploy_azure pour déployer\n"
-            "4. screenshot pour capturer l'app déployée\n"
-            "5. Validation finale\n"
-            "IMPORTANT: Exécutez les commandes réelles, ne simulez pas."
-        ),
+        "qa-campaign": qa_campaign_prompt,
+        "qa-execution": qa_execution_prompt,
+        "deploy-prod": deploy_prompt,
         "tma-routing": (
             f"Routage incidents TMA pour «{brief}».\n"
             "- Support N1 : classification, triage incident\n"
