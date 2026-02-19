@@ -255,6 +255,21 @@ async def toolbox_page(request: Request, tab: str = "skills"):
         "active_tab": tab, "tab_content": "",
     })
 
+@router.get("/design-system", response_class=HTMLResponse)
+async def design_system_page(request: Request):
+    """Design System — tokens, colors, icons, atoms, molecules, patterns."""
+    import re
+    # Extract icon names from SVG sprites
+    sprites_path = Path(__file__).resolve().parent / "templates" / "partials" / "svg_sprites.html"
+    icons = []
+    if sprites_path.exists():
+        text = sprites_path.read_text()
+        icons = re.findall(r'id="icon-([^"]+)"', text)
+    return _templates(request).TemplateResponse("design_system.html", {
+        "request": request, "page_title": "Design System",
+        "icons": icons,
+    })
+
 @router.post("/api/strategic-committee/launch")
 async def launch_strategic_committee(request: Request):
     """Launch a strategic committee session from the portfolio page."""
@@ -6030,14 +6045,19 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
         ),
         "dev-sprint": (
             f"Sprint de développement pour «{brief}».\n"
-            "VOUS DEVEZ UTILISER VOS OUTILS pour écrire du VRAI code dans le workspace du projet.\n"
-            "- Lead Dev : créez la structure projet (index.html, style.css, app.js, package.json, Dockerfile)\n"
-            "  Utilisez l'outil code_write pour créer chaque fichier.\n"
-            "- Développeur Backend : écrivez le code serveur/API avec code_write\n"
-            "- Développeur Frontend : écrivez le HTML/CSS/JS avec code_write\n"
-            "- QA : écrivez les tests unitaires avec code_write\n"
-            "Après avoir écrit le code, utilisez git_commit pour committer.\n"
-            "IMPORTANT: Ne discutez pas du code. ECRIVEZ-LE avec code_write."
+            "VOUS DEVEZ UTILISER VOS OUTILS pour écrire du VRAI code dans le workspace.\n\n"
+            "WORKFLOW OBLIGATOIRE:\n"
+            "1. LIRE LE WORKSPACE: list_files pour voir la structure actuelle\n"
+            "2. LIRE L'ARCHITECTURE: code_read sur les fichiers existants (README, Package.swift, etc.)\n"
+            "3. DECOMPOSER: Lead Dev donne des tâches fichier-par-fichier aux devs\n"
+            "4. CODER: Chaque dev utilise code_write pour créer les fichiers de son périmètre\n"
+            "5. TESTER: Utiliser test ou build pour vérifier que le code compile\n"
+            "6. COMMITTER: git_commit avec un message descriptif\n\n"
+            "IMPORTANT:\n"
+            "- Utilisez la stack technique décidée en phase Architecture (voir contexte ci-dessous)\n"
+            "- Ne réinventez PAS l'architecture — lisez le workspace et continuez le travail\n"
+            "- Chaque dev DOIT appeler code_write au moins 3 fois (fichiers réels, pas du pseudo-code)\n"
+            "- NE DISCUTEZ PAS du code. ECRIVEZ-LE avec code_write."
         ),
         "cicd": (
             f"Pipeline CI/CD pour «{brief}».\n"
