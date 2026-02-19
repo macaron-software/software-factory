@@ -1774,7 +1774,7 @@ function togglePhase(header) {
 /* ── SSE ── */
 if (SESSION_ID) {
     const es = new EventSource(`/sse/session/${SESSION_ID}`);
-    es.onmessage = e => { try { handleSSE(JSON.parse(e.data)); } catch(err){} };
+    es.onmessage = e => { try { handleSSE(JSON.parse(e.data)); } catch(err){ console.error('SSE handler error:', err, e.data?.substring(0,100)); } };
 }
 
 function handleSSE(d) {
@@ -1874,17 +1874,26 @@ function handleSSE(d) {
                     // Update thinking badge to "parle…"
                     const badge = container.querySelector(`.mc-stream-bubble[data-agent="${d.agent_id}"] .mc-thinking-badge`);
                     if (badge && badge.textContent === 'réfléchit…') badge.textContent = 'parle…';
+                } else {
+                    console.warn('stream_delta: no bubble found for', d.agent_id, 'in discuss-'+phaseId,
+                        'bubbles:', container.querySelectorAll('.mc-stream-bubble').length,
+                        'agents:', Array.from(container.querySelectorAll('.mc-stream-bubble')).map(b=>b.dataset.agent));
                 }
             }
         }
     }
     else if (d.type === 'stream_end') {
-        // Streaming finished — remove bubble, final message will arrive via 'message' event
+        // Streaming finished — finalize bubble (keep visible until message event replaces it)
         const phaseId = d.phase_id || currentRunningPhase();
         if (phaseId) {
             const container = document.getElementById(`discuss-${phaseId}`);
             if (container) {
-                container.querySelector(`.mc-stream-bubble[data-agent="${d.agent_id}"]`)?.remove();
+                const bubble = container.querySelector(`.mc-stream-bubble[data-agent="${d.agent_id}"]`);
+                if (bubble) {
+                    bubble.querySelector('.mc-typing-cursor')?.remove();
+                    bubble.querySelector('.mc-thinking-badge')?.remove();
+                    bubble.classList.remove('mc-streaming');
+                }
             }
         }
     }

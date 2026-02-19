@@ -1311,12 +1311,21 @@ class AgentExecutor:
                 # No tool calls → stream remaining content in chunks
                 if not llm_resp.tool_calls:
                     final_content = llm_resp.content or ""
+                    # Strip <think> blocks before chunking (tags would split across chunks)
+                    import re as _re_exec
+                    final_content = _re_exec.sub(r"<think>[\s\S]*?</think>\s*", "", final_content).strip()
+                    # Also strip unclosed <think> at the end
+                    if "<think>" in final_content and "</think>" not in final_content:
+                        final_content = final_content[:final_content.index("<think>")].strip()
+                    # Strip tool call artifacts
+                    final_content = _re_exec.sub(r"<minimax:tool_call>[\s\S]*?</minimax:tool_call>\s*", "", final_content).strip()
+                    final_content = _re_exec.sub(r"<tool_call>[\s\S]*?</tool_call>\s*", "", final_content).strip()
                     if final_content:
-                        # Emit in small chunks for streaming UX
-                        chunk_size = 12
+                        # Emit in word-sized chunks for natural streaming UX
+                        chunk_size = 8
                         for ci in range(0, len(final_content), chunk_size):
                             yield ("delta", final_content[ci:ci + chunk_size])
-                            await asyncio.sleep(0.01)
+                            await asyncio.sleep(0.03)
                     break
 
                 # Process tool calls (same as run())

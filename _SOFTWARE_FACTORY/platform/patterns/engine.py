@@ -372,6 +372,7 @@ async def _execute_node(
     try:
         async for kind, value in executor.run_streaming(ctx, full_task):
             if kind == "delta":
+                delta_count += 1
                 delta = value
                 # Filter <think> blocks
                 if "<think>" in delta:
