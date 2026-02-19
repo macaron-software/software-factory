@@ -369,6 +369,7 @@ async def _execute_node(
     in_think = False
     in_tool_call = False
     think_chunks = 0
+    delta_count = 0
     try:
         async for kind, value in executor.run_streaming(ctx, full_task):
             if kind == "delta":
@@ -388,13 +389,14 @@ async def _execute_node(
                     continue
                 if in_think:
                     think_chunks += 1
-                    # Send heartbeat every 20 think chunks so frontend knows agent is alive
                     if think_chunks % 20 == 0:
                         await _sse(run, {
                             "type": "stream_thinking",
                             "agent_id": agent.id,
                         })
                 elif not in_tool_call:
+                    if delta_count <= 3:
+                        logger.warning("STREAM_DELTA agent=%s count=%d len=%d", agent.id, delta_count, len(delta))
                     await _sse(run, {
                         "type": "stream_delta",
                         "agent_id": agent.id,
@@ -402,6 +404,7 @@ async def _execute_node(
                     })
             elif kind == "result":
                 result = value
+        logger.warning("STREAM_DONE agent=%s deltas=%d think=%d", agent.id, delta_count, think_chunks)
     except Exception as exc:
         logger.error("Streaming failed for %s, falling back: %s", agent.id, exc)
         result = await executor.run(ctx, full_task)
