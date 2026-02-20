@@ -61,10 +61,12 @@
             {% if st == 'running' %}<svg class="icon icon-xs"><use href="#icon-activity"/></svg>{% elif st == 'completed' %}<svg class="icon icon-xs"><use href="#icon-check"/></svg>{% elif st == 'failed' %}<svg class="icon icon-xs"><use href="#icon-x"/></svg>{% else %}<svg class="icon icon-xs"><use href="#icon-pause"/></svg>{% endif %}
         </div>
         <div class="mission-body">
+            {% set epic_name = run.brief.split(' - ')[0] if ' - ' in run.brief else run.brief[:50] %}
             <div class="mission-title">
-                {{ run.workflow_name or run.workflow_id }}
+                {{ epic_name }}
+                <span style="font-size:0.68rem;font-weight:400;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.1rem 0.4rem;border-radius:4px">{{ run.workflow_name or run.workflow_id }}</span>
             </div>
-            <div class="mission-brief">{{ run.brief[:140] }}</div>
+            <div class="mission-brief">{{ run.brief[epic_name|length + 3:epic_name|length + 143] if ' - ' in run.brief else run.brief[:140] }}</div>
             <div class="mission-progress-row">
                 <div class="mission-progress-bar">
                     <div class="mission-progress-fill {{ st }}" style="width:{{ pct }}%"></div>
