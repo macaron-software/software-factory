@@ -4,16 +4,18 @@
     {% set total = run.phases|length %}
     {% set pct = ((done_count / total) * 100)|round|int if total > 0 else 0 %}
     {% set st = run.status.value %}
+    {% set is_stuck = (st == 'running' and run.id not in (active_ids | default([]))) %}
     <div class="mission-card-wrap">
-    <a href="/missions/{{ run.id }}/control" class="mission-card">
-        <div class="mission-status-icon {{ st }}">
-            {% if st == 'running' %}<svg class="icon icon-xs"><use href="#icon-activity"/></svg>{% elif st == 'completed' %}<svg class="icon icon-xs"><use href="#icon-check"/></svg>{% elif st == 'failed' %}<svg class="icon icon-xs"><use href="#icon-x"/></svg>{% else %}<svg class="icon icon-xs"><use href="#icon-pause"/></svg>{% endif %}
+    <a href="/missions/{{ run.id }}/control" class="mission-card{% if is_stuck %} stuck{% endif %}">
+        <div class="mission-status-icon {{ 'stuck' if is_stuck else st }}">
+            {% if is_stuck %}<svg class="icon icon-xs"><use href="#icon-alert-triangle"/></svg>{% elif st == 'running' %}<svg class="icon icon-xs"><use href="#icon-activity"/></svg>{% elif st == 'completed' %}<svg class="icon icon-xs"><use href="#icon-check"/></svg>{% elif st == 'failed' %}<svg class="icon icon-xs"><use href="#icon-x"/></svg>{% else %}<svg class="icon icon-xs"><use href="#icon-pause"/></svg>{% endif %}
         </div>
         <div class="mission-body">
             {% set epic_name = run.brief.split(' - ')[0] if ' - ' in run.brief else run.brief[:50] %}
             <div class="mission-title">
                 {{ epic_name }}
                 <span style="font-size:0.68rem;font-weight:400;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.1rem 0.4rem;border-radius:4px">{{ run.workflow_name or run.workflow_id }}</span>
+                {% if is_stuck %}<span style="font-size:0.65rem;font-weight:600;color:#f59e0b;background:rgba(245,158,11,0.15);padding:0.1rem 0.4rem;border-radius:4px;margin-left:0.3rem">interrompu</span>{% endif %}
             </div>
             <div class="mission-brief">{{ run.brief[epic_name|length + 3:epic_name|length + 143] if ' - ' in run.brief else run.brief[:140] }}</div>
             <div class="mission-progress-row">
@@ -24,12 +26,16 @@
             </div>
         </div>
         <div class="mission-meta">
-            <span class="mission-badge {{ st }}">{{ st }}</span>
+            <span class="mission-badge {{ 'stuck' if is_stuck else st }}">{{ 'interrompu' if is_stuck else st }}</span>
             <span class="mission-date">{{ run.created_at[:16].replace('T',' ') if run.created_at is string else run.created_at.strftime('%d/%m %H:%M') }}</span>
         </div>
     </a>
     <div class="mission-actions">
-        {% if st == 'running' and done_count < total %}
+        {% if is_stuck %}
+        <button class="btn btn-sm" onclick="event.stopPropagation();runPhase('{{ run.id }}')" title="Reprendre l'exécution" style="background:#f59e0b;border-color:#f59e0b">
+            <svg class="icon icon-xs"><use href="#icon-refresh-cw"/></svg> Reprendre
+        </button>
+        {% elif st == 'running' and done_count < total %}
         <button class="btn btn-sm" onclick="event.stopPropagation();runPhase('{{ run.id }}')" title="Lancer la prochaine phase">
             <svg class="icon icon-xs"><use href="#icon-play"/></svg> Lancer phase {{ done_count + 1 }}
         </button>

@@ -12,6 +12,9 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Stre
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+# Track which mission_ids have an active asyncio task running
+_active_mission_tasks: dict[str, asyncio.Task] = {}
+
 
 # ── Workspace file serving (screenshots, artifacts) ──
 @router.get("/workspace/{path:path}")
@@ -243,9 +246,11 @@ async def pi_board_page(request: Request):
     runs = get_mission_run_store().list_runs(limit=50)
     projects = get_project_store().list_all()
     workflows = get_workflow_store().list_all()
+    active_ids = {mid for mid, t in _active_mission_tasks.items() if not t.done()}
     return _templates(request).TemplateResponse("pi_board.html", {
         "request": request, "page_title": "PI Board",
         "runs": runs, "projects": projects, "workflows": workflows,
+        "active_ids": active_ids,
     })
 
 @router.get("/ceremonies", response_class=HTMLResponse)
@@ -4976,8 +4981,10 @@ async def missions_list_partial(request: Request):
     """HTMX partial: refreshes mission list every 15s."""
     from ..missions.store import get_mission_run_store
     runs = get_mission_run_store().list_runs(limit=50)
+    # Detect stuck missions: status=running but no active asyncio task
+    active_ids = {mid for mid, t in _active_mission_tasks.items() if not t.done()}
     return _templates(request).TemplateResponse("partials/mission_list.html", {
-        "request": request, "runs": runs,
+        "request": request, "runs": runs, "active_ids": active_ids,
     })
 
 
@@ -6323,6 +6330,11 @@ async def api_mission_run(request: Request, mission_id: str):
     if not mission:
         return JSONResponse({"error": "Not found"}, status_code=404)
 
+    # Prevent double-launch: check if an asyncio task is already running
+    existing_task = _active_mission_tasks.get(mission_id)
+    if existing_task and not existing_task.done():
+        return JSONResponse({"status": "running", "mission_id": mission_id, "info": "already running"})
+
     wf = get_workflow_store().get(mission.workflow_id)
     if not wf:
         return JSONResponse({"error": "Workflow not found"}, status_code=404)
@@ -6996,7 +7008,12 @@ async def api_mission_run(request: Request, mission_id: str):
 
     mission.status = MissionStatus.RUNNING
     run_store.update(mission)
-    asyncio.create_task(_safe_run())
+
+    # Track the task so we can detect stuck missions after restart
+    task = asyncio.create_task(_safe_run())
+    _active_mission_tasks[mission_id] = task
+    task.add_done_callback(lambda t: _active_mission_tasks.pop(mission_id, None))
+
     return JSONResponse({"status": "running", "mission_id": mission_id})
 
 
