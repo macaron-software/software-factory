@@ -696,6 +696,9 @@ async def missions_page(request: Request):
             "progress_pct": round(done_t / total_t * 100) if total_t > 0 else 0,
         })
 
+    from ..workflows.store import get_workflow_store
+    all_workflows = get_workflow_store().list_all()
+
     return _templates(request).TemplateResponse("missions.html", {
         "request": request, "page_title": "PI Board",
         "missions": mission_cards,
@@ -703,6 +706,7 @@ async def missions_page(request: Request):
         "filter_status": filter_status,
         "filter_project": filter_project,
         "show_new_form": show_new,
+        "workflows": all_workflows,
     })
 
 

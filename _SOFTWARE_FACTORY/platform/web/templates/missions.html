@@ -96,7 +96,7 @@
 
 {% if show_new_form %}
 <div class="new-mission-overlay" onclick="if(event.target===this)location.href='/missions'">
-    <form class="new-mission-form" method="POST" action="/api/missions">
+    <form class="new-mission-form" id="newMissionForm">
         <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> New Epic</h3>
         <div class="nmf-field">
             <label>Projet</label>
@@ -107,22 +107,38 @@
             </select>
         </div>
         <div class="nmf-field">
-            <label>Nom</label>
-            <input name="name" placeholder="Auth mobile + biométrie" required>
+            <label>Ceremony Template (workflow)</label>
+            <select name="workflow_id" required>
+                {% for wf in workflows %}
+                <option value="{{ wf.id }}">{{ wf.name }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="nmf-field">
-            <label>Objectif (acceptance criteria)</label>
-            <textarea name="goal" placeholder="Tests E2E passent, deploy staging OK, 0 regression"></textarea>
-        </div>
-        <div class="nmf-field">
-            <label>Score WSJF</label>
-            <input name="wsjf_score" type="number" step="0.1" value="10" min="0">
+            <label>Brief (objectif, contexte, critères d'acceptance)</label>
+            <textarea name="brief" placeholder="Décrivez le besoin métier, le contexte projet, et les objectifs à atteindre..." required style="min-height:80px"></textarea>
         </div>
         <div class="nmf-actions">
             <a href="/missions" class="btn btn-ghost">Annuler</a>
-            <button type="submit" class="btn btn-primary">Créer</button>
+            <button type="submit" class="btn btn-primary">
+                <svg class="icon icon-sm"><use href="#icon-play"/></svg> Lancer
+            </button>
         </div>
     </form>
 </div>
+<script>
+document.getElementById('newMissionForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = e.target.querySelector('[type=submit]');
+    btn.disabled = true; btn.textContent = 'Lancement...';
+    try {
+        const r = await fetch('/api/missions/start', {method:'POST', body: fd});
+        const j = await r.json();
+        if (j.redirect) location.href = j.redirect;
+        else { alert(j.error || 'Erreur'); btn.disabled = false; btn.textContent = 'Lancer'; }
+    } catch(err) { alert(err); btn.disabled = false; btn.textContent = 'Lancer'; }
+});
+</script>
 {% endif %}
 {% endblock %}
