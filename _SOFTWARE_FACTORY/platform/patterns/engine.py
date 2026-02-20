@@ -134,15 +134,21 @@ WORKFLOW:
    - build(command="node --check file.js") for JS syntax
    - playwright_test(spec="tests/e2e.spec.js") for E2E tests
    - build(command="docker build -t test .") if Dockerfile exists
-3. code_read source files → check for obvious bugs
-4. Deliver verdict based on ACTUAL test results
+3. For web projects: TAKE REAL SCREENSHOTS:
+   - browser_screenshot() → captures real browser rendering of index.html
+   - browser_screenshot(url="http://localhost:3000", filename="02_interaction.png")
+   - Minimum 2 screenshots for web projects: home page + key interaction
+4. code_read source files → check for obvious bugs
+5. Deliver verdict based on ACTUAL test results + screenshots
 
 RULES:
 - You MUST call build or test tool at least once. Reading code alone is NOT testing.
-- If no test framework exists, at minimum validate: file exists + syntax correct
+- For web projects, you MUST call browser_screenshot at least once.
+- If no test framework exists, at minimum validate: file exists + syntax correct + screenshot
 - [APPROVE] only if build/tests pass. [VETO] if build fails or critical bugs found.
 - Include actual tool output in your verdict (exit codes, error messages).
-- Sprints are incremental. Missing features ≠ VETO. Broken build = VETO."""
+- Sprints are incremental. Missing features ≠ VETO. Broken build = VETO.
+- DO NOT fabricate screenshots. Use the browser_screenshot tool to capture REAL ones."""
 
 # Review protocol — telegraphic
 _REVIEW_PROTOCOL = """ROLE: Reviewer. Verify claims via tools.
@@ -519,9 +525,10 @@ async def _execute_node(
         state.status = NodeStatus.COMPLETED
 
     # ── Adversarial Guard with retry loop ──
-    # If rejected, re-run agent with feedback (max 2 retries)
+    # If rejected, re-run agent with feedback (max 4 retries = 5 attempts total)
     # Coordinators (decompose protocol) skip L1 — they manage, don't code
-    MAX_ADVERSARIAL_RETRIES = 2
+    # Severity tiers: 5-6 = WARNING (pass with note), 7-8 = RETRY, 9-10 = HARD REJECT
+    MAX_ADVERSARIAL_RETRIES = 4
     is_coordinator = protocol_override and "DECOMPOSE" in protocol_override
     guard_result = None
     cumulative_tool_calls = list(result.tool_calls or [])  # accumulate across retries
@@ -550,6 +557,16 @@ async def _execute_node(
                         "; ".join(guard_result.issues[:3]),
                     )
                 break  # approved
+
+            # Severity tiers: 5-6 = pass with warning, 7-8 = retry, 9-10 = hard reject
+            if guard_result.score <= 6:
+                logger.info(
+                    "ADVERSARIAL SOFT-PASS [%s] score=%d (≤6 = warning): %s",
+                    agent.name, guard_result.score,
+                    "; ".join(guard_result.issues[:3]),
+                )
+                content = f"[ADVERSARIAL WARNING — score {guard_result.score}/10]\n" + "\n".join(f"- {i}" for i in guard_result.issues[:3]) + "\n\n" + content
+                break  # pass with warning appended
 
             # Rejected — retry with feedback if attempts remain
             logger.warning(
@@ -1385,51 +1402,109 @@ async def _run_hierarchical(run: PatternRun, task: str):
 
         # ── Step 3: Preflight build gate — automatic build verification ──
         preflight_result = ""
+        test_results = ""
+        build_passed = True
         workspace = run.metadata.get("workspace") if run.metadata else None
         if workspace:
             try:
                 import subprocess as _sp
                 import os as _os
-                # Detect project type and run appropriate build check
+                from collections import Counter as _Counter
                 build_cmds = []
-                if _os.path.isfile(_os.path.join(workspace, "Dockerfile")):
-                    build_cmds.append(("docker build", "docker build --no-cache -t preflight-test ."))
+                test_cmds = []
+
+                # ── Duplicate file detection (caused chocolat Swift build failure) ──
+                try:
+                    all_src_files = []
+                    for root, dirs, files in _os.walk(workspace):
+                        dirs[:] = [d for d in dirs if d not in ('.git', 'node_modules', 'DerivedData', '.build', '__pycache__', 'dist')]
+                        for f in files:
+                            if f.endswith(('.swift', '.ts', '.tsx', '.js', '.jsx', '.py', '.rs')):
+                                all_src_files.append(f)
+                    dupes = [name for name, cnt in _Counter(all_src_files).items() if cnt > 1]
+                    if dupes:
+                        dupe_list = ", ".join(dupes[:10])
+                        preflight_result += f"[WARN] Duplicate filenames detected: {dupe_list}\n"
+                except Exception:
+                    pass
+
+                # ── Detect project type and run appropriate build ──
+                if _os.path.isfile(_os.path.join(workspace, "Package.swift")):
+                    build_cmds.append(("swift build", "swift build 2>&1 | tail -30"))
+                    test_cmds.append(("swift test", "swift test 2>&1 | tail -30"))
+                if _os.path.isfile(_os.path.join(workspace, "Cargo.toml")):
+                    build_cmds.append(("cargo check", "cargo check 2>&1 | tail -20"))
+                    test_cmds.append(("cargo test", "cargo test 2>&1 | tail -30"))
                 if _os.path.isfile(_os.path.join(workspace, "package.json")):
-                    build_cmds.append(("npm install", "npm install --no-audit --no-fund 2>&1"))
+                    build_cmds.append(("npm install", "npm install --no-audit --no-fund 2>&1 | tail -10"))
+                    # Check if build script exists
+                    try:
+                        import json as _json
+                        with open(_os.path.join(workspace, "package.json")) as _f:
+                            pkg = _json.load(_f)
+                        if "build" in pkg.get("scripts", {}):
+                            build_cmds.append(("npm build", "npm run build 2>&1 | tail -20"))
+                        if "test" in pkg.get("scripts", {}):
+                            test_cmds.append(("npm test", "npm test 2>&1 | tail -30"))
+                    except Exception:
+                        pass
                 if _os.path.isfile(_os.path.join(workspace, "requirements.txt")):
                     build_cmds.append(("pip check", "pip install -r requirements.txt --dry-run 2>&1 | tail -5"))
-                # Always: check for syntax errors in common files
-                for ext, checker in [("*.py", "python3 -m py_compile"), ("*.js", "node --check")]:
-                    check_r = _sp.run(
-                        f'find . -not -path "./.git/*" -name "{ext}" -type f | head -5',
-                        shell=True, capture_output=True, text=True, cwd=workspace, timeout=5
-                    )
-                    files = [f.strip() for f in check_r.stdout.strip().split("\n") if f.strip()]
-                    for fpath in files:
-                        build_cmds.append((f"syntax {fpath}", f"{checker} {fpath}"))
+                if _os.path.isfile(_os.path.join(workspace, "Dockerfile")):
+                    build_cmds.append(("docker build", "docker build --no-cache -t preflight-test . 2>&1 | tail -20"))
 
+                # Syntax checks for files without a build system
+                if not build_cmds:
+                    for ext, checker in [("*.py", "python3 -m py_compile"), ("*.js", "node --check")]:
+                        check_r = _sp.run(
+                            f'find . -not -path "./.git/*" -not -path "*/node_modules/*" -name "{ext}" -type f | head -5',
+                            shell=True, capture_output=True, text=True, cwd=workspace, timeout=5
+                        )
+                        files = [f.strip() for f in check_r.stdout.strip().split("\n") if f.strip()]
+                        for fpath in files:
+                            build_cmds.append((f"syntax {fpath}", f"{checker} {fpath}"))
+
+                # ── Run build checks ──
                 preflight_parts = []
                 any_failed = False
-                for label, cmd in build_cmds[:5]:  # max 5 checks
+                for label, cmd in build_cmds[:8]:
                     try:
                         r = _sp.run(cmd, shell=True, capture_output=True, text=True,
-                                    cwd=workspace, timeout=120, env={**_os.environ, "DOCKER_BUILDKIT": "1"})
+                                    cwd=workspace, timeout=180, env={**_os.environ, "DOCKER_BUILDKIT": "1"})
                         status = "PASS" if r.returncode == 0 else "FAIL"
                         if r.returncode != 0:
                             any_failed = True
-                        output = (r.stdout + r.stderr)[-300:].strip()
+                        output = (r.stdout + r.stderr)[-500:].strip()
                         preflight_parts.append(f"[{status}] {label}: exit={r.returncode}\n{output}")
                     except Exception as e:
                         preflight_parts.append(f"[SKIP] {label}: {e}")
 
+                # ── Run tests if build passed ──
+                test_result_parts = []
+                if not any_failed and test_cmds:
+                    for label, cmd in test_cmds[:3]:
+                        try:
+                            r = _sp.run(cmd, shell=True, capture_output=True, text=True,
+                                        cwd=workspace, timeout=180, env={**_os.environ})
+                            status = "PASS" if r.returncode == 0 else "FAIL"
+                            output = (r.stdout + r.stderr)[-500:].strip()
+                            test_result_parts.append(f"[{status}] {label}: exit={r.returncode}\n{output}")
+                        except Exception as e:
+                            test_result_parts.append(f"[SKIP] {label}: {e}")
+
                 preflight_result = "\n".join(preflight_parts)
+                test_results = "\n".join(test_result_parts) if test_result_parts else ""
+                build_passed = not any_failed
+
                 if preflight_result:
-                    # Send preflight results as SSE
                     status_label = "FAILED" if any_failed else "PASSED"
+                    full_report = f"**Preflight Build Gate — {status_label}**\n```\n{preflight_result}\n```"
+                    if test_results:
+                        full_report += f"\n**Test Results:**\n```\n{test_results}\n```"
                     await _sse(run, {
                         "type": "message",
                         "from_agent": "system",
-                        "content": f"**Preflight Build Gate — {status_label}**\n```\n{preflight_result}\n```",
+                        "content": full_report,
                         "message_type": "system",
                     })
                     store = get_session_store()
@@ -1437,9 +1512,20 @@ async def _run_hierarchical(run: PatternRun, task: str):
                         session_id=run.session_id,
                         from_agent="system", to_agent="all",
                         message_type="system",
-                        content=f"Preflight Build Gate — {status_label}\n{preflight_result}",
+                        content=f"Preflight Build Gate — {status_label}\n{preflight_result}" + (f"\nTests:\n{test_results}" if test_results else ""),
                     ))
-                    logger.info("Preflight gate: %s (%d checks)", status_label, len(preflight_parts))
+                    logger.info("Preflight gate: %s (%d build checks, %d test checks)", status_label, len(preflight_parts), len(test_result_parts))
+
+                    # ── BLOCKING: if build failed, loop back to devs ──
+                    if any_failed and outer < max_outer - 1:
+                        veto_feedback = f"BUILD FAILED — fix these errors before proceeding:\n{preflight_result}"
+                        await _sse(run, {
+                            "type": "system",
+                            "content": f"Build gate FAILED — looping back to dev (attempt {outer + 1}/{max_outer})",
+                        })
+                        logger.warning("Build gate FAILED — relooping to dev iteration %d", outer + 1)
+                        continue  # Goes back to outer loop → resets all statuses → devs get error feedback
+
             except Exception as e:
                 logger.warning("Preflight gate error: %s", e)
                 preflight_result = f"Preflight skipped: {e}"
@@ -1451,7 +1537,9 @@ async def _run_hierarchical(run: PatternRun, task: str):
 
         qa_context = f"Lead review:\n{review_output[:300]}\nDev output:\n{all_dev_work[:500]}"
         if preflight_result:
-            qa_context += f"\n\nPREFLIGHT BUILD RESULTS:\n{preflight_result}"
+            qa_context += f"\n\nPREFLIGHT BUILD RESULTS (build {'PASSED' if build_passed else 'FAILED'}):\n{preflight_result}"
+        if test_results:
+            qa_context += f"\n\nTEST RESULTS:\n{test_results}"
 
         for qid in qa_ids:
             run.nodes[qid].status = NodeStatus.PENDING

@@ -718,6 +718,21 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "browser_screenshot",
+                "description": "Take a real browser screenshot of a web page using Playwright headless. If no URL given, starts a local HTTP server on the workspace index.html. Use to verify UI rendering, check layout, detect visual bugs.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "URL to screenshot. Leave empty to auto-serve local index.html"},
+                        "filename": {"type": "string", "description": "Screenshot filename (default: screenshot.png)"},
+                        "wait_ms": {"type": "integer", "description": "Wait time in ms after page load (default: 2000)"},
+                    },
+                },
+            },
+        },
         # ── Fractal coding tool (sub-agent spawning) ──
         {
             "type": "function",
@@ -951,7 +966,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
     "qa": [
         "code_read", "code_write", "code_search", "list_files",
         "screenshot", "simulator_screenshot", "playwright_test",
-        "build",
+        "build", "test", "browser_screenshot",
         "memory_search", "memory_store", "get_project_context",
         "git_diff", "git_log",
         "github_issues", "github_prs",
@@ -962,6 +977,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "code_read", "code_write", "code_edit", "code_search",
         "git_status", "git_log", "git_diff", "git_commit",
         "list_files", "docker_build", "deploy_azure",
+        "build", "test", "browser_screenshot",
         "memory_search", "memory_store", "get_project_context",
         "lrm_build",
         "github_actions", "github_prs",
@@ -1523,7 +1539,7 @@ class AgentExecutor:
         # ── Resolve paths: project_path is the default for all file/git tools ──
         if ctx.project_path:
             # Git/build/deploy/test tools: inject cwd
-            if name in ("git_status", "git_log", "git_diff", "git_commit", "build", "test", "lint", "docker_build", "screenshot", "playwright_test"):
+            if name in ("git_status", "git_log", "git_diff", "git_commit", "build", "test", "lint", "docker_build", "screenshot", "playwright_test", "browser_screenshot"):
                 if "cwd" not in args or args["cwd"] in (".", "", "./"):
                     args["cwd"] = ctx.project_path
             # File tools: resolve relative paths to project root
@@ -1579,6 +1595,8 @@ class AgentExecutor:
             return await self._tool_fractal_code(args, ctx)
         if name in ("build", "test"):
             return await self._tool_build_test(name, args, ctx)
+        if name == "browser_screenshot":
+            return await self._tool_browser_screenshot(args, ctx)
 
         # ── Security & chaos tools ──
         if name in ("sast_scan", "dependency_audit", "secrets_scan",
@@ -1988,6 +2006,17 @@ class AgentExecutor:
             return f"[{tool_name.upper()}] TIMEOUT after 120s: {command}"
         except Exception as exc:
             return f"[{tool_name.upper()}] ERROR: {exc}"
+
+    async def _tool_browser_screenshot(self, args: dict, ctx: ExecutionContext) -> str:
+        """Take a real browser screenshot using Playwright."""
+        from ..tools.build_tools import BrowserScreenshotTool
+        if "cwd" not in args and ctx.project_path:
+            args["cwd"] = ctx.project_path
+        try:
+            tool = BrowserScreenshotTool()
+            return await tool.execute(args)
+        except Exception as e:
+            return f"[browser_screenshot] ERROR: {e}"
 
     async def _tool_security_chaos(self, name: str, args: dict, ctx: ExecutionContext) -> str:
         """Dispatch security/chaos/TMC/infra tools to their BaseTool implementations."""
