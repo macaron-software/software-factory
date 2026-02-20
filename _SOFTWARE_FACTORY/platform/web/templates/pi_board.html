@@ -45,6 +45,13 @@
 .nm-field textarea{resize:vertical;min-height:80px}
 .nm-actions{display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem}
 .wf-desc{font-size:0.75rem;color:var(--text-secondary);margin-top:0.3rem;padding:0.4rem 0.6rem;background:var(--bg-tertiary);border-radius:6px;display:none}
+.wf-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.6rem}
+.wf-card{display:flex;gap:0.75rem;align-items:flex-start;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:10px;padding:0.9rem 1rem;cursor:pointer;text-align:left;transition:border-color .15s,box-shadow .15s;color:inherit;font-family:inherit}
+.wf-card:hover{border-color:var(--purple-dim);box-shadow:0 2px 12px rgba(124,58,237,.1)}
+.wf-card-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.wf-card-body{display:flex;flex-direction:column;gap:0.2rem}
+.wf-card-body strong{font-size:0.88rem;color:var(--text-primary)}
+.wf-card-body span{font-size:0.75rem;color:var(--text-secondary);line-height:1.3}
 </style>
 
 {% if runs %}
@@ -105,27 +112,56 @@
 </div>
 {% endif %}
 
-<!-- Modal création mission -->
+<!-- Modal création mission — étape 1 : choix workflow -->
 <div id="newMissionModal" class="nm-overlay" onclick="if(event.target===this)this.style.display='none'">
-    <form class="nm-form" id="newMissionForm">
+    <div class="nm-form" id="step1" style="max-width:600px">
         <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> Nouvelle Mission</h3>
-        <input type="hidden" name="project_id" value="software-factory">
-        <div class="nm-field">
-            <label>Workflow</label>
-            <select name="workflow_id" id="wfSelect" required onchange="showWfDesc()">
-                <option value="" disabled selected>Choisir un workflow...</option>
-                {% for wf in workflows %}
-                <option value="{{ wf.id }}" data-phases="{{ wf.phases|length if wf.phases else '?' }}">{{ wf.name }}</option>
-                {% endfor %}
-            </select>
-            <div class="wf-desc" id="wfDesc"></div>
+        <p style="color:var(--text-secondary);font-size:0.82rem;margin:-0.5rem 0 1rem">Choisissez le type de mission</p>
+        <div class="wf-grid">
+            <button type="button" class="wf-card" onclick="selectWf('product-lifecycle')">
+                <div class="wf-card-icon" style="background:rgba(124,58,237,.15);color:var(--purple)"><svg class="icon"><use href="#icon-git-merge"/></svg></div>
+                <div class="wf-card-body">
+                    <strong>Cycle Complet</strong>
+                    <span>Ideation, architecture, sprints, CI/CD, QA, deploy, TMA — pipeline bout en bout</span>
+                </div>
+            </button>
+            <button type="button" class="wf-card" onclick="selectWf('tma-maintenance')">
+                <div class="wf-card-icon" style="background:rgba(251,191,36,.12);color:var(--yellow)"><svg class="icon"><use href="#icon-tool"/></svg></div>
+                <div class="wf-card-body">
+                    <strong>TMA / Ticketing</strong>
+                    <span>Maintenance applicative, tickets incidents, routage N1/N2/N3, correctifs</span>
+                </div>
+            </button>
+            <button type="button" class="wf-card" onclick="selectWf('security-hacking')">
+                <div class="wf-card-icon" style="background:rgba(239,68,68,.12);color:var(--red)"><svg class="icon"><use href="#icon-shield"/></svg></div>
+                <div class="wf-card-body">
+                    <strong>Hacking / Securite</strong>
+                    <span>Audit OWASP, pentesting, SAST/DAST, hardening, revue secrets et credentials</span>
+                </div>
+            </button>
+            <button type="button" class="wf-card" onclick="selectWf('feature-request')">
+                <div class="wf-card-icon" style="background:rgba(34,197,94,.12);color:var(--green)"><svg class="icon"><use href="#icon-plus-circle"/></svg></div>
+                <div class="wf-card-body">
+                    <strong>Nouvelles Features</strong>
+                    <span>Ajout de fonctionnalites sur existant, migration, evolution, amelioration</span>
+                </div>
+            </button>
         </div>
+        <div class="nm-actions" style="margin-top:0.75rem">
+            <button type="button" class="btn btn-ghost" onclick="document.getElementById('newMissionModal').style.display='none'">Annuler</button>
+        </div>
+    </div>
+    <!-- Étape 2 : brief -->
+    <form class="nm-form" id="step2" style="display:none">
+        <h3 id="step2Title"></h3>
+        <input type="hidden" name="project_id" value="software-factory">
+        <input type="hidden" name="workflow_id" id="wfInput">
         <div class="nm-field">
             <label>Brief de la mission</label>
-            <textarea name="brief" placeholder="Nom de la mission - Description du besoin, contexte, objectifs..." required></textarea>
+            <textarea name="brief" id="briefInput" placeholder="Nom - Description du besoin, contexte, objectifs..." required style="min-height:100px"></textarea>
         </div>
         <div class="nm-actions">
-            <button type="button" class="btn btn-ghost" onclick="document.getElementById('newMissionModal').style.display='none'">Annuler</button>
+            <button type="button" class="btn btn-ghost" onclick="backToStep1()">Retour</button>
             <button type="submit" class="btn btn-primary">
                 <svg class="icon icon-sm"><use href="#icon-play"/></svg> Lancer la Mission
             </button>
@@ -134,19 +170,25 @@
 </div>
 
 <script>
-const WF_INFO = {
-    {% for wf in workflows %}
-    "{{ wf.id }}": "{{ wf.name }} — {{ wf.phases|length if wf.phases else '?' }} phases",
-    {% endfor %}
+const WF_NAMES = {
+    'product-lifecycle': 'Cycle Complet',
+    'tma-maintenance': 'TMA / Ticketing',
+    'security-hacking': 'Hacking / Securite',
+    'feature-request': 'Nouvelles Features'
 };
-function showWfDesc(){
-    const sel = document.getElementById('wfSelect');
-    const desc = document.getElementById('wfDesc');
-    if(sel.value && WF_INFO[sel.value]){desc.textContent=WF_INFO[sel.value];desc.style.display='block';}
-    else desc.style.display='none';
+function selectWf(id){
+    document.getElementById('wfInput').value = id;
+    document.getElementById('step2Title').textContent = WF_NAMES[id] || id;
+    document.getElementById('step1').style.display = 'none';
+    document.getElementById('step2').style.display = 'block';
+    document.getElementById('briefInput').focus();
+}
+function backToStep1(){
+    document.getElementById('step2').style.display = 'none';
+    document.getElementById('step1').style.display = 'block';
 }
 
-document.getElementById('newMissionForm').addEventListener('submit', async e => {
+document.getElementById('step2').addEventListener('submit', async e => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const btn = e.target.querySelector('[type=submit]');
