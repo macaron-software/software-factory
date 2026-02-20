@@ -164,6 +164,25 @@ CREATE INDEX IF NOT EXISTS idx_tasks_mission ON tasks(mission_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 
 -- ============================================================================
+-- FEATURES (PO backlog items — extracted from agent discussions)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS features (
+    id TEXT PRIMARY KEY,
+    epic_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    acceptance_criteria TEXT DEFAULT '',
+    priority INTEGER DEFAULT 5,
+    status TEXT DEFAULT 'backlog',
+    story_points INTEGER DEFAULT 0,
+    assigned_to TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_features_epic ON features(epic_id);
+
+-- ============================================================================
 -- SESSIONS (legacy — kept for backward compatibility)
 -- ============================================================================
 

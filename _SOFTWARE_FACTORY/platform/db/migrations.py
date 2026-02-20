@@ -97,6 +97,23 @@ def _migrate(conn: sqlite3.Connection):
         )
     """)
 
+    # Features table (PO backlog items)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS features (
+            id TEXT PRIMARY KEY,
+            epic_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            acceptance_criteria TEXT DEFAULT '',
+            priority INTEGER DEFAULT 5,
+            status TEXT DEFAULT 'backlog',
+            story_points INTEGER DEFAULT 0,
+            assigned_to TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_features_epic ON features(epic_id)")
+
 def get_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
     """Get a database connection."""
     if not db_path.exists():

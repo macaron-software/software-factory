@@ -2838,6 +2838,20 @@ async def sandbox_status():
     })
 
 
+@router.get("/api/permissions/denials")
+async def permission_denials(limit: int = 50, agent_id: str = ""):
+    """Recent permission denials (audit log)."""
+    from ..agents.permissions import get_permission_guard
+    return JSONResponse(get_permission_guard().recent_denials(limit=limit, agent_id=agent_id))
+
+
+@router.get("/api/permissions/stats")
+async def permission_stats():
+    """Permission denial statistics."""
+    from ..agents.permissions import get_permission_guard
+    return JSONResponse(get_permission_guard().denial_stats())
+
+
 @router.get("/api/memory/project/{project_id}")
 async def project_memory(project_id: str, q: str = "", category: str = ""):
     """Get or search project memory."""
@@ -5556,9 +5570,12 @@ async def mission_control_page(request: Request, mission_id: str):
                 rel = os.path.relpath(root, ws)
                 if rel == ".":
                     rel = ""
-                # Skip hidden dirs
-                dirs[:] = [d for d in sorted(dirs) if not d.startswith(".")][:20]
+                # Skip hidden dirs and dependency dirs
+                _ws_exclude = {"node_modules", ".git", ".next", "dist", "build", "vendor", "__pycache__", ".tox", "venv"}
+                dirs[:] = [d for d in sorted(dirs) if not d.startswith(".") and d not in _ws_exclude][:20]
                 for f in sorted(files)[:30]:
+                    if f.endswith(".bak"):
+                        continue
                     fpath = os.path.join(rel, f) if rel else f
                     workspace_files.append({"path": fpath, "is_dir": False})
             workspace_files = workspace_files[:100]
@@ -5602,8 +5619,9 @@ async def mission_control_page(request: Request, mission_id: str):
         pass
     qa_pass_rate = round(qa_total_accepted / qa_total_iterations * 100) if qa_total_iterations > 0 else 0
 
-    # QA: Test files in workspace
+    # QA: Test files in workspace (exclude node_modules, .git, vendor, etc.)
     qa_test_files = []
+    _qa_exclude = {"node_modules", ".git", ".next", "dist", "build", "vendor", "__pycache__", ".tox", "venv"}
     if ws_path and Path(ws_path).exists():
         ws = Path(ws_path)
         test_globs = ["**/test_*.py", "**/*_test.py", "**/*.test.ts", "**/*.test.js",
@@ -5612,6 +5630,10 @@ async def mission_control_page(request: Request, mission_id: str):
         seen = set()
         for pat in test_globs:
             for tf in ws.glob(pat):
+                rel = str(tf.relative_to(ws))
+                # Skip dependency/build directories
+                if any(part in _qa_exclude for part in tf.relative_to(ws).parts):
+                    continue
                 if tf.is_file() and tf.suffix in (".py", ".ts", ".js", ".swift", ".kt", ".java") and str(tf) not in seen:
                     seen.add(str(tf))
                     rel = str(tf.relative_to(ws))
@@ -6764,6 +6786,10 @@ async def _run_post_phase_hooks(
     # After EVERY phase: update Architecture.md + docs via LLM (architect + tech writer)
     await _update_docs_post_phase(phase_id, phase_name, mission, session_id, push_sse)
 
+    # After ideation/architecture/dev: extract features for PO kanban
+    if any(k in phase_key for k in ("ideation", "architecture", "sprint", "dev", "setup")):
+        await _extract_features_from_phase(phase_id, mission, session_id)
+
     # After dev sprint: auto screenshots for HTML files
     if "dev" in phase_key or "sprint" in phase_key:
         ws = Path(workspace)
@@ -6890,6 +6916,74 @@ const {{ chromium }} = require('playwright');
                 })
         except Exception as e:
             logger.error("Post-phase QA screenshots failed: %s", e)
+
+
+async def _extract_features_from_phase(phase_id: str, mission, session_id: str):
+    """Extract features/stories from agent messages and store in features table."""
+    from ..sessions.store import get_session_store
+    from ..llm.client import get_llm_client, LLMMessage
+    from ..db.migrations import get_db
+    import json, uuid
+
+    try:
+        ss = get_session_store()
+        msgs = ss.get_messages(session_id, limit=500)
+        # Collect agent messages from this phase
+        texts = []
+        for m in msgs:
+            meta = m.metadata if isinstance(m.metadata, dict) else {}
+            if meta.get("phase_id") != phase_id:
+                continue
+            agent = getattr(m, "from_agent", "") or ""
+            if agent in ("system", "user", "chef_de_programme"):
+                continue
+            content = (getattr(m, "content", "") or "").strip()
+            if len(content) > 50:
+                texts.append(content[:500])
+        if not texts:
+            return
+
+        transcript = "\n---\n".join(texts[-10:])
+        llm = get_llm_client()
+        resp = await asyncio.wait_for(llm.chat([
+            LLMMessage(role="user", content=(
+                "Extract product features/stories from this team discussion. "
+                "Return a JSON array of objects with keys: name (short title), "
+                "description (1-2 sentences), priority (1-5, 1=highest), status (backlog/in_progress/done). "
+                "Only extract real product features, not meta-discussion. Max 8 items. "
+                "Return ONLY valid JSON array, no markdown.\n\n"
+                f"{transcript[:4000]}"
+            ))
+        ], max_tokens=500, temperature=0.2), timeout=30)
+
+        raw = (resp.content or "").strip()
+        # Extract JSON array from response
+        if raw.startswith("```"):
+            raw = raw.split("```")[1].strip()
+            if raw.startswith("json"):
+                raw = raw[4:].strip()
+        features = json.loads(raw)
+        if not isinstance(features, list):
+            return
+
+        db = get_db()
+        for f in features[:8]:
+            name = f.get("name", "").strip()
+            if not name or len(name) < 3:
+                continue
+            fid = str(uuid.uuid4())[:8]
+            try:
+                db.execute(
+                    "INSERT OR IGNORE INTO features (id, epic_id, name, description, priority, status) VALUES (?,?,?,?,?,?)",
+                    (fid, mission.id, name, f.get("description", "")[:500],
+                     f.get("priority", 5), f.get("status", "backlog"))
+                )
+            except Exception:
+                pass
+        db.commit()
+        db.close()
+    except Exception as e:
+        logger.warning("Feature extraction failed for phase %s: %s", phase_id, e)
 
 
 async def _update_docs_post_phase(
