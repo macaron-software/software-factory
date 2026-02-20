@@ -6989,12 +6989,26 @@ async def api_mission_run(request: Request, mission_id: str):
                     await asyncio.sleep(0.8)
                 else:
                     # Phase failed — check if it's a blocking phase
-                    # Only strategic gates (human-in-the-loop committees) are mission-critical
-                    # QA/deploy failures trigger reloop back to dev (handled above)
-                    blocking = pattern_type in ("human-in-the-loop",) and "deploy" not in phase.phase_id
+                    # Strategic gates (HITL) + dev/CI phases are blocking
+                    # Only discussion/ideation/TMA phases are non-blocking
+                    phase_key = phase.phase_id.lower() if phase.phase_id else ""
+                    is_execution_phase = any(k in phase_key for k in ("sprint", "dev", "cicd", "ci-cd", "pipeline", "deploy"))
+                    blocking = (
+                        (pattern_type in ("human-in-the-loop",) and "deploy" not in phase.phase_id)
+                        or is_execution_phase  # dev/CI/CD failures are blocking
+                    )
+                    # Phase failed — determine response
+                    phase_key = phase.phase_id.lower() if phase.phase_id else ""
+                    is_execution_phase = any(k in phase_key for k in ("sprint", "dev", "cicd", "ci-cd", "pipeline"))
+                    is_hitl_gate = pattern_type in ("human-in-the-loop",) and "deploy" not in phase.phase_id
                     short_err = phase_error[:200] if phase_error else "erreur inconnue"
-                    if blocking:
+                    if is_hitl_gate:
+                        # Strategic gate NOGO — stop mission
                         cdp_msg = f"Phase «{wf_phase.name}» échouée ({short_err}). Epic arrêtée — corrigez puis relancez via le bouton Réinitialiser."
+                    elif is_execution_phase:
+                        # Dev/CI/CD failure — keep as FAILED (reloop will handle if applicable)
+                        cdp_msg = f"Phase «{wf_phase.name}» échouée ({short_err}). Phase bloquante — correction nécessaire avant de continuer."
+                        # DON'T downgrade to DONE_WITH_ISSUES — this is a real failure
                     else:
                         cdp_msg = f"Phase «{wf_phase.name}» terminée avec des problèmes ({short_err}). Passage à la phase suivante malgré tout…"
                         phase.status = PhaseStatus.DONE_WITH_ISSUES  # clearly mark issues
@@ -7041,7 +7055,7 @@ async def api_mission_run(request: Request, mission_id: str):
                         "phase_id": phase.phase_id,
                         "msg_type": "text",
                     })
-                    if blocking:
+                    if is_hitl_gate:
                         mission.status = MissionStatus.FAILED
                         run_store.update(mission)
                         await _push_sse(session_id, {
@@ -7067,12 +7081,12 @@ async def api_mission_run(request: Request, mission_id: str):
                         logger.warning("Post-phase hooks timeout/error for %s: %s", phase.phase_id, hook_err)
                 asyncio.create_task(_safe_hooks())
 
-            # ── Error Reloop: QA/deploy failure → re-run dev→CI/CD→QA ──
-            # When a downstream phase (QA, deploy, TMA) fails, loop back to
-            # dev-sprint so agents can fix the errors before retrying.
+            # ── Error Reloop: execution phase failure → retry or loop back ──
+            # When dev/CI/QA/deploy fails, loop back to dev-sprint with error feedback.
             if not phase_success and reloop_count < MAX_RELOOPS:
-                qa_or_deploy = any(k in phase.phase_id for k in ("qa", "deploy", "tma"))
-                if qa_or_deploy:
+                phase_key_rl = phase.phase_id.lower() if phase.phase_id else ""
+                is_reloopable = any(k in phase_key_rl for k in ("qa", "deploy", "tma", "sprint", "dev", "cicd", "ci-cd", "pipeline"))
+                if is_reloopable:
                     reloop_count += 1
                     reloop_errors.append(f"[Reloop {reloop_count}] Phase «{wf_phase.name}» failed: {phase_error[:300]}")
                     # Find dev-sprint phase index
