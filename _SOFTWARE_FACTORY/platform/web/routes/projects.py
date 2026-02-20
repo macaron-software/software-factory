@@ -1,0 +1,676 @@
+"""Web routes — Project management routes."""
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+from datetime import datetime
+from pathlib import Path
+
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, FileResponse
+
+from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, serve_workspace_file
+
+router = APIRouter()
+logger = logging.getLogger(__name__)
+
+@router.get("/projects", response_class=HTMLResponse)
+async def projects_page(request: Request):
+    """Projects list (legacy)."""
+    from ...projects.manager import get_project_store
+    store = get_project_store()
+    projects = store.list_all()
+    return _templates(request).TemplateResponse("projects.html", {
+        "request": request,
+        "page_title": "Projects",
+        "projects": [{"info": p, "git": None, "tasks": None} for p in projects],
+    })
+
+
+@router.get("/api/projects/{project_id}/git-status")
+async def project_git_status(project_id: str):
+    """Lazy-load git status for a single project (called via HTMX)."""
+    import asyncio, functools
+    from ...projects.manager import get_project_store
+    from ..projects import git_service
+    project = get_project_store().get(project_id)
+    if not project or not project.has_git:
+        return HTMLResponse("")
+    loop = asyncio.get_event_loop()
+    git = await loop.run_in_executor(None, functools.partial(git_service.get_status, project.path))
+    if not git:
+        return HTMLResponse('<span class="text-muted">no git</span>')
+    branch = git.get("branch", "?")
+    clean = git.get("clean", True)
+    parts = [f'<div class="git-branch">'
+             f'<svg class="icon icon-xs"><use href="#icon-git-branch"/></svg> {branch}</div>']
+    if not clean:
+        counts = []
+        if git.get("staged"): counts.append(f'<span class="git-count staged">+{git["staged"]}</span>')
+        if git.get("modified"): counts.append(f'<span class="git-count modified">~{git["modified"]}</span>')
+        if git.get("untracked"): counts.append(f'<span class="git-count untracked">?{git["untracked"]}</span>')
+        if counts:
+            parts.append(f'<div class="git-dirty">{"".join(counts)}</div>')
+    else:
+        parts.append('<span class="git-clean-badge">clean</span>')
+    msg = git.get("commit_message", "")
+    if msg:
+        short = msg[:50] + ("..." if len(msg) > 50 else "")
+        date = git.get("commit_date", "")
+        parts.append(f'<div class="project-card-commit">'
+                     f'<svg class="icon icon-xs"><use href="#icon-git-commit"/></svg>'
+                     f'<span class="commit-msg">{short}</span>'
+                     f'<span class="commit-date">{date}</span></div>')
+    return HTMLResponse("\n".join(parts))
+
+
+@router.get("/projects/{project_id}/overview", response_class=HTMLResponse)
+async def project_overview(request: Request, project_id: str):
+    """Project overview page — created from ideation, shows epic/features/team."""
+    from ...projects.manager import get_project_store
+    from ...missions.store import get_mission_store
+    from ...missions.product import get_product_backlog
+    from ...agents.store import get_agent_store
+
+    proj_store = get_project_store()
+    project = proj_store.get(project_id)
+    if not project:
+        return HTMLResponse("<h2>Project not found</h2>", status_code=404)
+
+    mission_store = get_mission_store()
+    epics = mission_store.list_missions(project_id=project_id)
+
+    backlog = get_product_backlog()
+    agent_store = get_agent_store()
+
+    epics_enriched = []
+    for ep in epics:
+        features = backlog.list_features(ep.id)
+        features_enriched = []
+        for f in features:
+            stories = backlog.list_stories(f.id)
+            features_enriched.append({
+                "id": f.id, "name": f.name, "description": f.description,
+                "acceptance_criteria": f.acceptance_criteria,
+                "story_points": f.story_points, "status": f.status,
+                "stories": [{"id": s.id, "title": s.title,
+                             "story_points": s.story_points, "status": s.status,
+                             "acceptance_criteria": s.acceptance_criteria}
+                            for s in stories],
+            })
+        team_data = (ep.config or {}).get("team", [])
+        stack = (ep.config or {}).get("stack", [])
+        epics_enriched.append({
+            "id": ep.id, "name": ep.name, "description": ep.description,
+            "goal": ep.goal, "status": ep.status,
+            "features": features_enriched,
+            "team": team_data, "stack": stack,
+        })
+
+    # Resolve team agents with photos
+    team_agents = []
+    if epics_enriched:
+        for t in epics_enriched[0].get("team", []):
+            role = t.get("role", "")
+            agent = agent_store.get(role)
+            avatar_dir = Path(__file__).parent.parent / "static" / "avatars"
+            avatar_url = ""
+            if agent and (avatar_dir / f"{agent.id}.jpg").exists():
+                avatar_url = f"/static/avatars/{agent.id}.jpg"
+            team_agents.append({
+                "role": role, "label": t.get("label", role),
+                "name": agent.name if agent else t.get("label", role),
+                "avatar_url": avatar_url,
+                "persona": (agent.persona or "") if agent else "",
+            })
+
+    return _templates(request).TemplateResponse("project_overview.html", {
+        "request": request, "page_title": f"Projet: {project.name}",
+        "project": project,
+        "epics": epics_enriched,
+        "team_agents": team_agents,
+    })
+
+
+@router.get("/projects/{project_id}", response_class=HTMLResponse)
+async def project_detail(request: Request, project_id: str):
+    """Single project detail view with vision, agents, sessions."""
+    from ...projects.manager import get_project_store
+    from ..projects import git_service, factory_tasks
+    from ...sessions.store import get_session_store
+    from ...agents.store import get_agent_store
+    proj_store = get_project_store()
+    project = proj_store.get(project_id)
+    if not project:
+        return HTMLResponse("<h2>Project not found</h2>", status_code=404)
+    git = git_service.get_status(project.path) if project.has_git else None
+    commits = git_service.get_log(project.path, 15) if project.has_git else []
+    changes = git_service.get_changes(project.path) if project.has_git else []
+    branches = git_service.get_branches(project.path) if project.has_git else []
+    tasks = factory_tasks.get_task_summary(project.id)
+    recent_tasks = factory_tasks.get_recent_tasks(project.id, 15)
+    # Get sessions for this project
+    sess_store = get_session_store()
+    sessions = [s for s in sess_store.list_all() if s.project_id == project_id]
+    sessions.sort(key=lambda s: s.created_at or "", reverse=True)
+    # Select active session — from query param or most recent active
+    requested_session = request.query_params.get("session")
+    active_session = None
+    if requested_session:
+        active_session = sess_store.get(requested_session)
+    if not active_session:
+        active_sessions = [s for s in sessions if s.status == "active"]
+        if active_sessions:
+            active_session = active_sessions[0]
+    # Load messages for selected session
+    messages = []
+    if active_session:
+        messages = sess_store.get_messages(active_session.id)
+        messages = [m for m in messages if m.from_agent != "system"]
+    # Get agents
+    agent_store = get_agent_store()
+    agents = agent_store.list_all()
+    lead = agent_store.get(project.lead_agent_id) if project.lead_agent_id else None
+    # Get workflows linked to this project
+    workflows = []
+    try:
+        from ...workflows.store import get_workflow_store
+        wf_store = get_workflow_store()
+        for wf in wf_store.list_all():
+            cfg = wf.config or {}
+            if cfg.get("project_ref") == project_id:
+                # Find linked session
+                linked_session = None
+                for s in sessions:
+                    if (s.config or {}).get("workflow_id") == wf.id:
+                        linked_session = s
+                        break
+                workflows.append({"wf": wf, "session": linked_session})
+    except Exception:
+        pass
+    # Load project memory files (CLAUDE.md, copilot-instructions.md, etc.)
+    memory_files = []
+    if project.path:
+        try:
+            from ...memory.project_files import get_project_memory
+            pmem = get_project_memory(project_id, project.path)
+            memory_files = pmem.files
+        except Exception:
+            pass
+    # Load missions for this project
+    project_missions = []
+    try:
+        from ...missions.store import get_mission_store
+        m_store = get_mission_store()
+        project_missions = m_store.list_missions(project_id=project_id)
+    except Exception:
+        pass
+    return _templates(request).TemplateResponse("project_detail.html", {
+        "request": request,
+        "page_title": project.name,
+        "project": project,
+        "git": git,
+        "commits": commits,
+        "changes": changes,
+        "branches": branches,
+        "tasks": tasks,
+        "recent_tasks": recent_tasks,
+        "sessions": sessions,
+        "active_session": active_session,
+        "agents": agents,
+        "lead_agent": lead,
+        "messages": messages,
+        "memory_files": memory_files,
+        "workflows": workflows,
+        "missions": project_missions,
+    })
+
+
+# ── Project Board (Kanban) ───────────────────────────────────────
+
+@router.get("/projects/{project_id}/board", response_class=HTMLResponse)
+async def project_board_page(request: Request, project_id: str):
+    """Kanban board view for a project."""
+    from ...projects.manager import get_project_store
+    from ..projects import factory_tasks
+    from ...agents.store import get_agent_store
+    from ...missions.store import get_mission_store
+    import random
+
+    proj_store = get_project_store()
+    project = proj_store.get(project_id)
+    if not project:
+        return HTMLResponse("<h2>Project not found</h2>", status_code=404)
+
+    agent_store = get_agent_store()
+    all_agents = agent_store.list_all()
+    agents_by_id = {a.id: a for a in all_agents}
+
+    # Helper to get avatar URL
+    avatar_dir = Path(__file__).parent.parent / "static" / "avatars"
+    def _avatar(agent_id):
+        jpg = avatar_dir / f"{agent_id}.jpg"
+        svg = avatar_dir / f"{agent_id}.svg"
+        if jpg.exists(): return f"/static/avatars/{agent_id}.jpg"
+        if svg.exists(): return f"/static/avatars/{agent_id}.svg"
+        return ""
+
+    # Build task list from missions/stories
+    tasks = []
+    try:
+        m_store = get_mission_store()
+        missions = m_store.list_missions(project_id=project_id)
+        status_col = {"planning": "backlog", "active": "active", "review": "review",
+                       "completed": "done", "deployed": "done"}
+        status_labels = {"planning": "Planifié", "active": "En cours", "review": "En revue",
+                          "completed": "Terminé", "deployed": "Déployé"}
+        for m in missions:
+            col = status_col.get(m.status, "backlog")
+            agent = agents_by_id.get(m.lead_agent_id) if m.lead_agent_id else None
+            tasks.append({
+                "title": m.title,
+                "col": col,
+                "status_label": status_labels.get(m.status, m.status),
+                "avatar_url": _avatar(agent.id) if agent else "",
+                "agent_name": agent.name if agent else "",
+            })
+    except Exception:
+        pass
+
+    # If no real tasks, show demo
+    if not tasks:
+        demo = [
+            ("Setup projet initial", "done", "Terminé"),
+            ("Endpoint /api/users", "active", "En cours"),
+            ("Authentification JWT", "active", "En cours"),
+            ("Tests E2E smoke", "review", "En revue"),
+            ("Documentation API", "backlog", "Planifié"),
+            ("Dashboard admin", "backlog", "Planifié"),
+            ("Revue sécurité", "backlog", "Planifié"),
+        ]
+        sample_agents = [a for a in all_agents if _avatar(a.id)][:5]
+        for i, (title, col, label) in enumerate(demo):
+            ag = sample_agents[i % len(sample_agents)] if sample_agents else None
+            tasks.append({
+                "title": title, "col": col, "status_label": label,
+                "avatar_url": _avatar(ag.id) if ag else "",
+                "agent_name": ag.name if ag else "",
+            })
+
+    # Agent flow nodes (project team or general agents)
+    flow_nodes = []
+    flow_edges = []
+    team_agents = [a for a in all_agents if _avatar(a.id)][:6]
+    positions = [(60, 100), (160, 50), (160, 150), (280, 100), (380, 50), (380, 150)]
+    for i, ag in enumerate(team_agents[:6]):
+        x, y = positions[i] if i < len(positions) else (60 + i * 80, 100)
+        flow_nodes.append({"x": x, "y": y, "label": ag.name.split()[-1] if ag.name else "Agent"})
+    # Connect nodes sequentially + some cross-links
+    for i in range(len(flow_nodes) - 1):
+        n1, n2 = flow_nodes[i], flow_nodes[i + 1]
+        flow_edges.append({"x1": n1["x"] + 25, "y1": n1["y"], "x2": n2["x"] - 25, "y2": n2["y"]})
+
+    # Backlog items
+    backlog_items = [
+        {"title": "User stories non estimées", "count": random.randint(2, 8), "color": "var(--yellow)"},
+        {"title": "Bugs P2 en attente", "count": random.randint(0, 3), "color": "var(--red, #ef4444)"},
+        {"title": "Features priorisées", "count": random.randint(1, 5), "color": "var(--blue)"},
+    ]
+
+    # Pull requests (demo)
+    pull_requests = [
+        {"title": "feat: add /api/users endpoint", "status": "Open"},
+        {"title": "fix: JWT expiration handling", "status": "Review"},
+        {"title": "chore: update dependencies", "status": "Merged"},
+    ]
+
+    return _templates(request).TemplateResponse("project_board.html", {
+        "request": request,
+        "page_title": f"Board — {project.name}",
+        "project": project,
+        "tasks": tasks,
+        "flow_nodes": flow_nodes,
+        "flow_edges": flow_edges,
+        "backlog_items": backlog_items,
+        "pull_requests": pull_requests,
+    })
+
+
+# ── API: Projects ────────────────────────────────────────────────
+
+@router.get("/api/projects")
+async def api_projects():
+    """List all projects (JSON)."""
+    from ...projects.manager import get_project_store
+    store = get_project_store()
+    return JSONResponse([{
+        "id": p.id, "name": p.name, "path": p.path,
+        "factory_type": p.factory_type, "domains": p.domains,
+        "lead_agent_id": p.lead_agent_id, "status": p.status,
+        "has_vision": bool(p.vision), "values": p.values,
+    } for p in store.list_all()])
+
+
+@router.post("/api/projects")
+async def create_project(request: Request):
+    """Create a new project."""
+    from ...projects.manager import get_project_store, Project
+    form = await request.form()
+    store = get_project_store()
+    p = Project(
+        id=str(form.get("id", "")),
+        name=str(form.get("name", "")),
+        path=str(form.get("path", "")),
+        description=str(form.get("description", "")),
+        factory_type=str(form.get("factory_type", "standalone")),
+        lead_agent_id=str(form.get("lead_agent_id", "brain")),
+        values=[v.strip() for v in str(form.get("values", "quality,feedback")).split(",") if v.strip()],
+    )
+    # Auto-load vision
+    if p.exists:
+        p.vision = p.load_vision_from_file()
+    store.create(p)
+    return RedirectResponse(f"/projects/{p.id}", status_code=303)
+
+
+@router.post("/api/projects/{project_id}/vision")
+async def update_vision(request: Request, project_id: str):
+    """Update project vision."""
+    from ...projects.manager import get_project_store
+    form = await request.form()
+    store = get_project_store()
+    store.update_vision(project_id, str(form.get("vision", "")))
+    return HTMLResponse('<span class="badge badge-green">Saved</span>')
+
+
+@router.post("/api/projects/{project_id}/chat")
+async def project_chat(request: Request, project_id: str):
+    """Quick chat with a project's lead agent — creates or reuses session."""
+    from ...sessions.store import get_session_store, SessionDef, MessageDef
+    from ...sessions.runner import handle_user_message
+    from ...projects.manager import get_project_store
+    from ...agents.store import get_agent_store
+
+    form = await request.form()
+    content = str(form.get("content", "")).strip()
+    if not content:
+        return HTMLResponse("")
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return HTMLResponse("Project not found", status_code=404)
+
+    store = get_session_store()
+    # Find or create active session for this project
+    sessions = [s for s in store.list_all() if s.project_id == project_id and s.status == "active"]
+    sessions.sort(key=lambda s: s.created_at or "", reverse=True)
+    if sessions:
+        session = sessions[0]
+    else:
+        session = store.create(SessionDef(
+            name=f"{proj.name} — Chat",
+            goal="Project conversation",
+            project_id=project_id,
+            status="active",
+            config={"lead_agent": proj.lead_agent_id or "brain"},
+        ))
+        store.add_message(MessageDef(
+            session_id=session.id,
+            from_agent="system",
+            message_type="system",
+            content=f"Session started for project {proj.name}",
+        ))
+
+    # Store user message
+    store.add_message(MessageDef(
+        session_id=session.id,
+        from_agent="user",
+        message_type="text",
+        content=content,
+    ))
+
+    # Get agent response
+    agent_msg = await handle_user_message(session.id, content, proj.lead_agent_id or "")
+
+    # For HTMX: return both the user message and agent response as chat bubbles
+    import html as html_mod
+    import markdown as md_lib
+    user_html = (
+        f'<div class="chat-msg chat-msg-user">'
+        f'<div class="chat-msg-body"><div class="chat-msg-text">{html_mod.escape(content)}</div></div>'
+        f'<div class="chat-msg-avatar user">S</div>'
+        f'</div>'
+    )
+    if agent_msg:
+        agent_content = agent_msg.get("content", "") if isinstance(agent_msg, dict) else getattr(agent_msg, "content", str(agent_msg))
+        # Render tool calls if present
+        tools_html = ""
+        tool_calls = None
+        if isinstance(agent_msg, dict):
+            tool_calls = agent_msg.get("metadata", {}).get("tool_calls") if agent_msg.get("metadata") else None
+        elif hasattr(agent_msg, "metadata") and agent_msg.metadata:
+            tool_calls = agent_msg.metadata.get("tool_calls")
+        if tool_calls:
+            pills = "".join(f'<span class="chat-tool-pill"><svg class="icon icon-xs"><use href="#icon-wrench"/></svg> {html_mod.escape(str(tc.get("name", tc) if isinstance(tc, dict) else tc))}</span>' for tc in tool_calls)
+            tools_html = f'<div class="chat-msg-tools">{pills}</div>'
+        # Render markdown to HTML
+        rendered = md_lib.markdown(str(agent_content), extensions=["fenced_code", "tables", "nl2br"])
+        agent_html = (
+            f'<div class="chat-msg chat-msg-agent">'
+            f'<div class="chat-msg-avatar"><svg class="icon icon-sm"><use href="#icon-bot"/></svg></div>'
+            f'<div class="chat-msg-body">'
+            f'<div class="chat-msg-sender">{html_mod.escape(proj.name)}</div>'
+            f'<div class="chat-msg-text md-rendered">{rendered}</div>'
+            f'{tools_html}'
+            f'</div></div>'
+        )
+        return HTMLResponse(user_html + agent_html)
+    return HTMLResponse(user_html)
+
+
+# ── Conversation Management ──────────────────────────────────────
+
+@router.post("/api/projects/{project_id}/conversations")
+async def create_conversation(request: Request, project_id: str):
+    """Create a new conversation session for a project."""
+    from ...sessions.store import get_session_store, SessionDef
+    from ...projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return JSONResponse({"error": "Project not found"}, status_code=404)
+
+    store = get_session_store()
+    # Archive any existing active CHAT sessions (not workflow sessions)
+    active = [s for s in store.list_all()
+              if s.project_id == project_id and s.status == "active"
+              and not (s.config or {}).get("workflow_id")]
+    for s in active:
+        store.update_status(s.id, "completed")
+
+    session = store.create(SessionDef(
+        name=f"{proj.name} — {datetime.utcnow().strftime('%b %d, %H:%M')}",
+        goal="Project conversation",
+        project_id=project_id,
+        status="active",
+        config={"lead_agent": proj.lead_agent_id or "brain"},
+    ))
+    return JSONResponse({"session_id": session.id})
+
+
+# ── Streaming Chat (SSE) ────────────────────────────────────────
+
+@router.post("/api/projects/{project_id}/chat/stream")
+async def project_chat_stream(request: Request, project_id: str):
+    """Stream agent response via SSE — shows live progress to the user."""
+    from ...sessions.store import get_session_store, SessionDef, MessageDef
+    from ...sessions.runner import _build_context
+    from ...projects.manager import get_project_store
+    from ...agents.store import get_agent_store
+    from ...agents.executor import get_executor, ExecutionContext
+
+    form = await request.form()
+    content = str(form.get("content", "")).strip()
+    session_id = str(form.get("session_id", "")).strip()
+    if not content:
+        return HTMLResponse("")
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return HTMLResponse("Project not found", status_code=404)
+
+    store = get_session_store()
+    session = None
+    if session_id:
+        session = store.get(session_id)
+    if not session:
+        sessions = [s for s in store.list_all() if s.project_id == project_id and s.status == "active"]
+        sessions.sort(key=lambda s: s.created_at or "", reverse=True)
+        if sessions:
+            session = sessions[0]
+    if not session:
+        session = store.create(SessionDef(
+            name=f"{proj.name} — {datetime.utcnow().strftime('%b %d, %H:%M')}",
+            goal="Project conversation",
+            project_id=project_id,
+            status="active",
+            config={"lead_agent": proj.lead_agent_id or "brain"},
+        ))
+
+    # Store user message
+    store.add_message(MessageDef(
+        session_id=session.id, from_agent="user",
+        message_type="text", content=content,
+    ))
+
+    # Find agent
+    agent_store = get_agent_store()
+    agent_id = proj.lead_agent_id or "brain"
+    agent = agent_store.get(agent_id)
+    if not agent:
+        all_agents = agent_store.list_all()
+        agent = all_agents[0] if all_agents else None
+
+    async def event_generator():
+        import html as html_mod
+        import markdown as md_lib
+
+        def sse(event: str, data: dict) -> str:
+            return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+        yield sse("status", {"label": "Thinking…"})
+
+        if not agent:
+            yield sse("error", {"message": "No agent available"})
+            return
+
+        try:
+            # Build context
+            ctx = await _build_context(agent, session)
+
+            # Progress callback — called by executor for each tool invocation
+            progress_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+
+            async def on_tool_call(name: str, args: dict, result: str):
+                # RLM sub-events: args contains {"status": "label"}
+                if name == "deep_search" and isinstance(args, dict) and "status" in args:
+                    label = args["status"]
+                    await progress_queue.put(("status", name, label))
+                    return
+                labels = {
+                    "deep_search": "Deep search…",
+                    "code_read": "Reading files…",
+                    "code_search": "Searching code…",
+                    "git_log": "Checking git…",
+                    "git_diff": "Checking diff…",
+                    "memory_search": "Searching memory…",
+                    "memory_store": "Storing to memory…",
+                }
+                label = labels.get(name, f"{name}…")
+                await progress_queue.put(("tool", name, label))
+
+            ctx.on_tool_call = on_tool_call
+
+            # Run executor with streaming
+            executor = get_executor()
+            result = None
+            accumulated_content = ""
+
+            async for event_type_s, data_s in executor.run_streaming(ctx, content):
+                if event_type_s == "delta":
+                    accumulated_content += data_s
+                    yield sse("chunk", {"text": data_s})
+                elif event_type_s == "result":
+                    result = data_s
+
+            if not result:
+                yield sse("error", {"message": "No response from agent"})
+                return
+
+            # Store agent message
+            store.add_message(MessageDef(
+                session_id=session.id,
+                from_agent=agent.id,
+                to_agent="user",
+                message_type="text",
+                content=result.content,
+                metadata={
+                    "model": result.model,
+                    "provider": result.provider,
+                    "tokens_in": result.tokens_in,
+                    "tokens_out": result.tokens_out,
+                    "duration_ms": result.duration_ms,
+                    "tool_calls": result.tool_calls if result.tool_calls else None,
+                },
+            ))
+
+            # Build final HTML
+            rendered = md_lib.markdown(
+                str(result.content),
+                extensions=["fenced_code", "tables", "nl2br"]
+            )
+            yield sse("done", {"html": rendered})
+
+        except Exception as exc:
+            logger.exception("Streaming chat error")
+            yield sse("error", {"message": str(exc)[:200]})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+@router.get("/api/sessions/{session_id}/stream")
+async def session_sse_stream(request: Request, session_id: str):
+    """SSE stream for live session updates (messages, status changes)."""
+    import asyncio
+    from ...sessions.runner import add_sse_listener, remove_sse_listener
+
+    queue = add_sse_listener(session_id)
+
+    async def event_stream():
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    payload = json.dumps(event) if isinstance(event, dict) else str(event)
+                    yield f"data: {payload}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            remove_sse_listener(session_id, queue)
+
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+    )
+
+
