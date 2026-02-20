@@ -1,0 +1,361 @@
+
+        <!-- Tab: Dev -->
+        <div class="mc-tab-panel" data-tab="dev">
+            {% set dev_agent = agent_map.get('lead_dev') or agent_map.get('dev_backend') %}
+            {% if dev_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ dev_agent['avatar_url'] or '' }}" alt="" onerror="this.src='/static/avatars/lead_dev.jpg'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ dev_agent['name'] }}</div>
+                    <div class="mc-tab-agent-role">{{ dev_agent['role'] }}</div>
+                    {% if dev_agent.get('tagline') %}<div class="mc-tab-agent-tagline">{{ dev_agent['tagline'] }}</div>{% endif %}
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ dev_agent['id'] }}','{{ dev_agent['name'] }}','{{ dev_agent['role'] }}','{{ dev_agent['avatar_url'] or '' }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
+            <div class="mc-dev-grid">
+                <div class="mc-dev-commits">
+                    <h4>Commits</h4>
+                    {% for c in workspace_commits %}
+                    <div class="mc-dev-commit">
+                        <div class="mc-dev-commit-dot"></div>
+                        <code class="mc-dev-commit-hash">{{ c.hash[:7] }}</code>
+                        <span class="mc-dev-commit-msg">{{ c.message[:80] }}</span>
+                    </div>
+                    {% endfor %}
+                    {% if not workspace_commits %}<div class="mc-dev-empty">Aucun commit</div>{% endif %}
+                </div>
+                <div class="mc-dev-prs">
+                    <h4>Pull Requests</h4>
+                    {% for pr in pull_requests %}
+                    <div class="mc-dev-pr {{ pr.status|lower }}">
+                        <span class="mc-dev-pr-icon"><svg class="icon icon-xs"><use href="#icon-git-pull-request"/></svg></span>
+                        <span class="mc-dev-pr-num">#{{ pr.number }}</span>
+                        <span class="mc-dev-pr-title">{{ pr.title[:60] }}</span>
+                        <span class="mc-dev-pr-status {{ pr.status|lower }}">{{ pr.status }}</span>
+                    </div>
+                    {% endfor %}
+                    {% if not pull_requests %}<div class="mc-dev-empty">Aucune PR</div>{% endif %}
+                </div>
+            </div>
+            <div class="mc-dev-files">
+                <h4>Fichiers ({{ workspace_files|length if workspace_files else 0 }})</h4>
+                <div class="mc-dev-file-tree">
+                    {% for f in workspace_files or [] %}
+                    <div class="mc-dev-file"><span class="mc-dev-file-icon">{{ '📁' if f.is_dir else '📄' }}</span>{{ f.path }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: PO -->
+        <div class="mc-tab-panel" data-tab="po">
+            {% set po_agent = agent_map.get('product_owner') or agent_map.get('product_manager') or agent_map.get('chef_projet') %}
+            {% if po_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ po_agent['avatar_url'] or '' }}" alt="" onerror="this.src='/static/avatars/product_owner.jpg'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ po_agent['name'] }}</div>
+                    <div class="mc-tab-agent-role">{{ po_agent['role'] }}</div>
+                    {% if po_agent.get('tagline') %}<div class="mc-tab-agent-tagline">{{ po_agent['tagline'] }}</div>{% endif %}
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ po_agent['id'] }}','{{ po_agent['name'] }}','{{ po_agent['role'] }}','{{ po_agent['avatar_url'] or '' }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
+            <div class="mc-kanban">
+                <div class="mc-kanban-col" data-col="backlog">
+                    <div class="mc-kanban-col-header"><span class="mc-kanban-dot backlog"></span> Backlog <span class="mc-kanban-count">{{ po_backlog|length }}</span></div>
+                    {% for f in po_backlog %}
+                    <div class="mc-kanban-card">
+                        <div class="mc-kanban-card-title">{{ f.name }}</div>
+                        {% if f.acceptance_criteria %}<div class="mc-kanban-card-criteria">{{ f.acceptance_criteria[:100] }}</div>{% endif %}
+                        {% if f.assigned_to %}<div class="mc-kanban-card-assignee">{{ f.assigned_to }}</div>{% endif %}
+                        <div class="mc-kanban-card-meta">
+                            {% if f.story_points %}<span class="mc-kanban-sp">{{ f.story_points }} SP</span>{% endif %}
+                            <span class="mc-kanban-priority p{{ f.priority }}">P{{ f.priority }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mc-kanban-col" data-col="sprint">
+                    <div class="mc-kanban-col-header"><span class="mc-kanban-dot sprint"></span> En cours <span class="mc-kanban-count">{{ po_sprint|length }}</span></div>
+                    {% for f in po_sprint %}
+                    <div class="mc-kanban-card">
+                        <div class="mc-kanban-card-title">{{ f.name }}</div>
+                        {% if f.acceptance_criteria %}<div class="mc-kanban-card-criteria">{{ f.acceptance_criteria[:100] }}</div>{% endif %}
+                        {% if f.assigned_to %}<div class="mc-kanban-card-assignee">{{ f.assigned_to }}</div>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mc-kanban-col" data-col="done">
+                    <div class="mc-kanban-col-header"><span class="mc-kanban-dot done"></span> Terminé <span class="mc-kanban-count">{{ po_done|length }}</span></div>
+                    {% for f in po_done %}
+                    <div class="mc-kanban-card done">
+                        <div class="mc-kanban-card-title">{{ f.name }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: QA -->
+        <div class="mc-tab-panel" data-tab="qa">
+            {% set qa_agent = agent_map.get('qa_lead') or agent_map.get('test_manager') or agent_map.get('test_automation') %}
+            {% if qa_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ qa_agent['avatar_url'] or '' }}" alt="" onerror="this.src='/static/avatars/qa_lead.jpg'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ qa_agent['name'] }}</div>
+                    <div class="mc-tab-agent-role">{{ qa_agent['role'] }}</div>
+                    {% if qa_agent.get('tagline') %}<div class="mc-tab-agent-tagline">{{ qa_agent['tagline'] }}</div>{% endif %}
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ qa_agent['id'] }}','{{ qa_agent['name'] }}','{{ qa_agent['role'] }}','{{ qa_agent['avatar_url'] or '' }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
+            <div class="mc-qa">
+
+                <!-- Section 1: Tests unitaires & E2E trouvés dans le workspace -->
+                <div class="mc-qa-section">
+                    <h4>Tests — Fichiers</h4>
+                    {% if qa_test_files %}
+                    <div class="mc-qa-test-grid">
+                        {% for tf in qa_test_files %}
+                        <div class="mc-qa-test-file">
+                            <span class="mc-qa-test-badge mc-qa-badge-{{ tf.type }}">{{ tf.type }}</span>
+                            <span class="mc-qa-test-path">{{ tf.path }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="mc-qa-empty">Aucun fichier de test dans le workspace</div>
+                    {% endif %}
+                </div>
+
+                <!-- Section 2: Résultats d'exécution QA -->
+                <div class="mc-qa-section">
+                    <h4>Résultats d'exécution</h4>
+                    {% if qa_phase_results %}
+                    <div class="mc-qa-results">
+                        {% for r in qa_phase_results %}
+                        <div class="mc-qa-result-card">
+                            <div class="mc-qa-result-header">
+                                <span class="mc-qa-result-phase">{{ r.phase }}</span>
+                                <span class="mc-qa-result-agent">{{ r.agent }}</span>
+                                <span class="mc-qa-ok">{{ r.passes }} pass</span>
+                                <span class="mc-qa-ko">{{ r.fails }} fail</span>
+                            </div>
+                            <div class="mc-qa-result-excerpt">{{ r.excerpt | markdown | safe }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="mc-qa-empty">Aucun résultat de test</div>
+                    {% endif %}
+                </div>
+
+                <!-- Section 3: Screenshots parcours utilisateur -->
+                {% if result_screenshots %}
+                <div class="mc-qa-section">
+                    <h4>Parcours utilisateur — Screenshots</h4>
+                    <div class="mc-qa-screenshots-grid">
+                        {% for s in result_screenshots %}
+                        <div class="mc-qa-shot-card">
+                            <img src="/workspace/{{ mission.id }}/{{ s }}" alt="{{ s }}" loading="lazy" onclick="window.open(this.src)" onerror="this.parentElement.style.display='none'" style="width:100%;cursor:pointer;border-radius:6px">
+                            <div class="mc-qa-shot-label">{{ s.split('/')[-1] }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Section 4: Adversarial Guard (collapsible) -->
+                {% if agent_scores %}
+                <details class="mc-qa-section mc-qa-adversarial-details">
+                    <summary><h4 style="display:inline">Adversarial Guard — Code Review ({{ qa_pass_rate }}% pass)</h4></summary>
+                    <div class="mc-qa-grid" style="margin-top:0.5rem">
+                        {% for s in agent_scores %}
+                        <div class="mc-qa-agent-card">
+                            <div class="mc-qa-agent-name">{{ s.agent_id }}</div>
+                            <div class="mc-qa-agent-bar">
+                                <div class="mc-qa-bar-fill" style="width:{{ (s.accepted / s.iterations * 100)|round if s.iterations > 0 else 0 }}%;background:{{ 'var(--green)' if s.accepted > s.rejected else 'var(--red)' }}"></div>
+                            </div>
+                            <div class="mc-qa-agent-stats">
+                                <span class="mc-qa-ok">{{ s.accepted }}</span>
+                                <span class="mc-qa-ko">{{ s.rejected }}</span>
+                                <span class="mc-qa-total">{{ s.iterations }} iter</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="mc-qa-metrics" style="margin-top:0.5rem">
+                        <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_iterations }}</span><span class="mc-qa-metric-label">Iterations</span></div>
+                        <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_accepted }}</span><span class="mc-qa-metric-label">Accepted</span></div>
+                        <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_rejected }}</span><span class="mc-qa-metric-label">Rejected</span></div>
+                    </div>
+                </details>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Tab: Architecture -->
+        <div class="mc-tab-panel" data-tab="archi">
+            {% set archi_agent = agent_map.get('architecte') or agent_map.get('lead_dev') %}
+            {% if archi_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ archi_agent['avatar_url'] or '' }}" alt="" onerror="this.src='/static/avatars/architecte.jpg'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ archi_agent['name'] }}</div>
+                    <div class="mc-tab-agent-role">{{ archi_agent['role'] }}</div>
+                    {% if archi_agent.get('tagline') %}<div class="mc-tab-agent-tagline">{{ archi_agent['tagline'] }}</div>{% endif %}
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ archi_agent['id'] }}','{{ archi_agent['name'] }}','{{ archi_agent['role'] }}','{{ archi_agent['avatar_url'] or '' }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
+            <div class="mc-archi">
+                {% if archi_content %}
+                <div class="mc-archi-doc">
+                    <div class="mc-archi-header">
+                        <h4>Architecture du projet</h4>
+                        <span class="mc-archi-updated">{{ archi_updated or '' }}</span>
+                    </div>
+                    <div class="mc-archi-body">{{ archi_content | markdown | safe }}</div>
+                </div>
+                {% else %}
+                <div class="mc-archi-empty">
+                    <svg class="icon" style="width:32px;height:32px;opacity:.3"><use href="#icon-layers"/></svg>
+                    <p>Pas encore d'architecture documentee</p>
+                    <p class="mc-archi-hint">L'architecte mettra a jour ce document apres chaque phase technique</p>
+                </div>
+                {% endif %}
+                {% if archi_decisions %}
+                <div class="mc-archi-decisions">
+                    <h4>Decisions architecturales</h4>
+                    {% for d in archi_decisions %}
+                    <div class="mc-archi-decision">
+                        <div class="mc-archi-decision-phase">{{ d.phase }}</div>
+                        <div class="mc-archi-decision-text">{{ d.text | markdown | safe }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% if archi_stack %}
+                <div class="mc-archi-stack">
+                    <h4>Stack technique</h4>
+                    <div class="mc-archi-stack-tags">
+                        {% for t in archi_stack %}
+                        <span class="mc-archi-tag">{{ t }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Tab: Wiki -->
+        <div class="mc-tab-panel" data-tab="wiki">
+            {% set wiki_agent = agent_map.get('tech_writer') or agent_map.get('lead_dev') %}
+            {% if wiki_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ wiki_agent['avatar_url'] or '' }}" alt="" onerror="this.src='/static/avatars/tech_writer.jpg'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ wiki_agent['name'] }}</div>
+                    <div class="mc-tab-agent-role">{{ wiki_agent['role'] }}</div>
+                    {% if wiki_agent.get('tagline') %}<div class="mc-tab-agent-tagline">{{ wiki_agent['tagline'] }}</div>{% endif %}
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ wiki_agent['id'] }}','{{ wiki_agent['name'] }}','{{ wiki_agent['role'] }}','{{ wiki_agent['avatar_url'] or '' }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
+            <div class="mc-wiki">
+                {% if wiki_pages %}
+                {% for page in wiki_pages %}
+                <details class="mc-wiki-page" {% if loop.first %}open{% endif %}>
+                    <summary class="mc-wiki-page-title">
+                        <span>{{ page.title }}</span>
+                        {% if page.updated %}<span class="mc-wiki-page-date">{{ page.updated }}</span>{% endif %}
+                    </summary>
+                    <div class="mc-wiki-page-body">{{ page.content | markdown | safe }}</div>
+                </details>
+                {% endfor %}
+                {% else %}
+                <div class="mc-wiki-empty">
+                    <svg class="icon" style="width:32px;height:32px;opacity:.3"><use href="#icon-book-open"/></svg>
+                    <p>Pas encore de documentation</p>
+                    <p class="mc-wiki-hint">Le tech writer mettra a jour la documentation apres chaque phase</p>
+                </div>
+                {% endif %}
+                {% if wiki_memories %}
+                <div class="mc-wiki-memories">
+                    <h4>Memoire projet</h4>
+                    {% for m in wiki_memories %}
+                    <div class="mc-wiki-memory">
+                        <span class="mc-wiki-memory-cat">{{ m.category }}</span>
+                        <span class="mc-wiki-memory-text">{{ m.value }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Tab: Projet -->
+        <div class="mc-tab-panel" data-tab="projet">
+            <div class="mc-projet">
+                {% if result_launch_cmd %}
+                <div class="mc-projet-url" style="border-color:var(--green)">
+                    <h4>🚀 Lancer l'application</h4>
+                    <code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_launch_cmd }}" style="color:var(--green);border-color:var(--green);font-size:0.85rem;cursor:pointer" title="▶ Cliquer pour exécuter">{{ result_launch_cmd }}</code>
+                </div>
+                {% endif %}
+                {% if result_deploy_url %}
+                <div class="mc-projet-url">
+                    <h4>🌐 Application déployée</h4>
+                    <a href="{{ result_deploy_url }}" target="_blank">{{ result_deploy_url }}</a>
+                </div>
+                {% endif %}
+                {% if result_build_cmd %}
+                <div class="mc-projet-build">
+                    <h4>🔧 Build & Run</h4>
+                    <code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_build_cmd }}" style="cursor:pointer" title="▶ Cliquer pour exécuter">🔧 {{ result_build_cmd }}</code>
+                    {% if result_run_cmd %}<code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_run_cmd }}" style="cursor:pointer" title="▶ Cliquer pour exécuter">▶ {{ result_run_cmd }}</code>{% endif %}
+                </div>
+                {% endif %}
+                {% if result_screenshots %}
+                <div class="mc-projet-gallery">
+                    <h4>📸 Screenshots ({{ result_screenshots|length }})</h4>
+                    <div class="mc-projet-imgs">
+                        {% for s in result_screenshots %}
+                        <div style="text-align:center">
+                            <img src="/workspace/{{ mission.id }}/{{ s }}" alt="{{ s }}" loading="lazy" onclick="window.open(this.src)" onerror="this.parentElement.style.display='none'" style="max-width:300px;border-radius:8px;border:1px solid var(--border)">
+                            <div style="font-size:0.7rem;color:var(--text-secondary);margin-top:4px">{{ s }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                <div class="mc-projet-files">
+                    <h4>📁 Workspace</h4>
+                    <div class="mc-projet-file-tree">
+                        {% for f in workspace_files or [] %}
+                        <div class="mc-dev-file"><span class="mc-dev-file-icon">{{ '📁' if f.is_dir else '📄' }}</span>{{ f.path }}</div>
+                        {% endfor %}
+                    </div>
+                    {% if mission.workspace_path %}
+                    <code class="mc-result-cmd" style="margin-top:0.5rem;display:inline-block" onclick="navigator.clipboard.writeText(this.textContent.trim())">cd {{ mission.workspace_path }}</code>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}{# end workflow_type conditional tabs #}
+    </div>
+
+    <!-- ====== RIGHT SIDEBAR ====== -->
