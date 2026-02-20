@@ -4939,6 +4939,25 @@ async def missions_list_page(request: Request):
     })
 
 
+@router.delete("/api/mission-runs/{run_id}")
+async def delete_mission_run(run_id: str):
+    """Delete a mission run and its associated session/messages."""
+    from ..missions.store import get_mission_run_store
+    from ..db.migrations import get_db
+    store = get_mission_run_store()
+    run = store.get(run_id)
+    if not run:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    conn = get_db()
+    if run.session_id:
+        conn.execute("DELETE FROM messages WHERE session_id = ?", (run.session_id,))
+        conn.execute("DELETE FROM sessions WHERE id = ?", (run.session_id,))
+    conn.execute("DELETE FROM mission_runs WHERE id = ?", (run_id,))
+    conn.execute("DELETE FROM confluence_pages WHERE mission_id = ?", (run_id,))
+    conn.commit()
+    return JSONResponse({"status": "deleted"})
+
+
 @router.get("/missions/start/{workflow_id}", response_class=HTMLResponse)
 async def mission_start_page(request: Request, workflow_id: str):
     """Start a new mission — show brief form."""

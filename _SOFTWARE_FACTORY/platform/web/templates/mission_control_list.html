@@ -11,6 +11,7 @@
 .mission-list{display:flex;flex-direction:column;gap:0.75rem}
 .mission-card{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;text-decoration:none;transition:border-color .15s,box-shadow .15s}
 .mission-card:hover{border-color:var(--purple-dim);box-shadow:0 2px 12px rgba(124,58,237,.08)}
+.mission-card-wrap .mission-card{border-radius:10px 10px 0 0}
 
 .mission-status-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
 .mission-status-icon.running{background:rgba(124,58,237,.15);color:var(--purple)}
@@ -38,6 +39,8 @@
 .mission-badge.completed{background:rgba(34,197,94,.12);color:var(--green)}
 .mission-badge.failed{background:rgba(239,68,68,.12);color:var(--red)}
 .mission-badge.paused,.mission-badge.pending{background:var(--bg-tertiary);color:var(--text-secondary)}
+.mission-card-wrap{display:flex;flex-direction:column;gap:0}
+.mission-actions{display:flex;gap:0.4rem;padding:0.4rem 1.2rem 0.6rem;background:var(--bg-secondary);border:1px solid var(--border);border-top:0;border-radius:0 0 10px 10px;margin-top:-1px}
 .launch-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;justify-content:center}
 .launch-form{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;width:90%;max-width:520px}
 .launch-form h3{margin:0 0 1rem;color:var(--text-primary)}
@@ -56,6 +59,7 @@
     {% set total = run.phases|length %}
     {% set pct = ((done_count / total) * 100)|round|int if total > 0 else 0 %}
     {% set st = run.status.value %}
+    <div class="mission-card-wrap">
     <a href="/missions/{{ run.id }}/control" class="mission-card">
         <div class="mission-status-icon {{ st }}">
             {% if st == 'running' %}<svg class="icon icon-xs"><use href="#icon-activity"/></svg>{% elif st == 'completed' %}<svg class="icon icon-xs"><use href="#icon-check"/></svg>{% elif st == 'failed' %}<svg class="icon icon-xs"><use href="#icon-x"/></svg>{% else %}<svg class="icon icon-xs"><use href="#icon-pause"/></svg>{% endif %}
@@ -79,6 +83,20 @@
             <span class="mission-date">{{ run.created_at[:16].replace('T',' ') if run.created_at is string else run.created_at.strftime('%d/%m %H:%M') }}</span>
         </div>
     </a>
+    <div class="mission-actions">
+        {% if st == 'running' and done_count < total %}
+        <button class="btn btn-sm" onclick="event.stopPropagation();runPhase('{{ run.id }}')" title="Lancer la prochaine phase">
+            <svg class="icon icon-xs"><use href="#icon-play"/></svg> Lancer phase {{ done_count + 1 }}
+        </button>
+        {% endif %}
+        <a href="/missions/{{ run.id }}/control" class="btn btn-sm btn-ghost" title="Mission Control">
+            <svg class="icon icon-xs"><use href="#icon-monitor"/></svg> Control
+        </a>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteRun('{{ run.id }}')" title="Supprimer">
+            <svg class="icon icon-xs"><use href="#icon-trash"/></svg>
+        </button>
+    </div>
+    </div>
     {% endfor %}
 </div>
 {% else %}
@@ -137,5 +155,23 @@ document.getElementById('launchForm').addEventListener('submit', async e => {
         else { alert(j.error || 'Erreur'); btn.disabled = false; btn.textContent = 'Lancer'; }
     } catch(err) { alert(err); btn.disabled = false; btn.textContent = 'Lancer'; }
 });
+
+async function runPhase(runId) {
+    try {
+        const r = await fetch(`/api/missions/${runId}/run`, {method:'POST'});
+        const j = await r.json();
+        if (j.status === 'started' || j.redirect) location.href = `/missions/${runId}/control`;
+        else alert(j.error || j.message || 'Erreur');
+    } catch(err) { alert(err); }
+}
+
+async function deleteRun(runId) {
+    if (!confirm('Supprimer cette epic et toutes ses données ?')) return;
+    try {
+        const r = await fetch(`/api/mission-runs/${runId}`, {method:'DELETE'});
+        if (r.ok) location.reload();
+        else { const j = await r.json(); alert(j.error || 'Erreur'); }
+    } catch(err) { alert(err); }
+}
 </script>
 {% endblock %}
