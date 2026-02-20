@@ -1,19 +1,187 @@
 {% extends "base.html" %}
 {% block topbar_actions %}
-<a href="/missions?action=new" class="btn btn-primary">
-    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> New Epic
-</a>
+<button class="btn btn-primary" onclick="document.getElementById('newMissionModal').style.display='flex'">
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Nouvelle Mission
+</button>
 {% endblock %}
 {% block content %}
-<div class="tabs">
-    <button class="tab active" hx-get="/missions" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click, load" onclick="switchTab(this)">Epics</button>
-    <button class="tab" hx-get="/mission-control" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">Control</button>
+<style>
+.mission-list{display:flex;flex-direction:column;gap:0.75rem}
+.mission-card{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;text-decoration:none;transition:border-color .15s,box-shadow .15s}
+.mission-card:hover{border-color:var(--purple-dim);box-shadow:0 2px 12px rgba(124,58,237,.08)}
+.mission-card-wrap .mission-card{border-radius:10px 10px 0 0}
+.mission-status-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.mission-status-icon.running{background:rgba(124,58,237,.15);color:var(--purple)}
+.mission-status-icon.completed{background:rgba(34,197,94,.12);color:var(--green)}
+.mission-status-icon.failed{background:rgba(239,68,68,.12);color:var(--red)}
+.mission-status-icon.paused,.mission-status-icon.pending{background:var(--bg-tertiary);color:var(--text-secondary)}
+.mission-body{min-width:0}
+.mission-title{font-size:0.92rem;font-weight:600;color:var(--text-primary);margin-bottom:0.2rem;display:flex;align-items:center;gap:0.5rem}
+.mission-brief{font-size:0.8rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:500px;margin-bottom:0.45rem}
+.mission-progress-row{display:flex;align-items:center;gap:0.6rem}
+.mission-progress-bar{flex:1;max-width:220px;height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden}
+.mission-progress-fill{height:100%;border-radius:3px;transition:width .3s}
+.mission-progress-fill.running{background:var(--purple)}
+.mission-progress-fill.completed{background:var(--green)}
+.mission-progress-fill.failed{background:var(--red)}
+.mission-progress-fill.pending{background:var(--text-secondary)}
+.mission-progress-label{font-size:0.72rem;font-weight:600;color:var(--text-secondary);min-width:60px}
+.mission-meta{display:flex;flex-direction:column;align-items:flex-end;gap:0.3rem;flex-shrink:0}
+.mission-date{font-size:0.72rem;color:var(--text-secondary)}
+.mission-badge{font-size:0.68rem;padding:0.15rem 0.5rem;border-radius:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em}
+.mission-badge.running{background:rgba(124,58,237,.15);color:var(--purple)}
+.mission-badge.completed{background:rgba(34,197,94,.12);color:var(--green)}
+.mission-badge.failed{background:rgba(239,68,68,.12);color:var(--red)}
+.mission-badge.paused,.mission-badge.pending{background:var(--bg-tertiary);color:var(--text-secondary)}
+.mission-card-wrap{display:flex;flex-direction:column;gap:0}
+.mission-actions{display:flex;gap:0.4rem;padding:0.4rem 1.2rem 0.6rem;background:var(--bg-secondary);border:1px solid var(--border);border-top:0;border-radius:0 0 10px 10px;margin-top:-1px}
+.nm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;justify-content:center}
+.nm-form{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;width:90%;max-width:520px}
+.nm-form h3{margin:0 0 1rem;color:var(--text-primary)}
+.nm-field{margin-bottom:0.85rem}
+.nm-field label{display:block;font-size:0.78rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.3rem}
+.nm-field select,.nm-field textarea,.nm-field input{width:100%;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:0.5rem 0.75rem;font-size:0.85rem;font-family:inherit;outline:none}
+.nm-field select:focus,.nm-field textarea:focus,.nm-field input:focus{border-color:var(--purple)}
+.nm-field textarea{resize:vertical;min-height:80px}
+.nm-actions{display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem}
+.wf-desc{font-size:0.75rem;color:var(--text-secondary);margin-top:0.3rem;padding:0.4rem 0.6rem;background:var(--bg-tertiary);border-radius:6px;display:none}
+</style>
+
+{% if runs %}
+<div class="mission-list">
+    {% for run in runs %}
+    {% set done_count = run.phases|selectattr('status.value','equalto','done')|list|length %}
+    {% set total = run.phases|length %}
+    {% set pct = ((done_count / total) * 100)|round|int if total > 0 else 0 %}
+    {% set st = run.status.value %}
+    <div class="mission-card-wrap">
+    <a href="/missions/{{ run.id }}/control" class="mission-card">
+        <div class="mission-status-icon {{ st }}">
+            {% if st == 'running' %}<svg class="icon icon-xs"><use href="#icon-activity"/></svg>{% elif st == 'completed' %}<svg class="icon icon-xs"><use href="#icon-check"/></svg>{% elif st == 'failed' %}<svg class="icon icon-xs"><use href="#icon-x"/></svg>{% else %}<svg class="icon icon-xs"><use href="#icon-pause"/></svg>{% endif %}
+        </div>
+        <div class="mission-body">
+            {% set epic_name = run.brief.split(' - ')[0] if ' - ' in run.brief else run.brief[:50] %}
+            <div class="mission-title">
+                {{ epic_name }}
+                <span style="font-size:0.68rem;font-weight:400;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.1rem 0.4rem;border-radius:4px">{{ run.workflow_name or run.workflow_id }}</span>
+            </div>
+            <div class="mission-brief">{{ run.brief[epic_name|length + 3:epic_name|length + 143] if ' - ' in run.brief else run.brief[:140] }}</div>
+            <div class="mission-progress-row">
+                <div class="mission-progress-bar">
+                    <div class="mission-progress-fill {{ st }}" style="width:{{ pct }}%"></div>
+                </div>
+                <span class="mission-progress-label">{{ done_count }}/{{ total }} phases</span>
+            </div>
+        </div>
+        <div class="mission-meta">
+            <span class="mission-badge {{ st }}">{{ st }}</span>
+            <span class="mission-date">{{ run.created_at[:16].replace('T',' ') if run.created_at is string else run.created_at.strftime('%d/%m %H:%M') }}</span>
+        </div>
+    </a>
+    <div class="mission-actions">
+        {% if st == 'running' and done_count < total %}
+        <button class="btn btn-sm" onclick="event.stopPropagation();runPhase('{{ run.id }}')" title="Lancer la prochaine phase">
+            <svg class="icon icon-xs"><use href="#icon-play"/></svg> Lancer phase {{ done_count + 1 }}
+        </button>
+        {% endif %}
+        <a href="/missions/{{ run.id }}/control" class="btn btn-sm btn-ghost" title="Mission Control">
+            <svg class="icon icon-xs"><use href="#icon-monitor"/></svg> Control
+        </a>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteRun('{{ run.id }}')" title="Supprimer">
+            <svg class="icon icon-xs"><use href="#icon-trash"/></svg>
+        </button>
+    </div>
+    </div>
+    {% endfor %}
 </div>
-<div id="tab-content"></div>
+{% else %}
+<div class="empty-state" style="text-align:center;padding:3rem;">
+    <p style="margin-bottom:0.5rem"><svg class="icon" style="width:2.5rem;height:2.5rem"><use href="#icon-rocket"/></svg></p>
+    <h3 style="color:var(--text-primary);margin-bottom:0.3rem">Aucune mission</h3>
+    <p style="color:var(--text-secondary);font-size:0.88rem;margin-bottom:1rem">Lancez une mission pour orchestrer un workflow multi-agents.</p>
+    <button class="btn btn-primary" onclick="document.getElementById('newMissionModal').style.display='flex'">
+        <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Nouvelle Mission
+    </button>
+</div>
+{% endif %}
+
+<!-- Modal création mission -->
+<div id="newMissionModal" class="nm-overlay" onclick="if(event.target===this)this.style.display='none'">
+    <form class="nm-form" id="newMissionForm">
+        <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> Nouvelle Mission</h3>
+        <div class="nm-field">
+            <label>Projet</label>
+            <select name="project_id" required>
+                {% for p in projects %}
+                <option value="{{ p.id }}">{{ p.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="nm-field">
+            <label>Workflow</label>
+            <select name="workflow_id" id="wfSelect" required onchange="showWfDesc()">
+                <option value="" disabled selected>Choisir un workflow...</option>
+                {% for wf in workflows %}
+                <option value="{{ wf.id }}" data-phases="{{ wf.phases|length if wf.phases else '?' }}">{{ wf.name }}</option>
+                {% endfor %}
+            </select>
+            <div class="wf-desc" id="wfDesc"></div>
+        </div>
+        <div class="nm-field">
+            <label>Brief de la mission</label>
+            <textarea name="brief" placeholder="Nom de la mission - Description du besoin, contexte, objectifs..." required></textarea>
+        </div>
+        <div class="nm-actions">
+            <button type="button" class="btn btn-ghost" onclick="document.getElementById('newMissionModal').style.display='none'">Annuler</button>
+            <button type="submit" class="btn btn-primary">
+                <svg class="icon icon-sm"><use href="#icon-play"/></svg> Lancer la Mission
+            </button>
+        </div>
+    </form>
+</div>
+
 <script>
-function switchTab(btn){
-    document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.remove('active'));
-    btn.classList.add('active');
+const WF_INFO = {
+    {% for wf in workflows %}
+    "{{ wf.id }}": "{{ wf.name }} — {{ wf.phases|length if wf.phases else '?' }} phases",
+    {% endfor %}
+};
+function showWfDesc(){
+    const sel = document.getElementById('wfSelect');
+    const desc = document.getElementById('wfDesc');
+    if(sel.value && WF_INFO[sel.value]){desc.textContent=WF_INFO[sel.value];desc.style.display='block';}
+    else desc.style.display='none';
+}
+
+document.getElementById('newMissionForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = e.target.querySelector('[type=submit]');
+    btn.disabled = true; btn.textContent = 'Lancement...';
+    try {
+        const r = await fetch('/api/missions/start', {method:'POST', body: fd});
+        const j = await r.json();
+        if (j.redirect) location.href = j.redirect;
+        else { alert(j.error || 'Erreur'); btn.disabled = false; btn.textContent = 'Lancer la Mission'; }
+    } catch(err) { alert(err); btn.disabled = false; btn.textContent = 'Lancer la Mission'; }
+});
+
+async function runPhase(runId) {
+    try {
+        const r = await fetch(`/api/missions/${runId}/run`, {method:'POST'});
+        const j = await r.json();
+        if (j.status === 'started' || j.redirect) location.href = `/missions/${runId}/control`;
+        else alert(j.error || j.message || 'Erreur');
+    } catch(err) { alert(err); }
+}
+
+async function deleteRun(runId) {
+    if (!confirm('Supprimer cette mission et toutes ses données ?')) return;
+    try {
+        const r = await fetch(`/api/mission-runs/${runId}`, {method:'DELETE'});
+        if (r.ok) location.reload();
+        else { const j = await r.json(); alert(j.error || 'Erreur'); }
+    } catch(err) { alert(err); }
 }
 </script>
 {% endblock %}

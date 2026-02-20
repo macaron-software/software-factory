@@ -236,9 +236,16 @@ async def backlog_page(request: Request, tab: str = "backlog"):
 
 @router.get("/pi", response_class=HTMLResponse)
 async def pi_board_page(request: Request):
-    """PI Board — Epics + Control in tabs."""
+    """PI Board — missions list with creation."""
+    from ..missions.store import get_mission_run_store
+    from ..projects.manager import get_project_store
+    from ..workflows.store import get_workflow_store
+    runs = get_mission_run_store().list_runs(limit=50)
+    projects = get_project_store().list_all()
+    workflows = get_workflow_store().list_all()
     return _templates(request).TemplateResponse("pi_board.html", {
         "request": request, "page_title": "PI Board",
+        "runs": runs, "projects": projects, "workflows": workflows,
     })
 
 @router.get("/ceremonies", response_class=HTMLResponse)
