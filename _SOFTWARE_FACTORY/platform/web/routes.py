@@ -4077,6 +4077,29 @@ async def metier_page(request: Request):
     })
 
 
+# ── 3D Agent World ────────────────────────────────────────────────
+
+@router.get("/world", response_class=HTMLResponse)
+async def agent_world_page(request: Request):
+    """3D Sims-like agent visualization."""
+    import json as _json
+    from ..agents.store import AgentStore
+    store = AgentStore()
+    all_agents = store.list_all()
+    agents_json = _json.dumps([
+        {
+            "id": a.id, "name": a.name, "role": a.role,
+            "color": a.color, "avatar": a.avatar, "tagline": a.tagline,
+            "hierarchy_rank": a.hierarchy_rank,
+            "skills": a.skills[:8], "tools": a.tools[:6],
+        }
+        for a in all_agents
+    ])
+    return _templates(request).TemplateResponse("agent_world.html", {
+        "request": request, "page_title": "World",
+        "agents": all_agents, "agents_json": agents_json,
+    })
+
 # ── Product Line Manager ─────────────────────────────────────────
 
 @router.get("/product-line", response_class=HTMLResponse)

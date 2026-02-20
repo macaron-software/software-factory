@@ -1,0 +1,1245 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<div style="display:flex;align-items:center;gap:10px;">
+    <span class="badge badge-purple" id="world-agent-count">{{ agents|length }} agents</span>
+    <span class="badge badge-green" id="world-active-count">0 actifs</span>
+    <button class="btn btn-sm" onclick="worldResetCamera()" title="Reset camera">
+        <svg class="icon icon-sm"><use href="#icon-maximize"/></svg>
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+/* ── World Layout ── */
+.world-wrap{position:relative;width:100%;height:calc(100vh - 56px);overflow:hidden;background:#0a0812}
+#world-canvas{width:100%;height:100%;display:block}
+
+/* ── HUD Overlay ── */
+.world-hud{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:10}
+.world-hud > *{pointer-events:auto}
+
+/* ── Activity Feed ── */
+.world-feed{position:absolute;right:12px;top:12px;width:280px;max-height:45vh;overflow-y:auto;display:flex;flex-direction:column;gap:4px;scrollbar-width:thin;scrollbar-color:var(--purple-light) transparent}
+.world-feed::-webkit-scrollbar{width:4px}
+.world-feed::-webkit-scrollbar-thumb{background:var(--purple-light);border-radius:4px}
+.wf-item{background:rgba(15,13,26,0.85);backdrop-filter:blur(8px);border:1px solid rgba(124,58,237,0.2);border-radius:8px;padding:6px 10px;font-size:0.72rem;color:var(--text-secondary);display:flex;align-items:flex-start;gap:6px;animation:wf-in .3s ease}
+@keyframes wf-in{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+.wf-dot{width:6px;height:6px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.wf-dot--thinking{background:var(--yellow)}
+.wf-dot--acting{background:var(--blue)}
+.wf-dot--idle{background:var(--green)}
+.wf-dot--error{background:var(--red)}
+.wf-time{color:var(--text-muted);font-size:0.65rem;white-space:nowrap}
+.wf-name{color:var(--purple-light);font-weight:600}
+
+/* ── Agent Info Panel ── */
+.world-info{position:absolute;left:12px;bottom:12px;width:320px;background:rgba(15,13,26,0.92);backdrop-filter:blur(12px);border:1px solid rgba(124,58,237,0.3);border-radius:12px;padding:16px;display:none;animation:wi-in .25s ease}
+@keyframes wi-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.wi-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.wi-avatar{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:700;color:#fff}
+.wi-name{font-size:0.95rem;font-weight:700;color:var(--text-primary)}
+.wi-role{font-size:0.72rem;color:var(--text-secondary)}
+.wi-status{display:inline-flex;align-items:center;gap:4px;font-size:0.7rem;padding:2px 8px;border-radius:8px;background:var(--bg-tertiary)}
+.wi-status .dot{width:6px;height:6px;border-radius:50%}
+.wi-task{font-size:0.75rem;color:var(--text-secondary);margin-top:8px;padding:8px;background:var(--bg-tertiary);border-radius:8px;max-height:60px;overflow:hidden}
+.wi-skills{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px}
+.wi-skill{font-size:0.62rem;padding:1px 6px;border-radius:4px;background:rgba(124,58,237,0.2);color:var(--purple-light)}
+.wi-close{position:absolute;top:8px;right:8px;background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:1rem}
+
+/* ── Zone Labels ── */
+.world-zones{position:absolute;left:12px;top:12px;display:flex;flex-direction:column;gap:3px}
+.wz-label{font-size:0.65rem;color:var(--text-muted);padding:2px 8px;border-radius:4px;background:rgba(15,13,26,0.7);border-left:3px solid;cursor:pointer;transition:all .15s}
+.wz-label:hover{color:var(--text-primary);background:rgba(15,13,26,0.9)}
+
+/* ── Loading ── */
+.world-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a0812;z-index:100;transition:opacity .5s}
+.world-loading.hidden{opacity:0;pointer-events:none}
+.world-loading h3{color:var(--purple-light);font-size:1.2rem;margin-bottom:8px}
+.world-loading p{color:var(--text-secondary);font-size:0.8rem}
+.wl-bar{width:200px;height:3px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden;margin-top:12px}
+.wl-fill{height:100%;background:var(--purple);border-radius:3px;width:0%;transition:width .3s}
+
+/* ── Legend ── */
+.world-legend{position:absolute;right:12px;bottom:12px;display:flex;gap:10px;background:rgba(15,13,26,0.85);padding:6px 12px;border-radius:8px;border:1px solid rgba(124,58,237,0.15)}
+.wl-item{display:flex;align-items:center;gap:4px;font-size:0.62rem;color:var(--text-secondary)}
+.wl-diamond{width:8px;height:8px;transform:rotate(45deg);border-radius:1px}
+</style>
+
+<div class="world-wrap">
+    <!-- Loading screen -->
+    <div class="world-loading" id="world-loading">
+        <h3>Macaron World</h3>
+        <p>Construction du bureau...</p>
+        <div class="wl-bar"><div class="wl-fill" id="world-load-bar"></div></div>
+    </div>
+
+    <!-- Three.js Canvas -->
+    <canvas id="world-canvas"></canvas>
+
+    <!-- HUD Overlay -->
+    <div class="world-hud">
+        <!-- Zone shortcuts -->
+        <div class="world-zones" id="world-zones"></div>
+
+        <!-- Activity feed -->
+        <div class="world-feed" id="world-feed"></div>
+
+        <!-- Agent info panel -->
+        <div class="world-info" id="world-info">
+            <button class="wi-close" onclick="worldDeselectAgent()">&times;</button>
+            <div class="wi-header">
+                <div class="wi-avatar" id="wi-avatar">G</div>
+                <div>
+                    <div class="wi-name" id="wi-name">—</div>
+                    <div class="wi-role" id="wi-role">—</div>
+                </div>
+                <div class="wi-status" id="wi-status">
+                    <span class="dot"></span> <span>idle</span>
+                </div>
+            </div>
+            <div class="wi-task" id="wi-task" style="display:none"></div>
+            <div class="wi-skills" id="wi-skills"></div>
+        </div>
+
+        <!-- Legend -->
+        <div class="world-legend">
+            <div class="wl-item"><div class="wl-diamond" style="background:#22c55e"></div> Idle</div>
+            <div class="wl-item"><div class="wl-diamond" style="background:#eab308"></div> Thinking</div>
+            <div class="wl-item"><div class="wl-diamond" style="background:#3b82f6"></div> Acting</div>
+            <div class="wl-item"><div class="wl-diamond" style="background:#a855f7"></div> Waiting</div>
+            <div class="wl-item"><div class="wl-diamond" style="background:#ef4444"></div> Error</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+    }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ═══════════════════════════════════════════════════════════════
+// MACARON WORLD — 3D Sims-like Agent Visualization
+// ═══════════════════════════════════════════════════════════════
+
+const AGENT_DATA = {{ agents_json|safe }};
+
+// ── Zone Definitions ──
+const ZONES = [
+    { id:'board',   name:'Board Room',    x:-18, z:-14, w:14, h:8,  color:0xd4a017, floorColor:0x1a1508, roles:['dsi','cto','cpo','strat-cpo','strat-cto','lean_portfolio_manager','strat-portfolio'] },
+    { id:'meeting', name:'Meeting Room',  x:-18, z:-3,  w:14, h:10, color:0x7c3aed, floorColor:0x12091e, roles:['scrum_master','chef_projet','agile_coach','chef_de_programme','product_manager','epic_owner','solution_manager'] },
+    { id:'dev',     name:'Dev Zone',      x:-18, z:10,  w:14, h:14, color:0x3b82f6, floorColor:0x0a1020, roles:['lead_dev','dev_backend','dev_frontend','dev_mobile','dev_fullstack','worker','ml_engineer','data_engineer','plat-lead-dev','plat-dev-backend','plat-dev-frontend','plat-dev-agents','plat-dev-patterns','plat-dev-infra'] },
+    { id:'arch',    name:'Architecture',  x:0,   z:-14, w:14, h:8,  color:0x6366f1, floorColor:0x0e0a1e, roles:['enterprise_architect','solution_architect','cloud_architect','architecte','brain'] },
+    { id:'qa',      name:'QA Lab',        x:0,   z:-3,  w:14, h:10, color:0x22c55e, floorColor:0x081510, roles:['qa_lead','test_automation','test_manager','accessibility_expert','tester','performance_engineer','plat-tma-qa'] },
+    { id:'devops',  name:'Server Room',   x:0,   z:10,  w:14, h:14, color:0x06b6d4, floorColor:0x081518, roles:['devops','sre','dba','pipeline_engineer','devsecops','plat-dev-infra'] },
+    { id:'product', name:'Product Corner',x:18,  z:-14, w:14, h:8,  color:0xf97316, floorColor:0x1a1008, roles:['product','product_manager','epic_owner','tech_writer','pmo'] },
+    { id:'chill',   name:'Chill Zone',    x:18,  z:0,   w:14, h:12, color:0x84cc16, floorColor:0x101508, roles:[] },
+];
+
+const STATUS_COLORS = {
+    idle:     0x22c55e,
+    thinking: 0xeab308,
+    acting:   0x3b82f6,
+    waiting:  0xa855f7,
+    blocked:  0xf97316,
+    error:    0xef4444,
+    stopped:  0x6b7280,
+    paused:   0x6b7280,
+};
+
+// ── Globals ──
+let scene, camera, renderer, controls, clock;
+let agents = {};  // id → { mesh, data, target, status, walkPhase, ... }
+let raycaster, mouse;
+let selectedAgent = null;
+let particleSystems = [];
+
+// ── Loading ──
+const loadBar = document.getElementById('world-load-bar');
+const loadScreen = document.getElementById('world-loading');
+function setLoadProgress(pct) { loadBar.style.width = pct + '%'; }
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+function init() {
+    setLoadProgress(10);
+    const canvas = document.getElementById('world-canvas');
+
+    // Scene
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0812);
+    scene.fog = new THREE.FogExp2(0x0a0812, 0.012);
+
+    // Camera — isometric-ish
+    camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 0.1, 200);
+    camera.position.set(35, 30, 35);
+    camera.lookAt(0, 0, 0);
+
+    // Renderer
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+
+    // Controls
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.maxPolarAngle = Math.PI / 2.2;
+    controls.minDistance = 8;
+    controls.maxDistance = 80;
+    controls.target.set(0, 0, 0);
+
+    // Clock
+    clock = new THREE.Clock();
+
+    // Raycaster
+    raycaster = new THREE.Raycaster();
+    mouse = new THREE.Vector2();
+
+    setLoadProgress(20);
+    buildLighting();
+    setLoadProgress(30);
+    buildFloor();
+    setLoadProgress(40);
+    buildZones();
+    setLoadProgress(50);
+    buildFurniture();
+    setLoadProgress(70);
+    buildAgents();
+    setLoadProgress(85);
+    buildAmbientParticles();
+    setLoadProgress(95);
+    buildZoneLabelsUI();
+    setupInteraction();
+    connectSSE();
+
+    setLoadProgress(100);
+    setTimeout(() => loadScreen.classList.add('hidden'), 400);
+
+    // Resize
+    window.addEventListener('resize', onResize);
+    window.worldResetCamera = resetCamera;
+    window.worldDeselectAgent = deselectAgent;
+
+    animate();
+}
+
+// ═══════════════════════════════════════════════════════
+// LIGHTING
+// ═══════════════════════════════════════════════════════
+function buildLighting() {
+    // Ambient — soft purple tint
+    const ambient = new THREE.AmbientLight(0x2d1b4e, 0.6);
+    scene.add(ambient);
+
+    // Main directional — warm from top-right
+    const dir = new THREE.DirectionalLight(0xffeedd, 0.8);
+    dir.position.set(20, 30, 15);
+    dir.castShadow = true;
+    dir.shadow.mapSize.set(2048, 2048);
+    dir.shadow.camera.left = -40;
+    dir.shadow.camera.right = 40;
+    dir.shadow.camera.top = 40;
+    dir.shadow.camera.bottom = -40;
+    dir.shadow.camera.near = 1;
+    dir.shadow.camera.far = 80;
+    dir.shadow.bias = -0.001;
+    scene.add(dir);
+
+    // Hemisphere — sky/ground
+    const hemi = new THREE.HemisphereLight(0x7c3aed, 0x1a1025, 0.3);
+    scene.add(hemi);
+
+    // Zone point lights
+    for (const z of ZONES) {
+        const pl = new THREE.PointLight(z.color, 0.4, 20, 2);
+        pl.position.set(z.x, 6, z.z);
+        scene.add(pl);
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// FLOOR
+// ═══════════════════════════════════════════════════════
+function buildFloor() {
+    // Main floor
+    const floorGeo = new THREE.PlaneGeometry(80, 60);
+    const floorMat = new THREE.MeshStandardMaterial({
+        color: 0x0f0d1a,
+        roughness: 0.8,
+        metalness: 0.2,
+    });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.01;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // Grid lines
+    const gridHelper = new THREE.GridHelper(80, 40, 0x1a1530, 0x131025);
+    gridHelper.position.y = 0.01;
+    scene.add(gridHelper);
+}
+
+// ═══════════════════════════════════════════════════════
+// ZONES — colored floor areas
+// ═══════════════════════════════════════════════════════
+function buildZones() {
+    for (const z of ZONES) {
+        // Tinted floor rectangle
+        const geo = new THREE.PlaneGeometry(z.w, z.h);
+        const mat = new THREE.MeshStandardMaterial({
+            color: z.floorColor,
+            roughness: 0.9,
+            metalness: 0.1,
+            transparent: true,
+            opacity: 0.8,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.set(z.x, 0.02, z.z);
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+
+        // Border outline
+        const border = new THREE.EdgesGeometry(new THREE.PlaneGeometry(z.w, z.h));
+        const borderMat = new THREE.LineBasicMaterial({ color: z.color, transparent: true, opacity: 0.25 });
+        const borderLine = new THREE.LineSegments(border, borderMat);
+        borderLine.rotation.x = -Math.PI / 2;
+        borderLine.position.set(z.x, 0.03, z.z);
+        scene.add(borderLine);
+
+        // Zone name — 3D text sprite
+        const label = makeTextSprite(z.name, z.color, 0.4);
+        label.position.set(z.x - z.w / 2 + 1, 0.1, z.z - z.h / 2 + 0.5);
+        scene.add(label);
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// FURNITURE
+// ═══════════════════════════════════════════════════════
+function buildFurniture() {
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.7 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x2a2a35, roughness: 0.6 });
+    const screenOffMat = new THREE.MeshStandardMaterial({ color: 0x111118, roughness: 0.3, metalness: 0.5 });
+    const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.9 });
+    const sofaMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.8 });
+    const chromeMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.2, metalness: 0.8 });
+    const plantGreen = new THREE.MeshStandardMaterial({ color: 0x2d8a4e, roughness: 0.9 });
+    const rackMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2a, roughness: 0.5, metalness: 0.3 });
+
+    // ── Dev Zone: 12 desks (3 rows × 4) ──
+    for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 4; col++) {
+            const dx = -24 + col * 3.2;
+            const dz = 5 + row * 4;
+            createDesk(dx, dz, woodMat, darkMat, screenOffMat);
+        }
+    }
+
+    // ── QA Lab: 6 desks (2 rows × 3) ──
+    for (let row = 0; row < 2; row++) {
+        for (let col = 0; col < 3; col++) {
+            const dx = -2 + col * 3.2;
+            const dz = -6.5 + row * 4;
+            createDesk(dx, dz, woodMat, darkMat, screenOffMat);
+        }
+    }
+
+    // ── Architecture: 3 desks + whiteboard ──
+    for (let col = 0; col < 3; col++) {
+        createDesk(-2 + col * 3.2, -16, woodMat, darkMat, screenOffMat);
+    }
+    // Whiteboard
+    const wb = new THREE.Mesh(new THREE.BoxGeometry(4, 2.5, 0.08), whiteMat);
+    wb.position.set(0, 2, -17.5);
+    wb.castShadow = true;
+    scene.add(wb);
+
+    // ── Board Room: long table ──
+    const boardTable = new THREE.Mesh(new THREE.BoxGeometry(10, 0.1, 3), woodMat);
+    boardTable.position.set(-18, 0.75, -14);
+    boardTable.castShadow = true;
+    scene.add(boardTable);
+    // Board room chairs (6)
+    for (let i = 0; i < 3; i++) {
+        createChair(-22 + i * 3.5, -12.5, darkMat, 0);
+        createChair(-22 + i * 3.5, -15.5, darkMat, Math.PI);
+    }
+    // Big screen
+    const bigScreen = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 0.1), screenOffMat);
+    bigScreen.position.set(-18, 2.5, -17.8);
+    bigScreen.castShadow = true;
+    scene.add(bigScreen);
+
+    // ── Meeting Room: round table + chairs ──
+    const roundTable = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 0.08, 24), woodMat);
+    roundTable.position.set(-18, 0.75, -3);
+    roundTable.castShadow = true;
+    scene.add(roundTable);
+    for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        createChair(-18 + Math.cos(angle) * 3, -3 + Math.sin(angle) * 3, darkMat, -angle + Math.PI);
+    }
+
+    // ── Product Corner: kanban board ──
+    const kanban = new THREE.Mesh(new THREE.BoxGeometry(3.5, 2, 0.08), whiteMat);
+    kanban.position.set(18, 2, -17.5);
+    kanban.castShadow = true;
+    scene.add(kanban);
+    // Sticky notes on kanban
+    const stickyColors = [0xfde68a, 0xfca5a5, 0x86efac, 0x93c5fd, 0xc4b5fd];
+    for (let i = 0; i < 12; i++) {
+        const sticky = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.5, 0.5),
+            new THREE.MeshStandardMaterial({ color: stickyColors[i % stickyColors.length], roughness: 0.9 })
+        );
+        sticky.position.set(16.5 + (i % 4) * 0.8, 2.8 - Math.floor(i / 4) * 0.65, -17.44);
+        scene.add(sticky);
+    }
+    // Product desks
+    for (let col = 0; col < 3; col++) {
+        createDesk(16 + col * 3, -13, woodMat, darkMat, screenOffMat);
+    }
+
+    // ── Server Room: racks ──
+    for (let i = 0; i < 4; i++) {
+        const rack = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3, 1.2), rackMat);
+        rack.position.set(2 + i * 2.5, 1.5, 15);
+        rack.castShadow = true;
+        scene.add(rack);
+        // LED dots
+        for (let j = 0; j < 6; j++) {
+            const led = new THREE.Mesh(
+                new THREE.SphereGeometry(0.04, 6, 6),
+                new THREE.MeshBasicMaterial({ color: j % 3 === 0 ? 0x22c55e : 0x3b82f6 })
+            );
+            led.position.set(2 + i * 2.5 + 0.42, 0.5 + j * 0.4, 14.38);
+            led.userData.isLED = true;
+            led.userData.blinkSpeed = 0.5 + Math.random() * 2;
+            led.userData.blinkOffset = Math.random() * Math.PI * 2;
+            scene.add(led);
+        }
+    }
+    // DevOps desks
+    for (let col = 0; col < 3; col++) {
+        createDesk(-2 + col * 3.2, 11, woodMat, darkMat, screenOffMat);
+    }
+
+    // ── Chill Zone ──
+    // Sofa
+    const sofaBase = new THREE.Mesh(new THREE.BoxGeometry(4, 0.5, 1.2), sofaMat);
+    sofaBase.position.set(18, 0.4, -1);
+    sofaBase.castShadow = true;
+    scene.add(sofaBase);
+    const sofaBack = new THREE.Mesh(new THREE.BoxGeometry(4, 0.6, 0.2), sofaMat);
+    sofaBack.position.set(18, 0.8, -1.5);
+    scene.add(sofaBack);
+
+    // Coffee machine
+    const coffeeCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.6, 12), chromeMat);
+    coffeeCyl.position.set(22, 0.75 + 0.3, 2);
+    coffeeCyl.castShadow = true;
+    scene.add(coffeeCyl);
+    // Coffee table
+    const coffeeTable = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.8), woodMat);
+    coffeeTable.position.set(22, 0.75, 2);
+    coffeeTable.castShadow = true;
+    scene.add(coffeeTable);
+
+    // Plants
+    const plantPositions = [[-10, 0], [10, -10], [24, 5], [-24, -18], [8, 18], [-10, 18]];
+    for (const [px, pz] of plantPositions) {
+        // Pot
+        const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.2, 0.4, 8), new THREE.MeshStandardMaterial({ color: 0x8B4513 }));
+        pot.position.set(px, 0.2, pz);
+        scene.add(pot);
+        // Canopy
+        const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), plantGreen);
+        canopy.position.set(px, 0.9, pz);
+        canopy.castShadow = true;
+        scene.add(canopy);
+    }
+
+    // ── War Room (inside DevOps zone but separate area) ──
+    const warScreen = new THREE.Mesh(new THREE.BoxGeometry(5, 2.5, 0.1),
+        new THREE.MeshStandardMaterial({ color: 0x1a0a0a, emissive: 0x330000, emissiveIntensity: 0.3 }));
+    warScreen.position.set(6, 2, 18);
+    scene.add(warScreen);
+}
+
+function createDesk(x, z, woodMat, darkMat, screenMat) {
+    const group = new THREE.Group();
+    // Desktop
+    const top = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.06, 1), woodMat);
+    top.position.y = 0.75;
+    top.castShadow = true;
+    top.receiveShadow = true;
+    group.add(top);
+    // Legs
+    for (const [lx, lz] of [[-0.9, -0.4], [0.9, -0.4], [-0.9, 0.4], [0.9, 0.4]]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.75, 0.05), darkMat);
+        leg.position.set(lx, 0.375, lz);
+        group.add(leg);
+    }
+    // Screen
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.55, 0.03), screenMat);
+    screen.position.set(0, 1.25, -0.3);
+    screen.castShadow = true;
+    screen.userData.isScreen = true;
+    group.add(screen);
+    // Screen stand
+    const stand = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.22, 0.05), darkMat);
+    stand.position.set(0, 0.89, -0.3);
+    group.add(stand);
+
+    group.position.set(x, 0, z);
+    scene.add(group);
+    return group;
+}
+
+function createChair(x, z, mat, rotY) {
+    const g = new THREE.Group();
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.5), mat);
+    seat.position.y = 0.45;
+    g.add(seat);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.06), mat);
+    back.position.set(0, 0.7, -0.22);
+    g.add(back);
+    g.position.set(x, 0, z);
+    g.rotation.y = rotY;
+    scene.add(g);
+}
+
+// ═══════════════════════════════════════════════════════
+// AGENTS (Box-people)
+// ═══════════════════════════════════════════════════════
+function buildAgents() {
+    const zoneDesks = {};
+    for (const z of ZONES) zoneDesks[z.id] = { seats: [], idx: 0 };
+
+    // Pre-compute desk positions per zone
+    computeZoneSeats(zoneDesks);
+
+    for (const ad of AGENT_DATA) {
+        const zone = assignZone(ad);
+        const seat = getNextSeat(zoneDesks, zone);
+        const agentMesh = createAgentMesh(ad);
+        agentMesh.position.set(seat.x, 0, seat.z);
+        agentMesh.userData.agentId = ad.id;
+        scene.add(agentMesh);
+
+        agents[ad.id] = {
+            mesh: agentMesh,
+            data: ad,
+            zone: zone,
+            seat: seat,
+            target: { x: seat.x, z: seat.z },
+            status: 'idle',
+            walkPhase: Math.random() * Math.PI * 2,
+            speechBubble: null,
+            thoughtBubble: null,
+            walkSpeed: 1.5 + Math.random() * 0.5,
+            idleTimer: Math.random() * 10,
+        };
+    }
+}
+
+function computeZoneSeats(zoneDesks) {
+    // Dev zone: 12 seats
+    for (let r = 0; r < 3; r++)
+        for (let c = 0; c < 4; c++)
+            zoneDesks.dev.seats.push({ x: -24 + c * 3.2, z: 5 + r * 4 + 0.8 });
+    // QA: 6 seats
+    for (let r = 0; r < 2; r++)
+        for (let c = 0; c < 3; c++)
+            zoneDesks.qa.seats.push({ x: -2 + c * 3.2, z: -6.5 + r * 4 + 0.8 });
+    // Arch: 3 seats
+    for (let c = 0; c < 3; c++)
+        zoneDesks.arch.seats.push({ x: -2 + c * 3.2, z: -16 + 0.8 });
+    // Board: 6 seats
+    for (let i = 0; i < 3; i++) {
+        zoneDesks.board.seats.push({ x: -22 + i * 3.5, z: -12.5 });
+        zoneDesks.board.seats.push({ x: -22 + i * 3.5, z: -15.5 });
+    }
+    // Meeting: 8 seats around table
+    for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        zoneDesks.meeting.seats.push({ x: -18 + Math.cos(angle) * 3.5, z: -3 + Math.sin(angle) * 3.5 });
+    }
+    // Product: 3 seats
+    for (let c = 0; c < 3; c++)
+        zoneDesks.product.seats.push({ x: 16 + c * 3, z: -13 + 0.8 });
+    // DevOps: 3 + standing
+    for (let c = 0; c < 3; c++)
+        zoneDesks.devops.seats.push({ x: -2 + c * 3.2, z: 11 + 0.8 });
+    // Chill: scattered
+    zoneDesks.chill.seats.push({ x: 17, z: -0.5 }, { x: 19, z: -0.5 }, { x: 18, z: 2 }, { x: 20, z: 3 }, { x: 22, z: 0 });
+}
+
+function assignZone(agent) {
+    for (const z of ZONES) {
+        if (z.roles.includes(agent.id) || z.roles.includes(agent.role)) return z.id;
+    }
+    // Fallback: use hierarchy_rank
+    const rank = agent.hierarchy_rank || 50;
+    if (rank <= 10) return 'board';
+    if (rank <= 25) return 'arch';
+    if (rank <= 40) return 'dev';
+    return 'chill';
+}
+
+function getNextSeat(zoneDesks, zoneId) {
+    const z = zoneDesks[zoneId];
+    if (!z || z.seats.length === 0) {
+        // Fallback: random position in chill
+        return { x: 16 + Math.random() * 8, z: -2 + Math.random() * 8 };
+    }
+    const seat = z.seats[z.idx % z.seats.length];
+    z.idx++;
+    // Offset slightly to avoid stacking
+    return { x: seat.x + (z.idx > z.seats.length ? (Math.random() - 0.5) * 2 : 0), z: seat.z };
+}
+
+function createAgentMesh(agent) {
+    const group = new THREE.Group();
+    const bodyColor = new THREE.Color(agent.color || '#7c3aed');
+    const skinColor = new THREE.Color(0xe8beac);
+
+    // Body
+    const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.6 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.6, 0.25), bodyMat);
+    body.position.y = 0.95;
+    body.castShadow = true;
+    group.add(body);
+
+    // Head
+    const headMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.7 });
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.3), headMat);
+    head.position.y = 1.5;
+    head.castShadow = true;
+    group.add(head);
+
+    // Arms
+    const armMat = new THREE.MeshStandardMaterial({ color: bodyColor.clone().multiplyScalar(0.85), roughness: 0.6 });
+    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.45, 0.12), armMat);
+    leftArm.position.set(-0.32, 0.95, 0);
+    leftArm.userData.isArm = true;
+    group.add(leftArm);
+    const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.45, 0.12), armMat);
+    rightArm.position.set(0.32, 0.95, 0);
+    rightArm.userData.isArm = true;
+    group.add(rightArm);
+
+    // Legs
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x2a2a3a, roughness: 0.7 });
+    const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.5, 0.14), legMat);
+    leftLeg.position.set(-0.12, 0.38, 0);
+    leftLeg.userData.isLeg = true;
+    group.add(leftLeg);
+    const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.5, 0.14), legMat);
+    rightLeg.position.set(0.12, 0.38, 0);
+    rightLeg.userData.isLeg = true;
+    group.add(rightLeg);
+
+    // Plumbob (diamond)
+    const plumbobGeo = new THREE.OctahedronGeometry(0.15, 0);
+    const plumbobMat = new THREE.MeshStandardMaterial({
+        color: STATUS_COLORS.idle,
+        emissive: STATUS_COLORS.idle,
+        emissiveIntensity: 0.6,
+        transparent: true,
+        opacity: 0.85,
+    });
+    const plumbob = new THREE.Mesh(plumbobGeo, plumbobMat);
+    plumbob.position.y = 2.1;
+    plumbob.userData.isPlumbob = true;
+    group.add(plumbob);
+
+    // Name tag (billboard sprite)
+    const nameSprite = makeTextSprite(agent.name, 0xffffff, 0.22);
+    nameSprite.position.y = 1.85;
+    group.add(nameSprite);
+
+    return group;
+}
+
+// ═══════════════════════════════════════════════════════
+// TEXT SPRITES (canvas → texture → sprite)
+// ═══════════════════════════════════════════════════════
+function makeTextSprite(text, color, scale = 0.3) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const fontSize = 48;
+    ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
+    const metrics = ctx.measureText(text);
+    const w = Math.ceil(metrics.width) + 20;
+    const h = fontSize + 16;
+    canvas.width = w;
+    canvas.height = h;
+
+    ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
+    const c = new THREE.Color(color);
+    ctx.fillStyle = `rgba(${c.r*255|0},${c.g*255|0},${c.b*255|0},0.9)`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 10, h / 2);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.LinearFilter;
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(scale * w / h * 2, scale * 2, 1);
+    return sprite;
+}
+
+function makeSpeechBubble(text, maxWidth = 200) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const fontSize = 28;
+    const padding = 16;
+    canvas.width = maxWidth + padding * 2;
+    canvas.height = 80;
+
+    ctx.font = `${fontSize}px system-ui, sans-serif`;
+    // Truncate text
+    let displayText = text;
+    if (ctx.measureText(text).width > maxWidth) {
+        while (ctx.measureText(displayText + '…').width > maxWidth && displayText.length > 0)
+            displayText = displayText.slice(0, -1);
+        displayText += '…';
+    }
+
+    // Background
+    const tw = ctx.measureText(displayText).width + padding * 2;
+    canvas.width = tw;
+    ctx.font = `${fontSize}px system-ui, sans-serif`;
+    ctx.fillStyle = 'rgba(124,58,237,0.92)';
+    roundRect(ctx, 0, 0, tw, 52, 10);
+    ctx.fill();
+    // Triangle
+    ctx.beginPath();
+    ctx.moveTo(tw / 2 - 6, 52);
+    ctx.lineTo(tw / 2, 64);
+    ctx.lineTo(tw / 2 + 6, 52);
+    ctx.fill();
+    // Text
+    ctx.fillStyle = '#fff';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(displayText, padding / 2, 26);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.LinearFilter;
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(tw / 60, 64 / 60, 1);
+    return sprite;
+}
+
+function makeThoughtBubble() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64; canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(234,179,8,0.85)';
+    ctx.beginPath();
+    ctx.arc(32, 24, 22, 0, Math.PI * 2);
+    ctx.fill();
+    // Dots
+    ctx.fillStyle = '#1a1025';
+    for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.arc(20 + i * 12, 24, 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    // Small bubbles
+    ctx.fillStyle = 'rgba(234,179,8,0.6)';
+    ctx.beginPath(); ctx.arc(28, 50, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(24, 58, 3, 0, Math.PI * 2); ctx.fill();
+
+    const tex = new THREE.CanvasTexture(canvas);
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(0.8, 0.8, 1);
+    return sprite;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
+// ═══════════════════════════════════════════════════════
+// AMBIENT PARTICLES
+// ═══════════════════════════════════════════════════════
+function buildAmbientParticles() {
+    const count = 60;
+    const geo = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+
+    for (let i = 0; i < count; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 70;
+        positions[i * 3 + 1] = 0.5 + Math.random() * 5;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 50;
+        const c = new THREE.Color(0x7c3aed).lerp(new THREE.Color(0x3b82f6), Math.random());
+        colors[i * 3] = c.r;
+        colors[i * 3 + 1] = c.g;
+        colors[i * 3 + 2] = c.b;
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const mat = new THREE.PointsMaterial({
+        size: 0.08,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.5,
+        depthWrite: false,
+    });
+    const particles = new THREE.Points(geo, mat);
+    particles.userData.isAmbient = true;
+    scene.add(particles);
+    particleSystems.push(particles);
+}
+
+// ═══════════════════════════════════════════════════════
+// ANIMATION LOOP
+// ═══════════════════════════════════════════════════════
+function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const elapsed = clock.getElapsedTime();
+
+    controls.update();
+
+    // Animate agents
+    for (const id in agents) {
+        const ag = agents[id];
+        animateAgent(ag, dt, elapsed);
+    }
+
+    // Blink server LEDs
+    scene.traverse(obj => {
+        if (obj.userData.isLED) {
+            const v = Math.sin(elapsed * obj.userData.blinkSpeed + obj.userData.blinkOffset);
+            obj.material.opacity = 0.3 + v * 0.7;
+            obj.visible = v > -0.3;
+        }
+    });
+
+    // Ambient particles float
+    for (const ps of particleSystems) {
+        const pos = ps.geometry.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            pos.array[i * 3 + 1] += Math.sin(elapsed * 0.3 + i) * 0.003;
+            pos.array[i * 3] += Math.cos(elapsed * 0.2 + i * 0.5) * 0.002;
+        }
+        pos.needsUpdate = true;
+    }
+
+    renderer.render(scene, camera);
+}
+
+function animateAgent(ag, dt, elapsed) {
+    const mesh = ag.mesh;
+    const plumbob = mesh.children.find(c => c.userData.isPlumbob);
+    const arms = mesh.children.filter(c => c.userData.isArm);
+    const legs = mesh.children.filter(c => c.userData.isLeg);
+
+    // Plumbob — always bob and rotate
+    if (plumbob) {
+        plumbob.rotation.y += dt * (ag.status === 'thinking' ? 3 : 0.5);
+        plumbob.position.y = 2.1 + Math.sin(elapsed * 1.5 + ag.walkPhase) * 0.08;
+    }
+
+    // Movement toward target
+    const dx = ag.target.x - mesh.position.x;
+    const dz = ag.target.z - mesh.position.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+
+    if (dist > 0.15) {
+        // Walking
+        const speed = ag.walkSpeed * dt;
+        const step = Math.min(speed, dist);
+        mesh.position.x += (dx / dist) * step;
+        mesh.position.z += (dz / dist) * step;
+
+        // Face direction
+        mesh.rotation.y = Math.atan2(dx, dz);
+
+        // Walk cycle
+        ag.walkPhase += dt * 8;
+        const legSwing = Math.sin(ag.walkPhase) * 0.4;
+        if (legs[0]) legs[0].rotation.x = legSwing;
+        if (legs[1]) legs[1].rotation.x = -legSwing;
+        if (arms[0]) arms[0].rotation.x = -legSwing * 0.6;
+        if (arms[1]) arms[1].rotation.x = legSwing * 0.6;
+    } else {
+        // At destination — status-based animation
+        // Reset legs
+        for (const l of legs) l.rotation.x *= 0.9;
+
+        if (ag.status === 'acting') {
+            // Typing — arms oscillate fast
+            const typingPhase = elapsed * 6 + ag.walkPhase;
+            if (arms[0]) arms[0].rotation.x = Math.sin(typingPhase) * 0.25;
+            if (arms[1]) arms[1].rotation.x = Math.sin(typingPhase + 1) * 0.25;
+        } else if (ag.status === 'thinking') {
+            // Subtle sway
+            if (arms[0]) arms[0].rotation.x = Math.sin(elapsed * 0.8) * 0.1;
+        } else {
+            // Idle — arms rest
+            for (const a of arms) a.rotation.x *= 0.95;
+        }
+
+        // Idle behavior — occasional head turn
+        ag.idleTimer -= dt;
+        if (ag.idleTimer <= 0 && ag.status === 'idle') {
+            ag.idleTimer = 5 + Math.random() * 10;
+            // Small random rotation
+            mesh.rotation.y += (Math.random() - 0.5) * 0.5;
+        }
+    }
+
+    // Speech bubble fade
+    if (ag.speechBubble) {
+        ag.speechBubble._life -= dt;
+        if (ag.speechBubble._life <= 0) {
+            mesh.remove(ag.speechBubble);
+            ag.speechBubble = null;
+        } else if (ag.speechBubble._life < 0.5) {
+            ag.speechBubble.material.opacity = ag.speechBubble._life * 2;
+        }
+    }
+
+    // Thought bubble for thinking status
+    if (ag.status === 'thinking' && !ag.thoughtBubble) {
+        ag.thoughtBubble = makeThoughtBubble();
+        ag.thoughtBubble.position.set(0.4, 2.2, 0);
+        mesh.add(ag.thoughtBubble);
+    } else if (ag.status !== 'thinking' && ag.thoughtBubble) {
+        mesh.remove(ag.thoughtBubble);
+        ag.thoughtBubble = null;
+    }
+    if (ag.thoughtBubble) {
+        ag.thoughtBubble.position.y = 2.2 + Math.sin(elapsed * 2) * 0.1;
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// STATUS UPDATE
+// ═══════════════════════════════════════════════════════
+function updateAgentStatus(agentId, newStatus, task) {
+    const ag = agents[agentId];
+    if (!ag) return;
+
+    const oldStatus = ag.status;
+    ag.status = newStatus;
+
+    // Update plumbob color
+    const plumbob = ag.mesh.children.find(c => c.userData.isPlumbob);
+    if (plumbob) {
+        const color = STATUS_COLORS[newStatus] || STATUS_COLORS.idle;
+        plumbob.material.color.setHex(color);
+        plumbob.material.emissive.setHex(color);
+        plumbob.material.emissiveIntensity = newStatus === 'acting' ? 0.8 : 0.6;
+    }
+
+    // Glow nearby screens when acting
+    if (newStatus === 'acting') {
+        glowNearbyScreen(ag.mesh.position, true);
+    } else if (oldStatus === 'acting') {
+        glowNearbyScreen(ag.mesh.position, false);
+    }
+
+    // Feed item
+    addFeedItem(ag.data.name, newStatus, task);
+
+    // Update counters
+    updateCounters();
+}
+
+function glowNearbyScreen(pos, on) {
+    scene.traverse(obj => {
+        if (obj.userData.isScreen) {
+            const d = obj.getWorldPosition(new THREE.Vector3()).distanceTo(pos);
+            if (d < 3) {
+                if (on) {
+                    obj.material = new THREE.MeshStandardMaterial({
+                        color: 0x1a1a2a,
+                        emissive: 0x3b82f6,
+                        emissiveIntensity: 0.5,
+                        roughness: 0.3,
+                    });
+                } else {
+                    obj.material = new THREE.MeshStandardMaterial({
+                        color: 0x111118, roughness: 0.3, metalness: 0.5
+                    });
+                }
+            }
+        }
+    });
+}
+
+function showSpeechBubble(agentId, text) {
+    const ag = agents[agentId];
+    if (!ag) return;
+
+    // Remove old bubble
+    if (ag.speechBubble) {
+        ag.mesh.remove(ag.speechBubble);
+    }
+
+    const bubble = makeSpeechBubble(text);
+    bubble.position.set(0, 2.5, 0);
+    bubble._life = 5; // seconds
+    ag.mesh.add(bubble);
+    ag.speechBubble = bubble;
+}
+
+function triggerDelegation(fromId, toId) {
+    const from = agents[fromId];
+    const to = agents[toId];
+    if (!from || !to) return;
+
+    // Walk from agent to target agent
+    from.target = {
+        x: to.mesh.position.x + (Math.random() - 0.5) * 1.5,
+        z: to.mesh.position.z + (Math.random() - 0.5) * 1.5
+    };
+
+    // After a delay, walk back
+    setTimeout(() => {
+        from.target = { x: from.seat.x, z: from.seat.z };
+    }, 4000);
+}
+
+// ═══════════════════════════════════════════════════════
+// UI: FEED, ZONES, COUNTERS
+// ═══════════════════════════════════════════════════════
+const feedEl = document.getElementById('world-feed');
+
+function addFeedItem(name, status, detail) {
+    const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const item = document.createElement('div');
+    item.className = 'wf-item';
+    item.innerHTML = `<span class="wf-dot wf-dot--${status}"></span>
+        <div><span class="wf-time">${time}</span> <span class="wf-name">${name}</span>
+        <span>${statusLabel(status)}${detail ? ' — ' + truncate(detail, 40) : ''}</span></div>`;
+    feedEl.prepend(item);
+    // Keep max 30
+    while (feedEl.children.length > 30) feedEl.lastChild.remove();
+}
+
+function statusLabel(s) {
+    const labels = { idle: 'repos', thinking: 'réfléchit', acting: 'code', waiting: 'attend', blocked: 'bloqué', error: 'erreur', stopped: 'arrêté' };
+    return labels[s] || s;
+}
+
+function truncate(s, n) { return s && s.length > n ? s.slice(0, n) + '…' : s || ''; }
+
+function updateCounters() {
+    const total = Object.keys(agents).length;
+    const active = Object.values(agents).filter(a => ['thinking', 'acting'].includes(a.status)).length;
+    document.getElementById('world-agent-count').textContent = total + ' agents';
+    document.getElementById('world-active-count').textContent = active + ' actifs';
+}
+
+function buildZoneLabelsUI() {
+    const container = document.getElementById('world-zones');
+    for (const z of ZONES) {
+        const el = document.createElement('div');
+        el.className = 'wz-label';
+        el.style.borderLeftColor = '#' + z.color.toString(16).padStart(6, '0');
+        el.textContent = z.name;
+        el.onclick = () => flyToZone(z);
+        container.appendChild(el);
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// INTERACTION (click, hover, keyboard)
+// ═══════════════════════════════════════════════════════
+function setupInteraction() {
+    const canvas = renderer.domElement;
+
+    canvas.addEventListener('click', (e) => {
+        mouse.x = (e.offsetX / canvas.clientWidth) * 2 - 1;
+        mouse.y = -(e.offsetY / canvas.clientHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+
+        // Find clicked agent
+        const agentMeshes = Object.values(agents).map(a => a.mesh);
+        const intersects = raycaster.intersectObjects(agentMeshes, true);
+        if (intersects.length > 0) {
+            let obj = intersects[0].object;
+            while (obj.parent && !obj.userData.agentId) obj = obj.parent;
+            if (obj.userData.agentId) {
+                selectAgent(obj.userData.agentId);
+                return;
+            }
+        }
+        deselectAgent();
+    });
+
+    // Keyboard
+    document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        if (e.key === 'Escape') deselectAgent();
+        if (e.key === ' ') { e.preventDefault(); resetCamera(); }
+        const idx = parseInt(e.key) - 1;
+        if (idx >= 0 && idx < ZONES.length) flyToZone(ZONES[idx]);
+    });
+}
+
+function selectAgent(agentId) {
+    const ag = agents[agentId];
+    if (!ag) return;
+    selectedAgent = agentId;
+
+    // Camera zoom to agent
+    const targetPos = ag.mesh.position.clone();
+    smoothCameraTo(targetPos.x + 4, 5, targetPos.z + 4, targetPos.x, 1, targetPos.z);
+
+    // Show info panel
+    const panel = document.getElementById('world-info');
+    panel.style.display = 'block';
+    document.getElementById('wi-avatar').textContent = ag.data.avatar || ag.data.name[0];
+    document.getElementById('wi-avatar').style.background = ag.data.color;
+    document.getElementById('wi-name').textContent = ag.data.name;
+    document.getElementById('wi-role').textContent = ag.data.role;
+    const statusEl = document.getElementById('wi-status');
+    statusEl.querySelector('.dot').style.background = '#' + (STATUS_COLORS[ag.status] || 0x6b7280).toString(16).padStart(6, '0');
+    statusEl.querySelector('span:last-child').textContent = statusLabel(ag.status);
+
+    const taskEl = document.getElementById('wi-task');
+    taskEl.style.display = ag.data.tagline ? 'block' : 'none';
+    taskEl.textContent = ag.data.tagline || '';
+
+    const skillsEl = document.getElementById('wi-skills');
+    skillsEl.innerHTML = '';
+    for (const s of (ag.data.skills || []).slice(0, 8)) {
+        const tag = document.createElement('span');
+        tag.className = 'wi-skill';
+        tag.textContent = s;
+        skillsEl.appendChild(tag);
+    }
+}
+
+function deselectAgent() {
+    selectedAgent = null;
+    document.getElementById('world-info').style.display = 'none';
+}
+
+function flyToZone(zone) {
+    smoothCameraTo(zone.x + 12, 18, zone.z + 12, zone.x, 0, zone.z);
+}
+
+function resetCamera() {
+    smoothCameraTo(35, 30, 35, 0, 0, 0);
+}
+
+let cameraAnim = null;
+function smoothCameraTo(cx, cy, cz, tx, ty, tz) {
+    const start = {
+        cx: camera.position.x, cy: camera.position.y, cz: camera.position.z,
+        tx: controls.target.x, ty: controls.target.y, tz: controls.target.z,
+    };
+    const end = { cx, cy, cz, tx, ty, tz };
+    const duration = 800;
+    const startTime = performance.now();
+
+    if (cameraAnim) cancelAnimationFrame(cameraAnim);
+
+    function step() {
+        const t = Math.min((performance.now() - startTime) / duration, 1);
+        const ease = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2; // easeInOutQuad
+        camera.position.set(
+            start.cx + (end.cx - start.cx) * ease,
+            start.cy + (end.cy - start.cy) * ease,
+            start.cz + (end.cz - start.cz) * ease,
+        );
+        controls.target.set(
+            start.tx + (end.tx - start.tx) * ease,
+            start.ty + (end.ty - start.ty) * ease,
+            start.tz + (end.tz - start.tz) * ease,
+        );
+        if (t < 1) cameraAnim = requestAnimationFrame(step);
+    }
+    step();
+}
+
+// ═══════════════════════════════════════════════════════
+// SSE — Real-time agent status
+// ═══════════════════════════════════════════════════════
+function connectSSE() {
+    const evtSource = new EventSource('/sse/agents/status');
+
+    evtSource.onmessage = (e) => {
+        try {
+            const data = JSON.parse(e.data);
+            if (data.type === 'agent_status') {
+                const agentId = data.agent_id;
+                const status = (data.status || 'idle').toLowerCase();
+                updateAgentStatus(agentId, status, data.current_task);
+            }
+            if (data.type === 'message' || data.type === 'stream_end') {
+                if (data.from_agent || data.agent_id) {
+                    showSpeechBubble(data.from_agent || data.agent_id, data.content || '');
+                }
+            }
+            if (data.type === 'delegation') {
+                triggerDelegation(data.from, data.to);
+            }
+        } catch (err) { /* ignore parse errors */ }
+    };
+
+    evtSource.onerror = () => {
+        setTimeout(() => connectSSE(), 5000);
+        evtSource.close();
+    };
+}
+
+// ═══════════════════════════════════════════════════════
+// RESIZE
+// ═══════════════════════════════════════════════════════
+function onResize() {
+    const canvas = renderer.domElement;
+    const w = canvas.parentElement.clientWidth;
+    const h = canvas.parentElement.clientHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+}
+
+// ═══════════════════════════════════════════════════════
+// BOOTSTRAP
+// ═══════════════════════════════════════════════════════
+init();
+
+</script>
+{% endblock %}
