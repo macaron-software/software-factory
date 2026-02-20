@@ -15,6 +15,8 @@ def md_to_confluence(md: str) -> str:
     """Convert markdown to Confluence storage format XHTML."""
     if not md:
         return ""
+    # Strip emoji (Confluence XHTML rejects them)
+    md = re.sub(r'[\U0001F300-\U0001FFFF\u2700-\u27BF\u2600-\u26FF\u2300-\u23FF\u2B50\u2B55\u2934\u2935\u25AA-\u25FF\u2190-\u21FF\u200D\uFE0F]', '', md)
     lines = md.split("\n")
     out = []
     in_code = False
@@ -42,6 +44,7 @@ def md_to_confluence(md: str) -> str:
 
         # Close list if needed
         if in_list and not line.strip().startswith(("- ", "* ", "1.")):
+            out.append("</ul>")
             in_list = False
 
         # Headers
@@ -91,7 +94,8 @@ def md_to_confluence(md: str) -> str:
 
 def _inline(text: str) -> str:
     """Convert inline markdown (bold, italic, code, links)."""
-    t = html.escape(text)
+    t = re.sub(r'[\U0001F300-\U0001FFFF\u2700-\u27BF\u2600-\u26FF\u2300-\u23FF\u2B50\u2B55\u2934\u2935\u25AA-\u25FF\u2190-\u21FF\u200D\uFE0F]', '', text)
+    t = html.escape(t)
     t = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', t)
     t = re.sub(r'\*(.+?)\*', r'<em>\1</em>', t)
     t = re.sub(r'`(.+?)`', r'<code>\1</code>', t)

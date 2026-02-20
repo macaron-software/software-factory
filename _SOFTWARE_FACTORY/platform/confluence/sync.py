@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Optional
 
 from ..db.migrations import get_db
-from ..missions.store import get_mission_store, MissionDef
+from ..missions.store import get_mission_run_store
 from ..sessions.store import get_session_store
 from .client import ConfluenceClient, get_confluence_client, HOMEPAGE_ID
 from . import converter
@@ -30,10 +30,11 @@ class ConfluenceSyncEngine:
 
     # ── Page hierarchy ─────────────────────────────────────────
 
-    def _ensure_hierarchy(self, mission: MissionDef) -> dict[str, str]:
+    def _ensure_hierarchy(self, mission) -> dict[str, str]:
         """Ensure page hierarchy exists, return tab → page_id mapping."""
-        project_name = mission.project_id or "Software Factory"
-        epic_name = mission.name
+        project_name = getattr(mission, 'project_id', '') or "Software Factory"
+        # MissionRun uses brief, MissionDef uses name
+        epic_name = getattr(mission, 'brief', '')[:80] or getattr(mission, 'name', '') or mission.id
 
         # Create hierarchy: PROJETS / project / epic
         projets_id = self._get_or_create("PROJETS", HOMEPAGE_ID)
@@ -52,7 +53,13 @@ class ConfluenceSyncEngine:
 
     # ── Tab content builders ───────────────────────────────────
 
-    def _build_po_content(self, mission: MissionDef) -> str:
+    def _m_name(self, mission) -> str:
+        return getattr(mission, 'name', '') or getattr(mission, 'brief', '')[:80]
+
+    def _m_project(self, mission) -> str:
+        return getattr(mission, 'project_id', '') or ''
+
+    def _build_po_content(self, mission) -> str:
         """Build PO tab content (features kanban)."""
         db = get_db()
         features = db.execute(
@@ -64,8 +71,8 @@ class ConfluenceSyncEngine:
         features_list = [dict(f) for f in features]
         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
-        body = converter.page_header("Product Owner — Features", mission.name,
-                                      mission.project_id, now)
+        body = converter.page_header("Product Owner — Features", self._m_name(mission),
+                                      self._m_project(mission), now)
 
         # Group by status
         for status, label in [("backlog", "Backlog"), ("sprint", "Sprint"),
@@ -76,11 +83,11 @@ class ConfluenceSyncEngine:
 
         return body
 
-    def _build_qa_content(self, mission: MissionDef, session_id: str = None) -> str:
+    def _build_qa_content(self, mission, session_id: str = None) -> str:
         """Build QA tab content (test results + screenshots)."""
         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-        body = converter.page_header("QA — Tests & Qualité", mission.name,
-                                      mission.project_id, now)
+        body = converter.page_header("QA — Tests & Qualité", self._m_name(mission),
+                                      self._m_project(mission), now)
 
         # Get QA messages from mission sessions
         messages = self._get_phase_messages(mission.id, "qa")
@@ -93,11 +100,11 @@ class ConfluenceSyncEngine:
 
         return body
 
-    def _build_archi_content(self, mission: MissionDef) -> str:
+    def _build_archi_content(self, mission) -> str:
         """Build Architecture tab content."""
         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-        body = converter.page_header("Architecture", mission.name,
-                                      mission.project_id, now)
+        body = converter.page_header("Architecture", self._m_name(mission),
+                                      self._m_project(mission), now)
 
         # Workflow graph in architecture too
         body += self._build_workflow_graph_section(mission)
@@ -111,11 +118,11 @@ class ConfluenceSyncEngine:
         body += self._get_workspace_file_content(mission, "Architecture.md", "Architecture détaillée")
         return body
 
-    def _build_wiki_content(self, mission: MissionDef) -> str:
+    def _build_wiki_content(self, mission) -> str:
         """Build Wiki/documentation tab content."""
         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-        body = converter.page_header("Wiki — Documentation", mission.name,
-                                      mission.project_id, now)
+        body = converter.page_header("Wiki — Documentation", self._m_name(mission),
+                                      self._m_project(mission), now)
 
         messages = self._get_phase_messages(mission.id, "wiki")
         if messages:
@@ -127,28 +134,36 @@ class ConfluenceSyncEngine:
 
         return body
 
-    def _build_projet_content(self, mission: MissionDef) -> str:
+    def _build_projet_content(self, mission) -> str:
         """Build Project tab content (overview, stats, workflow graph)."""
         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-        body = converter.page_header("Projet — Vue d'ensemble", mission.name,
-                                      mission.project_id, now)
+        m_name = getattr(mission, 'name', '') or getattr(mission, 'brief', '')[:80]
+        m_project = getattr(mission, 'project_id', '') or ''
+        body = converter.page_header("Projet — Vue d'ensemble", m_name, m_project, now)
 
-        # Mission metadata
+        # Mission metadata — adapt to MissionRun or MissionDef
+        m_status = getattr(mission, 'status', '')
+        if hasattr(m_status, 'value'):
+            m_status = m_status.value
+        m_type = getattr(mission, 'type', getattr(mission, 'workflow_name', ''))
+        m_wsjf = getattr(mission, 'wsjf_score', '')
         body += converter.info_macro("Métadonnées", (
             f"<p>ID: <code>{mission.id}</code></p>"
-            f"<p>Status: <strong>{mission.status}</strong></p>"
-            f"<p>Type: {mission.type}</p>"
-            f"<p>WSJF: {mission.wsjf_score}</p>"
+            f"<p>Status: <strong>{m_status}</strong></p>"
+            f"<p>Type: {m_type}</p>"
+            f"<p>WSJF: {m_wsjf}</p>"
             f"<p>Créé: {mission.created_at}</p>"
         ))
 
-        # Description & Goal
-        if mission.description:
+        # Description & Goal (MissionDef) or Brief (MissionRun)
+        description = getattr(mission, 'description', '') or getattr(mission, 'brief', '')
+        if description:
             body += "<h2>Description</h2>"
-            body += converter.md_to_confluence(mission.description)
-        if mission.goal:
+            body += converter.md_to_confluence(description)
+        goal = getattr(mission, 'goal', '')
+        if goal:
             body += "<h2>Objectif</h2>"
-            body += converter.md_to_confluence(mission.goal)
+            body += converter.md_to_confluence(goal)
 
         # Workflow graph SVG
         body += self._build_workflow_graph_section(mission)
@@ -160,37 +175,40 @@ class ConfluenceSyncEngine:
 
     # ── Helpers ────────────────────────────────────────────────
 
-    def _build_workflow_graph_section(self, mission: MissionDef) -> str:
-        """Build SVG graph from workflow config and return XHTML with inline SVG."""
-        if not mission.workflow_id:
+    def _build_workflow_graph_section(self, mission) -> str:
+        """Build workflow graph as a Confluence table (SVG in CDATA causes 400 errors)."""
+        wf_id = getattr(mission, 'workflow_id', '')
+        if not wf_id:
             return ""
         try:
             from ..workflows.store import get_workflow_store
             ws = get_workflow_store()
-            wf = ws.get(mission.workflow_id)
+            wf = ws.get(wf_id)
             if not wf:
                 return ""
             import json as _json
             cfg = _json.loads(wf.config) if isinstance(wf.config, str) else (wf.config or {})
             graph = cfg.get("graph", {})
             nodes = graph.get("nodes", [])
-            edges = graph.get("edges", [])
             if not nodes:
                 return ""
 
-            svg = converter.graph_to_svg(nodes, edges, title=wf.name)
-            # Inline SVG in Confluence via HTML macro
+            # Build simple table instead of SVG (Confluence-compatible)
+            rows = ['<tr><th>Agent</th><th>Role</th></tr>']
+            for n in nodes:
+                label = n.get("label", n.get("id", "?"))
+                role = n.get("role", "")
+                rows.append(f'<tr><td><strong>{converter._inline(label)}</strong></td><td>{converter._inline(role)}</td></tr>')
+
             return (
-                f'<h2>Workflow — Graphe des agents</h2>'
-                f'<ac:structured-macro ac:name="html">'
-                f'<ac:plain-text-body><![CDATA[{svg}]]></ac:plain-text-body>'
-                f'</ac:structured-macro>'
+                f'<h2>Workflow — {converter._inline(wf.name)}</h2>'
+                f'<table><tbody>{"".join(rows)}</tbody></table>'
             )
         except Exception as e:
             log.warning("Graph generation failed: %s", e)
             return ""
 
-    def _build_screenshots_section(self, mission: MissionDef) -> str:
+    def _build_screenshots_section(self, mission) -> str:
         """Find screenshots in workspace and reference them."""
         from pathlib import Path
         from ..config import FACTORY_ROOT
@@ -223,7 +241,7 @@ class ConfluenceSyncEngine:
             )
         return body
 
-    def _upload_screenshots(self, mission: MissionDef, page_id: str):
+    def _upload_screenshots(self, mission, page_id: str):
         """Upload workspace screenshots as attachments."""
         from pathlib import Path
 
@@ -265,7 +283,7 @@ class ConfluenceSyncEngine:
 
             session_id = runs[0]["session_id"]
             messages = db.execute(
-                "SELECT * FROM messages WHERE session_id = ? ORDER BY created_at",
+                "SELECT * FROM messages WHERE session_id = ? ORDER BY timestamp",
                 (session_id,)
             ).fetchall()
 
@@ -273,22 +291,22 @@ class ConfluenceSyncEngine:
             for msg in messages:
                 m = dict(msg)
                 content = m.get("content", "")
-                sender = m.get("sender_id", "")
+                sender = (m.get("from_agent", "") or "").lower()
                 # Filter by tab relevance
-                if tab_keyword == "qa" and any(k in sender.lower() for k in ["qa", "test", "quality"]):
+                if tab_keyword == "qa" and any(k in sender for k in ["qa", "test", "quality"]):
                     result.append(m)
-                elif tab_keyword == "archi" and any(k in sender.lower() for k in ["archi", "lead", "sre"]):
+                elif tab_keyword == "archi" and any(k in sender for k in ["archi", "lead", "sre"]):
                     result.append(m)
-                elif tab_keyword == "wiki" and any(k in sender.lower() for k in ["tech_writer", "doc", "wiki"]):
+                elif tab_keyword == "wiki" and any(k in sender for k in ["tech_writer", "doc", "wiki"]):
                     result.append(m)
-                elif tab_keyword == "po" and any(k in sender.lower() for k in ["product", "po", "owner"]):
+                elif tab_keyword == "po" and any(k in sender for k in ["product", "po", "owner"]):
                     result.append(m)
 
             return result[-20:]  # Last 20 messages max
         finally:
             db.close()
 
-    def _get_workspace_file_content(self, mission: MissionDef, filename: str,
+    def _get_workspace_file_content(self, mission, filename: str,
                                      heading: str) -> str:
         """Read a file from workspace and convert to Confluence format."""
         from pathlib import Path
@@ -389,8 +407,22 @@ class ConfluenceSyncEngine:
 
     def sync_tab(self, mission_id: str, tab: str) -> dict:
         """Sync a single tab to Confluence. Returns {page_id, url, status}."""
-        ms = get_mission_store()
-        mission = ms.get_mission(mission_id)
+        # Try mission_runs first (active executions), fallback to missions (SAFe backlog)
+        run_store = get_mission_run_store()
+        mission = run_store.get(mission_id)
+        mission_name = ""
+        if mission:
+            mission_name = (mission.brief or "")[:80]
+        else:
+            try:
+                from ..missions.store import get_mission_store
+                ms = get_mission_store()
+                m = ms.get_mission(mission_id)
+                if m:
+                    mission = m
+                    mission_name = m.name
+            except Exception:
+                pass
         if not mission:
             return {"status": "error", "error": f"Mission {mission_id} not found"}
 
@@ -415,7 +447,7 @@ class ConfluenceSyncEngine:
         # Title format: "Epic Name — Tab"
         tab_labels = {"po": "PO — Features", "qa": "QA — Tests",
                        "archi": "Architecture", "wiki": "Wiki", "projet": "Projet"}
-        title = f"{mission.name} — {tab_labels.get(tab, tab)}"
+        title = f"{mission_name or mission_id} — {tab_labels.get(tab, tab)}"
 
         # Create or update
         page = self.client.create_or_update(title, body, epic_page_id)
