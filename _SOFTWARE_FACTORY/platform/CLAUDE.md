@@ -1,385 +1,284 @@
 # MACARON AGENT PLATFORM
 
 ## WHAT
-Web multi-agent platform. SAFe-aligned.
-Agents collaborate (debate/veto/delegate) to produce code autonomously.
-FastAPI + HTMX + SSE + SQLite. Dark purple theme.
+Web multi-agent platform SAFe-aligned. Agents collaborate (debate/veto/delegate) autonomously.
+FastAPI + HTMX + SSE + SQLite. Dark purple theme. Port 8099.
 
 ## RUN
 ```bash
 cd _SOFTWARE_FACTORY
-rm -f data/platform.db  # re-seed
-python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
+rm -f data/platform.db data/platform.db-wal data/platform.db-shm  # re-seed
+python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8099 --ws none --log-level warning
 # NO --reload (conflicts stdlib `platform` module)
 # --ws none mandatory (SSE not WS)
 # DB: data/platform.db (parent dir, NOT platform/data/)
-# NO dummy API keys — use real keys or omit
 ```
 
 ## ⚠️ COPILOT CLI — SERVER LAUNCH
 ```
 ALWAYS: nohup + & (detached, survives session shutdown)
   nohup python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8099 --ws none > /tmp/macaron-platform.log 2>&1 &
-
-NEVER: mode="async" sans detach (process killed quand session ferme → ERR_CONNECTION_REFUSED)
-NEVER: mode="sync" pour un serveur (bloque la session)
-VERIFY: curl -s -o /dev/null -w "%{http_code}" http://localhost:8099/ après lancement
-LOGS:   tail -f /tmp/macaron-platform.log
+NEVER: mode="async" sans detach | mode="sync" pour serveur
+VERIFY: curl -s -o /dev/null -w "%{http_code}" http://localhost:8099/
 KILL:   lsof -ti:8099 | xargs kill -9
 ```
 
 ## DEPLOY (Azure VM)
 ```bash
-# VM: 4.233.64.30, user azureadmin, key ~/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa
 SSH_KEY="$HOME/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa"
-rsync -azP --delete --exclude='__pycache__' --exclude='data/' --exclude='tests/e2e/node_modules' \
+rsync -azP --delete --exclude='__pycache__' --exclude='data/' \
   platform/ -e "ssh -i $SSH_KEY" azureadmin@4.233.64.30:/opt/macaron/platform/
 ssh -i "$SSH_KEY" azureadmin@4.233.64.30 "cd /opt/macaron && sudo docker compose --env-file .env -f platform/deploy/docker-compose-vm.yml up -d --build"
 # Basic Auth: macaron:macaron | .env: MINIMAX_API_KEY, AZURE_OPENAI_API_KEY
 ```
 
 ## STACK
-- **Backend**: FastAPI, Jinja2, SSE (no WebSocket)
-- **Frontend**: HTMX, CSS vars, no build step, zero emoji (SVG Feather icons only)
-- **DB**: SQLite WAL + FTS5 (~25 tables)
-- **LLM**: MiniMax M2.5 (primary) → Azure OpenAI → Azure AI (fallback)
-- **128 agents**, 23 patterns, 12 workflows, 1222 skills
+- FastAPI + Jinja2 + HTMX + SSE (no WS). Zero build step. Zero emoji (SVG Feather only)
+- SQLite WAL + FTS5 (~30 tables)
+- LLM: MiniMax M2.5 → Azure OpenAI → Azure AI (fallback chain)
+- **94 agents** (75 YAML defs), 12 patterns, 16 workflows, 1259 skills
 
 ---
 
-## SAFe VOCABULARY (AUTHORITATIVE)
+## SAFe VOCABULARY
 
-### Glossary — What each term means in this platform
+| SAFe | Platform | DB Table |
+|------|----------|----------|
+| Portfolio | Strategic view | — |
+| Epic | `MissionDef` | `missions` |
+| Feature | `FeatureDef` | `features` |
+| Story | `UserStoryDef` | `user_stories` |
+| Task | `TaskDef` | `tasks` |
+| PI | `MissionRun` | `mission_runs` |
+| Iteration | `SprintDef` | `sprints` |
+| ART | Agent teams | `agents` |
+| Ceremony | `SessionDef` | `sessions` |
+| Ceremony Template | `WorkflowDef` | `workflows` |
+| Pattern | `PatternDef` | `patterns` |
+| Discovery | Ideation flow | `ideation_*` |
 
-| SAFe Term | Platform Entity | DB Table | Description |
-|-----------|----------------|----------|-------------|
-| **Portfolio** | Strategic view | — | Cross-project governance, budgets, WSJF prioritization |
-| **Epic** | `MissionDef` | `missions` | Strategic initiative, WSJF-scored. Decomposes into Features |
-| **Feature** | `FeatureDef` | `features` | Product capability under an Epic. Has acceptance criteria |
-| **Story** | `UserStoryDef` | `user_stories` | User need under a Feature. Estimable, testable |
-| **Task** | `TaskDef` | `tasks` | Atomic work unit assigned to an agent |
-| **PI** | `MissionRun` | `mission_runs` | Program Increment execution (multi-phase lifecycle) |
-| **Iteration** | `SprintDef` | `sprints` | Time-boxed dev cycle within a PI |
-| **ART** | Agent teams | `agents` | Agile Release Train = team of agents (per-project) |
-| **Ceremony** | `SessionDef` | `sessions` | Agent collaboration instance (planning, review, retro...) |
-| **Ceremony Template** | `WorkflowDef` | `workflows` | Reusable multi-phase ceremony definition |
-| **Pattern** | `PatternDef` | `patterns` | Orchestration topology (sequential, hierarchical, debate...) |
-| **Backlog** | Product view | — | Epic → Feature → Story hierarchy + prioritization |
-| **Discovery** | Ideation flow | `ideation_*` | Brainstorm with agents → produces Epics |
-
-### Hierarchy
 ```
-Portfolio
-  └── Epic (= mission, WSJF-ordered)
-        └── Feature (product capability)
-              └── Story (user need)
-                    └── Task (atomic, assigned to agent)
-
-Execution:
-  ART (= agent team per project)
-    └── PI (= mission_run, multi-phase lifecycle)
-          └── Iteration (= sprint, time-boxed)
-                └── Ceremony (= session, agent collaboration)
-                      └── Pattern (orchestration: sequential/hierarchical/debate...)
+Portfolio → Epic (WSJF) → Feature → Story → Task
+ART → PI (mission_run) → Iteration (sprint) → Ceremony (session) → Pattern
 ```
 
-### Terms to STOP using
-| Wrong | Correct | Why |
-|-------|---------|-----|
-| "Mission" in UI | **Epic** or **PI** | "Mission" is military, not agile. Epic=backlog item, PI=execution |
-| "Mega-workflow" | **PI Lifecycle** | It's a PI execution with phases |
-| "Session" in UI | **Ceremony** | Sessions are SAFe ceremonies (planning, sprint, review, retro) |
-| "Workflow" in UI | **Ceremony Template** | Template that defines how a ceremony runs |
-| "Pipeline stratégique" | **Portfolio Kanban** | SAFe term for strategic flow |
-
-NOTE: DB tables/code keep current names (missions, sessions, workflows) — rename is UI-only.
+DB tables/code keep current names (missions, sessions, workflows) — rename UI-only.
 
 ---
 
-## NAV (sidebar — 8 entries, DONE)
+## NAV (sidebar — 8 entries)
 
 ```
-STRATEGY                              ENGINEERING
-  Portfolio /    (tabs: overview/dsi/metier)  Ceremonies /ceremonies (tabs: templates/patterns)
-  Backlog /backlog (tabs: backlog/discovery)  Live /live → /sessions
-  PI Board /pi   (tabs: epics/control)        ART /art (tabs: agents/org/generator)
-  Metrics /metrics                            Toolbox /toolbox (tabs: skills/memory/mcps)
+STRATEGY                           ENGINEERING
+  Portfolio /                        Ceremonies /ceremonies
+  Backlog /backlog                   Live /live
+  PI Board /pi                       ART /art
+  Metrics /metrics                   Toolbox /toolbox
 ```
-View switcher: all (8) | strategy (4) | engineering (4). localStorage persist.
-Old routes preserved for HTMX tab content loading. Tabbed pages use hx-trigger="click, load".
+View switcher: all|strategy|engineering. localStorage persist.
 
 ---
 
-## ARCHITECTURE
+## DYNAMIC ORCHESTRATOR
 
-```
-┌─ PORTFOLIO (Strategic) ─────────────────────┐
-│ CPO (Julie) · CTO (Karim) · Dir.Prog        │
-│ (Thomas) · Portfolio Mgr (Sofia)             │
-│ → debate VISION.md → create Epics (WSJF)     │
-├─ ART (per project) ─────────────────────────┤
-│ RTE · PO · Lead · Devs×N · QA               │
-│ + pool: sécu, adversarial, chaos, e2e, perf │
-│ → Ceremonies: PI Planning → Iteration → I&A  │
-├─ EXECUTION (subprocess, no LLM) ────────────┤
-│ Build · Deploy · Preflight · Evidence        │
-└──────────────────────────────────────────────┘
-```
+Workflow config `"orchestrator": "<agent_id>"` → overrides default `chef_de_programme`.
+- `api_mission_start` reads `wf.config.orchestrator` → sets `mission.cdp_agent_id`
+- `mission_control.html` uses `orchestrator_id` template var (avatar/name/role/SSE)
+- `api_mission_run` resolves orch_id/name/role/avatar once → all SSE messages
+- `api_mission_validate` sends GO/NOGO to `mission.cdp_agent_id`
 
-## KEY ROUTES (current → target)
-```
-# CURRENT                          # TARGET (after refactor)
-GET  /                             GET  /                    Portfolio (tabs: overview/dsi/metier)
-GET  /dsi                          (merged into / tab)
-GET  /metier                       (merged into / tab)
-GET  /product                      GET  /backlog             Backlog (tabs: backlog/discovery)
-GET  /ideation                     (merged into /backlog tab)
-GET  /missions                     GET  /pi                  PI list
-GET  /missions/{id}                GET  /pi/{id}             PI detail (iterations + kanban)
-GET  /mission-control              GET  /pi/{id}/control     PI lifecycle control
-GET  /workflows                    GET  /ceremonies          Ceremony templates
-GET  /patterns                     (merged into /ceremonies tab)
-GET  /sessions                     GET  /live                Active ceremonies
-GET  /sessions/{id}/live           GET  /live/{id}           Ceremony live view
-GET  /agents                       GET  /art                 ART (tabs: agents/org/generator)
-GET  /org                          (merged into /art tab)
-GET  /generate                     (merged into /art tab)
-GET  /skills                       GET  /toolbox             Toolbox (tabs: skills/memory/mcps)
-GET  /memory                       (merged into /toolbox tab)
-GET  /mcps                         (merged into /toolbox tab)
-GET  /metrics                      GET  /metrics             DORA metrics
-GET  /projects/{id}                GET  /projects/{id}       Project detail
-```
+Example: `security-hacking` workflow → CISO (Rachid Amrani) orchestrates, NOT CDP.
 
 ---
 
-## GRAPH VIZ (session_live.html → live/{id})
+## SECURITY AUDIT WORKFLOW (`security-hacking`)
 
-### Pan & Zoom
-- Mouse wheel zoom 0.3x–3x, drag-to-pan, +/-/fit-all buttons
-- CSS transform (translate+scale) on SVG, NOT viewBox
+### Teams (11 agents + compliance_officer)
+```
+🔴 RED TEAM: pentester-lead (Karim), security-researcher (Léa), exploit-dev (Yassine)
+🔵 BLUE TEAM: security-architect (Fatima), threat-analyst (Maxime), ciso (Rachid), secops-engineer (Aurélien)
+🟣 PURPLE TEAM: security-dev-lead (Inès), security-backend-dev (Thomas), security-frontend-dev (Clara), qa-security (Samira)
++ compliance_officer (Hélène, existing)
+```
 
-### Flow particles
-- SVG `<animateMotion>` along Bezier edge path on SSE message
-- 900ms duration, auto-cleanup
+### 8 Phases
+| # | Phase | Pattern | Agents |
+|---|-------|---------|--------|
+| 1 | Recon | parallel | Red Team (3) |
+| 2 | Threat Model | network | Red+Blue debate (4) |
+| 3 | Exploitation | loop ×5 | Red Team PoCs |
+| 4 | Vuln Report | aggregator | threat-analyst consolidates |
+| 5 | Security Review | human-in-the-loop | CISO GO/NOGO checkpoint |
+| 6 | Remediation | loop ×3 | Purple Team TDD fixes |
+| 7 | Verification | parallel | re-exploit + compliance |
+| 8 | Deploy Secure | sequential | staging→QA→canary→prod |
 
-### Focus/dim mode
-- Click node → `focusedNode` + `connectedSet` computed from edges
-- Unconnected: `.dimmed` (opacity 0.18, pointer-events none)
-- Click background to clear
+### Skills (4 .md files)
+pentest_web, pentest_infra, threat_intel, security_remediation
 
-### Minimap
-- 160x100px, auto-hidden if ≤6 agents. Viewport rect, click-to-navigate
+### Veto hierarchy
+ABSOLUTE: ciso, qa-security | STRONG: pentester-lead, compliance_officer, security-architect, threat-analyst
 
-### Agent chat panel
-- 380px slide-in from right (CSS transform)
-- Avatar, name, role, status dot, skills tags
-- Quick actions: Status/Review/Delegate (pre-filled prompts)
-- Chat bubbles (user/agent), animated typing dots (WhatsApp-style)
-- Sends via `POST /api/sessions/{id}/agents/{agent_id}/message` → A2A bus
+---
 
-### Pulse ring
-- `@keyframes pulseRing` on thinking/acting agents
+## PRODUCT LINE VIEW (`/product-line`)
 
-## SVG SPRITES
-All icons SVG in `partials/svg_sprites.html`. **ZERO emoji anywhere — ENFORCED**.
-`cleanLLM()` strips `<think>`, `[TOOL_CALL]`, `[DELEGATE:...]` from all rendered content.
+Responsable produit → applications → épics → roadmap jalons.
+DORA pilotage: qualité / time to market. SVG Feather icons (no emoji).
 
-## MODULES (key files)
+---
+
+## GRAPH VIZ (session_live.html)
+
+Pan+zoom (wheel 0.3–3x, drag). Flow particles (animateMotion 900ms).
+Focus/dim mode (click node). Minimap 160×100px.
+Agent chat panel 380px slide-in (avatar, skills, quick actions, WhatsApp-style dots).
+Pulse ring on thinking/acting agents.
+
+---
+
+## MODULES
 
 ### Core
-- `server.py` — FastAPI app + Jinja markdown filter with `_clean_llm()`
-- `config.py` — PlatformConfig, 7 config classes
-- `models.py` — 20+ Pydantic models (A2AMessage, AgentStatus, MessageType)
+- `server.py` — FastAPI app + Jinja `_clean_llm()` filter
+- `config.py` — PlatformConfig (7 config classes)
+- `models.py` — 20+ Pydantic models
 
 ### Agents
-- `agents/executor.py` (~1150L) — LLM tool-calling loop (max 15 rounds), mission tools
+- `agents/executor.py` (2438L) — LLM tool-calling loop (max 15 rounds), mission tools, tool ACL + path sandbox
 - `agents/loop.py` (516L) — AgentLoop autonomous + AgentLoopManager
-- `agents/store.py` (335L) — AgentDef CRUD + YAML seed (42 definitions)
+- `agents/store.py` (335L) — AgentDef CRUD + YAML seed (75 definitions)
 - `agents/rlm.py` (403L) — RLM deep search (arXiv:2512.24601)
 
 ### Patterns
-- `patterns/engine.py` (~1200L) — run_pattern(), 8 types:
-  solo, sequential, parallel, loop, hierarchical, network, debate, sf-tdd
-- Gate types: `all_approved` | `no_veto` | `always`
-- VETO detection: `[VETO]`, `NOGO`, `NO-GO`, `Statut: NOGO`
-- APPROVE detection: `[APPROVE]`, `Statut: GO`
-- SSE: `stream_thinking` heartbeat, `pattern_end` with DB fallback
+- `patterns/engine.py` (1727L) — run_pattern(), 8 types: solo, sequential, parallel, loop, hierarchical, network, debate, sf-tdd
+- Gate: `all_approved` | `no_veto` | `always` | `checkpoint`
+- VETO: `[VETO]`, `NOGO`, `NO-GO` | APPROVE: `[APPROVE]`, `Statut: GO`
+- Phase summaries LLM-generated from conversation
 
-### Missions (= Epics + PI execution)
+### Missions
 - `missions/store.py` — MissionDef, SprintDef, TaskDef + MissionStore + MissionRunStore
 - `missions/product.py` — Product backlog (Epics → Features → Stories)
 
-### Workflows (= Ceremony Templates)
-- `workflows/store.py` (518L) — WorkflowDef, WorkflowPhase, WorkflowRun
-- SAFe ceremonies: Planning (sequential) → Sprint (hierarchical) → Review (gate=all_approved)
-- 12 templates: safe-{veligo,popinz,psy,yolonow,fervenza,solaris,logs,factory}, migration-sharelook, sf-pipeline, review-cycle, debate-decide
+### Workflows
+- `workflows/store.py` (1760L) — WorkflowDef, WorkflowPhase, seed_builtins()
+- 16 templates: safe-{veligo,ppz,psy,yolo,ferv,sol,logs,factory}, migration-sharelook, sf-pipeline, review-cycle, debate-decide, security-hacking, product-lifecycle, + others
 
-### A2A (Agent-to-Agent)
-- `a2a/bus.py` (249L) — MessageBus, async queues (maxsize=2000), SSE bridge, dead letter
-- `a2a/protocol.py` (207L) — 11 message types, priority mapping (VETO=10, REQUEST=5)
-- `a2a/veto.py` (190L) — 3 levels: ABSOLUTE, STRONG, ADVISORY
-- `a2a/negotiation.py` (171L) — propose→counter→vote cycle
+### A2A
+- `a2a/bus.py` (247L) — MessageBus, async queues (2000), SSE bridge, dead letter
+- `a2a/protocol.py` (207L) — 11 msg types, priority (VETO=10)
+- `a2a/veto.py` (190L) — ABSOLUTE/STRONG/ADVISORY
+- `a2a/negotiation.py` (171L) — propose→counter→vote
 
 ### LLM
-- `llm/client.py` (~500L) — LLMClient singleton, multi-provider, cooldown on 429
-- Fallback: minimax → azure-ai
-- httpx timeout: connect=30s, read=300s (MiniMax thinking can be slow)
-- MiniMax strips `<think>` blocks automatically
-- Azure uses `max_completion_tokens` (not `max_tokens`)
+- `llm/client.py` (~500L) — multi-provider, cooldown on 429
+- MiniMax M2.5 (primary) → Azure AI (fallback)
+- httpx: connect=30s, read=300s. MiniMax strips `<think>` auto
+- Azure: `max_completion_tokens` (NOT `max_tokens`)
 
 ### Memory
-- `memory/manager.py` (205L) — 4-layer: session/pattern/project/global
-- `memory/project_files.py` (120L) — auto-loads CLAUDE.md, SPECS.md, VISION.md (3K/file, 8K total)
+- `memory/manager.py` (205L) — 4-layer: session/pattern/project/global (FTS5)
+- `memory/project_files.py` (120L) — auto-loads CLAUDE.md, SPECS.md, VISION.md
 
-### Generators
-- `generators/team.py` — Team composition from mission brief
-
-### Metrics
-- `metrics/dora.py` — DORA metrics (Deployment Freq, Lead Time, CFR, MTTR)
-
-### Tools (available to agents)
+### Tools (agent-callable)
 ```
 code_read, code_search, code_write, code_edit
 git_status, git_log, git_diff
-build, test, lint  (subprocess, 300s/120s timeout)
+build, test, lint  (subprocess 300s/120s)
 memory_search, memory_store
 list_files, deep_search (RLM)
+run_phase, list_phases, request_validation (orchestrator only)
 ```
 
 ### Web
-- `web/routes.py` (~5000L) — 100+ endpoints
+- `web/routes.py` (8575L) — 100+ endpoints
 - `web/ws.py` (156L) — SSE endpoints
-- ~48 templates (Jinja2), 3 CSS files
-- HTMX patterns: hx-get/post, hx-target, hx-swap, hx-trigger="load, every 30s"
+- 44 templates (Jinja2), 3 CSS files
+- HTMX: hx-get/post, hx-target, hx-swap, hx-trigger="load, every 30s"
 
-## DB TABLES (~25)
+---
+
+## ISOLATION LAYERS (implemented)
+
+| Layer | What | Status |
+|-------|------|--------|
+| Tool ACL | Agent only calls its declared tools | ✅ |
+| Path sandbox | Files restricted to workspace | ✅ |
+| Memory isolation | memory_search/store forced project scope | ❌ TODO |
+| Git branch isolation | agent/{id}/ branch, never master | ❌ TODO |
+| Rate limits | Max 100 tool calls, 50 writes/session | ❌ TODO |
+| Git path guard | git_diff/log restricted to project_path | ❌ TODO |
+| Docker per-agent | Container isolation for build/test | ❌ Optional |
+
+---
+
+## DB TABLES (~30)
 ```
-agents, agent_instances, patterns, skills, mcps,
+agents, agent_instances, agent_scores, patterns, skills, mcps,
 missions, sprints, tasks, features, user_stories,
 sessions, messages, messages_fts, artifacts,
 memory_pattern, memory_project, memory_project_fts,
 memory_global, memory_global_fts, tool_calls,
 skill_github_sources, projects, workflows,
 mission_runs, org_portfolios, org_arts, org_teams, org_team_members,
-ideation_sessions, ideation_messages, ideation_findings, retrospectives
+ideation_sessions, ideation_messages, ideation_findings,
+retrospectives, confluence_pages
 ```
 
-## AGENT TEAMS (128 total)
+## AGENT TEAMS (94 total)
 
-### Strategic (4, cross-project, pool)
-strat-cpo (Julie), strat-cto (Karim), strat-dirprog (Thomas), strat-portfolio (Sofia)
+### Strategic (4): strat-cpo (Julie), strat-cto (Karim), strat-dirprog (Thomas), strat-portfolio (Sofia)
+### Per-project (prefix: veligo-, ppz-, psy-, yolo-, ferv-, sol-, logs-, fact-): RTE, PO, Lead, Devs×2-3, QA, UX
+### Pool (prefix: pool-): security, whitebox-hacker, adversarial, e2e-tester, chaos, perf, data, devops, dpo, techwriter, a11y
+### Security (11 new): pentester-lead, security-researcher, exploit-dev, security-architect, threat-analyst, ciso, secops-engineer, security-dev-lead, security-backend-dev, security-frontend-dev, qa-security
+### 75 YAML definitions in skills/definitions/
 
-### Per-project teams (prefix: veligo-, ppz-, psy-, yolo-, ferv-, sol-, logs-, fact-)
-Each has: RTE, PO, Lead Dev, Dev×2-3, QA, UX
+## PATTERNS (12 DB)
+Core types: solo, sequential, parallel, loop, hierarchical, network, human-in-the-loop, wave, adversarial-pair, adversarial-cascade, router, aggregator
 
-### Pool agents (prefix: pool-)
-security, whitebox-hacker, adversarial, e2e-tester, chaos, perf, data, devops, dpo, techwriter, a11y
+Protocol: pattern type → agent behavior (NOT hierarchy_rank)
+- DISCUSSION (network, HITL): RESEARCH_PROTOCOL, no code writes
+- EXECUTION (hierarchical, sequential, parallel, loop): role-based (dev→EXEC, qa→QA, lead→REVIEW)
 
-### Agent definitions (42 YAML in skills/definitions/)
-Roles: DSI, architects, devs (back/front/full/mobile), QA, devops, SRE, DBA, SM, agile coach, RTE, PO, tech writer, security, compliance, UX, accessibility, data, ML
-
-## PATTERNS (23)
-
-### Core (8 types)
-solo-chat, sequential, parallel, adversarial-pair, adversarial-cascade, hierarchical, network, human-in-the-loop, wave
-
-### Pattern-based protocol (NO rank gating)
-```
-Pattern type determines agent behavior, NOT hierarchy_rank.
-All agents keep their configured tools (search, read, memory, etc.)
-
-DISCUSSION patterns (network, human-in-the-loop):
-  → Everyone gets RESEARCH_PROTOCOL
-  → Can read/search, MUST NOT write code
-  → Must deliver analysis/verdict immediately (no "let me check first")
-
-EXECUTION patterns (hierarchical, sequential, parallel, loop, wave, etc.):
-  → Role-based: dev→EXEC_PROTOCOL, qa→QA_PROTOCOL, lead→REVIEW_PROTOCOL
-  → Others (scrum, PM)→RESEARCH_PROTOCOL
-  → All get PR_PROTOCOL for commit conventions
-```
-
-### Phase summary
-LLM-generated from actual agent conversation (not regex/template).
-Prompt: "Summarize decisions, proposals, conclusions in 2-3 sentences."
-Stored in `phase.summary`, rendered in accordion when collapsed.
-
-### Project-specific (15)
-Per-project: *-pi (planning), *-sprint (dev), *-release, *-retro
-
-## HARNESS ENGINEERING (NEXT)
-
-### Concept
-Inside each Task in an Iteration, run a harness loop:
-```
-Dev codes → Preflight gate (deterministic) → Review gate (LLM) → Evidence → Done
-     ↑_________ remediation (max 3) _________↩
-```
-
-### Risk tiers (per project, in yaml)
-- HIGH: api/, auth/, db/, security/, migrations/ → full checks
-- LOW: everything else → preflight + build only
-
-### Preflight gate (subprocess, NOT LLM)
-lint + typecheck + unit tests → catch 60%+ errors before LLM review
-
-### Review gate (SHA-discipline)
-- Review valid ONLY for current HEAD SHA
-- Stale review = re-run. VETO → remediation → re-review
-
-### Evidence (structured JSON, machine-verifiable)
-test results, coverage delta, security scan, browser evidence (UI)
+---
 
 ## CONVENTIONS
 
-### Imports
+### Imports (always relative)
 ```python
 from ..db.migrations import get_db
 from ..agents.store import get_agent_store
 from ..llm.client import LLMMessage, get_llm_client
 ```
-Always relative. `from __future__ import annotations` for forward refs.
 
 ### Singletons
-```python
-get_agent_store(), get_project_store(), get_session_store(),
-get_mission_store(), get_pattern_store(), get_memory_manager(),
-get_llm_client(), get_workflow_store()
-```
+`get_agent_store()`, `get_project_store()`, `get_session_store()`, `get_mission_store()`, `get_pattern_store()`, `get_memory_manager()`, `get_llm_client()`, `get_workflow_store()`
 
 ### Templates
 Extend `base.html`, blocks: `topbar_actions`, `content`.
-Markdown filter: `{{ content | markdown | safe }}` (auto-strips `<think>`, `[TOOL_CALL]`).
+Markdown: `{{ content | markdown | safe }}` (strips `<think>`, `[TOOL_CALL]`).
 
 ### CSS
-Vars: `--bg-primary:#0f0a1a`, `--purple:#a855f7`, `--accent:#f78166`.
-Font: `JetBrains Mono`. Radius: 10px. Sidebar: 56px.
+`--bg-primary:#0f0a1a`, `--purple:#a855f7`, `--accent:#f78166`. JetBrains Mono. Radius 10px. Sidebar 56px.
 
-### UI rules
-- **ZERO emoji** — SVG Feather icons or plain text only
-- Animated typing dots (WhatsApp-style `dotPulse` keyframes)
-- `cleanLLM()` in JS + `_clean_llm()` in Jinja filter
+### Rules
+- ZERO emoji — SVG Feather or text only
+- `cleanLLM()` JS + `_clean_llm()` Jinja
 - 4 view modes: card, card-simple, list, list-compact
+- SSE: `bus.add_sse_listener()`, keepalive 30s, queue 2000
+- No `--reload`. No `import platform` top-level. Run from parent dir.
 
-### SSE
-`bus.add_sse_listener()`, filter by session_id, keepalive 30s.
-Queue maxsize=2000. `stream_thinking` heartbeat during MiniMax think phase.
-
-### Process
-No `--reload`. No `import platform` at top level.
-Run from parent: `python -m uvicorn platform.server:app`.
-Clean `__pycache__` before restart if stale bytecode errors.
+---
 
 ## FILE TREE
 ```
 platform/
 ├── server.py, config.py, models.py, security.py
-├── agents/    executor.py, loop.py, store.py, rlm.py
-├── patterns/  engine.py, store.py
+├── agents/    executor.py(2438L), loop.py, store.py, rlm.py
+├── patterns/  engine.py(1727L), store.py
 ├── missions/  store.py, product.py
-├── workflows/ store.py
-├── sessions/  store.py, runner.py
+├── workflows/ store.py(1760L)
+├── sessions/  store.py, runner.py(672L)
 ├── a2a/       bus.py, protocol.py, veto.py, negotiation.py
 ├── llm/       client.py
 ├── memory/    manager.py, project_files.py
@@ -388,23 +287,23 @@ platform/
 ├── rbac/      __init__.py
 ├── tools/     build_tools.py, code_tools.py, git_tools.py, web_tools.py
 ├── projects/  manager.py
-├── skills/    library.py, definitions/*.yaml (42)
+├── skills/    library.py, definitions/*.yaml (75)
 ├── db/        schema.sql, migrations.py
 ├── deploy/    Dockerfile, docker-compose-vm.yml, nginx-vm.conf
 ├── web/
-│   ├── routes.py (~5000L, 100+ endpoints)
+│   ├── routes.py (8575L)
 │   ├── ws.py (SSE)
-│   ├── templates/ (~48 files)
-│   │   ├── base.html (sidebar view-switch)
-│   │   ├── portfolio.html, dsi.html, metier.html, product.html
-│   │   ├── ideation.html, ideation_history.html
-│   │   ├── backlog.html, ceremonies.html, art.html, toolbox.html, pi_board.html (tabbed pages)
-│   │   ├── missions.html, mission_detail.html, mission_control.html, mission_control_list.html, mission_start.html
-│   │   ├── session_live.html (~1700L, graph+chat+thread)
-│   │   ├── conversation.html, workflows.html, workflow_edit.html
-│   │   ├── agents.html, org.html, generate.html, skills.html, memory.html
-│   │   ├── dora_dashboard.html, project_detail.html, project_board.html, project_overview.html
-│   │   └── partials/ (msg_unified.html, svg_sprites.html, view_switcher.html, ...)
-│   └── static/css/ main.css, agents.css, projects.css
+│   ├── templates/ (44 files)
+│   │   ├── base.html, portfolio.html, dsi.html, metier.html, product.html
+│   │   ├── ideation.html, ideation_history.html, backlog.html
+│   │   ├── ceremonies.html, art.html, toolbox.html, pi_board.html
+│   │   ├── mission_control.html, mission_start.html, mission_detail.html
+│   │   ├── session_live.html (~1700L), conversation.html
+│   │   ├── agents.html, org.html, generate.html, agent_edit.html
+│   │   ├── product_line.html, agent_world.html, settings.html
+│   │   ├── dora_dashboard.html, monitoring.html, design_system.html
+│   │   ├── project_detail.html, project_board.html, project_overview.html
+│   │   └── partials/ (svg_sprites.html, msg_unified.html, view_switcher.html)
+│   └── static/ css/(3), js/(4), avatars/(SVG+JPG)
 └── data/ → ../data/platform.db
 ```
