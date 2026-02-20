@@ -114,6 +114,17 @@ def _migrate(conn: sqlite3.Connection):
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_features_epic ON features(epic_id)")
 
+    # Confluence sync tracking
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS confluence_pages (
+            mission_id TEXT NOT NULL,
+            tab TEXT NOT NULL,
+            confluence_page_id TEXT NOT NULL,
+            last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (mission_id, tab)
+        )
+    """)
+
 def get_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
     """Get a database connection."""
     if not db_path.exists():

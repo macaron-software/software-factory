@@ -1084,6 +1084,9 @@
                     </div>
                     <div style="text-align:right;margin-top:0.3rem">
                         <button id="mc-reset-btn" onclick="resetMission()" style="background:none;border:none;color:var(--text-secondary);font-size:0.6rem;cursor:pointer;opacity:.6;transition:opacity .15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">Reinitialiser</button>
+                        <button id="mc-confluence-btn" onclick="syncConfluence()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-secondary);font-size:0.65rem;cursor:pointer;padding:2px 8px;margin-left:8px;opacity:.8;transition:opacity .15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.8'">
+                            <svg class="icon icon-xs" style="width:12px;height:12px;vertical-align:middle;margin-right:3px"><use href="#icon-upload-cloud"/></svg>Sync Confluence
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2180,6 +2183,29 @@ async function resetMission() {
             alert('Erreur lors de la réinitialisation');
         }
     } catch(err) { console.error(err); alert('Erreur réseau'); }
+}
+
+async function syncConfluence() {
+    const btn = document.getElementById('mc-confluence-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="icon icon-xs" style="width:12px;height:12px;vertical-align:middle;margin-right:3px"><use href="#icon-loader"/></svg>Sync...';
+    try {
+        const resp = await fetch(`/api/missions/${MISSION_ID}/confluence/sync`, {method:'POST'});
+        const data = await resp.json();
+        if (resp.ok) {
+            const synced = Object.entries(data).filter(([,v]) => v.status === 'ok').map(([k]) => k);
+            const failed = Object.entries(data).filter(([,v]) => v.status === 'error').map(([k]) => k);
+            let msg = synced.length ? `Sync OK: ${synced.join(', ')}` : '';
+            if (failed.length) msg += (msg ? '\n' : '') + `Erreur: ${failed.join(', ')}`;
+            alert(msg || 'Aucun contenu à synchroniser');
+        } else {
+            alert(data.error || 'Erreur Confluence');
+        }
+    } catch(err) { console.error(err); alert('Erreur réseau'); }
+    finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="icon icon-xs" style="width:12px;height:12px;vertical-align:middle;margin-right:3px"><use href="#icon-upload-cloud"/></svg>Sync Confluence';
+    }
 }
 
 function esc(t) { return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }

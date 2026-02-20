@@ -6149,6 +6149,53 @@ async def api_mission_reset(request: Request, mission_id: str):
     return JSONResponse({"status": "reset", "mission_id": mission_id})
 
 
+# ── Confluence Sync ──────────────────────────────────────────
+
+@router.post("/api/missions/{mission_id}/confluence/sync")
+async def api_confluence_sync_all(mission_id: str):
+    """Sync all mission tabs to Confluence."""
+    try:
+        from ..confluence.sync import get_sync_engine
+        engine = get_sync_engine()
+        results = engine.sync_mission(mission_id)
+        return JSONResponse(results)
+    except FileNotFoundError:
+        return JSONResponse({"error": "Confluence PAT not configured"}, status_code=503)
+    except Exception as e:
+        logger.error("Confluence sync failed: %s", e)
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.post("/api/missions/{mission_id}/confluence/sync/{tab}")
+async def api_confluence_sync_tab(mission_id: str, tab: str):
+    """Sync a single tab to Confluence."""
+    try:
+        from ..confluence.sync import get_sync_engine
+        engine = get_sync_engine()
+        result = engine.sync_tab(mission_id, tab)
+        return JSONResponse(result)
+    except FileNotFoundError:
+        return JSONResponse({"error": "Confluence PAT not configured"}, status_code=503)
+    except Exception as e:
+        logger.error("Confluence sync tab %s failed: %s", tab, e)
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.get("/api/missions/{mission_id}/confluence/status")
+async def api_confluence_status(mission_id: str):
+    """Get Confluence sync status for a mission."""
+    try:
+        from ..confluence.sync import get_sync_engine
+        engine = get_sync_engine()
+        status = engine.get_sync_status(mission_id)
+        healthy = engine.client.health_check()
+        return JSONResponse({"status": status, "connected": healthy})
+    except FileNotFoundError:
+        return JSONResponse({"connected": False, "status": {}})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @router.post("/api/missions/{mission_id}/run")
 async def api_mission_run(request: Request, mission_id: str):
     """Drive mission execution: CDP orchestrates phases sequentially.
@@ -7108,6 +7155,28 @@ const {{ chromium }} = require('playwright');
                 })
         except Exception as e:
             logger.error("Post-phase QA screenshots failed: %s", e)
+
+    # Confluence sync — auto-sync after every phase
+    try:
+        from ..confluence.sync import get_sync_engine
+        engine = get_sync_engine()
+        if engine.client.health_check():
+            results = engine.sync_mission(mission.id if hasattr(mission, 'id') else str(mission))
+            synced = [t for t, r in results.items() if r.get("status") == "ok"]
+            if synced:
+                await push_sse(session_id, {
+                    "type": "message",
+                    "from_agent": "system",
+                    "from_name": "Confluence",
+                    "from_role": "Sync",
+                    "content": f"Sync Confluence: {', '.join(synced)} ({len(synced)} pages)",
+                    "phase_id": phase_id,
+                    "msg_type": "text",
+                })
+    except FileNotFoundError:
+        pass  # No PAT configured — skip
+    except Exception as e:
+        logger.warning("Confluence sync failed: %s", e)
 
 
 async def _extract_features_from_phase(phase_id: str, mission, session_id: str):
