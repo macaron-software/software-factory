@@ -7098,7 +7098,7 @@ async def api_mission_run(request: Request, mission_id: str):
                         if "sprint" in pk_j or "dev" in pk_j:
                             dev_idx = j
                             break
-                    if dev_idx is not None and dev_idx < i:
+                    if dev_idx is not None and dev_idx <= i:
                         # CDP announces reloop
                         reloop_msg = (
                             f"Reloop {reloop_count}/{MAX_RELOOPS} — Phase «{wf_phase.name}» échouée. "
