@@ -3,7 +3,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl && \
+    git curl ripgrep nodejs npm docker.io && \
     rm -rf /var/lib/apt/lists/*
 
 COPY platform/requirements.txt /app/requirements.txt

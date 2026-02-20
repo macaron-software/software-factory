@@ -6402,7 +6402,7 @@ async def api_mission_run(request: Request, mission_id: str):
                 continue
 
             # Skip already-completed phases (for resume/fast-forward)
-            if phase.status in (PhaseStatus.DONE, PhaseStatus.SKIPPED):
+            if phase.status in (PhaseStatus.DONE, PhaseStatus.DONE_WITH_ISSUES, PhaseStatus.SKIPPED):
                 if phase.summary:
                     phase_summaries.append(f"## {wf_phase.name}\n{phase.summary}")
                 i += 1
@@ -6854,7 +6854,7 @@ async def api_mission_run(request: Request, mission_id: str):
                         cdp_msg = f"Phase «{wf_phase.name}» échouée ({short_err}). Epic arrêtée — corrigez puis relancez via le bouton Réinitialiser."
                     else:
                         cdp_msg = f"Phase «{wf_phase.name}» terminée avec des problèmes ({short_err}). Passage à la phase suivante malgré tout…"
-                        phase.status = PhaseStatus.DONE  # downgrade to done with issues
+                        phase.status = PhaseStatus.DONE_WITH_ISSUES  # clearly mark issues
                         phases_done += 1
                         phases_failed -= 1  # undo the +1 from above
                         # Rebuild summary from agent messages (not "Phase échouée")
@@ -6988,16 +6988,18 @@ async def api_mission_run(request: Request, mission_id: str):
 
         # Mission complete — count from actual phase statuses
         phases_done = sum(1 for p in mission.phases if p.status == PhaseStatus.DONE)
+        phases_with_issues = sum(1 for p in mission.phases if p.status == PhaseStatus.DONE_WITH_ISSUES)
         phases_failed = sum(1 for p in mission.phases if p.status == PhaseStatus.FAILED)
-        total = phases_done + phases_failed
-        if phases_failed == 0:
+        total = phases_done + phases_with_issues + phases_failed
+        if phases_failed == 0 and phases_with_issues == 0:
             mission.status = MissionStatus.COMPLETED
             reloop_info = f" ({reloop_count} reloop{'s' if reloop_count > 1 else ''})" if reloop_count > 0 else ""
             final_msg = f"Epic terminée avec succès — {phases_done}/{total} phases réussies{reloop_info}."
         else:
             mission.status = MissionStatus.COMPLETED if phases_done > 0 else MissionStatus.FAILED
             reloop_info = f" ({reloop_count} reloop{'s' if reloop_count > 1 else ''})" if reloop_count > 0 else ""
-            final_msg = f"Epic terminée — {phases_done} réussies, {phases_failed} échouées sur {total} phases{reloop_info}."
+            issues_info = f", {phases_with_issues} avec avertissements" if phases_with_issues > 0 else ""
+            final_msg = f"Epic terminée — {phases_done} réussies{issues_info}, {phases_failed} échouées sur {total} phases{reloop_info}."
         run_store.update(mission)
         await _push_sse(session_id, {
             "type": "message",

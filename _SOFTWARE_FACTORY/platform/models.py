@@ -291,6 +291,7 @@ class PhaseStatus(str, Enum):
     PENDING = "pending"
     RUNNING = "running"
     DONE = "done"
+    DONE_WITH_ISSUES = "done_with_issues"
     FAILED = "failed"
     SKIPPED = "skipped"
     WAITING_VALIDATION = "waiting_validation"

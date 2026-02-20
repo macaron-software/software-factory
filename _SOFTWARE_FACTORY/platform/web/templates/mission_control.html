@@ -27,10 +27,12 @@
 .mc-phase-connector{width:2px;flex:1;background:var(--border)}
 .mc-phase:last-child .mc-phase-connector{display:none}
 .mc-phase[data-status="done"] .mc-phase-dot{background:var(--green);border-color:var(--green)}
+.mc-phase[data-status="done_with_issues"] .mc-phase-dot{background:var(--yellow);border-color:var(--yellow)}
 .mc-phase[data-status="running"] .mc-phase-dot{background:var(--purple);border-color:var(--purple);animation:pulse-dot 1.5s ease-in-out infinite}
 .mc-phase[data-status="failed"] .mc-phase-dot{background:var(--red);border-color:var(--red)}
 .mc-phase[data-status="waiting_validation"] .mc-phase-dot{background:var(--yellow);border-color:var(--yellow);animation:pulse-dot 1s ease-in-out infinite}
 .mc-phase[data-status="done"] .mc-phase-connector{background:var(--green)}
+.mc-phase[data-status="done_with_issues"] .mc-phase-connector{background:var(--yellow)}
 .mc-phase[data-status="running"] .mc-phase-connector{background:var(--purple)}
 @keyframes pulse-dot{0%,100%{transform:scale(1)}50%{transform:scale(1.3)}}
 
@@ -38,6 +40,7 @@
 .mc-phase-card{flex:1;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;margin-bottom:0.5rem;overflow:hidden;transition:border-color .2s}
 .mc-phase[data-status="running"] .mc-phase-card{border-color:var(--purple)}
 .mc-phase[data-status="done"] .mc-phase-card{border-color:var(--green)}
+.mc-phase[data-status="done_with_issues"] .mc-phase-card{border-color:var(--yellow)}
 .mc-phase[data-status="failed"] .mc-phase-card{border-color:var(--red)}
 .mc-phase[data-status="waiting_validation"] .mc-phase-card{border-color:var(--yellow)}
 
@@ -55,6 +58,7 @@
 .mc-phase-status-badge.pending{color:var(--text-secondary);background:var(--bg-tertiary)}
 .mc-phase-status-badge.running{color:var(--purple);background:rgba(124,58,237,.15)}
 .mc-phase-status-badge.done{color:var(--green);background:rgba(34,197,94,.12)}
+.mc-phase-status-badge.done_with_issues{color:var(--yellow);background:rgba(234,179,8,.12)}
 .mc-phase-status-badge.failed{color:var(--red);background:rgba(239,68,68,.12)}
 .mc-phase-status-badge.waiting_validation{color:var(--yellow);background:rgba(234,179,8,.12)}
 .mc-phase-chevron{font-size:0.65rem;color:var(--text-secondary);transition:transform .2s}

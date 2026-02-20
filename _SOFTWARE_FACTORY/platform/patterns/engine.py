@@ -108,26 +108,68 @@ RULES: 1-2 files per subtask. Specific paths. NO code. NO veto."""
 # Execution protocol — telegraphic, code_write focused
 _EXEC_PROTOCOL = """ROLE: Developer. You MUST call code_write. No code_write = FAILURE.
 
-WORKFLOW: list_files (1 round) → code_write per file → git_commit
+WORKFLOW: list_files → code_write per file → build → git_commit
 TOOL: code_write(path="relative/path.swift", content="full source code here")
 
 RULES:
 - code_write EACH file. 30+ lines per file. No stubs.
 - Relative paths (Sources/Core/File.swift). Auto-resolved.
-- Do NOT describe changes. DO them via code_write."""
+- Do NOT describe changes. DO them via code_write.
+- AFTER writing code, call build tool to verify it works:
+  - HTML/CSS/JS: build(command="cat index.html | head -5") to verify file exists
+  - Python: build(command="python3 -m py_compile file.py")
+  - Node.js: build(command="node --check file.js") or build(command="npm install && npm run build")
+  - Swift: build(command="swiftc -parse Sources/*.swift") if available
+  - Docker: build(command="docker build -t test .") if Dockerfile present
+- If build fails, FIX the code and retry. Do NOT commit broken code."""
 
 # Validation protocol — telegraphic
-_QA_PROTOCOL = """ROLE: QA. Verify code changes via tools.
+_QA_PROTOCOL = """ROLE: QA Engineer. You MUST run actual tests, not just read code.
 
-DO: code_read changed files → check compiles/works → verdict.
-VERDICT: [APPROVE] if working code delivered. [VETO] only if broken/critical bugs.
-Sprints are incremental. Incomplete ≠ VETO. Broken = VETO."""
+WORKFLOW:
+1. list_files → find test files and source files
+2. Run REAL tests using tools:
+   - build(command="python3 -m pytest tests/") for Python
+   - build(command="npm test") for Node.js
+   - build(command="node --check file.js") for JS syntax
+   - playwright_test(spec="tests/e2e.spec.js") for E2E tests
+   - build(command="docker build -t test .") if Dockerfile exists
+3. code_read source files → check for obvious bugs
+4. Deliver verdict based on ACTUAL test results
+
+RULES:
+- You MUST call build or test tool at least once. Reading code alone is NOT testing.
+- If no test framework exists, at minimum validate: file exists + syntax correct
+- [APPROVE] only if build/tests pass. [VETO] if build fails or critical bugs found.
+- Include actual tool output in your verdict (exit codes, error messages).
+- Sprints are incremental. Missing features ≠ VETO. Broken build = VETO."""
 
 # Review protocol — telegraphic
 _REVIEW_PROTOCOL = """ROLE: Reviewer. Verify claims via tools.
 
-DO: code_read files → code_search references → check consistency.
-VERDICT: [APPROVE] or [REQUEST_CHANGES] with specific file:line issues."""
+DO: code_read files → code_search references → build(command="...") to verify.
+VERDICT: [APPROVE] or [REQUEST_CHANGES] with specific file:line issues.
+You MUST call build tool to verify the code compiles before approving."""
+
+# CI/CD protocol — MUST run real commands
+_CICD_PROTOCOL = """ROLE: DevOps / CI-CD Engineer. You MUST run real build+test commands.
+
+WORKFLOW:
+1. list_files → understand project structure
+2. Run actual build:
+   - build(command="docker build -t app .") if Dockerfile exists
+   - build(command="npm install && npm run build") for Node.js
+   - build(command="pip install -r requirements.txt") for Python
+3. Run tests:
+   - build(command="npm test") or build(command="pytest")
+4. Verify deployment artifacts exist
+5. Report REAL results with exit codes
+
+RULES:
+- You MUST call build tool with real commands. Writing YAML files is NOT CI/CD.
+- If docker build fails, report the actual error — do NOT invent success.
+- Include actual command output in your report.
+- [APPROVE] only if build succeeds. [VETO] if build fails."""
 
 # Research protocol for ideation/discussion — agents can READ docs, search memory, but NOT write code
 _RESEARCH_PROTOCOL = """[DISCUSSION MODE — MANDATORY]
@@ -336,7 +378,7 @@ async def _execute_node(
         if pattern_type in discussion_patterns or not has_project:
             full_task += _RESEARCH_PROTOCOL
         elif "devops" in role_lower or "sre" in role_lower or "pipeline" in role_lower:
-            full_task += _EXEC_PROTOCOL
+            full_task += _CICD_PROTOCOL
             full_task += "\n\n" + _PR_PROTOCOL
         elif "dev" in role_lower or "fullstack" in role_lower or "backend" in role_lower or "frontend" in role_lower:
             full_task += _EXEC_PROTOCOL
@@ -1341,21 +1383,86 @@ async def _run_hierarchical(run: PatternRun, task: str):
                 # Lead says complete — move to QA
                 break
 
-        # ── Step 3: QA validates ──
+        # ── Step 3: Preflight build gate — automatic build verification ──
+        preflight_result = ""
+        workspace = run.metadata.get("workspace") if run.metadata else None
+        if workspace:
+            try:
+                import subprocess as _sp
+                import os as _os
+                # Detect project type and run appropriate build check
+                build_cmds = []
+                if _os.path.isfile(_os.path.join(workspace, "Dockerfile")):
+                    build_cmds.append(("docker build", "docker build --no-cache -t preflight-test ."))
+                if _os.path.isfile(_os.path.join(workspace, "package.json")):
+                    build_cmds.append(("npm install", "npm install --no-audit --no-fund 2>&1"))
+                if _os.path.isfile(_os.path.join(workspace, "requirements.txt")):
+                    build_cmds.append(("pip check", "pip install -r requirements.txt --dry-run 2>&1 | tail -5"))
+                # Always: check for syntax errors in common files
+                for ext, checker in [("*.py", "python3 -m py_compile"), ("*.js", "node --check")]:
+                    check_r = _sp.run(
+                        f'find . -not -path "./.git/*" -name "{ext}" -type f | head -5',
+                        shell=True, capture_output=True, text=True, cwd=workspace, timeout=5
+                    )
+                    files = [f.strip() for f in check_r.stdout.strip().split("\n") if f.strip()]
+                    for fpath in files:
+                        build_cmds.append((f"syntax {fpath}", f"{checker} {fpath}"))
+
+                preflight_parts = []
+                any_failed = False
+                for label, cmd in build_cmds[:5]:  # max 5 checks
+                    try:
+                        r = _sp.run(cmd, shell=True, capture_output=True, text=True,
+                                    cwd=workspace, timeout=120, env={**_os.environ, "DOCKER_BUILDKIT": "1"})
+                        status = "PASS" if r.returncode == 0 else "FAIL"
+                        if r.returncode != 0:
+                            any_failed = True
+                        output = (r.stdout + r.stderr)[-300:].strip()
+                        preflight_parts.append(f"[{status}] {label}: exit={r.returncode}\n{output}")
+                    except Exception as e:
+                        preflight_parts.append(f"[SKIP] {label}: {e}")
+
+                preflight_result = "\n".join(preflight_parts)
+                if preflight_result:
+                    # Send preflight results as SSE
+                    status_label = "FAILED" if any_failed else "PASSED"
+                    await _sse(run, {
+                        "type": "message",
+                        "from_agent": "system",
+                        "content": f"**Preflight Build Gate — {status_label}**\n```\n{preflight_result}\n```",
+                        "message_type": "system",
+                    })
+                    store = get_session_store()
+                    store.add_message(MessageDef(
+                        session_id=run.session_id,
+                        from_agent="system", to_agent="all",
+                        message_type="system",
+                        content=f"Preflight Build Gate — {status_label}\n{preflight_result}",
+                    ))
+                    logger.info("Preflight gate: %s (%d checks)", status_label, len(preflight_parts))
+            except Exception as e:
+                logger.warning("Preflight gate error: %s", e)
+                preflight_result = f"Preflight skipped: {e}"
+
+        # ── Step 4: QA validates (with preflight results) ──
         if not qa_ids:
             # No QA agent — phase done
             return
+
+        qa_context = f"Lead review:\n{review_output[:300]}\nDev output:\n{all_dev_work[:500]}"
+        if preflight_result:
+            qa_context += f"\n\nPREFLIGHT BUILD RESULTS:\n{preflight_result}"
 
         for qid in qa_ids:
             run.nodes[qid].status = NodeStatus.PENDING
             await _execute_node(
                 run, qid,
-                f"Validate dev work. code_read files → [APPROVE] or [VETO] + reasons.\n"
-                f"Lead review:\n{review_output[:300]}\nDev output:\n{all_dev_work[:500]}",
+                f"Validate dev work. Run tests with build tool. [APPROVE] or [VETO] + reasons.\n"
+                f"{qa_context}",
                 context_from=review_output, to_agent_id=manager_agent,
             )
 
-        # ── Step 4: Check QA verdicts ──
+        # ── Step 5: Check QA verdicts ──
         vetoes = []
         for qid in qa_ids:
             ns = run.nodes[qid]
