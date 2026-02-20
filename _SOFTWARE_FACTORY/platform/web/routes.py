@@ -4925,11 +4925,17 @@ async def ideation_history_page(request: Request):
 async def missions_list_page(request: Request):
     """List all mission runs."""
     from ..missions.store import get_mission_run_store
+    from ..projects.manager import get_project_store
+    from ..workflows.store import get_workflow_store
     store = get_mission_run_store()
     runs = store.list_runs(limit=50)
+    projects = get_project_store().list_all()
+    workflows = get_workflow_store().list_all()
     return _templates(request).TemplateResponse("mission_control_list.html", {
         "request": request, "page_title": "Epic Control",
         "runs": runs,
+        "projects": projects,
+        "workflows": workflows,
     })
 
 

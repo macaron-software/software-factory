@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
 {% block topbar_actions %}
-<a href="/missions/start/product-lifecycle" class="btn btn-primary">
+<button class="btn btn-primary" onclick="document.getElementById('launchModal').style.display='flex'">
     <svg class="icon icon-sm"><use href="#icon-play"/></svg> Launch Epic
-</a>
+</button>
 {% endblock %}
 
 {% block content %}
@@ -38,11 +38,16 @@
 .mission-badge.completed{background:rgba(34,197,94,.12);color:var(--green)}
 .mission-badge.failed{background:rgba(239,68,68,.12);color:var(--red)}
 .mission-badge.paused,.mission-badge.pending{background:var(--bg-tertiary);color:var(--text-secondary)}
+.launch-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;justify-content:center}
+.launch-form{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;width:90%;max-width:520px}
+.launch-form h3{margin:0 0 1rem;color:var(--text-primary)}
+.lf-field{margin-bottom:0.85rem}
+.lf-field label{display:block;font-size:0.78rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.3rem}
+.lf-field select,.lf-field textarea{width:100%;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:0.5rem 0.75rem;font-size:0.85rem;font-family:inherit;outline:none}
+.lf-field select:focus,.lf-field textarea:focus{border-color:var(--purple)}
+.lf-field textarea{resize:vertical;min-height:80px}
+.lf-actions{display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem}
 </style>
-
-<a href="/missions/start/product-lifecycle" class="btn btn-primary" style="align-self:flex-start;margin-bottom:1rem">
-    <svg class="icon icon-sm"><use href="#icon-play"/></svg> Launch Epic
-</a>
 
 {% if runs %}
 <div class="mission-list">
@@ -79,7 +84,56 @@
     <p style="margin-bottom:0.5rem"><svg class="icon" style="width:2.5rem;height:2.5rem"><use href="#icon-rocket"/></svg></p>
     <h3 style="color:var(--text-primary);margin-bottom:0.3rem">Aucune epic</h3>
     <p style="color:var(--text-secondary);font-size:0.88rem;margin-bottom:1rem">Lancez une epic pour orchestrer le cycle de vie produit complet.</p>
-    <a href="/workflows" class="btn btn-ghost">Parcourir les workflows</a>
+    <button class="btn btn-primary" onclick="document.getElementById('launchModal').style.display='flex'">
+        <svg class="icon icon-sm"><use href="#icon-play"/></svg> Lancer une Epic
+    </button>
 </div>
 {% endif %}
+
+<div id="launchModal" class="launch-overlay" onclick="if(event.target===this)this.style.display='none'">
+    <form class="launch-form" id="launchForm">
+        <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> Lancer une Epic</h3>
+        <div class="lf-field">
+            <label>Projet</label>
+            <select name="project_id" required>
+                {% for p in projects %}
+                <option value="{{ p.id }}">{{ p.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="lf-field">
+            <label>Ceremony Template (workflow)</label>
+            <select name="workflow_id" required>
+                {% for wf in workflows %}
+                <option value="{{ wf.id }}">{{ wf.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="lf-field">
+            <label>Brief (objectif, contexte, criteres d'acceptance)</label>
+            <textarea name="brief" placeholder="Decrivez le besoin metier, le contexte projet, et les objectifs a atteindre..." required></textarea>
+        </div>
+        <div class="lf-actions">
+            <button type="button" class="btn btn-ghost" onclick="document.getElementById('launchModal').style.display='none'">Annuler</button>
+            <button type="submit" class="btn btn-primary">
+                <svg class="icon icon-sm"><use href="#icon-play"/></svg> Lancer
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+document.getElementById('launchForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = e.target.querySelector('[type=submit]');
+    btn.disabled = true; btn.textContent = 'Lancement...';
+    try {
+        const r = await fetch('/api/missions/start', {method:'POST', body: fd});
+        const j = await r.json();
+        if (j.redirect) location.href = j.redirect;
+        else { alert(j.error || 'Erreur'); btn.disabled = false; btn.textContent = 'Lancer'; }
+    } catch(err) { alert(err); btn.disabled = false; btn.textContent = 'Lancer'; }
+});
+</script>
 {% endblock %}
