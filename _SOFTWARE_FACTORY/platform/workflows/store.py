@@ -1077,6 +1077,239 @@ class WorkflowStore:
                 },
             ),
         )
+        # ── DSI Platform Features: Discovery → Comité → Arch → Sprint → CI/CD → QA → Deploy → Retro ──
+        builtins.append(
+            WorkflowDef(
+                id="dsi-platform-features",
+                name="DSI Plateforme — Nouvelles Features",
+                description="Pipeline complet pour les nouvelles fonctionnalités de la plateforme Macaron. "
+                            "Discovery réseau → Comité stratégique GO/NOGO → Architecture → Sprint Dev (6 devs spécialisés) "
+                            "→ CI/CD → QA parallèle → Deploy staging/prod → Rétrospective.",
+                icon="star", is_builtin=True,
+                phases=[
+                    WorkflowPhase(id="discovery", pattern_id="network",
+                                  name="Discovery & Idéation",
+                                  description="Le DSI, le CPO, le CTO et le PO Plateforme débattent des nouvelles features. "
+                                              "L'UX Designer et l'Architecte contribuent. Réseau de discussion ouverte pour faire émerger les idées.",
+                                  gate="always",
+                                  config={"agents": ["dsi", "strat-cpo", "strat-cto", "plat-product", "ux_designer", "architecte"]}),
+                    WorkflowPhase(id="strategic-committee", pattern_id="human-in-the-loop",
+                                  name="Comité Stratégique",
+                                  description="Le comité stratégique (CPO, CTO, DSI, Portfolio Manager) valide les features proposées. "
+                                              "GO/NOGO obligatoire. Seules les features validées passent en développement.",
+                                  gate="all_approved",
+                                  config={"agents": ["strat-cpo", "strat-cto", "dsi", "strat-portfolio", "lean_portfolio_manager"]}),
+                    WorkflowPhase(id="architecture", pattern_id="aggregator",
+                                  name="Architecture & Design",
+                                  description="L'Architecte, le Lead Dev et les devs spécialisés (agents, patterns) conçoivent la solution. "
+                                              "La Sécurité vérifie les impacts. Chacun contribue son expertise, l'Architecte synthétise.",
+                                  gate="no_veto",
+                                  config={"agents": ["architecte", "plat-lead-dev", "plat-dev-agents", "plat-dev-patterns", "securite"]}),
+                    WorkflowPhase(id="sprint-planning", pattern_id="sequential",
+                                  name="Sprint Planning",
+                                  description="Le PO Plateforme écrit les user stories. Le Scrum Master organise le sprint. "
+                                              "Le Lead Dev estime et découpe en tâches techniques.",
+                                  gate="always",
+                                  config={"agents": ["plat-product", "scrum_master", "plat-lead-dev"]}),
+                    WorkflowPhase(id="dev-sprint", pattern_id="hierarchical",
+                                  name="Sprint Développement",
+                                  description="Le Lead Dev distribue les tâches à 5 devs spécialisés : Backend (routes, DB), "
+                                              "Frontend (templates, CSS, HTMX), Agents (executor, loop, bus), Patterns (engine), Infra (deploy, SSE). "
+                                              "Chaque dev code dans son domaine avec tests.",
+                                  gate="no_veto",
+                                  config={"agents": ["plat-lead-dev", "plat-dev-backend", "plat-dev-frontend",
+                                                     "plat-dev-agents", "plat-dev-patterns", "plat-dev-infra"],
+                                          "leader": "plat-lead-dev"}),
+                    WorkflowPhase(id="cicd", pattern_id="sequential",
+                                  name="Pipeline CI/CD",
+                                  description="Le DevOps configure le pipeline. Le Pipeline Engineer vérifie les étapes. "
+                                              "Le DevSecOps scanne les vulnérabilités. Build + lint + tests unitaires.",
+                                  gate="always",
+                                  config={"agents": ["devops", "pipeline_engineer", "devsecops"]}),
+                    WorkflowPhase(id="qa-validation", pattern_id="parallel",
+                                  name="QA & Validation",
+                                  description="4 experts testent en parallèle : QA Lead (fonctionnel), Test Automation (E2E), "
+                                              "Sécurité (OWASP), Performance (charge). Tous doivent valider.",
+                                  gate="no_veto",
+                                  config={"agents": ["qa_lead", "test_automation", "securite", "performance_engineer"]}),
+                    WorkflowPhase(id="deploy-prod", pattern_id="sequential",
+                                  name="Deploy Staging → Prod",
+                                  description="Le DevOps déploie en staging. Le SRE vérifie la santé. Le QA Lead valide le smoke test. "
+                                              "Le Lead Dev donne le GO final pour la prod.",
+                                  gate="all_approved",
+                                  config={"agents": ["devops", "sre", "qa_lead", "plat-lead-dev"]}),
+                    WorkflowPhase(id="retrospective", pattern_id="network",
+                                  name="Rétrospective",
+                                  description="Le Lead Dev, le PO, le Scrum Master et le QA Lead débattent : "
+                                              "ce qui a bien marché, ce qui a échoué, les améliorations à apporter. "
+                                              "Les leçons sont stockées en mémoire globale.",
+                                  gate="always",
+                                  config={"agents": ["plat-lead-dev", "plat-product", "scrum_master", "qa_lead"]}),
+                ],
+                config={
+                    "project_ref": "macaron-platform",
+                    "graph": {
+                        "pattern": "hierarchical",
+                        "nodes": [
+                            {"id": "n1", "agent_id": "dsi", "x": 400, "y": 20, "label": "DSI"},
+                            {"id": "n2", "agent_id": "strat-cpo", "x": 250, "y": 20, "label": "CPO"},
+                            {"id": "n3", "agent_id": "strat-cto", "x": 550, "y": 20, "label": "CTO"},
+                            {"id": "n4", "agent_id": "strat-portfolio", "x": 700, "y": 20, "label": "Portfolio"},
+                            {"id": "n5", "agent_id": "plat-product", "x": 100, "y": 120, "label": "PO Plateforme"},
+                            {"id": "n6", "agent_id": "architecte", "x": 300, "y": 120, "label": "Architecte"},
+                            {"id": "n7", "agent_id": "ux_designer", "x": 500, "y": 120, "label": "UX Designer"},
+                            {"id": "n8", "agent_id": "scrum_master", "x": 700, "y": 120, "label": "Scrum Master"},
+                            {"id": "n9", "agent_id": "plat-lead-dev", "x": 400, "y": 240, "label": "Lead Dev Platform"},
+                            {"id": "n10", "agent_id": "plat-dev-backend", "x": 150, "y": 360, "label": "Dev Backend"},
+                            {"id": "n11", "agent_id": "plat-dev-frontend", "x": 300, "y": 360, "label": "Dev Frontend"},
+                            {"id": "n12", "agent_id": "plat-dev-agents", "x": 450, "y": 360, "label": "Dev Agents"},
+                            {"id": "n13", "agent_id": "plat-dev-patterns", "x": 600, "y": 360, "label": "Dev Patterns"},
+                            {"id": "n14", "agent_id": "plat-dev-infra", "x": 750, "y": 360, "label": "Dev Infra"},
+                            {"id": "n15", "agent_id": "securite", "x": 100, "y": 120, "label": "Sécurité"},
+                            {"id": "n16", "agent_id": "qa_lead", "x": 200, "y": 480, "label": "QA Lead"},
+                            {"id": "n17", "agent_id": "test_automation", "x": 400, "y": 480, "label": "Test Automation"},
+                            {"id": "n18", "agent_id": "performance_engineer", "x": 600, "y": 480, "label": "Perf Engineer"},
+                            {"id": "n19", "agent_id": "devops", "x": 300, "y": 580, "label": "DevOps"},
+                            {"id": "n20", "agent_id": "sre", "x": 500, "y": 580, "label": "SRE"},
+                            {"id": "n21", "agent_id": "pipeline_engineer", "x": 400, "y": 580, "label": "Pipeline Eng."},
+                            {"id": "n22", "agent_id": "devsecops", "x": 600, "y": 580, "label": "DevSecOps"},
+                        ],
+                        "edges": [
+                            {"from": "n1", "to": "n6", "label": "vision", "color": "#a855f7"},
+                            {"from": "n2", "to": "n5", "label": "priorités", "color": "#a855f7"},
+                            {"from": "n3", "to": "n6", "label": "tech stack", "color": "#3b82f6"},
+                            {"from": "n5", "to": "n8", "label": "stories", "color": "#f59e0b"},
+                            {"from": "n5", "to": "n9", "label": "sprint", "color": "#f59e0b"},
+                            {"from": "n6", "to": "n9", "label": "design", "color": "#3b82f6"},
+                            {"from": "n9", "to": "n10", "label": "routes/DB", "color": "#10b981"},
+                            {"from": "n9", "to": "n11", "label": "templates", "color": "#10b981"},
+                            {"from": "n9", "to": "n12", "label": "executor", "color": "#10b981"},
+                            {"from": "n9", "to": "n13", "label": "engine", "color": "#10b981"},
+                            {"from": "n9", "to": "n14", "label": "infra", "color": "#10b981"},
+                            {"from": "n10", "to": "n16", "label": "tests", "color": "#8b5cf6"},
+                            {"from": "n11", "to": "n16", "label": "tests", "color": "#8b5cf6"},
+                            {"from": "n12", "to": "n17", "label": "tests", "color": "#8b5cf6"},
+                            {"from": "n15", "to": "n9", "label": "audit", "color": "#ef4444"},
+                            {"from": "n16", "to": "n19", "label": "GO deploy", "color": "#10b981"},
+                            {"from": "n17", "to": "n19", "label": "E2E OK", "color": "#10b981"},
+                            {"from": "n19", "to": "n20", "label": "staging", "color": "#f59e0b"},
+                            {"from": "n20", "to": "n9", "label": "prod GO", "color": "#10b981"},
+                            {"from": "n21", "to": "n19", "label": "pipeline", "color": "#3b82f6"},
+                            {"from": "n22", "to": "n19", "label": "scan", "color": "#ef4444"},
+                        ],
+                    },
+                    "agents_permissions": {
+                        "dsi": {"can_veto": True, "veto_level": "ABSOLUTE", "can_delegate": True, "can_approve": True},
+                        "strat-cpo": {"can_veto": True, "veto_level": "ABSOLUTE", "can_approve": True},
+                        "strat-cto": {"can_veto": True, "veto_level": "ABSOLUTE", "can_approve": True},
+                        "plat-lead-dev": {"can_veto": True, "veto_level": "STRONG", "can_delegate": True, "can_approve": True},
+                        "architecte": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                        "qa_lead": {"can_veto": True, "veto_level": "ABSOLUTE"},
+                        "securite": {"can_veto": True, "veto_level": "STRONG"},
+                    },
+                },
+            ),
+        )
+        # ── DSI Platform TMA: Détection → Triage → Diagnostic → Fix → Non-Régression → Hotfix ──
+        builtins.append(
+            WorkflowDef(
+                id="dsi-platform-tma",
+                name="DSI Plateforme — TMA Maintenance",
+                description="Pipeline réactif de maintenance applicative pour la plateforme Macaron. "
+                            "Détection d'incidents (auto + manuel) → Triage P0-P4 → Diagnostic root cause parallèle "
+                            "→ Fix TDD itératif → Non-régression complète → Deploy hotfix.",
+                icon="tool", is_builtin=True,
+                phases=[
+                    WorkflowPhase(id="detection", pattern_id="parallel",
+                                  name="Détection Incidents",
+                                  description="Le TMA Lead analyse les incidents remontés (auto-détection 500, SSE drops, LLM failures + signalements manuels). "
+                                              "Le SRE vérifie les métriques serveur. Le QA Lead vérifie les tests automatisés.",
+                                  gate="always",
+                                  config={"agents": ["plat-tma-lead", "sre", "qa_lead"]}),
+                    WorkflowPhase(id="triage", pattern_id="router",
+                                  name="Triage & Priorisation P0-P4",
+                                  description="Le TMA Lead classifie chaque incident par sévérité (P0=platform down, P1=feature broken, "
+                                              "P2=minor, P3=cosmetic, P4=tech debt) et par domaine (backend/frontend/agents/patterns/infra). "
+                                              "L'Architecte évalue l'impact systémique. La Sécurité vérifie les aspects sécu.",
+                                  gate="always",
+                                  config={"agents": ["plat-tma-lead", "architecte", "securite"]}),
+                    WorkflowPhase(id="diagnostic", pattern_id="parallel",
+                                  name="Diagnostic Root Cause",
+                                  description="4 devs TMA analysent en parallèle selon leur domaine : Backend (routes, DB), "
+                                              "Frontend (templates, CSS, HTMX), Agents (executor, LLM, bus), DBA (requêtes, migrations). "
+                                              "Chacun identifie la root cause dans son périmètre.",
+                                  gate="always",
+                                  config={"agents": ["plat-tma-dev-back", "plat-tma-dev-front", "plat-tma-dev-agents", "dba"]}),
+                    WorkflowPhase(id="fix-tdd", pattern_id="loop",
+                                  name="Fix TDD Itératif",
+                                  description="Les devs TMA écrivent le test de non-régression (RED), puis le correctif (GREEN). "
+                                              "La QA TMA valide. Si échec, on reboucle. Max 3 itérations avant escalation.",
+                                  gate="no_veto",
+                                  config={"agents": ["plat-tma-dev-back", "plat-tma-dev-front", "plat-tma-dev-agents", "plat-tma-qa"],
+                                          "max_iterations": 3}),
+                    WorkflowPhase(id="non-regression", pattern_id="parallel",
+                                  name="Non-Régression Complète",
+                                  description="La QA TMA lance les tests fonctionnels. Le Test Automation vérifie les E2E. "
+                                              "La Sécurité fait un scan OWASP. Le Performance Engineer vérifie les benchmarks. "
+                                              "TOUS doivent approuver.",
+                                  gate="all_approved",
+                                  config={"agents": ["plat-tma-qa", "test_automation", "securite", "performance_engineer"]}),
+                    WorkflowPhase(id="deploy-hotfix", pattern_id="sequential",
+                                  name="Deploy Hotfix",
+                                  description="Le DevOps déploie le hotfix en staging. Le SRE vérifie la santé. "
+                                              "Le TMA Lead confirme la résolution de l'incident. Le QA Lead donne le GO prod.",
+                                  gate="all_approved",
+                                  config={"agents": ["devops", "sre", "plat-tma-lead", "qa_lead"]}),
+                ],
+                config={
+                    "project_ref": "macaron-platform",
+                    "graph": {
+                        "pattern": "hierarchical",
+                        "nodes": [
+                            {"id": "n1", "agent_id": "plat-tma-lead", "x": 400, "y": 20, "label": "TMA Lead"},
+                            {"id": "n2", "agent_id": "sre", "x": 600, "y": 20, "label": "SRE"},
+                            {"id": "n3", "agent_id": "architecte", "x": 250, "y": 120, "label": "Architecte"},
+                            {"id": "n4", "agent_id": "securite", "x": 550, "y": 120, "label": "Sécurité"},
+                            {"id": "n5", "agent_id": "plat-tma-dev-back", "x": 150, "y": 240, "label": "TMA Backend"},
+                            {"id": "n6", "agent_id": "plat-tma-dev-front", "x": 350, "y": 240, "label": "TMA Frontend"},
+                            {"id": "n7", "agent_id": "plat-tma-dev-agents", "x": 550, "y": 240, "label": "TMA Agents"},
+                            {"id": "n8", "agent_id": "dba", "x": 750, "y": 240, "label": "DBA"},
+                            {"id": "n9", "agent_id": "plat-tma-qa", "x": 300, "y": 360, "label": "QA TMA"},
+                            {"id": "n10", "agent_id": "test_automation", "x": 500, "y": 360, "label": "Test Auto"},
+                            {"id": "n11", "agent_id": "performance_engineer", "x": 700, "y": 360, "label": "Perf Eng."},
+                            {"id": "n12", "agent_id": "qa_lead", "x": 200, "y": 20, "label": "QA Lead"},
+                            {"id": "n13", "agent_id": "devops", "x": 400, "y": 460, "label": "DevOps"},
+                        ],
+                        "edges": [
+                            {"from": "n1", "to": "n3", "label": "triage", "color": "#ef4444"},
+                            {"from": "n1", "to": "n4", "label": "sécu?", "color": "#ef4444"},
+                            {"from": "n1", "to": "n5", "label": "fix back", "color": "#f59e0b"},
+                            {"from": "n1", "to": "n6", "label": "fix front", "color": "#f59e0b"},
+                            {"from": "n1", "to": "n7", "label": "fix agents", "color": "#f59e0b"},
+                            {"from": "n3", "to": "n1", "label": "impact", "color": "#3b82f6"},
+                            {"from": "n5", "to": "n9", "label": "test", "color": "#10b981"},
+                            {"from": "n6", "to": "n9", "label": "test", "color": "#10b981"},
+                            {"from": "n7", "to": "n9", "label": "test", "color": "#10b981"},
+                            {"from": "n8", "to": "n5", "label": "data", "color": "#3b82f6"},
+                            {"from": "n9", "to": "n1", "label": "validé", "color": "#10b981"},
+                            {"from": "n9", "to": "n10", "label": "E2E", "color": "#8b5cf6"},
+                            {"from": "n10", "to": "n13", "label": "GO", "color": "#10b981"},
+                            {"from": "n11", "to": "n13", "label": "perf OK", "color": "#10b981"},
+                            {"from": "n12", "to": "n1", "label": "incidents", "color": "#ef4444"},
+                            {"from": "n2", "to": "n1", "label": "métriques", "color": "#3b82f6"},
+                            {"from": "n13", "to": "n1", "label": "déployé", "color": "#10b981"},
+                        ],
+                    },
+                    "agents_permissions": {
+                        "plat-tma-lead": {"can_veto": True, "veto_level": "STRONG", "can_delegate": True, "can_approve": True},
+                        "qa_lead": {"can_veto": True, "veto_level": "ABSOLUTE"},
+                        "plat-tma-qa": {"can_veto": True, "veto_level": "ABSOLUTE"},
+                        "securite": {"can_veto": True, "veto_level": "STRONG"},
+                        "architecte": {"can_veto": True, "veto_level": "STRONG"},
+                    },
+                },
+            ),
+        )
         for w in builtins:
             self.create(w)
 

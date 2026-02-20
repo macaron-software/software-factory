@@ -236,6 +236,49 @@ class ProjectStore:
         # Auto-create sessions for projects with linked workflows
         self._seed_workflow_sessions()
 
+        # Seed DSI project (Macaron Platform itself)
+        self._seed_dsi_project()
+
+    def _seed_dsi_project(self):
+        """Seed the Macaron Agent Platform as a DSI project pointing to its own codebase."""
+        if self.get("macaron-platform"):
+            return
+        from ..config import PLATFORM_ROOT
+        plat_path = str(PLATFORM_ROOT)
+        p = Project(
+            id="macaron-platform",
+            name="Macaron Agent Platform",
+            path=plat_path,
+            description="Plateforme multi-agent SAFe. FastAPI + HTMX + SSE + SQLite. Self-improving: les agents lisent et écrivent dans leur propre codebase.",
+            factory_type="standalone",
+            domains=["backend", "frontend", "agents", "patterns", "infra"],
+            vision=(
+                "Macaron Agent Platform — Real Agentic ≠ Workflow Automation.\n"
+                "Agents collaborent (débat/véto/délégation) pour produire du code.\n"
+                "128 agents SAFe, 23 patterns, 12 workflows, 1222 skills.\n"
+                "Stack: FastAPI + Jinja2 + HTMX + SSE + SQLite (WAL + FTS5).\n"
+                "Dark purple theme. Zero emoji. SVG Feather icons.\n\n"
+                "2 Epics:\n"
+                "1. NEW FEATURES — Discovery → Comité Strat → Arch → Dev Sprint → QA → Deploy → Retro\n"
+                "2. TMA — Détection → Triage P0-P4 → Diagnostic → Fix TDD → Non-Régression → Hotfix Deploy"
+            ),
+            values=["quality", "feedback", "no-waste", "kaizen", "flow", "tdd"],
+            lead_agent_id="dsi",
+            agents=[
+                "dsi", "strat-cpo", "strat-cto", "strat-portfolio", "architecte",
+                "plat-lead-dev", "plat-dev-backend", "plat-dev-frontend",
+                "plat-dev-agents", "plat-dev-patterns", "plat-dev-infra", "plat-product",
+                "plat-tma-lead", "plat-tma-dev-back", "plat-tma-dev-front",
+                "plat-tma-dev-agents", "plat-tma-qa",
+                "qa_lead", "securite", "devops", "sre", "scrum_master", "ux_designer",
+                "performance_engineer", "pipeline_engineer", "devsecops", "test_automation",
+                "tech_writer", "lean_portfolio_manager",
+            ],
+            status="active",
+        )
+        self.create(p)
+        logger.info("Seeded DSI project: macaron-platform → %s", plat_path)
+
     def _load_vision_from_workflow(self, project_id: str) -> str:
         """Load vision from linked workflow config."""
         try:
@@ -317,6 +360,7 @@ def _project_color(project_id: str) -> str:
         "ppz": "#3fb950", "psy": "#a371f7", "yolonow": "#f85149",
         "solaris": "#d29922", "sharelook": "#79c0ff", "finary": "#56d364",
         "lpd": "#db6d28", "logs-facteur": "#8b949e",
+        "macaron-platform": "#c084fc",
     }
     return colors.get(project_id, "#8b949e")
 
