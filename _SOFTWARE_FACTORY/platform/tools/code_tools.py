@@ -24,7 +24,7 @@ class CodeReadTool(BaseTool):
         if not path or not os.path.exists(path):
             return f"Error: File not found: {path}"
         try:
-            max_lines = params.get("max_lines", 500)
+            max_lines = int(params.get("max_lines", 500))
             with open(path) as f:
                 lines = f.readlines()[:max_lines]
             return "".join(lines)
