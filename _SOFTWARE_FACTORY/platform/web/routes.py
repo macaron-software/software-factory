@@ -4971,6 +4971,16 @@ async def missions_list_page(request: Request):
     })
 
 
+@router.get("/api/missions/list-partial", response_class=HTMLResponse)
+async def missions_list_partial(request: Request):
+    """HTMX partial: refreshes mission list every 15s."""
+    from ..missions.store import get_mission_run_store
+    runs = get_mission_run_store().list_runs(limit=50)
+    return _templates(request).TemplateResponse("partials/mission_list.html", {
+        "request": request, "runs": runs,
+    })
+
+
 @router.delete("/api/mission-runs/{run_id}")
 async def delete_mission_run(run_id: str):
     """Delete a mission run and its associated session/messages."""
