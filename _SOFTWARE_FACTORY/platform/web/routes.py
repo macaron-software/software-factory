@@ -5028,6 +5028,11 @@ async def api_mission_start(request: Request):
     form = await request.form()
     workflow_id = str(form.get("workflow_id", ""))
     brief = str(form.get("brief", "")).strip()
+    # Fix double-encoded UTF-8 (curl sends UTF-8 bytes interpreted as latin-1)
+    try:
+        brief = brief.encode("latin-1").decode("utf-8")
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        pass
     project_id = str(form.get("project_id", ""))
 
     wf = get_workflow_store().get(workflow_id)
