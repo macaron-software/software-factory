@@ -13,7 +13,7 @@
 {% block content %}
 <style>
 /* ── World Layout ── */
-.world-wrap{position:relative;width:100%;height:calc(100vh - 56px);overflow:hidden;background:#0a0812}
+.world-wrap{position:relative;width:100%;height:calc(100vh - 56px);overflow:hidden;background:#151020}
 #world-canvas{width:100%;height:100%;display:block}
 
 /* ── HUD Overlay ── */
@@ -54,7 +54,7 @@
 .wz-label:hover{color:var(--text-primary);background:rgba(15,13,26,0.9)}
 
 /* ── Loading ── */
-.world-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a0812;z-index:100;transition:opacity .5s}
+.world-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#151020;z-index:100;transition:opacity .5s}
 .world-loading.hidden{opacity:0;pointer-events:none}
 .world-loading h3{color:var(--purple-light);font-size:1.2rem;margin-bottom:8px}
 .world-loading p{color:var(--text-secondary);font-size:0.8rem}
@@ -193,7 +193,7 @@ function init() {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.4;
 
     // Controls
     controls = new OrbitControls(camera, renderer.domElement);
@@ -1228,6 +1228,171 @@ function connectSSE() {
         setTimeout(() => connectSSE(), 5000);
         evtSource.close();
     };
+}
+
+// ═══════════════════════════════════════════════════════
+// AUTONOMOUS LIFE — agents move, chat, work on their own
+// ═══════════════════════════════════════════════════════
+const CHAT_LINES = [
+    "On devrait refactorer ce module...",
+    "Le build est passé ✅",
+    "J'ai trouvé un bug dans l'auth",
+    "Qui peut review ma PR ?",
+    "Le sprint se termine vendredi",
+    "On a besoin d'un index sur cette table",
+    "Le design est validé par l'UX",
+    "La couverture de tests monte à 85%",
+    "Faut mettre à jour la doc API",
+    "Le dashboard est prêt pour la démo",
+    "J'ai optimisé la requête, -40ms",
+    "On migre vers la v2 du SDK",
+    "Les E2E passent en staging",
+    "Attention aux CORS en prod",
+    "Le Figma est à jour",
+    "Il manque les guards sur cette route",
+    "Excellente idée, on implémente",
+    "Je délègue ça au backend",
+    "Le load test montre 200rps stable",
+    "On dockerise ce service ?",
+    "La rétro est à 14h",
+    "Le PO valide la feature",
+    "Merge conflict résolu 💪",
+    "Le pipeline CI est vert",
+    "Bonne analyse de risque !",
+    "Je push les tests unitaires",
+    "Il faut un webhook pour ça",
+    "Le comité approuve le budget",
+    "Feature flag activé en staging",
+    "Performance OK, on ship 🚀",
+];
+
+const ACTIONS = ['idle', 'thinking', 'acting', 'idle', 'acting', 'thinking', 'idle', 'idle'];
+
+function startAutonomousLife() {
+    const agentIds = Object.keys(agents);
+    if (agentIds.length === 0) return;
+
+    // Stagger initial states
+    agentIds.forEach((id, i) => {
+        const ag = agents[id];
+        const delay = i * 200 + Math.random() * 2000;
+        setTimeout(() => {
+            const action = ACTIONS[Math.floor(Math.random() * ACTIONS.length)];
+            setAgentLife(ag, action);
+        }, delay);
+    });
+
+    // Continuous life loop — periodic behavior changes
+    setInterval(() => {
+        // Pick 3-6 random agents to change behavior
+        const count = 3 + Math.floor(Math.random() * 4);
+        for (let i = 0; i < count; i++) {
+            const id = agentIds[Math.floor(Math.random() * agentIds.length)];
+            const ag = agents[id];
+            const action = ACTIONS[Math.floor(Math.random() * ACTIONS.length)];
+            setAgentLife(ag, action);
+        }
+    }, 3000);
+
+    // Random conversations between agents
+    setInterval(() => {
+        const count = 1 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < count; i++) {
+            triggerRandomChat(agentIds);
+        }
+    }, 4000);
+
+    // Random walks — agents visit other zones or each other
+    setInterval(() => {
+        const id = agentIds[Math.floor(Math.random() * agentIds.length)];
+        const ag = agents[id];
+        if (Math.random() < 0.4) {
+            // Walk to another agent in same zone or nearby
+            const candidates = agentIds.filter(oid => oid !== id);
+            const target = candidates[Math.floor(Math.random() * candidates.length)];
+            const tg = agents[target];
+            if (tg) {
+                ag.target = {
+                    x: tg.mesh.position.x + (Math.random() - 0.5) * 2,
+                    z: tg.mesh.position.z + (Math.random() - 0.5) * 2
+                };
+                // Walk back after a while
+                setTimeout(() => {
+                    ag.target = { x: ag.seat.x, z: ag.seat.z };
+                }, 5000 + Math.random() * 5000);
+            }
+        } else if (Math.random() < 0.3) {
+            // Walk to chill zone (coffee break)
+            const chill = ZONES.find(z => z.id === 'chill');
+            ag.target = {
+                x: chill.x + (Math.random() - 0.5) * chill.w * 0.6,
+                z: chill.z + (Math.random() - 0.5) * chill.h * 0.6
+            };
+            setTimeout(() => {
+                ag.target = { x: ag.seat.x, z: ag.seat.z };
+            }, 8000 + Math.random() * 7000);
+        } else {
+            // Walk to meeting room
+            const meeting = ZONES.find(z => z.id === 'meeting');
+            ag.target = {
+                x: meeting.x + (Math.random() - 0.5) * 4,
+                z: meeting.z + (Math.random() - 0.5) * 4
+            };
+            setTimeout(() => {
+                ag.target = { x: ag.seat.x, z: ag.seat.z };
+            }, 6000 + Math.random() * 4000);
+        }
+    }, 2500);
+
+    // Initial feed burst
+    setTimeout(() => {
+        for (let i = 0; i < 5; i++) {
+            const id = agentIds[Math.floor(Math.random() * agentIds.length)];
+            addFeedItem(agents[id].data.name, 'acting', CHAT_LINES[Math.floor(Math.random() * CHAT_LINES.length)]);
+        }
+    }, 1000);
+}
+
+function setAgentLife(ag, action) {
+    const oldStatus = ag.status;
+    ag.status = action;
+
+    // Update plumbob
+    const plumbob = ag.mesh.children.find(c => c.userData.isPlumbob);
+    if (plumbob) {
+        const color = STATUS_COLORS[action] || STATUS_COLORS.idle;
+        plumbob.material.color.setHex(color);
+        plumbob.material.emissive.setHex(color);
+        plumbob.material.emissiveIntensity = action === 'acting' ? 0.9 : 0.7;
+    }
+
+    // Glow screens
+    if (action === 'acting' && oldStatus !== 'acting') {
+        glowNearbyScreen(ag.mesh.position, true);
+    } else if (action !== 'acting' && oldStatus === 'acting') {
+        glowNearbyScreen(ag.mesh.position, false);
+    }
+}
+
+function triggerRandomChat(agentIds) {
+    const fromId = agentIds[Math.floor(Math.random() * agentIds.length)];
+    const toId = agentIds[Math.floor(Math.random() * agentIds.length)];
+    if (fromId === toId) return;
+
+    const from = agents[fromId];
+    const line = CHAT_LINES[Math.floor(Math.random() * CHAT_LINES.length)];
+
+    showSpeechBubble(fromId, line);
+    addFeedItem(from.data.name, 'acting', line);
+
+    // Other agent responds after a delay
+    setTimeout(() => {
+        const to = agents[toId];
+        if (!to) return;
+        const reply = CHAT_LINES[Math.floor(Math.random() * CHAT_LINES.length)];
+        showSpeechBubble(toId, reply);
+        addFeedItem(to.data.name, 'thinking', reply);
+    }, 1500 + Math.random() * 2000);
 }
 
 // ═══════════════════════════════════════════════════════
