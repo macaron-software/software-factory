@@ -1600,6 +1600,10 @@ class AgentExecutor:
             return await self._tool_mcp_jira(name, args, ctx)
 
         # Registry tools
+        # Inject agent context for git branch isolation
+        if name == "git_commit":
+            args["_agent_id"] = ctx.agent.id
+            args["_session_id"] = ctx.session_id or ""
         tool = self._registry.get(name)
         if not tool:
             return f"Error: unknown tool '{name}'"
@@ -1631,16 +1635,17 @@ class AgentExecutor:
         return "\n".join(lines[:200]) or "Empty directory"
 
     async def _tool_memory_search(self, args: dict, ctx: ExecutionContext) -> str:
-        """Search project/global memory."""
+        """Search project memory (scoped to project_id — agents cannot cross-project)."""
         from ..memory.manager import get_memory_manager
         mem = get_memory_manager()
         query = args.get("query", "")
-        scope = args.get("scope", "project")
         try:
-            if scope == "project" and ctx.project_id:
+            # ISOLATION: always scope to project_id, ignore client "scope" param
+            if ctx.project_id:
                 results = mem.project_search(ctx.project_id, query, limit=10)
             else:
-                results = mem.global_search(query, limit=10)
+                # No project → global read-only (limited)
+                results = mem.global_search(query, limit=5)
             if not results:
                 return "No memory entries found."
             return "\n".join(f"[{r.get('key','')}] {r.get('value','')[:300]}" for r in results)
@@ -1648,7 +1653,7 @@ class AgentExecutor:
             return f"Memory search error: {e}"
 
     async def _tool_memory_store(self, args: dict, ctx: ExecutionContext) -> str:
-        """Store a fact in project memory."""
+        """Store a fact in project memory (scoped to project_id, tagged with agent_id)."""
         from ..memory.manager import get_memory_manager
         mem = get_memory_manager()
         key = args.get("key", "")
@@ -1657,10 +1662,11 @@ class AgentExecutor:
         if not key or not value:
             return "Error: key and value required"
         try:
-            if ctx.project_id:
-                mem.project_store(ctx.project_id, key, value, category=category, author=ctx.agent.id)
-                return f"Stored in project memory: [{key}]"
-            return "Error: no project context"
+            # ISOLATION: must have project_id, store with agent_id traceability
+            if not ctx.project_id:
+                return "Error: no project context — cannot store memory without project scope"
+            mem.project_store(ctx.project_id, key, value, category=category, author=ctx.agent.id)
+            return f"Stored in project memory: [{key}] (by {ctx.agent.id})"
         except Exception as e:
             return f"Memory store error: {e}"
 

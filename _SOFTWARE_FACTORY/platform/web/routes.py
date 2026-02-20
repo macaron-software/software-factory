@@ -5524,8 +5524,18 @@ async def mission_control_page(request: Request, mission_id: str):
                                 result_screenshots.append(str(rel))
             result_screenshots = result_screenshots[:12]
 
-            # Auto-detect project platform
+            # Auto-detect project platform from workspace files + mission brief
             detected = _detect_project_platform(ws_path)
+            # Override with brief-based detection if files say one thing but brief says another
+            brief_lower = (mission.brief or "").lower()
+            brief_web_keywords = ("site web", "e-commerce", "webapp", "web app", "api rest",
+                                  "saas", "dashboard", "portail", "backoffice", "back-office",
+                                  "react", "vue", "angular", "svelte", "next.js", "django",
+                                  "flask", "fastapi", "express", "node.js", "docker")
+            if any(kw in brief_lower for kw in brief_web_keywords):
+                if detected in ("macos-native", "ios-native", "unknown"):
+                    # Brief says web but files say native/unknown → trust the brief
+                    detected = "web-docker" if "docker" in brief_lower else "web-node"
             result_project_type = detected
 
             if detected == "macos-native" or detected == "ios-native":

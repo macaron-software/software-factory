@@ -1,9 +1,11 @@
-"""Agent Permission Enforcement — tool ACL + file path sandboxing + audit.
+"""Agent Permission Enforcement — tool ACL + file path sandboxing + rate limits + audit.
 
-Three enforcement layers:
+Five enforcement layers:
   1. Tool ACL: agent can only call tools in its allowed_tools list
   2. Path sandbox: file tools restricted to project workspace + allowed_paths
-  3. Audit log: every denial is logged to SQLite for debugging
+  3. Rate limits: max tool calls and writes per agent per session
+  4. Git path guard: git tools restricted to project_path
+  5. Audit log: every denial is logged to SQLite for debugging
 
 Usage in executor._execute_tool():
     denied = check_permission(ctx, tool_name, args)
@@ -17,6 +19,7 @@ import logging
 import os
 import sqlite3
 import time
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional
 
@@ -30,6 +33,11 @@ _EXEC_TOOLS = {"build", "test", "lint", "docker_build", "deploy_azure",
                "sast_scan", "dependency_audit", "secrets_scan"}
 _GIT_WRITE_TOOLS = {"git_commit"}
 _GIT_READ_TOOLS = {"git_status", "git_log", "git_diff"}
+_ALL_WRITE_TOOLS = _FILE_WRITE_TOOLS | _GIT_WRITE_TOOLS
+
+# Rate limit defaults
+MAX_TOOL_CALLS_PER_SESSION = 200
+MAX_WRITES_PER_SESSION = 80
 
 # Default denied path patterns (always blocked regardless of config)
 _ALWAYS_DENIED_BASENAMES = {".env", "id_rsa", "id_ed25519"}
@@ -70,13 +78,16 @@ class PermissionDenial:
 
 
 class PermissionGuard:
-    """Enforces tool ACL and path sandboxing for agents."""
+    """Enforces tool ACL, path sandboxing, rate limits, and git path guard."""
 
     def __init__(self, db_path: str = ""):
         if not db_path:
             from ..config import DB_PATH
             db_path = str(DB_PATH).replace("platform.db", "permissions_audit.db")
         self._db_path = db_path
+        # Rate limit counters: key = "{agent_id}:{session_id}"
+        self._call_counts: dict[str, int] = defaultdict(int)
+        self._write_counts: dict[str, int] = defaultdict(int)
         self._init_db()
 
     def _init_db(self):
@@ -233,6 +244,91 @@ class PermissionGuard:
                 return "Permission denied: this agent cannot execute commands."
         return None
 
+    def check_rate_limit(self, agent_id: str, tool_name: str,
+                         session_id: str = "") -> Optional[str]:
+        """Check if agent has exceeded rate limits for this session."""
+        key = f"{agent_id}:{session_id}" if session_id else agent_id
+
+        # Increment call count
+        self._call_counts[key] += 1
+        if tool_name in _ALL_WRITE_TOOLS:
+            self._write_counts[key] += 1
+
+        if self._call_counts[key] > MAX_TOOL_CALLS_PER_SESSION:
+            denial = PermissionDenial(
+                agent_id=agent_id,
+                tool_name=tool_name,
+                reason=f"Rate limit: {self._call_counts[key]}/{MAX_TOOL_CALLS_PER_SESSION} tool calls exceeded",
+                timestamp=time.time(),
+            )
+            self._log_denial(denial, session_id=session_id)
+            return f"Rate limit exceeded: max {MAX_TOOL_CALLS_PER_SESSION} tool calls per session."
+
+        if tool_name in _ALL_WRITE_TOOLS and self._write_counts[key] > MAX_WRITES_PER_SESSION:
+            denial = PermissionDenial(
+                agent_id=agent_id,
+                tool_name=tool_name,
+                reason=f"Write limit: {self._write_counts[key]}/{MAX_WRITES_PER_SESSION} writes exceeded",
+                timestamp=time.time(),
+            )
+            self._log_denial(denial, session_id=session_id)
+            return f"Rate limit exceeded: max {MAX_WRITES_PER_SESSION} write operations per session."
+
+        return None
+
+    def check_git_path_guard(self, agent_id: str, tool_name: str,
+                             args: dict, project_path: str,
+                             session_id: str = "") -> Optional[str]:
+        """Restrict git tools to operate only within project_path."""
+        if tool_name not in (_GIT_READ_TOOLS | _GIT_WRITE_TOOLS):
+            return None
+        if not project_path:
+            return None
+
+        cwd = args.get("cwd", "")
+        if not cwd:
+            return None
+
+        abs_cwd = os.path.abspath(cwd)
+        abs_project = os.path.abspath(project_path)
+        if not abs_cwd.startswith(abs_project):
+            denial = PermissionDenial(
+                agent_id=agent_id,
+                tool_name=tool_name,
+                reason=f"Git tool cwd outside project: {abs_cwd}",
+                path=abs_cwd,
+                timestamp=time.time(),
+            )
+            self._log_denial(denial, session_id=session_id)
+            return f"Permission denied: git operations must be within the project workspace."
+
+        # Also check path argument for git_diff
+        if tool_name == "git_diff":
+            diff_path = args.get("path", "")
+            if diff_path and os.path.isabs(diff_path):
+                if not os.path.abspath(diff_path).startswith(abs_project):
+                    denial = PermissionDenial(
+                        agent_id=agent_id,
+                        tool_name=tool_name,
+                        reason=f"git_diff path outside project: {diff_path}",
+                        path=diff_path,
+                        timestamp=time.time(),
+                    )
+                    self._log_denial(denial, session_id=session_id)
+                    return f"Permission denied: git diff path is outside the project workspace."
+
+        return None
+
+    def get_rate_stats(self, agent_id: str, session_id: str = "") -> dict:
+        """Get current rate limit usage for an agent."""
+        key = f"{agent_id}:{session_id}" if session_id else agent_id
+        return {
+            "tool_calls": self._call_counts.get(key, 0),
+            "max_tool_calls": MAX_TOOL_CALLS_PER_SESSION,
+            "writes": self._write_counts.get(key, 0),
+            "max_writes": MAX_WRITES_PER_SESSION,
+        }
+
     def check(self, agent_id: str, tool_name: str, args: dict,
               allowed_tools: Optional[list[str]] = None,
               project_path: str = "",
@@ -254,7 +350,12 @@ class PermissionGuard:
         if denied:
             return denied
 
-        # 4. Path sandboxing (for file/code tools)
+        # 4. Rate limits
+        denied = self.check_rate_limit(agent_id, tool_name, session_id)
+        if denied:
+            return denied
+
+        # 5. Path sandboxing (for file/code tools)
         if tool_name in _FILE_READ_TOOLS | _FILE_WRITE_TOOLS:
             path = args.get("path", "")
             denied = self.check_path_access(
@@ -262,6 +363,11 @@ class PermissionGuard:
             )
             if denied:
                 return denied
+
+        # 6. Git path guard
+        denied = self.check_git_path_guard(agent_id, tool_name, args, project_path, session_id)
+        if denied:
+            return denied
 
         return None
 
