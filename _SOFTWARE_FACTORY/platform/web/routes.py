@@ -5051,6 +5051,9 @@ async def api_mission_start(request: Request):
     subprocess.run(["git", "commit", "-m", "Initial commit — mission workspace"], cwd=str(workspace_root), capture_output=True)
     workspace_path = str(workspace_root)
 
+    # Determine orchestrator agent (workflow config or default CDP)
+    orchestrator_id = (wf.config or {}).get("orchestrator", "chef_de_programme")
+
     mission = MissionRun(
         id=mission_id,
         workflow_id=workflow_id,
@@ -5060,12 +5063,13 @@ async def api_mission_start(request: Request):
         phases=phases,
         project_id=project_id or mission_id,
         workspace_path=workspace_path,
+        cdp_agent_id=orchestrator_id,
     )
 
     run_store = get_mission_run_store()
     run_store.create(mission)
 
-    # Create a session for the CDP agent
+    # Create a session for the orchestrator agent
     session_store = get_session_store()
     session_id = uuid.uuid4().hex[:8]
     session_store.create(SessionDef(
@@ -5082,15 +5086,15 @@ async def api_mission_start(request: Request):
     session_store.add_message(MessageDef(
         session_id=session_id,
         from_agent="user",
-        to_agent="chef_de_programme",
+        to_agent=orchestrator_id,
         message_type="instruction",
         content=brief,
     ))
 
-    # Start the CDP agent loop with workspace path
+    # Start the orchestrator agent loop with workspace path
     mgr = get_loop_manager()
     try:
-        await mgr.start_agent("chef_de_programme", session_id, mission.project_id, workspace_path)
+        await mgr.start_agent(orchestrator_id, session_id, mission.project_id, workspace_path)
     except Exception as e:
         logger.error("Failed to start CDP agent: %s", e)
 
@@ -6069,6 +6073,7 @@ async def mission_control_page(request: Request, mission_id: str):
         "archi_stack": archi_stack,
         "wiki_pages": wiki_pages,
         "wiki_memories": wiki_memories,
+        "orchestrator_id": mission.cdp_agent_id or "chef_de_programme",
     })
 
 
@@ -6154,13 +6159,14 @@ async def api_mission_validate(request: Request, mission_id: str):
                 p.status = PhaseStatus.DONE if decision == "GO" else PhaseStatus.FAILED
         run_store.update(mission)
 
-    # Send decision to CDP agent via bus
+    # Send decision to orchestrator agent via bus
+    orch_id = mission.cdp_agent_id or "chef_de_programme"
     if mission.session_id:
         session_store = get_session_store()
         session_store.add_message(MessageDef(
             session_id=mission.session_id,
             from_agent="user",
-            to_agent="chef_de_programme",
+            to_agent=orch_id,
             message_type="response",
             content=f"DECISION: {decision}",
         ))
@@ -6172,7 +6178,7 @@ async def api_mission_validate(request: Request, mission_id: str):
             id=uuid.uuid4().hex[:8],
             session_id=mission.session_id,
             from_agent="user",
-            to_agent="chef_de_programme",
+            to_agent=orch_id,
             message_type=MessageType.RESPONSE,
             content=f"DECISION: {decision}",
             timestamp=datetime.utcnow(),
@@ -6308,6 +6314,12 @@ async def api_mission_run(request: Request, mission_id: str):
 
     session_id = mission.session_id or ""
     agent_store = get_agent_store()
+    # Resolve orchestrator (CISO for security, CDP for product lifecycle, etc.)
+    orch_id = mission.cdp_agent_id or "chef_de_programme"
+    orch_agent = agent_store.get(orch_id)
+    orch_name = orch_agent.name if orch_agent else "Orchestrateur"
+    orch_role = orch_agent.role if orch_agent else "Orchestrateur"
+    orch_avatar = f"/static/avatars/{orch_id}.svg"
 
     async def _run_phases():
         """Execute phases sequentially using the real pattern engine.
@@ -6391,10 +6403,10 @@ async def api_mission_run(request: Request, mission_id: str):
                 cdp_announce += f"\n{cdp_context}"
             await _push_sse(session_id, {
                 "type": "message",
-                "from_agent": "chef_de_programme",
-                "from_name": "Alexandre Moreau",
-                "from_role": "Chef de Programme",
-                "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                "from_agent": orch_id,
+                "from_name": orch_name,
+                "from_role": orch_role,
+                "from_avatar": orch_avatar,
                 "content": cdp_announce,
                 "phase_id": phase.phase_id,
                 "msg_type": "text",
@@ -6531,10 +6543,10 @@ async def api_mission_run(request: Request, mission_id: str):
                     # Announce sprint start
                     await _push_sse(session_id, {
                         "type": "message",
-                        "from_agent": "chef_de_programme",
-                        "from_name": "Alexandre Moreau",
-                        "from_role": "Chef de Programme",
-                        "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                        "from_agent": orch_id,
+                        "from_name": orch_name,
+                        "from_role": orch_role,
+                        "from_avatar": orch_avatar,
                         "content": f"Lancement {sprint_label} pour «{wf_phase.name}»",
                         "phase_id": phase.phase_id,
                         "msg_type": "text",
@@ -6609,10 +6621,10 @@ async def api_mission_run(request: Request, mission_id: str):
                         remediation_msg = f"{retry_label} terminé avec des problèmes. Relance avec feedback correctif…"
                         await _push_sse(session_id, {
                             "type": "message",
-                            "from_agent": "chef_de_programme",
-                            "from_name": "Alexandre Moreau",
-                            "from_role": "Chef de Programme",
-                            "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                            "from_agent": orch_id,
+                            "from_name": orch_name,
+                            "from_role": orch_role,
+                            "from_avatar": orch_avatar,
                             "content": remediation_msg,
                             "phase_id": phase.phase_id,
                             "msg_type": "text",
@@ -6629,10 +6641,10 @@ async def api_mission_run(request: Request, mission_id: str):
                 if max_sprints > 1 and sprint_num < max_sprints:
                     await _push_sse(session_id, {
                         "type": "message",
-                        "from_agent": "chef_de_programme",
-                        "from_name": "Alexandre Moreau",
-                        "from_role": "Chef de Programme",
-                        "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                        "from_agent": orch_id,
+                        "from_name": orch_name,
+                        "from_role": orch_role,
+                        "from_avatar": orch_avatar,
                         "content": f"{sprint_label} terminé. Passage au sprint suivant…",
                         "phase_id": phase.phase_id,
                         "msg_type": "text",
@@ -6671,10 +6683,10 @@ async def api_mission_run(request: Request, mission_id: str):
                     })
                     await _push_sse(session_id, {
                         "type": "message",
-                        "from_agent": "chef_de_programme",
-                        "from_name": "Alexandre Moreau",
-                        "from_role": "Chef de Programme",
-                        "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                        "from_agent": orch_id,
+                        "from_name": orch_name,
+                        "from_role": orch_role,
+                        "from_avatar": orch_avatar,
                         "content": "Epic arrêtée — décision NOGO.",
                         "phase_id": phase.phase_id,
                         "msg_type": "text",
@@ -6766,10 +6778,10 @@ async def api_mission_run(request: Request, mission_id: str):
                     cdp_msg = f"Phase «{wf_phase.name}» réussie. Passage à la phase suivante…"
                     await _push_sse(session_id, {
                         "type": "message",
-                        "from_agent": "chef_de_programme",
-                        "from_name": "Alexandre Moreau",
-                        "from_role": "Chef de Programme",
-                        "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                        "from_agent": orch_id,
+                        "from_name": orch_name,
+                        "from_role": orch_role,
+                        "from_avatar": orch_avatar,
                         "content": cdp_msg,
                         "phase_id": phase.phase_id,
                         "msg_type": "text",
@@ -6821,10 +6833,10 @@ async def api_mission_run(request: Request, mission_id: str):
                             phase.summary = f"{len(aids)} agents ont travaillé ({pattern_type}) — terminée avec avertissements"
                     await _push_sse(session_id, {
                         "type": "message",
-                        "from_agent": "chef_de_programme",
-                        "from_name": "Alexandre Moreau",
-                        "from_role": "Chef de Programme",
-                        "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                        "from_agent": orch_id,
+                        "from_name": orch_name,
+                        "from_role": orch_role,
+                        "from_avatar": orch_avatar,
                         "content": cdp_msg,
                         "phase_id": phase.phase_id,
                         "msg_type": "text",
@@ -6879,10 +6891,10 @@ async def api_mission_run(request: Request, mission_id: str):
                         )
                         await _push_sse(session_id, {
                             "type": "message",
-                            "from_agent": "chef_de_programme",
-                            "from_name": "Alexandre Moreau",
-                            "from_role": "Chef de Programme",
-                            "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                            "from_agent": orch_id,
+                            "from_name": orch_name,
+                            "from_role": orch_role,
+                            "from_avatar": orch_avatar,
                             "content": reloop_msg,
                             "phase_id": phase.phase_id,
                             "msg_type": "text",
@@ -6932,10 +6944,10 @@ async def api_mission_run(request: Request, mission_id: str):
         run_store.update(mission)
         await _push_sse(session_id, {
             "type": "message",
-            "from_agent": "chef_de_programme",
-            "from_name": "Alexandre Moreau",
-            "from_role": "Chef de Programme",
-            "from_avatar": "/static/avatars/chef_de_programme.jpg",
+            "from_agent": orch_id,
+            "from_name": orch_name,
+            "from_role": orch_role,
+            "from_avatar": orch_avatar,
             "content": final_msg,
             "msg_type": "text",
         })
@@ -6957,10 +6969,10 @@ async def api_mission_run(request: Request, mission_id: str):
                 run_store.update(mission)
                 await _push_sse(session_id, {
                     "type": "message",
-                    "from_agent": "chef_de_programme",
-                    "from_name": "Alexandre Moreau",
-                    "from_role": "Chef de Programme",
-                    "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                    "from_agent": orch_id,
+                    "from_name": orch_name,
+                    "from_role": orch_role,
+                    "from_avatar": orch_avatar,
                     "content": f"Erreur interne: {exc}",
                     "msg_type": "text",
                 })

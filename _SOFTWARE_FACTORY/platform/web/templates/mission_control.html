@@ -1014,14 +1014,14 @@
 
     <!-- ====== RIGHT SIDEBAR ====== -->
     <div class="mc-sidebar">
-        {% set cdp = agent_map.get('chef_de_programme') %}
+        {% set cdp = agent_map.get(orchestrator_id|default('chef_de_programme')) %}
         <!-- CDP Agent Card -->
         <div class="mc-cdp-card">
             <div class="mc-cdp-card-inner">
                 <div class="mc-cdp-banner">
                     <div class="mc-cdp-avatar-wrap">
                         <img class="mc-cdp-avatar" src="{{ cdp['avatar_url'] if cdp else '' }}" alt=""
-                             onerror="this.src='/static/avatars/chef_de_programme.jpg'">
+                             onerror="this.src='/static/avatars/{{ orchestrator_id|default('chef_de_programme') }}.svg'">
                     </div>
                 </div>
                 <div class="mc-cdp-body">
@@ -1236,11 +1236,11 @@
 <div class="mc-chat-overlay" id="mcChatOverlay" onclick="if(event.target===this)closeCdpChat()">
     <div class="mc-chat-modal">
         <div class="mc-chat-head">
-            <img class="mc-chat-head-avatar" id="mcChatAvatar" src="{{ cdp['avatar_url'] if cdp else '/static/avatars/chef_de_programme.jpg' }}" alt=""
-                 onerror="this.src='/static/avatars/chef_de_programme.jpg'">
+            <img class="mc-chat-head-avatar" id="mcChatAvatar" src="{{ cdp['avatar_url'] if cdp else '/static/avatars/' + (orchestrator_id|default('chef_de_programme')) + '.svg' }}" alt=""
+                 onerror="this.src='/static/avatars/{{ orchestrator_id|default('chef_de_programme') }}.svg'">
             <div class="mc-chat-head-info">
-                <h3 id="mcChatName">{{ cdp['name'] if cdp else 'Chef de Programme' }}</h3>
-                <small id="mcChatRole">{{ cdp['role'] if cdp else 'Chef de Programme' }} &mdash; {{ mission.brief[:60] }}{% if mission.brief|length > 60 %}...{% endif %}</small>
+                <h3 id="mcChatName">{{ cdp['name'] if cdp else 'Orchestrateur' }}</h3>
+                <small id="mcChatRole">{{ cdp['role'] if cdp else 'Orchestrateur' }} &mdash; {{ mission.brief[:60] }}{% if mission.brief|length > 60 %}...{% endif %}</small>
             </div>
             <button class="mc-chat-close" onclick="closeCdpChat()">✕</button>
         </div>
@@ -1352,10 +1352,10 @@ for (const [pid, agents] of Object.entries(PHASE_AGENTS)) {
 }
 
 /* ── Agent Chat Modal (generic — CDP + tab agents) ── */
-const CDP_AVATAR = '{{ cdp["avatar_url"] if cdp else "/static/avatars/chef_de_programme.jpg" }}' || '/static/avatars/chef_de_programme.jpg';
-const CDP_NAME = '{{ cdp["name"] if cdp else "Chef de Programme" }}';
-const CDP_ROLE = '{{ cdp["role"] if cdp else "Chef de Programme" }}';
-let _chatAgentId = 'chef_de_programme';
+const CDP_AVATAR = '{{ cdp["avatar_url"] if cdp else "/static/avatars/" + (orchestrator_id|default("chef_de_programme")) + ".svg" }}' || '/static/avatars/{{ orchestrator_id|default("chef_de_programme") }}.svg';
+const CDP_NAME = '{{ cdp["name"] if cdp else "Orchestrateur" }}';
+const CDP_ROLE = '{{ cdp["role"] if cdp else "Orchestrateur" }}';
+let _chatAgentId = '{{ orchestrator_id|default("chef_de_programme") }}';
 let _chatAgentName = CDP_NAME;
 let _chatAgentRole = CDP_ROLE;
 let _chatAgentAvatar = CDP_AVATAR;
@@ -1394,7 +1394,7 @@ function openAgentChat(agentId, name, role, avatarUrl) {
     el('mcChatInput').focus();
 }
 function openCdpChat() {
-    openAgentChat('chef_de_programme', CDP_NAME, CDP_ROLE, CDP_AVATAR);
+    openAgentChat('{{ orchestrator_id|default("chef_de_programme") }}', CDP_NAME, CDP_ROLE, CDP_AVATAR);
 }
 function closeCdpChat() {
     document.getElementById('mcChatOverlay').classList.remove('open');
@@ -1414,7 +1414,7 @@ function _addChatMsg(type, content, opts = {}) {
         const av = document.createElement('img');
         av.className = 'mc-chat-msg-avatar';
         av.src = _chatAgentAvatar;
-        av.onerror = function(){ this.src = '/static/avatars/chef_de_programme.jpg'; };
+        av.onerror = function(){ this.src = '/static/avatars/{{ orchestrator_id|default("chef_de_programme") }}.svg'; };
         wrapper.appendChild(av);
     } else if (type === 'user') {
         const av = document.createElement('div');
@@ -1817,7 +1817,7 @@ function handleSSE(d) {
         addActivity(`CHECKPOINT: ${d.question}`, 'system');
     }
     else if (d.type === 'message') {
-        if (d.from_agent === 'chef_de_programme') addActivity(d.content, '');
+        if (d.from_agent === '{{ orchestrator_id|default("chef_de_programme") }}') addActivity(d.content, '');
         const phaseId = d.phase_id || currentRunningPhase();
         if (phaseId) addDiscussionMsg(phaseId, d);
         if (d.msg_type === 'tool_result') addActivity(d.content?.substring(0, 200), 'tool');

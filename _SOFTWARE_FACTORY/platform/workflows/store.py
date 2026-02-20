@@ -1403,6 +1403,7 @@ class WorkflowStore:
                                   config={"agents": ["secops-engineer", "qa-security", "pentester-lead", "ciso"]}),
                 ],
                 config={
+                    "orchestrator": "ciso",
                     "graph": {
                         "pattern": "hierarchical",
                         "nodes": [
