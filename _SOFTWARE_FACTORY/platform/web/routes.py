@@ -4077,6 +4077,161 @@ async def metier_page(request: Request):
     })
 
 
+# ── Product Line Manager ─────────────────────────────────────────
+
+@router.get("/product-line", response_class=HTMLResponse)
+async def product_line_page(request: Request):
+    """Product Line Manager — produits, roadmap, milestones, DORA."""
+    from ..missions.store import get_mission_store
+    from ..missions.product import get_product_backlog
+    from ..projects.manager import get_project_store, LEAN_VALUES
+    from ..metrics.dora import get_dora_metrics
+
+    project_store = get_project_store()
+    mission_store = get_mission_store()
+    backlog = get_product_backlog()
+    dora_engine = get_dora_metrics()
+
+    all_projects = project_store.list_all()
+    all_missions = mission_store.list_missions()
+
+    # Group missions by project
+    missions_by_project: dict[str, list] = {}
+    for m in all_missions:
+        pid = m.project_id or "default"
+        missions_by_project.setdefault(pid, []).append(m)
+
+    # Build product data
+    products = []
+    total_epics = 0
+    total_features = 0
+    total_stories = 0
+    total_done_stories = 0
+
+    for proj in all_projects:
+        proj_missions = missions_by_project.get(proj.id, [])
+        epics_data = []
+        proj_features = 0
+        proj_stories = 0
+        proj_done = 0
+        proj_points = 0
+
+        for m in proj_missions:
+            features = backlog.list_features(m.id)
+            feat_count = len(features)
+            story_count = 0
+            done_count = 0
+            ep_points = 0
+
+            for f in features:
+                stories = backlog.list_stories(f.id)
+                f_pts = f.story_points or sum(s.story_points for s in stories)
+                ep_points += f_pts
+                story_count += len(stories)
+                done_count += sum(1 for s in stories if s.status == "done")
+
+            proj_features += feat_count
+            proj_stories += story_count
+            proj_done += done_count
+            proj_points += ep_points
+
+            epics_data.append({
+                "id": m.id,
+                "name": m.name,
+                "status": m.status.value if hasattr(m.status, "value") else str(m.status),
+                "feature_count": feat_count,
+                "story_count": story_count,
+                "done_pct": round(done_count / max(story_count, 1) * 100),
+            })
+
+        total_epics += len(proj_missions)
+        total_features += proj_features
+        total_stories += proj_stories
+        total_done_stories += proj_done
+
+        # Milestones: derive from epic status progression
+        milestones = []
+        if proj_missions:
+            completed = sum(1 for e in epics_data if e["status"] == "completed")
+            running = sum(1 for e in epics_data if e["status"] == "running")
+            total_ep = len(epics_data)
+
+            milestones.append({
+                "name": "Kickoff", "date": "", "pct": 100, "state": "done",
+            })
+            if proj_features > 0:
+                feat_pct = min(100, round(proj_done / max(proj_stories, 1) * 100))
+                milestones.append({
+                    "name": f"Développement ({proj_features} features)",
+                    "date": "", "pct": feat_pct,
+                    "state": "done" if feat_pct == 100 else ("active" if feat_pct > 0 else "upcoming"),
+                })
+            if total_ep > 0:
+                deploy_pct = round(completed / total_ep * 100)
+                milestones.append({
+                    "name": f"Déploiement ({completed}/{total_ep} epics)",
+                    "date": "", "pct": deploy_pct,
+                    "state": "done" if deploy_pct == 100 else ("active" if deploy_pct > 0 else "upcoming"),
+                })
+            milestones.append({
+                "name": "Production",
+                "date": "",
+                "pct": 100 if all(e["status"] == "completed" for e in epics_data) else 0,
+                "state": "done" if all(e["status"] == "completed" for e in epics_data) else "upcoming",
+            })
+
+        # Per-product DORA
+        proj_dora = None
+        try:
+            proj_dora = dora_engine.summary(proj.id, 30)
+        except Exception:
+            pass
+
+        # Project values
+        proj_values = []
+        for vid in (proj.values or []):
+            for lv in LEAN_VALUES:
+                if lv["id"] == vid:
+                    proj_values.append(lv)
+                    break
+
+        products.append({
+            "id": proj.id,
+            "name": proj.name,
+            "description": proj.description,
+            "status": proj.status,
+            "epics": epics_data,
+            "feature_count": proj_features,
+            "total_points": proj_points,
+            "done_pct": round(proj_done / max(proj_stories, 1) * 100),
+            "milestones": milestones,
+            "dora": proj_dora,
+            "values": proj_values,
+        })
+
+    # Overall DORA
+    overall_dora = dora_engine.summary("", 30)
+    overall_done = round(total_done_stories / max(total_stories, 1) * 100)
+
+    # Global values (union of all project values)
+    all_value_ids = set()
+    for p in products:
+        all_value_ids.update(v["id"] for v in p.get("values", []))
+    global_values = [lv for lv in LEAN_VALUES if lv["id"] in all_value_ids] if all_value_ids else LEAN_VALUES[:4]
+
+    return _templates(request).TemplateResponse("product_line.html", {
+        "request": request,
+        "page_title": "Ligne de Produit",
+        "products": products,
+        "total_epics": total_epics,
+        "total_features": total_features,
+        "total_stories": total_stories,
+        "overall_done_pct": overall_done,
+        "dora": overall_dora,
+        "values": global_values,
+    })
+
+
 # ── Product Management ───────────────────────────────────────────
 
 @router.get("/product", response_class=HTMLResponse)
