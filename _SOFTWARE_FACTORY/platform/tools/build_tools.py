@@ -22,9 +22,13 @@ class BuildTool(BaseTool):
         cwd = params.get("cwd", ".")
         if not cmd:
             return "Error: build command required"
+        # Fix swift command to use Apple Swift (not OpenStack CLI)
+        import os
+        if cmd.strip().startswith("swift ") and os.path.isfile("/usr/bin/swift"):
+            cmd = "/usr/bin/" + cmd.strip()
         sandbox = get_sandbox(cwd)
         result = sandbox.run(cmd, cwd=cwd, timeout=300)
-        output = result.stdout[-3000:] if result.returncode == 0 else result.stderr[-3000:]
+        output = result.stdout[-3000:] if result.returncode == 0 else (result.stderr[-3000:] or result.stdout[-3000:])
         status = "[OK] SUCCESS" if result.returncode == 0 else f"[FAIL] FAILED (exit {result.returncode})"
         prefix = f"[sandbox:{result.image}] " if result.sandboxed else ""
         return f"{prefix}{status}\n{output}"
@@ -40,6 +44,10 @@ class TestTool(BaseTool):
         cwd = params.get("cwd", ".")
         if not cmd:
             return "Error: test command required"
+        # Fix swift command to use Apple Swift (not OpenStack CLI)
+        import os
+        if cmd.strip().startswith("swift ") and os.path.isfile("/usr/bin/swift"):
+            cmd = "/usr/bin/" + cmd.strip()
         sandbox = get_sandbox(cwd)
         result = sandbox.run(cmd, cwd=cwd, timeout=300)
         output = result.stdout[-3000:] + result.stderr[-1000:]

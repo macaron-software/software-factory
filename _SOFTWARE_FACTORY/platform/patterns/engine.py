@@ -1369,7 +1369,7 @@ async def _run_hierarchical(run: PatternRun, task: str):
             # Get actual file status for review context
             workspace_status = ""
             try:
-                workspace = run.metadata.get("workspace") if run.metadata else None
+                workspace = run.project_path or None
                 if workspace:
                     import subprocess as _sp
                     git_r = _sp.run(["git", "diff", "--stat", "HEAD"], capture_output=True, text=True, cwd=workspace, timeout=5)
@@ -1404,7 +1404,7 @@ async def _run_hierarchical(run: PatternRun, task: str):
         preflight_result = ""
         test_results = ""
         build_passed = True
-        workspace = run.metadata.get("workspace") if run.metadata else None
+        workspace = run.project_path or None
         if workspace:
             try:
                 import subprocess as _sp
@@ -1430,8 +1430,10 @@ async def _run_hierarchical(run: PatternRun, task: str):
 
                 # ── Detect project type and run appropriate build ──
                 if _os.path.isfile(_os.path.join(workspace, "Package.swift")):
-                    build_cmds.append(("swift build", "swift build 2>&1 | tail -30"))
-                    test_cmds.append(("swift test", "swift test 2>&1 | tail -30"))
+                    # Use /usr/bin/swift to avoid OpenStack Swift CLI conflict
+                    _swift = "/usr/bin/swift" if _os.path.isfile("/usr/bin/swift") else "swift"
+                    build_cmds.append(("swift build", f"{_swift} build 2>&1 | tail -30"))
+                    test_cmds.append(("swift test", f"{_swift} test 2>&1 | tail -30"))
                 if _os.path.isfile(_os.path.join(workspace, "Cargo.toml")):
                     build_cmds.append(("cargo check", "cargo check 2>&1 | tail -20"))
                     test_cmds.append(("cargo test", "cargo test 2>&1 | tail -30"))

@@ -6482,6 +6482,8 @@ async def api_update_ticket(request: Request, mission_id: str, ticket_id: str):
     if not row:
         return JSONResponse({"error": "Not found"}, status_code=404)
     return JSONResponse(dict(row))
+
+@router.post("/api/missions/{mission_id}/run")
 async def api_mission_run(request: Request, mission_id: str):
     """Drive mission execution: CDP orchestrates phases sequentially.
 

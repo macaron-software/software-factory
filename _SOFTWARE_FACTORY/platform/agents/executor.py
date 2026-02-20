@@ -1993,7 +1993,10 @@ class AgentExecutor:
         workspace = ctx.project_path
         if not workspace:
             return "Error: no workspace available"
-        import subprocess
+        import subprocess, os
+        # Fix swift command to use Apple Swift (not OpenStack CLI)
+        if command.strip().startswith("swift ") and os.path.isfile("/usr/bin/swift"):
+            command = "/usr/bin/" + command.strip()
         try:
             proc = subprocess.run(
                 command, shell=True, cwd=workspace,
