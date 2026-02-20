@@ -23,7 +23,8 @@
 /* ── DORA strip ── */
 .pl-dora{display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem}
 .pl-dora-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.85rem 1rem;text-align:center}
-.pl-dora-icon{font-size:1.2rem;margin-bottom:0.3rem}
+.pl-dora-icon{margin-bottom:0.3rem}
+.pl-dora-icon svg{width:24px;height:24px}
 .pl-dora-title{font-size:0.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:0.35rem;font-weight:600}
 .pl-dora-value{font-size:1.3rem;font-weight:700;color:var(--text-primary)}
 .pl-dora-detail{font-size:0.72rem;color:var(--text-secondary);margin:0.15rem 0 0.4rem}
@@ -36,7 +37,8 @@
 /* ── Values ── */
 .pl-values{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.5rem}
 .pl-value-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.65rem 0.85rem;display:flex;align-items:center;gap:0.5rem}
-.pl-value-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:0.9rem;flex-shrink:0}
+.pl-value-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pl-value-icon svg{width:16px;height:16px}
 .pl-value-text{flex:1}
 .pl-value-label{font-size:0.78rem;font-weight:600;color:var(--text-primary)}
 .pl-value-desc{font-size:0.68rem;color:var(--text-secondary);margin-top:1px}
@@ -166,28 +168,28 @@
         </div>
         <div class="pl-dora">
             <div class="pl-dora-card">
-                <div class="pl-dora-icon">🚀</div>
+                <div class="pl-dora-icon"><svg class="icon" style="color:var(--green)"><use href="#icon-rocket"/></svg></div>
                 <div class="pl-dora-title">Deploy Frequency</div>
                 <div class="pl-dora-value">{{ dora.deployment_frequency.count }}</div>
                 <div class="pl-dora-detail">{{ dora.deployment_frequency.per_day }}/jour</div>
                 <span class="pl-dora-level level-{{ dora.deployment_frequency.level }}">{{ dora.deployment_frequency.level }}</span>
             </div>
             <div class="pl-dora-card">
-                <div class="pl-dora-icon">⏱️</div>
+                <div class="pl-dora-icon"><svg class="icon" style="color:var(--blue)"><use href="#icon-clock"/></svg></div>
                 <div class="pl-dora-title">Lead Time</div>
                 <div class="pl-dora-value">{{ dora.lead_time.median_hours }}h</div>
                 <div class="pl-dora-detail">commit → prod (p90: {{ dora.lead_time.p90_hours }}h)</div>
                 <span class="pl-dora-level level-{{ dora.lead_time.level }}">{{ dora.lead_time.level }}</span>
             </div>
             <div class="pl-dora-card">
-                <div class="pl-dora-icon">🐛</div>
+                <div class="pl-dora-icon"><svg class="icon" style="color:var(--yellow)"><use href="#icon-alert-triangle"/></svg></div>
                 <div class="pl-dora-title">Change Failure</div>
                 <div class="pl-dora-value">{{ dora.change_failure_rate.rate_pct }}%</div>
                 <div class="pl-dora-detail">{{ dora.change_failure_rate.failures }}/{{ dora.change_failure_rate.total }} deploys</div>
                 <span class="pl-dora-level level-{{ dora.change_failure_rate.level }}">{{ dora.change_failure_rate.level }}</span>
             </div>
             <div class="pl-dora-card">
-                <div class="pl-dora-icon">🔧</div>
+                <div class="pl-dora-icon"><svg class="icon" style="color:var(--red)"><use href="#icon-wrench"/></svg></div>
                 <div class="pl-dora-title">MTTR</div>
                 <div class="pl-dora-value">{{ dora.mttr.median_hours }}h</div>
                 <div class="pl-dora-detail">temps de résolution</div>
@@ -203,10 +205,10 @@
             <svg><use href="#icon-target"/></svg> Valeurs de la Ligne de Produit
         </div>
         <div class="pl-values">
-            {% set value_icons = {'quality': ('🎯','#7c3aed22'), 'feedback': ('⚡','#3b82f622'), 'no-waste': ('🧹','#16a34a22'), 'respect': ('🤝','#f59e0b22'), 'kaizen': ('📈','#06b6d422'), 'flow': ('🌊','#8b5cf622'), 'zero-skip': ('🚫','#dc262622'), 'tdd': ('🧪','#10b98122'), 'innovation': ('💡','#f97316aa'), 'user-first': ('👤','#0ea5e922'), 'security': ('🔒','#ef444422'), 'scalability': ('📊','#6366f122')} %}
+            {% set value_icons = {'quality': ('icon-target','#7c3aed22'), 'feedback': ('icon-zap','#3b82f622'), 'no-waste': ('icon-leaf','#16a34a22'), 'respect': ('icon-users','#f59e0b22'), 'kaizen': ('icon-trending-up','#06b6d422'), 'flow': ('icon-activity','#8b5cf622'), 'zero-skip': ('icon-shield','#dc262622'), 'tdd': ('icon-flask','#10b98122'), 'innovation': ('icon-lightbulb','#f97316aa'), 'user-first': ('icon-user','#0ea5e922'), 'security': ('icon-lock','#ef444422'), 'scalability': ('icon-chart','#6366f122')} %}
             {% for v in values %}
             <div class="pl-value-card">
-                <div class="pl-value-icon" style="background:{{ value_icons.get(v.id, ('•','var(--bg-tertiary)'))[1] }}">{{ value_icons.get(v.id, ('•',''))[0] }}</div>
+                <div class="pl-value-icon" style="background:{{ value_icons.get(v.id, ('icon-circle','var(--bg-tertiary)'))[1] }}"><svg class="icon icon-sm"><use href="#{{ value_icons.get(v.id, ('icon-circle',''))[0] }}"/></svg></div>
                 <div class="pl-value-text">
                     <div class="pl-value-label">{{ v.label }}</div>
                     <div class="pl-value-desc">{{ v.desc }}</div>
