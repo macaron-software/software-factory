@@ -240,14 +240,14 @@ class ProjectStore:
         self._seed_dsi_project()
 
     def _seed_dsi_project(self):
-        """Seed the Macaron Agent Platform as a DSI project pointing to its own codebase."""
-        if self.get("macaron-platform"):
+        """Seed the Software Factory as a DSI project pointing to its own codebase."""
+        if self.get("software-factory"):
             return
         from ..config import PLATFORM_ROOT
         plat_path = str(PLATFORM_ROOT)
         p = Project(
-            id="macaron-platform",
-            name="Macaron Agent Platform",
+            id="software-factory",
+            name="Software Factory",
             path=plat_path,
             description="Plateforme multi-agent SAFe. FastAPI + HTMX + SSE + SQLite. Self-improving: les agents lisent et écrivent dans leur propre codebase.",
             factory_type="standalone",
@@ -277,7 +277,7 @@ class ProjectStore:
             status="active",
         )
         self.create(p)
-        logger.info("Seeded DSI project: macaron-platform → %s", plat_path)
+        logger.info("Seeded DSI project: software-factory → %s", plat_path)
 
     def _load_vision_from_workflow(self, project_id: str) -> str:
         """Load vision from linked workflow config."""
@@ -360,7 +360,7 @@ def _project_color(project_id: str) -> str:
         "ppz": "#3fb950", "psy": "#a371f7", "yolonow": "#f85149",
         "solaris": "#d29922", "sharelook": "#79c0ff", "finary": "#56d364",
         "lpd": "#db6d28", "logs-facteur": "#8b949e",
-        "macaron-platform": "#c084fc",
+        "software-factory": "#c084fc",
     }
     return colors.get(project_id, "#8b949e")
 

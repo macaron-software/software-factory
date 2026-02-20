@@ -1147,7 +1147,7 @@ class WorkflowStore:
                                   config={"agents": ["plat-lead-dev", "plat-product", "scrum_master", "qa_lead"]}),
                 ],
                 config={
-                    "project_ref": "macaron-platform",
+                    "project_ref": "software-factory",
                     "graph": {
                         "pattern": "hierarchical",
                         "nodes": [
@@ -1262,7 +1262,7 @@ class WorkflowStore:
                                   config={"agents": ["devops", "sre", "plat-tma-lead", "qa_lead"]}),
                 ],
                 config={
-                    "project_ref": "macaron-platform",
+                    "project_ref": "software-factory",
                     "graph": {
                         "pattern": "hierarchical",
                         "nodes": [
@@ -1310,6 +1310,163 @@ class WorkflowStore:
                 },
             ),
         )
+
+        # ── Security Hacking Workflow ──
+        builtins.append(
+            WorkflowDef(
+                id="security-hacking",
+                name="Security Hacking — Offensive + Défensive",
+                description="Pipeline complet de sécurité offensive et défensive. "
+                            "Red Team (reconnaissance, exploitation) → Blue Team (threat modeling, analyse) → "
+                            "CISO review GO/NOGO → Dev Team (remediation TDD via PR) → "
+                            "Verification (re-exploit + compliance) → Deploy hotfix sécurisé. "
+                            "Inspiré PentAGI: Orchestrator→Researcher→Developer→Executor.",
+                icon="shield", is_builtin=True,
+                phases=[
+                    WorkflowPhase(id="recon", pattern_id="parallel",
+                                  name="Reconnaissance",
+                                  description="Le Pentester Lead coordonne la phase de reconnaissance. "
+                                              "La Security Researcher cartographie la surface d'attaque (OSINT, ports, services, APIs). "
+                                              "L'Exploit Dev identifie les points d'entrée potentiels. Scan passif puis actif.",
+                                  gate="always",
+                                  config={"agents": ["pentester-lead", "security-researcher", "exploit-dev"]}),
+                    WorkflowPhase(id="threat-model", pattern_id="network",
+                                  name="Threat Modeling",
+                                  description="Débat contradictoire Red Team vs Blue Team. "
+                                              "Le Pentester Lead présente les vecteurs d'attaque identifiés. "
+                                              "La Security Architect évalue les défenses existantes. "
+                                              "La Threat Analyst quantifie les risques (STRIDE/DREAD). "
+                                              "Objectif: prioriser les scénarios d'attaque par impact.",
+                                  gate="always",
+                                  config={"agents": ["pentester-lead", "security-architect", "threat-analyst", "security-researcher"]}),
+                    WorkflowPhase(id="exploitation", pattern_id="loop",
+                                  name="Exploitation",
+                                  description="Le Pentester Lead orchestre les tests d'intrusion. "
+                                              "L'Exploit Dev développe et exécute les PoC (SQLi, XSS, SSRF, auth bypass, RCE). "
+                                              "Chaque vulnérabilité confirmée est scorée CVSS v3.1. "
+                                              "Itération: tester → analyser → adapter → re-tester. Max 5 itérations.",
+                                  gate="always",
+                                  config={"agents": ["pentester-lead", "exploit-dev", "security-researcher"],
+                                          "max_iterations": 5}),
+                    WorkflowPhase(id="vuln-report", pattern_id="aggregator",
+                                  name="Rapport de Vulnérabilités",
+                                  description="Toutes les findings sont consolidées en un rapport structuré. "
+                                              "La Security Researcher compile les CVE référencées. "
+                                              "La Threat Analyst score et priorise (P0-P3). "
+                                              "Le Pentester Lead rédige les recommandations de remédiation. "
+                                              "Livrable: rapport CVSS avec PoC, impact, et remediation pour chaque vuln.",
+                                  gate="always",
+                                  config={"agents": ["pentester-lead", "security-researcher", "threat-analyst"],
+                                          "leader": "threat-analyst"}),
+                    WorkflowPhase(id="security-review", pattern_id="human-in-the-loop",
+                                  name="Security Review — GO/NOGO",
+                                  description="Le CISO examine le rapport de vulnérabilités. "
+                                              "La Compliance Officer vérifie les implications réglementaires (GDPR, SOC2). "
+                                              "La Security Architect recommande les priorités de remédiation. "
+                                              "Checkpoint: GO (corriger immédiatement), NOGO (bloquer la release), "
+                                              "PIVOT (accepter le risque avec plan de mitigation).",
+                                  gate="checkpoint",
+                                  config={"agents": ["ciso", "compliance-officer", "security-architect"]}),
+                    WorkflowPhase(id="remediation", pattern_id="loop",
+                                  name="Remédiation TDD",
+                                  description="Le Security Dev Lead distribue les vulnérabilités aux développeurs. "
+                                              "Chaque fix suit TDD: RED (test reproduit l'exploit) → GREEN (fix) → REFACTOR. "
+                                              "Le Backend Dev corrige SQLi, auth bypass, SSRF. "
+                                              "Le Frontend Dev corrige XSS, CSRF, CSP. "
+                                              "La QA Security valide chaque PR. Loop max 3 itérations par vuln.",
+                                  gate="no_veto",
+                                  config={"agents": ["security-dev-lead", "security-backend-dev", "security-frontend-dev", "qa-security"],
+                                          "leader": "security-dev-lead",
+                                          "max_iterations": 3}),
+                    WorkflowPhase(id="verification", pattern_id="parallel",
+                                  name="Vérification & Non-Régression",
+                                  description="Re-test parallèle multi-aspect. "
+                                              "L'Exploit Dev re-exécute tous les PoC originaux — doivent ÉCHOUER. "
+                                              "La QA Security lance OWASP ZAP + SAST/DAST + tests de régression. "
+                                              "La Compliance Officer vérifie la conformité réglementaire. "
+                                              "Le SecOps vérifie les contrôles de sécurité en place. "
+                                              "TOUS doivent approuver.",
+                                  gate="all_approved",
+                                  config={"agents": ["exploit-dev", "qa-security", "compliance-officer", "secops-engineer"]}),
+                    WorkflowPhase(id="deploy-secure", pattern_id="sequential",
+                                  name="Deploy Sécurisé & Monitoring",
+                                  description="Le SecOps déploie le hotfix en staging. "
+                                              "La QA Security valide en staging. "
+                                              "Le Pentester Lead fait un smoke test sécurité. "
+                                              "Le CISO donne le GO final pour la prod. "
+                                              "Pipeline: staging → E2E sécu → canary 1% → monitoring → prod 100%.",
+                                  gate="all_approved",
+                                  config={"agents": ["secops-engineer", "qa-security", "pentester-lead", "ciso"]}),
+                ],
+                config={
+                    "graph": {
+                        "pattern": "hierarchical",
+                        "nodes": [
+                            # Red Team
+                            {"id": "n1", "agent_id": "pentester-lead", "x": 400, "y": 20, "label": "Pentester Lead", "phase": "recon"},
+                            {"id": "n2", "agent_id": "security-researcher", "x": 200, "y": 120, "label": "Researcher", "phase": "recon"},
+                            {"id": "n3", "agent_id": "exploit-dev", "x": 600, "y": 120, "label": "Exploit Dev", "phase": "exploitation"},
+                            # Blue Team
+                            {"id": "n4", "agent_id": "security-architect", "x": 100, "y": 240, "label": "Security Architect", "phase": "threat-model"},
+                            {"id": "n5", "agent_id": "threat-analyst", "x": 400, "y": 240, "label": "Threat Analyst", "phase": "threat-model"},
+                            {"id": "n6", "agent_id": "secops-engineer", "x": 700, "y": 240, "label": "SecOps", "phase": "deploy-secure"},
+                            # Governance
+                            {"id": "n7", "agent_id": "ciso", "x": 250, "y": 360, "label": "CISO", "phase": "security-review"},
+                            {"id": "n8", "agent_id": "compliance-officer", "x": 550, "y": 360, "label": "Compliance", "phase": "security-review"},
+                            # Dev Team
+                            {"id": "n9", "agent_id": "security-dev-lead", "x": 400, "y": 480, "label": "Security Dev Lead", "phase": "remediation"},
+                            {"id": "n10", "agent_id": "security-backend-dev", "x": 200, "y": 580, "label": "Backend Dev", "phase": "remediation"},
+                            {"id": "n11", "agent_id": "security-frontend-dev", "x": 400, "y": 580, "label": "Frontend Dev", "phase": "remediation"},
+                            {"id": "n12", "agent_id": "qa-security", "x": 600, "y": 580, "label": "QA Security", "phase": "verification"},
+                        ],
+                        "edges": [
+                            # Phase 1: Recon
+                            {"from": "n1", "to": "n2", "label": "recon OSINT", "color": "#ef4444"},
+                            {"from": "n1", "to": "n3", "label": "recon exploit", "color": "#ef4444"},
+                            # Phase 2: Threat Model (network/debate)
+                            {"from": "n2", "to": "n4", "label": "surface", "color": "#f97316"},
+                            {"from": "n2", "to": "n5", "label": "findings", "color": "#f97316"},
+                            {"from": "n1", "to": "n5", "label": "vecteurs", "color": "#f97316"},
+                            {"from": "n4", "to": "n5", "label": "défenses", "color": "#3b82f6"},
+                            {"from": "n5", "to": "n1", "label": "priorités", "color": "#8b5cf6"},
+                            # Phase 3: Exploitation
+                            {"from": "n1", "to": "n3", "label": "exploit", "color": "#dc2626"},
+                            {"from": "n3", "to": "n5", "label": "CVSS", "color": "#dc2626"},
+                            # Phase 4: Report → Phase 5: Review
+                            {"from": "n5", "to": "n7", "label": "rapport", "color": "#fbbf24"},
+                            {"from": "n5", "to": "n8", "label": "compliance?", "color": "#fbbf24"},
+                            {"from": "n4", "to": "n7", "label": "recommandations", "color": "#3b82f6"},
+                            # Phase 6: Remediation
+                            {"from": "n7", "to": "n9", "label": "GO fix", "color": "#22c55e"},
+                            {"from": "n9", "to": "n10", "label": "fix backend", "color": "#22c55e"},
+                            {"from": "n9", "to": "n11", "label": "fix frontend", "color": "#22c55e"},
+                            {"from": "n9", "to": "n12", "label": "validate PR", "color": "#22c55e"},
+                            # Phase 7: Verification
+                            {"from": "n10", "to": "n12", "label": "PR ready", "color": "#10b981"},
+                            {"from": "n11", "to": "n12", "label": "PR ready", "color": "#10b981"},
+                            {"from": "n12", "to": "n3", "label": "re-exploit?", "color": "#a78bfa"},
+                            {"from": "n3", "to": "n12", "label": "exploit fails", "color": "#10b981"},
+                            {"from": "n12", "to": "n8", "label": "compliance OK?", "color": "#64748b"},
+                            # Phase 8: Deploy
+                            {"from": "n8", "to": "n6", "label": "approved", "color": "#06b6d4"},
+                            {"from": "n12", "to": "n6", "label": "QA GO", "color": "#10b981"},
+                            {"from": "n6", "to": "n7", "label": "deployed", "color": "#10b981"},
+                            {"from": "n6", "to": "n1", "label": "monitoring", "color": "#06b6d4"},
+                        ],
+                    },
+                    "agents_permissions": {
+                        "pentester-lead": {"can_veto": True, "veto_level": "STRONG", "can_delegate": True},
+                        "ciso": {"can_veto": True, "veto_level": "ABSOLUTE", "can_approve": True},
+                        "compliance-officer": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                        "qa-security": {"can_veto": True, "veto_level": "ABSOLUTE"},
+                        "security-architect": {"can_veto": True, "veto_level": "STRONG"},
+                        "threat-analyst": {"can_veto": True, "veto_level": "STRONG"},
+                        "security-dev-lead": {"can_delegate": True, "can_approve": True},
+                    },
+                },
+            ),
+        )
+
         for w in builtins:
             self.create(w)
 

@@ -237,7 +237,7 @@ class OrgStore:
         self.create_art(ART(
             id="art-platform", name="ART Platform & Core",
             portfolio_id="portfolio-dsi",
-            description="Plateformes internes: Factory, Macaron Platform, Solaris Design System",
+            description="Plateformes internes: Factory, Software Factory, Solaris Design System",
             lead_agent_id="release_train_engineer",
             pi_cadence_weeks=10,
         ))

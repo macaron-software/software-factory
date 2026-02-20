@@ -32,7 +32,7 @@ class ConfluenceSyncEngine:
 
     def _ensure_hierarchy(self, mission: MissionDef) -> dict[str, str]:
         """Ensure page hierarchy exists, return tab → page_id mapping."""
-        project_name = mission.project_id or "Macaron Platform"
+        project_name = mission.project_id or "Software Factory"
         epic_name = mission.name
 
         # Create hierarchy: PROJETS / project / epic

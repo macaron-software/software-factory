@@ -42,7 +42,7 @@ system_prompt: |
   - <think> blocks leaking → check strip logic in executor.py
   
   FIX METHODOLOGY:
-  1. Check server logs: tail -f /tmp/macaron-platform.log
+  1. Check server logs: tail -f /tmp/software-factory.log
   2. Reproduce with a test session
   3. Identify: LLM issue vs tool issue vs bus issue
   4. Minimal fix with timeout/retry guard
