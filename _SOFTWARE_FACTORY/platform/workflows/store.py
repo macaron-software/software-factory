@@ -1370,7 +1370,7 @@ class WorkflowStore:
                                               "Checkpoint: GO (corriger immédiatement), NOGO (bloquer la release), "
                                               "PIVOT (accepter le risque avec plan de mitigation).",
                                   gate="checkpoint",
-                                  config={"agents": ["ciso", "compliance-officer", "security-architect"]}),
+                                  config={"agents": ["ciso", "compliance_officer", "security-architect"]}),
                     WorkflowPhase(id="remediation", pattern_id="loop",
                                   name="Remédiation TDD",
                                   description="Le Security Dev Lead distribue les vulnérabilités aux développeurs. "
@@ -1391,7 +1391,7 @@ class WorkflowStore:
                                               "Le SecOps vérifie les contrôles de sécurité en place. "
                                               "TOUS doivent approuver.",
                                   gate="all_approved",
-                                  config={"agents": ["exploit-dev", "qa-security", "compliance-officer", "secops-engineer"]}),
+                                  config={"agents": ["exploit-dev", "qa-security", "compliance_officer", "secops-engineer"]}),
                     WorkflowPhase(id="deploy-secure", pattern_id="sequential",
                                   name="Deploy Sécurisé & Monitoring",
                                   description="Le SecOps déploie le hotfix en staging. "
@@ -1416,7 +1416,7 @@ class WorkflowStore:
                             {"id": "n6", "agent_id": "secops-engineer", "x": 700, "y": 240, "label": "SecOps", "phase": "deploy-secure"},
                             # Governance
                             {"id": "n7", "agent_id": "ciso", "x": 250, "y": 360, "label": "CISO", "phase": "security-review"},
-                            {"id": "n8", "agent_id": "compliance-officer", "x": 550, "y": 360, "label": "Compliance", "phase": "security-review"},
+                            {"id": "n8", "agent_id": "compliance_officer", "x": 550, "y": 360, "label": "Compliance", "phase": "security-review"},
                             # Dev Team
                             {"id": "n9", "agent_id": "security-dev-lead", "x": 400, "y": 480, "label": "Security Dev Lead", "phase": "remediation"},
                             {"id": "n10", "agent_id": "security-backend-dev", "x": 200, "y": 580, "label": "Backend Dev", "phase": "remediation"},
@@ -1461,7 +1461,7 @@ class WorkflowStore:
                     "agents_permissions": {
                         "pentester-lead": {"can_veto": True, "veto_level": "STRONG", "can_delegate": True},
                         "ciso": {"can_veto": True, "veto_level": "ABSOLUTE", "can_approve": True},
-                        "compliance-officer": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                        "compliance_officer": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
                         "qa-security": {"can_veto": True, "veto_level": "ABSOLUTE"},
                         "security-architect": {"can_veto": True, "veto_level": "STRONG"},
                         "threat-analyst": {"can_veto": True, "veto_level": "STRONG"},
