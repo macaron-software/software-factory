@@ -4116,24 +4116,32 @@ async def agent_world_page(request: Request):
 @router.get("/product-line", response_class=HTMLResponse)
 async def product_line_page(request: Request):
     """Product Line Manager — produits, roadmap, milestones, DORA."""
-    from ..missions.store import get_mission_store
+    from ..missions.store import get_mission_store, get_mission_run_store
     from ..missions.product import get_product_backlog
     from ..projects.manager import get_project_store, LEAN_VALUES
     from ..metrics.dora import get_dora_metrics
 
     project_store = get_project_store()
     mission_store = get_mission_store()
+    run_store = get_mission_run_store()
     backlog = get_product_backlog()
     dora_engine = get_dora_metrics()
 
     all_projects = project_store.list_all()
     all_missions = mission_store.list_missions()
+    all_runs = run_store.list_runs(limit=200)
 
     # Group missions by project
     missions_by_project: dict[str, list] = {}
     for m in all_missions:
         pid = m.project_id or "default"
         missions_by_project.setdefault(pid, []).append(m)
+
+    # Group mission_runs by project
+    runs_by_project: dict[str, list] = {}
+    for r in all_runs:
+        pid = r.project_id or "default"
+        runs_by_project.setdefault(pid, []).append(r)
 
     # Build product data
     products = []
@@ -4144,6 +4152,7 @@ async def product_line_page(request: Request):
 
     for proj in all_projects:
         proj_missions = missions_by_project.get(proj.id, [])
+        proj_runs = runs_by_project.get(proj.id, [])
         epics_data = []
         proj_features = 0
         proj_stories = 0
@@ -4178,7 +4187,23 @@ async def product_line_page(request: Request):
                 "done_pct": round(done_count / max(story_count, 1) * 100),
             })
 
-        total_epics += len(proj_missions)
+        # Also include mission_runs as epics
+        for r in proj_runs:
+            epic_name = r.brief.split(' - ')[0] if ' - ' in r.brief else r.brief[:50]
+            done_phases = sum(1 for p in r.phases if p.status.value == 'done') if r.phases else 0
+            total_phases = len(r.phases) if r.phases else 0
+            epics_data.append({
+                "id": r.id,
+                "name": epic_name,
+                "status": r.status.value if hasattr(r.status, "value") else str(r.status),
+                "feature_count": total_phases,
+                "story_count": total_phases,
+                "done_pct": round(done_phases / max(total_phases, 1) * 100),
+                "is_run": True,
+            })
+
+        run_epic_count = len(proj_runs)
+        total_epics += len(proj_missions) + run_epic_count
         total_features += proj_features
         total_stories += proj_stories
         total_done_stories += proj_done
