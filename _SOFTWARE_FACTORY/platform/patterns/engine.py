@@ -402,6 +402,13 @@ async def _execute_node(
                         "agent_id": agent.id,
                         "delta": delta,
                     })
+            elif kind == "tool":
+                # Agent is calling a tool — send activity SSE so UI shows progress
+                await _sse(run, {
+                    "type": "stream_thinking",
+                    "agent_id": agent.id,
+                    "tool_name": value,
+                })
             elif kind == "result":
                 result = value
         logger.warning("STREAM_DONE agent=%s deltas=%d think=%d", agent.id, delta_count, think_chunks)

@@ -1909,13 +1909,49 @@ function handleSSE(d) {
         }
     }
     else if (d.type === 'stream_thinking') {
-        // Agent is in <think> mode — pulse the indicator
+        // Agent is in <think> mode or using a tool — pulse the indicator
         const phaseId = d.phase_id || currentRunningPhase();
         if (phaseId) {
             const container = document.getElementById(`discuss-${phaseId}`);
             if (container) {
+                // If no bubble yet for this agent, create one
+                let bubble = container.querySelector(`.mc-stream-bubble[data-agent="${d.agent_id}"]`);
+                if (!bubble) {
+                    // Create a thinking bubble — same as stream_start
+                    container.querySelector('.mc-discuss-empty')?.remove();
+                    const info = AGENT_INFO[d.agent_id] || {};
+                    const color = info.color || 'var(--purple)';
+                    const avatar = info.avatar || `/static/avatars/${d.agent_id}.jpg`;
+                    const name = info.name || d.agent_id;
+                    const role = info.role || '';
+                    const div = document.createElement('div');
+                    div.className = 'mu mu--chat mu--agent mc-stream-bubble';
+                    div.dataset.agent = d.agent_id;
+                    div.innerHTML = `
+                        <div class="mu__avatar" style="background:${color}20;border-color:${color}">
+                            <img src="${avatar}" alt="${esc(name)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover" onerror="this.outerHTML='${esc(name.substring(0,2))}'">
+                        </div>
+                        <div class="mu__bubble mu__bubble--agent mc-streaming">
+                            <div class="mu__sender">
+                                <span class="mu__name" style="color:${color}">${esc(name)}</span>
+                                ${role ? `<span class="mu__role">${esc(role)}</span>` : ''}
+                                <span class="mc-thinking-badge">réfléchit…</span>
+                            </div>
+                            <div class="mu__content"><span class="mc-stream-content"></span><span class="mc-typing-cursor">▊</span></div>
+                        </div>`;
+                    container.appendChild(div);
+                    container.scrollTop = container.scrollHeight;
+                }
                 const badge = container.querySelector(`.mc-stream-bubble[data-agent="${d.agent_id}"] .mc-thinking-badge`);
-                if (badge) badge.textContent = 'réfléchit…';
+                if (badge) {
+                    const toolName = d.tool_name;
+                    if (toolName) {
+                        const toolLabels = {code_read:'lit le code',code_search:'cherche',code_write:'écrit',code_edit:'modifie',list_files:'explore',git_status:'git status',git_diff:'git diff',deep_search:'analyse approfondie',memory_search:'mémoire'};
+                        badge.textContent = toolLabels[toolName] || toolName + '…';
+                    } else {
+                        badge.textContent = 'réfléchit…';
+                    }
+                }
             }
         }
     }

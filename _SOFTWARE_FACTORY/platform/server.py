@@ -85,6 +85,40 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("MCP Platform Server failed to start: %s", exc)
 
+    # Auto-resume stuck missions (status=running but no asyncio task after restart)
+    try:
+        from .missions.store import get_mission_run_store
+        _mrs = get_mission_run_store()
+        _all_runs = _mrs.list_runs(limit=50)
+        _stuck = [m for m in _all_runs if m.status.value == "running"]
+        if _stuck:
+            logger.warning("Found %d stuck missions to auto-resume: %s",
+                           len(_stuck), [m.id for m in _stuck])
+
+            async def _auto_resume():
+                """Resume stuck missions by directly calling the run endpoint handler."""
+                import asyncio
+                await asyncio.sleep(3)
+                from .web.routes import api_mission_run, _active_mission_tasks
+                from starlette.requests import Request
+                from starlette.datastructures import Headers
+                # Create a minimal fake request
+                scope = {"type": "http", "method": "POST", "path": "/",
+                         "headers": [], "query_string": b""}
+                fake_req = Request(scope)
+                for m in _stuck:
+                    try:
+                        resp = await api_mission_run(fake_req, m.id)
+                        logger.warning("Auto-resumed mission %s: %s", m.id,
+                                       getattr(resp, 'body', b'')[:100])
+                    except Exception as exc:
+                        logger.warning("Failed to auto-resume mission %s: %s", m.id, exc)
+
+            import asyncio
+            asyncio.create_task(_auto_resume())
+    except Exception as exc:
+        logger.warning("Auto-resume check failed: %s", exc)
+
     yield
 
     # Stop MCP Platform Server
