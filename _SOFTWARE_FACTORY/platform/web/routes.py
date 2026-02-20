@@ -1061,6 +1061,25 @@ async def agent_delete(agent_id: str):
     return HTMLResponse("")
 
 
+@router.get("/api/agents/{agent_id}/details")
+async def agent_details_json(agent_id: str):
+    """Full agent details as JSON for modals."""
+    from ..agents.store import get_agent_store
+    a = get_agent_store().get(agent_id)
+    if not a:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    avatars_dir = Path(__file__).resolve().parent / "static" / "avatars"
+    avatar_url = f"/static/avatars/{a.id}.jpg" if (avatars_dir / f"{a.id}.jpg").exists() else ""
+    return JSONResponse({
+        "id": a.id, "name": a.name, "role": a.role, "description": a.description,
+        "tagline": a.tagline or "", "persona": a.persona or "", "motivation": a.motivation or "",
+        "avatar_url": avatar_url, "color": a.color or "#7c3aed", "icon": a.icon or "bot",
+        "skills": a.skills or [], "tools": a.tools or [], "tags": a.tags or [],
+        "permissions": a.permissions or {}, "hierarchy_rank": a.hierarchy_rank or 30,
+        "provider": a.provider or "", "model": a.model or "",
+    })
+
+
 # ── Patterns ─────────────────────────────────────────────────────
 
 @router.get("/patterns", response_class=HTMLResponse)
