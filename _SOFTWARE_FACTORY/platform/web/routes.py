@@ -5284,7 +5284,7 @@ async def mission_control_page(request: Request, mission_id: str):
     _current_phase_infer = ""
     if mission.session_id:
         session_store = get_session_store()
-        msgs = session_store.get_messages(mission.session_id)
+        msgs = session_store.get_messages(mission.session_id, limit=500)
         for m in msgs:
             # Track phase transitions from system messages
             if m.from_agent == "system" and m.content:
@@ -5965,22 +5965,33 @@ async def api_mission_run(request: Request, mission_id: str):
     agent_store = get_agent_store()
 
     async def _run_phases():
-        """Execute phases sequentially using the real pattern engine."""
+        """Execute phases sequentially using the real pattern engine.
+        
+        Error reloop: when QA or deploy fails, re-run dev→CI/CD→QA with
+        error feedback injected (max 2 reloops to avoid infinite loops).
+        """
         workspace = mission.workspace_path or ""
         phases_done = 0
         phases_failed = 0
         phase_summaries = []  # accumulated phase results for cross-phase context
+        reloop_count = 0
+        MAX_RELOOPS = 2
+        reloop_errors = []  # accumulated error context across reloops
 
-        for i, phase in enumerate(mission.phases):
+        # Use index-based iteration to allow backtracking
+        i = 0
+        while i < len(mission.phases):
+            phase = mission.phases[i]
             wf_phase = wf.phases[i] if i < len(wf.phases) else None
             if not wf_phase:
+                i += 1
                 continue
 
             # Skip already-completed phases (for resume/fast-forward)
             if phase.status in (PhaseStatus.DONE, PhaseStatus.SKIPPED):
-                phases_done += 1
                 if phase.summary:
                     phase_summaries.append(f"## {wf_phase.name}\n{phase.summary}")
+                i += 1
                 continue
 
             cfg = wf_phase.config or {}
@@ -6048,7 +6059,7 @@ async def api_mission_run(request: Request, mission_id: str):
             # Snapshot message count before phase starts (for summary extraction)
             from ..sessions.store import get_session_store as _get_ss
             _ss_pre = _get_ss()
-            _pre_phase_msg_count = len(_ss_pre.get_messages(session_id))
+            _pre_phase_msg_count = len(_ss_pre.get_messages(session_id, limit=1000))
 
             # Update phase status
             phase.status = PhaseStatus.RUNNING
@@ -6341,7 +6352,7 @@ async def api_mission_run(request: Request, mission_id: str):
                     from ..sessions.store import get_session_store
                     from ..llm.client import get_llm_client, LLMMessage
                     ss = get_session_store()
-                    phase_msgs = ss.get_messages(session_id)
+                    phase_msgs = ss.get_messages(session_id, limit=1000)
                     convo = []
                     for m in phase_msgs[_pre_phase_msg_count:]:
                         txt = (getattr(m, 'content', '') or '').strip()
@@ -6421,9 +6432,9 @@ async def api_mission_run(request: Request, mission_id: str):
                     await asyncio.sleep(0.8)
                 else:
                     # Phase failed — check if it's a blocking phase
-                    # Dev sprints and CI/CD can fail without killing the entire mission
-                    # Only strategic gates (committees, deploy-prod) are mission-critical
-                    blocking = pattern_type in ("human-in-the-loop",) or "deploy" in phase.phase_id
+                    # Only strategic gates (human-in-the-loop committees) are mission-critical
+                    # QA/deploy failures trigger reloop back to dev (handled above)
+                    blocking = pattern_type in ("human-in-the-loop",) and "deploy" not in phase.phase_id
                     short_err = phase_error[:200] if phase_error else "erreur inconnue"
                     if blocking:
                         cdp_msg = f"Phase «{wf_phase.name}» échouée ({short_err}). Epic arrêtée — corrigez puis relancez via le bouton Réinitialiser."
@@ -6436,7 +6447,7 @@ async def api_mission_run(request: Request, mission_id: str):
                         try:
                             from ..sessions.store import get_session_store
                             ss = get_session_store()
-                            phase_msgs = ss.get_messages(session_id)
+                            phase_msgs = ss.get_messages(session_id, limit=1000)
                             convo = []
                             for pm in phase_msgs[_pre_phase_msg_count:]:
                                 txt = (getattr(pm, 'content', '') or '').strip()
@@ -6499,13 +6510,80 @@ async def api_mission_run(request: Request, mission_id: str):
                         logger.warning("Post-phase hooks timeout/error for %s: %s", phase.phase_id, hook_err)
                 asyncio.create_task(_safe_hooks())
 
-        # Mission complete — real summary
+            # ── Error Reloop: QA/deploy failure → re-run dev→CI/CD→QA ──
+            # When a downstream phase (QA, deploy, TMA) fails, loop back to
+            # dev-sprint so agents can fix the errors before retrying.
+            if not phase_success and reloop_count < MAX_RELOOPS:
+                qa_or_deploy = any(k in phase.phase_id for k in ("qa", "deploy", "tma"))
+                if qa_or_deploy:
+                    reloop_count += 1
+                    reloop_errors.append(f"[Reloop {reloop_count}] Phase «{wf_phase.name}» failed: {phase_error[:300]}")
+                    # Find dev-sprint phase index
+                    dev_idx = None
+                    for j, wp_j in enumerate(wf.phases):
+                        pk_j = wp_j.name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
+                        if "sprint" in pk_j or "dev" in pk_j:
+                            dev_idx = j
+                            break
+                    if dev_idx is not None and dev_idx < i:
+                        # CDP announces reloop
+                        reloop_msg = (
+                            f"Reloop {reloop_count}/{MAX_RELOOPS} — Phase «{wf_phase.name}» échouée. "
+                            f"Erreur: {phase_error[:200]}. "
+                            f"Retour au sprint de développement pour correction…"
+                        )
+                        await _push_sse(session_id, {
+                            "type": "message",
+                            "from_agent": "chef_de_programme",
+                            "from_name": "Alexandre Moreau",
+                            "from_role": "Chef de Programme",
+                            "from_avatar": "/static/avatars/chef_de_programme.jpg",
+                            "content": reloop_msg,
+                            "phase_id": phase.phase_id,
+                            "msg_type": "text",
+                        })
+                        await asyncio.sleep(1)
+                        # Reset dev-sprint and subsequent phases for re-execution
+                        reset_pids = []
+                        for k in range(dev_idx, len(mission.phases)):
+                            mission.phases[k].status = PhaseStatus.PENDING
+                            mission.phases[k].summary = None
+                            mission.phases[k].started_at = None
+                            mission.phases[k].completed_at = None
+                            reset_pids.append(mission.phases[k].phase_id)
+                        run_store.update(mission)
+                        # Send reloop SSE event to reset frontend
+                        await _push_sse(session_id, {
+                            "type": "reloop",
+                            "mission_id": mission.id,
+                            "reloop_count": reloop_count,
+                            "max_reloops": MAX_RELOOPS,
+                            "failed_phase": phase.phase_id,
+                            "target_phase": mission.phases[dev_idx].phase_id,
+                            "reset_phases": reset_pids,
+                            "error": phase_error[:200],
+                        })
+                        # Inject error context for dev agents
+                        error_feedback = "\n".join(reloop_errors)
+                        prev_context += f"\n\n--- RELOOP FEEDBACK (erreurs à corriger) ---\n{error_feedback}\n"
+                        # Jump back to dev-sprint
+                        i = dev_idx
+                        continue
+
+            i += 1
+
+        # Mission complete — count from actual phase statuses
+        phases_done = sum(1 for p in mission.phases if p.status == PhaseStatus.DONE)
+        phases_failed = sum(1 for p in mission.phases if p.status == PhaseStatus.FAILED)
+        total = phases_done + phases_failed
         if phases_failed == 0:
             mission.status = MissionStatus.COMPLETED
-            final_msg = f"Epic terminée avec succès — {phases_done}/{phases_done + phases_failed} phases réussies."
+            reloop_info = f" ({reloop_count} reloop{'s' if reloop_count > 1 else ''})" if reloop_count > 0 else ""
+            final_msg = f"Epic terminée avec succès — {phases_done}/{total} phases réussies{reloop_info}."
         else:
             mission.status = MissionStatus.COMPLETED if phases_done > 0 else MissionStatus.FAILED
-            final_msg = f"Epic terminée — {phases_done} réussies, {phases_failed} échouées sur {phases_done + phases_failed} phases."
+            reloop_info = f" ({reloop_count} reloop{'s' if reloop_count > 1 else ''})" if reloop_count > 0 else ""
+            final_msg = f"Epic terminée — {phases_done} réussies, {phases_failed} échouées sur {total} phases{reloop_info}."
         run_store.update(mission)
         await _push_sse(session_id, {
             "type": "message",
@@ -6558,9 +6636,7 @@ async def _auto_retrospective(mission, session_id: str, phase_summaries: list, p
     import json as _json
 
     ss = get_session_store()
-    msgs = ss.get_messages(session_id)
-
-    # Build context from phase summaries + messages
+    msgs = ss.get_messages(session_id, limit=500)
     ctx_parts = [f"Epic: {mission.brief[:200]}"]
     for ps in phase_summaries[-8:]:
         ctx_parts.append(ps[:300] if isinstance(ps, str) else str(ps)[:300])

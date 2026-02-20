@@ -1793,6 +1793,14 @@ function handleSSE(d) {
         updatePhaseStatus(d.phase_id, 'failed');
         addActivity('Phase échouée', 'system');
     }
+    else if (d.type === 'phase_reset') {
+        updatePhaseStatus(d.phase_id, 'pending');
+    }
+    else if (d.type === 'reloop') {
+        addActivity(`RELOOP ${d.reloop_count}/${d.max_reloops} — Retour au dev sprint`, 'system');
+        // Reset downstream phase statuses in UI
+        (d.reset_phases || []).forEach(pid => updatePhaseStatus(pid, 'pending'));
+    }
     else if (d.type === 'mission_failed') {
         addActivity('Epic arrêtée — phase échouée', 'system');
         // Disable run button, show reset
