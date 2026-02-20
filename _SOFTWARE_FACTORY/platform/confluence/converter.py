@@ -228,6 +228,63 @@ def svg_to_confluence_attachment(svg_content: str, filename: str = "graph.svg") 
     )
 
 
+def graph_to_svg(nodes: list[dict], edges: list[dict], title: str = "") -> str:
+    """Generate SVG from workflow graph data (nodes + edges)."""
+    if not nodes:
+        return ""
+
+    # Calculate viewBox from node positions
+    xs = [n.get("x", 0) for n in nodes]
+    ys = [n.get("y", 0) for n in nodes]
+    min_x, max_x = min(xs) - 40, max(xs) + 200
+    min_y, max_y = min(ys) - 40, max(ys) + 80
+    w = max_x - min_x + 80
+    h = max_y - min_y + 80
+
+    # Build node lookup
+    node_map = {n["id"]: n for n in nodes}
+
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{min_x} {min_y} {w} {h}" '
+        f'width="{w}" height="{h}" style="font-family:sans-serif;background:#1a1128">',
+        '<defs>',
+        '<marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">',
+        '<path d="M 0 0 L 10 5 L 0 10 z" fill="#666"/></marker>',
+        '</defs>',
+    ]
+
+    if title:
+        parts.append(f'<text x="{min_x + 10}" y="{min_y + 20}" fill="#c084fc" font-size="14" font-weight="bold">{html.escape(title)}</text>')
+
+    # Draw edges
+    for edge in edges:
+        src = node_map.get(edge["from"])
+        dst = node_map.get(edge["to"])
+        if not src or not dst:
+            continue
+        x1, y1 = src["x"] + 70, src["y"] + 25
+        x2, y2 = dst["x"] + 70, dst["y"] + 25
+        color = edge.get("color", "#666")
+        label = edge.get("label", "")
+        mx, my = (x1 + x2) / 2, (y1 + y2) / 2
+        parts.append(f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{color}" stroke-width="1.5" marker-end="url(#arrow)" opacity="0.7"/>')
+        if label:
+            parts.append(f'<text x="{mx}" y="{my - 4}" fill="{color}" font-size="8" text-anchor="middle" opacity="0.9">{html.escape(label)}</text>')
+
+    # Draw nodes
+    for n in nodes:
+        x, y = n["x"], n["y"]
+        label = n.get("label", n.get("agent_id", "?"))
+        parts.append(f'<rect x="{x}" y="{y}" width="140" height="50" rx="8" fill="#251a35" stroke="#7c3aed" stroke-width="1.5"/>')
+        parts.append(f'<text x="{x + 70}" y="{y + 20}" fill="#e2e8f0" font-size="10" text-anchor="middle" font-weight="bold">{html.escape(label)}</text>')
+        agent_id = n.get("agent_id", "")
+        if agent_id:
+            parts.append(f'<text x="{x + 70}" y="{y + 35}" fill="#a78bfa" font-size="7" text-anchor="middle">{html.escape(agent_id)}</text>')
+
+    parts.append('</svg>')
+    return "\n".join(parts)
+
+
 def mermaid_to_confluence(mermaid_code: str) -> str:
     """Convert mermaid diagram to Confluence code block (viewable with Mermaid plugin)."""
     return _code_macro("mermaid", mermaid_code)

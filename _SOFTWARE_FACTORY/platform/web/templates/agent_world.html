@@ -136,14 +136,14 @@ const AGENT_DATA = {{ agents_json|safe }};
 
 // ── Zone Definitions ──
 const ZONES = [
-    { id:'board',   name:'Board Room',    x:-18, z:-14, w:14, h:8,  color:0xd4a017, floorColor:0x1a1508, roles:['dsi','cto','cpo','strat-cpo','strat-cto','lean_portfolio_manager','strat-portfolio'] },
-    { id:'meeting', name:'Meeting Room',  x:-18, z:-3,  w:14, h:10, color:0x7c3aed, floorColor:0x12091e, roles:['scrum_master','chef_projet','agile_coach','chef_de_programme','product_manager','epic_owner','solution_manager'] },
-    { id:'dev',     name:'Dev Zone',      x:-18, z:10,  w:14, h:14, color:0x3b82f6, floorColor:0x0a1020, roles:['lead_dev','dev_backend','dev_frontend','dev_mobile','dev_fullstack','worker','ml_engineer','data_engineer','plat-lead-dev','plat-dev-backend','plat-dev-frontend','plat-dev-agents','plat-dev-patterns','plat-dev-infra'] },
-    { id:'arch',    name:'Architecture',  x:0,   z:-14, w:14, h:8,  color:0x6366f1, floorColor:0x0e0a1e, roles:['enterprise_architect','solution_architect','cloud_architect','architecte','brain'] },
-    { id:'qa',      name:'QA Lab',        x:0,   z:-3,  w:14, h:10, color:0x22c55e, floorColor:0x081510, roles:['qa_lead','test_automation','test_manager','accessibility_expert','tester','performance_engineer','plat-tma-qa'] },
-    { id:'devops',  name:'Server Room',   x:0,   z:10,  w:14, h:14, color:0x06b6d4, floorColor:0x081518, roles:['devops','sre','dba','pipeline_engineer','devsecops','plat-dev-infra'] },
-    { id:'product', name:'Product Corner',x:18,  z:-14, w:14, h:8,  color:0xf97316, floorColor:0x1a1008, roles:['product','product_manager','epic_owner','tech_writer','pmo'] },
-    { id:'chill',   name:'Chill Zone',    x:18,  z:0,   w:14, h:12, color:0x84cc16, floorColor:0x101508, roles:[] },
+    { id:'board',   name:'Board Room',    x:-18, z:-14, w:14, h:8,  color:0xd4a017, floorColor:0x2a2010, roles:['dsi','cto','cpo','strat-cpo','strat-cto','lean_portfolio_manager','strat-portfolio'] },
+    { id:'meeting', name:'Meeting Room',  x:-18, z:-3,  w:14, h:10, color:0x7c3aed, floorColor:0x201535, roles:['scrum_master','chef_projet','agile_coach','chef_de_programme','product_manager','epic_owner','solution_manager'] },
+    { id:'dev',     name:'Dev Zone',      x:-18, z:10,  w:14, h:14, color:0x3b82f6, floorColor:0x152040, roles:['lead_dev','dev_backend','dev_frontend','dev_mobile','dev_fullstack','worker','ml_engineer','data_engineer','plat-lead-dev','plat-dev-backend','plat-dev-frontend','plat-dev-agents','plat-dev-patterns','plat-dev-infra'] },
+    { id:'arch',    name:'Architecture',  x:0,   z:-14, w:14, h:8,  color:0x6366f1, floorColor:0x1a1535, roles:['enterprise_architect','solution_architect','cloud_architect','architecte','brain'] },
+    { id:'qa',      name:'QA Lab',        x:0,   z:-3,  w:14, h:10, color:0x22c55e, floorColor:0x102518, roles:['qa_lead','test_automation','test_manager','accessibility_expert','tester','performance_engineer','plat-tma-qa'] },
+    { id:'devops',  name:'Server Room',   x:0,   z:10,  w:14, h:14, color:0x06b6d4, floorColor:0x102528, roles:['devops','sre','dba','pipeline_engineer','devsecops','plat-dev-infra'] },
+    { id:'product', name:'Product Corner',x:18,  z:-14, w:14, h:8,  color:0xf97316, floorColor:0x2a1a10, roles:['product','product_manager','epic_owner','tech_writer','pmo'] },
+    { id:'chill',   name:'Chill Zone',    x:18,  z:0,   w:14, h:12, color:0x84cc16, floorColor:0x182510, roles:[] },
 ];
 
 const STATUS_COLORS = {
@@ -178,8 +178,8 @@ function init() {
 
     // Scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0812);
-    scene.fog = new THREE.FogExp2(0x0a0812, 0.012);
+    scene.background = new THREE.Color(0x151020);
+    scene.fog = new THREE.FogExp2(0x151020, 0.006);
 
     // Camera — isometric-ish
     camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 0.1, 200);
@@ -227,6 +227,7 @@ function init() {
     buildZoneLabelsUI();
     setupInteraction();
     connectSSE();
+    startAutonomousLife();
 
     setLoadProgress(100);
     setTimeout(() => loadScreen.classList.add('hidden'), 400);
@@ -243,12 +244,12 @@ function init() {
 // LIGHTING
 // ═══════════════════════════════════════════════════════
 function buildLighting() {
-    // Ambient — soft purple tint
-    const ambient = new THREE.AmbientLight(0x2d1b4e, 0.6);
+    // Ambient — brighter purple-tinted fill
+    const ambient = new THREE.AmbientLight(0x6040a0, 1.0);
     scene.add(ambient);
 
-    // Main directional — warm from top-right
-    const dir = new THREE.DirectionalLight(0xffeedd, 0.8);
+    // Main directional — bright warm from top-right
+    const dir = new THREE.DirectionalLight(0xffeedd, 1.2);
     dir.position.set(20, 30, 15);
     dir.castShadow = true;
     dir.shadow.mapSize.set(2048, 2048);
@@ -261,14 +262,19 @@ function buildLighting() {
     dir.shadow.bias = -0.001;
     scene.add(dir);
 
+    // Secondary fill light from opposite side
+    const fill = new THREE.DirectionalLight(0xaabbff, 0.5);
+    fill.position.set(-15, 20, -10);
+    scene.add(fill);
+
     // Hemisphere — sky/ground
-    const hemi = new THREE.HemisphereLight(0x7c3aed, 0x1a1025, 0.3);
+    const hemi = new THREE.HemisphereLight(0x9080d0, 0x302540, 0.6);
     scene.add(hemi);
 
-    // Zone point lights
+    // Zone point lights — brighter
     for (const z of ZONES) {
-        const pl = new THREE.PointLight(z.color, 0.4, 20, 2);
-        pl.position.set(z.x, 6, z.z);
+        const pl = new THREE.PointLight(z.color, 0.8, 25, 1.5);
+        pl.position.set(z.x, 5, z.z);
         scene.add(pl);
     }
 }
@@ -280,9 +286,9 @@ function buildFloor() {
     // Main floor
     const floorGeo = new THREE.PlaneGeometry(80, 60);
     const floorMat = new THREE.MeshStandardMaterial({
-        color: 0x0f0d1a,
-        roughness: 0.8,
-        metalness: 0.2,
+        color: 0x1e1830,
+        roughness: 0.7,
+        metalness: 0.15,
     });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
@@ -291,7 +297,7 @@ function buildFloor() {
     scene.add(floor);
 
     // Grid lines
-    const gridHelper = new THREE.GridHelper(80, 40, 0x1a1530, 0x131025);
+    const gridHelper = new THREE.GridHelper(80, 40, 0x302550, 0x251a40);
     gridHelper.position.y = 0.01;
     scene.add(gridHelper);
 }
@@ -318,7 +324,7 @@ function buildZones() {
 
         // Border outline
         const border = new THREE.EdgesGeometry(new THREE.PlaneGeometry(z.w, z.h));
-        const borderMat = new THREE.LineBasicMaterial({ color: z.color, transparent: true, opacity: 0.25 });
+        const borderMat = new THREE.LineBasicMaterial({ color: z.color, transparent: true, opacity: 0.5 });
         const borderLine = new THREE.LineSegments(border, borderMat);
         borderLine.rotation.x = -Math.PI / 2;
         borderLine.position.set(z.x, 0.03, z.z);

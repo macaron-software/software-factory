@@ -25,7 +25,7 @@ class MissionDef:
     description: str = ""
     goal: str = ""                        # acceptance criteria
     status: str = "planning"              # planning|active|completed|failed|blocked
-    type: str = "feature"                 # feature|epic|bug|debt|migration|security
+    type: str = "feature"                 # feature|epic|bug|debt|migration|security|hacking
     workflow_id: Optional[str] = None     # safe-veligo, safe-ppz...
     parent_mission_id: Optional[str] = None  # corrective mission → parent
     wsjf_score: float = 0.0

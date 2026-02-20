@@ -77,7 +77,7 @@ class ConfluenceSyncEngine:
         return body
 
     def _build_qa_content(self, mission: MissionDef, session_id: str = None) -> str:
-        """Build QA tab content (test results)."""
+        """Build QA tab content (test results + screenshots)."""
         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
         body = converter.page_header("QA — Tests & Qualité", mission.name,
                                       mission.project_id, now)
@@ -88,6 +88,9 @@ class ConfluenceSyncEngine:
             body += "<h2>Résultats QA</h2>"
             body += converter.messages_to_confluence(messages, "Discussion QA")
 
+        # Screenshots
+        body += self._build_screenshots_section(mission)
+
         return body
 
     def _build_archi_content(self, mission: MissionDef) -> str:
@@ -95,6 +98,9 @@ class ConfluenceSyncEngine:
         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
         body = converter.page_header("Architecture", mission.name,
                                       mission.project_id, now)
+
+        # Workflow graph in architecture too
+        body += self._build_workflow_graph_section(mission)
 
         messages = self._get_phase_messages(mission.id, "archi")
         if messages:
@@ -122,7 +128,7 @@ class ConfluenceSyncEngine:
         return body
 
     def _build_projet_content(self, mission: MissionDef) -> str:
-        """Build Project tab content (overview, stats)."""
+        """Build Project tab content (overview, stats, workflow graph)."""
         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
         body = converter.page_header("Projet — Vue d'ensemble", mission.name,
                                       mission.project_id, now)
@@ -144,12 +150,105 @@ class ConfluenceSyncEngine:
             body += "<h2>Objectif</h2>"
             body += converter.md_to_confluence(mission.goal)
 
+        # Workflow graph SVG
+        body += self._build_workflow_graph_section(mission)
+
         # Phase status from mission runs
         body += self._get_phase_summary(mission.id)
 
         return body
 
     # ── Helpers ────────────────────────────────────────────────
+
+    def _build_workflow_graph_section(self, mission: MissionDef) -> str:
+        """Build SVG graph from workflow config and return XHTML with inline SVG."""
+        if not mission.workflow_id:
+            return ""
+        try:
+            from ..workflows.store import get_workflow_store
+            ws = get_workflow_store()
+            wf = ws.get(mission.workflow_id)
+            if not wf:
+                return ""
+            import json as _json
+            cfg = _json.loads(wf.config) if isinstance(wf.config, str) else (wf.config or {})
+            graph = cfg.get("graph", {})
+            nodes = graph.get("nodes", [])
+            edges = graph.get("edges", [])
+            if not nodes:
+                return ""
+
+            svg = converter.graph_to_svg(nodes, edges, title=wf.name)
+            # Inline SVG in Confluence via HTML macro
+            return (
+                f'<h2>Workflow — Graphe des agents</h2>'
+                f'<ac:structured-macro ac:name="html">'
+                f'<ac:plain-text-body><![CDATA[{svg}]]></ac:plain-text-body>'
+                f'</ac:structured-macro>'
+            )
+        except Exception as e:
+            log.warning("Graph generation failed: %s", e)
+            return ""
+
+    def _build_screenshots_section(self, mission: MissionDef) -> str:
+        """Find screenshots in workspace and reference them."""
+        from pathlib import Path
+        from ..config import FACTORY_ROOT
+
+        db = get_db()
+        try:
+            runs = db.execute(
+                "SELECT workspace_path FROM mission_runs WHERE id = ? ORDER BY created_at DESC LIMIT 1",
+                (mission.id,)
+            ).fetchall()
+            if not runs or not runs[0]["workspace_path"]:
+                return ""
+            ws_path = Path(runs[0]["workspace_path"])
+        finally:
+            db.close()
+
+        screenshots_dir = ws_path / "screenshots"
+        if not screenshots_dir.exists():
+            return ""
+
+        images = list(screenshots_dir.glob("*.png")) + list(screenshots_dir.glob("*.jpg"))
+        if not images:
+            return ""
+
+        body = "<h2>Captures d'écran</h2>"
+        for img in sorted(images)[:10]:
+            body += f"<p><strong>{img.name}</strong></p>"
+            body += converter.svg_to_confluence_attachment(
+                "", filename=img.name
+            )
+        return body
+
+    def _upload_screenshots(self, mission: MissionDef, page_id: str):
+        """Upload workspace screenshots as attachments."""
+        from pathlib import Path
+
+        db = get_db()
+        try:
+            runs = db.execute(
+                "SELECT workspace_path FROM mission_runs WHERE id = ? ORDER BY created_at DESC LIMIT 1",
+                (mission.id,)
+            ).fetchall()
+            if not runs or not runs[0]["workspace_path"]:
+                return
+            ws_path = Path(runs[0]["workspace_path"])
+        finally:
+            db.close()
+
+        screenshots_dir = ws_path / "screenshots"
+        if not screenshots_dir.exists():
+            return
+
+        for img in sorted(screenshots_dir.glob("*.png"))[:10]:
+            try:
+                data = img.read_bytes()
+                self.client.upload_attachment(page_id, img.name, data, "image/png")
+            except Exception as e:
+                log.warning("Failed to upload screenshot %s: %s", img.name, e)
 
     def _get_phase_messages(self, mission_id: str, tab_keyword: str) -> list[dict]:
         """Get messages relevant to a tab from mission sessions."""
@@ -321,6 +420,10 @@ class ConfluenceSyncEngine:
         # Create or update
         page = self.client.create_or_update(title, body, epic_page_id)
         page_id = page["id"]
+
+        # Upload screenshots as attachments for QA tab
+        if tab == "qa":
+            self._upload_screenshots(mission, page_id)
 
         # Track in DB
         self._save_page_ref(mission_id, tab, page_id)
