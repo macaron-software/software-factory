@@ -122,9 +122,13 @@ class WorkflowStore:
         return c
 
     def seed_builtins(self):
-        """Seed pre-built workflow templates."""
+        """Seed pre-built workflow templates (upserts missing ones)."""
+        existing_ids = set()
         if self.count() > 0:
-            return
+            conn = get_db()
+            rows = conn.execute("SELECT id FROM workflows WHERE is_builtin=1").fetchall()
+            existing_ids = {r["id"] for r in rows}
+            conn.close()
         builtins = [
             WorkflowDef(
                 id="sf-pipeline", name="Software Factory Pipeline",
@@ -1468,7 +1472,8 @@ class WorkflowStore:
         )
 
         for w in builtins:
-            self.create(w)
+            if w.id not in existing_ids:
+                self.create(w)
 
     def _row_to_wf(self, row) -> WorkflowDef:
         phases_data = json.loads(row["phases_json"] or "[]")
