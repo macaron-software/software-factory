@@ -6084,6 +6084,58 @@ async def mission_control_page(request: Request, mission_id: str):
         wiki_memories.append({"category": "lesson", "value": lesson[:200] if isinstance(lesson, str) else str(lesson)[:200]})
     wiki_memories = wiki_memories[:20]
 
+    # ── Tab profiles by workflow type ──
+    wf_id = mission.workflow_id or ""
+    if wf_id == "security-hacking":
+        tab_profile = [
+            {"id": "phases", "label": "Phases", "icon": "list"},
+            {"id": "vulns", "label": "Vulnerabilites", "icon": "alert-triangle",
+             "agent_id": "threat-analyst", "fallback": "pentester-lead"},
+            {"id": "remediation", "label": "Remediation", "icon": "tool",
+             "agent_id": "security-dev-lead", "fallback": "lead_dev"},
+            {"id": "compliance", "label": "Compliance", "icon": "clipboard",
+             "agent_id": "compliance_officer", "fallback": "ciso"},
+            {"id": "ciso", "label": "CISO Dashboard", "icon": "shield",
+             "agent_id": "ciso", "fallback": "pentester-lead"},
+            {"id": "wiki", "label": "Rapport", "icon": "book-open",
+             "agent_id": "tech_writer", "fallback": "pentester-lead"},
+        ]
+    elif wf_id == "rse-compliance":
+        tab_profile = [
+            {"id": "phases", "label": "Phases", "icon": "list"},
+            {"id": "rgpd", "label": "RGPD", "icon": "lock",
+             "agent_id": "rse-dpo", "fallback": "rse-manager"},
+            {"id": "green-it", "label": "Green IT", "icon": "cpu",
+             "agent_id": "rse-nr", "fallback": "rse-manager"},
+            {"id": "a11y", "label": "Accessibilite", "icon": "eye",
+             "agent_id": "rse-a11y", "fallback": "rse-manager"},
+            {"id": "ethique", "label": "Ethique IA", "icon": "zap",
+             "agent_id": "rse-ethique-ia", "fallback": "rse-manager"},
+            {"id": "wiki", "label": "Synthese", "icon": "book-open",
+             "agent_id": "rse-manager", "fallback": "tech_writer"},
+        ]
+    else:
+        tab_profile = [
+            {"id": "phases", "label": "Phases", "icon": "list"},
+            {"id": "dev", "label": "Dev", "icon": "git-branch",
+             "agent_id": "lead_dev", "fallback": "dev_backend"},
+            {"id": "po", "label": "PO", "icon": "clipboard",
+             "agent_id": "product_owner", "fallback": "chef_projet"},
+            {"id": "qa", "label": "QA", "icon": "check",
+             "agent_id": "qa_lead", "fallback": "test_manager"},
+            {"id": "archi", "label": "Archi", "icon": "layers",
+             "agent_id": "architecte", "fallback": "lead_dev"},
+            {"id": "wiki", "label": "Wiki", "icon": "book-open",
+             "agent_id": "tech_writer", "fallback": "lead_dev"},
+            {"id": "projet", "label": "Projet", "icon": "code"},
+        ]
+
+    # Resolve agent for each tab
+    for tp in tab_profile:
+        aid = tp.get("agent_id", "")
+        ag = agent_map.get(aid) or agent_map.get(tp.get("fallback", "")) or {}
+        tp["agent"] = ag
+
     return _templates(request).TemplateResponse("mission_control.html", {
         "request": request,
         "page_title": f"Epic Control — {mission.workflow_name}",
@@ -6126,6 +6178,8 @@ async def mission_control_page(request: Request, mission_id: str):
         "wiki_pages": wiki_pages,
         "wiki_memories": wiki_memories,
         "orchestrator_id": mission.cdp_agent_id or "chef_de_programme",
+        "tab_profile": tab_profile,
+        "workflow_type": wf_id,
     })
 
 
