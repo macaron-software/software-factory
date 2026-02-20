@@ -100,6 +100,11 @@ class AgentPermissions(BaseModel):
     can_approve: bool = False
     escalation_to: Optional[str] = None
     require_human_approval_for: list[str] = Field(default_factory=list)
+    # File access control
+    allowed_paths: list[str] = Field(default_factory=list)   # glob patterns, empty = project_path only
+    denied_paths: list[str] = Field(default_factory=list)    # explicit denials (e.g. "*.env", "secrets/")
+    can_write: bool = True       # False = read-only agent (e.g. security auditor)
+    can_execute: bool = True     # False = no build/test/shell execution
 
 
 class AgentCommunication(BaseModel):

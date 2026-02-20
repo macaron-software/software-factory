@@ -1530,6 +1530,27 @@ class AgentExecutor:
                 elif not os.path.isabs(path):
                     args["path"] = os.path.join(ctx.project_path, path)
 
+        # ── Permission enforcement ──
+        try:
+            from .permissions import get_permission_guard
+            perms_dict = None
+            if hasattr(ctx.agent, "permissions"):
+                p = ctx.agent.permissions
+                perms_dict = p if isinstance(p, dict) else (p.model_dump() if hasattr(p, "model_dump") else {})
+            denied = get_permission_guard().check(
+                agent_id=ctx.agent.id,
+                tool_name=name,
+                args=args,
+                allowed_tools=ctx.allowed_tools,
+                project_path=ctx.project_path or "",
+                permissions=perms_dict,
+                session_id=ctx.session_id,
+            )
+            if denied:
+                return denied
+        except Exception as e:
+            logger.debug("Permission check skipped: %s", e)
+
         # Handle built-in tools that don't go through registry
         if name == "list_files":
             return await self._tool_list_files(args)
