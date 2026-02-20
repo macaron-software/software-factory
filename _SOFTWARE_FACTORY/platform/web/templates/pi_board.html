@@ -109,14 +109,7 @@
 <div id="newMissionModal" class="nm-overlay" onclick="if(event.target===this)this.style.display='none'">
     <form class="nm-form" id="newMissionForm">
         <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> Nouvelle Mission</h3>
-        <div class="nm-field">
-            <label>Projet</label>
-            <select name="project_id" required>
-                {% for p in projects %}
-                <option value="{{ p.id }}">{{ p.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
+        <input type="hidden" name="project_id" value="software-factory">
         <div class="nm-field">
             <label>Workflow</label>
             <select name="workflow_id" id="wfSelect" required onchange="showWfDesc()">
