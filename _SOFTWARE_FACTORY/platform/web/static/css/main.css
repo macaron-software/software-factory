@@ -80,6 +80,41 @@
     --sidebar-width: 56px;
 }
 
+/* ── Light theme overrides ── */
+[data-theme="light"] {
+    --bg-primary: #f8f6fb;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f0ecf5;
+    --border: #d8d0e5;
+    --text-primary: #1a1225;
+    --text-secondary: #5c5470;
+    --text-on-accent: #ffffff;
+    --purple: #7c3aed;
+    --purple-light: #a78bfa;
+    --purple-deep: #5b21b6;
+    --blue: #4f46e5;
+    --blue-bright: #2563eb;
+    --blue-light: #3b82f6;
+    --green: #16a34a;
+    --green-light: #22c55e;
+    --green-deep: #15803d;
+    --red: #dc2626;
+    --red-light: #ef4444;
+    --red-deep: #b91c1c;
+    --yellow: #ca8a04;
+    --yellow-light: #eab308;
+    --yellow-deep: #a16207;
+    --pink: #ec4899;
+    --cyan: #0891b2;
+    --gray: #6b7280;
+    --gray-light: #9ca3af;
+    --gray-muted: #6b7280;
+    --accent: #ea580c;
+    --accent-hover: #f97316;
+    --user-bubble: #dcfce7;
+    --user-bubble-border: #86efac;
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
@@ -1431,3 +1466,10 @@ body {
         box-shadow: -4px 0 20px rgba(0,0,0,0.3);
     }
 }
+
+/* ── Light theme refinements ── */
+[data-theme="light"] .sidebar { box-shadow: 1px 0 4px rgba(0,0,0,0.06); }
+[data-theme="light"] .topbar { box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+[data-theme="light"] .card, [data-theme="light"] .ds-token, [data-theme="light"] .ds-showcase { box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+[data-theme="light"] .sidebar .nav-links a.active { background: var(--purple); color: #fff; }
+[data-theme="light"] .sidebar .nav-links a:hover { background: var(--bg-tertiary); }
