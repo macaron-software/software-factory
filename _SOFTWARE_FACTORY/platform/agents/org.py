@@ -159,6 +159,9 @@ class OrgStore:
 
     def get_org_tree(self) -> list[dict]:
         """Return full org tree: portfolios → arts → teams with agents (enriched)."""
+        from pathlib import Path
+        avatars_dir = Path(__file__).resolve().parent.parent / "web" / "static" / "avatars"
+
         # Pre-load all agents for enrichment
         agents_map: dict[str, dict] = {}
         db = get_db()
@@ -171,6 +174,13 @@ class OrgStore:
         def _agent_display(agent_id: str) -> str:
             a = agents_map.get(agent_id)
             return a["name"] if a else agent_id
+
+        def _resolve_avatar(agent_id: str, initials: str) -> str:
+            """Resolve avatar to .jpg photo URL if available, else return initials."""
+            jpg = avatars_dir / f"{agent_id}.jpg"
+            if jpg.exists():
+                return f"/static/avatars/{agent_id}.jpg"
+            return initials
 
         tree = []
         for portfolio in self.list_portfolios():
@@ -192,7 +202,7 @@ class OrgStore:
                     "children": [],
                 }
                 for team in self.list_teams(art.id):
-                    # Enrich each member with full agent data
+                    # Enrich each member with full agent data + resolved avatar
                     enriched = []
                     for m in team.members:
                         aid = m.get("agent_id", "")
@@ -201,7 +211,7 @@ class OrgStore:
                             "agent_id": aid,
                             "role": m.get("role", "member"),
                             "name": agent.get("name", m.get("name", aid)),
-                            "avatar": agent.get("avatar", ""),
+                            "avatar": _resolve_avatar(aid, agent.get("avatar", "")),
                             "tagline": agent.get("tagline", ""),
                             "color": agent.get("color", ""),
                             "icon": agent.get("icon", ""),
@@ -333,6 +343,146 @@ class OrgStore:
 
         logger.info("[Org] Seeded default org: 1 portfolio, 3 ARTs, %d teams",
                     len(platform_teams) + len(product_teams) + len(service_teams))
+
+    def seed_additional_teams(self):
+        """Seed Security, Platform Dev/TMA, and RSE teams if they don't exist yet."""
+        db = get_db()
+        try:
+            existing = {r["id"] for r in db.execute("SELECT id FROM org_teams").fetchall()}
+            existing_arts = {r["id"] for r in db.execute("SELECT id FROM org_arts").fetchall()}
+        except Exception:
+            return
+        finally:
+            db.close()
+
+        # ── ART Security Operations ──────────────────────────────
+        if "art-security" not in existing_arts:
+            self.create_art(ART(
+                id="art-security", name="ART Security Operations",
+                portfolio_id="portfolio-dsi",
+                description="Sécurité offensive, défensive et remédiation — Red/Blue/Purple teams",
+                lead_agent_id="ciso", pi_cadence_weeks=10,
+            ))
+
+        security_teams = [
+            Team(id="team-red", name="🔴 Red Team — Offensive", art_id="art-security",
+                 description="Tests d'intrusion, exploit, reconnaissance", scrum_master_id="pentester-lead",
+                 capacity=3, wip_limit=2,
+                 members=[
+                     {"agent_id": "pentester-lead", "role": "lead"},
+                     {"agent_id": "security-researcher", "role": "threat-intel"},
+                     {"agent_id": "exploit-dev", "role": "exploit"},
+                 ]),
+            Team(id="team-blue", name="🔵 Blue Team — Défense", art_id="art-security",
+                 description="Architecture sécurité, détection, réponse incidents", scrum_master_id="security-architect",
+                 capacity=5, wip_limit=3,
+                 members=[
+                     {"agent_id": "security-architect", "role": "lead"},
+                     {"agent_id": "threat-analyst", "role": "analyst"},
+                     {"agent_id": "ciso", "role": "governance"},
+                     {"agent_id": "secops-engineer", "role": "secops"},
+                     {"agent_id": "securite", "role": "security"},
+                 ]),
+            Team(id="team-purple", name="🟣 Purple Team — Remédiation", art_id="art-security",
+                 description="Correction des vulnérabilités, tests de vérification", scrum_master_id="security-dev-lead",
+                 capacity=5, wip_limit=3,
+                 members=[
+                     {"agent_id": "security-dev-lead", "role": "lead"},
+                     {"agent_id": "security-backend-dev", "role": "backend"},
+                     {"agent_id": "security-frontend-dev", "role": "frontend"},
+                     {"agent_id": "qa-security", "role": "qa"},
+                     {"agent_id": "devsecops", "role": "devops"},
+                 ]),
+            Team(id="team-security-transverse", name="Transverse Sécurité", art_id="art-security",
+                 description="Compliance, audit, gouvernance sécurité", scrum_master_id="ciso",
+                 capacity=4, wip_limit=2,
+                 members=[
+                     {"agent_id": "ciso", "role": "lead"},
+                     {"agent_id": "compliance-officer", "role": "compliance"},
+                     {"agent_id": "security-critic", "role": "review"},
+                     {"agent_id": "devsecops", "role": "devops"},
+                 ]),
+        ]
+
+        # ── Platform Dev & TMA teams (add to existing art-platform) ──
+        platform_extra = [
+            Team(id="team-platform-dev", name="Team Platform Dev", art_id="art-platform",
+                 description="Développement features plateforme agent", scrum_master_id="plat-lead-dev",
+                 capacity=6, wip_limit=4,
+                 members=[
+                     {"agent_id": "plat-lead-dev", "role": "lead"},
+                     {"agent_id": "plat-dev-agents", "role": "backend"},
+                     {"agent_id": "plat-dev-patterns", "role": "backend"},
+                     {"agent_id": "plat-dev-frontend", "role": "frontend"},
+                     {"agent_id": "plat-dev-backend", "role": "backend"},
+                     {"agent_id": "plat-dev-infra", "role": "devops"},
+                 ]),
+            Team(id="team-platform-tma", name="Team Platform TMA", art_id="art-platform",
+                 description="Maintenance et support plateforme", scrum_master_id="plat-tma-lead",
+                 capacity=5, wip_limit=3,
+                 members=[
+                     {"agent_id": "plat-tma-lead", "role": "lead"},
+                     {"agent_id": "plat-tma-dev-front", "role": "frontend"},
+                     {"agent_id": "plat-tma-dev-back", "role": "backend"},
+                     {"agent_id": "plat-tma-dev-agents", "role": "backend"},
+                     {"agent_id": "plat-tma-qa", "role": "qa"},
+                 ]),
+        ]
+
+        # ── ART RSE & Compliance ─────────────────────────────────
+        if "art-rse" not in existing_arts:
+            self.create_art(ART(
+                id="art-rse", name="ART RSE & Compliance",
+                portfolio_id="portfolio-dsi",
+                description="Responsabilité Sociétale: RGPD, accessibilité, Green IT, éthique IA, juridique",
+                lead_agent_id="rse-manager", pi_cadence_weeks=12,
+            ))
+
+        rse_teams = [
+            Team(id="team-rse-privacy", name="Privacy & Legal", art_id="art-rse",
+                 description="RGPD, droit du numérique, conformité juridique", scrum_master_id="rse-dpo",
+                 capacity=3, wip_limit=2,
+                 members=[
+                     {"agent_id": "rse-dpo", "role": "lead"},
+                     {"agent_id": "rse-juriste", "role": "legal"},
+                     {"agent_id": "compliance_officer", "role": "compliance"},
+                 ]),
+            Team(id="team-rse-green", name="Green IT & Éco-conception", art_id="art-rse",
+                 description="Numérique responsable, sobriété, RGESN", scrum_master_id="rse-nr",
+                 capacity=3, wip_limit=2,
+                 members=[
+                     {"agent_id": "rse-nr", "role": "lead"},
+                     {"agent_id": "rse-eco", "role": "architect"},
+                     {"agent_id": "performance_engineer", "role": "perf"},
+                 ]),
+            Team(id="team-rse-inclusion", name="Accessibilité & Inclusion", art_id="art-rse",
+                 description="RGAA, WCAG, diversité, inclusion numérique", scrum_master_id="rse-a11y",
+                 capacity=4, wip_limit=2,
+                 members=[
+                     {"agent_id": "rse-a11y", "role": "lead"},
+                     {"agent_id": "accessibility_expert", "role": "a11y"},
+                     {"agent_id": "rse-audit-social", "role": "social"},
+                     {"agent_id": "ux_designer", "role": "ux"},
+                 ]),
+            Team(id="team-rse-ethique", name="Éthique IA & Gouvernance", art_id="art-rse",
+                 description="AI Act, biais, explicabilité, stratégie RSE", scrum_master_id="rse-manager",
+                 capacity=3, wip_limit=2,
+                 members=[
+                     {"agent_id": "rse-manager", "role": "lead"},
+                     {"agent_id": "rse-ethique-ia", "role": "ethique"},
+                     {"agent_id": "ml_engineer", "role": "ml"},
+                 ]),
+        ]
+
+        all_new = security_teams + platform_extra + rse_teams
+        count = 0
+        for t in all_new:
+            if t.id not in existing:
+                self.create_team(t)
+                count += 1
+
+        if count:
+            logger.info("[Org] Seeded %d additional teams (Security + Platform + RSE)", count)
 
 
 # Singleton

@@ -62,6 +62,7 @@ async def lifespan(app: FastAPI):
     # Seed org tree (Portfolio → ART → Team)
     from .agents.org import get_org_store
     get_org_store().seed_default()
+    get_org_store().seed_additional_teams()
 
     # Mark orphaned "active" sessions as interrupted (no running task after restart)
     from .sessions.store import get_session_store

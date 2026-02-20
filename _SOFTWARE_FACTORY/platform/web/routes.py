@@ -275,10 +275,21 @@ async def live_session_page(request: Request, session_id: str):
 
 @router.get("/art", response_class=HTMLResponse)
 async def art_page(request: Request, tab: str = "agents"):
-    """ART — Agents + Organisation + Generator in tabs."""
+    """ART — Agile Release Trains dashboard with real teams and agents."""
+    from ..agents.org import get_org_store
+    org = get_org_store()
+    tree = org.get_org_tree()
+    portfolios = org.list_portfolios()
+    all_arts = org.list_arts()
+    all_teams = org.list_teams()
+    total_members = sum(len(t.members) for t in all_teams)
     return _templates(request).TemplateResponse("art.html", {
         "request": request, "page_title": "ART",
-        "active_tab": tab, "tab_content": "",
+        "org_tree": tree,
+        "portfolios": portfolios,
+        "total_arts": len(all_arts),
+        "total_teams": len(all_teams),
+        "total_members": total_members,
     })
 
 @router.get("/toolbox", response_class=HTMLResponse)
