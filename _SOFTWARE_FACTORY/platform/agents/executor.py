@@ -1484,6 +1484,10 @@ class AgentExecutor:
                     key = "path"
                 elif key == "project_path":
                     key = "cwd"
+                elif key == "phase_name":
+                    key = "phase_id"
+                elif key == "context":
+                    key = "brief"
                 args[key] = am.group(2)
             calls.append(_TC(
                 id=f"call_{_uuid.uuid4().hex[:12]}",
@@ -2187,7 +2191,9 @@ RULES:
             parts.append(f"Description: {agent.description}")
 
         if ctx.tools_enabled:
-            parts.append("\nYou have access to tools. Use them to read files, search code, check git status, and access project memory. Call tools when you need concrete information rather than guessing.")
+            parts.append("""
+You have access to tools via function calling. When you need to take action, call the tools directly — do NOT write tool calls as text (no [TOOL_CALL], no JSON in your response). The system handles tool execution automatically when you use function calling.
+CRITICAL: When the user asks you to DO something (lancer, fixer, chercher), USE your tools immediately. Do not just describe what you would do — actually do it.""")
         else:
             parts.append("\nYou do NOT have tools. Do NOT write [TOOL_CALL] or attempt to use tools. Focus on analysis, synthesis, and delegation to your team.")
 
