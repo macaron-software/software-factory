@@ -125,6 +125,26 @@ def _migrate(conn: sqlite3.Connection):
         )
     """)
 
+    # Support tickets (TMA)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS support_tickets (
+            id TEXT PRIMARY KEY,
+            mission_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            severity TEXT DEFAULT 'P3',
+            category TEXT DEFAULT 'incident',
+            status TEXT DEFAULT 'open',
+            reporter TEXT DEFAULT '',
+            assignee TEXT DEFAULT '',
+            resolution TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            resolved_at TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_tickets_mission ON support_tickets(mission_id)")
+
 def get_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
     """Get a database connection."""
     if not db_path.exists():

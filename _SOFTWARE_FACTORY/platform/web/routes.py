@@ -6086,6 +6086,18 @@ async def mission_control_page(request: Request, mission_id: str):
 
     # ── Tab profiles by workflow type ──
     wf_id = mission.workflow_id or ""
+    support_tickets = []
+    try:
+        from ..db.migrations import get_db
+        _tdb = get_db()
+        _ticket_rows = _tdb.execute(
+            "SELECT * FROM support_tickets WHERE mission_id=? ORDER BY "
+            "CASE severity WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END, created_at DESC",
+            (mission_id,)).fetchall()
+        support_tickets = [dict(r) for r in _ticket_rows]
+        _tdb.close()
+    except Exception:
+        pass
     if wf_id == "security-hacking":
         tab_profile = [
             {"id": "phases", "label": "Phases", "icon": "list"},
@@ -6113,6 +6125,20 @@ async def mission_control_page(request: Request, mission_id: str):
              "agent_id": "rse-ethique-ia", "fallback": "rse-manager"},
             {"id": "wiki", "label": "Synthese", "icon": "book-open",
              "agent_id": "rse-manager", "fallback": "tech_writer"},
+        ]
+    elif wf_id in ("tma-maintenance", "dsi-platform-tma"):
+        tab_profile = [
+            {"id": "phases", "label": "Phases", "icon": "list"},
+            {"id": "tickets", "label": "Tickets", "icon": "inbox",
+             "agent_id": "responsable_tma", "fallback": "plat-tma-lead"},
+            {"id": "diagnostic", "label": "Diagnostic", "icon": "search",
+             "agent_id": "dev_tma", "fallback": "plat-tma-dev-back"},
+            {"id": "correctifs", "label": "Correctifs", "icon": "git-commit",
+             "agent_id": "lead_dev", "fallback": "dev_tma"},
+            {"id": "sla", "label": "SLA", "icon": "clock",
+             "agent_id": "chef_projet", "fallback": "responsable_tma"},
+            {"id": "historique", "label": "Historique", "icon": "archive",
+             "agent_id": "responsable_tma", "fallback": "plat-tma-lead"},
         ]
     else:
         tab_profile = [
@@ -6180,6 +6206,7 @@ async def mission_control_page(request: Request, mission_id: str):
         "orchestrator_id": mission.cdp_agent_id or "chef_de_programme",
         "tab_profile": tab_profile,
         "workflow_type": wf_id,
+        "support_tickets": support_tickets,
     })
 
 
@@ -6392,7 +6419,69 @@ async def api_confluence_status(mission_id: str):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@router.post("/api/missions/{mission_id}/run")
+# ── Support Tickets API (TMA) ──
+
+@router.get("/api/missions/{mission_id}/tickets")
+async def api_list_tickets(mission_id: str, status: str = ""):
+    from ..db.migrations import get_db
+    db = get_db()
+    if status:
+        rows = db.execute(
+            "SELECT * FROM support_tickets WHERE mission_id=? AND status=? ORDER BY "
+            "CASE severity WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END, created_at DESC",
+            (mission_id, status)).fetchall()
+    else:
+        rows = db.execute(
+            "SELECT * FROM support_tickets WHERE mission_id=? ORDER BY "
+            "CASE severity WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END, created_at DESC",
+            (mission_id,)).fetchall()
+    db.close()
+    return JSONResponse([dict(r) for r in rows])
+
+
+@router.post("/api/missions/{mission_id}/tickets")
+async def api_create_ticket(request: Request, mission_id: str):
+    import uuid
+    from ..db.migrations import get_db
+    body = await request.json()
+    tid = str(uuid.uuid4())[:8]
+    db = get_db()
+    db.execute(
+        "INSERT INTO support_tickets (id, mission_id, title, description, severity, category, reporter, assignee) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (tid, mission_id, body.get("title", ""), body.get("description", ""),
+         body.get("severity", "P3"), body.get("category", "incident"),
+         body.get("reporter", ""), body.get("assignee", "")))
+    db.commit()
+    row = db.execute("SELECT * FROM support_tickets WHERE id=?", (tid,)).fetchone()
+    db.close()
+    return JSONResponse(dict(row), status_code=201)
+
+
+@router.patch("/api/missions/{mission_id}/tickets/{ticket_id}")
+async def api_update_ticket(request: Request, mission_id: str, ticket_id: str):
+    from ..db.migrations import get_db
+    body = await request.json()
+    db = get_db()
+    sets, vals = [], []
+    for field in ("status", "severity", "assignee", "resolution", "title", "description", "category"):
+        if field in body:
+            sets.append(f"{field}=?")
+            vals.append(body[field])
+    if not sets:
+        db.close()
+        return JSONResponse({"error": "No fields to update"}, status_code=400)
+    sets.append("updated_at=CURRENT_TIMESTAMP")
+    if body.get("status") in ("resolved", "closed"):
+        sets.append("resolved_at=CURRENT_TIMESTAMP")
+    vals.extend([ticket_id, mission_id])
+    db.execute(f"UPDATE support_tickets SET {','.join(sets)} WHERE id=? AND mission_id=?", vals)
+    db.commit()
+    row = db.execute("SELECT * FROM support_tickets WHERE id=?", (ticket_id,)).fetchone()
+    db.close()
+    if not row:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    return JSONResponse(dict(row))
 async def api_mission_run(request: Request, mission_id: str):
     """Drive mission execution: CDP orchestrates phases sequentially.
 

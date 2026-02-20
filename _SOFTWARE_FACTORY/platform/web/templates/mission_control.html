@@ -538,6 +538,44 @@
 .mc-rse-score-ring{width:48px;height:48px;border-radius:50%;border:4px solid var(--green);display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:800;color:var(--green);flex-shrink:0}
 .mc-rse-score-info{flex:1;font-size:0.7rem;color:var(--text-secondary);line-height:1.4}
 
+/* ====== TMA TABS ====== */
+.mc-tma-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin-bottom:0.6rem}
+.mc-tma-section h4{font-size:0.78rem;color:var(--text-primary);margin:0 0 0.5rem;font-weight:700;display:flex;align-items:center;gap:0.35rem}
+.mc-tma-section h4 svg{width:14px;height:14px}
+.mc-tma-ticket{display:flex;align-items:center;gap:0.5rem;padding:0.45rem 0.5rem;background:var(--bg-tertiary);border-radius:6px;margin-bottom:0.35rem;border-left:3px solid var(--border);cursor:pointer;transition:background .15s}
+.mc-tma-ticket:hover{background:var(--bg-primary)}
+.mc-tma-ticket[data-sev="P0"]{border-left-color:#ef4444}
+.mc-tma-ticket[data-sev="P1"]{border-left-color:#f59e0b}
+.mc-tma-ticket[data-sev="P2"]{border-left-color:#eab308}
+.mc-tma-ticket[data-sev="P3"]{border-left-color:#3b82f6}
+.mc-tma-ticket[data-sev="P4"]{border-left-color:#6b7280}
+.mc-tma-sev{font-size:0.6rem;font-weight:800;padding:0.1rem 0.35rem;border-radius:4px;flex-shrink:0;min-width:22px;text-align:center}
+.mc-tma-sev[data-sev="P0"]{background:#ef4444;color:#fff;animation:pulse-sev 1.5s infinite}
+.mc-tma-sev[data-sev="P1"]{background:#f59e0b;color:#000}
+.mc-tma-sev[data-sev="P2"]{background:#eab308;color:#000}
+.mc-tma-sev[data-sev="P3"]{background:#3b82f6;color:#fff}
+.mc-tma-sev[data-sev="P4"]{background:#6b7280;color:#fff}
+@keyframes pulse-sev{0%,100%{opacity:1}50%{opacity:.6}}
+.mc-tma-ticket-title{flex:1;font-size:0.72rem;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mc-tma-ticket-cat{font-size:0.58rem;color:var(--purple-light);text-transform:uppercase;letter-spacing:.3px;flex-shrink:0}
+.mc-tma-ticket-status{font-size:0.58rem;padding:0.1rem 0.35rem;border-radius:4px;flex-shrink:0}
+.mc-tma-ticket-status[data-st="open"]{background:rgba(239,68,68,.15);color:#ef4444}
+.mc-tma-ticket-status[data-st="in_progress"]{background:rgba(59,130,246,.15);color:#3b82f6}
+.mc-tma-ticket-status[data-st="resolved"]{background:rgba(16,185,129,.15);color:#10b981}
+.mc-tma-ticket-status[data-st="closed"]{background:rgba(107,114,128,.15);color:#6b7280}
+.mc-tma-form{display:flex;flex-direction:column;gap:0.4rem;padding:0.6rem;background:var(--bg-tertiary);border-radius:8px;margin-bottom:0.6rem;border:1px dashed var(--border)}
+.mc-tma-form input,.mc-tma-form textarea,.mc-tma-form select{background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:0.35rem 0.5rem;font-size:0.72rem;color:var(--text-primary);font-family:inherit;resize:vertical}
+.mc-tma-form textarea{min-height:48px}
+.mc-tma-form-row{display:flex;gap:0.4rem}
+.mc-tma-form-row>*{flex:1}
+.mc-tma-form button[type="submit"]{background:var(--purple);color:#fff;border:none;border-radius:6px;padding:0.35rem 0.8rem;font-size:0.7rem;font-weight:600;cursor:pointer;align-self:flex-end;transition:background .15s;font-family:inherit}
+.mc-tma-form button[type="submit"]:hover{background:var(--purple-light)}
+.mc-tma-sla-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.5rem;margin-bottom:0.6rem}
+.mc-tma-sla-card{background:var(--bg-tertiary);border-radius:8px;padding:0.5rem;text-align:center}
+.mc-tma-sla-val{font-size:1.1rem;font-weight:800;color:var(--text-primary)}
+.mc-tma-sla-label{font-size:0.6rem;color:var(--text-secondary);margin-top:0.15rem}
+.mc-tma-empty{text-align:center;padding:1.5rem;color:var(--text-secondary);font-size:0.72rem}
+
 /* ====== TAB AGENT CARD (compact) ====== */
 .mc-tab-agent{display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0.6rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;margin-bottom:0.6rem}
 .mc-tab-agent-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid var(--purple);flex-shrink:0}
@@ -1099,6 +1137,322 @@
             {% endif %}
             {% if wiki_memories %}
             <div class="mc-wiki-memories"><h4>Memoire RSE</h4>
+                {% for m in wiki_memories %}
+                <div class="mc-wiki-memory"><span class="mc-wiki-memory-cat">{{ m.category }}</span><span class="mc-wiki-memory-text">{{ m.value }}</span></div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        {% elif workflow_type in ('tma-maintenance', 'dsi-platform-tma') %}
+        {# ══════ TMA TABS ══════ #}
+
+        <!-- Tab: Tickets -->
+        <div class="mc-tab-panel" data-tab="tickets">
+            {% set tickets_agent = (tab_profile|selectattr('id','equalto','tickets')|first).agent %}
+            {% if tickets_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ tickets_agent.get('avatar_url','') }}" alt="" onerror="this.style.display='none'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ tickets_agent.get('name','') }}</div>
+                    <div class="mc-tab-agent-role">{{ tickets_agent.get('role','') }}</div>
+                    {% if tickets_agent.get('tagline') %}<div class="mc-tab-agent-tagline">{{ tickets_agent['tagline'] }}</div>{% endif %}
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ tickets_agent.get('id','') }}','{{ tickets_agent.get('name','') }}','{{ tickets_agent.get('role','') }}','{{ tickets_agent.get('avatar_url','') }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
+
+            <div class="mc-tma-form" id="tmaTicketForm">
+                <h4 style="margin:0 0 0.2rem;font-size:0.75rem;color:var(--text-primary)"><svg class="icon" style="width:14px;height:14px;vertical-align:-2px"><use href="#icon-plus-circle"/></svg> Nouveau ticket</h4>
+                <input type="text" id="tmaTicketTitle" placeholder="Titre du ticket..." required>
+                <textarea id="tmaTicketDesc" placeholder="Description, steps de reproduction..."></textarea>
+                <div class="mc-tma-form-row">
+                    <select id="tmaTicketSev">
+                        <option value="P0">P0 — Bloquant</option>
+                        <option value="P1">P1 — Critique</option>
+                        <option value="P2">P2 — Majeur</option>
+                        <option value="P3" selected>P3 — Mineur</option>
+                        <option value="P4">P4 — Cosmetic</option>
+                    </select>
+                    <select id="tmaTicketCat">
+                        <option value="incident">Incident</option>
+                        <option value="demande">Demande utilisateur</option>
+                        <option value="amelioration">Amelioration</option>
+                        <option value="dette">Dette technique</option>
+                    </select>
+                </div>
+                <button type="submit" onclick="submitTicket()"><svg class="icon" style="width:12px;height:12px"><use href="#icon-send"/></svg> Creer ticket</button>
+            </div>
+
+            <div class="mc-tma-section">
+                <h4><svg><use href="#icon-inbox"/></svg> Tickets en cours ({{ support_tickets|selectattr('status','ne','closed')|list|length }})</h4>
+                <div id="tmaTicketList">
+                    {% for t in support_tickets %}
+                    {% if t.status != 'closed' %}
+                    <div class="mc-tma-ticket" data-sev="{{ t.severity }}" data-id="{{ t.id }}" onclick="toggleTicketDetail(this)">
+                        <span class="mc-tma-sev" data-sev="{{ t.severity }}">{{ t.severity }}</span>
+                        <span class="mc-tma-ticket-title">{{ t.title }}</span>
+                        <span class="mc-tma-ticket-cat">{{ t.category }}</span>
+                        <span class="mc-tma-ticket-status" data-st="{{ t.status }}">{{ t.status | replace('_',' ') }}</span>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                    {% if not support_tickets|selectattr('status','ne','closed')|list %}
+                    <div class="mc-tma-empty"><svg class="icon" style="width:28px;height:28px;opacity:.3;display:block;margin:0 auto 0.3rem"><use href="#icon-inbox"/></svg>Aucun ticket ouvert</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if support_tickets|selectattr('status','equalto','closed')|list %}
+            <div class="mc-tma-section" style="opacity:.7">
+                <h4><svg><use href="#icon-check-circle"/></svg> Resolus ({{ support_tickets|selectattr('status','equalto','closed')|list|length }})</h4>
+                {% for t in support_tickets|selectattr('status','equalto','closed')|list %}
+                <div class="mc-tma-ticket" data-sev="{{ t.severity }}" style="opacity:.6">
+                    <span class="mc-tma-sev" data-sev="{{ t.severity }}">{{ t.severity }}</span>
+                    <span class="mc-tma-ticket-title" style="text-decoration:line-through">{{ t.title }}</span>
+                    <span class="mc-tma-ticket-status" data-st="closed">ferme</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Tab: Diagnostic -->
+        <div class="mc-tab-panel" data-tab="diagnostic">
+            {% set diag_agent = (tab_profile|selectattr('id','equalto','diagnostic')|first).agent %}
+            {% if diag_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ diag_agent.get('avatar_url','') }}" alt="" onerror="this.style.display='none'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ diag_agent.get('name','') }}</div>
+                    <div class="mc-tab-agent-role">{{ diag_agent.get('role','') }}</div>
+                    {% if diag_agent.get('tagline') %}<div class="mc-tab-agent-tagline">{{ diag_agent['tagline'] }}</div>{% endif %}
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ diag_agent.get('id','') }}','{{ diag_agent.get('name','') }}','{{ diag_agent.get('role','') }}','{{ diag_agent.get('avatar_url','') }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
+
+            <div class="mc-tma-section">
+                <h4><svg><use href="#icon-search"/></svg> Triage & Priorisation</h4>
+                <div class="mc-sec-phase-content">
+                    {% set triage_msgs = phase_messages.get('triage', []) + phase_messages.get('detection', []) %}
+                    {% if triage_msgs %}
+                    {% for msg in triage_msgs[-5:] %}
+                    <div style="margin:0.3rem 0;padding:0.4rem;background:var(--bg-tertiary);border-radius:6px;border-left:2px solid var(--purple)">
+                        <div style="font-size:0.58rem;color:var(--purple-light)">{{ msg.agent_name or msg.agent_id or '' }}</div>
+                        <div style="font-size:0.7rem;color:var(--text-secondary)">{{ msg.content[:400] | markdown | safe if msg.content else '' }}</div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="mc-tma-empty">Triage en attente</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="mc-tma-section">
+                <h4><svg><use href="#icon-crosshair"/></svg> Analyse Root Cause</h4>
+                <div class="mc-sec-phase-content">
+                    {% set diag_msgs = phase_messages.get('diagnostic', []) %}
+                    {% if diag_msgs %}
+                    {% for msg in diag_msgs[-5:] %}
+                    <div style="margin:0.3rem 0;padding:0.4rem;background:var(--bg-tertiary);border-radius:6px;border-left:2px solid #f59e0b">
+                        <div style="font-size:0.58rem;color:var(--purple-light)">{{ msg.agent_name or msg.agent_id or '' }}</div>
+                        <div style="font-size:0.7rem;color:var(--text-secondary)">{{ msg.content[:400] | markdown | safe if msg.content else '' }}</div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="mc-tma-empty">Diagnostic en cours</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Correctifs -->
+        <div class="mc-tab-panel" data-tab="correctifs">
+            {% set fix_agent = (tab_profile|selectattr('id','equalto','correctifs')|first).agent %}
+            {% if fix_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ fix_agent.get('avatar_url','') }}" alt="" onerror="this.style.display='none'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ fix_agent.get('name','') }}</div>
+                    <div class="mc-tab-agent-role">{{ fix_agent.get('role','') }}</div>
+                    {% if fix_agent.get('tagline') %}<div class="mc-tab-agent-tagline">{{ fix_agent['tagline'] }}</div>{% endif %}
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ fix_agent.get('id','') }}','{{ fix_agent.get('name','') }}','{{ fix_agent.get('role','') }}','{{ fix_agent.get('avatar_url','') }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
+
+            <div class="mc-tma-section">
+                <h4><svg><use href="#icon-git-commit"/></svg> Correctifs TDD</h4>
+                <div class="mc-sec-phase-content">
+                    {% set fix_msgs = phase_messages.get('fix', []) + phase_messages.get('fix-tdd', []) %}
+                    {% if fix_msgs %}
+                    {% for msg in fix_msgs[-5:] %}
+                    <div style="margin:0.3rem 0;padding:0.4rem;background:var(--bg-tertiary);border-radius:6px;border-left:2px solid var(--green)">
+                        <div style="font-size:0.58rem;color:var(--purple-light)">{{ msg.agent_name or msg.agent_id or '' }}</div>
+                        <div style="font-size:0.7rem;color:var(--text-secondary)">{{ msg.content[:400] | markdown | safe if msg.content else '' }}</div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="mc-tma-empty">Aucun correctif en cours</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="mc-tma-section">
+                <h4><svg><use href="#icon-check-circle"/></svg> Validation & Deploy</h4>
+                <div class="mc-sec-phase-content">
+                    {% set val_msgs = phase_messages.get('validate', []) + phase_messages.get('non-regression', []) + phase_messages.get('deploy-hotfix', []) %}
+                    {% if val_msgs %}
+                    {% for msg in val_msgs[-5:] %}
+                    <div style="margin:0.3rem 0;padding:0.4rem;background:var(--bg-tertiary);border-radius:6px;border-left:2px solid #10b981">
+                        <div style="font-size:0.58rem;color:var(--purple-light)">{{ msg.agent_name or msg.agent_id or '' }}</div>
+                        <div style="font-size:0.7rem;color:var(--text-secondary)">{{ msg.content[:400] | markdown | safe if msg.content else '' }}</div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="mc-tma-empty">Validation en attente du correctif</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: SLA -->
+        <div class="mc-tab-panel" data-tab="sla">
+            {% set sla_agent = (tab_profile|selectattr('id','equalto','sla')|first).agent %}
+            {% if sla_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ sla_agent.get('avatar_url','') }}" alt="" onerror="this.style.display='none'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ sla_agent.get('name','') }}</div>
+                    <div class="mc-tab-agent-role">{{ sla_agent.get('role','') }}</div>
+                    {% if sla_agent.get('tagline') %}<div class="mc-tab-agent-tagline">{{ sla_agent['tagline'] }}</div>{% endif %}
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ sla_agent.get('id','') }}','{{ sla_agent.get('name','') }}','{{ sla_agent.get('role','') }}','{{ sla_agent.get('avatar_url','') }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
+
+            {% set open_count = support_tickets|selectattr('status','equalto','open')|list|length %}
+            {% set progress_count = support_tickets|selectattr('status','equalto','in_progress')|list|length %}
+            {% set resolved_count = support_tickets|selectattr('status','in','resolved,closed')|list|length if support_tickets else 0 %}
+            {% set total_count = support_tickets|length %}
+            <div class="mc-tma-sla-grid">
+                <div class="mc-tma-sla-card">
+                    <div class="mc-tma-sla-val" style="color:#ef4444">{{ open_count }}</div>
+                    <div class="mc-tma-sla-label">Tickets ouverts</div>
+                </div>
+                <div class="mc-tma-sla-card">
+                    <div class="mc-tma-sla-val" style="color:#3b82f6">{{ progress_count }}</div>
+                    <div class="mc-tma-sla-label">En cours</div>
+                </div>
+                <div class="mc-tma-sla-card">
+                    <div class="mc-tma-sla-val" style="color:#10b981">{{ resolved_count }}</div>
+                    <div class="mc-tma-sla-label">Resolus</div>
+                </div>
+                <div class="mc-tma-sla-card">
+                    <div class="mc-tma-sla-val">{{ ((resolved_count / total_count * 100)|round|int if total_count > 0 else 0) }}%</div>
+                    <div class="mc-tma-sla-label">Taux resolution</div>
+                </div>
+            </div>
+
+            <div class="mc-tma-section">
+                <h4><svg><use href="#icon-bar-chart-2"/></svg> Repartition par severite</h4>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+                    {% for sev in ['P0','P1','P2','P3','P4'] %}
+                    {% set sev_count = support_tickets|selectattr('severity','equalto',sev)|list|length %}
+                    {% if sev_count > 0 %}
+                    <div style="display:flex;align-items:center;gap:0.3rem">
+                        <span class="mc-tma-sev" data-sev="{{ sev }}">{{ sev }}</span>
+                        <span style="font-size:0.72rem;font-weight:700;color:var(--text-primary)">{{ sev_count }}</span>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                    {% if not support_tickets %}
+                    <div class="mc-tma-empty" style="width:100%">Aucun ticket</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if agent_scores %}
+            <div class="mc-tma-section">
+                <h4><svg><use href="#icon-activity"/></svg> Performance agents</h4>
+                <div class="mc-qa-grid">
+                    {% for s in agent_scores %}
+                    <div class="mc-qa-agent-card">
+                        <div class="mc-qa-agent-name">{{ s.agent_id }}</div>
+                        <div class="mc-qa-agent-bar">
+                            <div class="mc-qa-bar-fill" style="width:{{ (s.accepted / s.iterations * 100)|round if s.iterations > 0 else 0 }}%;background:{{ 'var(--green)' if s.accepted > s.rejected else 'var(--red)' }}"></div>
+                        </div>
+                        <div class="mc-qa-agent-stats">
+                            <span class="mc-qa-ok">{{ s.accepted }}</span> <span class="mc-qa-ko">{{ s.rejected }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Tab: Historique -->
+        <div class="mc-tab-panel" data-tab="historique">
+            {% set hist_agent = (tab_profile|selectattr('id','equalto','historique')|first).agent %}
+            {% if hist_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ hist_agent.get('avatar_url','') }}" alt="" onerror="this.style.display='none'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ hist_agent.get('name','') }}</div>
+                    <div class="mc-tab-agent-role">{{ hist_agent.get('role','') }}</div>
+                    {% if hist_agent.get('tagline') %}<div class="mc-tab-agent-tagline">{{ hist_agent['tagline'] }}</div>{% endif %}
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ hist_agent.get('id','') }}','{{ hist_agent.get('name','') }}','{{ hist_agent.get('role','') }}','{{ hist_agent.get('avatar_url','') }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
+
+            <div class="mc-tma-section">
+                <h4><svg><use href="#icon-archive"/></svg> Incidents resolus</h4>
+                {% set resolved_tickets = support_tickets|selectattr('status','in','resolved,closed')|list if support_tickets else [] %}
+                {% if resolved_tickets %}
+                {% for t in resolved_tickets %}
+                <div style="padding:0.4rem;background:var(--bg-tertiary);border-radius:6px;margin-bottom:0.3rem;border-left:3px solid #10b981">
+                    <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.2rem">
+                        <span class="mc-tma-sev" data-sev="{{ t.severity }}">{{ t.severity }}</span>
+                        <span style="font-size:0.72rem;font-weight:600;color:var(--text-primary)">{{ t.title }}</span>
+                        <span style="font-size:0.55rem;color:var(--text-secondary);margin-left:auto">{{ t.resolved_at or t.updated_at }}</span>
+                    </div>
+                    {% if t.resolution %}
+                    <div style="font-size:0.65rem;color:var(--text-secondary);padding-left:1.8rem">{{ t.resolution }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="mc-tma-empty">Aucun incident resolu pour le moment</div>
+                {% endif %}
+            </div>
+
+            {% if wiki_pages %}
+            <div class="mc-tma-section">
+                <h4><svg><use href="#icon-book-open"/></svg> Base de connaissance</h4>
+                {% for page in wiki_pages %}
+                <details class="mc-wiki-page" {% if loop.first %}open{% endif %}>
+                    <summary class="mc-wiki-page-title"><span>{{ page.title }}</span></summary>
+                    <div class="mc-wiki-page-body">{{ page.content | markdown | safe }}</div>
+                </details>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if wiki_memories %}
+            <div class="mc-wiki-memories"><h4>Memoire TMA</h4>
                 {% for m in wiki_memories %}
                 <div class="mc-wiki-memory"><span class="mc-wiki-memory-cat">{{ m.category }}</span><span class="mc-wiki-memory-text">{{ m.value }}</span></div>
                 {% endfor %}
@@ -1723,9 +2077,76 @@ const PHASE_GRAPHS = {{ phase_graphs | tojson }};
 function switchTab(tab) {
     document.querySelectorAll('.mc-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     document.querySelectorAll('.mc-tab-panel').forEach(p => p.style.display = p.dataset.tab === tab ? '' : 'none');
-    // Ensure selected tab is visible (block display)
     const active = document.querySelector(`.mc-tab-panel[data-tab="${tab}"]`);
     if (active) active.style.display = 'block';
+}
+
+/* ── TMA Ticket functions ── */
+async function submitTicket() {
+    const title = document.getElementById('tmaTicketTitle');
+    const desc = document.getElementById('tmaTicketDesc');
+    const sev = document.getElementById('tmaTicketSev');
+    const cat = document.getElementById('tmaTicketCat');
+    if (!title || !title.value.trim()) return;
+    try {
+        const res = await fetch(`/api/missions/{{ mission.id }}/tickets`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({title: title.value.trim(), description: desc.value.trim(), severity: sev.value, category: cat.value})
+        });
+        if (res.ok) {
+            const t = await res.json();
+            const list = document.getElementById('tmaTicketList');
+            const empty = list.querySelector('.mc-tma-empty');
+            if (empty) empty.remove();
+            const div = document.createElement('div');
+            div.className = 'mc-tma-ticket';
+            div.dataset.sev = t.severity;
+            div.dataset.id = t.id;
+            div.onclick = function(){ toggleTicketDetail(this) };
+            div.innerHTML = `<span class="mc-tma-sev" data-sev="${t.severity}">${t.severity}</span>`
+                + `<span class="mc-tma-ticket-title">${t.title}</span>`
+                + `<span class="mc-tma-ticket-cat">${t.category}</span>`
+                + `<span class="mc-tma-ticket-status" data-st="open">open</span>`;
+            list.prepend(div);
+            title.value = ''; desc.value = '';
+            // Update SLA counts
+            const openCount = list.querySelectorAll('.mc-tma-ticket:not([style*="opacity"])').length;
+            const slaOpen = document.querySelector('.mc-tma-sla-val[style*="ef4444"]');
+            if (slaOpen) slaOpen.textContent = openCount;
+        }
+    } catch(e) { console.error('Ticket creation failed:', e); }
+}
+
+function toggleTicketDetail(el) {
+    const existing = el.querySelector('.mc-tma-ticket-detail');
+    if (existing) { existing.remove(); return; }
+    const id = el.dataset.id;
+    const detail = document.createElement('div');
+    detail.className = 'mc-tma-ticket-detail';
+    detail.style.cssText = 'width:100%;margin-top:0.4rem;padding:0.4rem;background:var(--bg-primary);border-radius:6px;font-size:0.68rem;color:var(--text-secondary)';
+    detail.innerHTML = '<div style="display:flex;gap:0.3rem;margin-top:0.3rem">'
+        + `<button onclick="event.stopPropagation();updateTicketStatus('${id}','in_progress',this)" style="background:#3b82f6;color:#fff;border:none;border-radius:4px;padding:0.2rem 0.5rem;font-size:0.6rem;cursor:pointer">En cours</button>`
+        + `<button onclick="event.stopPropagation();updateTicketStatus('${id}','resolved',this)" style="background:#10b981;color:#fff;border:none;border-radius:4px;padding:0.2rem 0.5rem;font-size:0.6rem;cursor:pointer">Resolu</button>`
+        + `<button onclick="event.stopPropagation();updateTicketStatus('${id}','closed',this)" style="background:#6b7280;color:#fff;border:none;border-radius:4px;padding:0.2rem 0.5rem;font-size:0.6rem;cursor:pointer">Fermer</button>`
+        + '</div>';
+    el.appendChild(detail);
+}
+
+async function updateTicketStatus(ticketId, status, btn) {
+    try {
+        const res = await fetch(`/api/missions/{{ mission.id }}/tickets/${ticketId}`, {
+            method: 'PATCH', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({status: status})
+        });
+        if (res.ok) {
+            const ticket = btn.closest('.mc-tma-ticket');
+            const statusEl = ticket.querySelector('.mc-tma-ticket-status');
+            if (statusEl) { statusEl.dataset.st = status; statusEl.textContent = status.replace('_',' '); }
+            if (status === 'closed') { ticket.style.opacity = '.4'; ticket.style.pointerEvents = 'none'; }
+            const detail = ticket.querySelector('.mc-tma-ticket-detail');
+            if (detail) detail.remove();
+        }
+    } catch(e) { console.error('Status update failed:', e); }
 }
 
 /* ── Execute command in workspace ── */
