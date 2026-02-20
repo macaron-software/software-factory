@@ -11,6 +11,11 @@ from pathlib import Path
 from typing import Optional
 
 import yaml
+from dotenv import load_dotenv
+
+# Load .env from project root (before any os.environ access)
+_env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(_env_path)
 
 # Paths
 PLATFORM_ROOT = Path(__file__).parent

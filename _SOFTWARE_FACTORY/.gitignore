@@ -1,1 +1,4 @@
 platform/mcp_platform/__pycache__/
+
+# Environment secrets
+.env
