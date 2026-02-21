@@ -171,7 +171,7 @@
                 </div>
             </div>
             <div class="strat-graph-body" id="stratGraphBody">
-                <svg id="stratSvg" viewBox="0 0 820 400" xmlns="http://www.w3.org/2000/svg"></svg>
+                <svg id="stratSvg" viewBox="0 0 820 300" xmlns="http://www.w3.org/2000/svg"></svg>
             </div>
         </div>
         {% endif %}
@@ -441,96 +441,102 @@ function renderStratGraph(){
     const NS = 'http://www.w3.org/2000/svg';
     const nodes = STRAT_GRAPH.nodes;
     const edges = STRAT_GRAPH.edges || [];
-    const NW = 130, NH = 48, R = 10;
+    const NR = 22; // node radius
+
+    // Compact Y positions (fit in 300px viewBox)
+    const yMap = {20: 40, 140: 120, 280: 220, 330: 220};
 
     // Build node lookup
     const nodeMap = {};
-    nodes.forEach(n => { nodeMap[n.id] = n; });
+    nodes.forEach(n => { n._cx = n.x + 65; n._cy = (yMap[n.y] || n.y) + NR; nodeMap[n.id] = n; });
 
-    // Edges
+    // Defs: arrowhead + clip paths
+    const defs = document.createElementNS(NS, 'defs');
+    defs.innerHTML = '<marker id="arrowS" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,3.5 L0,7z" fill="#888" opacity="0.6"/></marker>';
+    nodes.forEach(n => {
+        if(n.avatar_url){
+            const clip = document.createElementNS(NS, 'clipPath');
+            clip.setAttribute('id', 'clip-'+n.id);
+            const cc = document.createElementNS(NS, 'circle');
+            cc.setAttribute('cx', n._cx); cc.setAttribute('cy', n._cy); cc.setAttribute('r', NR-2);
+            clip.appendChild(cc);
+            defs.appendChild(clip);
+        }
+    });
+    svg.appendChild(defs);
+
+    // Edges (curved)
     const edgeG = document.createElementNS(NS, 'g');
     edges.forEach(e => {
         const fn = nodeMap[e.from], tn = nodeMap[e.to];
         if(!fn || !tn) return;
-        const x1 = fn.x + NW/2, y1 = fn.y + NH/2;
-        const x2 = tn.x + NW/2, y2 = tn.y + NH/2;
-        // Offset for bidirectional edges
+        const x1 = fn._cx, y1 = fn._cy, x2 = tn._cx, y2 = tn._cy;
         const dx = x2-x1, dy = y2-y1, len = Math.sqrt(dx*dx+dy*dy) || 1;
         const ox = -dy/len * 4, oy = dx/len * 4;
-        const path = document.createElementNS(NS, 'path');
+        // Shorten to not overlap circles
+        const sx = x1 + dx/len*(NR+4) + ox, sy = y1 + dy/len*(NR+4) + oy;
+        const ex = x2 - dx/len*(NR+6) + ox, ey = y2 - dy/len*(NR+6) + oy;
         const mx = (x1+x2)/2 + ox*2, my = (y1+y2)/2 + oy*2;
-        path.setAttribute('d', `M${x1+ox},${y1+oy} Q${mx},${my} ${x2+ox},${y2+oy}`);
+        const path = document.createElementNS(NS, 'path');
+        path.setAttribute('d', `M${sx},${sy} Q${mx},${my} ${ex},${ey}`);
         path.setAttribute('fill', 'none');
         path.setAttribute('stroke', e.color || '#555');
         path.setAttribute('stroke-width', '1.5');
-        path.setAttribute('opacity', '0.6');
+        path.setAttribute('opacity', '0.5');
         path.setAttribute('marker-end', 'url(#arrowS)');
         edgeG.appendChild(path);
-        // Label
         if(e.label){
             const lbl = document.createElementNS(NS, 'text');
-            lbl.setAttribute('x', mx);
-            lbl.setAttribute('y', my - 4);
+            lbl.setAttribute('x', mx); lbl.setAttribute('y', my - 5);
             lbl.setAttribute('text-anchor', 'middle');
             lbl.setAttribute('fill', e.color || '#888');
-            lbl.setAttribute('font-size', '9');
-            lbl.setAttribute('opacity', '0.8');
+            lbl.setAttribute('font-size', '8'); lbl.setAttribute('opacity', '0.7');
             lbl.textContent = e.label;
             edgeG.appendChild(lbl);
         }
     });
-
-    // Arrowhead marker
-    const defs = document.createElementNS(NS, 'defs');
-    defs.innerHTML = '<marker id="arrowS" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,3.5 L0,7z" fill="#888" opacity="0.6"/></marker>';
-    svg.appendChild(defs);
     svg.appendChild(edgeG);
 
-    // Nodes
+    // Nodes — circle avatar + name label (like dsi_workflow)
     const nodeG = document.createElementNS(NS, 'g');
     nodes.forEach(n => {
         const g = document.createElementNS(NS, 'g');
-        g.setAttribute('transform', `translate(${n.x},${n.y})`);
         g.style.cursor = 'pointer';
-        // Card bg
-        const rect = document.createElementNS(NS, 'rect');
-        rect.setAttribute('width', NW); rect.setAttribute('height', NH);
-        rect.setAttribute('rx', R); rect.setAttribute('fill', '#1a1128');
-        rect.setAttribute('stroke', n.color || '#7c3aed');
-        rect.setAttribute('stroke-width', '1.5');
-        g.appendChild(rect);
-        // Avatar circle
+        // Outer ring
+        const ring = document.createElementNS(NS, 'circle');
+        ring.setAttribute('cx', n._cx); ring.setAttribute('cy', n._cy); ring.setAttribute('r', NR);
+        ring.setAttribute('fill', 'none'); ring.setAttribute('stroke', n.color || '#7c3aed');
+        ring.setAttribute('stroke-width', '2.5');
+        g.appendChild(ring);
+        // Avatar photo or fallback circle
         if(n.avatar_url){
-            const clipId = 'clip-' + n.id;
-            const clip = document.createElementNS(NS, 'clipPath');
-            clip.setAttribute('id', clipId);
-            const cc = document.createElementNS(NS, 'circle');
-            cc.setAttribute('cx', '18'); cc.setAttribute('cy', NH/2);
-            cc.setAttribute('r', '14');
-            clip.appendChild(cc);
-            defs.appendChild(clip);
             const img = document.createElementNS(NS, 'image');
             img.setAttribute('href', n.avatar_url);
-            img.setAttribute('x', '4'); img.setAttribute('y', NH/2 - 14);
-            img.setAttribute('width', '28'); img.setAttribute('height', '28');
-            img.setAttribute('clip-path', `url(#${clipId})`);
+            img.setAttribute('x', n._cx - (NR-2)); img.setAttribute('y', n._cy - (NR-2));
+            img.setAttribute('width', (NR-2)*2); img.setAttribute('height', (NR-2)*2);
+            img.setAttribute('clip-path', `url(#clip-${n.id})`);
             g.appendChild(img);
         } else {
-            const circ = document.createElementNS(NS, 'circle');
-            circ.setAttribute('cx', '18'); circ.setAttribute('cy', NH/2);
-            circ.setAttribute('r', '14'); circ.setAttribute('fill', (n.color || '#7c3aed') + '30');
-            circ.setAttribute('stroke', n.color || '#7c3aed');
-            g.appendChild(circ);
+            const inner = document.createElementNS(NS, 'circle');
+            inner.setAttribute('cx', n._cx); inner.setAttribute('cy', n._cy); inner.setAttribute('r', NR-2);
+            inner.setAttribute('fill', (n.color||'#7c3aed')+'20');
+            g.appendChild(inner);
+            const ini = document.createElementNS(NS, 'text');
+            ini.setAttribute('x', n._cx); ini.setAttribute('y', n._cy+4);
+            ini.setAttribute('text-anchor', 'middle'); ini.setAttribute('fill', n.color||'#7c3aed');
+            ini.setAttribute('font-size', '11'); ini.setAttribute('font-weight', '700');
+            ini.textContent = n.label.slice(0,3);
+            g.appendChild(ini);
         }
-        // Label
+        // Name label below
         const txt = document.createElementNS(NS, 'text');
-        txt.setAttribute('x', '38'); txt.setAttribute('y', NH/2 + 4);
-        txt.setAttribute('fill', '#e2e8f0');
-        txt.setAttribute('font-size', '11'); txt.setAttribute('font-weight', '600');
+        txt.setAttribute('x', n._cx); txt.setAttribute('y', n._cy + NR + 14);
+        txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('fill', '#c4b5fd');
+        txt.setAttribute('font-size', '10'); txt.setAttribute('font-weight', '600');
         txt.setAttribute('font-family', "'Inter','SF Pro',sans-serif");
         txt.textContent = n.label;
         g.appendChild(txt);
-        // Click → navigate to agent or open popover
+        // Click → popover
         g.addEventListener('click', () => {
             const idx = agents.findIndex(a => a.id === n.agent_id);
             if(idx >= 0){
