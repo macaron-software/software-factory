@@ -163,28 +163,32 @@ async def lifespan(app: FastAPI):
         _all_runs = _mrs.list_runs(limit=50)
         _stuck = [m for m in _all_runs if m.status.value == "running"]
         if _stuck:
-            logger.warning("Found %d stuck missions to auto-resume: %s",
+            logger.warning("Found %d stuck missions — pausing all, will resume first only: %s",
                            len(_stuck), [m.id for m in _stuck])
 
+            # Mark all stuck missions as paused first to prevent crash-resume loops
+            from .models import MissionStatus
+            for m in _stuck:
+                m.status = MissionStatus.PAUSED
+                _mrs.update(m)
+
             async def _auto_resume():
-                """Resume stuck missions sequentially with rate limiting."""
+                """Resume first stuck mission only — others stay paused for manual resume."""
                 import asyncio
-                await asyncio.sleep(10)  # Wait for server to stabilize
+                await asyncio.sleep(15)  # Wait for server to stabilize
                 from .web.routes import api_mission_run, _active_mission_tasks
                 from starlette.requests import Request
-                # Create a minimal fake request
                 scope = {"type": "http", "method": "POST", "path": "/",
                          "headers": [], "query_string": b""}
                 fake_req = Request(scope)
-                # Resume all stuck missions, one at a time with 90s gaps
-                for m in _stuck:
-                    try:
-                        resp = await api_mission_run(fake_req, m.id)
-                        logger.warning("Auto-resumed mission %s: %s", m.id,
-                                       getattr(resp, 'body', b'')[:100])
-                    except Exception as exc:
-                        logger.warning("Failed to auto-resume mission %s: %s", m.id, exc)
-                    await asyncio.sleep(90)  # 90s between resumes to avoid rate limit floods
+                # Resume only the first mission to avoid rate limit cascade
+                m = _stuck[0]
+                try:
+                    resp = await api_mission_run(fake_req, m.id)
+                    logger.warning("Auto-resumed mission %s: %s", m.id,
+                                   getattr(resp, 'body', b'')[:100])
+                except Exception as exc:
+                    logger.warning("Failed to auto-resume mission %s: %s", m.id, exc)
 
             import asyncio
             asyncio.create_task(_auto_resume())

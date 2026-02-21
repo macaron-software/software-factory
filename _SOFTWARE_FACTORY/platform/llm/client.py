@@ -348,7 +348,8 @@ class LLMClient:
             if resp.status_code != 429:
                 break
             retry_after = int(resp.headers.get("Retry-After", 2 ** attempt * 5))
-            retry_after = min(retry_after, 30)
+            retry_after = max(retry_after, 10)  # At least 10s for rate limits
+            retry_after = min(retry_after, 60)
             logger.warning("LLM %s/%s rate-limited (429), retry in %ds (attempt %d/2)",
                            provider, model, retry_after, attempt + 1)
             await asyncio.sleep(retry_after)
