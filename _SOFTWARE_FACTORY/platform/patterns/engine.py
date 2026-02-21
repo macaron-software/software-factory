@@ -637,7 +637,7 @@ async def _execute_node(
                     break
             else:
                 # No retries — pass with rejection warning (forward progress > perfection)
-                state.status = NodeStatus.DONE
+                state.status = NodeStatus.COMPLETED
                 msg_type = "agent"
                 rejection = (
                     f"[ADVERSARIAL WARNING — {guard_result.level}] "
