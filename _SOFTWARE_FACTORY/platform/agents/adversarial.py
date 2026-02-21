@@ -63,6 +63,16 @@ _MOCK_PATTERNS = [
     (r'console\.log\s*\(\s*["\']test', "console.log('test') — debug leftover"),
 ]
 
+# Fake build script patterns — scripts that do nothing
+_FAKE_BUILD_PATTERNS = [
+    (r'echo\s+["\'].*placeholder', "Fake build script — placeholder echo"),
+    (r'echo\s+["\'].*stub', "Fake build script — stub echo"),
+    (r'echo\s+["\']BUILD\s+SUCCESS', "Fake build script — hardcoded SUCCESS"),
+    (r'echo\s+["\']Tests?\s+passed', "Fake build script — hardcoded test pass"),
+    (r'exit\s+0\s*#?\s*(?:stub|fake|placeholder|todo)', "Fake script — exit 0 placeholder"),
+    (r'#!/bin/sh\s*\n\s*(?:echo|true|:)\s', "Empty shell script — does nothing"),
+]
+
 # Hallucination patterns — claiming actions without evidence
 _HALLUCINATION_PATTERNS = [
     (r"j'ai\s+(?:deploye|déployé|lancé|exécuté|testé|vérifié|créé le fichier|commit)", "Claims action without tool evidence"),
@@ -155,7 +165,7 @@ def check_l0(content: str, agent_role: str = "", tool_calls: list = None, task: 
     # Tool call names for evidence checking
     tool_names = {tc.get("name", "") for tc in tool_calls}
     has_write_tool = bool(tool_names & {"code_write", "code_edit", "git_commit", "deploy_azure", "docker_build"})
-    has_test_tool = bool(tool_names & {"test", "build", "playwright_test"})
+    has_test_tool = bool(tool_names & {"test", "build", "playwright_test", "android_build", "android_test", "android_lint", "android_emulator_test"})
 
     # Check stack mismatch — wrong language for declared project stack
     stack_issues = _check_stack_mismatch(tool_calls, task)
@@ -169,11 +179,37 @@ def check_l0(content: str, agent_role: str = "", tool_calls: list = None, task: 
             issues.append(f"SLOP: {desc}")
             score += 3
 
-    # Check mock/stub
+    # Check mock/stub in agent output
     for pattern, desc in _MOCK_PATTERNS:
         if re.search(pattern, content, re.IGNORECASE | re.MULTILINE):
             issues.append(f"MOCK: {desc}")
             score += 4
+
+    # Check code_write content for fake/mock/stub patterns
+    for tc in tool_calls:
+        if tc.get("name") not in ("code_write", "code_edit"):
+            continue
+        file_content = str(tc.get("args", {}).get("content", ""))
+        file_path = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
+        if not file_content:
+            continue
+        # Check for fake build scripts (gradlew, Makefile, build.sh)
+        is_build_script = any(kw in file_path.lower() for kw in ["gradlew", "makefile", "build.sh", "build.bat", "compile.sh"])
+        for pattern, desc in _FAKE_BUILD_PATTERNS:
+            if re.search(pattern, file_content, re.IGNORECASE | re.MULTILINE):
+                issues.append(f"FAKE_BUILD: {desc} in {file_path}")
+                score += 7  # severe — fake builds produce false success
+                break
+        # Check for tiny/empty build scripts
+        if is_build_script and len(file_content.strip()) < 50:
+            issues.append(f"FAKE_BUILD: Suspiciously small build script ({len(file_content)} chars) in {file_path}")
+            score += 7
+        # Check mock/stub patterns in written files
+        for pattern, desc in _MOCK_PATTERNS:
+            if re.search(pattern, file_content, re.IGNORECASE | re.MULTILINE):
+                issues.append(f"MOCK_IN_CODE: {desc} in {file_path}")
+                score += 3
+                break  # one mock per file is enough
 
     # Check hallucination — only flag if agent claims action WITHOUT corresponding tool call
     if not has_write_tool:

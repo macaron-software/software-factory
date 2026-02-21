@@ -41,6 +41,10 @@ tools:
   - build
   - test
   - lint
+  - android_build
+  - android_test
+  - android_lint
+  - android_emulator_test
 
 llm:
   model: MiniMax-M2.5

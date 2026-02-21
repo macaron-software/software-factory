@@ -32,6 +32,8 @@ _ROLE_LAYERS = {
     "business_owner": 1, "metier": 1, "change_manager": 1,
     # layer 2: leads / architects
     "lead_dev": 2, "tech_lead_mobile": 2,
+    "mobile_android_lead": 2, "mobile_ios_lead": 2,
+    "lead_frontend": 2, "lead_backend": 2,
     "architecte": 2, "solution_architect": 2,
     "system_architect_art": 2, "cloud_architect": 2,
     # layer 3: developers

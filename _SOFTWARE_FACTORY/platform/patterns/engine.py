@@ -97,13 +97,26 @@ Each [PR] will be tracked in the project dashboard."""
 
 # Decompose protocol — telegraphic
 _DECOMPOSE_PROTOCOL = """ROLE: Tech Lead. DECOMPOSE work, do NOT code.
-DO: list_files (1 round) → output [SUBTASK N] lines ONLY.
+
+WORKFLOW:
+1. list_files → understand project structure
+2. deep_search(query="build tools, SDK, dependencies") → check build environment
+3. Output [SUBTASK N] lines
+
+ENVIRONMENT CHECK (MANDATORY before decomposing):
+- Android/Kotlin: Use android_build() tools (NOT generic build). SDK is in android-builder container.
+- iOS/Swift: Verify swift toolchain available.
+- Web: Check node/npm availability.
+- If SDK/toolchain missing: first subtask MUST be environment setup.
 
 FORMAT:
 [SUBTASK 1]: Create path/to/file — description
 [SUBTASK 2]: Create path/to/file — description
 
-RULES: 1-2 files per subtask. Specific paths. NO code. NO veto."""
+RULES:
+- 1-2 files per subtask. Specific paths. NO code. NO veto.
+- Use correct file extensions for the stack (Kotlin=.kt, Swift=.swift, NO mixing).
+- NEVER mix languages (no Swift files in Android project, no Kotlin in iOS)."""
 
 # Execution protocol — telegraphic, code_write focused
 _EXEC_PROTOCOL = """ROLE: Developer. You MUST call code_write. No code_write = FAILURE.
