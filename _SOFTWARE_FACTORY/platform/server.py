@@ -167,23 +167,24 @@ async def lifespan(app: FastAPI):
                            len(_stuck), [m.id for m in _stuck])
 
             async def _auto_resume():
-                """Resume stuck missions by directly calling the run endpoint handler."""
+                """Resume stuck missions one at a time with rate limiting."""
                 import asyncio
-                await asyncio.sleep(3)
+                await asyncio.sleep(10)  # Wait for server to stabilize
                 from .web.routes import api_mission_run, _active_mission_tasks
                 from starlette.requests import Request
-                from starlette.datastructures import Headers
                 # Create a minimal fake request
                 scope = {"type": "http", "method": "POST", "path": "/",
                          "headers": [], "query_string": b""}
                 fake_req = Request(scope)
-                for m in _stuck:
+                # Resume max 1 at a time with 60s gaps to avoid rate limit floods
+                for m in _stuck[:2]:  # Only resume first 2 at most
                     try:
                         resp = await api_mission_run(fake_req, m.id)
                         logger.warning("Auto-resumed mission %s: %s", m.id,
                                        getattr(resp, 'body', b'')[:100])
                     except Exception as exc:
                         logger.warning("Failed to auto-resume mission %s: %s", m.id, exc)
+                    await asyncio.sleep(60)  # 60s between resumes
 
             import asyncio
             asyncio.create_task(_auto_resume())
