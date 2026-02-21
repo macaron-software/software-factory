@@ -25,10 +25,11 @@ class MissionDef:
     description: str = ""
     goal: str = ""                        # acceptance criteria
     status: str = "planning"              # planning|active|completed|failed|blocked
-    type: str = "feature"                 # feature|epic|bug|debt|migration|security|hacking
+    type: str = "feature"                 # feature|epic|bug|debt|migration|security|hacking|program
     workflow_id: Optional[str] = None     # safe-veligo, safe-ppz...
     parent_mission_id: Optional[str] = None  # corrective mission → parent
     wsjf_score: float = 0.0
+    kanban_status: str = "funnel"         # SAFe: funnel|analyzing|backlog|implementing|done
     created_by: str = ""                  # agent who created it (strat-cpo, etc.)
     config: dict = field(default_factory=dict)
     created_at: str = ""
@@ -45,6 +46,8 @@ class SprintDef:
     goal: str = ""
     status: str = "planning"              # planning|active|review|completed|failed
     retro_notes: str = ""
+    velocity: int = 0                     # SAFe: story points completed
+    planned_sp: int = 0                   # SAFe: story points planned
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
 
@@ -83,11 +86,14 @@ def _row_to_mission(row) -> MissionDef:
 
 
 def _row_to_sprint(row) -> SprintDef:
+    cols = row.keys() if hasattr(row, 'keys') else []
     return SprintDef(
         id=row["id"], mission_id=row["mission_id"],
         number=row["number"] or 1, name=row["name"] or "",
         goal=row["goal"] or "", status=row["status"] or "planning",
         retro_notes=row["retro_notes"] or "",
+        velocity=row["velocity"] if "velocity" in cols else 0,
+        planned_sp=row["planned_sp"] if "planned_sp" in cols else 0,
         started_at=row["started_at"], completed_at=row["completed_at"],
     )
 
@@ -159,10 +165,19 @@ class MissionStore:
         db = get_db()
         try:
             completed = datetime.utcnow().isoformat() if status in ("completed", "failed") else None
-            cur = db.execute(
-                "UPDATE missions SET status = ?, completed_at = ? WHERE id = ?",
-                (status, completed, mission_id),
-            )
+            # SAFe: auto-update kanban_status based on mission status
+            kanban_map = {"planning": "analyzing", "active": "implementing", "completed": "done", "failed": "backlog"}
+            kanban = kanban_map.get(status)
+            if kanban:
+                cur = db.execute(
+                    "UPDATE missions SET status = ?, completed_at = ?, kanban_status = ? WHERE id = ?",
+                    (status, completed, kanban, mission_id),
+                )
+            else:
+                cur = db.execute(
+                    "UPDATE missions SET status = ?, completed_at = ? WHERE id = ?",
+                    (status, completed, mission_id),
+                )
             db.commit()
             return cur.rowcount > 0
         finally:
@@ -207,9 +222,10 @@ class MissionStore:
         try:
             db.execute(
                 """INSERT INTO sprints (id, mission_id, number, name, goal, status,
-                   retro_notes, started_at, completed_at) VALUES (?,?,?,?,?,?,?,?,?)""",
+                   retro_notes, velocity, planned_sp, started_at, completed_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
                 (s.id, s.mission_id, s.number, s.name, s.goal, s.status,
-                 s.retro_notes, s.started_at, s.completed_at),
+                 s.retro_notes, s.velocity, s.planned_sp, s.started_at, s.completed_at),
             )
             db.commit()
         finally:
@@ -233,6 +249,41 @@ class MissionStore:
                 )
             db.commit()
             return cur.rowcount > 0
+        finally:
+            db.close()
+
+    def update_sprint_retro(self, sprint_id: str, retro_notes: str) -> bool:
+        """Store retrospective notes for a sprint (SAFe I&A)."""
+        db = get_db()
+        try:
+            cur = db.execute("UPDATE sprints SET retro_notes = ? WHERE id = ?", (retro_notes, sprint_id))
+            db.commit()
+            return cur.rowcount > 0
+        finally:
+            db.close()
+
+    def update_sprint_velocity(self, sprint_id: str, velocity: int, planned_sp: int = 0) -> bool:
+        """Update velocity tracking for a sprint (SAFe predictability)."""
+        db = get_db()
+        try:
+            cur = db.execute(
+                "UPDATE sprints SET velocity = ?, planned_sp = ? WHERE id = ?",
+                (velocity, planned_sp, sprint_id),
+            )
+            db.commit()
+            return cur.rowcount > 0
+        finally:
+            db.close()
+
+    def get_velocity_history(self, mission_id: str) -> list:
+        """Get velocity trend for a mission's sprints."""
+        db = get_db()
+        try:
+            rows = db.execute(
+                "SELECT number, velocity, planned_sp, status FROM sprints WHERE mission_id = ? ORDER BY number",
+                (mission_id,),
+            ).fetchall()
+            return [{"sprint": r[0], "velocity": r[1], "planned_sp": r[2], "status": r[3]} for r in rows]
         finally:
             db.close()
 

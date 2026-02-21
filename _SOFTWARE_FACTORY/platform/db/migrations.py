@@ -114,6 +114,52 @@ def _migrate(conn: sqlite3.Connection):
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_features_epic ON features(epic_id)")
 
+    # SAFe: velocity tracking on sprints
+    try:
+        sp_cols = {r[1] for r in conn.execute("PRAGMA table_info(sprints)").fetchall()}
+        if sp_cols:
+            if "velocity" not in sp_cols:
+                conn.execute("ALTER TABLE sprints ADD COLUMN velocity INTEGER DEFAULT 0")
+            if "planned_sp" not in sp_cols:
+                conn.execute("ALTER TABLE sprints ADD COLUMN planned_sp INTEGER DEFAULT 0")
+    except Exception:
+        pass
+
+    # SAFe: portfolio kanban status on missions
+    try:
+        m_cols2 = {r[1] for r in conn.execute("PRAGMA table_info(missions)").fetchall()}
+        if m_cols2 and "kanban_status" not in m_cols2:
+            conn.execute("ALTER TABLE missions ADD COLUMN kanban_status TEXT DEFAULT 'funnel'")
+    except Exception:
+        pass
+
+    # SAFe: feature dependencies
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS feature_deps (
+            feature_id TEXT NOT NULL,
+            depends_on TEXT NOT NULL,
+            dep_type TEXT DEFAULT 'blocked_by',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (feature_id, depends_on)
+        )
+    """)
+
+    # SAFe: Program Increments (PI cadence)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS program_increments (
+            id TEXT PRIMARY KEY,
+            art_id TEXT DEFAULT '',
+            number INTEGER DEFAULT 1,
+            name TEXT DEFAULT '',
+            goal TEXT DEFAULT '',
+            status TEXT DEFAULT 'planning',
+            start_date TEXT,
+            end_date TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_pi_art ON program_increments(art_id)")
+
     # Confluence sync tracking
     conn.execute("""
         CREATE TABLE IF NOT EXISTS confluence_pages (

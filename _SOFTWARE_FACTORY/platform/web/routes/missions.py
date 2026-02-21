@@ -335,6 +335,43 @@ async def missions_list_partial(request: Request):
     })
 
 
+@router.get("/api/portfolio/kanban", response_class=HTMLResponse)
+async def portfolio_kanban(request: Request):
+    """SAFe Portfolio Kanban — epics by kanban_status."""
+    from ...db.migrations import get_db
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, name, project_id, wsjf_score, kanban_status, status FROM missions ORDER BY wsjf_score DESC"
+        ).fetchall()
+    finally:
+        db.close()
+    columns = {"funnel": [], "analyzing": [], "backlog": [], "implementing": [], "done": []}
+    for r in rows:
+        ks = r["kanban_status"] if r["kanban_status"] else "funnel"
+        if ks in columns:
+            columns[ks].append(dict(r))
+    # WIP limit: max 3 in implementing
+    wip_limit = 3
+    wip_over = len(columns["implementing"]) > wip_limit
+    html = '<div style="display:flex;gap:12px;overflow-x:auto;padding:16px;">'
+    for col_name, label in [("funnel", "Funnel"), ("analyzing", "Analyzing"), ("backlog", "Backlog"), ("implementing", "Implementing"), ("done", "Done")]:
+        items = columns[col_name]
+        border_color = "var(--red)" if col_name == "implementing" and wip_over else "var(--border)"
+        html += f'<div style="flex:1;min-width:180px;background:var(--bg-secondary);border:1px solid {border_color};border-radius:var(--radius);padding:10px;">'
+        wip_tag = f' <span style="color:var(--red);font-size:0.7rem;">WIP {len(items)}/{wip_limit}</span>' if col_name == "implementing" else ""
+        html += f'<h4 style="margin:0 0 8px;font-size:0.85rem;color:var(--text-secondary)">{label} ({len(items)}){wip_tag}</h4>'
+        for item in items:
+            wsjf = item.get("wsjf_score", 0) or 0
+            html += f'<div style="background:var(--bg-tertiary);border-radius:6px;padding:8px;margin-bottom:6px;font-size:0.8rem;">'
+            html += f'<a href="/missions/{item["id"]}" style="color:var(--purple-light);text-decoration:none">{item["name"][:40]}</a>'
+            html += f'<div style="color:var(--text-muted);font-size:0.7rem;">WSJF: {wsjf:.0f} | {item.get("project_id","")}</div>'
+            html += '</div>'
+        html += '</div>'
+    html += '</div>'
+    return HTMLResponse(html)
+
+
 @router.delete("/api/mission-runs/{run_id}")
 async def delete_mission_run(run_id: str):
     """Delete a mission run and its associated session/messages."""
@@ -389,6 +426,13 @@ async def api_mission_start(request: Request):
         pass
     project_id = str(form.get("project_id", ""))
 
+    # WSJF components from form (SAFe prioritization)
+    bv = float(form.get("business_value", 5))
+    tc = float(form.get("time_criticality", 5))
+    rr = float(form.get("risk_reduction", 3))
+    jd = max(float(form.get("job_duration", 3)), 0.1)
+    wsjf_score = round((bv + tc + rr) / jd, 1)
+
     wf = get_workflow_store().get(workflow_id)
     if not wf:
         return JSONResponse({"error": "Workflow not found"}, status_code=404)
@@ -437,6 +481,36 @@ async def api_mission_start(request: Request):
 
     run_store = get_mission_run_store()
     run_store.create(mission)
+
+    # Create Epic record in missions table (SAFe backlog item) with WSJF
+    try:
+        from ...missions.store import get_mission_store, MissionDef
+        epic = MissionDef(
+            id=mission_id,
+            project_id=project_id or mission_id,
+            name=brief[:80] if brief else wf.name,
+            description=brief,
+            goal=brief,
+            status="active",
+            type="epic",
+            workflow_id=workflow_id,
+            wsjf_score=wsjf_score,
+            created_by="user",
+        )
+        ms = get_mission_store()
+        ms.create_mission(epic)
+        # Store WSJF components
+        from ...db.migrations import get_db as _gdb
+        db = _gdb()
+        try:
+            db.execute(
+                "UPDATE missions SET business_value=?, time_criticality=?, risk_reduction=?, job_duration=? WHERE id=?",
+                (bv, tc, rr, jd, mission_id))
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning("Could not create epic record: %s", e)
 
     # Create a session for the orchestrator agent
     session_store = get_session_store()
@@ -2101,9 +2175,29 @@ async def api_mission_run(request: Request, mission_id: str):
             # Run the real pattern engine — NO fake success on error
             phase_success = False
             phase_error = ""
+            current_sprint_id = None
 
             for sprint_num in range(1, max_sprints + 1):
                 sprint_label = f"Sprint {sprint_num}/{max_sprints}" if max_sprints > 1 else ""
+
+                # SAFe: Auto-create Sprint record for dev phases
+                if is_dev_phase:
+                    try:
+                        from ...missions.store import get_mission_store, SprintDef
+                        _ms = get_mission_store()
+                        sprint = SprintDef(
+                            mission_id=mission.id,
+                            number=sprint_num,
+                            name=f"Sprint {sprint_num}" + (f" — {wf_phase.name}" if sprint_num == 1 else ""),
+                            goal=phase_task[:200] if sprint_num == 1 else f"Iteration {sprint_num} — correction et amélioration",
+                            status="active",
+                            started_at=datetime.utcnow().isoformat(),
+                        )
+                        sprint = _ms.create_sprint(sprint)
+                        current_sprint_id = sprint.id
+                        logger.info("SAFe Sprint created: %s (num=%d, mission=%s)", sprint.id, sprint_num, mission.id)
+                    except Exception as e:
+                        logger.warning("Sprint creation failed: %s", e)
 
                 if max_sprints > 1:
                     # Announce sprint start
@@ -2147,6 +2241,35 @@ async def api_mission_run(request: Request, mission_id: str):
                         except Exception:
                             pass
 
+                    # SAFe B1: Feature Pull — inject features from product backlog
+                    if is_dev_phase:
+                        try:
+                            from ...missions.product import get_product_backlog
+                            pb = get_product_backlog()
+                            features = pb.list_features(epic_id=mission.id)
+                            if features:
+                                phase_task += "\n\n--- Features Backlog (WSJF priorité) ---\n"
+                                for fi, feat in enumerate(features[:8]):
+                                    status_icon = {"backlog": "⏳", "ready": "📋", "in_progress": "🔄", "done": "✅"}.get(feat.status, "?")
+                                    phase_task += f"{fi+1}. {status_icon} [{feat.story_points}SP] {feat.name}: {feat.description[:100]}\n"
+                                    if feat.status == "backlog" and sprint_num == 1:
+                                        pb.update_feature_status(feat.id, "in_progress")
+                        except Exception:
+                            pass
+
+                    # SAFe D1: Learning Loop — inject retro learnings from previous sprints
+                    if is_dev_phase and sprint_num > 1:
+                        try:
+                            from ...memory.manager import get_memory_manager
+                            mem = get_memory_manager()
+                            learnings = mem.global_search("retrospective sprint")
+                            if learnings:
+                                phase_task += "\n\n--- Learnings des sprints précédents ---\n"
+                                for l in learnings[:3]:
+                                    phase_task += f"- {l.get('value', '')[:200]}\n"
+                        except Exception:
+                            pass
+
                 try:
                     result = await run_pattern(
                         phase_pattern, session_id, phase_task,
@@ -2180,6 +2303,60 @@ async def api_mission_run(request: Request, mission_id: str):
                 # - Success → continue to next sprint (more features)
                 # - Failure/VETO → remediation: retry with feedback (all retryable phases)
                 # - Failure in non-retryable phases → break immediately
+
+                # SAFe B2: Sprint Review + Retro Auto — complete sprint record
+                if is_dev_phase and current_sprint_id:
+                    try:
+                        from ...missions.store import get_mission_store
+                        _ms = get_mission_store()
+                        sprint_status = "completed" if phase_success else "failed"
+                        _ms.update_sprint_status(current_sprint_id, sprint_status)
+                        # Generate mini-retro via LLM
+                        try:
+                            from ...llm.client import get_llm_client, LLMMessage
+                            llm = get_llm_client()
+                            retro_prompt = (
+                                f"Sprint {sprint_num} {'réussi' if phase_success else 'échoué'}. "
+                                f"Erreur: {phase_error[:300] if phase_error else 'aucune'}. "
+                                f"Génère une rétrospective en 3 points: "
+                                f"1) Ce qui a bien marché 2) Ce qui n'a pas marché 3) Action d'amélioration. "
+                                f"2-3 phrases max par point."
+                            )
+                            retro_resp = await asyncio.wait_for(
+                                llm.chat([LLMMessage(role="user", content=retro_prompt)], max_tokens=300, temperature=0.4),
+                                timeout=30)
+                            retro_text = (retro_resp.content or "").strip()
+                            if retro_text:
+                                _ms.update_sprint_retro(current_sprint_id, retro_text)
+                                # Store in global memory for learning loop
+                                from ...memory.manager import get_memory_manager
+                                mem = get_memory_manager()
+                                mem.global_store(
+                                    key=f"retro-sprint-{mission.id}-{sprint_num}",
+                                    value=retro_text[:500],
+                                    category="retrospective",
+                                )
+                                logger.info("SAFe Retro stored for sprint %d (mission %s)", sprint_num, mission.id)
+                        except Exception as e:
+                            logger.warning("Retro generation failed: %s", e)
+                        # SAFe B3: Velocity tracking — estimate SP from workspace changes
+                        if phase_success:
+                            try:
+                                import subprocess as _sp
+                                ws = getattr(mission, 'workspace_path', '')
+                                if ws:
+                                    res = _sp.run(
+                                        ["git", "diff", "--stat", "HEAD~1"],
+                                        cwd=ws, capture_output=True, text=True, timeout=10,
+                                    )
+                                    files_changed = res.stdout.count("|") if res.returncode == 0 else 0
+                                    velocity = max(1, files_changed)  # 1 SP per file changed, min 1
+                                    _ms.update_sprint_velocity(current_sprint_id, velocity, planned_sp=velocity)
+                            except Exception:
+                                pass
+                    except Exception as e:
+                        logger.warning("Sprint update failed: %s", e)
+
                 if not phase_success:
                     if sprint_num < max_sprints:
                         # Retry with veto/error feedback
@@ -2385,24 +2562,17 @@ async def api_mission_run(request: Request, mission_id: str):
                     })
                     await asyncio.sleep(0.8)
                 else:
-                    # Phase failed — check if it's a blocking phase
-                    # Strategic gates (HITL) + dev/CI phases are blocking
-                    # Only discussion/ideation/TMA phases are non-blocking
-                    phase_key = phase.phase_id.lower() if phase.phase_id else ""
-                    is_execution_phase = any(k in phase_key for k in ("sprint", "dev", "cicd", "ci-cd", "pipeline", "deploy"))
-                    blocking = (
-                        (pattern_type in ("human-in-the-loop",) and "deploy" not in phase.phase_id)
-                        or is_execution_phase  # dev/CI/CD failures are blocking
-                    )
-                    # Phase failed — determine response
+                    # Phase failed — use SAFe gate_type from workflow definition
+                    phase_gate = getattr(wf_phase, 'gate', 'always') or 'always'
                     phase_key = phase.phase_id.lower() if phase.phase_id else ""
                     is_execution_phase = any(k in phase_key for k in ("sprint", "dev", "cicd", "ci-cd", "pipeline"))
-                    is_hitl_gate = pattern_type in ("human-in-the-loop",) and "deploy" not in phase.phase_id
+                    is_hitl_gate = phase_gate == "all_approved" and pattern_type in ("human-in-the-loop",)
+                    is_blocking = phase_gate in ("all_approved", "no_veto") or is_execution_phase
                     short_err = phase_error[:200] if phase_error else "erreur inconnue"
                     if is_hitl_gate:
                         # Strategic gate NOGO — stop mission
                         cdp_msg = f"Phase «{wf_phase.name}» échouée ({short_err}). Epic arrêtée — corrigez puis relancez via le bouton Réinitialiser."
-                    elif is_execution_phase:
+                    elif is_blocking:
                         # Dev/CI/CD failure — keep as FAILED (reloop will handle if applicable)
                         cdp_msg = f"Phase «{wf_phase.name}» échouée ({short_err}). Phase bloquante — correction nécessaire avant de continuer."
                         # DON'T downgrade to DONE_WITH_ISSUES — this is a real failure

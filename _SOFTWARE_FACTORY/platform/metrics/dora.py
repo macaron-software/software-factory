@@ -162,12 +162,47 @@ class DORAMetrics:
         finally:
             db.close()
 
+    def velocity_metrics(self, project_id: str = "") -> dict:
+        """SAFe velocity tracking — SP per sprint across missions."""
+        db = get_db()
+        try:
+            if project_id:
+                rows = db.execute(
+                    """SELECT s.number, s.velocity, s.planned_sp, s.status, m.name as mission
+                       FROM sprints s JOIN missions m ON s.mission_id = m.id
+                       WHERE m.project_id = ? ORDER BY s.started_at""",
+                    (project_id,),
+                ).fetchall()
+            else:
+                rows = db.execute(
+                    """SELECT s.number, s.velocity, s.planned_sp, s.status, m.name as mission
+                       FROM sprints s JOIN missions m ON s.mission_id = m.id
+                       ORDER BY s.started_at""",
+                ).fetchall()
+            sprints = [{"sprint": r["number"], "velocity": r["velocity"] or 0,
+                       "planned": r["planned_sp"] or 0, "status": r["status"],
+                       "mission": r["mission"]} for r in rows]
+            total_vel = sum(s["velocity"] for s in sprints)
+            avg_vel = total_vel / len(sprints) if sprints else 0
+            # Predictability: % of sprints where velocity >= planned
+            predictable = sum(1 for s in sprints if s["velocity"] >= s["planned"] and s["planned"] > 0)
+            total_planned = sum(1 for s in sprints if s["planned"] > 0)
+            predictability = round(predictable / total_planned * 100, 1) if total_planned > 0 else 0
+            return {
+                "sprints": sprints, "total_velocity": total_vel,
+                "avg_velocity": round(avg_vel, 1), "predictability_pct": predictability,
+                "sprint_count": len(sprints),
+            }
+        finally:
+            db.close()
+
     def summary(self, project_id: str = "", period_days: int = 30) -> dict:
-        """All 4 DORA metrics + overall level."""
+        """All 4 DORA metrics + velocity + overall level."""
         df = self.deployment_frequency(project_id, period_days)
         lt = self.lead_time_for_changes(project_id, period_days)
         cfr = self.change_failure_rate(project_id, period_days)
         mt = self.mttr(project_id, period_days)
+        vel = self.velocity_metrics(project_id)
         overall = _overall_level([df["level"], lt["level"], cfr["level"], mt["level"]])
         return {
             "overall_level": overall,
@@ -177,6 +212,7 @@ class DORAMetrics:
             "lead_time": lt,
             "change_failure_rate": cfr,
             "mttr": mt,
+            "velocity": vel,
         }
 
     def trend(self, project_id: str = "", weeks: int = 12) -> dict:

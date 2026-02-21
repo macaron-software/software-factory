@@ -121,6 +121,17 @@
             <div class="dora-card-detail">{{ dora.mttr.count }} incidents</div>
             <span class="dora-card-level level-{{ dora.mttr.level }}">{{ dora.mttr.level }}</span>
         </div>
+
+        <!-- SAFe Velocity -->
+        {% if dora.velocity %}
+        <div class="dora-card">
+            <div class="dora-card-icon"><svg class="icon" style="color:var(--purple-light)"><use href="#icon-zap"/></svg></div>
+            <div class="dora-card-title">Velocity</div>
+            <div class="dora-card-value">{{ dora.velocity.avg_velocity }} SP/sprint</div>
+            <div class="dora-card-detail">{{ dora.velocity.sprint_count }} sprints</div>
+            <span class="dora-card-level level-{% if dora.velocity.predictability_pct >= 80 %}elite{% elif dora.velocity.predictability_pct >= 60 %}high{% elif dora.velocity.predictability_pct >= 40 %}medium{% else %}low{% endif %}">{{ dora.velocity.predictability_pct }}% predictable</span>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Sparkline Trends -->
