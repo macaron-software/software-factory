@@ -30,6 +30,22 @@ async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
     from .log_config import setup_logging
     setup_logging(level=os.environ.get("LOG_LEVEL", "WARNING"))
+
+    # OpenTelemetry tracing (opt-in via OTEL_ENABLED=1)
+    if os.environ.get("OTEL_ENABLED"):
+        try:
+            from opentelemetry import trace
+            from opentelemetry.sdk.trace import TracerProvider
+            from opentelemetry.sdk.trace.export import SimpleSpanProcessor, ConsoleSpanExporter
+            from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+            provider = TracerProvider()
+            provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+            trace.set_tracer_provider(provider)
+            FastAPIInstrumentor.instrument_app(app)
+            logger.info("OpenTelemetry tracing enabled")
+        except ImportError:
+            logger.warning("OpenTelemetry packages not installed, tracing disabled")
+
     cfg = get_config()
     logger.info("Starting Macaron Agent Platform on port %s", cfg.server.port)
     init_db()

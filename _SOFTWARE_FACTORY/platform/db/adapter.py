@@ -22,6 +22,12 @@ import re
 import sqlite3
 from typing import Any, Optional, Sequence
 
+try:
+    import psycopg
+    import psycopg.errors
+except ImportError:
+    psycopg = None  # type: ignore
+
 _PG_URL = os.environ.get("DATABASE_URL", "")
 _USE_PG = _PG_URL.startswith("postgresql://") or _PG_URL.startswith("postgres://")
 
@@ -265,7 +271,7 @@ class PgConnectionWrapper:
         cur = self._conn.cursor()
         try:
             cur.execute(translated, params)
-        except Exception:
+        except (psycopg.errors.Error, psycopg.OperationalError):
             self._conn.rollback()
             raise
         return PgCursorWrapper(cur)
@@ -314,7 +320,7 @@ class PgConnectionWrapper:
         try:
             pool = _get_pg_pool()
             pool.putconn(self._conn)
-        except Exception:
+        except (psycopg.OperationalError, OSError):
             self._conn.close()
 
     @property

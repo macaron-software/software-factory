@@ -181,7 +181,7 @@ class MessageBus:
                 ),
             )
             self.db.commit()
-        except Exception as e:
+        except (sqlite3.Error, OSError) as e:
             logger.error(f"Failed to persist message: {e}")
 
     # ── Query ─────────────────────────────────────────────────────────
