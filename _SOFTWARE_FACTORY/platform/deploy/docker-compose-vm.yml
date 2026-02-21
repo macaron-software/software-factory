@@ -17,9 +17,22 @@ services:
       - FOUNDRY_MODEL_DEPLOYMENT_NAME=${FOUNDRY_MODEL_DEPLOYMENT_NAME:-gpt-5-mini}
       - SF_ROOT=/app
       - MF_ROOT=/app/mf_projects
+      - ANDROID_BUILDER_CONTAINER=android-builder
     volumes:
       - platform-data:/app/data
       - /opt/macaron/.factory-keys:/root/.config/factory:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+  android-builder:
+    build:
+      context: /opt/macaron/platform/deploy/android-builder
+      dockerfile: Dockerfile
+    container_name: android-builder
+    volumes:
+      - platform-data:/workspace
+    devices:
+      - /dev/kvm:/dev/kvm
     restart: unless-stopped
 
   nginx:

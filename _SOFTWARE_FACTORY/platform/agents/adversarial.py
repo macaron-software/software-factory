@@ -93,6 +93,19 @@ _STACK_RULES = {
         "wrong_in_path": ["src/frontend/", "src/routes/"],
         "message": "STACK_MISMATCH: Frontend code in React/JSX but project stack is SvelteKit",
     },
+    # Mobile stack rules
+    "ios_swift": {
+        "keywords": ["swift", "swiftui", "ios", "xcode", "uikit"],
+        "wrong_extensions": [".kt", ".java", ".ts", ".js", ".dart"],
+        "wrong_in_path": ["Sources/", "App/", "Features/", "Models/"],
+        "message": "STACK_MISMATCH: iOS app must use Swift/SwiftUI only — no Kotlin/Java/TypeScript",
+    },
+    "android_kotlin": {
+        "keywords": ["kotlin", "compose", "android", "gradle", "jetpack"],
+        "wrong_extensions": [".swift", ".m", ".ts", ".js", ".dart"],
+        "wrong_in_path": ["src/main/", "app/src/", "features/", "data/"],
+        "message": "STACK_MISMATCH: Android app must use Kotlin/Compose only — no Swift/TypeScript",
+    },
 }
 
 

@@ -99,6 +99,12 @@ def _get_tool_registry():
         register_compose_tools(reg)
     except Exception:
         pass
+    # Android build tools (gradle, emulator, lint)
+    try:
+        from ..tools.android_tools import register_android_tools
+        register_android_tools(reg)
+    except Exception:
+        pass
     return reg
 
 
@@ -1050,6 +1056,59 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+        # Android build tools
+        {
+            "type": "function",
+            "function": {
+                "name": "android_build",
+                "description": "Build Android project (assembleDebug) via Gradle in the android-builder container.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "workspace_path": {"type": "string", "description": "Path to Android project inside container (default: /workspace)"},
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "android_test",
+                "description": "Run Android unit tests (testDebugUnitTest) via Gradle.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "workspace_path": {"type": "string", "description": "Path to Android project"},
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "android_lint",
+                "description": "Run Android Lint checks via Gradle.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "workspace_path": {"type": "string", "description": "Path to Android project"},
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "android_emulator_test",
+                "description": "Start headless Android emulator and run instrumented tests. Takes 2-5 min.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "workspace_path": {"type": "string", "description": "Path to Android project"},
+                    },
+                },
+            },
+        },
     ]
     _TOOL_SCHEMAS = schemas
     return schemas
@@ -1086,6 +1145,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "docker_build", "screenshot", "simulator_screenshot",
         "lrm_locate", "lrm_conventions", "lrm_build", "lrm_examples",
         "github_prs", "github_code_search",
+        "android_build", "android_test", "android_lint",
     ],
     "qa": [
         "code_read", "code_write", "code_search", "list_files",
@@ -1096,6 +1156,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "github_issues", "github_prs",
         "jira_search", "jira_create",
         "chaos_test", "tmc_load_test",
+        "android_build", "android_test", "android_lint", "android_emulator_test",
     ],
     "devops": [
         "code_read", "code_write", "code_edit", "code_search",
@@ -1735,6 +1796,10 @@ class AgentExecutor:
                      "list_sub_missions", "set_constraints"):
             return await self._tool_compose(name, args, ctx)
 
+        # ── Android build tools (docker exec android-builder) ──
+        if name.startswith("android_"):
+            return await self._tool_android(name, args, ctx)
+
         # ── MCP tools: proxy to external servers ──
         if name.startswith("lrm_"):
             return await self._tool_mcp_lrm(name, args, ctx)
@@ -2206,6 +2271,17 @@ class AgentExecutor:
             return f"Error: composition tool '{name}' not found"
         agent_inst = AgentInstance(id=ctx.agent.id, name=ctx.agent.name, role=ctx.agent.role) if ctx.agent else None
         return await tool.execute(args, agent_inst)
+
+    async def _tool_android(self, name: str, args: dict, ctx: ExecutionContext) -> str:
+        """Execute Android build/test tools via docker exec."""
+        reg = _get_tool_registry()
+        tool = reg.get(name)
+        if not tool:
+            return f"Error: android tool '{name}' not found"
+        # Set workspace path from mission context if not provided
+        if not args.get("workspace_path") and ctx.project_path:
+            args["workspace_path"] = f"/workspace/workspaces/{ctx.project_path.split('/')[-1]}"
+        return await tool.execute(args)
 
     async def _tool_fractal_code(self, args: dict, ctx: ExecutionContext) -> str:
         """Spawn a focused sub-agent LLM to complete an atomic coding task.
