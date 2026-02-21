@@ -21,6 +21,13 @@ COPY projects/ /app/projects/
 COPY mf_projects/ /app/mf_projects/
 COPY mcp_lrm/ /app/mcp_lrm/
 
+# Remove personal/local-only project configs (not deployed to Azure)
+RUN rm -f /app/projects/ppz.yaml /app/projects/psy.yaml \
+          /app/projects/yolonow.yaml /app/projects/fervenza.yaml
+
+# Capture build info
+RUN echo "built $(date -u +%Y-%m-%dT%H:%M:%SZ)" > /app/VERSION
+
 # Create non-root user (docker group GID must match host's docker socket GID)
 RUN groupadd -r -g 988 docker-host && groupadd -r macaron \
     && useradd -r -g macaron -G docker-host -d /app macaron \

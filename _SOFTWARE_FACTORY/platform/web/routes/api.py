@@ -741,6 +741,11 @@ async def monitoring_live(hours: int = 24):
                 if r3.returncode == 0:
                     git_info["last_commit_time"] = r3.stdout.strip()
                 break
+        if not git_info:
+            import pathlib as _pl
+            ver = _pl.Path("/app/VERSION")
+            if ver.exists():
+                git_info["branch"] = ver.read_text().strip()
     except Exception:
         pass
 
@@ -758,7 +763,7 @@ async def monitoring_live(hours: int = 24):
             try:
                 phases = json.loads(run["phases_json"]) if run["phases_json"] else []
                 for p in phases:
-                    key = p.get("name", "?")
+                    key = p.get("phase_name") or p.get("name", "?")
                     st = p.get("status", "pending")
                     k = (key, st)
                     phase_counts[k] = phase_counts.get(k, 0) + 1
