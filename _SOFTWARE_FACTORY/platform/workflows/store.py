@@ -1592,6 +1592,224 @@ class WorkflowStore:
             ),
         )
 
+        # ── Epic Decompose (Recursive Mission Orchestration) ────────────
+        builtins.append(
+            WorkflowDef(
+                id="epic-decompose",
+                name="Epic Decompose — ART Recursive",
+                description=(
+                    "Décomposition récursive d'un Epic SAFe en Features parallèles. "
+                    "PI Planning → Feature Planning → Sprint Execution (parallel) → Integration → Release. "
+                    "8 Feature Teams, WIP limits, build queue globale, traçabilité AO."
+                ),
+                icon="git-branch",
+                is_builtin=True,
+                phases=[
+                    WorkflowPhase(
+                        id="pi-planning",
+                        pattern_id="network",
+                        name="PI Planning",
+                        description="RTE + PM + Archi débattent la décomposition en Features. Input: AO + VISION.md + codebase.",
+                        gate="always",
+                        config={
+                            "agents": ["rte", "product-manager-art", "system-architect-art"],
+                            "max_iterations": 3,
+                        },
+                    ),
+                    WorkflowPhase(
+                        id="feature-planning",
+                        pattern_id="hierarchical",
+                        name="Feature Planning",
+                        description="RTE délègue aux Feature Leads. Chaque Lead planifie ses Stories avec REQ-IDs.",
+                        gate="always",
+                        config={
+                            "agents": ["rte", "ft-auth-lead", "ft-booking-lead", "ft-payment-lead",
+                                       "ft-admin-lead", "ft-user-lead", "ft-infra-lead", "ft-e2e-lead", "ft-proto-lead"],
+                            "leader": "rte",
+                        },
+                    ),
+                    WorkflowPhase(
+                        id="sprint-execution",
+                        pattern_id="parallel",
+                        name="Sprint Execution",
+                        description="N Feature Teams travaillent en parallèle. WIP max 4. Chaque team exécute son feature-sprint.",
+                        gate="no_veto",
+                        config={
+                            "agents": ["ft-auth-lead", "ft-booking-lead", "ft-payment-lead",
+                                       "ft-admin-lead", "ft-user-lead", "ft-infra-lead", "ft-e2e-lead", "ft-proto-lead"],
+                            "max_concurrent": 4,
+                        },
+                    ),
+                    WorkflowPhase(
+                        id="system-integration",
+                        pattern_id="aggregator",
+                        name="System Integration",
+                        description="System Architect agrège les résultats. Merge branches, build global, tests cross-domain.",
+                        gate="all_approved",
+                        config={
+                            "agents": ["system-architect-art", "ft-e2e-lead", "ft-proto-lead", "ft-infra-lead"],
+                        },
+                    ),
+                    WorkflowPhase(
+                        id="pi-review-release",
+                        pattern_id="human-in-the-loop",
+                        name="PI Review & Release",
+                        description="Demo → PM review → Staging → E2E global → Canary → Prod. GO/NOGO checkpoint.",
+                        gate="checkpoint",
+                        config={
+                            "agents": ["product-manager-art", "rte", "system-architect-art", "ft-e2e-lead"],
+                        },
+                    ),
+                ],
+                config={
+                    "graph": {
+                        "nodes": [
+                            {"id": "n1", "agent_id": "rte", "x": 400, "y": 20, "label": "RTE Marc", "phase": "pi-planning"},
+                            {"id": "n2", "agent_id": "product-manager-art", "x": 200, "y": 20, "label": "PM Isabelle", "phase": "pi-planning"},
+                            {"id": "n3", "agent_id": "system-architect-art", "x": 600, "y": 20, "label": "Archi Catherine", "phase": "pi-planning"},
+                            {"id": "n4", "agent_id": "ft-auth-lead", "x": 50, "y": 170, "label": "Auth Nicolas", "phase": "feature-planning"},
+                            {"id": "n5", "agent_id": "ft-booking-lead", "x": 200, "y": 170, "label": "Booking Antoine", "phase": "feature-planning"},
+                            {"id": "n6", "agent_id": "ft-payment-lead", "x": 350, "y": 170, "label": "Payment Caroline", "phase": "feature-planning"},
+                            {"id": "n7", "agent_id": "ft-admin-lead", "x": 500, "y": 170, "label": "Admin Olivier", "phase": "feature-planning"},
+                            {"id": "n8", "agent_id": "ft-user-lead", "x": 650, "y": 170, "label": "User Sarah", "phase": "feature-planning"},
+                            {"id": "n9", "agent_id": "ft-infra-lead", "x": 50, "y": 320, "label": "Infra Francois", "phase": "sprint-execution"},
+                            {"id": "n10", "agent_id": "ft-e2e-lead", "x": 250, "y": 320, "label": "E2E Virginie", "phase": "sprint-execution"},
+                            {"id": "n11", "agent_id": "ft-proto-lead", "x": 450, "y": 320, "label": "Proto JB", "phase": "sprint-execution"},
+                            {"id": "n12", "agent_id": "system-architect-art", "x": 400, "y": 470, "label": "Integration", "phase": "system-integration"},
+                            {"id": "n13", "agent_id": "product-manager-art", "x": 400, "y": 570, "label": "PI Review", "phase": "pi-review-release"},
+                        ],
+                        "edges": [
+                            {"from": "n2", "to": "n1", "label": "vision", "color": "#bc8cff"},
+                            {"from": "n3", "to": "n1", "label": "arch", "color": "#58a6ff"},
+                            {"from": "n1", "to": "n2", "label": "feedback", "color": "#d29922"},
+                            {"from": "n1", "to": "n3", "label": "feedback", "color": "#d29922"},
+                            {"from": "n1", "to": "n4", "label": "delegate", "color": "#f97316"},
+                            {"from": "n1", "to": "n5", "label": "delegate", "color": "#22c55e"},
+                            {"from": "n1", "to": "n6", "label": "delegate", "color": "#eab308"},
+                            {"from": "n1", "to": "n7", "label": "delegate", "color": "#a855f7"},
+                            {"from": "n1", "to": "n8", "label": "delegate", "color": "#06b6d4"},
+                            {"from": "n4", "to": "n9", "label": "infra", "color": "#ef4444"},
+                            {"from": "n5", "to": "n10", "label": "e2e", "color": "#ec4899"},
+                            {"from": "n6", "to": "n11", "label": "proto", "color": "#64748b"},
+                            {"from": "n7", "to": "n10", "label": "e2e", "color": "#ec4899"},
+                            {"from": "n8", "to": "n10", "label": "e2e", "color": "#ec4899"},
+                            {"from": "n9", "to": "n12", "label": "merge", "color": "#58a6ff"},
+                            {"from": "n10", "to": "n12", "label": "tests", "color": "#ec4899"},
+                            {"from": "n11", "to": "n12", "label": "schemas", "color": "#64748b"},
+                            {"from": "n4", "to": "n12", "label": "merge", "color": "#f97316"},
+                            {"from": "n5", "to": "n12", "label": "merge", "color": "#22c55e"},
+                            {"from": "n6", "to": "n12", "label": "merge", "color": "#eab308"},
+                            {"from": "n12", "to": "n13", "label": "release", "color": "#d29922"},
+                        ],
+                    },
+                    "agents_permissions": {
+                        "rte": {"can_delegate": True, "can_veto": True, "veto_level": "strong"},
+                        "product-manager-art": {"can_veto": True, "veto_level": "advisory"},
+                        "system-architect-art": {"can_veto": True, "veto_level": "strong"},
+                        "ft-e2e-lead": {"can_veto": True, "veto_level": "absolute"},
+                    },
+                },
+            ),
+        )
+
+        # ── Feature Sprint (reusable per Feature) ──────────────────────
+        builtins.append(
+            WorkflowDef(
+                id="feature-sprint",
+                name="Feature Sprint — TDD Cycle",
+                description=(
+                    "Workflow réutilisable pour chaque Feature d'un Epic. "
+                    "Design → TDD Sprint → Adversarial Review → E2E Tests → Deploy. "
+                    "Utilisé par chaque Feature Team dans le cadre d'un epic-decompose."
+                ),
+                icon="repeat",
+                is_builtin=True,
+                phases=[
+                    WorkflowPhase(
+                        id="feature-design",
+                        pattern_id="aggregator",
+                        name="Feature Design",
+                        description="Lead + Archi définissent l'architecture de la feature. Stories, acceptance criteria, interfaces.",
+                        gate="always",
+                        config={
+                            "agents": ["system-architect-art"],
+                            "dynamic_lead": True,
+                        },
+                    ),
+                    WorkflowPhase(
+                        id="tdd-sprint",
+                        pattern_id="loop",
+                        name="TDD Sprint",
+                        description="Devs implémentent en TDD. RED→GREEN→REFACTOR. FRACTAL: feature/guards/failures.",
+                        gate="no_veto",
+                        config={
+                            "agents": [],
+                            "max_iterations": 10,
+                            "dynamic_team": True,
+                        },
+                    ),
+                    WorkflowPhase(
+                        id="adversarial-review",
+                        pattern_id="sequential",
+                        name="Adversarial Review",
+                        description="L0 fast checks → L1 code critic → L2 architecture critic. Multi-vendor cascade.",
+                        gate="all_approved",
+                        config={
+                            "agents": ["system-architect-art"],
+                            "dynamic_reviewers": True,
+                        },
+                    ),
+                    WorkflowPhase(
+                        id="feature-e2e",
+                        pattern_id="parallel",
+                        name="Tests E2E",
+                        description="Tests E2E API + IHM en parallèle. Smoke + journeys.",
+                        gate="all_approved",
+                        config={
+                            "agents": ["ft-e2e-api", "ft-e2e-ihm"],
+                        },
+                    ),
+                    WorkflowPhase(
+                        id="feature-deploy",
+                        pattern_id="sequential",
+                        name="Deploy Feature",
+                        description="Build → Staging → Canary. Rollback auto si erreur.",
+                        gate="no_veto",
+                        config={
+                            "agents": ["ft-infra-lead"],
+                            "dynamic_deployer": True,
+                        },
+                    ),
+                ],
+                config={
+                    "graph": {
+                        "nodes": [
+                            {"id": "n1", "agent_id": "system-architect-art", "x": 400, "y": 20, "label": "Design", "phase": "feature-design"},
+                            {"id": "n2", "agent_id": "ft-auth-lead", "x": 200, "y": 150, "label": "TDD Dev 1", "phase": "tdd-sprint"},
+                            {"id": "n3", "agent_id": "ft-auth-dev1", "x": 400, "y": 150, "label": "TDD Dev 2", "phase": "tdd-sprint"},
+                            {"id": "n4", "agent_id": "ft-auth-dev2", "x": 600, "y": 150, "label": "TDD Dev 3", "phase": "tdd-sprint"},
+                            {"id": "n5", "agent_id": "system-architect-art", "x": 400, "y": 280, "label": "Review", "phase": "adversarial-review"},
+                            {"id": "n6", "agent_id": "ft-e2e-api", "x": 300, "y": 380, "label": "E2E API", "phase": "feature-e2e"},
+                            {"id": "n7", "agent_id": "ft-e2e-ihm", "x": 500, "y": 380, "label": "E2E IHM", "phase": "feature-e2e"},
+                            {"id": "n8", "agent_id": "ft-infra-lead", "x": 400, "y": 480, "label": "Deploy", "phase": "feature-deploy"},
+                        ],
+                        "edges": [
+                            {"from": "n1", "to": "n2", "label": "stories", "color": "#58a6ff"},
+                            {"from": "n1", "to": "n3", "label": "stories", "color": "#58a6ff"},
+                            {"from": "n1", "to": "n4", "label": "stories", "color": "#58a6ff"},
+                            {"from": "n2", "to": "n5", "label": "code", "color": "#3fb950"},
+                            {"from": "n3", "to": "n5", "label": "code", "color": "#3fb950"},
+                            {"from": "n4", "to": "n5", "label": "code", "color": "#3fb950"},
+                            {"from": "n5", "to": "n6", "label": "approved", "color": "#ec4899"},
+                            {"from": "n5", "to": "n7", "label": "approved", "color": "#ec4899"},
+                            {"from": "n6", "to": "n8", "label": "pass", "color": "#d29922"},
+                            {"from": "n7", "to": "n8", "label": "pass", "color": "#d29922"},
+                        ],
+                    },
+                },
+            ),
+        )
+
         for w in builtins:
             if w.id not in existing_ids:
                 self.create(w)
