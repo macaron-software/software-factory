@@ -23,6 +23,8 @@ class CodeReadTool(BaseTool):
         path = params.get("path", "")
         if not path or not os.path.exists(path):
             return f"Error: File not found: {path}"
+        # Resolve symlinks to prevent path traversal
+        path = os.path.realpath(path)
         try:
             max_lines = int(params.get("max_lines", 500))
             with open(path) as f:
@@ -43,6 +45,8 @@ class CodeWriteTool(BaseTool):
         content = params.get("content", "")
         if not path:
             return "Error: path required"
+        # Resolve symlinks to prevent path traversal
+        path = os.path.realpath(path)
         try:
             p = Path(path)
             if p.exists():
@@ -65,6 +69,8 @@ class CodeEditTool(BaseTool):
         new = params.get("new_str", "")
         if not path or not old:
             return "Error: path and old_str required"
+        # Resolve symlinks to prevent path traversal
+        path = os.path.realpath(path)
         try:
             content = Path(path).read_text()
             if old not in content:

@@ -22,6 +22,14 @@ class BuildTool(BaseTool):
         cwd = params.get("cwd", ".")
         if not cmd:
             return "Error: build command required"
+        # Command injection guard
+        try:
+            from ..security.sanitize import sanitize_command
+            cmd, err = sanitize_command(cmd, "build")
+            if err:
+                return err
+        except ImportError:
+            pass
         # Fix swift command to use Apple Swift (not OpenStack CLI)
         import os
         if cmd.strip().startswith("swift ") and os.path.isfile("/usr/bin/swift"):
@@ -44,6 +52,14 @@ class TestTool(BaseTool):
         cwd = params.get("cwd", ".")
         if not cmd:
             return "Error: test command required"
+        # Command injection guard
+        try:
+            from ..security.sanitize import sanitize_command
+            cmd, err = sanitize_command(cmd, "test")
+            if err:
+                return err
+        except ImportError:
+            pass
         # Fix swift command to use Apple Swift (not OpenStack CLI)
         import os
         if cmd.strip().startswith("swift ") and os.path.isfile("/usr/bin/swift"):
@@ -66,6 +82,14 @@ class LintTool(BaseTool):
         cwd = params.get("cwd", ".")
         if not cmd:
             return "Error: lint command required"
+        # Command injection guard
+        try:
+            from ..security.sanitize import sanitize_command
+            cmd, err = sanitize_command(cmd, "lint")
+            if err:
+                return err
+        except ImportError:
+            pass
         sandbox = get_sandbox(cwd)
         result = sandbox.run(cmd, cwd=cwd, timeout=120)
         output = result.stdout[-3000:] + result.stderr[-1000:]

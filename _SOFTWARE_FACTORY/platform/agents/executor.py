@@ -1297,6 +1297,21 @@ class AgentExecutor:
         total_tokens_out = 0
         all_tool_calls = []
 
+        # ── Prompt injection guard ──
+        try:
+            from ..security.prompt_guard import get_prompt_guard
+            user_message, inj_score = get_prompt_guard().check_and_sanitize(
+                user_message, source=f"user→{agent.id}"
+            )
+            if inj_score.blocked:
+                return ExecutionResult(
+                    content=user_message,
+                    agent_id=agent.id,
+                    error="prompt_injection_blocked",
+                )
+        except ImportError:
+            pass
+
         # Set trace context for observability
         self._llm.set_trace_context(
             agent_id=agent.id,
@@ -1454,6 +1469,22 @@ class AgentExecutor:
         total_tokens_in = 0
         total_tokens_out = 0
         all_tool_calls = []
+
+        # ── Prompt injection guard ──
+        try:
+            from ..security.prompt_guard import get_prompt_guard
+            user_message, inj_score = get_prompt_guard().check_and_sanitize(
+                user_message, source=f"user→{agent.id}"
+            )
+            if inj_score.blocked:
+                result = ExecutionResult(
+                    content=user_message, agent_id=agent.id,
+                    error="prompt_injection_blocked",
+                )
+                yield ("result", result)
+                return
+        except ImportError:
+            pass
 
         # Set trace context for observability
         self._llm.set_trace_context(

@@ -159,9 +159,9 @@ class PermissionGuard:
         if not path:
             return None
 
-        # Normalize path
-        abs_path = os.path.abspath(path)
-        abs_project = os.path.abspath(project_path) if project_path else ""
+        # Normalize path (resolve symlinks to prevent traversal)
+        abs_path = os.path.realpath(path)
+        abs_project = os.path.realpath(project_path) if project_path else ""
 
         # 1. Check always-denied patterns (secrets, keys, etc.)
         denied_rule = _is_path_denied(abs_path)
@@ -198,7 +198,10 @@ class PermissionGuard:
                 for ap in (permissions.get("allowed_paths") or []):
                     allowed_roots.append(os.path.abspath(ap))
 
-            in_allowed = any(abs_path.startswith(root) for root in allowed_roots)
+            in_allowed = any(
+                abs_path == root or abs_path.startswith(root + os.sep)
+                for root in allowed_roots
+            )
             if not in_allowed:
                 denial = PermissionDenial(
                     agent_id=agent_id,
@@ -289,9 +292,9 @@ class PermissionGuard:
         if not cwd:
             return None
 
-        abs_cwd = os.path.abspath(cwd)
-        abs_project = os.path.abspath(project_path)
-        if not abs_cwd.startswith(abs_project):
+        abs_cwd = os.path.realpath(cwd)
+        abs_project = os.path.realpath(project_path)
+        if not (abs_cwd == abs_project or abs_cwd.startswith(abs_project + os.sep)):
             denial = PermissionDenial(
                 agent_id=agent_id,
                 tool_name=tool_name,
@@ -306,7 +309,7 @@ class PermissionGuard:
         if tool_name == "git_diff":
             diff_path = args.get("path", "")
             if diff_path and os.path.isabs(diff_path):
-                if not os.path.abspath(diff_path).startswith(abs_project):
+                if not os.path.realpath(diff_path).startswith(abs_project + os.sep):
                     denial = PermissionDenial(
                         agent_id=agent_id,
                         tool_name=tool_name,

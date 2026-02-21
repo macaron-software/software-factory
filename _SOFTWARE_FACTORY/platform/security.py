@@ -24,6 +24,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         api_key = os.getenv("MACARON_API_KEY")
         if not api_key:
+            # Log warning in production-like environments
+            if os.getenv("ENVIRONMENT", "dev") != "dev":
+                logger.warning("AUTH DISABLED — set MACARON_API_KEY for production")
             return await call_next(request)
 
         path = request.url.path
