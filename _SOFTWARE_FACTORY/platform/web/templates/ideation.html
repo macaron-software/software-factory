@@ -389,8 +389,12 @@ function closeIgPopover(){
 }
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeIgPopover(); });
 
-// Render on load
-document.addEventListener('DOMContentLoaded', renderIdeaGraph);
+// Render on load (works both standalone and when injected via htmx)
+if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', renderIdeaGraph);
+} else {
+    renderIdeaGraph();
+}
 
 /* ── Ideation Chat ── */
 const messagesEl = document.getElementById('ideaMessages');

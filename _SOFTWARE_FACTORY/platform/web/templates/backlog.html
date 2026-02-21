@@ -3,7 +3,7 @@
 <div class="tabs">
     <button class="tab active" id="tab-backlog" hx-get="/product" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click, load" onclick="switchTab(this)">Backlog</button>
     <button class="tab" id="tab-kanban" hx-get="/api/portfolio/kanban" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">Portfolio Kanban</button>
-    <button class="tab" id="tab-discovery" hx-get="/ideation" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">Discovery</button>
+    <button class="tab" id="tab-discovery" hx-get="/ideation" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">Idéation</button>
 </div>
 <div id="tab-content"></div>
 <script>
