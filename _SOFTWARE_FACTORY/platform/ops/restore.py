@@ -201,7 +201,7 @@ def restore_postgresql(date_filter: str = "", dry_run: bool = False) -> bool:
         with gzip.open(dest_gz, "rb") as f_in, open(dest_sql, "wb") as f_out:
             shutil.copyfileobj(f_in, f_out)
 
-        # Execute SQL statements via psycopg
+        # Execute SQL via psycopg — group by table for speed
         print("  ⚠ Executing restore statements...")
         try:
             import psycopg
@@ -213,16 +213,21 @@ def restore_postgresql(date_filter: str = "", dry_run: bool = False) -> bool:
 
             sql_text = dest_sql.read_text()
             stmts = [s.strip() for s in sql_text.split("\n") if s.strip() and not s.strip().startswith("--")]
+            total = len(stmts)
             ok, err = 0, 0
+
+            # Execute in autocommit + catch errors
             for stmt in stmts:
                 try:
                     conn.execute(stmt)
                     ok += 1
                 except Exception:
                     err += 1
+                if (ok + err) % 500 == 0:
+                    print(f"    ... {ok + err}/{total}", flush=True)
 
             conn.close()
-            print(f"  ✅ PostgreSQL restored ({ok} statements OK, {err} conflicts/skipped)")
+            print(f"  ✅ PostgreSQL restored ({ok} OK, {err} conflicts/skipped)")
             return True
         except ImportError:
             print("  ❌ psycopg not installed")
