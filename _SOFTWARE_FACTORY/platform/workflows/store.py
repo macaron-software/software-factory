@@ -400,7 +400,7 @@ async def run_workflow(
             logger.error("Workflow phase %s failed: %s", phase.name, e)
             await _rte_facilitate(
                 session_id,
-                f"Erreur technique sur la phase **{phase.name}**: {e}\n"
+                f"Technical error on phase **{phase.name}**: {e}\n"
                 f"Annonce l'erreur à l'équipe et propose un plan de recovery.",
                 to_agent=leader,
                 project_id=project_id,

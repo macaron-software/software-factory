@@ -166,7 +166,7 @@
                         <svg><use href="#icon-settings"/></svg> Workflow
                     </a>
                     <button class="strat-graph-btn" onclick="launchStrategicCommittee()" id="btnLaunchComite" style="border-color:var(--purple);color:var(--purple)">
-                        <svg><use href="#icon-play"/></svg> Lancer le Comité
+                        <svg><use href="#icon-play"/></svg> {{ _('launch_committee') }}
                     </button>
                 </div>
             </div>
@@ -242,7 +242,7 @@
                         {% endif %}
                     </div>
                     {% else %}
-                    <div class="pmc-no-missions">Aucune epic — prete pour la prochaine vision</div>
+                    <div class="pmc-no-missions">{{ _('no_epics_ready') }}</div>
                     {% endfor %}
                 </div>
 
@@ -563,14 +563,14 @@ async function launchStrategicCommittee(){
         if(data.session_id){
             window.location.href = `/sessions/${data.session_id}/live`;
         } else {
-            alert(data.error || 'Erreur');
+            alert(data.error || _('error_generic'));
             btn.disabled = false;
-            btn.innerHTML = '<svg style="width:12px;height:12px"><use href="#icon-play"/></svg> Lancer le Comité';
+            btn.innerHTML = '<svg style="width:12px;height:12px"><use href="#icon-play"/></svg> {{ _('launch_committee') }}';
         }
     } catch(e){
-        alert('Erreur: ' + e.message);
+        alert(_('error') + ': ' + e.message);
         btn.disabled = false;
-        btn.innerHTML = '<svg style="width:12px;height:12px"><use href="#icon-play"/></svg> Lancer le Comité';
+        btn.innerHTML = '<svg style="width:12px;height:12px"><use href="#icon-play"/></svg> {{ _('launch_committee') }}';
     }
 }
 

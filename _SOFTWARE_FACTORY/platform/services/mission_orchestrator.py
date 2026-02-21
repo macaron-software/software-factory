@@ -336,7 +336,7 @@ class MissionOrchestrator:
                             llm = get_llm_client()
                             retro_prompt = (
                                 f"Sprint {sprint_num} {'réussi' if phase_success else 'échoué'}. "
-                                f"Erreur: {phase_error[:300] if phase_error else 'aucune'}. "
+                                f"Erreur: {phase_error[:300] if phase_error else 'none'}. "
                                 f"Génère une rétrospective en 3 points: "
                                 f"1) Ce qui a bien marché 2) Ce qui n'a pas marché 3) Action d'amélioration. "
                                 f"2-3 phrases max par point."
@@ -622,8 +622,8 @@ class MissionOrchestrator:
                     if dev_idx is not None and dev_idx <= i:
                         reloop_msg = (
                             f"Reloop {reloop_count}/{MAX_RELOOPS} — Phase «{wf_phase.name}» échouée. "
-                            f"Erreur: {phase_error[:200]}. "
-                            f"Retour au sprint de développement pour correction…"
+                            f"Error: {phase_error[:200]}. "
+                            f"Back to development sprint for correction…"
                         )
                         await self._sse_orch_msg(reloop_msg, phase.phase_id)
                         await asyncio.sleep(1)

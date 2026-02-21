@@ -87,9 +87,9 @@
     </a>
     {% else %}
     <div class="empty-state">
-        <p>Aucune mission</p>
+        <p>{{ _('no_mission') }}</p>
         <p style="color:var(--text-secondary);font-size:0.82rem">Les agents stratégiques créent des missions depuis la VISION du projet.</p>
-        <a href="/missions?action=new" class="btn btn-primary" style="margin-top:0.5rem">Créer manuellement</a>
+        <a href="/missions?action=new" class="btn btn-primary" style="margin-top:0.5rem">{{ _('create_manually') }}</a>
     </div>
     {% endfor %}
 </div>
@@ -121,7 +121,7 @@
         <div class="nmf-actions">
             <a href="/missions" class="btn btn-ghost">Annuler</a>
             <button type="submit" class="btn btn-primary">
-                <svg class="icon icon-sm"><use href="#icon-play"/></svg> Lancer
+                <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch') }}
             </button>
         </div>
     </form>
@@ -136,8 +136,8 @@ document.getElementById('newMissionForm').addEventListener('submit', async e => 
         const r = await fetch('/api/missions/start', {method:'POST', body: fd});
         const j = await r.json();
         if (j.redirect) location.href = j.redirect;
-        else { alert(j.error || 'Erreur'); btn.disabled = false; btn.textContent = 'Lancer'; }
-    } catch(err) { alert(err); btn.disabled = false; btn.textContent = 'Lancer'; }
+        else { alert(j.error || _('error_generic')); btn.disabled = false; btn.textContent = _('launch'); }
+    } catch(err) { alert(err); btn.disabled = false; btn.textContent = _('launch'); }
 });
 </script>
 {% endif %}

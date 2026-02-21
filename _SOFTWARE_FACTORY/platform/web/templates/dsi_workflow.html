@@ -86,7 +86,7 @@
     {% if not session %}
     <form method="POST" action="/api/dsi/workflow/{{ workflow.id }}/start" style="margin:0">
         <button type="submit" class="btn btn-primary">
-            <svg class="icon icon-sm"><use href="#icon-play"/></svg> Lancer Phase 1
+            <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch_phase', n=1) }}
         </button>
     </form>
     {% elif current_phase and current_phase.id != phases[-1].id %}

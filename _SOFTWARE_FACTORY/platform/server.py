@@ -357,6 +357,31 @@ def create_app() -> FastAPI:
         return _render_screenshots(html)
 
     templates.env.filters["markdown"] = _markdown_filter
+
+    # i18n — make _() available in all templates
+    from .i18n import t as _translate, get_lang as _get_lang, SUPPORTED_LANGS
+
+    def _i18n_global(key: str, **kwargs):
+        """Template global: {{ _('key', name='val') }}"""
+        return _translate(key, lang=_i18n_global._current_lang, **kwargs)
+    _i18n_global._current_lang = "en"
+
+    templates.env.globals["_"] = _i18n_global
+    templates.env.globals["SUPPORTED_LANGS"] = SUPPORTED_LANGS
+
+    # Middleware to set current language per-request
+    from starlette.middleware.base import BaseHTTPMiddleware
+
+    class I18nMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            lang = _get_lang(request)
+            _i18n_global._current_lang = lang
+            request.state.lang = lang
+            response = await call_next(request)
+            return response
+
+    app.add_middleware(I18nMiddleware)
+
     app.state.templates = templates
 
     # Routes

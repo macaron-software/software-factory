@@ -228,7 +228,7 @@
         {% if not products %}
         <div style="text-align:center;padding:3rem;color:var(--text-secondary);font-size:0.85rem">
             <svg class="icon" style="width:48px;height:48px;margin-bottom:1rem;opacity:.3"><use href="#icon-layers"/></svg>
-            <div>Aucun produit. Créez un projet pour commencer.</div>
+            <div>{{ _('no_product') }}</div>
         </div>
         {% endif %}
 
@@ -278,7 +278,7 @@
                     <!-- Epics list -->
                     <div class="pl-epics-title"><svg><use href="#icon-rocket"/></svg> Epics</div>
                     {% if not p.epics %}
-                    <div style="color:var(--text-secondary);font-size:0.78rem;font-style:italic;padding:0.4rem 0">Aucun epic pour ce produit</div>
+                    <div style="color:var(--text-secondary);font-size:0.78rem;font-style:italic;padding:0.4rem 0">{{ _('no_epics_product') }}</div>
                     {% endif %}
                     {% for e in p.epics %}
                     <div class="pl-epic-row">

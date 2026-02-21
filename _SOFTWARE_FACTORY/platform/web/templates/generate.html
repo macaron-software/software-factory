@@ -71,7 +71,7 @@
         <button type="submit" class="gen-btn" id="genBtn">
             <span class="gen-spinner" id="genSpinner"><svg class="icon icon-sm spin"><use href="#icon-loader"/></svg></span>
             <svg class="icon icon-sm"><use href="#icon-lightning"/></svg>
-            Générer & Lancer
+            {{ _('generate_launch') }}
         </button>
     </form>
 
@@ -115,7 +115,7 @@ document.getElementById('genForm').addEventListener('submit', async (e) => {
         const data = await resp.json();
 
         if (data.error) {
-            document.getElementById('genResultTitle').textContent = 'Erreur';
+            document.getElementById('genResultTitle').textContent = _('error');
             document.getElementById('genTeamList').innerHTML = '';
             document.getElementById('genResultMsg').textContent = data.error;
             result.classList.add('show');
@@ -130,7 +130,7 @@ document.getElementById('genForm').addEventListener('submit', async (e) => {
             setTimeout(() => { window.location.href = data.redirect; }, 1500);
         }
     } catch (err) {
-        document.getElementById('genResultTitle').textContent = 'Erreur réseau';
+        document.getElementById('genResultTitle').textContent = _('error_network');
         document.getElementById('genResultMsg').textContent = err.message;
         result.classList.add('show');
     } finally {

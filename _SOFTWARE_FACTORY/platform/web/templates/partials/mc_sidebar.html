@@ -64,7 +64,7 @@
                             <svg class="icon icon-xs"><use href="#icon-message-square"/></svg> Discuter
                         </button>
                         <button id="mc-run-btn" class="mc-cdp-btn mc-cdp-btn-wf" onclick="startMissionExecution()">
-                            <svg class="icon icon-xs"><use href="#icon-play"/></svg> Lancer
+                            <svg class="icon icon-xs"><use href="#icon-play"/></svg> {{ _('launch') }}
                         </button>
                     </div>
                     <div style="text-align:right;margin-top:0.3rem">
@@ -131,7 +131,7 @@
             <div class="mc-side-title">
                 <svg class="icon icon-xs"><use href="#icon-book-open"/></svg> Contexte Projet
             </div>
-            <input type="text" class="mc-mem-search" id="mc-mem-search" placeholder="Rechercher…" oninput="filterMemory(this.value)">
+            <input type="text" class="mc-mem-search" id="mc-mem-search" placeholder="{{ _('search') }}" oninput="filterMemory(this.value)">
             <div id="mc-memory">
                 {% if memories %}
                     {% set cat_labels = {'phase-summary':'Phases','product':'Produit','architecture':'Architecture','security':'Securite','development':'Developpement','quality':'Qualite','vision':'Vision','convention':'Conventions','team':'Equipe','decisions':'Decisions','infrastructure':'Infrastructure'} %}
@@ -151,10 +151,10 @@
                     </div>
                     {% endfor %}
                 {% else %}
-                <div class="mc-mem-empty">Aucun contexte — les agents alimenteront cette base au fil des phases</div>
+                <div class="mc-mem-empty">{{ _('no_context') }}</div>
                 {% endif %}
             </div>
-            <button class="mc-mem-add" onclick="addMemoryEntry()">+ Ajouter une entree</button>
+            <button class="mc-mem-add" onclick="addMemoryEntry()">{{ _('new_entry') }}</button>
         </div>
 
         <!-- SI Blueprint -->
@@ -230,7 +230,7 @@
                     </div>
                     {% endfor %}
                 {% else %}
-                <div class="mc-pr-empty">Aucune PR detectee</div>
+                <div class="mc-pr-empty">{{ _('no_pr_detected') }}</div>
                 {% endif %}
             </div>
             <div id="mc-commits">
@@ -242,7 +242,7 @@
                     </div>
                     {% endfor %}
                 {% else %}
-                <div style="font-size:0.7rem;color:var(--text-secondary);font-style:italic;padding:0.3rem 0">Aucun commit detecte</div>
+                <div style="font-size:0.7rem;color:var(--text-secondary);font-style:italic;padding:0.3rem 0">{{ _('no_commit_detected') }}</div>
                 {% endif %}
             </div>
         </div>

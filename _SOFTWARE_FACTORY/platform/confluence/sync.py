@@ -341,7 +341,7 @@ class ConfluenceSyncEngine:
                 (mission_id,)
             ).fetchall()
             if not runs:
-                return "<p><em>Aucune exécution.</em></p>"
+                return "<p><em>No execution.</em></p>"
 
             run = dict(runs[0])
             phases_raw = run.get("phases_json", "[]")
@@ -351,7 +351,7 @@ class ConfluenceSyncEngine:
                 phases = []
 
             if not phases:
-                return "<p><em>Aucune phase exécutée.</em></p>"
+                return "<p><em>No phase executed.</em></p>"
 
             rows = ['<tr><th>Phase</th><th>Status</th><th>Résumé</th></tr>']
             for p in phases:

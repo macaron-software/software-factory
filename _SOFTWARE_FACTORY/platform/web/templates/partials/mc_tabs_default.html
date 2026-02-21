@@ -25,7 +25,7 @@
                         <span class="mc-dev-commit-msg">{{ c.message[:80] }}</span>
                     </div>
                     {% endfor %}
-                    {% if not workspace_commits %}<div class="mc-dev-empty">Aucun commit</div>{% endif %}
+                    {% if not workspace_commits %}<div class="mc-dev-empty">{{ _('no_commit') }}</div>{% endif %}
                 </div>
                 <div class="mc-dev-prs">
                     <h4>Pull Requests</h4>
@@ -37,7 +37,7 @@
                         <span class="mc-dev-pr-status {{ pr.status|lower }}">{{ pr.status }}</span>
                     </div>
                     {% endfor %}
-                    {% if not pull_requests %}<div class="mc-dev-empty">Aucune PR</div>{% endif %}
+                    {% if not pull_requests %}<div class="mc-dev-empty">{{ _('no_pr') }}</div>{% endif %}
                 </div>
             </div>
             <div class="mc-dev-files">
@@ -161,7 +161,7 @@
                         {% endfor %}
                     </div>
                     {% else %}
-                    <div class="mc-qa-empty">Aucun fichier de test dans le workspace</div>
+                    <div class="mc-qa-empty">{{ _('no_test_file') }}</div>
                     {% endif %}
                 </div>
 
@@ -183,7 +183,7 @@
                         {% endfor %}
                     </div>
                     {% else %}
-                    <div class="mc-qa-empty">Aucun résultat de test</div>
+                    <div class="mc-qa-empty">{{ _('no_test_result') }}</div>
                     {% endif %}
                 </div>
 
@@ -340,7 +340,7 @@
             <div class="mc-projet">
                 {% if result_launch_cmd %}
                 <div class="mc-projet-url" style="border-color:var(--green)">
-                    <h4>🚀 Lancer l'application</h4>
+                    <h4>{{ _('launch_app') }}</h4>
                     <code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_launch_cmd }}" style="color:var(--green);border-color:var(--green);font-size:0.85rem;cursor:pointer" title="▶ Cliquer pour exécuter">{{ result_launch_cmd }}</code>
                 </div>
                 {% endif %}

@@ -140,7 +140,7 @@
                     <span style="margin-left:auto;font-size:0.6rem;color:var(--text-muted)">{{ t.count }} tâches</span>
                 </div>
                 {% else %}
-                <div style="font-size:0.72rem;color:var(--text-muted);padding:0.5rem 0">Aucune tâche en attente</div>
+                <div style="font-size:0.72rem;color:var(--text-muted);padding:0.5rem 0">{{ _('pending_tasks') }}</div>
                 {% endfor %}
 
                 <div style="font-size:0.68rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin:0.8rem 0 0.3rem">Pull Requests (Agents)</div>
@@ -151,7 +151,7 @@
                     <span class="board-pr-status">{{ pr.status }}</span>
                 </div>
                 {% else %}
-                <div style="font-size:0.72rem;color:var(--text-muted);padding:0.5rem 0">Aucune PR</div>
+                <div style="font-size:0.72rem;color:var(--text-muted);padding:0.5rem 0">{{ _('no_pr') }}</div>
                 {% endfor %}
             </div>
         </div>

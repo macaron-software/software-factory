@@ -137,7 +137,7 @@ def _wrap_tables(xhtml: str) -> str:
 def features_to_confluence(features: list[dict]) -> str:
     """Convert features list to Confluence table."""
     if not features:
-        return "<p><em>Aucune feature définie.</em></p>"
+        return "<p><em>No feature defined.</em></p>"
 
     status_colors = {
         "backlog": "#6B7280", "sprint": "#3B82F6",
@@ -175,7 +175,7 @@ def _status_confluence_color(status: str) -> str:
 def messages_to_confluence(messages: list[dict], title: str = "") -> str:
     """Convert agent messages to formatted discussion thread."""
     if not messages:
-        return "<p><em>Aucune discussion.</em></p>"
+        return "<p><em>No discussion.</em></p>"
 
     parts = []
     if title:

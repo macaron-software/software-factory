@@ -10,7 +10,7 @@
             hx-post="/api/missions/{{ mission.id }}/start"
             hx-swap="none"
             hx-on::after-request="location.reload()">
-        <svg class="icon icon-sm"><use href="#icon-play"/></svg> Lancer
+        <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch') }}
     </button>
     {% elif mission.status == 'active' %}
     <a href="/missions/{{ mission.id }}/live" class="btn btn-sm btn-primary">
@@ -18,7 +18,7 @@
     </a>
     <button class="btn btn-sm btn-ghost" id="btnLaunchWorkflow"
             onclick="launchWorkflow()">
-        <svg class="icon icon-sm"><use href="#icon-play"/></svg> Lancer Workflow
+        <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch_workflow') }}
     </button>
     {% endif %}
 </div>
@@ -119,12 +119,12 @@
         </div>
         {% else %}
         <div style="text-align:center;padding:2rem;color:var(--text-secondary)">
-            <p>Aucun sprint — créez le premier pour démarrer.</p>
+            <p>{{ _('no_sprint') }}</p>
             <button class="btn btn-primary"
                     hx-post="/api/missions/{{ mission.id }}/sprints"
                     hx-swap="none"
                     hx-on::after-request="location.reload()">
-                <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Créer Sprint 1
+                <svg class="icon icon-sm"><use href="#icon-plus"/></svg> {{ _('new_sprint') }}
             </button>
         </div>
         {% endif %}
@@ -158,7 +158,7 @@
                 {% endfor %}
                 {% if col_status == 'pending' %}
                 <div class="inline-form" id="addTaskForm">
-                    <input class="inline-form__input" id="newTaskTitle" placeholder="Nouvelle tâche..." onkeydown="if(event.key==='Enter'){addTask()}">
+                    <input class="inline-form__input" id="newTaskTitle" placeholder="{{ _('new_task') }}" onkeydown="if(event.key==='Enter'){addTask()}">
                     <button class="inline-form__btn" onclick="addTask()">
                         <svg class="icon icon-xs"><use href="#icon-plus"/></svg>
                     </button>
@@ -248,14 +248,14 @@ async function launchWorkflow() {
         if (data.session_id) {
             window.location.href = `/sessions/${data.session_id}/live`;
         } else {
-            alert(data.error || 'Erreur');
+            alert(data.error || _('error_generic'));
             btn.disabled = false;
-            btn.textContent = 'Lancer Workflow';
+            btn.textContent = _('launch_workflow');
         }
     } catch(e) {
-        alert('Erreur: ' + e.message);
+        alert(_('error') + ': ' + e.message);
         btn.disabled = false;
-        btn.textContent = 'Lancer Workflow';
+        btn.textContent = _('launch_workflow');
     }
 }
 </script>

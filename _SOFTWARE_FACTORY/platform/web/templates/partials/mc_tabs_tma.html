@@ -53,7 +53,7 @@
                     {% endif %}
                     {% endfor %}
                     {% if not support_tickets|selectattr('status','ne','closed')|list %}
-                    <div class="mc-tma-empty"><svg class="icon" style="width:28px;height:28px;opacity:.3;display:block;margin:0 auto 0.3rem"><use href="#icon-inbox"/></svg>Aucun ticket ouvert</div>
+                    <div class="mc-tma-empty"><svg class="icon" style="width:28px;height:28px;opacity:.3;display:block;margin:0 auto 0.3rem"><use href="#icon-inbox"/></svg>{{ _('no_ticket') }}</div>
                     {% endif %}
                 </div>
             </div>
@@ -153,7 +153,7 @@
                     </div>
                     {% endfor %}
                     {% else %}
-                    <div class="mc-tma-empty">Aucun correctif en cours</div>
+                    <div class="mc-tma-empty">{{ _('no_fix') }}</div>
                     {% endif %}
                 </div>
             </div>
@@ -229,7 +229,7 @@
                     {% endif %}
                     {% endfor %}
                     {% if not support_tickets %}
-                    <div class="mc-tma-empty" style="width:100%">Aucun ticket</div>
+                    <div class="mc-tma-empty" style="width:100%">{{ _('no_tickets') }}</div>
                     {% endif %}
                 </div>
             </div>
@@ -288,7 +288,7 @@
                 </div>
                 {% endfor %}
                 {% else %}
-                <div class="mc-tma-empty">Aucun incident resolu pour le moment</div>
+                <div class="mc-tma-empty">{{ _('no_incident_resolved') }}</div>
                 {% endif %}
             </div>
 

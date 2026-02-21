@@ -166,14 +166,14 @@
                         </div>
                         {% endfor %}
                         {% if not f.stories %}
-                        <div class="po-story" style="opacity:0.5">Aucune user story</div>
+                        <div class="po-story" style="opacity:0.5">{{ _('no_story') }}</div>
                         {% endif %}
                     </div>
                 </div>
                 {% endfor %}
 
                 {% if not ep.features %}
-                <div style="font-size:0.8rem;color:var(--text-tertiary);padding:0.5rem 0">Aucune feature encore</div>
+                <div style="font-size:0.8rem;color:var(--text-tertiary);padding:0.5rem 0">{{ _('no_feature_yet') }}</div>
                 {% endif %}
             </div>
             {% endfor %}
@@ -181,7 +181,7 @@
             {% if not epics %}
             <div class="po-card">
                 <div style="text-align:center;padding:2rem;color:var(--text-tertiary)">
-                    Aucun epic créé pour ce projet
+                    {{ _('no_epics_project') }}
                 </div>
             </div>
             {% endif %}
@@ -195,7 +195,7 @@
                     <svg class="icon icon-xs"><use href="#icon-terminal"/></svg> Espace Projet
                 </a>
                 <a href="/ideation" class="btn btn-sm" style="border:1px solid var(--border)">
-                    <svg class="icon icon-xs"><use href="#icon-lightning"/></svg> Retour Idéation
+                    <svg class="icon icon-xs"><use href="#icon-lightning"/></svg> {{ _('back_ideation') }}
                 </a>
             </div>
         </div>

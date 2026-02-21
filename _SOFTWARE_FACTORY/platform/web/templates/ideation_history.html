@@ -50,7 +50,7 @@
             Historique des Idéations
         </div>
         <a href="/ideation" class="btn btn-primary btn-sm">
-            <svg class="icon icon-xs"><use href="#icon-lightning"/></svg> Nouvelle Idéation
+            <svg class="icon icon-xs"><use href="#icon-lightning"/></svg> {{ _('new_ideation') }}
         </a>
     </div>
 
@@ -78,8 +78,8 @@
         {% if not sessions %}
         <div class="ih-empty">
             <svg class="icon" style="width:40px;height:40px;color:var(--text-tertiary);margin-bottom:0.5rem"><use href="#icon-lightning"/></svg>
-            <div>Aucune idéation pour l'instant</div>
-            <a href="/ideation" style="color:var(--purple);font-size:0.8rem">Lancer une première idéation</a>
+            <div>{{ _('no_ideation') }}</div>
+            <a href="/ideation" style="color:var(--purple);font-size:0.8rem">{{ _('start_first_ideation') }}</a>
         </div>
         {% endif %}
     </div>
@@ -95,7 +95,7 @@
         </button>
     </div>
     <div class="ih-detail-body" id="ihDetailBody">
-        <div style="text-align:center;padding:2rem;color:var(--text-tertiary)">Chargement...</div>
+        <div style="text-align:center;padding:2rem;color:var(--text-tertiary)">{{ _('loading') }}</div>
     </div>
 </div>
 
@@ -103,7 +103,7 @@
 async function loadSession(id) {
     document.getElementById('ihOverlay').classList.add('open');
     document.getElementById('ihDetail').classList.add('open');
-    document.getElementById('ihDetailBody').innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-tertiary)">Chargement...</div>';
+    document.getElementById('ihDetailBody').innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-tertiary)">{{ _('loading') }}</div>';
 
     try {
         const resp = await fetch(`/api/ideation/sessions/${id}`);
@@ -166,7 +166,7 @@ async function loadSession(id) {
         document.getElementById('ihDetailBody').innerHTML = html;
     } catch(e) {
         document.getElementById('ihDetailBody').innerHTML =
-            `<div style="color:var(--red);padding:1rem">Erreur: ${e.message}</div>`;
+            `<div style="color:var(--red);padding:1rem">${_("error")}: ${e.message}</div>`;
     }
 }
 

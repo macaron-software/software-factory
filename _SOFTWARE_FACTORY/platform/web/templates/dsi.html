@@ -216,7 +216,7 @@
             <a href="/api/incidents" class="btn btn-ghost" style="font-size:0.65rem;padding:0.15rem 0.4rem">Tout →</a>
         </div>
         <div class="dsi-panel-body" style="max-height:200px" id="incidents-content">
-            <div style="text-align:center;color:var(--text-muted);padding:1rem;font-size:0.75rem">Chargement…</div>
+            <div style="text-align:center;color:var(--text-muted);padding:1rem;font-size:0.75rem">{{ _('loading_ellipsis') }}</div>
         </div>
     </div>
 </div>
@@ -237,7 +237,7 @@ document.addEventListener('htmx:afterRequest', function(evt) {
             html += '</div>';
             const recent = data.recent || [];
             if (recent.length === 0) {
-                html += '<div style="text-align:center;color:var(--text-muted);padding:0.5rem;font-size:0.72rem">Aucun incident</div>';
+                html += '<div style="text-align:center;color:var(--text-muted);padding:0.5rem;font-size:0.72rem">'+_('no_incident')+'</div>';
             }
             for (const r of recent) {
                 const sc = colors[r.severity] || '#6b7280';

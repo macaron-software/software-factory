@@ -136,7 +136,7 @@ async def memory_search(q: str = ""):
     mem = get_memory_manager()
     results = mem.global_search(q, limit=20)
     if not results:
-        return HTMLResponse(f'<div style="color:var(--text-muted);font-size:0.75rem;padding:0.5rem">Aucun résultat pour "{q}"</div>')
+        return HTMLResponse(f'<div style="color:var(--text-muted);font-size:0.75rem;padding:0.5rem">No results for "{q}"</div>')
     html = ""
     for r in results:
         cat = r.get("category", "")

@@ -774,7 +774,7 @@ def get_builtin_workflows() -> list[WorkflowDef]:
         WorkflowDef(
             id="product-lifecycle",
             name="Cycle de Vie Produit Complet",
-            description="Pipeline bout en bout: idéation → comité stratégique GO/NOGO → architecture → sprints dev → CI/CD pipeline → campagne QA → deploy prod → TMA maintenance.",
+            description="Pipeline bout en bout: ideation → strategic committee GO/NOGO → architecture → dev sprints → CI/CD pipeline → QA campaign → prod deploy → TMA maintenance.",
             icon="rocket", is_builtin=True,
             phases=[
                 # ── Phase 1: Idéation (NETWORK — PO briefe, experts débattent, PO synthétise) ──
@@ -823,7 +823,7 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                 # ── Phase 7: QA (LOOP — Test Manager planifie, exécution, si KO → reboucle) ──
                 WorkflowPhase(id="qa-campaign", pattern_id="loop",
                               name="Campagne de Tests QA",
-                              description="Le Test Manager planifie et lance la campagne. Le QA Lead exécute les suites (E2E, API, perf). Si VETO (bugs trouvés): boucle retour au Test Manager qui re-planifie les corrections. Itère jusqu'à APPROVE ou max 5 itérations.",
+                              description="The Test Manager plans and launches the campaign. The QA Lead runs suites (E2E, API, perf). On VETO (bugs found): loop back to Test Manager who re-plans fixes. Iterates until APPROVE or max 5 iterations.",
                               gate="all_approved",
                               config={"agents": ["test_manager", "qa_lead"], "max_iterations": 5}),
                 # ── Phase 8: QA Détaillée (PARALLEL — QA Lead dispatche) ──
@@ -962,7 +962,7 @@ def get_builtin_workflows() -> list[WorkflowDef]:
     builtins.append(
         WorkflowDef(
             id="dsi-platform-features",
-            name="DSI Plateforme — Nouvelles Features",
+            name="DSI Platform — New Features",
             description="Pipeline complet pour les nouvelles fonctionnalités de la plateforme Macaron. "
                         "Discovery réseau → Comité stratégique GO/NOGO → Architecture → Sprint Dev (6 devs spécialisés) "
                         "→ CI/CD → QA parallèle → Deploy staging/prod → Rétrospective.",
@@ -1366,7 +1366,7 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                                           "base légale des traitements, minimisation, durées de conservation, "
                                           "droits des personnes (accès, effacement, portabilité), PIA si nécessaire. "
                                           "Le Juriste complète sur les transferts hors UE et sous-traitants. "
-                                          "Recherche web des dernières décisions CNIL.",
+                                          "Web search for latest CNIL decisions.",
                               gate="always",
                               config={"agents": ["rse-dpo", "rse-juriste"]}),
                 WorkflowPhase(id="legal-audit", pattern_id="sequential",

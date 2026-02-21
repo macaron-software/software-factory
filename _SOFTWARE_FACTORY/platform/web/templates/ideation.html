@@ -36,7 +36,7 @@
                 </div>
                 {% endfor %}
                 {% if not past_sessions %}
-                <div style="text-align:center;padding:1rem;font-size:0.7rem;color:var(--text-tertiary)">Aucun historique</div>
+                <div style="text-align:center;padding:1rem;font-size:0.7rem;color:var(--text-tertiary)">{{ _('no_history') }}</div>
                 {% endif %}
             </div>
             <div class="idea-sidebar-footer">
@@ -171,7 +171,7 @@
             <div id="ideaActions" style="display:flex;flex-direction:column;gap:0.4rem">
                 <button class="pm-filter" style="width:100%;text-align:left;opacity:.5;pointer-events:none" id="btnCreateEpic">
                     <svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-rocket"/></svg>
-                    Créer un Epic depuis cette idée
+                    {{ _('create_epic') }}
                 </button>
                 <button class="pm-filter" style="width:100%;text-align:left;opacity:.5;pointer-events:none" id="btnGenerateTeam">
                     <svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-users"/></svg>
@@ -586,7 +586,7 @@ async function sendIdea() {
             body: JSON.stringify({prompt: text, session_id: sessionId}),
         });
         if (!resp.ok) {
-            addMsg('system', 'Système', `Erreur serveur (${resp.status})`, 'var(--red)', '');
+            addMsg('system', 'Système', `${_('error')} (${resp.status})`, 'var(--red)', '');
             sendBtn.disabled = false;
             return;
         }
@@ -757,7 +757,7 @@ async function sendIdea() {
 
     } catch (e) {
         resetGraphState();
-        addMsg('system', 'Système', 'Erreur de connexion: ' + e.message, 'var(--red)', '');
+        addMsg('system', 'System', _('error') + ': ' + e.message, 'var(--red)', '');
         sendBtn.disabled = false;
     }
 }
@@ -846,16 +846,16 @@ document.getElementById('btnCreateEpic').addEventListener('click', async () => {
                 igAgents.find(a=>a.id==='product_manager')?.avatar_url || '');
             setTimeout(() => { window.location.href = data.redirect; }, 2000);
         } else if (data.error) {
-            addMsg('system', 'Système', 'Erreur: ' + data.error, 'var(--red)', '');
+            addMsg('system', 'System', _('error') + ': ' + data.error, 'var(--red)', '');
             btn.disabled = false;
-            btn.innerHTML = '<svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-rocket"/></svg> Créer un Epic depuis cette idée';
+            btn.innerHTML = '<svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-rocket"/></svg> {{ _('create_epic') }}';
         }
     } catch(e) {
         epicDone = true;
         progressTimers.forEach(clearTimeout);
-        addMsg('system', 'Système', 'Erreur: ' + e.message, 'var(--red)', '');
+        addMsg('system', 'System', _('error') + ': ' + e.message, 'var(--red)', '');
         btn.disabled = false;
-        btn.innerHTML = '<svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-rocket"/></svg> Créer un Epic depuis cette idée';
+        btn.innerHTML = '<svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-rocket"/></svg> {{ _('create_epic') }}';
     }
 });
 
@@ -928,7 +928,7 @@ async function loadPastSession(id) {
                 'var(--green)', '');
         }
     } catch(e) {
-        addMsg('system', 'Système', 'Erreur chargement: ' + e.message, 'var(--red)', '');
+        addMsg('system', 'System', _('error') + ': ' + e.message, 'var(--red)', '');
     }
 }
 

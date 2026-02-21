@@ -2,7 +2,7 @@
 
 {% block topbar_actions %}
 <a href="/ideation" class="btn btn-primary">
-    <svg class="icon icon-sm"><use href="#icon-compass"/></svg> Nouvelle Idée
+    <svg class="icon icon-sm"><use href="#icon-compass"/></svg> {{ _('new_idea') }}
 </a>
 {% endblock %}
 
@@ -181,7 +181,7 @@
                 {% else %}
                 <div class="met-empty">
                     <svg><use href="#icon-inbox"/></svg>
-                    <div class="met-empty-text">Aucune mission active</div>
+                    <div class="met-empty-text">{{ _('no_mission_active') }}</div>
                     <div class="met-empty-sub">Lancez une mission depuis le PI Board ou l'Idéation</div>
                 </div>
                 {% endif %}
@@ -205,7 +205,7 @@
                     </a>
                     {% endfor %}
                     {% if not workflows %}
-                    <div style="font-size:0.68rem;color:var(--text-muted);padding:0.5rem">Aucun workflow défini</div>
+                    <div style="font-size:0.68rem;color:var(--text-muted);padding:0.5rem">{{ _('no_workflow') }}</div>
                     {% endif %}
                 </div>
             </div>
@@ -265,7 +265,7 @@
                     {% endfor %}
                 </div>
                 {% else %}
-                <div style="font-size:0.68rem;color:var(--text-muted);padding:0.5rem;text-align:center">Aucune activité agent</div>
+                <div style="font-size:0.68rem;color:var(--text-muted);padding:0.5rem;text-align:center">{{ _('no_activity') }}</div>
                 {% endif %}
             </div>
         </div>

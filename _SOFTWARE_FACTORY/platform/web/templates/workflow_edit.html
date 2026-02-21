@@ -50,14 +50,14 @@
         {% endfor %}
       </select>
 
-      <div class="ge-panel-title" style="margin-top:1rem">Ajouter Agent</div>
+      <div class="ge-panel-title" style="margin-top:1rem">{{ _('add_agent') }}</div>
       <select id="selAgent" class="ge-select">
         <option value="">— choisir —</option>
         {% for a in (agents or []) %}
         <option value="{{ a.id }}">{{ a.name }}</option>
         {% endfor %}
       </select>
-      <button class="ge-btn ge-btn-accent ge-btn-block" id="btnAddAgent">+ Ajouter</button>
+      <button class="ge-btn ge-btn-accent ge-btn-block" id="btnAddAgent">{{ _('add') }}</button>
 
       <div class="ge-panel-title" style="margin-top:1.2rem">Options globales</div>
       <label class="ge-toggle-row">
@@ -122,7 +122,7 @@
           <span class="ge-toggle-track"><span class="ge-toggle-thumb"></span></span>
         </label>
 
-        <button class="ge-btn ge-btn-danger ge-btn-block" style="margin-top:1.2rem" id="btnRemoveNode"><svg class="icon icon-xs"><use href="#icon-trash"/></svg> Supprimer Agent</button>
+        <button class="ge-btn ge-btn-danger ge-btn-block" style="margin-top:1.2rem" id="btnRemoveNode"><svg class="icon icon-xs"><use href="#icon-trash"/></svg> {{ _('remove_agent') }}</button>
       </div>
     </aside>
 
@@ -403,7 +403,7 @@ function onDblClick(e){
   const card = e.target.closest('.node-card');
   if(!card) return;
   const nid = card.dataset.nid;
-  if(confirm('Supprimer cet agent du graphe ?')) removeNode(nid);
+  if(confirm(_('delete_confirm_agent'))) removeNode(nid);
 }
 
 function removeNode(nid){
@@ -460,7 +460,7 @@ function bindPropListeners(){
     n.tools.push(t); render(); showProps();
   });
   document.getElementById('btnRemoveNode').addEventListener('click', function(){
-    if(selectedId && confirm('Supprimer cet agent ?')) removeNode(selectedId);
+    if(selectedId && confirm(_('delete_confirm_agent'))) removeNode(selectedId);
   });
 }
 

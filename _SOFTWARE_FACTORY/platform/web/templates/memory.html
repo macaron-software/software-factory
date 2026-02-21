@@ -122,7 +122,7 @@
                 </div>
                 {% else %}
                 <div style="text-align:center;padding:1.5rem;font-size:0.75rem;color:var(--text-muted)">
-                    Aucune mémoire projet. Les agents rempliront cette section lors de l'analyse des codebases.
+                    {{ _('no_memory') }}
                 </div>
                 {% endfor %}
             </div>
@@ -169,7 +169,7 @@ async function generateRetro() {
         html += `<div style="margin-top:0.5rem;font-size:0.6rem;color:var(--text-muted);text-align:right">Leçons → mémoire globale ✓</div>`;
         panel.innerHTML = html;
     } catch(e) {
-        panel.innerHTML = `<div class="retro-item failure"><span class="retro-icon">−</span> Erreur: ${e.message}</div>`;
+        panel.innerHTML = `<div class="retro-item failure"><span class="retro-icon">−</span> ${_("error")}: ${e.message}</div>`;
     }
 }
 

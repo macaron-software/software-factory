@@ -161,7 +161,7 @@ async def ideation_submit(request: Request):
                 session_id=session_id,
                 from_agent="system",
                 message_type="system",
-                content=f"Erreur idéation: {e}",
+                content=f"Ideation error: {e}",
             ))
 
     asyncio.create_task(_run_ideation())

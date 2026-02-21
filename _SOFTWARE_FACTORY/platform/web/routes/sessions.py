@@ -11,6 +11,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, FileResponse
 
 from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, serve_workspace_file
+from ...i18n import t, get_lang
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -383,7 +384,7 @@ async def session_live_page(request: Request, session_id: str):
                 "agent_id": m.from_agent,
                 "icon": "x-circle" if m.message_type == "veto" else "check-circle",
             })
-        elif any(kw in content[:200].lower() for kw in ("rapport", "audit", "analyse", "synthèse", "conclusion", "décomposition")):
+        elif any(kw in content[:200].lower() for kw in ("report", "audit", "analysis", "summary", "conclusion", "decomposition", "rapport", "analyse", "synthèse")):
             meta = {}
             if hasattr(m, "metadata") and m.metadata:
                 meta = m.metadata if isinstance(m.metadata, dict) else {}
@@ -410,6 +411,7 @@ async def session_live_page(request: Request, session_id: str):
     agent_map_dict = _agent_map_for_template(agents)
 
     # Build prompt suggestions based on workflow/session goal
+    lang = get_lang(request)
     suggestions = []
     if wf_id:
         from platform.workflows.store import WorkflowStore as _WS2
@@ -418,78 +420,78 @@ async def session_live_page(request: Request, session_id: str):
             _WORKFLOW_SUGGESTIONS = {
                 "strategic-committee": [
                     ("bar-chart-2", "Arbitrage portfolio", "Analysez le portfolio actuel et recommandez les arbitrages d'investissement pour le trimestre"),
-                    ("target", "Priorisation WSJF", "Priorisez les initiatives en cours avec la méthode WSJF et identifiez les quick wins"),
-                    ("check-circle", "GO/NOGO projet", "Évaluez la faisabilité et décidez GO ou NOGO pour les projets en attente"),
-                    ("dollar-sign", "Revue budget", "Passez en revue les budgets par projet et identifiez les dépassements potentiels"),
+                    ("target", "WSJF Prioritization", "Prioritize current initiatives using WSJF method and identify quick wins"),
+                    ("check-circle", "GO/NOGO Decision", "Evaluate feasibility and decide GO or NOGO for pending projects"),
+                    ("dollar-sign", "Budget Review", "Review budgets per project and identify potential overruns"),
                 ],
                 "sf-pipeline": [
-                    ("cpu", "Analyse codebase", "Analysez la codebase et décomposez les prochaines tâches de développement"),
+                    ("cpu", "Codebase Analysis", "Analyze the codebase and decompose upcoming development tasks"),
                     ("alert-triangle", "Fix bugs critiques", "Identifiez et corrigez les bugs critiques en production"),
-                    ("shield", "Audit sécurité", "Lancez un audit de sécurité OWASP sur le code actuel"),
+                    ("shield", "Security Audit", "Run an OWASP security audit on the current code"),
                     ("trending-up", "Optimisation perf", "Analysez les performances et proposez des optimisations"),
                 ],
                 "migration-sharelook": [
-                    ("refresh-cw", "Démarrer migration", "Lancez la migration Angular 16→17 en commençant par l'inventaire des modules"),
-                    ("check-square", "Vérifier golden files", "Comparez les golden files legacy vs migration pour valider l'ISO 100%"),
+                    ("refresh-cw", "Start Migration", "Launch Angular 16→17 migration starting with module inventory"),
+                    ("check-square", "Verify Golden Files", "Compare legacy vs migration golden files to validate ISO 100%"),
                     ("package", "Migrer module", "Migrez le prochain module standalone avec les codemods"),
-                    ("activity", "Tests de régression", "Exécutez les tests de régression post-migration"),
+                    ("activity", "Regression Tests", "Run post-migration regression tests"),
                 ],
                 "review-cycle": [
-                    ("eye", "Review derniers commits", "Passez en revue les derniers commits et identifiez les problèmes"),
-                    ("search", "Analyse qualité", "Analysez la qualité du code : complexité, duplication, couverture"),
-                    ("shield", "Audit sécurité", "Vérifiez les vulnérabilités de sécurité dans le code récent"),
+                    ("eye", "Review Latest Commits", "Review latest commits and identify issues"),
+                    ("search", "Quality Analysis", "Analyze code quality: complexity, duplication, coverage"),
+                    ("shield", "Security Audit", "Check for security vulnerabilities in recent code"),
                 ],
                 "debate-decide": [
-                    ("zap", "Proposition technique", "Débattez des options d'architecture pour la prochaine feature"),
-                    ("layers", "Choix de stack", "Comparez les stacks techniques et décidez la meilleure approche"),
+                    ("zap", "Technical Proposal", "Debate architecture options for the next feature"),
+                    ("layers", "Stack Choice", "Compare tech stacks and decide the best approach"),
                 ],
                 "ideation-to-prod": [
-                    ("compass", "Nouvelle idée", "Explorons une nouvelle idée de produit — de l'idéation jusqu'au MVP"),
-                    ("box", "Architecture MVP", "Définissez l'architecture du MVP et les composants nécessaires"),
-                    ("play", "Sprint dev", "Lancez un sprint de développement sur les user stories prioritaires"),
+                    ("compass", t("new_idea_explore", lang=lang), t("new_idea_explore_desc", lang=lang)),
+                    ("box", "MVP Architecture", "Define MVP architecture and required components"),
+                    ("play", "Dev Sprint", "Launch a development sprint on priority user stories"),
                 ],
                 "feature-request": [
-                    ("file-text", "Nouveau besoin", "J'ai un besoin métier à exprimer pour challenge et implémentation"),
-                    ("target", "User story", "Transformez ce besoin en user stories priorisées"),
+                    ("file-text", "New Requirement", "I have a business need to express for challenge and implementation"),
+                    ("target", "User Story", "Transform this need into prioritized user stories"),
                 ],
                 "tech-debt-reduction": [
                     ("tool", "Audit dette", "Lancez un audit cross-projet de la dette technique"),
                     ("bar-chart-2", "Prioriser fixes", "Priorisez les corrections de dette par impact WSJF"),
                 ],
                 "tma-maintenance": [
-                    ("alert-triangle", "Triage incidents", "Triez les incidents ouverts par sévérité et assignez les correctifs"),
+                    ("alert-triangle", "Incident Triage", "Sort open incidents by severity and assign fixes"),
                     ("search", "Diagnostic bug", "Diagnostiquez le bug suivant avec analyse root cause et impact"),
                     ("zap", "Hotfix urgent", "Lancez un correctif hotfix P0 avec deploy express"),
-                    ("bar-chart-2", "Bilan TMA", "Faites un bilan des SLA, incidents résolus et dette technique restante"),
+                    ("bar-chart-2", "TMA Report", "Review SLA status, resolved incidents and remaining tech debt"),
                 ],
                 "test-campaign": [
-                    ("clipboard", "Plan de test", "Définissez la matrice de couverture et les parcours critiques à tester"),
-                    ("terminal", "Automatiser tests", "Écrivez les tests E2E Playwright pour les parcours identifiés"),
-                    ("play-circle", "Lancer campagne", "Exécutez la campagne complète: E2E, API, smoke, performance"),
-                    ("bar-chart-2", "Rapport qualité", "Consolidez les résultats et décidez GO/NOGO pour la release"),
+                    ("clipboard", "Test Plan", "Define coverage matrix and critical paths to test"),
+                    ("terminal", "Automate Tests", "Write E2E Playwright tests for identified paths"),
+                    ("play-circle", t("launch_qa", lang=lang), t("launch_qa_desc", lang=lang)),
+                    ("bar-chart-2", "Quality Report", "Consolidate results and decide GO/NOGO for release"),
                 ],
                 "cicd-pipeline": [
                     ("settings", "Setup pipeline", "Configurez le pipeline CI/CD GitHub Actions pour le projet"),
                     ("refresh-cw", "Optimiser CI", "Analysez et optimisez les temps de build du pipeline actuel"),
-                    ("shield", "Quality gates", "Configurez les quality gates: couverture, sécurité, performance"),
-                    ("upload-cloud", "Deploy canary", "Lancez un déploiement canary avec monitoring et rollback automatique"),
+                    ("shield", "Quality Gates", "Configure quality gates: coverage, security, performance"),
+                    ("upload-cloud", "Canary Deploy", "Launch canary deployment with monitoring and auto-rollback"),
                 ],
                 "product-lifecycle": [
-                    ("compass", "Nouvelle idée produit", "J'ai une idée de produit à explorer — lancez l'idéation avec le métier, l'UX et l'architecte"),
-                    ("git-merge", "Cycle complet depuis un besoin", "Voici un besoin métier — faites-le passer par le cycle complet: idéation → comité strat → dev → CICD → QA → prod → TMA"),
-                    ("refresh-cw", "Reprendre au sprint dev", "Le comité stratégique a validé le GO — lancez les sprints de développement"),
-                    ("activity", "Lancer la campagne QA", "Le code est prêt — lancez la campagne de tests QA complète avant le deploy"),
+                    ("compass", t("new_idea_product", lang=lang), t("new_idea_product_desc", lang=lang)),
+                    ("git-merge", "Full Cycle from Requirement", "Here's a business need — run it through the full cycle: ideation → strategic committee → dev → CI/CD → QA → prod → TMA"),
+                    ("refresh-cw", "Resume Dev Sprint", "Strategic committee validated GO — launch development sprints"),
+                    ("activity", "Launch QA Campaign", "Code is ready — launch the full QA test campaign before deployment"),
                 ],
             }
             suggestions = _WORKFLOW_SUGGESTIONS.get(wf_id, [])
             if not suggestions and _wf2.description:
                 suggestions = [
-                    ("play", "Démarrer", f"Démarrons : {_wf2.description}"),
-                    ("help-circle", "État des lieux", "Faites un état des lieux avant de commencer"),
+                    ("play", "Start", f"Let's start: {_wf2.description}"),
+                    ("help-circle", "Status Report", "Get a status report before starting"),
                 ]
     if not suggestions and session.goal:
         suggestions = [
-            ("play", "Démarrer", f"Commençons : {session.goal}"),
+            ("play", "Start", f"Commençons : {session.goal}"),
             ("clipboard", "Plan d'action", f"Proposez un plan d'action pour : {session.goal}"),
         ]
 

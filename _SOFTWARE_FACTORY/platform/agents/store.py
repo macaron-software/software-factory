@@ -243,7 +243,7 @@ class AgentStore:
                      provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.3, max_tokens=4096,
                      icon="rocket", color="#3fb950",
-                     avatar="KD", tagline="CI/CD, Docker, déploiement canary, monitoring",
+                     avatar="KD", tagline="CI/CD, Docker, canary deployment, monitoring",
                      is_builtin=True, tags=["deploy", "infra", "ci-cd"]),
 
             AgentDef(id="product", name="Laura Vidal", role="Product Owner",

@@ -91,14 +91,14 @@
     </a>
     <div class="mission-actions">
         {% if st == 'running' and done_count < total %}
-        <button class="btn btn-sm" onclick="event.stopPropagation();runPhase('{{ run.id }}')" title="Lancer la prochaine phase">
-            <svg class="icon icon-xs"><use href="#icon-play"/></svg> Lancer phase {{ done_count + 1 }}
+        <button class="btn btn-sm" onclick="event.stopPropagation();runPhase('{{ run.id }}')" title="{{ _('launch_next_phase') }}">
+            <svg class="icon icon-xs"><use href="#icon-play"/></svg> {{ _('launch_phase', n=done_count + 1) }}
         </button>
         {% endif %}
         <a href="/missions/{{ run.id }}/control" class="btn btn-sm btn-ghost" title="Mission Control">
             <svg class="icon icon-xs"><use href="#icon-monitor"/></svg> Control
         </a>
-        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteRun('{{ run.id }}')" title="Supprimer">
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteRun('{{ run.id }}')" title="{{ _('delete') }}">
             <svg class="icon icon-xs"><use href="#icon-trash"/></svg>
         </button>
     </div>
@@ -108,17 +108,17 @@
 {% else %}
 <div class="empty-state" style="text-align:center;padding:3rem;">
     <p style="margin-bottom:0.5rem"><svg class="icon" style="width:2.5rem;height:2.5rem"><use href="#icon-rocket"/></svg></p>
-    <h3 style="color:var(--text-primary);margin-bottom:0.3rem">Aucune epic</h3>
+    <h3 style="color:var(--text-primary);margin-bottom:0.3rem">{{ _('no_epic') }}</h3>
     <p style="color:var(--text-secondary);font-size:0.88rem;margin-bottom:1rem">Lancez une epic pour orchestrer le cycle de vie produit complet.</p>
     <button class="btn btn-primary" onclick="document.getElementById('launchModal').style.display='flex'">
-        <svg class="icon icon-sm"><use href="#icon-play"/></svg> Lancer une Epic
+        <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch_epic') }}
     </button>
 </div>
 {% endif %}
 
 <div id="launchModal" class="launch-overlay" onclick="if(event.target===this)this.style.display='none'">
     <form class="launch-form" id="launchForm">
-        <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> Lancer une Epic</h3>
+        <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> {{ _('launch_epic') }}</h3>
         <div class="lf-field">
             <label>Projet</label>
             <select name="project_id" required>
@@ -142,7 +142,7 @@
         <div class="lf-actions">
             <button type="button" class="btn btn-ghost" onclick="document.getElementById('launchModal').style.display='none'">Annuler</button>
             <button type="submit" class="btn btn-primary">
-                <svg class="icon icon-sm"><use href="#icon-play"/></svg> Lancer
+                <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch') }}
             </button>
         </div>
     </form>
@@ -158,8 +158,8 @@ document.getElementById('launchForm').addEventListener('submit', async e => {
         const r = await fetch('/api/missions/start', {method:'POST', body: fd});
         const j = await r.json();
         if (j.redirect) location.href = j.redirect;
-        else { alert(j.error || 'Erreur'); btn.disabled = false; btn.textContent = 'Lancer'; }
-    } catch(err) { alert(err); btn.disabled = false; btn.textContent = 'Lancer'; }
+        else { alert(j.error || _('error_generic')); btn.disabled = false; btn.textContent = _('launch'); }
+    } catch(err) { alert(err); btn.disabled = false; btn.textContent = _('launch'); }
 });
 
 async function runPhase(runId) {
@@ -167,16 +167,16 @@ async function runPhase(runId) {
         const r = await fetch(`/api/missions/${runId}/run`, {method:'POST'});
         const j = await r.json();
         if (j.status === 'started' || j.redirect) location.href = `/missions/${runId}/control`;
-        else alert(j.error || j.message || 'Erreur');
+        else alert(j.error || j.message || _('error_generic'));
     } catch(err) { alert(err); }
 }
 
 async function deleteRun(runId) {
-    if (!confirm('Supprimer cette epic et toutes ses données ?')) return;
+    if (!confirm(_('delete_confirm_epic'))) return;
     try {
         const r = await fetch(`/api/mission-runs/${runId}`, {method:'DELETE'});
         if (r.ok) location.reload();
-        else { const j = await r.json(); alert(j.error || 'Erreur'); }
+        else { const j = await r.json(); alert(j.error || _('error_generic')); }
     } catch(err) { alert(err); }
 }
 </script>

@@ -192,7 +192,7 @@
     </div>
     {% else %}
     <div style="text-align:center;padding:2rem;color:var(--text-muted);font-size:0.8rem">
-        Aucune structure organisationnelle définie.
+        {{ _('no_org') }}
     </div>
     {% endfor %}
 </div>
@@ -216,7 +216,7 @@
         <h3><svg><use href="#icon-user"/></svg> <span id="fhTitle">Agent</span></h3>
         <button class="art-modal-close" onclick="closeFiche()"><svg><use href="#icon-x"/></svg></button>
     </div>
-    <div id="fhContent"><div class="fiche-loading">Chargement...</div></div>
+    <div id="fhContent"><div class="fiche-loading">{{ _('loading') }}</div></div>
 </div>
 
 {% endblock %}
@@ -265,7 +265,7 @@
         // Extract agent_id from the member data
         const agentId = m.dataset.agentId || '';
 
-        mbHTML += `<div class="art-modal-member" onclick="openFiche('${agentId}')" title="Voir la fiche">`;
+        mbHTML += `<div class="art-modal-member" onclick="openFiche('${agentId}')" title="{{ _('view_card') }}">`;
         if (avatarSrc) {
           mbHTML += `<div class="art-modal-member-av" style="background:${bg}"><img src="${avatarSrc}" alt="${nameText}" loading="lazy"></div>`;
         } else {
@@ -290,7 +290,7 @@
   window.openFiche = async function(agentId) {
     if (!agentId) return;
     const content = document.getElementById('fhContent');
-    content.innerHTML = '<div class="fiche-loading">Chargement...</div>';
+    content.innerHTML = '<div class="fiche-loading">{{ _('loading') }}</div>';
     ficheModal.classList.add('open');
     teamModal.classList.remove('open');
     document.getElementById('fhTitle').textContent = 'Agent';

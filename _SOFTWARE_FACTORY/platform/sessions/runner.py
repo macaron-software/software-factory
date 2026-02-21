@@ -651,7 +651,7 @@ async def _stream_agent_response(
             })
         except Exception as exc2:
             logger.error("Fallback also failed for %s: %s", agent.id, exc2)
-            full_content = f"(Erreur: {exc2})"
+            full_content = f"(Error: {exc2})"
 
     return full_content
 

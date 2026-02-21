@@ -122,7 +122,7 @@
         {% if not epics %}
         <div class="pm-empty">
             <svg><use href="#icon-layers"/></svg>
-            <div>Aucun epic. Créez une mission pour commencer.</div>
+            <div>{{ _('no_epic_create') }}</div>
         </div>
         {% endif %}
 
@@ -173,7 +173,7 @@
                     {% endif %}
                     {% else %}
                     <div class="pm-feat" style="justify-content:center;grid-template-columns:1fr">
-                        <span style="color:var(--text-secondary);font-size:0.78rem;font-style:italic">Aucune feature — décomposez cet epic</span>
+                        <span style="color:var(--text-secondary);font-size:0.78rem;font-style:italic">{{ _('no_feature') }}</span>
                     </div>
                     {% endfor %}
                 </div>

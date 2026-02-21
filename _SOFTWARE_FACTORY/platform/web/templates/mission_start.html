@@ -63,7 +63,7 @@
         <div class="ms-actions">
             <a href="/missions" class="btn btn-ghost">Annuler</a>
             <button type="submit" class="btn btn-primary">
-                <svg class="icon icon-sm"><use href="#icon-play"/></svg> Lancer l'Epic
+                <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch_epic') }}
             </button>
         </div>
     </form>
@@ -93,7 +93,7 @@ document.getElementById('missionForm').addEventListener('submit', async e => {
         else alert(j.error || 'Error');
     } catch(err) { alert(err); }
     btn.disabled = false;
-    btn.textContent = 'Lancer l\'Epic';
+    btn.textContent = _('launch_epic');
 });
 </script>
 {% endblock %}

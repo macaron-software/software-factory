@@ -11,6 +11,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, FileResponse
 
 from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, serve_workspace_file
+from ...i18n import t
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -131,7 +132,7 @@ async def create_mission(request: Request):
     form = await request.form()
     m = MissionDef(
         project_id=form.get("project_id", ""),
-        name=form.get("name", "Nouvelle mission"),
+        name=form.get("name", t("mission_default_name", lang=getattr(request.state, "lang", "en"))),
         goal=form.get("goal", ""),
         wsjf_score=float(form.get("wsjf_score", 0)),
         created_by="user",
@@ -657,8 +658,8 @@ Tes outils d'orchestration:
 Tes outils d'investigation:
 - code_read(path): Lire un fichier du projet
 - code_search(query, path): Chercher dans le code
-- git_log(cwd): Voir l'historique git
-- git_diff(cwd): Voir les changements
+- git_log(cwd): View git history
+- git_diff(cwd): View changes
 - memory_search(query): Chercher dans la mémoire projet
 - platform_missions(): État des missions
 - platform_agents(): Liste des agents
@@ -738,7 +739,7 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
                 elif evt == "tool":
                     # Tool being called — show in UI
                     tool_labels = {
-                        "memory_search": "Recherche mémoire",
+                        "memory_search": t("tool_memory_search", lang=getattr(request.state, "lang", "en")),
                         "memory_store": "Sauvegarde mémoire",
                         "get_phase_status": "Statut des phases",
                         "list_phases": "Liste des phases",
@@ -747,7 +748,7 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
                         "code_read": "Lecture de code",
                         "code_write": "Écriture de code",
                         "code_edit": "Modification de code",
-                        "code_search": "Recherche dans le code",
+                        "code_search": t("tool_code_search", lang=getattr(request.state, "lang", "en")),
                         "list_files": "Liste des fichiers",
                         "git_log": "Historique Git",
                         "git_status": "Statut Git",
@@ -1164,7 +1165,7 @@ async def api_mission_run(request: Request, mission_id: str):
                     "from_name": orch_name,
                     "from_role": orch_role,
                     "from_avatar": orch_avatar,
-                    "content": f"Erreur interne: {exc}",
+                    "content": f"Internal error: {exc}",
                     "msg_type": "text",
                 })
             except Exception:

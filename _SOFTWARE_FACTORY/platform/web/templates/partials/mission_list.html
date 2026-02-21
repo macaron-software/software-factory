@@ -36,14 +36,14 @@
             <svg class="icon icon-xs"><use href="#icon-refresh-cw"/></svg> Reprendre
         </button>
         {% elif st == 'running' and done_count < total %}
-        <button class="btn btn-sm" onclick="event.stopPropagation();runPhase('{{ run.id }}')" title="Lancer la prochaine phase">
-            <svg class="icon icon-xs"><use href="#icon-play"/></svg> Lancer phase {{ done_count + 1 }}
+        <button class="btn btn-sm" onclick="event.stopPropagation();runPhase('{{ run.id }}')" title="{{ _('launch_next_phase') }}">
+            <svg class="icon icon-xs"><use href="#icon-play"/></svg> {{ _('launch_phase', n=done_count + 1) }}
         </button>
         {% endif %}
         <a href="/missions/{{ run.id }}/control" class="btn btn-sm btn-ghost" title="Mission Control">
             <svg class="icon icon-xs"><use href="#icon-monitor"/></svg> Control
         </a>
-        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteRun('{{ run.id }}')" title="Supprimer">
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteRun('{{ run.id }}')" title="{{ _('delete') }}">
             <svg class="icon icon-xs"><use href="#icon-trash"/></svg>
         </button>
     </div>

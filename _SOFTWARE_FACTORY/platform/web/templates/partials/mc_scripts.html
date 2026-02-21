@@ -58,7 +58,7 @@ function toggleTicketDetail(el) {
     detail.innerHTML = '<div style="display:flex;gap:0.3rem;margin-top:0.3rem">'
         + `<button onclick="event.stopPropagation();updateTicketStatus('${id}','in_progress',this)" style="background:#3b82f6;color:#fff;border:none;border-radius:4px;padding:0.2rem 0.5rem;font-size:0.6rem;cursor:pointer">En cours</button>`
         + `<button onclick="event.stopPropagation();updateTicketStatus('${id}','resolved',this)" style="background:#10b981;color:#fff;border:none;border-radius:4px;padding:0.2rem 0.5rem;font-size:0.6rem;cursor:pointer">Resolu</button>`
-        + `<button onclick="event.stopPropagation();updateTicketStatus('${id}','closed',this)" style="background:#6b7280;color:#fff;border:none;border-radius:4px;padding:0.2rem 0.5rem;font-size:0.6rem;cursor:pointer">Fermer</button>`
+        + `<button onclick="event.stopPropagation();updateTicketStatus('${id}','closed',this)" style="background:#6b7280;color:#fff;border:none;border-radius:4px;padding:0.2rem 0.5rem;font-size:0.6rem;cursor:pointer">{{ _('close') }}</button>`
         + '</div>';
     el.appendChild(detail);
 }
@@ -354,11 +354,11 @@ async function sendCdpMessage() {
                         } else if (evtType === 'error') {
                             if (document.contains(think)) think.remove();
                             if (agentMsg) {
-                                agentMsg.contentDiv.innerHTML = `<span style="color:var(--red)">${d.message||'Erreur'}</span>`;
+                                agentMsg.contentDiv.innerHTML = `<span style="color:var(--red)">${d.message||_('error_generic')}</span>`;
                                 agentMsg.contentDiv.classList.remove('mu--streaming');
                                 agentMsg.bubble.classList.remove('streaming');
                             } else {
-                                _addChatMsg('system', d.message || 'Erreur');
+                                _addChatMsg('system', d.message || _('error_generic'));
                             }
                         }
                     } catch(e){}
@@ -384,7 +384,7 @@ async function sendCdpMessage() {
         if (document.contains(think)) think.remove();
         const msg = (err.message || '').toLowerCase().includes('network') || (err.message || '').toLowerCase().includes('fetch')
             ? 'Le serveur ne repond pas. Verifiez qu\'il est en cours d\'execution.'
-            : err.message || 'Erreur inconnue';
+            : err.message || _('error_unknown');
         _addChatMsg('system', msg);
     }
     _cdpChatBusy = false;
@@ -608,7 +608,7 @@ function handleSSE(d) {
         updatePhaseStatus(d.phase_id, 'pending');
     }
     else if (d.type === 'reloop') {
-        addActivity(`RELOOP ${d.reloop_count}/${d.max_reloops} — Retour au dev sprint`, 'system');
+        addActivity(`RELOOP ${d.reloop_count}/${d.max_reloops} — Back to dev sprint`, 'system');
         // Reset downstream phase statuses in UI
         (d.reset_phases || []).forEach(pid => updatePhaseStatus(pid, 'pending'));
     }
@@ -1068,9 +1068,9 @@ async function resetMission() {
         if (resp.ok) {
             window.location.reload();
         } else {
-            alert('Erreur lors de la réinitialisation');
+            alert(_('error_reset'));
         }
-    } catch(err) { console.error(err); alert('Erreur réseau'); }
+    } catch(err) { console.error(err); alert(_('error_network')); }
 }
 
 async function syncConfluence() {
@@ -1084,12 +1084,12 @@ async function syncConfluence() {
             const synced = Object.entries(data).filter(([,v]) => v.status === 'ok').map(([k]) => k);
             const failed = Object.entries(data).filter(([,v]) => v.status === 'error').map(([k]) => k);
             let msg = synced.length ? `Sync OK: ${synced.join(', ')}` : '';
-            if (failed.length) msg += (msg ? '\n' : '') + `Erreur: ${failed.join(', ')}`;
-            alert(msg || 'Aucun contenu à synchroniser');
+            if (failed.length) msg += (msg ? '\n' : '') + `${_('error')}: ${failed.join(', ')}`;
+            alert(msg || _('no_sync_content'));
         } else {
-            alert(data.error || 'Erreur Confluence');
+            alert(data.error || _('error_confluence'));
         }
-    } catch(err) { console.error(err); alert('Erreur réseau'); }
+    } catch(err) { console.error(err); alert(_('error_network')); }
     finally {
         btn.disabled = false;
         btn.innerHTML = '<svg class="icon icon-xs" style="width:12px;height:12px;vertical-align:middle;margin-right:3px"><use href="#icon-upload-cloud"/></svg>Sync Confluence';
