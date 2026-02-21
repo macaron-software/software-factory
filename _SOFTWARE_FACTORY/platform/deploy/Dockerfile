@@ -19,6 +19,7 @@ COPY core/ /app/core/
 COPY skills/ /app/skills/
 COPY projects/ /app/projects/
 COPY mf_projects/ /app/mf_projects/
+COPY mcp_lrm/ /app/mcp_lrm/
 
 # Create non-root user (needs docker group for container tools)
 RUN groupadd -r macaron && useradd -r -g macaron -G docker -d /app macaron \
