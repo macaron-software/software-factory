@@ -1314,6 +1314,36 @@ async def mission_control_page(request: Request, mission_id: str):
                     qa_test_files.append({"path": rel, "type": ttype})
         qa_test_files = sorted(qa_test_files, key=lambda x: x["type"])[:30]
 
+    # QA: Coverage metrics — ratio tests/code + coverage from tool output
+    qa_coverage = {"test_count": len(qa_test_files), "code_count": 0, "ratio": 0, "coverage_pct": None}
+    if ws_path and Path(ws_path).exists():
+        ws = Path(ws_path)
+        code_exts = {".py", ".ts", ".js", ".swift", ".kt", ".java", ".rs"}
+        code_count = 0
+        for ext in code_exts:
+            for cf in ws.rglob(f"*{ext}"):
+                if any(part in _qa_exclude for part in cf.relative_to(ws).parts):
+                    continue
+                name = cf.name.lower()
+                if not any(t in name for t in ("test_", "_test.", ".test.", ".spec.", "test")):
+                    code_count += 1
+        qa_coverage["code_count"] = code_count
+        qa_coverage["ratio"] = round(len(qa_test_files) / max(code_count, 1) * 100)
+        # Try to find coverage report
+        for cov_file in ["coverage/coverage-summary.json", "htmlcov/status.json", ".coverage", "coverage.xml", "lcov.info"]:
+            cp = ws / cov_file
+            if cp.exists():
+                try:
+                    import json as _jcov
+                    if cov_file.endswith(".json"):
+                        with open(cp) as _cf:
+                            cov_data = _jcov.load(_cf)
+                        if "total" in cov_data:
+                            qa_coverage["coverage_pct"] = cov_data["total"].get("lines", {}).get("pct")
+                            break
+                except Exception:
+                    pass
+
     # QA: Extract test results from QA/test phase messages
     qa_phase_results = []
     if wf:
@@ -1530,6 +1560,7 @@ async def mission_control_page(request: Request, mission_id: str):
         "qa_total_iterations": qa_total_iterations,
         "qa_test_files": qa_test_files,
         "qa_phase_results": qa_phase_results,
+        "qa_coverage": qa_coverage,
         "archi_content": archi_content,
         "archi_updated": archi_updated,
         "archi_decisions": archi_decisions,
@@ -4170,21 +4201,34 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
             "Produisez le dossier d'architecture consolidé."
         ),
         "dev-sprint": (
-            f"Sprint de développement pour «{brief}».\n"
+            f"Sprint de développement TDD pour «{brief}».\n"
             + (f"PLATEFORME: {platform_label}\n" if platform_label else "")
             + "VOUS DEVEZ UTILISER VOS OUTILS pour écrire du VRAI code dans le workspace.\n\n"
-            "WORKFLOW OBLIGATOIRE:\n"
+            "METHODE TDD OBLIGATOIRE (Red-Green-Refactor):\n"
             "1. LIRE LE WORKSPACE: list_files pour voir la structure actuelle\n"
-            "2. LIRE L'ARCHITECTURE: code_read sur les fichiers existants (README, Package.swift, etc.)\n"
-            "3. DECOMPOSER: Lead Dev donne des tâches fichier-par-fichier aux devs\n"
-            "4. CODER: Chaque dev utilise code_write pour créer les fichiers de son périmètre\n"
-            "5. TESTER: Utiliser test ou build pour vérifier que le code compile\n"
-            "6. COMMITTER: git_commit avec un message descriptif\n\n"
-            "IMPORTANT:\n"
-            "- Utilisez la stack technique décidée en phase Architecture (voir contexte ci-dessous)\n"
-            "- Ne réinventez PAS l'architecture — lisez le workspace et continuez le travail\n"
-            "- Chaque dev DOIT appeler code_write au moins 3 fois (fichiers réels, pas du pseudo-code)\n"
-            "- NE DISCUTEZ PAS du code. ECRIVEZ-LE avec code_write."
+            "2. LIRE L'ARCHITECTURE: code_read sur les fichiers existants\n"
+            "3. DECOMPOSER: Lead Dev donne des taches fichier-par-fichier aux devs\n"
+            "4. RED — ECRIRE LE TEST D'ABORD:\n"
+            "   - code_write pour creer le fichier test AVANT le code\n"
+            "   - Le test DOIT decrire le comportement attendu\n"
+            "   - Lancer le test avec build_tool — il DOIT echouer (RED)\n"
+            "5. GREEN — ECRIRE LE CODE MINIMAL:\n"
+            "   - code_write pour creer/modifier le code de production\n"
+            "   - Le code fait passer le test, rien de plus (KISS)\n"
+            "   - Lancer le test — il DOIT passer (GREEN)\n"
+            "6. REFACTOR — NETTOYER:\n"
+            "   - Eliminer la duplication, ameliorer les noms\n"
+            "   - Les tests doivent toujours passer apres refactor\n"
+            "7. COVERAGE: Lancer les tests avec coverage (--coverage, --cov, etc.)\n"
+            "   - Objectif: 80%+ de couverture\n"
+            "   - Reporter le taux dans le commit message\n"
+            "8. COMMITTER: git_commit avec message descriptif incluant le taux de coverage\n\n"
+            "REGLES:\n"
+            "- PAS de code sans test. Chaque fichier .ts/.py/.rs/.swift DOIT avoir son test\n"
+            "- Tests dans __tests__/ ou tests/ (convention du projet)\n"
+            "- Chaque dev DOIT appeler code_write au moins 3 fois (tests + code + refactor)\n"
+            "- NE DISCUTEZ PAS du code. ECRIVEZ-LE avec code_write.\n"
+            "- Le Lead Dev VERIFIE que chaque dev a ecrit ses tests AVANT de valider"
         ),
         "cicd": _qa("cicd"),
         "qa-campaign": _qa("qa-campaign"),
@@ -4199,13 +4243,15 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
             "Classifiez et routez l'incident."
         ),
         "tma-fix": (
-            f"Correctif TMA pour «{brief}».\n"
-            "UTILISEZ VOS OUTILS pour corriger :\n"
-            "1. Lisez le code concerné avec code_read\n"
-            "2. Corrigez avec code_edit\n"
-            "3. Ecrivez le test de non-regression avec code_write\n"
-            "4. Lancez les tests avec playwright_test ou build_tool\n"
-            "5. Commitez avec git_commit"
+            f"Correctif TMA (TDD) pour «{brief}».\n"
+            "UTILISEZ VOS OUTILS — methode TDD obligatoire :\n"
+            "1. Lisez le code concerne avec code_read\n"
+            "2. RED: Ecrivez le test de non-regression qui reproduit le bug (code_write)\n"
+            "3. Lancez le test — il DOIT echouer (confirmant le bug)\n"
+            "4. GREEN: Corrigez le code avec code_edit (fix minimal)\n"
+            "5. Lancez le test — il DOIT passer\n"
+            "6. Lancez TOUS les tests pour verifier zero regression\n"
+            "7. Commitez avec git_commit (message: fix + test ajouté)"
         ),
     }
     # Fallback to generic prompt

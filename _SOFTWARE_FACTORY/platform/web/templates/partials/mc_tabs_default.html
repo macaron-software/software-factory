@@ -120,7 +120,35 @@
             {% endif %}
             <div class="mc-qa">
 
-                <!-- Section 1: Tests unitaires & E2E trouvés dans le workspace -->
+                <!-- Section 0: Coverage & TDD Metrics -->
+                <div class="mc-qa-section">
+                    <h4>TDD / Coverage</h4>
+                    <div class="mc-qa-metrics">
+                        <div class="mc-qa-metric">
+                            <div class="mc-qa-metric-value">{{ qa_coverage.test_count }}</div>
+                            <div class="mc-qa-metric-label">Tests</div>
+                        </div>
+                        <div class="mc-qa-metric">
+                            <div class="mc-qa-metric-value">{{ qa_coverage.code_count }}</div>
+                            <div class="mc-qa-metric-label">Fichiers code</div>
+                        </div>
+                        <div class="mc-qa-metric">
+                            <div class="mc-qa-metric-value{% if qa_coverage.ratio >= 80 %} mc-qa-ok{% elif qa_coverage.ratio >= 50 %} mc-qa-warn{% else %} mc-qa-ko{% endif %}">{{ qa_coverage.ratio }}%</div>
+                            <div class="mc-qa-metric-label">Ratio test/code</div>
+                        </div>
+                        {% if qa_coverage.coverage_pct is not none %}
+                        <div class="mc-qa-metric">
+                            <div class="mc-qa-metric-value{% if qa_coverage.coverage_pct >= 80 %} mc-qa-ok{% elif qa_coverage.coverage_pct >= 60 %} mc-qa-warn{% else %} mc-qa-ko{% endif %}">{{ qa_coverage.coverage_pct }}%</div>
+                            <div class="mc-qa-metric-label">Coverage</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if qa_coverage.ratio < 50 %}
+                    <div class="mc-qa-alert">Ratio test/code faible — TDD non respecte</div>
+                    {% endif %}
+                </div>
+
+                <!-- Section 1: Tests unitaires & E2E trouves dans le workspace -->
                 <div class="mc-qa-section">
                     <h4>Tests — Fichiers</h4>
                     {% if qa_test_files %}
