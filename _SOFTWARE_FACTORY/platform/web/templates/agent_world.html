@@ -137,8 +137,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const AGENT_DATA = {{ agents_json|safe }};
 const LIVE_DATA = {{ live_json|safe }};
 
-// ── Day/Night Mode ──
-let isDayMode = localStorage.getItem('world-day') === '1';
+// ── Day/Night Mode — synced with site theme ──
+let isDayMode = (localStorage.getItem('macaron_theme') || 'dark') === 'light';
 const THEMES = {
     night: { bg: 0x151020, fog: 0x151020, ambient: 0x6040a0, ambientI: 1.0, dirColor: 0xffeedd, dirI: 1.2,
              fillColor: 0xaabbff, fillI: 0.5, hemiSky: 0x9080d0, hemiGnd: 0x302540, hemiI: 0.6,
@@ -252,6 +252,17 @@ function init() {
     seedLiveData();
     if (isDayMode) applyDayNight(true, false);
     document.getElementById('btn-daynight').textContent = isDayMode ? '☀️' : '🌙';
+
+    // Listen for site theme changes (topbar toggle)
+    new MutationObserver(() => {
+        const siteTheme = document.documentElement.getAttribute('data-theme');
+        const shouldBeDay = siteTheme === 'light';
+        if (shouldBeDay !== isDayMode) {
+            isDayMode = shouldBeDay;
+            document.getElementById('btn-daynight').textContent = isDayMode ? '☀️' : '🌙';
+            applyDayNight(isDayMode, true);
+        }
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
     setLoadProgress(100);
     setTimeout(() => loadScreen.classList.add('hidden'), 400);
@@ -1516,7 +1527,10 @@ function seedLiveData() {
 // ═══════════════════════════════════════════════════════
 function toggleDayNight() {
     isDayMode = !isDayMode;
-    localStorage.setItem('world-day', isDayMode ? '1' : '0');
+    // Sync with site theme
+    const theme = isDayMode ? 'light' : 'dark';
+    localStorage.setItem('macaron_theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
     document.getElementById('btn-daynight').textContent = isDayMode ? '☀️' : '🌙';
     applyDayNight(isDayMode, true);
 }
