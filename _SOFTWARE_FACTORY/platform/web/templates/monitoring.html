@@ -97,7 +97,54 @@
         </div>
     </div>
 
-    <!-- Row 4: Memory + System -->
+    <!-- Row 4: Database + Vector Store -->
+    <div class="mon-grid">
+        <div class="mon-card">
+            <h3><svg class="icon"><use href="#icon-database"/></svg> Database (SQLite)</h3>
+            <div class="mon-row" style="margin-bottom:0.7rem">
+                <div class="mon-col"><div class="label">Size</div><div class="val" id="monDbSize">—</div></div>
+                <div class="mon-col"><div class="label">Tables</div><div class="val" id="monDbTables">—</div></div>
+                <div class="mon-col"><div class="label">Total Rows</div><div class="val" id="monDbRows">—</div></div>
+                <div class="mon-col"><div class="label">Journal</div><div class="val" id="monDbJournal">—</div></div>
+            </div>
+            <table class="mon-table">
+                <thead><tr><th>Table</th><th style="text-align:right">Rows</th></tr></thead>
+                <tbody id="monDbTopTables"><tr><td colspan="2" style="color:var(--text-tertiary)">Loading...</td></tr></tbody>
+            </table>
+        </div>
+        <div class="mon-card">
+            <h3><svg class="icon"><use href="#icon-search"/></svg> Vector Store</h3>
+            <div class="mon-row" style="margin-bottom:0.7rem">
+                <div class="mon-col"><div class="label">Vectors</div><div class="val" id="monVecTotal">0</div></div>
+                <div class="mon-col"><div class="label">Embedded</div><div class="val" id="monVecEmbedded">0</div></div>
+                <div class="mon-col"><div class="label">Scopes</div><div class="val" id="monVecScopes">0</div></div>
+                <div class="mon-col"><div class="label">Dim</div><div class="val" id="monVecDim">—</div></div>
+            </div>
+            <div class="mon-sub" id="monVecProvider" style="font-size:0.7rem;color:var(--text-tertiary)">—</div>
+            <div class="mon-bar" style="margin-top:0.5rem"><div class="mon-bar-fill purple" id="monVecBar" style="width:0%"></div></div>
+            <div class="mon-sub" id="monVecPct" style="font-size:0.65rem;margin-top:0.2rem;color:var(--text-tertiary)">0% embedded</div>
+        </div>
+    </div>
+
+    <!-- Row 5: MCP Servers + Incidents -->
+    <div class="mon-grid">
+        <div class="mon-card">
+            <h3><svg class="icon"><use href="#icon-server"/></svg> MCP Servers</h3>
+            <div id="monMcpServers" style="display:flex;flex-direction:column;gap:0.5rem">
+                <div style="color:var(--text-tertiary);font-size:0.75rem">Loading...</div>
+            </div>
+        </div>
+        <div class="mon-card">
+            <h3><svg class="icon"><use href="#icon-alert-triangle"/></svg> Incidents</h3>
+            <div class="mon-row" style="margin-bottom:0.7rem">
+                <div class="mon-col"><div class="label">Open</div><div class="val" id="monIncOpen" style="color:var(--red,#ef4444)">0</div></div>
+                <div class="mon-col"><div class="label">Total</div><div class="val" id="monIncTotal">0</div></div>
+            </div>
+            <div id="monIncBadges" style="display:flex;gap:0.4rem;flex-wrap:wrap"></div>
+        </div>
+    </div>
+
+    <!-- Row 6: Memory + System -->
     <div class="mon-grid">
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-book-open"/></svg> Memory</h3>
@@ -221,6 +268,70 @@ async function refresh() {
             memEl.innerHTML = Object.entries(d.memory).map(([k,v]) =>
                 `<div class="mon-col"><div class="label">${k}</div><div class="val">${typeof v === 'number' ? fmt(v) : v}</div></div>`
             ).join('');
+        }
+
+        // Database
+        if (d.database) {
+            const db = d.database;
+            document.getElementById('monDbSize').textContent = (db.size_mb || 0) + ' MB';
+            document.getElementById('monDbTables').textContent = db.tables || 0;
+            document.getElementById('monDbRows').textContent = fmt(db.total_rows || 0);
+            document.getElementById('monDbJournal').textContent = db.journal_mode || '—';
+            const tbEl = document.getElementById('monDbTopTables');
+            if (db.top_tables && db.top_tables.length > 0) {
+                tbEl.innerHTML = db.top_tables.map(([name, cnt]) =>
+                    `<tr><td style="font-size:0.7rem">${name}</td><td style="text-align:right">${fmt(cnt)}</td></tr>`
+                ).join('');
+            }
+        }
+
+        // Vectors
+        if (d.vectors) {
+            const v = d.vectors;
+            document.getElementById('monVecTotal').textContent = fmt(v.total_vectors || 0);
+            document.getElementById('monVecEmbedded').textContent = fmt(v.with_embedding || 0);
+            document.getElementById('monVecScopes').textContent = v.scopes || 0;
+            document.getElementById('monVecDim').textContent = v.dimension || '—';
+            document.getElementById('monVecProvider').textContent = v.provider || '—';
+            const pct = v.total_vectors > 0 ? Math.round(v.with_embedding / v.total_vectors * 100) : 0;
+            document.getElementById('monVecBar').style.width = pct + '%';
+            document.getElementById('monVecPct').textContent = pct + '% embedded';
+        }
+
+        // MCP Servers
+        if (d.mcp) {
+            const mcpEl = document.getElementById('monMcpServers');
+            const entries = Object.entries(d.mcp).filter(([k]) => k !== 'error');
+            if (entries.length > 0) {
+                mcpEl.innerHTML = entries.map(([name, info]) => {
+                    const up = info.status === 'up' || info.status === 'ok';
+                    const dot = `<span class="dot" style="background:${up ? 'var(--green,#22c55e)' : 'var(--red,#ef4444)'};width:8px;height:8px;display:inline-block;border-radius:50%;margin-right:0.4rem"></span>`;
+                    const port = info.port ? `:${info.port}` : '';
+                    let detail = '';
+                    if (info.tools) detail += ` · ${info.tools} tools`;
+                    if (info.sessions !== undefined) detail += ` · ${info.sessions} sessions`;
+                    if (info.entries !== undefined) detail += ` · ${fmt(info.entries)} entries`;
+                    if (info.size_mb) detail += ` · ${info.size_mb} MB`;
+                    return `<div style="display:flex;align-items:center;font-size:0.8rem">${dot}<span style="font-weight:500">${name}</span><span style="color:var(--text-tertiary);margin-left:0.4rem">${port}${detail}</span></div>`;
+                }).join('');
+            } else {
+                mcpEl.innerHTML = '<div style="color:var(--text-tertiary);font-size:0.75rem">No MCP servers detected</div>';
+            }
+        }
+
+        // Incidents
+        if (d.incidents) {
+            document.getElementById('monIncOpen').textContent = d.incidents.open || 0;
+            document.getElementById('monIncTotal').textContent = d.incidents.total || 0;
+            const incEl = document.getElementById('monIncBadges');
+            if (d.incidents.by_severity_status && d.incidents.by_severity_status.length > 0) {
+                const sevColors = {P0:'red',P1:'red',P2:'yellow',P3:'blue',P4:'purple'};
+                incEl.innerHTML = d.incidents.by_severity_status.map(r =>
+                    `<span class="mon-badge ${sevColors[r.severity]||'purple'}">${r.severity} ${r.status}: ${r.cnt}</span>`
+                ).join('');
+            } else {
+                incEl.innerHTML = '<span style="color:var(--text-tertiary);font-size:0.75rem">No incidents ✓</span>';
+            }
         }
     } catch(e) {
         console.warn('Monitoring refresh error:', e);

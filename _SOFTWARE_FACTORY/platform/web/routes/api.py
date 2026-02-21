@@ -520,6 +520,136 @@ async def monitoring_live():
     except Exception:
         sse_connections = 0
 
+    # ── Database stats ──
+    db_stats = {}
+    try:
+        from ...db.migrations import get_db
+        db = get_db()
+        # Table row counts
+        tables = [r[0] for r in db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+        ).fetchall()]
+        table_counts = {}
+        total_rows = 0
+        for t in tables:
+            try:
+                cnt = db.execute(f"SELECT COUNT(*) FROM [{t}]").fetchone()[0]
+                table_counts[t] = cnt
+                total_rows += cnt
+            except Exception:
+                pass
+        # DB file size
+        db_path = str(db.execute("PRAGMA database_list").fetchone()[2]) if db.execute("PRAGMA database_list").fetchone() else ""
+        db_size_mb = 0
+        if db_path:
+            import pathlib
+            p = pathlib.Path(db_path)
+            if p.exists():
+                db_size_mb = round(p.stat().st_size / 1024 / 1024, 2)
+                # Include WAL
+                wal = p.with_suffix('.db-wal')
+                if wal.exists():
+                    db_size_mb += round(wal.stat().st_size / 1024 / 1024, 2)
+        # Page stats
+        page_size = db.execute("PRAGMA page_size").fetchone()[0]
+        page_count = db.execute("PRAGMA page_count").fetchone()[0]
+        freelist = db.execute("PRAGMA freelist_count").fetchone()[0]
+        journal_mode = db.execute("PRAGMA journal_mode").fetchone()[0]
+        db.close()
+        db_stats = {
+            "size_mb": db_size_mb,
+            "tables": len(tables),
+            "total_rows": total_rows,
+            "top_tables": sorted(table_counts.items(), key=lambda x: -x[1])[:10],
+            "page_size": page_size,
+            "page_count": page_count,
+            "freelist_pages": freelist,
+            "journal_mode": journal_mode,
+        }
+    except Exception as e:
+        db_stats = {"error": str(e)}
+
+    # ── Vector store stats ──
+    vector_stats = {}
+    try:
+        from ...db.migrations import get_db
+        db = get_db()
+        vr = db.execute("""
+            SELECT COUNT(*) as total,
+                   SUM(CASE WHEN embedding IS NOT NULL AND embedding != '' THEN 1 ELSE 0 END) as embedded,
+                   COUNT(DISTINCT scope_id) as scopes
+            FROM memory_vectors
+        """).fetchone()
+        vector_stats = {
+            "total_vectors": vr["total"] if vr else 0,
+            "with_embedding": vr["embedded"] if vr else 0,
+            "scopes": vr["scopes"] if vr else 0,
+            "dimension": 1536,
+            "provider": os.environ.get("EMBEDDING_ENDPOINT", "azure-openai")[:60],
+        }
+        db.close()
+    except Exception:
+        vector_stats = {"total_vectors": 0, "with_embedding": 0, "scopes": 0}
+
+    # ── MCP servers status ──
+    mcp_status = {}
+    try:
+        # MCP Platform (port 9501)
+        import urllib.request
+        try:
+            r = urllib.request.urlopen("http://127.0.0.1:9501/health", timeout=2)
+            mcp_platform = json.loads(r.read().decode())
+            mcp_status["mcp_platform"] = {"status": "up", "port": 9501, **mcp_platform}
+        except Exception:
+            mcp_status["mcp_platform"] = {"status": "down", "port": 9501}
+
+        # MCP LRM (port 9500)
+        try:
+            r = urllib.request.urlopen("http://127.0.0.1:9500/health", timeout=2)
+            mcp_lrm = json.loads(r.read().decode())
+            mcp_status["mcp_lrm"] = {"status": "up", "port": 9500, **mcp_lrm}
+        except Exception:
+            mcp_status["mcp_lrm"] = {"status": "down", "port": 9500}
+
+        # RLM Cache DB
+        import pathlib
+        rlm_cache = pathlib.Path(os.environ.get("DATA_DIR", "data")) / "rlm_cache.db"
+        if not rlm_cache.exists():
+            rlm_cache = pathlib.Path(__file__).resolve().parents[3] / "data" / "rlm_cache.db"
+        if rlm_cache.exists():
+            import sqlite3
+            cdb = sqlite3.connect(str(rlm_cache))
+            cdb.row_factory = sqlite3.Row
+            try:
+                cc = cdb.execute("SELECT COUNT(*) as cnt FROM rlm_cache").fetchone()
+                mcp_status["rlm_cache"] = {
+                    "status": "ok",
+                    "entries": cc["cnt"] if cc else 0,
+                    "size_mb": round(rlm_cache.stat().st_size / 1024 / 1024, 2),
+                }
+            except Exception:
+                mcp_status["rlm_cache"] = {"status": "empty", "entries": 0}
+            cdb.close()
+    except Exception as e:
+        mcp_status["error"] = str(e)
+
+    # ── Incidents stats ──
+    incidents = {}
+    try:
+        from ...db.migrations import get_db
+        db = get_db()
+        inc_rows = db.execute("""
+            SELECT severity, status, COUNT(*) as cnt
+            FROM platform_incidents
+            GROUP BY severity, status
+        """).fetchall()
+        open_count = sum(r["cnt"] for r in inc_rows if r["status"] == "open")
+        total_count = sum(r["cnt"] for r in inc_rows)
+        incidents = {"open": open_count, "total": total_count, "by_severity_status": [dict(r) for r in inc_rows]}
+        db.close()
+    except Exception:
+        incidents = {"open": 0, "total": 0}
+
     return JSONResponse({
         "timestamp": datetime.utcnow().isoformat(),
         "system": system,
@@ -540,6 +670,10 @@ async def monitoring_live():
         "memory": mem_stats,
         "projects": project_count,
         "sse_connections": sse_connections,
+        "database": db_stats,
+        "vectors": vector_stats,
+        "mcp": mcp_status,
+        "incidents": incidents,
     })
 
 
