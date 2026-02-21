@@ -99,6 +99,12 @@ async def ideation_submit(request: Request):
     if not prompt:
         return JSONResponse({"error": "Prompt requis"}, status_code=400)
 
+    # Prompt injection guard
+    from ...security.prompt_guard import get_prompt_guard
+    prompt, score = get_prompt_guard().check_and_sanitize(prompt, source="ideation")
+    if score.blocked:
+        return JSONResponse({"error": prompt}, status_code=400)
+
     session_id = data.get("session_id", "") or str(uuid.uuid4())[:8]
 
     # Create a real session
@@ -240,6 +246,16 @@ async def ideation_create_epic(request: Request):
     data = await request.json()
     idea = data.get("goal", "") or data.get("name", "")
     findings = data.get("description", "")
+
+    # ── Prompt injection guard ──
+    from ...security.prompt_guard import get_prompt_guard
+    guard = get_prompt_guard()
+    idea, score = guard.check_and_sanitize(idea, source="ideation-idea")
+    if score.blocked:
+        return JSONResponse({"error": idea}, status_code=400)
+    findings, score2 = guard.check_and_sanitize(findings, source="ideation-findings")
+    if score2.blocked:
+        return JSONResponse({"error": findings}, status_code=400)
 
     # ── Step 1: PO agent structures via LLM ──
     client = get_llm_client()

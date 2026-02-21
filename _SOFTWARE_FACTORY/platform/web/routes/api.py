@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import asyncio
+import html as html_mod
 import json
 import logging
 from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, FileResponse, PlainTextResponse
 
 from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, serve_workspace_file
 
@@ -149,7 +150,7 @@ async def memory_search(q: str = ""):
     mem = get_memory_manager()
     results = mem.global_search(q, limit=20)
     if not results:
-        return HTMLResponse(f'<div style="color:var(--text-muted);font-size:0.75rem;padding:0.5rem">No results for "{q}"</div>')
+        return HTMLResponse(f'<div style="color:var(--text-muted);font-size:0.75rem;padding:0.5rem">No results for "{html_mod.escape(q)}"</div>')
     html = ""
     for r in results:
         cat = r.get("category", "")
@@ -493,21 +494,13 @@ async def monitoring_live(hours: int = 24):
     disk = psutil.disk_usage('/')
 
     system = {
-        "pid": os.getpid(),
         "cpu_percent": round(cpu_percent, 1),
         "mem_rss_mb": round(mem_info.rss / 1024 / 1024, 1),
-        "mem_vms_mb": round(mem_info.vms / 1024 / 1024, 1),
         "sys_cpu_percent": round(sys_cpu, 1),
-        "sys_mem_total_gb": round(sys_mem.total / 1024**3, 1),
-        "sys_mem_used_gb": round(sys_mem.used / 1024**3, 1),
         "sys_mem_percent": round(sys_mem.percent, 1),
-        "disk_total_gb": round(disk.total / 1024**3, 1),
-        "disk_used_gb": round(disk.used / 1024**3, 1),
-        "disk_free_gb": round(disk.free / 1024**3, 1),
         "disk_percent": round(disk.percent, 1),
         "uptime_seconds": round(import_time() - process.create_time()),
         "threads": process.num_threads(),
-        "open_files": len(process.open_files()),
     }
 
     # LLM stats
@@ -1521,3 +1514,126 @@ async def velocity_data():
         return JSONResponse([])
     finally:
         db.close()
+
+
+# ── GitHub Webhook Integration ────────────────────────────────────────────────
+
+import hashlib
+import hmac
+import os
+import uuid
+
+
+@router.post("/api/webhooks/github")
+async def github_webhook(request: Request):
+    """Handle GitHub webhook events (push, pull_request, issues).
+
+    Configure in GitHub: Settings → Webhooks → Add webhook
+    Payload URL: https://your-domain/api/webhooks/github
+    Content type: application/json
+    Secret: set GITHUB_WEBHOOK_SECRET env var
+    Events: push, pull_request, issues
+    """
+    secret = os.environ.get("GITHUB_WEBHOOK_SECRET", "")
+    body = await request.body()
+
+    # HMAC signature verification
+    if secret:
+        sig_header = request.headers.get("X-Hub-Signature-256", "")
+        expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig_header, expected):
+            return JSONResponse({"error": "Invalid signature"}, status_code=401)
+
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+    event = request.headers.get("X-GitHub-Event", "ping")
+
+    if event == "ping":
+        return JSONResponse({"ok": True, "event": "ping"})
+
+    from ...db.connection import get_db
+    db = get_db()
+    now = datetime.utcnow().isoformat()
+
+    try:
+        if event == "push":
+            repo = payload.get("repository", {}).get("full_name", "unknown")
+            branch = payload.get("ref", "").split("/")[-1]
+            commits = payload.get("commits", [])
+            mid = str(uuid.uuid4())[:8]
+            db.execute(
+                "INSERT INTO missions (id, name, project_id, type, status, description, created_at) VALUES (?, ?, ?, 'feature', 'planning', ?, ?)",
+                (mid, f"Build: {repo}@{branch}", repo, f"{len(commits)} commit(s) pushed to {branch}", now),
+            )
+            db.commit()
+            return JSONResponse({"ok": True, "event": "push", "mission_id": mid})
+
+        elif event == "pull_request":
+            action = payload.get("action", "")
+            pr = payload.get("pull_request", {})
+            repo = payload.get("repository", {}).get("full_name", "unknown")
+            if action in ("opened", "synchronize"):
+                mid = str(uuid.uuid4())[:8]
+                db.execute(
+                    "INSERT INTO missions (id, name, project_id, type, status, description, created_at) VALUES (?, ?, ?, 'feature', 'in_review', ?, ?)",
+                    (mid, f"Review: PR #{pr.get('number')} {pr.get('title', '')}", repo, pr.get("body", "")[:500], now),
+                )
+                db.commit()
+                return JSONResponse({"ok": True, "event": "pull_request", "action": action, "mission_id": mid})
+
+        elif event == "issues":
+            action = payload.get("action", "")
+            issue = payload.get("issue", {})
+            repo = payload.get("repository", {}).get("full_name", "unknown")
+            if action == "opened":
+                mid = str(uuid.uuid4())[:8]
+                mtype = "bug" if any(l.get("name") == "bug" for l in issue.get("labels", [])) else "feature"
+                db.execute(
+                    "INSERT INTO missions (id, name, project_id, type, status, description, created_at) VALUES (?, ?, ?, ?, 'planning', ?, ?)",
+                    (mid, f"Issue #{issue.get('number')}: {issue.get('title', '')}", repo, mtype, issue.get("body", "")[:500], now),
+                )
+                db.commit()
+                return JSONResponse({"ok": True, "event": "issues", "mission_id": mid})
+    finally:
+        db.close()
+
+    return JSONResponse({"ok": True, "event": event, "action": "ignored"})
+
+
+# ── Notification Configuration ────────────────────────────────────────────────
+
+@router.get("/api/notifications/status")
+async def notification_status():
+    """Check notification configuration status."""
+    from ...services.notification_service import get_notification_service
+    svc = get_notification_service()
+    return JSONResponse({
+        "configured": svc.is_configured,
+        "channels": {
+            "slack": svc.has_slack,
+            "email": svc.has_email,
+            "webhook": svc.has_webhook,
+        },
+    })
+
+
+@router.post("/api/notifications/test")
+async def notification_test():
+    """Send a test notification to all configured channels."""
+    from ...services.notification_service import get_notification_service, NotificationPayload
+    svc = get_notification_service()
+    if not svc.is_configured:
+        return JSONResponse({"error": "No notification channels configured"}, status_code=400)
+    payload = NotificationPayload(
+        event="test",
+        title="Test Notification",
+        message="This is a test notification from Macaron Software Factory.",
+        severity="info",
+    )
+    await svc.notify(payload)
+    return JSONResponse({"ok": True, "channels": {
+        "slack": svc.has_slack, "email": svc.has_email, "webhook": svc.has_webhook,
+    }})

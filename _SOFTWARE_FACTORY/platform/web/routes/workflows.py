@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import html as html_mod
 import json
 import logging
 from datetime import datetime
@@ -164,7 +165,7 @@ async def run_session_workflow(request: Request, session_id: str):
 
     wf = get_workflow_store().get(workflow_id)
     if not wf:
-        return HTMLResponse(f'<div class="msg-system-text">Workflow {workflow_id} not found.</div>')
+        return HTMLResponse(f'<div class="msg-system-text">Workflow {html_mod.escape(str(workflow_id))} not found.</div>')
 
     # User message targets the workflow leader (first agent of first phase)
     leader = ""

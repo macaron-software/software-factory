@@ -116,10 +116,16 @@ class IntentRouter:
 
         # Use LLM for ambiguous cases
         try:
+            # Prompt injection guard
+            from ..security.prompt_guard import get_prompt_guard
+            safe_input, score = get_prompt_guard().check_and_sanitize(user_input, source="router")
+            if score.blocked:
+                return self._default()
+
             intents_list = "\n".join(f"- {k}: {v['keywords'][:3]}" for k, v in INTENT_PATTERNS.items())
             prompt = (
                 f"Classify this user request into ONE of these intents:\n{intents_list}\n\n"
-                f"User request: {user_input}\n\n"
+                f"User request: {safe_input}\n\n"
                 f"Respond with ONLY the intent name."
             )
 

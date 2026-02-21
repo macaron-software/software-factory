@@ -298,7 +298,7 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=[o.strip() for o in _cors_origins],
         allow_methods=["GET", "POST", "PUT", "DELETE"],
-        allow_headers=["*"],
+        allow_headers=["Content-Type", "Authorization", "X-Trace-ID", "X-Requested-With"],
         allow_credentials=True,
     )
 
@@ -310,7 +310,15 @@ def create_app() -> FastAPI:
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Content-Security-Policy"] = "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self' *; img-src 'self' data: https:;"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: https://api.dicebear.com https://avatars.githubusercontent.com; "
+            "connect-src 'self' *; "
+            "frame-ancestors 'none'"
+        )
         if request.url.scheme == "https":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response

@@ -188,6 +188,22 @@ class TestSearchExport:
         r = client.get("/api/search", params={"q": "test"})
         assert r.status_code == 200
 
+    def test_search_xss_escaped(self, client):
+        """Verify XSS payloads are escaped in HTML search results."""
+        r = client.get("/api/search", params={"q": '<script>alert("xss")</script>'})
+        assert r.status_code == 200
+        # JSON responses are safe (Content-Type: application/json, browsers don't execute)
+        # The XSS fix is in the memory search HTMLResponse, not this JSON endpoint
+        assert r.headers.get("content-type", "").startswith("application/json")
+
+    def test_memory_search_xss_escaped(self, client):
+        """Verify XSS payloads are escaped in memory search HTML responses."""
+        r = client.get("/api/memory/search", params={"q": '<script>alert("xss")</script>'})
+        assert r.status_code == 200
+        # HTMLResponse must escape user input
+        if "text/html" in r.headers.get("content-type", ""):
+            assert "<script>" not in r.text
+
     def test_export_epics(self, client):
         r = client.get("/api/export/epics")
         assert r.status_code == 200
@@ -195,6 +211,28 @@ class TestSearchExport:
     def test_export_features(self, client):
         r = client.get("/api/export/features")
         assert r.status_code == 200
+
+
+# ─── Security ───────────────────────────────────────────────────
+
+class TestSecurity:
+    def test_csp_header(self, client):
+        r = client.get("/api/health")
+        csp = r.headers.get("Content-Security-Policy", "")
+        assert "unsafe-eval" not in csp
+        assert "frame-ancestors 'none'" in csp
+
+    def test_security_headers(self, client):
+        r = client.get("/api/health")
+        assert r.headers.get("X-Content-Type-Options") == "nosniff"
+        assert r.headers.get("X-Frame-Options") == "DENY"
+
+    def test_monitoring_no_pid(self, client):
+        """Monitoring should not expose PID."""
+        r = client.get("/api/monitoring/live")
+        if r.status_code == 200:
+            data = r.json()
+            assert "pid" not in data.get("system", {})
 
 
 # ─── Memory ─────────────────────────────────────────────────────

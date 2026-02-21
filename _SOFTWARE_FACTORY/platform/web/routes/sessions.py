@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import html as html_mod
 import json
 import logging
 from datetime import datetime
@@ -702,7 +703,7 @@ async def run_session_pattern(request: Request, session_id: str):
 
     pattern = get_pattern_store().get(pattern_id)
     if not pattern:
-        return HTMLResponse(f'<div class="msg-system-text">Pattern {pattern_id} not found.</div>')
+        return HTMLResponse(f'<div class="msg-system-text">Pattern {html_mod.escape(str(pattern_id))} not found.</div>')
 
     # Store user's task as a message
     store.add_message(MessageDef(
