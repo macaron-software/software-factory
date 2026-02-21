@@ -104,6 +104,21 @@ async def portfolio_page(request: Request):
         total_done += p_done
         active_count += p_active
 
+        # Compute badges from mission names/types
+        tma_count = sum(1 for m in p_missions if '[TMA' in m.name and m.status == 'active')
+        tma_resolved = sum(1 for m in p_missions if '[TMA' in m.name and m.status == 'resolved')
+        has_secu = any('[TMA' in m.name and 'secur' in (m.name + (m.description or '')).lower() for m in p_missions) or p.factory_type == 'security'
+        has_cicd = p_total > 0 and any(
+            run and any(ph.phase_id in ('cicd', 'deploy-prod') for ph in (run.phases or []))
+            for m in p_missions
+            for run in [runs_by_mission.get(m.id)]
+        )
+        running_phases = sum(
+            1 for m in p_missions
+            for run in [runs_by_mission.get(m.id)]
+            if run and any(ph.status.value == 'running' for ph in (run.phases or []))
+        )
+
         projects_data.append({
             "id": p.id, "name": p.name, "factory_type": p.factory_type,
             "description": p.description or (p.vision or "")[:100],
@@ -111,6 +126,9 @@ async def portfolio_page(request: Request):
             "active_mission_count": p_active,
             "team_avatars": team_avatars,
             "total_tasks": p_total, "done_tasks": p_done,
+            "tma_active": tma_count, "tma_resolved": tma_resolved,
+            "has_secu": has_secu, "has_cicd": has_cicd,
+            "running_phases": running_phases,
         })
 
     # Build epics progression table (from live phase data)
