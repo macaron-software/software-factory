@@ -410,6 +410,41 @@ async def dora_dashboard_page(request: Request):
     })
 
 
+@router.get("/api/metrics/prometheus", response_class=PlainTextResponse)
+async def prometheus_metrics():
+    """Prometheus-compatible metrics endpoint."""
+    import os, time as _t, psutil
+    from ...metrics.collector import get_collector
+    c = get_collector()
+    snap = c.snapshot()
+    proc = psutil.Process(os.getpid())
+    lines = []
+
+    def _m(name, value, help_text="", labels=""):
+        if help_text:
+            lines.append(f"# HELP {name} {help_text}")
+            lines.append(f"# TYPE {name} gauge")
+        lbl = f"{{{labels}}}" if labels else ""
+        lines.append(f"{name}{lbl} {value}")
+
+    _m("macaron_uptime_seconds", snap["uptime_seconds"], "Platform uptime")
+    _m("macaron_http_requests_total", snap["http"]["total_requests"], "Total HTTP requests")
+    _m("macaron_http_errors_total", snap["http"]["total_errors"], "Total HTTP errors")
+    _m("macaron_http_avg_ms", snap["http"]["avg_ms"], "Average HTTP latency ms")
+    for code, cnt in snap["http"].get("by_status", {}).items():
+        _m("macaron_http_status", cnt, labels=f'code="{code}"')
+    _m("macaron_mcp_calls_total", snap["mcp"]["total_calls"], "Total MCP tool calls")
+    _m("macaron_process_cpu_percent", round(proc.cpu_percent(interval=0), 1), "Process CPU")
+    mem = proc.memory_info()
+    _m("macaron_process_rss_bytes", mem.rss, "Process RSS bytes")
+    _m("macaron_process_threads", proc.num_threads(), "Process threads")
+    for provider, stats in snap.get("llm", {}).get("by_provider", {}).items():
+        _m("macaron_llm_calls", stats.get("calls", 0), labels=f'provider="{provider}"')
+        _m("macaron_llm_cost_usd", stats.get("cost_usd", 0), labels=f'provider="{provider}"')
+
+    return "\n".join(lines) + "\n"
+
+
 @router.get("/api/metrics/dora/{project_id}")
 async def dora_api(request: Request, project_id: str):
     """DORA metrics JSON API."""
@@ -1242,3 +1277,247 @@ async def list_workspaces():
         "status": w.status.value,
         "created_at": w.created_at,
     } for w in active])
+
+
+# ── Integrations CRUD ────────────────────────────────────────────
+
+@router.get("/api/integrations")
+async def list_integrations():
+    """List all integrations."""
+    from ...db.migrations import get_db
+    db = get_db()
+    try:
+        rows = db.execute("SELECT * FROM integrations ORDER BY name").fetchall()
+        return JSONResponse([dict(r) for r in rows])
+    finally:
+        db.close()
+
+
+@router.patch("/api/integrations/{integ_id}")
+async def update_integration(integ_id: str, request: Request):
+    """Toggle or update integration config."""
+    from ...db.migrations import get_db
+    data = await request.json()
+    db = get_db()
+    try:
+        if "enabled" in data:
+            db.execute("UPDATE integrations SET enabled=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                       (1 if data["enabled"] else 0, integ_id))
+        if "config" in data:
+            existing = db.execute("SELECT config_json FROM integrations WHERE id=?", (integ_id,)).fetchone()
+            if existing:
+                import json as _json
+                cfg = _json.loads(existing["config_json"] or "{}")
+                cfg.update(data["config"])
+                db.execute("UPDATE integrations SET config_json=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                           (_json.dumps(cfg), integ_id))
+        db.commit()
+        return JSONResponse({"ok": True})
+    finally:
+        db.close()
+
+
+@router.post("/api/integrations/{integ_id}/test")
+async def test_integration(integ_id: str):
+    """Test integration connectivity."""
+    from ...db.migrations import get_db
+    db = get_db()
+    try:
+        row = db.execute("SELECT * FROM integrations WHERE id=?", (integ_id,)).fetchone()
+        if not row:
+            return JSONResponse({"ok": False, "error": "not found"}, 404)
+        import json as _json
+        cfg = _json.loads(row["config_json"] or "{}")
+        url = cfg.get("url", "")
+        if not url:
+            db.execute("UPDATE integrations SET status='error', updated_at=CURRENT_TIMESTAMP WHERE id=?", (integ_id,))
+            db.commit()
+            return JSONResponse({"ok": False, "error": "no URL configured"})
+        # Basic connectivity test
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, method="HEAD")
+            req.add_header("User-Agent", "Macaron-Platform/1.0")
+            token = cfg.get("api_token", "")
+            if token:
+                req.add_header("Authorization", f"Bearer {token}")
+            urllib.request.urlopen(req, timeout=10)
+            db.execute("UPDATE integrations SET status='connected', last_sync=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE id=?", (integ_id,))
+            db.commit()
+            return JSONResponse({"ok": True})
+        except Exception as e:
+            db.execute("UPDATE integrations SET status='error', updated_at=CURRENT_TIMESTAMP WHERE id=?", (integ_id,))
+            db.commit()
+            return JSONResponse({"ok": False, "error": str(e)[:200]})
+    finally:
+        db.close()
+
+
+# ── Search (JQL-like) ────────────────────────────────────────────
+
+@router.get("/api/search")
+async def search_all(request: Request):
+    """Search epics, features, missions, tickets across all projects."""
+    from ...db.migrations import get_db
+    q = request.query_params.get("q", "").strip()
+    if not q:
+        return JSONResponse({"results": [], "total": 0})
+
+    db = get_db()
+    try:
+        like = f"%{q}%"
+        results = []
+
+        # Search missions (epics)
+        for r in db.execute(
+            "SELECT id, name, status, project_id, type, workflow_id FROM missions WHERE name LIKE ? OR description LIKE ? LIMIT 20",
+            (like, like)
+        ).fetchall():
+            results.append({"type": "epic", "id": r["id"], "name": r["name"],
+                           "status": r["status"], "project": r["project_id"], "subtype": r["type"]})
+
+        # Search features
+        for r in db.execute(
+            "SELECT f.id, f.name, f.status, f.epic_id, f.story_points FROM features f WHERE f.name LIKE ? OR f.description LIKE ? LIMIT 20",
+            (like, like)
+        ).fetchall():
+            results.append({"type": "feature", "id": r["id"], "name": r["name"],
+                           "status": r["status"], "epic_id": r["epic_id"], "sp": r["story_points"]})
+
+        # Search tickets
+        for r in db.execute(
+            "SELECT id, title, status, severity, mission_id FROM support_tickets WHERE title LIKE ? OR description LIKE ? LIMIT 10",
+            (like, like)
+        ).fetchall():
+            results.append({"type": "ticket", "id": r["id"], "name": r["title"],
+                           "status": r["status"], "severity": r["severity"]})
+
+        # Search memory
+        try:
+            for r in db.execute(
+                "SELECT key, category, content FROM memory WHERE key LIKE ? OR content LIKE ? LIMIT 10",
+                (like, like)
+            ).fetchall():
+                results.append({"type": "memory", "id": r["key"], "name": r["key"],
+                               "category": r["category"], "preview": r["content"][:100]})
+        except Exception:
+            pass
+
+        return JSONResponse({"results": results, "total": len(results), "query": q})
+    finally:
+        db.close()
+
+
+# ── Export (CSV) ─────────────────────────────────────────────────
+
+@router.get("/api/export/epics")
+async def export_epics_csv(request: Request):
+    """Export all epics as CSV."""
+    from ...db.migrations import get_db
+    import csv
+    import io
+
+    db = get_db()
+    try:
+        rows = db.execute("""
+            SELECT m.id, m.name, m.status, m.project_id, m.type, m.workflow_id, m.wsjf_score,
+                   m.created_at, COUNT(f.id) as feature_count, COALESCE(SUM(f.story_points),0) as total_sp
+            FROM missions m LEFT JOIN features f ON f.epic_id = m.id
+            GROUP BY m.id ORDER BY m.created_at DESC
+        """).fetchall()
+
+        out = io.StringIO()
+        writer = csv.writer(out)
+        writer.writerow(["ID", "Name", "Status", "Project", "Type", "Workflow", "WSJF", "Created", "Features", "Story Points"])
+        for r in rows:
+            writer.writerow([r["id"], r["name"], r["status"], r["project_id"], r["type"],
+                           r["workflow_id"], r["wsjf_score"], r["created_at"], r["feature_count"], r["total_sp"]])
+
+        return StreamingResponse(
+            iter([out.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=epics_export.csv"}
+        )
+    finally:
+        db.close()
+
+
+@router.get("/api/export/features")
+async def export_features_csv(request: Request):
+    """Export features as CSV, optionally filtered by epic."""
+    from ...db.migrations import get_db
+    import csv
+    import io
+
+    epic_id = request.query_params.get("epic_id", "")
+    db = get_db()
+    try:
+        if epic_id:
+            rows = db.execute("SELECT * FROM features WHERE epic_id=? ORDER BY priority", (epic_id,)).fetchall()
+        else:
+            rows = db.execute("SELECT * FROM features ORDER BY epic_id, priority").fetchall()
+
+        out = io.StringIO()
+        writer = csv.writer(out)
+        writer.writerow(["ID", "Epic ID", "Name", "Status", "Priority", "Story Points", "Assigned To", "Created"])
+        for r in rows:
+            writer.writerow([r["id"], r["epic_id"], r["name"], r["status"], r["priority"],
+                           r["story_points"], r["assigned_to"], r["created_at"]])
+
+        return StreamingResponse(
+            iter([out.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=features_export{'_'+epic_id if epic_id else ''}.csv"}
+        )
+    finally:
+        db.close()
+
+
+# ── Burndown / Velocity ─────────────────────────────────────────
+
+@router.get("/api/metrics/burndown/{epic_id}")
+async def burndown_data(epic_id: str):
+    """Get burndown data for an epic — features completed over time."""
+    from ...db.migrations import get_db
+    db = get_db()
+    try:
+        total_sp = db.execute("SELECT COALESCE(SUM(story_points),0) FROM features WHERE epic_id=?", (epic_id,)).fetchone()[0]
+        done_features = db.execute(
+            "SELECT name, story_points, completed_at FROM features WHERE epic_id=? AND status='done' AND completed_at IS NOT NULL ORDER BY completed_at",
+            (epic_id,)
+        ).fetchall()
+
+        points = [{"date": r["completed_at"][:10], "sp": r["story_points"], "name": r["name"]} for r in done_features]
+        remaining = total_sp
+        burndown = []
+        for p in points:
+            remaining -= p["sp"]
+            burndown.append({"date": p["date"], "remaining": remaining, "done_name": p["name"]})
+
+        return JSONResponse({
+            "total_sp": total_sp,
+            "remaining_sp": remaining,
+            "completed_count": len(done_features),
+            "burndown": burndown,
+        })
+    finally:
+        db.close()
+
+
+@router.get("/api/metrics/velocity")
+async def velocity_data():
+    """Get velocity across sprints."""
+    from ...db.migrations import get_db
+    db = get_db()
+    try:
+        sprints = db.execute(
+            "SELECT id, name, status, velocity, planned_sp FROM sprints ORDER BY created_at DESC LIMIT 20"
+        ).fetchall()
+        return JSONResponse([{
+            "id": s["id"], "name": s["name"], "status": s["status"],
+            "velocity": s["velocity"], "planned_sp": s["planned_sp"],
+        } for s in sprints])
+    except Exception:
+        return JSONResponse([])
+    finally:
+        db.close()

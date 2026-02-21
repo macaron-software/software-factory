@@ -233,13 +233,20 @@ async def pi_board_page(request: Request):
             WHERE m.type = 'epic'
             ORDER BY m.created_at DESC
         """).fetchall()
+        # Batch feature stats in a single query instead of N+1
+        epic_ids = [r["id"] for r in rows]
+        feat_stats = {}
+        if epic_ids:
+            placeholders = ",".join("?" * len(epic_ids))
+            feat_rows = db.execute(f"""
+                SELECT epic_id, status, COUNT(*) as cnt, COALESCE(SUM(story_points),0) as sp
+                FROM features WHERE epic_id IN ({placeholders}) GROUP BY epic_id, status
+            """, epic_ids).fetchall()
+            for fr in feat_rows:
+                feat_stats.setdefault(fr["epic_id"], {})[fr["status"]] = {"count": fr["cnt"], "sp": fr["sp"]}
         for r in rows:
             eid = r["id"]
-            feats = db.execute("""
-                SELECT status, COUNT(*) as cnt, SUM(story_points) as sp
-                FROM features WHERE epic_id = ? GROUP BY status
-            """, (eid,)).fetchall()
-            feat_map = {f["status"]: {"count": f["cnt"], "sp": f["sp"] or 0} for f in feats}
+            feat_map = feat_stats.get(eid, {})
             total_f = sum(v["count"] for v in feat_map.values())
             done_f = feat_map.get("done", {}).get("count", 0)
             total_sp = sum(v["sp"] for v in feat_map.values())
@@ -433,12 +440,27 @@ async def monitoring_page(request: Request):
 async def settings_page(request: Request):
     from ...config import get_config
     from ...llm.providers import list_providers
+    from ...db.migrations import get_db
+    import json as _json
     cfg = get_config()
+    db = get_db()
+    try:
+        rows = db.execute("SELECT * FROM integrations ORDER BY name").fetchall()
+        integrations = []
+        for r in rows:
+            d = dict(r)
+            d["config"] = _json.loads(d.get("config_json") or "{}")
+            integrations.append(d)
+    except Exception:
+        integrations = []
+    finally:
+        db.close()
     return _templates(request).TemplateResponse("settings.html", {
         "request": request,
         "page_title": "Settings",
         "config": cfg,
         "providers": list_providers(),
+        "integrations": integrations,
     })
 
 

@@ -1,8 +1,18 @@
 {% extends "base.html" %}
 {% block topbar_actions %}
-<button class="btn btn-primary" onclick="document.getElementById('newMissionModal').style.display='flex'">
-    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> {{ _('new_mission') }}
-</button>
+<div style="display:flex;gap:0.5rem;align-items:center">
+    <div style="position:relative">
+        <input type="text" id="piSearch" placeholder="Search epics, features, tickets..." style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:0.35rem 0.7rem 0.35rem 2rem;font-size:0.78rem;color:var(--text-primary);width:240px;outline:none;font-family:inherit" oninput="debounceSearch(this.value)" onfocus="this.style.borderColor='var(--purple)'" onblur="setTimeout(()=>{this.style.borderColor='var(--border)';document.getElementById('searchResults').style.display='none'},200)">
+        <svg style="position:absolute;left:0.6rem;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text-secondary)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <div id="searchResults" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;margin-top:4px;max-height:360px;overflow-y:auto;z-index:50;box-shadow:0 8px 32px rgba(0,0,0,.3)"></div>
+    </div>
+    <a href="/api/export/epics" class="btn btn-ghost btn-sm" title="Export CSV" style="font-size:0.72rem">
+        <svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-download"/></svg>
+    </a>
+    <button class="btn btn-primary" onclick="document.getElementById('newMissionModal').style.display='flex'">
+        <svg class="icon icon-sm"><use href="#icon-plus"/></svg> {{ _('new_mission') }}
+    </button>
+</div>
 {% endblock %}
 {% block content %}
 <style>
@@ -387,6 +397,20 @@
                     <span>{{ _("adding_features_to_existing_migration_evolution") }}</span>
                 </div>
             </button>
+            <button type="button" class="wf-card" onclick="selectWf('pi-planning')">
+                <div class="wf-card-icon" style="background:rgba(59,130,246,.12);color:var(--blue)"><svg class="icon"><use href="#icon-calendar"/></svg></div>
+                <div class="wf-card-body">
+                    <strong>PI Planning</strong>
+                    <span>{{ _("pi_planning_safe_program_increment") }}</span>
+                </div>
+            </button>
+            <button type="button" class="wf-card" onclick="selectWf('tech-debt-reduction')">
+                <div class="wf-card-icon" style="background:rgba(245,158,11,.12);color:var(--yellow)"><svg class="icon"><use href="#icon-alert-triangle"/></svg></div>
+                <div class="wf-card-body">
+                    <strong>{{ _("dette_technique") }}</strong>
+                    <span>{{ _("tech_debt_audit_wsjf_sprint_fix") }}</span>
+                </div>
+            </button>
         </div>
         <div class="nm-actions" style="margin-top:0.75rem">
             <button type="button" class="btn btn-ghost" onclick="document.getElementById('newMissionModal').style.display='none'">{{ _("cancel") }}</button>
@@ -452,7 +476,9 @@ const WF_NAMES = {
     'product-lifecycle': 'Cycle Complet',
     'tma-maintenance': 'TMA / Ticketing',
     'security-hacking': 'Hacking / Securite',
-    'feature-request': 'Nouvelle Feature'
+    'feature-request': 'Nouvelle Feature',
+    'pi-planning': 'PI Planning — SAFe',
+    'tech-debt-reduction': 'Dette Technique'
 };
 function selectWf(id){
     document.getElementById('wfInput').value = id;
@@ -495,6 +521,22 @@ async function deleteRun(runId) {
         if (r.ok) location.reload();
         else { const j = await r.json(); alert(j.error || 'Erreur'); }
     } catch(err) { alert(err); }
+}
+
+let _searchTimer;
+function debounceSearch(q) {
+    clearTimeout(_searchTimer);
+    const box = document.getElementById('searchResults');
+    if (q.length < 2) { box.style.display='none'; return; }
+    _searchTimer = setTimeout(async()=>{
+        const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        const j = await r.json();
+        if (!j.results.length) { box.innerHTML='<div style="padding:0.8rem;color:var(--text-secondary);font-size:0.8rem">No results</div>'; box.style.display='block'; return; }
+        const icons = {epic:'<use href="#icon-rocket"/>',feature:'<use href="#icon-star"/>',ticket:'<use href="#icon-alert-triangle"/>',memory:'<use href="#icon-database"/>'};
+        const colors = {epic:'var(--purple)',feature:'var(--blue)',ticket:'var(--yellow)',memory:'var(--green)'};
+        box.innerHTML = j.results.map(r => `<a href="${r.type==='epic'?'/missions/'+r.id+'/control':r.type==='feature'?'#':'#'}" style="display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0.8rem;text-decoration:none;border-bottom:1px solid var(--border);transition:background .1s" onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='transparent'"><svg class="icon icon-sm" style="width:15px;height:15px;color:${colors[r.type]||'var(--text-secondary)'};flex-shrink:0">${icons[r.type]||'<use href="#icon-file-text"/>'}</svg><div style="min-width:0;flex:1"><div style="font-size:0.8rem;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div><div style="font-size:0.68rem;color:var(--text-secondary)">${r.type} · ${r.status||''} ${r.project?'· '+r.project:''}</div></div></a>`).join('');
+        box.style.display='block';
+    }, 300);
 }
 </script>
 {% endblock %}

@@ -249,13 +249,53 @@ def _migrate(conn):
     # ── Performance indexes ──
     conn.execute("CREATE INDEX IF NOT EXISTS idx_missions_wsjf ON missions(wsjf_score DESC)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_missions_created ON missions(created_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_missions_type ON missions(type)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_missions_workflow ON missions(workflow_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_created ON sessions(created_at)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_session_from ON messages(session_id, from_agent)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_toolcalls_session ON tool_calls(session_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_sprints_status ON sprints(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_features_status ON features(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_ideation_project ON ideation_sessions(project_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_ideation_status ON ideation_sessions(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_artifacts_type ON artifacts(type)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_mission_runs_parent ON mission_runs(parent_mission_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_mission_runs_session ON mission_runs(session_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_to)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_incidents_created ON platform_incidents(created_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_scores_agent ON agent_scores(agent_id)")
+
+    # ── Integrations (plugin connectors) ──
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS integrations (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL,
+            enabled INTEGER DEFAULT 0,
+            config_json TEXT DEFAULT '{}',
+            status TEXT DEFAULT 'disconnected',
+            last_sync TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_integrations_type ON integrations(type)")
+
+    # Seed default integrations if empty
+    existing = conn.execute("SELECT COUNT(*) FROM integrations").fetchone()[0]
+    if existing == 0:
+        for integ in [
+            ("jira", "Jira", "project_management", '{"url":"","project_key":"","mode":"import"}'),
+            ("confluence", "Confluence", "documentation", '{"url":"","space_key":"","auto_publish":["adr","retro"]}'),
+            ("xray", "Xray", "test_management", '{"url":"","test_plan_sync":true}'),
+            ("sonarqube", "SonarQube", "quality", '{"url":"","project_key":"","quality_gate":true}'),
+            ("gitlab", "GitLab", "devops", '{"url":"","project_id":"","ci_sync":true}'),
+            ("azure-devops", "Azure DevOps", "devops", '{"org":"","project":"","boards_sync":true}'),
+        ]:
+            conn.execute(
+                "INSERT OR IGNORE INTO integrations (id, name, type, config_json) VALUES (?,?,?,?)",
+                integ
+            )
 
 
 def _migrate_pg(conn):
