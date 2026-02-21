@@ -1,4 +1,34 @@
-platform/mcp_platform/__pycache__/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Data (SQLite DBs, logs, workspaces — too large for git)
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Logs
+*.log
+logs/
 
 # Environment secrets
 .env
+.env.*
+*.key
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
