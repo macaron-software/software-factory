@@ -289,6 +289,183 @@ async def update_story(request: Request, story_id: str):
     db.commit()
     db.close()
     return JSONResponse({"ok": True, "story_id": story_id})
+
+
+# ── Feature / Story creation ─────────────────────────────────────
+
+@router.post("/api/epics/{epic_id}/features")
+async def create_feature_api(request: Request, epic_id: str):
+    """Create a new feature under an epic."""
+    from ...missions.product import get_product_backlog, FeatureDef
+    data = await request.json()
+    name = data.get("name", "").strip()
+    if not name:
+        return JSONResponse({"error": "Name required"}, status_code=400)
+    backlog = get_product_backlog()
+    feat = backlog.create_feature(FeatureDef(
+        epic_id=epic_id, name=name,
+        description=data.get("description", ""),
+        acceptance_criteria=data.get("acceptance_criteria", ""),
+        story_points=int(data.get("story_points", 0)),
+        priority=int(data.get("priority", 5)),
+    ))
+    return JSONResponse({"ok": True, "feature": {"id": feat.id, "name": feat.name}})
+
+
+@router.post("/api/features/{feature_id}/stories")
+async def create_story_api(request: Request, feature_id: str):
+    """Create a new user story under a feature."""
+    from ...missions.product import get_product_backlog, UserStoryDef
+    data = await request.json()
+    title = data.get("title", "").strip()
+    if not title:
+        return JSONResponse({"error": "Title required"}, status_code=400)
+    backlog = get_product_backlog()
+    story = backlog.create_story(UserStoryDef(
+        feature_id=feature_id, title=title,
+        description=data.get("description", ""),
+        acceptance_criteria=data.get("acceptance_criteria", ""),
+        story_points=int(data.get("story_points", 0)),
+        priority=int(data.get("priority", 5)),
+    ))
+    return JSONResponse({"ok": True, "story": {"id": story.id, "title": story.title}})
+
+
+# ── Backlog priority reorder ─────────────────────────────────────
+
+@router.patch("/api/backlog/reorder")
+async def reorder_backlog(request: Request):
+    """Reorder features or stories by priority. Body: {type:'feature'|'story', ids:[ordered list]}"""
+    from ...db.migrations import get_db
+    data = await request.json()
+    item_type = data.get("type", "feature")
+    ids = data.get("ids", [])
+    if not ids:
+        return JSONResponse({"error": "ids list required"}, status_code=400)
+    table = "features" if item_type == "feature" else "user_stories"
+    db = get_db()
+    try:
+        for priority, item_id in enumerate(ids, 1):
+            db.execute(f"UPDATE {table} SET priority = ? WHERE id = ?", (priority, item_id))
+        db.commit()
+    finally:
+        db.close()
+    return JSONResponse({"ok": True, "reordered": len(ids)})
+
+
+# ── Feature dependencies ─────────────────────────────────────────
+
+@router.post("/api/features/{feature_id}/deps")
+async def add_feature_dep(request: Request, feature_id: str):
+    """Add a dependency: feature_id depends on depends_on_id."""
+    from ...db.migrations import get_db
+    data = await request.json()
+    depends_on = data.get("depends_on", "").strip()
+    if not depends_on or depends_on == feature_id:
+        return JSONResponse({"error": "Valid depends_on required"}, status_code=400)
+    db = get_db()
+    try:
+        db.execute(
+            "INSERT OR IGNORE INTO feature_deps (feature_id, depends_on, dep_type) VALUES (?, ?, ?)",
+            (feature_id, depends_on, data.get("dep_type", "blocked_by")),
+        )
+        db.commit()
+    finally:
+        db.close()
+    return JSONResponse({"ok": True})
+
+
+@router.delete("/api/features/{feature_id}/deps/{depends_on}")
+async def remove_feature_dep(feature_id: str, depends_on: str):
+    """Remove a feature dependency."""
+    from ...db.migrations import get_db
+    db = get_db()
+    try:
+        db.execute("DELETE FROM feature_deps WHERE feature_id = ? AND depends_on = ?", (feature_id, depends_on))
+        db.commit()
+    finally:
+        db.close()
+    return JSONResponse({"ok": True})
+
+
+@router.get("/api/features/{feature_id}/deps")
+async def list_feature_deps(feature_id: str):
+    """List dependencies for a feature."""
+    from ...db.migrations import get_db
+    db = get_db()
+    try:
+        rows = db.execute(
+            """SELECT fd.depends_on, fd.dep_type, f.name, f.status
+               FROM feature_deps fd LEFT JOIN features f ON fd.depends_on = f.id
+               WHERE fd.feature_id = ?""",
+            (feature_id,),
+        ).fetchall()
+        return JSONResponse({"deps": [
+            {"depends_on": r["depends_on"], "dep_type": r["dep_type"],
+             "name": r["name"] or r["depends_on"], "status": r["status"] or "unknown"}
+            for r in rows
+        ]})
+    finally:
+        db.close()
+
+
+# ── Sprint planning: assign stories to sprint ────────────────────
+
+@router.post("/api/sprints/{sprint_id}/assign-stories")
+async def assign_stories_to_sprint(request: Request, sprint_id: str):
+    """Assign multiple stories to a sprint. Body: {story_ids: [...]}"""
+    from ...db.migrations import get_db
+    data = await request.json()
+    story_ids = data.get("story_ids", [])
+    if not story_ids:
+        return JSONResponse({"error": "story_ids required"}, status_code=400)
+    db = get_db()
+    try:
+        for sid in story_ids:
+            db.execute("UPDATE user_stories SET sprint_id = ? WHERE id = ?", (sprint_id, sid))
+        db.commit()
+    finally:
+        db.close()
+    return JSONResponse({"ok": True, "assigned": len(story_ids)})
+
+
+@router.delete("/api/sprints/{sprint_id}/stories/{story_id}")
+async def unassign_story_from_sprint(sprint_id: str, story_id: str):
+    """Remove a story from a sprint."""
+    from ...db.migrations import get_db
+    db = get_db()
+    try:
+        db.execute("UPDATE user_stories SET sprint_id = '' WHERE id = ? AND sprint_id = ?", (story_id, sprint_id))
+        db.commit()
+    finally:
+        db.close()
+    return JSONResponse({"ok": True})
+
+
+@router.get("/api/sprints/{sprint_id}/available-stories")
+async def available_stories_for_sprint(sprint_id: str):
+    """List unassigned stories (backlog) available for sprint planning."""
+    from ...db.migrations import get_db
+    db = get_db()
+    try:
+        # Get the mission for this sprint
+        sprint = db.execute("SELECT mission_id FROM sprints WHERE id = ?", (sprint_id,)).fetchone()
+        if not sprint:
+            return JSONResponse({"error": "Sprint not found"}, status_code=404)
+        mission_id = sprint["mission_id"]
+        rows = db.execute(
+            """SELECT us.id, us.title, us.story_points, us.status, us.priority, f.name as feature_name
+               FROM user_stories us
+               JOIN features f ON us.feature_id = f.id
+               WHERE f.epic_id = ? AND (us.sprint_id = '' OR us.sprint_id IS NULL)
+               ORDER BY us.priority""",
+            (mission_id,),
+        ).fetchall()
+        return JSONResponse({"stories": [dict(r) for r in rows]})
+    finally:
+        db.close()
+
+
 async def launch_mission_workflow(request: Request, mission_id: str):
     """Create a session from mission's workflow and redirect to live view."""
     from ...missions.store import get_mission_store

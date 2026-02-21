@@ -840,6 +840,23 @@ async def product_page(request: Request):
 
     project_names = {p.id: p.name for p in all_projects}
 
+    # Load feature dependencies
+    from ...db.migrations import get_db as _gdb
+    _db = _gdb()
+    try:
+        dep_rows = _db.execute("SELECT feature_id, depends_on, dep_type FROM feature_deps").fetchall()
+        # Build lookup: feature_id → list of deps
+        deps_map = {}
+        for r in dep_rows:
+            deps_map.setdefault(r["feature_id"], []).append(
+                {"depends_on": r["depends_on"], "dep_type": r["dep_type"]})
+        # Reverse lookup: who depends on me
+        blocked_by_map = {}
+        for r in dep_rows:
+            blocked_by_map.setdefault(r["depends_on"], []).append(r["feature_id"])
+    finally:
+        _db.close()
+
     # Build epic → features → stories tree
     epics = []
     total_features = 0
@@ -866,8 +883,12 @@ async def product_page(request: Request):
             epic_features.append({
                 "id": f.id, "name": f.name, "status": f.status,
                 "story_points": f_points, "assigned_to": f.assigned_to,
+                "acceptance_criteria": f.acceptance_criteria or "",
+                "description": f.description or "",
+                "deps": deps_map.get(f.id, []),
+                "depended_by": blocked_by_map.get(f.id, []),
                 "stories": [{"id": s.id, "title": s.title, "status": s.status,
-                             "story_points": s.story_points} for s in stories],
+                             "story_points": s.story_points, "priority": s.priority} for s in stories],
             })
 
         total_features += len(features)
@@ -875,7 +896,13 @@ async def product_page(request: Request):
 
         epics.append({
             "id": m.id, "name": m.name, "status": m.status,
+            "project_id": m.project_id,
             "project_name": project_names.get(m.project_id, m.project_id),
+            "wsjf_score": getattr(m, 'wsjf_score', 0) or 0,
+            "business_value": getattr(m, 'business_value', 0) or 0,
+            "time_criticality": getattr(m, 'time_criticality', 0) or 0,
+            "risk_reduction": getattr(m, 'risk_reduction', 0) or 0,
+            "job_duration": getattr(m, 'job_duration', 1) or 1,
             "features": epic_features,
             "total_points": epic_points,
             "total_stories": epic_stories,

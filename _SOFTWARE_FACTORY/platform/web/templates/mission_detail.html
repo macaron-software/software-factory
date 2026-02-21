@@ -99,6 +99,30 @@
             {% if mission.goal %}
             <div class="mission-goal"><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-target"/></svg>{{ mission.goal }}</div>
             {% endif %}
+
+            <!-- WSJF inline calculator -->
+            <div style="margin-top:0.5rem;display:flex;align-items:center;gap:0.5rem">
+                <button class="btn btn-sm btn-ghost" onclick="document.getElementById('wsjfInline').classList.toggle('open')" style="font-size:0.72rem">
+                    <svg class="icon icon-xs"><use href="#icon-chart"/></svg> WSJF {% if mission.wsjf_score > 0 %}({{ mission.wsjf_score|round(1) }}){% endif %}
+                </button>
+            </div>
+            <div id="wsjfInline" style="display:none;margin-top:0.5rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;padding:0.75rem">
+                <style>#wsjfInline.open{display:block !important}
+                .wsjf-row{display:flex;align-items:center;gap:0.5rem;margin:0.3rem 0;font-size:0.78rem}
+                .wsjf-row label{flex:0 0 140px;color:var(--text-secondary)}
+                .wsjf-row input[type=range]{flex:1;accent-color:var(--purple)}
+                .wsjf-row .wsjf-val{min-width:25px;text-align:right;font-weight:700;color:var(--text-primary)}
+                </style>
+                <div class="wsjf-row"><label>Business Value</label><input type="range" min="1" max="21" value="{{ mission.business_value|default(1)|int }}" id="md-wsjf-bv" oninput="mdWSJF()"><span class="wsjf-val" id="md-bv-v">{{ mission.business_value|default(1)|int }}</span></div>
+                <div class="wsjf-row"><label>Time Criticality</label><input type="range" min="1" max="21" value="{{ mission.time_criticality|default(1)|int }}" id="md-wsjf-tc" oninput="mdWSJF()"><span class="wsjf-val" id="md-tc-v">{{ mission.time_criticality|default(1)|int }}</span></div>
+                <div class="wsjf-row"><label>Risk Reduction</label><input type="range" min="1" max="21" value="{{ mission.risk_reduction|default(1)|int }}" id="md-wsjf-rr" oninput="mdWSJF()"><span class="wsjf-val" id="md-rr-v">{{ mission.risk_reduction|default(1)|int }}</span></div>
+                <div class="wsjf-row"><label>Job Duration</label><input type="range" min="1" max="21" value="{{ mission.job_duration|default(1)|int }}" id="md-wsjf-jd" oninput="mdWSJF()"><span class="wsjf-val" id="md-jd-v">{{ mission.job_duration|default(1)|int }}</span></div>
+                <div style="text-align:center;margin-top:0.5rem;padding:0.4rem;background:var(--bg-tertiary);border-radius:4px">
+                    <span style="font-size:0.72rem;color:var(--text-secondary)">WSJF =</span>
+                    <span style="font-size:1.2rem;font-weight:700;color:var(--purple)" id="md-wsjf-score">{{ mission.wsjf_score|default(0)|round(1) }}</span>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="saveMdWSJF()" style="width:100%;margin-top:0.5rem">Save WSJF</button>
+            </div>
         </div>
 
         <!-- Sprint timeline -->
@@ -133,6 +157,72 @@
 
         <!-- Kanban board (for selected sprint) -->
         {% if selected_sprint %}
+
+        <!-- Sprint Planning Panel -->
+        <div style="margin-bottom:1rem">
+            <button class="btn btn-sm btn-ghost" onclick="document.getElementById('sprintPlanPanel').classList.toggle('open')" style="font-size:0.78rem">
+                <svg class="icon icon-xs"><use href="#icon-layers"/></svg> Sprint Planning
+            </button>
+            <div id="sprintPlanPanel" style="display:none;margin-top:0.5rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                    <h4 style="margin:0;font-size:0.82rem;color:var(--text-primary)">Available Stories (Backlog)</h4>
+                    <span id="sprintCapacity" style="font-size:0.72rem;color:var(--text-secondary)"></span>
+                </div>
+                <div id="availableStories" style="max-height:250px;overflow-y:auto;min-height:40px">
+                    <div style="font-size:0.75rem;color:var(--text-secondary);font-style:italic;text-align:center;padding:1rem">Loading...</div>
+                </div>
+            </div>
+        </div>
+        <style>
+        #sprintPlanPanel.open{display:block !important}
+        .avail-story{display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.5rem;border:1px solid var(--border);border-radius:4px;margin-bottom:0.3rem;font-size:0.78rem;background:var(--bg-tertiary);cursor:pointer;transition:border-color .15s}
+        .avail-story:hover{border-color:var(--purple)}
+        .avail-story-sp{font-size:0.68rem;background:var(--bg-primary);padding:0.05rem 0.3rem;border-radius:3px;color:var(--text-secondary)}
+        .avail-story-feat{font-size:0.65rem;color:var(--text-secondary)}
+        .avail-story-assign{margin-left:auto;font-size:0.68rem;color:var(--purple);cursor:pointer;padding:0.15rem 0.4rem;border:1px solid var(--purple);border-radius:4px;background:transparent}
+        .avail-story-assign:hover{background:rgba(124,58,237,.1)}
+        </style>
+        <script>
+        (function(){
+            const panel = document.getElementById('sprintPlanPanel');
+            const container = document.getElementById('availableStories');
+            const sprintId = '{{ selected_sprint.id }}';
+            let loaded = false;
+            document.querySelector('[onclick*="sprintPlanPanel"]').addEventListener('click', function() {
+                if (loaded) return;
+                loaded = true;
+                fetch(`/api/sprints/${sprintId}/available-stories`).then(r=>r.json()).then(data => {
+                    if (!data.stories || data.stories.length === 0) {
+                        container.innerHTML = '<div style="font-size:0.75rem;color:var(--text-secondary);font-style:italic;text-align:center;padding:1rem">All stories assigned</div>';
+                        return;
+                    }
+                    const totalSP = data.stories.reduce((a,s) => a + (s.story_points||0), 0);
+                    document.getElementById('sprintCapacity').textContent = `${data.stories.length} stories · ${totalSP} SP available`;
+                    container.innerHTML = data.stories.map(s =>
+                        `<div class="avail-story" data-story-id="${s.id}">
+                            <span style="color:var(--text-primary)">${s.title}</span>
+                            ${s.story_points ? `<span class="avail-story-sp">${s.story_points} SP</span>` : ''}
+                            <span class="avail-story-feat">${s.feature_name || ''}</span>
+                            <button class="avail-story-assign" onclick="assignToSprint('${s.id}',this)">+ Sprint</button>
+                        </div>`
+                    ).join('');
+                }).catch(() => {
+                    container.innerHTML = '<div style="color:var(--red);font-size:0.75rem">Error loading stories</div>';
+                });
+            });
+        })();
+        async function assignToSprint(storyId, btn) {
+            btn.disabled = true; btn.textContent = '...';
+            try {
+                await fetch(`/api/sprints/{{ selected_sprint.id }}/assign-stories`, {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({story_ids: [storyId]}),
+                });
+                btn.closest('.avail-story').remove();
+            } catch(e) { btn.disabled = false; btn.textContent = '+ Sprint'; }
+        }
+        </script>
+
         <div class="kanban"
              hx-get="/api/missions/{{ mission.id }}/board?sprint={{ selected_sprint.id }}"
              hx-trigger="every 10s"
@@ -371,6 +461,34 @@ if (bdCanvas && typeof Chart !== 'undefined') {
             }}
         });
     }).catch(() => { bdCanvas.style.display = 'none'; });
+}
+
+// ── WSJF inline calculator ──
+function mdWSJF() {
+    const bv = parseInt(document.getElementById('md-wsjf-bv').value);
+    const tc = parseInt(document.getElementById('md-wsjf-tc').value);
+    const rr = parseInt(document.getElementById('md-wsjf-rr').value);
+    const jd = Math.max(parseInt(document.getElementById('md-wsjf-jd').value), 1);
+    document.getElementById('md-bv-v').textContent = bv;
+    document.getElementById('md-tc-v').textContent = tc;
+    document.getElementById('md-rr-v').textContent = rr;
+    document.getElementById('md-jd-v').textContent = jd;
+    document.getElementById('md-wsjf-score').textContent = ((bv + tc + rr) / jd).toFixed(1);
+}
+async function saveMdWSJF() {
+    const body = {
+        business_value: parseInt(document.getElementById('md-wsjf-bv').value),
+        time_criticality: parseInt(document.getElementById('md-wsjf-tc').value),
+        risk_reduction: parseInt(document.getElementById('md-wsjf-rr').value),
+        job_duration: parseInt(document.getElementById('md-wsjf-jd').value),
+    };
+    try {
+        const resp = await fetch('/api/missions/{{ mission.id }}/wsjf', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        document.getElementById('md-wsjf-score').textContent = data.wsjf;
+    } catch(e) { console.error(e); }
 }
 </script>
 {% endblock %}

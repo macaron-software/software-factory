@@ -29,6 +29,10 @@ class MissionDef:
     workflow_id: Optional[str] = None     # safe-veligo, safe-ppz...
     parent_mission_id: Optional[str] = None  # corrective mission → parent
     wsjf_score: float = 0.0
+    business_value: float = 0
+    time_criticality: float = 0
+    risk_reduction: float = 0
+    job_duration: float = 1
     kanban_status: str = "funnel"         # SAFe: funnel|analyzing|backlog|implementing|done
     created_by: str = ""                  # agent who created it (strat-cpo, etc.)
     config: dict = field(default_factory=dict)
@@ -73,13 +77,18 @@ class TaskDef:
 # ── Row converters ───────────────────────────────────────────────────
 
 def _row_to_mission(row) -> MissionDef:
+    keys = row.keys() if hasattr(row, 'keys') else []
     return MissionDef(
         id=row["id"], project_id=row["project_id"],
         name=row["name"], description=row["description"] or "",
         goal=row["goal"] or "", status=row["status"] or "planning",
-        type=row["type"] if "type" in row.keys() else "feature",
+        type=row["type"] if "type" in keys else "feature",
         workflow_id=row["workflow_id"], parent_mission_id=row["parent_mission_id"],
         wsjf_score=row["wsjf_score"] or 0.0, created_by=row["created_by"] or "",
+        business_value=row["business_value"] if "business_value" in keys else 0,
+        time_criticality=row["time_criticality"] if "time_criticality" in keys else 0,
+        risk_reduction=row["risk_reduction"] if "risk_reduction" in keys else 0,
+        job_duration=row["job_duration"] if "job_duration" in keys else 1,
         config=json.loads(row["config_json"] or "{}"),
         created_at=row["created_at"] or "", completed_at=row["completed_at"],
     )
