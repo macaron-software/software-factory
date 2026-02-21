@@ -22,16 +22,25 @@ import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 VM_HOST = "4.233.64.30"
 VM_USER = "azureadmin"
-PG_HOST = "macaron-platform-pg.postgres.database.azure.com"
-PG_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://macaron:Macaron2026!Pg@macaron-platform-pg.postgres.database.azure.com"
-    "/macaron_platform?sslmode=require",
-)
 STORAGE_ACCOUNT = "macaronbackups"
+
+
+def _load_env():
+    """Load secrets from ~/.config/factory/.env if not in environment."""
+    env_file = Path.home() / ".config" / "factory" / ".env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            if "=" in line and not line.startswith("#"):
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip())
+
+
+_load_env()
+PG_URL = os.environ.get("DATABASE_URL", "")
 
 
 def _run(cmd: str, timeout: int = 15) -> tuple[int, str]:
@@ -74,13 +83,9 @@ def check_pg_connectivity() -> dict:
 
 def check_vm_containers() -> dict:
     """Check Docker containers on VM."""
-    code, out = _run(
-        f"sshpass -p '$VM_PASS' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "
-        f"{VM_USER}@{VM_HOST} 'docker ps --format \"{{{{.Names}}}} {{{{.Status}}}}\"'",
-        timeout=20,
-    )
-    # Fallback: read VM_PASS from env or skip
-    vm_pass = os.environ.get("VM_PASS", "MacaronAz2026!")
+    vm_pass = os.environ.get("VM_PASS", "")
+    if not vm_pass:
+        return {"name": "vm_containers", "ok": False, "detail": "VM_PASS not set"}
     code, out = _run(
         f"sshpass -p '{vm_pass}' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "
         f"{VM_USER}@{VM_HOST} 'docker ps --format \"{{{{.Names}}}} {{{{.Status}}}}\"'",
@@ -97,7 +102,9 @@ def check_vm_containers() -> dict:
 
 def check_vm_disk() -> dict:
     """Check disk usage on VM."""
-    vm_pass = os.environ.get("VM_PASS", "MacaronAz2026!")
+    vm_pass = os.environ.get("VM_PASS", "")
+    if not vm_pass:
+        return {"name": "vm_disk", "ok": False, "detail": "VM_PASS not set"}
     code, out = _run(
         f"sshpass -p '{vm_pass}' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "
         f"{VM_USER}@{VM_HOST} 'df -h / --output=pcent | tail -1'",

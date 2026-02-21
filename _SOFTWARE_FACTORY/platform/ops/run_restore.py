@@ -10,10 +10,11 @@ clean_path = [p for p in sys.path if not p.endswith("/platform/ops") and not p.e
 sys.path = clean_path
 
 if not os.environ.get("DATABASE_URL"):
-    os.environ["DATABASE_URL"] = (
-        "postgresql://macaron:Macaron2026!Pg@macaron-platform-pg.postgres.database.azure.com"
-        "/macaron_platform?sslmode=require"
-    )
+    env_file = Path.home() / ".config" / "factory" / ".env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            if line.startswith("DATABASE_URL="):
+                os.environ["DATABASE_URL"] = line.split("=", 1)[1].strip()
 
 g = {"__file__": str(script), "__name__": "__main__"}
 exec(compile(script.read_text(), str(script), "exec"), g)

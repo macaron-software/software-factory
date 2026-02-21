@@ -25,19 +25,38 @@ from typing import Any, Optional, Sequence
 _PG_URL = os.environ.get("DATABASE_URL", "")
 _USE_PG = _PG_URL.startswith("postgresql://") or _PG_URL.startswith("postgres://")
 
-# Lazy import psycopg only when needed
+# Connection pool for PostgreSQL (lazy initialized)
 _pg_pool = None
+_pg_pool_lock = None
+
+
+def _get_pg_pool():
+    """Get or create the PostgreSQL connection pool (lazy, thread-safe)."""
+    global _pg_pool, _pg_pool_lock
+    import threading
+    if _pg_pool_lock is None:
+        _pg_pool_lock = threading.Lock()
+    if _pg_pool is None:
+        with _pg_pool_lock:
+            if _pg_pool is None:
+                from psycopg_pool import ConnectionPool
+                conninfo = _PG_URL
+                if "connect_timeout" not in conninfo:
+                    sep = "&" if "?" in conninfo else "?"
+                    conninfo += f"{sep}connect_timeout=10"
+                _pg_pool = ConnectionPool(
+                    conninfo=conninfo,
+                    min_size=2,
+                    max_size=20,
+                    max_idle=300,  # 5 min idle timeout
+                    open=True,
+                )
+    return _pg_pool
 
 
 def _get_pg_connection():
-    """Get a direct psycopg connection (no pool for now)."""
-    import psycopg
-    # Add connect_timeout if not present
-    conninfo = _PG_URL
-    if "connect_timeout" not in conninfo:
-        sep = "&" if "?" in conninfo else "?"
-        conninfo += f"{sep}connect_timeout=10"
-    return psycopg.connect(conninfo)
+    """Get a psycopg connection from the pool."""
+    return _get_pg_pool().getconn()
 
 
 # ── Placeholder translation ─────────────────────────────────────────────────
@@ -291,7 +310,12 @@ class PgConnectionWrapper:
         self._conn.rollback()
 
     def close(self):
-        self._conn.close()
+        """Return connection to pool instead of closing."""
+        try:
+            pool = _get_pg_pool()
+            pool.putconn(self._conn)
+        except Exception:
+            self._conn.close()
 
     @property
     def row_factory(self):

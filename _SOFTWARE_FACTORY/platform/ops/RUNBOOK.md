@@ -175,8 +175,9 @@ python3 platform/ops/run_health.py
 | Snapshots | vm-macaron-snap-* | Incremental | francecentral |
 
 ### Credentials
-- VM SSH: `azureadmin@4.233.64.30` / `MacaronAz2026!`
-- PG: `macaron:Macaron2026!Pg@macaron-platform-pg.postgres.database.azure.com`
+- Stored in `~/.config/factory/.env` (chmod 600) — NEVER hardcode in source
+- VM SSH: `azureadmin@4.233.64.30` / `$VM_PASS`
+- PG: `$DATABASE_URL`
 - Web: basic auth `macaron:macaron`
 - LLM: Azure OpenAI `ascii-ui-openai` / gpt-5-mini / 100 req/min
 

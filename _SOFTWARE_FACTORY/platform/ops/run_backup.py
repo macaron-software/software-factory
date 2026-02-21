@@ -13,10 +13,12 @@ sys.path = clean_path
 
 # Set DATABASE_URL if not already set
 if not os.environ.get("DATABASE_URL"):
-    os.environ["DATABASE_URL"] = (
-        "postgresql://macaron:Macaron2026!Pg@macaron-platform-pg.postgres.database.azure.com"
-        "/macaron_platform?sslmode=require"
-    )
+    # Try loading from ~/.config/factory/.env
+    env_file = Path.home() / ".config" / "factory" / ".env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            if line.startswith("DATABASE_URL="):
+                os.environ["DATABASE_URL"] = line.split("=", 1)[1].strip()
 
 # Execute backup.py with proper __file__
 g = {"__file__": str(script), "__name__": "__main__"}
