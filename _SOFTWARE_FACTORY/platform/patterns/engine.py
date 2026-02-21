@@ -1236,7 +1236,7 @@ async def _run_hierarchical(run: PatternRun, task: str):
         if ws and ws.agent:
             worker_roster.append(f"- {ws.agent.name} ({ws.agent.role})")
 
-    max_outer = 3   # QA validation retries
+    max_outer = 5   # QA validation retries (build gate reloops up to max_outer-1)
     max_inner = 2   # Dev completeness retries
     veto_feedback = ""
 
@@ -1582,7 +1582,10 @@ async def _run_hierarchical(run: PatternRun, task: str):
             "message_type": "system",
         })
 
-    # Exhausted retries
+    # Exhausted retries — if build never passed, raise to mark phase as FAILED
+    if not build_passed:
+        logger.warning("Hierarchical phase exhausted %d iterations — build NEVER passed", max_outer)
+        raise RuntimeError(f"Build never passed after {max_outer} dev iterations")
     logger.warning("Hierarchical phase exhausted %d QA iterations with unresolved VETOs", max_outer)
 
 
