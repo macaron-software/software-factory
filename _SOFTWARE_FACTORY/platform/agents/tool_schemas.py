@@ -1101,7 +1101,7 @@ def _classify_agent_role(agent: "AgentDef") -> str:
     name = (agent.name or "").lower()
     combined = f"{role} {name}"
 
-    if any(k in combined for k in ("product", "business", "analyste", "ba ", "fonctionnel")):
+    if any(k in combined for k in ("product", "business", "analyste", "ba ", "fonctionnel", "product-manager")):
         return "product"
     if any(k in combined for k in ("archi", "architect")):
         return "architecture"

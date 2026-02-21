@@ -58,7 +58,7 @@
             </a>
             {% endfor %}
             {% if not sessions %}
-            <div class="chat-conv-empty">No conversations yet</div>
+            <div class="chat-conv-empty">{{ _("no_conversations_yet") }}</div>
             {% endif %}
         </div>
 
@@ -67,8 +67,10 @@
                 {% for msg in messages %}
                 <div class="chat-msg {{ 'chat-msg-user' if msg.from_agent == 'user' else 'chat-msg-agent' }}">
                     {% if msg.from_agent != 'user' %}
-                    <div class="chat-msg-avatar agent-avatar-sm">
-                        {% if lead_agent and lead_agent.avatar %}
+                    <div class="chat-msg-avatar agent-avatar-sm" {% if lead_agent %}style="background:{{ lead_agent.color }};color:#fff;font-weight:700;font-size:0.7rem;display:flex;align-items:center;justify-content:center;border-radius:50%;width:32px;height:32px"{% endif %}>
+                        {% if lead_agent and lead_agent.avatar != 'bot' %}
+                        {{ lead_agent.name.split()[0][0] }}{{ lead_agent.name.split()[-1][0] if lead_agent.name.split()|length > 1 else '' }}
+                        {% elif lead_agent and lead_agent.avatar %}
                         <svg class="icon icon-sm" style="color:{{ lead_agent.color }}"><use href="#icon-{{ lead_agent.avatar }}"/></svg>
                         {% else %}
                         <svg class="icon icon-sm"><use href="#icon-bot"/></svg>
@@ -102,7 +104,11 @@
             {% else %}
                 <div class="chat-welcome">
                     <div class="chat-welcome-icon">
-                        {% if lead_agent and lead_agent.avatar %}
+                        {% if lead_agent and lead_agent.avatar != 'bot' %}
+                        <div style="width:64px;height:64px;border-radius:50%;background:{{ lead_agent.color }};color:#fff;font-weight:700;font-size:1.4rem;display:flex;align-items:center;justify-content:center">
+                            {{ lead_agent.name.split()[0][0] }}{{ lead_agent.name.split()[-1][0] if lead_agent.name.split()|length > 1 else '' }}
+                        </div>
+                        {% elif lead_agent and lead_agent.avatar %}
                         <svg class="icon" style="width:48px;height:48px;color:{{ lead_agent.color }}"><use href="#icon-{{ lead_agent.avatar }}"/></svg>
                         {% else %}
                         <svg class="icon" style="width:48px;height:48px;color:var(--purple)"><use href="#icon-bot"/></svg>
@@ -112,11 +118,11 @@
                     {% if lead_agent and lead_agent.tagline %}
                     <p style="color:var(--text-secondary);font-style:italic;margin-bottom:0.5rem">{{ lead_agent.tagline }}</p>
                     {% endif %}
-                    <p>Ask anything about this project — the agent can browse files, read code, search git history, and more.</p>
+                    <p>{{ _("ask_anything_about_this_project_the") }}</p>
                     <div class="chat-suggestions">
-                        <button class="chat-suggestion" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">What is this project about?</button>
-                        <button class="chat-suggestion" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">Show me the project structure</button>
-                        <button class="chat-suggestion" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">What are the recent changes?</button>
+                        <button class="chat-suggestion" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">{{ _("what_is_this_project_about") }}</button>
+                        <button class="chat-suggestion" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">{{ _("show_me_the_project_structure") }}</button>
+                        <button class="chat-suggestion" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">{{ _("what_are_the_recent_changes") }}</button>
                     </div>
                 </div>
             {% endif %}
@@ -140,35 +146,43 @@
     <!-- ═══ Sidebar: Project info (collapsible) ═══ -->
     <aside class="project-sidebar" id="project-sidebar">
         <div class="ps-section">
-            <h4>Vision</h4>
+            <h4>{{ _("vision") }}</h4>
             {% if project.vision %}
             <div class="ps-text md-rendered">{{ project.vision[:800] | markdown | safe }}</div>
             {% else %}
-            <p class="ps-empty">No vision defined — add a VISION.md to your project</p>
+            <p class="ps-empty">{{ _("no_vision_defined_add_a_vision") }}</p>
             {% endif %}
         </div>
 
         <div class="ps-section">
-            <h4>Values</h4>
+            <h4>{{ _("values") }}</h4>
             <div class="ps-tags">
                 {% for v in project.values %}
                 <span class="item-tag">{{ v }}</span>
                 {% endfor %}
                 {% if not project.values %}
-                <span class="ps-empty">No values</span>
+                <span class="ps-empty">{{ _("no_values") }}</span>
                 {% endif %}
             </div>
         </div>
 
-        {% if project.lead_agent_id %}
+        {% if lead_agent %}
         <div class="ps-section">
-            <h4>Lead Agent</h4>
-            <span class="item-badge accent">{{ project.lead_agent_id }}</span>
+            <h4>{{ _("lead_agent") }}</h4>
+            <div style="display:flex;align-items:center;gap:0.5rem">
+                <div style="width:28px;height:28px;border-radius:50%;background:{{ lead_agent.color }};color:#fff;font-weight:700;font-size:0.6rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                    {{ lead_agent.name.split()[0][0] }}{{ lead_agent.name.split()[-1][0] if lead_agent.name.split()|length > 1 else '' }}
+                </div>
+                <div>
+                    <div style="font-weight:600;font-size:0.8rem">{{ lead_agent.name }}</div>
+                    <div style="font-size:0.65rem;color:var(--text-secondary)">{{ lead_agent.role }}</div>
+                </div>
+            </div>
         </div>
         {% endif %}
 
         <div class="ps-section">
-            <h4>Domains</h4>
+            <h4>{{ _("domains") }}</h4>
             <div class="ps-tags">
                 {% for d in project.domains %}
                 <span class="item-tag">{{ d }}</span>
@@ -192,7 +206,7 @@
                 {% endfor %}
             </div>
             {% else %}
-            <p class="ps-empty">No memory files found (CLAUDE.md, copilot-instructions.md, etc.)</p>
+            <p class="ps-empty">{{ _("no_memory_files_found_claude_md") }}</p>
             {% endif %}
         </div>
 
@@ -201,7 +215,7 @@
              hx-get="/api/projects/{{ project.id }}/git"
              hx-trigger="load, every 30s"
              hx-swap="innerHTML">
-            <p class="ps-empty">Loading git…</p>
+            <p class="ps-empty">{{ _("loading_git") }}</p>
         </div>
 
         <!-- Task panel -->
@@ -209,12 +223,12 @@
              hx-get="/api/projects/{{ project.id }}/tasks"
              hx-trigger="load, every 30s"
              hx-swap="innerHTML">
-            <p class="ps-empty">Loading tasks…</p>
+            <p class="ps-empty">{{ _("loading_tasks") }}</p>
         </div>
 
         {% if project.factory_type in ('sf', 'mf') %}
         <div class="ps-section">
-            <h4>Pipeline</h4>
+            <h4>{{ _("pipeline") }}</h4>
             <div class="ps-pipeline">
                 {% if project.factory_type == 'sf' %}
                     {% for step in ['Brain', 'TDD', 'Review', 'Build', 'Deploy'] %}
@@ -290,6 +304,10 @@ const SESSION_ID = "{{ active_session.id if active_session else '' }}";
 const AGENT_AVATAR = "{{ lead_agent.avatar if lead_agent and lead_agent.avatar else '' }}";
 const AGENT_COLOR = "{{ lead_agent.color if lead_agent and lead_agent.color else '#bc8cff' }}";
 const AGENT_NAME = "{{ lead_agent.name if lead_agent else project.name }}";
+const AGENT_INITIALS = (() => {
+    const parts = AGENT_NAME.split(' ');
+    return parts.length > 1 ? parts[0][0] + parts[parts.length-1][0] : parts[0][0];
+})();
 let chatBusy = false;
 
 function scrollChat() {
@@ -309,8 +327,8 @@ function addUserBubble(text) {
 
 function addStreamingBubble() {
     const id = 'stream-' + Date.now();
-    const avatarHtml = AGENT_AVATAR
-        ? `<div class="chat-msg-avatar agent-avatar-sm"><svg class="icon icon-sm" style="color:${AGENT_COLOR}"><use href="#icon-${AGENT_AVATAR}"/></svg></div>`
+    const avatarHtml = (AGENT_AVATAR && AGENT_AVATAR !== 'bot')
+        ? `<div class="chat-msg-avatar agent-avatar-sm" style="background:${AGENT_COLOR};color:#fff;font-weight:700;font-size:0.7rem;display:flex;align-items:center;justify-content:center;border-radius:50%;width:32px;height:32px">${AGENT_INITIALS}</div>`
         : `<div class="chat-msg-avatar"><svg class="icon icon-sm"><use href="#icon-bot"/></svg></div>`;
     document.getElementById('chat-messages').insertAdjacentHTML('beforeend',
         `<div class="chat-msg chat-msg-agent" id="${id}">

@@ -268,45 +268,72 @@ class ProjectStore:
 
         for info in registry.all():
             existing = self.get(info.id)
-            if existing:
-                continue  # Don't overwrite user customizations
 
+            # Always ensure project agent is a Product Manager with proper tools
+            agent_id = f"agent-{info.id}"
+            pm = _PROJECT_PM.get(info.id, {})
+            pm_name = pm.get("name", f"PM {info.name}")
+            pm_avatar = pm.get("avatar", "user")
+            pm_tagline = pm.get("tagline", info.description[:60] if info.description else f"Product Manager — {info.name}")
+            pm_tools = [
+                "code_read", "code_search", "list_files", "deep_search",
+                "memory_search", "memory_store", "get_project_context",
+                "git_status", "git_log", "git_diff",
+                "lrm_locate", "lrm_summarize", "lrm_context", "lrm_conventions",
+                "github_issues", "github_prs", "github_code_search",
+                "jira_search", "confluence_read",
+                "screenshot",
+                "platform_agents", "platform_missions", "platform_memory_search",
+                "platform_metrics", "platform_sessions", "platform_workflows",
+            ]
+            agent = AgentDef(
+                id=agent_id,
+                name=pm_name,
+                role="product-manager",
+                description=f"Product Manager pour {info.name}. Connaît le code, la vision, le backlog, les docs et les tickets.",
+                provider="azure-openai", model="gpt-5-mini",
+                temperature=0.5, max_tokens=8192,
+                icon="user", color=_project_color(info.id),
+                avatar=pm_avatar,
+                tagline=pm_tagline,
+                is_builtin=True,
+                tags=["project", "product", info.factory_type or "general"],
+                tools=pm_tools,
+                mcps=["lrm", "platform"],
+                system_prompt=f"Tu es {pm_name}, Product Manager du projet {info.name}.\n"
+                f"Chemin projet: {info.path}\n"
+                f"Type: {info.factory_type or 'general'}\n\n"
+                "Tu connais le code, l'architecture, la vision, le backlog, les docs et le wiki.\n"
+                "Tu utilises tes outils (code_read, deep_search, memory, git, lrm) pour répondre avec précision.\n"
+                "Tu peux consulter Jira, Confluence, GitHub si configurés.\n"
+                "Sois concis, factuel, et proactif. Propose des actions concrètes.",
+            )
+            existing_agent = agent_store.get(agent_id)
+            if existing_agent:
+                agent_store.update(agent)
+            else:
+                agent_store.create(agent)
+
+            if existing:
+                # Update lead_agent_id if missing
+                if not existing.lead_agent_id or existing.lead_agent_id != agent_id:
+                    from ..db import get_db
+                    conn = get_db()
+                    conn.execute("UPDATE projects SET lead_agent_id = ? WHERE id = ?", (agent_id, existing.id))
+                    conn.commit()
+                    conn.close()
+                continue  # Don't overwrite user customizations for project itself
+
+            # New project — create it
             p = Project(
-                id=info.id,
-                name=info.name,
-                path=info.path,
-                description=info.description,
-                factory_type=info.factory_type,
+                id=info.id, name=info.name, path=info.path,
+                description=info.description, factory_type=info.factory_type,
                 domains=info.domains,
             )
-            # Auto-load vision from file or workflow config
             if p.exists:
                 p.vision = p.load_vision_from_file()
             if not p.vision:
                 p.vision = self._load_vision_from_workflow(info.id)
-
-            # Create a dedicated project agent
-            agent_id = f"agent-{info.id}"
-            if not agent_store.get(agent_id):
-                agent = AgentDef(
-                    id=agent_id,
-                    name=info.name,
-                    role="project-agent",
-                    description=f"Conversational agent for {info.name}. Knows the codebase, can search files, read code, and answer questions.",
-                    provider="minimax", model="MiniMax-M2.5",
-                    temperature=0.5, max_tokens=4096,
-                    icon="bot", color=_project_color(info.id),
-                    avatar="bot", tagline=info.description[:60] if info.description else f"Your guide to {info.name}",
-                    is_builtin=True,
-                    tags=["project", info.factory_type or "general"],
-                    system_prompt=f"You are the project agent for {info.name}.\n"
-                    f"Project path: {info.path}\n"
-                    f"Type: {info.factory_type or 'general'}\n"
-                    "You help the team understand the codebase, find files, explain architecture, "
-                    "and answer questions. You can trigger deep search (RLM) for complex queries. "
-                    "Be concise, precise, and helpful.",
-                )
-                agent_store.create(agent)
 
             p.lead_agent_id = agent_id
 
@@ -438,6 +465,23 @@ class ProjectStore:
             created_at=row["created_at"] or "",
             updated_at=row["updated_at"] or "",
         )
+
+
+_PROJECT_PM: dict[str, dict] = {
+    "lpd": {"name": "Nathalie Renaud", "avatar": "user", "tagline": "Product Manager — LPD Data Platform"},
+    "logs-facteur": {"name": "Thomas Girard", "avatar": "user", "tagline": "Product Manager — Logs Facteur Support N1"},
+    "sharelook": {"name": "Claire Dubois", "avatar": "user", "tagline": "Product Manager — Sharelook Platform"},
+    "software-factory": {"name": "Émilie Laurent", "avatar": "user", "tagline": "Product Manager — Software Factory"},
+    "factory": {"name": "Émilie Laurent", "avatar": "user", "tagline": "Product Manager — Software Factory (Self)"},
+    "solaris": {"name": "Julie Martin", "avatar": "user", "tagline": "Product Manager — Solaris Design System"},
+    "veligo": {"name": "Antoine Lefèvre", "avatar": "user", "tagline": "Product Manager — Veligo Platform"},
+    "fervenza": {"name": "Lucas Morel", "avatar": "user", "tagline": "Product Manager — Fervenza IoT"},
+    "finary": {"name": "Sophie Blanc", "avatar": "user", "tagline": "Product Manager — Finary"},
+    "popinz": {"name": "Hugo Petit", "avatar": "user", "tagline": "Product Manager — Popinz SaaS"},
+    "psy": {"name": "Camille Roux", "avatar": "user", "tagline": "Product Manager — PSY Platform"},
+    "yolonow": {"name": "Léa Fournier", "avatar": "user", "tagline": "Product Manager — YoloNow"},
+    "sharelook-2": {"name": "Claire Dubois", "avatar": "user", "tagline": "Product Manager — Sharelook 2.0"},
+}
 
 
 def _project_color(project_id: str) -> str:
