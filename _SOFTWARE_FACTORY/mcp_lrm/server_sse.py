@@ -232,6 +232,47 @@ class MCPLRMServer:
                     "required": ["domain", "project"],
                 },
             },
+            {
+                "name": "confluence_search",
+                "description": "Search Confluence wiki pages (full-text). Returns titles, excerpts, page IDs. Content is anonymized.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Search query (keywords)"},
+                        "space": {"type": "string", "description": "Confluence space key", "default": "IAN"},
+                        "limit": {"type": "integer", "description": "Max results", "default": 10},
+                        "refresh": {"type": "boolean", "description": "Force refresh from Confluence API", "default": False},
+                    },
+                    "required": ["query"],
+                },
+            },
+            {
+                "name": "confluence_read",
+                "description": "Read a Confluence page by ID or title. Returns full content, anonymized.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "page_id": {"type": "string", "description": "Confluence page ID"},
+                        "title": {"type": "string", "description": "Page title (alternative to page_id)"},
+                        "space": {"type": "string", "description": "Space key", "default": "IAN"},
+                        "max_chars": {"type": "integer", "description": "Max chars to return", "default": 8000},
+                    },
+                },
+            },
+            {
+                "name": "jira_search",
+                "description": "Search Jira issues via JQL or keywords. Returns issue keys, summaries, statuses. Content is anonymized.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "JQL query or plain text keywords"},
+                        "project": {"type": "string", "description": "Jira project key (optional filter)"},
+                        "limit": {"type": "integer", "description": "Max results", "default": 20},
+                        "refresh": {"type": "boolean", "description": "Force refresh from Jira API", "default": False},
+                    },
+                    "required": ["query"],
+                },
+            },
         ]
 
     async def handle_tool_call(self, name: str, arguments: Dict) -> Any:
@@ -251,6 +292,12 @@ class MCPLRMServer:
                 return await self._tool_task_update(arguments)
             elif clean_name == "build":
                 return await self._tool_build(arguments)
+            elif clean_name == "confluence_search":
+                return await self._tool_confluence_search(arguments)
+            elif clean_name == "confluence_read":
+                return await self._tool_confluence_read(arguments)
+            elif clean_name == "jira_search":
+                return await self._tool_jira_search(arguments)
             else:
                 return {"error": f"Unknown tool: {name} (cleaned: {clean_name})"}
         except Exception as e:
@@ -433,6 +480,245 @@ class MCPLRMServer:
             return {"error": "Command timed out (300s)"}
         except Exception as e:
             return {"error": str(e)}
+
+    # ── Confluence tools ──
+
+    def _get_confluence_client(self):
+        """Lazy-load Confluence client."""
+        if not hasattr(self, '_confluence_client'):
+            self._confluence_client = None
+            try:
+                import sys
+                sys.path.insert(0, str(Path(__file__).resolve().parents[0].parent / "platform"))
+                from confluence.client import ConfluenceClient
+                self._confluence_client = ConfluenceClient()
+                log("Confluence client loaded")
+            except Exception as e:
+                log(f"Confluence client unavailable: {e}", "WARN")
+        return self._confluence_client
+
+    def _get_anonymizer(self):
+        """Lazy-load anonymizer."""
+        if not hasattr(self, '_anonymizer'):
+            from .anonymizer import get_anonymizer
+            self._anonymizer = get_anonymizer()
+        return self._anonymizer
+
+    def _get_cache(self):
+        """Lazy-load RLM cache."""
+        if not hasattr(self, '_rlm_cache'):
+            from .rlm_cache import get_rlm_cache
+            self._rlm_cache = get_rlm_cache()
+        return self._rlm_cache
+
+    async def _tool_confluence_search(self, args: Dict) -> Dict:
+        """Search Confluence wiki pages."""
+        query = args.get("query", "")
+        space = args.get("space", "IAN")
+        limit = args.get("limit", 10)
+        refresh = args.get("refresh", False)
+
+        cache = self._get_cache()
+        anon = self._get_anonymizer()
+
+        # Try cache first
+        if not refresh:
+            results = cache.search_confluence(query, limit)
+            if results:
+                return {"results": [anon.anonymize_dict(r) for r in results], "source": "cache"}
+
+        # Fetch from Confluence API
+        client = self._get_confluence_client()
+        if not client:
+            # Fallback to cache even if stale
+            results = cache.search_confluence(query, limit)
+            return {"results": [anon.anonymize_dict(r) for r in results], "source": "cache", "note": "Confluence API unavailable"}
+
+        try:
+            import re as _re
+            # Use CQL search
+            cql = f'space="{space}" AND (title~"{query}" OR text~"{query}")'
+            resp = client._request("GET", f"/rest/api/content/search", params={
+                "cql": cql, "limit": limit,
+                "expand": "body.storage,ancestors"
+            })
+            pages = resp.get("results", [])
+            for p in pages:
+                body_html = p.get("body", {}).get("storage", {}).get("value", "")
+                # Strip HTML tags for plain text
+                body_text = _re.sub(r'<[^>]+>', ' ', body_html)
+                body_text = _re.sub(r'\s+', ' ', body_text).strip()
+                ancestors = " > ".join(a.get("title", "") for a in p.get("ancestors", []))
+                url = client.base_url + p.get("_links", {}).get("webui", "")
+                cache.upsert_confluence_page(
+                    page_id=str(p["id"]), space_key=space, title=p["title"],
+                    body=body_text, url=url, ancestors=ancestors
+                )
+
+            results = cache.search_confluence(query, limit)
+            return {"results": [anon.anonymize_dict(r) for r in results], "source": "api", "fetched": len(pages)}
+        except Exception as e:
+            log(f"Confluence search error: {e}", "ERROR")
+            results = cache.search_confluence(query, limit)
+            return {"results": [anon.anonymize_dict(r) for r in results], "source": "cache", "error": str(e)}
+
+    async def _tool_confluence_read(self, args: Dict) -> Dict:
+        """Read a Confluence page by ID or title."""
+        page_id = args.get("page_id", "")
+        title = args.get("title", "")
+        space = args.get("space", "IAN")
+        max_chars = args.get("max_chars", 8000)
+
+        cache = self._get_cache()
+        anon = self._get_anonymizer()
+
+        # Try cache first
+        if page_id:
+            cached = cache.get_confluence_page(page_id)
+            if cached and not cached.get("stale"):
+                cached["body"] = cached["body"][:max_chars]
+                return anon.anonymize_dict(cached)
+
+        # Fetch from API
+        client = self._get_confluence_client()
+        if not client:
+            if page_id:
+                cached = cache.get_confluence_page(page_id)
+                if cached:
+                    cached["body"] = cached["body"][:max_chars]
+                    return anon.anonymize_dict(cached)
+            return {"error": "Confluence API unavailable and page not in cache"}
+
+        try:
+            import re as _re
+            if title and not page_id:
+                # Find by title
+                found = client.find_page(title, space)
+                if found:
+                    page_id = str(found["id"])
+                else:
+                    return {"error": f"Page '{title}' not found in space {space}"}
+
+            page = client.get_page(page_id)
+            if not page:
+                return {"error": f"Page {page_id} not found"}
+
+            body_html = page.get("body", {}).get("storage", {}).get("value", "")
+            body_text = _re.sub(r'<[^>]+>', ' ', body_html)
+            body_text = _re.sub(r'\s+', ' ', body_text).strip()
+            ancestors = " > ".join(a.get("title", "") for a in page.get("ancestors", []))
+            url = client.base_url + page.get("_links", {}).get("webui", "")
+
+            cache.upsert_confluence_page(
+                page_id=page_id, space_key=space, title=page["title"],
+                body=body_text, url=url, ancestors=ancestors
+            )
+
+            result = {
+                "page_id": page_id, "title": page["title"], "space_key": space,
+                "body": body_text[:max_chars], "url": url, "ancestors": ancestors,
+            }
+            return anon.anonymize_dict(result)
+        except Exception as e:
+            log(f"Confluence read error: {e}", "ERROR")
+            return {"error": str(e)}
+
+    # ── Jira tools ──
+
+    def _get_jira_config(self):
+        """Load Jira configuration from tokens."""
+        if not hasattr(self, '_jira_config'):
+            self._jira_config = None
+            # Try ~/.config/factory/jira.key
+            key_file = Path.home() / ".config" / "factory" / "jira.key"
+            if key_file.exists():
+                token = key_file.read_text().strip()
+            else:
+                token = os.environ.get("ATLASSIAN_TOKEN", "")
+
+            url = os.environ.get("ATLASSIAN_URL", "") or os.environ.get("JIRA_URL", "")
+            if not url:
+                # Try to infer from Confluence URL
+                confluence_url = os.environ.get("CONFLUENCE_URL", "https://wiki.net.extra.laposte.fr/confluence")
+                # Jira is typically on same domain as Confluence
+                url = confluence_url.replace("/confluence", "").replace("wiki.", "jira.")
+
+            if token and url:
+                self._jira_config = {"url": url, "token": token}
+                log(f"Jira configured: {url}")
+            else:
+                log("Jira not configured (no token/URL)", "WARN")
+        return self._jira_config
+
+    async def _tool_jira_search(self, args: Dict) -> Dict:
+        """Search Jira issues."""
+        query = args.get("query", "")
+        project = args.get("project", "")
+        limit = args.get("limit", 20)
+        refresh = args.get("refresh", False)
+
+        cache = self._get_cache()
+        anon = self._get_anonymizer()
+
+        # Try cache first
+        if not refresh:
+            results = cache.search_jira(query, limit)
+            if results:
+                return {"results": [anon.anonymize_dict(r) for r in results], "source": "cache"}
+
+        # Fetch from Jira API
+        jira = self._get_jira_config()
+        if not jira:
+            results = cache.search_jira(query, limit)
+            return {"results": [anon.anonymize_dict(r) for r in results], "source": "cache", "note": "Jira not configured"}
+
+        try:
+            import urllib.request
+            import json
+
+            # Build JQL
+            if query.upper().startswith("PROJECT") or "=" in query or " AND " in query.upper():
+                jql = query  # Already JQL
+            else:
+                jql = f'text ~ "{query}"'
+                if project:
+                    jql = f'project = "{project}" AND {jql}'
+            jql += " ORDER BY updated DESC"
+
+            url = f"{jira['url']}/rest/api/2/search"
+            data = json.dumps({"jql": jql, "maxResults": limit, "fields": [
+                "summary", "description", "status", "assignee", "priority", "issuetype", "labels", "created"
+            ]}).encode()
+
+            req = urllib.request.Request(url, data=data, method="POST")
+            req.add_header("Authorization", f"Bearer {jira['token']}")
+            req.add_header("Content-Type", "application/json")
+
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                result = json.loads(resp.read())
+
+            issues = result.get("issues", [])
+            for issue in issues:
+                fields = issue.get("fields", {})
+                cache.upsert_jira_issue(
+                    issue_key=issue["key"],
+                    project=issue["key"].split("-")[0],
+                    summary=fields.get("summary", ""),
+                    description=(fields.get("description") or "")[:5000],
+                    status=(fields.get("status", {}) or {}).get("name", ""),
+                    assignee=(fields.get("assignee", {}) or {}).get("displayName", ""),
+                    priority=(fields.get("priority", {}) or {}).get("name", ""),
+                    issue_type=(fields.get("issuetype", {}) or {}).get("name", ""),
+                    labels=",".join(fields.get("labels", [])),
+                    created_at=fields.get("created", ""),
+                )
+
+            results = cache.search_jira(query, limit)
+            return {"results": [anon.anonymize_dict(r) for r in results], "source": "api", "fetched": len(issues)}
+        except Exception as e:
+            log(f"Jira search error: {e}", "ERROR")
+            results = cache.search_jira(query, limit)
+            return {"results": [anon.anonymize_dict(r) for r in results], "source": "cache", "error": str(e)}
 
 
 # ============================================================================
