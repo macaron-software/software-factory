@@ -167,21 +167,30 @@ async def lifespan(app: FastAPI):
                            len(_stuck), [m.id for m in _stuck])
 
             async def _auto_resume():
-                """Resume stuck missions one at a time (semaphore handles serialization)."""
+                """Resume only the first stuck mission; pause the rest."""
                 import asyncio
                 await asyncio.sleep(15)  # Wait for server to stabilize
-                from .web.routes import api_mission_run
-                from starlette.requests import Request
-                scope = {"type": "http", "method": "POST", "path": "/",
-                         "headers": [], "query_string": b""}
-                fake_req = Request(scope)
-                for m in _stuck:
+                from .missions.store import get_mission_run_store as _get_mrs
+                from .models import MissionStatus
+                _mrs2 = _get_mrs()
+                # Pause all stuck except first
+                for m in _stuck[1:]:
+                    m.status = MissionStatus.PAUSED
+                    _mrs2.update(m)
+                    logger.warning("Paused stuck mission %s (queued)", m.id)
+                # Resume first only
+                if _stuck:
+                    from .web.routes import api_mission_run
+                    from starlette.requests import Request
+                    scope = {"type": "http", "method": "POST", "path": "/",
+                             "headers": [], "query_string": b""}
+                    fake_req = Request(scope)
                     try:
-                        resp = await api_mission_run(fake_req, m.id)
-                        logger.warning("Auto-resumed mission %s: %s", m.id,
+                        resp = await api_mission_run(fake_req, _stuck[0].id)
+                        logger.warning("Auto-resumed mission %s: %s", _stuck[0].id,
                                        getattr(resp, 'body', b'')[:100])
                     except Exception as exc:
-                        logger.warning("Failed to auto-resume mission %s: %s", m.id, exc)
+                        logger.warning("Failed to auto-resume mission %s: %s", _stuck[0].id, exc)
 
             import asyncio
             asyncio.create_task(_auto_resume())

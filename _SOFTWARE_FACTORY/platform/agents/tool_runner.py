@@ -985,7 +985,10 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
                     ws_id = os.path.basename(ctx.project_path)
                     if path.startswith(ws_id + "/"):
                         path = path[len(ws_id) + 1:]
-                args["path"] = os.path.join(ctx.project_path, path)
+                    # Strip project_path prefix if LLM used it as relative
+                    elif path.startswith("." + ctx.project_path):
+                        path = path[1:]  # remove leading dot, keep absolute
+                args["path"] = os.path.join(ctx.project_path, path) if not os.path.isabs(path) else path
 
     # ── Permission enforcement ──
     try:
