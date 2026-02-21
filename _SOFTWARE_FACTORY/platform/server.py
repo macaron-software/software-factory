@@ -167,7 +167,7 @@ async def lifespan(app: FastAPI):
                            len(_stuck), [m.id for m in _stuck])
 
             async def _auto_resume():
-                """Resume stuck missions one at a time with rate limiting."""
+                """Resume stuck missions sequentially with rate limiting."""
                 import asyncio
                 await asyncio.sleep(10)  # Wait for server to stabilize
                 from .web.routes import api_mission_run, _active_mission_tasks
@@ -176,15 +176,15 @@ async def lifespan(app: FastAPI):
                 scope = {"type": "http", "method": "POST", "path": "/",
                          "headers": [], "query_string": b""}
                 fake_req = Request(scope)
-                # Resume max 1 at a time with 60s gaps to avoid rate limit floods
-                for m in _stuck[:2]:  # Only resume first 2 at most
+                # Resume all stuck missions, one at a time with 90s gaps
+                for m in _stuck:
                     try:
                         resp = await api_mission_run(fake_req, m.id)
                         logger.warning("Auto-resumed mission %s: %s", m.id,
                                        getattr(resp, 'body', b'')[:100])
                     except Exception as exc:
                         logger.warning("Failed to auto-resume mission %s: %s", m.id, exc)
-                    await asyncio.sleep(60)  # 60s between resumes
+                    await asyncio.sleep(90)  # 90s between resumes to avoid rate limit floods
 
             import asyncio
             asyncio.create_task(_auto_resume())

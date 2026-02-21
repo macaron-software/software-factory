@@ -359,7 +359,8 @@ class LLMClient:
             raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
 
         data = resp.json()
-        choice = data.get("choices", [{}])[0]
+        choices = data.get("choices") or [{}]
+        choice = choices[0] if choices else {}
         msg = choice.get("message", {})
         content = msg.get("content", "") or ""
         # Strip <think> blocks from MiniMax
@@ -531,9 +532,12 @@ class LLMClient:
                         return
                     try:
                         data = json.loads(payload)
-                        delta = data.get("choices", [{}])[0].get("delta", {})
+                        choices = data.get("choices") or [{}]
+                        if not choices:
+                            continue
+                        delta = choices[0].get("delta", {})
                         content = delta.get("content", "")
-                        finish = data.get("choices", [{}])[0].get("finish_reason")
+                        finish = choices[0].get("finish_reason")
                         if content:
                             yield LLMStreamChunk(delta=content, model=model)
                         if finish:

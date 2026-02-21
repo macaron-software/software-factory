@@ -290,11 +290,16 @@ class MissionOrchestrator:
                             pass
 
                 try:
-                    result = await run_pattern(
-                        phase_pattern, session_id, phase_task,
-                        project_id=mission.id,
-                        project_path=mission.workspace_path,
-                        phase_id=phase.phase_id,
+                    # Phase timeout: 10 minutes max per phase execution
+                    PHASE_TIMEOUT = 600
+                    result = await asyncio.wait_for(
+                        run_pattern(
+                            phase_pattern, session_id, phase_task,
+                            project_id=mission.id,
+                            project_path=mission.workspace_path,
+                            phase_id=phase.phase_id,
+                        ),
+                        timeout=PHASE_TIMEOUT,
                     )
                     phase_success = result.success
                     if not phase_success:
@@ -312,6 +317,9 @@ class MissionOrchestrator:
                             phase_error = "; ".join(errors)
                         else:
                             phase_error = "Pattern returned success=False"
+                except asyncio.TimeoutError:
+                    logger.error("Phase %s timed out after %ds", phase.phase_id, PHASE_TIMEOUT)
+                    phase_error = f"Phase timed out after {PHASE_TIMEOUT}s"
                 except Exception as exc:
                     logger.error("Phase %s pattern crashed: %s\n%s", phase.phase_id, exc, traceback.format_exc())
                     phase_error = str(exc)
