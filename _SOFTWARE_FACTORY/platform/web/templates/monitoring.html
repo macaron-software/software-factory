@@ -16,7 +16,7 @@
     </div>
 
     <!-- Row 1: System vitals -->
-    <div class="mon-grid mon-grid-4">
+    <div class="mon-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.8rem">
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-cpu"/></svg> CPU</h3>
             <div class="mon-big" id="monCpu">—</div>
@@ -28,6 +28,12 @@
             <div class="mon-big" id="monMem">—</div>
             <div class="mon-sub" id="monMemSys">System: —</div>
             <div class="mon-bar"><div class="mon-bar-fill green" id="monMemBar" style="width:0%"></div></div>
+        </div>
+        <div class="mon-card">
+            <h3><svg class="icon"><use href="#icon-database"/></svg> Disk</h3>
+            <div class="mon-big" id="monDisk">—</div>
+            <div class="mon-sub" id="monDiskSub">—</div>
+            <div class="mon-bar"><div class="mon-bar-fill green" id="monDiskBar" style="width:0%"></div></div>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-users"/></svg> Agents</h3>
@@ -50,7 +56,17 @@
     <!-- Row 2: LLM Usage -->
     <div class="mon-grid mon-grid-2">
         <div class="mon-card">
-            <h3><svg class="icon"><use href="#icon-zap"/></svg> LLM Usage (24h)</h3>
+            <h3 style="display:flex;align-items:center;gap:0.5rem">
+                <svg class="icon"><use href="#icon-zap"/></svg>
+                <span>LLM Usage</span>
+                <span id="monLlmPeriod" style="opacity:0.5;font-weight:400;font-size:0.75rem">(24h)</span>
+                <div style="margin-left:auto;display:flex;gap:0.25rem">
+                    <button class="mon-range-btn" onclick="setRange(24)" data-hours="24">24h</button>
+                    <button class="mon-range-btn" onclick="setRange(168)" data-hours="168">7d</button>
+                    <button class="mon-range-btn" onclick="setRange(720)" data-hours="720">30d</button>
+                    <button class="mon-range-btn" onclick="setRange(8760)" data-hours="8760">1y</button>
+                </div>
+            </h3>
             <div class="mon-row" style="margin-bottom:1rem">
                 <div class="mon-col"><div class="label">Calls</div><div class="val" id="monLlmCalls">0</div></div>
                 <div class="mon-col"><div class="label">Tokens In</div><div class="val" id="monLlmIn">0</div></div>
@@ -234,11 +250,19 @@
     <!-- Row 9: Azure Costs + Process -->
     <div class="mon-grid mon-grid-2">
         <div class="mon-card">
-            <h3><svg class="icon"><use href="#icon-zap"/></svg> Azure Costs (LLM)</h3>
+            <h3><svg class="icon"><use href="#icon-zap"/></svg> Azure Costs</h3>
+            <div class="mon-section-label" style="margin-bottom:0.3rem">LLM (token usage)</div>
             <div class="mon-row" style="margin-bottom:0.8rem">
                 <div class="mon-col"><div class="label">Azure LLM</div><div class="val" id="monAzCostAzure">$0</div></div>
                 <div class="mon-col"><div class="label">Other LLM</div><div class="val" id="monAzCostOther">$0</div></div>
-                <div class="mon-col"><div class="label">Total</div><div class="val" id="monAzCostTotal">$0</div></div>
+                <div class="mon-col"><div class="label">Total LLM</div><div class="val" id="monAzCostTotal">$0</div></div>
+            </div>
+            <div class="mon-section-label" style="margin-bottom:0.3rem">Infrastructure (monthly est.)</div>
+            <div class="mon-row">
+                <div class="mon-col"><div class="label">VM B2ms</div><div class="val" id="monAzCostVm">—</div></div>
+                <div class="mon-col"><div class="label">PG B1ms</div><div class="val" id="monAzCostPg">—</div></div>
+                <div class="mon-col"><div class="label">Storage</div><div class="val" id="monAzCostStorage">—</div></div>
+                <div class="mon-col"><div class="label">Total/mo</div><div class="val" id="monAzCostInfra" style="color:var(--accent)">—</div></div>
             </div>
         </div>
         <div class="mon-card">
@@ -262,12 +286,14 @@
 </div>
 
 <script>
+let currentHours = 24;
 function fmt(n) {
     if (n == null) return '—';
     if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
     if (n >= 1e3) return (n/1e3).toFixed(1) + 'K';
     return String(n);
 }
+function fmtUsd(n) { return '$' + (n || 0).toFixed(2); }
 function fmtTime(sec) {
     if (!sec) return '—';
     if (sec < 60) return sec + 's';
@@ -291,7 +317,7 @@ function $(id) { return document.getElementById(id); }
 
 async function refresh() {
     try {
-        const r = await fetch('/api/monitoring/live');
+        const r = await fetch('/api/monitoring/live?hours=' + currentHours);
         if (!r.ok) return;
         const d = await r.json();
         const s = d.system || {};
@@ -308,6 +334,13 @@ async function refresh() {
         const memBar = $('monMemBar');
         memBar.style.width = (s.sys_mem_percent || 0) + '%';
         memBar.className = 'mon-bar-fill ' + barColor(s.sys_mem_percent || 0);
+
+        // Disk
+        $('monDisk').textContent = (s.disk_percent || 0) + '%';
+        $('monDiskSub').textContent = (s.disk_used_gb||0).toFixed(1) + ' / ' + (s.disk_total_gb||0).toFixed(1) + ' GB';
+        const diskBar = $('monDiskBar');
+        diskBar.style.width = (s.disk_percent || 0) + '%';
+        diskBar.className = 'mon-bar-fill ' + barColor(s.disk_percent || 0);
 
         $('monUptime').textContent = 'Uptime: ' + fmtTime(s.uptime_seconds);
         $('monPid').textContent = s.pid || '—';
@@ -328,6 +361,8 @@ async function refresh() {
 
         // LLM
         const l = d.llm || {};
+        const periodLabels = {24:'24h',168:'7d',720:'30d',8760:'1y'};
+        $('monLlmPeriod').textContent = '(' + (periodLabels[currentHours] || currentHours+'h') + ')';
         $('monLlmCalls').textContent = fmt(l.total_calls || 0);
         $('monLlmIn').textContent = fmt(l.total_tokens_in || 0);
         $('monLlmOut').textContent = fmt(l.total_tokens_out || 0);
@@ -557,14 +592,28 @@ async function refresh() {
 
         // Azure costs
         const azc = az.costs || {};
-        $('monAzCostAzure').textContent = '$' + (azc.azure_llm_usd || 0).toFixed(4);
-        $('monAzCostOther').textContent = '$' + (azc.other_llm_usd || 0).toFixed(4);
-        $('monAzCostTotal').textContent = '$' + (azc.total_llm_usd || 0).toFixed(4);
+        $('monAzCostAzure').textContent = fmtUsd(azc.azure_llm_usd);
+        $('monAzCostOther').textContent = fmtUsd(azc.other_llm_usd);
+        $('monAzCostTotal').textContent = fmtUsd(azc.total_llm_usd);
+        $('monAzCostVm').textContent = fmtUsd(azc.vm_monthly_usd);
+        $('monAzCostPg').textContent = fmtUsd(azc.pg_monthly_usd);
+        $('monAzCostStorage').textContent = fmtUsd(azc.storage_monthly_usd);
+        $('monAzCostInfra').textContent = fmtUsd(azc.total_infra_monthly_usd);
 
     } catch(e) {
         console.warn('Monitoring refresh error:', e);
     }
 }
+
+function setRange(hours) {
+    currentHours = hours;
+    document.querySelectorAll('.mon-range-btn').forEach(b => {
+        b.classList.toggle('active', parseInt(b.dataset.hours) === hours);
+    });
+    refresh();
+}
+// Init active button
+document.querySelector('.mon-range-btn[data-hours="24"]').classList.add('active');
 
 refresh();
 setInterval(refresh, 5000);

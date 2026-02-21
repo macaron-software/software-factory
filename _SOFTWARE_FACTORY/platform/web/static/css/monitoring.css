@@ -76,6 +76,11 @@
 .mon-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
 @media (max-width: 768px) { .mon-2col { grid-template-columns: 1fr; } }
 
+/* Time range buttons */
+.mon-range-btn { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); padding: 0.15rem 0.5rem; border-radius: 6px; font-size: 0.65rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.mon-range-btn:hover { border-color: var(--accent, #7c3aed); color: var(--text-primary); }
+.mon-range-btn.active { background: var(--accent, #7c3aed); border-color: var(--accent, #7c3aed); color: #fff; }
+
 /* Sparkline */
 .mon-spark { display: inline-flex; align-items: flex-end; gap: 1px; height: 20px; vertical-align: middle; margin-left: 0.5rem; }
 .mon-spark-bar { width: 3px; background: var(--accent, #7c3aed); border-radius: 1px; min-height: 1px; }
