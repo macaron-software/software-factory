@@ -15,6 +15,14 @@ from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_m
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+# Prime psutil cpu_percent so interval=0 returns meaningful values
+try:
+    import psutil as _ps, os as _os
+    _ps.Process(_os.getpid()).cpu_percent()
+    _ps.cpu_percent()
+except Exception:
+    pass
+
 # ── Memory API ───────────────────────────────────────────────────
 
 @router.get("/api/memory/stats")
@@ -414,10 +422,11 @@ async def monitoring_live(hours: int = 24):
     if cache and cache.get("hours") == hours and now - cache.get("ts", 0) < 5:
         return JSONResponse(cache["data"])
 
-    # System metrics (fast, no cache needed)
+    # System metrics — primed at module load, interval=0 measures since last call
     process = psutil.Process(os.getpid())
     mem_info = process.memory_info()
     cpu_percent = process.cpu_percent(interval=0)
+    sys_cpu = psutil.cpu_percent(interval=0)
     sys_mem = psutil.virtual_memory()
     disk = psutil.disk_usage('/')
 
@@ -426,7 +435,7 @@ async def monitoring_live(hours: int = 24):
         "cpu_percent": round(cpu_percent, 1),
         "mem_rss_mb": round(mem_info.rss / 1024 / 1024, 1),
         "mem_vms_mb": round(mem_info.vms / 1024 / 1024, 1),
-        "sys_cpu_percent": round(psutil.cpu_percent(interval=0), 1),
+        "sys_cpu_percent": round(sys_cpu, 1),
         "sys_mem_total_gb": round(sys_mem.total / 1024**3, 1),
         "sys_mem_used_gb": round(sys_mem.used / 1024**3, 1),
         "sys_mem_percent": round(sys_mem.percent, 1),
