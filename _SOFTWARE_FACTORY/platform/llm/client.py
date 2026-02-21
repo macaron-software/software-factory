@@ -14,8 +14,11 @@ import asyncio
 import json
 import logging
 import os
+import sqlite3
 import time
+import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncIterator, Optional
 
@@ -172,6 +175,20 @@ class LLMStreamChunk:
     finish_reason: str = ""
 
 
+# Cost estimation: $/1M tokens (input, output) per model
+_MODEL_PRICING: dict[str, tuple[float, float]] = {
+    "gpt-5.2":       (2.50, 10.00),
+    "gpt-5-mini":    (0.40,  1.60),
+    "kimi-k2":       (0.60,  2.40),
+    "m1":            (0.50,  2.00),
+    "m2.5":          (0.50,  2.00),
+    "demo":          (0.00,  0.00),
+}
+_DEFAULT_PRICING = (1.00, 4.00)  # fallback for unknown models
+
+_USAGE_DB_PATH = Path(__file__).parent.parent.parent / "data" / "platform.db"
+
+
 class LLMClient:
     """Async LLM client with multi-provider support, fallback, and circuit breaker."""
 
@@ -183,6 +200,7 @@ class LLMClient:
     def __init__(self):
         self._http: Optional[httpx.AsyncClient] = None
         self._stats = {"calls": 0, "tokens_in": 0, "tokens_out": 0, "errors": 0}
+        self._usage_table_ready = False
         # Cooldown: provider → timestamp when it becomes available again
         self._provider_cooldown: dict[str, float] = {}
         # Circuit breaker: provider → list of failure timestamps
@@ -357,6 +375,7 @@ class LLMClient:
                     self._cb_record_success(prov)
                     # Trace for observability
                     self._trace(result, messages)
+                    await self._persist_usage(prov, use_model, result.tokens_in, result.tokens_out)
                     return result
                 except Exception as exc:
                     last_exc = exc
@@ -377,6 +396,7 @@ class LLMClient:
                     logger.warning("LLM %s/%s failed after %d attempts: %s", prov, use_model, attempt + 1, err_str[:200])
                     self._stats["errors"] += 1
                     self._cb_record_failure(prov)
+                    await self._persist_usage(prov, use_model, 0, 0, error=True)
                     if is_rate_limit:
                         self._provider_cooldown[prov] = time.monotonic() + 30
                         logger.warning("LLM %s → cooldown 30s (rate limited)", prov)
@@ -733,6 +753,122 @@ class LLMClient:
                 "has_key": has_key,
             })
         return result
+
+    # ── LLM usage persistence ──────────────────────────────────────
+
+    def _ensure_usage_table(self):
+        """Create llm_usage table if it doesn't exist (called once lazily)."""
+        if self._usage_table_ready:
+            return
+        _USAGE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(_USAGE_DB_PATH))
+        try:
+            conn.execute("""CREATE TABLE IF NOT EXISTS llm_usage (
+                id TEXT PRIMARY KEY,
+                ts TEXT,
+                provider TEXT,
+                model TEXT,
+                tokens_in INT,
+                tokens_out INT,
+                cost_estimate REAL,
+                agent_id TEXT,
+                mission_id TEXT,
+                phase TEXT,
+                error INT DEFAULT 0
+            )""")
+            conn.commit()
+        finally:
+            conn.close()
+        self._usage_table_ready = True
+
+    def _estimate_cost(self, model: str, tokens_in: int, tokens_out: int) -> float:
+        """Estimate cost in USD based on per-model pricing."""
+        price_in, price_out = _MODEL_PRICING.get(model, _DEFAULT_PRICING)
+        return (tokens_in * price_in + tokens_out * price_out) / 1_000_000
+
+    async def _persist_usage(
+        self, provider: str, model: str, tokens_in: int, tokens_out: int, error: bool = False,
+    ):
+        """Insert a usage row into the llm_usage SQLite table (non-blocking)."""
+        try:
+            ctx = self._trace_context
+            row = (
+                uuid.uuid4().hex,
+                datetime.now(timezone.utc).isoformat(),
+                provider,
+                model,
+                tokens_in,
+                tokens_out,
+                self._estimate_cost(model, tokens_in, tokens_out),
+                ctx.get("agent_id", ""),
+                ctx.get("mission_id", ""),
+                ctx.get("phase", ""),
+                1 if error else 0,
+            )
+
+            def _insert():
+                self._ensure_usage_table()
+                conn = sqlite3.connect(str(_USAGE_DB_PATH))
+                try:
+                    conn.execute(
+                        "INSERT INTO llm_usage (id,ts,provider,model,tokens_in,tokens_out,"
+                        "cost_estimate,agent_id,mission_id,phase,error) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                        row,
+                    )
+                    conn.commit()
+                finally:
+                    conn.close()
+
+            await asyncio.to_thread(_insert)
+        except Exception as exc:
+            logger.debug("Usage persistence failed: %s", exc)
+
+    async def aggregate_usage(self, days: int = 7) -> dict:
+        """Return cost/day, cost/phase, cost/agent breakdowns for the last N days."""
+        def _query():
+            self._ensure_usage_table()
+            conn = sqlite3.connect(str(_USAGE_DB_PATH))
+            try:
+                cutoff = f"datetime('now', '-{days} days')"
+                by_day = conn.execute(
+                    f"SELECT date(ts) AS day, SUM(cost_estimate), SUM(tokens_in), SUM(tokens_out), COUNT(*)"
+                    f" FROM llm_usage WHERE ts >= {cutoff} GROUP BY day ORDER BY day"
+                ).fetchall()
+                by_phase = conn.execute(
+                    f"SELECT phase, SUM(cost_estimate), COUNT(*)"
+                    f" FROM llm_usage WHERE ts >= {cutoff} GROUP BY phase ORDER BY SUM(cost_estimate) DESC"
+                ).fetchall()
+                by_agent = conn.execute(
+                    f"SELECT agent_id, SUM(cost_estimate), SUM(tokens_in), SUM(tokens_out), COUNT(*)"
+                    f" FROM llm_usage WHERE ts >= {cutoff} GROUP BY agent_id ORDER BY SUM(cost_estimate) DESC"
+                ).fetchall()
+                totals = conn.execute(
+                    f"SELECT SUM(cost_estimate), SUM(tokens_in), SUM(tokens_out), COUNT(*), SUM(error)"
+                    f" FROM llm_usage WHERE ts >= {cutoff}"
+                ).fetchone()
+                return {
+                    "days": days,
+                    "total": {
+                        "cost": totals[0] or 0, "tokens_in": totals[1] or 0,
+                        "tokens_out": totals[2] or 0, "calls": totals[3] or 0, "errors": totals[4] or 0,
+                    },
+                    "by_day": [
+                        {"day": r[0], "cost": r[1], "tokens_in": r[2], "tokens_out": r[3], "calls": r[4]}
+                        for r in by_day
+                    ],
+                    "by_phase": [
+                        {"phase": r[0] or "(none)", "cost": r[1], "calls": r[2]}
+                        for r in by_phase
+                    ],
+                    "by_agent": [
+                        {"agent_id": r[0] or "(none)", "cost": r[1], "tokens_in": r[2], "tokens_out": r[3], "calls": r[4]}
+                        for r in by_agent
+                    ],
+                }
+            finally:
+                conn.close()
+
+        return await asyncio.to_thread(_query)
 
     @property
     def stats(self) -> dict:

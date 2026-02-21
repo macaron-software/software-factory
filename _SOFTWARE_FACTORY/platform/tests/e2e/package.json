@@ -14,6 +14,9 @@
     "test:agents": "npx playwright test agents",
     "test:pages": "npx playwright test pages",
     "test:i18n": "npx playwright test i18n",
+    "test:endurance": "npx playwright test endurance.spec.ts --timeout 300000",
+    "test:chaos": "npx playwright test chaos.spec.ts --timeout 300000",
+    "test:fast": "npx playwright test portfolio pages journeys",
     "report": "npx playwright show-report"
   },
   "devDependencies": {

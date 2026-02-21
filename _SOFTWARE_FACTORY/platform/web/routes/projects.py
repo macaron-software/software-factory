@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, FileResponse
 
-from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, serve_workspace_file
+from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, serve_workspace_file, _parse_body, _is_json_request
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -28,6 +28,31 @@ def _detect_domains(project_path: str) -> list[str]:
     if not p.is_dir():
         return []
     return list({d for f, d in _DOMAIN_MARKERS.items() if (p / f).exists()})
+
+
+def _auto_git_init(project):
+    """Initialize git repo with .gitignore + README if not already a repo."""
+    import subprocess
+    p = Path(project.path)
+    if not p.exists():
+        p.mkdir(parents=True, exist_ok=True)
+    if (p / ".git").exists():
+        return
+    try:
+        subprocess.run(["git", "init"], cwd=str(p), capture_output=True, timeout=10)
+        # .gitignore
+        gitignore = p / ".gitignore"
+        if not gitignore.exists():
+            gitignore.write_text("node_modules/\n__pycache__/\n*.pyc\n.env\n.DS_Store\ntarget/\ndist/\nbuild/\n")
+        # README
+        readme = p / "README.md"
+        if not readme.exists():
+            readme.write_text(f"# {project.name}\n\n{project.description or 'A new project.'}\n")
+        subprocess.run(["git", "add", "."], cwd=str(p), capture_output=True, timeout=10)
+        subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=str(p), capture_output=True, timeout=10)
+        logger.info("git init done for %s at %s", project.id, p)
+    except Exception as e:
+        logger.warning("git init failed for %s: %s", project.id, e)
 
 
 @router.get("/projects", response_class=HTMLResponse)
@@ -461,7 +486,7 @@ async def api_projects():
 async def create_project(request: Request):
     """Create a new project."""
     from ...projects.manager import get_project_store, Project
-    form = await request.form()
+    form = await _parse_body(request)
     store = get_project_store()
     p = Project(
         id=str(form.get("id", "")),
@@ -494,6 +519,12 @@ async def create_project(request: Request):
         except Exception as e:
             logger.warning("generate_cicd failed for %s: %s", p.id, e)
 
+    # Auto-init git repo if path specified and not already a repo
+    if p.path:
+        _auto_git_init(p)
+
+    if _is_json_request(request):
+        return JSONResponse({"ok": True, "project": {"id": p.id, "name": p.name}})
     return RedirectResponse(f"/projects/{p.id}", status_code=303)
 
 
@@ -501,9 +532,9 @@ async def create_project(request: Request):
 async def update_vision(request: Request, project_id: str):
     """Update project vision."""
     from ...projects.manager import get_project_store
-    form = await request.form()
+    data = await _parse_body(request)
     store = get_project_store()
-    store.update_vision(project_id, str(form.get("vision", "")))
+    store.update_vision(project_id, str(data.get("vision", "")))
     return HTMLResponse('<span class="badge badge-green">Saved</span>')
 
 
@@ -515,8 +546,8 @@ async def project_chat(request: Request, project_id: str):
     from ...projects.manager import get_project_store
     from ...agents.store import get_agent_store
 
-    form = await request.form()
-    content = str(form.get("content", "")).strip()
+    data = await _parse_body(request)
+    content = str(data.get("content", "")).strip()
     if not content:
         return HTMLResponse("")
 
@@ -633,9 +664,9 @@ async def project_chat_stream(request: Request, project_id: str):
     from ...agents.store import get_agent_store
     from ...agents.executor import get_executor, ExecutionContext
 
-    form = await request.form()
-    content = str(form.get("content", "")).strip()
-    session_id = str(form.get("session_id", "")).strip()
+    data = await _parse_body(request)
+    content = str(data.get("content", "")).strip()
+    session_id = str(data.get("session_id", "")).strip()
     if not content:
         return HTMLResponse("")
 

@@ -1220,6 +1220,58 @@ async def autoheal_trigger():
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
+# ── Chaos Endurance ──────────────────────────────────────────────────
+
+@router.get("/api/chaos/history")
+async def chaos_history():
+    """Get chaos run history."""
+    from ...ops.chaos_endurance import get_chaos_history
+    return JSONResponse(get_chaos_history())
+
+
+@router.post("/api/chaos/trigger")
+async def chaos_trigger(request: Request):
+    """Manually trigger a chaos scenario."""
+    from ...ops.chaos_endurance import trigger_chaos
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    scenario = body.get("scenario")
+    try:
+        result = await trigger_chaos(scenario)
+        return JSONResponse({
+            "ok": result.success,
+            "scenario": result.scenario,
+            "mttr_ms": result.mttr_ms,
+            "detail": result.detail,
+        })
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+# ── Endurance Watchdog ───────────────────────────────────────────────
+
+@router.get("/api/watchdog/metrics")
+async def watchdog_metrics():
+    """Get endurance watchdog metrics."""
+    from ...ops.endurance_watchdog import get_metrics
+    return JSONResponse(get_metrics(limit=100))
+
+
+@router.get("/api/llm/usage")
+async def llm_usage_stats():
+    """Get LLM usage aggregate (cost by day/phase/agent)."""
+    try:
+        from ...llm.client import get_llm_client
+        client = get_llm_client()
+        data = await client.aggregate_usage(days=7)
+        return JSONResponse(data)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 
 
 # ── i18n ─────────────────────────────────────────────────────────────
