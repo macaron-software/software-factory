@@ -60,11 +60,13 @@ def _migrate(conn: sqlite3.Connection):
     except Exception:
         pass
 
-    # Mission runs: add workspace_path
+    # Mission runs: add workspace_path + parent_mission_id
     try:
         mr_cols = {r[1] for r in conn.execute("PRAGMA table_info(mission_runs)").fetchall()}
         if mr_cols and "workspace_path" not in mr_cols:
             conn.execute("ALTER TABLE mission_runs ADD COLUMN workspace_path TEXT DEFAULT ''")
+        if mr_cols and "parent_mission_id" not in mr_cols:
+            conn.execute("ALTER TABLE mission_runs ADD COLUMN parent_mission_id TEXT DEFAULT ''")
     except Exception:
         pass
 

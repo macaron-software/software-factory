@@ -165,6 +165,27 @@
 .mc-side-section{padding:0.6rem 0.75rem;border-bottom:1px solid var(--border)}
 .mc-side-title{font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);margin-bottom:0.45rem;display:flex;align-items:center;gap:0.3rem}
 
+/* Sub-Missions (Epic→Feature hierarchy) */
+.mc-sub-missions{display:flex;flex-direction:column;gap:0.3rem}
+.mc-sub-card{display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.5rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;text-decoration:none;transition:border-color .15s}
+.mc-sub-card:hover{border-color:var(--purple-dim)}
+.mc-sub-status{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.mc-sub-status.running{background:var(--purple);animation:pulse-dot 2s infinite}
+.mc-sub-status.completed{background:var(--green)}
+.mc-sub-status.failed{background:var(--red)}
+.mc-sub-status.pending{background:var(--text-secondary)}
+.mc-sub-body{flex:1;min-width:0}
+.mc-sub-name{font-size:0.72rem;color:var(--text-primary);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mc-sub-progress{display:flex;align-items:center;gap:0.3rem;margin-top:0.15rem}
+.mc-sub-bar{flex:1;height:3px;background:var(--bg-secondary);border-radius:2px;overflow:hidden}
+.mc-sub-fill{height:100%;border-radius:2px}
+.mc-sub-fill.running{background:var(--purple)}
+.mc-sub-fill.completed{background:var(--green)}
+.mc-sub-fill.failed{background:var(--red)}
+.mc-sub-label{font-size:0.58rem;color:var(--text-secondary);font-weight:600;min-width:22px}
+.mc-parent-link{display:block;padding:0.4rem 0.5rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;text-decoration:none;font-size:0.72rem;color:var(--text-primary);transition:border-color .15s;display:flex;align-items:center;gap:0.4rem}
+.mc-parent-link:hover{border-color:var(--purple-dim)}
+
 /* CDP Agent Card */
 .mc-cdp-card{padding:0.75rem;border-bottom:1px solid var(--border);background:var(--bg-secondary)}
 .mc-cdp-card-inner{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius,10px);overflow:hidden}

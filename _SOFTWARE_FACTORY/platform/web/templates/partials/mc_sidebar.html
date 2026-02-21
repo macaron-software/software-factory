@@ -86,6 +86,46 @@
             {% endif %}
         </div>
 
+        <!-- Sub-Missions Hierarchy (Epic → Features) -->
+        {% if sub_missions %}
+        <div class="mc-side-section">
+            <div class="mc-side-title">
+                <svg class="icon icon-xs"><use href="#icon-git-branch"/></svg> Sous-Missions ({{ sub_missions|length }})
+            </div>
+            <div class="mc-sub-missions">
+                {% for sub in sub_missions %}
+                {% set sub_done = sub.phases|selectattr('status.value','equalto','done')|list|length %}
+                {% set sub_total = sub.phases|length %}
+                {% set sub_pct = ((sub_done / sub_total) * 100)|round|int if sub_total > 0 else 0 %}
+                {% set sub_st = sub.status.value %}
+                <a href="/missions/{{ sub.id }}/control" class="mc-sub-card">
+                    <div class="mc-sub-status {{ sub_st }}"></div>
+                    <div class="mc-sub-body">
+                        <div class="mc-sub-name">{{ sub.brief[:60] if sub.brief else sub.workflow_name }}</div>
+                        <div class="mc-sub-progress">
+                            <div class="mc-sub-bar"><div class="mc-sub-fill {{ sub_st }}" style="width:{{ sub_pct }}%"></div></div>
+                            <span class="mc-sub-label">{{ sub_done }}/{{ sub_total }}</span>
+                        </div>
+                    </div>
+                    <span class="mission-badge {{ sub_st }}" style="font-size:0.6rem">{{ sub_st }}</span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if parent_mission %}
+        <div class="mc-side-section">
+            <div class="mc-side-title">
+                <svg class="icon icon-xs"><use href="#icon-arrow-up"/></svg> Epic Parente
+            </div>
+            <a href="/missions/{{ parent_mission.id }}/control" class="mc-parent-link">
+                <span class="mission-badge {{ parent_mission.status.value }}" style="font-size:0.6rem">{{ parent_mission.status.value }}</span>
+                {{ parent_mission.brief[:80] if parent_mission.brief else parent_mission.workflow_name }}
+            </a>
+        </div>
+        {% endif %}
+
         <!-- Memory — Project Wiki -->
         <div class="mc-side-section">
             <div class="mc-side-title">

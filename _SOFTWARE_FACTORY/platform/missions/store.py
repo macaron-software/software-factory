@@ -194,6 +194,34 @@ class MissionStore:
         finally:
             db.close()
 
+    def list_children(self, parent_mission_id: str) -> list[MissionDef]:
+        """List sub-missions of a parent mission (Epic→Features)."""
+        db = get_db()
+        try:
+            rows = db.execute(
+                "SELECT * FROM missions WHERE parent_mission_id = ? ORDER BY wsjf_score DESC",
+                (parent_mission_id,),
+            ).fetchall()
+            return [_row_to_mission(r) for r in rows]
+        finally:
+            db.close()
+
+    def update_mission(self, m: MissionDef) -> bool:
+        """Full update of a mission (config, status, etc.)."""
+        db = get_db()
+        try:
+            cur = db.execute(
+                """UPDATE missions SET name=?, description=?, goal=?, status=?, type=?,
+                   workflow_id=?, wsjf_score=?, config_json=?, kanban_status=?
+                   WHERE id=?""",
+                (m.name, m.description, m.goal, m.status, m.type,
+                 m.workflow_id, m.wsjf_score, json.dumps(m.config), m.kanban_status, m.id),
+            )
+            db.commit()
+            return cur.rowcount > 0
+        finally:
+            db.close()
+
     # ── Sprints ──────────────────────────────────────────────────
 
     def list_sprints(self, mission_id: str) -> list[SprintDef]:
@@ -438,10 +466,15 @@ from ..models import MissionRun, MissionStatus, PhaseRun, PhaseStatus
 
 def _row_to_mission_run(row) -> MissionRun:
     phases = json.loads(row["phases_json"]) if row["phases_json"] else []
-    # Safe access for workspace_path (may not exist in older DBs)
+    # Safe access for columns that may not exist in older DBs
     wp = ""
     try:
         wp = row["workspace_path"] or ""
+    except (IndexError, KeyError):
+        pass
+    pmid = ""
+    try:
+        pmid = row["parent_mission_id"] or ""
     except (IndexError, KeyError):
         pass
     return MissionRun(
@@ -452,6 +485,7 @@ def _row_to_mission_run(row) -> MissionRun:
         cdp_agent_id=row["cdp_agent_id"] or "chef_de_programme",
         project_id=row["project_id"] or "",
         workspace_path=wp,
+        parent_mission_id=pmid,
         status=MissionStatus(row["status"]),
         current_phase=row["current_phase"] or "",
         phases=[PhaseRun(**p) for p in phases],
@@ -470,11 +504,13 @@ class MissionRunStore:
         try:
             db.execute(
                 """INSERT INTO mission_runs (id, workflow_id, workflow_name, session_id,
-                   cdp_agent_id, project_id, workspace_path, status, current_phase,
-                   phases_json, brief, created_at, updated_at, completed_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   cdp_agent_id, project_id, workspace_path, parent_mission_id, status,
+                   current_phase, phases_json, brief, created_at, updated_at, completed_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (run.id, run.workflow_id, run.workflow_name, run.session_id,
-                 run.cdp_agent_id, run.project_id, run.workspace_path, run.status.value,
+                 run.cdp_agent_id, run.project_id, run.workspace_path,
+                 run.parent_mission_id or "",
+                 run.status.value,
                  run.current_phase, json.dumps([p.model_dump() for p in run.phases]),
                  run.brief, run.created_at.isoformat(), run.updated_at.isoformat(),
                  run.completed_at.isoformat() if run.completed_at else None),
@@ -548,6 +584,20 @@ class MissionRunStore:
             cur = db.execute("DELETE FROM mission_runs WHERE id = ?", (run_id,))
             db.commit()
             return cur.rowcount > 0
+        finally:
+            db.close()
+
+    def list_children_runs(self, parent_id: str) -> list[MissionRun]:
+        """List sub-mission runs linked to a parent mission run."""
+        db = get_db()
+        try:
+            rows = db.execute(
+                "SELECT * FROM mission_runs WHERE parent_mission_id = ? ORDER BY created_at",
+                (parent_id,),
+            ).fetchall()
+            return [_row_to_mission_run(r) for r in rows]
+        except Exception:
+            return []
         finally:
             db.close()
 

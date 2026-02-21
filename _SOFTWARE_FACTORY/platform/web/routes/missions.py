@@ -811,6 +811,13 @@ async def mission_control_page(request: Request, mission_id: str):
     mission = run_store.get(mission_id)
     if not mission:
         return RedirectResponse("/pi", status_code=302)
+
+    # Sub-missions hierarchy (Epic→Features)
+    sub_missions = run_store.list_children_runs(mission_id)
+    parent_mission = None
+    if mission.parent_mission_id:
+        parent_mission = run_store.get(mission.parent_mission_id)
+
     agents = get_agent_store().list_all()
     agent_map = _agent_map_for_template(agents)
 
@@ -1645,6 +1652,8 @@ async def mission_control_page(request: Request, mission_id: str):
         "tab_profile": tab_profile,
         "workflow_type": wf_id,
         "support_tickets": support_tickets,
+        "sub_missions": sub_missions,
+        "parent_mission": parent_mission,
     })
 
 
@@ -1657,6 +1666,26 @@ async def api_mission_status(request: Request, mission_id: str):
     if not mission:
         return JSONResponse({"error": "Not found"}, status_code=404)
     return JSONResponse(mission.model_dump(mode="json"))
+
+
+@router.get("/api/missions/{mission_id}/children")
+async def api_mission_children(request: Request, mission_id: str):
+    """List sub-missions (Features) of a parent mission (Epic)."""
+    from ...missions.store import get_mission_run_store, get_mission_store
+    run_store = get_mission_run_store()
+    mission_store = get_mission_store()
+    # Get children from both stores
+    run_children = run_store.list_children_runs(mission_id)
+    def_children = mission_store.list_children(mission_id)
+    return JSONResponse({
+        "parent_id": mission_id,
+        "sub_mission_runs": [r.model_dump(mode="json") for r in run_children],
+        "sub_mission_defs": [
+            {"id": c.id, "name": c.name, "type": c.type, "status": c.status,
+             "wsjf_score": c.wsjf_score, "workflow_id": c.workflow_id}
+            for c in def_children
+        ],
+    })
 
 
 @router.post("/api/missions/{mission_id}/exec")

@@ -40,6 +40,10 @@
 .mission-badge.failed{background:rgba(239,68,68,.12);color:var(--red)}
 .mission-badge.paused,.mission-badge.pending{background:var(--bg-tertiary);color:var(--text-secondary)}
 .mission-card-wrap{display:flex;flex-direction:column;gap:0}
+.mission-child{margin-left:2rem;border-left:2px solid var(--purple-dim)}
+.mission-child .mission-card{border-left:none;border-radius:0 10px 0 0}
+.mission-child .mission-actions{border-left:none;border-radius:0 0 10px 0}
+.mission-child-badge{font-size:0.62rem;padding:0.1rem 0.35rem;border-radius:3px;background:rgba(124,58,237,.12);color:var(--purple);font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
 .mission-actions{display:flex;gap:0.4rem;padding:0.4rem 1.2rem 0.6rem;background:var(--bg-secondary);border:1px solid var(--border);border-top:0;border-radius:0 0 10px 10px;margin-top:-1px}
 .launch-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;justify-content:center}
 .launch-form{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;width:90%;max-width:520px}
@@ -59,7 +63,8 @@
     {% set total = run.phases|length %}
     {% set pct = ((done_count / total) * 100)|round|int if total > 0 else 0 %}
     {% set st = run.status.value %}
-    <div class="mission-card-wrap">
+    {% set is_child = run.parent_mission_id %}
+    <div class="mission-card-wrap {{ 'mission-child' if is_child else '' }}">
     <a href="/missions/{{ run.id }}/control" class="mission-card">
         <div class="mission-status-icon {{ st }}">
             {% if st == 'running' %}<svg class="icon icon-xs"><use href="#icon-activity"/></svg>{% elif st == 'completed' %}<svg class="icon icon-xs"><use href="#icon-check"/></svg>{% elif st == 'failed' %}<svg class="icon icon-xs"><use href="#icon-x"/></svg>{% else %}<svg class="icon icon-xs"><use href="#icon-pause"/></svg>{% endif %}
@@ -67,6 +72,7 @@
         <div class="mission-body">
             {% set epic_name = run.brief.split(' - ')[0] if ' - ' in run.brief else run.brief[:50] %}
             <div class="mission-title">
+                {% if is_child %}<span class="mission-child-badge">Feature</span>{% endif %}
                 {{ epic_name }}
                 <span style="font-size:0.68rem;font-weight:400;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.1rem 0.4rem;border-radius:4px">{{ run.workflow_name or run.workflow_id }}</span>
             </div>

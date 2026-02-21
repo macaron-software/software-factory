@@ -328,6 +328,7 @@ class MissionRun(BaseModel):
     cdp_agent_id: str = "chef_de_programme"
     project_id: str = ""
     workspace_path: str = ""  # filesystem path for agent tools (code_write, git, docker)
+    parent_mission_id: str = ""  # SAFe: Epic→Feature hierarchy
     status: MissionStatus = MissionStatus.PENDING
     current_phase: str = ""
     phases: list[PhaseRun] = Field(default_factory=list)

@@ -93,6 +93,12 @@ def _get_tool_registry():
         register_platform_tools(reg)
     except Exception:
         pass
+    # Composition tools (dynamic workflow/team/mission creation)
+    try:
+        from ..tools.compose_tools import register_compose_tools
+        register_compose_tools(reg)
+    except Exception:
+        pass
     return reg
 
 
@@ -927,6 +933,123 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {"type": "object", "properties": {}},
             },
         },
+        # ── Composition tools (dynamic workflow/team/mission) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "compose_workflow",
+                "description": "Create a dynamic workflow definition. Define phases, patterns, and agent assignments based on project analysis. Returns workflow ID.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string", "description": "Workflow ID (auto-generated if omitted)"},
+                        "name": {"type": "string", "description": "Workflow name"},
+                        "description": {"type": "string", "description": "What this workflow does"},
+                        "phases": {
+                            "type": "array",
+                            "description": "List of phases: [{id, name, pattern, agents: [agent_ids], config, gate}]",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "pattern": {"type": "string", "enum": ["solo", "sequential", "parallel", "loop", "hierarchical", "network", "router", "aggregator", "human-in-the-loop"]},
+                                    "agents": {"type": "array", "items": {"type": "string"}},
+                                    "config": {"type": "object"},
+                                    "gate": {"type": "string", "enum": ["all_approved", "no_veto", "always"]},
+                                },
+                            },
+                        },
+                    },
+                    "required": ["name", "phases"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "create_team",
+                "description": "Create a feature team with specialized agents. Each agent gets a prompt tailored to the domain and stack.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "team_name": {"type": "string", "description": "Team name (e.g. 'Auth Team', 'Booking Team')"},
+                        "domain": {"type": "string", "description": "Domain: auth, booking, payment, admin, infra, qa, proto"},
+                        "stack": {"type": "string", "description": "Tech stack: 'Rust axum/sqlx', 'SvelteKit', 'Python FastAPI'"},
+                        "roles": {
+                            "type": "array",
+                            "description": "Team members: [{id, name, role, skills: [], prompt}]",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "role": {"type": "string"},
+                                    "skills": {"type": "array", "items": {"type": "string"}},
+                                    "prompt": {"type": "string"},
+                                },
+                            },
+                        },
+                    },
+                    "required": ["team_name", "domain", "roles"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "create_sub_mission",
+                "description": "Create a sub-mission (Feature) linked to the parent epic. Assign a workflow and team.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "parent_mission_id": {"type": "string", "description": "Parent mission/epic ID"},
+                        "name": {"type": "string", "description": "Feature name"},
+                        "description": {"type": "string", "description": "Feature description"},
+                        "goal": {"type": "string", "description": "Acceptance criteria"},
+                        "project_id": {"type": "string", "description": "Project identifier"},
+                        "type": {"type": "string", "description": "Mission type: feature|story", "enum": ["feature", "story"]},
+                        "workflow_id": {"type": "string", "description": "Workflow to execute for this feature"},
+                        "wsjf_score": {"type": "number", "description": "WSJF priority score"},
+                        "config": {"type": "object", "description": "Extra config: team_ids, stack, ao_refs"},
+                    },
+                    "required": ["parent_mission_id", "name"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "list_sub_missions",
+                "description": "List all sub-missions (Features) of a parent mission (Epic).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "parent_mission_id": {"type": "string", "description": "Parent mission ID"},
+                    },
+                    "required": ["parent_mission_id"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "set_constraints",
+                "description": "Set execution constraints on a mission: WIP limits, stack rules, AO refs, sprint duration.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "mission_id": {"type": "string", "description": "Mission ID to update"},
+                        "wip_limit": {"type": "integer", "description": "Max concurrent workers"},
+                        "stack": {"type": "string", "description": "Required tech stack"},
+                        "ao_refs": {"type": "array", "items": {"type": "string"}, "description": "AO reference IDs"},
+                        "sprint_duration": {"type": "string", "description": "Sprint duration (e.g. '4h', '1d')"},
+                        "max_workers": {"type": "integer", "description": "Max parallel workers"},
+                    },
+                    "required": ["mission_id"],
+                },
+            },
+        },
     ]
     _TOOL_SCHEMAS = schemas
     return schemas
@@ -946,6 +1069,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "lrm_conventions", "lrm_context", "lrm_summarize",
         "github_code_search",
         "get_si_blueprint",
+        "compose_workflow", "create_team", "create_sub_mission", "list_sub_missions", "set_constraints",
     ],
     "ux": [
         "code_read", "code_search", "list_files", "screenshot",
@@ -996,6 +1120,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "memory_search", "memory_store", "get_project_context",
         "list_files",
         "run_phase", "get_phase_status", "list_phases", "request_validation",
+        "compose_workflow", "create_team", "create_sub_mission", "list_sub_missions", "set_constraints",
         "github_issues", "github_prs",
         "jira_search",
     ],
@@ -1605,6 +1730,11 @@ class AgentExecutor:
         if name == "get_si_blueprint":
             return await self._tool_si_blueprint(args, ctx)
 
+        # ── Composition tools (dynamic workflow/team/mission) ──
+        if name in ("compose_workflow", "create_team", "create_sub_mission",
+                     "list_sub_missions", "set_constraints"):
+            return await self._tool_compose(name, args, ctx)
+
         # ── MCP tools: proxy to external servers ──
         if name.startswith("lrm_"):
             return await self._tool_mcp_lrm(name, args, ctx)
@@ -2066,6 +2196,16 @@ class AgentExecutor:
             return f"[SI Blueprint] {project_id}:\n{yaml.dump(bp, default_flow_style=False, allow_unicode=True)}"
         except Exception as e:
             return f"[SI Blueprint] Error reading: {e}"
+
+    async def _tool_compose(self, name: str, args: dict, ctx: ExecutionContext) -> str:
+        """Execute composition tools via the registry."""
+        from ..models import AgentInstance
+        registry = _get_tool_registry()
+        tool = registry.get(name)
+        if not tool:
+            return f"Error: composition tool '{name}' not found"
+        agent_inst = AgentInstance(id=ctx.agent.id, name=ctx.agent.name, role=ctx.agent.role) if ctx.agent else None
+        return await tool.execute(args, agent_inst)
 
     async def _tool_fractal_code(self, args: dict, ctx: ExecutionContext) -> str:
         """Spawn a focused sub-agent LLM to complete an atomic coding task.
