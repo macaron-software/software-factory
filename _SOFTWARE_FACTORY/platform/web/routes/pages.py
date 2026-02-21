@@ -238,10 +238,33 @@ async def pi_board_page(request: Request):
             })
     except Exception:
         pass
+    # Load TMA tickets (bugs, debt, security)
+    tma_tickets = []
+    try:
+        db = get_db()
+        tma_rows = db.execute("""
+            SELECT m.id, m.project_id, m.name, m.description, m.goal, m.status, m.type, m.created_at,
+                   p.name as project_name
+            FROM missions m LEFT JOIN projects p ON m.project_id = p.id
+            WHERE m.type IN ('bug', 'debt', 'security')
+            ORDER BY
+                CASE m.type WHEN 'security' THEN 0 WHEN 'bug' THEN 1 WHEN 'debt' THEN 2 ELSE 3 END,
+                m.created_at DESC
+        """).fetchall()
+        for r in tma_rows:
+            tma_tickets.append({
+                "id": r["id"], "project_id": r["project_id"], "name": r["name"],
+                "description": r["description"], "goal": r["goal"],
+                "status": r["status"], "type": r["type"],
+                "project_name": r["project_name"] or r["project_id"],
+                "created_at": r["created_at"],
+            })
+    except Exception:
+        pass
     return _templates(request).TemplateResponse("pi_board.html", {
         "request": request, "page_title": "PI Board",
         "runs": runs, "projects": projects, "workflows": workflows,
-        "active_ids": active_ids, "epics": epics,
+        "active_ids": active_ids, "epics": epics, "tma_tickets": tma_tickets,
     })
 
 @router.get("/ceremonies", response_class=HTMLResponse)

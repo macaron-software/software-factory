@@ -76,6 +76,23 @@
 .feat-chip.in_progress{background:rgba(124,58,237,.12);color:var(--purple)}
 .feat-chip.active{background:rgba(124,58,237,.12);color:var(--purple)}
 .epic-toggle{cursor:pointer;font-size:0.75rem;color:var(--purple);background:none;border:none;font-family:inherit;padding:0.2rem 0.4rem}
+/* TMA Tickets */
+.tma-list{display:flex;flex-direction:column;gap:0.5rem}
+.tma-card{display:grid;grid-template-columns:auto 1fr auto;gap:0.8rem;align-items:center;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.8rem 1rem;transition:border-color .15s}
+.tma-card:hover{border-color:var(--purple-dim)}
+.tma-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.tma-icon.bug{background:rgba(239,68,68,.1)}
+.tma-icon.security{background:rgba(245,158,11,.1)}
+.tma-icon.debt{background:rgba(99,102,241,.1)}
+.tma-body{min-width:0}
+.tma-title{font-size:0.88rem;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap}
+.tma-desc{font-size:0.78rem;color:var(--text-secondary);margin-top:0.3rem;line-height:1.4}
+.tma-goal{font-size:0.75rem;color:var(--text-secondary);margin-top:0.2rem;opacity:0.8}
+.tma-meta{display:flex;flex-direction:column;align-items:flex-end;gap:0.3rem;flex-shrink:0}
+.tma-type-badge{font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:3px;font-weight:600;text-transform:uppercase}
+.tma-type-badge.bug{background:rgba(239,68,68,.12);color:var(--red)}
+.tma-type-badge.security{background:rgba(245,158,11,.12);color:#f59e0b}
+.tma-type-badge.debt{background:rgba(99,102,241,.12);color:#6366f1}
 </style>
 
 <!-- ═══ Epics (SAFe Portfolio) ═══ -->
@@ -112,6 +129,37 @@
         </div>
     </div>
     {% endfor %}
+</div>
+{% endif %}
+
+<!-- ═══ TMA / Tickets (Self-Healing) ═══ -->
+{% if tma_tickets %}
+<div class="epic-section">
+    <h2><svg class="icon icon-sm"><use href="#icon-tool"/></svg> TMA — Tickets Maintenance
+        <span style="font-size:0.72rem;font-weight:400;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.15rem 0.5rem;border-radius:4px">{{ tma_tickets|length }}</span>
+    </h2>
+    <div class="tma-list">
+    {% for t in tma_tickets %}
+    <div class="tma-card">
+        <div class="tma-icon {{ t.type }}">
+            {% if t.type == 'bug' %}🐛{% elif t.type == 'security' %}🔒{% elif t.type == 'debt' %}🔧{% else %}📋{% endif %}
+        </div>
+        <div class="tma-body">
+            <div class="tma-title">
+                {{ t.name }}
+                <span class="epic-project-badge">{{ t.project_name }}</span>
+                <span class="tma-type-badge {{ t.type }}">{{ t.type }}</span>
+            </div>
+            {% if t.description %}<div class="tma-desc">{{ t.description[:200] }}</div>{% endif %}
+            {% if t.goal %}<div class="tma-goal">🎯 {{ t.goal[:200] }}</div>{% endif %}
+        </div>
+        <div class="tma-meta">
+            <span class="mission-badge {{ t.status }}">{{ t.status }}</span>
+            <span class="mission-date">{{ t.created_at[:10] if t.created_at else '' }}</span>
+        </div>
+    </div>
+    {% endfor %}
+    </div>
 </div>
 {% endif %}
 
