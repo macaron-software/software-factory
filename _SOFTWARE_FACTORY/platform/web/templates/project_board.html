@@ -63,6 +63,18 @@
 .board-flow-node:hover{stroke:var(--purple);fill:rgba(124,58,237,.08)}
 .board-flow-label{font-size:9px;fill:var(--text-secondary);text-anchor:middle}
 .board-flow-edge{stroke:var(--border);stroke-width:1;fill:none;marker-end:url(#arrowBoard)}
+
+/* Operations panel */
+.ops-item{display:flex;align-items:flex-start;gap:0.5rem;padding:0.4rem 0;border-bottom:1px solid var(--border)}
+.ops-item:last-child{border-bottom:none}
+.ops-icon{flex-shrink:0;margin-top:0.1rem}
+.ops-content{flex:1;min-width:0}
+.ops-label{font-size:0.72rem;font-weight:600;color:var(--text-primary)}
+.ops-status{display:flex;align-items:center;gap:0.3rem;margin-top:0.15rem;flex-wrap:wrap}
+.ops-badge{font-size:0.58rem;padding:0.08rem 0.3rem;border-radius:3px;font-weight:600}
+.ops-badge.active{background:rgba(52,211,153,.15);color:var(--green)}
+.ops-badge.pending{background:rgba(107,114,128,.15);color:#9ca3af}
+.ops-meta{font-size:0.58rem;color:var(--text-muted)}
 </style>
 
 <div class="board-layout">
@@ -126,6 +138,97 @@
 
     <!-- Right sidebar -->
     <div style="display:flex;flex-direction:column;gap:1.2rem">
+        <!-- Operations: TMA + Security + Debt -->
+        <div class="board-panel">
+            <div class="board-panel-header">
+                <div class="board-panel-title"><svg><use href="#icon-activity"/></svg> Opérations</div>
+            </div>
+            <div class="board-panel-body" style="display:flex;flex-direction:column;gap:0.6rem">
+                <!-- CI/CD -->
+                <div class="ops-item">
+                    <div class="ops-icon" style="color:{% if has_cicd %}var(--green){% else %}var(--text-muted){% endif %}">
+                        <svg class="icon icon-sm"><use href="#icon-git-merge"/></svg>
+                    </div>
+                    <div class="ops-content">
+                        <div class="ops-label">CI/CD Pipeline</div>
+                        <div class="ops-status">{% if has_cicd %}<span class="ops-badge active">Configuré</span>{% else %}<span class="ops-badge pending">Non configuré</span>{% endif %}</div>
+                    </div>
+                </div>
+                <!-- TMA -->
+                <div class="ops-item">
+                    <div class="ops-icon" style="color:{% if ops_missions.tma %}{% if ops_missions.tma.status == 'active' %}var(--green){% else %}var(--yellow){% endif %}{% else %}var(--text-muted){% endif %}">
+                        <svg class="icon icon-sm"><use href="#icon-tool"/></svg>
+                    </div>
+                    <div class="ops-content">
+                        <div class="ops-label">TMA Maintenance</div>
+                        {% if ops_missions.tma %}
+                        <div class="ops-status">
+                            <span class="ops-badge {% if ops_missions.tma.status == 'active' %}active{% else %}pending{% endif %}">{{ ops_missions.tma.status }}</span>
+                            {% if ops_missions.tma.incident_count %}<span class="ops-meta">{{ ops_missions.tma.incident_count }} incidents{% if ops_missions.tma.recurring %}, {{ ops_missions.tma.recurring }} récurrents{% endif %}</span>{% endif %}
+                        </div>
+                        {% else %}
+                        <div class="ops-status"><span class="ops-badge pending">Non provisionné</span>
+                            <button class="btn btn-ghost" style="font-size:0.6rem;padding:0.1rem 0.3rem" hx-post="/api/projects/{{ project.id }}/provision" hx-swap="none" onclick="location.reload()">Provisionner</button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <!-- Security -->
+                <div class="ops-item">
+                    <div class="ops-icon" style="color:{% if ops_missions.security %}{% if ops_missions.security.status == 'active' %}var(--green){% else %}var(--blue){% endif %}{% else %}var(--text-muted){% endif %}">
+                        <svg class="icon icon-sm"><use href="#icon-shield"/></svg>
+                    </div>
+                    <div class="ops-content">
+                        <div class="ops-label">Centre Sécurité</div>
+                        {% if ops_missions.security %}
+                        <div class="ops-status">
+                            <span class="ops-badge {% if ops_missions.security.status == 'active' %}active{% else %}pending{% endif %}">{{ ops_missions.security.status }}</span>
+                            <span class="ops-meta">{{ ops_missions.security.schedule }}</span>
+                        </div>
+                        {% else %}
+                        <div class="ops-status"><span class="ops-badge pending">Non provisionné</span></div>
+                        {% endif %}
+                    </div>
+                </div>
+                <!-- Tech Debt -->
+                <div class="ops-item">
+                    <div class="ops-icon" style="color:{% if ops_missions.debt %}{% if ops_missions.debt.status == 'active' %}var(--yellow){% else %}var(--blue){% endif %}{% else %}var(--text-muted){% endif %}">
+                        <svg class="icon icon-sm"><use href="#icon-alert-triangle"/></svg>
+                    </div>
+                    <div class="ops-content">
+                        <div class="ops-label">Dette Technique</div>
+                        {% if ops_missions.debt %}
+                        <div class="ops-status">
+                            <span class="ops-badge {% if ops_missions.debt.status == 'active' %}active{% else %}pending{% endif %}">{{ ops_missions.debt.status }}</span>
+                            <span class="ops-meta">{{ ops_missions.debt.schedule }}</span>
+                        </div>
+                        {% else %}
+                        <div class="ops-status"><span class="ops-badge pending">Non provisionné</span></div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Epics list -->
+        {% if epics_list %}
+        <div class="board-panel">
+            <div class="board-panel-header">
+                <div class="board-panel-title"><svg><use href="#icon-layers"/></svg> Epics</div>
+                <span style="font-size:0.65rem;color:var(--text-muted)">{{ epics_list|length }}</span>
+            </div>
+            <div class="board-panel-body">
+                {% for ep in epics_list %}
+                <div class="board-backlog-item">
+                    <div class="board-backlog-dot" style="background:{% if ep.status == 'completed' %}var(--green){% elif ep.status == 'active' %}var(--blue){% else %}var(--text-muted){% endif %}"></div>
+                    <span style="color:var(--text-primary);font-weight:500">{{ ep.name[:35] }}{% if ep.name|length > 35 %}...{% endif %}</span>
+                    <span style="margin-left:auto;font-size:0.6rem;color:var(--text-muted)">{{ ep.status }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Backlog -->
         <div class="board-panel">
             <div class="board-panel-header">

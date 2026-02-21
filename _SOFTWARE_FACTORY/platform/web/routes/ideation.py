@@ -317,6 +317,10 @@ async def ideation_create_epic(request: Request):
                 _sp.run(["git", "add", "."], cwd=str(proj_dir), capture_output=True, timeout=10)
                 _sp.run(["git", "commit", "-m", "Initial commit from ideation"],
                         cwd=str(proj_dir), capture_output=True, timeout=10)
+
+            # Generate CI/CD pipeline based on stack
+            from ...projects.manager import ProjectStore
+            ProjectStore.generate_cicd(project_path, stack)
         except Exception as e:
             logger.warning("Project dir creation: %s", e)
 
@@ -334,6 +338,7 @@ async def ideation_create_epic(request: Request):
             status="active",
         )
         project_store.create(project)
+        project_store.auto_provision(project_id, project.name)
         project_name = project.name
 
     # ── Step 4: Create epic (mission) with type & workflow routing ──

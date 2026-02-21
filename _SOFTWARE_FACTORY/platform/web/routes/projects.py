@@ -347,6 +347,42 @@ async def project_board_page(request: Request, project_id: str):
     except Exception:
         pass
 
+    # Operational missions (TMA, Security, Debt — auto-provisioned)
+    ops_missions = {"tma": None, "security": None, "debt": None}
+    epics_list = []
+    for m in missions:
+        cfg = m.config or {}
+        if cfg.get("auto_provisioned"):
+            if m.type == "program" and "tma" in (m.workflow_id or ""):
+                incidents = cfg.get("recurring_incidents", {})
+                ops_missions["tma"] = {
+                    "id": m.id, "name": m.name, "status": m.status,
+                    "incident_count": sum(incidents.values()),
+                    "recurring": sum(1 for v in incidents.values() if v >= 3),
+                }
+            elif m.type == "security":
+                ops_missions["security"] = {
+                    "id": m.id, "name": m.name, "status": m.status,
+                    "schedule": cfg.get("schedule", "weekly"),
+                }
+            elif m.type == "debt":
+                ops_missions["debt"] = {
+                    "id": m.id, "name": m.name, "status": m.status,
+                    "schedule": cfg.get("schedule", "monthly"),
+                }
+        else:
+            epics_list.append({
+                "id": m.id, "name": m.name, "status": m.status,
+                "type": m.type, "wsjf": m.wsjf_score,
+            })
+
+    # CI/CD pipeline status
+    cicd_file = None
+    if project.path:
+        ci_path = Path(project.path) / ".github" / "workflows" / "ci.yml"
+        if ci_path.exists():
+            cicd_file = str(ci_path)
+
     return _templates(request).TemplateResponse("project_board.html", {
         "request": request,
         "page_title": f"Board — {project.name}",
@@ -356,6 +392,9 @@ async def project_board_page(request: Request, project_id: str):
         "flow_edges": flow_edges,
         "backlog_items": backlog_items,
         "pull_requests": pull_requests,
+        "ops_missions": ops_missions,
+        "epics_list": epics_list,
+        "has_cicd": cicd_file is not None,
     })
 
 

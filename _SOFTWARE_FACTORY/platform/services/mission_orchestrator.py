@@ -545,6 +545,15 @@ class MissionOrchestrator:
                 "success": phase_success,
             })
 
+            # Feedback loop: activate TMA after deploy phase
+            if phase_success and phase.phase_id in ("deploy-prod", "deploy", "tma-handoff"):
+                try:
+                    from ..missions.feedback import on_deploy_completed
+                    if mission.project_id:
+                        on_deploy_completed(mission.project_id, mission.id)
+                except Exception as _fb_err:
+                    logger.warning("Feedback on_deploy_completed failed: %s", _fb_err)
+
             # CDP announces result
             if i < len(mission.phases) - 1:
                 if phase_success:

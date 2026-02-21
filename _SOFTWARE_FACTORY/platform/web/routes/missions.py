@@ -2866,3 +2866,44 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
         )
 
     return prompt
+
+
+# ── Feedback Loop API ──────────────────────────────────────────────
+
+@router.post("/api/projects/{project_id}/feedback/security-alert")
+async def api_security_alert(request: Request, project_id: str):
+    """Create a priority bug for a security vulnerability."""
+    from ...missions.feedback import on_security_alert
+    data = await request.json()
+    cve_id = data.get("cve_id", "UNKNOWN")
+    severity = data.get("severity", "critical")
+    description = data.get("description", "")
+    bug = on_security_alert(project_id, cve_id, severity, description)
+    if bug:
+        return JSONResponse({"ok": True, "mission_id": bug.id, "name": bug.name})
+    return JSONResponse({"ok": False, "reason": "Already tracked or severity too low"})
+
+
+@router.post("/api/projects/{project_id}/feedback/tma-incident")
+async def api_tma_incident(request: Request, project_id: str):
+    """Track a recurring TMA incident. Creates debt item after 3+ occurrences."""
+    from ...missions.feedback import on_tma_incident_fixed
+    data = await request.json()
+    incident_key = data.get("incident_key", "unknown")
+    result = on_tma_incident_fixed(project_id, incident_key)
+    if result:
+        return JSONResponse({"ok": True, "mission_id": result.id, "name": result.name,
+                             "message": "Root-cause fix mission created"})
+    return JSONResponse({"ok": True, "message": "Incident tracked, below threshold"})
+
+
+@router.post("/api/projects/{project_id}/provision")
+async def api_project_provision(request: Request, project_id: str):
+    """Manually trigger auto-provision (TMA+security+debt) for an existing project."""
+    from ...projects.manager import get_project_store
+    store = get_project_store()
+    project = store.get(project_id)
+    if not project:
+        return JSONResponse({"ok": False, "reason": "Project not found"}, status_code=404)
+    created = store.auto_provision(project_id, project.name)
+    return JSONResponse({"ok": True, "created": [{"id": m.id, "type": m.type, "name": m.name} for m in created]})

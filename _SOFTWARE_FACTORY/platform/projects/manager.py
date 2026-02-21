@@ -143,6 +143,81 @@ class ProjectStore:
         conn.close()
         return p
 
+    def auto_provision(self, project_id: str, project_name: str):
+        """Auto-create TMA, Security, and Tech Debt missions for a new project."""
+        from ..missions.store import MissionDef, get_mission_store
+        ms = get_mission_store()
+        provisions = [
+            MissionDef(
+                name=f"TMA — {project_name}",
+                description=f"Maintenance applicative permanente pour {project_name}. Triage incidents → diagnostic → fix TDD → validation.",
+                goal="Assurer la stabilité et la disponibilité en continu.",
+                status="active", type="program",
+                project_id=project_id, workflow_id="tma-maintenance",
+                wsjf_score=8, created_by="responsable_tma",
+                config={"auto_provisioned": True, "permanent": True},
+            ),
+            MissionDef(
+                name=f"Sécurité — {project_name}",
+                description=f"Audit sécurité périodique pour {project_name}. Scan OWASP, CVE watch, revue code sécurité.",
+                goal="Maintenir un score sécurité ≥ 80% et zéro CVE critique non corrigée.",
+                status="planning", type="security",
+                project_id=project_id, workflow_id="review-cycle",
+                wsjf_score=12, created_by="devsecops",
+                config={"auto_provisioned": True, "schedule": "weekly"},
+            ),
+            MissionDef(
+                name=f"Dette Technique — {project_name}",
+                description=f"Suivi et réduction de la dette technique pour {project_name}. Audit → priorisation WSJF → sprint correctif.",
+                goal="Réduire la dette technique de 20% par PI. Complexité cyclomatique < 15, couverture > 80%.",
+                status="planning", type="debt",
+                project_id=project_id, workflow_id="tech-debt-reduction",
+                wsjf_score=5, created_by="enterprise_architect",
+                config={"auto_provisioned": True, "schedule": "monthly"},
+            ),
+        ]
+        created = []
+        for m in provisions:
+            try:
+                created.append(ms.create_mission(m))
+                logger.info("Auto-provisioned %s for project %s", m.type, project_id)
+            except Exception as e:
+                logger.warning("Failed to auto-provision %s for %s: %s", m.type, project_id, e)
+        return created
+
+    @staticmethod
+    def generate_cicd(project_path: str, domains: list[str]) -> str | None:
+        """Generate a CI/CD pipeline file based on project stack."""
+        proj_dir = Path(project_path)
+        if not proj_dir.is_dir():
+            return None
+        gh_dir = proj_dir / ".github" / "workflows"
+        gh_dir.mkdir(parents=True, exist_ok=True)
+        ci_path = gh_dir / "ci.yml"
+        if ci_path.exists():
+            return str(ci_path)
+
+        # Detect stack from domains
+        dl = [d.lower() for d in domains]
+        steps = []
+        if any(d in dl for d in ("rust", "cargo")):
+            steps.append(_CICD_RUST)
+        if any(d in dl for d in ("python", "django", "fastapi", "flask")):
+            steps.append(_CICD_PYTHON)
+        if any(d in dl for d in ("node", "typescript", "svelte", "react", "vue", "next")):
+            steps.append(_CICD_NODE)
+        if any(d in dl for d in ("swift", "ios", "swiftui")):
+            steps.append(_CICD_SWIFT)
+        if any(d in dl for d in ("kotlin", "android", "java")):
+            steps.append(_CICD_KOTLIN)
+        if not steps:
+            steps.append(_CICD_GENERIC)
+
+        content = _CICD_HEADER + "\n".join(steps) + "\n"
+        ci_path.write_text(content, encoding="utf-8")
+        logger.info("Generated CI/CD pipeline at %s", ci_path)
+        return str(ci_path)
+
     def update(self, p: Project) -> Project:
         conn = get_db()
         conn.execute("""
@@ -374,3 +449,83 @@ def get_project_store() -> ProjectStore:
     if _store is None:
         _store = ProjectStore()
     return _store
+
+
+# ── CI/CD Pipeline Templates ──
+
+_CICD_HEADER = """name: CI/CD Pipeline
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+"""
+
+_CICD_RUST = """
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build
+        run: cargo build --workspace
+      - name: Test
+        run: cargo test --workspace
+      - name: Clippy
+        run: cargo clippy --workspace -- -D warnings
+"""
+
+_CICD_PYTHON = """
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: pip install -r requirements.txt || pip install -e .
+      - name: Lint
+        run: python -m ruff check . || true
+      - name: Test
+        run: python -m pytest tests/ -v
+"""
+
+_CICD_NODE = """
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps
+        run: npm ci || npm install
+      - name: Lint
+        run: npm run lint || true
+      - name: Build
+        run: npm run build
+      - name: Test
+        run: npm test || npm run test
+"""
+
+_CICD_SWIFT = """
+      - name: Build iOS
+        run: xcodebuild -scheme App -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15' build
+      - name: Test iOS
+        run: xcodebuild -scheme App -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15' test
+"""
+
+_CICD_KOTLIN = """
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Build
+        run: ./gradlew build
+      - name: Test
+        run: ./gradlew test
+"""
+
+_CICD_GENERIC = """
+      - name: Check files
+        run: ls -la && echo "Add your build/test steps here"
+"""
