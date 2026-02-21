@@ -195,18 +195,53 @@ async def backlog_page(request: Request, tab: str = "backlog"):
 
 @router.get("/pi", response_class=HTMLResponse)
 async def pi_board_page(request: Request):
-    """PI Board — missions list with creation."""
+    """PI Board — epics + missions list with creation."""
     from ...missions.store import get_mission_run_store
     from ...projects.manager import get_project_store
     from ...workflows.store import get_workflow_store
+    from ...db.migrations import get_db
     runs = get_mission_run_store().list_runs(limit=50)
     projects = get_project_store().list_all()
     workflows = get_workflow_store().list_all()
     active_ids = {mid for mid, t in _active_mission_tasks.items() if not t.done()}
+    # Load epics from missions table with feature counts
+    epics = []
+    try:
+        db = get_db()
+        rows = db.execute("""
+            SELECT m.id, m.project_id, m.name, m.description, m.goal, m.status, m.type, m.created_at,
+                   p.name as project_name
+            FROM missions m LEFT JOIN projects p ON m.project_id = p.id
+            WHERE m.type = 'epic'
+            ORDER BY m.created_at DESC
+        """).fetchall()
+        for r in rows:
+            eid = r["id"]
+            feats = db.execute("""
+                SELECT status, COUNT(*) as cnt, SUM(story_points) as sp
+                FROM features WHERE epic_id = ? GROUP BY status
+            """, (eid,)).fetchall()
+            feat_map = {f["status"]: {"count": f["cnt"], "sp": f["sp"] or 0} for f in feats}
+            total_f = sum(v["count"] for v in feat_map.values())
+            done_f = feat_map.get("done", {}).get("count", 0)
+            total_sp = sum(v["sp"] for v in feat_map.values())
+            done_sp = feat_map.get("done", {}).get("sp", 0)
+            epics.append({
+                "id": eid, "project_id": r["project_id"], "name": r["name"],
+                "description": r["description"], "goal": r["goal"],
+                "status": r["status"], "type": r["type"],
+                "project_name": r["project_name"] or r["project_id"],
+                "created_at": r["created_at"],
+                "total_features": total_f, "done_features": done_f,
+                "total_sp": total_sp, "done_sp": done_sp,
+                "features_by_status": feat_map,
+            })
+    except Exception:
+        pass
     return _templates(request).TemplateResponse("pi_board.html", {
         "request": request, "page_title": "PI Board",
         "runs": runs, "projects": projects, "workflows": workflows,
-        "active_ids": active_ids,
+        "active_ids": active_ids, "epics": epics,
     })
 
 @router.get("/ceremonies", response_class=HTMLResponse)

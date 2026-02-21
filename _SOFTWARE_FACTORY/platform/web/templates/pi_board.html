@@ -55,9 +55,72 @@
 .mission-card.stuck{border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.03)}
 .mission-status-icon.stuck{background:rgba(245,158,11,.15);color:#f59e0b}
 .mission-badge.stuck{background:rgba(245,158,11,.15);color:#f59e0b}
+/* Epics */
+.epic-section{margin-bottom:2rem}
+.epic-section h2{font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:0.75rem;display:flex;align-items:center;gap:0.5rem}
+.epic-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1.2rem;margin-bottom:0.75rem;transition:border-color .15s}
+.epic-card:hover{border-color:var(--purple-dim)}
+.epic-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:0.6rem}
+.epic-title{font-size:0.95rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:0.5rem}
+.epic-project-badge{font-size:0.68rem;font-weight:500;background:var(--bg-tertiary);color:var(--text-secondary);padding:0.15rem 0.5rem;border-radius:4px}
+.epic-desc{font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.75rem;line-height:1.4}
+.epic-stats{display:flex;gap:1.5rem;align-items:center;margin-bottom:0.6rem}
+.epic-stat{font-size:0.75rem;color:var(--text-secondary)}
+.epic-stat strong{color:var(--text-primary);font-weight:700}
+.epic-progress{height:8px;background:var(--bg-tertiary);border-radius:4px;overflow:hidden;flex:1;max-width:300px}
+.epic-progress-fill{height:100%;border-radius:4px;background:var(--green);transition:width .3s}
+.epic-features{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.6rem}
+.feat-chip{font-size:0.7rem;padding:0.2rem 0.55rem;border-radius:5px;font-weight:500}
+.feat-chip.done{background:rgba(34,197,94,.12);color:var(--green)}
+.feat-chip.backlog{background:var(--bg-tertiary);color:var(--text-secondary)}
+.feat-chip.in_progress{background:rgba(124,58,237,.12);color:var(--purple)}
+.feat-chip.active{background:rgba(124,58,237,.12);color:var(--purple)}
+.epic-toggle{cursor:pointer;font-size:0.75rem;color:var(--purple);background:none;border:none;font-family:inherit;padding:0.2rem 0.4rem}
 </style>
 
+<!-- ═══ Epics (SAFe Portfolio) ═══ -->
+{% if epics %}
+<div class="epic-section">
+    <h2><svg class="icon icon-sm"><use href="#icon-layers"/></svg> Epics</h2>
+    {% for e in epics %}
+    {% set pct = ((e.done_features / e.total_features) * 100)|round|int if e.total_features > 0 else 0 %}
+    <div class="epic-card">
+        <div class="epic-header">
+            <div class="epic-title">
+                {% if e.status == 'active' %}🟢{% elif e.status == 'completed' %}✅{% else %}⬜{% endif %}
+                {{ e.name }}
+                <span class="epic-project-badge">{{ e.project_name }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.6rem">
+                <span class="mission-badge {{ e.status }}">{{ e.status }}</span>
+                <button class="epic-toggle" onclick="this.closest('.epic-card').querySelector('.epic-features').classList.toggle('hidden')">
+                    ▾ features
+                </button>
+            </div>
+        </div>
+        {% if e.description %}<div class="epic-desc">{{ e.description }}</div>{% endif %}
+        <div class="epic-stats">
+            <div class="epic-progress"><div class="epic-progress-fill" style="width:{{ pct }}%"></div></div>
+            <span class="epic-stat"><strong>{{ e.done_features }}/{{ e.total_features }}</strong> features</span>
+            <span class="epic-stat"><strong>{{ e.done_sp }}/{{ e.total_sp }}</strong> SP</span>
+            <span class="epic-stat" style="font-size:0.7rem;opacity:0.6">{{ pct }}%</span>
+        </div>
+        <div class="epic-features" id="feats-{{ e.id }}">
+            {% for status_key, info in e.features_by_status.items() %}
+            <span class="feat-chip {{ status_key }}">{{ status_key }}: {{ info.count }} ({{ info.sp }} SP)</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- ═══ Missions (Runs) ═══ -->
 {% if runs %}
+<div style="margin-bottom:0.75rem"><h2 style="font-size:1rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:0.5rem">
+    <svg class="icon icon-sm"><use href="#icon-rocket"/></svg> Missions en cours
+    <span style="font-size:0.72rem;font-weight:400;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.15rem 0.5rem;border-radius:4px">{{ runs|length }}</span>
+</h2></div>
 {% include "partials/mission_list.html" %}
 {% else %}
 <div class="empty-state" style="text-align:center;padding:3rem;">

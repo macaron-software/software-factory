@@ -406,6 +406,20 @@ async def dora_api(request: Request, project_id: str):
     return JSONResponse(get_dora_metrics().summary(pid, period))
 
 
+@router.get("/api/epics/{epic_id}/features")
+async def epic_features(epic_id: str):
+    """List features for an epic."""
+    from ...db.migrations import get_db
+    db = get_db()
+    rows = db.execute("""
+        SELECT id, name, description, status, story_points, assigned_to, created_at
+        FROM features WHERE epic_id = ? ORDER BY
+        CASE status WHEN 'in_progress' THEN 0 WHEN 'backlog' THEN 1 WHEN 'done' THEN 2 ELSE 3 END,
+        priority ASC, name ASC
+    """, (epic_id,)).fetchall()
+    return JSONResponse([dict(r) for r in rows])
+
+
 @router.get("/api/monitoring/live")
 async def monitoring_live(hours: int = 24):
     """Live monitoring data: system, LLM, agents, missions, memory.
