@@ -511,6 +511,8 @@ async def agent_world_page(request: Request):
                 "brief": (mr.brief or '')[:100], "status": st,
                 "session_id": mr.session_id,
                 "phases_done": phases_done, "phases_total": phases_total,
+                "phases": [{"name": p.phase_name or f"Phase {i+1}", "status": _s(p.status)}
+                           for i, p in enumerate(mr.phases or [])],
             })
             if mr.session_id:
                 active_session_ids.add(mr.session_id)
