@@ -123,7 +123,44 @@ export default function SCAPage() {
         <StatCard label="Impayés Beaussier" value={beaussierDebt.af_impayes} tone="negative" />
       </div>
 
-      {/* ─── Scénario Vente Forcée Art. 19 ─── */}
+      {/* ─── PTZ Alert ─── */}
+      {(legal as any).ptz_alert && (() => {
+        const ptz = (legal as any).ptz_alert;
+        return (
+          <Section title={<span className="flex items-center gap-2"><AlertCircle className="w-4 h-4 text-loss" />Alerte PTZ — {ptz.dossier}</span>}>
+            <div className="bg-loss/10 border border-loss/30 rounded-lg p-4 space-y-3">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-t-1 font-semibold">Relance Crédit Agricole du {fmtDate(ptz.lettre_date)}</p>
+                  <p className="text-t-3 text-xs">{ptz.emetteur} — Agence {ptz.agence}</p>
+                </div>
+                <Badge variant="loss">{formatEUR(ptz.restant_a_debloquer)} à débloquer</Badge>
+              </div>
+              <p className="text-loss text-sm font-medium">{ptz.risque}</p>
+              <div>
+                <p className="text-t-2 text-xs font-semibold mb-1">Justificatifs demandés :</p>
+                <ul className="text-t-3 text-xs space-y-1 list-disc pl-4">
+                  {ptz.justificatifs_demandes.map((j: string, i: number) => <li key={i}>{j}</li>)}
+                </ul>
+              </div>
+              <p className="text-t-4 text-xs italic">Alternative : {ptz.alternative_si_pas_habitable}</p>
+              <div className="border-t border-bd-1 pt-3 mt-2">
+                <p className="text-t-2 text-xs font-semibold mb-1 flex items-center gap-1"><CheckCircle className="w-3 h-3 text-gain" />Réponse envoyée le {fmtDate(ptz.reponse_envoyee.date)}</p>
+                <p className="text-t-3 text-xs mb-2">{ptz.reponse_envoyee.objet}</p>
+                <ul className="text-t-4 text-xs space-y-1">
+                  {ptz.reponse_envoyee.pieces_jointes.map((p: any, i: number) => (
+                    <li key={i} className="flex items-start gap-1">
+                      <FileText className="w-3 h-3 mt-0.5 shrink-0" />
+                      <span>{p.nom}{p.note && <span className="text-loss ml-1">({p.note})</span>}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <p className="text-loss/70 text-xs mt-2 italic">🔒 {ptz.blocage_actuel}</p>
+            </div>
+          </Section>
+        );
+      })()}
       {scenario && (
         <Section title={<span className="flex items-center gap-2"><Key className="w-4 h-4 text-accent" />Scénario : {scenario.titre}</span>}>
           <p className="text-t-3 text-xs mb-4 italic border-l-2 border-accent pl-3">{scenario.hypothese}</p>

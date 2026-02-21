@@ -1731,6 +1731,7 @@ def get_sca_legal():
         "adverse_strategy": "Me Vernhet joue la montre: renvois systématiques, heure-à-heure sur chaque AG. Pari = SCA dissoute avant expulsion/vente art.19.",
         "our_counter": "Prolongation SCA de 2 ans (audience 26/02) + accélérer art.19 en parallèle",
         "critical_path": [
+            "⚠️ PTZ RW2646 — 27 695,15€ restant à débloquer, justificatifs exigés (DAACT + RP)",
             "26/02 → Prolongation SCA (bloque la dissolution)",
             "31/03 → Délibéré appel heure-à-heure",
             "23/03 → Conclusions adverses expulsion",
@@ -1766,6 +1767,33 @@ def get_sca_legal():
         "procedures": procedures,
         "strategy": strategy,
         "chart_monthly": chart_data,
+        "ptz_alert": {
+            "dossier": "RW2646",
+            "agence": "ST GELY LES VERRIES",
+            "lettre_date": "2026-02-11",
+            "lettre_type": "LRAR — Relance régularisation PTZ",
+            "emetteur": "J.B. BOURDON — Responsable Service Crédits aux Particuliers",
+            "restant_a_debloquer": 27695.15,
+            "risque": "Exigibilité immédiate du PTZ si résidence principale non justifiée",
+            "justificatifs_demandes": [
+                "DAACT (Déclaration Attestant l'Achèvement et la Conformité des Travaux) tamponnée Mairie",
+                "Justificatif de domicile à l'adresse du projet (230 rue des Cinsaults, 34790 Grabels)",
+            ],
+            "alternative_si_pas_habitable": "Attestation sur l'honneur d'occuper dans les 12 mois + engagement justificatif",
+            "blocage_actuel": "Construction impossible — AIT Mairie Grabels + 8 procédures judiciaires Beaussier",
+            "reponse_envoyee": {
+                "date": "2026-02-21",
+                "objet": "Demande de report — cas de force majeure (procédures contentieuses)",
+                "pieces_jointes": [
+                    {"nom": "AIT Mairie de Grabels", "fichier": "9. Courrier de la ville de Grabels du 24.06.25 et arrêté interruptif.pdf"},
+                    {"nom": "Assignation au fond TJ Montpellier (RG 25/A1551)", "fichier": "14. Assignation du 26.08.25.pdf"},
+                    {"nom": "Déclaration d'appel CA Montpellier (RG 25/04363)", "fichier": "Conclusions d'appelant récap SVA - RG 25 04363.pdf",
+                     "note": "⚠️ Conclusions d'appelant — déclaration d'appel elle-même à demander à Me Saint Martin"},
+                    {"nom": "Assignation référé expulsion JCP", "fichier": "Assignation TJ JCP - Occupant sans droit ni titre[24].pdf"},
+                ],
+                "destinataire": "SGFGAS via Crédit Agricole du Languedoc",
+            },
+        },
         "beaussier_debt": {
             "af_impayes": 25334.71,
             "capital_non_libere": 192127.97,
