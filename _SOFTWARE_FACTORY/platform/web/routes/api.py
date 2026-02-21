@@ -669,6 +669,52 @@ async def monitoring_live():
     except Exception:
         pass
 
+    # ── Azure infrastructure ──
+    azure_infra = {"vm": {}, "backup": {}, "costs": {}, "servers": []}
+    try:
+        azure_infra["vm"] = {
+            "name": "vm-macaron",
+            "ip": "4.233.64.30",
+            "rg": "RG-MACARON",
+            "region": "francecentral",
+            "size": "Standard_B2ms",
+            "os": "Ubuntu 24.04",
+            "disk_gb": 30,
+        }
+        # Backup info from config
+        azure_infra["backup"] = {
+            "storage_account": "macaronbackups",
+            "replication": "GRS (francesouth)",
+            "containers": ["db-backups", "pg-dumps", "secrets"],
+            "sqlite_dbs": 7,
+            "retention": {"daily": "90d", "weekly": "365d", "monthly": "forever"},
+        }
+        # Servers running on VM
+        azure_infra["servers"] = [
+            {"name": "Platform (uvicorn)", "port": 8099, "status": "up"},
+            {"name": "MCP Platform", "port": 9501, "status": "up" if mcp_status.get("mcp_platform", {}).get("status") in ("up", "ok") else "down"},
+            {"name": "MCP LRM", "port": 9500, "status": "up" if mcp_status.get("mcp_lrm", {}).get("status") in ("up", "ok") else "down"},
+            {"name": "PostgreSQL", "port": 5432, "status": "configured"},
+            {"name": "Nginx (reverse proxy)", "port": 80, "status": "configured"},
+        ]
+        # LLM cost summary by provider type (Azure vs non-Azure)
+        azure_cost = 0.0
+        other_cost = 0.0
+        for p in llm.get("by_provider", []):
+            prov = p.get("provider", "")
+            cost = p.get("cost_usd", 0)
+            if "azure" in prov.lower():
+                azure_cost += cost
+            else:
+                other_cost += cost
+        azure_infra["costs"] = {
+            "azure_llm_usd": round(azure_cost, 4),
+            "other_llm_usd": round(other_cost, 4),
+            "total_llm_usd": round(azure_cost + other_cost, 4),
+        }
+    except Exception:
+        pass
+
     return JSONResponse({
         "timestamp": datetime.utcnow().isoformat(),
         "system": system,
@@ -697,6 +743,7 @@ async def monitoring_live():
         "mcp_calls": metrics_snapshot.get("mcp", {}),
         "anonymization": metrics_snapshot.get("anonymization", {}),
         "llm_costs": metrics_snapshot.get("llm_costs", {}),
+        "azure": azure_infra,
     })
 
 

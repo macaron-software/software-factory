@@ -200,11 +200,46 @@
         </div>
     </div>
 
-    <!-- Row 8: Memory + Process -->
+    <!-- Row 8: Azure Infrastructure -->
     <div class="mon-grid mon-grid-2">
         <div class="mon-card">
-            <h3><svg class="icon"><use href="#icon-book-open"/></svg> Memory</h3>
-            <div id="monMemory" class="mon-row"><span class="mon-empty">Loading…</span></div>
+            <h3><svg class="icon"><use href="#icon-server"/></svg> Azure VM</h3>
+            <div class="mon-row" style="margin-bottom:0.8rem">
+                <div class="mon-col"><div class="label">Name</div><div class="val" id="monAzVmName">—</div></div>
+                <div class="mon-col"><div class="label">IP</div><div class="val" id="monAzVmIp">—</div></div>
+                <div class="mon-col"><div class="label">Region</div><div class="val" id="monAzVmRegion">—</div></div>
+                <div class="mon-col"><div class="label">Size</div><div class="val" id="monAzVmSize">—</div></div>
+            </div>
+            <div class="mon-section-label">Services</div>
+            <div id="monAzServers" class="mon-mcp-list"><span class="mon-empty">Loading…</span></div>
+        </div>
+        <div class="mon-card">
+            <h3><svg class="icon"><use href="#icon-database"/></svg> Azure Backup</h3>
+            <div class="mon-row" style="margin-bottom:0.8rem">
+                <div class="mon-col"><div class="label">Account</div><div class="val" id="monAzBackupAcct">—</div></div>
+                <div class="mon-col"><div class="label">Replication</div><div class="val" id="monAzBackupGRS">—</div></div>
+                <div class="mon-col"><div class="label">SQLite DBs</div><div class="val" id="monAzBackupDbs">—</div></div>
+            </div>
+            <div class="mon-section" style="margin-top:0.3rem">
+                <div class="mon-section-label">Containers</div>
+                <div id="monAzContainers" class="mon-badges-row"><span class="mon-empty">—</span></div>
+            </div>
+            <div class="mon-section" style="margin-top:0.3rem">
+                <div class="mon-section-label">Retention</div>
+                <div id="monAzRetention" class="mon-badges-row"><span class="mon-empty">—</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 9: Azure Costs + Process -->
+    <div class="mon-grid mon-grid-2">
+        <div class="mon-card">
+            <h3><svg class="icon"><use href="#icon-zap"/></svg> Azure Costs (LLM)</h3>
+            <div class="mon-row" style="margin-bottom:0.8rem">
+                <div class="mon-col"><div class="label">Azure LLM</div><div class="val" id="monAzCostAzure">$0</div></div>
+                <div class="mon-col"><div class="label">Other LLM</div><div class="val" id="monAzCostOther">$0</div></div>
+                <div class="mon-col"><div class="label">Total</div><div class="val" id="monAzCostTotal">$0</div></div>
+            </div>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-settings"/></svg> Process</h3>
@@ -214,6 +249,15 @@
                 <div class="mon-col"><div class="label">Open Files</div><div class="val" id="monFiles">—</div></div>
             </div>
         </div>
+    </div>
+
+    <!-- Row 10: Memory -->
+    <div class="mon-grid mon-grid-2">
+        <div class="mon-card">
+            <h3><svg class="icon"><use href="#icon-book-open"/></svg> Memory</h3>
+            <div id="monMemory" class="mon-row"><span class="mon-empty">Loading…</span></div>
+        </div>
+        <div class="mon-card" style="opacity:0.3"></div>
     </div>
 </div>
 
@@ -476,6 +520,47 @@ async function refresh() {
         } else {
             incEl.innerHTML = '<span class="mon-empty">No incidents ✓</span>';
         }
+
+        // Azure Infrastructure
+        const az = d.azure || {};
+        const vm = az.vm || {};
+        $('monAzVmName').textContent = vm.name || '—';
+        $('monAzVmIp').textContent = vm.ip || '—';
+        $('monAzVmRegion').textContent = vm.region || '—';
+        $('monAzVmSize').textContent = vm.size || '—';
+
+        // Azure servers
+        const srvEl = $('monAzServers');
+        if (az.servers && az.servers.length > 0) {
+            srvEl.innerHTML = az.servers.map(s => {
+                const up = s.status === 'up';
+                const cls = up ? 'mon-dot-up' : (s.status === 'down' ? 'mon-dot-down' : '');
+                return `<div class="mon-mcp-item"><span class="mon-dot ${cls}"></span><span class="mon-mcp-name">${s.name}</span><span class="mon-mcp-detail">:${s.port}</span></div>`;
+            }).join('');
+        }
+
+        // Azure backup
+        const bk = az.backup || {};
+        $('monAzBackupAcct').textContent = bk.storage_account || '—';
+        $('monAzBackupGRS').textContent = bk.replication || '—';
+        $('monAzBackupDbs').textContent = bk.sqlite_dbs || '—';
+        if (bk.containers && bk.containers.length > 0) {
+            $('monAzContainers').innerHTML = bk.containers.map(c =>
+                `<span class="mon-badge blue">${c}</span>`
+            ).join('');
+        }
+        if (bk.retention) {
+            $('monAzRetention').innerHTML = Object.entries(bk.retention).map(([k,v]) =>
+                `<span class="mon-badge purple">${k}: ${v}</span>`
+            ).join('');
+        }
+
+        // Azure costs
+        const azc = az.costs || {};
+        $('monAzCostAzure').textContent = '$' + (azc.azure_llm_usd || 0).toFixed(4);
+        $('monAzCostOther').textContent = '$' + (azc.other_llm_usd || 0).toFixed(4);
+        $('monAzCostTotal').textContent = '$' + (azc.total_llm_usd || 0).toFixed(4);
+
     } catch(e) {
         console.warn('Monitoring refresh error:', e);
     }
