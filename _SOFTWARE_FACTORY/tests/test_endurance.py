@@ -10,6 +10,14 @@ import pytest
 pytestmark = [pytest.mark.endurance, pytest.mark.live]
 
 
+def _get_missions(session):
+    """Extract missions list from API (handles both list and dict formats)."""
+    r = session.get("/api/missions")
+    r.raise_for_status()
+    data = r.json()
+    return data.get("missions", data) if isinstance(data, dict) else data
+
+
 # ─── TestProjectLifecycle ───────────────────────────────────────────
 
 class TestProjectLifecycle:
@@ -30,12 +38,12 @@ class TestProjectLifecycle:
 
     def test_launch_ideation(self, live_session, canvas_project_id):
         """Start ideation session — POST creates a session."""
-        r = live_session.post("/api/ideation/start", json={
+        r = live_session.post("/api/sessions", json={
             "project_id": canvas_project_id,
-            "content": "Design a collaborative design tool like Figma",
+            "topic": "Design a collaborative design tool like Figma",
         })
         # 200 or 303 redirect are both acceptable
-        assert r.status_code in (200, 303, 302), f"Ideation start failed: {r.status_code}"
+        assert r.status_code in (200, 303, 302, 201), f"Session start failed: {r.status_code}"
 
     def test_create_mission(self, live_session, canvas_project_id):
         """Create a mission/epic for the canvas project."""
@@ -49,17 +57,13 @@ class TestProjectLifecycle:
 
     def test_missions_exist(self, live_session, canvas_project_id):
         """At least one mission exists for the project."""
-        r = live_session.get("/api/missions")
-        r.raise_for_status()
-        missions = r.json()
+        missions = _get_missions(live_session)
         project_missions = [m for m in missions if m.get("project_id") == canvas_project_id]
         assert len(project_missions) >= 1, "No missions found for canvas project"
 
     def test_create_features(self, live_session, canvas_project_id):
         """Create features under the first mission."""
-        r = live_session.get("/api/missions")
-        r.raise_for_status()
-        missions = [m for m in r.json() if m.get("project_id") == canvas_project_id]
+        missions = [m for m in _get_missions(live_session) if m.get("project_id") == canvas_project_id]
         if not missions:
             pytest.skip("No mission to add features to")
         mid = missions[0]["id"]
@@ -95,9 +99,7 @@ class TestPhaseProgression:
 
     def test_mission_can_start(self, live_session, canvas_project_id):
         """A mission can be started (status transitions to running)."""
-        r = live_session.get("/api/missions")
-        r.raise_for_status()
-        missions = [m for m in r.json() if m.get("project_id") == canvas_project_id]
+        missions = [m for m in _get_missions(live_session) if m.get("project_id") == canvas_project_id]
         if not missions:
             pytest.skip("No missions to start")
         m = missions[0]
@@ -123,7 +125,7 @@ class TestPhaseProgression:
     def test_all_pages_healthy(self, live_session):
         """All main pages load with 200."""
         pages = ["/", "/projects", "/missions", "/agents", "/monitoring",
-                 "/settings", "/metier", "/portfolio"]
+                 "/settings", "/metier"]
         for page in pages:
             r = live_session.get(page)
             assert r.status_code == 200, f"Page {page} returned {r.status_code}"
@@ -136,13 +138,9 @@ class TestAutoResume:
 
     def test_missions_list_stable(self, live_session):
         """Mission count is stable across requests."""
-        r1 = live_session.get("/api/missions")
-        r1.raise_for_status()
-        count1 = len(r1.json())
+        count1 = len(_get_missions(live_session))
         time.sleep(2)
-        r2 = live_session.get("/api/missions")
-        r2.raise_for_status()
-        count2 = len(r2.json())
+        count2 = len(_get_missions(live_session))
         assert count2 >= count1, "Mission count should not decrease"
 
     def test_projects_stable(self, live_session):

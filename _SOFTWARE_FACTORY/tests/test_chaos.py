@@ -62,7 +62,9 @@ class TestChaosContainerRestart:
         """Record mission count before restart."""
         r = live_session.get("/api/missions")
         r.raise_for_status()
-        self.__class__._missions_before = len(r.json())
+        data = r.json()
+        missions = data.get("missions", data) if isinstance(data, dict) else data
+        self.__class__._missions_before = len(missions)
         r = live_session.get("/api/projects")
         r.raise_for_status()
         self.__class__._projects_before = len(r.json())
@@ -86,7 +88,9 @@ class TestChaosContainerRestart:
         """Mission count unchanged after restart."""
         r = live_session.get("/api/missions")
         r.raise_for_status()
-        count = len(r.json())
+        data = r.json()
+        missions = data.get("missions", data) if isinstance(data, dict) else data
+        count = len(missions)
         expected = getattr(self.__class__, "_missions_before", 0)
         if expected > 0:
             assert count >= expected, f"Missions lost: {expected} → {count}"

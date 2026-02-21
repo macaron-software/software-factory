@@ -1225,7 +1225,11 @@ async def autoheal_trigger():
 @router.get("/api/chaos/history")
 async def chaos_history():
     """Get chaos run history."""
-    from ...ops.chaos_endurance import get_chaos_history
+    from ...ops.chaos_endurance import get_chaos_history, _ensure_table
+    try:
+        _ensure_table()
+    except Exception:
+        pass
     return JSONResponse(get_chaos_history())
 
 
@@ -1256,7 +1260,11 @@ async def chaos_trigger(request: Request):
 @router.get("/api/watchdog/metrics")
 async def watchdog_metrics():
     """Get endurance watchdog metrics."""
-    from ...ops.endurance_watchdog import get_metrics
+    from ...ops.endurance_watchdog import get_metrics, _ensure_table
+    try:
+        _ensure_table()
+    except Exception:
+        pass
     return JSONResponse(get_metrics(limit=100))
 
 
