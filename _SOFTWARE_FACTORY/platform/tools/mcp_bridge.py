@@ -12,7 +12,7 @@ from .registry import BaseTool
 
 logger = logging.getLogger(__name__)
 
-MCP_URL = "http://localhost:9500"
+MCP_URL = "http://localhost:9501"
 
 
 class MCPTool(BaseTool):
@@ -28,7 +28,7 @@ class MCPTool(BaseTool):
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{MCP_URL}/call",
+                    f"{MCP_URL}/tool",
                     json={"name": self._tool_name, "arguments": params},
                     timeout=aiohttp.ClientTimeout(total=60),
                 ) as resp:

@@ -799,7 +799,7 @@ RULES:
 # ── MCP Tool Handlers ─────────────────────────────────────────
 
 async def _tool_mcp_lrm(name: str, args: dict, ctx: ExecutionContext) -> str:
-    """Proxy to LRM MCP server (localhost:9500)."""
+    """Proxy to unified MCP SF server (localhost:9501, merged LRM+Platform)."""
     import aiohttp
     tool_name = name.replace("lrm_", "")
     if ctx.project_id:
@@ -807,7 +807,7 @@ async def _tool_mcp_lrm(name: str, args: dict, ctx: ExecutionContext) -> str:
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                "http://localhost:9500/call",
+                "http://localhost:9501/tool",
                 json={"name": tool_name, "arguments": args},
                 timeout=aiohttp.ClientTimeout(total=60),
             ) as resp:
@@ -980,6 +980,11 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
             if not path or path == ".":
                 args["path"] = ctx.project_path
             elif not os.path.isabs(path):
+                # Strip workspace ID prefix if LLM included it (avoids path doubling)
+                if ctx.project_path:
+                    ws_id = os.path.basename(ctx.project_path)
+                    if path.startswith(ws_id + "/"):
+                        path = path[len(ws_id) + 1:]
                 args["path"] = os.path.join(ctx.project_path, path)
 
     # ── Permission enforcement ──
