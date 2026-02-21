@@ -291,13 +291,13 @@ async def _tool_deep_search(args: dict, ctx: ExecutionContext) -> str:
     query = args.get("query", "")
     if not query:
         return "Error: query is required"
-    if not ctx.project_id:
+    if not ctx.project_id and not ctx.project_path:
         return "Error: no project context for RLM"
 
     print(f"[EXECUTOR] deep_search called: {query[:80]}", flush=True)
-    rlm = get_project_rlm(ctx.project_id)
+    rlm = get_project_rlm(ctx.project_id or "workspace", workspace_path=ctx.project_path)
     if not rlm:
-        return f"Error: could not initialize RLM for project {ctx.project_id}"
+        return f"Error: could not initialize RLM for project {ctx.project_id} (no path found)"
 
     max_iter = int(args.get("max_iterations", 3))
 
@@ -315,10 +315,6 @@ async def _tool_deep_search(args: dict, ctx: ExecutionContext) -> str:
         max_iterations=min(max_iter, 3),
         on_progress=rlm_progress,
     )
-
-    print(f"[EXECUTOR] deep_search done: {result.iterations} iters, {result.total_queries} queries, {len(result.answer)} chars", flush=True)
-    header = f"RLM Deep Search ({result.iterations} iterations, {result.total_queries} queries)\n\n"
-    return header + result.answer
 
     print(f"[EXECUTOR] deep_search done: {result.iterations} iters, {result.total_queries} queries, {len(result.answer)} chars", flush=True)
     header = f"RLM Deep Search ({result.iterations} iterations, {result.total_queries} queries)\n\n"

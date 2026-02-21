@@ -372,21 +372,33 @@ OR:
 _rlm_cache: dict[str, ProjectRLM] = {}
 
 
-def get_project_rlm(project_id: str) -> Optional[ProjectRLM]:
-    """Get or create an RLM for a project."""
-    if project_id in _rlm_cache:
-        return _rlm_cache[project_id]
+def get_project_rlm(project_id: str, workspace_path: str = "") -> Optional[ProjectRLM]:
+    """Get or create an RLM for a project.  Falls back to workspace_path."""
+    cache_key = f"{project_id}:{workspace_path}" if workspace_path else project_id
+    if cache_key in _rlm_cache:
+        return _rlm_cache[cache_key]
 
     from ..projects.manager import get_project_store
     from ..agents.store import get_agent_store
 
     proj = get_project_store().get(project_id)
-    if not proj:
+    project_path = ""
+    project_name = project_id
+
+    if proj:
+        project_path = proj.path or ""
+        project_name = proj.name or project_id
+
+    # Fallback: use workspace_path if project has no path or isn't registered
+    if not project_path and workspace_path:
+        project_path = workspace_path
+
+    if not project_path:
         return None
 
     # Use the project's lead agent LLM config
     provider, model = "", ""
-    if proj.lead_agent_id:
+    if proj and proj.lead_agent_id:
         agent = get_agent_store().get(proj.lead_agent_id)
         if agent:
             provider = agent.provider
@@ -394,10 +406,10 @@ def get_project_rlm(project_id: str) -> Optional[ProjectRLM]:
 
     rlm = ProjectRLM(
         project_id=project_id,
-        project_path=proj.path,
-        project_name=proj.name,
+        project_path=project_path,
+        project_name=project_name,
         provider=provider,
         model=model,
     )
-    _rlm_cache[project_id] = rlm
+    _rlm_cache[cache_key] = rlm
     return rlm

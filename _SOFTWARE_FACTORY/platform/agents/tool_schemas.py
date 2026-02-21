@@ -1015,7 +1015,8 @@ def _get_tool_schemas() -> list[dict]:
 # Tools available to each agent role category
 ROLE_TOOL_MAP: dict[str, list[str]] = {
     "product": [
-        "code_read", "code_search", "list_files", "memory_search", "memory_store",
+        "code_read", "code_search", "list_files", "deep_search",
+        "memory_search", "memory_store",
         "get_project_context", "screenshot",
         "github_issues", "github_prs",
         "jira_search", "jira_create", "confluence_read",
@@ -1047,7 +1048,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "android_build", "android_test", "android_lint",
     ],
     "qa": [
-        "code_read", "code_write", "code_search", "list_files",
+        "code_read", "code_write", "code_search", "list_files", "deep_search",
         "screenshot", "simulator_screenshot", "playwright_test",
         "build", "test", "browser_screenshot",
         "memory_search", "memory_store", "get_project_context",
@@ -1078,7 +1079,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
     ],
     "cdp": [
         "memory_search", "memory_store", "get_project_context",
-        "list_files",
+        "list_files", "deep_search", "code_read",
         "run_phase", "get_phase_status", "list_phases", "request_validation",
         "compose_workflow", "create_team", "create_sub_mission", "list_sub_missions", "set_constraints",
         "github_issues", "github_prs",
