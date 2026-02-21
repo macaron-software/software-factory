@@ -73,40 +73,61 @@ def log(msg: str, level: str = "INFO"):
 # ---------------------------------------------------------------------------
 _stores: dict = {}
 
+# Detect container layout
+_PKG = "macaron_platform" if Path("/app/macaron_platform").exists() else "platform"
+
 
 def _agent_store():
     if "agent" not in _stores:
-        from platform.agents.store import get_agent_store
-        _stores["agent"] = get_agent_store()
+        mod = __import__(f"{_PKG}.agents.store", fromlist=["get_agent_store"])
+        _stores["agent"] = mod.get_agent_store()
     return _stores["agent"]
 
 
 def _session_store():
     if "session" not in _stores:
-        from platform.sessions.store import get_session_store
-        _stores["session"] = get_session_store()
+        mod = __import__(f"{_PKG}.sessions.store", fromlist=["get_session_store"])
+        _stores["session"] = mod.get_session_store()
     return _stores["session"]
 
 
 def _mission_store():
     if "mission" not in _stores:
-        from platform.missions.store import get_mission_run_store
-        _stores["mission"] = get_mission_run_store()
+        mod = __import__(f"{_PKG}.missions.store", fromlist=["get_mission_run_store"])
+        _stores["mission"] = mod.get_mission_run_store()
     return _stores["mission"]
 
 
 def _memory_manager():
     if "memory" not in _stores:
-        from platform.memory.manager import get_memory_manager
-        _stores["memory"] = get_memory_manager()
+        mod = __import__(f"{_PKG}.memory.manager", fromlist=["get_memory_manager"])
+        _stores["memory"] = mod.get_memory_manager()
     return _stores["memory"]
 
 
 def _workflow_store():
     if "workflow" not in _stores:
-        from platform.workflows.store import get_workflow_store
-        _stores["workflow"] = get_workflow_store()
+        mod = __import__(f"{_PKG}.workflows.store", fromlist=["get_workflow_store"])
+        _stores["workflow"] = mod.get_workflow_store()
     return _stores["workflow"]
+
+
+# ---------------------------------------------------------------------------
+# LRM server (lazy-loaded for merged MCP)
+# ---------------------------------------------------------------------------
+_lrm_server = None
+
+
+def _get_lrm():
+    global _lrm_server
+    if _lrm_server is None:
+        try:
+            from mcp_lrm.server_sse import MCPLRMServer
+            _lrm_server = MCPLRMServer()
+            log("LRM tools loaded (merged)")
+        except Exception as e:
+            log(f"LRM tools unavailable: {e}", "WARN")
+    return _lrm_server
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +229,23 @@ TOOLS = [
     },
 ]
 
+# Merge LRM tools at import time (lazy — added on first /tools call)
+_lrm_tools_merged = False
+
+
+def _ensure_lrm_tools():
+    global _lrm_tools_merged
+    if _lrm_tools_merged:
+        return
+    _lrm_tools_merged = True
+    lrm = _get_lrm()
+    if lrm:
+        existing_names = {t["name"] for t in TOOLS}
+        for tool in lrm.get_tools():
+            if tool["name"] not in existing_names:
+                TOOLS.append(tool)
+        log(f"Merged {len(TOOLS)} tools (platform + LRM)")
+
 
 # ---------------------------------------------------------------------------
 # MCP call tracking (in-memory counters, exposed via /health & /metrics)
@@ -252,6 +290,11 @@ async def handle_tool(name: str, args: dict) -> str:
         elif name == "platform_metrics":
             return _handle_metrics(args)
         else:
+            # Delegate to LRM server if tool exists there
+            lrm = _get_lrm()
+            if lrm:
+                result = await lrm.handle_tool_call(name, args)
+                return json.dumps(result) if not isinstance(result, str) else result
             _ok = False
             return json.dumps({"error": f"Unknown tool: {name}"})
     except Exception as exc:
@@ -544,15 +587,17 @@ async def handle_message(request: web.Request):
     params = body.get("params", {})
 
     if method == "initialize":
+        _ensure_lrm_tools()
         response = {
             "jsonrpc": "2.0", "id": req_id,
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {"listChanged": False}},
-                "serverInfo": {"name": "mcp-platform", "version": "1.0.0"},
+                "serverInfo": {"name": "mcp-sf", "version": "2.0.0"},
             },
         }
     elif method == "tools/list":
+        _ensure_lrm_tools()
         response = {
             "jsonrpc": "2.0", "id": req_id,
             "result": {"tools": TOOLS},
@@ -583,6 +628,7 @@ async def handle_message(request: web.Request):
 
 
 async def handle_health(request: web.Request):
+    _ensure_lrm_tools()
     with _mcp_stats_lock:
         tool_stats = {k: dict(v) for k, v in _mcp_call_stats.items()}
         total_calls = sum(s["calls"] for s in tool_stats.values())
@@ -599,6 +645,7 @@ async def handle_health(request: web.Request):
 
 async def handle_tools_list(request: web.Request):
     """REST endpoint for quick tool listing."""
+    _ensure_lrm_tools()
     return web.json_response({"tools": [t["name"] for t in TOOLS]})
 
 

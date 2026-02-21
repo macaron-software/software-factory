@@ -239,6 +239,17 @@ def _migrate(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_incidents_status ON platform_incidents(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_incidents_severity ON platform_incidents(severity)")
 
+    # ── Performance indexes ──
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_missions_wsjf ON missions(wsjf_score DESC)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_missions_created ON missions(created_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_created ON sessions(created_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_session_from ON messages(session_id, from_agent)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_toolcalls_session ON tool_calls(session_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_sprints_status ON sprints(status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_features_status ON features(status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_ideation_project ON ideation_sessions(project_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_artifacts_type ON artifacts(type)")
+
 
 def _migrate_pg(conn):
     """PostgreSQL incremental migrations (safe ALTER TABLE IF NOT EXISTS)."""

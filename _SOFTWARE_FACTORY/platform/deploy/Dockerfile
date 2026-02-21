@@ -21,8 +21,9 @@ COPY projects/ /app/projects/
 COPY mf_projects/ /app/mf_projects/
 COPY mcp_lrm/ /app/mcp_lrm/
 
-# Create non-root user (needs docker group for container tools)
-RUN groupadd -r macaron && useradd -r -g macaron -G docker -d /app macaron \
+# Create non-root user (docker group GID must match host's docker socket GID)
+RUN groupadd -r -g 988 docker-host && groupadd -r macaron \
+    && useradd -r -g macaron -G docker-host -d /app macaron \
     && mkdir -p /app/data/logs \
     && chown -R macaron:macaron /app
 USER macaron

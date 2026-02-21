@@ -561,3 +561,41 @@ CREATE TABLE IF NOT EXISTS support_tickets (
     resolved_at TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_tickets_mission ON support_tickets(mission_id);
+
+-- ============================================================================
+-- PERFORMANCE INDEXES (missing from initial schema)
+-- ============================================================================
+
+-- Missions: sort by priority
+CREATE INDEX IF NOT EXISTS idx_missions_wsjf ON missions(wsjf_score DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS idx_missions_created ON missions(created_at);
+
+-- Sessions: timeline queries
+CREATE INDEX IF NOT EXISTS idx_sessions_created ON sessions(created_at);
+
+-- Messages: heavy aggregation queries
+CREATE INDEX IF NOT EXISTS idx_messages_session_from ON messages(session_id, from_agent);
+
+-- Tool calls: subquery by session
+CREATE INDEX IF NOT EXISTS idx_toolcalls_session ON tool_calls(session_id);
+
+-- LLM traces: time-range queries + cost reports
+CREATE INDEX IF NOT EXISTS idx_llm_traces_created ON llm_traces(created_at);
+CREATE INDEX IF NOT EXISTS idx_llm_traces_agent ON llm_traces(agent_id);
+CREATE INDEX IF NOT EXISTS idx_llm_traces_provider ON llm_traces(provider, model);
+
+-- Sprints: status queries
+CREATE INDEX IF NOT EXISTS idx_sprints_status ON sprints(status);
+
+-- Features: status board
+CREATE INDEX IF NOT EXISTS idx_features_status ON features(status);
+
+-- Incidents: open incident scan (auto-heal)
+CREATE INDEX IF NOT EXISTS idx_incidents_status ON platform_incidents(status);
+CREATE INDEX IF NOT EXISTS idx_incidents_severity ON platform_incidents(severity);
+
+-- Ideation: by project
+CREATE INDEX IF NOT EXISTS idx_ideation_project ON ideation_sessions(project_id);
+
+-- Artifacts: by type
+CREATE INDEX IF NOT EXISTS idx_artifacts_type ON artifacts(type);

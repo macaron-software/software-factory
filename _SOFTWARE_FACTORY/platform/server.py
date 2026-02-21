@@ -91,12 +91,10 @@ async def lifespan(app: FastAPI):
     if _orphaned:
         logger.info("Marked %d orphaned active sessions as interrupted", _orphaned)
 
-    # Start MCP servers with auto-restart watchdog
+    # Start unified MCP SF server (platform + LRM tools merged)
     _mcp_procs: dict[str, Any] = {}
 
-    # Detect module names based on container vs local layout
-    _mcp_platform_mod = "macaron_platform.mcp_platform.server" if Path("/app/macaron_platform").exists() else "platform.mcp_platform.server"
-    _mcp_lrm_mod = "mcp_lrm.server_sse"
+    _mcp_sf_mod = "macaron_platform.mcp_platform.server" if Path("/app/macaron_platform").exists() else "platform.mcp_platform.server"
 
     def _start_mcp(name: str, module: str, port: int):
         """Start an MCP server subprocess, return Popen."""
@@ -114,28 +112,21 @@ async def lifespan(app: FastAPI):
         return proc
 
     try:
-        _mcp_procs["platform"] = _start_mcp("platform", _mcp_platform_mod, 9501)
+        _mcp_procs["sf"] = _start_mcp("sf", _mcp_sf_mod, 9501)
     except Exception as exc:
-        logger.warning("MCP Platform Server failed to start: %s", exc)
-
-    try:
-        _mcp_procs["lrm"] = _start_mcp("lrm", _mcp_lrm_mod, 9500)
-    except Exception as exc:
-        logger.warning("MCP LRM Server failed to start: %s", exc)
+        logger.warning("MCP SF Server failed to start: %s", exc)
 
     async def _mcp_watchdog():
-        """Auto-restart MCP servers if they crash."""
+        """Auto-restart MCP server if it crashes."""
         while True:
             await asyncio.sleep(30)
-            for name, info in [("platform", (_mcp_platform_mod, 9501)),
-                               ("lrm", (_mcp_lrm_mod, 9500))]:
-                proc = _mcp_procs.get(name)
-                if proc and proc.poll() is not None:
-                    logger.warning("MCP %s died (exit=%s), restarting...", name, proc.returncode)
-                    try:
-                        _mcp_procs[name] = _start_mcp(name, info[0], info[1])
-                    except Exception as e:
-                        logger.error("MCP %s restart failed: %s", name, e)
+            proc = _mcp_procs.get("sf")
+            if proc and proc.poll() is not None:
+                logger.warning("MCP SF died (exit=%s), restarting...", proc.returncode)
+                try:
+                    _mcp_procs["sf"] = _start_mcp("sf", _mcp_sf_mod, 9501)
+                except Exception as e:
+                    logger.error("MCP SF restart failed: %s", e)
 
     import asyncio
     asyncio.create_task(_mcp_watchdog())

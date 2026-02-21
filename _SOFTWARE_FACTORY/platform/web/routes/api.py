@@ -608,25 +608,16 @@ async def monitoring_live(hours: int = 24):
     except Exception:
         vector_stats = {"total_vectors": 0, "with_embedding": 0, "scopes": 0}
 
-    # ── MCP servers status ──
+    # ── MCP server status (unified SF server) ──
     mcp_status = {}
     try:
-        # MCP Platform (port 9501) — includes per-tool call stats
         import urllib.request
         try:
             r = urllib.request.urlopen("http://127.0.0.1:9501/health", timeout=2)
-            mcp_platform = json.loads(r.read().decode())
-            mcp_status["mcp_platform"] = {"status": "up", "port": 9501, **mcp_platform}
+            mcp_sf = json.loads(r.read().decode())
+            mcp_status["mcp_sf"] = {"status": "up", "port": 9501, **mcp_sf}
         except Exception:
-            mcp_status["mcp_platform"] = {"status": "down", "port": 9501}
-
-        # MCP LRM (port 9500)
-        try:
-            r = urllib.request.urlopen("http://127.0.0.1:9500/health", timeout=2)
-            mcp_lrm = json.loads(r.read().decode())
-            mcp_status["mcp_lrm"] = {"status": "up", "port": 9500, **mcp_lrm}
-        except Exception:
-            mcp_status["mcp_lrm"] = {"status": "down", "port": 9500}
+            mcp_status["mcp_sf"] = {"status": "down", "port": 9501}
 
         # RLM Cache DB
         import pathlib
@@ -801,9 +792,8 @@ async def monitoring_live(hours: int = 24):
         }
         # Servers running on VM
         azure_infra["servers"] = [
-            {"name": "Platform (uvicorn)", "port": 8099, "status": "up"},
-            {"name": "MCP Platform", "port": 9501, "status": "up" if mcp_status.get("mcp_platform", {}).get("status") in ("up", "ok") else "down"},
-            {"name": "MCP LRM", "port": 9500, "status": "up" if mcp_status.get("mcp_lrm", {}).get("status") in ("up", "ok") else "down"},
+            {"name": "Platform (uvicorn)", "port": 8090, "status": "up"},
+            {"name": "MCP SF (unified)", "port": 9501, "status": "up" if mcp_status.get("mcp_sf", {}).get("status") in ("up", "ok") else "down"},
             {"name": "PostgreSQL", "port": 5432, "status": "configured"},
             {"name": "Nginx (reverse proxy)", "port": 80, "status": "configured"},
         ]

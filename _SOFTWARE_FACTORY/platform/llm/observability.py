@@ -97,6 +97,14 @@ class LLMTracer:
             CREATE INDEX IF NOT EXISTS idx_llm_traces_created
             ON llm_traces(created_at)
         """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_llm_traces_agent
+            ON llm_traces(agent_id)
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_llm_traces_provider
+            ON llm_traces(provider, model)
+        """)
         conn.commit()
         conn.close()
 

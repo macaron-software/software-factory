@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<link rel="stylesheet" href="/static/css/monitoring.css?v=20260221b">
+<link rel="stylesheet" href="/static/css/monitoring.css?v=20260221c">
 
 <div class="mon-page" id="monRoot">
     <div class="mon-header">
@@ -148,12 +148,13 @@
             <h3><svg class="icon"><use href="#icon-activity"/></svg> HTTP Requests (live)</h3>
             <div class="mon-row" style="margin-bottom:0.8rem">
                 <div class="mon-col"><div class="label">Total</div><div class="val" id="monReqTotal">0</div></div>
-                <div class="mon-col"><div class="label">Errors</div><div class="val mon-val-red" id="monReqErrors">0</div></div>
+                <div class="mon-col"><div class="label">4xx</div><div class="val mon-val-yellow" id="monReq4xx">0</div></div>
+                <div class="mon-col"><div class="label">5xx</div><div class="val mon-val-red" id="monReq5xx">0</div></div>
                 <div class="mon-col"><div class="label">Avg ms</div><div class="val" id="monReqAvg">—</div></div>
             </div>
             <table class="mon-table">
-                <thead><tr><th>Endpoint</th><th style="text-align:right">Hits</th></tr></thead>
-                <tbody id="monReqEndpoints"><tr><td colspan="2" class="mon-empty">No requests yet</td></tr></tbody>
+                <thead><tr><th>Endpoint</th><th style="text-align:right">Hits</th><th style="text-align:right">Avg</th><th style="text-align:right">P95</th></tr></thead>
+                <tbody id="monReqEndpoints"><tr><td colspan="4" class="mon-empty">No requests yet</td></tr></tbody>
             </table>
             <div class="mon-section" style="margin-top:0.5rem">
                 <div class="mon-section-label">Status Codes</div>
@@ -170,6 +171,28 @@
             <table class="mon-table">
                 <thead><tr><th>Tool</th><th>Calls</th><th>Errors</th><th>Avg ms</th></tr></thead>
                 <tbody id="monMcpCallsTable"><tr><td colspan="4" class="mon-empty">No MCP calls yet</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Row 5b: Docker Containers + Git -->
+    <div class="mon-grid mon-grid-2">
+        <div class="mon-card">
+            <h3><svg class="icon"><use href="#icon-layers"/></svg> Docker Containers</h3>
+            <table class="mon-table">
+                <thead><tr><th>Container</th><th>Status</th><th>Image</th></tr></thead>
+                <tbody id="monDockerTable"><tr><td colspan="3" class="mon-empty">Loading…</td></tr></tbody>
+            </table>
+        </div>
+        <div class="mon-card">
+            <h3><svg class="icon"><use href="#icon-git-branch"/></svg> Git Activity</h3>
+            <div class="mon-row" style="margin-bottom:0.8rem">
+                <div class="mon-col"><div class="label">Branch</div><div class="val" id="monGitBranch">—</div></div>
+                <div class="mon-col"><div class="label">Last Commit</div><div class="val" id="monGitLastCommit">—</div></div>
+            </div>
+            <table class="mon-table">
+                <thead><tr><th>Hash</th><th>Message</th></tr></thead>
+                <tbody id="monGitCommits"><tr><td colspan="2" class="mon-empty">Loading…</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -276,13 +299,19 @@
         </div>
     </div>
 
-    <!-- Row 10: Memory -->
+    <!-- Row 10: Memory + Phase Stats -->
     <div class="mon-grid mon-grid-2">
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-book-open"/></svg> Memory</h3>
             <div id="monMemory" class="mon-row"><span class="mon-empty">Loading…</span></div>
         </div>
-        <div class="mon-card" style="opacity:0.3"></div>
+        <div class="mon-card">
+            <h3><svg class="icon"><use href="#icon-activity"/></svg> Mission Phases</h3>
+            <table class="mon-table">
+                <thead><tr><th>Phase</th><th>Status</th><th>Count</th><th>Avg Time</th></tr></thead>
+                <tbody id="monPhaseStats"><tr><td colspan="4" class="mon-empty">Loading…</td></tr></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -473,15 +502,16 @@ async function refresh() {
         // HTTP Requests
         const req = d.requests || {};
         $('monReqTotal').textContent = fmt(req.total_requests || 0);
-        $('monReqErrors').textContent = fmt(req.total_errors || 0);
+        $('monReq4xx').textContent = fmt(req.errors_4xx || 0);
+        $('monReq5xx').textContent = fmt(req.errors_5xx || 0);
         $('monReqAvg').textContent = req.avg_ms ? req.avg_ms.toFixed(1) + 'ms' : '—';
         const reqEndEl = $('monReqEndpoints');
         if (req.top_endpoints && req.top_endpoints.length > 0) {
-            reqEndEl.innerHTML = req.top_endpoints.slice(0,8).map(([ep, cnt]) =>
-                `<tr><td style="font-size:0.7rem">${ep}</td><td style="text-align:right">${fmt(cnt)}</td></tr>`
+            reqEndEl.innerHTML = req.top_endpoints.slice(0,10).map(ep =>
+                `<tr><td style="font-size:0.7rem">${ep.endpoint}</td><td style="text-align:right">${fmt(ep.hits)}</td><td style="text-align:right">${ep.avg_ms}ms</td><td style="text-align:right;color:${ep.p95_ms > 500 ? 'var(--red, #ef4444)' : 'inherit'}">${ep.p95_ms}ms</td></tr>`
             ).join('');
         } else {
-            reqEndEl.innerHTML = '<tr><td colspan="2" class="mon-empty">No requests yet</td></tr>';
+            reqEndEl.innerHTML = '<tr><td colspan="4" class="mon-empty">No requests yet</td></tr>';
         }
         const statColors = {'200':'green','201':'green','204':'green','301':'blue','302':'blue','304':'blue','400':'yellow','401':'yellow','403':'yellow','404':'yellow','500':'red','502':'red','503':'red'};
         if (req.by_status && Object.keys(req.by_status).length > 0) {
@@ -498,7 +528,7 @@ async function refresh() {
         $('monMcpCallsErrors').textContent = fmt(mcpC.total_errors || 0);
         $('monMcpCallsAvg').textContent = mcpC.avg_ms ? mcpC.avg_ms.toFixed(1) + 'ms' : '—';
         const mcpTb = $('monMcpCallsTable');
-        const mcpHealth = (d.mcp && d.mcp.mcp_platform) ? d.mcp.mcp_platform : {};
+        const mcpHealth = (d.mcp && d.mcp.mcp_sf) ? d.mcp.mcp_sf : (d.mcp && d.mcp.mcp_platform) ? d.mcp.mcp_platform : {};
         const byTool = mcpHealth.by_tool || mcpC.by_tool || {};
         const toolEntries = Object.entries(byTool);
         if (toolEntries.length > 0) {
@@ -601,6 +631,43 @@ async function refresh() {
         $('monAzCostPg').textContent = fmtUsd(azc.pg_monthly_usd);
         $('monAzCostStorage').textContent = fmtUsd(azc.storage_monthly_usd);
         $('monAzCostInfra').textContent = fmtUsd(azc.total_infra_monthly_usd);
+
+        // Docker containers
+        const dockerEl = $('monDockerTable');
+        if (d.docker && d.docker.length > 0) {
+            dockerEl.innerHTML = d.docker.map(c => {
+                const up = (c.state || c.status || '').toLowerCase().includes('running') || (c.status || '').toLowerCase().startsWith('up');
+                const color = up ? 'color:var(--green, #22c55e)' : 'color:var(--red, #ef4444)';
+                const restart = c.restarts ? ` (${c.restarts} restarts)` : '';
+                return `<tr><td style="font-size:0.75rem;font-weight:500">${c.name}</td><td style="${color};font-size:0.7rem">${c.status}${restart}</td><td style="font-size:0.65rem;opacity:0.7">${c.image}</td></tr>`;
+            }).join('');
+        } else {
+            dockerEl.innerHTML = '<tr><td colspan="3" class="mon-empty">No Docker info (socket not mounted?)</td></tr>';
+        }
+
+        // Git activity
+        const git = d.git || {};
+        $('monGitBranch').textContent = git.branch || '—';
+        $('monGitLastCommit').textContent = git.last_commit_time ? git.last_commit_time.substring(0, 16) : '—';
+        const gitEl = $('monGitCommits');
+        if (git.recent_commits && git.recent_commits.length > 0) {
+            gitEl.innerHTML = git.recent_commits.map(c =>
+                `<tr><td style="font-family:monospace;font-size:0.7rem;color:var(--accent)">${c.hash}</td><td style="font-size:0.7rem">${c.message}</td></tr>`
+            ).join('');
+        } else {
+            gitEl.innerHTML = '<tr><td colspan="2" class="mon-empty">No git data</td></tr>';
+        }
+
+        // Phase stats
+        const phaseEl = $('monPhaseStats');
+        if (d.phase_stats && d.phase_stats.length > 0) {
+            const statusColors = {completed:'color:var(--green,#22c55e)',running:'color:var(--blue,#3b82f6)',failed:'color:var(--red,#ef4444)',pending:'opacity:0.6'};
+            phaseEl.innerHTML = d.phase_stats.map(p =>
+                `<tr><td style="font-size:0.75rem">${p.phase_name||'—'}</td><td style="${statusColors[p.status]||''};font-size:0.7rem">${p.status}</td><td>${p.cnt}</td><td>${p.avg_sec ? fmtTime(Math.round(p.avg_sec)) : '—'}</td></tr>`
+            ).join('');
+        } else {
+            phaseEl.innerHTML = '<tr><td colspan="4" class="mon-empty">No phase data</td></tr>';
+        }
 
     } catch(e) {
         console.warn('Monitoring refresh error:', e);
