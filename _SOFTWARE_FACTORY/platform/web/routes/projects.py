@@ -33,7 +33,7 @@ async def project_git_status(project_id: str):
     """Lazy-load git status for a single project (called via HTMX)."""
     import asyncio, functools
     from ...projects.manager import get_project_store
-    from ..projects import git_service
+    from ...projects import git_service
     project = get_project_store().get(project_id)
     if not project or not project.has_git:
         return HTMLResponse("")
@@ -137,7 +137,7 @@ async def project_overview(request: Request, project_id: str):
 async def project_detail(request: Request, project_id: str):
     """Single project detail view with vision, agents, sessions."""
     from ...projects.manager import get_project_store
-    from ..projects import git_service, factory_tasks
+    from ...projects import git_service, factory_tasks
     from ...sessions.store import get_session_store
     from ...agents.store import get_agent_store
     proj_store = get_project_store()
@@ -233,7 +233,7 @@ async def project_detail(request: Request, project_id: str):
 async def project_board_page(request: Request, project_id: str):
     """Kanban board view for a project."""
     from ...projects.manager import get_project_store
-    from ..projects import factory_tasks
+    from ...projects import factory_tasks
     from ...agents.store import get_agent_store
     from ...missions.store import get_mission_store
     import random

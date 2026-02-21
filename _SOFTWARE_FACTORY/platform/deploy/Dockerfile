@@ -4,7 +4,8 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl ripgrep nodejs npm docker.io && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    git config --global --add safe.directory "*"
 
 COPY platform/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
@@ -24,4 +25,4 @@ ENV PYTHONPATH=/app
 
 EXPOSE 8090
 
-CMD ["uvicorn", "macaron_platform.server:app", "--host", "0.0.0.0", "--port", "8090", "--ws", "none"]
+CMD ["sh", "-c", "git config --global --add safe.directory '*' && uvicorn macaron_platform.server:app --host 0.0.0.0 --port 8090 --ws none"]

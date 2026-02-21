@@ -339,7 +339,7 @@ async def api_put_si_blueprint(request: Request, project_id: str):
 async def api_project_git(request: Request, project_id: str):
     """Git panel partial (HTMX)."""
     from ...projects.manager import get_project_store
-    from ..projects import git_service
+    from ...projects import git_service
     project = get_project_store().get(project_id)
     if not project:
         return HTMLResponse("")
@@ -354,7 +354,7 @@ async def api_project_git(request: Request, project_id: str):
 @router.get("/api/projects/{project_id}/tasks", response_class=HTMLResponse)
 async def api_project_tasks(request: Request, project_id: str):
     """Task panel partial (HTMX)."""
-    from ..projects import factory_tasks
+    from ...projects import factory_tasks
     tasks = factory_tasks.get_task_summary(project_id)
     recent = factory_tasks.get_recent_tasks(project_id, 15)
     return _templates(request).TemplateResponse("partials/task_panel.html", {
