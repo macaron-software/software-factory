@@ -26,6 +26,8 @@ import json
 import os
 import subprocess
 import sys
+import threading
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -208,9 +210,30 @@ TOOLS = [
 
 
 # ---------------------------------------------------------------------------
+# MCP call tracking (in-memory counters, exposed via /health & /metrics)
+# ---------------------------------------------------------------------------
+_mcp_call_stats: dict[str, dict] = {}
+_mcp_stats_lock = threading.Lock()
+
+
+def _track_mcp_call(tool_name: str, duration_ms: float, success: bool):
+    """Track a tool call for MCP monitoring."""
+    with _mcp_stats_lock:
+        if tool_name not in _mcp_call_stats:
+            _mcp_call_stats[tool_name] = {"calls": 0, "total_ms": 0.0, "errors": 0}
+        s = _mcp_call_stats[tool_name]
+        s["calls"] += 1
+        s["total_ms"] += duration_ms
+        if not success:
+            s["errors"] += 1
+
+
+# ---------------------------------------------------------------------------
 # Tool handlers
 # ---------------------------------------------------------------------------
 async def handle_tool(name: str, args: dict) -> str:
+    _t0 = time.time()
+    _ok = True
     try:
         if name == "platform_agents":
             return _handle_agents(args)
@@ -229,10 +252,15 @@ async def handle_tool(name: str, args: dict) -> str:
         elif name == "platform_metrics":
             return _handle_metrics(args)
         else:
+            _ok = False
             return json.dumps({"error": f"Unknown tool: {name}"})
     except Exception as exc:
+        _ok = False
         log(f"Tool {name} error: {exc}", "ERROR")
         return json.dumps({"error": str(exc)[:500]})
+    finally:
+        _dur = (time.time() - _t0) * 1000
+        _track_mcp_call(name, _dur, _ok)
 
 
 def _handle_agents(args: dict) -> str:
@@ -555,7 +583,18 @@ async def handle_message(request: web.Request):
 
 
 async def handle_health(request: web.Request):
-    return web.json_response({"status": "ok", "tools": len(TOOLS), "sessions": len(_sessions)})
+    with _mcp_stats_lock:
+        tool_stats = {k: dict(v) for k, v in _mcp_call_stats.items()}
+        total_calls = sum(s["calls"] for s in tool_stats.values())
+        total_errors = sum(s["errors"] for s in tool_stats.values())
+    return web.json_response({
+        "status": "ok",
+        "tools": len(TOOLS),
+        "sessions": len(_sessions),
+        "total_calls": total_calls,
+        "total_errors": total_errors,
+        "by_tool": tool_stats,
+    })
 
 
 async def handle_tools_list(request: web.Request):

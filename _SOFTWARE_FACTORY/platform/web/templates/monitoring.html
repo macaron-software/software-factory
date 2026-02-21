@@ -125,10 +125,42 @@
         </div>
     </div>
 
-    <!-- Row 5: MCP Servers + Incidents -->
+    <!-- Row 5: HTTP Requests + MCP Tool Calls -->
     <div class="mon-grid mon-grid-2">
         <div class="mon-card">
-            <h3><svg class="icon"><use href="#icon-plug"/></svg> MCP Servers</h3>
+            <h3><svg class="icon"><use href="#icon-activity"/></svg> HTTP Requests (live)</h3>
+            <div class="mon-row" style="margin-bottom:0.8rem">
+                <div class="mon-col"><div class="label">Total</div><div class="val" id="monReqTotal">0</div></div>
+                <div class="mon-col"><div class="label">Errors</div><div class="val mon-val-red" id="monReqErrors">0</div></div>
+                <div class="mon-col"><div class="label">Avg ms</div><div class="val" id="monReqAvg">—</div></div>
+            </div>
+            <table class="mon-table">
+                <thead><tr><th>Endpoint</th><th style="text-align:right">Hits</th></tr></thead>
+                <tbody id="monReqEndpoints"><tr><td colspan="2" class="mon-empty">No requests yet</td></tr></tbody>
+            </table>
+            <div class="mon-section" style="margin-top:0.5rem">
+                <div class="mon-section-label">Status Codes</div>
+                <div id="monReqStatus" class="mon-badges-row"><span class="mon-empty">—</span></div>
+            </div>
+        </div>
+        <div class="mon-card">
+            <h3><svg class="icon"><use href="#icon-plug"/></svg> MCP Tool Calls</h3>
+            <div class="mon-row" style="margin-bottom:0.8rem">
+                <div class="mon-col"><div class="label">Total</div><div class="val" id="monMcpCallsTotal">0</div></div>
+                <div class="mon-col"><div class="label">Errors</div><div class="val mon-val-red" id="monMcpCallsErrors">0</div></div>
+                <div class="mon-col"><div class="label">Avg ms</div><div class="val" id="monMcpCallsAvg">—</div></div>
+            </div>
+            <table class="mon-table">
+                <thead><tr><th>Tool</th><th>Calls</th><th>Errors</th><th>Avg ms</th></tr></thead>
+                <tbody id="monMcpCallsTable"><tr><td colspan="4" class="mon-empty">No MCP calls yet</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Row 6: MCP Servers + Incidents -->
+    <div class="mon-grid mon-grid-2">
+        <div class="mon-card">
+            <h3><svg class="icon"><use href="#icon-server"/></svg> MCP Servers</h3>
             <div id="monMcpServers" class="mon-mcp-list">
                 <div class="mon-empty">Loading…</div>
             </div>
@@ -143,7 +175,32 @@
         </div>
     </div>
 
-    <!-- Row 6: Memory + Process -->
+    <!-- Row 7: LLM Costs + Anonymization -->
+    <div class="mon-grid mon-grid-2">
+        <div class="mon-card">
+            <h3><svg class="icon"><use href="#icon-zap"/></svg> LLM Costs (live session)</h3>
+            <div class="mon-row" style="margin-bottom:0.8rem">
+                <div class="mon-col"><div class="label">Total</div><div class="val" id="monCostTotal">$0</div></div>
+            </div>
+            <table class="mon-table">
+                <thead><tr><th>Provider</th><th>Calls</th><th>Tokens</th><th>Cost</th></tr></thead>
+                <tbody id="monCostByProvider"><tr><td colspan="4" class="mon-empty">No LLM costs yet</td></tr></tbody>
+            </table>
+        </div>
+        <div class="mon-card">
+            <h3><svg class="icon"><use href="#icon-layers"/></svg> Anonymization (RLM)</h3>
+            <div class="mon-row" style="margin-bottom:0.8rem">
+                <div class="mon-col"><div class="label">Total</div><div class="val" id="monAnonTotal">0</div></div>
+            </div>
+            <div id="monAnonByType" class="mon-badges-row"><span class="mon-empty">No anonymization data</span></div>
+            <div class="mon-section" style="margin-top:0.5rem">
+                <div class="mon-section-label">RLM Cache Scopes</div>
+                <div id="monRlmScopes" class="mon-badges-row"><span class="mon-empty">—</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 8: Memory + Process -->
     <div class="mon-grid mon-grid-2">
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-book-open"/></svg> Memory</h3>
@@ -330,6 +387,80 @@ async function refresh() {
             } else {
                 mcpEl.innerHTML = '<div class="mon-empty">No MCP servers detected</div>';
             }
+        }
+
+        // HTTP Requests
+        const req = d.requests || {};
+        $('monReqTotal').textContent = fmt(req.total_requests || 0);
+        $('monReqErrors').textContent = fmt(req.total_errors || 0);
+        $('monReqAvg').textContent = req.avg_ms ? req.avg_ms.toFixed(1) + 'ms' : '—';
+        const reqEndEl = $('monReqEndpoints');
+        if (req.top_endpoints && req.top_endpoints.length > 0) {
+            reqEndEl.innerHTML = req.top_endpoints.slice(0,8).map(([ep, cnt]) =>
+                `<tr><td style="font-size:0.7rem">${ep}</td><td style="text-align:right">${fmt(cnt)}</td></tr>`
+            ).join('');
+        } else {
+            reqEndEl.innerHTML = '<tr><td colspan="2" class="mon-empty">No requests yet</td></tr>';
+        }
+        const statColors = {'200':'green','201':'green','204':'green','301':'blue','302':'blue','304':'blue','400':'yellow','401':'yellow','403':'yellow','404':'yellow','500':'red','502':'red','503':'red'};
+        if (req.by_status && Object.keys(req.by_status).length > 0) {
+            $('monReqStatus').innerHTML = Object.entries(req.by_status).map(([code,cnt]) =>
+                `<span class="mon-badge ${statColors[code]||'purple'}">${code}: ${cnt}</span>`
+            ).join('');
+        } else {
+            $('monReqStatus').innerHTML = '<span class="mon-empty">—</span>';
+        }
+
+        // MCP Tool Calls
+        const mcpC = d.mcp_calls || {};
+        $('monMcpCallsTotal').textContent = fmt(mcpC.total_calls || 0);
+        $('monMcpCallsErrors').textContent = fmt(mcpC.total_errors || 0);
+        $('monMcpCallsAvg').textContent = mcpC.avg_ms ? mcpC.avg_ms.toFixed(1) + 'ms' : '—';
+        const mcpTb = $('monMcpCallsTable');
+        const mcpHealth = (d.mcp && d.mcp.mcp_platform) ? d.mcp.mcp_platform : {};
+        const byTool = mcpHealth.by_tool || mcpC.by_tool || {};
+        const toolEntries = Object.entries(byTool);
+        if (toolEntries.length > 0) {
+            mcpTb.innerHTML = toolEntries.map(([tool, info]) => {
+                if (typeof info === 'object') {
+                    return `<tr><td style="font-size:0.7rem">${tool}</td><td>${info.calls||0}</td><td>${info.errors||0}</td><td>${info.avg_ms ? info.avg_ms.toFixed(0) : '—'}</td></tr>`;
+                }
+                return `<tr><td style="font-size:0.7rem">${tool}</td><td>${info}</td><td>—</td><td>—</td></tr>`;
+            }).join('');
+        } else {
+            mcpTb.innerHTML = '<tr><td colspan="4" class="mon-empty">No MCP calls yet</td></tr>';
+        }
+
+        // LLM Costs (live)
+        const costs = d.llm_costs || {};
+        $('monCostTotal').textContent = '$' + (costs.total_usd || 0).toFixed(4);
+        const costTb = $('monCostByProvider');
+        if (costs.by_provider && Object.keys(costs.by_provider).length > 0) {
+            costTb.innerHTML = Object.entries(costs.by_provider).map(([prov, info]) =>
+                `<tr><td>${prov}</td><td>${info.calls||0}</td><td>${fmt((info.tokens_in||0)+(info.tokens_out||0))}</td><td>$${(info.cost_usd||0).toFixed(4)}</td></tr>`
+            ).join('');
+        } else {
+            costTb.innerHTML = '<tr><td colspan="4" class="mon-empty">No LLM costs yet</td></tr>';
+        }
+
+        // Anonymization
+        const anon = d.anonymization || {};
+        $('monAnonTotal').textContent = fmt(anon.total || 0);
+        if (anon.by_type && Object.keys(anon.by_type).length > 0) {
+            $('monAnonByType').innerHTML = Object.entries(anon.by_type).map(([t,c]) =>
+                `<span class="mon-badge purple">${t}: ${c}</span>`
+            ).join('');
+        } else {
+            $('monAnonByType').innerHTML = '<span class="mon-empty">No anonymization data</span>';
+        }
+        // RLM Cache scopes from MCP data
+        const rlm = d.mcp && d.mcp.rlm_cache;
+        if (rlm && rlm.by_scope && Object.keys(rlm.by_scope).length > 0) {
+            $('monRlmScopes').innerHTML = Object.entries(rlm.by_scope).map(([s,c]) =>
+                `<span class="mon-badge blue">${s}: ${c}</span>`
+            ).join('');
+        } else {
+            $('monRlmScopes').innerHTML = `<span class="mon-empty">${rlm ? fmt(rlm.entries||0) + ' cached' : 'No RLM cache'}</span>`;
         }
 
         // Incidents

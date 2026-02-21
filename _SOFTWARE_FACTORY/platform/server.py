@@ -180,11 +180,24 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Incident middleware — auto-detect 500 errors
+    # Metrics + incident middleware
     @app.middleware("http")
-    async def incident_middleware(request, call_next):
+    async def metrics_middleware(request, call_next):
+        import time as _t
+        _start = _t.time()
         try:
             response = await call_next(request)
+            _dur = (_t.time() - _start) * 1000
+            # Track request metrics
+            try:
+                from .metrics.collector import get_collector
+                get_collector().track_request(
+                    request.method, request.url.path,
+                    response.status_code, _dur,
+                )
+            except Exception:
+                pass
+            # Record incidents for 500+
             if response.status_code >= 500:
                 _record_incident(request.url.path, response.status_code)
             return response

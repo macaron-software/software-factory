@@ -594,7 +594,7 @@ async def monitoring_live():
     # ── MCP servers status ──
     mcp_status = {}
     try:
-        # MCP Platform (port 9501)
+        # MCP Platform (port 9501) — includes per-tool call stats
         import urllib.request
         try:
             r = urllib.request.urlopen("http://127.0.0.1:9501/health", timeout=2)
@@ -622,10 +622,21 @@ async def monitoring_live():
             cdb.row_factory = sqlite3.Row
             try:
                 cc = cdb.execute("SELECT COUNT(*) as cnt FROM rlm_cache").fetchone()
+                # Anonymization stats from RLM cache
+                anon_stats = {}
+                try:
+                    anon_rows = cdb.execute(
+                        "SELECT COALESCE(scope, 'default') as scope, COUNT(*) as cnt "
+                        "FROM rlm_cache GROUP BY scope"
+                    ).fetchall()
+                    anon_stats = {r["scope"]: r["cnt"] for r in anon_rows}
+                except Exception:
+                    pass
                 mcp_status["rlm_cache"] = {
                     "status": "ok",
                     "entries": cc["cnt"] if cc else 0,
                     "size_mb": round(rlm_cache.stat().st_size / 1024 / 1024, 2),
+                    "by_scope": anon_stats,
                 }
             except Exception:
                 mcp_status["rlm_cache"] = {"status": "empty", "entries": 0}
@@ -649,6 +660,14 @@ async def monitoring_live():
         db.close()
     except Exception:
         incidents = {"open": 0, "total": 0}
+
+    # ── Live metrics from collector ──
+    metrics_snapshot = {}
+    try:
+        from ...metrics.collector import get_collector
+        metrics_snapshot = get_collector().snapshot()
+    except Exception:
+        pass
 
     return JSONResponse({
         "timestamp": datetime.utcnow().isoformat(),
@@ -674,6 +693,10 @@ async def monitoring_live():
         "vectors": vector_stats,
         "mcp": mcp_status,
         "incidents": incidents,
+        "requests": metrics_snapshot.get("http", {}),
+        "mcp_calls": metrics_snapshot.get("mcp", {}),
+        "anonymization": metrics_snapshot.get("anonymization", {}),
+        "llm_costs": metrics_snapshot.get("llm_costs", {}),
     })
 
 

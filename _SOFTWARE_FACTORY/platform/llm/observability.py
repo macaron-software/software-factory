@@ -134,6 +134,14 @@ class LLMTracer:
 
         logger.info("LLM trace %s: %s/%s %din/%dout $%.4f %dms",
                      trace_id, provider, model, tokens_in, tokens_out, cost, duration_ms)
+
+        # Feed metrics collector
+        try:
+            from ..metrics.collector import get_collector
+            get_collector().track_llm_cost(provider, model, cost, tokens_in, tokens_out)
+        except Exception:
+            pass
+
         return trace_id
 
     def stats(self, session_id: str = "", hours: int = 24) -> dict:
