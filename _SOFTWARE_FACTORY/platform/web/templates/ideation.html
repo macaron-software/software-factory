@@ -585,7 +585,17 @@ async function sendIdea() {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({prompt: text, session_id: sessionId}),
         });
-        const data = await resp.json();
+        if (!resp.ok) {
+            addMsg('system', 'Système', `Erreur serveur (${resp.status})`, 'var(--red)', '');
+            sendBtn.disabled = false;
+            return;
+        }
+        let data;
+        try { data = await resp.json(); } catch(e) {
+            addMsg('system', 'Système', 'Réponse serveur invalide', 'var(--red)', '');
+            sendBtn.disabled = false;
+            return;
+        }
         if (data.error) {
             addMsg('system', 'Système', data.error, 'var(--red)', '');
             sendBtn.disabled = false;

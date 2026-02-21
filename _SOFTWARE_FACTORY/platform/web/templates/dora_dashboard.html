@@ -89,7 +89,7 @@
         <!-- Deployment Frequency -->
         <div class="dora-card">
             <div class="dora-card-icon"><svg class="icon" style="color:var(--green)"><use href="#icon-rocket"/></svg></div>
-            <div class="dora-card-title">Deploy Frequency</div>
+            <div class="dora-card-title">Phases Done</div>
             <div class="dora-card-value">{{ dora.deployment_frequency.count }}</div>
             <div class="dora-card-detail">{{ dora.deployment_frequency.per_day }}/jour</div>
             <span class="dora-card-level level-{{ dora.deployment_frequency.level }}">{{ dora.deployment_frequency.level }}</span>
@@ -127,7 +127,7 @@
         <div class="dora-card">
             <div class="dora-card-icon"><svg class="icon" style="color:var(--purple-light)"><use href="#icon-zap"/></svg></div>
             <div class="dora-card-title">Velocity</div>
-            <div class="dora-card-value">{{ dora.velocity.avg_velocity }} SP/sprint</div>
+            <div class="dora-card-value">{{ dora.velocity.avg_velocity }} phases/epic</div>
             <div class="dora-card-detail">{{ dora.velocity.sprint_count }} sprints</div>
             <span class="dora-card-level level-{% if dora.velocity.predictability_pct >= 80 %}elite{% elif dora.velocity.predictability_pct >= 60 %}high{% elif dora.velocity.predictability_pct >= 40 %}medium{% else %}low{% endif %}">{{ dora.velocity.predictability_pct }}% predictable</span>
         </div>
@@ -139,11 +139,11 @@
         <h4><svg class="icon icon-sm" style="vertical-align:-2px"><use href="#icon-trending-up"/></svg> Tendance — 12 dernières semaines</h4>
 
         <div class="dora-trend-row">
-            <span class="dora-trend-label">Deploys</span>
+            <span class="dora-trend-label">Ceremonies</span>
             <div class="dora-sparkline" id="sparkDeploy"></div>
         </div>
         <div class="dora-trend-row">
-            <span class="dora-trend-label">Lead Time (h)</span>
+            <span class="dora-trend-label">Activity</span>
             <div class="dora-sparkline" id="sparkLeadTime"></div>
         </div>
         <div class="dora-trend-row">

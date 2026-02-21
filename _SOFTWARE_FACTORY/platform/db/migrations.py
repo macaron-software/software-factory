@@ -166,6 +166,13 @@ def _migrate(conn):
     except Exception:
         pass
 
+    try:
+        f_cols = {r[1] for r in conn.execute("PRAGMA table_info(features)").fetchall()}
+        if f_cols and "completed_at" not in f_cols:
+            conn.execute("ALTER TABLE features ADD COLUMN completed_at TEXT")
+    except Exception:
+        pass
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS feature_deps (
             feature_id TEXT NOT NULL,
