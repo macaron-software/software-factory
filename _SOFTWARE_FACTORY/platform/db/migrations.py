@@ -1,17 +1,46 @@
 """
 Database migrations and initialization for the platform.
+Supports dual backend: SQLite (local) / PostgreSQL (production).
+Backend selected via DATABASE_URL env var.
 """
 
+import os
 import sqlite3
 from pathlib import Path
 
 from ..config import DB_PATH, DATA_DIR
+from .adapter import is_postgresql, get_connection
 
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
+SCHEMA_PG_PATH = Path(__file__).parent / "schema_pg.sql"
+
+_USE_PG = is_postgresql()
 
 
-def init_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
+def _pg_column_exists(conn, table: str, column: str) -> bool:
+    """Check if a column exists in a PostgreSQL table."""
+    row = conn.execute(
+        "SELECT 1 FROM information_schema.columns "
+        "WHERE table_name=? AND column_name=?",
+        (table, column)
+    ).fetchone()
+    return row is not None
+
+
+def _pg_table_exists(conn, table: str) -> bool:
+    """Check if a table exists in PostgreSQL."""
+    row = conn.execute(
+        "SELECT 1 FROM information_schema.tables WHERE table_name=?",
+        (table,)
+    ).fetchone()
+    return row is not None
+
+
+def init_db(db_path: Path = DB_PATH):
     """Initialize database with schema. Safe to call multiple times."""
+    if _USE_PG:
+        return _init_pg()
+
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
@@ -21,17 +50,27 @@ def init_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
     conn.executescript(schema)
 
     conn.execute("PRAGMA foreign_keys=ON")
-
-    # Migrations — add columns safely
     _migrate(conn)
-
     conn.commit()
     return conn
 
 
-def _migrate(conn: sqlite3.Connection):
+def _init_pg():
+    """Initialize PostgreSQL schema."""
+    conn = get_connection()
+    schema = SCHEMA_PG_PATH.read_text()
+    conn.executescript(schema)
+    conn.commit()
+    return conn
+
+
+def _migrate(conn):
     """Run incremental migrations. Safe to call multiple times."""
-    # Check existing columns
+    if _USE_PG:
+        _migrate_pg(conn)
+        return
+
+    # SQLite migrations (unchanged)
     cols = {r[1] for r in conn.execute("PRAGMA table_info(agents)").fetchall()}
     if "avatar" not in cols:
         conn.execute("ALTER TABLE agents ADD COLUMN avatar TEXT DEFAULT ''")
@@ -40,7 +79,6 @@ def _migrate(conn: sqlite3.Connection):
     if "motivation" not in cols:
         conn.execute("ALTER TABLE agents ADD COLUMN motivation TEXT DEFAULT ''")
 
-    # Ideation messages: add role + target columns
     try:
         im_cols = {r[1] for r in conn.execute("PRAGMA table_info(ideation_messages)").fetchall()}
         if im_cols and "role" not in im_cols:
@@ -50,7 +88,6 @@ def _migrate(conn: sqlite3.Connection):
     except Exception:
         pass
 
-    # Missions: add WSJF component fields
     try:
         m_cols = {r[1] for r in conn.execute("PRAGMA table_info(missions)").fetchall()}
         for col, default in [("business_value", "0"), ("time_criticality", "0"),
@@ -60,7 +97,6 @@ def _migrate(conn: sqlite3.Connection):
     except Exception:
         pass
 
-    # Mission runs: add workspace_path + parent_mission_id
     try:
         mr_cols = {r[1] for r in conn.execute("PRAGMA table_info(mission_runs)").fetchall()}
         if mr_cols and "workspace_path" not in mr_cols:
@@ -70,7 +106,6 @@ def _migrate(conn: sqlite3.Connection):
     except Exception:
         pass
 
-    # Agent scores: performance tracking across epics
     conn.execute("""
         CREATE TABLE IF NOT EXISTS agent_scores (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,7 +120,6 @@ def _migrate(conn: sqlite3.Connection):
         )
     """)
 
-    # Retrospectives table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS retrospectives (
             id TEXT PRIMARY KEY,
@@ -99,7 +133,6 @@ def _migrate(conn: sqlite3.Connection):
         )
     """)
 
-    # Features table (PO backlog items)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS features (
             id TEXT PRIMARY KEY,
@@ -116,7 +149,6 @@ def _migrate(conn: sqlite3.Connection):
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_features_epic ON features(epic_id)")
 
-    # SAFe: velocity tracking on sprints
     try:
         sp_cols = {r[1] for r in conn.execute("PRAGMA table_info(sprints)").fetchall()}
         if sp_cols:
@@ -127,7 +159,6 @@ def _migrate(conn: sqlite3.Connection):
     except Exception:
         pass
 
-    # SAFe: portfolio kanban status on missions
     try:
         m_cols2 = {r[1] for r in conn.execute("PRAGMA table_info(missions)").fetchall()}
         if m_cols2 and "kanban_status" not in m_cols2:
@@ -135,7 +166,6 @@ def _migrate(conn: sqlite3.Connection):
     except Exception:
         pass
 
-    # SAFe: feature dependencies
     conn.execute("""
         CREATE TABLE IF NOT EXISTS feature_deps (
             feature_id TEXT NOT NULL,
@@ -146,7 +176,6 @@ def _migrate(conn: sqlite3.Connection):
         )
     """)
 
-    # SAFe: Program Increments (PI cadence)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS program_increments (
             id TEXT PRIMARY KEY,
@@ -162,7 +191,6 @@ def _migrate(conn: sqlite3.Connection):
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_pi_art ON program_increments(art_id)")
 
-    # Confluence sync tracking
     conn.execute("""
         CREATE TABLE IF NOT EXISTS confluence_pages (
             mission_id TEXT NOT NULL,
@@ -173,7 +201,6 @@ def _migrate(conn: sqlite3.Connection):
         )
     """)
 
-    # Support tickets (TMA)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS support_tickets (
             id TEXT PRIMARY KEY,
@@ -193,8 +220,38 @@ def _migrate(conn: sqlite3.Connection):
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_tickets_mission ON support_tickets(mission_id)")
 
-def get_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
-    """Get a database connection."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS platform_incidents (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            severity TEXT DEFAULT 'P3',
+            status TEXT DEFAULT 'open',
+            source TEXT DEFAULT 'auto',
+            error_type TEXT,
+            error_detail TEXT,
+            mission_id TEXT,
+            agent_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            resolved_at TIMESTAMP,
+            resolution TEXT
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_incidents_status ON platform_incidents(status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_incidents_severity ON platform_incidents(severity)")
+
+
+def _migrate_pg(conn):
+    """PostgreSQL incremental migrations (safe ALTER TABLE IF NOT EXISTS)."""
+    # PG schema_pg.sql already includes all columns, but for future migrations:
+    pass
+
+
+def get_db(db_path: Path = DB_PATH):
+    """Get a database connection. Returns SQLite or PostgreSQL adapter."""
+    if _USE_PG:
+        conn = get_connection()
+        return conn
+
     if not db_path.exists():
         return init_db(db_path)
     conn = sqlite3.connect(str(db_path))

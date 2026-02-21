@@ -105,15 +105,24 @@ class MemoryManager:
         return [dict(r) for r in rows]
 
     def project_search(self, project_id: str, query: str, limit: int = 20) -> list[dict]:
-        """FTS5 search in project memory."""
+        """Full-text search in project memory (FTS5 or tsvector)."""
+        from ..db.adapter import is_postgresql
         conn = get_db()
         try:
-            rows = conn.execute("""
-                SELECT mp.*, rank FROM memory_project mp
-                JOIN memory_project_fts fts ON mp.id = fts.rowid
-                WHERE memory_project_fts MATCH ? AND mp.project_id = ?
-                ORDER BY rank LIMIT ?
-            """, (query, project_id, limit)).fetchall()
+            if is_postgresql():
+                rows = conn.execute("""
+                    SELECT mp.*, ts_rank(mp.search_tsv, plainto_tsquery('simple', ?)) as rank
+                    FROM memory_project mp
+                    WHERE mp.search_tsv @@ plainto_tsquery('simple', ?) AND mp.project_id = ?
+                    ORDER BY rank DESC LIMIT ?
+                """, (query, query, project_id, limit)).fetchall()
+            else:
+                rows = conn.execute("""
+                    SELECT mp.*, rank FROM memory_project mp
+                    JOIN memory_project_fts fts ON mp.id = fts.rowid
+                    WHERE memory_project_fts MATCH ? AND mp.project_id = ?
+                    ORDER BY rank LIMIT ?
+                """, (query, project_id, limit)).fetchall()
         except Exception:
             rows = conn.execute(
                 "SELECT * FROM memory_project WHERE project_id=? AND (key LIKE ? OR value LIKE ?) LIMIT ?",
@@ -164,14 +173,23 @@ class MemoryManager:
         return [dict(r) for r in rows]
 
     def global_search(self, query: str, limit: int = 20) -> list[dict]:
+        from ..db.adapter import is_postgresql
         conn = get_db()
         try:
-            rows = conn.execute("""
-                SELECT mg.*, rank FROM memory_global mg
-                JOIN memory_global_fts fts ON mg.id = fts.rowid
-                WHERE memory_global_fts MATCH ?
-                ORDER BY rank LIMIT ?
-            """, (query, limit)).fetchall()
+            if is_postgresql():
+                rows = conn.execute("""
+                    SELECT mg.*, ts_rank(mg.search_tsv, plainto_tsquery('simple', ?)) as rank
+                    FROM memory_global mg
+                    WHERE mg.search_tsv @@ plainto_tsquery('simple', ?)
+                    ORDER BY rank DESC LIMIT ?
+                """, (query, query, limit)).fetchall()
+            else:
+                rows = conn.execute("""
+                    SELECT mg.*, rank FROM memory_global mg
+                    JOIN memory_global_fts fts ON mg.id = fts.rowid
+                    WHERE memory_global_fts MATCH ?
+                    ORDER BY rank LIMIT ?
+                """, (query, limit)).fetchall()
         except Exception:
             rows = conn.execute(
                 "SELECT * FROM memory_global WHERE key LIKE ? OR value LIKE ? LIMIT ?",

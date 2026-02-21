@@ -80,16 +80,27 @@ class AgentMemory:
         self.db.commit()
 
     async def search(self, agent_id: str, query: str, limit: int = 10) -> list[str]:
-        """Search long-term memory using FTS5."""
-        rows = self.db.execute(
-            """SELECT m.value, m.key, m.importance
-               FROM memory_entries m
-               JOIN memory_fts f ON m.id = f.rowid
-               WHERE memory_fts MATCH ? AND m.agent_id = ?
-               ORDER BY rank
-               LIMIT ?""",
-            (query, agent_id, limit),
-        ).fetchall()
+        """Search long-term memory using FTS5 or tsvector."""
+        from ..db.adapter import is_postgresql
+        if is_postgresql():
+            rows = self.db.execute(
+                """SELECT m.value, m.key, m.importance
+                   FROM memory_entries m
+                   WHERE to_tsvector('simple', m.value) @@ plainto_tsquery('simple', ?)
+                     AND m.agent_id = ?
+                   LIMIT ?""",
+                (query, agent_id, limit),
+            ).fetchall()
+        else:
+            rows = self.db.execute(
+                """SELECT m.value, m.key, m.importance
+                   FROM memory_entries m
+                   JOIN memory_fts f ON m.id = f.rowid
+                   WHERE memory_fts MATCH ? AND m.agent_id = ?
+                   ORDER BY rank
+                   LIMIT ?""",
+                (query, agent_id, limit),
+            ).fetchall()
 
         # Update access timestamps
         for row in rows:
@@ -105,15 +116,25 @@ class AgentMemory:
 
     async def search_all(self, query: str, limit: int = 20) -> list[dict]:
         """Search across all agents' memories."""
-        rows = self.db.execute(
-            """SELECT m.agent_id, m.key, m.value, m.importance
-               FROM memory_entries m
-               JOIN memory_fts f ON m.id = f.rowid
-               WHERE memory_fts MATCH ?
-               ORDER BY rank
-               LIMIT ?""",
-            (query, limit),
-        ).fetchall()
+        from ..db.adapter import is_postgresql
+        if is_postgresql():
+            rows = self.db.execute(
+                """SELECT m.agent_id, m.key, m.value, m.importance
+                   FROM memory_entries m
+                   WHERE to_tsvector('simple', m.value) @@ plainto_tsquery('simple', ?)
+                   LIMIT ?""",
+                (query, limit),
+            ).fetchall()
+        else:
+            rows = self.db.execute(
+                """SELECT m.agent_id, m.key, m.value, m.importance
+                   FROM memory_entries m
+                   JOIN memory_fts f ON m.id = f.rowid
+                   WHERE memory_fts MATCH ?
+                   ORDER BY rank
+                   LIMIT ?""",
+                (query, limit),
+            ).fetchall()
 
         return [dict(row) for row in rows]
 

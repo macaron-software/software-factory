@@ -205,22 +205,41 @@ class MessageBus:
         """Full-text search on messages."""
         if not self.db:
             return []
-        if session_id:
-            rows = self.db.execute(
-                """SELECT m.* FROM messages m
-                   JOIN messages_fts f ON m.rowid = f.rowid
-                   WHERE messages_fts MATCH ? AND m.session_id = ?
-                   ORDER BY rank LIMIT ?""",
-                (query, session_id, limit),
-            ).fetchall()
+        from ..db.adapter import is_postgresql
+        if is_postgresql():
+            # PostgreSQL: tsvector search
+            if session_id:
+                rows = self.db.execute(
+                    """SELECT m.* FROM messages m
+                       WHERE m.content_tsv @@ plainto_tsquery('simple', ?) AND m.session_id = ?
+                       ORDER BY ts_rank(m.content_tsv, plainto_tsquery('simple', ?)) DESC LIMIT ?""",
+                    (query, session_id, query, limit),
+                ).fetchall()
+            else:
+                rows = self.db.execute(
+                    """SELECT m.* FROM messages m
+                       WHERE m.content_tsv @@ plainto_tsquery('simple', ?)
+                       ORDER BY ts_rank(m.content_tsv, plainto_tsquery('simple', ?)) DESC LIMIT ?""",
+                    (query, query, limit),
+                ).fetchall()
         else:
-            rows = self.db.execute(
-                """SELECT m.* FROM messages m
-                   JOIN messages_fts f ON m.rowid = f.rowid
-                   WHERE messages_fts MATCH ?
-                   ORDER BY rank LIMIT ?""",
-                (query, limit),
-            ).fetchall()
+            # SQLite: FTS5 search
+            if session_id:
+                rows = self.db.execute(
+                    """SELECT m.* FROM messages m
+                       JOIN messages_fts f ON m.rowid = f.rowid
+                       WHERE messages_fts MATCH ? AND m.session_id = ?
+                       ORDER BY rank LIMIT ?""",
+                    (query, session_id, limit),
+                ).fetchall()
+            else:
+                rows = self.db.execute(
+                    """SELECT m.* FROM messages m
+                       JOIN messages_fts f ON m.rowid = f.rowid
+                       WHERE messages_fts MATCH ?
+                       ORDER BY rank LIMIT ?""",
+                    (query, limit),
+                ).fetchall()
         return [dict(r) for r in rows]
 
     # ── Stats ─────────────────────────────────────────────────────────
