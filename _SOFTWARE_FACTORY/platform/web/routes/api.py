@@ -23,6 +23,19 @@ try:
 except Exception:
     pass
 
+# ── Health ────────────────────────────────────────────────────────
+
+@router.get("/api/health")
+async def health_check():
+    """Liveness/readiness probe for Docker healthcheck."""
+    from ..db.migrations import get_db
+    try:
+        db = get_db()
+        db.execute("SELECT 1")
+        return JSONResponse({"status": "ok"})
+    except Exception as e:
+        return JSONResponse({"status": "error", "detail": str(e)}, status_code=503)
+
 # ── Memory API ───────────────────────────────────────────────────
 
 @router.get("/api/memory/stats")
