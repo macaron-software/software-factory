@@ -216,17 +216,33 @@ async def run_session_workflow(request: Request, session_id: str):
 async def _run_workflow_background(wf, session_id: str, task: str, project_id: str):
     """Background workflow execution."""
     from ...workflows.store import run_workflow
+    from ...sessions.store import get_session_store, MessageDef
     try:
-        await run_workflow(wf, session_id, task, project_id)
+        result = await run_workflow(wf, session_id, task, project_id)
+        # Update linked mission status if autoheal
+        sess_store = get_session_store()
+        sess = sess_store.get(session_id)
+        if sess and sess.config and sess.config.get("autoheal"):
+            mission_id = sess.config.get("mission_id")
+            if mission_id:
+                from ...missions.store import get_mission_store
+                ms = get_mission_store()
+                final = "completed" if result.status == "completed" else "failed"
+                ms.update_mission_status(mission_id, final)
+                logger.info("Auto-heal mission %s → %s", mission_id, final)
     except Exception as e:
         logger.error("Workflow failed: %s", e)
-        from ...sessions.store import get_session_store, MessageDef
         get_session_store().add_message(MessageDef(
             session_id=session_id,
             from_agent="system",
             message_type="system",
             content=f"Workflow error: {e}",
         ))
+        # Mark session as failed
+        try:
+            get_session_store().update_status(session_id, "failed")
+        except Exception:
+            pass
 
 
 # ── Workflow Resume ───────────────────────────────────────────────

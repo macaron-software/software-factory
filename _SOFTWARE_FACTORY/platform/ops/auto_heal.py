@@ -155,6 +155,7 @@ def create_heal_epic(group: IncidentGroup) -> str:
         workflow_id=TMA_WORKFLOW_ID,
         wsjf_score=_sev_to_wsjf(group.severity),
         created_by="auto-heal",
+        kanban_status="implementing",
         config={
             "autoheal": True,
             "error_type": group.error_type,
@@ -205,6 +206,30 @@ async def launch_tma_workflow(mission_id: str) -> Optional[str]:
     if not mission:
         logger.error("Auto-heal: mission %s not found", mission_id)
         return None
+
+    # Skip if there's already an active/planning session for this mission
+    db = _get_db()
+    try:
+        existing = db.execute(
+            """SELECT id FROM sessions
+               WHERE name LIKE ? AND status IN ('planning', 'active')
+               LIMIT 1""",
+            (f"%{mission_id[:8]}%",),
+        ).fetchone()
+        if not existing:
+            # Check by config_json containing mission_id
+            existing = db.execute(
+                """SELECT id FROM sessions
+                   WHERE config_json LIKE ? AND status IN ('planning', 'active')
+                   LIMIT 1""",
+                (f"%{mission_id}%",),
+            ).fetchone()
+        if existing:
+            logger.info("Auto-heal: session %s already active for mission %s, skipping",
+                       existing["id"], mission_id)
+            return existing["id"]
+    finally:
+        db.close()
 
     wf = wf_store.get(TMA_WORKFLOW_ID)
     if not wf:
@@ -280,16 +305,15 @@ async def heal_cycle():
     # 1. Resolve completed missions first
     await resolve_completed_missions()
 
-    # 2. Prune completed heals
-    if _active_heals:
-        from ..missions.store import get_mission_store
-        ms = get_mission_store()
-        done = set()
-        for mid in _active_heals:
-            m = ms.get_mission(mid)
-            if m and m.status in ("completed", "failed"):
-                done.add(mid)
-        _active_heals -= done
+    # 2. Rebuild active heals from DB (survives restart)
+    db = _get_db()
+    try:
+        rows = db.execute(
+            "SELECT id FROM missions WHERE created_by='auto-heal' AND status='active'"
+        ).fetchall()
+        _active_heals = {r["id"] for r in rows}
+    finally:
+        db.close()
 
     # 3. Scan for new incidents
     groups = scan_open_incidents()

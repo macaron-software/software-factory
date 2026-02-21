@@ -277,6 +277,12 @@ async def run_workflow(
     store = get_session_store()
     pattern_store = get_pattern_store()
 
+    # Mark session as running
+    try:
+        store.update_status(session_id, "active")
+    except Exception:
+        pass
+
     # Workflow leader = first agent of first phase (typically CP)
     leader = ""
     if workflow.phases:
@@ -403,6 +409,13 @@ async def run_workflow(
 
     if run.status == "running":
         run.status = "completed"
+
+    # Update session status to match workflow outcome
+    session_status = {"completed": "completed", "failed": "failed", "gated": "interrupted"}.get(run.status, "completed")
+    try:
+        store.update_status(session_id, session_status)
+    except Exception:
+        pass
 
     # RTE closes the workflow
     status_emoji = {"completed": "[OK]", "failed": "[FAIL]", "gated": "[BLOCKED]"}.get(run.status, "[DONE]")
