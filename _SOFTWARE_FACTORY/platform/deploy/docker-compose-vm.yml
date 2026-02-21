@@ -7,11 +7,11 @@ services:
       dockerfile: platform/deploy/Dockerfile
     expose:
       - "8090"
+    env_file:
+      - /opt/macaron/.env
     environment:
       - PLATFORM_LLM_PROVIDER=azure-openai
       - PLATFORM_LLM_MODEL=gpt-5-mini
-      - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
-      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}
       - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-https://ascii-ui-openai.openai.azure.com}
       - FOUNDRY_PROJECT_ENDPOINT=${FOUNDRY_PROJECT_ENDPOINT:-}
       - FOUNDRY_MODEL_DEPLOYMENT_NAME=${FOUNDRY_MODEL_DEPLOYMENT_NAME:-gpt-5-mini}
@@ -20,7 +20,7 @@ services:
       - ANDROID_BUILDER_CONTAINER=android-builder
     volumes:
       - platform-data:/app/data
-      - /opt/macaron/.factory-keys:/root/.config/factory:ro
+      - /opt/macaron/.factory-keys:/app/.config/factory:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /opt/macaron/repos:/opt/macaron/repos
     restart: unless-stopped

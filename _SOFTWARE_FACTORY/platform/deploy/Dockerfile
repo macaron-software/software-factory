@@ -22,6 +22,7 @@ COPY mf_projects/ /app/mf_projects/
 
 # Create non-root user (needs docker group for container tools)
 RUN groupadd -r macaron && useradd -r -g macaron -G docker -d /app macaron \
+    && mkdir -p /app/data/logs \
     && chown -R macaron:macaron /app
 USER macaron
 
