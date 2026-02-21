@@ -7,19 +7,35 @@ _SOFTWARE_FACTORY/      # Software Factory (SF) — TDD automation + Agent Platf
   ├── cli/factory.py    # CLI: factory <project> <command>
   ├── core/             # Brain, TDD workers, adversarial, FRACTAL
   ├── platform/         # Macaron Agent Platform — FastAPI web app
-  │   ├── server.py     # App factory, port 8090
+  │   ├── server.py     # App factory, port 8090 (public) / 8099 (dev)
   │   ├── web/routes/   # HTTP routes package (10 sub-modules, was 8800 LOC monolith)
   │   ├── a2a/          # Agent-to-Agent messaging (bus, negotiation, veto)
-  │   ├── agents/       # Loop, executor, store (133 agents)
+  │   ├── agents/       # Loop, executor, store (143 agents)
   │   ├── patterns/     # 8 orchestration patterns
-  │   ├── missions/     # SAFe mission lifecycle
+  │   ├── missions/     # SAFe mission lifecycle + ProductBacklog (features, stories)
   │   ├── llm/          # Multi-provider LLM client
   │   ├── tools/        # Agent tools (code, git, deploy, memory, security, browser)
+  │   ├── ops/          # Auto-heal, chaos endurance, endurance watchdog
+  │   ├── services/     # Notification (Slack/Email/Webhook)
   │   └── deploy/       # Dockerfile + docker-compose (Azure VM)
+  ├── Dockerfile        # Public Docker image (python:3.12-slim, non-root macaron)
+  ├── docker-compose.yml # Public compose (port 8090, demo mode default)
+  ├── Makefile          # setup/run/stop/logs/dev/test/clean
+  ├── .env.example      # Template (PLATFORM_LLM_PROVIDER=demo by default)
   ├── projects/*.yaml   # Per-project configs
   ├── skills/*.md       # Domain-specific prompts
   └── data/             # SQLite DBs (factory.db, platform.db)
 _MIGRATION_FACTORY/     # Code migration engine (Angular 16→17, ISO 100%)
+```
+
+## PUBLIC REPO
+```
+GitHub:   macaron-software/software-factory (AGPL-3.0)
+Tags:     v1.0.0, v1.1.0, v1.2.0
+Clone:    /tmp/gh_push_ops/software-factory (for pushes, auth: leglands via gh)
+README:   8 languages (EN/FR/ZH/ES/JA/PT/DE/KO)
+Docker:   git clone → make setup → make run → http://localhost:8090
+Demo:     PLATFORM_LLM_PROVIDER=demo (mock LLM, no API key needed)
 ```
 
 ## RUN COMMANDS
@@ -30,12 +46,15 @@ factory <p> brain run --mode vision|fix|security|refactor|missing
 factory <p> cycle start -w 5 -b 20 -t 30   # batch TDD
 factory status --all
 
-# Platform (NEVER --reload, ALWAYS --ws none)
+# Platform — local dev (NEVER --reload, ALWAYS --ws none)
 python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8099 --ws none --log-level warning
 
+# Platform — public Docker
+cd software-factory && make setup && make run  # → http://localhost:8090
+
 # Tests
-python3 -m pytest tests/ -v
-cd platform/tests/e2e && npx playwright test
+python3 -m pytest tests/ -v                     # 52 tests
+cd platform/tests/e2e && npx playwright test    # 82 tests (9 specs)
 ```
 
 ## LLM PROVIDERS (env-driven)
@@ -278,6 +297,141 @@ Config: `brain.current_phase` + `brain.vision_doc` in projects/*.yaml
 - opencode: `permission.doom_loop: "allow"` mandatory (prevents stdin hang)
 - Process cleanup: `start_new_session=True` + `os.killpg()` on timeout
 
+## TESTS INFRASTRUCTURE
+```
+Backend:   python3 -m pytest tests/ -v  (52 tests: health, projects, agents, missions, i18n, security, search, memory, demo)
+E2E:       cd platform/tests/e2e && npx playwright test  (82 tests, 9 specs: portfolio, pages, journeys, project-chat, agents, epic, ideation, i18n, migration)
+Config:    pyproject.toml (asyncio_mode=auto), playwright.config.ts (baseURL=http://4.233.64.30, timeout=120s, chromium, domcontentloaded)
+Fresh:     Docker from-scratch verified: clone→make setup→make run→health OK→all pages 200→API CRUD OK
+```
+
+### ENDURANCE + CHAOS TEST PLAN (pending)
+```
+tests/test_endurance.py   — 15+ pytest: project lifecycle, phase progression, auto-resume, LLM stats, 24h poll
+tests/test_chaos.py       — 12+ pytest: container restart, CPU stress, network latency, DB pressure, disk fill, 4h chaos loop
+tests/conftest.py         — Shared fixtures: live_url, live_session, canvas_project_id. Markers: endurance, chaos, live
+endurance.spec.ts         — 11 Playwright: monitoring, SSE, pages during mission, API latency, post-chaos recovery
+chaos.spec.ts             — 11 Playwright: visual recovery, data integrity, stale state, chaos controls
+
+Backend support (ops/):
+  chaos_endurance.py      — Asyncio loop: random 2-6h → pick scenario → execute → log MTTR. Table chaos_runs
+  endurance_watchdog.py   — 60s loop: phase stall detect, zombie missions, disk, LLM health. Table endurance_metrics
+  llm_usage table         — Hook chat() → INSERT per call. Aggregation: cost/day, cost/phase, cost/agent
+
+Test project: "Macaron Canvas" (Figma clone) — stack decided by agents, run 24/7 indefinitely
+Target: VM Azure #2 (B2s, ~30€/mois) for generated app deployment
+```
+
+### SECURITY HARDENING (implemented)
+```
+XSS:          Jinja2 autoescaping (|e), CSP headers, X-Content-Type-Options
+SQL injection: parameterized queries throughout (? placeholders, no f-strings)
+Prompt injection: LLM input sanitization, adversarial L0+L1 guards
+Auth:         AuthMiddleware bearer token (platform/security/__init__.py), MACARON_API_KEY env var
+              Smart exclusions: HTML pages, /static, /health, /sse always public
+              Public GET API endpoints accessible without auth
+              Mutation endpoints require Bearer token when MACARON_API_KEY set
+CSP:          connect-src 'self' (no wildcard), unsafe-inline needed for HTMX
+Redaction:    /api/monitoring/live strips docker IDs, kernel, git branch when unauthenticated
+Secrets:      externalized ~/.config/factory/*.key, chmod 600, no hardcoded defaults
+Docker:       non-root user 'macaron', minimal image
+Headers:      HSTS, X-Frame-Options DENY, X-XSS-Protection, Referrer-Policy strict
+```
+
+### PRODUCT MANAGEMENT (implemented)
+```
+Backlog:      Epic(mission) → Feature → UserStory hierarchy. product.html, missions/product.py
+Tables:       features, user_stories, feature_deps, sprints (all in migrations.py)
+WSJF:         4 components (business_value, time_criticality, risk_reduction, job_duration)
+              Slider UI in product.html (modal) + mission_detail.html (inline)
+              POST /api/missions/{id}/wsjf → auto-compute CoD/JD
+              MissionDef dataclass has 4 WSJF fields + wsjf_score
+
+Creation UI:  Inline forms: "+ Feature" under epic, "+ Story" under feature
+              POST /api/epics/{id}/features, POST /api/features/{id}/stories
+
+Kanban:       SortableJS drag-drop in mission_detail (kanban columns)
+              PATCH /api/tasks/{id}/status (cross-column drag)
+
+Prioritization: SortableJS on features list (⋮⋮ drag handle)
+                PATCH /api/backlog/reorder {type, ids} → priority update
+
+Dependencies: feature_deps table (feature_id, depends_on, dep_type)
+              POST/GET/DELETE /api/features/{id}/deps
+              Visual: 🔗 icons + dep count badges in product.html
+
+Sprint Planning: Collapsible panel in mission_detail
+                 GET /api/sprints/{id}/available-stories (unassigned backlog)
+                 POST /api/sprints/{id}/assign-stories {story_ids}
+                 DELETE /api/sprints/{id}/stories/{id}
+
+Charts:       Chart.js — velocity bar (actual vs planned), burndown line (ideal + remaining)
+              Cycle time histogram in dora_dashboard (/api/metrics/cycle-time)
+              Gantt timeline bars in product_line.html
+
+Releases:     GET /api/releases/{project_id} → completed features by epic
+              Release notes panel in pi_board + dora_dashboard
+```
+
+### REST API (JSON + FORM)
+```
+Helper:       _parse_body(request) → auto-detect Content-Type, parse JSON or form
+              _is_json_request(request) → True if JSON (choose JSON vs redirect response)
+              Located in web/routes/helpers.py
+
+All POST endpoints accept both application/json and multipart/form-data:
+  POST /api/projects              → create project (JSON returns redirect or {"ok":true})
+  POST /api/missions              → create mission (JSON returns {"ok":true,"mission":{id,name}})
+  POST /api/missions/{id}/start   → start mission
+  POST /api/missions/{id}/wsjf    → compute WSJF
+  POST /api/missions/{id}/sprints → create sprint
+  POST /api/epics/{id}/features   → create feature
+  POST /api/features/{id}/stories → create story
+  POST /api/features/{id}/deps    → add dependency
+  PATCH /api/features/{id}        → update feature (SP, status, AC, priority, name)
+  PATCH /api/stories/{id}         → update story (SP, status, sprint_id, title)
+  PATCH /api/tasks/{id}/status    → update task status (kanban drag)
+  PATCH /api/backlog/reorder      → reorder features/stories by priority
+  GET /api/sprints/{id}/available-stories → unassigned stories for sprint
+  GET /api/features/{id}/deps     → list dependencies
+  GET /api/releases/{project_id}  → release notes
+  GET /api/metrics/cycle-time     → cycle time distribution
+  DELETE /api/features/{id}/deps/{dep} → remove dependency
+  DELETE /api/sprints/{id}/stories/{id} → unassign story
+```
+
+### MISSION EXECUTION (live)
+```
+Semaphore:    asyncio.Semaphore(2) — 2 concurrent missions max (helpers.py)
+Auto-resume:  server.py lifespan finds running/paused missions → resume after 15s delay
+Phase timeout: 600s (10 min), max 2 reloops on QA/deploy failure
+API:          POST /api/missions (create), GET /api/missions (list+progress), POST /api/missions/{id}/run
+Orchestrator: services/mission_orchestrator.py — 11 phases sequential with gates (all_approved, no_veto, always)
+Sprint mgmt:  auto-creation, feature pull PO, review/retro, velocity tracking, error reloop
+```
+
+### DEPLOY TO AZURE VM
+```
+Azure VM#1:   4.233.64.30 (macaron@), container deploy-platform-1
+SSH:          sshpass -p "$VM_PASS" ssh azureadmin@4.233.64.30
+Workflow:     scp → docker cp → clear __pycache__ → docker restart → wait 15s → health
+Container:    deploy-platform-1 (CID: docker ps -q -f 'name=deploy-platform-1')
+Path mapping: local platform/ → container /app/macaron_platform/ (NOT /app/platform/)
+Templates:    no restart needed (Jinja2 re-reads)
+⚠️ SCP collision: files named store.py from different dirs overwrite each other → use unique names
+Push clone:   /tmp/gh_push_ops/software-factory (auth via `gh auth` as leglands)
+Public repo:  macaron-software/software-factory (AGPL-3.0)
+Tags:         v1.0.0, v1.1.0, v1.2.0
+```
+
+### DOCKER DEPLOY (PUBLIC)
+```
+From scratch: git clone → make setup (.env from .env.example) → make run → http://localhost:8090
+Demo mode:    PLATFORM_LLM_PROVIDER=demo (default, no API key needed)
+LLM mode:     Set in .env: PLATFORM_LLM_PROVIDER=azure-openai, AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, PLATFORM_LLM_MODEL
+Verified:     143 agents loaded, 13 projects provisioned, all 11 pages 200 OK, API CRUD JSON works
+```
+
 ## FIGMA MCP
 Figma Desktop (127.0.0.1:3845) via `proxy_figma.py`, fallback `mcp.figma.com`
 Tools: get_file, get_node, get_styles, get_selection
@@ -339,7 +493,11 @@ db/adapter.py (SQLite/PG dual), db/migrations.py, db/schema_pg.sql, db/migrate_d
 metrics/dora.py (DORA + velocity), workflows/store.py (27 nodes, 34 edges)
 skills/library.py (1200+ GitHub), skills/definitions/*.yaml (42 YAML agents)
 tools/ (code, git, deploy, memory, phase, browser, android, compose)
-web/routes/ (10 sub-modules), web/ws.py (SSE), web/templates/ (20+ templates)
+web/routes/ (10 sub-modules + helpers.py), web/ws.py (SSE), web/templates/ (20+ templates)
+  routes/helpers.py: _parse_body(), _is_json_request() — dual JSON/form support all POST endpoints
+  routes/missions.py: 9 new PM endpoints (feature/story CRUD, backlog reorder, deps, sprint assign)
+  routes/projects.py: project CRUD + chat, all accept JSON via _parse_body()
+  routes/pages.py: product_page loads deps_map + WSJF fields for template
 mcp_platform/ (port 9501, auto-start, 8 tools)
 ```
 
