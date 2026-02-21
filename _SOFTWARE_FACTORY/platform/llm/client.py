@@ -71,7 +71,58 @@ _PROVIDERS = {
 
 # Fallback order driven by PLATFORM_LLM_PROVIDER (local=minimax first, azure=azure-openai first)
 _primary = os.environ.get("PLATFORM_LLM_PROVIDER", "minimax")
-_FALLBACK_CHAIN = [_primary] + [p for p in ["minimax", "azure-openai", "azure-ai"] if p != _primary]
+_is_azure = os.environ.get("AZURE_DEPLOY", "")
+if _is_azure:
+    # Azure prod: only azure-openai, no minimax/nvidia
+    _FALLBACK_CHAIN = ["azure-openai"]
+else:
+    _FALLBACK_CHAIN = [_primary] + [p for p in ["minimax", "azure-openai", "azure-ai"] if p != _primary]
+
+
+class _RateLimiter:
+    """Sliding window rate limiter with async queuing.
+
+    Queues requests when rate limit is approached instead of failing fast.
+    Azure OpenAI gpt-5-mini: 100 req/60s, 100K tokens/60s.
+    We target 80 req/60s to leave headroom.
+    """
+
+    def __init__(self, max_requests: int = 80, window_seconds: float = 60.0):
+        self._max = max_requests
+        self._window = window_seconds
+        self._timestamps: list[float] = []
+        self._lock = asyncio.Lock()
+
+    async def acquire(self, timeout: float = 120.0):
+        """Wait until a request slot is available. Raises TimeoutError after timeout."""
+        deadline = time.monotonic() + timeout
+        while True:
+            async with self._lock:
+                now = time.monotonic()
+                cutoff = now - self._window
+                self._timestamps = [t for t in self._timestamps if t > cutoff]
+                if len(self._timestamps) < self._max:
+                    self._timestamps.append(now)
+                    return
+                # Calculate wait time until oldest request exits the window
+                wait = self._timestamps[0] - cutoff
+            if time.monotonic() + wait > deadline:
+                raise TimeoutError(f"Rate limiter: waited {timeout}s, still at capacity ({self._max} req/{self._window}s)")
+            await asyncio.sleep(min(wait + 0.1, 5.0))
+
+    @property
+    def usage(self) -> str:
+        now = time.monotonic()
+        cutoff = now - self._window
+        active = sum(1 for t in self._timestamps if t > cutoff)
+        return f"{active}/{self._max}"
+
+
+# Global rate limiter (shared across all agents in this process)
+_rate_limiter = _RateLimiter(
+    max_requests=int(os.environ.get("LLM_RATE_LIMIT_RPM", "80")),
+    window_seconds=60.0,
+)
 
 
 @dataclass
@@ -243,9 +294,18 @@ class LLMClient:
                 continue
 
             use_model = model if (prov == provider and model and model in pcfg.get("models", [])) else pcfg["default"]
-            logger.warning("LLM trying %s/%s ...", prov, use_model)
+
+            # Rate limiter: queue until a slot is available
+            try:
+                await _rate_limiter.acquire(timeout=180.0)
+            except TimeoutError:
+                logger.error("LLM rate limiter timeout (180s) — queue full (%s)", _rate_limiter.usage)
+                continue
+
+            logger.warning("LLM trying %s/%s ... [rate: %s]", prov, use_model, _rate_limiter.usage)
             last_exc = None
-            for attempt in range(3):
+            max_attempts = 5  # More retries for rate limits (with backoff)
+            for attempt in range(max_attempts):
                 try:
                     result = await self._do_chat(pcfg, prov, use_model, messages, temperature, max_tokens, system_prompt, tools)
                     self._stats["calls"] += 1
@@ -261,19 +321,23 @@ class LLMClient:
                     err_str = repr(exc)
                     is_rate_limit = "429" in err_str or "RateLimitReached" in err_str
                     is_transient = "ReadError" in err_str or "ConnectError" in err_str or "RemoteProtocolError" in err_str
-                    # Retry on transient errors or rate limits with backoff
-                    if attempt < 2 and (is_transient or is_rate_limit):
-                        delay = (2 ** attempt) * (10 if is_rate_limit else 3)
-                        logger.warning("LLM %s/%s %s (attempt %d): %s — retrying in %ds",
-                                       prov, use_model, "rate-limited" if is_rate_limit else "transient", attempt+1, err_str[:120], delay)
+                    if attempt < max_attempts - 1 and (is_transient or is_rate_limit):
+                        import random
+                        # Exponential backoff with jitter: 10s, 20s, 40s, 80s
+                        base = (2 ** attempt) * (10 if is_rate_limit else 3)
+                        jitter = random.uniform(0, base * 0.3)
+                        delay = min(base + jitter, 90)
+                        logger.warning("LLM %s/%s %s (attempt %d/%d): %s — retrying in %ds",
+                                       prov, use_model, "rate-limited" if is_rate_limit else "transient",
+                                       attempt + 1, max_attempts, err_str[:120], int(delay))
                         await asyncio.sleep(delay)
                         continue
-                    logger.warning("LLM %s/%s failed: %s — trying next", prov, use_model, err_str[:200])
+                    logger.warning("LLM %s/%s failed after %d attempts: %s", prov, use_model, attempt + 1, err_str[:200])
                     self._stats["errors"] += 1
                     self._cb_record_failure(prov)
                     if is_rate_limit:
-                        self._provider_cooldown[prov] = time.monotonic() + 60
-                        logger.warning("LLM %s → cooldown 60s (rate limited)", prov)
+                        self._provider_cooldown[prov] = time.monotonic() + 30
+                        logger.warning("LLM %s → cooldown 30s (rate limited)", prov)
                 continue
 
         raise RuntimeError(f"All LLM providers failed for {provider}/{model}")
@@ -342,16 +406,17 @@ class LLMClient:
 
         t0 = time.monotonic()
 
-        # Retry loop for 429 rate limits (2 attempts, then fallback to next provider)
-        for attempt in range(2):
+        # Retry loop for 429 rate limits (3 attempts with exponential backoff)
+        import random
+        for attempt in range(3):
             resp = await http.post(url, json=body, headers=headers)
             if resp.status_code != 429:
                 break
-            retry_after = int(resp.headers.get("Retry-After", 2 ** attempt * 5))
-            retry_after = max(retry_after, 10)  # At least 10s for rate limits
-            retry_after = min(retry_after, 60)
-            logger.warning("LLM %s/%s rate-limited (429), retry in %ds (attempt %d/2)",
-                           provider, model, retry_after, attempt + 1)
+            retry_after = int(resp.headers.get("Retry-After", (2 ** attempt) * 10))
+            retry_after = max(retry_after, 10)
+            retry_after = min(retry_after + random.randint(0, 5), 90)
+            logger.warning("LLM %s/%s rate-limited (429), retry in %ds (attempt %d/3) [rate: %s]",
+                           provider, model, retry_after, attempt + 1, _rate_limiter.usage)
             await asyncio.sleep(retry_after)
 
         elapsed = int((time.monotonic() - t0) * 1000)
@@ -427,22 +492,43 @@ class LLMClient:
             cooldown_until = self._provider_cooldown.get(prov, 0)
             if cooldown_until > now:
                 continue
+            if self._cb_is_open(prov):
+                continue
             pcfg = self._get_provider_config(prov)
             key = self._get_api_key(pcfg)
             if not key or key == "no-key":
                 continue
             use_model = model if (prov == provider and model and model in pcfg.get("models", [])) else pcfg["default"]
+
+            # Rate limiter: queue until a slot is available
             try:
-                async for chunk in self._do_stream(pcfg, prov, use_model, messages, temperature, max_tokens, system_prompt):
-                    yield chunk
-                return
-            except Exception as exc:
-                err_str = repr(exc)
-                is_rate_limit = "429" in err_str or "RateLimitReached" in err_str
-                logger.warning("LLM stream %s/%s failed: %s — trying next", prov, use_model, err_str[:200])
-                if is_rate_limit:
-                    self._provider_cooldown[prov] = time.monotonic() + 60
+                await _rate_limiter.acquire(timeout=180.0)
+            except TimeoutError:
+                logger.error("LLM stream rate limiter timeout (%s)", _rate_limiter.usage)
                 continue
+
+            max_attempts = 4
+            for attempt in range(max_attempts):
+                try:
+                    async for chunk in self._do_stream(pcfg, prov, use_model, messages, temperature, max_tokens, system_prompt):
+                        yield chunk
+                    self._cb_record_success(prov)
+                    return
+                except Exception as exc:
+                    err_str = repr(exc)
+                    is_rate_limit = "429" in err_str or "RateLimitReached" in err_str
+                    if attempt < max_attempts - 1 and is_rate_limit:
+                        import random
+                        delay = min((2 ** attempt) * 10 + random.uniform(0, 5), 90)
+                        logger.warning("LLM stream %s/%s rate-limited (attempt %d/%d) — retrying in %ds",
+                                       prov, use_model, attempt + 1, max_attempts, int(delay))
+                        await asyncio.sleep(delay)
+                        continue
+                    logger.warning("LLM stream %s/%s failed: %s — trying next", prov, use_model, err_str[:200])
+                    self._cb_record_failure(prov)
+                    if is_rate_limit:
+                        self._provider_cooldown[prov] = time.monotonic() + 30
+                    break
 
         raise RuntimeError(f"All LLM providers failed for streaming {provider}/{model}")
 
@@ -595,7 +681,9 @@ class LLMClient:
 
     @property
     def stats(self) -> dict:
-        return dict(self._stats)
+        s = dict(self._stats)
+        s["rate_limiter"] = _rate_limiter.usage
+        return s
 
 
 # Singleton
