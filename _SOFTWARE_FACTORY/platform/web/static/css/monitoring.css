@@ -25,6 +25,7 @@
 .mon-col .label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); }
 .mon-col .val { font-size: 1.2rem; font-weight: 600; color: var(--text-primary); }
 .mon-val-red { color: var(--red, #ef4444) !important; }
+.mon-val-yellow { color: var(--yellow, #eab308) !important; }
 
 /* Empty state */
 .mon-empty { color: var(--text-secondary); font-size: 0.75rem; font-style: italic; }

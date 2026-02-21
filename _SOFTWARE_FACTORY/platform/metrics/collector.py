@@ -64,8 +64,9 @@ class MetricsCollector:
             lambda: {"calls": 0, "cost_usd": 0.0, "tokens_in": 0, "tokens_out": 0}
         )
 
-        # Top endpoints by call count (for "hot paths")
-        self._endpoint_calls: dict[str, int] = defaultdict(int)
+        # Per-endpoint latencies (keep last N for p95)
+        self._endpoint_latencies: dict[str, list[float]] = defaultdict(list)
+        self._max_latencies = 200  # keep last 200 per endpoint
 
     # ── HTTP Tracking ──
 
@@ -83,7 +84,10 @@ class MetricsCollector:
             if status_code >= 400:
                 self._http_total.errors += 1
             self._http_status[status_code] += 1
-            self._endpoint_calls[f"{method} {prefix}"] += 1
+            key = f"{method} {prefix}"
+            self._endpoint_latencies[key].append(duration_ms)
+            if len(self._endpoint_latencies[key]) > self._max_latencies:
+                self._endpoint_latencies[key] = self._endpoint_latencies[key][-self._max_latencies:]
 
     # ── MCP Tracking ──
 
@@ -135,9 +139,17 @@ class MetricsCollector:
 
             # HTTP
             top_endpoints = sorted(
-                self._endpoint_calls.items(), key=lambda x: -x[1]
+                [
+                    (ep, len(lats), round(sum(lats)/len(lats), 1),
+                     round(sorted(lats)[int(len(lats)*0.95)] if lats else 0, 1))
+                    for ep, lats in self._endpoint_latencies.items()
+                ],
+                key=lambda x: -x[1]
             )[:15]
             http_by_status = dict(sorted(self._http_status.items()))
+            # 4xx vs 5xx breakdown
+            errors_4xx = sum(v for k, v in self._http_status.items() if 400 <= k < 500)
+            errors_5xx = sum(v for k, v in self._http_status.items() if k >= 500)
 
             # MCP tools
             mcp_tools = {
@@ -164,9 +176,14 @@ class MetricsCollector:
                 "http": {
                     "total_requests": self._http_total.count,
                     "total_errors": self._http_total.errors,
+                    "errors_4xx": errors_4xx,
+                    "errors_5xx": errors_5xx,
                     "avg_ms": round(self._http_total.total_ms / self._http_total.count, 1) if self._http_total.count else 0,
                     "by_status": http_by_status,
-                    "top_endpoints": top_endpoints,
+                    "top_endpoints": [
+                        {"endpoint": ep, "hits": hits, "avg_ms": avg, "p95_ms": p95}
+                        for ep, hits, avg, p95 in top_endpoints
+                    ],
                 },
                 "mcp": {
                     "total_calls": self._mcp_total.count,
