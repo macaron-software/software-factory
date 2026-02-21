@@ -235,8 +235,8 @@ async def project_board_page(request: Request, project_id: str):
     from ...projects.manager import get_project_store
     from ...projects import factory_tasks
     from ...agents.store import get_agent_store
-    from ...missions.store import get_mission_store
-    import random
+    from ...missions.store import get_mission_store, get_mission_run_store
+    from ...missions.product import get_product_backlog
 
     proj_store = get_project_store()
     project = proj_store.get(project_id)
@@ -247,7 +247,6 @@ async def project_board_page(request: Request, project_id: str):
     all_agents = agent_store.list_all()
     agents_by_id = {a.id: a for a in all_agents}
 
-    # Helper to get avatar URL
     avatar_dir = Path(__file__).parent.parent / "static" / "avatars"
     def _avatar(agent_id):
         jpg = avatar_dir / f"{agent_id}.jpg"
@@ -256,11 +255,19 @@ async def project_board_page(request: Request, project_id: str):
         if svg.exists(): return f"/static/avatars/{agent_id}.svg"
         return ""
 
-    # Build task list from missions/stories
+    # Build task list from missions + mission_run phases (live)
     tasks = []
     try:
         m_store = get_mission_store()
+        run_store = get_mission_run_store()
         missions = m_store.list_missions(project_id=project_id)
+        all_runs = run_store.list_runs(limit=100)
+        runs_by_mission = {}
+        for r in all_runs:
+            if r.parent_mission_id:
+                runs_by_mission[r.parent_mission_id] = r
+            runs_by_mission[r.id] = r
+
         status_col = {"planning": "backlog", "active": "active", "review": "review",
                        "completed": "done", "deployed": "done"}
         status_labels = {"planning": "Planifié", "active": "En cours", "review": "En revue",
@@ -275,30 +282,24 @@ async def project_board_page(request: Request, project_id: str):
                 "avatar_url": _avatar(agent.id) if agent else "",
                 "agent_name": agent.name if agent else "",
             })
+            # Also add phases from mission_run as sub-tasks
+            run = runs_by_mission.get(m.id)
+            if run and run.phases:
+                phase_col_map = {"done": "done", "done_with_issues": "done",
+                                  "running": "active", "pending": "backlog", "failed": "review"}
+                for ph in run.phases:
+                    ph_status = ph.status.value if hasattr(ph.status, "value") else str(ph.status)
+                    tasks.append({
+                        "title": ph.phase_name or ph.phase_id,
+                        "col": phase_col_map.get(ph_status, "backlog"),
+                        "status_label": ph_status.replace("_", " ").title(),
+                        "avatar_url": "",
+                        "agent_name": "",
+                    })
     except Exception:
         pass
 
-    # If no real tasks, show demo
-    if not tasks:
-        demo = [
-            ("Setup projet initial", "done", "Terminé"),
-            ("Endpoint /api/users", "active", "En cours"),
-            ("Authentification JWT", "active", "En cours"),
-            ("Tests E2E smoke", "review", "En revue"),
-            ("Documentation API", "backlog", "Planifié"),
-            ("Dashboard admin", "backlog", "Planifié"),
-            ("Revue sécurité", "backlog", "Planifié"),
-        ]
-        sample_agents = [a for a in all_agents if _avatar(a.id)][:5]
-        for i, (title, col, label) in enumerate(demo):
-            ag = sample_agents[i % len(sample_agents)] if sample_agents else None
-            tasks.append({
-                "title": title, "col": col, "status_label": label,
-                "avatar_url": _avatar(ag.id) if ag else "",
-                "agent_name": ag.name if ag else "",
-            })
-
-    # Agent flow nodes (project team or general agents)
+    # Agent flow nodes (project team)
     flow_nodes = []
     flow_edges = []
     team_agents = [a for a in all_agents if _avatar(a.id)][:6]
@@ -306,24 +307,45 @@ async def project_board_page(request: Request, project_id: str):
     for i, ag in enumerate(team_agents[:6]):
         x, y = positions[i] if i < len(positions) else (60 + i * 80, 100)
         flow_nodes.append({"x": x, "y": y, "label": ag.name.split()[-1] if ag.name else "Agent"})
-    # Connect nodes sequentially + some cross-links
     for i in range(len(flow_nodes) - 1):
         n1, n2 = flow_nodes[i], flow_nodes[i + 1]
         flow_edges.append({"x1": n1["x"] + 25, "y1": n1["y"], "x2": n2["x"] - 25, "y2": n2["y"]})
 
-    # Backlog items
+    # Backlog items (live from DB)
+    backlog = get_product_backlog()
+    story_count = 0
+    feature_count = 0
+    unestimated = 0
+    try:
+        for m in missions:
+            features = backlog.list_features(m.id)
+            feature_count += len(features)
+            for f in features:
+                stories = backlog.list_stories(f.id)
+                story_count += len(stories)
+                unestimated += sum(1 for s in stories if not s.story_points)
+    except Exception:
+        pass
     backlog_items = [
-        {"title": "User stories non estimées", "count": random.randint(2, 8), "color": "var(--yellow)"},
-        {"title": "Bugs P2 en attente", "count": random.randint(0, 3), "color": "var(--red, #ef4444)"},
-        {"title": "Features priorisées", "count": random.randint(1, 5), "color": "var(--blue)"},
+        {"title": "Stories non estimées", "count": unestimated, "color": "var(--yellow)"},
+        {"title": "Features", "count": feature_count, "color": "var(--blue)"},
+        {"title": "User stories", "count": story_count, "color": "var(--green)"},
     ]
 
-    # Pull requests (demo)
-    pull_requests = [
-        {"title": "feat: add /api/users endpoint", "status": "Open"},
-        {"title": "fix: JWT expiration handling", "status": "Review"},
-        {"title": "chore: update dependencies", "status": "Merged"},
-    ]
+    # Git activity (live from project workspace)
+    pull_requests = []
+    try:
+        if project.path and project.has_git:
+            import subprocess
+            result = subprocess.run(
+                ["git", "--no-pager", "log", "--oneline", "-5"],
+                cwd=project.path, capture_output=True, text=True, timeout=5,
+            )
+            for line in (result.stdout or "").strip().split("\n"):
+                if line.strip():
+                    pull_requests.append({"title": line.strip(), "status": "Commit"})
+    except Exception:
+        pass
 
     return _templates(request).TemplateResponse("project_board.html", {
         "request": request,

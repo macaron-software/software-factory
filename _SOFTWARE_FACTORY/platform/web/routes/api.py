@@ -918,12 +918,19 @@ async def monitoring_live(hours: int = 24):
             "sqlite_dbs": 7,
             "retention": {"daily": "90d", "weekly": "365d", "monthly": "forever"},
         }
-        # Servers running on VM
+        # Servers running on VM (probe ports)
+        import socket
+        def _port_up(port, host="127.0.0.1"):
+            try:
+                with socket.create_connection((host, port), timeout=1):
+                    return "up"
+            except Exception:
+                return "down"
         azure_infra["servers"] = [
             {"name": "Platform (uvicorn)", "port": 8090, "status": "up"},
             {"name": "MCP SF (unified)", "port": 9501, "status": "up" if mcp_status.get("mcp_sf", {}).get("status") in ("up", "ok") else "down"},
-            {"name": "PostgreSQL", "port": 5432, "status": "configured"},
-            {"name": "Nginx (reverse proxy)", "port": 80, "status": "configured"},
+            {"name": "PostgreSQL", "port": 5432, "status": _port_up(5432)},
+            {"name": "Nginx (reverse proxy)", "port": 80, "status": _port_up(80)},
         ]
         # LLM cost summary by provider type (Azure vs non-Azure)
         azure_cost = 0.0
@@ -1159,3 +1166,27 @@ async def autoheal_trigger():
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
+
+
+# ── i18n ─────────────────────────────────────────────────────────────
+@router.get("/api/set-lang/{lang}")
+async def set_language(lang: str, request: Request):
+    """Switch UI language. Sets cookie and redirects back."""
+    from ...i18n import SUPPORTED_LANGS
+    if lang not in SUPPORTED_LANGS:
+        lang = "en"
+    referer = request.headers.get("referer", "/")
+    response = RedirectResponse(url=referer, status_code=303)
+    response.set_cookie("lang", lang, max_age=365 * 86400, httponly=False, samesite="lax")
+    return response
+
+
+@router.get("/api/i18n/{lang}.json")
+async def i18n_catalog(lang: str):
+    """Serve translation catalog for client-side JS."""
+    from ...i18n import SUPPORTED_LANGS, _catalog, _load_catalog
+    if not _catalog:
+        _load_catalog()
+    if lang not in SUPPORTED_LANGS:
+        lang = "en"
+    return JSONResponse(_catalog.get(lang, {}))
