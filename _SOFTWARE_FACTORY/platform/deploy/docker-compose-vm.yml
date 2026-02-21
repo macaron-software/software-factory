@@ -9,13 +9,15 @@ services:
       - "8090"
     environment:
       - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-https://ascii-ui-openai.openai.azure.com}
       - FOUNDRY_PROJECT_ENDPOINT=${FOUNDRY_PROJECT_ENDPOINT:-}
-      - FOUNDRY_MODEL_DEPLOYMENT_NAME=${FOUNDRY_MODEL_DEPLOYMENT_NAME:-gpt-4o}
-      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-dummy}
+      - FOUNDRY_MODEL_DEPLOYMENT_NAME=${FOUNDRY_MODEL_DEPLOYMENT_NAME:-gpt-5-mini}
       - SF_ROOT=/app
       - MF_ROOT=/app/mf_projects
     volumes:
       - platform-data:/app/data
+      - /opt/macaron/.factory-keys:/root/.config/factory:ro
     restart: unless-stopped
 
   nginx:

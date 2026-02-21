@@ -559,7 +559,12 @@ async def _execute_node(
                 break  # approved
 
             # Severity tiers: 5-6 = pass with warning, 7-8 = retry, 9-10 = hard reject
-            if guard_result.score <= 6:
+            # BUT: HALLUCINATION/SLOP keywords always force retry (never soft-pass)
+            has_critical_flags = any(
+                "HALLUCINATION" in i or "SLOP" in i
+                for i in guard_result.issues
+            )
+            if guard_result.score <= 6 and not has_critical_flags:
                 logger.info(
                     "ADVERSARIAL SOFT-PASS [%s] score=%d (≤6 = warning): %s",
                     agent.name, guard_result.score,

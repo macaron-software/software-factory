@@ -269,6 +269,15 @@ Respond ONLY with JSON:
         l1_issues = data.get("issues", [])
         verdict = data.get("verdict", "APPROVE")
 
+        # HALLUCINATION/SLOP in issues = always reject, regardless of score
+        has_critical = any(
+            "HALLUCINATION" in i.upper() or "SLOP" in i.upper()
+            for i in l1_issues
+        )
+        if has_critical:
+            l1_score = max(l1_score, 7)  # floor at 7 = force retry
+            verdict = "REJECT"
+
         return GuardResult(
             passed=verdict == "APPROVE" and l1_score < 6,
             score=l1_score,

@@ -38,15 +38,16 @@ _PROVIDERS = {
         "max_tokens_param": {"gpt-5.2": "max_completion_tokens"},
     },
     "azure-openai": {
-        "name": "Azure OpenAI (GPT-4o)",
-        "base_url": os.environ.get("AZURE_OPENAI_ENDPOINT", "https://castudioiadevelopopenai.openai.azure.com").rstrip("/"),
+        "name": "Azure OpenAI (GPT-5-mini)",
+        "base_url": os.environ.get("AZURE_OPENAI_ENDPOINT", "https://ascii-ui-openai.openai.azure.com").rstrip("/"),
         "key_env": "AZURE_OPENAI_API_KEY",
-        "models": ["gpt-4o"],
-        "default": "gpt-4o",
+        "models": ["gpt-5-mini"],
+        "default": "gpt-5-mini",
         "auth_header": "api-key",
         "auth_prefix": "",
-        "azure_api_version": "2024-10-21",
-        "azure_deployment_map": {"gpt-4o": "gpt-4o"},
+        "azure_api_version": "2025-01-01-preview",
+        "azure_deployment_map": {"gpt-5-mini": "gpt-5-mini"},
+        "max_tokens_param": {"gpt-5-mini": "max_completion_tokens"},
     },
     "nvidia": {
         "name": "NVIDIA (Kimi K2)",
@@ -68,8 +69,7 @@ _PROVIDERS = {
     },
 }
 
-# Fallback: MiniMax (reliable, fast) → Azure GPT-5.2 (powerful but rate-limited)
-# NVIDIA Kimi K2 disabled — API endpoint unreachable/timing out
+# Fallback: MiniMax (reliable, fast) → Azure GPT-5-mini (cheap, public endpoint) → Azure GPT-5.2 (powerful)
 _FALLBACK_CHAIN = ["minimax", "azure-openai", "azure-ai"]
 
 
@@ -273,12 +273,17 @@ class LLMClient:
         body = {
             "model": model,
             "messages": msgs,
-            "temperature": temperature,
         }
+        # GPT-5-mini only supports temperature=1 (default)
+        if not (model.startswith("gpt-5-mini") or model.startswith("gpt-5.1-codex")):
+            body["temperature"] = temperature
         # MiniMax uses <think> blocks that consume tokens — boost limit
+        # GPT-5-mini is a reasoning model — needs extra tokens for internal reasoning
         effective_max = max_tokens
         if provider == "minimax":
             effective_max = max(max_tokens, 16000)
+        elif model.startswith("gpt-5-mini") or model.startswith("gpt-5.1-codex"):
+            effective_max = max(max_tokens, 8000)
         # Some models (gpt-5.2) use max_completion_tokens instead of max_tokens
         mt_param = pcfg.get("max_tokens_param", {}).get(model, "max_tokens")
         body[mt_param] = effective_max
@@ -445,14 +450,19 @@ class LLMClient:
         effective_max = max_tokens
         if provider == "minimax":
             effective_max = max(max_tokens, 16000)
+        elif model.startswith("gpt-5-mini") or model.startswith("gpt-5.1-codex"):
+            effective_max = max(max_tokens, 8000)
 
+        mt_param = pcfg.get("max_tokens_param", {}).get(model, "max_tokens")
         body = {
             "model": model,
             "messages": msgs,
-            "temperature": temperature,
-            "max_tokens": effective_max,
+            mt_param: effective_max,
             "stream": True,
         }
+        # GPT-5-mini only supports temperature=1 (default)
+        if not (model.startswith("gpt-5-mini") or model.startswith("gpt-5.1-codex")):
+            body["temperature"] = temperature
 
         # Use a separate client for streaming to avoid blocking the shared client
         stream_http = httpx.AsyncClient(timeout=httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0))
