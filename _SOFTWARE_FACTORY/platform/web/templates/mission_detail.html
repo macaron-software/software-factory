@@ -170,7 +170,7 @@
         {% endif %}
     </div>
 
-    <!-- Right sidebar: stats + team -->
+    <!-- Right sidebar: stats + velocity + retro + team -->
     <aside class="mission-sidebar">
         <div class="ms-section">
             <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-chart"/></svg> Progression</h4>
@@ -180,6 +180,40 @@
             <div class="ms-stat"><span class="ms-stat-label">In Progress</span><span class="ms-stat-value" style="color:var(--yellow)">{{ stats.get('in_progress', 0) }}</span></div>
             <div class="ms-stat"><span class="ms-stat-label">Failed</span><span class="ms-stat-value" style="color:var(--red)">{{ stats.get('failed', 0) }}</span></div>
         </div>
+
+        {% if velocity_history %}
+        <div class="ms-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-trending-up"/></svg> Vélocité</h4>
+            <div class="ms-stat"><span class="ms-stat-label">Moyenne</span><span class="ms-stat-value">{{ avg_velocity }} SP</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">Total livré</span><span class="ms-stat-value" style="color:var(--green)">{{ total_velocity }} SP</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">Total planifié</span><span class="ms-stat-value">{{ total_planned }} SP</span></div>
+            <div class="vel-chart" style="display:flex;align-items:flex-end;gap:3px;height:60px;margin-top:0.5rem">
+                {% set max_vel = velocity_history|map(attribute='velocity')|max if velocity_history else 1 %}
+                {% for v in velocity_history %}
+                {% set h = (v.velocity / (max_vel if max_vel > 0 else 1) * 50)|int %}
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+                    <span style="font-size:0.55rem;color:var(--text-muted)">{{ v.velocity }}</span>
+                    <div style="width:100%;height:{{ h if h > 2 else 2 }}px;background:{% if v.status == 'completed' %}var(--green){% elif v.status == 'failed' %}var(--red){% else %}var(--purple){% endif %};border-radius:2px;min-height:2px" title="Sprint {{ v.sprint }}: {{ v.velocity }}/{{ v.planned_sp }} SP"></div>
+                    <span style="font-size:0.55rem;color:var(--text-muted)">S{{ v.sprint }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% if total_planned > 0 %}
+            <div style="margin-top:0.4rem;font-size:0.72rem;color:var(--text-secondary)">
+                Predictability: <strong style="color:{% if total_velocity >= total_planned %}var(--green){% else %}var(--yellow){% endif %}">{{ ((total_velocity / total_planned) * 100)|int }}%</strong>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if selected_sprint and selected_sprint.retro_notes %}
+        <div class="ms-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-message-circle"/></svg> Rétrospective</h4>
+            <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.5;max-height:200px;overflow-y:auto">
+                {{ selected_sprint.retro_notes | markdown | safe }}
+            </div>
+        </div>
+        {% endif %}
 
         {% if team_agents %}
         <div class="ms-section">

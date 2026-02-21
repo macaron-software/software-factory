@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, FileResponse
 
-from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, serve_workspace_file
+from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, _mission_semaphore, serve_workspace_file
 from ...i18n import t
 
 router = APIRouter()
@@ -109,6 +109,12 @@ async def mission_detail_page(request: Request, mission_id: str):
             col = t.status if t.status in ("pending", "in_progress", "review", "done") else "pending"
             tasks_by_status.setdefault(col, []).append(t)
 
+    # Velocity history (live from DB)
+    velocity_history = mission_store.get_velocity_history(mission_id)
+    total_velocity = sum(v["velocity"] for v in velocity_history)
+    total_planned = sum(v["planned_sp"] for v in velocity_history)
+    avg_velocity = round(total_velocity / len(velocity_history), 1) if velocity_history else 0
+
     # Team agents
     agent_store = get_agent_store()
     prefix = mission.project_id[:4] if len(mission.project_id) >= 4 else mission.project_id
@@ -122,6 +128,10 @@ async def mission_detail_page(request: Request, mission_id: str):
         "selected_sprint": selected_sprint,
         "tasks_by_status": tasks_by_status,
         "team_agents": team_agents,
+        "velocity_history": velocity_history,
+        "total_velocity": total_velocity,
+        "total_planned": total_planned,
+        "avg_velocity": avg_velocity,
     })
 
 
@@ -1152,7 +1162,9 @@ async def api_mission_run(request: Request, mission_id: str):
 
     async def _safe_run():
         try:
-            await orchestrator.run_phases()
+            async with _mission_semaphore:
+                logger.info("Mission %s acquired semaphore, starting execution", mission_id)
+                await orchestrator.run_phases()
         except Exception as exc:
             import traceback
             logger.error("Mission %s _run_phases crashed: %s\n%s", mission_id, exc, traceback.format_exc())

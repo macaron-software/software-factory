@@ -292,34 +292,52 @@ class MissionOrchestrator:
                 try:
                     # Phase timeout: 10 minutes max per phase execution
                     PHASE_TIMEOUT = 600
-                    result = await asyncio.wait_for(
-                        run_pattern(
-                            phase_pattern, session_id, phase_task,
-                            project_id=mission.id,
-                            project_path=mission.workspace_path,
-                            phase_id=phase.phase_id,
-                        ),
-                        timeout=PHASE_TIMEOUT,
-                    )
-                    phase_success = result.success
-                    if not phase_success:
-                        failed_nodes = [
-                            n for n in result.nodes.values()
-                            if n.status not in (NodeStatus.COMPLETED, NodeStatus.PENDING)
-                        ]
-                        if result.error:
-                            phase_error = result.error
-                        elif failed_nodes:
-                            errors = []
-                            for fn in failed_nodes:
-                                err = (fn.result.error if fn.result else "") or fn.output or ""
-                                errors.append(f"{fn.agent_id}: {err[:100]}")
-                            phase_error = "; ".join(errors)
-                        else:
-                            phase_error = "Pattern returned success=False"
-                except asyncio.TimeoutError:
-                    logger.error("Phase %s timed out after %ds", phase.phase_id, PHASE_TIMEOUT)
-                    phase_error = f"Phase timed out after {PHASE_TIMEOUT}s"
+                    MAX_LLM_RETRIES = 3
+                    LLM_RETRY_DELAY = 30  # seconds between retries on rate limit
+
+                    for llm_attempt in range(1, MAX_LLM_RETRIES + 1):
+                        try:
+                            result = await asyncio.wait_for(
+                                run_pattern(
+                                    phase_pattern, session_id, phase_task,
+                                    project_id=mission.id,
+                                    project_path=mission.workspace_path,
+                                    phase_id=phase.phase_id,
+                                ),
+                                timeout=PHASE_TIMEOUT,
+                            )
+                            phase_success = result.success
+                            if not phase_success:
+                                failed_nodes = [
+                                    n for n in result.nodes.values()
+                                    if n.status not in (NodeStatus.COMPLETED, NodeStatus.PENDING)
+                                ]
+                                if result.error:
+                                    phase_error = result.error
+                                elif failed_nodes:
+                                    errors = []
+                                    for fn in failed_nodes:
+                                        err = (fn.result.error if fn.result else "") or fn.output or ""
+                                        errors.append(f"{fn.agent_id}: {err[:100]}")
+                                    phase_error = "; ".join(errors)
+                                else:
+                                    phase_error = "Pattern returned success=False"
+                                # Retry on rate limit errors
+                                is_rate_limit = any(kw in phase_error.lower() for kw in ("rate limit", "429", "all llm providers failed", "throttl"))
+                                if is_rate_limit and llm_attempt < MAX_LLM_RETRIES:
+                                    logger.warning("Phase %s rate-limited (attempt %d/%d), waiting %ds...", phase.phase_id, llm_attempt, MAX_LLM_RETRIES, LLM_RETRY_DELAY)
+                                    await self._sse_orch_msg(f"⏳ Rate limit — pause {LLM_RETRY_DELAY}s avant retry ({llm_attempt}/{MAX_LLM_RETRIES})…", phase.phase_id)
+                                    await asyncio.sleep(LLM_RETRY_DELAY)
+                                    continue
+                            break  # Success or non-retryable error
+                        except asyncio.TimeoutError:
+                            if llm_attempt < MAX_LLM_RETRIES:
+                                logger.warning("Phase %s timed out (attempt %d/%d), retrying...", phase.phase_id, llm_attempt, MAX_LLM_RETRIES)
+                                await asyncio.sleep(LLM_RETRY_DELAY)
+                                continue
+                            logger.error("Phase %s timed out after %ds (all retries exhausted)", phase.phase_id, PHASE_TIMEOUT)
+                            phase_error = f"Phase timed out after {PHASE_TIMEOUT}s"
+                            break
                 except Exception as exc:
                     logger.error("Phase %s pattern crashed: %s\n%s", phase.phase_id, exc, traceback.format_exc())
                     phase_error = str(exc)
