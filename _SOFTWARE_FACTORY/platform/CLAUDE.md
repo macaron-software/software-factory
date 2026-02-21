@@ -36,7 +36,7 @@ ssh -i "$SSH_KEY" azureadmin@4.233.64.30 "cd /opt/macaron && sudo docker compose
 - FastAPI + Jinja2 + HTMX + SSE (no WS). Zero build step. Zero emoji (SVG Feather only)
 - SQLite WAL + FTS5 (~30 tables)
 - LLM: MiniMax M2.5 → Azure OpenAI → Azure AI (fallback chain)
-- **94 agents** (75 YAML defs), 12 patterns, 16 workflows, 1259 skills
+- **133 agents** (75 YAML defs), 12 patterns, 19 workflows, 1271 skills
 
 ---
 
@@ -63,6 +63,49 @@ ART → PI (mission_run) → Iteration (sprint) → Ceremony (session) → Patte
 ```
 
 DB tables/code keep current names (missions, sessions, workflows) — rename UI-only.
+
+---
+
+## SAFe BACKBONE (implemented)
+
+### WSJF Real Computation
+- Mission creation form: sliders BV/TC/RR/JD (1-10)
+- Formula: `(business_value + time_criticality + risk_reduction) / job_duration`
+- Live computation in JS, stored in `missions` table
+
+### Gate Enforcement
+- `wf_phase.gate` enforced at runtime: `all_approved` blocks, `no_veto` blocks, `always` passes
+- No more hardcoded blocking — uses workflow config
+
+### Sprint Lifecycle
+- Auto-created at dev-sprint start (SprintDef in `sprints` table)
+- Status flow: `planning → active → review → completed → failed`
+- Velocity tracking: `velocity` + `planned_sp` columns
+- Retro auto-generated via LLM after each sprint, stored in `sprints.retro_notes` + `memory_global`
+
+### Feature Pull
+- Features from product backlog auto-injected into dev-sprint prompt
+- Status set to `in_progress` at sprint 1 start
+
+### Learning Loop
+- Retro lessons from `memory_global` (category=retrospective) injected into sprint>1 prompts
+- Continuous improvement across missions
+
+### Portfolio Kanban
+- 5 columns: Funnel → Analyzing → Backlog → Implementing → Done
+- WIP limit: 3 epics max in Implementing (red border when exceeded)
+- Route: `/api/portfolio/kanban` (HTMX tab in Backlog page)
+- `kanban_status` on missions table, auto-updated on status change
+
+### DORA + Velocity Metrics
+- 4 DORA metrics + velocity card in dashboard
+- Predictability: % sprints where velocity ≥ planned SP
+- Velocity trend per sprint across missions
+
+### I&A Ceremony
+- Auto-trigger `_auto_retrospective()` after epic completes all phases
+- LLM generates: successes, failures, lessons, improvements (JSON)
+- Stored in `retrospectives` table + `memory_global` (lesson/improvement categories)
 
 ---
 
@@ -162,7 +205,7 @@ Pulse ring on thinking/acting agents.
 
 ### Workflows
 - `workflows/store.py` (1760L) — WorkflowDef, WorkflowPhase, seed_builtins()
-- 16 templates: safe-{veligo,ppz,psy,yolo,ferv,sol,logs,factory}, migration-sharelook, sf-pipeline, review-cycle, debate-decide, security-hacking, product-lifecycle, + others
+- 19 templates: safe-{veligo,ppz,psy,yolo,ferv,sol,logs,factory}, migration-sharelook, sf-pipeline, review-cycle, debate-decide, security-hacking, product-lifecycle, dsi-platform-features, dsi-platform-tma, + others
 
 ### A2A
 - `a2a/bus.py` (247L) — MessageBus, async queues (2000), SSE bridge, dead letter
@@ -212,7 +255,7 @@ run_phase, list_phases, request_validation (orchestrator only)
 
 ---
 
-## DB TABLES (~30)
+## DB TABLES (~33)
 ```
 agents, agent_instances, agent_scores, patterns, skills, mcps,
 missions, sprints, tasks, features, user_stories,
@@ -222,10 +265,11 @@ memory_global, memory_global_fts, tool_calls,
 skill_github_sources, projects, workflows,
 mission_runs, org_portfolios, org_arts, org_teams, org_team_members,
 ideation_sessions, ideation_messages, ideation_findings,
-retrospectives, confluence_pages
+retrospectives, confluence_pages, support_tickets,
+feature_deps, program_increments
 ```
 
-## AGENT TEAMS (94 total)
+## AGENT TEAMS (133 total)
 
 ### Strategic (4): strat-cpo (Julie), strat-cto (Karim), strat-dirprog (Thomas), strat-portfolio (Sofia)
 ### Per-project (prefix: veligo-, ppz-, psy-, yolo-, ferv-, sol-, logs-, fact-): RTE, PO, Lead, Devs×2-3, QA, UX
