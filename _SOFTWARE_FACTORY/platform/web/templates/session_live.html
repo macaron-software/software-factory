@@ -58,7 +58,7 @@
           </div>
           {% endif %}
           {% if suggestions %}
-          <div class="suggestions-label">Démarrez la conversation :</div>
+          <div class="suggestions-label">{{ _("demarrez_la_conversation") }}</div>
           <div class="suggestions-grid">
             {% for icon, label, prompt in suggestions %}
             <button class="suggestion-badge" data-prompt="{{ prompt }}" onclick="useSuggestion(this)">
@@ -82,7 +82,7 @@
       <div class="chat-split">
         <div class="chat-main">
           <div class="chat-selector">
-            <label style="font-size:0.78rem;color:var(--text-secondary);margin-right:0.4rem">Chat with:</label>
+            <label style="font-size:0.78rem;color:var(--text-secondary);margin-right:0.4rem">{{ _("chat_with") }}</label>
             <div class="agent-dropdown" id="chatAgentDropdown">
               <button type="button" class="agent-dropdown__trigger" id="chatAgentTrigger">
                 {% if agents %}
@@ -110,11 +110,11 @@
         </div>
         <div class="chat-panel">
           <div class="chat-panel-header">
-            <span>Inter-Agent Feed</span>
+            <span>{{ _("inter_agent_feed") }}</span>
             <div class="chat-panel-filters">
-              <button class="panel-filter active" data-filter="all">All</button>
-              <button class="panel-filter" data-filter="decisions">Decisions</button>
-              <button class="panel-filter" data-filter="errors">Errors</button>
+              <button class="panel-filter active" data-filter="all">{{ _("tt_all") }}</button>
+              <button class="panel-filter" data-filter="decisions">{{ _("decisions") }}</button>
+              <button class="panel-filter" data-filter="errors">{{ _("errors") }}</button>
             </div>
           </div>
           <div class="chat-panel-feed" id="panelFeed"></div>
@@ -156,7 +156,7 @@
           </svg>
           <!-- Pattern Legend -->
           <div class="graph-legend" id="graphLegend">
-            <div class="graph-legend-title">Patterns</div>
+            <div class="graph-legend-title">{{ _("patterns") }}</div>
             <div class="graph-legend-items"></div>
           </div>
           <!-- Zoom controls -->
@@ -178,7 +178,7 @@
                 <div class="agent-chat-role" id="acRole"></div>
                 <div class="agent-chat-status-bar">
                   <span class="agent-chat-status-dot" id="acStatusDot"></span>
-                  <span class="agent-chat-status-text" id="acStatusText">idle</span>
+                  <span class="agent-chat-status-text" id="acStatusText">{{ _("idle") }}</span>
                 </div>
               </div>
               <button class="agent-chat-close" id="acClose"><svg class="icon"><use href="#icon-x"/></svg></button>
@@ -217,7 +217,7 @@
             </div>
             {% endfor %}
           {% else %}
-            <div class="graph-memory-empty">No PRs yet — agents will produce [PR] items</div>
+            <div class="graph-memory-empty">{{ _("no_prs_yet_agents_will_produce") }}</div>
           {% endif %}
 
           <!-- Artifacts: decisions, reports -->
@@ -230,7 +230,7 @@
             </div>
             {% endfor %}
           {% else %}
-            <div class="graph-memory-empty">No artifacts yet</div>
+            <div class="graph-memory-empty">{{ _("no_artifacts_yet") }}</div>
           {% endif %}
 
           <div class="graph-memory-title" style="margin-top:12px"><svg class="icon icon-xs"><use href="#icon-database"/></svg> Session Memory</div>
@@ -243,7 +243,7 @@
             </div>
             {% endfor %}
           {% else %}
-            <div class="graph-memory-empty">No session memory yet</div>
+            <div class="graph-memory-empty">{{ _("no_session_memory_yet") }}</div>
           {% endif %}
 
           <div class="graph-memory-title"><svg class="icon icon-xs"><use href="#icon-folder"/></svg> Project Memory</div>
@@ -256,7 +256,7 @@
             </div>
             {% endfor %}
           {% else %}
-            <div class="graph-memory-empty">No project memory yet</div>
+            <div class="graph-memory-empty">{{ _("no_project_memory_yet") }}</div>
           {% endif %}
 
           <div class="graph-memory-title"><svg class="icon icon-xs"><use href="#icon-share"/></svg> Shared Memory</div>
@@ -269,7 +269,7 @@
             </div>
             {% endfor %}
           {% else %}
-            <div class="graph-memory-empty">No shared memory yet</div>
+            <div class="graph-memory-empty">{{ _("no_shared_memory_yet") }}</div>
           {% endif %}
         </div>
         <div class="graph-log" id="graphLog">
@@ -295,14 +295,14 @@
     <div class="agent-dropdown agent-dropdown--compact" id="targetAgentDropdown">
       <button type="button" class="agent-dropdown__trigger agent-dropdown__trigger--compact" id="targetAgentTrigger">
         <svg class="icon icon-xs" style="color:var(--text-secondary)"><use href="#icon-users"/></svg>
-        <span class="agent-dropdown__name">All agents</span>
+        <span class="agent-dropdown__name">{{ _("all_agents") }}</span>
         <svg class="icon icon-xs agent-dropdown__chevron"><use href="#icon-chevron-down"/></svg>
       </button>
       <input type="hidden" id="targetAgent" value="">
       <div class="agent-dropdown__menu agent-dropdown__menu--up" id="targetAgentMenu">
         <div class="agent-dropdown__item active" data-value="">
           <svg class="icon icon-xs" style="color:var(--text-secondary)"><use href="#icon-users"/></svg>
-          <span class="agent-dropdown__name">All agents</span>
+          <span class="agent-dropdown__name">{{ _("all_agents") }}</span>
           <span class="agent-dropdown__role"></span>
         </div>
         {% for n in graph.nodes %}

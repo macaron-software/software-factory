@@ -16,26 +16,26 @@
                     <div class="mc-cdp-tagline">{{ cdp['tagline'] }}</div>
                     {% endif %}
                     <div class="mc-cdp-status-row">
-                        <span class="mc-cdp-status active" id="mc-cdp-status">Pilotage actif</span>
+                        <span class="mc-cdp-status active" id="mc-cdp-status">{{ _("pilotage_actif") }}</span>
                     </div>
 
                     {% if cdp and cdp.get('persona') %}
                     <div class="mc-cdp-section">
-                        <div class="mc-cdp-section-title">Persona</div>
+                        <div class="mc-cdp-section-title">{{ _("persona") }}</div>
                         <div class="mc-cdp-persona">{{ cdp['persona'][:250] }}{% if cdp['persona']|length > 250 %}...{% endif %}</div>
                     </div>
                     {% endif %}
 
                     {% if cdp and cdp.get('motivation') %}
                     <div class="mc-cdp-section">
-                        <div class="mc-cdp-section-title">Motivation</div>
+                        <div class="mc-cdp-section-title">{{ _("motivation") }}</div>
                         <div class="mc-cdp-motivation">{{ cdp['motivation'][:200] }}{% if cdp['motivation']|length > 200 %}...{% endif %}</div>
                     </div>
                     {% endif %}
 
                     {% if cdp and cdp.get('skills') %}
                     <div class="mc-cdp-section">
-                        <div class="mc-cdp-section-title">Skills</div>
+                        <div class="mc-cdp-section-title">{{ _("skills") }}</div>
                         <div class="mc-cdp-tags">
                             {% for s in cdp['skills'][:8] %}
                             <span class="mc-cdp-tag skill">{{ s }}</span>
@@ -46,7 +46,7 @@
 
                     {% if cdp and cdp.get('tools') %}
                     <div class="mc-cdp-section">
-                        <div class="mc-cdp-section-title">Tools</div>
+                        <div class="mc-cdp-section-title">{{ _("tools") }}</div>
                         <div class="mc-cdp-tags">
                             {% for t in cdp['tools'][:20] %}
                             {% if t.startswith('mcp:') %}
@@ -68,7 +68,7 @@
                         </button>
                     </div>
                     <div style="text-align:right;margin-top:0.3rem">
-                        <button id="mc-reset-btn" onclick="resetMission()" style="background:none;border:none;color:var(--text-secondary);font-size:0.6rem;cursor:pointer;opacity:.6;transition:opacity .15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">Reinitialiser</button>
+                        <button id="mc-reset-btn" onclick="resetMission()" style="background:none;border:none;color:var(--text-secondary);font-size:0.6rem;cursor:pointer;opacity:.6;transition:opacity .15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">{{ _("reinitialiser") }}</button>
                         <button id="mc-confluence-btn" onclick="syncConfluence()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-secondary);font-size:0.65rem;cursor:pointer;padding:2px 8px;margin-left:8px;opacity:.8;transition:opacity .15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.8'">
                             <svg class="icon icon-xs" style="width:12px;height:12px;vertical-align:middle;margin-right:3px"><use href="#icon-upload-cloud"/></svg>Sync Confluence
                         </button>
@@ -164,16 +164,16 @@
                 <svg class="icon icon-xs"><use href="#icon-server"/></svg> SI Blueprint
             </div>
             {% if si_blueprint.cloud %}
-            <div class="mc-si-item"><span class="mc-si-label">Cloud</span><span class="mc-si-value">{{ si_blueprint.cloud.provider | default('?') }} / {{ si_blueprint.cloud.region | default('') }}</span></div>
+            <div class="mc-si-item"><span class="mc-si-label">{{ _("cloud") }}</span><span class="mc-si-value">{{ si_blueprint.cloud.provider | default('?') }} / {{ si_blueprint.cloud.region | default('') }}</span></div>
             {% endif %}
             {% if si_blueprint.compute %}
-            <div class="mc-si-item"><span class="mc-si-label">Compute</span><span class="mc-si-value">{{ si_blueprint.compute.type | default('?') }} ({{ si_blueprint.compute.size | default('') }})</span></div>
+            <div class="mc-si-item"><span class="mc-si-label">{{ _("compute") }}</span><span class="mc-si-value">{{ si_blueprint.compute.type | default('?') }} ({{ si_blueprint.compute.size | default('') }})</span></div>
             {% endif %}
             {% if si_blueprint.cicd %}
-            <div class="mc-si-item"><span class="mc-si-label">CI/CD</span><span class="mc-si-value">{{ si_blueprint.cicd.provider | default('?') }}</span></div>
+            <div class="mc-si-item"><span class="mc-si-label">{{ _("ci_cd") }}</span><span class="mc-si-value">{{ si_blueprint.cicd.provider | default('?') }}</span></div>
             {% endif %}
             {% if si_blueprint.databases %}
-            <div class="mc-si-item"><span class="mc-si-label">DBs</span><span class="mc-si-value">{{ si_blueprint.databases | map(attribute='type') | join(', ') }}</span></div>
+            <div class="mc-si-item"><span class="mc-si-label">{{ _("dbs") }}</span><span class="mc-si-value">{{ si_blueprint.databases | map(attribute='type') | join(', ') }}</span></div>
             {% endif %}
             {% if si_blueprint.existing_services %}
             <div style="margin-top:0.2rem">
@@ -271,13 +271,13 @@
         </div>
         <div class="mc-chat-msgs" id="mcChatMsgs">
             <div class="mc-chat-msg system">
-                <div class="mc-chat-bubble" id="mcChatWelcome">Discutez avec le CDP. Il peut chercher dans le code, les conversations des agents, le git, la memoire, les PRs et les features.</div>
+                <div class="mc-chat-bubble" id="mcChatWelcome">{{ _("discutez_avec_le_cdp_il_peut") }}</div>
             </div>
         </div>
         <div class="mc-chat-input-row">
             <textarea class="mc-chat-input" id="mcChatInput" placeholder="Posez une question..." rows="1"
                       onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCdpMessage()}"></textarea>
-            <button class="mc-chat-send" id="mcChatSend" onclick="sendCdpMessage()">Envoyer</button>
+            <button class="mc-chat-send" id="mcChatSend" onclick="sendCdpMessage()">{{ _("envoyer") }}</button>
         </div>
     </div>
 </div>

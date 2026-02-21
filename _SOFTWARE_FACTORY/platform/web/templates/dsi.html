@@ -129,27 +129,27 @@
 <div class="dsi-kpis">
     <div class="dsi-kpi">
         <div class="dsi-kpi-icon" style="background:rgba(124,58,237,.15)"><svg style="color:var(--purple)"><use href="#icon-rocket"/></svg></div>
-        <div><div class="dsi-kpi-value">{{ total_missions }}</div><div class="dsi-kpi-label">Epics</div></div>
+        <div><div class="dsi-kpi-value">{{ total_missions }}</div><div class="dsi-kpi-label">{{ _("epics") }}</div></div>
     </div>
     <div class="dsi-kpi">
         <div class="dsi-kpi-icon" style="background:rgba(52,211,153,.15)"><svg style="color:var(--green)"><use href="#icon-activity"/></svg></div>
-        <div><div class="dsi-kpi-value">{{ active_missions }}</div><div class="dsi-kpi-label">En cours</div></div>
+        <div><div class="dsi-kpi-value">{{ active_missions }}</div><div class="dsi-kpi-label">{{ _("in_progress") }}</div></div>
     </div>
     <div class="dsi-kpi">
         <div class="dsi-kpi-icon" style="background:rgba(59,130,246,.15)"><svg style="color:var(--blue)"><use href="#icon-check"/></svg></div>
-        <div><div class="dsi-kpi-value">{{ total_done }}/{{ total_tasks }}</div><div class="dsi-kpi-label">Phases</div></div>
+        <div><div class="dsi-kpi-value">{{ total_done }}/{{ total_tasks }}</div><div class="dsi-kpi-label">{{ _("phases") }}</div></div>
     </div>
     <div class="dsi-kpi">
         <div class="dsi-kpi-icon" style="background:rgba(245,158,11,.15)"><svg style="color:var(--yellow)"><use href="#icon-users"/></svg></div>
-        <div><div class="dsi-kpi-value">{{ total_agents }}</div><div class="dsi-kpi-label">Agents</div></div>
+        <div><div class="dsi-kpi-value">{{ total_agents }}</div><div class="dsi-kpi-label">{{ _("agents") }}</div></div>
     </div>
     <div class="dsi-kpi">
         <div class="dsi-kpi-icon" style="background:rgba(248,113,113,.15)"><svg style="color:var(--red)"><use href="#icon-alert-triangle"/></svg></div>
-        <div><div class="dsi-kpi-value">{{ blocked_missions }}</div><div class="dsi-kpi-label">Bloquées</div></div>
+        <div><div class="dsi-kpi-value">{{ blocked_missions }}</div><div class="dsi-kpi-label">{{ _("blocked") }}</div></div>
     </div>
     <div class="dsi-kpi">
         <div class="dsi-kpi-icon" style="background:rgba(6,182,212,.15)"><svg style="color:#06b6d4"><use href="#icon-layers"/></svg></div>
-        <div><div class="dsi-kpi-value">{{ total_projects }}</div><div class="dsi-kpi-label">Projets</div></div>
+        <div><div class="dsi-kpi-value">{{ total_projects }}</div><div class="dsi-kpi-label">{{ _("projets") }}</div></div>
     </div>
 </div>
 
@@ -162,22 +162,22 @@
         </div>
         <div class="dsi-panel-body" style="max-height:200px">
             <div class="dsi-chart-row">
-                <div class="dsi-chart-label">Deploy</div>
+                <div class="dsi-chart-label">{{ _("deploy") }}</div>
                 <div class="dsi-chart-bar"><div class="dsi-chart-fill" style="width:{{ [dora.deployment_frequency.per_day * 100, 100]|min }}%;background:var(--green)"></div></div>
                 <div class="dsi-chart-value">{{ dora.deployment_frequency.per_day }}/j</div>
             </div>
             <div class="dsi-chart-row">
-                <div class="dsi-chart-label">Lead</div>
+                <div class="dsi-chart-label">{{ _("lead") }}</div>
                 <div class="dsi-chart-bar"><div class="dsi-chart-fill" style="width:{{ [100 - dora.lead_time.median_hours, 0]|max }}%;background:var(--blue)"></div></div>
                 <div class="dsi-chart-value">{{ dora.lead_time.median_hours }}h</div>
             </div>
             <div class="dsi-chart-row">
-                <div class="dsi-chart-label">Fail%</div>
+                <div class="dsi-chart-label">{{ _("fail") }}</div>
                 <div class="dsi-chart-bar"><div class="dsi-chart-fill" style="width:{{ dora.change_failure_rate.rate_pct }}%;background:var(--red)"></div></div>
                 <div class="dsi-chart-value">{{ dora.change_failure_rate.rate_pct }}%</div>
             </div>
             <div class="dsi-chart-row">
-                <div class="dsi-chart-label">MTTR</div>
+                <div class="dsi-chart-label">{{ _("mttr") }}</div>
                 <div class="dsi-chart-bar"><div class="dsi-chart-fill" style="width:{{ [100 - dora.mttr.median_hours, 0]|max }}%;background:var(--yellow)"></div></div>
                 <div class="dsi-chart-value">{{ dora.mttr.median_hours }}h</div>
             </div>
@@ -186,25 +186,25 @@
     <div class="dsi-panel">
         <div class="dsi-panel-header">
             <div class="dsi-panel-title"><svg><use href="#icon-users"/></svg> Organisation SAFe</div>
-            <a href="/org" class="btn btn-ghost" style="font-size:0.65rem;padding:0.15rem 0.4rem">Détails →</a>
+            <a href="/org" class="btn btn-ghost" style="font-size:0.65rem;padding:0.15rem 0.4rem">{{ _("details") }}</a>
         </div>
         <div class="dsi-panel-body" style="max-height:200px">
             <div style="display:flex;gap:1.5rem;justify-content:center;padding:0.5rem 0">
                 <div style="text-align:center">
                     <div style="font-size:1.5rem;font-weight:800;color:var(--purple)">{{ org_portfolios }}</div>
-                    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Portfolios</div>
+                    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">{{ _("portfolios") }}</div>
                 </div>
                 <div style="text-align:center">
                     <div style="font-size:1.5rem;font-weight:800;color:var(--blue)">{{ org_arts }}</div>
-                    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">ARTs</div>
+                    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">{{ _("arts") }}</div>
                 </div>
                 <div style="text-align:center">
                     <div style="font-size:1.5rem;font-weight:800;color:var(--green)">{{ org_teams }}</div>
-                    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Teams</div>
+                    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">{{ _("teams") }}</div>
                 </div>
                 <div style="text-align:center">
                     <div style="font-size:1.5rem;font-weight:800;color:var(--yellow)">{{ total_agents }}</div>
-                    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Agents</div>
+                    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">{{ _("agents") }}</div>
                 </div>
             </div>
         </div>
@@ -213,7 +213,7 @@
     <div class="dsi-panel" id="incidents-panel" hx-get="/api/incidents/stats" hx-trigger="load, every 60s" hx-swap="innerHTML" hx-target="#incidents-content">
         <div class="dsi-panel-header">
             <div class="dsi-panel-title"><svg><use href="#icon-alert-triangle"/></svg> Incidents</div>
-            <a href="/api/incidents" class="btn btn-ghost" style="font-size:0.65rem;padding:0.15rem 0.4rem">Tout →</a>
+            <a href="/api/incidents" class="btn btn-ghost" style="font-size:0.65rem;padding:0.15rem 0.4rem">{{ _("tout") }}</a>
         </div>
         <div class="dsi-panel-body" style="max-height:200px" id="incidents-content">
             <div style="text-align:center;color:var(--text-muted);padding:1rem;font-size:0.75rem">{{ _('loading_ellipsis') }}</div>
@@ -262,7 +262,7 @@ document.addEventListener('htmx:afterRequest', function(evt) {
         <div class="dsi-panel-header">
             <div class="dsi-panel-title"><svg><use href="#icon-target"/></svg> Comité Stratégique (IA)</div>
             <select style="font-size:0.65rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:4px;color:var(--text-secondary);padding:0.15rem 0.3rem">
-                <option>Décision</option><option>Planification</option><option>Revue</option>
+                <option>{{ _("decision") }}</option><option>{{ _("planification") }}</option><option>{{ _("revue") }}</option>
             </select>
         </div>
         <div class="dsi-panel-body">
@@ -270,7 +270,7 @@ document.addEventListener('htmx:afterRequest', function(evt) {
             <div class="dsi-decision">
                 <div class="dsi-decision-title">
                     {{ d.content[:80] }}{% if d.content|length > 80 %}...{% endif %}
-                    <span class="dsi-decision-badge approved">Approved</span>
+                    <span class="dsi-decision-badge approved">{{ _("approved") }}</span>
                 </div>
                 <div class="dsi-decision-time">{{ d.agent_name }} · {{ d.time }}</div>
             </div>
@@ -307,12 +307,12 @@ document.addEventListener('htmx:afterRequest', function(evt) {
                     {% else %}
                     <div class="dsi-map-score-value">0%</div>
                     {% endif %}
-                    <div class="dsi-map-score-label">Progression Globale</div>
+                    <div class="dsi-map-score-label">{{ _("progression_globale") }}</div>
                 </div>
                 <div class="dsi-map-legend">
-                    <span class="network">Network</span>
-                    <span class="hierarchical">Hierarchical</span>
-                    <span class="sequential">Sequential</span>
+                    <span class="network">{{ _("network") }}</span>
+                    <span class="hierarchical">{{ _("hierarchical") }}</span>
+                    <span class="sequential">{{ _("sequential") }}</span>
                 </div>
                 <div class="dsi-map-nodes">
                     {% for sp in system_patterns %}
@@ -337,7 +337,7 @@ document.addEventListener('htmx:afterRequest', function(evt) {
                     </div>
                     {% endfor %}
                     {% if not resources %}
-                    <div style="text-align:center;color:var(--text-muted);padding:1rem;font-size:0.75rem">Pas de données</div>
+                    <div style="text-align:center;color:var(--text-muted);padding:1rem;font-size:0.75rem">{{ _("no_data") }}</div>
                     {% endif %}
                 </div>
             </div>
@@ -352,7 +352,7 @@ document.addEventListener('htmx:afterRequest', function(evt) {
                     </div>
                     {% endfor %}
                     {% if not resources %}
-                    <div style="text-align:center;color:var(--text-muted);padding:1rem;font-size:0.75rem">Pas de données</div>
+                    <div style="text-align:center;color:var(--text-muted);padding:1rem;font-size:0.75rem">{{ _("no_data") }}</div>
                     {% endif %}
                 </div>
             </div>

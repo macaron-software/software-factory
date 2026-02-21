@@ -29,7 +29,7 @@
                 </div>
             </div>
             {% else %}
-            <div class="mc-sec-empty">Audit RGPD en attente d'execution</div>
+            <div class="mc-sec-empty">{{ _("audit_rgpd_en_attente_d_execution") }}</div>
             {% endif %}
         </div>
 
@@ -62,7 +62,7 @@
                 </div>
             </div>
             {% else %}
-            <div class="mc-sec-empty">Audit Green IT en attente</div>
+            <div class="mc-sec-empty">{{ _("audit_green_it_en_attente") }}</div>
             {% endif %}
         </div>
 
@@ -95,7 +95,7 @@
                 </div>
             </div>
             {% else %}
-            <div class="mc-sec-empty">Audit accessibilite en attente</div>
+            <div class="mc-sec-empty">{{ _("audit_accessibilite_en_attente") }}</div>
             {% endif %}
         </div>
 
@@ -128,7 +128,7 @@
                 </div>
             </div>
             {% else %}
-            <div class="mc-sec-empty">Audit ethique IA en attente</div>
+            <div class="mc-sec-empty">{{ _("audit_ethique_ia_en_attente") }}</div>
             {% endif %}
         </div>
 
@@ -162,7 +162,7 @@
             </div>
             {% endif %}
             {% if wiki_memories %}
-            <div class="mc-wiki-memories"><h4>Memoire RSE</h4>
+            <div class="mc-wiki-memories"><h4>{{ _("memoire_rse") }}</h4>
                 {% for m in wiki_memories %}
                 <div class="mc-wiki-memory"><span class="mc-wiki-memory-cat">{{ m.category }}</span><span class="mc-wiki-memory-text">{{ m.value }}</span></div>
                 {% endfor %}

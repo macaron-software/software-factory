@@ -19,11 +19,11 @@
   {# ── Top bar ── #}
   <header class="ge-topbar">
     <div class="ge-topbar-left">
-      <a href="/workflows" class="ge-back" title="Back">←</a>
+      <a href="/workflows" class="ge-back" title="{{ _("back") }}">←</a>
       <input type="text" id="wfName" class="ge-title-input"
              value="{{ workflow.name if workflow else 'New Workflow' }}" placeholder="Workflow name">
       <input type="text" id="wfDesc" class="ge-desc-input"
-             value="{{ workflow.description if workflow else '' }}" placeholder="Description…">
+             value="{{ workflow.description if workflow else '' }}" placeholder="{{ _("ph_description") }}">
       <select id="wfIcon" class="ge-icon-select">
         {% for ico in ['workflow','rocket','eye','briefcase','shield','beaker','cog'] %}
         <option value="{{ ico }}" {% if workflow and workflow.icon == ico %}selected{% endif %}>{{ ico }}</option>
@@ -43,7 +43,7 @@
 
     {# ── Left panel ── #}
     <aside class="ge-left">
-      <div class="ge-panel-title">Pattern</div>
+      <div class="ge-panel-title">{{ _("pattern") }}</div>
       <select id="selPattern" class="ge-select">
         {% for pat in (patterns or []) %}
         <option value="{{ pat.id }}">{{ pat.name }}</option>
@@ -59,14 +59,14 @@
       </select>
       <button class="ge-btn ge-btn-accent ge-btn-block" id="btnAddAgent">{{ _('add') }}</button>
 
-      <div class="ge-panel-title" style="margin-top:1.2rem">Options globales</div>
+      <div class="ge-panel-title" style="margin-top:1.2rem">{{ _("options_globales") }}</div>
       <label class="ge-toggle-row">
-        <span>Tools partagés</span>
+        <span>{{ _("tools_partages") }}</span>
         <input type="checkbox" id="chkGlobalTools">
         <span class="ge-toggle-track"><span class="ge-toggle-thumb"></span></span>
       </label>
       <label class="ge-toggle-row">
-        <span>Memory partagée</span>
+        <span>{{ _("memory_partagee") }}</span>
         <input type="checkbox" id="chkGlobalMem">
         <span class="ge-toggle-track"><span class="ge-toggle-thumb"></span></span>
       </label>
@@ -91,21 +91,21 @@
         <g id="edgesLayer"></g>
         <g id="nodesLayer"></g>
       </svg>
-      <div class="ge-canvas-hint" id="canvasHint">Sélectionnez un pattern et ajoutez des agents</div>
+      <div class="ge-canvas-hint" id="canvasHint">{{ _("selectionnez_un_pattern_et_ajoutez_des") }}</div>
     </div>
 
     {# ── Right panel ── #}
     <aside class="ge-right" id="rightPanel">
       <div class="ge-right-empty" id="rightEmpty">
-        <p>Cliquez sur un agent pour voir ses propriétés</p>
+        <p>{{ _("cliquez_sur_un_agent_pour_voir") }}</p>
       </div>
       <div class="ge-right-content" id="rightContent" style="display:none">
-        <div class="ge-panel-title">Propriétés Agent</div>
+        <div class="ge-panel-title">{{ _("proprietes_agent") }}</div>
 
-        <label class="ge-field-label">Nom</label>
+        <label class="ge-field-label">{{ _("nom") }}</label>
         <input type="text" class="ge-input" id="propName">
 
-        <label class="ge-field-label">Rôle / Description</label>
+        <label class="ge-field-label">{{ _("role_description") }}</label>
         <textarea class="ge-input ge-textarea" id="propRole" rows="3"></textarea>
 
         <label class="ge-field-label">Tools
@@ -113,11 +113,11 @@
         </label>
         <div id="propTools" class="ge-tools-list"></div>
 
-        <label class="ge-field-label">Skills</label>
+        <label class="ge-field-label">{{ _("skills") }}</label>
         <div id="propSkills" class="ge-skills-list"></div>
 
         <label class="ge-toggle-row" style="margin-top:0.8rem">
-          <span>Memory (Long Term Vector DB)</span>
+          <span>{{ _("memory_long_term_vector_db") }}</span>
           <input type="checkbox" id="propMemory">
           <span class="ge-toggle-track"><span class="ge-toggle-thumb"></span></span>
         </label>

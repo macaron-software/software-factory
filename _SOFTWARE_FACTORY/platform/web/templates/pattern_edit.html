@@ -5,7 +5,7 @@
     <button type="submit" form="pattern-form" class="btn btn-primary">
         <svg class="icon icon-sm"><use href="#icon-save"/></svg> Save
     </button>
-    <a href="/patterns" class="btn btn-ghost">Cancel</a>
+    <a href="/patterns" class="btn btn-ghost">{{ _("cancel") }}</a>
 </div>
 {% endblock %}
 
@@ -62,7 +62,7 @@
         <!-- Properties panel -->
         <aside class="pe-props" id="props-panel">
             <div class="pe-props-header">
-                <strong>Properties</strong>
+                <strong>{{ _("properties") }}</strong>
                 <button type="button" class="btn-icon" id="props-close" onclick="deselectAll()">&times;</button>
             </div>
             <div id="props-content" class="pe-props-body">

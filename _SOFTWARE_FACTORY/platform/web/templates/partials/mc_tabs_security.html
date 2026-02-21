@@ -18,10 +18,10 @@
             {% endif %}
 
             <div class="mc-sec-kpis">
-                <div class="mc-sec-kpi critical"><div class="val" id="sec-critical">--</div><div class="lbl">Critiques</div></div>
-                <div class="mc-sec-kpi high"><div class="val" id="sec-high">--</div><div class="lbl">Hautes</div></div>
-                <div class="mc-sec-kpi fixed"><div class="val" id="sec-fixed">--</div><div class="lbl">Corrigees</div></div>
-                <div class="mc-sec-kpi pending"><div class="val" id="sec-pending">--</div><div class="lbl">En attente</div></div>
+                <div class="mc-sec-kpi critical"><div class="val" id="sec-critical">--</div><div class="lbl">{{ _("critiques") }}</div></div>
+                <div class="mc-sec-kpi high"><div class="val" id="sec-high">--</div><div class="lbl">{{ _("hautes") }}</div></div>
+                <div class="mc-sec-kpi fixed"><div class="val" id="sec-fixed">--</div><div class="lbl">{{ _("corrigees") }}</div></div>
+                <div class="mc-sec-kpi pending"><div class="val" id="sec-pending">--</div><div class="lbl">{{ _("en_attente") }}</div></div>
             </div>
 
             {% set vuln_phases = ['recon', 'threat-model', 'exploitation', 'vuln-report'] %}
@@ -43,7 +43,7 @@
             {% endfor %}
 
             {% if not phase_messages.get('recon') and not phase_messages.get('exploitation') and not phase_messages.get('vuln-report') %}
-            <div class="mc-sec-empty"><svg class="icon" style="width:28px;height:28px;opacity:.3;display:block;margin:0 auto 0.3rem"><use href="#icon-alert-triangle"/></svg>En attente des resultats de reconnaissance et exploitation</div>
+            <div class="mc-sec-empty"><svg class="icon" style="width:28px;height:28px;opacity:.3;display:block;margin:0 auto 0.3rem"><use href="#icon-alert-triangle"/></svg>{{ _("en_attente_des_resultats_de_reconnaissance") }}</div>
             {% endif %}
         </div>
 
@@ -94,7 +94,7 @@
             {% endif %}
 
             {% if not remed_msgs and not pull_requests %}
-            <div class="mc-sec-empty"><svg class="icon" style="width:28px;height:28px;opacity:.3;display:block;margin:0 auto 0.3rem"><use href="#icon-tool"/></svg>Phase de remediation non demarree</div>
+            <div class="mc-sec-empty"><svg class="icon" style="width:28px;height:28px;opacity:.3;display:block;margin:0 auto 0.3rem"><use href="#icon-tool"/></svg>{{ _("phase_de_remediation_non_demarree") }}</div>
             {% endif %}
         </div>
 
@@ -130,7 +130,7 @@
                 </div>
             </div>
             {% else %}
-            <div class="mc-sec-empty"><svg class="icon" style="width:28px;height:28px;opacity:.3;display:block;margin:0 auto 0.3rem"><use href="#icon-clipboard"/></svg>Revue de compliance en attente</div>
+            <div class="mc-sec-empty"><svg class="icon" style="width:28px;height:28px;opacity:.3;display:block;margin:0 auto 0.3rem"><use href="#icon-clipboard"/></svg>{{ _("revue_de_compliance_en_attente") }}</div>
             {% endif %}
         </div>
 
@@ -222,10 +222,10 @@
                 </details>
                 {% endfor %}
                 {% else %}
-                <div class="mc-wiki-empty"><svg class="icon" style="width:28px;height:28px;opacity:.3;display:block;margin:0 auto 0.3rem"><use href="#icon-book-open"/></svg>Rapport final en cours de redaction</div>
+                <div class="mc-wiki-empty"><svg class="icon" style="width:28px;height:28px;opacity:.3;display:block;margin:0 auto 0.3rem"><use href="#icon-book-open"/></svg>{{ _("rapport_final_en_cours_de_redaction") }}</div>
                 {% endif %}
                 {% if wiki_memories %}
-                <div class="mc-wiki-memories"><h4>Memoire securite</h4>
+                <div class="mc-wiki-memories"><h4>{{ _("memoire_securite") }}</h4>
                     {% for m in wiki_memories %}
                     <div class="mc-wiki-memory"><span class="mc-wiki-memory-cat">{{ m.category }}</span><span class="mc-wiki-memory-text">{{ m.value }}</span></div>
                     {% endfor %}

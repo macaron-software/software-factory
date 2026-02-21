@@ -40,25 +40,25 @@
     <div class="memory-stats">
         <div class="stat-card">
             <div class="stat-number">{{ stats.global_count }}</div>
-            <div class="stat-label">Global Memories</div>
+            <div class="stat-label">{{ _("global_memories") }}</div>
         </div>
         <div class="stat-card">
             <div class="stat-number">{{ stats.project_count }}</div>
-            <div class="stat-label">Project Memories</div>
+            <div class="stat-label">{{ _("project_memories") }}</div>
         </div>
         <div class="stat-card">
             <div class="stat-number">{{ stats.session_count }}</div>
-            <div class="stat-label">Session Archives</div>
+            <div class="stat-label">{{ _("session_archives") }}</div>
         </div>
         <div class="stat-card">
             <div class="stat-number" id="retroCount">—</div>
-            <div class="stat-label">Rétrospectives</div>
+            <div class="stat-label">{{ _("retrospectives") }}</div>
         </div>
     </div>
 
     <div class="panel" style="margin-top: 16px">
         <div class="panel-header">
-            <h3>Search Memory</h3>
+            <h3>{{ _("search_memory") }}</h3>
         </div>
         <div class="panel-body">
             <form hx-get="/api/memory/search" hx-target="#memory-results" class="search-form">

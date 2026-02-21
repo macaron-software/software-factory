@@ -58,6 +58,8 @@
 .kanban-col-count{background:var(--bg-tertiary);padding:0.1rem 0.4rem;border-radius:4px;font-size:0.65rem}
 .kanban-task{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:0.6rem;margin-bottom:0.5rem;transition:border-color .15s}
 .kanban-task:hover{border-color:var(--purple)}
+.kanban-task-ghost{opacity:0.4;background:var(--purple) !important;border-color:var(--purple) !important}
+.kanban-task-chosen{box-shadow:0 4px 12px rgba(124,58,237,0.3);transform:rotate(2deg)}
 .kanban-task-title{font-size:0.8rem;font-weight:600;color:var(--text-primary);margin-bottom:0.25rem}
 .kanban-task-meta{display:flex;align-items:center;gap:0.4rem;font-size:0.68rem;color:var(--text-secondary)}
 .kanban-task-type{padding:0.1rem 0.35rem;border-radius:3px;font-size:0.62rem;font-weight:600}
@@ -137,13 +139,14 @@
              hx-swap="innerHTML">
             {% set cols = [('pending', 'Backlog', 'clipboard'), ('in_progress', 'In Progress', 'zap'), ('review', 'Review', 'eye'), ('done', 'Done', 'check')] %}
             {% for col_status, col_name, col_icon in cols %}
-            <div class="kanban-col">
+            <div class="kanban-col" data-status="{{ col_status }}">
                 <div class="kanban-col-title">
                     <svg class="icon icon-xs"><use href="#icon-{{ col_icon }}"/></svg> {{ col_name }}
                     <span class="kanban-col-count">{{ tasks_by_status.get(col_status, [])|length }}</span>
                 </div>
+                <div class="kanban-col-tasks" data-status="{{ col_status }}">
                 {% for t in tasks_by_status.get(col_status, []) %}
-                <div class="kanban-task">
+                <div class="kanban-task" data-task-id="{{ t.id }}">
                     <div class="kanban-task-title">{{ t.title }}</div>
                     <div class="kanban-task-meta">
                         <span class="kanban-task-type {{ t.type }}">{{ t.type }}</span>
@@ -156,6 +159,7 @@
                 {% else %}
                 <div class="kanban-empty">—</div>
                 {% endfor %}
+                </div>
                 {% if col_status == 'pending' %}
                 <div class="inline-form" id="addTaskForm">
                     <input class="inline-form__input" id="newTaskTitle" placeholder="{{ _('new_task') }}" onkeydown="if(event.key==='Enter'){addTask()}">
@@ -174,30 +178,20 @@
     <aside class="mission-sidebar">
         <div class="ms-section">
             <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-chart"/></svg> Progression</h4>
-            <div class="ms-stat"><span class="ms-stat-label">Sprints</span><span class="ms-stat-value">{{ sprints|length }}</span></div>
-            <div class="ms-stat"><span class="ms-stat-label">Tasks total</span><span class="ms-stat-value">{{ stats.get('total', 0) }}</span></div>
-            <div class="ms-stat"><span class="ms-stat-label">Done</span><span class="ms-stat-value" style="color:var(--green)">{{ stats.get('done', 0) }}</span></div>
-            <div class="ms-stat"><span class="ms-stat-label">In Progress</span><span class="ms-stat-value" style="color:var(--yellow)">{{ stats.get('in_progress', 0) }}</span></div>
-            <div class="ms-stat"><span class="ms-stat-label">Failed</span><span class="ms-stat-value" style="color:var(--red)">{{ stats.get('failed', 0) }}</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">{{ _("sprints") }}</span><span class="ms-stat-value">{{ sprints|length }}</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">{{ _("tasks_total") }}</span><span class="ms-stat-value">{{ stats.get('total', 0) }}</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">{{ _("done") }}</span><span class="ms-stat-value" style="color:var(--green)">{{ stats.get('done', 0) }}</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">{{ _("in_progress") }}</span><span class="ms-stat-value" style="color:var(--yellow)">{{ stats.get('in_progress', 0) }}</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">{{ _("failed") }}</span><span class="ms-stat-value" style="color:var(--red)">{{ stats.get('failed', 0) }}</span></div>
         </div>
 
         {% if velocity_history %}
         <div class="ms-section">
-            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-trending-up"/></svg> Vélocité</h4>
-            <div class="ms-stat"><span class="ms-stat-label">Moyenne</span><span class="ms-stat-value">{{ avg_velocity }} SP</span></div>
-            <div class="ms-stat"><span class="ms-stat-label">Total livré</span><span class="ms-stat-value" style="color:var(--green)">{{ total_velocity }} SP</span></div>
-            <div class="ms-stat"><span class="ms-stat-label">Total planifié</span><span class="ms-stat-value">{{ total_planned }} SP</span></div>
-            <div class="vel-chart" style="display:flex;align-items:flex-end;gap:3px;height:60px;margin-top:0.5rem">
-                {% set max_vel = velocity_history|map(attribute='velocity')|max if velocity_history else 1 %}
-                {% for v in velocity_history %}
-                {% set h = (v.velocity / (max_vel if max_vel > 0 else 1) * 50)|int %}
-                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
-                    <span style="font-size:0.55rem;color:var(--text-muted)">{{ v.velocity }}</span>
-                    <div style="width:100%;height:{{ h if h > 2 else 2 }}px;background:{% if v.status == 'completed' %}var(--green){% elif v.status == 'failed' %}var(--red){% else %}var(--purple){% endif %};border-radius:2px;min-height:2px" title="Sprint {{ v.sprint }}: {{ v.velocity }}/{{ v.planned_sp }} SP"></div>
-                    <span style="font-size:0.55rem;color:var(--text-muted)">S{{ v.sprint }}</span>
-                </div>
-                {% endfor %}
-            </div>
+            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-trending-up"/></svg> {{ _("velocity") }}</h4>
+            <div class="ms-stat"><span class="ms-stat-label">{{ _("moyenne") }}</span><span class="ms-stat-value">{{ avg_velocity }} SP</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">{{ _("total_livre") }}</span><span class="ms-stat-value" style="color:var(--green)">{{ total_velocity }} SP</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">{{ _("total_planifie") }}</span><span class="ms-stat-value">{{ total_planned }} SP</span></div>
+            <canvas id="velocityChart" height="120" style="margin-top:0.5rem"></canvas>
             {% if total_planned > 0 %}
             <div style="margin-top:0.4rem;font-size:0.72rem;color:var(--text-secondary)">
                 Predictability: <strong style="color:{% if total_velocity >= total_planned %}var(--green){% else %}var(--yellow){% endif %}">{{ ((total_velocity / total_planned) * 100)|int }}%</strong>
@@ -205,6 +199,12 @@
             {% endif %}
         </div>
         {% endif %}
+
+        <!-- Burndown chart -->
+        <div class="ms-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-activity"/></svg> Burndown</h4>
+            <canvas id="burndownChart" height="120" style="margin-top:0.5rem"></canvas>
+        </div>
 
         {% if selected_sprint and selected_sprint.retro_notes %}
         <div class="ms-section">
@@ -250,6 +250,8 @@
     </aside>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 async function addTask() {
     const input = document.getElementById('newTaskTitle');
@@ -282,15 +284,93 @@ async function launchWorkflow() {
         if (data.session_id) {
             window.location.href = `/sessions/${data.session_id}/live`;
         } else {
-            alert(data.error || _('error_generic'));
+            alert(data.error || 'Erreur');
             btn.disabled = false;
-            btn.textContent = _('launch_workflow');
+            btn.textContent = 'Launch';
         }
     } catch(e) {
-        alert(_('error') + ': ' + e.message);
+        alert('Error: ' + e.message);
         btn.disabled = false;
-        btn.textContent = _('launch_workflow');
+        btn.textContent = 'Launch';
     }
+}
+
+// ── Drag-drop Kanban ──
+document.querySelectorAll('.kanban-col-tasks').forEach(col => {
+    new Sortable(col, {
+        group: 'kanban',
+        animation: 150,
+        ghostClass: 'kanban-task-ghost',
+        chosenClass: 'kanban-task-chosen',
+        onEnd: async function(evt) {
+            const taskId = evt.item.dataset.taskId;
+            const newStatus = evt.to.dataset.status;
+            if (!taskId || !newStatus) return;
+            try {
+                await fetch(`/api/tasks/${taskId}/status`, {
+                    method: 'PATCH',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({status: newStatus}),
+                });
+                // Update column counts
+                document.querySelectorAll('.kanban-col').forEach(c => {
+                    const tasks = c.querySelector('.kanban-col-tasks');
+                    const count = c.querySelector('.kanban-col-count');
+                    if (tasks && count) count.textContent = tasks.children.length;
+                });
+            } catch(e) { console.error('Drag update error:', e); }
+        }
+    });
+});
+
+// ── Velocity Chart ──
+const velCanvas = document.getElementById('velocityChart');
+if (velCanvas && typeof Chart !== 'undefined') {
+    const velData = {{ velocity_history | tojson if velocity_history else '[]' }};
+    const chartOpts = {responsive:true, plugins:{legend:{display:false}}, scales:{
+        x:{ticks:{color:'rgba(255,255,255,0.5)',font:{size:9}},grid:{display:false}},
+        y:{ticks:{color:'rgba(255,255,255,0.5)',font:{size:9}},grid:{color:'rgba(255,255,255,0.06)'}}
+    }};
+    new Chart(velCanvas, {
+        type: 'bar',
+        data: {
+            labels: velData.map(v => 'S' + v.sprint),
+            datasets: [
+                {label: 'Actual', data: velData.map(v => v.velocity), backgroundColor: 'rgba(124,58,237,0.7)', borderRadius: 3},
+                {label: 'Planned', data: velData.map(v => v.planned_sp), backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3}
+            ]
+        },
+        options: chartOpts,
+    });
+}
+
+// ── Burndown Chart ──
+const bdCanvas = document.getElementById('burndownChart');
+if (bdCanvas && typeof Chart !== 'undefined') {
+    fetch('/api/metrics/burndown/{{ mission.id }}').then(r => r.json()).then(data => {
+        if (!data.burndown || data.burndown.length === 0) {
+            bdCanvas.parentElement.querySelector('h4').insertAdjacentHTML('afterend',
+                '<p style="font-size:0.75rem;color:var(--text-muted);text-align:center">No data yet</p>');
+            bdCanvas.style.display = 'none';
+            return;
+        }
+        const bd = data.burndown;
+        const ideal = bd.map((_, i) => data.total - (data.total / (bd.length - 1)) * i);
+        new Chart(bdCanvas, {
+            type: 'line',
+            data: {
+                labels: bd.map(p => p.date.slice(5)),
+                datasets: [
+                    {label: 'Remaining', data: bd.map(p => p.remaining), borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.1)', fill: true, tension: 0.3, pointRadius: 2},
+                    {label: 'Ideal', data: ideal, borderColor: 'rgba(255,255,255,0.2)', borderDash: [5,5], pointRadius: 0, fill: false}
+                ]
+            },
+            options: {responsive:true, plugins:{legend:{display:false}}, scales:{
+                x:{ticks:{color:'rgba(255,255,255,0.5)',font:{size:8}},grid:{display:false}},
+                y:{ticks:{color:'rgba(255,255,255,0.5)',font:{size:9}},grid:{color:'rgba(255,255,255,0.06)'}}
+            }}
+        });
+    }).catch(() => { bdCanvas.style.display = 'none'; });
 }
 </script>
 {% endblock %}

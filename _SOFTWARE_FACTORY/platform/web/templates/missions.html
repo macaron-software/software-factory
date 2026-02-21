@@ -37,7 +37,7 @@
 
 <!-- Filters -->
 <div class="mission-filters">
-    <a href="/missions" class="mission-filter {% if not filter_status and not filter_project %}active{% endif %}">Toutes</a>
+    <a href="/missions" class="mission-filter {% if not filter_status and not filter_project %}active{% endif %}">{{ _("toutes") }}</a>
     <a href="/missions?status=active" class="mission-filter {% if filter_status == 'active' %}active{% endif %}"><svg class="icon icon-xs"><use href="#icon-play"/></svg> En cours</a>
     <a href="/missions?status=planning" class="mission-filter {% if filter_status == 'planning' %}active{% endif %}"><svg class="icon icon-xs"><use href="#icon-clipboard"/></svg> Planning</a>
     <a href="/missions?status=completed" class="mission-filter {% if filter_status == 'completed' %}active{% endif %}"><svg class="icon icon-xs"><use href="#icon-check"/></svg> Terminées</a>
@@ -88,7 +88,7 @@
     {% else %}
     <div class="empty-state">
         <p>{{ _('no_mission') }}</p>
-        <p style="color:var(--text-secondary);font-size:0.82rem">Les agents stratégiques créent des missions depuis la VISION du projet.</p>
+        <p style="color:var(--text-secondary);font-size:0.82rem">{{ _("les_agents_strategiques_creent_des_missions") }}</p>
         <a href="/missions?action=new" class="btn btn-primary" style="margin-top:0.5rem">{{ _('create_manually') }}</a>
     </div>
     {% endfor %}
@@ -99,7 +99,7 @@
     <form class="new-mission-form" id="newMissionForm">
         <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> New Epic</h3>
         <div class="nmf-field">
-            <label>Projet</label>
+            <label>{{ _("project") }}</label>
             <select name="project_id" required>
                 {% for pid in project_ids %}
                 <option value="{{ pid }}">{{ pid }}</option>
@@ -107,7 +107,7 @@
             </select>
         </div>
         <div class="nmf-field">
-            <label>Ceremony Template (workflow)</label>
+            <label>{{ _("ceremony_template_workflow") }}</label>
             <select name="workflow_id" required>
                 {% for wf in workflows %}
                 <option value="{{ wf.id }}">{{ wf.name }}</option>
@@ -115,11 +115,11 @@
             </select>
         </div>
         <div class="nmf-field">
-            <label>Brief (objectif, contexte, critères d'acceptance)</label>
+            <label>{{ _("brief_objective_context_acceptance_criteria") }}</label>
             <textarea name="brief" placeholder="Décrivez le besoin métier, le contexte projet, et les objectifs à atteindre..." required style="min-height:80px"></textarea>
         </div>
         <div class="nmf-actions">
-            <a href="/missions" class="btn btn-ghost">Annuler</a>
+            <a href="/missions" class="btn btn-ghost">{{ _("cancel") }}</a>
             <button type="submit" class="btn btn-primary">
                 <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch') }}
             </button>

@@ -28,7 +28,7 @@
     <div class="mc-main">
         {% if mission.brief %}
         <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.85rem;margin-bottom:0.5rem;display:flex;align-items:baseline;gap:0.5rem">
-            <span style="font-size:0.7rem;color:var(--purple);font-weight:700;white-space:nowrap">DEMANDE</span>
+            <span style="font-size:0.7rem;color:var(--purple);font-weight:700;white-space:nowrap">{{ _("demande") }}</span>
             <span style="font-size:0.82rem;color:var(--text-primary);line-height:1.4">{{ mission.brief }}</span>
         </div>
         {% endif %}
@@ -37,7 +37,7 @@
         {% if result_screenshots or result_build_cmd or result_deploy_url or result_launch_cmd %}
         <div class="mc-result-banner">
             <div class="mc-result-header">
-                <span style="font-size:0.7rem;color:var(--green);font-weight:700">RÉSULTAT</span>
+                <span style="font-size:0.7rem;color:var(--green);font-weight:700">{{ _("resultat") }}</span>
                 {% if result_project_type %}
                 <span style="font-size:0.65rem;background:var(--bg-tertiary);color:var(--purple-light);padding:2px 8px;border-radius:10px;border:1px solid var(--border)">{{ {'macos-native':'🖥️ macOS','ios-native':'📱 iOS','android-native':'🤖 Android','web-docker':'🐳 Docker','web-node':'⬢ Node.js','web-static':'🌐 Static'}.get(result_project_type, result_project_type) }}</span>
                 {% endif %}
@@ -131,17 +131,17 @@
                                 {% include "partials/msg_unified.html" %}
                                 {% endfor %}
                             {% else %}
-                                <div class="mc-discuss-empty">En attente d'exécution…</div>
+                                <div class="mc-discuss-empty">{{ _("en_attente_d_execution") }}</div>
                             {% endif %}
                         </div>
                     </div>
                     {% if phase.status.value == 'waiting_validation' %}
                     <div class="mc-checkpoint">
-                        <h4>Checkpoint — Validation requise</h4>
+                        <h4>{{ _("checkpoint_validation_requise") }}</h4>
                         <div class="mc-checkpoint-actions">
-                            <button class="mc-btn-go" onclick="validateMission('GO')">GO</button>
-                            <button class="mc-btn-nogo" onclick="validateMission('NOGO')">NOGO</button>
-                            <button class="mc-btn-pivot" onclick="validateMission('PIVOT')">PIVOT</button>
+                            <button class="mc-btn-go" onclick="validateMission('GO')">{{ _("go") }}</button>
+                            <button class="mc-btn-nogo" onclick="validateMission('NOGO')">{{ _("nogo") }}</button>
+                            <button class="mc-btn-pivot" onclick="validateMission('PIVOT')">{{ _("pivot") }}</button>
                         </div>
                     </div>
                     {% endif %}

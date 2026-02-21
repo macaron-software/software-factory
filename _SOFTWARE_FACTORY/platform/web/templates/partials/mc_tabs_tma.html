@@ -23,17 +23,17 @@
                 <textarea id="tmaTicketDesc" placeholder="Description, steps de reproduction..."></textarea>
                 <div class="mc-tma-form-row">
                     <select id="tmaTicketSev">
-                        <option value="P0">P0 — Bloquant</option>
-                        <option value="P1">P1 — Critique</option>
-                        <option value="P2">P2 — Majeur</option>
-                        <option value="P3" selected>P3 — Mineur</option>
-                        <option value="P4">P4 — Cosmetic</option>
+                        <option value="P0">{{ _("p0_bloquant") }}</option>
+                        <option value="P1">{{ _("p1_critique") }}</option>
+                        <option value="P2">{{ _("p2_majeur") }}</option>
+                        <option value="P3" selected>{{ _("p3_mineur") }}</option>
+                        <option value="P4">{{ _("p4_cosmetic") }}</option>
                     </select>
                     <select id="tmaTicketCat">
-                        <option value="incident">Incident</option>
-                        <option value="demande">Demande utilisateur</option>
-                        <option value="amelioration">Amelioration</option>
-                        <option value="dette">Dette technique</option>
+                        <option value="incident">{{ _("incident") }}</option>
+                        <option value="demande">{{ _("demande_utilisateur") }}</option>
+                        <option value="amelioration">{{ _("amelioration") }}</option>
+                        <option value="dette">{{ _("dette_technique_2") }}</option>
                     </select>
                 </div>
                 <button type="submit" onclick="submitTicket()"><svg class="icon" style="width:12px;height:12px"><use href="#icon-send"/></svg> Creer ticket</button>
@@ -65,7 +65,7 @@
                 <div class="mc-tma-ticket" data-sev="{{ t.severity }}" style="opacity:.6">
                     <span class="mc-tma-sev" data-sev="{{ t.severity }}">{{ t.severity }}</span>
                     <span class="mc-tma-ticket-title" style="text-decoration:line-through">{{ t.title }}</span>
-                    <span class="mc-tma-ticket-status" data-st="closed">ferme</span>
+                    <span class="mc-tma-ticket-status" data-st="closed">{{ _("ferme") }}</span>
                 </div>
                 {% endfor %}
             </div>
@@ -101,7 +101,7 @@
                     </div>
                     {% endfor %}
                     {% else %}
-                    <div class="mc-tma-empty">Triage en attente</div>
+                    <div class="mc-tma-empty">{{ _("triage_en_attente") }}</div>
                     {% endif %}
                 </div>
             </div>
@@ -118,7 +118,7 @@
                     </div>
                     {% endfor %}
                     {% else %}
-                    <div class="mc-tma-empty">Diagnostic en cours</div>
+                    <div class="mc-tma-empty">{{ _("diagnostic_en_cours") }}</div>
                     {% endif %}
                 </div>
             </div>
@@ -170,7 +170,7 @@
                     </div>
                     {% endfor %}
                     {% else %}
-                    <div class="mc-tma-empty">Validation en attente du correctif</div>
+                    <div class="mc-tma-empty">{{ _("validation_en_attente_du_correctif") }}</div>
                     {% endif %}
                 </div>
             </div>
@@ -200,19 +200,19 @@
             <div class="mc-tma-sla-grid">
                 <div class="mc-tma-sla-card">
                     <div class="mc-tma-sla-val" style="color:#ef4444">{{ open_count }}</div>
-                    <div class="mc-tma-sla-label">Tickets ouverts</div>
+                    <div class="mc-tma-sla-label">{{ _("tickets_ouverts") }}</div>
                 </div>
                 <div class="mc-tma-sla-card">
                     <div class="mc-tma-sla-val" style="color:#3b82f6">{{ progress_count }}</div>
-                    <div class="mc-tma-sla-label">En cours</div>
+                    <div class="mc-tma-sla-label">{{ _("in_progress") }}</div>
                 </div>
                 <div class="mc-tma-sla-card">
                     <div class="mc-tma-sla-val" style="color:#10b981">{{ resolved_count }}</div>
-                    <div class="mc-tma-sla-label">Resolus</div>
+                    <div class="mc-tma-sla-label">{{ _("resolus") }}</div>
                 </div>
                 <div class="mc-tma-sla-card">
                     <div class="mc-tma-sla-val">{{ ((resolved_count / total_count * 100)|round|int if total_count > 0 else 0) }}%</div>
-                    <div class="mc-tma-sla-label">Taux resolution</div>
+                    <div class="mc-tma-sla-label">{{ _("taux_resolution") }}</div>
                 </div>
             </div>
 
@@ -305,7 +305,7 @@
             {% endif %}
 
             {% if wiki_memories %}
-            <div class="mc-wiki-memories"><h4>Memoire TMA</h4>
+            <div class="mc-wiki-memories"><h4>{{ _("memoire_tma") }}</h4>
                 {% for m in wiki_memories %}
                 <div class="mc-wiki-memory"><span class="mc-wiki-memory-cat">{{ m.category }}</span><span class="mc-wiki-memory-text">{{ m.value }}</span></div>
                 {% endfor %}

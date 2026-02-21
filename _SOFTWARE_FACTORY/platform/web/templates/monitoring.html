@@ -18,15 +18,15 @@
     <!-- Row 1: System vitals -->
     <div class="mon-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.8rem">
         <div class="mon-card">
-            <h3><svg class="icon"><use href="#icon-cpu"/></svg> CPU</h3>
+            <h3><svg class="icon"><use href="#icon-cpu"/></svg> {{ _("cpu") }}</h3>
             <div class="mon-big" id="monCpu">—</div>
-            <div class="mon-sub" id="monCpuSys">System: —</div>
+            <div class="mon-sub" id="monCpuSys">{{ _("system") }}</div>
             <div class="mon-bar"><div class="mon-bar-fill green" id="monCpuBar" style="width:0%"></div></div>
         </div>
         <div class="mon-card">
-            <h3><svg class="icon"><use href="#icon-layers"/></svg> Memory</h3>
+            <h3><svg class="icon"><use href="#icon-layers"/></svg> {{ _("memory") }}</h3>
             <div class="mon-big" id="monMem">—</div>
-            <div class="mon-sub" id="monMemSys">System: —</div>
+            <div class="mon-sub" id="monMemSys">{{ _("system") }}</div>
             <div class="mon-bar"><div class="mon-bar-fill green" id="monMemBar" style="width:0%"></div></div>
         </div>
         <div class="mon-card">
@@ -38,18 +38,18 @@
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-users"/></svg> Agents</h3>
             <div class="mon-row">
-                <div class="mon-col"><div class="label">Registered</div><div class="val" id="monAgentsRegistered">0</div></div>
-                <div class="mon-col"><div class="label">Active Now</div><div class="val" id="monAgentsActive">0</div></div>
-                <div class="mon-col"><div class="label">Participated</div><div class="val" id="monAgentsParticipated">0</div></div>
-                <div class="mon-col"><div class="label">Sessions</div><div class="val" id="monAgentsSessions">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("registered") }}</div><div class="val" id="monAgentsRegistered">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("active_now") }}</div><div class="val" id="monAgentsActive">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("participated") }}</div><div class="val" id="monAgentsParticipated">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("sessions") }}</div><div class="val" id="monAgentsSessions">0</div></div>
             </div>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-message-circle"/></svg> Messages</h3>
             <div class="mon-row">
                 <div class="mon-col"><div class="label">24h</div><div class="val" id="monMsg24h">0</div></div>
-                <div class="mon-col"><div class="label">Total</div><div class="val" id="monMsgTotal">0</div></div>
-                <div class="mon-col"><div class="label">Projects</div><div class="val" id="monProjects">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("total") }}</div><div class="val" id="monMsgTotal">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("projects") }}</div><div class="val" id="monProjects">—</div></div>
             </div>
         </div>
     </div>
@@ -59,7 +59,7 @@
         <div class="mon-card">
             <h3 style="display:flex;align-items:center;gap:0.5rem">
                 <svg class="icon"><use href="#icon-zap"/></svg>
-                <span>LLM Usage</span>
+                <span>{{ _("llm_usage") }}</span>
                 <span id="monLlmPeriod" style="opacity:0.5;font-weight:400;font-size:0.75rem">(24h)</span>
                 <div style="margin-left:auto;display:flex;gap:0.25rem">
                     <button class="mon-range-btn" onclick="setRange(24)" data-hours="24">24h</button>
@@ -69,28 +69,28 @@
                 </div>
             </h3>
             <div class="mon-row" style="margin-bottom:1rem">
-                <div class="mon-col"><div class="label">Calls</div><div class="val" id="monLlmCalls">0</div></div>
-                <div class="mon-col"><div class="label">Tokens In</div><div class="val" id="monLlmIn">0</div></div>
-                <div class="mon-col"><div class="label">Tokens Out</div><div class="val" id="monLlmOut">0</div></div>
-                <div class="mon-col"><div class="label">Cost</div><div class="val" id="monLlmCost">$0</div></div>
-                <div class="mon-col"><div class="label">Latency</div><div class="val" id="monLlmLatency">—</div></div>
-                <div class="mon-col"><div class="label">Errors</div><div class="val" id="monLlmErrors">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("calls") }}</div><div class="val" id="monLlmCalls">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("tokens_in") }}</div><div class="val" id="monLlmIn">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("tokens_out") }}</div><div class="val" id="monLlmOut">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("cost") }}</div><div class="val" id="monLlmCost">$0</div></div>
+                <div class="mon-col"><div class="label">{{ _("latency") }}</div><div class="val" id="monLlmLatency">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("errors") }}</div><div class="val" id="monLlmErrors">0</div></div>
             </div>
-            <div class="mon-chart" id="monLlmChart"><div class="mon-empty">No hourly data</div></div>
+            <div class="mon-chart" id="monLlmChart"><div class="mon-empty">{{ _("no_hourly_data") }}</div></div>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-briefcase"/></svg> Missions & Sprints</h3>
             <div class="mon-section">
-                <div class="mon-section-label">Missions</div>
-                <div id="monMissions" class="mon-badges-row"><span class="mon-empty">No missions</span></div>
+                <div class="mon-section-label">{{ _("missions") }}</div>
+                <div id="monMissions" class="mon-badges-row"><span class="mon-empty">{{ _("no_missions") }}</span></div>
             </div>
             <div class="mon-section">
-                <div class="mon-section-label">Sprints</div>
-                <div id="monSprints" class="mon-badges-row"><span class="mon-empty">No sprints</span></div>
+                <div class="mon-section-label">{{ _("sprints") }}</div>
+                <div id="monSprints" class="mon-badges-row"><span class="mon-empty">{{ _("no_sprints") }}</span></div>
             </div>
             <div class="mon-section">
-                <div class="mon-section-label">Features</div>
-                <div id="monFeatures" class="mon-badges-row"><span class="mon-empty">No features</span></div>
+                <div class="mon-section-label">{{ _("features") }}</div>
+                <div id="monFeatures" class="mon-badges-row"><span class="mon-empty">{{ _("no_features") }}</span></div>
             </div>
         </div>
     </div>
@@ -100,15 +100,15 @@
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-server"/></svg> LLM Providers</h3>
             <table class="mon-table">
-                <thead><tr><th>Provider</th><th>Model</th><th>Calls</th><th>Cost</th><th>Avg ms</th></tr></thead>
-                <tbody id="monProviders"><tr><td colspan="5" class="mon-empty">Loading…</td></tr></tbody>
+                <thead><tr><th>{{ _("provider") }}</th><th>{{ _("model") }}</th><th>{{ _("calls") }}</th><th>{{ _("cost") }}</th><th>{{ _("avg_ms") }}</th></tr></thead>
+                <tbody id="monProviders"><tr><td colspan="5" class="mon-empty">{{ _("loading_ellipsis") }}</td></tr></tbody>
             </table>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-user"/></svg> Top Agents (by cost)</h3>
             <table class="mon-table">
-                <thead><tr><th>Agent</th><th>Calls</th><th>Tokens Out</th><th>Cost</th></tr></thead>
-                <tbody id="monTopAgents"><tr><td colspan="4" class="mon-empty">Loading…</td></tr></tbody>
+                <thead><tr><th>{{ _("agent") }}</th><th>{{ _("calls") }}</th><th>{{ _("tokens_out") }}</th><th>{{ _("cost") }}</th></tr></thead>
+                <tbody id="monTopAgents"><tr><td colspan="4" class="mon-empty">{{ _("loading_ellipsis") }}</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -118,23 +118,23 @@
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-database"/></svg> Database (SQLite)</h3>
             <div class="mon-row" style="margin-bottom:0.8rem">
-                <div class="mon-col"><div class="label">Size</div><div class="val" id="monDbSize">—</div></div>
-                <div class="mon-col"><div class="label">Tables</div><div class="val" id="monDbTables">—</div></div>
-                <div class="mon-col"><div class="label">Rows</div><div class="val" id="monDbRows">—</div></div>
-                <div class="mon-col"><div class="label">Journal</div><div class="val" id="monDbJournal">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("size") }}</div><div class="val" id="monDbSize">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("tables") }}</div><div class="val" id="monDbTables">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("rows") }}</div><div class="val" id="monDbRows">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("journal") }}</div><div class="val" id="monDbJournal">—</div></div>
             </div>
             <table class="mon-table">
-                <thead><tr><th>Table</th><th style="text-align:right">Rows</th></tr></thead>
-                <tbody id="monDbTopTables"><tr><td colspan="2" class="mon-empty">Loading…</td></tr></tbody>
+                <thead><tr><th>{{ _("table") }}</th><th style="text-align:right">{{ _("rows") }}</th></tr></thead>
+                <tbody id="monDbTopTables"><tr><td colspan="2" class="mon-empty">{{ _("loading_ellipsis") }}</td></tr></tbody>
             </table>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-search"/></svg> Vector Store</h3>
             <div class="mon-row" style="margin-bottom:0.8rem">
-                <div class="mon-col"><div class="label">Vectors</div><div class="val" id="monVecTotal">0</div></div>
-                <div class="mon-col"><div class="label">Embedded</div><div class="val" id="monVecEmbedded">0</div></div>
-                <div class="mon-col"><div class="label">Scopes</div><div class="val" id="monVecScopes">0</div></div>
-                <div class="mon-col"><div class="label">Dim</div><div class="val" id="monVecDim">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("vectors") }}</div><div class="val" id="monVecTotal">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("embedded") }}</div><div class="val" id="monVecEmbedded">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("scopes") }}</div><div class="val" id="monVecScopes">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("dim") }}</div><div class="val" id="monVecDim">—</div></div>
             </div>
             <div class="mon-sub" id="monVecProvider">—</div>
             <div class="mon-bar" style="margin-top:0.5rem"><div class="mon-bar-fill purple" id="monVecBar" style="width:0%"></div></div>
@@ -147,30 +147,30 @@
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-activity"/></svg> HTTP Requests (live)</h3>
             <div class="mon-row" style="margin-bottom:0.8rem">
-                <div class="mon-col"><div class="label">Total</div><div class="val" id="monReqTotal">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("total") }}</div><div class="val" id="monReqTotal">0</div></div>
                 <div class="mon-col"><div class="label">4xx</div><div class="val mon-val-yellow" id="monReq4xx">0</div></div>
                 <div class="mon-col"><div class="label">5xx</div><div class="val mon-val-red" id="monReq5xx">0</div></div>
-                <div class="mon-col"><div class="label">Avg ms</div><div class="val" id="monReqAvg">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("avg_ms") }}</div><div class="val" id="monReqAvg">—</div></div>
             </div>
             <table class="mon-table">
-                <thead><tr><th>Endpoint</th><th style="text-align:right">Hits</th><th style="text-align:right">Avg</th><th style="text-align:right">P95</th></tr></thead>
-                <tbody id="monReqEndpoints"><tr><td colspan="4" class="mon-empty">No requests yet</td></tr></tbody>
+                <thead><tr><th>{{ _("endpoint") }}</th><th style="text-align:right">{{ _("hits") }}</th><th style="text-align:right">{{ _("avg") }}</th><th style="text-align:right">{{ _("p95") }}</th></tr></thead>
+                <tbody id="monReqEndpoints"><tr><td colspan="4" class="mon-empty">{{ _("no_requests_yet") }}</td></tr></tbody>
             </table>
             <div class="mon-section" style="margin-top:0.5rem">
-                <div class="mon-section-label">Status Codes</div>
+                <div class="mon-section-label">{{ _("status_codes") }}</div>
                 <div id="monReqStatus" class="mon-badges-row"><span class="mon-empty">—</span></div>
             </div>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-plug"/></svg> MCP Tool Calls</h3>
             <div class="mon-row" style="margin-bottom:0.8rem">
-                <div class="mon-col"><div class="label">Total</div><div class="val" id="monMcpCallsTotal">0</div></div>
-                <div class="mon-col"><div class="label">Errors</div><div class="val mon-val-red" id="monMcpCallsErrors">0</div></div>
-                <div class="mon-col"><div class="label">Avg ms</div><div class="val" id="monMcpCallsAvg">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("total") }}</div><div class="val" id="monMcpCallsTotal">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("errors") }}</div><div class="val mon-val-red" id="monMcpCallsErrors">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("avg_ms") }}</div><div class="val" id="monMcpCallsAvg">—</div></div>
             </div>
             <table class="mon-table">
-                <thead><tr><th>Tool</th><th>Calls</th><th>Errors</th><th>Avg ms</th></tr></thead>
-                <tbody id="monMcpCallsTable"><tr><td colspan="4" class="mon-empty">No MCP calls yet</td></tr></tbody>
+                <thead><tr><th>{{ _("tool") }}</th><th>{{ _("calls") }}</th><th>{{ _("errors") }}</th><th>{{ _("avg_ms") }}</th></tr></thead>
+                <tbody id="monMcpCallsTable"><tr><td colspan="4" class="mon-empty">{{ _("no_mcp_calls_yet") }}</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -181,24 +181,24 @@
             <h3><svg class="icon"><use href="#icon-layers"/></svg> Docker</h3>
             <!-- Docker system overview -->
             <div class="mon-row" style="margin-bottom:1rem">
-                <div class="mon-col"><div class="label">Version</div><div class="val" id="monDockerVersion">—</div></div>
-                <div class="mon-col"><div class="label">Running</div><div class="val" id="monDockerRunning">—</div></div>
-                <div class="mon-col"><div class="label">Stopped</div><div class="val" id="monDockerStopped">—</div></div>
-                <div class="mon-col"><div class="label">Images</div><div class="val" id="monDockerImages">—</div></div>
-                <div class="mon-col"><div class="label">Volumes</div><div class="val" id="monDockerVolumes">—</div></div>
-                <div class="mon-col"><div class="label">Disk Usage</div><div class="val" id="monDockerDisk">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("version") }}</div><div class="val" id="monDockerVersion">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("running") }}</div><div class="val" id="monDockerRunning">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("stopped") }}</div><div class="val" id="monDockerStopped">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("images") }}</div><div class="val" id="monDockerImages">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("volumes") }}</div><div class="val" id="monDockerVolumes">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("disk_usage") }}</div><div class="val" id="monDockerDisk">—</div></div>
             </div>
             <!-- Docker disk breakdown -->
             <div class="mon-row" style="margin-bottom:1rem">
-                <div class="mon-col"><div class="label">Images</div><div class="val" style="font-size:0.7rem" id="monDockerImgDisk">—</div></div>
-                <div class="mon-col"><div class="label">Containers</div><div class="val" style="font-size:0.7rem" id="monDockerCtDisk">—</div></div>
-                <div class="mon-col"><div class="label">Volumes</div><div class="val" style="font-size:0.7rem" id="monDockerVolDisk">—</div></div>
-                <div class="mon-col"><div class="label">Build Cache</div><div class="val" style="font-size:0.7rem" id="monDockerCacheDisk">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("images") }}</div><div class="val" style="font-size:0.7rem" id="monDockerImgDisk">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("containers") }}</div><div class="val" style="font-size:0.7rem" id="monDockerCtDisk">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("volumes") }}</div><div class="val" style="font-size:0.7rem" id="monDockerVolDisk">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("build_cache") }}</div><div class="val" style="font-size:0.7rem" id="monDockerCacheDisk">—</div></div>
             </div>
             <!-- Container table with CPU/Memory -->
             <table class="mon-table">
-                <thead><tr><th>Container</th><th>Status</th><th>CPU</th><th>Memory</th><th>Net I/O</th><th>PIDs</th><th>Image</th></tr></thead>
-                <tbody id="monDockerTable"><tr><td colspan="7" class="mon-empty">Loading…</td></tr></tbody>
+                <thead><tr><th>{{ _("container") }}</th><th>{{ _("status") }}</th><th>CPU</th><th>Memory</th><th>{{ _("net_i_o") }}</th><th>{{ _("pids") }}</th><th>{{ _("image") }}</th></tr></thead>
+                <tbody id="monDockerTable"><tr><td colspan="7" class="mon-empty">{{ _("loading_ellipsis") }}</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -208,12 +208,12 @@
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-git-branch"/></svg> Git Activity</h3>
             <div class="mon-row" style="margin-bottom:0.8rem">
-                <div class="mon-col"><div class="label">Branch</div><div class="val" id="monGitBranch">—</div></div>
-                <div class="mon-col"><div class="label">Last Commit</div><div class="val" id="monGitLastCommit">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("branch") }}</div><div class="val" id="monGitBranch">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("last_commit") }}</div><div class="val" id="monGitLastCommit">—</div></div>
             </div>
             <table class="mon-table">
-                <thead><tr><th>Hash</th><th>Message</th></tr></thead>
-                <tbody id="monGitCommits"><tr><td colspan="2" class="mon-empty">Loading…</td></tr></tbody>
+                <thead><tr><th>{{ _("hash") }}</th><th>{{ _("message") }}</th></tr></thead>
+                <tbody id="monGitCommits"><tr><td colspan="2" class="mon-empty">{{ _("loading_ellipsis") }}</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -223,16 +223,16 @@
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-server"/></svg> MCP Servers</h3>
             <div id="monMcpServers" class="mon-mcp-list">
-                <div class="mon-empty">Loading…</div>
+                <div class="mon-empty">{{ _("loading_ellipsis") }}</div>
             </div>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-alert-triangle"/></svg> Incidents</h3>
             <div class="mon-row" style="margin-bottom:0.8rem">
-                <div class="mon-col"><div class="label">Open</div><div class="val mon-val-red" id="monIncOpen">0</div></div>
-                <div class="mon-col"><div class="label">Total</div><div class="val" id="monIncTotal">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("open") }}</div><div class="val mon-val-red" id="monIncOpen">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("total") }}</div><div class="val" id="monIncTotal">0</div></div>
             </div>
-            <div id="monIncBadges" class="mon-badges-row"><span class="mon-empty">No incidents ✓</span></div>
+            <div id="monIncBadges" class="mon-badges-row"><span class="mon-empty">{{ _("no_incidents") }}</span></div>
         </div>
     </div>
 
@@ -241,21 +241,21 @@
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-zap"/></svg> LLM Costs (live session)</h3>
             <div class="mon-row" style="margin-bottom:0.8rem">
-                <div class="mon-col"><div class="label">Total</div><div class="val" id="monCostTotal">$0</div></div>
+                <div class="mon-col"><div class="label">{{ _("total") }}</div><div class="val" id="monCostTotal">$0</div></div>
             </div>
             <table class="mon-table">
-                <thead><tr><th>Provider</th><th>Calls</th><th>Tokens</th><th>Cost</th></tr></thead>
-                <tbody id="monCostByProvider"><tr><td colspan="4" class="mon-empty">No LLM costs yet</td></tr></tbody>
+                <thead><tr><th>{{ _("provider") }}</th><th>{{ _("calls") }}</th><th>{{ _("tokens") }}</th><th>{{ _("cost") }}</th></tr></thead>
+                <tbody id="monCostByProvider"><tr><td colspan="4" class="mon-empty">{{ _("no_llm_costs_yet") }}</td></tr></tbody>
             </table>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-layers"/></svg> Anonymization (RLM)</h3>
             <div class="mon-row" style="margin-bottom:0.8rem">
-                <div class="mon-col"><div class="label">Total</div><div class="val" id="monAnonTotal">0</div></div>
+                <div class="mon-col"><div class="label">{{ _("total") }}</div><div class="val" id="monAnonTotal">0</div></div>
             </div>
-            <div id="monAnonByType" class="mon-badges-row"><span class="mon-empty">No anonymization data</span></div>
+            <div id="monAnonByType" class="mon-badges-row"><span class="mon-empty">{{ _("no_anonymization_data") }}</span></div>
             <div class="mon-section" style="margin-top:0.5rem">
-                <div class="mon-section-label">RLM Cache Scopes</div>
+                <div class="mon-section-label">{{ _("rlm_cache_scopes") }}</div>
                 <div id="monRlmScopes" class="mon-badges-row"><span class="mon-empty">—</span></div>
             </div>
         </div>
@@ -266,27 +266,27 @@
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-server"/></svg> Azure VM</h3>
             <div class="mon-row" style="margin-bottom:0.8rem">
-                <div class="mon-col"><div class="label">Name</div><div class="val" id="monAzVmName">—</div></div>
-                <div class="mon-col"><div class="label">IP</div><div class="val" id="monAzVmIp">—</div></div>
-                <div class="mon-col"><div class="label">Region</div><div class="val" id="monAzVmRegion">—</div></div>
-                <div class="mon-col"><div class="label">Size</div><div class="val" id="monAzVmSize">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("name") }}</div><div class="val" id="monAzVmName">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("ip") }}</div><div class="val" id="monAzVmIp">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("region") }}</div><div class="val" id="monAzVmRegion">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("size") }}</div><div class="val" id="monAzVmSize">—</div></div>
             </div>
-            <div class="mon-section-label">Services</div>
-            <div id="monAzServers" class="mon-mcp-list"><span class="mon-empty">Loading…</span></div>
+            <div class="mon-section-label">{{ _("services") }}</div>
+            <div id="monAzServers" class="mon-mcp-list"><span class="mon-empty">{{ _("loading_ellipsis") }}</span></div>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-database"/></svg> Azure Backup</h3>
             <div class="mon-row" style="margin-bottom:0.8rem">
-                <div class="mon-col"><div class="label">Account</div><div class="val" id="monAzBackupAcct">—</div></div>
-                <div class="mon-col"><div class="label">Replication</div><div class="val" id="monAzBackupGRS">—</div></div>
-                <div class="mon-col"><div class="label">SQLite DBs</div><div class="val" id="monAzBackupDbs">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("account") }}</div><div class="val" id="monAzBackupAcct">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("replication") }}</div><div class="val" id="monAzBackupGRS">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("sqlite_dbs") }}</div><div class="val" id="monAzBackupDbs">—</div></div>
             </div>
             <div class="mon-section" style="margin-top:0.3rem">
-                <div class="mon-section-label">Containers</div>
+                <div class="mon-section-label">{{ _("containers") }}</div>
                 <div id="monAzContainers" class="mon-badges-row"><span class="mon-empty">—</span></div>
             </div>
             <div class="mon-section" style="margin-top:0.3rem">
-                <div class="mon-section-label">Retention</div>
+                <div class="mon-section-label">{{ _("retention") }}</div>
                 <div id="monAzRetention" class="mon-badges-row"><span class="mon-empty">—</span></div>
             </div>
         </div>
@@ -296,26 +296,26 @@
     <div class="mon-grid mon-grid-2">
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-zap"/></svg> Azure Costs</h3>
-            <div class="mon-section-label" style="margin-bottom:0.3rem">LLM (token usage)</div>
+            <div class="mon-section-label" style="margin-bottom:0.3rem">{{ _("llm_token_usage") }}</div>
             <div class="mon-row" style="margin-bottom:0.8rem">
-                <div class="mon-col"><div class="label">Azure LLM</div><div class="val" id="monAzCostAzure">$0</div></div>
-                <div class="mon-col"><div class="label">Other LLM</div><div class="val" id="monAzCostOther">$0</div></div>
-                <div class="mon-col"><div class="label">Total LLM</div><div class="val" id="monAzCostTotal">$0</div></div>
+                <div class="mon-col"><div class="label">{{ _("azure_llm") }}</div><div class="val" id="monAzCostAzure">$0</div></div>
+                <div class="mon-col"><div class="label">{{ _("other_llm") }}</div><div class="val" id="monAzCostOther">$0</div></div>
+                <div class="mon-col"><div class="label">{{ _("total_llm") }}</div><div class="val" id="monAzCostTotal">$0</div></div>
             </div>
-            <div class="mon-section-label" style="margin-bottom:0.3rem">Infrastructure (monthly est.)</div>
+            <div class="mon-section-label" style="margin-bottom:0.3rem">{{ _("infrastructure_monthly_est") }}</div>
             <div class="mon-row">
-                <div class="mon-col"><div class="label">VM B2ms</div><div class="val" id="monAzCostVm">—</div></div>
-                <div class="mon-col"><div class="label">PG B1ms</div><div class="val" id="monAzCostPg">—</div></div>
-                <div class="mon-col"><div class="label">Storage</div><div class="val" id="monAzCostStorage">—</div></div>
-                <div class="mon-col"><div class="label">Total/mo</div><div class="val" id="monAzCostInfra" style="color:var(--accent)">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("vm_b2ms") }}</div><div class="val" id="monAzCostVm">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("pg_b1ms") }}</div><div class="val" id="monAzCostPg">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("storage") }}</div><div class="val" id="monAzCostStorage">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("total_mo") }}</div><div class="val" id="monAzCostInfra" style="color:var(--accent)">—</div></div>
             </div>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-settings"/></svg> Process</h3>
             <div class="mon-row">
-                <div class="mon-col"><div class="label">PID</div><div class="val" id="monPid">—</div></div>
-                <div class="mon-col"><div class="label">Threads</div><div class="val" id="monThreads">—</div></div>
-                <div class="mon-col"><div class="label">Open Files</div><div class="val" id="monFiles">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("pid") }}</div><div class="val" id="monPid">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("threads") }}</div><div class="val" id="monThreads">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("open_files") }}</div><div class="val" id="monFiles">—</div></div>
             </div>
         </div>
     </div>
@@ -324,13 +324,13 @@
     <div class="mon-grid mon-grid-2">
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-book-open"/></svg> Memory</h3>
-            <div id="monMemory" class="mon-row"><span class="mon-empty">Loading…</span></div>
+            <div id="monMemory" class="mon-row"><span class="mon-empty">{{ _("loading_ellipsis") }}</span></div>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-activity"/></svg> Mission Phases</h3>
             <table class="mon-table">
-                <thead><tr><th>Phase</th><th>Status</th><th>Count</th><th>Avg Time</th></tr></thead>
-                <tbody id="monPhaseStats"><tr><td colspan="4" class="mon-empty">Loading…</td></tr></tbody>
+                <thead><tr><th>{{ _("phase") }}</th><th>{{ _("status") }}</th><th>{{ _("count") }}</th><th>{{ _("avg_time") }}</th></tr></thead>
+                <tbody id="monPhaseStats"><tr><td colspan="4" class="mon-empty">{{ _("loading_ellipsis") }}</td></tr></tbody>
             </table>
         </div>
     </div>

@@ -19,7 +19,7 @@
             GitHub Sources ({{ github_sources|length }})
         </h4>
         <span id="gh-sync-status"></span>
-        <span id="sync-spinner" class="htmx-indicator" style="font-size:0.75rem;color:var(--purple)">syncing…</span>
+        <span id="sync-spinner" class="htmx-indicator" style="font-size:0.75rem;color:var(--purple)">{{ _("syncing") }}</span>
     </summary>
     <div class="gh-sources-list" id="gh-sources-list">
         {% for src in github_sources %}
@@ -29,15 +29,15 @@
             <span class="gh-source-meta">{{ src.files_count }} files · {{ src.fetched_at[:10] if src.fetched_at != 'never' else 'not synced' }}</span>
             <form style="display:inline" hx-post="/api/skills/github/remove" hx-target="closest .gh-source-item" hx-swap="outerHTML">
                 <input type="hidden" name="repo" value="{{ src.repo }}">
-                <button type="submit" class="gh-source-remove" title="Remove"><svg class="icon icon-xs"><use href="#icon-x"/></svg></button>
+                <button type="submit" class="gh-source-remove" title="{{ _("tt_remove") }}"><svg class="icon icon-xs"><use href="#icon-x"/></svg></button>
             </form>
         </div>
         {% endfor %}
     </div>
     <form class="gh-add-form" hx-post="/api/skills/github/add" hx-target="#gh-sync-status" hx-swap="innerHTML" hx-on::after-request="if(event.detail.successful) setTimeout(()=>location.reload(), 800)">
-        <input type="text" name="repo" placeholder="owner/repo" class="gh-add-input" required>
+        <input type="text" name="repo" placeholder="{{ _("ph_owner_repo") }}" class="gh-add-input" required>
         <input type="text" name="path" placeholder="path (optional)" class="gh-add-input gh-add-path">
-        <input type="text" name="branch" placeholder="main" class="gh-add-input gh-add-branch" value="main">
+        <input type="text" name="branch" placeholder="{{ _("ph_main") }}" class="gh-add-input gh-add-branch" value="main">
         <button type="submit" class="btn btn-sm btn-primary">+ Add</button>
     </form>
 </details>
@@ -60,7 +60,7 @@
             <option value="github" {% if source_filter == 'github' %}selected{% endif %}><svg class="icon icon-xs"><use href="#icon-git-branch"/></svg> GitHub ({{ source_counts.get('github', 0) }})</option>
         </select>
         <select name="repo" class="filter-select" hx-get="/skills" hx-target="#skills-grid" hx-swap="innerHTML" hx-include="#skills-q, [name=source]" hx-push-url="true">
-            <option value="">All repos</option>
+            <option value="">{{ _("all_repos") }}</option>
             {% for r in repos %}
             <option value="{{ r }}" {% if repo_filter == r %}selected{% endif %}>{{ r.split('/')[1][:25] }}</option>
             {% endfor %}

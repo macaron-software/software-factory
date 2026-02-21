@@ -32,11 +32,11 @@
     <form class="ms-form" id="missionForm">
         <input type="hidden" name="workflow_id" value="{{ workflow.id }}">
         <div class="ms-field">
-            <label>Brief de l'epic</label>
+            <label>{{ _("brief_de_l_epic") }}</label>
             <textarea name="brief" placeholder="Décrivez le besoin métier, le contexte projet, et les objectifs à atteindre..." required></textarea>
         </div>
 
-        <div style="margin:1rem 0 0.5rem;font-size:0.78rem;font-weight:600;color:var(--text-secondary)">Priorisation WSJF</div>
+        <div style="margin:1rem 0 0.5rem;font-size:0.78rem;font-weight:600;color:var(--text-secondary)">{{ _("priorisation_wsjf") }}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem">
             <div class="ms-field" style="margin:0">
                 <label>Business Value <span id="bv-val" style="color:var(--purple)">5</span>/10</label>
@@ -61,7 +61,7 @@
         </div>
 
         <div class="ms-actions">
-            <a href="/missions" class="btn btn-ghost">Annuler</a>
+            <a href="/missions" class="btn btn-ghost">{{ _("cancel") }}</a>
             <button type="submit" class="btn btn-primary">
                 <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch_epic') }}
             </button>

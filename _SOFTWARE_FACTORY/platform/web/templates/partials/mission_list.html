@@ -15,7 +15,7 @@
             <div class="mission-title">
                 {{ epic_name }}
                 <span style="font-size:0.68rem;font-weight:400;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.1rem 0.4rem;border-radius:4px">{{ run.workflow_name or run.workflow_id }}</span>
-                {% if is_stuck %}<span style="font-size:0.65rem;font-weight:600;color:#f59e0b;background:rgba(245,158,11,0.15);padding:0.1rem 0.4rem;border-radius:4px;margin-left:0.3rem">interrompu</span>{% endif %}
+                {% if is_stuck %}<span style="font-size:0.65rem;font-weight:600;color:#f59e0b;background:rgba(245,158,11,0.15);padding:0.1rem 0.4rem;border-radius:4px;margin-left:0.3rem">{{ _("interrompu") }}</span>{% endif %}
             </div>
             <div class="mission-brief">{{ run.brief[epic_name|length + 3:epic_name|length + 143] if ' - ' in run.brief else run.brief[:140] }}</div>
             <div class="mission-progress-row">

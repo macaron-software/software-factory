@@ -30,8 +30,8 @@
     {% if not mcps %}
     <div class="empty-state">
         <svg class="icon icon-xl"><use href="#icon-plug"/></svg>
-        <h3>No MCPs configured</h3>
-        <p>MCP servers provide tools to agents (git, Playwright, Jira, Figma...).</p>
+        <h3>{{ _("no_mcps_configured") }}</h3>
+        <p>{{ _("mcp_servers_provide_tools_to_agents") }}</p>
         <a href="/mcps/new" class="btn btn-primary">
             <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Add MCP Server
         </a>

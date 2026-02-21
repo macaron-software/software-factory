@@ -114,11 +114,11 @@
 <div class="art-dash">
     <!-- KPIs -->
     <div class="art-kpis">
-        <div class="art-kpi"><div class="num">{{ portfolios|length }}</div><div class="lbl">Portfolios</div></div>
-        <div class="art-kpi"><div class="num">{{ total_arts }}</div><div class="lbl">ARTs</div></div>
+        <div class="art-kpi"><div class="num">{{ portfolios|length }}</div><div class="lbl">{{ _("portfolios") }}</div></div>
+        <div class="art-kpi"><div class="num">{{ total_arts }}</div><div class="lbl">{{ _("arts") }}</div></div>
         <div class="art-kpi"><div class="num">{{ total_teams }}</div><div class="lbl">{{ _('teams') }}</div></div>
-        <div class="art-kpi"><div class="num">{{ total_members }}</div><div class="lbl">Agents</div></div>
-        <div class="art-kpi"><div class="num">{{ total_teams * 10 }}</div><div class="lbl">PI Weeks</div></div>
+        <div class="art-kpi"><div class="num">{{ total_members }}</div><div class="lbl">{{ _("agents") }}</div></div>
+        <div class="art-kpi"><div class="num">{{ total_teams * 10 }}</div><div class="lbl">{{ _("pi_weeks") }}</div></div>
     </div>
 
     <!-- Org Tree -->
@@ -213,7 +213,7 @@
 <!-- Agent Fiche Modal -->
 <div class="art-modal fiche-modal" id="ficheModal">
     <div class="art-modal-head">
-        <h3><svg><use href="#icon-user"/></svg> <span id="fhTitle">Agent</span></h3>
+        <h3><svg><use href="#icon-user"/></svg> <span id="fhTitle">{{ _("agent") }}</span></h3>
         <button class="art-modal-close" onclick="closeFiche()"><svg><use href="#icon-x"/></svg></button>
     </div>
     <div id="fhContent"><div class="fiche-loading">{{ _('loading') }}</div></div>

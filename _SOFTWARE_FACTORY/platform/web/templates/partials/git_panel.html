@@ -1,7 +1,7 @@
 <!-- Git panel partial — HTMX refreshable -->
 {% if git %}
 <div class="panel-header">
-    <h3><svg class="icon icon-sm"><use href="#icon-git-branch"/></svg> Git</h3>
+    <h3><svg class="icon icon-sm"><use href="#icon-git-branch"/></svg> {{ _("git") }}</h3>
     <span class="badge badge-{% if git.clean %}green{% else %}yellow{% endif %}">
         {{ git.branch }}
     </span>
@@ -33,7 +33,7 @@
 
     <!-- Recent commits -->
     <div class="git-commits">
-        <h4>Recent Commits</h4>
+        <h4>{{ _("recent_commits") }}</h4>
         {% for c in commits[:8] %}
         <div class="git-commit-row">
             <span class="commit-hash">{{ c.short_hash }}</span>
@@ -45,5 +45,5 @@
 </div>
 {% else %}
 <div class="panel-header"><h3>Git</h3></div>
-<div class="panel-body"><p class="empty-state">No git repository found.</p></div>
+<div class="panel-body"><p class="empty-state">{{ _("no_git_repository_found") }}</p></div>
 {% endif %}

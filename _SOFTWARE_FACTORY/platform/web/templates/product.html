@@ -107,7 +107,7 @@
 
     <!-- Filters -->
     <div class="pm-filters">
-        <a href="/product" class="pm-filter {% if not filter_project %}active{% endif %}">Tous</a>
+        <a href="/product" class="pm-filter {% if not filter_project %}active{% endif %}">{{ _("tous") }}</a>
         {% for p in projects %}
         <a href="/product?project={{ p.id }}" class="pm-filter {% if filter_project == p.id %}active{% endif %}">{{ p.name }}</a>
         {% endfor %}
@@ -156,9 +156,12 @@
                     <div class="pm-feat">
                         <svg class="pm-feat-icon"><use href="#icon-layers"/></svg>
                         <span class="pm-feat-name">{{ f.name }}</span>
-                        <span class="pm-feat-points">{{ f.story_points }} pts</span>
+                        <span class="pm-feat-points editable-sp" data-type="feature" data-id="{{ f.id }}" title="Click to edit">{{ f.story_points }} pts</span>
                         <span class="pm-feat-assignee">{{ f.assigned_to or '—' }}</span>
                         <span class="pm-feat-status {{ f.status }}">{{ f.status }}</span>
+                        {% if f.acceptance_criteria %}
+                        <span class="pm-feat-ac" title="{{ f.acceptance_criteria }}" style="cursor:help;color:var(--green);font-size:0.65rem">AC</span>
+                        {% endif %}
                     </div>
                     {% if f.stories %}
                     <div class="pm-stories">
@@ -166,7 +169,7 @@
                         <div class="pm-story">
                             <span class="pm-story-dot {{ s.status }}"></span>
                             <span class="pm-story-title">{{ s.title }}</span>
-                            {% if s.story_points %}<span class="pm-story-sp">{{ s.story_points }} pts</span>{% endif %}
+                            {% if s.story_points %}<span class="pm-story-sp editable-sp" data-type="story" data-id="{{ s.id }}" title="Click to edit">{{ s.story_points }} pts</span>{% endif %}
                         </div>
                         {% endfor %}
                     </div>
@@ -187,5 +190,44 @@
 function toggleEpic(id) {
     document.getElementById('epic-' + id).classList.toggle('open');
 }
+
+// Inline story point editing
+document.querySelectorAll('.editable-sp').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', function() {
+        const current = parseInt(this.textContent) || 0;
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.value = current;
+        input.min = 0;
+        input.max = 100;
+        input.style.cssText = 'width:50px;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--purple);border-radius:4px;padding:2px 4px;font-size:0.75rem;text-align:center';
+        const original = this.textContent;
+        this.textContent = '';
+        this.appendChild(input);
+        input.focus();
+        input.select();
+
+        const save = async () => {
+            const val = parseInt(input.value) || 0;
+            const type = el.dataset.type;
+            const id = el.dataset.id;
+            const url = type === 'feature' ? `/api/features/${id}` : `/api/stories/${id}`;
+            try {
+                await fetch(url, {
+                    method: 'PATCH',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({story_points: val}),
+                });
+                el.textContent = val + ' pts';
+            } catch(e) {
+                el.textContent = original;
+                console.error('SP update error:', e);
+            }
+        };
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', e => { if(e.key === 'Enter') input.blur(); if(e.key === 'Escape') { el.textContent = original; }});
+    });
+});
 </script>
 {% endblock %}

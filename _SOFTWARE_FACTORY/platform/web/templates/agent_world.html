@@ -5,7 +5,7 @@
     <span class="badge badge-purple" id="world-agent-count">{{ agents|length }} agents</span>
     <span class="badge badge-green" id="world-active-count">0 actifs</span>
     <span class="badge badge-blue" id="world-mission-count">0 missions</span>
-    <button class="btn btn-sm" onclick="worldToggleDayNight()" title="Jour/Nuit" id="btn-daynight">🌙</button>
+    <button class="btn btn-sm" onclick="worldToggleDayNight()" title="{{ _("tt_day_night") }}" id="btn-daynight">🌙</button>
     <button class="btn btn-sm" onclick="worldResetCamera()" title="Reset camera">
         <svg class="icon icon-sm"><use href="#icon-maximize"/></svg>
     </button>
@@ -72,8 +72,8 @@
 <div class="world-wrap">
     <!-- Loading screen -->
     <div class="world-loading" id="world-loading">
-        <h3>Macaron World</h3>
-        <p>Construction du bureau...</p>
+        <h3>{{ _("macaron_world") }}</h3>
+        <p>{{ _("building_office") }}</p>
         <div class="wl-bar"><div class="wl-fill" id="world-load-bar"></div></div>
     </div>
 
@@ -98,7 +98,7 @@
                     <div class="wi-role" id="wi-role">—</div>
                 </div>
                 <div class="wi-status" id="wi-status">
-                    <span class="dot"></span> <span>idle</span>
+                    <span class="dot"></span> <span>{{ _("idle") }}</span>
                 </div>
             </div>
             <div class="wi-task" id="wi-task" style="display:none"></div>

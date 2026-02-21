@@ -91,7 +91,7 @@
       {% if to_role %}<span class="mu__target-role">{{ to_role }}</span>{% endif %}
       {% elif to_id == 'All' or (to_id and to_id in ('all',)) %}
       <span class="mu__arrow">→</span>
-      <span class="mu__target" style="color:var(--text-secondary)">All</span>
+      <span class="mu__target" style="color:var(--text-secondary)">{{ _("tt_all") }}</span>
       {% endif %}
     </div>
     {% endif %}
@@ -138,7 +138,7 @@
       {% if to_role %}<span class="mu__target-role mu__target-role--sm">{{ to_role }}</span>{% endif %}
       {% elif to_id == 'All' or (to_id and to_id in ('all',)) %}
       <span class="mu__arrow">→</span>
-      <span class="mu__target mu__target--sm" style="color:var(--text-secondary)">All</span>
+      <span class="mu__target mu__target--sm" style="color:var(--text-secondary)">{{ _("tt_all") }}</span>
       {% endif %}
       <span class="mu__time mu__time--right">{{ ts[11:16] if ts|length > 16 else ts }}</span>
     </div>
@@ -152,7 +152,7 @@
 {% else %}
 <div class="mu mu--thread" data-msg-id="{{ msg.id | default('') }}" style="border-left-color:{{ type_border }}">
   {% if is_user %}
-  <div class="mu__avatar mu__avatar--user">You</div>
+  <div class="mu__avatar mu__avatar--user">{{ _("you") }}</div>
   {% else %}
   <div class="mu__avatar" style="background:{{ from_color }}20;border-color:{{ from_color }}">
     {% if from_avatar_url %}
@@ -177,7 +177,7 @@
       {% if to_role %}<span class="mu__target-role">{{ to_role }}</span>{% endif %}
       {% elif to_id == 'All' or (to_id and to_id in ('all',)) %}
       <span class="mu__arrow">→</span>
-      <span class="mu__target" style="color:var(--text-secondary)">All</span>
+      <span class="mu__target" style="color:var(--text-secondary)">{{ _("tt_all") }}</span>
       {% endif %}
       <span class="mu__time mu__time--right">{{ ts[11:16] if ts|length > 16 else ts }}</span>
     </div>

@@ -107,19 +107,19 @@
 <div class="met-kpis">
     <div class="met-kpi kpi-wip">
         <div class="met-kpi-value">{{ wip }}</div>
-        <div class="met-kpi-label">WIP en cours</div>
+        <div class="met-kpi-label">{{ _("wip_en_cours") }}</div>
     </div>
     <div class="met-kpi kpi-done">
         <div class="met-kpi-value">{{ completed }}</div>
-        <div class="met-kpi-label">Complétées</div>
+        <div class="met-kpi-label">{{ _("completed") }}</div>
     </div>
     <div class="met-kpi kpi-fail">
         <div class="met-kpi-value">{{ failed }}</div>
-        <div class="met-kpi-label">Échouées</div>
+        <div class="met-kpi-label">{{ _("failed") }}</div>
     </div>
     <div class="met-kpi kpi-time">
         <div class="met-kpi-value">{{ avg_lead_time }}h</div>
-        <div class="met-kpi-label">Lead Time moy.</div>
+        <div class="met-kpi-label">{{ _("lead_time_moy") }}</div>
     </div>
 </div>
 
@@ -182,7 +182,7 @@
                 <div class="met-empty">
                     <svg><use href="#icon-inbox"/></svg>
                     <div class="met-empty-text">{{ _('no_mission_active') }}</div>
-                    <div class="met-empty-sub">Lancez une mission depuis le PI Board ou l'Idéation</div>
+                    <div class="met-empty-sub">{{ _("launch_a_mission_from_pi_board") }}</div>
                 </div>
                 {% endif %}
             </div>
@@ -223,16 +223,16 @@
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.6rem">
                     <div style="text-align:center">
                         <div style="font-size:1.1rem;font-weight:800;color:var(--purple)">{{ throughput_pct }}%</div>
-                        <div style="font-size:0.58rem;color:var(--text-muted);text-transform:uppercase">Throughput</div>
+                        <div style="font-size:0.58rem;color:var(--text-muted);text-transform:uppercase">{{ _("throughput") }}</div>
                     </div>
                     <div style="text-align:center">
                         <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary)">{{ agents_total }}</div>
-                        <div style="font-size:0.58rem;color:var(--text-muted);text-transform:uppercase">Agents ART</div>
+                        <div style="font-size:0.58rem;color:var(--text-muted);text-transform:uppercase">{{ _("agents_art") }}</div>
                     </div>
                 </div>
                 <div style="height:1px;background:var(--border);margin:0.4rem 0"></div>
                 <div style="font-size:0.65rem;color:var(--text-muted);display:flex;justify-content:space-between;padding-top:0.3rem">
-                    <span>WIP Limit</span>
+                    <span>{{ _("wip_limit") }}</span>
                     <span style="font-weight:700;color:{{ 'var(--red,#ef4444)' if wip > 5 else 'var(--green,#22c55e)' }}">{{ wip }}/5</span>
                 </div>
             </div>
@@ -277,13 +277,13 @@
             </div>
             <div class="met-panel-body">
                 <div class="met-cal">
-                    <div class="met-cal-header">Lun</div>
-                    <div class="met-cal-header">Mar</div>
-                    <div class="met-cal-header">Mer</div>
-                    <div class="met-cal-header">Jeu</div>
-                    <div class="met-cal-header">Ven</div>
-                    <div class="met-cal-header">Sam</div>
-                    <div class="met-cal-header">Dim</div>
+                    <div class="met-cal-header">{{ _("lun") }}</div>
+                    <div class="met-cal-header">{{ _("mar") }}</div>
+                    <div class="met-cal-header">{{ _("mer") }}</div>
+                    <div class="met-cal-header">{{ _("jeu") }}</div>
+                    <div class="met-cal-header">{{ _("ven") }}</div>
+                    <div class="met-cal-header">{{ _("sam") }}</div>
+                    <div class="met-cal-header">{{ _("dim") }}</div>
                     {% for day in calendar_days %}
                     <div class="met-cal-day l{{ day.level }}" title="{{ day.count }} messages">{{ day.num }}</div>
                     {% endfor %}

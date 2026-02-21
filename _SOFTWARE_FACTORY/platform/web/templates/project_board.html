@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block topbar_actions %}
-<span style="font-size:0.75rem;color:var(--text-secondary);margin-right:0.5rem">Intouts à filtrer</span>
+<span style="font-size:0.75rem;color:var(--text-secondary);margin-right:0.5rem">{{ _("intouts_a_filtrer") }}</span>
 <a href="/projects/{{ project.id }}" class="btn btn-ghost" style="font-size:0.75rem">
     <svg class="icon icon-sm"><use href="#icon-arrow-left"/></svg> Projet
 </a>
@@ -117,7 +117,7 @@
         <!-- Agent Flow Graph -->
         <div class="board-panel">
             <div class="board-panel-header">
-                <div class="board-panel-title"><svg><use href="#icon-git-merge"/></svg> Flux Agents Projet</div>
+                <div class="board-panel-title"><svg><use href="#icon-git-merge"/></svg> {{ _("agent_flow") }}</div>
             </div>
             <div class="board-flow">
                 <svg viewBox="0 0 500 200" width="100%" height="180">
@@ -132,6 +132,39 @@
                     <line class="board-flow-edge" x1="{{ edge.x1 }}" y1="{{ edge.y1 }}" x2="{{ edge.x2 }}" y2="{{ edge.y2 }}"/>
                     {% endfor %}
                 </svg>
+            </div>
+        </div>
+
+        <!-- Velocity + PI Cadence -->
+        <div class="board-panel">
+            <div class="board-panel-header">
+                <div class="board-panel-title"><svg><use href="#icon-trending-up"/></svg> {{ _("velocity") }} & PI</div>
+            </div>
+            <div class="board-panel-body">
+                <!-- Velocity bar -->
+                <div style="margin-bottom:0.8rem">
+                    <div style="display:flex;justify-content:space-between;font-size:0.68rem;margin-bottom:0.3rem">
+                        <span style="color:var(--text-secondary)">{{ _("story_points") }}</span>
+                        <span style="font-weight:700;color:var(--text-primary)">{{ velocity.done }}/{{ velocity.planned }} SP ({{ velocity.pct }}%)</span>
+                    </div>
+                    <div style="height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden">
+                        <div style="height:100%;width:{{ velocity.pct }}%;background:{% if velocity.pct >= 80 %}var(--green){% elif velocity.pct >= 50 %}var(--blue){% else %}var(--yellow){% endif %};border-radius:3px;transition:width .3s"></div>
+                    </div>
+                </div>
+                <!-- PI Phase Timeline -->
+                {% if pi_phases %}
+                <div style="font-size:0.68rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:0.4rem">PI Phases</div>
+                <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+                    {% for ph in pi_phases %}
+                    <div style="display:flex;align-items:center;gap:0.2rem;font-size:0.62rem;padding:0.15rem 0.4rem;border-radius:4px;border:1px solid var(--border);background:{% if ph.status == 'done' %}rgba(52,211,153,.08){% elif ph.status == 'running' %}rgba(59,130,246,.08){% else %}var(--bg-tertiary){% endif %}">
+                        <span style="width:5px;height:5px;border-radius:50%;background:{% if ph.status == 'done' %}var(--green){% elif ph.status == 'running' %}var(--blue){% else %}var(--text-muted){% endif %}"></span>
+                        {{ ph.name[:15] }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div style="font-size:0.68rem;color:var(--text-muted);padding:0.3rem 0">{{ _("no_active_pi") }}</div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -150,8 +183,8 @@
                         <svg class="icon icon-sm"><use href="#icon-git-merge"/></svg>
                     </div>
                     <div class="ops-content">
-                        <div class="ops-label">CI/CD Pipeline</div>
-                        <div class="ops-status">{% if has_cicd %}<span class="ops-badge active">Configuré</span>{% else %}<span class="ops-badge pending">Non configuré</span>{% endif %}</div>
+                        <div class="ops-label">{{ _("ci_cd_pipeline") }}</div>
+                        <div class="ops-status">{% if has_cicd %}<span class="ops-badge active">{{ _("configure") }}</span>{% else %}<span class="ops-badge pending">{{ _("non_configure") }}</span>{% endif %}</div>
                     </div>
                 </div>
                 <!-- TMA -->
@@ -160,15 +193,15 @@
                         <svg class="icon icon-sm"><use href="#icon-tool"/></svg>
                     </div>
                     <div class="ops-content">
-                        <div class="ops-label">TMA Maintenance</div>
+                        <div class="ops-label">{{ _("tma_maintenance") }}</div>
                         {% if ops_missions.tma %}
                         <div class="ops-status">
                             <span class="ops-badge {% if ops_missions.tma.status == 'active' %}active{% else %}pending{% endif %}">{{ ops_missions.tma.status }}</span>
                             {% if ops_missions.tma.incident_count %}<span class="ops-meta">{{ ops_missions.tma.incident_count }} incidents{% if ops_missions.tma.recurring %}, {{ ops_missions.tma.recurring }} récurrents{% endif %}</span>{% endif %}
                         </div>
                         {% else %}
-                        <div class="ops-status"><span class="ops-badge pending">Non provisionné</span>
-                            <button class="btn btn-ghost" style="font-size:0.6rem;padding:0.1rem 0.3rem" hx-post="/api/projects/{{ project.id }}/provision" hx-swap="none" onclick="location.reload()">Provisionner</button>
+                        <div class="ops-status"><span class="ops-badge pending">{{ _("non_provisionne") }}</span>
+                            <button class="btn btn-ghost" style="font-size:0.6rem;padding:0.1rem 0.3rem" hx-post="/api/projects/{{ project.id }}/provision" hx-swap="none" onclick="location.reload()">{{ _("provisionner") }}</button>
                         </div>
                         {% endif %}
                     </div>
@@ -179,14 +212,14 @@
                         <svg class="icon icon-sm"><use href="#icon-shield"/></svg>
                     </div>
                     <div class="ops-content">
-                        <div class="ops-label">Centre Sécurité</div>
+                        <div class="ops-label">{{ _("centre_securite") }}</div>
                         {% if ops_missions.security %}
                         <div class="ops-status">
                             <span class="ops-badge {% if ops_missions.security.status == 'active' %}active{% else %}pending{% endif %}">{{ ops_missions.security.status }}</span>
                             <span class="ops-meta">{{ ops_missions.security.schedule }}</span>
                         </div>
                         {% else %}
-                        <div class="ops-status"><span class="ops-badge pending">Non provisionné</span></div>
+                        <div class="ops-status"><span class="ops-badge pending">{{ _("non_provisionne") }}</span></div>
                         {% endif %}
                     </div>
                 </div>
@@ -196,14 +229,14 @@
                         <svg class="icon icon-sm"><use href="#icon-alert-triangle"/></svg>
                     </div>
                     <div class="ops-content">
-                        <div class="ops-label">Dette Technique</div>
+                        <div class="ops-label">{{ _("dette_technique") }}</div>
                         {% if ops_missions.debt %}
                         <div class="ops-status">
                             <span class="ops-badge {% if ops_missions.debt.status == 'active' %}active{% else %}pending{% endif %}">{{ ops_missions.debt.status }}</span>
                             <span class="ops-meta">{{ ops_missions.debt.schedule }}</span>
                         </div>
                         {% else %}
-                        <div class="ops-status"><span class="ops-badge pending">Non provisionné</span></div>
+                        <div class="ops-status"><span class="ops-badge pending">{{ _("non_provisionne") }}</span></div>
                         {% endif %}
                     </div>
                 </div>
@@ -235,7 +268,7 @@
                 <div class="board-panel-title"><svg><use href="#icon-list"/></svg> Backlog & PRs</div>
             </div>
             <div class="board-panel-body">
-                <div style="font-size:0.68rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:0.3rem">Tâches en attente</div>
+                <div style="font-size:0.68rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:0.3rem">{{ _("taches_en_attente") }}</div>
                 {% for t in backlog_items %}
                 <div class="board-backlog-item">
                     <div class="board-backlog-dot" style="background:{{ t.color }}"></div>
@@ -246,7 +279,7 @@
                 <div style="font-size:0.72rem;color:var(--text-muted);padding:0.5rem 0">{{ _('pending_tasks') }}</div>
                 {% endfor %}
 
-                <div style="font-size:0.68rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin:0.8rem 0 0.3rem">Pull Requests (Agents)</div>
+                <div style="font-size:0.68rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin:0.8rem 0 0.3rem">{{ _("pull_requests_agents") }}</div>
                 {% for pr in pull_requests %}
                 <div class="board-pr">
                     <div class="board-pr-icon"><svg><use href="#icon-git-pull-request"/></svg></div>

@@ -17,7 +17,7 @@
             {% endif %}
             <div class="mc-dev-grid">
                 <div class="mc-dev-commits">
-                    <h4>Commits</h4>
+                    <h4>{{ _("commits") }}</h4>
                     {% for c in workspace_commits %}
                     <div class="mc-dev-commit">
                         <div class="mc-dev-commit-dot"></div>
@@ -28,7 +28,7 @@
                     {% if not workspace_commits %}<div class="mc-dev-empty">{{ _('no_commit') }}</div>{% endif %}
                 </div>
                 <div class="mc-dev-prs">
-                    <h4>Pull Requests</h4>
+                    <h4>{{ _("pull_requests") }}</h4>
                     {% for pr in pull_requests %}
                     <div class="mc-dev-pr {{ pr.status|lower }}">
                         <span class="mc-dev-pr-icon"><svg class="icon icon-xs"><use href="#icon-git-pull-request"/></svg></span>
@@ -122,35 +122,35 @@
 
                 <!-- Section 0: Coverage & TDD Metrics -->
                 <div class="mc-qa-section">
-                    <h4>TDD / Coverage</h4>
+                    <h4>{{ _("tdd_coverage") }}</h4>
                     <div class="mc-qa-metrics">
                         <div class="mc-qa-metric">
                             <div class="mc-qa-metric-value">{{ qa_coverage.test_count }}</div>
-                            <div class="mc-qa-metric-label">Tests</div>
+                            <div class="mc-qa-metric-label">{{ _("tests") }}</div>
                         </div>
                         <div class="mc-qa-metric">
                             <div class="mc-qa-metric-value">{{ qa_coverage.code_count }}</div>
-                            <div class="mc-qa-metric-label">Fichiers code</div>
+                            <div class="mc-qa-metric-label">{{ _("fichiers_code") }}</div>
                         </div>
                         <div class="mc-qa-metric">
                             <div class="mc-qa-metric-value{% if qa_coverage.ratio >= 80 %} mc-qa-ok{% elif qa_coverage.ratio >= 50 %} mc-qa-warn{% else %} mc-qa-ko{% endif %}">{{ qa_coverage.ratio }}%</div>
-                            <div class="mc-qa-metric-label">Ratio test/code</div>
+                            <div class="mc-qa-metric-label">{{ _("ratio_test_code") }}</div>
                         </div>
                         {% if qa_coverage.coverage_pct is not none %}
                         <div class="mc-qa-metric">
                             <div class="mc-qa-metric-value{% if qa_coverage.coverage_pct >= 80 %} mc-qa-ok{% elif qa_coverage.coverage_pct >= 60 %} mc-qa-warn{% else %} mc-qa-ko{% endif %}">{{ qa_coverage.coverage_pct }}%</div>
-                            <div class="mc-qa-metric-label">Coverage</div>
+                            <div class="mc-qa-metric-label">{{ _("coverage") }}</div>
                         </div>
                         {% endif %}
                     </div>
                     {% if qa_coverage.ratio < 50 %}
-                    <div class="mc-qa-alert">Ratio test/code faible — TDD non respecte</div>
+                    <div class="mc-qa-alert">{{ _("ratio_test_code_faible_tdd_non") }}</div>
                     {% endif %}
                 </div>
 
                 <!-- Section 1: Tests unitaires & E2E trouves dans le workspace -->
                 <div class="mc-qa-section">
-                    <h4>Tests — Fichiers</h4>
+                    <h4>{{ _("tests_fichiers") }}</h4>
                     {% if qa_test_files %}
                     <div class="mc-qa-test-grid">
                         {% for tf in qa_test_files %}
@@ -167,7 +167,7 @@
 
                 <!-- Section 2: Résultats d'exécution QA -->
                 <div class="mc-qa-section">
-                    <h4>Résultats d'exécution</h4>
+                    <h4>{{ _("resultats_d_execution") }}</h4>
                     {% if qa_phase_results %}
                     <div class="mc-qa-results">
                         {% for r in qa_phase_results %}
@@ -190,7 +190,7 @@
                 <!-- Section 3: Screenshots parcours utilisateur -->
                 {% if result_screenshots %}
                 <div class="mc-qa-section">
-                    <h4>Parcours utilisateur — Screenshots</h4>
+                    <h4>{{ _("parcours_utilisateur_screenshots") }}</h4>
                     <div class="mc-qa-screenshots-grid">
                         {% for s in result_screenshots %}
                         <div class="mc-qa-shot-card">
@@ -222,9 +222,9 @@
                         {% endfor %}
                     </div>
                     <div class="mc-qa-metrics" style="margin-top:0.5rem">
-                        <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_iterations }}</span><span class="mc-qa-metric-label">Iterations</span></div>
-                        <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_accepted }}</span><span class="mc-qa-metric-label">Accepted</span></div>
-                        <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_rejected }}</span><span class="mc-qa-metric-label">Rejected</span></div>
+                        <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_iterations }}</span><span class="mc-qa-metric-label">{{ _("iterations") }}</span></div>
+                        <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_accepted }}</span><span class="mc-qa-metric-label">{{ _("accepted") }}</span></div>
+                        <div class="mc-qa-metric"><span class="mc-qa-metric-val">{{ qa_total_rejected }}</span><span class="mc-qa-metric-label">{{ _("rejected") }}</span></div>
                     </div>
                 </details>
                 {% endif %}
@@ -251,7 +251,7 @@
                 {% if archi_content %}
                 <div class="mc-archi-doc">
                     <div class="mc-archi-header">
-                        <h4>Architecture du projet</h4>
+                        <h4>{{ _("architecture_du_projet") }}</h4>
                         <span class="mc-archi-updated">{{ archi_updated or '' }}</span>
                     </div>
                     <div class="mc-archi-body">{{ archi_content | markdown | safe }}</div>
@@ -259,13 +259,13 @@
                 {% else %}
                 <div class="mc-archi-empty">
                     <svg class="icon" style="width:32px;height:32px;opacity:.3"><use href="#icon-layers"/></svg>
-                    <p>Pas encore d'architecture documentee</p>
-                    <p class="mc-archi-hint">L'architecte mettra a jour ce document apres chaque phase technique</p>
+                    <p>{{ _("pas_encore_d_architecture_documentee") }}</p>
+                    <p class="mc-archi-hint">{{ _("l_architecte_mettra_a_jour_ce") }}</p>
                 </div>
                 {% endif %}
                 {% if archi_decisions %}
                 <div class="mc-archi-decisions">
-                    <h4>Decisions architecturales</h4>
+                    <h4>{{ _("decisions_architecturales") }}</h4>
                     {% for d in archi_decisions %}
                     <div class="mc-archi-decision">
                         <div class="mc-archi-decision-phase">{{ d.phase }}</div>
@@ -276,7 +276,7 @@
                 {% endif %}
                 {% if archi_stack %}
                 <div class="mc-archi-stack">
-                    <h4>Stack technique</h4>
+                    <h4>{{ _("stack_technique") }}</h4>
                     <div class="mc-archi-stack-tags">
                         {% for t in archi_stack %}
                         <span class="mc-archi-tag">{{ t }}</span>
@@ -317,13 +317,13 @@
                 {% else %}
                 <div class="mc-wiki-empty">
                     <svg class="icon" style="width:32px;height:32px;opacity:.3"><use href="#icon-book-open"/></svg>
-                    <p>Pas encore de documentation</p>
-                    <p class="mc-wiki-hint">Le tech writer mettra a jour la documentation apres chaque phase</p>
+                    <p>{{ _("pas_encore_de_documentation") }}</p>
+                    <p class="mc-wiki-hint">{{ _("le_tech_writer_mettra_a_jour") }}</p>
                 </div>
                 {% endif %}
                 {% if wiki_memories %}
                 <div class="mc-wiki-memories">
-                    <h4>Memoire projet</h4>
+                    <h4>{{ _("memoire_projet") }}</h4>
                     {% for m in wiki_memories %}
                     <div class="mc-wiki-memory">
                         <span class="mc-wiki-memory-cat">{{ m.category }}</span>

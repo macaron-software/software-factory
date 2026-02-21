@@ -16,15 +16,15 @@
         <!-- Left column: identity + skills + tools + memory -->
         <div class="form-column">
             <div class="panel">
-                <div class="panel-header"><h3>Identity</h3></div>
+                <div class="panel-header"><h3>{{ _("identity") }}</h3></div>
                 <div class="panel-body">
                     <div class="form-row">
                         <div class="form-group" style="flex:2">
-                            <label for="name">Name</label>
+                            <label for="name">{{ _("name") }}</label>
                             <input type="text" id="name" name="name" value="{{ agent.name }}" required placeholder="e.g. Analyste de Données">
                         </div>
                         <div class="form-group" style="flex:1">
-                            <label for="role">Role</label>
+                            <label for="role">{{ _("role") }}</label>
                             <select id="role" name="role">
                                 {% for r in roles %}
                                 <option value="{{ r }}" {% if agent.role == r %}selected{% endif %}>{{ r }}</option>
@@ -34,7 +34,7 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="icon">Icon</label>
+                            <label for="icon">{{ _("icon") }}</label>
                             <select id="icon" name="icon">
                                 {% for ic in icons %}
                                 <option value="{{ ic }}" {% if agent.icon == ic %}selected{% endif %}>{{ ic }}</option>
@@ -42,13 +42,13 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="color">Color</label>
+                            <label for="color">{{ _("color") }}</label>
                             <input type="color" id="color" name="color" value="{{ agent.color }}">
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="avatar">Avatar icon</label>
+                            <label for="avatar">{{ _("avatar_icon") }}</label>
                             <select id="avatar" name="avatar" style="width:140px">
                                 <option value="">— default —</option>
                                 {% for ic in icons %}
@@ -57,16 +57,16 @@
                             </select>
                         </div>
                         <div class="form-group" style="flex:1">
-                            <label for="tagline">Tagline</label>
+                            <label for="tagline">{{ _("tagline") }}</label>
                             <input type="text" id="tagline" name="tagline" value="{{ agent.tagline }}" placeholder="Short personality quote...">
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="description">Description</label>
+                        <label for="description">{{ _("description") }}</label>
                         <textarea id="description" name="description" rows="2" placeholder="What this agent does...">{{ agent.description }}</textarea>
                     </div>
                     <div class="form-group">
-                        <label for="tags">Tags (comma separated)</label>
+                        <label for="tags">{{ _("tags_comma_separated") }}</label>
                         <input type="text" id="tags" name="tags" value="{{ agent.tags | join(', ') }}" placeholder="coding, review, rust">
                     </div>
                 </div>
@@ -75,7 +75,7 @@
             <!-- Skills section (editable list) -->
             <div class="panel">
                 <div class="panel-header">
-                    <h3>Compétences (Skills)</h3>
+                    <h3>{{ _("skills") }}</h3>
                     <button type="button" class="btn btn-sm" onclick="addSkillRow()">
                         <svg class="icon icon-xs"><use href="#icon-plus"/></svg> Add
                     </button>
@@ -93,7 +93,7 @@
                     </div>
                     {% endfor %}
                     {% if not agent.skills %}
-                    <div class="editable-list-empty">No skills assigned</div>
+                    <div class="editable-list-empty">{{ _("no_skills_assigned") }}</div>
                     {% endif %}
                 </div>
             </div>
@@ -101,7 +101,7 @@
             <!-- Tools section -->
             <div class="panel">
                 <div class="panel-header">
-                    <h3>Outils (Tools)</h3>
+                    <h3>{{ _("tools") }}</h3>
                     <button type="button" class="btn btn-sm" onclick="addToolRow()">
                         <svg class="icon icon-xs"><use href="#icon-plus"/></svg> Add tools
                     </button>
@@ -120,26 +120,26 @@
                     </div>
                     {% endfor %}
                     {% if not agent.tools %}
-                    <div class="editable-list-empty">No tools connected</div>
+                    <div class="editable-list-empty">{{ _("no_tools_connected") }}</div>
                     {% endif %}
                 </div>
             </div>
 
             <!-- Memory section -->
             <div class="panel">
-                <div class="panel-header"><h3>Mémoire</h3></div>
+                <div class="panel-header"><h3>{{ _("memory") }}</h3></div>
                 <div class="panel-body">
                     <div class="form-group">
-                        <label for="memory_type">Memory Type</label>
+                        <label for="memory_type">{{ _("memory_type") }}</label>
                         <select id="memory_type" name="memory_type">
-                            <option value="session">Session (ephemeral)</option>
-                            <option value="project">Project (persistent)</option>
-                            <option value="global">Global (cross-project)</option>
-                            <option value="vector">Vector Store</option>
+                            <option value="session">{{ _("session_ephemeral") }}</option>
+                            <option value="project">{{ _("project_persistent") }}</option>
+                            <option value="global">{{ _("global_cross_project") }}</option>
+                            <option value="vector">{{ _("vector_store") }}</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="context_window">Context Window Size</label>
+                        <label for="context_window">{{ _("context_window_size") }}</label>
                         <input type="number" id="context_window" name="context_window" value="200" min="50" max="1000" step="50">
                     </div>
                 </div>
@@ -149,10 +149,10 @@
         <!-- Right column: LLM + permissions + system prompt -->
         <div class="form-column">
             <div class="panel">
-                <div class="panel-header"><h3>LLM Configuration</h3></div>
+                <div class="panel-header"><h3>{{ _("llm_configuration") }}</h3></div>
                 <div class="panel-body">
                     <div class="form-group">
-                        <label for="provider">Provider</label>
+                        <label for="provider">{{ _("provider") }}</label>
                         <select id="provider" name="provider" onchange="updateModels(this.value)">
                             {% for p in providers %}
                             <option value="{{ p.id }}" {% if agent.provider == p.id %}selected{% endif %} {% if not p.enabled %}disabled{% endif %}>
@@ -162,7 +162,7 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="model">Model</label>
+                        <label for="model">{{ _("model") }}</label>
                         <select id="model" name="model">
                             {% for m in models %}
                             <option value="{{ m.model }}" data-provider="{{ m.provider }}" {% if agent.model == m.model and agent.provider == m.provider %}selected{% endif %}>
@@ -173,11 +173,11 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="temperature">Temperature</label>
+                            <label for="temperature">{{ _("temperature") }}</label>
                             <input type="number" id="temperature" name="temperature" value="{{ agent.temperature }}" min="0" max="2" step="0.1">
                         </div>
                         <div class="form-group">
-                            <label for="max_tokens">Max Tokens</label>
+                            <label for="max_tokens">{{ _("max_tokens") }}</label>
                             <input type="number" id="max_tokens" name="max_tokens" value="{{ agent.max_tokens }}" min="256" max="32768" step="256">
                         </div>
                     </div>
@@ -185,7 +185,7 @@
             </div>
 
             <div class="panel">
-                <div class="panel-header"><h3>Permissions</h3></div>
+                <div class="panel-header"><h3>{{ _("permissions") }}</h3></div>
                 <div class="panel-body">
                     <label class="checkbox-label">
                         <input type="checkbox" name="can_veto" {% if agent.permissions.get('can_veto') %}checked{% endif %}>
@@ -204,7 +204,7 @@
 
             <!-- System prompt -->
             <div class="panel">
-                <div class="panel-header"><h3>System Prompt</h3></div>
+                <div class="panel-header"><h3>{{ _("system_prompt") }}</h3></div>
                 <div class="panel-body">
                     <textarea id="system_prompt" name="system_prompt" rows="12" class="code-textarea" placeholder="Instructions for the agent...">{{ agent.system_prompt }}</textarea>
                 </div>
@@ -213,7 +213,7 @@
     </div>
 
     <div class="form-actions">
-        <a href="/agents" class="btn">Cancel</a>
+        <a href="/agents" class="btn">{{ _("cancel") }}</a>
         <button type="submit" class="btn btn-primary btn-lg">
             <svg class="icon icon-sm"><use href="#icon-check"/></svg>
             {{ 'Update' if agent.id else 'Create' }} Agent

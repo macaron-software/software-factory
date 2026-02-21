@@ -1,16 +1,16 @@
 {# View mode switcher — include in any list page #}
 {# Usage: {% include "partials/view_switcher.html" %} #}
 <div class="view-switcher" data-page="{{ page_title|lower|replace(' ','_') }}">
-    <button class="vs-btn active" data-mode="card" title="Cards">
+    <button class="vs-btn active" data-mode="card" title="{{ _("tt_cards") }}">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
     </button>
-    <button class="vs-btn" data-mode="card-simple" title="Simplified">
+    <button class="vs-btn" data-mode="card-simple" title="{{ _("tt_simplified") }}">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="2.5"/><rect x="9" y="1" width="6" height="6" rx="2.5"/><rect x="1" y="9" width="6" height="6" rx="2.5"/><rect x="9" y="9" width="6" height="6" rx="2.5"/></svg>
     </button>
-    <button class="vs-btn" data-mode="list" title="List">
+    <button class="vs-btn" data-mode="list" title="{{ _("tt_list") }}">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1.5" width="14" height="3" rx="1"/><rect x="1" y="6.5" width="14" height="3" rx="1"/><rect x="1" y="11.5" width="14" height="3" rx="1"/></svg>
     </button>
-    <button class="vs-btn" data-mode="list-compact" title="Compact">
+    <button class="vs-btn" data-mode="list-compact" title="{{ _("tt_compact") }}">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2" rx="0.5"/><rect x="1" y="5.5" width="14" height="2" rx="0.5"/><rect x="1" y="9" width="14" height="2" rx="0.5"/><rect x="1" y="12.5" width="14" height="2" rx="0.5"/></svg>
     </button>
 </div>

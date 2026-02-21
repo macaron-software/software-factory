@@ -8,18 +8,18 @@
     </h3>
     <form action="/api/sessions" method="post">
         <div class="form-group">
-            <label for="name">Session Name</label>
+            <label for="name">{{ _("session_name") }}</label>
             <input type="text" id="name" name="name" placeholder="e.g. Review auth module" required>
         </div>
 
         <div class="form-group">
-            <label for="goal">Goal</label>
+            <label for="goal">{{ _("goal") }}</label>
             <textarea id="goal" name="goal" rows="3"
                       placeholder="What should the agents accomplish?"></textarea>
         </div>
 
         <div class="form-group">
-            <label for="pattern_id">Orchestration Pattern</label>
+            <label for="pattern_id">{{ _("orchestration_pattern") }}</label>
             <select id="pattern_id" name="pattern_id" onchange="showPatternPreview(this.value)">
                 <option value="">— Solo Chat (direct agent) —</option>
                 {% for p in patterns %}
@@ -30,7 +30,7 @@
         </div>
 
         <div class="form-group">
-            <label for="workflow_id">Workflow (optional — chains patterns)</label>
+            <label for="workflow_id">{{ _("workflow_optional_chains_patterns") }}</label>
             <select id="workflow_id" name="workflow_id">
                 <option value="">— No workflow —</option>
                 {% for wf in workflows %}
@@ -40,7 +40,7 @@
         </div>
 
         <div class="form-group">
-            <label for="project_id">Project (optional)</label>
+            <label for="project_id">{{ _("project_optional") }}</label>
             <select id="project_id" name="project_id">
                 <option value="">— None —</option>
                 {% for proj in projects %}
@@ -50,7 +50,7 @@
         </div>
 
         <div class="form-group">
-            <label for="lead_agent">Lead Agent (for Solo Chat)</label>
+            <label for="lead_agent">{{ _("lead_agent_for_solo_chat") }}</label>
             <select id="lead_agent" name="lead_agent">
                 <option value="">— Default (Brain) —</option>
                 {% for a in agents %}

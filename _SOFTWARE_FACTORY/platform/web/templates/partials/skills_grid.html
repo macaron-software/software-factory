@@ -36,17 +36,17 @@
         </div>
         <div class="item-meta">
             {% if s.source == 'github' %}
-            <span class="item-badge" style="background:rgba(255,255,255,0.08);color:var(--text-primary)">GitHub</span>
+            <span class="item-badge" style="background:rgba(255,255,255,0.08);color:var(--text-primary)">{{ _("github") }}</span>
             {% elif s.source == 'local-yaml' %}
-            <span class="item-badge accent">Role</span>
+            <span class="item-badge accent">{{ _("role") }}</span>
             {% else %}
-            <span class="item-badge muted">Local</span>
+            <span class="item-badge muted">{{ _("local") }}</span>
             {% endif %}
         </div>
     </div>
     {% endfor %}
     {% if not skills %}
-    <div class="empty-state"><p>No skills match your search.</p></div>
+    <div class="empty-state"><p>{{ _("no_skills_match_your_search") }}</p></div>
     {% endif %}
 </div>
 
@@ -58,7 +58,7 @@
     {% endif %}
     <span class="pagination-info">Page {{ page }} of {{ total_pages }} · {{ total }} skills</span>
     {% if page < total_pages %}
-    <a class="pagination-btn" hx-get="/skills?page={{ page + 1 }}&q={{ q }}&source={{ source_filter }}&repo={{ repo_filter }}" hx-target="#skills-grid" hx-swap="innerHTML" hx-push-url="true">Next →</a>
+    <a class="pagination-btn" hx-get="/skills?page={{ page + 1 }}&q={{ q }}&source={{ source_filter }}&repo={{ repo_filter }}" hx-target="#skills-grid" hx-swap="innerHTML" hx-push-url="true">{{ _("next") }}</a>
     {% endif %}
 </div>
 {% endif %}

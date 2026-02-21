@@ -363,6 +363,21 @@
     </div>
 </div>
 
+<!-- Release Notes Section -->
+<div class="pi-section" id="section-releases">
+    <div class="pi-section-header" onclick="toggleSection('releases')">
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        <h2><svg class="icon icon-sm"><use href="#icon-package"/></svg> Release Notes
+            <span class="pi-count" id="releaseCount">0</span>
+        </h2>
+    </div>
+    <div class="pi-section-body" id="body-releases">
+        <div id="releaseNotesPI" style="font-size:0.82rem;color:var(--text-secondary)">
+            <p style="font-style:italic;color:var(--text-muted)">Loading release data...</p>
+        </div>
+    </div>
+</div>
+
 <!-- Modal creation mission -->
 <div id="newMissionModal" class="nm-overlay" onclick="if(event.target===this)this.style.display='none'">
     <div class="nm-form" id="step1" style="max-width:600px">
@@ -458,7 +473,7 @@ function setViewMode(section, mode) {
 }
 
 function restoreCollapseState() {
-    ['epics','tma','missions'].forEach(id => {
+    ['epics','tma','missions','releases'].forEach(id => {
         try {
             if (localStorage.getItem(`pi_collapse_${id}`) === '1') {
                 const header = document.querySelector(`#section-${id} .pi-section-header`);
@@ -538,5 +553,38 @@ function debounceSearch(q) {
         box.style.display='block';
     }, 300);
 }
+
+// Load release notes
+(async () => {
+    try {
+        const projects = {{ projects | map(attribute='id') | list | tojson if projects else '[]' }};
+        const projectId = projects.length > 0 ? projects[0] : '';
+        if (!projectId) return;
+        const resp = await fetch(`/api/releases/${projectId}`);
+        const data = await resp.json();
+        const el = document.getElementById('releaseNotesPI');
+        const countEl = document.getElementById('releaseCount');
+        if (!data.releases || data.releases.length === 0) {
+            el.innerHTML = '<p style="text-align:center;color:var(--text-muted)">No releases yet</p>';
+            return;
+        }
+        countEl.textContent = data.releases.length;
+        let html = '';
+        for (const r of data.releases) {
+            const date = r.completed_at ? r.completed_at.slice(0, 10) : 'In progress';
+            const pct = r.progress_pct !== undefined ? ` — ${r.progress_pct}%` : '';
+            html += `<div style="margin-bottom:1rem;padding:0.75rem;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border)">`;
+            html += `<div style="font-weight:600;color:var(--text-primary);font-size:0.88rem;margin-bottom:0.3rem">${r.epic_name}</div>`;
+            html += `<div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:0.5rem">${date}${pct} &middot; ${r.feature_count} features &middot; ${r.total_sp} SP</div>`;
+            for (const f of r.features) {
+                const icon = f.status === 'done' ? '&#10003;' : '&#9679;';
+                const clr = f.status === 'done' ? 'var(--green)' : 'var(--text-muted)';
+                html += `<div style="padding:0.15rem 0 0.15rem 0.5rem;font-size:0.78rem"><span style="color:${clr}">${icon}</span> ${f.name}${f.sp ? ' ('+f.sp+' SP)' : ''}</div>`;
+            }
+            html += `</div>`;
+        }
+        el.innerHTML = html;
+    } catch(e) { console.error('Release notes error:', e); }
+})();
 </script>
 {% endblock %}

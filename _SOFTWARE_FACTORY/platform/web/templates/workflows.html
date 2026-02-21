@@ -29,7 +29,7 @@
         </div>
         <div class="item-meta">
             {% if wf.is_builtin %}
-            <span class="item-badge muted">built-in</span>
+            <span class="item-badge muted">{{ _("built_in") }}</span>
             {% endif %}
         </div>
         <div class="item-actions">
@@ -37,12 +37,12 @@
             {% if wf.phases|length > 3 %}
             <a href="/missions/start/{{ wf.id }}" class="btn btn-sm btn-ghost" title="Mission Control"><svg class="icon icon-xs"><use href="#icon-play"/></svg></a>
             {% endif %}
-            <a href="/sessions/new?workflow_id={{ wf.id }}" class="btn btn-sm btn-primary">Use</a>
+            <a href="/sessions/new?workflow_id={{ wf.id }}" class="btn btn-sm btn-primary">{{ _("use") }}</a>
         </div>
     </div>
     {% endfor %}
     {% if not workflows %}
-    <div class="empty-state"><p>No workflows yet.</p></div>
+    <div class="empty-state"><p>{{ _("no_workflows_yet") }}</p></div>
     {% endif %}
 </div>
 {% endblock %}

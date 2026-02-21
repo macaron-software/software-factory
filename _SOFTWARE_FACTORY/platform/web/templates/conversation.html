@@ -43,7 +43,7 @@
 
         <!-- Messages -->
         <div id="message-list" class="conv-messages">
-            <div class="conv-date-separator"><span>Today</span></div>
+            <div class="conv-date-separator"><span>{{ _("today") }}</span></div>
             {% for msg in messages %}
             {% set msg_mode = 'chat' %}
             {% include "partials/msg_unified.html" %}
@@ -139,8 +139,8 @@
     <aside class="conv-logs-panel">
         <div class="conv-logs-header">
             <svg class="icon icon-sm"><use href="#icon-activity"/></svg>
-            <strong>Logs &amp; Pensées</strong>
-            <span class="badge badge-green" style="margin-left:auto">Live</span>
+            <strong>{{ _("logs_thoughts") }}</strong>
+            <span class="badge badge-green" style="margin-left:auto">{{ _("live") }}</span>
         </div>
 
         <!-- Agents in session -->
@@ -165,17 +165,17 @@
                 </span>
                 <div class="conv-log-tags">
                     {% if msg.message_type == 'veto' %}
-                    <span class="log-tag log-tag-red">Veto</span>
+                    <span class="log-tag log-tag-red">{{ _("veto") }}</span>
                     {% elif msg.message_type == 'approval' %}
-                    <span class="log-tag log-tag-green">Approval</span>
+                    <span class="log-tag log-tag-green">{{ _("approval") }}</span>
                     {% elif msg.message_type == 'delegation' %}
-                    <span class="log-tag log-tag-purple">Delegation</span>
+                    <span class="log-tag log-tag-purple">{{ _("delegation") }}</span>
                     {% elif msg.message_type == 'code' or msg.message_type == 'artifact' %}
-                    <span class="log-tag log-tag-blue">Code</span>
+                    <span class="log-tag log-tag-blue">{{ _("code") }}</span>
                     {% elif msg.message_type == 'instruction' %}
-                    <span class="log-tag log-tag-yellow">Instruction</span>
+                    <span class="log-tag log-tag-yellow">{{ _("instruction") }}</span>
                     {% else %}
-                    <span class="log-tag log-tag-default">Message</span>
+                    <span class="log-tag log-tag-default">{{ _("message") }}</span>
                     {% endif %}
                     {% for a_name in [msg.from_agent] %}
                     {% set ag = agent_map.get(a_name, {}) if agent_map is defined else {} %}
@@ -186,7 +186,7 @@
             {% endif %}
             {% endfor %}
             {% if not messages %}
-            <div class="conv-log-empty">En attente de messages…</div>
+            <div class="conv-log-empty">{{ _("waiting_for_messages") }}</div>
             {% endif %}
         </div>
     </aside>

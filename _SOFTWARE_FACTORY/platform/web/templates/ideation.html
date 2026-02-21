@@ -20,7 +20,7 @@
         <!-- History sidebar -->
         <div class="idea-sidebar" id="ideaSidebar">
             <div class="idea-sidebar-header">
-                <span class="idea-sidebar-title">Historique</span>
+                <span class="idea-sidebar-title">{{ _("historique") }}</span>
                 <button class="idea-sidebar-close" onclick="toggleSidebar()">
                     <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
                 </button>
@@ -40,7 +40,7 @@
                 {% endif %}
             </div>
             <div class="idea-sidebar-footer">
-                <a href="/ideation/history" style="font-size:0.7rem;color:var(--purple);text-decoration:none">Voir tout l'historique</a>
+                <a href="/ideation/history" style="font-size:0.7rem;color:var(--purple);text-decoration:none">{{ _("voir_tout_l_historique") }}</a>
             </div>
         </div>
         <div class="idea-messages" id="ideaMessages">
@@ -151,7 +151,7 @@
 
             <!-- Project selector -->
             <div style="margin-bottom:0.5rem">
-                <label style="font-size:0.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Projet</label>
+                <label style="font-size:0.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:700">{{ _("project") }}</label>
                 <select id="ideaProjectSelect" class="input-agent-select" style="width:100%;margin-top:0.25rem">
                     <option value="">{{ _('new_project') }}</option>
                     {% for p in projects %}

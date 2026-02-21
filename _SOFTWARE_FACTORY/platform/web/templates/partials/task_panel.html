@@ -10,25 +10,25 @@
     <!-- Summary counters -->
     <div class="task-summary-grid">
         {% if tasks.pending %}
-        <div class="task-stat"><span class="task-stat-value pending">{{ tasks.pending }}</span><span class="task-stat-label">Pending</span></div>
+        <div class="task-stat"><span class="task-stat-value pending">{{ tasks.pending }}</span><span class="task-stat-label">{{ _("pending") }}</span></div>
         {% endif %}
         {% if tasks.tdd_in_progress %}
-        <div class="task-stat"><span class="task-stat-value active">{{ tasks.tdd_in_progress }}</span><span class="task-stat-label">In Progress</span></div>
+        <div class="task-stat"><span class="task-stat-value active">{{ tasks.tdd_in_progress }}</span><span class="task-stat-label">{{ _("in_progress") }}</span></div>
         {% endif %}
         {% if tasks.code_written %}
-        <div class="task-stat"><span class="task-stat-value written">{{ tasks.code_written }}</span><span class="task-stat-label">Written</span></div>
+        <div class="task-stat"><span class="task-stat-value written">{{ tasks.code_written }}</span><span class="task-stat-label">{{ _("written") }}</span></div>
         {% endif %}
         {% if tasks.build_ok %}
-        <div class="task-stat"><span class="task-stat-value ok">{{ tasks.build_ok }}</span><span class="task-stat-label">Built</span></div>
+        <div class="task-stat"><span class="task-stat-value ok">{{ tasks.build_ok }}</span><span class="task-stat-label">{{ _("built") }}</span></div>
         {% endif %}
         {% if tasks.deployed %}
-        <div class="task-stat"><span class="task-stat-value deployed">{{ tasks.deployed }}</span><span class="task-stat-label">Deployed</span></div>
+        <div class="task-stat"><span class="task-stat-value deployed">{{ tasks.deployed }}</span><span class="task-stat-label">{{ _("deployed") }}</span></div>
         {% endif %}
         {% if tasks.build_failed %}
-        <div class="task-stat"><span class="task-stat-value failed">{{ tasks.build_failed }}</span><span class="task-stat-label">Failed</span></div>
+        <div class="task-stat"><span class="task-stat-value failed">{{ tasks.build_failed }}</span><span class="task-stat-label">{{ _("failed") }}</span></div>
         {% endif %}
         {% if tasks.tdd_failed %}
-        <div class="task-stat"><span class="task-stat-value failed">{{ tasks.tdd_failed }}</span><span class="task-stat-label">TDD Failed</span></div>
+        <div class="task-stat"><span class="task-stat-value failed">{{ tasks.tdd_failed }}</span><span class="task-stat-label">{{ _("tdd_failed") }}</span></div>
         {% endif %}
     </div>
 
@@ -45,6 +45,6 @@
     </div>
     {% endif %}
     {% else %}
-    <p class="empty-state">No factory tasks found for this project.</p>
+    <p class="empty-state">{{ _("no_factory_tasks_found_for_this") }}</p>
     {% endif %}
 </div>

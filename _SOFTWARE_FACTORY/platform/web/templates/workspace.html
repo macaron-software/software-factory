@@ -5,23 +5,23 @@
     <!-- Sessions panel -->
     <section class="panel sessions-panel">
         <div class="panel-header">
-            <h3>Sessions</h3>
+            <h3>{{ _("sessions") }}</h3>
             <button class="btn btn-sm" onclick="location.href='/sessions/new'">+</button>
         </div>
         <div id="sessions-list" class="panel-body">
-            <p class="empty-state">No active sessions. Create one to start collaborating.</p>
+            <p class="empty-state">{{ _("no_active_sessions_create_one_to") }}</p>
         </div>
     </section>
 
     <!-- Conversation panel -->
     <section class="panel conversation-panel">
         <div class="panel-header">
-            <h3>Conversation</h3>
+            <h3>{{ _("conversation") }}</h3>
         </div>
         <div id="conversation-area" class="panel-body">
             <div class="welcome-message">
                 <h2><svg class="icon icon-lg"><use href="#icon-macaron"/></svg> Welcome to Macaron Agent Platform</h2>
-                <p>Create a new session to start a multi-agent collaboration.</p>
+                <p>{{ _("create_a_new_session_to_start") }}</p>
                 <div class="quick-actions">
                     <button class="btn btn-primary" onclick="location.href='/sessions/new'">
                         <svg class="icon icon-sm"><use href="#icon-rocket"/></svg> New Session
@@ -40,10 +40,10 @@
     <!-- Agents sidebar -->
     <aside class="panel agents-sidebar">
         <div class="panel-header">
-            <h3>Agents</h3>
+            <h3>{{ _("agents") }}</h3>
         </div>
         <div id="agents-panel" hx-get="/api/agents/status" hx-trigger="load, every 5s" hx-swap="innerHTML">
-            <p class="empty-state">Loading agents...</p>
+            <p class="empty-state">{{ _("loading_agents") }}</p>
         </div>
     </aside>
 </div>

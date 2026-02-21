@@ -189,8 +189,8 @@
             {% else %}
             <div style="text-align:center;color:var(--text-muted);padding:2rem;font-size:0.78rem">
                 <svg class="icon" style="color:var(--purple);margin-bottom:0.5rem;width:32px;height:32px"><use href="#icon-message-circle"/></svg>
-                <div>Les échanges entre agents apparaîtront ici</div>
-                <div style="font-size:0.68rem;margin-top:0.3rem">Lancez le workflow pour démarrer la collaboration</div>
+                <div>{{ _("agent_exchanges_will_appear_here") }}</div>
+                <div style="font-size:0.68rem;margin-top:0.3rem">{{ _("launch_the_workflow_to_start_collaboration") }}</div>
             </div>
             {% endfor %}
         </div>
@@ -202,10 +202,10 @@
     <div class="wf-panel-header">
         <div class="wf-panel-title"><svg><use href="#icon-share"/></svg> Graphe d'Organisation</div>
         <div style="display:flex;gap:0.6rem;font-size:0.62rem;color:var(--text-secondary)">
-            <span style="color:var(--purple)">Cadrage</span>
-            <span style="color:var(--blue)">Architecture</span>
-            <span style="color:var(--yellow)">Sprint</span>
-            <span style="color:var(--green)">Delivery</span>
+            <span style="color:var(--purple)">{{ _("cadrage") }}</span>
+            <span style="color:var(--blue)">{{ _("architecture") }}</span>
+            <span style="color:var(--yellow)">{{ _("sprint") }}</span>
+            <span style="color:var(--green)">{{ _("delivery") }}</span>
         </div>
     </div>
     <div class="wf-graph-container">

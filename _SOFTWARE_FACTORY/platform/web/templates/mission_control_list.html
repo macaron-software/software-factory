@@ -72,7 +72,7 @@
         <div class="mission-body">
             {% set epic_name = run.brief.split(' - ')[0] if ' - ' in run.brief else run.brief[:50] %}
             <div class="mission-title">
-                {% if is_child %}<span class="mission-child-badge">Feature</span>{% endif %}
+                {% if is_child %}<span class="mission-child-badge">{{ _("feature") }}</span>{% endif %}
                 {{ epic_name }}
                 <span style="font-size:0.68rem;font-weight:400;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.1rem 0.4rem;border-radius:4px">{{ run.workflow_name or run.workflow_id }}</span>
             </div>
@@ -109,7 +109,7 @@
 <div class="empty-state" style="text-align:center;padding:3rem;">
     <p style="margin-bottom:0.5rem"><svg class="icon" style="width:2.5rem;height:2.5rem"><use href="#icon-rocket"/></svg></p>
     <h3 style="color:var(--text-primary);margin-bottom:0.3rem">{{ _('no_epic') }}</h3>
-    <p style="color:var(--text-secondary);font-size:0.88rem;margin-bottom:1rem">Lancez une epic pour orchestrer le cycle de vie produit complet.</p>
+    <p style="color:var(--text-secondary);font-size:0.88rem;margin-bottom:1rem">{{ _("lancez_une_epic_pour_orchestrer_le") }}</p>
     <button class="btn btn-primary" onclick="document.getElementById('launchModal').style.display='flex'">
         <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch_epic') }}
     </button>
@@ -120,7 +120,7 @@
     <form class="launch-form" id="launchForm">
         <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> {{ _('launch_epic') }}</h3>
         <div class="lf-field">
-            <label>Projet</label>
+            <label>{{ _("project") }}</label>
             <select name="project_id" required>
                 {% for p in projects %}
                 <option value="{{ p.id }}">{{ p.name }}</option>
@@ -128,7 +128,7 @@
             </select>
         </div>
         <div class="lf-field">
-            <label>Ceremony Template (workflow)</label>
+            <label>{{ _("ceremony_template_workflow") }}</label>
             <select name="workflow_id" required>
                 {% for wf in workflows %}
                 <option value="{{ wf.id }}">{{ wf.name }}</option>
@@ -136,11 +136,11 @@
             </select>
         </div>
         <div class="lf-field">
-            <label>Brief (objectif, contexte, criteres d'acceptance)</label>
+            <label>{{ _("brief_objectif_contexte_criteres_d_acceptance") }}</label>
             <textarea name="brief" placeholder="Decrivez le besoin metier, le contexte projet, et les objectifs a atteindre..." required></textarea>
         </div>
         <div class="lf-actions">
-            <button type="button" class="btn btn-ghost" onclick="document.getElementById('launchModal').style.display='none'">Annuler</button>
+            <button type="button" class="btn btn-ghost" onclick="document.getElementById('launchModal').style.display='none'">{{ _("cancel") }}</button>
             <button type="submit" class="btn btn-primary">
                 <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch') }}
             </button>

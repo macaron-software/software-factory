@@ -61,7 +61,7 @@
         <h3><svg class="icon icon-sm" style="vertical-align:-2px"><use href="#icon-chart"/></svg> DORA Metrics</h3>
         <div class="dora-filters">
             <select class="dora-select" onchange="location.href='/metrics?project='+this.value+'&period={{ period }}'">
-                <option value="" {% if not selected_project %}selected{% endif %}>Tous les projets</option>
+                <option value="" {% if not selected_project %}selected{% endif %}>{{ _("tous_les_projets") }}</option>
                 {% for p in projects %}
                 <option value="{{ p.id }}" {% if selected_project == p.id %}selected{% endif %}>{{ p.name }}</option>
                 {% endfor %}
@@ -89,7 +89,7 @@
         <!-- Deployment Frequency -->
         <div class="dora-card">
             <div class="dora-card-icon"><svg class="icon" style="color:var(--green)"><use href="#icon-rocket"/></svg></div>
-            <div class="dora-card-title">Phases Done</div>
+            <div class="dora-card-title">{{ _("phases_done") }}</div>
             <div class="dora-card-value">{{ dora.deployment_frequency.count }}</div>
             <div class="dora-card-detail">{{ dora.deployment_frequency.per_day }}/jour</div>
             <span class="dora-card-level level-{{ dora.deployment_frequency.level }}">{{ dora.deployment_frequency.level }}</span>
@@ -98,7 +98,7 @@
         <!-- Lead Time -->
         <div class="dora-card">
             <div class="dora-card-icon"><svg class="icon" style="color:var(--blue)"><use href="#icon-clock"/></svg></div>
-            <div class="dora-card-title">Lead Time</div>
+            <div class="dora-card-title">{{ _("lead_time") }}</div>
             <div class="dora-card-value">{{ dora.lead_time.median_hours }}h</div>
             <div class="dora-card-detail">p90: {{ dora.lead_time.p90_hours }}h</div>
             <span class="dora-card-level level-{{ dora.lead_time.level }}">{{ dora.lead_time.level }}</span>
@@ -107,7 +107,7 @@
         <!-- Change Failure Rate -->
         <div class="dora-card">
             <div class="dora-card-icon"><svg class="icon" style="color:var(--red)"><use href="#icon-alert-circle"/></svg></div>
-            <div class="dora-card-title">Failure Rate</div>
+            <div class="dora-card-title">{{ _("failure_rate") }}</div>
             <div class="dora-card-value">{{ dora.change_failure_rate.rate_pct }}%</div>
             <div class="dora-card-detail">{{ dora.change_failure_rate.failures }}/{{ dora.change_failure_rate.total }}</div>
             <span class="dora-card-level level-{{ dora.change_failure_rate.level }}">{{ dora.change_failure_rate.level }}</span>
@@ -116,7 +116,7 @@
         <!-- MTTR -->
         <div class="dora-card">
             <div class="dora-card-icon"><svg class="icon" style="color:var(--yellow)"><use href="#icon-wrench"/></svg></div>
-            <div class="dora-card-title">MTTR</div>
+            <div class="dora-card-title">{{ _("mttr") }}</div>
             <div class="dora-card-value">{{ dora.mttr.median_hours }}h</div>
             <div class="dora-card-detail">{{ dora.mttr.count }} incidents</div>
             <span class="dora-card-level level-{{ dora.mttr.level }}">{{ dora.mttr.level }}</span>
@@ -126,7 +126,7 @@
         {% if dora.velocity %}
         <div class="dora-card">
             <div class="dora-card-icon"><svg class="icon" style="color:var(--purple-light)"><use href="#icon-zap"/></svg></div>
-            <div class="dora-card-title">Velocity</div>
+            <div class="dora-card-title">{{ _("velocity") }}</div>
             <div class="dora-card-value">{{ dora.velocity.avg_velocity }} phases/epic</div>
             <div class="dora-card-detail">{{ dora.velocity.sprint_count }} sprints</div>
             <span class="dora-card-level level-{% if dora.velocity.predictability_pct >= 80 %}elite{% elif dora.velocity.predictability_pct >= 60 %}high{% elif dora.velocity.predictability_pct >= 40 %}medium{% else %}low{% endif %}">{{ dora.velocity.predictability_pct }}% predictable</span>
@@ -139,22 +139,67 @@
         <h4><svg class="icon icon-sm" style="vertical-align:-2px"><use href="#icon-trending-up"/></svg> Tendance — 12 dernières semaines</h4>
 
         <div class="dora-trend-row">
-            <span class="dora-trend-label">Ceremonies</span>
+            <span class="dora-trend-label">{{ _("ceremonies") }}</span>
             <div class="dora-sparkline" id="sparkDeploy"></div>
         </div>
         <div class="dora-trend-row">
-            <span class="dora-trend-label">Activity</span>
+            <span class="dora-trend-label">{{ _("activity") }}</span>
             <div class="dora-sparkline" id="sparkLeadTime"></div>
         </div>
         <div class="dora-trend-row">
-            <span class="dora-trend-label">Failure %</span>
+            <span class="dora-trend-label">{{ _("failure") }}</span>
             <div class="dora-sparkline" id="sparkFailure"></div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="dora-grid" style="margin-top:1.5rem">
+        <div class="dora-card" style="grid-column:span 2;text-align:left">
+            <div class="dora-card-title" style="text-align:center">Deployment Frequency & Lead Time</div>
+            <canvas id="chartTrend" height="200"></canvas>
+        </div>
+    </div>
+
+    <div class="dora-grid" style="margin-top:1rem">
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Failure Rate (%)</div>
+            <canvas id="chartFailure" height="180"></canvas>
+        </div>
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Velocity (phases/sprint)</div>
+            <canvas id="chartVelocity" height="180"></canvas>
+        </div>
+    </div>
+
+    <!-- Cycle Time + Release Notes -->
+    <div class="dora-grid" style="margin-top:1rem">
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Cycle Time Distribution (days)</div>
+            <canvas id="chartCycleTime" height="180"></canvas>
+        </div>
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Release Notes</div>
+            <div id="releaseNotes" style="max-height:220px;overflow-y:auto;font-size:0.78rem;color:var(--text-secondary)">
+                <p style="color:var(--text-muted);font-style:italic">Loading...</p>
+            </div>
         </div>
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 const trend = {{ trend | tojson }};
+const chartColors = { grid: 'rgba(255,255,255,0.06)', text: 'rgba(255,255,255,0.5)' };
+const chartDefaults = {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+        x: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text, font: { size: 10 } } },
+        y: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text, font: { size: 10 } }, beginAtZero: true },
+    },
+};
+
+function weekLabels(n) { return Array.from({length: n}, (_, i) => `W-${n - i}`); }
 
 function renderSparkline(containerId, data, color) {
     const el = document.getElementById(containerId);
@@ -169,5 +214,121 @@ function renderSparkline(containerId, data, color) {
 renderSparkline('sparkDeploy', trend.deploy, '#16a34a');
 renderSparkline('sparkLeadTime', trend.lead_time, '#3b82f6');
 renderSparkline('sparkFailure', trend.failure, '#dc2626');
+
+// Deployment + Lead Time dual-axis chart
+if (trend.deploy && trend.deploy.length > 0) {
+    new Chart(document.getElementById('chartTrend'), {
+        type: 'bar',
+        data: {
+            labels: weekLabels(trend.deploy.length),
+            datasets: [
+                { label: 'Deployments', data: trend.deploy, backgroundColor: 'rgba(22,163,74,0.6)', borderRadius: 4, yAxisID: 'y' },
+                { label: 'Lead Time (h)', data: trend.lead_time || [], type: 'line', borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3, yAxisID: 'y1', pointRadius: 3 },
+            ],
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { legend: { display: true, labels: { color: chartColors.text, font: { size: 11 } } } },
+            scales: {
+                ...chartDefaults.scales,
+                y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#3b82f6', font: { size: 10 } }, beginAtZero: true },
+            },
+        },
+    });
+}
+
+// Failure Rate chart
+if (trend.failure && trend.failure.length > 0) {
+    new Chart(document.getElementById('chartFailure'), {
+        type: 'line',
+        data: {
+            labels: weekLabels(trend.failure.length),
+            datasets: [{ data: trend.failure, borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,0.1)', fill: true, tension: 0.3, pointRadius: 3 }],
+        },
+        options: chartDefaults,
+    });
+}
+
+// Velocity chart (fetch from API)
+fetch('/api/metrics/velocity').then(r => r.json()).then(sprints => {
+    if (!sprints || sprints.length === 0) return;
+    const labels = sprints.slice(-12).map(s => s.name || s.id.slice(0, 6));
+    const planned = sprints.slice(-12).map(s => s.planned_sp || 0);
+    const actual = sprints.slice(-12).map(s => s.velocity || 0);
+    new Chart(document.getElementById('chartVelocity'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Planned', data: planned, backgroundColor: 'rgba(124,58,237,0.3)', borderRadius: 4 },
+                { label: 'Actual', data: actual, backgroundColor: 'rgba(124,58,237,0.7)', borderRadius: 4 },
+            ],
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { legend: { display: true, labels: { color: chartColors.text, font: { size: 11 } } } },
+        },
+    });
+});
+
+// ── Cycle Time Histogram ──
+const project = '{{ dora.project_id | default("") }}';
+fetch(`/api/metrics/cycle-time?project_id=${project}`).then(r => r.json()).then(ct => {
+    const hist = ct.features.histogram || [];
+    if (hist.length === 0) {
+        document.getElementById('chartCycleTime').parentElement.querySelector('.dora-card-title')
+            .insertAdjacentHTML('afterend', '<p style="color:var(--text-muted);font-size:0.75rem;text-align:center;margin-top:2rem">No completed features yet</p>');
+        document.getElementById('chartCycleTime').style.display = 'none';
+        return;
+    }
+    new Chart(document.getElementById('chartCycleTime'), {
+        type: 'bar',
+        data: {
+            labels: hist.map(h => h.range + 'd'),
+            datasets: [{
+                label: 'Features',
+                data: hist.map(h => h.count),
+                backgroundColor: 'rgba(52,211,153,0.6)',
+                borderRadius: 3,
+            }]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { color: chartColors.text, font: { size: 9 } }, grid: { display: false } },
+                y: { ticks: { color: chartColors.text, stepSize: 1 }, grid: { color: chartColors.grid } },
+            },
+        },
+    });
+    // Stats
+    const title = document.getElementById('chartCycleTime').parentElement.querySelector('.dora-card-title');
+    title.innerHTML += ` <span style="font-weight:400;font-size:0.72rem;color:var(--text-secondary)">(avg: ${ct.features.avg_days}d, median: ${ct.features.median_days}d)</span>`;
+}).catch(() => {});
+
+// ── Release Notes ──
+fetch(`/api/releases/${project}`).then(r => r.json()).then(data => {
+    const el = document.getElementById('releaseNotes');
+    if (!data.releases || data.releases.length === 0) {
+        el.innerHTML = '<p style="color:var(--text-muted);text-align:center">No releases yet</p>';
+        return;
+    }
+    let html = '';
+    for (const r of data.releases.slice(0, 5)) {
+        const date = r.completed_at ? r.completed_at.slice(0, 10) : 'In progress';
+        const pct = r.progress_pct !== undefined ? ` (${r.progress_pct}%)` : '';
+        html += `<div style="margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border)">`;
+        html += `<div style="font-weight:600;color:var(--text-primary);font-size:0.82rem">${r.epic_name}${pct}</div>`;
+        html += `<div style="font-size:0.68rem;color:var(--text-muted)">${date} &middot; ${r.feature_count} features &middot; ${r.total_sp} SP</div>`;
+        for (const f of r.features.slice(0, 8)) {
+            const icon = f.status === 'done' ? '&#10003;' : '&#9679;';
+            const clr = f.status === 'done' ? 'var(--green)' : 'var(--text-muted)';
+            html += `<div style="margin-left:0.5rem;font-size:0.72rem"><span style="color:${clr}">${icon}</span> ${f.name}</div>`;
+        }
+        if (r.features.length > 8) html += `<div style="margin-left:0.5rem;font-size:0.68rem;color:var(--text-muted)">+${r.features.length - 8} more</div>`;
+        html += `</div>`;
+    }
+    el.innerHTML = html;
+}).catch(() => {});
 </script>
 {% endblock %}

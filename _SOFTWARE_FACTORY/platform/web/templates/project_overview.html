@@ -87,19 +87,19 @@
     <div class="po-stats">
         <div class="po-stat">
             <div class="po-stat-val">{{ epics|length }}</div>
-            <div class="po-stat-label">Epics</div>
+            <div class="po-stat-label">{{ _("epics") }}</div>
         </div>
         <div class="po-stat">
             <div class="po-stat-val" id="featCount">0</div>
-            <div class="po-stat-label">Features</div>
+            <div class="po-stat-label">{{ _("features") }}</div>
         </div>
         <div class="po-stat">
             <div class="po-stat-val" id="storyCount">0</div>
-            <div class="po-stat-label">User Stories</div>
+            <div class="po-stat-label">{{ _("user_stories") }}</div>
         </div>
         <div class="po-stat">
             <div class="po-stat-val" id="pointsCount">0</div>
-            <div class="po-stat-label">Story Points</div>
+            <div class="po-stat-label">{{ _("story_points") }}</div>
         </div>
     </div>
 
@@ -134,7 +134,7 @@
                     <div class="po-epic-desc">{{ ep.description }}</div>
                     {% endif %}
                     {% if ep.goal %}
-                    <div class="po-epic-goal"><strong>Objectifs:</strong> {{ ep.goal }}</div>
+                    <div class="po-epic-goal"><strong>{{ _("objectifs") }}</strong> {{ ep.goal }}</div>
                     {% endif %}
                 </div>
 
@@ -241,13 +241,13 @@
                     <svg><use href="#icon-settings"/></svg> Informations
                 </div>
                 <div style="font-size:0.75rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:0.4rem">
-                    <div><strong>Type:</strong> {{ project.factory_type }}</div>
-                    <div><strong>Lead:</strong> {{ project.lead_agent_id }}</div>
+                    <div><strong>{{ _("type") }}</strong> {{ project.factory_type }}</div>
+                    <div><strong>{{ _("lead_2") }}</strong> {{ project.lead_agent_id }}</div>
                     {% if project.values %}
-                    <div><strong>Valeurs:</strong> {{ project.values|join(', ') }}</div>
+                    <div><strong>{{ _("valeurs") }}</strong> {{ project.values|join(', ') }}</div>
                     {% endif %}
                     {% if project.domains %}
-                    <div><strong>Domaines:</strong> {{ project.domains|join(', ') }}</div>
+                    <div><strong>{{ _("domaines") }}</strong> {{ project.domains|join(', ') }}</div>
                     {% endif %}
                 </div>
             </div>

@@ -31,13 +31,13 @@
         {% if msg.message_type == 'system' %}
         <div class="msg-content msg-system-text">{{ msg.content }}</div>
         {% elif msg.message_type == 'veto' %}
-        <div class="msg-content"><span class="msg-badge msg-badge-veto">VETO</span> {{ msg.content }}</div>
+        <div class="msg-content"><span class="msg-badge msg-badge-veto">{{ _("veto_2") }}</span> {{ msg.content }}</div>
         {% elif msg.message_type in ('approval', 'approve') %}
-        <div class="msg-content"><span class="msg-badge msg-badge-approval">APPROVED</span> {{ msg.content }}</div>
+        <div class="msg-content"><span class="msg-badge msg-badge-approval">{{ _("approved_2") }}</span> {{ msg.content }}</div>
         {% elif msg.message_type in ('delegation', 'delegate') %}
-        <div class="msg-content"><span class="msg-badge msg-badge-delegation">DELEGATION</span> {{ msg.content }}</div>
+        <div class="msg-content"><span class="msg-badge msg-badge-delegation">{{ _("delegation_2") }}</span> {{ msg.content }}</div>
         {% elif msg.message_type == 'instruction' %}
-        <div class="msg-content"><span class="msg-badge msg-badge-instruction">INSTRUCTION</span> {{ msg.content }}</div>
+        <div class="msg-content"><span class="msg-badge msg-badge-instruction">{{ _("instruction_2") }}</span> {{ msg.content }}</div>
         {% elif msg.message_type == 'code' or msg.message_type == 'artifact' %}
         <div class="msg-content"><pre><code>{{ msg.content }}</code></pre></div>
         {% else %}

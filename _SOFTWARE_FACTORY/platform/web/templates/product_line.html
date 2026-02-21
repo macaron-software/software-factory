@@ -114,6 +114,18 @@
 .pl-epic-status.failed{background:rgba(248,113,113,.15);color:#f87171}
 .pl-epic-status.paused{background:rgba(251,191,36,.15);color:#fbbf24}
 
+/* Gantt roadmap */
+.pl-gantt{margin-top:0.75rem;overflow-x:auto}
+.pl-gantt-row{display:flex;align-items:center;gap:0.5rem;padding:0.25rem 0;font-size:0.75rem}
+.pl-gantt-label{min-width:120px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary);font-weight:500}
+.pl-gantt-track{flex:1;height:14px;background:var(--bg-tertiary);border-radius:3px;position:relative;min-width:200px}
+.pl-gantt-bar{height:100%;border-radius:3px;position:absolute;top:0;min-width:4px;transition:width .3s}
+.pl-gantt-bar.completed{background:rgba(96,165,250,0.5)}
+.pl-gantt-bar.running{background:rgba(124,58,237,0.6)}
+.pl-gantt-bar.pending{background:rgba(107,114,128,0.3)}
+.pl-gantt-bar.failed{background:rgba(248,113,113,0.4)}
+.pl-gantt-date{font-size:0.6rem;color:var(--text-muted);min-width:60px;text-align:right}
+
 /* Product DORA mini */
 .pl-product-dora{display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid rgba(255,255,255,.04)}
 .pl-pdora{text-align:center;padding:0.4rem;background:var(--bg-tertiary);border-radius:6px}
@@ -134,29 +146,29 @@
     <!-- ── Hero: Product Line KPIs ── -->
     <div class="pl-hero">
         <div>
-            <h2 class="pl-hero-title">Ligne de Produit</h2>
-            <p class="pl-hero-subtitle">Pilotage des produits, applications, roadmap et qualité (DORA)</p>
+            <h2 class="pl-hero-title">{{ _("ligne_de_produit") }}</h2>
+            <p class="pl-hero-subtitle">{{ _("pilotage_des_produits_applications_roadmap_et") }}</p>
         </div>
         <div class="pl-hero-kpis">
             <div class="pl-kpi">
                 <div class="pl-kpi-value">{{ products|length }}</div>
-                <div class="pl-kpi-label">Produits</div>
+                <div class="pl-kpi-label">{{ _("produits") }}</div>
             </div>
             <div class="pl-kpi">
                 <div class="pl-kpi-value">{{ total_epics }}</div>
-                <div class="pl-kpi-label">Epics</div>
+                <div class="pl-kpi-label">{{ _("epics") }}</div>
             </div>
             <div class="pl-kpi">
                 <div class="pl-kpi-value">{{ total_features }}</div>
-                <div class="pl-kpi-label">Features</div>
+                <div class="pl-kpi-label">{{ _("features") }}</div>
             </div>
             <div class="pl-kpi">
                 <div class="pl-kpi-value">{{ total_stories }}</div>
-                <div class="pl-kpi-label">Stories</div>
+                <div class="pl-kpi-label">{{ _("stories") }}</div>
             </div>
             <div class="pl-kpi">
                 <div class="pl-kpi-value">{{ overall_done_pct }}%</div>
-                <div class="pl-kpi-label">Achevé</div>
+                <div class="pl-kpi-label">{{ _("acheve") }}</div>
             </div>
         </div>
     </div>
@@ -169,30 +181,30 @@
         <div class="pl-dora">
             <div class="pl-dora-card">
                 <div class="pl-dora-icon"><svg class="icon" style="color:var(--green)"><use href="#icon-rocket"/></svg></div>
-                <div class="pl-dora-title">Deploy Frequency</div>
+                <div class="pl-dora-title">{{ _("deploy_frequency") }}</div>
                 <div class="pl-dora-value">{{ dora.deployment_frequency.count }}</div>
                 <div class="pl-dora-detail">{{ dora.deployment_frequency.per_day }}/jour</div>
                 <span class="pl-dora-level level-{{ dora.deployment_frequency.level }}">{{ dora.deployment_frequency.level }}</span>
             </div>
             <div class="pl-dora-card">
                 <div class="pl-dora-icon"><svg class="icon" style="color:var(--blue)"><use href="#icon-clock"/></svg></div>
-                <div class="pl-dora-title">Lead Time</div>
+                <div class="pl-dora-title">{{ _("lead_time") }}</div>
                 <div class="pl-dora-value">{{ dora.lead_time.median_hours }}h</div>
                 <div class="pl-dora-detail">commit → prod (p90: {{ dora.lead_time.p90_hours }}h)</div>
                 <span class="pl-dora-level level-{{ dora.lead_time.level }}">{{ dora.lead_time.level }}</span>
             </div>
             <div class="pl-dora-card">
                 <div class="pl-dora-icon"><svg class="icon" style="color:var(--yellow)"><use href="#icon-alert-triangle"/></svg></div>
-                <div class="pl-dora-title">Change Failure</div>
+                <div class="pl-dora-title">{{ _("change_failure") }}</div>
                 <div class="pl-dora-value">{{ dora.change_failure_rate.rate_pct }}%</div>
                 <div class="pl-dora-detail">{{ dora.change_failure_rate.failures }}/{{ dora.change_failure_rate.total }} deploys</div>
                 <span class="pl-dora-level level-{{ dora.change_failure_rate.level }}">{{ dora.change_failure_rate.level }}</span>
             </div>
             <div class="pl-dora-card">
                 <div class="pl-dora-icon"><svg class="icon" style="color:var(--red)"><use href="#icon-wrench"/></svg></div>
-                <div class="pl-dora-title">MTTR</div>
+                <div class="pl-dora-title">{{ _("mttr") }}</div>
                 <div class="pl-dora-value">{{ dora.mttr.median_hours }}h</div>
-                <div class="pl-dora-detail">temps de résolution</div>
+                <div class="pl-dora-detail">{{ _("temps_de_resolution") }}</div>
                 <span class="pl-dora-level level-{{ dora.mttr.level }}">{{ dora.mttr.level }}</span>
             </div>
         </div>
@@ -294,26 +306,42 @@
                     </div>
                     {% endfor %}
 
+                    <!-- Gantt-style Epic Timeline -->
+                    {% if p.epics|length > 1 %}
+                    <div class="pl-gantt">
+                        <div class="pl-roadmap-title" style="margin-top:0.75rem"><svg><use href="#icon-bar-chart-2"/></svg> Epic Timeline</div>
+                        {% for e in p.epics %}
+                        <div class="pl-gantt-row">
+                            <span class="pl-gantt-label" title="{{ e.name }}">{{ e.name }}</span>
+                            <div class="pl-gantt-track">
+                                <div class="pl-gantt-bar {{ e.status }}" style="width:{{ e.done_pct if e.done_pct else (100 if e.status == 'completed' else 15) }}%"></div>
+                            </div>
+                            <span class="pl-gantt-date">{{ e.done_pct|default(0) }}%</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
                     <!-- Per-product DORA mini -->
                     {% if p.dora %}
                     <div class="pl-product-dora">
                         <div class="pl-pdora">
-                            <div class="pl-pdora-label">Deploy</div>
+                            <div class="pl-pdora-label">{{ _("deploy") }}</div>
                             <div class="pl-pdora-value">{{ p.dora.deployment_frequency.count }}</div>
                             <div class="pl-pdora-level level-{{ p.dora.deployment_frequency.level }}">{{ p.dora.deployment_frequency.level }}</div>
                         </div>
                         <div class="pl-pdora">
-                            <div class="pl-pdora-label">Lead Time</div>
+                            <div class="pl-pdora-label">{{ _("lead_time") }}</div>
                             <div class="pl-pdora-value">{{ p.dora.lead_time.median_hours }}h</div>
                             <div class="pl-pdora-level level-{{ p.dora.lead_time.level }}">{{ p.dora.lead_time.level }}</div>
                         </div>
                         <div class="pl-pdora">
-                            <div class="pl-pdora-label">Failure</div>
+                            <div class="pl-pdora-label">{{ _("failure_2") }}</div>
                             <div class="pl-pdora-value">{{ p.dora.change_failure_rate.rate_pct }}%</div>
                             <div class="pl-pdora-level level-{{ p.dora.change_failure_rate.level }}">{{ p.dora.change_failure_rate.level }}</div>
                         </div>
                         <div class="pl-pdora">
-                            <div class="pl-pdora-label">MTTR</div>
+                            <div class="pl-pdora-label">{{ _("mttr") }}</div>
                             <div class="pl-pdora-value">{{ p.dora.mttr.median_hours }}h</div>
                             <div class="pl-pdora-level level-{{ p.dora.mttr.level }}">{{ p.dora.mttr.level }}</div>
                         </div>

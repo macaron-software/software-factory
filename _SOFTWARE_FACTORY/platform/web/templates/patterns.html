@@ -27,15 +27,15 @@
         </div>
         <div class="item-meta">
             {% if pattern.is_builtin %}
-            <span class="item-badge muted">built-in</span>
+            <span class="item-badge muted">{{ _("built_in") }}</span>
             {% endif %}
         </div>
     </a>
     {% endfor %}
     {% if not patterns %}
     <div class="empty-state">
-        <p>No patterns yet.</p>
-        <a href="/patterns/new" class="btn btn-primary">Create Pattern</a>
+        <p>{{ _("no_patterns_yet") }}</p>
+        <a href="/patterns/new" class="btn btn-primary">{{ _("create_pattern") }}</a>
     </div>
     {% endif %}
 </div>
