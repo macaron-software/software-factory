@@ -56,7 +56,9 @@ VM:   vm-macaron (RG-MACARON, francecentral) — Standard_D4as_v5 (4 vCPU, 16GB)
       IP: 4.233.64.30, SSH: azureadmin, nginx basic auth: macaron/macaron
       Files: /opt/macaron/platform/ — docker compose (platform + nginx)
       NOTE: D4as_v6 fails (SCSI disk controller incompatible, needs NVMe)
-      NOTE: active compose = platform/docker-compose.yml (NOT deploy/)
+      NOTE: active compose = deploy/docker-compose-vm.yml (deploy project)
+      NOTE: /opt/macaron/platform/docker-compose.yml = LEGACY, must stay stopped
+      NOTE: after rsync: ALWAYS `cd /opt/macaron/platform && docker compose down`
       NOTE: files owned by azureadmin → SCP to /tmp + sudo cp
 
 PG:   macaron-platform-pg (RG-MACARON, francecentral) — B1ms, PG 17, 32GB
@@ -73,9 +75,14 @@ LLM:  ascii-ui-openai (rg-ascii-ui, francecentral) — gpt-5-mini
       Capacity: 100 req/min, 100K tokens/min
       NOTE: castudioia* resources are private endpoint (VNet only, unusable)
 
-Deploy: rsync fails (permissions) → SCP to /tmp + sudo cp
+Deploy: rsync to /tmp + sudo cp (permissions). Or hotfix: cat file | ssh vm-macaron "docker exec -i CID tee /app/macaron_platform/PATH"
+        Package installed as macaron_platform (NOT platform) — container path: /app/macaron_platform/
+        After hotfix: clear pyc (`find /app/macaron_platform -name "*.pyc" -delete`) + restart container
         VM resize: az vm deallocate → az vm resize → az vm start
-        Container rebuild: sudo docker compose up -d --build
+        Container rebuild: cd /opt/macaron/platform/deploy && sudo docker compose up -d --build
+        Auto-resume: server.py lifespan (L98-118) restarts "running" missions on container restart
+        Volume: deploy_platform-data at /app/data — survives container recreation
+        ⚠️ No git remote, no CI/CD — hotfixes lost on rebuild (persistence plan: Phase 1-5 above)
 
 DR:   L3 full — 14/14 checks verified, 100% coverage
       Blob: macaronbackups (Standard_GRS francecentral→francesouth, secondary=available)
@@ -143,6 +150,19 @@ Auto-Heal (platform/ops/auto_heal.py):
   Env: AUTOHEAL_ENABLED=1, AUTOHEAL_INTERVAL=60, AUTOHEAL_SEVERITY=P3, AUTOHEAL_MAX_CONCURRENT=3
   Dedup: links new incidents to existing active TMA epics (no duplicates)
   Resolution: mission completed → incidents auto-resolved
+
+  ⚠️ PERSISTENCE GAP (PLANNED — not yet implemented):
+    Current: fixes via docker cp → LOST on rebuild. No git remote, no CI/CD.
+    Target: Auto-Heal → git commit → git push → GitHub → CI/CD (GH Actions) → Docker build → deploy Azure VM
+    Plan:
+      1. GitHub repo + secrets (SSH key, API keys)
+      2. GH Actions: deploy.yml (build→GHCR→SSH deploy→health check→rollback)
+      3. GH Actions: pr-check.yml (lint+test, auto-merge heal PRs P0/P1)
+      4. New tool git_push (approval required) in tools/git_tools.py
+      5. auto_heal.py: after fix verified → commit + push + PR auto
+      6. Azure VM: deploy key SSH, container git clone at startup
+      7. Circuit breaker: max 3 fails → stop, revert auto si health check fail
+    Safety: agents never touch secrets (CI/CD injects), main protected, 1 deploy/10min max
 ```
 
 ## SF PIPELINE
@@ -310,7 +330,7 @@ Build gate: preflight build + reloop max 5x. TDD enforcement in dev-sprint promp
 server.py, models.py, config.py
 llm/client.py (multi-provider), llm/observability.py (per-call tracing)
 a2a/bus.py (MessageBus), a2a/protocol.py, a2a/negotiation.py, a2a/veto.py
-agents/loop.py (AgentLoop), agents/executor.py (LLM+tools), agents/store.py (133 agents YAML)
+agents/loop.py (AgentLoop), agents/executor.py (LLM+tools), agents/store.py (143 agents YAML)
 patterns/engine.py (8 patterns), patterns/store.py (PatternDef/Run/NodeState)
 missions/store.py (MissionRun/PhaseRun/Sprint), missions/product.py (backlog)
 sessions/store.py (SessionDef+MessageDef), sessions/runner.py (_push_sse dual)
@@ -338,11 +358,40 @@ Cost: per-model pricing ($0.30-$15/1M tokens)
 ### DASHBOARD VIEWS
 DSI/CTO (`/dsi`), Métier (`/metier`), Portefeuille (`/`), Projet Board (`/projects/{id}/board`)
 
+**Métier tab** (`/metier`, htmx-loaded from portfolio):
+  - LEAN/SAFe product-centric, 100% live data (zero mock)
+  - Top: Flow KPIs (WIP, completed, failed, avg lead time) — from missions DB
+  - Left: Value Stream — Epic pipeline cards with phase dots (✓/▶/pending), progress bar, lead time, click→Mission Control
+  - Right: Flow Metrics (throughput %, agents ART, WIP limit), Agent Velocity (top 8 by real message count), Activity Heatmap (28j from message timestamps)
+  - Workflow Catalog: SAFe workflows with run counts
+  - Route: `pages.py metier_page()`, Template: `metier.html`
+  - NOTE: enum comparison — use `_s(val)` helper (`.value` for enums, `str()` otherwise)
+
 ### IDEATION
 `/ideation` → 5 agents (BA+Archi+UX+Sécu+PM) → run_pattern(network) → streaming debate → Brief→Analyse→Synthèse
 "Créer Epic" → PO creates project+git
+NOTE: Graph init uses readyState check (not DOMContentLoaded) for htmx compatibility
 
 ### MEMORY
 4-layer: session→pattern→project→global (FTS5 on SQLite, tsvector on PG)
 Wiki-like `/memory`, confidence bars, auto-population from epic creation
 Retrospectives → LLM analyze → lessons → memory_global (recursive self-improvement)
+
+### MOBILE EPICS (Azure-hosted)
+```
+Workflows: mobile-ios-epic (SwiftUI, 5 phases), mobile-android-epic (Kotlin/Compose, 5 phases)
+Phases: archi → network → features → tests → integration
+Agents: 10 mobile-specific YAMLs (mobile_archi, mobile_ios_lead, mobile_android_lead, mobile_ux, mobile_qa, etc.)
+Status: missions re-created after DB re-seed, workspace files preserved on deploy_platform-data volume
+iOS output: ~19 Swift files (MVVM, async/await, Combine, URLSession)
+Android output: ~37 Kotlin files (Compose, Hilt DI, OkHttp, Coroutines)
+Android builder: deploy/Dockerfile.android (JDK 17, SDK 34, cmdline-tools, emulator headless)
+⚠️ Android code_write path bug: agents write with duplicated workspace prefix (needs fix in executor.py)
+```
+
+### HTMX PATTERNS (common pitfalls)
+- `DOMContentLoaded` does NOT fire for htmx-injected content → use `readyState` check:
+  `if(document.readyState==='loading'){addEventListener('DOMContentLoaded',fn)}else{fn()}`
+- htmx tabs: `hx-get="/route" hx-select=".main-area > *" hx-target="#tab-content" hx-push-url="/?tab=X"`
+- Enum→string in Jinja: use `_s(val)` helper (`val.value if hasattr(val,'value') else str(val)`)
+- Template injection: `<script>` in htmx fragments executes but DOM events already fired
