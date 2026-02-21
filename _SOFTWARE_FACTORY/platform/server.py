@@ -156,41 +156,32 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Auto-heal loop failed to start: %s", e)
 
-    # Auto-resume stuck missions (status=running but no asyncio task after restart)
+    # Auto-resume missions after restart (running OR paused with phases remaining)
     try:
         from .missions.store import get_mission_run_store
         _mrs = get_mission_run_store()
         _all_runs = _mrs.list_runs(limit=50)
-        _stuck = [m for m in _all_runs if m.status.value == "running"]
-        if _stuck:
-            logger.warning("Found %d stuck missions after restart: %s",
-                           len(_stuck), [m.id for m in _stuck])
+        _resumable = [m for m in _all_runs if m.status.value in ("running", "paused")]
+        if _resumable:
+            logger.warning("Found %d resumable missions after restart: %s",
+                           len(_resumable), [m.id for m in _resumable])
 
             async def _auto_resume():
-                """Resume only the first stuck mission; pause the rest."""
+                """Resume ALL resumable missions — semaphore serializes them."""
                 import asyncio
-                await asyncio.sleep(15)  # Wait for server to stabilize
-                from .missions.store import get_mission_run_store as _get_mrs
-                from .models import MissionStatus
-                _mrs2 = _get_mrs()
-                # Pause all stuck except first
-                for m in _stuck[1:]:
-                    m.status = MissionStatus.PAUSED
-                    _mrs2.update(m)
-                    logger.warning("Paused stuck mission %s (queued)", m.id)
-                # Resume first only
-                if _stuck:
-                    from .web.routes import api_mission_run
-                    from starlette.requests import Request
-                    scope = {"type": "http", "method": "POST", "path": "/",
-                             "headers": [], "query_string": b""}
-                    fake_req = Request(scope)
+                await asyncio.sleep(15)
+                from .web.routes import api_mission_run
+                from starlette.requests import Request
+                scope = {"type": "http", "method": "POST", "path": "/",
+                         "headers": [], "query_string": b""}
+                fake_req = Request(scope)
+                for m in _resumable:
                     try:
-                        resp = await api_mission_run(fake_req, _stuck[0].id)
-                        logger.warning("Auto-resumed mission %s: %s", _stuck[0].id,
+                        resp = await api_mission_run(fake_req, m.id)
+                        logger.warning("Auto-resumed mission %s: %s", m.id,
                                        getattr(resp, 'body', b'')[:100])
                     except Exception as exc:
-                        logger.warning("Failed to auto-resume mission %s: %s", _stuck[0].id, exc)
+                        logger.warning("Failed to auto-resume mission %s: %s", m.id, exc)
 
             import asyncio
             asyncio.create_task(_auto_resume())
