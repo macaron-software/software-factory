@@ -792,6 +792,50 @@ function handleSSE(d) {
             }
         }
     }
+    else if (d.type === 'backlog_update') {
+        // Update PO kanban live — append new features
+        const col = document.querySelector('.mc-kanban-col[data-col="backlog"]');
+        if (col && d.features) {
+            const countEl = col.querySelector('.mc-kanban-count');
+            d.features.forEach(f => {
+                const card = document.createElement('div');
+                card.className = 'mc-kanban-card new-card';
+                card.innerHTML = `<div class="mc-kanban-card-title">${f.name}</div>
+                    <div class="mc-kanban-card-meta">
+                        ${f.story_points ? `<span class="mc-kanban-sp">${f.story_points} SP</span>` : ''}
+                        <span class="mc-kanban-priority p${f.priority||5}">P${f.priority||5}</span>
+                    </div>`;
+                col.appendChild(card);
+            });
+            if (countEl) {
+                const cur = parseInt(countEl.textContent) || 0;
+                countEl.textContent = cur + d.features.length;
+            }
+            addActivity(`+${d.features.length} features extraites de la phase ${d.phase_id}`, 'tool');
+        }
+    }
+    else if (d.type === 'kanban_refresh') {
+        // Full kanban refresh — rebuild all columns
+        ['backlog','sprint','done'].forEach(col => {
+            const el = document.querySelector(`.mc-kanban-col[data-col="${col}"]`);
+            if (!el) return;
+            el.querySelectorAll('.mc-kanban-card').forEach(c => c.remove());
+            const items = d[col] || [];
+            const countEl = el.querySelector('.mc-kanban-count');
+            if (countEl) countEl.textContent = items.length;
+            items.forEach(f => {
+                const card = document.createElement('div');
+                card.className = 'mc-kanban-card' + (col === 'done' ? ' done' : ' new-card');
+                card.innerHTML = `<div class="mc-kanban-card-title">${f.name}</div>` +
+                    (col !== 'done' ? `<div class="mc-kanban-card-meta">
+                        ${f.story_points ? `<span class="mc-kanban-sp">${f.story_points} SP</span>` : ''}
+                        <span class="mc-kanban-priority p${f.priority||5}">P${f.priority||5}</span>
+                    </div>` : '');
+                el.appendChild(card);
+            });
+        });
+        addActivity('Kanban PO mis a jour', 'tool');
+    }
     else if (d.type === 'agent_message' || d.type === 'agent_response') {
         const phaseId = d.phase_id || currentRunningPhase();
         if (phaseId) {

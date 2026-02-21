@@ -385,6 +385,8 @@
 .mc-kanban-dot.done{background:var(--green)}
 .mc-kanban-count{font-size:0.6rem;color:var(--text-secondary);font-weight:400;margin-left:auto}
 .mc-kanban-card{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:0.5rem;border-left:3px solid var(--border)}
+.mc-kanban-card.new-card{animation:card-slide-in .4s ease;border-left-color:var(--purple)}
+@keyframes card-slide-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 .mc-kanban-card.done{opacity:.7}
 .mc-kanban-card-title{font-size:0.75rem;font-weight:600;color:var(--text-primary);margin-bottom:0.2rem}
 .mc-kanban-card-criteria{font-size:0.65rem;color:var(--text-secondary);line-height:1.4;margin-bottom:0.25rem}

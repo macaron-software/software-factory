@@ -1229,7 +1229,7 @@ async def mission_control_page(request: Request, mission_id: str):
                     workspace_files.append({"path": fpath, "is_dir": False})
             workspace_files = workspace_files[:100]
 
-    # PO Kanban: features from DB or extracted from tool_features
+    # PO Kanban: features from DB or extracted from phase summaries
     po_backlog, po_sprint, po_done = [], [], []
     try:
         from ...db.migrations import get_db
@@ -1249,6 +1249,22 @@ async def mission_control_page(request: Request, mission_id: str):
     if not po_backlog and not po_sprint and not po_done and tool_features:
         for f in tool_features:
             po_done.append({"name": f, "description": "", "acceptance_criteria": "", "priority": 5, "story_points": 0, "assigned_to": ""})
+    # Fallback 2: derive from completed phases if still empty
+    if not po_backlog and not po_sprint and not po_done and mission:
+        from ...models import PhaseStatus
+        done_phases = {"deploy-prod", "qa-execution", "qa-campaign", "tma-router", "tma-fix"}
+        sprint_phases = {"dev-sprint", "cicd"}
+        for ph in mission.phases:
+            if not getattr(ph, "summary", None):
+                continue
+            feat = {"name": ph.summary[:80], "description": "", "acceptance_criteria": "",
+                    "priority": 5, "story_points": 0, "assigned_to": ""}
+            if ph.phase_id in done_phases and ph.status in (PhaseStatus.DONE,):
+                po_done.append(feat)
+            elif ph.phase_id in sprint_phases:
+                po_sprint.append(feat)
+            elif ph.status in (PhaseStatus.DONE, PhaseStatus.DONE_WITH_ISSUES):
+                po_done.append(feat)
 
     # QA: Agent adversarial scores (moved to Phases tab as collapsible)
     agent_scores = []
@@ -2282,6 +2298,37 @@ async def api_mission_run(request: Request, mission_id: str):
                 phase.summary = f"Phase échouée — {phase_error[:200]}"
                 phases_failed += 1
             run_store.update(mission)
+
+            # Extract features from phase output into PO backlog
+            if phase_success:
+                asyncio.ensure_future(_extract_features_from_phase(
+                    mission.id, session_id, phase.phase_id,
+                    wf_phase.name, phase.summary or "",
+                    _pre_phase_msg_count
+                ))
+                # Progress feature statuses based on phase type
+                try:
+                    from ...db.migrations import get_db as _gdb_feat
+                    _fdb = _gdb_feat()
+                    if phase.phase_id in ("dev-sprint",):
+                        _fdb.execute("UPDATE features SET status='in_progress' WHERE epic_id=? AND status='backlog'", (mission.id,))
+                        _fdb.commit()
+                    elif phase.phase_id in ("qa-campaign", "qa-execution", "deploy-prod"):
+                        _fdb.execute("UPDATE features SET status='done' WHERE epic_id=? AND status='in_progress'", (mission.id,))
+                        _fdb.commit()
+                    # Send updated kanban via SSE
+                    rows = _fdb.execute("SELECT name, status, priority, story_points FROM features WHERE epic_id=?", (mission.id,)).fetchall()
+                    if rows:
+                        _bl = [{"name":r[0],"priority":r[2],"story_points":r[3]} for r in rows if r[1]=="backlog"]
+                        _sp = [{"name":r[0],"priority":r[2],"story_points":r[3]} for r in rows if r[1]=="in_progress"]
+                        _dn = [{"name":r[0]} for r in rows if r[1]=="done"]
+                        await _push_sse(session_id, {
+                            "type": "kanban_refresh",
+                            "mission_id": mission.id,
+                            "backlog": _bl, "sprint": _sp, "done": _dn,
+                        })
+                except Exception:
+                    pass
 
             # Send phase_completed SSE IMMEDIATELY (before slow hooks)
             await _push_sse(session_id, {
@@ -3993,6 +4040,75 @@ _WEB_QA = {
         "4. build + verify"
     ),
 }
+
+
+async def _extract_features_from_phase(
+    mission_id: str, session_id: str, phase_id: str,
+    phase_name: str, summary: str, pre_msg_count: int
+):
+    """Extract features/user stories from phase output and insert into features table."""
+    import uuid
+    try:
+        from ...sessions.store import get_session_store
+        from ...llm.client import get_llm_client, LLMMessage
+        from ...db.migrations import get_db
+
+        ss = get_session_store()
+        msgs = ss.get_messages(session_id, limit=1000)
+        phase_msgs = msgs[pre_msg_count:]
+        transcript_parts = []
+        for m in phase_msgs:
+            txt = (getattr(m, 'content', '') or '').strip()
+            if txt and len(txt) > 30:
+                name = getattr(m, 'from_name', '') or getattr(m, 'from_agent', '') or ''
+                transcript_parts.append(f"{name}: {txt[:600]}")
+        if not transcript_parts and not summary:
+            return
+        transcript = "\n".join(transcript_parts[-20:])
+
+        llm = get_llm_client()
+        resp = await asyncio.wait_for(llm.chat([
+            LLMMessage(role="user", content=(
+                "Extract actionable features/user stories from this phase output. "
+                "Return a JSON array of objects with keys: name (short title), description, priority (1-5, 1=highest), story_points (1,2,3,5,8,13). "
+                "If no features found, return []. Only valid JSON, no markdown.\n\n"
+                f"Phase: {phase_name}\nSummary: {summary}\n\nTranscript:\n{transcript[:3000]}"
+            ))
+        ], max_tokens=500, temperature=0.2), timeout=30)
+
+        import json as _json
+        raw = (resp.content or "").strip()
+        # Strip markdown fences
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        features = _json.loads(raw)
+        if not isinstance(features, list):
+            return
+
+        db = get_db()
+        inserted = []
+        for feat in features[:15]:
+            if not isinstance(feat, dict) or not feat.get("name"):
+                continue
+            fid = str(uuid.uuid4())[:8]
+            db.execute(
+                "INSERT OR IGNORE INTO features (id, epic_id, name, description, priority, status, story_points) VALUES (?,?,?,?,?,?,?)",
+                (fid, mission_id, feat["name"][:120], feat.get("description", "")[:500],
+                 feat.get("priority", 5), "backlog", feat.get("story_points", 3))
+            )
+            inserted.append({"id": fid, "name": feat["name"][:120], "priority": feat.get("priority", 5),
+                           "story_points": feat.get("story_points", 3), "status": "backlog"})
+        db.commit()
+
+        if inserted:
+            await _push_sse(session_id, {
+                "type": "backlog_update",
+                "mission_id": mission_id,
+                "phase_id": phase_id,
+                "features": inserted,
+            })
+    except Exception:
+        pass
 
 
 def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, total: int, prev_context: str = "", workspace_path: str = "") -> str:
