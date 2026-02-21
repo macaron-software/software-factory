@@ -376,32 +376,32 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         {"id": "n2", "agent_id": "strat-cpo", "x": 200, "y": 140, "label": "Julie - CPO"},
                         {"id": "n3", "agent_id": "strat-cto", "x": 600, "y": 140, "label": "Karim - CTO"},
                         {"id": "n4", "agent_id": "strat-portfolio", "x": 120, "y": 280, "label": "Sofia - Portfolio"},
-                        {"id": "n5", "agent_id": "strat-dirprog", "x": 680, "y": 280, "label": "Thomas - Dir Programme"},
+                        {"id": "n5", "agent_id": "strat-dirprog", "x": 680, "y": 280, "label": "Thomas - Program Dir"},
                         {"id": "n6", "agent_id": "lean_portfolio_manager", "x": 400, "y": 330, "label": "Lean Portfolio Mgr"},
                     ],
                     "edges": [
-                        # DSI ↔ CPO/CTO: arbitrage stratégique
-                        {"from": "n1", "to": "n2", "label": "vision produit", "color": "#a855f7"},
-                        {"from": "n1", "to": "n3", "label": "vision tech", "color": "#a855f7"},
-                        {"from": "n2", "to": "n1", "label": "proposition", "color": "#8b5cf6"},
-                        {"from": "n3", "to": "n1", "label": "faisabilite", "color": "#8b5cf6"},
-                        # CPO ↔ CTO: produit vs technique
-                        {"from": "n2", "to": "n3", "label": "feature vs dette", "color": "#f59e0b"},
-                        {"from": "n3", "to": "n2", "label": "contraintes archi", "color": "#f59e0b"},
-                        # Portfolio ↔ CPO: priorisation WSJF
+                        # DSI ↔ CPO/CTO: strategic arbitration
+                        {"from": "n1", "to": "n2", "label": "product vision", "color": "#a855f7"},
+                        {"from": "n1", "to": "n3", "label": "tech vision", "color": "#a855f7"},
+                        {"from": "n2", "to": "n1", "label": "proposal", "color": "#8b5cf6"},
+                        {"from": "n3", "to": "n1", "label": "feasibility", "color": "#8b5cf6"},
+                        # CPO ↔ CTO: product vs tech
+                        {"from": "n2", "to": "n3", "label": "feature vs debt", "color": "#f59e0b"},
+                        {"from": "n3", "to": "n2", "label": "arch constraints", "color": "#f59e0b"},
+                        # Portfolio ↔ CPO: WSJF prioritization
                         {"from": "n4", "to": "n2", "label": "WSJF scoring", "color": "#10b981"},
-                        {"from": "n2", "to": "n4", "label": "valeur business", "color": "#10b981"},
+                        {"from": "n2", "to": "n4", "label": "business value", "color": "#10b981"},
                         # Portfolio ↔ Lean: budget & capacity
-                        {"from": "n4", "to": "n6", "label": "metriques flux", "color": "#06b6d4"},
-                        {"from": "n6", "to": "n4", "label": "budget lean", "color": "#06b6d4"},
+                        {"from": "n4", "to": "n6", "label": "flow metrics", "color": "#06b6d4"},
+                        {"from": "n6", "to": "n4", "label": "lean budget", "color": "#06b6d4"},
                         # CTO ↔ Dir Programme: charge & planning
-                        {"from": "n3", "to": "n5", "label": "complexite", "color": "#ef4444"},
-                        {"from": "n5", "to": "n3", "label": "capacite equipes", "color": "#ef4444"},
+                        {"from": "n3", "to": "n5", "label": "complexity", "color": "#ef4444"},
+                        {"from": "n5", "to": "n3", "label": "team capacity", "color": "#ef4444"},
                         # Dir Programme ↔ Lean: staffing
-                        {"from": "n5", "to": "n6", "label": "plan staffing", "color": "#d946ef"},
+                        {"from": "n5", "to": "n6", "label": "staffing plan", "color": "#d946ef"},
                         {"from": "n6", "to": "n5", "label": "guardrails", "color": "#d946ef"},
-                        # DSI ↔ Lean: alignement strategique
-                        {"from": "n1", "to": "n6", "label": "themes strat", "color": "#64748b"},
+                        # DSI ↔ Lean: strategic alignment
+                        {"from": "n1", "to": "n6", "label": "strat themes", "color": "#64748b"},
                         {"from": "n6", "to": "n1", "label": "portfolio health", "color": "#64748b"},
                     ],
                 },

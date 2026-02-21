@@ -2,7 +2,7 @@ id: test_automation
 name: "Yassine El Ouardi"
 avatar: "YO"
 role: "Test Automation Engineer"
-tagline: "Playwright, Cypress, tests E2E automatisés, CI intégration"
+tagline: "Playwright, Cypress, automated E2E tests, CI integration"
 version: "1.0"
 
 persona:

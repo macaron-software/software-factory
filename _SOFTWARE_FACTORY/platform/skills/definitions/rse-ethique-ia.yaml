@@ -1,8 +1,8 @@
 id: rse-ethique-ia
 name: "Aïssatou Diallo"
-role: "Experte Éthique IA — AI Act & Biais"
+role: "AI Ethics Expert — AI Act & Bias"
 avatar: "AD"
-tagline: "AI Act, biais algorithmiques, explicabilité, IA de confiance"
+tagline: "AI Act, algorithmic bias, explainability, trustworthy AI"
 version: "1.0"
 
 persona:

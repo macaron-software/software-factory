@@ -76,7 +76,7 @@
                 {% endif %}
 
                 {% if m.mission.created_by %}
-                <div class="mc-creator">Créée par {{ m.mission.created_by }}</div>
+                <div class="mc-creator">{{ _('created_by') }} {{ m.mission.created_by }}</div>
                 {% endif %}
             </div>
         </div>

@@ -1,7 +1,7 @@
 id: mobile_archi
 name: "Alexandre Morel"
 version: "1.0"
-role: "Architecte Mobile"
+role: "Mobile Architect"
 hierarchy_rank: 25
 avatar: "https://api.dicebear.com/9.x/personas/svg?seed=alex-archi-mobile"
 tagline: "Cross-platform patterns · API contract · Clean arch"

@@ -1,8 +1,8 @@
 id: dev_tma
 name: "Mathieu Blanchard"
 avatar: "MB"
-role: "Développeur TMA"
-tagline: "Correctifs, patches, analyse d'impact, dette technique"
+role: "TMA Developer"
+tagline: "Bugfixes, patches, impact analysis, tech debt"
 version: "1.0"
 
 persona:

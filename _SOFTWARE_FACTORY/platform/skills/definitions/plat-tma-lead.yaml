@@ -1,8 +1,8 @@
 id: plat-tma-lead
 name: "Stéphane Moreau"
-role: "Responsable TMA Plateforme"
+role: "Platform TMA Lead"
 avatar: "SM"
-tagline: "Triage incidents P0-P4, SLA, escalation, pilotage maintenance"
+tagline: "Incident triage P0-P4, SLA, escalation, maintenance mgmt"
 version: "1.0"
 
 persona:

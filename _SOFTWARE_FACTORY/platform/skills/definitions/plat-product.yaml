@@ -1,8 +1,8 @@
 id: plat-product
 name: "Nathalie Duval"
-role: "Product Owner Plateforme"
+role: "Platform Product Owner"
 avatar: "ND"
-tagline: "Backlog SAFe, priorisation WSJF, features plateforme"
+tagline: "SAFe backlog, WSJF prioritization, platform features"
 version: "1.0"
 
 persona:

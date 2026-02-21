@@ -115,5 +115,26 @@
   "phase_error_back": "Erreur: {error}. Retour au sprint de développement pour correction…",
 
   "dsi_workflow": "Flux de gouvernance",
-  "feature_request": "Nouvelles Features"
+  "feature_request": "Nouvelles Features",
+
+  "ideation_workshop": "Atelier Idéation",
+  "ideation_subtitle": "Soumettez une idée, un concept produit ou un besoin métier. Les agents vont challenger, enrichir et structurer la proposition.",
+  "ideation_placeholder": "Décrivez votre idée, concept ou besoin métier...",
+  "ideation_empty_findings": "Lancez une idée pour voir les analyses apparaître ici.",
+  "ideation_in_progress": "Idéation en cours",
+  "ideation_realtime": "Les agents analysent votre idée en temps réel…",
+  "idea_ex_rideshare": "App de covoiturage d'entreprise",
+  "idea_ex_iot": "Plateforme de suivi IoT pour vélos",
+  "idea_ex_migration": "Migration Angular 16 vers 19",
+  "idea_ex_chatbot": "Chatbot IA pour le support client",
+  "mobilized_agents": "Agents Mobilisés",
+  "synthesis": "Synthèse",
+  "new_project": "Nouveau projet",
+  "generate_team": "Générer l'équipe",
+  "strategic_committee": "Comité Stratégique",
+  "governance_flow": "Flux de gouvernance",
+  "teams": "Équipes",
+  "created_by": "Créée par",
+  "gen_subtitle": "Décrivez votre mission en langage naturel — l'IA compose l'équipe optimale, génère le workflow et lance l'exécution.",
+  "gen_placeholder": "Ex: Migration Angular 16→17 sur le projet Sharelook, 3 dev frontend en parallèle, QA avec tests E2E Playwright, DevOps pour CI/CD, Security audit OWASP..."
 }

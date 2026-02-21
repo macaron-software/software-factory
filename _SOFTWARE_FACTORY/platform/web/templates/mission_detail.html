@@ -92,7 +92,7 @@
                 <span class="project-type-dot {{ project.factory_type if project else '' }}"></span>
                 {{ project.name if project else mission.project_id }}
                 {% if mission.wsjf_score > 0 %} · WSJF {{ mission.wsjf_score|round(1) }}{% endif %}
-                {% if mission.created_by %} · Créée par {{ mission.created_by }}{% endif %}
+                {% if mission.created_by %} · {{ _('created_by') }} {{ mission.created_by }}{% endif %}
             </div>
             {% if mission.goal %}
             <div class="mission-goal"><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-target"/></svg>{{ mission.goal }}</div>

@@ -2,7 +2,7 @@ id: plat-tma-qa
 name: "Aurélie Fabre"
 role: "QA TMA Plateforme"
 avatar: "AF"
-tagline: "Tests non-régression, smoke tests, validation hotfix"
+tagline: "Regression tests, smoke tests, hotfix validation"
 version: "1.0"
 
 persona:

@@ -1,8 +1,8 @@
 id: chef_projet
 name: "Sophie Martin"
-role: "Chef de Projet"
+role: "Project Manager"
 avatar: "SM"
-tagline: "Coordinatrice de l'équipe, garante du delivery"
+tagline: "Team coordinator, delivery guardian"
 version: "1.0"
 
 persona:

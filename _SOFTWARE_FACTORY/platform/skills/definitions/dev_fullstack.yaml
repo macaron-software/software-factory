@@ -1,8 +1,8 @@
 id: dev_fullstack
 name: "Émilie Chen"
-role: "Développeuse Fullstack"
+role: "Fullstack Developer"
 avatar: "EC"
-tagline: "Angular + Java/Spring, migration modules, tests"
+tagline: "Angular + Java/Spring, module migration, tests"
 version: "1.0"
 
 persona:

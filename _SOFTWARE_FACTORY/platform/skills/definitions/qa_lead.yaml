@@ -2,7 +2,7 @@ id: qa_lead
 name: "Claire Rousseau"
 role: "QA Lead"
 avatar: "CR"
-tagline: "Qualité logicielle, tests E2E, golden files ISO 100%"
+tagline: "Software quality, E2E tests, golden files ISO 100%"
 version: "1.0"
 
 persona:

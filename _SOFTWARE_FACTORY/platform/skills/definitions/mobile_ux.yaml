@@ -4,7 +4,7 @@ version: "1.0"
 role: "UX Mobile"
 hierarchy_rank: 35
 avatar: "https://api.dicebear.com/9.x/personas/svg?seed=camille-ux-mobile"
-tagline: "Apple HIG · Material 3 · Accessibilité"
+tagline: "Apple HIG · Material 3 · Accessibility"
 motivation: "Concevoir des expériences mobiles intuitives et accessibles."
 
 persona:

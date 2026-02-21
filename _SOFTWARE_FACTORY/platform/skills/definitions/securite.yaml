@@ -2,7 +2,7 @@ id: securite
 name: "Nadia Benali"
 role: "Security Engineer"
 avatar: "NB"
-tagline: "OWASP, audit sécurité, revue vulnérabilités"
+tagline: "OWASP, security audit, vulnerability review"
 version: "1.0"
 
 persona:

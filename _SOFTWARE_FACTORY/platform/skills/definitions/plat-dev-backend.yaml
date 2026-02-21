@@ -1,8 +1,8 @@
 id: plat-dev-backend
 name: "Romain Garnier"
-role: "Dev Backend Plateforme"
+role: "Platform Backend Dev"
 avatar: "RG"
-tagline: "Routes, sessions, missions, DB — le cœur du serveur"
+tagline: "Routes, sessions, missions, DB — the server core"
 version: "1.0"
 
 persona:

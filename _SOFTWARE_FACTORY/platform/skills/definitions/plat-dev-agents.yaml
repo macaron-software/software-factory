@@ -2,7 +2,7 @@ id: plat-dev-agents
 name: "Lucas Martin"
 role: "Dev Agents & A2A"
 avatar: "LM"
-tagline: "Executor, AgentLoop, MessageBus, outils agents — le cerveau"
+tagline: "Executor, AgentLoop, MessageBus, agent tools — the brain"
 version: "1.0"
 
 persona:

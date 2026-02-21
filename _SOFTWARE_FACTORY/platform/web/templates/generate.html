@@ -61,13 +61,12 @@
 <div class="gen-container">
     <div class="gen-title"><svg class="icon icon-sm" style="vertical-align:-2px"><use href="#icon-lightning"/></svg> Team & Workflow Generator</div>
     <div class="gen-subtitle">
-        Décrivez votre mission en langage naturel — l'IA compose l'équipe optimale,
-        génère le workflow et lance l'exécution.
+        {{ _('gen_subtitle') }}
     </div>
 
     <form class="gen-form" id="genForm">
         <textarea class="gen-textarea" id="genPrompt" name="prompt"
-            placeholder="Ex: Migration Angular 16→17 sur le projet Sharelook, 3 dev frontend en parallèle, QA avec tests E2E Playwright, DevOps pour CI/CD, Security audit OWASP..."></textarea>
+            placeholder="{{ _('gen_placeholder') }}"></textarea>
         <button type="submit" class="gen-btn" id="genBtn">
             <span class="gen-spinner" id="genSpinner"><svg class="icon icon-sm spin"><use href="#icon-loader"/></svg></span>
             <svg class="icon icon-sm"><use href="#icon-lightning"/></svg>

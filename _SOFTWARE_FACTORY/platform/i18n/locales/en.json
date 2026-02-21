@@ -115,5 +115,26 @@
   "phase_error_back": "Error: {error}. Back to development sprint for correction…",
 
   "dsi_workflow": "Governance Flow",
-  "feature_request": "New Features"
+  "feature_request": "New Features",
+
+  "ideation_workshop": "Ideation Workshop",
+  "ideation_subtitle": "Submit an idea, a product concept or a business need. Agents will challenge, enrich and structure the proposal.",
+  "ideation_placeholder": "Describe your idea, concept or business need...",
+  "ideation_empty_findings": "Submit an idea to see the analysis appear here.",
+  "ideation_in_progress": "Ideation in progress",
+  "ideation_realtime": "Agents are analyzing your idea in real time…",
+  "idea_ex_rideshare": "Enterprise carpooling app",
+  "idea_ex_iot": "IoT fleet tracking platform",
+  "idea_ex_migration": "Angular 16 to 19 migration",
+  "idea_ex_chatbot": "AI chatbot for customer support",
+  "mobilized_agents": "Mobilized Agents",
+  "synthesis": "Synthesis",
+  "new_project": "New project",
+  "generate_team": "Generate team",
+  "strategic_committee": "Strategic Committee",
+  "governance_flow": "Governance Flow",
+  "teams": "Teams",
+  "created_by": "Created by",
+  "gen_subtitle": "Describe your mission in natural language — AI composes the optimal team, generates the workflow and launches execution.",
+  "gen_placeholder": "Ex: Angular 16→17 migration on the Sharelook project, 3 frontend devs in parallel, QA with E2E Playwright tests, DevOps for CI/CD, Security audit OWASP..."
 }

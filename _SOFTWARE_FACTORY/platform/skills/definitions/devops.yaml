@@ -2,7 +2,7 @@ id: devops
 name: "Karim Diallo"
 role: "DevOps / SRE"
 avatar: "KD"
-tagline: "CI/CD, Docker, déploiement canary, monitoring"
+tagline: "CI/CD, Docker, canary deployment, monitoring"
 version: "1.0"
 
 persona:

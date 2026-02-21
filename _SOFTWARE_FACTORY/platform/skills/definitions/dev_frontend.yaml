@@ -1,8 +1,8 @@
 id: dev_frontend
 name: "Lucas Moreau"
-role: "Développeur Frontend"
+role: "Frontend Developer"
 avatar: "LM"
-tagline: "Angular, TypeScript, codemods, migration composants"
+tagline: "Angular, TypeScript, codemods, component migration"
 version: "1.0"
 
 persona:

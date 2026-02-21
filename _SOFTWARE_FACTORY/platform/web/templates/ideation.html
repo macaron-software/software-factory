@@ -46,22 +46,22 @@
         <div class="idea-messages" id="ideaMessages">
             <div class="idea-empty" id="ideaPlaceholder">
                 <svg><use href="#icon-compass"/></svg>
-                <div class="idea-empty-title">Atelier Idéation</div>
+                <div class="idea-empty-title">{{ _('ideation_workshop') }}</div>
                 <div class="idea-empty-subtitle">
-                    Soumettez une idée, un concept produit ou un besoin métier. Les agents vont challenger, enrichir et structurer la proposition.
+                    {{ _('ideation_subtitle') }}
                 </div>
                 <div class="idea-examples">
-                    <button class="idea-example" onclick="setPrompt(this.textContent)">App de covoiturage pour La Poste</button>
-                    <button class="idea-example" onclick="setPrompt(this.textContent)">Plateforme de suivi IoT pour vélos</button>
-                    <button class="idea-example" onclick="setPrompt(this.textContent)">Migration Angular 16 vers 19</button>
-                    <button class="idea-example" onclick="setPrompt(this.textContent)">Chatbot IA pour le support client</button>
+                    <button class="idea-example" onclick="setPrompt(this.textContent)">{{ _('idea_ex_rideshare') }}</button>
+                    <button class="idea-example" onclick="setPrompt(this.textContent)">{{ _('idea_ex_iot') }}</button>
+                    <button class="idea-example" onclick="setPrompt(this.textContent)">{{ _('idea_ex_migration') }}</button>
+                    <button class="idea-example" onclick="setPrompt(this.textContent)">{{ _('idea_ex_chatbot') }}</button>
                 </div>
             </div>
         </div>
 
         <div class="idea-input-bar">
             <textarea class="idea-input" id="ideaInput" rows="1"
-                placeholder="Décrivez votre idée, concept ou besoin métier..."
+                placeholder="{{ _('ideation_placeholder') }}"
                 onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendIdea()}"></textarea>
             <button class="idea-send" id="ideaSend" onclick="sendIdea()">
                 <svg><use href="#icon-send"/></svg>
@@ -122,7 +122,7 @@
         <!-- Agent roster -->
         <div class="idea-agents">
             <div class="idea-agents-title">
-                <svg><use href="#icon-users"/></svg> Agents Mobilisés
+                <svg><use href="#icon-users"/></svg> {{ _('mobilized_agents') }}
             </div>
             {% for a in agents %}
             <div class="idea-agent-row" id="agent-{{ a.id }}">
@@ -136,10 +136,10 @@
         <!-- Structured findings -->
         <div class="idea-output">
             <div class="idea-output-title">
-                <svg><use href="#icon-target"/></svg> Synthèse
+                <svg><use href="#icon-target"/></svg> {{ _('synthesis') }}
             </div>
             <div id="ideaFindings">
-                <div class="idea-output-empty">Lancez une idée pour voir les analyses apparaître ici.</div>
+                <div class="idea-output-empty">{{ _('ideation_empty_findings') }}</div>
             </div>
         </div>
 
@@ -153,7 +153,7 @@
             <div style="margin-bottom:0.5rem">
                 <label style="font-size:0.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Projet</label>
                 <select id="ideaProjectSelect" class="input-agent-select" style="width:100%;margin-top:0.25rem">
-                    <option value="">Nouveau projet</option>
+                    <option value="">{{ _('new_project') }}</option>
                     {% for p in projects %}
                     <option value="{{ p.id }}">{{ p.name }}</option>
                     {% endfor %}
@@ -175,7 +175,7 @@
                 </button>
                 <button class="pm-filter" style="width:100%;text-align:left;opacity:.5;pointer-events:none" id="btnGenerateTeam">
                     <svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-users"/></svg>
-                    Générer l'équipe
+                    {{ _('generate_team') }}
                 </button>
             </div>
         </div>
@@ -576,7 +576,7 @@ async function sendIdea() {
         return parts.length ? `<div class="mu__meta">${parts.join(' ')}</div>` : '';
     }
 
-    addPhaseHeader('Idéation en cours', 'Les agents analysent votre idée en temps réel…');
+    addPhaseHeader(_('ideation_in_progress'), _('ideation_realtime'));
 
     try {
         // Start the real pattern engine

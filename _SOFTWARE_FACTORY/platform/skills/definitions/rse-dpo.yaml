@@ -1,8 +1,8 @@
 id: rse-dpo
 name: "Margaux Leroy"
-role: "DPO — Déléguée à la Protection des Données"
+role: "DPO — Data Protection Officer"
 avatar: "ML"
-tagline: "RGPD, privacy by design, registre des traitements, PIA"
+tagline: "GDPR, privacy by design, processing registry, PIA"
 version: "1.0"
 
 persona:

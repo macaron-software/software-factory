@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 
 LOCALES_DIR = Path(__file__).parent / "locales"
 DEFAULT_LANG = "en"
-SUPPORTED_LANGS = ("en", "fr")
+SUPPORTED_LANGS = ("en", "fr", "zh", "es", "ja", "pt", "de", "ko")
 
 # In-memory catalog: {"en": {"key": "value"}, "fr": {"key": "valeur"}}
 _catalog: dict[str, dict[str, str]] = {}

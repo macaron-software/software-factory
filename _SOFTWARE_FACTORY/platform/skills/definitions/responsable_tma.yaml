@@ -1,8 +1,8 @@
 id: responsable_tma
 name: "Frédérique Gauthier"
 avatar: "FG"
-role: "Responsable TMA"
-tagline: "Maintenance applicative, triage bugs, SLA, dette technique"
+role: "TMA Lead"
+tagline: "Application maintenance, bug triage, SLA, tech debt"
 version: "1.0"
 
 persona:

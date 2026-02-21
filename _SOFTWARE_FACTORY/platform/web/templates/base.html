@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" data-theme="dark">
+<html lang="{{ request.state.lang|default('en') }}" data-theme="dark">
 <head>
     <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('macaron_theme') || 'dark')</script>
     <meta charset="UTF-8">
@@ -63,6 +63,19 @@
             </div>
 
             <div class="sidebar-section" style="margin-top: auto">
+                <!-- Language selector -->
+                <div class="sidebar-view-switch" style="margin-bottom:0.2rem">
+                    <select id="langSelect" title="Language" style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:2px 4px;font-size:0.7rem;width:100%;cursor:pointer;text-align:center">
+                        <option value="en" {% if request.state.lang|default('en') == 'en' %}selected{% endif %}>EN</option>
+                        <option value="fr" {% if request.state.lang|default('en') == 'fr' %}selected{% endif %}>FR</option>
+                        <option value="zh" {% if request.state.lang|default('en') == 'zh' %}selected{% endif %}>中文</option>
+                        <option value="es" {% if request.state.lang|default('en') == 'es' %}selected{% endif %}>ES</option>
+                        <option value="ja" {% if request.state.lang|default('en') == 'ja' %}selected{% endif %}>日本</option>
+                        <option value="pt" {% if request.state.lang|default('en') == 'pt' %}selected{% endif %}>PT</option>
+                        <option value="de" {% if request.state.lang|default('en') == 'de' %}selected{% endif %}>DE</option>
+                        <option value="ko" {% if request.state.lang|default('en') == 'ko' %}selected{% endif %}>한국</option>
+                    </select>
+                </div>
                 <!-- Theme toggle -->
                 <div class="sidebar-view-switch" style="margin-bottom:0.2rem">
                     <button class="view-switch-btn theme-toggle-btn" id="themeToggle" title="Changer le theme">
@@ -139,6 +152,12 @@
         localStorage.setItem('macaron_theme', next);
       });
     })();
+    </script>
+    <script>
+    /* Language selector */
+    document.getElementById('langSelect')?.addEventListener('change', function(){
+      fetch('/api/set-lang/' + this.value).then(function(){ location.reload(); });
+    });
     </script>
     <script>
     (function(){

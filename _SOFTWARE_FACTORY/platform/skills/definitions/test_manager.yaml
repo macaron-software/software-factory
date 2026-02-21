@@ -2,7 +2,7 @@ id: test_manager
 name: "Véronique Laroche"
 avatar: "VL"
 role: "Test Manager"
-tagline: "Stratégie de test, plans de recette, couverture fonctionnelle"
+tagline: "Test strategy, acceptance plans, functional coverage"
 version: "1.0"
 
 persona:

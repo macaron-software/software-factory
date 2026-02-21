@@ -1,8 +1,8 @@
 id: plat-dev-frontend
 name: "Émilie Rousseau"
-role: "Dev Frontend Plateforme"
+role: "Platform Frontend Dev"
 avatar: "ER"
-tagline: "Templates Jinja2, HTMX, CSS dark theme, SSE côté client"
+tagline: "Jinja2 templates, HTMX, CSS dark theme, client-side SSE"
 version: "1.0"
 
 persona:
