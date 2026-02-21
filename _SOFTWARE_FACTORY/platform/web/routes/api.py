@@ -398,6 +398,157 @@ async def dora_api(request: Request, project_id: str):
     return JSONResponse(get_dora_metrics().summary(pid, period))
 
 
+@router.get("/api/monitoring/live")
+async def monitoring_live():
+    """Live monitoring data: system, LLM, agents, missions, memory."""
+    import os
+    import psutil
+
+    # System metrics
+    process = psutil.Process(os.getpid())
+    mem_info = process.memory_info()
+    cpu_percent = process.cpu_percent(interval=0)
+    sys_mem = psutil.virtual_memory()
+
+    system = {
+        "pid": os.getpid(),
+        "cpu_percent": round(cpu_percent, 1),
+        "mem_rss_mb": round(mem_info.rss / 1024 / 1024, 1),
+        "mem_vms_mb": round(mem_info.vms / 1024 / 1024, 1),
+        "sys_cpu_percent": round(psutil.cpu_percent(interval=0), 1),
+        "sys_mem_total_gb": round(sys_mem.total / 1024**3, 1),
+        "sys_mem_used_gb": round(sys_mem.used / 1024**3, 1),
+        "sys_mem_percent": round(sys_mem.percent, 1),
+        "uptime_seconds": round(import_time() - process.create_time()),
+        "threads": process.num_threads(),
+        "open_files": len(process.open_files()),
+    }
+
+    # LLM stats (24h)
+    try:
+        from ...llm.observability import get_tracer
+        llm = get_tracer().stats(hours=24)
+        # Hourly breakdown for chart
+        from ...db.migrations import get_db
+        db = get_db()
+        hourly = db.execute("""
+            SELECT strftime('%H', created_at) as hour,
+                   COUNT(*) as calls,
+                   COALESCE(SUM(tokens_in + tokens_out), 0) as tokens,
+                   COALESCE(SUM(cost_usd), 0) as cost
+            FROM llm_traces
+            WHERE created_at > datetime('now', '-24 hours')
+            GROUP BY hour ORDER BY hour
+        """).fetchall()
+        llm["hourly"] = [dict(r) for r in hourly]
+        db.close()
+    except Exception:
+        llm = {"total_calls": 0, "total_tokens_in": 0, "total_tokens_out": 0,
+               "total_cost_usd": 0, "avg_duration_ms": 0, "error_count": 0,
+               "by_provider": [], "by_agent": [], "hourly": []}
+
+    # Active agents (from AgentLoopManager)
+    try:
+        from ...agents.loop import AgentLoopManager
+        mgr = AgentLoopManager.instance()
+        active_loops = {k: {"status": v.status, "agent_id": v.agent_id}
+                        for k, v in mgr._loops.items() if v.status in ("thinking", "acting")}
+        agents_active = len(active_loops)
+        agents_total = len(mgr._loops)
+    except Exception:
+        active_loops = {}
+        agents_active = 0
+        agents_total = 0
+
+    # Missions & sessions counts
+    try:
+        from ...db.migrations import get_db
+        db = get_db()
+        missions = db.execute("""
+            SELECT status, COUNT(*) as cnt
+            FROM missions GROUP BY status
+        """).fetchall()
+        sessions = db.execute("""
+            SELECT status, COUNT(*) as cnt
+            FROM sessions GROUP BY status
+        """).fetchall()
+        sprints = db.execute("""
+            SELECT status, COUNT(*) as cnt
+            FROM sprints GROUP BY status
+        """).fetchall()
+        features = db.execute("""
+            SELECT status, COUNT(*) as cnt
+            FROM features GROUP BY status
+        """).fetchall()
+        # Messages count (last 24h)
+        msg_count = db.execute("""
+            SELECT COUNT(*) as cnt FROM messages
+            WHERE created_at > datetime('now', '-24 hours')
+        """).fetchone()
+        # Total messages ever
+        msg_total = db.execute("SELECT COUNT(*) as cnt FROM messages").fetchone()
+        db.close()
+    except Exception:
+        missions = []
+        sessions = []
+        sprints = []
+        features = []
+        msg_count = {"cnt": 0}
+        msg_total = {"cnt": 0}
+
+    # Memory stats
+    try:
+        from ...memory.manager import get_memory_manager
+        mem_stats = get_memory_manager().stats()
+    except Exception:
+        mem_stats = {}
+
+    # Projects count
+    try:
+        from ...projects.manager import get_project_store
+        projects = get_project_store().list_all()
+        project_count = len(projects)
+    except Exception:
+        projects = []
+        project_count = 0
+
+    # SSE connections (from bus)
+    try:
+        from ...a2a.bus import get_bus
+        bus = get_bus()
+        sse_connections = len(getattr(bus, '_sse_listeners', []))
+    except Exception:
+        sse_connections = 0
+
+    return JSONResponse({
+        "timestamp": datetime.utcnow().isoformat(),
+        "system": system,
+        "llm": llm,
+        "agents": {
+            "active": agents_active,
+            "total": agents_total,
+            "loops": {k: v for k, v in list(active_loops.items())[:10]},
+        },
+        "missions": {s["status"]: s["cnt"] for s in missions},
+        "sessions": {s["status"]: s["cnt"] for s in sessions},
+        "sprints": {s["status"]: s["cnt"] for s in sprints},
+        "features": {s["status"]: s["cnt"] for s in features},
+        "messages": {
+            "last_24h": msg_count["cnt"] if msg_count else 0,
+            "total": msg_total["cnt"] if msg_total else 0,
+        },
+        "memory": mem_stats,
+        "projects": project_count,
+        "sse_connections": sse_connections,
+    })
+
+
+def import_time():
+    """Get current time as epoch."""
+    import time
+    return time.time()
+
+
 # ── RBAC ─────────────────────────────────────────────────────────
 
 @router.get("/api/rbac/agent/{agent_id}")
