@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<link rel="stylesheet" href="/static/css/monitoring.css?v=20260221">
+<link rel="stylesheet" href="/static/css/monitoring.css?v=20260221b">
 
 <div class="mon-page" id="monRoot">
     <div class="mon-header">
@@ -16,7 +16,7 @@
     </div>
 
     <!-- Row 1: System vitals -->
-    <div class="mon-grid">
+    <div class="mon-grid mon-grid-4">
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-cpu"/></svg> CPU</h3>
             <div class="mon-big" id="monCpu">—</div>
@@ -24,7 +24,7 @@
             <div class="mon-bar"><div class="mon-bar-fill green" id="monCpuBar" style="width:0%"></div></div>
         </div>
         <div class="mon-card">
-            <h3><svg class="icon"><use href="#icon-database"/></svg> Memory</h3>
+            <h3><svg class="icon"><use href="#icon-layers"/></svg> Memory</h3>
             <div class="mon-big" id="monMem">—</div>
             <div class="mon-sub" id="monMemSys">System: —</div>
             <div class="mon-bar"><div class="mon-bar-fill green" id="monMemBar" style="width:0%"></div></div>
@@ -33,122 +33,121 @@
             <h3><svg class="icon"><use href="#icon-users"/></svg> Agents</h3>
             <div class="mon-row">
                 <div class="mon-col"><div class="label">Active</div><div class="val" id="monAgentsActive">0</div></div>
-                <div class="mon-col"><div class="label">Total Loops</div><div class="val" id="monAgentsTotal">0</div></div>
+                <div class="mon-col"><div class="label">Loops</div><div class="val" id="monAgentsTotal">0</div></div>
                 <div class="mon-col"><div class="label">SSE</div><div class="val" id="monSSE">0</div></div>
             </div>
         </div>
         <div class="mon-card">
-            <h3><svg class="icon"><use href="#icon-message-square"/></svg> Messages</h3>
+            <h3><svg class="icon"><use href="#icon-message-circle"/></svg> Messages</h3>
             <div class="mon-row">
                 <div class="mon-col"><div class="label">24h</div><div class="val" id="monMsg24h">0</div></div>
                 <div class="mon-col"><div class="label">Total</div><div class="val" id="monMsgTotal">0</div></div>
+                <div class="mon-col"><div class="label">Projects</div><div class="val" id="monProjects">—</div></div>
             </div>
         </div>
     </div>
 
-    <!-- Row 2: LLM + Missions -->
-    <div class="mon-grid">
-        <div class="mon-card" style="grid-column: span 2">
+    <!-- Row 2: LLM Usage -->
+    <div class="mon-grid mon-grid-2">
+        <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-zap"/></svg> LLM Usage (24h)</h3>
             <div class="mon-row" style="margin-bottom:1rem">
                 <div class="mon-col"><div class="label">Calls</div><div class="val" id="monLlmCalls">0</div></div>
                 <div class="mon-col"><div class="label">Tokens In</div><div class="val" id="monLlmIn">0</div></div>
                 <div class="mon-col"><div class="label">Tokens Out</div><div class="val" id="monLlmOut">0</div></div>
-                <div class="mon-col"><div class="label">Cost USD</div><div class="val" id="monLlmCost">$0</div></div>
-                <div class="mon-col"><div class="label">Avg Latency</div><div class="val" id="monLlmLatency">0ms</div></div>
+                <div class="mon-col"><div class="label">Cost</div><div class="val" id="monLlmCost">$0</div></div>
+                <div class="mon-col"><div class="label">Latency</div><div class="val" id="monLlmLatency">—</div></div>
                 <div class="mon-col"><div class="label">Errors</div><div class="val" id="monLlmErrors">0</div></div>
             </div>
-            <div class="mon-chart" id="monLlmChart" title="Calls per hour (24h)"></div>
+            <div class="mon-chart" id="monLlmChart"><div class="mon-empty">No hourly data</div></div>
         </div>
-        <div class="mon-card" style="grid-column: span 2">
+        <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-briefcase"/></svg> Missions & Sprints</h3>
-            <div class="mon-2col">
-                <div>
-                    <div class="label" style="font-size:0.65rem;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.4rem">Missions</div>
-                    <div id="monMissions" style="display:flex;gap:0.5rem;flex-wrap:wrap"></div>
-                </div>
-                <div>
-                    <div class="label" style="font-size:0.65rem;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.4rem">Sprints</div>
-                    <div id="monSprints" style="display:flex;gap:0.5rem;flex-wrap:wrap"></div>
-                </div>
+            <div class="mon-section">
+                <div class="mon-section-label">Missions</div>
+                <div id="monMissions" class="mon-badges-row"><span class="mon-empty">No missions</span></div>
             </div>
-            <div style="margin-top:1rem">
-                <div class="label" style="font-size:0.65rem;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.4rem">Features</div>
-                <div id="monFeatures" style="display:flex;gap:0.5rem;flex-wrap:wrap"></div>
+            <div class="mon-section">
+                <div class="mon-section-label">Sprints</div>
+                <div id="monSprints" class="mon-badges-row"><span class="mon-empty">No sprints</span></div>
+            </div>
+            <div class="mon-section">
+                <div class="mon-section-label">Features</div>
+                <div id="monFeatures" class="mon-badges-row"><span class="mon-empty">No features</span></div>
             </div>
         </div>
     </div>
 
     <!-- Row 3: Providers + Top Agents -->
-    <div class="mon-grid">
+    <div class="mon-grid mon-grid-2">
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-server"/></svg> LLM Providers</h3>
             <table class="mon-table">
                 <thead><tr><th>Provider</th><th>Model</th><th>Calls</th><th>Cost</th><th>Avg ms</th></tr></thead>
-                <tbody id="monProviders"><tr><td colspan="5" style="color:var(--text-tertiary)">Loading...</td></tr></tbody>
+                <tbody id="monProviders"><tr><td colspan="5" class="mon-empty">Loading…</td></tr></tbody>
             </table>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-user"/></svg> Top Agents (by cost)</h3>
             <table class="mon-table">
                 <thead><tr><th>Agent</th><th>Calls</th><th>Tokens Out</th><th>Cost</th></tr></thead>
-                <tbody id="monTopAgents"><tr><td colspan="4" style="color:var(--text-tertiary)">Loading...</td></tr></tbody>
+                <tbody id="monTopAgents"><tr><td colspan="4" class="mon-empty">Loading…</td></tr></tbody>
             </table>
         </div>
     </div>
 
     <!-- Row 4: Database + Vector Store -->
-    <div class="mon-grid">
+    <div class="mon-grid mon-grid-2">
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-database"/></svg> Database (SQLite)</h3>
-            <div class="mon-row" style="margin-bottom:0.7rem">
+            <div class="mon-row" style="margin-bottom:0.8rem">
                 <div class="mon-col"><div class="label">Size</div><div class="val" id="monDbSize">—</div></div>
                 <div class="mon-col"><div class="label">Tables</div><div class="val" id="monDbTables">—</div></div>
-                <div class="mon-col"><div class="label">Total Rows</div><div class="val" id="monDbRows">—</div></div>
+                <div class="mon-col"><div class="label">Rows</div><div class="val" id="monDbRows">—</div></div>
                 <div class="mon-col"><div class="label">Journal</div><div class="val" id="monDbJournal">—</div></div>
             </div>
             <table class="mon-table">
                 <thead><tr><th>Table</th><th style="text-align:right">Rows</th></tr></thead>
-                <tbody id="monDbTopTables"><tr><td colspan="2" style="color:var(--text-tertiary)">Loading...</td></tr></tbody>
+                <tbody id="monDbTopTables"><tr><td colspan="2" class="mon-empty">Loading…</td></tr></tbody>
             </table>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-search"/></svg> Vector Store</h3>
-            <div class="mon-row" style="margin-bottom:0.7rem">
+            <div class="mon-row" style="margin-bottom:0.8rem">
                 <div class="mon-col"><div class="label">Vectors</div><div class="val" id="monVecTotal">0</div></div>
                 <div class="mon-col"><div class="label">Embedded</div><div class="val" id="monVecEmbedded">0</div></div>
                 <div class="mon-col"><div class="label">Scopes</div><div class="val" id="monVecScopes">0</div></div>
                 <div class="mon-col"><div class="label">Dim</div><div class="val" id="monVecDim">—</div></div>
             </div>
-            <div class="mon-sub" id="monVecProvider" style="font-size:0.7rem;color:var(--text-tertiary)">—</div>
+            <div class="mon-sub" id="monVecProvider">—</div>
             <div class="mon-bar" style="margin-top:0.5rem"><div class="mon-bar-fill purple" id="monVecBar" style="width:0%"></div></div>
-            <div class="mon-sub" id="monVecPct" style="font-size:0.65rem;margin-top:0.2rem;color:var(--text-tertiary)">0% embedded</div>
+            <div class="mon-sub" id="monVecPct" style="font-size:0.65rem;margin-top:0.2rem">0% embedded</div>
         </div>
     </div>
 
     <!-- Row 5: MCP Servers + Incidents -->
-    <div class="mon-grid">
+    <div class="mon-grid mon-grid-2">
         <div class="mon-card">
-            <h3><svg class="icon"><use href="#icon-server"/></svg> MCP Servers</h3>
-            <div id="monMcpServers" style="display:flex;flex-direction:column;gap:0.5rem">
-                <div style="color:var(--text-tertiary);font-size:0.75rem">Loading...</div>
+            <h3><svg class="icon"><use href="#icon-plug"/></svg> MCP Servers</h3>
+            <div id="monMcpServers" class="mon-mcp-list">
+                <div class="mon-empty">Loading…</div>
             </div>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-alert-triangle"/></svg> Incidents</h3>
-            <div class="mon-row" style="margin-bottom:0.7rem">
-                <div class="mon-col"><div class="label">Open</div><div class="val" id="monIncOpen" style="color:var(--red,#ef4444)">0</div></div>
+            <div class="mon-row" style="margin-bottom:0.8rem">
+                <div class="mon-col"><div class="label">Open</div><div class="val mon-val-red" id="monIncOpen">0</div></div>
                 <div class="mon-col"><div class="label">Total</div><div class="val" id="monIncTotal">0</div></div>
             </div>
-            <div id="monIncBadges" style="display:flex;gap:0.4rem;flex-wrap:wrap"></div>
+            <div id="monIncBadges" class="mon-badges-row"><span class="mon-empty">No incidents ✓</span></div>
         </div>
     </div>
 
-    <!-- Row 6: Memory + System -->
-    <div class="mon-grid">
+    <!-- Row 6: Memory + Process -->
+    <div class="mon-grid mon-grid-2">
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-book-open"/></svg> Memory</h3>
-            <div id="monMemory" class="mon-row"></div>
+            <div id="monMemory" class="mon-row"><span class="mon-empty">Loading…</span></div>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-settings"/></svg> Process</h3>
@@ -156,7 +155,6 @@
                 <div class="mon-col"><div class="label">PID</div><div class="val" id="monPid">—</div></div>
                 <div class="mon-col"><div class="label">Threads</div><div class="val" id="monThreads">—</div></div>
                 <div class="mon-col"><div class="label">Open Files</div><div class="val" id="monFiles">—</div></div>
-                <div class="mon-col"><div class="label">Projects</div><div class="val" id="monProjects">—</div></div>
             </div>
         </div>
     </div>
@@ -164,11 +162,13 @@
 
 <script>
 function fmt(n) {
+    if (n == null) return '—';
     if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
     if (n >= 1e3) return (n/1e3).toFixed(1) + 'K';
     return String(n);
 }
 function fmtTime(sec) {
+    if (!sec) return '—';
     if (sec < 60) return sec + 's';
     if (sec < 3600) return Math.floor(sec/60) + 'm';
     const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60);
@@ -176,162 +176,174 @@ function fmtTime(sec) {
 }
 function badges(obj, el) {
     const colors = {completed:'green',done:'green',active:'blue',running:'blue',in_progress:'purple',failed:'red',pending:'yellow',backlog:'yellow',planning:'yellow',blocked:'red',review:'purple'};
-    el.innerHTML = Object.entries(obj).map(([k,v]) =>
+    const entries = Object.entries(obj || {});
+    if (entries.length === 0) {
+        el.innerHTML = '<span class="mon-empty">—</span>';
+        return;
+    }
+    el.innerHTML = entries.map(([k,v]) =>
         `<span class="mon-badge ${colors[k]||'purple'}">${k}: ${v}</span>`
     ).join('');
 }
 function barColor(pct) { return pct > 80 ? 'red' : pct > 60 ? 'yellow' : 'green'; }
+function $(id) { return document.getElementById(id); }
 
 async function refresh() {
     try {
         const r = await fetch('/api/monitoring/live');
+        if (!r.ok) return;
         const d = await r.json();
-        const s = d.system;
+        const s = d.system || {};
 
         // System
-        document.getElementById('monCpu').textContent = s.cpu_percent + '%';
-        document.getElementById('monCpuSys').textContent = 'System: ' + s.sys_cpu_percent + '%';
-        const cpuBar = document.getElementById('monCpuBar');
-        cpuBar.style.width = Math.min(s.cpu_percent, 100) + '%';
-        cpuBar.className = 'mon-bar-fill ' + barColor(s.cpu_percent);
+        $('monCpu').textContent = (s.cpu_percent || 0) + '%';
+        $('monCpuSys').textContent = 'System: ' + (s.sys_cpu_percent || 0) + '%';
+        const cpuBar = $('monCpuBar');
+        cpuBar.style.width = Math.min(s.cpu_percent || 0, 100) + '%';
+        cpuBar.className = 'mon-bar-fill ' + barColor(s.cpu_percent || 0);
 
-        document.getElementById('monMem').textContent = s.mem_rss_mb + ' MB';
-        document.getElementById('monMemSys').textContent = s.sys_mem_used_gb + ' / ' + s.sys_mem_total_gb + ' GB (' + s.sys_mem_percent + '%)';
-        const memBar = document.getElementById('monMemBar');
-        memBar.style.width = s.sys_mem_percent + '%';
-        memBar.className = 'mon-bar-fill ' + barColor(s.sys_mem_percent);
+        $('monMem').textContent = (s.mem_rss_mb || 0).toFixed(1) + ' MB';
+        $('monMemSys').textContent = (s.sys_mem_used_gb||0).toFixed(1) + ' / ' + (s.sys_mem_total_gb||0).toFixed(1) + ' GB (' + (s.sys_mem_percent||0) + '%)';
+        const memBar = $('monMemBar');
+        memBar.style.width = (s.sys_mem_percent || 0) + '%';
+        memBar.className = 'mon-bar-fill ' + barColor(s.sys_mem_percent || 0);
 
-        document.getElementById('monUptime').textContent = 'Uptime: ' + fmtTime(s.uptime_seconds);
-        document.getElementById('monPid').textContent = s.pid;
-        document.getElementById('monThreads').textContent = s.threads;
-        document.getElementById('monFiles').textContent = s.open_files;
+        $('monUptime').textContent = 'Uptime: ' + fmtTime(s.uptime_seconds);
+        $('monPid').textContent = s.pid || '—';
+        $('monThreads').textContent = s.threads || '—';
+        $('monFiles').textContent = s.open_files || '—';
 
         // Agents
-        document.getElementById('monAgentsActive').textContent = d.agents.active;
-        document.getElementById('monAgentsTotal').textContent = d.agents.total;
-        document.getElementById('monSSE').textContent = d.sse_connections;
+        const ag = d.agents || {};
+        $('monAgentsActive').textContent = ag.active || 0;
+        $('monAgentsTotal').textContent = ag.total || 0;
+        $('monSSE').textContent = d.sse_connections || 0;
 
         // Messages
-        document.getElementById('monMsg24h').textContent = fmt(d.messages.last_24h);
-        document.getElementById('monMsgTotal').textContent = fmt(d.messages.total);
+        const msg = d.messages || {};
+        $('monMsg24h').textContent = fmt(msg.last_24h || 0);
+        $('monMsgTotal').textContent = fmt(msg.total || 0);
+        $('monProjects').textContent = d.projects || 0;
 
         // LLM
-        const l = d.llm;
-        document.getElementById('monLlmCalls').textContent = fmt(l.total_calls);
-        document.getElementById('monLlmIn').textContent = fmt(l.total_tokens_in);
-        document.getElementById('monLlmOut').textContent = fmt(l.total_tokens_out);
-        document.getElementById('monLlmCost').textContent = '$' + (l.total_cost_usd || 0).toFixed(2);
-        document.getElementById('monLlmLatency').textContent = Math.round(l.avg_duration_ms) + 'ms';
-        document.getElementById('monLlmErrors').textContent = l.error_count;
+        const l = d.llm || {};
+        $('monLlmCalls').textContent = fmt(l.total_calls || 0);
+        $('monLlmIn').textContent = fmt(l.total_tokens_in || 0);
+        $('monLlmOut').textContent = fmt(l.total_tokens_out || 0);
+        $('monLlmCost').textContent = '$' + (l.total_cost_usd || 0).toFixed(2);
+        $('monLlmLatency').textContent = l.avg_duration_ms ? Math.round(l.avg_duration_ms) + 'ms' : '—';
+        $('monLlmErrors').textContent = l.error_count || 0;
 
         // LLM hourly chart
-        const chart = document.getElementById('monLlmChart');
+        const chart = $('monLlmChart');
         if (l.hourly && l.hourly.length > 0) {
             const maxCalls = Math.max(...l.hourly.map(h => h.calls), 1);
             chart.innerHTML = l.hourly.map(h => {
                 const pct = Math.max((h.calls / maxCalls) * 100, 2);
-                return `<div class="mon-chart-bar" style="height:${pct}%" title="${h.hour}h: ${h.calls} calls, ${fmt(h.tokens)} tokens, $${h.cost.toFixed(3)}"></div>`;
+                return `<div class="mon-chart-bar" style="height:${pct}%" title="${h.hour}h: ${h.calls} calls, ${fmt(h.tokens)} tok, $${h.cost.toFixed(3)}"></div>`;
             }).join('');
+        } else {
+            chart.innerHTML = '<div class="mon-empty" style="margin:auto">No hourly data</div>';
         }
 
         // Providers
-        const prov = document.getElementById('monProviders');
+        const prov = $('monProviders');
         if (l.by_provider && l.by_provider.length > 0) {
             prov.innerHTML = l.by_provider.map(p =>
-                `<tr><td>${p.provider}</td><td style="font-size:0.7rem">${p.model}</td><td>${p.calls}</td><td>$${(p.cost_usd||0).toFixed(2)}</td><td>${Math.round(p.avg_ms||0)}</td></tr>`
+                `<tr><td>${p.provider}</td><td style="font-size:0.7rem">${p.model}</td><td>${p.calls}</td><td>$${(p.cost_usd||0).toFixed(3)}</td><td>${Math.round(p.avg_ms||0)}</td></tr>`
             ).join('');
         } else {
-            prov.innerHTML = '<tr><td colspan="5" style="color:var(--text-tertiary)">No LLM calls</td></tr>';
+            prov.innerHTML = '<tr><td colspan="5" class="mon-empty">No LLM calls yet</td></tr>';
         }
 
         // Top agents
-        const agents = document.getElementById('monTopAgents');
+        const agentsTb = $('monTopAgents');
         if (l.by_agent && l.by_agent.length > 0) {
-            agents.innerHTML = l.by_agent.slice(0, 10).map(a =>
-                `<tr><td>${a.agent_id}</td><td>${a.calls}</td><td>${fmt(a.tokens_out||0)}</td><td>$${(a.cost_usd||0).toFixed(2)}</td></tr>`
+            agentsTb.innerHTML = l.by_agent.slice(0, 10).map(a =>
+                `<tr><td>${a.agent_id}</td><td>${a.calls}</td><td>${fmt(a.tokens_out||0)}</td><td>$${(a.cost_usd||0).toFixed(3)}</td></tr>`
             ).join('');
         } else {
-            agents.innerHTML = '<tr><td colspan="4" style="color:var(--text-tertiary)">No agent data</td></tr>';
+            agentsTb.innerHTML = '<tr><td colspan="4" class="mon-empty">No agent data yet</td></tr>';
         }
 
         // Missions / Sprints / Features
-        badges(d.missions || {}, document.getElementById('monMissions'));
-        badges(d.sprints || {}, document.getElementById('monSprints'));
-        badges(d.features || {}, document.getElementById('monFeatures'));
-
-        // Projects
-        document.getElementById('monProjects').textContent = d.projects;
+        badges(d.missions, $('monMissions'));
+        badges(d.sprints, $('monSprints'));
+        badges(d.features, $('monFeatures'));
 
         // Memory
-        const memEl = document.getElementById('monMemory');
+        const memEl = $('monMemory');
         if (d.memory && typeof d.memory === 'object') {
-            memEl.innerHTML = Object.entries(d.memory).map(([k,v]) =>
-                `<div class="mon-col"><div class="label">${k}</div><div class="val">${typeof v === 'number' ? fmt(v) : v}</div></div>`
-            ).join('');
-        }
-
-        // Database
-        if (d.database) {
-            const db = d.database;
-            document.getElementById('monDbSize').textContent = (db.size_mb || 0) + ' MB';
-            document.getElementById('monDbTables').textContent = db.tables || 0;
-            document.getElementById('monDbRows').textContent = fmt(db.total_rows || 0);
-            document.getElementById('monDbJournal').textContent = db.journal_mode || '—';
-            const tbEl = document.getElementById('monDbTopTables');
-            if (db.top_tables && db.top_tables.length > 0) {
-                tbEl.innerHTML = db.top_tables.map(([name, cnt]) =>
-                    `<tr><td style="font-size:0.7rem">${name}</td><td style="text-align:right">${fmt(cnt)}</td></tr>`
-                ).join('');
+            const entries = Object.entries(d.memory);
+            if (entries.length > 0) {
+                memEl.innerHTML = entries.map(([k,v]) => {
+                    const label = k.replace(/_/g, ' ');
+                    return `<div class="mon-col"><div class="label">${label}</div><div class="val">${typeof v === 'number' ? fmt(v) : (v || '—')}</div></div>`;
+                }).join('');
+            } else {
+                memEl.innerHTML = '<span class="mon-empty">No memory data</span>';
             }
         }
 
-        // Vectors
-        if (d.vectors) {
-            const v = d.vectors;
-            document.getElementById('monVecTotal').textContent = fmt(v.total_vectors || 0);
-            document.getElementById('monVecEmbedded').textContent = fmt(v.with_embedding || 0);
-            document.getElementById('monVecScopes').textContent = v.scopes || 0;
-            document.getElementById('monVecDim').textContent = v.dimension || '—';
-            document.getElementById('monVecProvider').textContent = v.provider || '—';
-            const pct = v.total_vectors > 0 ? Math.round(v.with_embedding / v.total_vectors * 100) : 0;
-            document.getElementById('monVecBar').style.width = pct + '%';
-            document.getElementById('monVecPct').textContent = pct + '% embedded';
+        // Database
+        const db = d.database || {};
+        $('monDbSize').textContent = db.size_mb != null ? db.size_mb.toFixed(1) + ' MB' : '—';
+        $('monDbTables').textContent = db.tables || '—';
+        $('monDbRows').textContent = fmt(db.total_rows || 0);
+        $('monDbJournal').textContent = db.journal_mode || '—';
+        const tbEl = $('monDbTopTables');
+        if (db.top_tables && db.top_tables.length > 0) {
+            tbEl.innerHTML = db.top_tables.map(([name, cnt]) =>
+                `<tr><td>${name}</td><td style="text-align:right">${fmt(cnt)}</td></tr>`
+            ).join('');
+        } else {
+            tbEl.innerHTML = '<tr><td colspan="2" class="mon-empty">No tables</td></tr>';
         }
+
+        // Vectors
+        const v = d.vectors || {};
+        $('monVecTotal').textContent = fmt(v.total_vectors || 0);
+        $('monVecEmbedded').textContent = fmt(v.with_embedding || 0);
+        $('monVecScopes').textContent = v.scopes || 0;
+        $('monVecDim').textContent = v.dimension || '—';
+        $('monVecProvider').textContent = v.provider || 'No provider configured';
+        const vecPct = v.total_vectors > 0 ? Math.round((v.with_embedding || 0) / v.total_vectors * 100) : 0;
+        $('monVecBar').style.width = vecPct + '%';
+        $('monVecPct').textContent = vecPct + '% embedded';
 
         // MCP Servers
         if (d.mcp) {
-            const mcpEl = document.getElementById('monMcpServers');
+            const mcpEl = $('monMcpServers');
             const entries = Object.entries(d.mcp).filter(([k]) => k !== 'error');
             if (entries.length > 0) {
                 mcpEl.innerHTML = entries.map(([name, info]) => {
                     const up = info.status === 'up' || info.status === 'ok';
-                    const dot = `<span class="dot" style="background:${up ? 'var(--green,#22c55e)' : 'var(--red,#ef4444)'};width:8px;height:8px;display:inline-block;border-radius:50%;margin-right:0.4rem"></span>`;
+                    const statusClass = up ? 'mon-dot-up' : 'mon-dot-down';
                     const port = info.port ? `:${info.port}` : '';
-                    let detail = '';
-                    if (info.tools) detail += ` · ${info.tools} tools`;
-                    if (info.sessions !== undefined) detail += ` · ${info.sessions} sessions`;
-                    if (info.entries !== undefined) detail += ` · ${fmt(info.entries)} entries`;
-                    if (info.size_mb) detail += ` · ${info.size_mb} MB`;
-                    return `<div style="display:flex;align-items:center;font-size:0.8rem">${dot}<span style="font-weight:500">${name}</span><span style="color:var(--text-tertiary);margin-left:0.4rem">${port}${detail}</span></div>`;
+                    let detail = [];
+                    if (info.tools) detail.push(info.tools + ' tools');
+                    if (info.sessions !== undefined) detail.push(info.sessions + ' sessions');
+                    if (info.entries !== undefined) detail.push(fmt(info.entries) + ' entries');
+                    if (info.size_mb) detail.push(info.size_mb + ' MB');
+                    return `<div class="mon-mcp-item"><span class="mon-dot ${statusClass}"></span><span class="mon-mcp-name">${name}</span><span class="mon-mcp-detail">${port}${detail.length ? ' · ' + detail.join(' · ') : ''}</span></div>`;
                 }).join('');
             } else {
-                mcpEl.innerHTML = '<div style="color:var(--text-tertiary);font-size:0.75rem">No MCP servers detected</div>';
+                mcpEl.innerHTML = '<div class="mon-empty">No MCP servers detected</div>';
             }
         }
 
         // Incidents
-        if (d.incidents) {
-            document.getElementById('monIncOpen').textContent = d.incidents.open || 0;
-            document.getElementById('monIncTotal').textContent = d.incidents.total || 0;
-            const incEl = document.getElementById('monIncBadges');
-            if (d.incidents.by_severity_status && d.incidents.by_severity_status.length > 0) {
-                const sevColors = {P0:'red',P1:'red',P2:'yellow',P3:'blue',P4:'purple'};
-                incEl.innerHTML = d.incidents.by_severity_status.map(r =>
-                    `<span class="mon-badge ${sevColors[r.severity]||'purple'}">${r.severity} ${r.status}: ${r.cnt}</span>`
-                ).join('');
-            } else {
-                incEl.innerHTML = '<span style="color:var(--text-tertiary);font-size:0.75rem">No incidents ✓</span>';
-            }
+        const inc = d.incidents || {};
+        $('monIncOpen').textContent = inc.open || 0;
+        $('monIncTotal').textContent = inc.total || 0;
+        const incEl = $('monIncBadges');
+        if (inc.by_severity_status && inc.by_severity_status.length > 0) {
+            const sevColors = {P0:'red',P1:'red',P2:'yellow',P3:'blue',P4:'purple'};
+            incEl.innerHTML = inc.by_severity_status.map(r =>
+                `<span class="mon-badge ${sevColors[r.severity]||'purple'}">${r.severity} ${r.status}: ${r.cnt}</span>`
+            ).join('');
+        } else {
+            incEl.innerHTML = '<span class="mon-empty">No incidents ✓</span>';
         }
     } catch(e) {
         console.warn('Monitoring refresh error:', e);
