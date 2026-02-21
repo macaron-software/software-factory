@@ -119,7 +119,13 @@ class ProjectStore:
         conn = get_db()
         rows = conn.execute("SELECT * FROM projects ORDER BY name").fetchall()
         conn.close()
-        return [self._row_to_project(r) for r in rows]
+        projects = [self._row_to_project(r) for r in rows]
+        # Filter out personal projects on Azure deployment
+        import os
+        if os.environ.get("AZURE_DEPLOY", ""):
+            from .registry import _PERSONAL_IDS
+            projects = [p for p in projects if p.id not in _PERSONAL_IDS]
+        return projects
 
     def get(self, project_id: str) -> Optional[Project]:
         conn = get_db()
