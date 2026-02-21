@@ -115,6 +115,54 @@
 .tma-card-project{font-size:0.68rem;font-weight:500;background:var(--bg-tertiary);color:var(--text-secondary);padding:0.1rem 0.4rem;border-radius:3px}
 .tma-card-date{font-size:0.68rem;color:var(--text-secondary)}
 .tma-empty{font-size:0.78rem;color:var(--text-secondary);text-align:center;padding:1.5rem 0;opacity:0.6}
+/* View mode toggle buttons */
+.view-toggle{display:flex;gap:2px;margin-left:auto;flex-shrink:0}
+.view-toggle button{background:none;border:1px solid transparent;border-radius:4px;padding:3px 5px;cursor:pointer;color:var(--text-secondary);display:flex;align-items:center;justify-content:center;transition:all .15s}
+.view-toggle button:hover{color:var(--text-primary);background:var(--bg-tertiary)}
+.view-toggle button.active{color:var(--purple);background:rgba(124,58,237,.1);border-color:rgba(124,58,237,.2)}
+.view-toggle button svg{width:14px;height:14px}
+/* ── List view ── */
+.pi-section-body.view-list .epic-card{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:0.8rem;padding:0.6rem 1rem;border-radius:6px;margin-bottom:0.35rem}
+.pi-section-body.view-list .epic-header{margin-bottom:0}
+.pi-section-body.view-list .epic-desc,.pi-section-body.view-list .epic-features{display:none}
+.pi-section-body.view-list .epic-stats{margin:0;gap:0.8rem}
+.pi-section-body.view-list .epic-progress{max-width:160px}
+.pi-section-body.view-list .tma-board{display:flex;flex-direction:column;gap:0.5rem}
+.pi-section-body.view-list .tma-col{flex-direction:row;flex-wrap:wrap;gap:0.35rem}
+.pi-section-body.view-list .tma-col-header{border-bottom:none;margin-bottom:0;width:100%;padding:0.3rem 0.6rem;background:var(--bg-tertiary);border-radius:6px}
+.pi-section-body.view-list .tma-card{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:0.6rem;padding:0.5rem 0.8rem;border-radius:6px;width:100%}
+.pi-section-body.view-list .tma-card-desc{display:none}
+.pi-section-body.view-list .tma-card-header{margin-bottom:0}
+.pi-section-body.view-list .tma-card-footer{margin:0}
+.pi-section-body.view-list .mission-card{padding:0.6rem 1rem;border-radius:6px}
+.pi-section-body.view-list .mission-brief{display:none}
+.pi-section-body.view-list .mission-card-wrap .mission-card{border-radius:6px 6px 0 0}
+.pi-section-body.view-list .mission-actions{padding:0.25rem 1rem 0.4rem}
+/* ── Compact view ── */
+.pi-section-body.view-compact .epic-card{display:flex;align-items:center;gap:0.6rem;padding:0.35rem 0.8rem;border-radius:4px;margin-bottom:2px;border:none;background:transparent;border-bottom:1px solid var(--border)}
+.pi-section-body.view-compact .epic-card:hover{background:var(--bg-secondary)}
+.pi-section-body.view-compact .epic-header{margin-bottom:0;flex:1;min-width:0}
+.pi-section-body.view-compact .epic-title{font-size:0.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pi-section-body.view-compact .epic-desc,.pi-section-body.view-compact .epic-features,.pi-section-body.view-compact .epic-toggle,.pi-section-body.view-compact .epic-stats{display:none}
+.pi-section-body.view-compact .epic-header>div:last-child{flex-shrink:0}
+.pi-section-body.view-compact .tma-board{display:flex;flex-direction:column;gap:0}
+.pi-section-body.view-compact .tma-col-header{font-size:0.7rem;padding:0.2rem 0.6rem;margin-bottom:0;border-bottom:1px solid var(--border)}
+.pi-section-body.view-compact .tma-col-body{gap:0}
+.pi-section-body.view-compact .tma-card{display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0.8rem;border-radius:0;border:none;border-bottom:1px solid var(--border);background:transparent}
+.pi-section-body.view-compact .tma-card:hover{background:var(--bg-secondary)}
+.pi-section-body.view-compact .tma-card-desc,.pi-section-body.view-compact .tma-card-footer{display:none}
+.pi-section-body.view-compact .tma-card-header{margin-bottom:0;flex:1;min-width:0}
+.pi-section-body.view-compact .tma-card-title{font-size:0.78rem}
+.pi-section-body.view-compact .tma-type-icon{width:22px;height:22px;border-radius:4px}
+.pi-section-body.view-compact .mission-list{gap:0}
+.pi-section-body.view-compact .mission-card{padding:0.35rem 0.8rem;border-radius:0;border:none;border-bottom:1px solid var(--border);background:transparent}
+.pi-section-body.view-compact .mission-card:hover{background:var(--bg-secondary)}
+.pi-section-body.view-compact .mission-brief{display:none}
+.pi-section-body.view-compact .mission-status-icon{width:28px;height:28px;border-radius:6px;font-size:0.85rem}
+.pi-section-body.view-compact .mission-title{font-size:0.82rem}
+.pi-section-body.view-compact .mission-card-wrap .mission-card{border-radius:0}
+.pi-section-body.view-compact .mission-card-wrap{border-bottom:1px solid var(--border)}
+.pi-section-body.view-compact .mission-actions{display:none}
 </style>
 
 <!-- ═══ Epics (SAFe Portfolio) ═══ -->
@@ -125,6 +173,11 @@
         <h2><svg class="icon icon-sm"><use href="#icon-layers"/></svg> Epics
             <span class="pi-count">{{ epics|length }}</span>
         </h2>
+        <div class="view-toggle" onclick="event.stopPropagation()">
+            <button title="Cards" onclick="setViewMode('epics','card')" data-mode="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+            <button title="List" onclick="setViewMode('epics','list')" data-mode="list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></button>
+            <button title="Compact" onclick="setViewMode('epics','compact')" data-mode="compact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="3" y1="14" x2="21" y2="14"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        </div>
     </div>
     <div class="pi-section-body" id="body-epics">
     {% for e in epics %}
@@ -172,6 +225,11 @@
         <h2><svg class="icon icon-sm"><use href="#icon-tool"/></svg> TMA — Tickets Maintenance
             <span class="pi-count">{{ tma_tickets|length }}</span>
         </h2>
+        <div class="view-toggle" onclick="event.stopPropagation()">
+            <button title="Cards" onclick="setViewMode('tma','card')" data-mode="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+            <button title="List" onclick="setViewMode('tma','list')" data-mode="list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></button>
+            <button title="Compact" onclick="setViewMode('tma','compact')" data-mode="compact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="3" y1="14" x2="21" y2="14"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        </div>
     </div>
     <div class="pi-section-body" id="body-tma">
     <div class="tma-board">
@@ -201,7 +259,7 @@
                 </div>
             </div>
             {% endfor %}
-            {% if not tma_active %}<div class="tma-empty">Aucun ticket actif</div>{% endif %}
+            {% if not tma_active %}<div class="tma-empty">{{ _("aucun_ticket_actif") }}</div>{% endif %}
             </div>
         </div>
         <div class="tma-col">
@@ -230,7 +288,7 @@
                 </div>
             </div>
             {% endfor %}
-            {% if not tma_wip %}<div class="tma-empty">Aucun ticket en cours</div>{% endif %}
+            {% if not tma_wip %}<div class="tma-empty">{{ _("aucun_ticket_en_cours") }}</div>{% endif %}
             </div>
         </div>
         <div class="tma-col">
@@ -258,7 +316,7 @@
                 </div>
             </div>
             {% endfor %}
-            {% if not tma_resolved %}<div class="tma-empty">Aucun ticket resolu</div>{% endif %}
+            {% if not tma_resolved %}<div class="tma-empty">{{ _("aucun_ticket_resolu") }}</div>{% endif %}
             </div>
         </div>
     </div>
@@ -273,6 +331,11 @@
         <h2><svg class="icon icon-sm"><use href="#icon-zap"/></svg> Missions en cours
             <span class="pi-count">{{ runs|length }}</span>
         </h2>
+        <div class="view-toggle" onclick="event.stopPropagation()">
+            <button title="Cards" onclick="setViewMode('missions','card')" data-mode="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+            <button title="List" onclick="setViewMode('missions','list')" data-mode="list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></button>
+            <button title="Compact" onclick="setViewMode('missions','compact')" data-mode="compact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="3" y1="14" x2="21" y2="14"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        </div>
     </div>
     <div class="pi-section-body" id="body-missions">
 {% if runs %}
@@ -281,7 +344,7 @@
 <div class="empty-state" style="text-align:center;padding:3rem;">
     <p style="margin-bottom:0.5rem"><svg class="icon" style="width:2.5rem;height:2.5rem"><use href="#icon-zap"/></svg></p>
     <h3 style="color:var(--text-primary);margin-bottom:0.3rem">{{ _('no_mission') }}</h3>
-    <p style="color:var(--text-secondary);font-size:0.88rem;margin-bottom:1rem">Lancez une mission pour orchestrer un workflow multi-agents.</p>
+    <p style="color:var(--text-secondary);font-size:0.88rem;margin-bottom:1rem">{{ _("lancez_une_mission_pour_orchestrer_un") }}</p>
     <button class="btn btn-primary" onclick="document.getElementById('newMissionModal').style.display='flex'">
         <svg class="icon icon-sm"><use href="#icon-plus"/></svg> {{ _('new_mission') }}
     </button>
@@ -294,39 +357,39 @@
 <div id="newMissionModal" class="nm-overlay" onclick="if(event.target===this)this.style.display='none'">
     <div class="nm-form" id="step1" style="max-width:600px">
         <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-zap"/></svg> {{ _('new_mission') }}</h3>
-        <p style="color:var(--text-secondary);font-size:0.82rem;margin:-0.5rem 0 1rem">Choisissez le type de mission</p>
+        <p style="color:var(--text-secondary);font-size:0.82rem;margin:-0.5rem 0 1rem">{{ _("choisissez_le_type_de_mission") }}</p>
         <div class="wf-grid">
             <button type="button" class="wf-card" onclick="selectWf('product-lifecycle')">
                 <div class="wf-card-icon" style="background:rgba(124,58,237,.15);color:var(--purple)"><svg class="icon"><use href="#icon-git-merge"/></svg></div>
                 <div class="wf-card-body">
-                    <strong>Cycle Complet</strong>
-                    <span>Ideation, architecture, sprints, CI/CD, QA, deploy, TMA — pipeline bout en bout</span>
+                    <strong>{{ _("full_cycle") }}</strong>
+                    <span>{{ _("ideation_architecture_sprints_ci_cd_qa") }}</span>
                 </div>
             </button>
             <button type="button" class="wf-card" onclick="selectWf('tma-maintenance')">
                 <div class="wf-card-icon" style="background:rgba(251,191,36,.12);color:var(--yellow)"><svg class="icon"><use href="#icon-tool"/></svg></div>
                 <div class="wf-card-body">
-                    <strong>TMA / Ticketing</strong>
-                    <span>Maintenance applicative, tickets incidents, routage N1/N2/N3, correctifs</span>
+                    <strong>{{ _("tma_ticketing") }}</strong>
+                    <span>{{ _("application_maintenance_incident_tickets_n1_n2") }}</span>
                 </div>
             </button>
             <button type="button" class="wf-card" onclick="selectWf('security-hacking')">
                 <div class="wf-card-icon" style="background:rgba(239,68,68,.12);color:var(--red)"><svg class="icon"><use href="#icon-shield"/></svg></div>
                 <div class="wf-card-body">
-                    <strong>Hacking / Securite</strong>
-                    <span>Audit OWASP, pentesting, SAST/DAST, hardening, revue secrets et credentials</span>
+                    <strong>{{ _("hacking_security") }}</strong>
+                    <span>{{ _("owasp_audit_pentesting_sast_dast_hardening") }}</span>
                 </div>
             </button>
             <button type="button" class="wf-card" onclick="selectWf('feature-request')">
                 <div class="wf-card-icon" style="background:rgba(34,197,94,.12);color:var(--green)"><svg class="icon"><use href="#icon-plus-circle"/></svg></div>
                 <div class="wf-card-body">
                     <strong>{{ _('new_features') }}</strong>
-                    <span>Ajout de fonctionnalites sur existant, migration, evolution, amelioration</span>
+                    <span>{{ _("adding_features_to_existing_migration_evolution") }}</span>
                 </div>
             </button>
         </div>
         <div class="nm-actions" style="margin-top:0.75rem">
-            <button type="button" class="btn btn-ghost" onclick="document.getElementById('newMissionModal').style.display='none'">Annuler</button>
+            <button type="button" class="btn btn-ghost" onclick="document.getElementById('newMissionModal').style.display='none'">{{ _("cancel") }}</button>
         </div>
     </div>
     <form class="nm-form" id="step2" style="display:none">
@@ -334,7 +397,7 @@
         <input type="hidden" name="project_id" value="software-factory">
         <input type="hidden" name="workflow_id" id="wfInput">
         <div class="nm-field">
-            <label>Brief de la mission</label>
+            <label>{{ _("mission_brief") }}</label>
             <textarea name="brief" id="briefInput" placeholder="Nom - Description du besoin, contexte, objectifs..." required style="min-height:100px"></textarea>
         </div>
         <div class="nm-actions">
@@ -356,6 +419,20 @@ function toggleSection(id) {
     body.classList.toggle('collapsed', collapsed);
     try { localStorage.setItem(`pi_collapse_${id}`, collapsed ? '1' : '0'); } catch(e){}
 }
+
+/* View mode switching (card/list/compact) with localStorage */
+function setViewMode(section, mode) {
+    const body = document.getElementById(`body-${section}`);
+    if (!body) return;
+    body.classList.remove('view-list', 'view-compact');
+    if (mode === 'list') body.classList.add('view-list');
+    else if (mode === 'compact') body.classList.add('view-compact');
+    // Update active button
+    const toggles = document.querySelector(`#section-${section} .view-toggle`);
+    if (toggles) toggles.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    try { localStorage.setItem(`pi_view_${section}`, mode); } catch(e){}
+}
+
 function restoreCollapseState() {
     ['epics','tma','missions'].forEach(id => {
         try {
@@ -364,6 +441,8 @@ function restoreCollapseState() {
                 const body = document.getElementById(`body-${id}`);
                 if (header && body) { header.classList.add('collapsed'); body.classList.add('collapsed'); }
             }
+            const vm = localStorage.getItem(`pi_view_${id}`) || 'card';
+            setViewMode(id, vm);
         } catch(e){}
     });
 }
