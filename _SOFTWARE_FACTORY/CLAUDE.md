@@ -133,6 +133,16 @@ Observability:
   LOG_LEVEL env var, LOG_FORMAT=text for human-readable
   OpenTelemetry: FastAPIInstrumentor + ConsoleSpanExporter (OTEL_ENABLED=1)
   Trace-ID: X-Trace-ID header (generated per-request, propagated in responses)
+
+Auto-Heal (platform/ops/auto_heal.py):
+  Pipeline: incident → group → TMA epic → workflow (diagnose→fix→verify→close)
+  Loop: 60s scan, max 3 concurrent heals, severity≥P3
+  Workflow: tma-autoheal (4 phases: hierarchical→adversarial-pair→sequential→solo)
+  Agents: Brain + Architect (diag), Senior Dev + QA (fix), SRE (verify), RTE (close)
+  API: GET /api/autoheal/stats, POST /api/autoheal/trigger
+  Env: AUTOHEAL_ENABLED=1, AUTOHEAL_INTERVAL=60, AUTOHEAL_SEVERITY=P3, AUTOHEAL_MAX_CONCURRENT=3
+  Dedup: links new incidents to existing active TMA epics (no duplicates)
+  Resolution: mission completed → incidents auto-resolved
 ```
 
 ## SF PIPELINE
