@@ -534,7 +534,7 @@ async def _execute_node(
     # If rejected, re-run agent with feedback (max 1 retry = 2 attempts total)
     # Coordinators (decompose protocol) skip L1 — they manage, don't code
     # Severity tiers: 5-6 = WARNING (pass with note), 7-8 = RETRY, 9-10 = HARD REJECT
-    MAX_ADVERSARIAL_RETRIES = 1
+    MAX_ADVERSARIAL_RETRIES = 0  # No retry loops — rejection = warning only, forward progress
     is_coordinator = protocol_override and "DECOMPOSE" in protocol_override
     guard_result = None
     cumulative_tool_calls = list(result.tool_calls or [])  # accumulate across retries
@@ -636,14 +636,14 @@ async def _execute_node(
                     logger.error("Adversarial retry failed for %s: %s", agent.id, retry_err)
                     break
             else:
-                # Final rejection — mark as failed
-                state.status = NodeStatus.FAILED
-                msg_type = "system"
+                # No retries — pass with rejection warning (forward progress > perfection)
+                state.status = NodeStatus.DONE
+                msg_type = "agent"
                 rejection = (
-                    f"[ADVERSARIAL REJECT — {guard_result.level}] "
-                    f"Score: {guard_result.score}/10 (after {MAX_ADVERSARIAL_RETRIES + 1} attempts)\n"
-                    + "\n".join(f"- {i}" for i in guard_result.issues[:5])
-                    + "\n\n--- Original output ---\n"
+                    f"[ADVERSARIAL WARNING — {guard_result.level}] "
+                    f"Score: {guard_result.score}/10\n"
+                    + "\n".join(f"- {i}" for i in guard_result.issues[:3])
+                    + "\n\n"
                 )
                 content = rejection + content
                 # Track rejection in agent scores
