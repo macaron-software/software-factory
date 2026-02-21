@@ -492,6 +492,7 @@ class AgentStore:
                      is_builtin=True, tags=["feature-team", "auth", "rgpd", "rust", "lead"],
                      permissions={"can_delegate": True, "can_veto": True, "veto_level": "advisory"},
                      system_prompt="Lead Backend Auth & RGPD. Scope: backend/src/auth/, middleware/.\n"
+                     "Stack: Rust axum/sqlx (backend). JAMAIS TypeScript/JavaScript pour le backend.\n"
                      "REQs: REQ-AUTH-001 (MFA), REQ-RGPD-001/002/003. TDD obligatoire."),
 
             AgentDef(id="ft-auth-dev1", name="Samir Khelif", role="Dev Rust Auth",
@@ -530,6 +531,7 @@ class AgentStore:
                      is_builtin=True, tags=["feature-team", "booking", "stations", "lead"],
                      permissions={"can_delegate": True, "can_veto": True, "veto_level": "advisory"},
                      system_prompt="Lead Booking & Stations. REQ-BOOK-001, REQ-STATION-001.\n"
+                     "Stack: Rust axum/sqlx/tonic (backend), SvelteKit (frontend). JAMAIS TypeScript pour le backend.\n"
                      "gRPC streaming tonic, Mapbox frontend. TDD."),
 
             AgentDef(id="ft-booking-dev-back", name="Lucas Martin", role="Dev Rust Booking",
@@ -567,7 +569,8 @@ class AgentStore:
                      tagline="PCI-DSS n'est pas une option", hierarchy_rank=20,
                      is_builtin=True, tags=["feature-team", "payment", "lead"],
                      permissions={"can_delegate": True, "can_veto": True, "veto_level": "advisory"},
-                     system_prompt="Lead Payment. REQ-PAY-001. Stripe (IDFM), Paynum (Nantes). PCI-DSS."),
+                     system_prompt="Lead Payment. REQ-PAY-001. Stripe (IDFM), Paynum (Nantes). PCI-DSS.\n"
+                     "Stack: Rust axum/sqlx (backend). JAMAIS TypeScript/JavaScript pour le backend."),
 
             AgentDef(id="ft-payment-dev", name="Raphael Morin", role="Dev Rust Payment",
                      description="Dev Rust paiement, Stripe/Paynum.",
@@ -725,7 +728,8 @@ class AgentStore:
                      tagline="Le schema est le contrat", hierarchy_rank=20,
                      is_builtin=True, tags=["feature-team", "proto", "data", "lead"],
                      permissions={"can_delegate": True, "can_veto": True, "veto_level": "strong"},
-                     system_prompt="Lead Data & Proto. Proto schemas, SQL migrations, RLS multi-tenant."),
+                     system_prompt="Lead Data & Proto. Proto schemas (.proto), SQL migrations, RLS multi-tenant.\n"
+                     "Stack: Rust sqlx (migrations), Protobuf (schemas). SQL PostgreSQL. JAMAIS TypeScript pour le data layer."),
 
             AgentDef(id="ft-proto-dev", name="Alexis Nguyen", role="Dev Proto & Migrations",
                      description="Dev protobuf et migrations SQL.",

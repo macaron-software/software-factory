@@ -77,6 +77,48 @@ _LIE_PATTERNS = [
     (r'(?:http|https)://(?:staging|prod|api)\.\S+(?:\.local|\.internal)', "Invented internal URL"),
 ]
 
+# Stack mismatch detection — backend code in wrong language
+# Maps declared stack keywords to expected/forbidden file extensions
+_STACK_RULES = {
+    # If task mentions these keywords, backend .ts/.js files are wrong
+    "rust_backend": {
+        "keywords": ["rust", "axum", "sqlx", "tonic", "cargo"],
+        "wrong_extensions": [".ts", ".js", ".mjs"],
+        "wrong_in_path": ["src/backend/", "src/domain/", "src/data/"],
+        "message": "STACK_MISMATCH: Backend code written in TypeScript/JavaScript but project stack is Rust",
+    },
+    "svelte_frontend": {
+        "keywords": ["sveltekit", "svelte"],
+        "wrong_extensions": [".jsx", ".tsx"],
+        "wrong_in_path": ["src/frontend/", "src/routes/"],
+        "message": "STACK_MISMATCH: Frontend code in React/JSX but project stack is SvelteKit",
+    },
+}
+
+
+def _check_stack_mismatch(tool_calls: list, task: str) -> list[str]:
+    """Check if code_write tool calls use the wrong language for the declared stack."""
+    if not tool_calls or not task:
+        return []
+    task_lower = task.lower()
+    issues = []
+    for rule in _STACK_RULES.values():
+        if not any(kw in task_lower for kw in rule["keywords"]):
+            continue
+        for tc in tool_calls:
+            if tc.get("name") not in ("code_write", "code_edit"):
+                continue
+            file_path = str(tc.get("args", {}).get("file_path", "") or tc.get("args", {}).get("path", ""))
+            if not file_path:
+                continue
+            has_wrong_ext = any(file_path.endswith(ext) for ext in rule["wrong_extensions"])
+            in_wrong_path = any(p in file_path for p in rule["wrong_in_path"])
+            if has_wrong_ext and in_wrong_path:
+                issues.append(rule["message"])
+                break  # one issue per rule is enough
+    return issues
+
+
 # Minimum content thresholds by context
 _MIN_CONTENT_LENGTH = {
     "dev": 200,
@@ -87,7 +129,7 @@ _MIN_CONTENT_LENGTH = {
 }
 
 
-def check_l0(content: str, agent_role: str = "", tool_calls: list = None) -> GuardResult:
+def check_l0(content: str, agent_role: str = "", tool_calls: list = None, task: str = "") -> GuardResult:
     """L0: Fast deterministic checks. Returns immediately."""
     if not content or not content.strip():
         return GuardResult(passed=False, score=10, issues=["Empty output"], level="L0")
@@ -101,6 +143,12 @@ def check_l0(content: str, agent_role: str = "", tool_calls: list = None) -> Gua
     tool_names = {tc.get("name", "") for tc in tool_calls}
     has_write_tool = bool(tool_names & {"code_write", "code_edit", "git_commit", "deploy_azure", "docker_build"})
     has_test_tool = bool(tool_names & {"test", "build", "playwright_test"})
+
+    # Check stack mismatch — wrong language for declared project stack
+    stack_issues = _check_stack_mismatch(tool_calls, task)
+    for si in stack_issues:
+        issues.append(si)
+        score += 7  # severe — wrong language is a hard reject
 
     # Check slop
     for pattern, desc in _SLOP_PATTERNS:
@@ -245,6 +293,7 @@ Check for:
 3. MOCK: Fake implementations (TODO, pass, NotImplementedError, dummy data)
 4. LIES: Invented file paths, URLs, results not in tool output
 5. ECHO: Just rephrasing the task without doing real work
+6. STACK_MISMATCH: Code written in wrong language for declared stack (e.g. TypeScript backend when task says Rust/axum)
 
 Respond ONLY with JSON:
 {{"score": <0-10>, "issues": ["issue1", "issue2"], "verdict": "APPROVE" or "REJECT"}}"""
@@ -269,9 +318,9 @@ Respond ONLY with JSON:
         l1_issues = data.get("issues", [])
         verdict = data.get("verdict", "APPROVE")
 
-        # HALLUCINATION/SLOP in issues = always reject, regardless of score
+        # HALLUCINATION/SLOP/STACK_MISMATCH in issues = always reject, regardless of score
         has_critical = any(
-            "HALLUCINATION" in i.upper() or "SLOP" in i.upper()
+            "HALLUCINATION" in i.upper() or "SLOP" in i.upper() or "STACK_MISMATCH" in i.upper()
             for i in l1_issues
         )
         if has_critical:
@@ -306,7 +355,7 @@ async def run_guard(
     L1 runs only for execution patterns (not discussions) and if L0 passes.
     """
     # L0: Fast deterministic
-    l0 = check_l0(content, agent_role, tool_calls)
+    l0 = check_l0(content, agent_role, tool_calls, task)
 
     if not l0.passed:
         logger.info(f"GUARD L0 REJECT [{agent_name}]: {l0.summary}")

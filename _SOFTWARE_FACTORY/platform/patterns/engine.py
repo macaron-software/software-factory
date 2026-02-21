@@ -559,9 +559,9 @@ async def _execute_node(
                 break  # approved
 
             # Severity tiers: 5-6 = pass with warning, 7-8 = retry, 9-10 = hard reject
-            # BUT: HALLUCINATION/SLOP keywords always force retry (never soft-pass)
+            # BUT: HALLUCINATION/SLOP/STACK_MISMATCH keywords always force retry (never soft-pass)
             has_critical_flags = any(
-                "HALLUCINATION" in i or "SLOP" in i
+                "HALLUCINATION" in i or "SLOP" in i or "STACK_MISMATCH" in i
                 for i in guard_result.issues
             )
             if guard_result.score <= 6 and not has_critical_flags:
