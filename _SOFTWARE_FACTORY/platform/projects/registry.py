@@ -40,6 +40,8 @@ class ProjectInfo:
             return False
 
 
+_PERSONAL_IDS = {"fervenza", "finary", "popinz", "psy", "yolonow", "sharelook-2"}
+
 _MANUAL_PROJECTS: list[dict] = [
     {"id": "factory", "name": "Software Factory (Self)", "path": "", "factory_type": "sf",
      "domains": ["python"], "description": "Self-improving software factory"},
@@ -109,9 +111,12 @@ class ProjectRegistry:
                 except Exception:
                     pass
 
-        # Manual additions
+        # Manual additions (skip personal projects on Azure)
+        is_azure = os.environ.get("AZURE_DEPLOY", "")
         for m in _MANUAL_PROJECTS:
             pid = m["id"]
+            if is_azure and pid in _PERSONAL_IDS:
+                continue
             if pid not in self._projects:
                 self._projects[pid] = ProjectInfo(**m)
 

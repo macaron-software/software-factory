@@ -18,6 +18,7 @@ services:
       - SF_ROOT=/app
       - MF_ROOT=/app/mf_projects
       - ANDROID_BUILDER_CONTAINER=android-builder
+      - AZURE_DEPLOY=1
     volumes:
       - platform-data:/app/data
       - /opt/macaron/.factory-keys:/app/.config/factory:ro
