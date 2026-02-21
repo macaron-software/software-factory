@@ -137,7 +137,7 @@
     </div>
     <div class="dsi-kpi">
         <div class="dsi-kpi-icon" style="background:rgba(59,130,246,.15)"><svg style="color:var(--blue)"><use href="#icon-check"/></svg></div>
-        <div><div class="dsi-kpi-value">{{ total_done }}/{{ total_tasks }}</div><div class="dsi-kpi-label">Tasks</div></div>
+        <div><div class="dsi-kpi-value">{{ total_done }}/{{ total_tasks }}</div><div class="dsi-kpi-label">Phases</div></div>
     </div>
     <div class="dsi-kpi">
         <div class="dsi-kpi-icon" style="background:rgba(245,158,11,.15)"><svg style="color:var(--yellow)"><use href="#icon-users"/></svg></div>
@@ -302,8 +302,12 @@ document.addEventListener('htmx:afterRequest', function(evt) {
             </div>
             <div class="dsi-map">
                 <div class="dsi-map-score">
-                    <div class="dsi-map-score-value">{{ system_patterns|length * 100 }}%</div>
-                    <div class="dsi-map-score-label">Intelligence Globale</div>
+                    {% if total_tasks > 0 %}
+                    <div class="dsi-map-score-value">{{ (total_done / total_tasks * 100)|round|int }}%</div>
+                    {% else %}
+                    <div class="dsi-map-score-value">0%</div>
+                    {% endif %}
+                    <div class="dsi-map-score-label">Progression Globale</div>
                 </div>
                 <div class="dsi-map-legend">
                     <span class="network">Network</span>
@@ -323,20 +327,22 @@ document.addEventListener('htmx:afterRequest', function(evt) {
         <!-- Metrics: 2-col -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem">
             <div class="dsi-panel">
-                <div class="dsi-panel-header"><div class="dsi-panel-title"><svg><use href="#icon-chart"/></svg> Agent Efficiency</div></div>
+                <div class="dsi-panel-header"><div class="dsi-panel-title"><svg><use href="#icon-chart"/></svg> Progression Epics</div></div>
                 <div class="dsi-panel-body">
-                    {% set months = ['Jan','Fév','Mar','Avr','Mai','Jun'] %}
-                    {% for m in months %}
+                    {% for r in resources %}
                     <div class="dsi-chart-row">
-                        <span class="dsi-chart-label">{{ m }}</span>
-                        <div class="dsi-chart-bar"><div class="dsi-chart-fill" style="width:{{ range(40,95)|random }}%;background:var(--green)"></div></div>
-                        <span class="dsi-chart-value">{{ range(40,95)|random }}%</span>
+                        <span class="dsi-chart-label" style="width:70px">{{ r.name[:10] }}</span>
+                        <div class="dsi-chart-bar"><div class="dsi-chart-fill" style="width:{{ r.pct }}%;background:{{ r.color }}"></div></div>
+                        <span class="dsi-chart-value">{{ r.active }}/{{ r.total }}</span>
                     </div>
                     {% endfor %}
+                    {% if not resources %}
+                    <div style="text-align:center;color:var(--text-muted);padding:1rem;font-size:0.75rem">Pas de données</div>
+                    {% endif %}
                 </div>
             </div>
             <div class="dsi-panel">
-                <div class="dsi-panel-header"><div class="dsi-panel-title"><svg><use href="#icon-cpu"/></svg> System Load</div></div>
+                <div class="dsi-panel-header"><div class="dsi-panel-title"><svg><use href="#icon-cpu"/></svg> Charge Projets</div></div>
                 <div class="dsi-panel-body">
                     {% for r in resources %}
                     <div class="dsi-chart-row">
@@ -373,7 +379,8 @@ document.addEventListener('htmx:afterRequest', function(evt) {
                     <div class="dsi-card-project">{{ m.project_name }}</div>
                     <div class="dsi-card-meta">
                         {% if m.wsjf > 0 %}<span class="dsi-card-wsjf">WSJF {{ m.wsjf|round(1) }}</span>{% endif %}
-                        <span>{{ m.done }}/{{ m.total }}</span>
+                        <span>{{ m.done }}/{{ m.total }} phases</span>
+                        {% if m.current_phase %}<span style="font-size:0.6rem;color:var(--purple-light)">{{ m.current_phase }}</span>{% endif %}
                         {% if m.total > 0 %}<div class="dsi-card-progress"><div class="dsi-card-progress-fill" style="width:{{ (m.done / m.total * 100)|round }}%"></div></div>{% endif %}
                     </div>
                 </a>

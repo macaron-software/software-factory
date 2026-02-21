@@ -387,16 +387,17 @@ async def metier_page(request: Request):
     all_agents = agent_store.list_all()
     all_workflows = wf_store.list_all()
 
+    # helper to normalize enum → string
+    def _s(val):
+        return val.value if hasattr(val, "value") else str(val) if val else "pending"
+
     # ── Epics Pipeline (missions as value items) ──
     epics = []
     for m in all_missions:
         phases_total = len(m.phases) if m.phases else 0
-        phases_done = sum(1 for p in (m.phases or []) if p.status in ("done", "done_with_issues"))
-        phases_running = sum(1 for p in (m.phases or []) if p.status == "running")
+        phases_done = sum(1 for p in (m.phases or []) if _s(p.status) in ("done", "done_with_issues"))
+        phases_running = sum(1 for p in (m.phases or []) if _s(p.status) == "running")
         progress = int(phases_done / phases_total * 100) if phases_total else 0
-        agents_involved = set()
-        for p in (m.phases or []):
-            agents_involved.add(p.phase_id)  # count unique phases as proxy
 
         phase_nodes = []
         for p in (m.phases or []):
@@ -404,7 +405,7 @@ async def metier_page(request: Request):
                 "id": p.phase_id,
                 "name": p.phase_name or p.phase_id,
                 "pattern": p.pattern_id or "solo",
-                "status": p.status or "pending",
+                "status": _s(p.status),
             })
 
         # Compute lead time
@@ -431,7 +432,7 @@ async def metier_page(request: Request):
             "id": m.id,
             "name": m.workflow_name or m.workflow_id or "Mission",
             "brief": (m.brief or "")[:120],
-            "status": m.status or "pending",
+            "status": _s(m.status),
             "current_phase": m.current_phase or "",
             "progress": progress,
             "phases_done": phases_done,

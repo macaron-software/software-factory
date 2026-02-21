@@ -270,15 +270,37 @@ async def dsi_board_page(request: Request):
     all_agents = agent_store.list_all()
     all_missions = mission_store.list_missions()
 
+    # Load mission runs for live phase progress
+    from ...missions.store import get_mission_run_store
+    run_store = get_mission_run_store()
+    all_runs = run_store.list_runs(limit=100)
+    runs_by_mission: dict = {}
+    for r in all_runs:
+        if r.parent_mission_id:
+            runs_by_mission[r.parent_mission_id] = r
+        runs_by_mission[r.id] = r
+
+    def _phase_stats(mission_id):
+        """Get progress from mission_run phases (live) or fallback to tasks."""
+        run = runs_by_mission.get(mission_id)
+        if run and run.phases:
+            total = len(run.phases)
+            done = sum(1 for ph in run.phases if ph.status.value in ("done", "done_with_issues"))
+            current = run.current_phase or ""
+            current_name = next((ph.phase_name for ph in run.phases if ph.phase_id == current), current)
+            return {"total": total, "done": done, "current_phase": current_name, "run_status": run.status.value}
+        stats = mission_store.mission_stats(mission_id)
+        return {"total": stats.get("total", 0), "done": stats.get("done", 0), "current_phase": "", "run_status": ""}
+
     # KPIs
     active_missions = sum(1 for m in all_missions if m.status == "active")
     blocked_missions = sum(1 for m in all_missions if m.status == "blocked")
-    total_tasks = 0
-    total_done = 0
+    total_phases = 0
+    total_phases_done = 0
     for m in all_missions:
-        stats = mission_store.mission_stats(m.id)
-        total_tasks += stats.get("total", 0)
-        total_done += stats.get("done", 0)
+        ps = _phase_stats(m.id)
+        total_phases += ps["total"]
+        total_phases_done += ps["done"]
 
     # Pipeline kanban columns
     project_names = {p.id: p.name for p in all_projects}
@@ -298,68 +320,73 @@ async def dsi_board_page(request: Request):
                 if m.status == "planning":
                     sprints = mission_store.list_sprints(m.id)
                     if not sprints:
-                        stats = mission_store.mission_stats(m.id)
+                        ps = _phase_stats(m.id)
                         col_missions.append({
                             "id": m.id, "name": m.name,
                             "project_name": project_names.get(m.project_id, m.project_id),
-                            "wsjf": m.wsjf_score, "total": stats.get("total", 0),
-                            "done": stats.get("done", 0),
+                            "wsjf": m.wsjf_score, "total": ps["total"],
+                            "done": ps["done"], "current_phase": ps["current_phase"],
                         })
         elif status_key == "planning":
             for m in all_missions:
                 if m.status == "planning":
                     sprints = mission_store.list_sprints(m.id)
                     if sprints:
-                        stats = mission_store.mission_stats(m.id)
+                        ps = _phase_stats(m.id)
                         col_missions.append({
                             "id": m.id, "name": m.name,
                             "project_name": project_names.get(m.project_id, m.project_id),
-                            "wsjf": m.wsjf_score, "total": stats.get("total", 0),
-                            "done": stats.get("done", 0),
+                            "wsjf": m.wsjf_score, "total": ps["total"],
+                            "done": ps["done"], "current_phase": ps["current_phase"],
                         })
         elif status_key == "review":
-            # Missions with status "completed" but also any "review" sprints
             for m in all_missions:
                 sprints = mission_store.list_sprints(m.id)
                 if any(s.status == "review" for s in sprints) and m.status == "active":
-                    stats = mission_store.mission_stats(m.id)
+                    ps = _phase_stats(m.id)
                     col_missions.append({
                         "id": m.id, "name": m.name,
                         "project_name": project_names.get(m.project_id, m.project_id),
-                        "wsjf": m.wsjf_score, "total": stats.get("total", 0),
-                        "done": stats.get("done", 0),
+                        "wsjf": m.wsjf_score, "total": ps["total"],
+                        "done": ps["done"], "current_phase": ps["current_phase"],
                     })
         else:
             for m in all_missions:
                 if m.status == match_status:
-                    # Skip those already in backlog/planning/review
                     if status_key == "active":
                         sprints = mission_store.list_sprints(m.id)
                         if any(s.status == "review" for s in sprints):
                             continue
-                    stats = mission_store.mission_stats(m.id)
+                    ps = _phase_stats(m.id)
                     col_missions.append({
                         "id": m.id, "name": m.name,
                         "project_name": project_names.get(m.project_id, m.project_id),
-                        "wsjf": m.wsjf_score, "total": stats.get("total", 0),
-                        "done": stats.get("done", 0),
+                        "wsjf": m.wsjf_score, "total": ps["total"],
+                        "done": ps["done"], "current_phase": ps["current_phase"],
                     })
         pipeline.append({"status": status_key, "label": label, "missions": col_missions})
 
-    # Resource allocation per project
+    # Resource allocation per project (phase-based progress)
     resources = []
     project_colors = ["var(--purple)", "var(--blue)", "var(--green)", "var(--yellow)", "var(--red)", "#06b6d4", "#8b5cf6"]
     for i, p in enumerate(all_projects):
         p_missions = [m for m in all_missions if m.project_id == p.id]
-        p_active = sum(1 for m in p_missions if m.status == "active")
-        if p_missions:
-            resources.append({
-                "name": p.name,
-                "total": len(p_missions),
-                "active": p_active,
-                "pct": round(p_active / max(len(p_missions), 1) * 100),
-                "color": project_colors[i % len(project_colors)],
-            })
+        if not p_missions:
+            continue
+        p_phases_total = 0
+        p_phases_done = 0
+        for m in p_missions:
+            ps = _phase_stats(m.id)
+            p_phases_total += ps["total"]
+            p_phases_done += ps["done"]
+        pct = round(p_phases_done / max(p_phases_total, 1) * 100)
+        resources.append({
+            "name": p.name,
+            "total": p_phases_total,
+            "active": p_phases_done,
+            "pct": pct,
+            "color": project_colors[i % len(project_colors)],
+        })
 
     # Strategic agents
     avatar_dir = Path(__file__).parent.parent / "static" / "avatars"
@@ -437,8 +464,8 @@ async def dsi_board_page(request: Request):
         "total_missions": len(all_missions),
         "active_missions": active_missions,
         "blocked_missions": blocked_missions,
-        "total_tasks": total_tasks,
-        "total_done": total_done,
+        "total_tasks": total_phases,
+        "total_done": total_phases_done,
         "total_agents": len(all_agents),
         "total_projects": len(all_projects),
         "pipeline": pipeline,
