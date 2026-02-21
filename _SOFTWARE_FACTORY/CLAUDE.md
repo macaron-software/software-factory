@@ -76,6 +76,15 @@ LLM:  ascii-ui-openai (rg-ascii-ui, francecentral) — gpt-5-mini
 Deploy: rsync fails (permissions) → SCP to /tmp + sudo cp
         VM resize: az vm deallocate → az vm resize → az vm start
         Container rebuild: sudo docker compose up -d --build
+
+DR:   Blob: macaronbackups (GRS francecentral→francesouth)
+      Backup: platform/ops/run_backup.py — SQLite(7DBs)+PG(psycopg)+secrets→blob
+      Restore: platform/ops/run_restore.py — --list/--latest/--dry-run/--pg-only
+      Health: platform/ops/run_health.py — 5 checks (HTTP/PG/containers/disk/backup)
+      Snapshots: vm-macaron-snap-* (incremental, keep 4)
+      Lifecycle: daily=90d, weekly=365d
+      Runbook: platform/ops/RUNBOOK.md
+      NOTE: run from /tmp or via run_*.py wrappers (avoid 'platform' package shadowing)
 ```
 
 ## SF PIPELINE
