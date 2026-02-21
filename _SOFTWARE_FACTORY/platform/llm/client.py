@@ -82,12 +82,12 @@ else:
 class _RateLimiter:
     """Sliding window rate limiter with async queuing.
 
-    Queues requests when rate limit is approached instead of failing fast.
     Azure OpenAI gpt-5-mini: 100 req/60s, 100K tokens/60s.
-    We target 80 req/60s to leave headroom.
+    With ~12K tokens per agent call, we hit the token limit at ~8 req/min.
+    Target: 6 req/60s to stay safely under token limit.
     """
 
-    def __init__(self, max_requests: int = 80, window_seconds: float = 60.0):
+    def __init__(self, max_requests: int = 6, window_seconds: float = 60.0):
         self._max = max_requests
         self._window = window_seconds
         self._timestamps: list[float] = []
@@ -120,7 +120,7 @@ class _RateLimiter:
 
 # Global rate limiter (shared across all agents in this process)
 _rate_limiter = _RateLimiter(
-    max_requests=int(os.environ.get("LLM_RATE_LIMIT_RPM", "80")),
+    max_requests=int(os.environ.get("LLM_RATE_LIMIT_RPM", "6")),
     window_seconds=60.0,
 )
 
@@ -266,6 +266,8 @@ class LLMClient:
         tools: Optional[list[dict]] = None,
     ) -> LLMResponse:
         """Send a chat completion request. Falls back to next provider on failure."""
+        if _is_azure:
+            provider = "azure-openai"
         providers_to_try = [provider] + [p for p in _FALLBACK_CHAIN if p != provider]
 
         for prov in providers_to_try:
@@ -483,6 +485,8 @@ class LLMClient:
         system_prompt: str = "",
     ) -> AsyncIterator[LLMStreamChunk]:
         """Stream chat completion response with provider fallback."""
+        if _is_azure:
+            provider = "azure-openai"
         providers_to_try = [provider] + [p for p in _FALLBACK_CHAIN if p != provider]
 
         for prov in providers_to_try:
