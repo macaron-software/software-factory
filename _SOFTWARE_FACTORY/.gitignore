@@ -32,3 +32,5 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+platform/tests/e2e/test-results/
+platform/tests/e2e/playwright-report/

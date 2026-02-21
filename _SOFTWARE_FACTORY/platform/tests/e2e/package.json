@@ -4,9 +4,16 @@
   "private": true,
   "scripts": {
     "test": "npx playwright test",
+    "test:smoke": "npx playwright test portfolio pages",
+    "test:journeys": "npx playwright test journeys",
+    "test:projects": "npx playwright test project-chat",
     "test:ideation": "npx playwright test ideation",
     "test:epic": "npx playwright test epic",
     "test:migration": "npx playwright test migration",
+    "test:portfolio": "npx playwright test portfolio",
+    "test:agents": "npx playwright test agents",
+    "test:pages": "npx playwright test pages",
+    "test:i18n": "npx playwright test i18n",
     "report": "npx playwright show-report"
   },
   "devDependencies": {
