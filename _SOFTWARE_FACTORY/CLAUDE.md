@@ -1,184 +1,95 @@
-# SOFTWARE FACTORY - RLM (MIT CSAIL arXiv:2512.24601)
+# Macaron Software — Project Context
 
-## PHILOSOPHIE: Lean + Agile + KISS + XP
-
-| Principe | Implémentation |
-|----------|----------------|
-| **Lean** | WIP limits, flow continu, éliminer waste |
-| **Agile** | Feedback rapide, adapt, WSJF priorité |
-| **KISS** | FRACTAL atomic tasks, minimal code |
-| **XP** | TDD first, pair review, refactor continu |
-
-## ⛔ ZERO SKIP POLICY (MANDATORY)
-
-**JAMAIS DE SKIP. NULLE PART. SOUS AUCUN PRÉTEXTE.**
-
-La Factory doit CORRIGER les problèmes, pas les contourner.
-
-### Interdit absolument:
-| Interdit | Pourquoi |
-|----------|----------|
-| `--skip-*` flags | Masque les vrais problèmes |
-| `--skip-deploy` | Bypass du pipeline qualité |
-| `--skip-chaos` | Évite les tests de résilience |
-| `--skip-e2e` | Saute la validation end-to-end |
-| `test.skip()` | Tests non exécutés = bugs cachés |
-| `@ts-ignore` | Erreurs TypeScript ignorées |
-| `#[ignore]` | Tests Rust désactivés |
-| Regex "rapide" vs LLM | Analyse superficielle = faux positifs |
-
-### Quand un déploiement échoue:
+## REPO STRUCTURE
 ```
-1. NE PAS skipper le check qui échoue
-2. ANALYSER la cause racine
-3. CRÉER une tâche de fix (feedback loop)
-4. LAISSER la Factory corriger via TDD
-5. RETENTER le déploiement une fois fixé
+_FACTORY_CORE/          # Shared utils (subprocess, logging, LLM, daemon)
+_SOFTWARE_FACTORY/      # Software Factory (SF) — TDD automation + Agent Platform
+  ├── cli/factory.py    # CLI: factory <project> <command>
+  ├── core/             # Brain, TDD workers, adversarial, FRACTAL
+  ├── platform/         # Macaron Agent Platform — FastAPI web app
+  │   ├── server.py     # App factory, port 8090
+  │   ├── web/routes/   # HTTP routes package (10 sub-modules, was 8800 LOC monolith)
+  │   ├── a2a/          # Agent-to-Agent messaging (bus, negotiation, veto)
+  │   ├── agents/       # Loop, executor, store (133 agents)
+  │   ├── patterns/     # 8 orchestration patterns
+  │   ├── missions/     # SAFe mission lifecycle
+  │   ├── llm/          # Multi-provider LLM client
+  │   ├── tools/        # Agent tools (code, git, deploy, memory, security, browser)
+  │   └── deploy/       # Dockerfile + docker-compose (Azure VM)
+  ├── projects/*.yaml   # Per-project configs
+  ├── skills/*.md       # Domain-specific prompts
+  └── data/             # SQLite DBs (factory.db, platform.db)
+_MIGRATION_FACTORY/     # Code migration engine (Angular 16→17, ISO 100%)
 ```
 
-### Adversarial Reviews:
-```
-TOUJOURS LLM (MiniMax-M2.1), JAMAIS regex
-   ↓
-Analyse sémantique complète du code
-   ↓
-Comprend le contexte (CLI print() = OK, test skip = REJECT)
-   ↓
-Qualité > Vitesse
-```
+## RUN COMMANDS
+```bash
+# SF CLI
+cd _SOFTWARE_FACTORY && source setup_env.sh
+factory <p> brain run --mode vision|fix|security|refactor|missing
+factory <p> cycle start -w 5 -b 20 -t 30   # batch TDD
+factory status --all
 
-### Si bloqué:
-- La Factory crée automatiquement une tâche de fix
-- Le feedback loop s'en charge
-- Les workers TDD corrigent le problème
-- Le déploiement est retenté automatiquement
+# Platform (NEVER --reload, ALWAYS --ws none)
+python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8099 --ws none --log-level warning
 
-**RULE: FIX > SKIP. TOUJOURS.**
-
-### ⚠️ NO MANUAL FIXES - IMPROVE THE FACTORY
-
-**JAMAIS de fix manuel en prod/infra.**
-
-```
-❌ WRONG: SSH → fix nginx manually
-   → Bypass la Factory
-   → Pas d'audit trail
-   → Pas reproductible
-
-✅ RIGHT: Factory detects → Factory fixes
-   → wiggum_infra diagnose + fix
-   → Task créée si échec
-   → Pattern appris pour next time
+# Tests
+python3 -m pytest tests/ -v
+cd platform/tests/e2e && npx playwright test
 ```
 
-**Si la Factory ne sait pas fixer:**
-1. Créer une tâche feedback (`factory-infra-*`)
-2. Améliorer wiggum_infra.py pour ce pattern
-3. Laisser la Factory fixer la prochaine fois
-
-**Exemple pattern appris:**
+## LLM PROVIDERS (env-driven)
 ```
-403 Forbidden + localhost:3000 = 200
-  → nginx static (try_files) vs SSR (Node.js)
-  → Fix: proxy_pass http://localhost:3000
-  → wiggum_infra.fix_nginx_403() auto-détecte et corrige
+Local (default):  PLATFORM_LLM_PROVIDER=minimax    PLATFORM_LLM_MODEL=MiniMax-M2.5
+Azure (docker):   PLATFORM_LLM_PROVIDER=azure-openai PLATFORM_LLM_MODEL=gpt-5-mini
 ```
+Fallback chain: primary → next in [minimax, azure-openai, azure-ai]
+- MiniMax M2.5: fast, cheap, <think> blocks consume tokens (min 16K)
+- Azure GPT-5-mini: reasoning model, NO temperature (only 1.0), needs max_completion_tokens≥8K
+- Azure GPT-5.2: swedencentral private endpoint (VNet only)
+- Keys: `~/.config/factory/*.key` — NEVER set `*_API_KEY=dummy`
+- Client: `platform/llm/client.py` — `_PROVIDERS`, `_FALLBACK_CHAIN`, cooldown 90s on 429
 
-## ARCH
+## AZURE INFRASTRUCTURE
 ```
-BRAIN (Opus4.5) + MCP + CoVe → deep recursive → backlog WSJF priorité
-    ↓
-FRACTAL L1 → 3 concerns // : feature/guards/failures
-    ↓
-WIP-LIMITED WORKERS → TDD atomic
-    ↓
-ADVERSARIAL PAIR + CoVe → 2 LLMs débattent qualité (verified)
-    ↓
-BUILD + QUALITY GATES → coverage 80%+, complexity check
-    ↓
-INFRA CHECK (wiggum_infra) → docker/nginx/db/sites verified BEFORE E2E
-    ↓
-DEPLOY CANARY → 1% traffic, metrics watch
-    ↓
-E2E DIRECT → subprocess.run() PAS LLM (real Playwright)
-    ↓
-PROMOTE/ROLLBACK AUTO → based on error rate
-    ↓
-FEEDBACK → errs + metrics → new tasks WSJF recalc
-    ↓
-XP AGENT → retrospective auto → SELF-MODIFY FACTORY
-```
+VM:   vm-macaron (RG-MACARON, francecentral) — Standard_D4as_v5 (4 vCPU, 16GB)
+      IP: 4.233.64.30, SSH: azureadmin, nginx basic auth: macaron/macaron
+      Files: /opt/macaron/platform/ — docker compose (platform + nginx)
+      NOTE: D4as_v6 fails (SCSI disk controller incompatible, needs NVMe)
+      NOTE: active compose = platform/docker-compose.yml (NOT deploy/)
+      NOTE: files owned by azureadmin → SCP to /tmp + sudo cp
 
-## TEAM OF RIVALS - Multi-Agent Adversarial (arXiv:2601.14351)
+PG:   macaron-platform-pg (RG-MACARON, francecentral) — B1ms, PG 17, 32GB
+      FQDN: macaron-platform-pg.postgres.database.azure.com
+      DB: macaron_platform | User: macaron | SSL: require
+      Extensions: pgvector 0.8.0, pg_trgm 1.6, uuid-ossp 1.1
+      Firewall: allow-vm (4.233.64.30), allow-dev (update IP as needed)
+      Status: READY (not yet migrated from SQLite)
 
-**Référence:** "If You Want Coherence, Orchestrate a Team of Rivals: Multi-Agent Models of Organizational Intelligence" - Isotopes AI, Jan 2025
+LLM:  ascii-ui-openai (rg-ascii-ui, francecentral) — gpt-5-mini
+      Capacity: 100 req/min, 100K tokens/min
+      NOTE: castudioia* resources are private endpoint (VNet only, unusable)
 
-**Concept clé:** La cohérence émerge de forces opposées avec droit de veto. Chaque critic pousse dans une direction différente: un pour la complétude, un pour la praticité, un pour la correction.
-
-### Cascade de Critics (Swiss Cheese Model)
-
-```
-Code Changes
-    ↓
-┌─────────────────────────────────────────────────────────────┐
-│ L0: FAST CHECKS (deterministic, 0ms)                        │
-│     - test.skip, @ts-ignore, #[ignore]                      │
-│     - Empty catch blocks                                    │
-│     - Protected files (.md, node_modules)                   │
-│     Catch rate: ~25%                                        │
-└─────────────────────────────────────────────────────────────┘
-    ↓ (si L0 passe)
-┌─────────────────────────────────────────────────────────────┐
-│ L1a: CODE CRITIC (MiniMax M2.5, ~5s)                        │
-│     - Syntax/logic errors                                   │
-│     - API misuse (axum extractors, sqlx FromRow)            │
-│     - SLOP detection (code qui compile mais ne fait rien)   │
-│     Catch rate: ~60%                                        │
-└─────────────────────────────────────────────────────────────┘
-    ↓ (si L1a passe)
-┌─────────────────────────────────────────────────────────────┐
-│ L1b: SECURITY CRITIC (GLM-4.7-free, ~10s)                   │
-│     - SQL injection, XSS, command injection                 │
-│     - Secrets in code (not fixtures)                        │
-│     - OWASP Top 10                                          │
-│     Catch rate: ~15%                                        │
-└─────────────────────────────────────────────────────────────┘
-    ↓ (si L1b passe)
-┌─────────────────────────────────────────────────────────────┐
-│ L2: ARCHITECTURE CRITIC (Claude Opus 4.5, ~20s)             │
-│     - RBAC/Auth coverage                                    │
-│     - Input validation completeness                         │
-│     - Error handling (all error codes)                      │
-│     - API design (pagination, rate limit)                   │
-│     Catch rate: ~10%                                        │
-└─────────────────────────────────────────────────────────────┘
-    ↓
-✅ APPROVED (ALL critics passed) → 90%+ erreurs interceptées
+Deploy: rsync fails (permissions) → SCP to /tmp + sudo cp
+        VM resize: az vm deallocate → az vm resize → az vm start
+        Container rebuild: sudo docker compose up -d --build
 ```
 
-### Multi-Vendor Cognitive Diversity
-
-| Role | LLM | Provider | Raison |
-|------|-----|----------|--------|
-| **Brain** | Opus 4.5 | Anthropic | Best reasoning |
-| **TDD Worker** | MiniMax M2.5 | MiniMax | Fast, cheap |
-| **Code Critic** | MiniMax M2.5 | MiniMax | Same perspective as worker |
-| **Security Critic** | GLM-4.7-free | Zhipu AI | Different provider = cognitive diversity |
-| **Arch Critic** | Opus 4.5 | Anthropic | Architectural reasoning |
-
-**Règle:** "Le même processus de raisonnement qui a produit la réponse initiale ne peut pas l'évaluer de manière fiable." → Multi-vendor obligatoire.
-
-### Veto Hierarchy
-
+## SF PIPELINE
 ```
-L0: VETO ABSOLU (deterministic, always correct)
-    ↓
-L1: VETO ABSOLU (LLM agreed, no override)
-    ↓
-L2: VETO with ESCALATION (human can override exceptionnellement)
+Brain (Opus) → FRACTAL (3 concerns) → TDD Workers (//) → Adversarial → Build → Infra Check → Deploy → E2E → Promote/Rollback → Feedback → XP Agent
 ```
 
-**Règle paper:** "Code writers cannot declare their own success. Executors cannot declare success. Only independent critics can approve."
+## ADVERSARIAL (Team of Rivals — arXiv:2601.14351)
+```
+L0: deterministic (test.skip, @ts-ignore, empty catch) → VETO ABSOLU
+L1: LLM semantic (SLOP, hallucination, logic) → VETO ABSOLU
+  - HALLUCINATION/SLOP keywords → force score≥7 + REJECT (engine.py has_critical_flags)
+  - Retry loop: 5 attempts max, then NodeStatus.FAILED
+L2: architecture (RBAC, validation, API design) → VETO + ESCALATION
+```
+Multi-vendor: Brain=Opus, Worker=MiniMax, Security=GLM, Arch=Opus
+Rule: "Code writers cannot declare their own success"
 
 ### Métriques (core/metrics.py)
 
@@ -414,28 +325,31 @@ factory mcp start/stop/status/restart
 
 **Fichiers:** `mcp_lrm/server_sse.py` (daemon), `mcp_lrm/proxy.py` (bridge)
 
-**MCP Tools:**
+**MCP Tools (9 tools):**
 | Tool | Description |
 |------|-------------|
 | `lrm_locate` | Find files by pattern/description |
-| `lrm_summarize` | Summarize file/directory content |
+| `lrm_read` | Read file content |
 | `lrm_conventions` | Get project conventions for domain |
-| `lrm_examples` | Get code examples from codebase |
+| `lrm_task_read` | Read task by ID |
+| `lrm_task_update` | Update task status |
 | `lrm_build` | Run build/test/lint commands |
-| `lrm_context` | **NEW** - RAG context (vision, arch, data_model, api) |
+| `confluence_search` | Search Confluence wiki (FTS5 cache + anonymized) |
+| `confluence_read` | Read Confluence page by ID/title (anonymized) |
+| `jira_search` | Search Jira issues via JQL (FTS5 cache + anonymized) |
 
-**lrm_context** (ProjectContext RAG via MCP):
-```json
-{
-  "name": "context",
-  "inputSchema": {
-    "category": "vision|architecture|data_model|api_surface|conventions|state|history|all",
-    "max_chars": 8000
-  }
-}
-```
+**Anonymization** (`mcp_lrm/anonymizer.py`):
+- Regex-based PII stripping: phones, emails, SSN, IPs, API keys, French names (180+ dict)
+- Consistent replacement per session: `Jean Dupont` → `[PRENOM-001] [NOM-001]`
+- Applied to all Confluence/Jira tool outputs
 
-**Usage Brain:** `mcp.call("lrm", "context", {"category": "vision"})` → VISION.md + AO refs
+**RLM Cache** (`mcp_lrm/rlm_cache.py`):
+- SQLite FTS5 at `data/rlm_cache.db`, 1h stale TTL
+- Tables: `confluence_pages` + `jira_issues` with FTS5 indexes
+- Cache-first strategy, API fallback on miss/stale
+
+**Confluence config:** PAT in `~/.config/factory/confluence.key`, base URL in env `CONFLUENCE_URL`
+**Jira config:** PAT in `~/.config/factory/jira.key` or `ATLASSIAN_TOKEN`, URL in `JIRA_URL` or `ATLASSIAN_URL`
 
 ## MCP PLATFORM SERVER (Internal Tools)
 
@@ -1861,7 +1775,9 @@ GET  /sse/session/{id}                → SSE filtered par session_id
 platform/
 ├── server.py                    # FastAPI app factory + lifespan
 ├── models.py                    # Pydantic: A2AMessage, AgentStatus, MessageType, PhaseStatus, MissionStatus
-├── llm/client.py                # Multi-provider (Azure/MiniMax/NVIDIA), fallback, streaming
+├── llm/
+│   ├── client.py                # Multi-provider (Azure/MiniMax/NVIDIA), fallback, streaming
+│   └── observability.py         # Per-call tracing: tokens, cost, duration → SQLite llm_traces
 ├── a2a/
 │   ├── bus.py                   # MessageBus singleton, SSE bridge (add_sse_listener), dead letter
 │   ├── protocol.py              # Message types, priority, permissions
@@ -1875,25 +1791,38 @@ platform/
 │   ├── engine.py                # run_pattern() + _execute_node() streaming + 8 pattern impls
 │   └── store.py                 # PatternDef, PatternRun, NodeState, NodeStatus
 ├── missions/
-│   ├── store.py                 # MissionRunStore CRUD (~L407), MissionRun, PhaseRun
-│   └── product.py               # Product lifecycle config
+│   ├── store.py                 # MissionRunStore CRUD, MissionRun, PhaseRun, SprintDef
+│   └── product.py               # ProductBacklog, FeatureDef, UserStoryDef
 ├── sessions/
 │   ├── store.py                 # SessionDef + MessageDef
 │   └── runner.py                # _push_sse() dual SSE (queues + bus), context builder
-├── memory/manager.py            # 4 layers, FTS5 search
+├── metrics/
+│   └── dora.py                  # DORA metrics (deploy freq, lead time, CFR, MTTR) + velocity
+├── memory/manager.py            # 4 layers (session/pattern/project/global), FTS5 search
 ├── workflows/store.py           # WorkflowDef + product-lifecycle (27 nodes, 34 edges, 11 phases)
 ├── skills/
 │   ├── library.py               # Scan local + GitHub (1200+ skills)
 │   └── definitions/*.yaml       # 42 YAML agents SAFe
 ├── tools/                       # code_tools, git_tools, deploy_tools, memory_tools, phase_tools, etc.
 ├── web/
-│   ├── routes.py                # Toutes routes (~5100 lignes)
+│   ├── routes/                  # HTTP routes package (10 sub-modules)
+│   │   ├── __init__.py          # Assembles 8 sub-routers
+│   │   ├── pages.py             # HTML page routes
+│   │   ├── api.py               # JSON API + DORA + LLM stats
+│   │   ├── missions.py          # Mission lifecycle (~4200 LOC)
+│   │   ├── sessions.py          # Session CRUD + live view
+│   │   ├── agents.py            # Agent CRUD + config
+│   │   ├── workflows.py         # Workflow CRUD + editor
+│   │   ├── projects.py          # Project management
+│   │   ├── memory_routes.py     # Memory wiki + search
+│   │   └── skills_routes.py     # Skills library
 │   ├── ws.py                    # SSE endpoints (bus.add_sse_listener, dict+A2AMessage filter)
 │   └── templates/
-│       ├── base.html            # Layout + sidebar nav
-│       ├── mission_control.html # CDP mega-workflow dashboard (accordion+streaming+SVG graphs)
-│       ├── mission_control_list.html # Liste missions
-│       ├── mission_start.html   # Form lancement mission
+│       ├── base.html            # Layout + sidebar nav + theme toggle (light/dark)
+│       ├── mission_control.html # CDP mega-workflow (includes 7 partials)
+│       ├── partials/mc_*.html   # 7 partials: styles, tabs (security/RSE/TMA/default), sidebar, scripts
+│       ├── monitoring.html      # Live monitoring (agents, messages, sessions)
+│       ├── dora_dashboard.html  # DORA metrics + velocity + sparklines
 │       ├── session_live.html    # 3-mode live view (Thread/Chat/Graph) pan+zoom
 │       ├── conversation.html    # Session classique + bouton "Go Live"
 │       ├── workflow_edit.html   # Éditeur SVG graphe d'agents
@@ -1904,6 +1833,9 @@ platform/
 │       ├── project_board.html   # Kanban 4 colonnes
 │       ├── skills.html          # 50/page, search, filtres source
 │       └── memory.html          # Wiki-like, FTS5
+├── mcp_platform/                # Internal MCP server (port 9501)
+│   ├── server.py                # SSE daemon
+│   └── proxy.py                 # stdio bridge
 └── data/
     ├── platform.db              # SQLite (rm pour re-seed, 48 agents + 4 workflows)
     └── github_skills/           # Cache 1156 skills .md
@@ -1936,12 +1868,43 @@ CDP Migration → Lead Dev → Dev Pilot + Dev Main + QA + Security + DevOps
 - `--ws none` obligatoire (websocket issue)
 - `start_new_session=True` pour process persistant (survit shell close)
 - Skills GitHub: git clone shallow (pas API rate-limited)
-- Theme: CSS vars `--bg-primary:#0f0d1a` `--purple:#7c3aed`
+- Theme: CSS vars light/dark toggle, `data-theme` attribute on `<html>`
 - Views: 4 modes display (card/compact/list/list-compact)
 - SSE: `_push_sse()` → dual delivery (queues + bus), `bus.add_sse_listener()` → filter session_id, keepalive 30s
 - `_agent_map_for_template(agents)` → returns dicts (access `a["name"]` NOT `a.name`)
 - `MissionRunStore.update()` persists session_id (was bug, fixed)
 - `SessionStore.get_messages()` (NOT `list_messages`)
+- `.env` loaded by `config.py` via python-dotenv (MINIMAX_API_KEY, NVIDIA_API_KEY)
+
+### SAFe IMPLEMENTATION (Score ~7/10)
+
+**Implemented:**
+| Mechanism | Location |
+|-----------|----------|
+| WSJF real calc | missions.py L429-434 (sliders BV/TC/RR/JD) |
+| Sprint auto-creation | missions.py L2183-2200 (SprintDef per iteration) |
+| Feature Pull PO | missions.py L2244-2258 (backlog injected in prompt) |
+| Sprint Review/Retro | missions.py L2307-2341 (LLM retro → memory) |
+| Velocity Tracking | missions.py L2342-2356 (SP from git diff) |
+| Learning Loop | missions.py L2260-2271 (retro learnings → next sprint) |
+| I&A Retrospective | missions.py L2778-2868 (auto at epic end) |
+| Gates (HITL) | missions.py L2397-2439 (GO/NOGO/PIVOT) |
+| Gate enforcement | missions.py L2574-2638 (all_approved/no_veto/always) |
+| Error Reloop | missions.py L2653-2711 (QA fail → dev-sprint max 2x) |
+| Build Gate | engine.py L1408-1537 (preflight build + reloop max 5x) |
+| TDD enforcement | Dev-sprint prompt mandates Red-Green-Refactor |
+
+### MONITORING & OBSERVABILITY
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| DORA Metrics | metrics/dora.py | Deploy freq, lead time, CFR, MTTR + velocity |
+| LLM Traces | llm/observability.py | Per-call: provider, model, tokens, cost, duration |
+| LLM Stats API | /api/llm/stats | Aggregated: calls, tokens, cost by provider/agent |
+| LLM Traces API | /api/llm/traces | Recent 50 traces with cost |
+| Monitoring page | /monitoring | Live SSE: agents, messages, sessions |
+| DORA Dashboard | /metrics | 4 DORA gauges + velocity + 12-week sparklines |
+| Cost estimation | observability.py L29-44 | Per-model pricing ($0.30-$15/1M tokens) |
 
 ### START
 ```bash
