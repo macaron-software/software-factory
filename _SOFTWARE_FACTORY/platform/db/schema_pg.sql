@@ -2,6 +2,42 @@
 -- Requires extensions: pgvector, pg_trgm, uuid-ossp
 
 -- ============================================================================
+-- WORKFLOWS (created at runtime by WorkflowStore)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS workflows (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    phases_json TEXT DEFAULT '[]',
+    config_json TEXT DEFAULT '{}',
+    icon TEXT DEFAULT 'workflow',
+    is_builtin INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================================
+-- PROJECTS (created at runtime by ProjectManager)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS projects (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    path TEXT NOT NULL DEFAULT '',
+    description TEXT DEFAULT '',
+    factory_type TEXT DEFAULT 'standalone',
+    domains_json TEXT DEFAULT '[]',
+    vision TEXT DEFAULT '',
+    values_json TEXT DEFAULT '[]',
+    lead_agent_id TEXT DEFAULT '',
+    agents_json TEXT DEFAULT '[]',
+    active_pattern_id TEXT DEFAULT '',
+    status TEXT DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================================
 -- AGENTS
 -- ============================================================================
 

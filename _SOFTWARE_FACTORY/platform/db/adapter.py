@@ -52,6 +52,65 @@ def _translate_sql(sql: str) -> str:
     return _Q_RE.sub("%s", sql)
 
 
+# ── INSERT OR REPLACE / INSERT OR IGNORE translation ────────────────────────
+
+_INSERT_OR_REPLACE_RE = re.compile(
+    r"INSERT\s+OR\s+REPLACE\s+INTO\s+(\w+)\s*\(([^)]+)\)",
+    re.IGNORECASE,
+)
+
+_INSERT_OR_IGNORE_RE = re.compile(
+    r"INSERT\s+OR\s+IGNORE\s+INTO",
+    re.IGNORECASE,
+)
+
+
+def _translate_upsert(sql: str) -> str:
+    """Convert INSERT OR REPLACE INTO t (cols) VALUES (...)
+    to INSERT INTO t (cols) VALUES (...) ON CONFLICT (pk) DO UPDATE SET ..."""
+    m = _INSERT_OR_REPLACE_RE.search(sql)
+    if not m:
+        return sql
+
+    table = m.group(1).lower()
+    cols_str = m.group(2)
+    cols = [c.strip() for c in cols_str.split(",")]
+
+    # Tables with composite primary keys
+    _COMPOSITE_PKS = {
+        "org_team_members": ["team_id", "agent_id"],
+        "confluence_pages": ["mission_id", "tab"],
+        "feature_deps": ["feature_id", "depends_on"],
+    }
+
+    pk_cols = _COMPOSITE_PKS.get(table, [cols[0]])
+
+    # Build SET clause for all non-PK columns
+    updates = [f"{c} = EXCLUDED.{c}" for c in cols if c not in pk_cols]
+
+    # Replace "INSERT OR REPLACE INTO" with "INSERT INTO"
+    new_sql = re.sub(r"INSERT\s+OR\s+REPLACE\s+INTO", "INSERT INTO", sql, flags=re.IGNORECASE)
+
+    pk_str = ", ".join(pk_cols)
+    if updates:
+        new_sql += f" ON CONFLICT ({pk_str}) DO UPDATE SET " + ", ".join(updates)
+    else:
+        new_sql += f" ON CONFLICT ({pk_str}) DO NOTHING"
+
+    return new_sql
+
+
+def _translate_insert_ignore(sql: str) -> str:
+    """Convert INSERT OR IGNORE INTO to INSERT INTO ... ON CONFLICT DO NOTHING."""
+    if not _INSERT_OR_IGNORE_RE.search(sql):
+        return sql
+    new_sql = re.sub(r"INSERT\s+OR\s+IGNORE\s+INTO", "INSERT INTO", sql, flags=re.IGNORECASE)
+    # Add ON CONFLICT DO NOTHING at end (before any trailing semicolon)
+    new_sql = new_sql.rstrip().rstrip(";")
+    new_sql += " ON CONFLICT DO NOTHING"
+    return new_sql
+
+
 # ── Row wrapper ──────────────────────────────────────────────────────────────
 
 class DictRow:
@@ -172,11 +231,17 @@ class PgConnectionWrapper:
 
         translated = _translate_sql(sql)
 
-        # AUTOINCREMENT → GENERATED ALWAYS not needed: just remove keyword
+        # AUTOINCREMENT → just remove keyword
         translated = translated.replace("AUTOINCREMENT", "")
 
         # datetime('now') → CURRENT_TIMESTAMP
         translated = translated.replace("datetime('now')", "CURRENT_TIMESTAMP")
+
+        # INSERT OR REPLACE → INSERT ... ON CONFLICT DO UPDATE
+        translated = _translate_upsert(translated)
+
+        # INSERT OR IGNORE → INSERT ... ON CONFLICT DO NOTHING
+        translated = _translate_insert_ignore(translated)
 
         cur = self._conn.cursor()
         try:
