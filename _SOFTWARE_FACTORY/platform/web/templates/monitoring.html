@@ -38,9 +38,10 @@
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-users"/></svg> Agents</h3>
             <div class="mon-row">
-                <div class="mon-col"><div class="label">Active</div><div class="val" id="monAgentsActive">0</div></div>
-                <div class="mon-col"><div class="label">Loops</div><div class="val" id="monAgentsTotal">0</div></div>
-                <div class="mon-col"><div class="label">SSE</div><div class="val" id="monSSE">0</div></div>
+                <div class="mon-col"><div class="label">Registered</div><div class="val" id="monAgentsRegistered">0</div></div>
+                <div class="mon-col"><div class="label">Active Now</div><div class="val" id="monAgentsActive">0</div></div>
+                <div class="mon-col"><div class="label">Participated</div><div class="val" id="monAgentsParticipated">0</div></div>
+                <div class="mon-col"><div class="label">Sessions</div><div class="val" id="monAgentsSessions">0</div></div>
             </div>
         </div>
         <div class="mon-card">
@@ -349,9 +350,10 @@ async function refresh() {
 
         // Agents
         const ag = d.agents || {};
+        $('monAgentsRegistered').textContent = ag.registered || 0;
         $('monAgentsActive').textContent = ag.active || 0;
-        $('monAgentsTotal').textContent = ag.total || 0;
-        $('monSSE').textContent = d.sse_connections || 0;
+        $('monAgentsParticipated').textContent = ag.participated || 0;
+        $('monAgentsSessions').textContent = ag.sessions_with_agents || 0;
 
         // Messages
         const msg = d.messages || {};

@@ -467,18 +467,34 @@ async def monitoring_live(hours: int = 24):
                "total_cost_usd": 0, "avg_duration_ms": 0, "error_count": 0,
                "by_provider": [], "by_agent": [], "hourly": []}
 
-    # Active agents (from AgentLoopManager)
+    # Active agents (runtime from AgentLoopManager + historical from DB)
+    agents_runtime = {"active": 0, "loops": 0}
+    agents_historical = {"total_registered": 0, "participated": 0, "sessions_with_agents": 0}
     try:
         from ...agents.loop import get_loop_manager
         mgr = get_loop_manager()
         active_loops = {k: {"status": v.status, "agent_id": v.agent_id}
                         for k, v in mgr._loops.items() if v.status in ("thinking", "acting")}
-        agents_active = len(active_loops)
-        agents_total = len(mgr._loops)
+        agents_runtime = {"active": len(active_loops), "loops": len(mgr._loops)}
     except Exception:
         active_loops = {}
-        agents_active = 0
-        agents_total = 0
+    try:
+        from ...db.migrations import get_db
+        adb = get_db()
+        agents_historical["total_registered"] = adb.execute(
+            "SELECT COUNT(*) FROM agents").fetchone()[0]
+        agents_historical["participated"] = adb.execute(
+            "SELECT COUNT(DISTINCT from_agent) FROM messages WHERE from_agent IS NOT NULL AND from_agent != 'system'").fetchone()[0]
+        agents_historical["sessions_with_agents"] = adb.execute(
+            "SELECT COUNT(DISTINCT session_id) FROM messages WHERE from_agent IS NOT NULL AND from_agent != 'system'").fetchone()[0]
+        agents_historical["total_messages"] = adb.execute(
+            "SELECT COUNT(*) FROM messages WHERE from_agent IS NOT NULL AND from_agent != 'system'").fetchone()[0]
+        top = adb.execute(
+            "SELECT from_agent, COUNT(*) as cnt FROM messages WHERE from_agent IS NOT NULL AND from_agent != 'system' GROUP BY from_agent ORDER BY cnt DESC LIMIT 5").fetchall()
+        agents_historical["top_agents"] = [{"agent": r[0], "messages": r[1]} for r in top]
+        adb.close()
+    except Exception:
+        pass
 
     # Missions & sessions counts
     try:
@@ -747,9 +763,13 @@ async def monitoring_live(hours: int = 24):
         "system": system,
         "llm": llm,
         "agents": {
-            "active": agents_active,
-            "total": agents_total,
-            "loops": {k: v for k, v in list(active_loops.items())[:10]},
+            "active": agents_runtime["active"],
+            "loops": agents_runtime["loops"],
+            "registered": agents_historical.get("total_registered", 0),
+            "participated": agents_historical.get("participated", 0),
+            "sessions_with_agents": agents_historical.get("sessions_with_agents", 0),
+            "total_messages": agents_historical.get("total_messages", 0),
+            "top_agents": agents_historical.get("top_agents", []),
         },
         "missions": {s["status"]: s["cnt"] for s in missions},
         "sessions": {s["status"]: s["cnt"] for s in sessions},
