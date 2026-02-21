@@ -16,6 +16,11 @@ COPY platform/ /app/platform/
 COPY core/ /app/core/
 COPY skills/ /app/skills/
 
+# Create non-root user
+RUN groupadd -r macaron && useradd -r -g macaron -d /app macaron \
+    && chown -R macaron:macaron /app
+USER macaron
+
 # Env
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app

@@ -6,6 +6,7 @@ Runs on port 8090 (separate from Factory dashboard on 8080).
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -27,6 +28,8 @@ STATIC_DIR = WEB_DIR / "static"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
+    from .log_config import setup_logging
+    setup_logging(level=os.environ.get("LOG_LEVEL", "WARNING"))
     cfg = get_config()
     logger.info("Starting Macaron Agent Platform on port %s", cfg.server.port)
     init_db()
@@ -216,6 +219,18 @@ def create_app() -> FastAPI:
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         if request.url.scheme == "https":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+    # ── Trace ID middleware ─────────────────────────────────────────────
+    @app.middleware("http")
+    async def trace_id_middleware(request, call_next):
+        import uuid as _uuid
+        from .log_config import trace_id_var
+        tid = request.headers.get("X-Trace-ID", str(_uuid.uuid4())[:8])
+        token = trace_id_var.set(tid)
+        response = await call_next(request)
+        response.headers["X-Trace-ID"] = tid
+        trace_id_var.reset(token)
         return response
 
     # Metrics + incident middleware

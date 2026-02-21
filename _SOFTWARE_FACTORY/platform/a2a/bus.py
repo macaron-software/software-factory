@@ -71,9 +71,9 @@ class MessageBus:
         """Publish a message to the bus."""
         self._stats["published"] += 1
 
-        # Persist to DB
+        # Persist to DB asynchronously (non-blocking)
         if self.db:
-            self._persist_message(message)
+            asyncio.get_event_loop().call_soon(self._persist_message, message)
 
         # Route the message
         if message.to_agent:

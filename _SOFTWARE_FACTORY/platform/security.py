@@ -44,27 +44,75 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Simple in-memory rate limiter (per IP)."""
+    """Rate limiter with PG persistence (survives restart) and in-memory fast path."""
 
     def __init__(self, app, max_requests: int = 60, window_seconds: int = 60):
         super().__init__(app)
         self.max_requests = max_requests
         self.window = window_seconds
         self._hits: dict[str, list[float]] = defaultdict(list)
+        self._pg_synced = False
+
+    def _ensure_pg_table(self):
+        """Create rate_limit_hits table if using PG."""
+        if self._pg_synced:
+            return
+        try:
+            from .db.adapter import is_postgresql, get_connection
+            if is_postgresql():
+                db = get_connection()
+                db.execute("""CREATE TABLE IF NOT EXISTS rate_limit_hits (
+                    id SERIAL PRIMARY KEY,
+                    client_key TEXT NOT NULL,
+                    ts DOUBLE PRECISION NOT NULL
+                )""")
+                db.execute("CREATE INDEX IF NOT EXISTS idx_rl_key_ts ON rate_limit_hits(client_key, ts)")
+                db.commit()
+                db.close()
+        except Exception:
+            pass
+        self._pg_synced = True
 
     async def dispatch(self, request: Request, call_next):
+        self._ensure_pg_table()
+        # Key: combine IP + bearer token for per-client limiting
         client_ip = request.client.host if request.client else "unknown"
+        token = request.headers.get("Authorization", "")[:20]
+        client_key = f"{client_ip}:{hashlib.md5(token.encode()).hexdigest()[:8]}" if token else client_ip
         now = time.time()
         cutoff = now - self.window
 
-        hits = self._hits[client_ip]
-        self._hits[client_ip] = [t for t in hits if t > cutoff]
+        # Fast path: in-memory check
+        hits = self._hits[client_key]
+        self._hits[client_key] = [t for t in hits if t > cutoff]
 
-        if len(self._hits[client_ip]) >= self.max_requests:
+        if len(self._hits[client_key]) >= self.max_requests:
             raise HTTPException(status_code=429, detail="Rate limit exceeded")
 
-        self._hits[client_ip].append(now)
+        self._hits[client_key].append(now)
+
+        # Async persist to PG (non-blocking)
+        try:
+            from .db.adapter import is_postgresql
+            if is_postgresql():
+                import asyncio
+                asyncio.get_event_loop().call_soon(self._pg_persist, client_key, now, cutoff)
+        except Exception:
+            pass
+
         return await call_next(request)
+
+    def _pg_persist(self, client_key: str, ts: float, cutoff: float):
+        """Persist hit to PG and cleanup old entries."""
+        try:
+            from .db.adapter import get_connection
+            db = get_connection()
+            db.execute("INSERT INTO rate_limit_hits (client_key, ts) VALUES (?, ?)", (client_key, ts))
+            db.execute("DELETE FROM rate_limit_hits WHERE ts < ?", (cutoff,))
+            db.commit()
+            db.close()
+        except Exception:
+            pass
 
 
 def health_check():

@@ -111,15 +111,52 @@ class LLMStreamChunk:
 
 
 class LLMClient:
-    """Async LLM client with multi-provider support and fallback."""
+    """Async LLM client with multi-provider support, fallback, and circuit breaker."""
+
+    # Circuit breaker: opens after FAIL_THRESHOLD errors in WINDOW seconds
+    CB_FAIL_THRESHOLD = 5
+    CB_WINDOW = 60  # seconds
+    CB_OPEN_DURATION = 120  # seconds — how long circuit stays open
 
     def __init__(self):
         self._http: Optional[httpx.AsyncClient] = None
         self._stats = {"calls": 0, "tokens_in": 0, "tokens_out": 0, "errors": 0}
         # Cooldown: provider → timestamp when it becomes available again
         self._provider_cooldown: dict[str, float] = {}
+        # Circuit breaker: provider → list of failure timestamps
+        self._cb_failures: dict[str, list[float]] = {}
+        self._cb_open_until: dict[str, float] = {}
         # Context for observability tracing (set by caller before chat())
         self._trace_context: dict = {}  # agent_id, session_id, mission_id
+
+    def _cb_record_failure(self, provider: str):
+        """Record a failure for circuit breaker evaluation."""
+        now = time.monotonic()
+        fails = self._cb_failures.setdefault(provider, [])
+        fails.append(now)
+        # Trim old failures outside window
+        cutoff = now - self.CB_WINDOW
+        self._cb_failures[provider] = [t for t in fails if t > cutoff]
+        if len(self._cb_failures[provider]) >= self.CB_FAIL_THRESHOLD:
+            self._cb_open_until[provider] = now + self.CB_OPEN_DURATION
+            self._cb_failures[provider] = []
+            logger.error("Circuit breaker OPEN for %s (%d failures in %ds) — blocked for %ds",
+                        provider, self.CB_FAIL_THRESHOLD, self.CB_WINDOW, self.CB_OPEN_DURATION)
+
+    def _cb_record_success(self, provider: str):
+        """Reset failures on success (half-open → closed)."""
+        self._cb_failures.pop(provider, None)
+        self._cb_open_until.pop(provider, None)
+
+    def _cb_is_open(self, provider: str) -> bool:
+        """Check if circuit breaker is open for provider."""
+        until = self._cb_open_until.get(provider, 0)
+        if until > time.monotonic():
+            return True
+        if until > 0:
+            # Half-open: allow one probe request
+            self._cb_open_until.pop(provider, None)
+        return False
 
     async def _get_http(self) -> httpx.AsyncClient:
         if self._http is None or self._http.is_closed:
@@ -194,6 +231,11 @@ class LLMClient:
                 logger.warning("LLM %s in cooldown (%ds left), skipping → fallback", prov, remaining)
                 continue
 
+            # Skip providers with open circuit breaker
+            if self._cb_is_open(prov):
+                logger.warning("LLM %s circuit breaker OPEN, skipping → fallback", prov)
+                continue
+
             pcfg = self._get_provider_config(prov)
             key = self._get_api_key(pcfg)
             if not key or key == "no-key":
@@ -210,6 +252,7 @@ class LLMClient:
                     self._stats["tokens_in"] += result.tokens_in
                     self._stats["tokens_out"] += result.tokens_out
                     logger.warning("LLM %s/%s OK (%d in, %d out tokens)", prov, use_model, result.tokens_in, result.tokens_out)
+                    self._cb_record_success(prov)
                     # Trace for observability
                     self._trace(result, messages)
                     return result
@@ -227,6 +270,7 @@ class LLMClient:
                         continue
                     logger.warning("LLM %s/%s failed: %s — trying next", prov, use_model, err_str[:200])
                     self._stats["errors"] += 1
+                    self._cb_record_failure(prov)
                     if is_rate_limit:
                         self._provider_cooldown[prov] = time.monotonic() + 60
                         logger.warning("LLM %s → cooldown 60s (rate limited)", prov)
