@@ -175,15 +175,36 @@
         </div>
     </div>
 
-    <!-- Row 5b: Docker Containers + Git -->
-    <div class="mon-grid mon-grid-2">
+    <!-- Row 5b: Docker Monitoring -->
+    <div class="mon-grid mon-grid-1">
         <div class="mon-card">
-            <h3><svg class="icon"><use href="#icon-layers"/></svg> Docker Containers</h3>
+            <h3><svg class="icon"><use href="#icon-layers"/></svg> Docker</h3>
+            <!-- Docker system overview -->
+            <div class="mon-row" style="margin-bottom:1rem">
+                <div class="mon-col"><div class="label">Version</div><div class="val" id="monDockerVersion">—</div></div>
+                <div class="mon-col"><div class="label">Running</div><div class="val" id="monDockerRunning">—</div></div>
+                <div class="mon-col"><div class="label">Stopped</div><div class="val" id="monDockerStopped">—</div></div>
+                <div class="mon-col"><div class="label">Images</div><div class="val" id="monDockerImages">—</div></div>
+                <div class="mon-col"><div class="label">Volumes</div><div class="val" id="monDockerVolumes">—</div></div>
+                <div class="mon-col"><div class="label">Disk Usage</div><div class="val" id="monDockerDisk">—</div></div>
+            </div>
+            <!-- Docker disk breakdown -->
+            <div class="mon-row" style="margin-bottom:1rem">
+                <div class="mon-col"><div class="label">Images</div><div class="val" style="font-size:0.7rem" id="monDockerImgDisk">—</div></div>
+                <div class="mon-col"><div class="label">Containers</div><div class="val" style="font-size:0.7rem" id="monDockerCtDisk">—</div></div>
+                <div class="mon-col"><div class="label">Volumes</div><div class="val" style="font-size:0.7rem" id="monDockerVolDisk">—</div></div>
+                <div class="mon-col"><div class="label">Build Cache</div><div class="val" style="font-size:0.7rem" id="monDockerCacheDisk">—</div></div>
+            </div>
+            <!-- Container table with CPU/Memory -->
             <table class="mon-table">
-                <thead><tr><th>Container</th><th>Status</th><th>Image</th></tr></thead>
-                <tbody id="monDockerTable"><tr><td colspan="3" class="mon-empty">Loading…</td></tr></tbody>
+                <thead><tr><th>Container</th><th>Status</th><th>CPU</th><th>Memory</th><th>Net I/O</th><th>PIDs</th><th>Image</th></tr></thead>
+                <tbody id="monDockerTable"><tr><td colspan="7" class="mon-empty">Loading…</td></tr></tbody>
             </table>
         </div>
+    </div>
+
+    <!-- Row 5c: Git Activity -->
+    <div class="mon-grid mon-grid-1">
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-git-branch"/></svg> Git Activity</h3>
             <div class="mon-row" style="margin-bottom:0.8rem">
@@ -632,17 +653,42 @@ async function refresh() {
         $('monAzCostStorage').textContent = fmtUsd(azc.storage_monthly_usd);
         $('monAzCostInfra').textContent = fmtUsd(azc.total_infra_monthly_usd);
 
-        // Docker containers
+        // Docker system info
+        const ds = d.docker_system || {};
+        $('monDockerVersion').textContent = ds.server_version || '—';
+        $('monDockerRunning').textContent = ds.containers_running ?? '—';
+        $('monDockerRunning').className = 'val' + ((ds.containers_running > 0) ? '' : ' mon-val-red');
+        $('monDockerStopped').textContent = ds.containers_stopped ?? '—';
+        $('monDockerStopped').className = 'val' + ((ds.containers_stopped > 0) ? ' mon-val-yellow' : '');
+        $('monDockerImages').textContent = ds.images ?? '—';
+        $('monDockerVolumes').textContent = ds.volumes_count ?? '—';
+        $('monDockerDisk').textContent = ds.total_disk_gb ? ds.total_disk_gb + ' GB' : '—';
+        $('monDockerImgDisk').textContent = ds.images_size_gb ? ds.images_size_gb + ' GB' : '—';
+        $('monDockerCtDisk').textContent = ds.containers_disk_mb != null ? ds.containers_disk_mb + ' MB' : '—';
+        $('monDockerVolDisk').textContent = ds.volumes_size_gb ? ds.volumes_size_gb + ' GB' : '—';
+        $('monDockerCacheDisk').textContent = ds.build_cache_gb ? ds.build_cache_gb + ' GB' : '—';
+
+        // Docker containers with CPU/mem
         const dockerEl = $('monDockerTable');
         if (d.docker && d.docker.length > 0) {
             dockerEl.innerHTML = d.docker.map(c => {
-                const up = (c.state || c.status || '').toLowerCase().includes('running') || (c.status || '').toLowerCase().startsWith('up');
-                const color = up ? 'color:var(--green, #22c55e)' : 'color:var(--red, #ef4444)';
-                const restart = c.restarts ? ` (${c.restarts} restarts)` : '';
-                return `<tr><td style="font-size:0.75rem;font-weight:500">${c.name}</td><td style="${color};font-size:0.7rem">${c.status}${restart}</td><td style="font-size:0.65rem;opacity:0.7">${c.image}</td></tr>`;
+                const up = c.state === 'running';
+                const dot = up ? '🟢' : (c.state === 'exited' ? '🔴' : '🟡');
+                const memPct = (c.mem_limit_mb > 0) ? Math.round(c.mem_mb / c.mem_limit_mb * 100) : 0;
+                const memBar = c.mem_limit_mb > 0 ? `<div style="background:var(--bg-tertiary,#1a1730);border-radius:3px;height:4px;width:60px;margin-top:2px"><div style="background:${memPct>80?'var(--red,#ef4444)':memPct>50?'var(--yellow,#eab308)':'var(--green,#22c55e)'};height:4px;border-radius:3px;width:${Math.min(memPct,100)}%"></div></div>` : '';
+                const cpuColor = c.cpu_pct > 80 ? 'var(--red,#ef4444)' : c.cpu_pct > 40 ? 'var(--yellow,#eab308)' : 'var(--green,#22c55e)';
+                return `<tr>
+                    <td style="font-size:0.75rem;font-weight:500">${dot} ${c.name}</td>
+                    <td style="font-size:0.7rem;opacity:0.8">${c.status}${c.restarts ? ' <span style="color:var(--yellow,#eab308)">('+c.restarts+' restarts)</span>' : ''}</td>
+                    <td style="font-size:0.75rem;font-weight:600;color:${cpuColor}">${up ? c.cpu_pct+'%' : '—'}</td>
+                    <td style="font-size:0.7rem">${up ? c.mem_mb+' MB' : '—'}${memBar}</td>
+                    <td style="font-size:0.65rem;opacity:0.7">${up ? '↓'+c.net_rx_mb+' / ↑'+c.net_tx_mb+' MB' : '—'}</td>
+                    <td style="font-size:0.7rem">${up ? c.pids : '—'}</td>
+                    <td style="font-size:0.65rem;opacity:0.6">${c.image}</td>
+                </tr>`;
             }).join('');
         } else {
-            dockerEl.innerHTML = '<tr><td colspan="3" class="mon-empty">No Docker info (socket not mounted?)</td></tr>';
+            dockerEl.innerHTML = '<tr><td colspan="7" class="mon-empty">No Docker info</td></tr>';
         }
 
         // Git activity

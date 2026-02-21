@@ -22,15 +22,23 @@ async def portfolio_page(request: Request):
     """Portfolio dashboard — tour de contrôle DSI."""
     from ...projects.manager import get_project_store
     from ...agents.store import get_agent_store
-    from ...missions.store import get_mission_store
+    from ...missions.store import get_mission_store, get_mission_run_store
 
     project_store = get_project_store()
     agent_store = get_agent_store()
     mission_store = get_mission_store()
+    run_store = get_mission_run_store()
 
     all_projects = project_store.list_all()
     all_agents = agent_store.list_all()
     all_missions = mission_store.list_missions()
+    all_runs = run_store.list_runs(limit=100)
+    # Index runs by parent_mission_id for quick lookup
+    runs_by_mission: dict = {}
+    for r in all_runs:
+        if r.parent_mission_id:
+            runs_by_mission[r.parent_mission_id] = r
+        runs_by_mission[r.id] = r  # Also index by run id (same as mission id)
 
     strategic_raw = [a for a in all_agents if any(t == 'strategy' for t in (a.tags or []))]
     avatar_dir = Path(__file__).parent.parent / "static" / "avatars"
@@ -67,15 +75,31 @@ async def portfolio_page(request: Request):
         p_active = 0
         mission_cards = []
         for m in p_missions:
-            stats = mission_store.mission_stats(m.id)
-            t_total = stats.get("total", 0)
-            t_done = stats.get("done", 0)
+            # Compute progress from mission_run phases (live data)
+            run = runs_by_mission.get(m.id)
+            if run and run.phases:
+                t_total = len(run.phases)
+                t_done = sum(1 for ph in run.phases if ph.status.value in ("done", "done_with_issues"))
+                current = run.current_phase or ""
+                current_name = next((ph.phase_name for ph in run.phases if ph.phase_id == current), current)
+            else:
+                # Fallback to task-based stats
+                stats = mission_store.mission_stats(m.id)
+                t_total = stats.get("total", 0)
+                t_done = stats.get("done", 0)
+                current_name = ""
             p_total += t_total
             p_done += t_done
             if m.status == "active":
                 p_active += 1
             progress = f"{t_done}/{t_total}" if t_total > 0 else ""
-            mission_cards.append({"name": m.name, "status": m.status, "task_progress": progress})
+            run_status = run.status.value if run else m.status
+            mission_cards.append({
+                "name": m.name, "status": m.status,
+                "task_progress": progress,
+                "current_phase": current_name,
+                "run_status": run_status,
+            })
         total_tasks += p_total
         total_done += p_done
         active_count += p_active
@@ -89,12 +113,22 @@ async def portfolio_page(request: Request):
             "total_tasks": p_total, "done_tasks": p_done,
         })
 
-    # Build epics progression table
+    # Build epics progression table (from live phase data)
     epics_data = []
     for m in all_missions:
-        stats = mission_store.mission_stats(m.id)
-        t_total = stats.get("total", 0)
-        t_done = stats.get("done", 0)
+        run = runs_by_mission.get(m.id)
+        if run and run.phases:
+            t_total = len(run.phases)
+            t_done = sum(1 for ph in run.phases if ph.status.value in ("done", "done_with_issues"))
+            current = run.current_phase or ""
+            current_name = next((ph.phase_name for ph in run.phases if ph.phase_id == current), current)
+            run_status = run.status.value
+        else:
+            stats = mission_store.mission_stats(m.id)
+            t_total = stats.get("total", 0)
+            t_done = stats.get("done", 0)
+            current_name = ""
+            run_status = m.status
         pct = int(t_done / t_total * 100) if t_total > 0 else 0
         p = next((p for p in all_projects if p.id == m.project_id), None)
         epics_data.append({
@@ -102,6 +136,8 @@ async def portfolio_page(request: Request):
             "project_name": p.name if p else m.project_id or "—",
             "done": t_done, "total": t_total, "pct": pct,
             "wsjf": getattr(m, "wsjf", 0) or 0,
+            "current_phase": current_name,
+            "run_status": run_status,
         })
     epics_data.sort(key=lambda e: e["pct"], reverse=True)
 
@@ -334,67 +370,169 @@ async def settings_page(request: Request):
 
 @router.get("/metier", response_class=HTMLResponse)
 async def metier_page(request: Request):
-    """Vue Métier — business process flows by department."""
+    """Vue Métier — SAFe / LEAN product-centric live dashboard."""
     from ...workflows.store import get_workflow_store
     from ...sessions.store import get_session_store
     from ...agents.store import get_agent_store
-    import random
+    from ...missions.store import get_mission_run_store
+    from datetime import datetime, timedelta
 
     wf_store = get_workflow_store()
     session_store = get_session_store()
+    agent_store = get_agent_store()
+    mission_store = get_mission_run_store()
+
+    all_missions = mission_store.list_runs(limit=50)
+    all_sessions = session_store.list_all(limit=100)
+    all_agents = agent_store.list_all()
     all_workflows = wf_store.list_all()
-    all_sessions = session_store.list_all()
 
-    # Build department swim lanes from workflows
-    dept_map = {
-        "Sales": {"color": "var(--blue)", "icon": "trending-up", "workflows": []},
-        "Supply Chain": {"color": "var(--green)", "icon": "truck", "workflows": []},
-        "Support": {"color": "var(--yellow)", "icon": "headphones", "workflows": []},
-    }
-    for wf in all_workflows:
-        pattern = wf.phases[0].pattern_id if wf.phases else "sequential"
-        entry = {"name": wf.name, "pattern": pattern}
-        # Distribute workflows across departments
-        if "migration" in wf.id or "pipeline" in wf.id:
-            dept_map["Supply Chain"]["workflows"].append(entry)
-        elif "review" in wf.id or "debate" in wf.id:
-            dept_map["Support"]["workflows"].append(entry)
-        else:
-            dept_map["Sales"]["workflows"].append(entry)
+    # ── Epics Pipeline (missions as value items) ──
+    epics = []
+    for m in all_missions:
+        phases_total = len(m.phases) if m.phases else 0
+        phases_done = sum(1 for p in (m.phases or []) if p.status in ("done", "done_with_issues"))
+        phases_running = sum(1 for p in (m.phases or []) if p.status == "running")
+        progress = int(phases_done / phases_total * 100) if phases_total else 0
+        agents_involved = set()
+        for p in (m.phases or []):
+            agents_involved.add(p.phase_id)  # count unique phases as proxy
 
-    departments = []
-    for dept_name, dept_data in dept_map.items():
-        nodes = []
-        # Agent node
-        nodes.append({"type": "agent", "icon": dept_data["icon"], "label": dept_name, "active": True})
-        nodes.append({"type": "agent", "icon": "layers", "label": "Sequential", "active": False})
-        nodes.append({"type": "agent", "icon": "users", "label": "Agent", "active": False})
-        # Pattern box
-        if dept_data["workflows"]:
-            patterns = ", ".join(set(w["pattern"] for w in dept_data["workflows"]))
-            nodes.append({"type": "pattern", "label": f"Patterns\n{patterns.title()}", "active": False})
-        nodes.append({"type": "agent", "icon": "check-circle", "label": "Agent", "active": False})
-        departments.append({
-            "name": dept_name,
-            "nodes": nodes,
-            "efficiency": random.randint(55, 95),
-            "color": dept_data["color"],
+        phase_nodes = []
+        for p in (m.phases or []):
+            phase_nodes.append({
+                "id": p.phase_id,
+                "name": p.phase_name or p.phase_id,
+                "pattern": p.pattern_id or "solo",
+                "status": p.status or "pending",
+            })
+
+        # Compute lead time
+        lead_time_h = None
+        if m.created_at:
+            end = m.completed_at or datetime.utcnow()
+            if isinstance(m.created_at, str):
+                try:
+                    start = datetime.fromisoformat(m.created_at.replace("Z", "+00:00")).replace(tzinfo=None)
+                except Exception:
+                    start = datetime.utcnow()
+            else:
+                start = m.created_at.replace(tzinfo=None) if hasattr(m.created_at, 'replace') else m.created_at
+            if isinstance(end, str):
+                try:
+                    end = datetime.fromisoformat(end.replace("Z", "+00:00")).replace(tzinfo=None)
+                except Exception:
+                    end = datetime.utcnow()
+            elif hasattr(end, 'replace'):
+                end = end.replace(tzinfo=None)
+            lead_time_h = round((end - start).total_seconds() / 3600, 1)
+
+        epics.append({
+            "id": m.id,
+            "name": m.workflow_name or m.workflow_id or "Mission",
+            "brief": (m.brief or "")[:120],
+            "status": m.status or "pending",
+            "current_phase": m.current_phase or "",
+            "progress": progress,
+            "phases_done": phases_done,
+            "phases_total": phases_total,
+            "phases_running": phases_running,
+            "phase_nodes": phase_nodes,
+            "lead_time_h": lead_time_h,
+            "session_id": m.session_id or "",
         })
 
-    # Productivity
-    total_efficiency = sum(d["efficiency"] for d in departments) // max(len(departments), 1)
+    # ── Flow Metrics (LEAN) ──
+    wip = sum(1 for e in epics if e["status"] == "running")
+    completed = sum(1 for e in epics if e["status"] in ("completed", "done"))
+    failed = sum(1 for e in epics if e["status"] == "failed")
+    total = len(epics)
+    throughput_pct = int(completed / total * 100) if total else 0
 
-    # Calendar heatmap (31 days)
+    lead_times = [e["lead_time_h"] for e in epics if e["lead_time_h"] is not None and e["status"] in ("completed", "done")]
+    avg_lead_time = round(sum(lead_times) / len(lead_times), 1) if lead_times else 0
+
+    # ── Agent Velocity (top contributors by message count) ──
+    agent_map = {a.id: a for a in all_agents}
+    agent_msg_counts: dict[str, int] = {}
+    for s in all_sessions[:30]:
+        try:
+            msgs = session_store.get_messages(s.id, limit=500)
+            for msg in msgs:
+                if msg.from_agent and msg.from_agent != "user":
+                    agent_msg_counts[msg.from_agent] = agent_msg_counts.get(msg.from_agent, 0) + 1
+        except Exception:
+            pass
+    top_agents = sorted(agent_msg_counts.items(), key=lambda x: -x[1])[:8]
+    max_msgs = top_agents[0][1] if top_agents else 1
+    agent_velocity = []
+    for aid, count in top_agents:
+        a = agent_map.get(aid)
+        agent_velocity.append({
+            "id": aid,
+            "name": a.name if a else aid,
+            "role": (a.role if a else "")[:30],
+            "count": count,
+            "pct": int(count / max_msgs * 100),
+            "avatar": a.avatar if a else "",
+        })
+
+    # ── Activity Heatmap (real message timestamps, last 28 days) ──
+    now = datetime.utcnow()
+    day_counts: dict[int, int] = {i: 0 for i in range(28)}
+    for s in all_sessions[:50]:
+        try:
+            msgs = session_store.get_messages(s.id, limit=200)
+            for msg in msgs:
+                if msg.timestamp:
+                    ts = msg.timestamp
+                    if isinstance(ts, str):
+                        try:
+                            ts = datetime.fromisoformat(ts.replace("Z", "+00:00")).replace(tzinfo=None)
+                        except Exception:
+                            continue
+                    delta = (now - ts).days
+                    if 0 <= delta < 28:
+                        day_counts[delta] = day_counts.get(delta, 0) + 1
+        except Exception:
+            pass
+
+    max_day_count = max(day_counts.values()) if day_counts else 1
     calendar_days = []
-    for i in range(1, 32):
-        level = random.choice([0, 0, 1, 1, 2, 3, 4]) if i <= 28 else random.choice([0, 1])
-        calendar_days.append({"num": i, "level": level})
+    for i in range(27, -1, -1):
+        day_date = now - timedelta(days=i)
+        count = day_counts.get(i, 0)
+        if max_day_count > 0:
+            level = min(4, int(count / max(max_day_count, 1) * 5))
+        else:
+            level = 0
+        calendar_days.append({"num": day_date.day, "level": level, "count": count})
+
+    # ── Workflow catalog ──
+    workflows = []
+    for wf in all_workflows:
+        mission_count = sum(1 for m in all_missions if m.workflow_id == wf.id)
+        workflows.append({
+            "id": wf.id,
+            "name": wf.name,
+            "phases_count": len(wf.phases) if wf.phases else 0,
+            "mission_count": mission_count,
+            "icon": getattr(wf, "icon", ""),
+        })
 
     return _templates(request).TemplateResponse("metier.html", {
         "request": request, "page_title": "Vue Métier",
-        "departments": departments,
-        "productivity_pct": total_efficiency,
+        "epics": epics,
+        "wip": wip,
+        "completed": completed,
+        "failed": failed,
+        "total": total,
+        "throughput_pct": throughput_pct,
+        "avg_lead_time": avg_lead_time,
+        "agent_velocity": agent_velocity,
         "calendar_days": calendar_days,
+        "workflows": workflows,
+        "agents_total": len(all_agents),
     })
 
 
