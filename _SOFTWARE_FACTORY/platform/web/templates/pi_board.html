@@ -33,6 +33,8 @@
 .mission-badge.completed{background:rgba(34,197,94,.12);color:var(--green)}
 .mission-badge.failed{background:rgba(239,68,68,.12);color:var(--red)}
 .mission-badge.paused,.mission-badge.pending{background:var(--bg-tertiary);color:var(--text-secondary)}
+.mission-badge.resolved{background:rgba(34,197,94,.12);color:var(--green)}
+.mission-badge.active{background:rgba(124,58,237,.15);color:var(--purple)}
 .mission-card-wrap{display:flex;flex-direction:column;gap:0}
 .mission-actions{display:flex;gap:0.4rem;padding:0.4rem 1.2rem 0.6rem;background:var(--bg-secondary);border:1px solid var(--border);border-top:0;border-radius:0 0 10px 10px;margin-top:-1px}
 .nm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;justify-content:center}
@@ -55,13 +57,24 @@
 .mission-card.stuck{border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.03)}
 .mission-status-icon.stuck{background:rgba(245,158,11,.15);color:#f59e0b}
 .mission-badge.stuck{background:rgba(245,158,11,.15);color:#f59e0b}
+/* Collapsible sections */
+.pi-section{margin-bottom:1.5rem}
+.pi-section-header{display:flex;align-items:center;gap:0.5rem;cursor:pointer;user-select:none;padding:0.4rem 0;margin-bottom:0.75rem}
+.pi-section-header h2{font-size:1rem;font-weight:700;color:var(--text-primary);margin:0;display:flex;align-items:center;gap:0.5rem}
+.pi-section-header .chevron{width:16px;height:16px;color:var(--text-secondary);transition:transform .2s;flex-shrink:0}
+.pi-section-header.collapsed .chevron{transform:rotate(-90deg)}
+.pi-section-body{overflow:hidden;transition:max-height .25s ease}
+.pi-section-body.collapsed{max-height:0!important;overflow:hidden}
+.pi-count{font-size:0.72rem;font-weight:400;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.15rem 0.5rem;border-radius:4px}
 /* Epics */
-.epic-section{margin-bottom:2rem}
-.epic-section h2{font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:0.75rem;display:flex;align-items:center;gap:0.5rem}
 .epic-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1.2rem;margin-bottom:0.75rem;transition:border-color .15s}
 .epic-card:hover{border-color:var(--purple-dim)}
 .epic-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:0.6rem}
 .epic-title{font-size:0.95rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:0.5rem}
+.epic-status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.epic-status-dot.active{background:var(--green)}
+.epic-status-dot.completed{background:var(--green)}
+.epic-status-dot.planning,.epic-status-dot.pending{background:var(--text-secondary)}
 .epic-project-badge{font-size:0.68rem;font-weight:500;background:var(--bg-tertiary);color:var(--text-secondary);padding:0.15rem 0.5rem;border-radius:4px}
 .epic-desc{font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.75rem;line-height:1.4}
 .epic-stats{display:flex;gap:1.5rem;align-items:center;margin-bottom:0.6rem}
@@ -75,43 +88,58 @@
 .feat-chip.backlog{background:var(--bg-tertiary);color:var(--text-secondary)}
 .feat-chip.in_progress{background:rgba(124,58,237,.12);color:var(--purple)}
 .feat-chip.active{background:rgba(124,58,237,.12);color:var(--purple)}
-.epic-toggle{cursor:pointer;font-size:0.75rem;color:var(--purple);background:none;border:none;font-family:inherit;padding:0.2rem 0.4rem}
-/* TMA Tickets */
-.tma-list{display:flex;flex-direction:column;gap:0.5rem}
-.tma-card{display:grid;grid-template-columns:auto 1fr auto;gap:0.8rem;align-items:center;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.8rem 1rem;transition:border-color .15s}
+.epic-toggle{cursor:pointer;font-size:0.75rem;color:var(--purple);background:none;border:none;font-family:inherit;padding:0.2rem 0.4rem;display:flex;align-items:center;gap:0.3rem}
+/* TMA 3-column board */
+.tma-board{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem}
+@media(max-width:900px){.tma-board{grid-template-columns:1fr}}
+.tma-col{display:flex;flex-direction:column;gap:0}
+.tma-col-header{font-size:0.78rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.04em;padding:0.4rem 0.6rem;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.4rem;border-bottom:2px solid var(--border)}
+.tma-col-header.active-col{border-bottom-color:var(--purple)}
+.tma-col-header.wip-col{border-bottom-color:#f59e0b}
+.tma-col-header.resolved-col{border-bottom-color:var(--green)}
+.tma-col-body{display:flex;flex-direction:column;gap:0.5rem;min-height:60px}
+.tma-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.8rem 1rem;transition:border-color .15s}
 .tma-card:hover{border-color:var(--purple-dim)}
-.tma-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
-.tma-icon.bug{background:rgba(239,68,68,.1)}
-.tma-icon.security{background:rgba(245,158,11,.1)}
-.tma-icon.debt{background:rgba(99,102,241,.1)}
-.tma-body{min-width:0}
-.tma-title{font-size:0.88rem;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap}
-.tma-desc{font-size:0.78rem;color:var(--text-secondary);margin-top:0.3rem;line-height:1.4}
-.tma-goal{font-size:0.75rem;color:var(--text-secondary);margin-top:0.2rem;opacity:0.8}
-.tma-meta{display:flex;flex-direction:column;align-items:flex-end;gap:0.3rem;flex-shrink:0}
-.tma-type-badge{font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:3px;font-weight:600;text-transform:uppercase}
+.tma-card-header{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem}
+.tma-type-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tma-type-icon.bug{background:rgba(239,68,68,.1);color:var(--red)}
+.tma-type-icon.security{background:rgba(245,158,11,.1);color:#f59e0b}
+.tma-type-icon.debt{background:rgba(99,102,241,.1);color:#6366f1}
+.tma-card-title{font-size:0.82rem;font-weight:600;color:var(--text-primary);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tma-type-badge{font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:3px;font-weight:600;text-transform:uppercase;flex-shrink:0}
 .tma-type-badge.bug{background:rgba(239,68,68,.12);color:var(--red)}
 .tma-type-badge.security{background:rgba(245,158,11,.12);color:#f59e0b}
 .tma-type-badge.debt{background:rgba(99,102,241,.12);color:#6366f1}
+.tma-card-desc{font-size:0.75rem;color:var(--text-secondary);line-height:1.4;margin-bottom:0.3rem}
+.tma-card-footer{display:flex;align-items:center;justify-content:space-between;gap:0.4rem}
+.tma-card-project{font-size:0.68rem;font-weight:500;background:var(--bg-tertiary);color:var(--text-secondary);padding:0.1rem 0.4rem;border-radius:3px}
+.tma-card-date{font-size:0.68rem;color:var(--text-secondary)}
+.tma-empty{font-size:0.78rem;color:var(--text-secondary);text-align:center;padding:1.5rem 0;opacity:0.6}
 </style>
 
 <!-- ═══ Epics (SAFe Portfolio) ═══ -->
 {% if epics %}
-<div class="epic-section">
-    <h2><svg class="icon icon-sm"><use href="#icon-layers"/></svg> Epics</h2>
+<div class="pi-section" id="section-epics">
+    <div class="pi-section-header" onclick="toggleSection('epics')">
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        <h2><svg class="icon icon-sm"><use href="#icon-layers"/></svg> Epics
+            <span class="pi-count">{{ epics|length }}</span>
+        </h2>
+    </div>
+    <div class="pi-section-body" id="body-epics">
     {% for e in epics %}
     {% set pct = ((e.done_features / e.total_features) * 100)|round|int if e.total_features > 0 else 0 %}
     <div class="epic-card">
         <div class="epic-header">
             <div class="epic-title">
-                {% if e.status == 'active' %}🟢{% elif e.status == 'completed' %}✅{% else %}⬜{% endif %}
+                <span class="epic-status-dot {{ e.status }}"></span>
                 {{ e.name }}
                 <span class="epic-project-badge">{{ e.project_name }}</span>
             </div>
             <div style="display:flex;align-items:center;gap:0.6rem">
                 <span class="mission-badge {{ e.status }}">{{ e.status }}</span>
-                <button class="epic-toggle" onclick="this.closest('.epic-card').querySelector('.epic-features').classList.toggle('hidden')">
-                    ▾ features
+                <button class="epic-toggle" onclick="event.stopPropagation();this.closest('.epic-card').querySelector('.epic-features').classList.toggle('hidden')">
+                    <svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-chevron-down"/></svg> features
                 </button>
             </div>
         </div>
@@ -129,50 +157,129 @@
         </div>
     </div>
     {% endfor %}
+    </div>
 </div>
 {% endif %}
 
-<!-- ═══ TMA / Tickets (Self-Healing) ═══ -->
+<!-- ═══ TMA / Tickets — 3 columns: Active / WIP / Resolved ═══ -->
 {% if tma_tickets %}
-<div class="epic-section">
-    <h2><svg class="icon icon-sm"><use href="#icon-tool"/></svg> TMA — Tickets Maintenance
-        <span style="font-size:0.72rem;font-weight:400;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.15rem 0.5rem;border-radius:4px">{{ tma_tickets|length }}</span>
-    </h2>
-    <div class="tma-list">
-    {% for t in tma_tickets %}
-    <div class="tma-card">
-        <div class="tma-icon {{ t.type }}">
-            {% if t.type == 'bug' %}🐛{% elif t.type == 'security' %}🔒{% elif t.type == 'debt' %}🔧{% else %}📋{% endif %}
-        </div>
-        <div class="tma-body">
-            <div class="tma-title">
-                {{ t.name }}
-                <span class="epic-project-badge">{{ t.project_name }}</span>
-                <span class="tma-type-badge {{ t.type }}">{{ t.type }}</span>
+{% set tma_active = tma_tickets|selectattr('status','equalto','active')|list %}
+{% set tma_wip = tma_tickets|selectattr('status','in',['in_progress','planning'])|list %}
+{% set tma_resolved = tma_tickets|selectattr('status','in',['resolved','completed','done'])|list %}
+<div class="pi-section" id="section-tma">
+    <div class="pi-section-header" onclick="toggleSection('tma')">
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        <h2><svg class="icon icon-sm"><use href="#icon-tool"/></svg> TMA — Tickets Maintenance
+            <span class="pi-count">{{ tma_tickets|length }}</span>
+        </h2>
+    </div>
+    <div class="pi-section-body" id="body-tma">
+    <div class="tma-board">
+        <div class="tma-col">
+            <div class="tma-col-header active-col">
+                <svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-alert-circle"/></svg>
+                Active <span class="pi-count">{{ tma_active|length }}</span>
             </div>
-            {% if t.description %}<div class="tma-desc">{{ t.description[:200] }}</div>{% endif %}
-            {% if t.goal %}<div class="tma-goal">🎯 {{ t.goal[:200] }}</div>{% endif %}
+            <div class="tma-col-body">
+            {% for t in tma_active %}
+            <div class="tma-card">
+                <div class="tma-card-header">
+                    <div class="tma-type-icon {{ t.type }}">
+                        {% if t.type == 'bug' %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-alert-triangle"/></svg>
+                        {% elif t.type == 'security' %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-shield"/></svg>
+                        {% elif t.type == 'debt' %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-tool"/></svg>
+                        {% else %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-file-text"/></svg>{% endif %}
+                    </div>
+                    <span class="tma-card-title" title="{{ t.name }}">{{ t.name }}</span>
+                    <span class="tma-type-badge {{ t.type }}">{{ t.type }}</span>
+                </div>
+                {% if t.description %}<div class="tma-card-desc">{{ t.description[:120] }}</div>{% endif %}
+                {% if t.goal %}<div class="tma-card-desc" style="opacity:0.7"><svg class="icon icon-sm" style="width:12px;height:12px;vertical-align:-2px"><use href="#icon-target"/></svg> {{ t.goal[:120] }}</div>{% endif %}
+                <div class="tma-card-footer">
+                    <span class="tma-card-project">{{ t.project_name }}</span>
+                    <span class="tma-card-date">{{ t.created_at[:10] if t.created_at else '' }}</span>
+                </div>
+            </div>
+            {% endfor %}
+            {% if not tma_active %}<div class="tma-empty">Aucun ticket actif</div>{% endif %}
+            </div>
         </div>
-        <div class="tma-meta">
-            <span class="mission-badge {{ t.status }}">{{ t.status }}</span>
-            <span class="mission-date">{{ t.created_at[:10] if t.created_at else '' }}</span>
+        <div class="tma-col">
+            <div class="tma-col-header wip-col">
+                <svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-loader"/></svg>
+                En cours <span class="pi-count">{{ tma_wip|length }}</span>
+            </div>
+            <div class="tma-col-body">
+            {% for t in tma_wip %}
+            <div class="tma-card">
+                <div class="tma-card-header">
+                    <div class="tma-type-icon {{ t.type }}">
+                        {% if t.type == 'bug' %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-alert-triangle"/></svg>
+                        {% elif t.type == 'security' %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-shield"/></svg>
+                        {% elif t.type == 'debt' %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-tool"/></svg>
+                        {% else %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-file-text"/></svg>{% endif %}
+                    </div>
+                    <span class="tma-card-title" title="{{ t.name }}">{{ t.name }}</span>
+                    <span class="tma-type-badge {{ t.type }}">{{ t.type }}</span>
+                </div>
+                {% if t.description %}<div class="tma-card-desc">{{ t.description[:120] }}</div>{% endif %}
+                {% if t.goal %}<div class="tma-card-desc" style="opacity:0.7"><svg class="icon icon-sm" style="width:12px;height:12px;vertical-align:-2px"><use href="#icon-target"/></svg> {{ t.goal[:120] }}</div>{% endif %}
+                <div class="tma-card-footer">
+                    <span class="tma-card-project">{{ t.project_name }}</span>
+                    <span class="tma-card-date">{{ t.created_at[:10] if t.created_at else '' }}</span>
+                </div>
+            </div>
+            {% endfor %}
+            {% if not tma_wip %}<div class="tma-empty">Aucun ticket en cours</div>{% endif %}
+            </div>
+        </div>
+        <div class="tma-col">
+            <div class="tma-col-header resolved-col">
+                <svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-check-circle"/></svg>
+                Resolved <span class="pi-count">{{ tma_resolved|length }}</span>
+            </div>
+            <div class="tma-col-body">
+            {% for t in tma_resolved %}
+            <div class="tma-card">
+                <div class="tma-card-header">
+                    <div class="tma-type-icon {{ t.type }}">
+                        {% if t.type == 'bug' %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-alert-triangle"/></svg>
+                        {% elif t.type == 'security' %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-shield"/></svg>
+                        {% elif t.type == 'debt' %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-tool"/></svg>
+                        {% else %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-file-text"/></svg>{% endif %}
+                    </div>
+                    <span class="tma-card-title" title="{{ t.name }}">{{ t.name }}</span>
+                    <span class="tma-type-badge {{ t.type }}">{{ t.type }}</span>
+                </div>
+                {% if t.goal %}<div class="tma-card-desc" style="opacity:0.7"><svg class="icon icon-sm" style="width:12px;height:12px;vertical-align:-2px"><use href="#icon-target"/></svg> {{ t.goal[:120] }}</div>{% endif %}
+                <div class="tma-card-footer">
+                    <span class="tma-card-project">{{ t.project_name }}</span>
+                    <span class="tma-card-date">{{ t.created_at[:10] if t.created_at else '' }}</span>
+                </div>
+            </div>
+            {% endfor %}
+            {% if not tma_resolved %}<div class="tma-empty">Aucun ticket resolu</div>{% endif %}
+            </div>
         </div>
     </div>
-    {% endfor %}
     </div>
 </div>
 {% endif %}
 
 <!-- ═══ Missions (Runs) ═══ -->
+<div class="pi-section" id="section-missions">
+    <div class="pi-section-header" onclick="toggleSection('missions')">
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        <h2><svg class="icon icon-sm"><use href="#icon-zap"/></svg> Missions en cours
+            <span class="pi-count">{{ runs|length }}</span>
+        </h2>
+    </div>
+    <div class="pi-section-body" id="body-missions">
 {% if runs %}
-<div style="margin-bottom:0.75rem"><h2 style="font-size:1rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:0.5rem">
-    <svg class="icon icon-sm"><use href="#icon-rocket"/></svg> Missions en cours
-    <span style="font-size:0.72rem;font-weight:400;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.15rem 0.5rem;border-radius:4px">{{ runs|length }}</span>
-</h2></div>
 {% include "partials/mission_list.html" %}
 {% else %}
 <div class="empty-state" style="text-align:center;padding:3rem;">
-    <p style="margin-bottom:0.5rem"><svg class="icon" style="width:2.5rem;height:2.5rem"><use href="#icon-rocket"/></svg></p>
+    <p style="margin-bottom:0.5rem"><svg class="icon" style="width:2.5rem;height:2.5rem"><use href="#icon-zap"/></svg></p>
     <h3 style="color:var(--text-primary);margin-bottom:0.3rem">{{ _('no_mission') }}</h3>
     <p style="color:var(--text-secondary);font-size:0.88rem;margin-bottom:1rem">Lancez une mission pour orchestrer un workflow multi-agents.</p>
     <button class="btn btn-primary" onclick="document.getElementById('newMissionModal').style.display='flex'">
@@ -180,11 +287,13 @@
     </button>
 </div>
 {% endif %}
+    </div>
+</div>
 
-<!-- Modal création mission — étape 1 : choix workflow -->
+<!-- Modal creation mission -->
 <div id="newMissionModal" class="nm-overlay" onclick="if(event.target===this)this.style.display='none'">
     <div class="nm-form" id="step1" style="max-width:600px">
-        <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> {{ _('new_mission') }}</h3>
+        <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-zap"/></svg> {{ _('new_mission') }}</h3>
         <p style="color:var(--text-secondary);font-size:0.82rem;margin:-0.5rem 0 1rem">Choisissez le type de mission</p>
         <div class="wf-grid">
             <button type="button" class="wf-card" onclick="selectWf('product-lifecycle')">
@@ -220,7 +329,6 @@
             <button type="button" class="btn btn-ghost" onclick="document.getElementById('newMissionModal').style.display='none'">Annuler</button>
         </div>
     </div>
-    <!-- Étape 2 : brief -->
     <form class="nm-form" id="step2" style="display:none">
         <h3 id="step2Title"></h3>
         <input type="hidden" name="project_id" value="software-factory">
@@ -239,11 +347,33 @@
 </div>
 
 <script>
+/* Collapsible sections with localStorage persistence */
+function toggleSection(id) {
+    const header = document.querySelector(`#section-${id} .pi-section-header`);
+    const body = document.getElementById(`body-${id}`);
+    const collapsed = !header.classList.contains('collapsed');
+    header.classList.toggle('collapsed', collapsed);
+    body.classList.toggle('collapsed', collapsed);
+    try { localStorage.setItem(`pi_collapse_${id}`, collapsed ? '1' : '0'); } catch(e){}
+}
+function restoreCollapseState() {
+    ['epics','tma','missions'].forEach(id => {
+        try {
+            if (localStorage.getItem(`pi_collapse_${id}`) === '1') {
+                const header = document.querySelector(`#section-${id} .pi-section-header`);
+                const body = document.getElementById(`body-${id}`);
+                if (header && body) { header.classList.add('collapsed'); body.classList.add('collapsed'); }
+            }
+        } catch(e){}
+    });
+}
+restoreCollapseState();
+
 const WF_NAMES = {
     'product-lifecycle': 'Cycle Complet',
     'tma-maintenance': 'TMA / Ticketing',
     'security-hacking': 'Hacking / Securite',
-    'feature-request': _('new_features')
+    'feature-request': 'Nouvelle Feature'
 };
 function selectWf(id){
     document.getElementById('wfInput').value = id;
@@ -266,8 +396,8 @@ document.getElementById('step2').addEventListener('submit', async e => {
         const r = await fetch('/api/missions/start', {method:'POST', body: fd});
         const j = await r.json();
         if (j.redirect) location.href = j.redirect;
-        else { alert(j.error || _('error_generic')); btn.disabled = false; btn.textContent = _('launch_mission'); }
-    } catch(err) { alert(err); btn.disabled = false; btn.textContent = _('launch_mission'); }
+        else { alert(j.error || 'Erreur'); btn.disabled = false; btn.textContent = 'Lancer'; }
+    } catch(err) { alert(err); btn.disabled = false; btn.textContent = 'Lancer'; }
 });
 
 async function runPhase(runId) {
@@ -275,16 +405,16 @@ async function runPhase(runId) {
         const r = await fetch(`/api/missions/${runId}/run`, {method:'POST'});
         const j = await r.json();
         if (j.status === 'started' || j.status === 'running' || j.redirect) location.href = `/missions/${runId}/control`;
-        else alert(j.error || j.message || _('error_generic'));
+        else alert(j.error || j.message || 'Erreur');
     } catch(err) { alert(err); }
 }
 
 async function deleteRun(runId) {
-    if (!confirm(_('delete_confirm_mission'))) return;
+    if (!confirm('Supprimer cette mission ?')) return;
     try {
         const r = await fetch(`/api/mission-runs/${runId}`, {method:'DELETE'});
         if (r.ok) location.reload();
-        else { const j = await r.json(); alert(j.error || _('error_generic')); }
+        else { const j = await r.json(); alert(j.error || 'Erreur'); }
     } catch(err) { alert(err); }
 }
 </script>
