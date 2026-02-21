@@ -733,9 +733,10 @@ async def monitoring_live(hours: int = 24):
             "total_llm_usd": round(azure_cost + other_cost, 4),
             # Azure infra monthly estimates (Standard_B2ms + PG B1ms + storage)
             "vm_monthly_usd": 60.74,        # Standard_B2ms francecentral
+            "disk_monthly_usd": 9.50,        # P6 Premium SSD 64GB
             "pg_monthly_usd": 12.34,         # PG B1ms 1vCPU/2GB
             "storage_monthly_usd": 2.50,     # Blob GRS ~50GB
-            "total_infra_monthly_usd": 75.58,
+            "total_infra_monthly_usd": 85.08,
         }
     except Exception:
         pass
