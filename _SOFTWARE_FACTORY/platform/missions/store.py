@@ -507,7 +507,13 @@ from ..models import MissionRun, MissionStatus, PhaseRun, PhaseStatus
 
 
 def _row_to_mission_run(row) -> MissionRun:
-    phases = json.loads(row["phases_json"]) if row["phases_json"] else []
+    phases_raw = json.loads(row["phases_json"]) if row["phases_json"] else []
+    # Ensure phase_name defaults to phase_id for legacy data
+    phases = []
+    for p in phases_raw:
+        if "phase_name" not in p:
+            p["phase_name"] = p.get("phase_id", "")
+        phases.append(PhaseRun(**p))
     # Safe access for columns that may not exist in older DBs
     wp = ""
     try:
@@ -530,7 +536,7 @@ def _row_to_mission_run(row) -> MissionRun:
         parent_mission_id=pmid,
         status=MissionStatus(row["status"]),
         current_phase=row["current_phase"] or "",
-        phases=[PhaseRun(**p) for p in phases],
+        phases=phases,
         brief=row["brief"] or "",
         created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else datetime.utcnow(),
         updated_at=datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else datetime.utcnow(),

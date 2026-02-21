@@ -91,6 +91,13 @@ class MissionOrchestrator:
         MAX_RELOOPS = 2
         reloop_errors = []
 
+        # Evidence gate: acceptance criteria for dev phases
+        from ..services.evidence import get_criteria_for_workflow, run_evidence_checks, format_evidence_report
+        wf_config = wf.config if hasattr(wf, 'config') and isinstance(wf.config, dict) else {}
+        acceptance_criteria = get_criteria_for_workflow(wf.id, wf_config)
+        if acceptance_criteria:
+            logger.info("Evidence gate: %d acceptance criteria for workflow %s", len(acceptance_criteria), wf.id)
+
         i = 0
         while i < len(mission.phases):
             phase = mission.phases[i]
@@ -199,9 +206,9 @@ class MissionOrchestrator:
 
             # Sprint loop
             phase_key_check = wf_phase.name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
-            is_dev_phase = "sprint" in phase_key_check or "dev" in phase_key_check
+            is_dev_phase = "sprint" in phase_key_check or "dev" in phase_key_check or "features" in phase_key_check or "test" in phase_key_check
             is_retryable = is_dev_phase or "cicd" in phase_key_check or "qa" in phase_key_check or "architecture" in phase_key_check or "setup" in phase_key_check
-            max_sprints = wf_phase.config.get("max_iterations", 3) if is_dev_phase else 1
+            max_sprints = wf_phase.config.get("max_iterations", 5) if is_dev_phase else 1
 
             phase_success = False
             phase_error = ""
@@ -404,6 +411,55 @@ class MissionOrchestrator:
                         continue
                     else:
                         break
+
+                # ── Evidence Gate: check acceptance criteria after dev sprints ──
+                if is_dev_phase and acceptance_criteria and workspace:
+                    # Reset criteria for fresh check
+                    for c in acceptance_criteria:
+                        c.passed = False
+                        c.detail = ""
+                    all_passed, results = run_evidence_checks(workspace, acceptance_criteria)
+                    evidence_report = format_evidence_report(results)
+                    passed_count = sum(1 for c in results if c.passed)
+                    total_count = len(results)
+
+                    await self._push_sse(session_id, {
+                        "type": "evidence_gate",
+                        "mission_id": mission.id,
+                        "phase_id": phase.phase_id,
+                        "sprint_num": sprint_num,
+                        "passed": passed_count,
+                        "total": total_count,
+                        "all_passed": all_passed,
+                        "details": [{"id": c.id, "desc": c.description, "passed": c.passed, "detail": c.detail} for c in results],
+                    })
+
+                    if all_passed:
+                        await self._sse_orch_msg(
+                            f"Evidence Gate PASSED ({passed_count}/{total_count}) — tous les critères d'acceptation remplis.",
+                            phase.phase_id,
+                        )
+                        logger.info("Evidence gate PASSED for %s sprint %d (%d/%d)", phase.phase_id, sprint_num, passed_count, total_count)
+                        break  # All criteria met, exit sprint loop
+                    else:
+                        if sprint_num < max_sprints:
+                            await self._sse_orch_msg(
+                                f"Evidence Gate FAILED ({passed_count}/{total_count}) — critères manquants, relance sprint…",
+                                phase.phase_id,
+                            )
+                            logger.warning("Evidence gate FAILED for %s sprint %d (%d/%d), looping", phase.phase_id, sprint_num, passed_count, total_count)
+                            # Inject evidence feedback into next sprint prompt
+                            prev_context += f"\n\n{evidence_report}"
+                            continue  # Loop to next sprint
+                        else:
+                            await self._sse_orch_msg(
+                                f"Evidence Gate FAILED ({passed_count}/{total_count}) — max sprints atteint.\n{evidence_report}",
+                                phase.phase_id,
+                            )
+                            logger.error("Evidence gate FAILED for %s, max sprints exhausted", phase.phase_id)
+                            phase_success = False
+                            phase_error = f"Acceptance criteria not met: {passed_count}/{total_count}"
+                            break
 
                 if max_sprints > 1 and sprint_num < max_sprints:
                     await self._sse_orch_msg(f"{sprint_label} terminé. Passage au sprint suivant…", phase.phase_id)

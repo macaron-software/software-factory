@@ -300,7 +300,7 @@ class PhaseStatus(str, Enum):
 class PhaseRun(BaseModel):
     """Tracks execution of a single phase within a mission."""
     phase_id: str
-    phase_name: str
+    phase_name: str = ""
     pattern_id: str = ""
     status: PhaseStatus = PhaseStatus.PENDING
     started_at: Optional[datetime] = None
@@ -309,6 +309,7 @@ class PhaseRun(BaseModel):
     summary: Optional[str] = ""
     error: Optional[str] = ""
     iteration: int = 0
+    sprint_count: int = 0
 
 
 class MissionStatus(str, Enum):
