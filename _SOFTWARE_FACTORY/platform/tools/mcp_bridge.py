@@ -28,8 +28,8 @@ class MCPTool(BaseTool):
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{MCP_URL}/tools/{self._tool_name}",
-                    json=params,
+                    f"{MCP_URL}/call",
+                    json={"name": self._tool_name, "arguments": params},
                     timeout=aiohttp.ClientTimeout(total=60),
                 ) as resp:
                     if resp.status == 200:

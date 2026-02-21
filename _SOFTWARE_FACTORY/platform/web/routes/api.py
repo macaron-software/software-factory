@@ -400,14 +400,21 @@ async def dora_api(request: Request, project_id: str):
 
 @router.get("/api/monitoring/live")
 async def monitoring_live(hours: int = 24):
-    """Live monitoring data: system, LLM, agents, missions, memory."""
+    """Live monitoring data: system, LLM, agents, missions, memory.
+    Cached for 5 seconds to avoid hammering DB on rapid polling."""
     import os
     import psutil
+    import time as _time
 
-    # Clamp hours to valid range
-    hours = max(1, min(hours, 8760))  # 1h to 1 year
+    hours = max(1, min(hours, 8760))
 
-    # System metrics
+    # ── TTL cache (5s) ──
+    cache = getattr(monitoring_live, "_cache", None)
+    now = _time.monotonic()
+    if cache and cache.get("hours") == hours and now - cache.get("ts", 0) < 5:
+        return JSONResponse(cache["data"])
+
+    # System metrics (fast, no cache needed)
     process = psutil.Process(os.getpid())
     mem_info = process.memory_info()
     cpu_percent = process.cpu_percent(interval=0)
@@ -467,9 +474,11 @@ async def monitoring_live(hours: int = 24):
                "total_cost_usd": 0, "avg_duration_ms": 0, "error_count": 0,
                "by_provider": [], "by_agent": [], "hourly": []}
 
-    # Active agents (runtime from AgentLoopManager + historical from DB)
+    # Active agents (runtime from AgentLoopManager + historical from DB — single connection)
     agents_runtime = {"active": 0, "loops": 0}
     agents_historical = {"total_registered": 0, "participated": 0, "sessions_with_agents": 0}
+    missions = []; sessions = []; sprints = []; features = []
+    msg_count = {"cnt": 0}; msg_total = {"cnt": 0}
     try:
         from ...agents.loop import get_loop_manager
         mgr = get_loop_manager()
@@ -492,45 +501,16 @@ async def monitoring_live(hours: int = 24):
         top = adb.execute(
             "SELECT from_agent, COUNT(*) as cnt FROM messages WHERE from_agent IS NOT NULL AND from_agent != 'system' GROUP BY from_agent ORDER BY cnt DESC LIMIT 5").fetchall()
         agents_historical["top_agents"] = [{"agent": r[0], "messages": r[1]} for r in top]
+        # Reuse same connection for missions/sessions/sprints/features/messages
+        missions = adb.execute("SELECT status, COUNT(*) as cnt FROM missions GROUP BY status").fetchall()
+        sessions = adb.execute("SELECT status, COUNT(*) as cnt FROM sessions GROUP BY status").fetchall()
+        sprints = adb.execute("SELECT status, COUNT(*) as cnt FROM sprints GROUP BY status").fetchall()
+        features = adb.execute("SELECT status, COUNT(*) as cnt FROM features GROUP BY status").fetchall()
+        msg_count = adb.execute("SELECT COUNT(*) as cnt FROM messages WHERE timestamp > datetime('now', '-24 hours')").fetchone()
+        msg_total = adb.execute("SELECT COUNT(*) as cnt FROM messages").fetchone()
         adb.close()
     except Exception:
         pass
-
-    # Missions & sessions counts
-    try:
-        from ...db.migrations import get_db
-        db = get_db()
-        missions = db.execute("""
-            SELECT status, COUNT(*) as cnt
-            FROM missions GROUP BY status
-        """).fetchall()
-        sessions = db.execute("""
-            SELECT status, COUNT(*) as cnt
-            FROM sessions GROUP BY status
-        """).fetchall()
-        sprints = db.execute("""
-            SELECT status, COUNT(*) as cnt
-            FROM sprints GROUP BY status
-        """).fetchall()
-        features = db.execute("""
-            SELECT status, COUNT(*) as cnt
-            FROM features GROUP BY status
-        """).fetchall()
-        # Messages count (last 24h) — column is 'timestamp' not 'created_at'
-        msg_count = db.execute("""
-            SELECT COUNT(*) as cnt FROM messages
-            WHERE timestamp > datetime('now', '-24 hours')
-        """).fetchone()
-        # Total messages ever
-        msg_total = db.execute("SELECT COUNT(*) as cnt FROM messages").fetchone()
-        db.close()
-    except Exception:
-        missions = []
-        sessions = []
-        sprints = []
-        features = []
-        msg_count = {"cnt": 0}
-        msg_total = {"cnt": 0}
 
     # Memory stats
     try:
@@ -556,24 +536,25 @@ async def monitoring_live(hours: int = 24):
     except Exception:
         sse_connections = 0
 
-    # ── Database stats ──
+    # ── Database stats (single pass — no N+1) ──
     db_stats = {}
     try:
         from ...db.migrations import get_db
         db = get_db()
-        # Table row counts
         tables = [r[0] for r in db.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
         ).fetchall()]
-        table_counts = {}
-        total_rows = 0
-        for t in tables:
-            try:
-                cnt = db.execute(f"SELECT COUNT(*) FROM [{t}]").fetchone()[0]
-                table_counts[t] = cnt
-                total_rows += cnt
-            except Exception:
-                pass
+        # Single query for all table counts via UNION ALL
+        if tables:
+            union = " UNION ALL ".join(
+                f"SELECT '{t}' as tbl, COUNT(*) as cnt FROM [{t}]" for t in tables
+            )
+            rows = db.execute(union).fetchall()
+            table_counts = {r[0]: r[1] for r in rows}
+            total_rows = sum(table_counts.values())
+        else:
+            table_counts = {}
+            total_rows = 0
         # DB file size
         db_path = str(db.execute("PRAGMA database_list").fetchone()[2]) if db.execute("PRAGMA database_list").fetchone() else ""
         db_size_mb = 0
@@ -705,6 +686,99 @@ async def monitoring_live(hours: int = 24):
     except Exception:
         pass
 
+    # ── Docker containers (via Docker socket API) ──
+    docker_info = []
+    try:
+        import pathlib
+        sock_path = "/var/run/docker.sock"
+        if pathlib.Path(sock_path).exists():
+            import http.client, urllib.parse
+            class DockerSocket(http.client.HTTPConnection):
+                def __init__(self):
+                    super().__init__("localhost")
+                def connect(self):
+                    import socket
+                    self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                    self.sock.connect(sock_path)
+                    self.sock.settimeout(3)
+            conn = DockerSocket()
+            conn.request("GET", "/containers/json")
+            resp = conn.getresponse()
+            if resp.status == 200:
+                containers = json.loads(resp.read().decode())
+                for c in containers:
+                    name = (c.get("Names", ["/?"]) or ["/?"]) [0].lstrip("/")
+                    state = c.get("State", "?")
+                    status = c.get("Status", "?")
+                    image = (c.get("Image", "?") or "?")[:40]
+                    ports_raw = c.get("Ports", [])
+                    ports_str = ", ".join(
+                        f"{p.get('PublicPort', '')}→{p.get('PrivatePort', '')}"
+                        for p in ports_raw if p.get("PublicPort")
+                    ) if ports_raw else ""
+                    restarts = 0
+                    if c.get("HostConfig", {}).get("RestartPolicy"):
+                        restarts = c.get("RestartCount", 0)
+                    docker_info.append({
+                        "name": name, "status": status, "state": state,
+                        "image": image, "ports": ports_str, "restarts": restarts,
+                    })
+            conn.close()
+    except Exception:
+        pass
+
+    # ── Git info ──
+    git_info = {}
+    try:
+        import subprocess, pathlib
+        for git_dir in ["/app", "/opt/macaron", os.environ.get("GIT_DIR", "")]:
+            if not git_dir or not pathlib.Path(git_dir).exists():
+                continue
+            r = subprocess.run(["git", "log", "--oneline", "-5", "--no-decorate"],
+                               capture_output=True, text=True, timeout=5, cwd=git_dir)
+            if r.returncode == 0 and r.stdout.strip():
+                git_info["recent_commits"] = [
+                    {"hash": line[:7], "message": line[8:]}
+                    for line in r.stdout.strip().split("\n") if line
+                ]
+                r2 = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                                    capture_output=True, text=True, timeout=5, cwd=git_dir)
+                if r2.returncode == 0:
+                    git_info["branch"] = r2.stdout.strip()
+                r3 = subprocess.run(["git", "log", "-1", "--format=%ci"],
+                                    capture_output=True, text=True, timeout=5, cwd=git_dir)
+                if r3.returncode == 0:
+                    git_info["last_commit_time"] = r3.stdout.strip()
+                break
+    except Exception:
+        pass
+
+    # ── Mission phase durations (from mission_runs.phases_json) ──
+    phase_stats = []
+    try:
+        from ...db.migrations import get_db
+        db = get_db()
+        runs = db.execute("""
+            SELECT phases_json, status, current_phase
+            FROM mission_runs WHERE phases_json IS NOT NULL
+        """).fetchall()
+        phase_counts = {}
+        for run in runs:
+            try:
+                phases = json.loads(run["phases_json"]) if run["phases_json"] else []
+                for p in phases:
+                    key = p.get("name", "?")
+                    st = p.get("status", "pending")
+                    k = (key, st)
+                    phase_counts[k] = phase_counts.get(k, 0) + 1
+            except Exception:
+                pass
+        phase_stats = [{"phase_name": k[0], "status": k[1], "cnt": v}
+                       for k, v in sorted(phase_counts.items())]
+        db.close()
+    except Exception:
+        pass
+
     # ── Azure infrastructure ──
     azure_infra = {"vm": {}, "backup": {}, "costs": {}, "servers": []}
     try:
@@ -715,7 +789,7 @@ async def monitoring_live(hours: int = 24):
             "region": "francecentral",
             "size": "Standard_B2ms",
             "os": "Ubuntu 24.04",
-            "disk_gb": 30,
+            "disk_gb": 64,
         }
         # Backup info from config
         azure_infra["backup"] = {
@@ -757,7 +831,7 @@ async def monitoring_live(hours: int = 24):
     except Exception:
         pass
 
-    return JSONResponse({
+    result = {
         "timestamp": datetime.utcnow().isoformat(),
         "hours": hours,
         "system": system,
@@ -791,7 +865,14 @@ async def monitoring_live(hours: int = 24):
         "anonymization": metrics_snapshot.get("anonymization", {}),
         "llm_costs": metrics_snapshot.get("llm_costs", {}),
         "azure": azure_infra,
-    })
+        "docker": docker_info,
+        "git": git_info,
+        "phase_stats": phase_stats,
+    }
+
+    # Store in cache
+    monitoring_live._cache = {"data": result, "hours": hours, "ts": _time.monotonic()}
+    return JSONResponse(result)
 
 
 def import_time():
