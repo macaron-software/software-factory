@@ -161,9 +161,56 @@ class BrowserScreenshotTool(BaseTool):
                 server_proc.terminate()
 
 
+class CICDRunnerTool(BaseTool):
+    name = "cicd_run"
+    description = (
+        "Run the full CI/CD pipeline for a project: lint → build → test → report. "
+        "Detects stack from project files and runs appropriate commands."
+    )
+    category = "build"
+
+    _STACK_CMDS = {
+        "Cargo.toml": [("cargo fmt -- --check", "lint"), ("cargo build --release", "build"), ("cargo test", "test")],
+        "pyproject.toml": [("ruff check .", "lint"), ("python -m pytest -q", "test")],
+        "requirements.txt": [("python -m pytest -q", "test")],
+        "package.json": [("npm run lint", "lint"), ("npm run build", "build"), ("npm test", "test")],
+        "go.mod": [("go vet ./...", "lint"), ("go build ./...", "build"), ("go test ./...", "test")],
+    }
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import os
+        cwd = params.get("cwd", ".")
+        if not os.path.isdir(cwd):
+            return f"[FAIL] Directory not found: {cwd}"
+
+        steps = []
+        for marker, cmds in self._STACK_CMDS.items():
+            if os.path.isfile(os.path.join(cwd, marker)):
+                steps.extend(cmds)
+                break
+        if not steps:
+            return "[SKIP] No recognized project markers found"
+
+        results, passed, failed = [], 0, 0
+        sandbox = get_sandbox(cwd)
+        for cmd, stage in steps:
+            r = sandbox.run(cmd, cwd=cwd, timeout=300)
+            ok = r.returncode == 0
+            results.append(f"{'✓' if ok else '✗'} {stage}: {cmd}")
+            if not ok:
+                results.append(f"  {(r.stderr or r.stdout)[-500:]}")
+                failed += 1
+            else:
+                passed += 1
+
+        status = "[OK] PIPELINE PASSED" if failed == 0 else f"[FAIL] {failed} stage(s) failed"
+        return f"{status} ({passed}/{passed+failed})\n" + "\n".join(results)
+
+
 def register_build_tools(registry):
     """Register all build tools."""
     registry.register(BuildTool())
     registry.register(TestTool())
     registry.register(LintTool())
     registry.register(BrowserScreenshotTool())
+    registry.register(CICDRunnerTool())

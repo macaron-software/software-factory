@@ -291,6 +291,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # ── Security: Auth middleware (API key) ────────────────────────────────
+    from .security import AuthMiddleware
+    app.add_middleware(AuthMiddleware)
+
     # ── Security: CORS ──────────────────────────────────────────────────────
     from starlette.middleware.cors import CORSMiddleware
     _cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:8090,http://4.233.64.30").split(",")
@@ -316,7 +320,7 @@ def create_app() -> FastAPI:
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https://api.dicebear.com https://avatars.githubusercontent.com; "
-            "connect-src 'self' *; "
+            "connect-src 'self'; "
             "frame-ancestors 'none'"
         )
         if request.url.scheme == "https":

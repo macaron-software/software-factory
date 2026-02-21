@@ -78,11 +78,17 @@ class WorkflowStore:
         conn.close()
 
     def list_all(self) -> list[WorkflowDef]:
+        from ..cache import get as cache_get, put as cache_put
+        cached = cache_get("workflows:all")
+        if cached is not None:
+            return cached
         self._ensure_table()
         conn = get_db()
         rows = conn.execute("SELECT * FROM workflows ORDER BY created_at").fetchall()
         conn.close()
-        return [self._row_to_wf(r) for r in rows]
+        result = [self._row_to_wf(r) for r in rows]
+        cache_put("workflows:all", result, ttl=120)
+        return result
 
     def get(self, wf_id: str) -> Optional[WorkflowDef]:
         self._ensure_table()

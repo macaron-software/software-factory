@@ -36,6 +36,9 @@ class ReactionEvent(str, Enum):
     AGENT_STUCK = "agent_stuck"
     PHASE_TIMEOUT = "phase_timeout"
     TMA_INCIDENT = "tma_incident"
+    MISSION_CREATED = "mission_created"
+    MISSION_COMPLETED = "mission_completed"
+    MISSION_FAILED = "mission_failed"
 
 
 class ReactionAction(str, Enum):
@@ -45,6 +48,9 @@ class ReactionAction(str, Enum):
     ESCALATE = "escalate"
     CREATE_TASK = "create_task"
     ROLLBACK = "rollback"
+    EMAIL = "email"
+    SLACK = "slack"
+    WEBHOOK = "webhook"
 
 
 # ── Data classes ───────────────────────────────────────────────────

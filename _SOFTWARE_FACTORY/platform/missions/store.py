@@ -179,9 +179,42 @@ class MissionStore:
                     (status, completed, mission_id),
                 )
             db.commit()
-            return cur.rowcount > 0
+            updated = cur.rowcount > 0
+
+            # Trigger notification on terminal states
+            if updated and status in ("completed", "failed"):
+                self._notify_mission_status(mission_id, status, db)
+
+            return updated
         finally:
             db.close()
+
+    def _notify_mission_status(self, mission_id: str, status: str, db):
+        """Fire async notification for mission completion/failure."""
+        try:
+            row = db.execute("SELECT name, project_id, type FROM missions WHERE id = ?", (mission_id,)).fetchone()
+            if not row:
+                return
+            from ..services.notification_service import get_notification_service, NotificationPayload
+            svc = get_notification_service()
+            if not svc.is_configured:
+                return
+            severity = "critical" if status == "failed" else "info"
+            title = f"Mission {status}: {row['name']}"
+            message = f"Mission '{row['name']}' ({row['type']}) has {status}."
+            payload = NotificationPayload(
+                event=f"mission_{status}", title=title, message=message,
+                project_id=row["project_id"], mission_id=mission_id, severity=severity,
+            )
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(svc.notify(payload))
+            except RuntimeError:
+                pass  # No event loop — skip (e.g. in tests)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Notification error: %s", e)
 
     def delete_mission(self, mission_id: str) -> bool:
         db = get_db()

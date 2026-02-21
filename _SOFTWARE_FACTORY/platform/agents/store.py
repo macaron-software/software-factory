@@ -79,10 +79,16 @@ class AgentStore:
     """CRUD for agent definitions."""
 
     def list_all(self) -> list[AgentDef]:
+        from ..cache import get as cache_get, put as cache_put
+        cached = cache_get("agents:all")
+        if cached is not None:
+            return cached
         db = get_db()
         try:
             rows = db.execute("SELECT * FROM agents ORDER BY is_builtin DESC, name").fetchall()
-            return [_row_to_agent(r) for r in rows]
+            result = [_row_to_agent(r) for r in rows]
+            cache_put("agents:all", result, ttl=60)
+            return result
         finally:
             db.close()
 
@@ -95,6 +101,7 @@ class AgentStore:
             db.close()
 
     def create(self, agent: AgentDef) -> AgentDef:
+        from ..cache import invalidate
         if not agent.id:
             agent.id = str(uuid.uuid4())[:8]
         now = datetime.utcnow().isoformat()
@@ -121,9 +128,11 @@ class AgentStore:
             db.commit()
         finally:
             db.close()
+        invalidate("agents:all")
         return agent
 
     def update(self, agent: AgentDef) -> AgentDef:
+        from ..cache import invalidate
         agent.updated_at = datetime.utcnow().isoformat()
         db = get_db()
         try:
@@ -147,16 +156,21 @@ class AgentStore:
             db.commit()
         finally:
             db.close()
+        invalidate("agents:all")
         return agent
 
     def delete(self, agent_id: str) -> bool:
+        from ..cache import invalidate
         db = get_db()
         try:
             cur = db.execute("DELETE FROM agents WHERE id = ? AND is_builtin = 0", (agent_id,))
             db.commit()
-            return cur.rowcount > 0
+            deleted = cur.rowcount > 0
         finally:
             db.close()
+        if deleted:
+            invalidate("agents:all")
+        return deleted
 
     def count(self) -> int:
         db = get_db()

@@ -15,6 +15,21 @@ from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_m
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+_DOMAIN_MARKERS = {
+    "Cargo.toml": "rust", "pyproject.toml": "python", "requirements.txt": "python",
+    "package.json": "node", "tsconfig.json": "typescript", "angular.json": "angular",
+    "svelte.config.js": "svelte", "next.config.js": "next", "Gemfile": "ruby",
+    "go.mod": "go", "build.gradle": "kotlin", "Package.swift": "swift",
+}
+
+def _detect_domains(project_path: str) -> list[str]:
+    """Auto-detect tech stack from project files."""
+    p = Path(project_path)
+    if not p.is_dir():
+        return []
+    return list({d for f, d in _DOMAIN_MARKERS.items() if (p / f).exists()})
+
+
 @router.get("/projects", response_class=HTMLResponse)
 async def projects_page(request: Request):
     """Projects list (legacy)."""
@@ -383,6 +398,33 @@ async def project_board_page(request: Request, project_id: str):
         if ci_path.exists():
             cicd_file = str(ci_path)
 
+    # Velocity metrics
+    total_sp_planned = 0
+    total_sp_done = 0
+    for m in missions:
+        features = backlog.list_features(m.id)
+        for f in features:
+            stories = backlog.list_stories(f.id)
+            for s in stories:
+                sp = s.story_points or 0
+                total_sp_planned += sp
+                if s.status in ("done", "accepted"):
+                    total_sp_done += sp
+    velocity_pct = round(total_sp_done * 100 / total_sp_planned) if total_sp_planned else 0
+
+    # PI cadence — phases from active mission runs
+    pi_phases = []
+    for m in missions:
+        run = runs_by_mission.get(m.id)
+        if run and run.phases:
+            for ph in run.phases:
+                ph_status = ph.status.value if hasattr(ph.status, "value") else str(ph.status)
+                pi_phases.append({
+                    "name": ph.phase_name or ph.phase_id,
+                    "status": ph_status,
+                    "mission": m.name[:25],
+                })
+
     return _templates(request).TemplateResponse("project_board.html", {
         "request": request,
         "page_title": f"Board — {project.name}",
@@ -395,6 +437,8 @@ async def project_board_page(request: Request, project_id: str):
         "ops_missions": ops_missions,
         "epics_list": epics_list,
         "has_cicd": cicd_file is not None,
+        "velocity": {"planned": total_sp_planned, "done": total_sp_done, "pct": velocity_pct},
+        "pi_phases": pi_phases,
     })
 
 
@@ -428,10 +472,28 @@ async def create_project(request: Request):
         lead_agent_id=str(form.get("lead_agent_id", "brain")),
         values=[v.strip() for v in str(form.get("values", "quality,feedback")).split(",") if v.strip()],
     )
+    # Auto-detect domains from path
+    if p.path and not p.domains:
+        p.domains = _detect_domains(p.path)
     # Auto-load vision
     if p.exists:
         p.vision = p.load_vision_from_file()
     store.create(p)
+
+    # Auto-provision TMA, Security, Tech Debt missions
+    try:
+        store.auto_provision(p.id, p.name)
+    except Exception as e:
+        logger.warning("auto_provision failed for %s: %s", p.id, e)
+
+    # Auto-generate CI/CD pipeline
+    if p.path:
+        try:
+            from ...projects.manager import ProjectStore
+            ProjectStore.generate_cicd(p.path, p.domains or [])
+        except Exception as e:
+            logger.warning("generate_cicd failed for %s: %s", p.id, e)
+
     return RedirectResponse(f"/projects/{p.id}", status_code=303)
 
 

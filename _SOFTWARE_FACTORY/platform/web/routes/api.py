@@ -470,7 +470,7 @@ async def epic_features(epic_id: str):
 
 
 @router.get("/api/monitoring/live")
-async def monitoring_live(hours: int = 24):
+async def monitoring_live(request: Request, hours: int = 24):
     """Live monitoring data: system, LLM, agents, missions, memory.
     Cached for 5 seconds to avoid hammering DB on rapid polling."""
     import os
@@ -997,6 +997,19 @@ async def monitoring_live(hours: int = 24):
     except Exception:
         pass
 
+    # Redact sensitive infrastructure details for unauthenticated requests
+    is_authed = getattr(request.state, "authenticated", False) if hasattr(request, "state") else False
+    if not is_authed and os.getenv("MACARON_API_KEY"):
+        # Strip container IDs, kernel, server version, git branch, Azure details
+        for d in docker_info:
+            d.pop("id", None)
+            d.pop("pids", None)
+        docker_system.pop("kernel", None)
+        docker_system.pop("server_version", None)
+        docker_system.pop("os", None)
+        git_info.pop("branch", None)
+        azure_infra = {}
+
     result = {
         "timestamp": datetime.utcnow().isoformat(),
         "hours": hours,
@@ -1512,6 +1525,126 @@ async def velocity_data():
         } for s in sprints])
     except Exception:
         return JSONResponse([])
+    finally:
+        db.close()
+
+
+@router.get("/api/releases/{project_id}")
+async def releases_data(project_id: str):
+    """Get release notes — completed features grouped by epic, with dates."""
+    from ...db.migrations import get_db
+    db = get_db()
+    try:
+        epics = db.execute(
+            "SELECT id, name, status, completed_at FROM missions WHERE project_id=? AND type='epic' AND status='completed' ORDER BY completed_at DESC",
+            (project_id,)
+        ).fetchall()
+
+        releases = []
+        for epic in epics:
+            features = db.execute(
+                "SELECT name, status, story_points, completed_at, acceptance_criteria FROM features WHERE epic_id=? AND status='done' ORDER BY completed_at",
+                (epic["id"],)
+            ).fetchall()
+            total_sp = sum(f["story_points"] or 0 for f in features)
+            releases.append({
+                "epic_id": epic["id"],
+                "epic_name": epic["name"],
+                "completed_at": epic["completed_at"],
+                "feature_count": len(features),
+                "total_sp": total_sp,
+                "features": [{"name": f["name"], "sp": f["story_points"], "date": f["completed_at"]} for f in features],
+            })
+
+        # Also include active epics with partial completion
+        active = db.execute(
+            "SELECT id, name, status FROM missions WHERE project_id=? AND type='epic' AND status IN ('active','planning') ORDER BY created_at DESC",
+            (project_id,)
+        ).fetchall()
+        for epic in active:
+            features = db.execute(
+                "SELECT name, status, story_points, completed_at FROM features WHERE epic_id=? ORDER BY status, completed_at",
+                (epic["id"],)
+            ).fetchall()
+            done = [f for f in features if f["status"] == "done"]
+            total = len(features)
+            releases.append({
+                "epic_id": epic["id"],
+                "epic_name": epic["name"] + " (in progress)",
+                "completed_at": None,
+                "feature_count": total,
+                "done_count": len(done),
+                "progress_pct": round(len(done) / total * 100) if total else 0,
+                "total_sp": sum(f["story_points"] or 0 for f in features),
+                "features": [{"name": f["name"], "sp": f["story_points"], "status": f["status"], "date": f["completed_at"]} for f in features],
+            })
+
+        return JSONResponse({"project_id": project_id, "releases": releases})
+    finally:
+        db.close()
+
+
+@router.get("/api/metrics/cycle-time")
+async def cycle_time_data(project_id: str = ""):
+    """Cycle time distribution — time from created to completed for features and stories."""
+    from ...db.migrations import get_db
+    db = get_db()
+    try:
+        where = "AND f.epic_id IN (SELECT id FROM missions WHERE project_id=?)" if project_id else ""
+        params = (project_id,) if project_id else ()
+
+        features = db.execute(f"""
+            SELECT f.name,
+                   julianday(f.completed_at) - julianday(f.created_at) as days
+            FROM features f
+            WHERE f.status='done' AND f.completed_at IS NOT NULL AND f.created_at IS NOT NULL {where}
+            ORDER BY days
+        """, params).fetchall()
+
+        stories = db.execute(f"""
+            SELECT s.title,
+                   julianday(s.completed_at) - julianday(s.created_at) as days
+            FROM user_stories s
+            JOIN features f ON s.feature_id = f.id
+            WHERE s.status='done' AND s.completed_at IS NOT NULL AND s.created_at IS NOT NULL {where}
+            ORDER BY days
+        """, params).fetchall()
+
+        feat_days = [round(r["days"], 1) for r in features if r["days"] and r["days"] > 0]
+        story_days = [round(r["days"], 1) for r in stories if r["days"] and r["days"] > 0]
+
+        def histogram(values, bins=10):
+            if not values:
+                return []
+            mn, mx = min(values), max(values)
+            if mn == mx:
+                return [{"range": f"{mn:.0f}", "count": len(values)}]
+            step = (mx - mn) / bins
+            result = []
+            for i in range(bins):
+                lo = mn + step * i
+                hi = lo + step
+                cnt = sum(1 for v in values if lo <= v < hi) if i < bins - 1 else sum(1 for v in values if lo <= v <= hi)
+                result.append({"range": f"{lo:.0f}-{hi:.0f}", "count": cnt})
+            return result
+
+        return JSONResponse({
+            "features": {
+                "count": len(feat_days),
+                "avg_days": round(sum(feat_days) / len(feat_days), 1) if feat_days else 0,
+                "median_days": round(sorted(feat_days)[len(feat_days)//2], 1) if feat_days else 0,
+                "p90_days": round(sorted(feat_days)[int(len(feat_days)*0.9)] , 1) if feat_days else 0,
+                "histogram": histogram(feat_days),
+            },
+            "stories": {
+                "count": len(story_days),
+                "avg_days": round(sum(story_days) / len(story_days), 1) if story_days else 0,
+                "median_days": round(sorted(story_days)[len(story_days)//2], 1) if story_days else 0,
+                "histogram": histogram(story_days),
+            },
+        })
+    except Exception:
+        return JSONResponse({"features": {"count": 0, "histogram": []}, "stories": {"count": 0, "histogram": []}})
     finally:
         db.close()
 

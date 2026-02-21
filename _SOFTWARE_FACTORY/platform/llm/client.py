@@ -25,6 +25,15 @@ logger = logging.getLogger(__name__)
 
 # Provider configs — OpenAI-compatible endpoints
 _PROVIDERS = {
+    "demo": {
+        "name": "Demo (mock responses)",
+        "base_url": "http://localhost",
+        "key_env": "__DEMO__",
+        "models": ["demo"],
+        "default": "demo",
+        "auth_header": "Authorization",
+        "auth_prefix": "Bearer ",
+    },
     "azure-ai": {
         "name": "Azure AI Foundry (GPT-5.2)",
         "base_url": os.environ.get("AZURE_AI_ENDPOINT", "https://swedencentral.api.cognitive.microsoft.com").rstrip("/"),
@@ -72,7 +81,9 @@ _PROVIDERS = {
 # Fallback order driven by PLATFORM_LLM_PROVIDER (local=minimax first, azure=azure-openai first)
 _primary = os.environ.get("PLATFORM_LLM_PROVIDER", "minimax")
 _is_azure = os.environ.get("AZURE_DEPLOY", "")
-if _is_azure:
+if _primary == "demo":
+    _FALLBACK_CHAIN = ["demo"]
+elif _is_azure:
     # Azure prod: only azure-openai, no minimax/nvidia
     _FALLBACK_CHAIN = ["azure-openai"]
 else:
@@ -225,6 +236,8 @@ class LLMClient:
         env = pcfg.get("key_env", "")
         if not env:
             return "no-key"
+        if env == "__DEMO__":
+            return "demo-key"
         key = os.environ.get(env, "")
         if key:
             return key
@@ -238,6 +251,28 @@ class LLMClient:
             return Path(key_file).read_text().strip()
         except (OSError, FileNotFoundError):
             return ""
+
+    def _demo_response(self, messages: list[LLMMessage]) -> LLMResponse:
+        """Return a contextual mock response for demo mode."""
+        last = messages[-1].content if messages else ""
+        lower = last.lower()
+        if any(k in lower for k in ["bug", "fix", "error", "incident"]):
+            content = "I've analyzed the issue. The root cause is a null reference in the request handler. Here's my recommended fix: add input validation before processing. This should resolve the error without side effects."
+        elif any(k in lower for k in ["test", "qa", "quality"]):
+            content = "I've reviewed the test coverage. Current coverage is at 78%. I recommend adding integration tests for the API endpoints and edge case tests for the data validation layer."
+        elif any(k in lower for k in ["deploy", "release", "ci/cd"]):
+            content = "Deployment plan: 1) Run full test suite, 2) Build Docker image, 3) Deploy to staging, 4) Run smoke tests, 5) Promote to production with blue-green strategy."
+        elif any(k in lower for k in ["architect", "design", "structure"]):
+            content = "Recommended architecture: microservices with event-driven communication. Use gRPC for inter-service calls, PostgreSQL for persistence, and Redis for caching. Deploy on Kubernetes with Helm charts."
+        elif any(k in lower for k in ["security", "cve", "vulnerab"]):
+            content = "Security audit complete. Found 2 medium-severity issues: 1) Missing rate limiting on auth endpoint, 2) SQL injection risk in search query. Both have been patched."
+        else:
+            content = f"Task acknowledged. I've analyzed the request and prepared an implementation plan. The work is broken down into 3 phases: analysis, implementation, and validation. Proceeding with phase 1."
+        return LLMResponse(
+            content=content, model="demo", provider="demo",
+            tokens_in=len(last) // 4, tokens_out=len(content) // 4,
+            duration_ms=50, finish_reason="stop",
+        )
 
     def _build_url(self, pcfg: dict, model: str) -> str:
         base = pcfg["base_url"].rstrip("/")
@@ -292,8 +327,13 @@ class LLMClient:
             pcfg = self._get_provider_config(prov)
             key = self._get_api_key(pcfg)
             if not key or key == "no-key":
-                logger.warning("LLM %s skipped (no API key)", prov)
-                continue
+                if prov != "demo":
+                    logger.warning("LLM %s skipped (no API key)", prov)
+                    continue
+
+            # Demo mode: return mock response without HTTP call
+            if prov == "demo":
+                return self._demo_response(messages)
 
             use_model = model if (prov == provider and model and model in pcfg.get("models", [])) else pcfg["default"]
 
@@ -501,7 +541,18 @@ class LLMClient:
             pcfg = self._get_provider_config(prov)
             key = self._get_api_key(pcfg)
             if not key or key == "no-key":
-                continue
+                if prov != "demo":
+                    continue
+
+            # Demo mode: yield mock response as stream
+            if prov == "demo":
+                resp = self._demo_response(messages)
+                words = resp.content.split()
+                for i, word in enumerate(words):
+                    yield LLMStreamChunk(delta=(" " if i else "") + word, done=False, model="demo")
+                    await asyncio.sleep(0.02)
+                yield LLMStreamChunk(delta="", done=True, model="demo", finish_reason="stop")
+                return
             use_model = model if (prov == provider and model and model in pcfg.get("models", [])) else pcfg["default"]
 
             # Rate limiter: queue until a slot is available
