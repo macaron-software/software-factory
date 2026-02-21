@@ -562,6 +562,15 @@ async def _tool_build_test(tool_name: str, args: dict, ctx: ExecutionContext) ->
     if not workspace:
         return "Error: no workspace available"
     import subprocess, os
+
+    # Intercept Android builds — redirect to android_build tool
+    if any(kw in command for kw in ["gradlew", "gradle ", "assembleDebug", "assembleRelease"]):
+        return (
+            "⚠️ WRONG TOOL: Do NOT use build() for Android/Gradle projects.\n"
+            "Use android_build() instead — it runs in the android-builder container with real SDK.\n"
+            "Generic build() has no Android SDK and will silently produce nothing."
+        )
+
     # Fix swift command to use Apple Swift (not OpenStack CLI)
     if command.strip().startswith("swift ") and os.path.isfile("/usr/bin/swift"):
         command = "/usr/bin/" + command.strip()
