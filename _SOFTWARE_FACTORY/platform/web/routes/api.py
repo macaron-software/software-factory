@@ -399,16 +399,20 @@ async def dora_api(request: Request, project_id: str):
 
 
 @router.get("/api/monitoring/live")
-async def monitoring_live():
+async def monitoring_live(hours: int = 24):
     """Live monitoring data: system, LLM, agents, missions, memory."""
     import os
     import psutil
+
+    # Clamp hours to valid range
+    hours = max(1, min(hours, 8760))  # 1h to 1 year
 
     # System metrics
     process = psutil.Process(os.getpid())
     mem_info = process.memory_info()
     cpu_percent = process.cpu_percent(interval=0)
     sys_mem = psutil.virtual_memory()
+    disk = psutil.disk_usage('/')
 
     system = {
         "pid": os.getpid(),
@@ -419,27 +423,43 @@ async def monitoring_live():
         "sys_mem_total_gb": round(sys_mem.total / 1024**3, 1),
         "sys_mem_used_gb": round(sys_mem.used / 1024**3, 1),
         "sys_mem_percent": round(sys_mem.percent, 1),
+        "disk_total_gb": round(disk.total / 1024**3, 1),
+        "disk_used_gb": round(disk.used / 1024**3, 1),
+        "disk_free_gb": round(disk.free / 1024**3, 1),
+        "disk_percent": round(disk.percent, 1),
         "uptime_seconds": round(import_time() - process.create_time()),
         "threads": process.num_threads(),
         "open_files": len(process.open_files()),
     }
 
-    # LLM stats (24h)
+    # LLM stats
     try:
         from ...llm.observability import get_tracer
-        llm = get_tracer().stats(hours=24)
+        llm = get_tracer().stats(hours=hours)
         # Hourly breakdown for chart
         from ...db.migrations import get_db
         db = get_db()
-        hourly = db.execute("""
-            SELECT strftime('%H', created_at) as hour,
-                   COUNT(*) as calls,
-                   COALESCE(SUM(tokens_in + tokens_out), 0) as tokens,
-                   COALESCE(SUM(cost_usd), 0) as cost
-            FROM llm_traces
-            WHERE created_at > datetime('now', '-24 hours')
-            GROUP BY hour ORDER BY hour
-        """).fetchall()
+        # Use day grouping for periods > 48h, else hourly
+        if hours > 48:
+            hourly = db.execute(f"""
+                SELECT strftime('%m-%d', created_at) as hour,
+                       COUNT(*) as calls,
+                       COALESCE(SUM(tokens_in + tokens_out), 0) as tokens,
+                       COALESCE(SUM(cost_usd), 0) as cost
+                FROM llm_traces
+                WHERE created_at > datetime('now', '-{hours} hours')
+                GROUP BY hour ORDER BY hour
+            """).fetchall()
+        else:
+            hourly = db.execute(f"""
+                SELECT strftime('%H', created_at) as hour,
+                       COUNT(*) as calls,
+                       COALESCE(SUM(tokens_in + tokens_out), 0) as tokens,
+                       COALESCE(SUM(cost_usd), 0) as cost
+                FROM llm_traces
+                WHERE created_at > datetime('now', '-{hours} hours')
+                GROUP BY hour ORDER BY hour
+            """).fetchall()
         llm["hourly"] = [dict(r) for r in hourly]
         db.close()
     except Exception:
@@ -449,8 +469,8 @@ async def monitoring_live():
 
     # Active agents (from AgentLoopManager)
     try:
-        from ...agents.loop import AgentLoopManager
-        mgr = AgentLoopManager.instance()
+        from ...agents.loop import get_loop_manager
+        mgr = get_loop_manager()
         active_loops = {k: {"status": v.status, "agent_id": v.agent_id}
                         for k, v in mgr._loops.items() if v.status in ("thinking", "acting")}
         agents_active = len(active_loops)
@@ -480,10 +500,10 @@ async def monitoring_live():
             SELECT status, COUNT(*) as cnt
             FROM features GROUP BY status
         """).fetchall()
-        # Messages count (last 24h)
+        # Messages count (last 24h) — column is 'timestamp' not 'created_at'
         msg_count = db.execute("""
             SELECT COUNT(*) as cnt FROM messages
-            WHERE created_at > datetime('now', '-24 hours')
+            WHERE timestamp > datetime('now', '-24 hours')
         """).fetchone()
         # Total messages ever
         msg_total = db.execute("SELECT COUNT(*) as cnt FROM messages").fetchone()
@@ -711,12 +731,18 @@ async def monitoring_live():
             "azure_llm_usd": round(azure_cost, 4),
             "other_llm_usd": round(other_cost, 4),
             "total_llm_usd": round(azure_cost + other_cost, 4),
+            # Azure infra monthly estimates (Standard_B2ms + PG B1ms + storage)
+            "vm_monthly_usd": 60.74,        # Standard_B2ms francecentral
+            "pg_monthly_usd": 12.34,         # PG B1ms 1vCPU/2GB
+            "storage_monthly_usd": 2.50,     # Blob GRS ~50GB
+            "total_infra_monthly_usd": 75.58,
         }
     except Exception:
         pass
 
     return JSONResponse({
         "timestamp": datetime.utcnow().isoformat(),
+        "hours": hours,
         "system": system,
         "llm": llm,
         "agents": {
@@ -889,5 +915,26 @@ async def update_incident(request: Request, incident_id: str):
         return JSONResponse({"ok": True, "id": incident_id})
     finally:
         db.close()
+
+
+# ── Auto-Heal API ────────────────────────────────────────────────────
+
+@router.get("/api/autoheal/stats")
+async def autoheal_stats():
+    """Auto-heal engine statistics."""
+    from ...ops.auto_heal import get_autoheal_stats
+    return JSONResponse(get_autoheal_stats())
+
+
+@router.post("/api/autoheal/trigger")
+async def autoheal_trigger():
+    """Manually trigger one auto-heal cycle."""
+    from ...ops.auto_heal import heal_cycle
+    try:
+        await heal_cycle()
+        from ...ops.auto_heal import get_autoheal_stats
+        return JSONResponse({"ok": True, **get_autoheal_stats()})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 

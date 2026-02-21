@@ -1793,4 +1793,66 @@ def get_builtin_workflows() -> list[WorkflowDef]:
         ),
     )
 
+    # ── TMA Auto-Heal Workflow ──────────────────────────────────────
+    builtins.append(
+        WorkflowDef(
+            id="tma-autoheal",
+            name="TMA Auto-Heal",
+            description="Tierce Maintenance Applicative — auto-diagnose and fix platform errors",
+            icon="🔧",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="diagnose", pattern_id="hierarchical",
+                    name="Diagnostic",
+                    description="Analyze error logs, stack traces, and incident context to identify root cause",
+                    gate="Root cause identified and documented",
+                    config={"agents": ["brain", "architect", "sre_ops"]},
+                ),
+                WorkflowPhase(
+                    id="fix", pattern_id="adversarial-pair",
+                    name="Fix Implementation",
+                    description="Implement the fix with TDD: write test → fix code → validate",
+                    gate="Fix implemented and all tests pass",
+                    config={"agents": ["senior_dev", "qa_engineer"]},
+                ),
+                WorkflowPhase(
+                    id="verify", pattern_id="sequential",
+                    name="Verification",
+                    description="Run regression tests, check no new incidents introduced",
+                    gate="Zero regressions, fix verified in staging",
+                    config={"agents": ["qa_engineer", "sre_ops"]},
+                ),
+                WorkflowPhase(
+                    id="close", pattern_id="solo",
+                    name="Resolution",
+                    description="Document fix, close incidents, update runbook if needed",
+                    gate="Incidents resolved, knowledge base updated",
+                    config={"agents": ["release_train_engineer"]},
+                ),
+            ],
+            config={
+                "autoheal": True,
+                "max_duration_minutes": 30,
+                "auto_rollback": True,
+                "graph": {
+                    "nodes": [
+                        {"id": "n1", "agent_id": "brain", "x": 100, "y": 150, "label": "Brain Diag", "phase": "diagnose"},
+                        {"id": "n2", "agent_id": "senior_dev", "x": 300, "y": 100, "label": "Fix Dev", "phase": "fix"},
+                        {"id": "n3", "agent_id": "qa_engineer", "x": 300, "y": 200, "label": "QA Verify", "phase": "fix"},
+                        {"id": "n4", "agent_id": "sre_ops", "x": 500, "y": 150, "label": "SRE Verify", "phase": "verify"},
+                        {"id": "n5", "agent_id": "release_train_engineer", "x": 700, "y": 150, "label": "RTE Close", "phase": "close"},
+                    ],
+                    "edges": [
+                        {"from": "n1", "to": "n2", "label": "root cause", "color": "#ef4444"},
+                        {"from": "n1", "to": "n3", "label": "test spec", "color": "#f97316"},
+                        {"from": "n2", "to": "n4", "label": "fix", "color": "#3fb950"},
+                        {"from": "n3", "to": "n4", "label": "test results", "color": "#3fb950"},
+                        {"from": "n4", "to": "n5", "label": "verified", "color": "#58a6ff"},
+                    ],
+                },
+            },
+        ),
+    )
+
     return builtins

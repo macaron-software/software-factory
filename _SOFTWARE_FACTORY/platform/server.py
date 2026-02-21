@@ -120,6 +120,15 @@ async def lifespan(app: FastAPI):
     import asyncio
     asyncio.create_task(_wal_checkpoint_loop())
 
+    # Auto-heal loop: scan incidents → create epics → launch TMA workflows
+    try:
+        from .ops.auto_heal import auto_heal_loop, ENABLED as _ah_enabled
+        if _ah_enabled:
+            asyncio.create_task(auto_heal_loop())
+            logger.info("Auto-heal loop enabled")
+    except Exception as e:
+        logger.warning("Auto-heal loop failed to start: %s", e)
+
     # Auto-resume stuck missions (status=running but no asyncio task after restart)
     try:
         from .missions.store import get_mission_run_store
