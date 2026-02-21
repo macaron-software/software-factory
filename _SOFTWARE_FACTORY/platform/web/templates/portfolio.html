@@ -125,6 +125,34 @@
 .epics-table th{text-align:left;padding:0.5rem 0.6rem;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);border-bottom:1px solid var(--border)}
 .epics-table td{padding:0.45rem 0.6rem;border-bottom:1px solid var(--border-light,rgba(255,255,255,.04))}
 .epics-table tr:hover td{background:var(--bg-tertiary)}
+
+/* ── View mode toggle ── */
+.port-view-toggle{display:flex;gap:2px;margin-left:auto}
+.port-view-toggle button{background:none;border:1px solid transparent;border-radius:4px;padding:3px 5px;cursor:pointer;color:var(--text-secondary);display:flex;align-items:center;transition:all .12s}
+.port-view-toggle button:hover{color:var(--text-primary)}
+.port-view-toggle button.active{background:var(--bg-tertiary);border-color:var(--border);color:var(--purple)}
+.port-view-toggle button svg{width:14px;height:14px}
+
+/* Projects — list view */
+.section-body.port-view-list .portfolio-projects{grid-template-columns:1fr;gap:0.4rem}
+.section-body.port-view-list .project-mission-card{padding:0.65rem 1rem;display:grid;grid-template-columns:1fr auto;gap:0.5rem;align-items:center}
+.section-body.port-view-list .pmc-missions,.section-body.port-view-list .pmc-team,.section-body.port-view-list .pmc-progress-bar,.section-body.port-view-list .pmc-header>div[style]{display:none}
+.section-body.port-view-list .pmc-header{margin-bottom:0}
+.section-body.port-view-list .pmc-badges{margin-top:0;justify-self:end}
+
+/* Projects — compact view */
+.section-body.port-view-compact .portfolio-projects{grid-template-columns:1fr;gap:0}
+.section-body.port-view-compact .project-mission-card{padding:0.4rem 0.8rem;border-radius:0;border-bottom:1px solid var(--border);border-left:none;border-right:none;border-top:none;display:flex;align-items:center;gap:0.6rem}
+.section-body.port-view-compact .pmc-header{margin-bottom:0;flex:1}
+.section-body.port-view-compact .pmc-missions,.section-body.port-view-compact .pmc-team,.section-body.port-view-compact .pmc-progress-bar,.section-body.port-view-compact .pmc-header>div[style],.section-body.port-view-compact .pmc-badges{display:none}
+.section-body.port-view-compact .pmc-status{font-size:0.6rem}
+
+/* Epics — list view (already table, make more compact) */
+.section-body.port-view-list .epics-table td,.section-body.port-view-list .epics-table th{padding:0.3rem 0.5rem}
+
+/* Epics — compact view */
+.section-body.port-view-compact .epics-table td,.section-body.port-view-compact .epics-table th{padding:0.2rem 0.4rem;font-size:0.72rem}
+.section-body.port-view-compact .epic-bar{width:70px;height:4px}
 .epic-name{font-weight:600;color:var(--text-primary)}
 .epic-project{font-size:0.68rem;color:var(--text-secondary)}
 .epic-status{font-size:0.62rem;padding:0.1rem 0.4rem;border-radius:4px;font-weight:600}
@@ -229,6 +257,11 @@
         <div class="section-title" onclick="togglePortSection('projects')">
             <svg class="chevron-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
             <svg class="icon icon-sm"><use href="#icon-folder"/></svg> Projets
+            <div class="port-view-toggle" onclick="event.stopPropagation()">
+                <button title="Cards" data-mode="card" onclick="setPortView('projects','card')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+                <button title="List" data-mode="list" onclick="setPortView('projects','list')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></button>
+                <button title="Compact" data-mode="compact" onclick="setPortView('projects','compact')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="3" y1="14" x2="21" y2="14"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+            </div>
         </div>
         <div class="section-body" id="body-projects">
         <div class="portfolio-projects">
@@ -314,6 +347,11 @@
         <div class="section-title" onclick="togglePortSection('epics')">
             <svg class="chevron-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
             <svg class="icon icon-sm"><use href="#icon-rocket"/></svg> Épics & Progression
+            <div class="port-view-toggle" onclick="event.stopPropagation()">
+                <button title="Cards" data-mode="card" onclick="setPortView('epics','card')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+                <button title="List" data-mode="list" onclick="setPortView('epics','list')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></button>
+                <button title="Compact" data-mode="compact" onclick="setPortView('epics','compact')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="3" y1="14" x2="21" y2="14"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+            </div>
         </div>
         <div class="section-body" id="body-epics">
         <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
@@ -630,12 +668,31 @@ function togglePortSection(id){
     body.classList.toggle('collapsed', collapsed);
     localStorage.setItem('portfolio_collapse_'+id, collapsed?'1':'0');
 }
+
+// ── View mode (card/list/compact) with localStorage ──
+function setPortView(section, mode) {
+    const body = document.getElementById('body-'+section);
+    if (!body) return;
+    body.classList.remove('port-view-list', 'port-view-compact');
+    if (mode === 'list') body.classList.add('port-view-list');
+    else if (mode === 'compact') body.classList.add('port-view-compact');
+    const toggles = document.querySelector('#section-'+section+' .port-view-toggle');
+    if (toggles) toggles.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    try { localStorage.setItem('portfolio_view_'+section, mode); } catch(e){}
+}
+
 function restorePortCollapse(){
     ['strat','metrics','projects','epics','milestones'].forEach(id=>{
         if(localStorage.getItem('portfolio_collapse_'+id)==='1'){
             const title = document.querySelector('#section-'+id+' .section-title');
             const body = document.getElementById('body-'+id);
             if(title && body){ title.classList.add('collapsed'); body.classList.add('collapsed'); }
+        }
+        const vm = localStorage.getItem('portfolio_view_'+id);
+        if (vm && vm !== 'card') setPortView(id, vm);
+        else {
+            const toggle = document.querySelector('#section-'+id+' .port-view-toggle button[data-mode="card"]');
+            if (toggle) toggle.classList.add('active');
         }
     });
 }
