@@ -69,8 +69,9 @@ _PROVIDERS = {
     },
 }
 
-# Fallback: MiniMax (reliable, fast) → Azure GPT-5-mini (cheap, public endpoint) → Azure GPT-5.2 (powerful)
-_FALLBACK_CHAIN = ["minimax", "azure-openai", "azure-ai"]
+# Fallback order driven by PLATFORM_LLM_PROVIDER (local=minimax first, azure=azure-openai first)
+_primary = os.environ.get("PLATFORM_LLM_PROVIDER", "minimax")
+_FALLBACK_CHAIN = [_primary] + [p for p in ["minimax", "azure-openai", "azure-ai"] if p != _primary]
 
 
 @dataclass

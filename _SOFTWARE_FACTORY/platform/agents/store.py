@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -9,6 +10,10 @@ from pathlib import Path
 from typing import Optional
 
 from ..db.migrations import get_db
+
+# Environment-driven defaults: Azure uses GPT-5-mini, local uses MiniMax M2.5
+DEFAULT_PROVIDER = os.environ.get("PLATFORM_LLM_PROVIDER", "minimax")
+DEFAULT_MODEL = os.environ.get("PLATFORM_LLM_MODEL", "MiniMax-M2.5")
 
 
 @dataclass
@@ -19,8 +24,8 @@ class AgentDef:
     role: str = "worker"
     description: str = ""
     system_prompt: str = ""
-    provider: str = "minimax"
-    model: str = "MiniMax-M2.5"
+    provider: str = DEFAULT_PROVIDER
+    model: str = DEFAULT_MODEL
     temperature: float = 0.7
     max_tokens: int = 4096
     skills: list[str] = field(default_factory=list)
@@ -48,8 +53,8 @@ def _row_to_agent(row) -> AgentDef:
         role=row["role"],
         description=row["description"] or "",
         system_prompt=row["system_prompt"] or "",
-        provider=row["provider"] or "minimax",
-        model=row["model"] or "MiniMax-M2.5",
+        provider=row["provider"] or DEFAULT_PROVIDER,
+        model=row["model"] or DEFAULT_MODEL,
         temperature=row["temperature"],
         max_tokens=row["max_tokens"],
         skills=json.loads(row["skills_json"] or "[]"),
@@ -169,7 +174,7 @@ class AgentStore:
         builtins = [
             AgentDef(id="brain", name="Gabriel Mercier", role="Strategic Orchestrator",
                      description="Strategic orchestrator. Deep recursive analysis, task decomposition, WSJF prioritization.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.3, max_tokens=8192,
                      icon="brain", color="#bc8cff",
                      avatar="GM", tagline="I see the big picture",
@@ -181,7 +186,7 @@ class AgentStore:
 
             AgentDef(id="worker", name="Yann Lefevre", role="TDD Worker",
                      description="Writes code following strict TDD: Red → Green → Refactor. Atomic, KISS.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.4, max_tokens=4096,
                      icon="code", color="#58a6ff",
                      avatar="YL", tagline="Test first, code second",
@@ -192,7 +197,7 @@ class AgentStore:
 
             AgentDef(id="code-critic", name="Diane Moreau", role="Code Critic",
                      description="Reviews code for quality: SLOP detection, API misuse, syntax/logic errors.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.2, max_tokens=4096,
                      icon="eye", color="#d29922",
                      avatar="DM", tagline="Nothing escapes my review",
@@ -207,7 +212,7 @@ class AgentStore:
 
             AgentDef(id="security-critic", name="Tariq Haddad", role="Security Critic",
                      description="OWASP Top 10, secrets detection, SQL injection, XSS analysis.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.1, max_tokens=4096,
                      icon="shield", color="#f85149",
                      avatar="TH", tagline="Zero vulnerabilities tolerated",
@@ -220,7 +225,7 @@ class AgentStore:
 
             AgentDef(id="arch-critic", name="Sylvie Dumont", role="Architecture Critic",
                      description="Reviews RBAC, input validation, error handling, API design patterns.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.3, max_tokens=4096,
                      icon="building", color="#bc8cff",
                      avatar="SD", tagline="Clean architecture, strong foundations",
@@ -235,7 +240,7 @@ class AgentStore:
 
             AgentDef(id="devops", name="Karim Diallo", role="DevOps / SRE",
                      description="Build, deploy, infrastructure. Docker, CI/CD, monitoring.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.3, max_tokens=4096,
                      icon="rocket", color="#3fb950",
                      avatar="KD", tagline="CI/CD, Docker, déploiement canary, monitoring",
@@ -243,7 +248,7 @@ class AgentStore:
 
             AgentDef(id="product", name="Laura Vidal", role="Product Owner",
                      description="Business value, user stories, acceptance criteria. WSJF prioritization.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.5, max_tokens=4096,
                      icon="clipboard", color="#f78166",
                      avatar="LV", tagline="Value over features",
@@ -251,7 +256,7 @@ class AgentStore:
 
             AgentDef(id="tester", name="Éric Fontaine", role="QA Engineer",
                      description="E2E tests, smoke tests, regression. Playwright specialist.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.3, max_tokens=4096,
                      icon="flask", color="#a371f7",
                       avatar="EF", tagline="If it's not tested, it's broken",
@@ -262,7 +267,7 @@ class AgentStore:
             # Red Team (offensive)
             AgentDef(id="pentester-lead", name="Romain Vasseur", role="Pentester Lead",
                      description="Leads offensive security operations. Coordinates reconnaissance, exploitation, and reporting.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.3, max_tokens=8192,
                      icon="shield", color="#ef4444",
                      avatar="RV", tagline="Every system has a weakness",
@@ -277,7 +282,7 @@ class AgentStore:
 
             AgentDef(id="security-researcher", name="Inès Belkacem", role="Security Researcher",
                      description="OSINT, threat intelligence, vulnerability research. Maps attack surface.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.4, max_tokens=4096,
                      icon="search", color="#f97316",
                      avatar="IB", tagline="Intelligence before action",
@@ -291,7 +296,7 @@ class AgentStore:
 
             AgentDef(id="exploit-dev", name="Maxime Renard", role="Exploit Developer",
                      description="Develops and executes exploits. PoC creation, payload crafting.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.2, max_tokens=8192,
                      icon="zap", color="#dc2626",
                      avatar="MR", tagline="Proof or it didn't happen",
@@ -306,7 +311,7 @@ class AgentStore:
             # Blue Team (defensive)
             AgentDef(id="security-architect", name="Hélène Carpentier", role="Security Architect",
                      description="Designs secure architectures. Threat modeling, security patterns, defense in depth.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.3, max_tokens=8192,
                      icon="lock", color="#3b82f6",
                      avatar="HC", tagline="Security by design, not by patch",
@@ -321,7 +326,7 @@ class AgentStore:
 
             AgentDef(id="secops-engineer", name="Julien Marchand", role="SecOps Engineer",
                      description="Security operations, monitoring, incident response. SIEM, IDS/IPS.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.3, max_tokens=4096,
                      icon="monitor", color="#06b6d4",
                      avatar="JM", tagline="Detect, respond, contain",
@@ -335,7 +340,7 @@ class AgentStore:
 
             AgentDef(id="threat-analyst", name="Amira Djebbari", role="Threat Analyst",
                      description="Analyzes threat landscape, prioritizes risks, CVSS scoring, risk matrices.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.3, max_tokens=4096,
                      icon="alert-triangle", color="#8b5cf6",
                      avatar="AD", tagline="Risk is a number, not a feeling",
@@ -350,7 +355,7 @@ class AgentStore:
             # Dev Team (remediation)
             AgentDef(id="security-dev-lead", name="Théo Blanchard", role="Security Dev Lead",
                      description="Leads security fix development. Coordinates remediation PRs, TDD security tests.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.3, max_tokens=8192,
                      icon="git-pull-request", color="#22c55e",
                      avatar="TB", tagline="Fix it right, fix it once",
@@ -365,7 +370,7 @@ class AgentStore:
 
             AgentDef(id="security-backend-dev", name="Léa Fournier", role="Security Backend Dev",
                      description="Backend security fixes. SQL injection, auth bypass, SSRF, input validation.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.4, max_tokens=4096,
                      icon="server", color="#10b981",
                      avatar="LF", tagline="Secure the API, secure the data",
@@ -378,7 +383,7 @@ class AgentStore:
 
             AgentDef(id="security-frontend-dev", name="Hugo Martinez", role="Security Frontend Dev",
                      description="Frontend security fixes. XSS, CSRF, CSP, DOM-based vulnerabilities.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.4, max_tokens=4096,
                      icon="layout", color="#14b8a6",
                      avatar="HM", tagline="Sanitize everything, trust nothing",
@@ -391,7 +396,7 @@ class AgentStore:
 
             AgentDef(id="qa-security", name="Clara Nguyen", role="QA Security Engineer",
                      description="Security-focused QA. Penetration test validation, regression, compliance verification.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.3, max_tokens=4096,
                      icon="check-circle", color="#a78bfa",
                      avatar="CN", tagline="Verify the fix, break it again",
@@ -407,7 +412,7 @@ class AgentStore:
             # Governance
             AgentDef(id="ciso", name="Philippe Lemaire", role="CISO",
                      description="Chief Information Security Officer. Security strategy, risk acceptance, compliance.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.3, max_tokens=4096,
                      icon="shield", color="#fbbf24",
                      avatar="PL", tagline="Risk-based decisions, zero compromise",
@@ -422,7 +427,7 @@ class AgentStore:
 
             AgentDef(id="compliance-officer", name="Sophie Duval", role="Compliance Officer",
                      description="Regulatory compliance verification. GDPR, SOC2, ISO 27001, PCI-DSS.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.2, max_tokens=4096,
                      icon="file-text", color="#64748b",
                      avatar="SDu", tagline="Compliance is not optional",
@@ -438,7 +443,7 @@ class AgentStore:
             # ── ART-Level Agents (Agile Release Train) ──────────────────────
             AgentDef(id="rte", name="Marc Delacroix", role="Release Train Engineer",
                      description="Orchestre les PIs, facilite les cérémonies SAFe, résout les impediments cross-teams.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.5, max_tokens=8192,
                      icon="train", color="#d29922",
                      avatar="MD", tagline="Le train passe, montez ou ratez le PI",
@@ -452,7 +457,7 @@ class AgentStore:
 
             AgentDef(id="system-architect-art", name="Catherine Vidal", role="System Architect",
                      description="Cohérence technique cross-teams. Architecture, intégration, standards.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.4, max_tokens=8192,
                      icon="cpu", color="#58a6ff",
                      avatar="CV", tagline="L'architecture emerge des contraintes",
@@ -466,7 +471,7 @@ class AgentStore:
 
             AgentDef(id="product-manager-art", name="Isabelle Renaud", role="Product Manager",
                      description="Priorisation WSJF, traçabilité AO, valeur métier.",
-                     provider="minimax", model="MiniMax-M2.5",
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL,
                      temperature=0.5, max_tokens=8192,
                      icon="target", color="#bc8cff",
                      avatar="IR", tagline="Chaque feature tracee jusqu'a l'AO",
@@ -481,7 +486,7 @@ class AgentStore:
             # ── Feature Team: Auth & RGPD ───────────────────────────────────
             AgentDef(id="ft-auth-lead", name="Nicolas Bertrand", role="Lead Backend Auth",
                      description="Lead Auth & RGPD. JWT, MFA, FranceConnect, consent.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.3, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.3, max_tokens=8192,
                      icon="shield", color="#f97316", avatar="NB",
                      tagline="Zero trust, zero compromise", hierarchy_rank=20,
                      is_builtin=True, tags=["feature-team", "auth", "rgpd", "rust", "lead"],
@@ -491,7 +496,7 @@ class AgentStore:
 
             AgentDef(id="ft-auth-dev1", name="Samir Khelif", role="Dev Rust Auth",
                      description="Dev Rust auth, crypto, sessions.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.2, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.2, max_tokens=8192,
                      icon="code", color="#f97316", avatar="SK",
                      tagline="Chaque token a une raison d'etre", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "auth", "rust", "dev"],
@@ -500,7 +505,7 @@ class AgentStore:
 
             AgentDef(id="ft-auth-dev2", name="Emilie Rousseau", role="Dev Rust RGPD",
                      description="Dev Rust RGPD, data protection.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.2, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.2, max_tokens=8192,
                      icon="code", color="#f97316", avatar="ER",
                      tagline="Les donnees personnelles sont sacrees", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "auth", "rgpd", "rust", "dev"],
@@ -509,7 +514,7 @@ class AgentStore:
 
             AgentDef(id="ft-auth-qa", name="Fatima El Amrani", role="QA Auth",
                      description="QA sécurité auth et conformité RGPD.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.3, max_tokens=4096,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.3, max_tokens=4096,
                      icon="check-circle", color="#f97316", avatar="FA",
                      tagline="Si le test passe pas, ca ship pas", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "auth", "qa"],
@@ -519,7 +524,7 @@ class AgentStore:
             # ── Feature Team: Booking & Stations ────────────────────────────
             AgentDef(id="ft-booking-lead", name="Antoine Garnier", role="Lead Backend Booking",
                      description="Lead Booking & Stations. Réservation, carte temps réel.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.3, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.3, max_tokens=8192,
                      icon="map-pin", color="#22c55e", avatar="AG",
                      tagline="Chaque velo trouve son cycliste", hierarchy_rank=20,
                      is_builtin=True, tags=["feature-team", "booking", "stations", "lead"],
@@ -529,7 +534,7 @@ class AgentStore:
 
             AgentDef(id="ft-booking-dev-back", name="Lucas Martin", role="Dev Rust Booking",
                      description="Dev Rust backend booking et stations gRPC.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.2, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.2, max_tokens=8192,
                      icon="code", color="#22c55e", avatar="LM",
                      tagline="gRPC streaming, zero latence", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "booking", "rust", "dev"],
@@ -538,7 +543,7 @@ class AgentStore:
 
             AgentDef(id="ft-booking-dev-front", name="Julie Perrin", role="Dev Frontend Booking",
                      description="Dev SvelteKit booking et carte stations.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.3, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.3, max_tokens=8192,
                      icon="layout", color="#22c55e", avatar="JP",
                      tagline="L'UX du velo, c'est le trajet", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "booking", "svelte", "dev"],
@@ -547,7 +552,7 @@ class AgentStore:
 
             AgentDef(id="ft-booking-qa", name="Youssef Benali", role="QA Booking",
                      description="QA booking flows et stations temps réel.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.3, max_tokens=4096,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.3, max_tokens=4096,
                      icon="check-circle", color="#22c55e", avatar="YB",
                      tagline="Le velo doit etre la", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "booking", "qa"],
@@ -557,7 +562,7 @@ class AgentStore:
             # ── Feature Team: Payment ───────────────────────────────────────
             AgentDef(id="ft-payment-lead", name="Caroline Dupuis", role="Lead Backend Payment",
                      description="Lead paiement. Stripe, Paynum, abonnements.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.3, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.3, max_tokens=8192,
                      icon="credit-card", color="#eab308", avatar="CDu",
                      tagline="PCI-DSS n'est pas une option", hierarchy_rank=20,
                      is_builtin=True, tags=["feature-team", "payment", "lead"],
@@ -566,7 +571,7 @@ class AgentStore:
 
             AgentDef(id="ft-payment-dev", name="Raphael Morin", role="Dev Rust Payment",
                      description="Dev Rust paiement, Stripe/Paynum.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.2, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.2, max_tokens=8192,
                      icon="code", color="#eab308", avatar="RMo",
                      tagline="Idempotent ou rien", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "payment", "rust", "dev"],
@@ -575,7 +580,7 @@ class AgentStore:
 
             AgentDef(id="ft-payment-qa", name="Nadia Cheikh", role="QA Payment",
                      description="QA paiement, flows monétaires.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.3, max_tokens=4096,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.3, max_tokens=4096,
                      icon="check-circle", color="#eab308", avatar="NCh",
                      tagline="Chaque centime doit etre trace", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "payment", "qa"],
@@ -585,7 +590,7 @@ class AgentStore:
             # ── Feature Team: Admin ─────────────────────────────────────────
             AgentDef(id="ft-admin-lead", name="Olivier Blanc", role="Lead Frontend Admin",
                      description="Lead frontend admin multi-tenant.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.3, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.3, max_tokens=8192,
                      icon="settings", color="#a855f7", avatar="OBl",
                      tagline="L'admin qui voit tout", hierarchy_rank=20,
                      is_builtin=True, tags=["feature-team", "admin", "svelte", "lead"],
@@ -594,7 +599,7 @@ class AgentStore:
 
             AgentDef(id="ft-admin-dev1", name="Manon Lefebvre", role="Dev Svelte Admin",
                      description="Dev SvelteKit admin dashboard.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.2, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.2, max_tokens=8192,
                      icon="code", color="#a855f7", avatar="MLe",
                      tagline="Dashboard reactif", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "admin", "svelte", "dev"],
@@ -603,7 +608,7 @@ class AgentStore:
 
             AgentDef(id="ft-admin-dev2", name="Thomas Girard", role="Dev Svelte Admin",
                      description="Dev SvelteKit admin reporting et config tenant.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.2, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.2, max_tokens=8192,
                      icon="code", color="#a855f7", avatar="TGi",
                      tagline="Chaque tenant, sa realite", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "admin", "svelte", "dev"],
@@ -612,7 +617,7 @@ class AgentStore:
 
             AgentDef(id="ft-admin-qa", name="Camille Roux", role="QA Admin",
                      description="QA admin dashboard et tenant isolation.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.3, max_tokens=4096,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.3, max_tokens=4096,
                      icon="check-circle", color="#a855f7", avatar="CRo",
                      tagline="Cross-tenant = rejet", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "admin", "qa"],
@@ -622,7 +627,7 @@ class AgentStore:
             # ── Feature Team: User Frontend ─────────────────────────────────
             AgentDef(id="ft-user-lead", name="Sarah Lemoine", role="Lead Frontend User",
                      description="Lead frontend utilisateur. Mobile-first, PWA.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.3, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.3, max_tokens=8192,
                      icon="smartphone", color="#06b6d4", avatar="SLe",
                      tagline="Mobile-first, toujours", hierarchy_rank=20,
                      is_builtin=True, tags=["feature-team", "user", "svelte", "lead"],
@@ -631,7 +636,7 @@ class AgentStore:
 
             AgentDef(id="ft-user-dev1", name="Adrien Petit", role="Dev Svelte User",
                      description="Dev SvelteKit frontend user, PWA.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.2, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.2, max_tokens=8192,
                      icon="code", color="#06b6d4", avatar="APe",
                      tagline="PWA = natif sans les contraintes", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "user", "svelte", "dev"],
@@ -640,7 +645,7 @@ class AgentStore:
 
             AgentDef(id="ft-user-dev2", name="Chloe Bernard", role="Dev Svelte User",
                      description="Dev SvelteKit composants et design system.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.2, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.2, max_tokens=8192,
                      icon="code", color="#06b6d4", avatar="CBe",
                      tagline="Composants reutilisables", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "user", "svelte", "dev"],
@@ -649,7 +654,7 @@ class AgentStore:
 
             AgentDef(id="ft-user-qa", name="Karim Hadj", role="QA User Frontend",
                      description="QA frontend user, UX, a11y, mobile.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.3, max_tokens=4096,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.3, max_tokens=4096,
                      icon="check-circle", color="#06b6d4", avatar="KHa",
                      tagline="Mobile first = test mobile first", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "user", "qa"],
@@ -659,7 +664,7 @@ class AgentStore:
             # ── Feature Team: Infra & DevOps ────────────────────────────────
             AgentDef(id="ft-infra-lead", name="Francois Mercier", role="Lead DevOps",
                      description="Lead infra & DevOps. Docker, CI/CD, Azure.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.3, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.3, max_tokens=8192,
                      icon="server", color="#ef4444", avatar="FMe",
                      tagline="Infra as code, reproductible", hierarchy_rank=20,
                      is_builtin=True, tags=["feature-team", "infra", "devops", "lead"],
@@ -668,7 +673,7 @@ class AgentStore:
 
             AgentDef(id="ft-infra-dev", name="Bastien Faure", role="Dev DevOps",
                      description="DevOps, pipelines, containerisation.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.2, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.2, max_tokens=8192,
                      icon="code", color="#ef4444", avatar="BFa",
                      tagline="Pipeline vert = bonne journee", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "infra", "devops", "dev"],
@@ -677,7 +682,7 @@ class AgentStore:
 
             AgentDef(id="ft-infra-secops", name="Diane Prevost", role="SecOps",
                      description="Sécurité opérationnelle, hardening.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.3, max_tokens=4096,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.3, max_tokens=4096,
                      icon="lock", color="#ef4444", avatar="DPr",
                      tagline="Securise par defaut", hierarchy_rank=30,
                      is_builtin=True, tags=["feature-team", "infra", "security"],
@@ -687,7 +692,7 @@ class AgentStore:
             # ── Feature Team: E2E Tests ─────────────────────────────────────
             AgentDef(id="ft-e2e-lead", name="Virginie Dumas", role="Lead QA E2E",
                      description="Lead QA E2E. Stratégie tests, couverture.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.4, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.4, max_tokens=8192,
                      icon="crosshair", color="#ec4899", avatar="VDu",
                      tagline="Couverture 80pct ou rien ne ship", hierarchy_rank=20,
                      is_builtin=True, tags=["feature-team", "e2e", "qa", "lead"],
@@ -696,7 +701,7 @@ class AgentStore:
 
             AgentDef(id="ft-e2e-api", name="Romain Leclerc", role="QA API E2E",
                      description="Tests E2E API, guards, failures.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.2, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.2, max_tokens=8192,
                      icon="code", color="#ec4899", avatar="RLe",
                      tagline="Chaque endpoint teste", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "e2e", "api", "qa"],
@@ -705,7 +710,7 @@ class AgentStore:
 
             AgentDef(id="ft-e2e-ihm", name="Marie-Claire Joubert", role="QA IHM E2E",
                      description="Tests E2E navigateur, Playwright.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.2, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.2, max_tokens=8192,
                      icon="monitor", color="#ec4899", avatar="MCJ",
                      tagline="Mon test casse avant l'humain", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "e2e", "ihm", "playwright"],
@@ -715,7 +720,7 @@ class AgentStore:
             # ── Feature Team: Proto & Data ──────────────────────────────────
             AgentDef(id="ft-proto-lead", name="Jean-Baptiste Arnaud", role="Lead Data & Proto",
                      description="Lead data model, protobuf, migrations.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.3, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.3, max_tokens=8192,
                      icon="database", color="#64748b", avatar="JBA",
                      tagline="Le schema est le contrat", hierarchy_rank=20,
                      is_builtin=True, tags=["feature-team", "proto", "data", "lead"],
@@ -724,7 +729,7 @@ class AgentStore:
 
             AgentDef(id="ft-proto-dev", name="Alexis Nguyen", role="Dev Proto & Migrations",
                      description="Dev protobuf et migrations SQL.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.2, max_tokens=8192,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.2, max_tokens=8192,
                      icon="code", color="#64748b", avatar="ANg",
                      tagline="Migration reversible ou rien", hierarchy_rank=40,
                      is_builtin=True, tags=["feature-team", "proto", "sql", "dev"],
@@ -733,7 +738,7 @@ class AgentStore:
 
             AgentDef(id="ft-proto-dba", name="Patricia Moreau", role="DBA",
                      description="DBA, performance, indexation, RLS.",
-                     provider="minimax", model="MiniMax-M2.5", temperature=0.3, max_tokens=4096,
+                     provider=DEFAULT_PROVIDER, model=DEFAULT_MODEL, temperature=0.3, max_tokens=4096,
                      icon="database", color="#64748b", avatar="PMo",
                      tagline="Index manquant = requete lente", hierarchy_rank=30,
                      is_builtin=True, tags=["feature-team", "proto", "dba", "postgresql"],
@@ -802,8 +807,8 @@ class AgentStore:
                     role=raw.get("role", raw.get("id", "worker")),
                     description=persona_desc,
                     system_prompt=raw.get("system_prompt", ""),
-                    provider=raw.get("llm", {}).get("provider", "minimax") if isinstance(raw.get("llm"), dict) else "minimax",
-                    model=raw.get("llm", {}).get("model", "MiniMax-M2.5") if isinstance(raw.get("llm"), dict) else "MiniMax-M2.5",
+                    provider=raw.get("llm", {}).get("provider", DEFAULT_PROVIDER) if isinstance(raw.get("llm"), dict) else DEFAULT_PROVIDER,
+                    model=raw.get("llm", {}).get("model", DEFAULT_MODEL) if isinstance(raw.get("llm"), dict) else DEFAULT_MODEL,
                     temperature=raw.get("llm", {}).get("temperature", 0.7) if isinstance(raw.get("llm"), dict) else 0.7,
                     max_tokens=raw.get("llm", {}).get("max_tokens", 4096) if isinstance(raw.get("llm"), dict) else 4096,
                     skills=raw.get("skills", []),
