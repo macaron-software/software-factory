@@ -10,6 +10,7 @@ import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -90,19 +91,50 @@ async def lifespan(app: FastAPI):
     if _orphaned:
         logger.info("Marked %d orphaned active sessions as interrupted", _orphaned)
 
-    # Start MCP Platform Server (background, port 9501)
-    _mcp_proc = None
-    try:
+    # Start MCP servers with auto-restart watchdog
+    _mcp_procs: dict[str, Any] = {}
+
+    def _start_mcp(name: str, module: str, port: int):
+        """Start an MCP server subprocess, return Popen."""
         import subprocess as _sp
-        _mcp_proc = _sp.Popen(
-            [sys.executable, "-m", "platform.mcp_platform.server"],
+        log_file = Path(__file__).parent.parent / "data" / "logs" / f"mcp-{name}.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        fh = open(log_file, "a")
+        proc = _sp.Popen(
+            [sys.executable, "-m", module],
             cwd=str(Path(__file__).parent.parent),
             start_new_session=True,
-            stdout=_sp.DEVNULL, stderr=_sp.DEVNULL,
+            stdout=fh, stderr=_sp.STDOUT,
         )
-        logger.info("MCP Platform Server started (PID %d, port 9501)", _mcp_proc.pid)
+        logger.info("MCP %s started (PID %d, port %d)", name, proc.pid, port)
+        return proc
+
+    try:
+        _mcp_procs["platform"] = _start_mcp("platform", "platform.mcp_platform.server", 9501)
     except Exception as exc:
         logger.warning("MCP Platform Server failed to start: %s", exc)
+
+    try:
+        _mcp_procs["lrm"] = _start_mcp("lrm", "mcp_lrm.server_sse", 9500)
+    except Exception as exc:
+        logger.warning("MCP LRM Server failed to start: %s", exc)
+
+    async def _mcp_watchdog():
+        """Auto-restart MCP servers if they crash."""
+        while True:
+            await asyncio.sleep(30)
+            for name, info in [("platform", ("platform.mcp_platform.server", 9501)),
+                               ("lrm", ("mcp_lrm.server_sse", 9500))]:
+                proc = _mcp_procs.get(name)
+                if proc and proc.poll() is not None:
+                    logger.warning("MCP %s died (exit=%s), restarting...", name, proc.returncode)
+                    try:
+                        _mcp_procs[name] = _start_mcp(name, info[0], info[1])
+                    except Exception as e:
+                        logger.error("MCP %s restart failed: %s", name, e)
+
+    import asyncio
+    asyncio.create_task(_mcp_watchdog())
 
     # Periodic WAL checkpoint to prevent data loss on crash
     async def _wal_checkpoint_loop():
@@ -165,13 +197,15 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Stop MCP Platform Server
-    if _mcp_proc and _mcp_proc.poll() is None:
-        import os as _os
-        try:
-            _os.killpg(_os.getpgid(_mcp_proc.pid), 15)
-        except Exception:
-            _mcp_proc.terminate()
+    # Stop MCP servers
+    import os as _os
+    for name, proc in _mcp_procs.items():
+        if proc and proc.poll() is None:
+            try:
+                _os.killpg(_os.getpgid(proc.pid), 15)
+            except Exception:
+                proc.terminate()
+            logger.info("MCP %s stopped", name)
 
     # Cleanup LLM client
     try:

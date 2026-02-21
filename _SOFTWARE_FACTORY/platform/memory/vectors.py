@@ -26,10 +26,11 @@ from ..db.migrations import get_db
 
 logger = logging.getLogger(__name__)
 
-# Embedding config — uses Azure OpenAI text-embedding-3-small by default
+# Embedding config — uses Azure OpenAI text-embedding-3-small
+# NOTE: castudioia* endpoints are VNet-only (unusable from Docker) — use ascii-ui-openai
 _EMBEDDING_ENDPOINT = os.environ.get(
     "EMBEDDING_ENDPOINT",
-    os.environ.get("AZURE_OPENAI_ENDPOINT", "https://castudioiadevelopopenai.openai.azure.com").rstrip("/")
+    os.environ.get("AZURE_OPENAI_ENDPOINT", "https://ascii-ui-openai.openai.azure.com").rstrip("/")
     + "/openai/deployments/text-embedding-3-small/embeddings?api-version=2024-10-21"
 )
 _EMBEDDING_KEY_ENV = os.environ.get("EMBEDDING_KEY_ENV", "AZURE_OPENAI_API_KEY")
