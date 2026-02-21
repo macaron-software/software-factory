@@ -1,0 +1,942 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/css/ideation.css?v=20260221">
+
+<div class="idea-layout">
+
+    <!-- Chat area -->
+    <div class="idea-chat" style="position:relative;overflow:hidden">
+
+        <!-- History toggle -->
+        <button class="idea-history-btn" onclick="toggleSidebar()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+            {{ past_sessions|length if past_sessions else 0 }}
+        </button>
+
+        <!-- History sidebar -->
+        <div class="idea-sidebar" id="ideaSidebar">
+            <div class="idea-sidebar-header">
+                <span class="idea-sidebar-title">{{ _("historique") }}</span>
+                <button class="idea-sidebar-close" onclick="toggleSidebar()">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="idea-sidebar-list" id="ideaSidebarList">
+                {% for s in past_sessions %}
+                <div class="idea-sidebar-item" onclick="loadPastSession('{{ s.id }}')">
+                    <div class="idea-sidebar-item-title">{{ s.title or 'Sans titre' }}</div>
+                    <div class="idea-sidebar-item-meta">
+                        <span class="idea-sidebar-badge {{ s.status }}">{{ s.status }}</span>
+                        <span>{{ s.created_at[:10] if s.created_at else '' }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+                {% if not past_sessions %}
+                <div style="text-align:center;padding:1rem;font-size:0.7rem;color:var(--text-tertiary)">{{ _('no_history') }}</div>
+                {% endif %}
+            </div>
+            <div class="idea-sidebar-footer">
+                <a href="/ideation/history" style="font-size:0.7rem;color:var(--purple);text-decoration:none">{{ _("voir_tout_l_historique") }}</a>
+            </div>
+        </div>
+        <div class="idea-messages" id="ideaMessages">
+            <div class="idea-empty" id="ideaPlaceholder">
+                <svg><use href="#icon-compass"/></svg>
+                <div class="idea-empty-title">{{ _('ideation_workshop') }}</div>
+                <div class="idea-empty-subtitle">
+                    {{ _('ideation_subtitle') }}
+                </div>
+                <div class="idea-examples">
+                    <button class="idea-example" onclick="setPrompt(this.textContent)">{{ _('idea_ex_rideshare') }}</button>
+                    <button class="idea-example" onclick="setPrompt(this.textContent)">{{ _('idea_ex_iot') }}</button>
+                    <button class="idea-example" onclick="setPrompt(this.textContent)">{{ _('idea_ex_migration') }}</button>
+                    <button class="idea-example" onclick="setPrompt(this.textContent)">{{ _('idea_ex_chatbot') }}</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="idea-input-bar">
+            <textarea class="idea-input" id="ideaInput" rows="1"
+                placeholder="{{ _('ideation_placeholder') }}"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendIdea()}"></textarea>
+            <button class="idea-send" id="ideaSend" onclick="sendIdea()">
+                <svg><use href="#icon-send"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Right panel -->
+    <div class="idea-panel">
+
+        <!-- Agent Graph -->
+        <div class="idea-graph">
+            <div class="idea-graph-header" onclick="toggleIdeaGraph()">
+                <div class="idea-graph-title">
+                    <svg><use href="#icon-git-branch"/></svg> Organisation &amp; Flow
+                </div>
+                <svg class="idea-graph-toggle open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+            <div class="idea-graph-canvas" id="ideaGraphCanvas">
+                <svg id="ideaGraphSvg" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <marker id="ig-arrow-network" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M0,0 L10,5 L0,10 z" fill="#8b5cf6" opacity="0.8"/>
+                        </marker>
+                        <marker id="ig-arrow-sequential" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M0,0 L10,5 L0,10 z" fill="#3b82f6" opacity="0.8"/>
+                        </marker>
+                        <marker id="ig-arrow-report" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M0,0 L10,5 L0,10 z" fill="#ef4444" opacity="0.8"/>
+                        </marker>
+                        <marker id="ig-arrow-hierarchical" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b" opacity="0.8"/>
+                        </marker>
+                    </defs>
+                    <g id="ideaEdges"></g>
+                    <g id="ideaNodes"></g>
+                </svg>
+            </div>
+            <div class="idea-graph-legend" id="ideaGraphLegend"></div>
+        </div>
+
+        <!-- Popover overlay -->
+        <div class="ig-popover-overlay" id="igOverlay" onclick="closeIgPopover()"></div>
+        <div class="ig-popover" id="igPopover">
+            <div class="ig-popover-header">
+                <div id="igPopAvatar"></div>
+                <div class="ig-popover-info">
+                    <div class="ig-popover-name" id="igPopName"></div>
+                    <div class="ig-popover-role" id="igPopRole"></div>
+                </div>
+                <button class="ig-popover-close" onclick="closeIgPopover()">
+                    <svg class="icon icon-sm"><use href="#icon-x"/></svg>
+                </button>
+            </div>
+            <div class="ig-popover-body" id="igPopBody"></div>
+        </div>
+
+        <!-- Agent roster -->
+        <div class="idea-agents">
+            <div class="idea-agents-title">
+                <svg><use href="#icon-users"/></svg> {{ _('mobilized_agents') }}
+            </div>
+            {% for a in agents %}
+            <div class="idea-agent-row" id="agent-{{ a.id }}">
+                <span class="idea-agent-dot idle" id="dot-{{ a.id }}"></span>
+                <span class="idea-agent-label">{{ a.name }}</span>
+                <span class="idea-agent-role">{{ a.short_role }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Structured findings -->
+        <div class="idea-output">
+            <div class="idea-output-title">
+                <svg><use href="#icon-target"/></svg> {{ _('synthesis') }}
+            </div>
+            <div id="ideaFindings">
+                <div class="idea-output-empty">{{ _('ideation_empty_findings') }}</div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="idea-output">
+            <div class="idea-output-title">
+                <svg><use href="#icon-lightning"/></svg> Actions
+            </div>
+
+            <!-- Project selector -->
+            <div style="margin-bottom:0.5rem">
+                <label style="font-size:0.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:700">{{ _("project") }}</label>
+                <select id="ideaProjectSelect" class="input-agent-select" style="width:100%;margin-top:0.25rem">
+                    <option value="">{{ _('new_project') }}</option>
+                    {% for p in projects %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- PO Proposal (filled after analysis) -->
+            <div id="poProposalPanel" style="display:none;margin-bottom:0.5rem">
+                <label style="font-size:0.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:700">
+                    <svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-clipboard"/></svg> Proposition PO
+                </label>
+                <div id="poProposalContent" style="margin-top:0.25rem;padding:0.5rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;font-size:0.78rem;line-height:1.5"></div>
+            </div>
+
+            <div id="ideaActions" style="display:flex;flex-direction:column;gap:0.4rem">
+                <button class="pm-filter" style="width:100%;text-align:left;opacity:.5;pointer-events:none" id="btnCreateEpic">
+                    <svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-rocket"/></svg>
+                    {{ _('create_epic') }}
+                </button>
+                <button class="pm-filter" style="width:100%;text-align:left;opacity:.5;pointer-events:none" id="btnGenerateTeam">
+                    <svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-users"/></svg>
+                    {{ _('generate_team') }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ── Ideation Graph Data ── */
+const igAgents = {{ agents | tojson }};
+const IG_NW = 130, IG_NH = 56;
+
+// Graph layout: Product Manager at top (orchestrator), 4 experts below in a network
+const igNodes = [
+    {id: 'product_manager', x: 130, y: 10, rank: 0},
+    {id: 'metier',          x: 10,  y: 110, rank: 1},
+    {id: 'architecte',      x: 90,  y: 200, rank: 1},
+    {id: 'ux_designer',     x: 180, y: 110, rank: 1},
+    {id: 'securite',        x: 260, y: 200, rank: 1},
+];
+const igEdges = [
+    {from: 'product_manager', to: 'metier',      pattern: 'hierarchical', label: 'brief'},
+    {from: 'product_manager', to: 'architecte',   pattern: 'hierarchical', label: 'brief'},
+    {from: 'product_manager', to: 'ux_designer',  pattern: 'hierarchical', label: 'brief'},
+    {from: 'product_manager', to: 'securite',     pattern: 'hierarchical', label: 'brief'},
+    {from: 'metier',          to: 'architecte',   pattern: 'network',      label: 'challenge'},
+    {from: 'architecte',      to: 'securite',     pattern: 'network',      label: 'review'},
+    {from: 'ux_designer',     to: 'metier',       pattern: 'network',      label: 'feedback'},
+    {from: 'metier',          to: 'product_manager', pattern: 'report',    label: 'synthèse'},
+    {from: 'securite',        to: 'product_manager', pattern: 'report',    label: 'risques'},
+];
+
+const IG_PATTERNS = {
+    network:      {color:'#8b5cf6', dash:'2 4 8 4', label:'Network'},
+    hierarchical: {color:'#f59e0b', dash:'',         label:'Hierarchical'},
+    sequential:   {color:'#3b82f6', dash:'',         label:'Sequential'},
+    report:       {color:'#ef4444', dash:'3 3',       label:'Report'},
+};
+
+function igAgent(id){ return igAgents.find(a=>a.id===id); }
+function igEsc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function renderIdeaGraph(){
+    const svg = document.getElementById('ideaGraphSvg');
+    const W = 400, H = 280;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+    // Edges
+    const edgesG = document.getElementById('ideaEdges');
+    edgesG.innerHTML = '';
+    const activePatterns = new Set();
+    igEdges.forEach(e=>{
+        const fn = igNodes.find(n=>n.id===e.from);
+        const tn = igNodes.find(n=>n.id===e.to);
+        if(!fn||!tn) return;
+        const style = IG_PATTERNS[e.pattern] || IG_PATTERNS.network;
+        activePatterns.add(e.pattern);
+
+        const x1 = fn.x + IG_NW/2, y1 = fn.y + IG_NH;
+        const x2 = tn.x + IG_NW/2, y2 = tn.y;
+        const dy = tn.y - fn.y, dx = tn.x - fn.x;
+
+        let d, mx, my;
+        if(Math.abs(dy) < IG_NH * 0.8){
+            // Horizontal connection
+            const lx = dx>0 ? fn.x+IG_NW : fn.x;
+            const ly = fn.y+IG_NH/2;
+            const rx = dx>0 ? tn.x : tn.x+IG_NW;
+            const ry = tn.y+IG_NH/2;
+            const mid = Math.min(ly, ry) - 25;
+            d = `M${lx},${ly} C${lx},${mid} ${rx},${mid} ${rx},${ry}`;
+            mx = (lx+rx)/2; my = (ly+ry)/2 - 8;
+        } else if(dy > 0){
+            const co = Math.max(20, Math.abs(dy)*0.35);
+            d = `M${x1},${y1} C${x1},${y1+co} ${x2},${y2-co} ${x2},${y2}`;
+            mx = (x1+x2)/2; my = (y1+y2)/2 - 4;
+        } else {
+            const co = Math.max(20, Math.abs(dy)*0.35);
+            d = `M${x1},${fn.y} C${x1},${fn.y-co} ${x2},${tn.y+IG_NH+co} ${x2},${tn.y+IG_NH}`;
+            mx = (x1+x2)/2; my = (fn.y+tn.y+IG_NH)/2 - 4;
+        }
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+        path.setAttribute('d', d);
+        path.setAttribute('class','ig-edge');
+        path.style.stroke = style.color;
+        path.style.markerEnd = `url(#ig-arrow-${e.pattern})`;
+        if(style.dash) path.style.strokeDasharray = style.dash;
+        edgesG.appendChild(path);
+
+        if(e.label){
+            const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+            lbl.setAttribute('class','ig-edge-label');
+            lbl.setAttribute('x', mx); lbl.setAttribute('y', my);
+            lbl.style.fill = style.color;
+            lbl.textContent = e.label;
+            edgesG.appendChild(lbl);
+        }
+    });
+
+    // Nodes
+    const nodesG = document.getElementById('ideaNodes');
+    nodesG.innerHTML = '';
+    igNodes.forEach(n=>{
+        const agent = igAgent(n.id);
+        const col = agent ? agent.color : '#7c3aed';
+        const name = agent ? agent.name : n.id;
+        const role = agent ? agent.short_role : '';
+        const avatarUrl = agent ? agent.avatar_url : '';
+
+        const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+        g.setAttribute('class','ig-node');
+        g.setAttribute('transform',`translate(${n.x},${n.y})`);
+
+        const avatarR = 14, avatarCx = 20, avatarCy = IG_NH/2;
+        const avatarSvg = avatarUrl
+            ? `<clipPath id="ig-clip-${n.id}"><circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}"/></clipPath>
+               <image href="${avatarUrl}" x="${avatarCx-avatarR}" y="${avatarCy-avatarR}" width="${avatarR*2}" height="${avatarR*2}" clip-path="url(#ig-clip-${n.id})"/>`
+            : `<circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}" fill="${col}" opacity="0.25"/>
+               <text x="${avatarCx}" y="${avatarCy+4}" text-anchor="middle" style="font-size:10px;fill:${col};font-weight:700">${igEsc(name.substring(0,2))}</text>`;
+
+        g.innerHTML = `
+            <rect class="ig-node-bg" width="${IG_NW}" height="${IG_NH}"/>
+            <line class="ig-node-bar" x1="0" y1="0" x2="${IG_NW}" y2="0" stroke="${col}" stroke-width="3"/>
+            ${avatarSvg}
+            <text class="ig-node-name" x="40" y="22">${igEsc(name.length>14?name.substring(0,13)+'…':name)}</text>
+            <text class="ig-node-role" x="40" y="36">${igEsc(role)}</text>
+            <circle class="ig-node-dot" cx="${IG_NW-12}" cy="14" fill="${col}" opacity="0.6"/>
+        `;
+        g.addEventListener('click', (ev)=>{ ev.stopPropagation(); showIgPopover(n.id, ev); });
+        g.dataset.agent = n.id;
+        nodesG.appendChild(g);
+    });
+
+    // Legend
+    const legendEl = document.getElementById('ideaGraphLegend');
+    legendEl.innerHTML = '';
+    activePatterns.forEach(p=>{
+        const s = IG_PATTERNS[p]; if(!s) return;
+        const item = document.createElement('div');
+        item.className = 'idea-graph-legend-item';
+        item.innerHTML = `
+            <svg width="28" height="10"><line x1="0" y1="5" x2="20" y2="5" stroke="${s.color}" stroke-width="2" ${s.dash?`stroke-dasharray="${s.dash}"`:''}/><polygon points="20,1 28,5 20,9" fill="${s.color}" opacity="0.8"/></svg>
+            <span>${s.label}</span>`;
+        legendEl.appendChild(item);
+    });
+}
+
+function toggleIdeaGraph(){
+    const canvas = document.getElementById('ideaGraphCanvas');
+    const legend = document.getElementById('ideaGraphLegend');
+    const toggle = document.querySelector('.idea-graph-toggle');
+    const hidden = canvas.style.display === 'none';
+    canvas.style.display = hidden ? '' : 'none';
+    legend.style.display = hidden ? '' : 'none';
+    toggle.classList.toggle('open', hidden);
+}
+
+function showIgPopover(agentId, ev){
+    const agent = igAgent(agentId); if(!agent) return;
+    const overlay = document.getElementById('igOverlay');
+    const pop = document.getElementById('igPopover');
+
+    // Avatar
+    const avatarEl = document.getElementById('igPopAvatar');
+    if(agent.avatar_url){
+        avatarEl.innerHTML = `<img class="ig-popover-avatar" src="${agent.avatar_url}" alt="${igEsc(agent.name)}">`;
+    } else {
+        avatarEl.innerHTML = `<div class="ig-popover-avatar-fallback" style="background:${agent.color}">${igEsc(agent.name.substring(0,2))}</div>`;
+    }
+    document.getElementById('igPopName').textContent = agent.name;
+    document.getElementById('igPopRole').textContent = agent.short_role || '';
+
+    // Body
+    let html = '';
+    if(agent.tagline) html += `<div class="ig-popover-text" style="font-style:italic;font-size:0.75rem;color:var(--text-secondary)">${igEsc(agent.tagline)}</div>`;
+    if(agent.persona){
+        html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-user"/></svg> Persona</div>
+                  <div class="ig-popover-text">${igEsc(agent.persona.substring(0,300))}${agent.persona.length>300?'…':''}</div></div>`;
+    }
+    if(agent.motivation){
+        html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-zap"/></svg> Motivation</div>
+                  <div class="ig-popover-text">${igEsc(agent.motivation)}</div></div>`;
+    }
+    if(agent.skills && agent.skills.length){
+        html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-layers"/></svg> Skills (${agent.skills.length})</div>
+                  <div class="ig-popover-tags">${agent.skills.map(s=>`<span class="ig-popover-tag skill">${igEsc(s)}</span>`).join('')}</div></div>`;
+    }
+    if(agent.tools && agent.tools.length){
+        html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-settings"/></svg> Tools (${agent.tools.length})</div>
+                  <div class="ig-popover-tags">${agent.tools.map(t=>`<span class="ig-popover-tag tool">${igEsc(t)}</span>`).join('')}</div></div>`;
+    }
+    if(agent.model || agent.provider){
+        html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-brain"/></svg> LLM</div>
+                  <span class="ig-popover-tag">${igEsc((agent.provider||'')+' '+(agent.model||'default'))}</span></div>`;
+    }
+    document.getElementById('igPopBody').innerHTML = html;
+
+    // Position near click
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let left = ev.clientX + 12, top = ev.clientY - 20;
+    if(left + 330 > vw) left = vw - 340;
+    if(top + 350 > vh) top = Math.max(10, vh - 400);
+    pop.style.left = left + 'px'; pop.style.top = top + 'px';
+
+    overlay.classList.add('visible');
+    pop.classList.add('visible');
+}
+function closeIgPopover(){
+    document.getElementById('igOverlay').classList.remove('visible');
+    document.getElementById('igPopover').classList.remove('visible');
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeIgPopover(); });
+
+// Render on load (works both standalone and when injected via htmx)
+if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', renderIdeaGraph);
+} else {
+    renderIdeaGraph();
+}
+
+/* ── Ideation Chat ── */
+const messagesEl = document.getElementById('ideaMessages');
+const inputEl = document.getElementById('ideaInput');
+const sendBtn = document.getElementById('ideaSend');
+const placeholder = document.getElementById('ideaPlaceholder');
+const findingsEl = document.getElementById('ideaFindings');
+let sessionId = '';
+
+// Lightweight markdown renderer (same as session_live.html)
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function cleanLLM(s){
+  s = s.replace(/<think>[\s\S]*?<\/think>/g, '');
+  s = s.replace(/<think>[\s\S]*$/, '');
+  s = s.replace(/\[TOOL_CALL\][\s\S]*?\[\/TOOL_CALL\]/g, '');
+  s = s.replace(/\[TOOL_CALL\][\s\S]*$/, '');
+  s = s.replace(/\[(DELEGATE|VETO|APPROVE|ASK|ESCALATE)[^\]]*\]/g, '');
+  return s.trim();
+}
+function md(s){
+  s = cleanLLM(s);
+  if (!s) return '';
+  let h = esc(s);
+  h = h.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+  h = h.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+  h = h.replace(/^# (.+)$/gm, '<h2>$1</h2>');
+  h = h.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+  h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  h = h.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  h = h.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  h = h.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)*)/gm, (m, hdr, sep, body)=>{
+    const th = hdr.split('|').filter(c=>c.trim()).map(c=>`<th>${c.trim()}</th>`).join('');
+    const rows = body.trim().split('\n').map(r=>{
+      const cells = r.split('|').filter(c=>c.trim()).map(c=>`<td>${c.trim()}</td>`).join('');
+      return `<tr>${cells}</tr>`;
+    }).join('');
+    return `<table><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table>`;
+  });
+  h = h.replace(/^---$/gm, '<hr>');
+  h = h.replace(/^- (.+)$/gm, '<li>$1</li>');
+  h = h.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
+  h = h.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+  // @mentions
+  h = h.replace(/@(\w[\w\s]*?)(?=[\s,.:!?<]|$)/g, '<span style="color:var(--purple);font-weight:600">@$1</span>');
+  h = h.replace(/\n/g, '<br>');
+  return h;
+}
+
+function setPrompt(text) {
+    inputEl.value = text;
+    inputEl.focus();
+}
+
+function addMsg(agent, name, content, color, avatarUrl, role, targetAgent, patternType) {
+    if (placeholder) placeholder.style.display = 'none';
+    const isUser = agent === 'user';
+    const isSystem = agent === 'system';
+    const div = document.createElement('div');
+    div.className = `mu mu--chat ${isUser ? 'mu--user' : 'mu--agent'}`;
+
+    const icon = isUser ? '' : (avatarUrl
+        ? `<img src="${avatarUrl}" alt="${name}">`
+        : `<svg class="icon icon-sm" style="color:${color||'#8b949e'}"><use href="#icon-bot"/></svg>`);
+    const avatarHtml = isUser ? '' : `<div class="mu__avatar" style="background:${color||'#8b949e'}20;border-color:${color||'#8b949e'}">${icon}</div>`;
+
+    const roleHtml = role && !isUser && !isSystem
+        ? `<span class="mu__role">${role}</span>` : '';
+    const patternHtml = patternType && !isUser && !isSystem
+        ? `<span class="mu__pattern">(${patternType})</span>` : '';
+    const targetHtml = targetAgent && !isUser
+        ? `<span class="mu__arrow">→</span><span class="mu__target">@${targetAgent}</span>` : '';
+
+    // Highlight @mentions in content
+    const rendered = content.replace(/@(\w[\w\s]*?)(?=[\s,.:!?]|$)/g,
+        '<span style="color:var(--purple);font-weight:600">@$1</span>');
+
+    div.innerHTML = `
+        ${avatarHtml}
+        <div class="mu__bubble ${isUser ? 'mu__bubble--user' : 'mu__bubble--agent'}">
+            ${!isUser ? `<div class="mu__sender">
+                <span class="mu__name" style="color:${color||'var(--text-secondary)'}">${name}</span>
+                ${roleHtml}${patternHtml}${targetHtml}
+            </div>` : ''}
+            <div class="mu__content md-rendered">${rendered}</div>
+        </div>`;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function addPhaseHeader(title, subtitle) {
+    const div = document.createElement('div');
+    div.style.cssText = 'text-align:center;margin:0.8rem 0 0.4rem;padding:0.3rem 0';
+    div.innerHTML = `<div style="font-size:0.7rem;font-weight:700;color:var(--purple);letter-spacing:.5px">${title}</div>
+        <div style="font-size:0.6rem;color:var(--text-muted)">${subtitle}</div>`;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function addFinding(type, text) {
+    const empty = findingsEl.querySelector('.idea-output-empty');
+    if (empty) empty.remove();
+    const div = document.createElement('div');
+    div.className = 'idea-finding';
+    div.innerHTML = `<div class="idea-finding-type ${type}">${type}</div><div class="idea-finding-text">${text}</div>`;
+    findingsEl.appendChild(div);
+}
+
+function setAgentStatus(agentId, status) {
+    // Roster dot
+    const dot = document.getElementById('dot-' + agentId);
+    if (dot) { dot.className = 'idea-agent-dot ' + status; }
+    // Graph node
+    const nodeG = document.querySelector(`.ig-node[data-agent="${agentId}"]`);
+    if(nodeG){
+        nodeG.classList.remove('active','thinking');
+        if(status === 'thinking') nodeG.classList.add('thinking');
+        else if(status === 'speaking') nodeG.classList.add('active');
+    }
+}
+
+function setEdgeActive(fromId, toId, active){
+    document.querySelectorAll('#ideaEdges .ig-edge').forEach(p=>{
+        if(p.dataset.from===fromId && p.dataset.to===toId){
+            p.classList.toggle('flowing', active);
+            p.classList.toggle('active', active);
+        }
+    });
+}
+
+function resetGraphState(){
+    document.querySelectorAll('.ig-node').forEach(n=> n.classList.remove('active','thinking'));
+    document.querySelectorAll('.ig-edge').forEach(e=> e.classList.remove('active','flowing'));
+    document.querySelectorAll('.idea-agent-dot').forEach(d => d.className = 'idea-agent-dot idle');
+}
+
+// Flow order: PM briefs → experts think in parallel → experts report back → PM synthesizes
+const FLOW_SEQUENCE = [
+    {phase:'brief', agents:['product_manager'], edges:[
+        ['product_manager','metier'],['product_manager','architecte'],
+        ['product_manager','ux_designer'],['product_manager','securite']
+    ]},
+    {phase:'analyze', agents:['metier','architecte','ux_designer','securite'], edges:[
+        ['metier','architecte'],['architecte','securite'],['ux_designer','metier']
+    ]},
+    {phase:'report', agents:['product_manager'], edges:[
+        ['metier','product_manager'],['securite','product_manager']
+    ]},
+];
+
+async function sendIdea() {
+    const text = inputEl.value.trim();
+    if (!text) return;
+    inputEl.value = '';
+    sendBtn.disabled = true;
+
+    addMsg('user', 'Vous', text, '', '');
+    originalPrompt = originalPrompt || text;
+
+    // Agent role map for display
+    // Build from DB data — no hardcoding
+    const ROLES = {}; const COLORS = {};
+    igAgents.forEach(a => { ROLES[a.id] = a.short_role || a.role || a.id; COLORS[a.id] = a.color || '#8b949e'; });
+
+    // Build metadata tags for bubble header
+    function metaTags(evt) {
+        const parts = [];
+        if (evt.pattern_type) parts.push(`<span class="mu__tag mu__tag--pattern">${evt.pattern_type}</span>`);
+        if (evt.flow_step) parts.push(`<span class="mu__tag mu__tag--flow">${evt.flow_step}</span>`);
+        if (evt.to_agent && evt.to_agent !== 'all') {
+            const names = evt.to_agent.split(',').map(id => {
+                const a = igAgents.find(x => x.id === id.trim());
+                return a ? a.name.split(' ')[0] : id;
+            });
+            parts.push(`<span class="mu__tag mu__tag--to">→ ${names.join(', ')}</span>`);
+        } else if (evt.to_agent === 'all') {
+            parts.push(`<span class="mu__tag mu__tag--to">→ Équipe</span>`);
+        }
+        return parts.length ? `<div class="mu__meta">${parts.join(' ')}</div>` : '';
+    }
+
+    addPhaseHeader(_('ideation_in_progress'), _('ideation_realtime'));
+
+    try {
+        // Start the real pattern engine
+        const resp = await fetch('/api/ideation', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({prompt: text, session_id: sessionId}),
+        });
+        if (!resp.ok) {
+            addMsg('system', 'Système', `${_('error')} (${resp.status})`, 'var(--red)', '');
+            sendBtn.disabled = false;
+            return;
+        }
+        let data;
+        try { data = await resp.json(); } catch(e) {
+            addMsg('system', 'Système', 'Réponse serveur invalide', 'var(--red)', '');
+            sendBtn.disabled = false;
+            return;
+        }
+        if (data.error) {
+            addMsg('system', 'Système', data.error, 'var(--red)', '');
+            sendBtn.disabled = false;
+            return;
+        }
+
+        sessionId = data.session_id;
+
+        // Connect to SSE — receive REAL streaming from pattern engine
+        const es = new EventSource(`/api/sessions/${sessionId}/sse`);
+        let currentStreamAgent = null;
+        let streamBuffer = '';
+        let currentPatternType = '';
+        let msgCounter = 0;  // unique ID per bubble (agents can speak multiple times)
+
+        es.onmessage = function(event) {
+            const evt = JSON.parse(event.data);
+
+            if (evt.type === 'agent_status') {
+                const status = evt.status === 'thinking' ? 'thinking'
+                    : evt.status === 'idle' ? 'idle' : 'speaking';
+                setAgentStatus(evt.agent_id, status);
+            }
+            else if (evt.type === 'stream_start') {
+                const bubbleId = `stream-${evt.agent_id}-${++msgCounter}`;
+                currentStreamAgent = evt.agent_id;
+                currentPatternType = evt.pattern_type || '';
+                // Track per-agent buffer for parallel streams
+                if (!window._streamBuffers) window._streamBuffers = {};
+                window._streamBuffers[evt.agent_id] = '';
+                window._streamBubbles = window._streamBubbles || {};
+                window._streamBubbles[evt.agent_id] = bubbleId;
+                setAgentStatus(evt.agent_id, 'speaking');
+                igEdges.filter(e => e.from === evt.agent_id).forEach(e => setEdgeActive(e.from, e.to, true));
+                const agentName = evt.agent_name || ROLES[evt.agent_id] || evt.agent_id;
+                const color = COLORS[evt.agent_id] || '#8b949e';
+                const agent = igAgent(evt.agent_id);
+                const div = document.createElement('div');
+                div.className = 'mu mu--chat mu--agent';
+                div.id = bubbleId;
+                const icon = agent?.avatar_url
+                    ? `<img src="${agent.avatar_url}" alt="${agentName}">`
+                    : `<svg class="icon icon-sm" style="color:${color}"><use href="#icon-bot"/></svg>`;
+                div.innerHTML = `
+                    <div class="mu__avatar" style="background:${color}20;border-color:${color}">${icon}</div>
+                    <div class="mu__bubble mu__bubble--agent">
+                        <div class="mu__sender">
+                            <span class="mu__name" style="color:${color}">${agentName}</span>
+                            <span class="mu__role">${ROLES[evt.agent_id] || ''}</span>
+                        </div>
+                        ${metaTags(evt)}
+                        <div class="mu__content md-rendered" id="content-${bubbleId}">
+                            <span class="typing-indicator"><span></span><span></span><span></span></span>
+                        </div>
+                    </div>`;
+                messagesEl.appendChild(div);
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
+            else if (evt.type === 'stream_delta' && evt.agent_id) {
+                if (!window._streamBuffers) window._streamBuffers = {};
+                window._streamBuffers[evt.agent_id] = (window._streamBuffers[evt.agent_id] || '') + evt.delta;
+                const bubbleId = (window._streamBubbles || {})[evt.agent_id];
+                let el = bubbleId ? document.getElementById(`content-${bubbleId}`) : null;
+                if (!el) {
+                    // stream_start was missed — create container now
+                    const fallbackId = `stream-${evt.agent_id}-${++msgCounter}`;
+                    window._streamBubbles = window._streamBubbles || {};
+                    window._streamBubbles[evt.agent_id] = fallbackId;
+                    const agentName = ROLES[evt.agent_id] || evt.agent_id;
+                    const color = COLORS[evt.agent_id] || '#8b949e';
+                    const agent = igAgent(evt.agent_id);
+                    const div = document.createElement('div');
+                    div.className = 'mu mu--chat mu--agent';
+                    div.id = fallbackId;
+                    const icon = agent?.avatar_url
+                        ? `<img src="${agent.avatar_url}" alt="${agentName}">`
+                        : `<svg class="icon icon-sm" style="color:${color}"><use href="#icon-bot"/></svg>`;
+                    div.innerHTML = `
+                        <div class="mu__avatar" style="background:${color}20;border-color:${color}">${icon}</div>
+                        <div class="mu__bubble mu__bubble--agent">
+                            <div class="mu__sender">
+                                <span class="mu__name" style="color:${color}">${agentName}</span>
+                                <span class="mu__role">${ROLES[evt.agent_id] || ''}</span>
+                            </div>
+                            ${metaTags(evt)}
+                            <div class="mu__content md-rendered" id="content-${fallbackId}"></div>
+                        </div>`;
+                    messagesEl.appendChild(div);
+                    el = div.querySelector(`#content-${fallbackId}`);
+                }
+                if (el) {
+                    el.innerHTML = md(window._streamBuffers[evt.agent_id]);
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                }
+            }
+            else if (evt.type === 'stream_end' && evt.agent_id) {
+                igEdges.filter(e => e.from === evt.agent_id).forEach(e => setEdgeActive(e.from, e.to, false));
+                setAgentStatus(evt.agent_id, 'idle');
+                const bubbleId = (window._streamBubbles || {})[evt.agent_id];
+                const el = bubbleId ? document.getElementById(`content-${bubbleId}`) : null;
+                if (el && evt.content) {
+                    el.innerHTML = md(evt.content);
+                }
+                if (window._streamBuffers) delete window._streamBuffers[evt.agent_id];
+                if (window._streamBubbles) delete window._streamBubbles[evt.agent_id];
+                // Populate synthesis panel when PO finishes the synthesis step
+                if (evt.flow_step === 'Synthèse' && evt.content) {
+                    const findings = document.getElementById('ideaFindings');
+                    if (findings) findings.innerHTML = `<div class="md-rendered">${md(evt.content)}</div>`;
+                }
+            }
+            // stream_thinking: agent is in <think> phase, keep typing indicator alive
+            else if (evt.type === 'stream_thinking' && evt.agent_id) {
+                // noop — just keeps SSE alive and confirms agent is working
+            }
+            // message events are handled by stream_start/delta/end above
+            // Only create bubble for non-streamed messages (errors, system)
+            else if (evt.type === 'message' && evt.from_agent && evt.from_agent !== 'user' && evt.from_agent !== 'system') {
+                // noop — streaming already rendered this
+            }
+            else if (evt.type === 'pattern_end') {
+                es.close();
+                // Fetch all messages to fill any missed during streaming
+                fetch(`/api/sessions/${sessionId}/messages/json`)
+                    .then(r => r.ok ? r.json() : [])
+                    .then(msgs => {
+                        const synthesis = [...msgs].reverse().find(m => m.agent_id === 'product_manager');
+                        if (synthesis) {
+                            const findings = document.getElementById('ideaFindings');
+                            if (findings) findings.innerHTML = `<div class="md-rendered">${md(synthesis.content)}</div>`;
+                        }
+                        for (const m of msgs) {
+                            const bubbleId = window._streamBubbles?.[m.agent_id];
+                            if (bubbleId) {
+                                const el = document.getElementById(`content-${bubbleId}`);
+                                if (el && (!el.textContent || el.querySelector('.typing-indicator'))) {
+                                    el.innerHTML = md(m.content);
+                                }
+                            }
+                        }
+                    }).catch(() => {});
+                resetGraphState();
+                sendBtn.disabled = false;
+                document.getElementById('btnCreateEpic').style.opacity = '1';
+                document.getElementById('btnCreateEpic').style.pointerEvents = 'auto';
+                document.getElementById('btnGenerateTeam').style.opacity = '1';
+                document.getElementById('btnGenerateTeam').style.pointerEvents = 'auto';
+            }
+        };
+
+        es.onerror = function(e) {
+            // SSE auto-reconnects by default; only close if readyState is CLOSED
+            if (es.readyState === EventSource.CLOSED) {
+                resetGraphState();
+                sendBtn.disabled = false;
+            }
+            // Otherwise let browser auto-reconnect
+        };
+
+    } catch (e) {
+        resetGraphState();
+        addMsg('system', 'System', _('error') + ': ' + e.message, 'var(--red)', '');
+        sendBtn.disabled = false;
+    }
+}
+
+function sleep(ms){ return new Promise(r=> setTimeout(r, ms)); }
+
+// Collect findings from the panel
+function collectFindings() {
+    const items = document.querySelectorAll('.idea-finding');
+    return Array.from(items).map(el => {
+        const type = el.querySelector('.idea-finding-type')?.textContent?.trim() || '';
+        const text = el.querySelector('.idea-finding-text')?.textContent?.trim() || '';
+        return {type, text};
+    });
+}
+
+// Collect the original prompt
+let originalPrompt = '';
+let lastRequestType = 'new_feature';
+let lastPoProposal = {};
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+
+// Create epic from idea — PO agent structures everything
+document.getElementById('btnCreateEpic').addEventListener('click', async () => {
+    if (!sessionId && !originalPrompt) return;
+    const btn = document.getElementById('btnCreateEpic');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="icon icon-xs spin" style="vertical-align:-2px"><use href="#icon-loader"/></svg> Alexandre Faure (PO) structure le projet...';
+
+    const poAvatar = igAgents.find(a=>a.id==='product_manager')?.avatar_url || '';
+    addMsg('agent', 'Alexandre Faure', 'Je prends le relai ! Structuration du projet, epic, features et user stories en cours...', 'var(--green)', poAvatar);
+
+    // Progress messages while LLM works
+    const progressMsgs = [
+        {t: 8000,  txt: 'Analyse des contributions de l\'équipe...'},
+        {t: 20000, txt: 'Structuration de l\'epic et des features...'},
+        {t: 35000, txt: 'Rédaction des user stories...'},
+        {t: 50000, txt: 'Finalisation du backlog...'},
+    ];
+    let epicDone = false;
+    const progressTimers = progressMsgs.map(p => setTimeout(() => {
+        if (!epicDone) addMsg('agent', 'Alexandre Faure', p.txt, 'var(--green)', poAvatar);
+    }, p.t));
+
+    const findings = collectFindings();
+    const description = findings.map(f => `[${f.type.toUpperCase()}] ${f.text}`).join('\n');
+
+    // Collect agent messages as context
+    const msgs = document.querySelectorAll('.idea-msg');
+    let agentAnalysis = description;
+    msgs.forEach(m => {
+        const name = m.querySelector('.idea-msg-name')?.textContent || '';
+        const text = m.querySelector('.idea-msg-body')?.textContent || '';
+        if (name && text && name !== 'Système' && name !== 'Vous') {
+            agentAnalysis += `\n\n[${name}]: ${text}`;
+        }
+    });
+
+    try {
+        const resp = await fetch('/api/ideation/create-epic', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                session_id: sessionId,
+                name: originalPrompt.substring(0, 100) || 'Epic from ideation',
+                description: agentAnalysis,
+                goal: originalPrompt,
+            }),
+        });
+        const data = await resp.json();
+        epicDone = true;
+        progressTimers.forEach(clearTimeout);
+        if (data.redirect) {
+            const featCount = (data.features || []).length;
+            const storyCount = (data.features || []).reduce((s,f) => s + (f.stories||[]).length, 0);
+            const typeBadge = data.type ? `[${data.type.toUpperCase()}] ` : '';
+            const wfBadge = data.workflow_id ? ` → Workflow: ${data.workflow_id}` : '';
+            addMsg('agent', 'Alexandre Faure',
+                `${typeBadge}Projet <strong>${esc(data.project_name)}</strong> créé !${wfBadge}\n` +
+                `Epic: <strong>${esc(data.mission_name)}</strong>\n` +
+                `${featCount} features, ${storyCount} user stories\n` +
+                `Stack: ${(data.stack||[]).join(', ')}\n` +
+                `Redirection vers l'overview...`,
+                'var(--green)',
+                igAgents.find(a=>a.id==='product_manager')?.avatar_url || '');
+            setTimeout(() => { window.location.href = data.redirect; }, 2000);
+        } else if (data.error) {
+            addMsg('system', 'System', _('error') + ': ' + data.error, 'var(--red)', '');
+            btn.disabled = false;
+            btn.innerHTML = '<svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-rocket"/></svg> {{ _('create_epic') }}';
+        }
+    } catch(e) {
+        epicDone = true;
+        progressTimers.forEach(clearTimeout);
+        addMsg('system', 'System', _('error') + ': ' + e.message, 'var(--red)', '');
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-rocket"/></svg> {{ _('create_epic') }}';
+    }
+});
+
+// Generate team — pass the prompt as context
+document.getElementById('btnGenerateTeam').addEventListener('click', () => {
+    const prompt = encodeURIComponent(originalPrompt || '');
+    window.location.href = '/generate' + (prompt ? '?prompt=' + prompt : '');
+});
+
+// Auto-resize textarea
+inputEl.addEventListener('input', () => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+});
+
+// ── Sidebar & History ──
+function toggleSidebar() {
+    document.getElementById('ideaSidebar').classList.toggle('open');
+}
+
+async function loadPastSession(id) {
+    toggleSidebar();
+    try {
+        const resp = await fetch(`/api/ideation/sessions/${id}`);
+        const data = await resp.json();
+        if (data.error) return;
+
+        // Update session state
+        sessionId = data.id;
+        originalPrompt = data.prompt;
+
+        // Clear and show messages
+        const placeholder = document.getElementById('ideaPlaceholder');
+        if (placeholder) placeholder.style.display = 'none';
+        const msgEl = document.getElementById('ideaMessages');
+        // Clear existing messages (keep placeholder hidden)
+        msgEl.querySelectorAll('.idea-msg').forEach(m => m.remove());
+
+        // Replay messages
+        for (const m of data.messages || []) {
+            if (m.agent_id === 'user') {
+                addMsg('user', 'Vous', m.content, '', '');
+            } else {
+                const agent = igAgents.find(a => a.id === m.agent_id);
+                addMsg('agent', m.agent_name, m.content, m.color || '',
+                    agent?.avatar_url || m.avatar_url || '',
+                    m.role || '', m.target || '');
+            }
+        }
+
+        // Replay findings
+        const findingsEl = document.getElementById('ideaFindings');
+        if (findingsEl) findingsEl.innerHTML = '';
+        for (const f of data.findings || []) {
+            addFinding(f.type, f.text);
+        }
+
+        // Enable buttons if session was analyzed
+        if (data.status === 'analyzed' || data.status === 'epic_created') {
+            document.getElementById('btnCreateEpic').style.opacity = '1';
+            document.getElementById('btnCreateEpic').style.pointerEvents = 'auto';
+            document.getElementById('btnGenerateTeam').style.opacity = '1';
+            document.getElementById('btnGenerateTeam').style.pointerEvents = 'auto';
+        }
+
+        // If epic already created, show info
+        if (data.status === 'epic_created' && data.project_id) {
+            addMsg('system', 'Système',
+                `Epic déjà créé → <a href="/projects/${data.project_id}/overview" style="color:var(--purple)">Voir le projet</a>`,
+                'var(--green)', '');
+        }
+    } catch(e) {
+        addMsg('system', 'System', _('error') + ': ' + e.message, 'var(--red)', '');
+    }
+}
+
+// Check URL for session param (from history page "Reprendre")
+const urlParams = new URLSearchParams(window.location.search);
+const resumeSession = urlParams.get('session');
+if (resumeSession) {
+    loadPastSession(resumeSession);
+}
+</script>
+{% endblock %}

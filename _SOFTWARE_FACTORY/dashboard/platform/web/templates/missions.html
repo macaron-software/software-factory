@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+{% include "partials/view_switcher.html" %}
+<a href="/missions?action=new" class="btn btn-primary">
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> New Epic
+</a>
+{% endblock %}
+
+{% block content %}
+<style>
+.mission-filters{display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap}
+.mission-filter{background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-secondary);padding:0.35rem 0.75rem;border-radius:6px;font-size:0.78rem;cursor:pointer;transition:all .15s}
+.mission-filter:hover,.mission-filter.active{background:var(--purple);color:#fff;border-color:var(--purple)}
+
+.mission-card{position:relative}
+.mission-card .item-icon{position:relative}
+.mc-sprint-badge{position:absolute;bottom:-2px;right:-2px;font-size:0.6rem;background:var(--purple);color:#fff;border-radius:4px;padding:0 4px;font-weight:700}
+.mc-progress{display:flex;align-items:center;gap:0.5rem;margin-top:0.4rem}
+.mc-progress-bar{flex:1;height:4px;background:var(--bg-tertiary);border-radius:2px;overflow:hidden}
+.mc-progress-fill{height:100%;background:linear-gradient(90deg,var(--purple),var(--purple-light));border-radius:2px}
+.mc-progress-text{font-size:0.7rem;color:var(--text-secondary);min-width:40px;text-align:right}
+.mc-wsjf{font-size:0.65rem;background:var(--bg-tertiary);color:var(--yellow);padding:0.1rem 0.4rem;border-radius:4px;font-weight:600}
+.mc-creator{font-size:0.72rem;color:var(--text-secondary);display:flex;align-items:center;gap:0.3rem}
+
+/* New mission form */
+.new-mission-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:flex;align-items:center;justify-content:center}
+.new-mission-form{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;width:90%;max-width:520px}
+.new-mission-form h3{margin:0 0 1rem;color:var(--text-primary)}
+.nmf-field{margin-bottom:0.85rem}
+.nmf-field label{display:block;font-size:0.78rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.3rem}
+.nmf-field input,.nmf-field textarea,.nmf-field select{width:100%;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:0.5rem 0.75rem;font-size:0.85rem;font-family:inherit;outline:none}
+.nmf-field input:focus,.nmf-field textarea:focus,.nmf-field select:focus{border-color:var(--purple)}
+.nmf-field textarea{resize:vertical;min-height:60px}
+.nmf-actions{display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem}
+</style>
+
+<!-- Filters -->
+<div class="mission-filters">
+    <a href="/missions" class="mission-filter {% if not filter_status and not filter_project %}active{% endif %}">{{ _("toutes") }}</a>
+    <a href="/missions?status=active" class="mission-filter {% if filter_status == 'active' %}active{% endif %}"><svg class="icon icon-xs"><use href="#icon-play"/></svg> En cours</a>
+    <a href="/missions?status=planning" class="mission-filter {% if filter_status == 'planning' %}active{% endif %}"><svg class="icon icon-xs"><use href="#icon-clipboard"/></svg> Planning</a>
+    <a href="/missions?status=completed" class="mission-filter {% if filter_status == 'completed' %}active{% endif %}"><svg class="icon icon-xs"><use href="#icon-check"/></svg> Terminées</a>
+    {% for pid in project_ids %}
+    <a href="/missions?project={{ pid }}" class="mission-filter {% if filter_project == pid %}active{% endif %}">{{ pid }}</a>
+    {% endfor %}
+</div>
+
+<div class="item-grid" data-view-grid data-view="card">
+    {% for m in missions %}
+    <a href="/missions/{{ m.mission.id }}" class="item-card mission-card">
+        <div class="item-icon">
+            <span class="status-dot {% if m.mission.status == 'active' %}active{% elif m.mission.status == 'completed' %}done{% elif m.mission.status == 'blocked' %}error{% else %}idle{% endif %}"></span>
+            {% if m.sprint_count > 0 %}
+            <span class="mc-sprint-badge">S{{ m.current_sprint }}</span>
+            {% endif %}
+        </div>
+        <div class="item-main">
+            <div class="item-title">{{ m.mission.name }}</div>
+            <div class="item-subtitle">
+                {{ m.project_name }}
+                {% if m.mission.wsjf_score > 0 %} · <span class="mc-wsjf">WSJF {{ m.mission.wsjf_score|round(1) }}</span>{% endif %}
+            </div>
+            <div class="item-detail">
+                {% if m.mission.goal %}
+                <p class="item-desc">{{ m.mission.goal[:120] }}{% if m.mission.goal|length > 120 %}…{% endif %}</p>
+                {% endif %}
+
+                {% if m.total_tasks > 0 %}
+                <div class="mc-progress">
+                    <div class="mc-progress-bar">
+                        <div class="mc-progress-fill" style="width:{{ m.progress_pct }}%"></div>
+                    </div>
+                    <span class="mc-progress-text">{{ m.done_tasks }}/{{ m.total_tasks }}</span>
+                </div>
+                {% endif %}
+
+                {% if m.mission.created_by %}
+                <div class="mc-creator">{{ _('created_by') }} {{ m.mission.created_by }}</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="item-meta">
+            <span class="item-badge">{{ m.sprint_count }} sprint{{ 's' if m.sprint_count != 1 }}</span>
+            <span class="item-badge muted">{{ m.mission.created_at[:10] }}</span>
+        </div>
+    </a>
+    {% else %}
+    <div class="empty-state">
+        <p>{{ _('no_mission') }}</p>
+        <p style="color:var(--text-secondary);font-size:0.82rem">{{ _("les_agents_strategiques_creent_des_missions") }}</p>
+        <a href="/missions?action=new" class="btn btn-primary" style="margin-top:0.5rem">{{ _('create_manually') }}</a>
+    </div>
+    {% endfor %}
+</div>
+
+{% if show_new_form %}
+<div class="new-mission-overlay" onclick="if(event.target===this)location.href='/missions'">
+    <form class="new-mission-form" id="newMissionForm">
+        <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> New Epic</h3>
+        <div class="nmf-field">
+            <label>{{ _("project") }}</label>
+            <select name="project_id" required>
+                {% for pid in project_ids %}
+                <option value="{{ pid }}">{{ pid }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="nmf-field">
+            <label>{{ _("ceremony_template_workflow") }}</label>
+            <select name="workflow_id" required>
+                {% for wf in workflows %}
+                <option value="{{ wf.id }}">{{ wf.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="nmf-field">
+            <label>{{ _("brief_objective_context_acceptance_criteria") }}</label>
+            <textarea name="brief" placeholder="Décrivez le besoin métier, le contexte projet, et les objectifs à atteindre..." required style="min-height:80px"></textarea>
+        </div>
+        <div class="nmf-actions">
+            <a href="/missions" class="btn btn-ghost">{{ _("cancel") }}</a>
+            <button type="submit" class="btn btn-primary">
+                <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch') }}
+            </button>
+        </div>
+    </form>
+</div>
+<script>
+document.getElementById('newMissionForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = e.target.querySelector('[type=submit]');
+    btn.disabled = true; btn.textContent = 'Lancement...';
+    try {
+        const r = await fetch('/api/missions/start', {method:'POST', body: fd});
+        const j = await r.json();
+        if (j.redirect) location.href = j.redirect;
+        else { alert(j.error || _('error_generic')); btn.disabled = false; btn.textContent = _('launch'); }
+    } catch(err) { alert(err); btn.disabled = false; btn.textContent = _('launch'); }
+});
+</script>
+{% endif %}
+{% endblock %}

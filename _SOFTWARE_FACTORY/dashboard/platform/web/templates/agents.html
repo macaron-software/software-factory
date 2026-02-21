@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+{% include "partials/view_switcher.html" %}
+<a href="/agents/new" class="btn btn-primary">
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> New
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="item-grid" data-view-grid data-view="card">
+    {% for agent in agents %}
+    <div class="item-card" data-id="{{ agent.id }}">
+        <div class="item-icon">
+            {% if agent.avatar %}
+            <div class="agent-avatar-circle" style="background:{{ agent.color }}20;border-color:{{ agent.color }}">
+                <svg class="icon icon-sm" style="color:{{ agent.color }}"><use href="#icon-{{ agent.avatar }}"/></svg>
+            </div>
+            {% else %}
+            <div class="agent-dot" style="background:{{ agent.color }}">
+                <svg class="icon icon-sm" style="color:#fff"><use href="#icon-{{ agent.icon }}"/></svg>
+            </div>
+            {% endif %}
+        </div>
+        <div class="item-main">
+            <div class="item-title">{{ agent.name }}</div>
+            <div class="item-subtitle" style="color:{{ agent.color }}">
+                {% if agent.tagline %}{{ agent.tagline }}{% else %}{{ agent.role }}{% endif %}
+            </div>
+            <div class="item-detail">
+                <p class="item-desc">{{ agent.description }}</p>
+                <div class="item-tags">
+                    <span class="item-tag">{{ agent.provider }}:{{ agent.model }}</span>
+                    {% for tag in agent.tags[:2] %}
+                    <span class="item-tag">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="item-meta">
+            {% if agent.skills %}
+            <span class="item-badge">{{ agent.skills | length }} skills</span>
+            {% endif %}
+            {% if agent.is_builtin %}
+            <span class="item-badge muted">{{ _("built_in") }}</span>
+            {% endif %}
+        </div>
+        <div class="item-actions">
+            <a href="/agents/{{ agent.id }}/edit" class="btn btn-sm btn-ghost" title="{{ _("tt_edit") }}">
+                <svg class="icon icon-sm"><use href="#icon-edit"/></svg>
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+    {% if not agents %}
+    <div class="empty-state">
+        <p>{{ _("no_agents_yet_create_your_first") }}</p>
+        <a href="/agents/new" class="btn btn-primary">{{ _("create_agent") }}</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

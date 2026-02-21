@@ -1,0 +1,441 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+{% for sp in system_patterns %}
+{% if sp.id.startswith('dsi-') %}
+<a href="/dsi/workflow/{{ sp.id }}" class="btn btn-primary" style="margin-right:0.4rem">
+    <svg class="icon icon-sm"><use href="#icon-workflow"/></svg> {{ sp.name[:25] }}
+</a>
+{% endif %}
+{% endfor %}
+<a href="/missions?action=new" class="btn btn-ghost">
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Mission
+</a>
+{% endblock %}
+
+{% block content %}
+<style>
+/* ── DSI Layout: 2-column top + full-width bottom ── */
+.dsi-top{display:grid;grid-template-columns:320px 1fr;gap:1.2rem;margin-bottom:1.2rem}
+@media(max-width:1100px){.dsi-top{grid-template-columns:1fr}}
+.dsi-bottom{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem}
+@media(max-width:900px){.dsi-bottom{grid-template-columns:1fr}}
+
+/* Panel */
+.dsi-panel{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.dsi-panel-header{display:flex;align-items:center;justify-content:space-between;padding:0.7rem 0.9rem;border-bottom:1px solid var(--border)}
+.dsi-panel-title{font-size:0.82rem;font-weight:700;display:flex;align-items:center;gap:0.4rem}
+.dsi-panel-title svg{width:15px;height:15px;color:var(--purple)}
+.dsi-panel-body{padding:0.6rem 0.9rem;max-height:420px;overflow-y:auto}
+
+/* Decisions feed */
+.dsi-decision{padding:0.5rem 0.6rem;margin-bottom:0.4rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-tertiary);cursor:pointer;transition:border-color .15s}
+.dsi-decision:hover{border-color:var(--purple)}
+.dsi-decision-title{font-size:0.78rem;font-weight:600;color:var(--text-primary);margin-bottom:0.2rem;display:flex;align-items:center;gap:0.3rem}
+.dsi-decision-time{font-size:0.62rem;color:var(--text-muted)}
+.dsi-decision-badge{font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;font-weight:600}
+.dsi-decision-badge.approved{background:rgba(52,211,153,.15);color:var(--green)}
+
+/* System map */
+.dsi-map{position:relative;padding:1rem}
+.dsi-map-score{position:absolute;top:0.8rem;right:1rem;text-align:center}
+.dsi-map-score-value{font-size:2rem;font-weight:800;color:var(--green)}
+.dsi-map-score-label{font-size:0.65rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.dsi-map-legend{position:absolute;top:0.8rem;right:8rem;display:flex;flex-direction:column;gap:0.25rem;font-size:0.65rem;color:var(--text-secondary)}
+.dsi-map-legend span{display:flex;align-items:center;gap:0.3rem}
+.dsi-map-legend span::before{content:'';width:8px;height:8px;border-radius:50%;display:inline-block}
+.dsi-map-legend span.network::before{background:var(--blue)}
+.dsi-map-legend span.hierarchical::before{background:var(--green)}
+.dsi-map-legend span.sequential::before{background:var(--yellow)}
+
+/* Node bubbles */
+.dsi-map-nodes{display:flex;flex-wrap:wrap;gap:1.5rem;justify-content:center;padding-top:0.5rem}
+.dsi-map-node{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid;font-size:0.68rem;font-weight:600;text-align:center;line-height:1.2;transition:transform .15s;cursor:pointer}
+.dsi-map-node:hover{transform:scale(1.1)}
+.dsi-map-node.network{border-color:var(--blue);background:rgba(59,130,246,.08);color:var(--blue)}
+.dsi-map-node.hierarchical{border-color:var(--green);background:rgba(52,211,153,.08);color:var(--green)}
+.dsi-map-node.sequential{border-color:var(--yellow);background:rgba(245,158,11,.08);color:var(--yellow)}
+
+/* Metrics charts (CSS-only) */
+.dsi-chart{padding:0.5rem 0}
+.dsi-chart-title{font-size:0.72rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.5rem}
+.dsi-chart-row{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.35rem}
+.dsi-chart-label{font-size:0.68rem;color:var(--text-secondary);width:50px;flex-shrink:0;text-align:right}
+.dsi-chart-bar{flex:1;height:16px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden}
+.dsi-chart-fill{height:100%;border-radius:3px;transition:width .5s}
+.dsi-chart-value{font-size:0.65rem;color:var(--text-secondary);width:30px;text-align:right}
+
+/* KPIs inline */
+.dsi-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:0.5rem;margin-bottom:1.2rem}
+.dsi-kpi{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.6rem 0.75rem;display:flex;align-items:center;gap:0.6rem}
+.dsi-kpi-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.dsi-kpi-icon svg{width:16px;height:16px}
+.dsi-kpi-value{font-size:1.3rem;font-weight:700;line-height:1}
+.dsi-kpi-label{font-size:0.62rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+
+/* Pipeline kanban */
+.dsi-pipeline{display:grid;grid-template-columns:repeat(5,1fr);gap:0.6rem}
+@media(max-width:1200px){.dsi-pipeline{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:768px){.dsi-pipeline{grid-template-columns:1fr}}
+.dsi-col{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.5rem;min-height:150px}
+.dsi-col-header{display:flex;align-items:center;justify-content:space-between;padding:0.3rem 0.2rem;margin-bottom:0.4rem;border-bottom:2px solid var(--border)}
+.dsi-col-title{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary)}
+.dsi-col-count{font-size:0.65rem;background:var(--bg-tertiary);padding:0.1rem 0.4rem;border-radius:8px;color:var(--text-secondary)}
+.dsi-col[data-status="backlog"] .dsi-col-header{border-color:#6b7280}
+.dsi-col[data-status="planning"] .dsi-col-header{border-color:var(--yellow)}
+.dsi-col[data-status="active"] .dsi-col-header{border-color:var(--green)}
+.dsi-col[data-status="review"] .dsi-col-header{border-color:var(--blue)}
+.dsi-col[data-status="completed"] .dsi-col-header{border-color:var(--purple)}
+.dsi-card{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:0.45rem 0.55rem;margin-bottom:0.35rem;cursor:pointer;transition:border-color .15s;text-decoration:none;display:block;color:inherit}
+.dsi-card:hover{border-color:var(--purple)}
+.dsi-card-name{font-size:0.75rem;font-weight:600;color:var(--text-primary);margin-bottom:0.15rem}
+.dsi-card-project{font-size:0.62rem;color:var(--text-secondary)}
+.dsi-card-meta{display:flex;align-items:center;gap:0.4rem;margin-top:0.25rem;font-size:0.62rem;color:var(--text-secondary)}
+.dsi-card-wsjf{background:rgba(124,58,237,.15);color:var(--purple);padding:0.1rem 0.3rem;border-radius:3px;font-weight:600;font-size:0.6rem}
+.dsi-card-progress{flex:1;height:3px;background:var(--bg-secondary);border-radius:2px;overflow:hidden}
+.dsi-card-progress-fill{height:100%;background:var(--green);border-radius:2px}
+
+/* Agents row */
+.dsi-agents-row{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.6rem}
+.dsi-agent-chip{display:flex;align-items:center;gap:0.4rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:20px;padding:0.25rem 0.6rem 0.25rem 0.25rem;cursor:pointer;transition:border-color .15s}
+.dsi-agent-chip:hover{border-color:var(--purple)}
+.dsi-agent-chip img{width:24px;height:24px;border-radius:50%;object-fit:cover}
+.dsi-agent-chip-name{font-size:0.7rem;font-weight:500}
+
+/* Agent popover reused from before */
+.agent-popover-overlay{position:fixed;inset:0;z-index:999;display:none}
+.agent-popover-overlay.open{display:block}
+.agent-popover{position:fixed;z-index:1000;width:340px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 12px 40px rgba(0,0,0,.45);overflow:hidden;display:none;animation:popIn .15s ease}
+.agent-popover.open{display:block}
+@keyframes popIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+.agent-popover-header{padding:1rem;display:flex;align-items:center;gap:0.8rem;border-bottom:1px solid var(--border)}
+.agent-popover-photo{width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--purple)}
+.agent-popover-name{font-size:0.95rem;font-weight:700}
+.agent-popover-role{font-size:0.72rem;color:var(--text-secondary)}
+.agent-popover-tagline{font-size:0.7rem;color:var(--purple);font-style:italic;margin-top:2px}
+.agent-popover-body{padding:0.8rem 1rem;font-size:0.76rem;color:var(--text-secondary);line-height:1.5;max-height:320px;overflow-y:auto}
+.agent-popover-section{margin-top:0.5rem}
+.agent-popover-section-title{font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);margin-bottom:0.25rem}
+.agent-popover-tags{display:flex;flex-wrap:wrap;gap:3px}
+.agent-popover-tag{padding:0.12rem 0.35rem;border-radius:3px;font-size:0.62rem;background:var(--bg-tertiary);color:var(--text-secondary)}
+.agent-popover-tag.skill{background:rgba(124,58,237,.12);color:var(--purple)}
+.agent-popover-tag.tool{background:rgba(59,130,246,.12);color:var(--blue)}
+.agent-popover-model{display:flex;align-items:center;gap:0.4rem;margin-top:0.5rem;padding:0.4rem 0.6rem;background:var(--bg-tertiary);border-radius:6px;font-size:0.68rem;color:var(--text-secondary)}
+.agent-popover-model svg{width:14px;height:14px;color:var(--purple)}
+.agent-popover-close{position:absolute;top:0.5rem;right:0.5rem;background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:0.3rem}
+</style>
+
+<!-- KPIs -->
+<div class="dsi-kpis">
+    <div class="dsi-kpi">
+        <div class="dsi-kpi-icon" style="background:rgba(124,58,237,.15)"><svg style="color:var(--purple)"><use href="#icon-rocket"/></svg></div>
+        <div><div class="dsi-kpi-value">{{ total_missions }}</div><div class="dsi-kpi-label">{{ _("epics") }}</div></div>
+    </div>
+    <div class="dsi-kpi">
+        <div class="dsi-kpi-icon" style="background:rgba(52,211,153,.15)"><svg style="color:var(--green)"><use href="#icon-activity"/></svg></div>
+        <div><div class="dsi-kpi-value">{{ active_missions }}</div><div class="dsi-kpi-label">{{ _("in_progress") }}</div></div>
+    </div>
+    <div class="dsi-kpi">
+        <div class="dsi-kpi-icon" style="background:rgba(59,130,246,.15)"><svg style="color:var(--blue)"><use href="#icon-check"/></svg></div>
+        <div><div class="dsi-kpi-value">{{ total_done }}/{{ total_tasks }}</div><div class="dsi-kpi-label">{{ _("phases") }}</div></div>
+    </div>
+    <div class="dsi-kpi">
+        <div class="dsi-kpi-icon" style="background:rgba(245,158,11,.15)"><svg style="color:var(--yellow)"><use href="#icon-users"/></svg></div>
+        <div><div class="dsi-kpi-value">{{ total_agents }}</div><div class="dsi-kpi-label">{{ _("agents") }}</div></div>
+    </div>
+    <div class="dsi-kpi">
+        <div class="dsi-kpi-icon" style="background:rgba(248,113,113,.15)"><svg style="color:var(--red)"><use href="#icon-alert-triangle"/></svg></div>
+        <div><div class="dsi-kpi-value">{{ blocked_missions }}</div><div class="dsi-kpi-label">{{ _("blocked") }}</div></div>
+    </div>
+    <div class="dsi-kpi">
+        <div class="dsi-kpi-icon" style="background:rgba(6,182,212,.15)"><svg style="color:#06b6d4"><use href="#icon-layers"/></svg></div>
+        <div><div class="dsi-kpi-value">{{ total_projects }}</div><div class="dsi-kpi-label">{{ _("projets") }}</div></div>
+    </div>
+</div>
+
+<!-- DORA Metrics + Org Summary + Incidents -->
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.2rem">
+    <div class="dsi-panel">
+        <div class="dsi-panel-header">
+            <div class="dsi-panel-title"><svg><use href="#icon-chart"/></svg> DORA Metrics (30j)</div>
+            <span class="dsi-decision-badge" style="background:{% if dora.overall_level == 'elite' %}rgba(52,211,153,.15);color:var(--green){% elif dora.overall_level == 'high' %}rgba(59,130,246,.15);color:var(--blue){% elif dora.overall_level == 'medium' %}rgba(245,158,11,.15);color:var(--yellow){% else %}rgba(248,113,113,.15);color:var(--red){% endif %}">{{ dora.overall_level|upper }}</span>
+        </div>
+        <div class="dsi-panel-body" style="max-height:200px">
+            <div class="dsi-chart-row">
+                <div class="dsi-chart-label">{{ _("deploy") }}</div>
+                <div class="dsi-chart-bar"><div class="dsi-chart-fill" style="width:{{ [dora.deployment_frequency.per_day * 100, 100]|min }}%;background:var(--green)"></div></div>
+                <div class="dsi-chart-value">{{ dora.deployment_frequency.per_day }}/j</div>
+            </div>
+            <div class="dsi-chart-row">
+                <div class="dsi-chart-label">{{ _("lead") }}</div>
+                <div class="dsi-chart-bar"><div class="dsi-chart-fill" style="width:{{ [100 - dora.lead_time.median_hours, 0]|max }}%;background:var(--blue)"></div></div>
+                <div class="dsi-chart-value">{{ dora.lead_time.median_hours }}h</div>
+            </div>
+            <div class="dsi-chart-row">
+                <div class="dsi-chart-label">{{ _("fail") }}</div>
+                <div class="dsi-chart-bar"><div class="dsi-chart-fill" style="width:{{ dora.change_failure_rate.rate_pct }}%;background:var(--red)"></div></div>
+                <div class="dsi-chart-value">{{ dora.change_failure_rate.rate_pct }}%</div>
+            </div>
+            <div class="dsi-chart-row">
+                <div class="dsi-chart-label">{{ _("mttr") }}</div>
+                <div class="dsi-chart-bar"><div class="dsi-chart-fill" style="width:{{ [100 - dora.mttr.median_hours, 0]|max }}%;background:var(--yellow)"></div></div>
+                <div class="dsi-chart-value">{{ dora.mttr.median_hours }}h</div>
+            </div>
+        </div>
+    </div>
+    <div class="dsi-panel">
+        <div class="dsi-panel-header">
+            <div class="dsi-panel-title"><svg><use href="#icon-users"/></svg> Organisation SAFe</div>
+            <a href="/org" class="btn btn-ghost" style="font-size:0.65rem;padding:0.15rem 0.4rem">{{ _("details") }}</a>
+        </div>
+        <div class="dsi-panel-body" style="max-height:200px">
+            <div style="display:flex;gap:1.5rem;justify-content:center;padding:0.5rem 0">
+                <div style="text-align:center">
+                    <div style="font-size:1.5rem;font-weight:800;color:var(--purple)">{{ org_portfolios }}</div>
+                    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">{{ _("portfolios") }}</div>
+                </div>
+                <div style="text-align:center">
+                    <div style="font-size:1.5rem;font-weight:800;color:var(--blue)">{{ org_arts }}</div>
+                    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">{{ _("arts") }}</div>
+                </div>
+                <div style="text-align:center">
+                    <div style="font-size:1.5rem;font-weight:800;color:var(--green)">{{ org_teams }}</div>
+                    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">{{ _("teams") }}</div>
+                </div>
+                <div style="text-align:center">
+                    <div style="font-size:1.5rem;font-weight:800;color:var(--yellow)">{{ total_agents }}</div>
+                    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">{{ _("agents") }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Incidents -->
+    <div class="dsi-panel" id="incidents-panel" hx-get="/api/incidents/stats" hx-trigger="load, every 60s" hx-swap="innerHTML" hx-target="#incidents-content">
+        <div class="dsi-panel-header">
+            <div class="dsi-panel-title"><svg><use href="#icon-alert-triangle"/></svg> Incidents</div>
+            <a href="/api/incidents" class="btn btn-ghost" style="font-size:0.65rem;padding:0.15rem 0.4rem">{{ _("tout") }}</a>
+        </div>
+        <div class="dsi-panel-body" style="max-height:200px" id="incidents-content">
+            <div style="text-align:center;color:var(--text-muted);padding:1rem;font-size:0.75rem">{{ _('loading_ellipsis') }}</div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Render incidents stats from JSON into the panel
+document.addEventListener('htmx:afterRequest', function(evt) {
+    if (evt.detail.target && evt.detail.target.id === 'incidents-content') {
+        try {
+            const data = JSON.parse(evt.detail.xhr.responseText);
+            const sev = data.by_severity || {};
+            const colors = {P0:'var(--red)',P1:'#f97316',P2:'var(--yellow)',P3:'var(--blue)',P4:'#6b7280'};
+            let html = '<div style="display:flex;gap:0.4rem;margin-bottom:0.5rem;flex-wrap:wrap">';
+            for (const p of ['P0','P1','P2','P3','P4']) {
+                const cnt = sev[p] || 0;
+                if (cnt > 0) html += `<span style="padding:0.15rem 0.45rem;border-radius:4px;font-size:0.65rem;font-weight:700;background:${colors[p]}22;color:${colors[p]}">${p}: ${cnt}</span>`;
+            }
+            html += '</div>';
+            const recent = data.recent || [];
+            if (recent.length === 0) {
+                html += '<div style="text-align:center;color:var(--text-muted);padding:0.5rem;font-size:0.72rem">'+_('no_incident')+'</div>';
+            }
+            for (const r of recent) {
+                const sc = colors[r.severity] || '#6b7280';
+                const st = r.status === 'open' ? 'var(--red)' : (r.status === 'resolved' ? 'var(--green)' : 'var(--text-muted)');
+                html += `<div style="padding:0.35rem 0.5rem;margin-bottom:0.3rem;border-radius:5px;border:1px solid var(--border);background:var(--bg-tertiary);font-size:0.72rem">
+                    <div style="display:flex;align-items:center;gap:0.3rem">
+                        <span style="color:${sc};font-weight:700;font-size:0.62rem">${r.severity}</span>
+                        <span style="flex:1;font-weight:600;color:var(--text-primary)">${(r.title||'').substring(0,60)}</span>
+                        <span style="font-size:0.58rem;padding:0.1rem 0.3rem;border-radius:3px;background:${st}18;color:${st};font-weight:600">${r.status}</span>
+                    </div>
+                    <div style="font-size:0.6rem;color:var(--text-muted);margin-top:2px">${r.source || 'auto'} · ${(r.created_at||'').substring(0,16)}</div>
+                </div>`;
+            }
+            evt.detail.target.innerHTML = html;
+        } catch(e) {}
+    }
+});
+</script>
+<div class="dsi-top">
+    <!-- Left: Comité Stratégique decisions -->
+    <div class="dsi-panel">
+        <div class="dsi-panel-header">
+            <div class="dsi-panel-title"><svg><use href="#icon-target"/></svg> Comité Stratégique (IA)</div>
+            <select style="font-size:0.65rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:4px;color:var(--text-secondary);padding:0.15rem 0.3rem">
+                <option>{{ _("decision") }}</option><option>{{ _("planification") }}</option><option>{{ _("revue") }}</option>
+            </select>
+        </div>
+        <div class="dsi-panel-body">
+            {% for d in decisions %}
+            <div class="dsi-decision">
+                <div class="dsi-decision-title">
+                    {{ d.content[:80] }}{% if d.content|length > 80 %}...{% endif %}
+                    <span class="dsi-decision-badge approved">{{ _("approved") }}</span>
+                </div>
+                <div class="dsi-decision-time">{{ d.agent_name }} · {{ d.time }}</div>
+            </div>
+            {% else %}
+            <div style="text-align:center;color:var(--text-muted);padding:2rem;font-size:0.78rem">
+                Lancez le comité stratégique pour voir les décisions ici
+            </div>
+            {% endfor %}
+
+            <!-- Strategic agents chips -->
+            <div class="dsi-agents-row" style="margin-top:0.8rem;padding-top:0.6rem;border-top:1px solid var(--border)">
+                {% for a in strategic_agents %}
+                <div class="dsi-agent-chip" onclick="showAgentPopover(event, {{ loop.index0 }})">
+                    {% if a.avatar_url %}<img src="{{ a.avatar_url }}" alt="{{ a.name }}">
+                    {% else %}<div style="width:24px;height:24px;border-radius:50%;background:{{ a.color }}20;display:flex;align-items:center;justify-content:center"><svg class="icon icon-xs" style="color:{{ a.color }}"><use href="#icon-{{ a.avatar }}"/></svg></div>{% endif %}
+                    <span class="dsi-agent-chip-name">{{ a.name.split(' ')[0] }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: System map + metrics -->
+    <div style="display:flex;flex-direction:column;gap:1.2rem">
+        <!-- System map -->
+        <div class="dsi-panel">
+            <div class="dsi-panel-header">
+                <div class="dsi-panel-title"><svg><use href="#icon-share"/></svg> Carte des Systèmes et Patterns</div>
+            </div>
+            <div class="dsi-map">
+                <div class="dsi-map-score">
+                    {% if total_tasks > 0 %}
+                    <div class="dsi-map-score-value">{{ (total_done / total_tasks * 100)|round|int }}%</div>
+                    {% else %}
+                    <div class="dsi-map-score-value">0%</div>
+                    {% endif %}
+                    <div class="dsi-map-score-label">{{ _("progression_globale") }}</div>
+                </div>
+                <div class="dsi-map-legend">
+                    <span class="network">{{ _("network") }}</span>
+                    <span class="hierarchical">{{ _("hierarchical") }}</span>
+                    <span class="sequential">{{ _("sequential") }}</span>
+                </div>
+                <div class="dsi-map-nodes">
+                    {% for sp in system_patterns %}
+                    <a href="/workflows" class="dsi-map-node {{ sp.pattern }}" style="text-decoration:none">
+                        {{ sp.name[:12] }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics: 2-col -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem">
+            <div class="dsi-panel">
+                <div class="dsi-panel-header"><div class="dsi-panel-title"><svg><use href="#icon-chart"/></svg> Progression Epics</div></div>
+                <div class="dsi-panel-body">
+                    {% for r in resources %}
+                    <div class="dsi-chart-row">
+                        <span class="dsi-chart-label" style="width:70px">{{ r.name[:10] }}</span>
+                        <div class="dsi-chart-bar"><div class="dsi-chart-fill" style="width:{{ r.pct }}%;background:{{ r.color }}"></div></div>
+                        <span class="dsi-chart-value">{{ r.active }}/{{ r.total }}</span>
+                    </div>
+                    {% endfor %}
+                    {% if not resources %}
+                    <div style="text-align:center;color:var(--text-muted);padding:1rem;font-size:0.75rem">{{ _("no_data") }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="dsi-panel">
+                <div class="dsi-panel-header"><div class="dsi-panel-title"><svg><use href="#icon-cpu"/></svg> Charge Projets</div></div>
+                <div class="dsi-panel-body">
+                    {% for r in resources %}
+                    <div class="dsi-chart-row">
+                        <span class="dsi-chart-label" style="width:70px">{{ r.name[:10] }}</span>
+                        <div class="dsi-chart-bar"><div class="dsi-chart-fill" style="width:{{ r.pct }}%;background:{{ r.color }}"></div></div>
+                        <span class="dsi-chart-value">{{ r.pct }}%</span>
+                    </div>
+                    {% endfor %}
+                    {% if not resources %}
+                    <div style="text-align:center;color:var(--text-muted);padding:1rem;font-size:0.75rem">{{ _("no_data") }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bottom: Pipeline Kanban -->
+<div class="dsi-panel" style="margin-bottom:1.2rem">
+    <div class="dsi-panel-header">
+        <div class="dsi-panel-title"><svg><use href="#icon-layers"/></svg> Pipeline Stratégique</div>
+    </div>
+    <div style="padding:0.6rem">
+        <div class="dsi-pipeline">
+            {% for col in pipeline %}
+            <div class="dsi-col" data-status="{{ col.status }}">
+                <div class="dsi-col-header">
+                    <span class="dsi-col-title">{{ col.label }}</span>
+                    <span class="dsi-col-count">{{ col.missions|length }}</span>
+                </div>
+                {% for m in col.missions %}
+                <a href="/missions/{{ m.id }}" class="dsi-card">
+                    <div class="dsi-card-name">{{ m.name }}</div>
+                    <div class="dsi-card-project">{{ m.project_name }}</div>
+                    <div class="dsi-card-meta">
+                        {% if m.wsjf > 0 %}<span class="dsi-card-wsjf">WSJF {{ m.wsjf|round(1) }}</span>{% endif %}
+                        <span>{{ m.done }}/{{ m.total }} phases</span>
+                        {% if m.current_phase %}<span style="font-size:0.6rem;color:var(--purple-light)">{{ m.current_phase }}</span>{% endif %}
+                        {% if m.total > 0 %}<div class="dsi-card-progress"><div class="dsi-card-progress-fill" style="width:{{ (m.done / m.total * 100)|round }}%"></div></div>{% endif %}
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Agent Popover -->
+<div class="agent-popover-overlay" id="agentOverlay" onclick="closeAgentPopover()"></div>
+<div class="agent-popover" id="agentPopover">
+    <button class="agent-popover-close" onclick="closeAgentPopover()"><svg class="icon icon-sm"><use href="#icon-x"/></svg></button>
+    <div class="agent-popover-header" id="popHeader"></div>
+    <div class="agent-popover-body" id="popBody"></div>
+</div>
+
+<script>
+const agents = {{ strategic_agents | tojson }};
+function esc(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
+function showAgentPopover(ev, idx) {
+    ev.stopPropagation();
+    const a = agents[idx];
+    const pop = document.getElementById('agentPopover');
+    const overlay = document.getElementById('agentOverlay');
+    const photo = a.avatar_url
+        ? `<img class="agent-popover-photo" src="${a.avatar_url}" alt="${esc(a.name)}">`
+        : `<div style="width:52px;height:52px;border-radius:50%;background:${a.color}20;border:2px solid ${a.color};display:flex;align-items:center;justify-content:center"><svg class="icon" style="color:${a.color}"><use href="#icon-${a.avatar}"/></svg></div>`;
+    document.getElementById('popHeader').innerHTML = `${photo}<div>
+        <div class="agent-popover-name">${esc(a.name)}</div>
+        <div class="agent-popover-role">${esc(a.role)}</div>
+        ${a.tagline ? `<div class="agent-popover-tagline">${esc(a.tagline)}</div>` : ''}
+    </div>`;
+    let html = '';
+    if (a.description) html += `<div>${esc(a.description)}</div>`;
+    if (a.persona) html += `<div class="agent-popover-section"><div class="agent-popover-section-title">Persona</div><div style="white-space:pre-line">${esc(a.persona)}</div></div>`;
+    if (a.motivation) html += `<div class="agent-popover-section"><div class="agent-popover-section-title">Motivation</div><div style="white-space:pre-line">${esc(a.motivation)}</div></div>`;
+    if (a.skills?.length) html += `<div class="agent-popover-section"><div class="agent-popover-section-title">Skills</div><div class="agent-popover-tags">${a.skills.map(s=>`<span class="agent-popover-tag skill">${esc(s)}</span>`).join('')}</div></div>`;
+    if (a.tools?.length) html += `<div class="agent-popover-section"><div class="agent-popover-section-title">Tools</div><div class="agent-popover-tags">${a.tools.map(t=>`<span class="agent-popover-tag tool">${esc(t)}</span>`).join('')}</div></div>`;
+    if (a.model || a.provider) html += `<div class="agent-popover-model"><svg><use href="#icon-cpu"/></svg> ${esc(a.provider||'')} ${esc(a.model||'default')}</div>`;
+    document.getElementById('popBody').innerHTML = html;
+    const rect = ev.currentTarget.getBoundingClientRect();
+    let top = rect.bottom + 8, left = rect.left;
+    if (top + 350 > window.innerHeight) top = rect.top - 360;
+    if (left + 340 > window.innerWidth) left = window.innerWidth - 350;
+    pop.style.top = Math.max(10, top) + 'px';
+    pop.style.left = Math.max(10, left) + 'px';
+    pop.classList.add('open'); overlay.classList.add('open');
+}
+function closeAgentPopover() {
+    document.getElementById('agentPopover').classList.remove('open');
+    document.getElementById('agentOverlay').classList.remove('open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAgentPopover(); });
+</script>
+{% endblock %}

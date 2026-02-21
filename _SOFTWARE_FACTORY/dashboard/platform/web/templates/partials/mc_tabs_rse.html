@@ -1,0 +1,172 @@
+        {# ══════ RSE TABS ══════ #}
+
+        <!-- Tab: RGPD -->
+        <div class="mc-tab-panel" data-tab="rgpd">
+            {% set rgpd_agent = (tab_profile|selectattr('id','equalto','rgpd')|first).agent %}
+            {% if rgpd_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ rgpd_agent.get('avatar_url','') }}" alt="" onerror="this.style.display='none'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ rgpd_agent.get('name','') }}</div>
+                    <div class="mc-tab-agent-role">{{ rgpd_agent.get('role','') }}</div>
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ rgpd_agent.get('id','') }}','{{ rgpd_agent.get('name','') }}','{{ rgpd_agent.get('role','') }}','{{ rgpd_agent.get('avatar_url','') }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
+            {% set rgpd_msgs = phase_messages.get('rgpd-audit', []) %}
+            {% if rgpd_msgs %}
+            <div class="mc-rse-section">
+                <h4><svg><use href="#icon-lock"/></svg> Audit RGPD</h4>
+                <div class="mc-sec-phase-content">
+                    {% for msg in rgpd_msgs %}
+                    <div style="margin-bottom:0.4rem;padding-bottom:0.4rem;border-bottom:1px solid var(--bg-tertiary)">
+                        <div style="font-size:0.6rem;color:var(--purple-light)">{{ msg.agent_name or msg.agent_id or '' }}</div>
+                        <div>{{ msg.content[:500] | markdown | safe if msg.content else '' }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="mc-sec-empty">{{ _("audit_rgpd_en_attente_d_execution") }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Tab: Green IT -->
+        <div class="mc-tab-panel" data-tab="green-it">
+            {% set nr_agent = (tab_profile|selectattr('id','equalto','green-it')|first).agent %}
+            {% if nr_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ nr_agent.get('avatar_url','') }}" alt="" onerror="this.style.display='none'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ nr_agent.get('name','') }}</div>
+                    <div class="mc-tab-agent-role">{{ nr_agent.get('role','') }}</div>
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ nr_agent.get('id','') }}','{{ nr_agent.get('name','') }}','{{ nr_agent.get('role','') }}','{{ nr_agent.get('avatar_url','') }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
+            {% set nr_msgs = phase_messages.get('green-it-audit', []) %}
+            {% if nr_msgs %}
+            <div class="mc-rse-section">
+                <h4><svg><use href="#icon-cpu"/></svg> Numerique Responsable</h4>
+                <div class="mc-sec-phase-content">
+                    {% for msg in nr_msgs %}
+                    <div style="margin-bottom:0.4rem;padding-bottom:0.4rem;border-bottom:1px solid var(--bg-tertiary)">
+                        <div style="font-size:0.6rem;color:var(--purple-light)">{{ msg.agent_name or msg.agent_id or '' }}</div>
+                        <div>{{ msg.content[:500] | markdown | safe if msg.content else '' }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="mc-sec-empty">{{ _("audit_green_it_en_attente") }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Tab: Accessibilite -->
+        <div class="mc-tab-panel" data-tab="a11y">
+            {% set a11y_agent = (tab_profile|selectattr('id','equalto','a11y')|first).agent %}
+            {% if a11y_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ a11y_agent.get('avatar_url','') }}" alt="" onerror="this.style.display='none'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ a11y_agent.get('name','') }}</div>
+                    <div class="mc-tab-agent-role">{{ a11y_agent.get('role','') }}</div>
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ a11y_agent.get('id','') }}','{{ a11y_agent.get('name','') }}','{{ a11y_agent.get('role','') }}','{{ a11y_agent.get('avatar_url','') }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
+            {% set a11y_msgs = phase_messages.get('a11y-audit', []) %}
+            {% if a11y_msgs %}
+            <div class="mc-rse-section">
+                <h4><svg><use href="#icon-eye"/></svg> Audit Accessibilite RGAA / WCAG</h4>
+                <div class="mc-sec-phase-content">
+                    {% for msg in a11y_msgs %}
+                    <div style="margin-bottom:0.4rem;padding-bottom:0.4rem;border-bottom:1px solid var(--bg-tertiary)">
+                        <div style="font-size:0.6rem;color:var(--purple-light)">{{ msg.agent_name or msg.agent_id or '' }}</div>
+                        <div>{{ msg.content[:500] | markdown | safe if msg.content else '' }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="mc-sec-empty">{{ _("audit_accessibilite_en_attente") }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Tab: Ethique IA -->
+        <div class="mc-tab-panel" data-tab="ethique">
+            {% set eth_agent = (tab_profile|selectattr('id','equalto','ethique')|first).agent %}
+            {% if eth_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ eth_agent.get('avatar_url','') }}" alt="" onerror="this.style.display='none'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ eth_agent.get('name','') }}</div>
+                    <div class="mc-tab-agent-role">{{ eth_agent.get('role','') }}</div>
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ eth_agent.get('id','') }}','{{ eth_agent.get('name','') }}','{{ eth_agent.get('role','') }}','{{ eth_agent.get('avatar_url','') }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
+            {% set eth_msgs = phase_messages.get('ethique-ia-audit', []) %}
+            {% if eth_msgs %}
+            <div class="mc-rse-section">
+                <h4><svg><use href="#icon-zap"/></svg> Audit Ethique IA / AI Act</h4>
+                <div class="mc-sec-phase-content">
+                    {% for msg in eth_msgs %}
+                    <div style="margin-bottom:0.4rem;padding-bottom:0.4rem;border-bottom:1px solid var(--bg-tertiary)">
+                        <div style="font-size:0.6rem;color:var(--purple-light)">{{ msg.agent_name or msg.agent_id or '' }}</div>
+                        <div>{{ msg.content[:500] | markdown | safe if msg.content else '' }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="mc-sec-empty">{{ _("audit_ethique_ia_en_attente") }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Tab: Synthese RSE -->
+        <div class="mc-tab-panel" data-tab="wiki">
+            {% set synth_agent = (tab_profile|selectattr('id','equalto','wiki')|first).agent %}
+            {% if synth_agent %}
+            <div class="mc-tab-agent">
+                <img class="mc-tab-agent-avatar" src="{{ synth_agent.get('avatar_url','') }}" alt="" onerror="this.style.display='none'">
+                <div class="mc-tab-agent-info">
+                    <div class="mc-tab-agent-name">{{ synth_agent.get('name','') }}</div>
+                    <div class="mc-tab-agent-role">{{ synth_agent.get('role','') }}</div>
+                </div>
+                <button class="mc-tab-agent-chat" onclick="openAgentChat('{{ synth_agent.get('id','') }}','{{ synth_agent.get('name','') }}','{{ synth_agent.get('role','') }}','{{ synth_agent.get('avatar_url','') }}')">
+                    <svg class="icon"><use href="#icon-send"/></svg> Discuter
+                </button>
+            </div>
+            {% endif %}
+            {% set synth_msgs = phase_messages.get('rse-synthesis', []) %}
+            {% if synth_msgs %}
+            <div class="mc-rse-section">
+                <h4><svg><use href="#icon-book-open"/></svg> Synthese RSE</h4>
+                <div class="mc-sec-phase-content">
+                    {% for msg in synth_msgs %}
+                    <div style="margin-bottom:0.4rem">
+                        <div style="font-size:0.6rem;color:var(--purple-light)">{{ msg.agent_name or msg.agent_id or '' }}</div>
+                        <div>{{ msg.content[:600] | markdown | safe if msg.content else '' }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% if wiki_memories %}
+            <div class="mc-wiki-memories"><h4>{{ _("memoire_rse") }}</h4>
+                {% for m in wiki_memories %}
+                <div class="mc-wiki-memory"><span class="mc-wiki-memory-cat">{{ m.category }}</span><span class="mc-wiki-memory-text">{{ m.value }}</span></div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+

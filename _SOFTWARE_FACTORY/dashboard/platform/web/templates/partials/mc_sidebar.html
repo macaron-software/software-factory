@@ -1,0 +1,284 @@
+    <div class="mc-sidebar">
+        {% set cdp = agent_map.get(orchestrator_id|default('chef_de_programme')) %}
+        <!-- CDP Agent Card -->
+        <div class="mc-cdp-card">
+            <div class="mc-cdp-card-inner">
+                <div class="mc-cdp-banner">
+                    <div class="mc-cdp-avatar-wrap">
+                        <img class="mc-cdp-avatar" src="{{ cdp['avatar_url'] if cdp else '' }}" alt=""
+                             onerror="this.src='/static/avatars/{{ orchestrator_id|default('chef_de_programme') }}.svg'">
+                    </div>
+                </div>
+                <div class="mc-cdp-body">
+                    <h3 class="mc-cdp-name">{{ cdp['name'] if cdp else 'Chef de Programme' }}</h3>
+                    <div class="mc-cdp-role">{{ cdp['role'] if cdp else 'Chef de Programme' }}</div>
+                    {% if cdp and cdp.get('tagline') %}
+                    <div class="mc-cdp-tagline">{{ cdp['tagline'] }}</div>
+                    {% endif %}
+                    <div class="mc-cdp-status-row">
+                        <span class="mc-cdp-status active" id="mc-cdp-status">{{ _("pilotage_actif") }}</span>
+                    </div>
+
+                    {% if cdp and cdp.get('persona') %}
+                    <div class="mc-cdp-section">
+                        <div class="mc-cdp-section-title">{{ _("persona") }}</div>
+                        <div class="mc-cdp-persona">{{ cdp['persona'][:250] }}{% if cdp['persona']|length > 250 %}...{% endif %}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if cdp and cdp.get('motivation') %}
+                    <div class="mc-cdp-section">
+                        <div class="mc-cdp-section-title">{{ _("motivation") }}</div>
+                        <div class="mc-cdp-motivation">{{ cdp['motivation'][:200] }}{% if cdp['motivation']|length > 200 %}...{% endif %}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if cdp and cdp.get('skills') %}
+                    <div class="mc-cdp-section">
+                        <div class="mc-cdp-section-title">{{ _("skills") }}</div>
+                        <div class="mc-cdp-tags">
+                            {% for s in cdp['skills'][:8] %}
+                            <span class="mc-cdp-tag skill">{{ s }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if cdp and cdp.get('tools') %}
+                    <div class="mc-cdp-section">
+                        <div class="mc-cdp-section-title">{{ _("tools") }}</div>
+                        <div class="mc-cdp-tags">
+                            {% for t in cdp['tools'][:20] %}
+                            {% if t.startswith('mcp:') %}
+                            <span class="mc-cdp-tag mcp">{{ t[4:] }}</span>
+                            {% else %}
+                            <span class="mc-cdp-tag tool">{{ t }}</span>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="mc-cdp-actions">
+                        <button class="mc-cdp-btn mc-cdp-btn-chat" onclick="openCdpChat()">
+                            <svg class="icon icon-xs"><use href="#icon-message-square"/></svg> Discuter
+                        </button>
+                        <button id="mc-run-btn" class="mc-cdp-btn mc-cdp-btn-wf" onclick="startMissionExecution()">
+                            <svg class="icon icon-xs"><use href="#icon-play"/></svg> {{ _('launch') }}
+                        </button>
+                    </div>
+                    <div style="text-align:right;margin-top:0.3rem">
+                        <button id="mc-reset-btn" onclick="resetMission()" style="background:none;border:none;color:var(--text-secondary);font-size:0.6rem;cursor:pointer;opacity:.6;transition:opacity .15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'">{{ _("reinitialiser") }}</button>
+                        <button id="mc-confluence-btn" onclick="syncConfluence()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-secondary);font-size:0.65rem;cursor:pointer;padding:2px 8px;margin-left:8px;opacity:.8;transition:opacity .15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.8'">
+                            <svg class="icon icon-xs" style="width:12px;height:12px;vertical-align:middle;margin-right:3px"><use href="#icon-upload-cloud"/></svg>Sync Confluence
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity feed -->
+        <div class="mc-activity" id="mc-activity">
+            <div class="mc-msg system"><div class="mc-msg-content">Epic démarrée — {{ mission.brief[:200] }}</div></div>
+            <div class="mc-msg tool"><div class="mc-msg-time">{{ "now" }}</div><div class="mc-msg-content">{{ mission.phases|length }} phases à orchestrer • Pattern: mega-workflow lifecycle</div></div>
+            {% if mission.workspace_path %}
+            <div class="mc-msg tool"><div class="mc-msg-content">Workspace: <code>{{ mission.workspace_path }}</code></div></div>
+            {% endif %}
+        </div>
+
+        <!-- Sub-Missions Hierarchy (Epic → Features) -->
+        {% if sub_missions %}
+        <div class="mc-side-section">
+            <div class="mc-side-title">
+                <svg class="icon icon-xs"><use href="#icon-git-branch"/></svg> Sous-Missions ({{ sub_missions|length }})
+            </div>
+            <div class="mc-sub-missions">
+                {% for sub in sub_missions %}
+                {% set sub_done = sub.phases|selectattr('status.value','equalto','done')|list|length %}
+                {% set sub_total = sub.phases|length %}
+                {% set sub_pct = ((sub_done / sub_total) * 100)|round|int if sub_total > 0 else 0 %}
+                {% set sub_st = sub.status.value %}
+                <a href="/missions/{{ sub.id }}/control" class="mc-sub-card">
+                    <div class="mc-sub-status {{ sub_st }}"></div>
+                    <div class="mc-sub-body">
+                        <div class="mc-sub-name">{{ sub.brief[:60] if sub.brief else sub.workflow_name }}</div>
+                        <div class="mc-sub-progress">
+                            <div class="mc-sub-bar"><div class="mc-sub-fill {{ sub_st }}" style="width:{{ sub_pct }}%"></div></div>
+                            <span class="mc-sub-label">{{ sub_done }}/{{ sub_total }}</span>
+                        </div>
+                    </div>
+                    <span class="mission-badge {{ sub_st }}" style="font-size:0.6rem">{{ sub_st }}</span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if parent_mission %}
+        <div class="mc-side-section">
+            <div class="mc-side-title">
+                <svg class="icon icon-xs"><use href="#icon-arrow-up"/></svg> Epic Parente
+            </div>
+            <a href="/missions/{{ parent_mission.id }}/control" class="mc-parent-link">
+                <span class="mission-badge {{ parent_mission.status.value }}" style="font-size:0.6rem">{{ parent_mission.status.value }}</span>
+                {{ parent_mission.brief[:80] if parent_mission.brief else parent_mission.workflow_name }}
+            </a>
+        </div>
+        {% endif %}
+
+        <!-- Memory — Project Wiki -->
+        <div class="mc-side-section">
+            <div class="mc-side-title">
+                <svg class="icon icon-xs"><use href="#icon-book-open"/></svg> Contexte Projet
+            </div>
+            <input type="text" class="mc-mem-search" id="mc-mem-search" placeholder="{{ _('search') }}" oninput="filterMemory(this.value)">
+            <div id="mc-memory">
+                {% if memories %}
+                    {% set cat_labels = {'phase-summary':'Phases','product':'Produit','architecture':'Architecture','security':'Securite','development':'Developpement','quality':'Qualite','vision':'Vision','convention':'Conventions','team':'Equipe','decisions':'Decisions','infrastructure':'Infrastructure'} %}
+                    {% for cat, entries in memory_groups.items() %}
+                    <div class="mc-mem-group" data-cat="{{ cat }}">
+                        <div class="mc-mem-group-title" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+                            {{ cat_labels.get(cat, cat) }} <span class="mc-mem-group-count">({{ entries|length }})</span>
+                        </div>
+                        <div class="mc-mem-group-items">
+                            {% for mem in entries %}
+                            <div class="mc-mem-entry" data-key="{{ mem.get('key','') }}" title="{{ mem.get('value','') }}">
+                                <div class="mc-mem-key">{{ mem.get('key','') }}</div>
+                                <div class="mc-mem-val">{{ mem.get('value','')[:200] }}{% if mem.get('value','')|length > 200 %}...{% endif %}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="mc-mem-empty">{{ _('no_context') }}</div>
+                {% endif %}
+            </div>
+            <button class="mc-mem-add" onclick="addMemoryEntry()">{{ _('new_entry') }}</button>
+        </div>
+
+        <!-- SI Blueprint -->
+        {% if si_blueprint %}
+        <div class="mc-side-section">
+            <div class="mc-side-title">
+                <svg class="icon icon-xs"><use href="#icon-server"/></svg> SI Blueprint
+            </div>
+            {% if si_blueprint.cloud %}
+            <div class="mc-si-item"><span class="mc-si-label">{{ _("cloud") }}</span><span class="mc-si-value">{{ si_blueprint.cloud.provider | default('?') }} / {{ si_blueprint.cloud.region | default('') }}</span></div>
+            {% endif %}
+            {% if si_blueprint.compute %}
+            <div class="mc-si-item"><span class="mc-si-label">{{ _("compute") }}</span><span class="mc-si-value">{{ si_blueprint.compute.type | default('?') }} ({{ si_blueprint.compute.size | default('') }})</span></div>
+            {% endif %}
+            {% if si_blueprint.cicd %}
+            <div class="mc-si-item"><span class="mc-si-label">{{ _("ci_cd") }}</span><span class="mc-si-value">{{ si_blueprint.cicd.provider | default('?') }}</span></div>
+            {% endif %}
+            {% if si_blueprint.databases %}
+            <div class="mc-si-item"><span class="mc-si-label">{{ _("dbs") }}</span><span class="mc-si-value">{{ si_blueprint.databases | map(attribute='type') | join(', ') }}</span></div>
+            {% endif %}
+            {% if si_blueprint.existing_services %}
+            <div style="margin-top:0.2rem">
+                {% for svc in si_blueprint.existing_services[:5] %}
+                <div class="mc-si-svc">{{ svc.name }} — {{ svc.proto | default('') }} ({{ svc.tech | default('') | truncate(30) }})</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Lessons from past epics -->
+        {% if lessons %}
+        <div class="mc-side-section">
+            <div class="mc-side-title">
+                <svg class="icon icon-xs"><use href="#icon-zap"/></svg> Lessons ({{ lessons|length }})
+            </div>
+            {% for l in lessons[:8] %}
+            <div class="mc-lesson">
+                <div class="mc-lesson-cat">{{ l.category | default('lesson') }}</div>
+                {{ l.value | default(l.get('key', '')) | truncate(120) }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Features / Deliverables -->
+        {% if features %}
+        <div class="mc-side-section">
+            <div class="mc-side-title">
+                <svg class="icon icon-xs"><use href="#icon-check-circle"/></svg> Livrables ({{ features|length }})
+            </div>
+            {% for f in features[:15] %}
+            <div style="display:flex;align-items:flex-start;gap:0.4rem;padding:0.2rem 0;font-size:0.72rem">
+                <span style="color:var(--green);flex-shrink:0;margin-top:1px">&#9679;</span>
+                <span style="color:var(--text-secondary)">{{ f[:80] }}{% if f|length > 80 %}…{% endif %}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Git + PRs -->
+        <div class="mc-side-section">
+            <div class="mc-side-title">
+                <svg class="icon icon-xs"><use href="#icon-git-branch"/></svg> Git & PRs
+            </div>
+            <div id="mc-prs">
+                {% if pull_requests %}
+                    {% for pr in pull_requests %}
+                    <div class="mc-pr">
+                        <span class="mc-pr-icon {{ pr.status|lower }}"><svg class="icon icon-xs"><use href="#icon-git-pull-request"/></svg></span>
+                        <span class="mc-pr-title" title="{{ pr.title }}">#{{ pr.number }} {{ pr.title[:30] }}{% if pr.title|length > 30 %}…{% endif %}</span>
+                        <span class="mc-pr-status {{ pr.status|lower }}">{{ pr.status }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="mc-pr-empty">{{ _('no_pr_detected') }}</div>
+                {% endif %}
+            </div>
+            <div id="mc-commits">
+                {% if workspace_commits %}
+                    {% for c in workspace_commits[:15] %}
+                    <div class="mc-commit">
+                        <code class="mc-commit-hash">{{ c.hash[:7] }}</code>
+                        <span class="mc-commit-msg">{{ c.message[:60] }}{% if c.message|length > 60 %}…{% endif %}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div style="font-size:0.7rem;color:var(--text-secondary);font-style:italic;padding:0.3rem 0">{{ _('no_commit_detected') }}</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Agent Popover -->
+<div class="mc-popover-overlay" id="mcPopoverOverlay" onclick="closeMcPopover()"></div>
+<div class="mc-popover" id="mcPopover">
+    <button class="mc-popover-close" onclick="closeMcPopover()">✕</button>
+    <div class="mc-popover-header" id="mcPopHeader"></div>
+    <div class="mc-popover-body" id="mcPopBody"></div>
+</div>
+
+<!-- Agent Chat Modal (generic — works for CDP + tab agents) -->
+<div class="mc-chat-overlay" id="mcChatOverlay" onclick="if(event.target===this)closeCdpChat()">
+    <div class="mc-chat-modal">
+        <div class="mc-chat-head">
+            <img class="mc-chat-head-avatar" id="mcChatAvatar" src="{{ cdp['avatar_url'] if cdp else '/static/avatars/' + (orchestrator_id|default('chef_de_programme')) + '.svg' }}" alt=""
+                 onerror="this.src='/static/avatars/{{ orchestrator_id|default('chef_de_programme') }}.svg'">
+            <div class="mc-chat-head-info">
+                <h3 id="mcChatName">{{ cdp['name'] if cdp else 'Orchestrateur' }}</h3>
+                <small id="mcChatRole">{{ cdp['role'] if cdp else 'Orchestrateur' }} &mdash; {{ mission.brief[:60] }}{% if mission.brief|length > 60 %}...{% endif %}</small>
+            </div>
+            <button class="mc-chat-close" onclick="closeCdpChat()">✕</button>
+        </div>
+        <div class="mc-chat-msgs" id="mcChatMsgs">
+            <div class="mc-chat-msg system">
+                <div class="mc-chat-bubble" id="mcChatWelcome">{{ _("discutez_avec_le_cdp_il_peut") }}</div>
+            </div>
+        </div>
+        <div class="mc-chat-input-row">
+            <textarea class="mc-chat-input" id="mcChatInput" placeholder="Posez une question..." rows="1"
+                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCdpMessage()}"></textarea>
+            <button class="mc-chat-send" id="mcChatSend" onclick="sendCdpMessage()">{{ _("envoyer") }}</button>
+        </div>
+    </div>
+</div>
+

@@ -532,10 +532,13 @@ async def _execute_node(
 
     # ── Adversarial Guard with retry loop ──
     # If rejected, re-run agent with feedback (max 1 retry = 2 attempts total)
-    # Coordinators (decompose protocol) skip L1 — they manage, don't code
-    # Severity tiers: 5-6 = WARNING (pass with note), 7-8 = RETRY, 9-10 = HARD REJECT
+    # Coordinators and discussion patterns skip L1 (expensive LLM check)
+    # Discussion patterns: agents brainstorm, quality varies — L1 wastes rate-limited calls
     MAX_ADVERSARIAL_RETRIES = 0  # No retry loops — rejection = warning only, forward progress
     is_coordinator = protocol_override and "DECOMPOSE" in protocol_override
+    _discussion_patterns = {"network", "human-in-the-loop", "debate", "aggregator"}
+    is_discussion = run.pattern.type in _discussion_patterns
+    skip_l1 = is_coordinator or is_discussion
     guard_result = None
     cumulative_tool_calls = list(result.tool_calls or [])  # accumulate across retries
     if content and not result.error and state.status == NodeStatus.COMPLETED:
@@ -549,7 +552,7 @@ async def _execute_node(
                     agent_name=agent.name,
                     tool_calls=cumulative_tool_calls,
                     pattern_type=run.pattern.type,
-                    enable_l1=not is_coordinator,
+                    enable_l1=not skip_l1,
                 )
             except Exception as guard_err:
                 logger.warning("Adversarial guard error: %s", guard_err)
