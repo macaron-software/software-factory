@@ -139,6 +139,39 @@ async def lifespan(app: FastAPI):
     logger.info("Platform shut down")
 
 
+def _record_incident(path: str, status_code: int, detail: str = ""):
+    """Record a platform incident with deduplication (5-minute window)."""
+    import sqlite3
+    import uuid
+    from .config import DB_PATH
+
+    error_type = str(status_code)
+    error_detail = detail or f"HTTP {status_code} on {path}"
+    title = f"[Auto] {error_type} — {path}"
+
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+        # Deduplicate: skip if same error_type+error_detail in last 5 minutes
+        dup = conn.execute(
+            "SELECT 1 FROM platform_incidents "
+            "WHERE error_type=? AND error_detail=? "
+            "AND created_at > datetime('now', '-5 minutes')",
+            (error_type, error_detail),
+        ).fetchone()
+        if dup:
+            conn.close()
+            return
+        conn.execute(
+            "INSERT INTO platform_incidents (id, title, severity, status, source, error_type, error_detail) "
+            "VALUES (?, ?, 'P3', 'open', 'auto', ?, ?)",
+            (str(uuid.uuid4())[:12], title, error_type, error_detail),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
 def create_app() -> FastAPI:
     """Application factory."""
     app = FastAPI(
@@ -146,6 +179,18 @@ def create_app() -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+
+    # Incident middleware — auto-detect 500 errors
+    @app.middleware("http")
+    async def incident_middleware(request, call_next):
+        try:
+            response = await call_next(request)
+            if response.status_code >= 500:
+                _record_incident(request.url.path, response.status_code)
+            return response
+        except Exception as e:
+            _record_incident(request.url.path, 500, str(e))
+            raise
 
     # Static files
     if STATIC_DIR.exists():

@@ -579,3 +579,111 @@ async def rbac_check(request: Request):
     return JSONResponse({"allowed": ok, "reason": reason})
 
 
+# ── Incidents ────────────────────────────────────────────────────
+
+@router.get("/api/incidents/stats")
+async def incidents_stats():
+    """Incident counts by severity and status."""
+    from ...db.migrations import get_db
+    db = get_db()
+    try:
+        by_severity = db.execute(
+            "SELECT severity, COUNT(*) as cnt FROM platform_incidents GROUP BY severity"
+        ).fetchall()
+        by_status = db.execute(
+            "SELECT status, COUNT(*) as cnt FROM platform_incidents GROUP BY status"
+        ).fetchall()
+        recent = db.execute(
+            "SELECT id, title, severity, status, source, error_type, created_at "
+            "FROM platform_incidents ORDER BY created_at DESC LIMIT 5"
+        ).fetchall()
+        return JSONResponse({
+            "by_severity": {r["severity"]: r["cnt"] for r in by_severity},
+            "by_status": {r["status"]: r["cnt"] for r in by_status},
+            "recent": [dict(r) for r in recent],
+        })
+    except Exception:
+        return JSONResponse({"by_severity": {}, "by_status": {}, "recent": []})
+    finally:
+        db.close()
+
+
+@router.get("/api/incidents")
+async def list_incidents(request: Request):
+    """List incidents, optionally filtered by status/severity."""
+    from ...db.migrations import get_db
+    status = request.query_params.get("status", "")
+    severity = request.query_params.get("severity", "")
+    limit = int(request.query_params.get("limit", "50"))
+    db = get_db()
+    try:
+        query = "SELECT * FROM platform_incidents WHERE 1=1"
+        params = []
+        if status:
+            query += " AND status=?"
+            params.append(status)
+        if severity:
+            query += " AND severity=?"
+            params.append(severity)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        rows = db.execute(query, params).fetchall()
+        return JSONResponse([dict(r) for r in rows])
+    except Exception:
+        return JSONResponse([])
+    finally:
+        db.close()
+
+
+@router.post("/api/incidents")
+async def create_incident(request: Request):
+    """Create a manual incident."""
+    import uuid
+    from ...db.migrations import get_db
+    data = await request.json()
+    title = data.get("title", "")
+    if not title:
+        return JSONResponse({"error": "title required"}, status_code=400)
+    inc_id = str(uuid.uuid4())[:12]
+    db = get_db()
+    try:
+        db.execute(
+            "INSERT INTO platform_incidents (id, title, severity, status, source, error_type, error_detail, mission_id, agent_id) "
+            "VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?)",
+            (inc_id, title, data.get("severity", "P3"), data.get("source", "manual"),
+             data.get("error_type", ""), data.get("error_detail", ""),
+             data.get("mission_id", ""), data.get("agent_id", "")),
+        )
+        db.commit()
+        return JSONResponse({"id": inc_id, "title": title})
+    finally:
+        db.close()
+
+
+@router.patch("/api/incidents/{incident_id}")
+async def update_incident(request: Request, incident_id: str):
+    """Update incident status (resolve, close)."""
+    from ...db.migrations import get_db
+    data = await request.json()
+    db = get_db()
+    try:
+        updates = []
+        params = []
+        if "status" in data:
+            updates.append("status=?")
+            params.append(data["status"])
+            if data["status"] in ("resolved", "closed"):
+                updates.append("resolved_at=CURRENT_TIMESTAMP")
+        if "resolution" in data:
+            updates.append("resolution=?")
+            params.append(data["resolution"])
+        if not updates:
+            return JSONResponse({"error": "nothing to update"}, status_code=400)
+        params.append(incident_id)
+        db.execute(f"UPDATE platform_incidents SET {', '.join(updates)} WHERE id=?", params)
+        db.commit()
+        return JSONResponse({"ok": True, "id": incident_id})
+    finally:
+        db.close()
+
+

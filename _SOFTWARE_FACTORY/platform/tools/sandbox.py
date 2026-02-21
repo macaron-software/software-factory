@@ -87,13 +87,14 @@ class SandboxExecutor:
         image: Optional[str] = None,
         network: str = SANDBOX_NETWORK,
         env: Optional[dict] = None,
+        agent_id: Optional[str] = None,
     ) -> SandboxResult:
         """Execute command — in Docker if sandbox enabled, else direct subprocess."""
         import time
         t0 = time.monotonic()
 
         if SANDBOX_ENABLED:
-            result = self._run_docker(command, cwd, timeout, image, network, env)
+            result = self._run_docker(command, cwd, timeout, image, network, env, agent_id)
         else:
             result = self._run_direct(command, cwd, timeout, env)
 
@@ -108,19 +109,32 @@ class SandboxExecutor:
         image: Optional[str],
         network: str,
         env: Optional[dict],
+        agent_id: Optional[str] = None,
     ) -> SandboxResult:
-        """Run command inside a Docker container."""
+        """Run command inside a Docker container with per-agent isolation."""
         use_image = image or _detect_image(command)
         workdir = cwd or self.workspace
+
+        # Per-agent UID isolation: hash agent_id to a stable UID (10000-60000 range)
+        uid = None
+        if agent_id:
+            uid = 10000 + (hash(agent_id) % 50000)
 
         docker_cmd = [
             "docker", "run", "--rm",
             "--network", network,
             "--memory", SANDBOX_MEMORY,
             "--cpus", "2",
+            "--read-only",
+            "--tmpfs", "/tmp:rw,noexec,nosuid,size=100m",
             "-v", f"{self.workspace}:/workspace",
             "-w", f"/workspace/{os.path.relpath(workdir, self.workspace)}" if workdir != self.workspace else "/workspace",
         ]
+
+        # Run as non-root agent-specific user
+        if uid:
+            docker_cmd.extend(["--user", str(uid)])
+            logger.debug("Sandbox agent=%s uid=%d", agent_id, uid)
 
         # Pass environment variables
         if env:

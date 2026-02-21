@@ -153,8 +153,8 @@
     </div>
 </div>
 
-<!-- DORA Metrics + Org Summary -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.2rem">
+<!-- DORA Metrics + Org Summary + Incidents -->
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.2rem">
     <div class="dsi-panel">
         <div class="dsi-panel-header">
             <div class="dsi-panel-title"><svg><use href="#icon-chart"/></svg> DORA Metrics (30j)</div>
@@ -209,9 +209,53 @@
             </div>
         </div>
     </div>
+    <!-- Incidents -->
+    <div class="dsi-panel" id="incidents-panel" hx-get="/api/incidents/stats" hx-trigger="load, every 60s" hx-swap="innerHTML" hx-target="#incidents-content">
+        <div class="dsi-panel-header">
+            <div class="dsi-panel-title"><svg><use href="#icon-alert-triangle"/></svg> Incidents</div>
+            <a href="/api/incidents" class="btn btn-ghost" style="font-size:0.65rem;padding:0.15rem 0.4rem">Tout →</a>
+        </div>
+        <div class="dsi-panel-body" style="max-height:200px" id="incidents-content">
+            <div style="text-align:center;color:var(--text-muted);padding:1rem;font-size:0.75rem">Chargement…</div>
+        </div>
+    </div>
 </div>
 
-<!-- Top: Decisions + System Map -->
+<script>
+// Render incidents stats from JSON into the panel
+document.addEventListener('htmx:afterRequest', function(evt) {
+    if (evt.detail.target && evt.detail.target.id === 'incidents-content') {
+        try {
+            const data = JSON.parse(evt.detail.xhr.responseText);
+            const sev = data.by_severity || {};
+            const colors = {P0:'var(--red)',P1:'#f97316',P2:'var(--yellow)',P3:'var(--blue)',P4:'#6b7280'};
+            let html = '<div style="display:flex;gap:0.4rem;margin-bottom:0.5rem;flex-wrap:wrap">';
+            for (const p of ['P0','P1','P2','P3','P4']) {
+                const cnt = sev[p] || 0;
+                if (cnt > 0) html += `<span style="padding:0.15rem 0.45rem;border-radius:4px;font-size:0.65rem;font-weight:700;background:${colors[p]}22;color:${colors[p]}">${p}: ${cnt}</span>`;
+            }
+            html += '</div>';
+            const recent = data.recent || [];
+            if (recent.length === 0) {
+                html += '<div style="text-align:center;color:var(--text-muted);padding:0.5rem;font-size:0.72rem">Aucun incident</div>';
+            }
+            for (const r of recent) {
+                const sc = colors[r.severity] || '#6b7280';
+                const st = r.status === 'open' ? 'var(--red)' : (r.status === 'resolved' ? 'var(--green)' : 'var(--text-muted)');
+                html += `<div style="padding:0.35rem 0.5rem;margin-bottom:0.3rem;border-radius:5px;border:1px solid var(--border);background:var(--bg-tertiary);font-size:0.72rem">
+                    <div style="display:flex;align-items:center;gap:0.3rem">
+                        <span style="color:${sc};font-weight:700;font-size:0.62rem">${r.severity}</span>
+                        <span style="flex:1;font-weight:600;color:var(--text-primary)">${(r.title||'').substring(0,60)}</span>
+                        <span style="font-size:0.58rem;padding:0.1rem 0.3rem;border-radius:3px;background:${st}18;color:${st};font-weight:600">${r.status}</span>
+                    </div>
+                    <div style="font-size:0.6rem;color:var(--text-muted);margin-top:2px">${r.source || 'auto'} · ${(r.created_at||'').substring(0,16)}</div>
+                </div>`;
+            }
+            evt.detail.target.innerHTML = html;
+        } catch(e) {}
+    }
+});
+</script>
 <div class="dsi-top">
     <!-- Left: Comité Stratégique decisions -->
     <div class="dsi-panel">
