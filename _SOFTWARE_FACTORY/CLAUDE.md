@@ -113,6 +113,28 @@ DR:   L3 full — 14/14 checks verified, 100% coverage
       Runbook: platform/ops/RUNBOOK.md (5 scenarios: PG corruption, SQLite loss, VM loss, keys lost, full disaster)
 ```
 
+## INFRA HARDENING (implemented)
+```
+Security:
+  CORS: CORSMiddleware (localhost + VM origins)
+  Headers: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, HSTS, Referrer-Policy
+  Secrets: externalized → ~/.config/factory/.env (chmod 600), no hardcoded defaults
+  Docker: non-root user 'macaron' in both Dockerfiles
+  Auth: AuthMiddleware (bearer token, MACARON_API_KEY env var)
+
+Resilience:
+  PG pool: psycopg_pool.ConnectionPool (min=2, max=20, idle=300s)
+  LLM circuit breaker: 5 failures/60s → open 120s, half-open probe, auto-recovery
+  Bus: async persist via call_soon (non-blocking publish)
+  Rate limit: PG-backed (rate_limit_hits table), per-IP+token, survives restart
+
+Observability:
+  Structured logging: JSON format, trace_id (per-request), agent_id, secret redaction
+  LOG_LEVEL env var, LOG_FORMAT=text for human-readable
+  OpenTelemetry: FastAPIInstrumentor + ConsoleSpanExporter (OTEL_ENABLED=1)
+  Trace-ID: X-Trace-ID header (generated per-request, propagated in responses)
+```
+
 ## SF PIPELINE
 ```
 Brain (Opus) → FRACTAL (3 concerns) → TDD Workers (//) → Adversarial → Build → Infra Check → Deploy → E2E → Promote/Rollback → Feedback → XP Agent
