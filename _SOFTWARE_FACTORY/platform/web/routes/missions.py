@@ -966,6 +966,12 @@ async def api_mission_reset(request: Request, mission_id: str):
     if not mission:
         return JSONResponse({"error": "Not found"}, status_code=404)
 
+    # Cancel any running asyncio task for this mission
+    existing_task = _active_mission_tasks.pop(mission_id, None)
+    if existing_task and not existing_task.done():
+        existing_task.cancel()
+        logger.info("Cancelled running task for mission %s", mission_id)
+
     # Reset all phases to pending
     for p in mission.phases:
         p.status = PhaseStatus.PENDING

@@ -531,10 +531,10 @@ async def _execute_node(
         state.status = NodeStatus.COMPLETED
 
     # ── Adversarial Guard with retry loop ──
-    # If rejected, re-run agent with feedback (max 4 retries = 5 attempts total)
+    # If rejected, re-run agent with feedback (max 1 retry = 2 attempts total)
     # Coordinators (decompose protocol) skip L1 — they manage, don't code
     # Severity tiers: 5-6 = WARNING (pass with note), 7-8 = RETRY, 9-10 = HARD REJECT
-    MAX_ADVERSARIAL_RETRIES = 4
+    MAX_ADVERSARIAL_RETRIES = 1
     is_coordinator = protocol_override and "DECOMPOSE" in protocol_override
     guard_result = None
     cumulative_tool_calls = list(result.tool_calls or [])  # accumulate across retries
