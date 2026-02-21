@@ -28,10 +28,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/api/health', timeout=5)"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 20s
 
   android-builder:
     build:
@@ -52,8 +52,7 @@ services:
       - ./nginx-vm.conf:/etc/nginx/conf.d/default.conf:ro
       - /opt/macaron/.htpasswd:/etc/nginx/.htpasswd:ro
     depends_on:
-      platform:
-        condition: service_healthy
+      - platform
     restart: unless-stopped
 
 volumes:
