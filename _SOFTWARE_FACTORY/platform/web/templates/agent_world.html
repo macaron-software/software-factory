@@ -4,6 +4,8 @@
 <div style="display:flex;align-items:center;gap:10px;">
     <span class="badge badge-purple" id="world-agent-count">{{ agents|length }} agents</span>
     <span class="badge badge-green" id="world-active-count">0 actifs</span>
+    <span class="badge badge-blue" id="world-mission-count">0 missions</span>
+    <button class="btn btn-sm" onclick="worldToggleDayNight()" title="Jour/Nuit" id="btn-daynight">🌙</button>
     <button class="btn btn-sm" onclick="worldResetCamera()" title="Reset camera">
         <svg class="icon icon-sm"><use href="#icon-maximize"/></svg>
     </button>
@@ -133,17 +135,29 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ═══════════════════════════════════════════════════════════════
 
 const AGENT_DATA = {{ agents_json|safe }};
+const LIVE_DATA = {{ live_json|safe }};
+
+// ── Day/Night Mode ──
+let isDayMode = localStorage.getItem('world-day') === '1';
+const THEMES = {
+    night: { bg: 0x151020, fog: 0x151020, ambient: 0x6040a0, ambientI: 1.0, dirColor: 0xffeedd, dirI: 1.2,
+             fillColor: 0xaabbff, fillI: 0.5, hemiSky: 0x9080d0, hemiGnd: 0x302540, hemiI: 0.6,
+             floor: 0x1e1830, grid1: 0x302550, grid2: 0x251a40, exposure: 1.4 },
+    day:   { bg: 0xb8d0e8, fog: 0xc8ddf0, ambient: 0xffffff, ambientI: 0.6, dirColor: 0xfffaf0, dirI: 1.8,
+             fillColor: 0x8ebbff, fillI: 0.7, hemiSky: 0x87ceeb, hemiGnd: 0x8fbc8f, hemiI: 0.8,
+             floor: 0xd5cfc2, grid1: 0xc0b8a8, grid2: 0xccc4b4, exposure: 1.0 },
+};
 
 // ── Zone Definitions ──
 const ZONES = [
-    { id:'board',   name:'Board Room',    x:-18, z:-14, w:14, h:8,  color:0xd4a017, floorColor:0x2a2010, roles:['dsi','cto','cpo','strat-cpo','strat-cto','lean_portfolio_manager','strat-portfolio'] },
-    { id:'meeting', name:'Meeting Room',  x:-18, z:-3,  w:14, h:10, color:0x7c3aed, floorColor:0x201535, roles:['scrum_master','chef_projet','agile_coach','chef_de_programme','product_manager','epic_owner','solution_manager'] },
-    { id:'dev',     name:'Dev Zone',      x:-18, z:10,  w:14, h:14, color:0x3b82f6, floorColor:0x152040, roles:['lead_dev','dev_backend','dev_frontend','dev_mobile','dev_fullstack','worker','ml_engineer','data_engineer','plat-lead-dev','plat-dev-backend','plat-dev-frontend','plat-dev-agents','plat-dev-patterns','plat-dev-infra'] },
-    { id:'arch',    name:'Architecture',  x:0,   z:-14, w:14, h:8,  color:0x6366f1, floorColor:0x1a1535, roles:['enterprise_architect','solution_architect','cloud_architect','architecte','brain'] },
-    { id:'qa',      name:'QA Lab',        x:0,   z:-3,  w:14, h:10, color:0x22c55e, floorColor:0x102518, roles:['qa_lead','test_automation','test_manager','accessibility_expert','tester','performance_engineer','plat-tma-qa'] },
-    { id:'devops',  name:'Server Room',   x:0,   z:10,  w:14, h:14, color:0x06b6d4, floorColor:0x102528, roles:['devops','sre','dba','pipeline_engineer','devsecops','plat-dev-infra'] },
-    { id:'product', name:'Product Corner',x:18,  z:-14, w:14, h:8,  color:0xf97316, floorColor:0x2a1a10, roles:['product','product_manager','epic_owner','tech_writer','pmo'] },
-    { id:'chill',   name:'Chill Zone',    x:18,  z:0,   w:14, h:12, color:0x84cc16, floorColor:0x182510, roles:[] },
+    { id:'board',   name:'Board Room',    x:-18, z:-14, w:14, h:8,  color:0xd4a017, floorColor:0x2a2010, floorDay:0xe8dcc0, roles:['dsi','cto','cpo','strat-cpo','strat-cto','lean_portfolio_manager','strat-portfolio'] },
+    { id:'meeting', name:'Meeting Room',  x:-18, z:-3,  w:14, h:10, color:0x7c3aed, floorColor:0x201535, floorDay:0xd8d0e8, roles:['scrum_master','chef_projet','agile_coach','chef_de_programme','product_manager','epic_owner','solution_manager'] },
+    { id:'dev',     name:'Dev Zone',      x:-18, z:10,  w:14, h:14, color:0x3b82f6, floorColor:0x152040, floorDay:0xc8d8f0, roles:['lead_dev','dev_backend','dev_frontend','dev_mobile','dev_fullstack','worker','ml_engineer','data_engineer','plat-lead-dev','plat-dev-backend','plat-dev-frontend','plat-dev-agents','plat-dev-patterns','plat-dev-infra'] },
+    { id:'arch',    name:'Architecture',  x:0,   z:-14, w:14, h:8,  color:0x6366f1, floorColor:0x1a1535, floorDay:0xd0cce8, roles:['enterprise_architect','solution_architect','cloud_architect','architecte','brain'] },
+    { id:'qa',      name:'QA Lab',        x:0,   z:-3,  w:14, h:10, color:0x22c55e, floorColor:0x102518, floorDay:0xc0e0c8, roles:['qa_lead','test_automation','test_manager','accessibility_expert','tester','performance_engineer','plat-tma-qa'] },
+    { id:'devops',  name:'Server Room',   x:0,   z:10,  w:14, h:14, color:0x06b6d4, floorColor:0x102528, floorDay:0xc0dce0, roles:['devops','sre','dba','pipeline_engineer','devsecops','plat-dev-infra'] },
+    { id:'product', name:'Product Corner',x:18,  z:-14, w:14, h:8,  color:0xf97316, floorColor:0x2a1a10, floorDay:0xf0dcc0, roles:['product','product_manager','epic_owner','tech_writer','pmo'] },
+    { id:'chill',   name:'Chill Zone',    x:18,  z:0,   w:14, h:12, color:0x84cc16, floorColor:0x182510, floorDay:0xd0e8c0, roles:[] },
 ];
 
 const STATUS_COLORS = {
@@ -163,6 +177,8 @@ let agents = {};  // id → { mesh, data, target, status, walkPhase, ... }
 let raycaster, mouse;
 let selectedAgent = null;
 let particleSystems = [];
+// Day/Night scene references
+let sceneRefs = { ambient: null, dir: null, fill: null, hemi: null, floor: null, grid: null, zoneMeshes: [], trees: [], skyDome: null, fountain: null, stars: null };
 
 // ── Loading ──
 const loadBar = document.getElementById('world-load-bar');
@@ -215,19 +231,27 @@ function init() {
     buildLighting();
     setLoadProgress(30);
     buildFloor();
-    setLoadProgress(40);
+    setLoadProgress(35);
     buildZones();
+    setLoadProgress(40);
+    buildWalls();
     setLoadProgress(50);
     buildFurniture();
+    setLoadProgress(60);
+    buildNature();
     setLoadProgress(70);
     buildAgents();
-    setLoadProgress(85);
+    setLoadProgress(80);
     buildAmbientParticles();
-    setLoadProgress(95);
+    setLoadProgress(85);
+    buildMissionBoards();
+    setLoadProgress(90);
     buildZoneLabelsUI();
     setupInteraction();
     connectSSE();
-    startAutonomousLife();
+    seedLiveData();
+    if (isDayMode) applyDayNight(true, false);
+    document.getElementById('btn-daynight').textContent = isDayMode ? '☀️' : '🌙';
 
     setLoadProgress(100);
     setTimeout(() => loadScreen.classList.add('hidden'), 400);
@@ -236,6 +260,7 @@ function init() {
     window.addEventListener('resize', onResize);
     window.worldResetCamera = resetCamera;
     window.worldDeselectAgent = deselectAgent;
+    window.worldToggleDayNight = toggleDayNight;
 
     animate();
 }
@@ -244,36 +269,34 @@ function init() {
 // LIGHTING
 // ═══════════════════════════════════════════════════════
 function buildLighting() {
-    // Ambient — brighter purple-tinted fill
-    const ambient = new THREE.AmbientLight(0x6040a0, 1.0);
+    const t = isDayMode ? THEMES.day : THEMES.night;
+    const ambient = new THREE.AmbientLight(t.ambient, t.ambientI);
     scene.add(ambient);
+    sceneRefs.ambient = ambient;
 
-    // Main directional — bright warm from top-right
-    const dir = new THREE.DirectionalLight(0xffeedd, 1.2);
+    const dir = new THREE.DirectionalLight(t.dirColor, t.dirI);
     dir.position.set(20, 30, 15);
     dir.castShadow = true;
     dir.shadow.mapSize.set(2048, 2048);
-    dir.shadow.camera.left = -40;
-    dir.shadow.camera.right = 40;
-    dir.shadow.camera.top = 40;
-    dir.shadow.camera.bottom = -40;
-    dir.shadow.camera.near = 1;
-    dir.shadow.camera.far = 80;
+    dir.shadow.camera.left = -40; dir.shadow.camera.right = 40;
+    dir.shadow.camera.top = 40; dir.shadow.camera.bottom = -40;
+    dir.shadow.camera.near = 1; dir.shadow.camera.far = 80;
     dir.shadow.bias = -0.001;
     scene.add(dir);
+    sceneRefs.dir = dir;
 
-    // Secondary fill light from opposite side
-    const fill = new THREE.DirectionalLight(0xaabbff, 0.5);
+    const fill = new THREE.DirectionalLight(t.fillColor, t.fillI);
     fill.position.set(-15, 20, -10);
     scene.add(fill);
+    sceneRefs.fill = fill;
 
-    // Hemisphere — sky/ground
-    const hemi = new THREE.HemisphereLight(0x9080d0, 0x302540, 0.6);
+    const hemi = new THREE.HemisphereLight(t.hemiSky, t.hemiGnd, t.hemiI);
     scene.add(hemi);
+    sceneRefs.hemi = hemi;
 
-    // Zone point lights — brighter
+    // Zone point lights
     for (const z of ZONES) {
-        const pl = new THREE.PointLight(z.color, 0.8, 25, 1.5);
+        const pl = new THREE.PointLight(z.color, isDayMode ? 0.3 : 0.8, 25, 1.5);
         pl.position.set(z.x, 5, z.z);
         scene.add(pl);
     }
@@ -283,23 +306,20 @@ function buildLighting() {
 // FLOOR
 // ═══════════════════════════════════════════════════════
 function buildFloor() {
-    // Main floor
+    const t = isDayMode ? THEMES.day : THEMES.night;
     const floorGeo = new THREE.PlaneGeometry(80, 60);
-    const floorMat = new THREE.MeshStandardMaterial({
-        color: 0x1e1830,
-        roughness: 0.7,
-        metalness: 0.15,
-    });
+    const floorMat = new THREE.MeshStandardMaterial({ color: t.floor, roughness: 0.7, metalness: 0.15 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.01;
     floor.receiveShadow = true;
     scene.add(floor);
+    sceneRefs.floor = floor;
 
-    // Grid lines
-    const gridHelper = new THREE.GridHelper(80, 40, 0x302550, 0x251a40);
+    const gridHelper = new THREE.GridHelper(80, 40, t.grid1, t.grid2);
     gridHelper.position.y = 0.01;
     scene.add(gridHelper);
+    sceneRefs.grid = gridHelper;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -307,22 +327,18 @@ function buildFloor() {
 // ═══════════════════════════════════════════════════════
 function buildZones() {
     for (const z of ZONES) {
-        // Tinted floor rectangle
         const geo = new THREE.PlaneGeometry(z.w, z.h);
         const mat = new THREE.MeshStandardMaterial({
-            color: z.floorColor,
-            roughness: 0.9,
-            metalness: 0.1,
-            transparent: true,
-            opacity: 0.8,
+            color: isDayMode ? z.floorDay : z.floorColor,
+            roughness: 0.9, metalness: 0.1, transparent: true, opacity: 0.8,
         });
         const mesh = new THREE.Mesh(geo, mat);
         mesh.rotation.x = -Math.PI / 2;
         mesh.position.set(z.x, 0.02, z.z);
         mesh.receiveShadow = true;
         scene.add(mesh);
+        sceneRefs.zoneMeshes.push({ mesh, zone: z });
 
-        // Border outline
         const border = new THREE.EdgesGeometry(new THREE.PlaneGeometry(z.w, z.h));
         const borderMat = new THREE.LineBasicMaterial({ color: z.color, transparent: true, opacity: 0.5 });
         const borderLine = new THREE.LineSegments(border, borderMat);
@@ -330,7 +346,6 @@ function buildZones() {
         borderLine.position.set(z.x, 0.03, z.z);
         scene.add(borderLine);
 
-        // Zone name — 3D text sprite
         const label = makeTextSprite(z.name, z.color, 0.4);
         label.position.set(z.x - z.w / 2 + 1, 0.1, z.z - z.h / 2 + 0.5);
         scene.add(label);
@@ -488,6 +503,176 @@ function buildFurniture() {
         new THREE.MeshStandardMaterial({ color: 0x1a0a0a, emissive: 0x330000, emissiveIntensity: 0.3 }));
     warScreen.position.set(6, 2, 18);
     scene.add(warScreen);
+}
+
+// ═══════════════════════════════════════════════════════
+// WALLS & BUILDINGS
+// ═══════════════════════════════════════════════════════
+function buildWalls() {
+    const wallMat = new THREE.MeshStandardMaterial({
+        color: isDayMode ? 0xe8e0d0 : 0x2a2540, transparent: true, opacity: 0.35,
+        roughness: 0.8, side: THREE.DoubleSide,
+    });
+    const wallH = 3.5;
+
+    for (const z of ZONES) {
+        if (z.id === 'chill') continue; // open air
+        const hw = z.w / 2, hh = z.h / 2;
+        // Back wall
+        const back = new THREE.Mesh(new THREE.PlaneGeometry(z.w, wallH), wallMat);
+        back.position.set(z.x, wallH / 2, z.z - hh);
+        scene.add(back);
+        // Left wall
+        const left = new THREE.Mesh(new THREE.PlaneGeometry(z.h, wallH), wallMat);
+        left.rotation.y = Math.PI / 2;
+        left.position.set(z.x - hw, wallH / 2, z.z);
+        scene.add(left);
+        // Sign above entrance
+        const sign = makeTextSprite(z.name, z.color, 0.35);
+        sign.position.set(z.x, wallH + 0.3, z.z - hh);
+        scene.add(sign);
+    }
+
+    // Board Room — elevated platform
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(14, 0.15, 8),
+        new THREE.MeshStandardMaterial({ color: isDayMode ? 0xc8b090 : 0x3a2a20, roughness: 0.6 }));
+    platform.position.set(-18, 0.075, -14);
+    platform.receiveShadow = true;
+    scene.add(platform);
+
+    // Corridors — floor paths between zones
+    const pathMat = new THREE.MeshStandardMaterial({ color: isDayMode ? 0xd0c8b8 : 0x252040, roughness: 0.8 });
+    const paths = [
+        { x: -18, z: 3.5, w: 2, h: 3 },   // dev↔meeting
+        { x: -9, z: -14, w: 4, h: 2 },     // board↔arch
+        { x: -9, z: -3, w: 4, h: 2 },      // meeting↔qa
+        { x: 0, z: 3.5, w: 2, h: 3 },      // qa↔devops
+        { x: 11, z: -14, w: 4, h: 2 },     // arch↔product
+    ];
+    for (const p of paths) {
+        const path = new THREE.Mesh(new THREE.PlaneGeometry(p.w, p.h), pathMat);
+        path.rotation.x = -Math.PI / 2;
+        path.position.set(p.x, 0.015, p.z);
+        scene.add(path);
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// NATURE — trees, fountain, skybox
+// ═══════════════════════════════════════════════════════
+function buildNature() {
+    // Trees around the perimeter
+    const treePositions = [
+        [-30, -18], [-30, -8], [-30, 2], [-30, 12], [-30, 20],
+        [30, -18], [30, -8], [30, 2], [30, 12], [30, 20],
+        [-20, 22], [-10, 22], [0, 22], [10, 22], [20, 22],
+        [-20, -20], [-10, -20], [0, -20], [10, -20], [20, -20],
+        [24, -6], [26, 8],
+    ];
+    for (const [tx, tz] of treePositions) {
+        const h = 2.5 + Math.random() * 2;
+        const trunkMat = new THREE.MeshStandardMaterial({ color: isDayMode ? 0x8B5A2B : 0x4a3020, roughness: 0.9 });
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, h * 0.5, 6), trunkMat);
+        trunk.position.set(tx, h * 0.25, tz);
+        trunk.castShadow = true;
+        scene.add(trunk);
+        const leafMat = new THREE.MeshStandardMaterial({ color: isDayMode ? 0x4CAF50 : 0x1a5c30, roughness: 0.8 });
+        const crown = new THREE.Mesh(new THREE.ConeGeometry(h * 0.4, h * 0.6, 6), leafMat);
+        crown.position.set(tx, h * 0.7, tz);
+        crown.castShadow = true;
+        scene.add(crown);
+        sceneRefs.trees.push({ trunk, crown });
+    }
+
+    // Fountain in chill zone
+    const basinMat = new THREE.MeshStandardMaterial({ color: isDayMode ? 0xbbb8b0 : 0x3a3550, roughness: 0.4, metalness: 0.3 });
+    const basin = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.8, 0.4, 16), basinMat);
+    basin.position.set(18, 0.2, 4);
+    scene.add(basin);
+    const waterMat = new THREE.MeshStandardMaterial({
+        color: isDayMode ? 0x4488cc : 0x2244aa, transparent: true, opacity: 0.6,
+        roughness: 0.1, metalness: 0.5,
+    });
+    const water = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 0.05, 16), waterMat);
+    water.position.set(18, 0.38, 4);
+    scene.add(water);
+    sceneRefs.fountain = water;
+    // Fountain pillar
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 1.2, 8), basinMat);
+    pillar.position.set(18, 0.8, 4);
+    scene.add(pillar);
+
+    // Sky dome
+    const skyGeo = new THREE.SphereGeometry(90, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+    const skyMat = new THREE.MeshBasicMaterial({
+        color: isDayMode ? 0x87CEEB : 0x0a0820, side: THREE.BackSide,
+    });
+    const sky = new THREE.Mesh(skyGeo, skyMat);
+    scene.add(sky);
+    sceneRefs.skyDome = sky;
+
+    // Stars (night only)
+    if (!isDayMode) buildStars();
+}
+
+function buildStars() {
+    const count = 200;
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.random() * Math.PI * 0.4;
+        const r = 85;
+        pos[i*3] = r * Math.sin(phi) * Math.cos(theta);
+        pos[i*3+1] = r * Math.cos(phi);
+        pos[i*3+2] = r * Math.sin(phi) * Math.sin(theta);
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.3, transparent: true, opacity: 0.7 });
+    const stars = new THREE.Points(geo, mat);
+    scene.add(stars);
+    sceneRefs.stars = stars;
+}
+
+// ═══════════════════════════════════════════════════════
+// MISSION BOARDS — show active missions on screens
+// ═══════════════════════════════════════════════════════
+function buildMissionBoards() {
+    const missions = LIVE_DATA.missions || [];
+    if (missions.length === 0) return;
+
+    // Board Room big screen — show first mission progress
+    const m0 = missions[0];
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#1a1030';
+    ctx.fillRect(0, 0, 512, 256);
+    ctx.fillStyle = '#7c3aed';
+    ctx.font = 'bold 22px system-ui';
+    ctx.fillText('📊 Missions Actives', 20, 35);
+    for (let i = 0; i < Math.min(missions.length, 5); i++) {
+        const mi = missions[i];
+        const y = 70 + i * 36;
+        ctx.fillStyle = mi.status === 'running' ? '#3b82f6' : '#6b7280';
+        ctx.fillRect(20, y, 472 * (mi.phases_done / Math.max(mi.phases_total, 1)), 20);
+        ctx.strokeStyle = '#444';
+        ctx.strokeRect(20, y, 472, 20);
+        ctx.fillStyle = '#fff';
+        ctx.font = '14px system-ui';
+        ctx.fillText(`${mi.name} (${mi.phases_done}/${mi.phases_total})`, 25, y + 15);
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    // Apply to board room big screen
+    scene.traverse(obj => {
+        if (obj.isMesh && obj.geometry?.parameters?.width === 6 && obj.geometry?.parameters?.height === 3 &&
+            Math.abs(obj.position.x - (-18)) < 1 && Math.abs(obj.position.z - (-17.8)) < 1) {
+            obj.material = new THREE.MeshStandardMaterial({ map: tex, emissive: 0x111111, emissiveIntensity: 0.3 });
+        }
+    });
+
+    // Update mission counter
+    document.getElementById('world-mission-count').textContent = missions.length + ' missions';
 }
 
 function createDesk(x, z, woodMat, darkMat, screenMat) {
@@ -867,6 +1052,12 @@ function animate() {
         pos.needsUpdate = true;
     }
 
+    // Fountain water wobble
+    if (sceneRefs.fountain) {
+        sceneRefs.fountain.position.y = 0.38 + Math.sin(elapsed * 2) * 0.02;
+        sceneRefs.fountain.rotation.y = elapsed * 0.3;
+    }
+
     renderer.render(scene, camera);
 }
 
@@ -1143,8 +1334,9 @@ function selectAgent(agentId) {
     statusEl.querySelector('span:last-child').textContent = statusLabel(ag.status);
 
     const taskEl = document.getElementById('wi-task');
-    taskEl.style.display = ag.data.tagline ? 'block' : 'none';
-    taskEl.textContent = ag.data.tagline || '';
+    const missionText = ag.missionName ? `🚀 ${ag.missionName}` : (ag.data.tagline || '');
+    taskEl.style.display = missionText ? 'block' : 'none';
+    taskEl.textContent = missionText;
 
     const skillsEl = document.getElementById('wi-skills');
     skillsEl.innerHTML = '';
@@ -1214,8 +1406,16 @@ function connectSSE() {
                 updateAgentStatus(agentId, status, data.current_task);
             }
             if (data.type === 'message' || data.type === 'stream_end') {
-                if (data.from_agent || data.agent_id) {
-                    showSpeechBubble(data.from_agent || data.agent_id, data.content || '');
+                const fromAgent = data.from_agent || data.agent_id;
+                const content = data.content || '';
+                if (fromAgent && content) {
+                    showSpeechBubble(fromAgent, content);
+                    const agName = agents[fromAgent]?.data?.name || fromAgent;
+                    addFeedItem(agName, 'acting', content.slice(0, 120));
+                }
+                // Real interaction — walk to target
+                if (data.to_agent && agents[fromAgent] && agents[data.to_agent]) {
+                    triggerDelegation(fromAgent, data.to_agent);
                 }
             }
             if (data.type === 'delegation') {
@@ -1225,174 +1425,138 @@ function connectSSE() {
     };
 
     evtSource.onerror = () => {
-        setTimeout(() => connectSSE(), 5000);
         evtSource.close();
+        setTimeout(() => connectSSE(), 5000);
     };
-}
 
-// ═══════════════════════════════════════════════════════
-// AUTONOMOUS LIFE — agents move, chat, work on their own
-// ═══════════════════════════════════════════════════════
-const CHAT_LINES = [
-    "On devrait refactorer ce module...",
-    "Le build est passé ✅",
-    "J'ai trouvé un bug dans l'auth",
-    "Qui peut review ma PR ?",
-    "Le sprint se termine vendredi",
-    "On a besoin d'un index sur cette table",
-    "Le design est validé par l'UX",
-    "La couverture de tests monte à 85%",
-    "Faut mettre à jour la doc API",
-    "Le dashboard est prêt pour la démo",
-    "J'ai optimisé la requête, -40ms",
-    "On migre vers la v2 du SDK",
-    "Les E2E passent en staging",
-    "Attention aux CORS en prod",
-    "Le Figma est à jour",
-    "Il manque les guards sur cette route",
-    "Excellente idée, on implémente",
-    "Je délègue ça au backend",
-    "Le load test montre 200rps stable",
-    "On dockerise ce service ?",
-    "La rétro est à 14h",
-    "Le PO valide la feature",
-    "Merge conflict résolu 💪",
-    "Le pipeline CI est vert",
-    "Bonne analyse de risque !",
-    "Je push les tests unitaires",
-    "Il faut un webhook pour ça",
-    "Le comité approuve le budget",
-    "Feature flag activé en staging",
-    "Performance OK, on ship 🚀",
-];
-
-const ACTIONS = ['idle', 'thinking', 'acting', 'idle', 'acting', 'thinking', 'idle', 'idle'];
-
-function startAutonomousLife() {
-    const agentIds = Object.keys(agents);
-    if (agentIds.length === 0) return;
-
-    // Stagger initial states
-    agentIds.forEach((id, i) => {
-        const ag = agents[id];
-        const delay = i * 200 + Math.random() * 2000;
-        setTimeout(() => {
-            const action = ACTIONS[Math.floor(Math.random() * ACTIONS.length)];
-            setAgentLife(ag, action);
-        }, delay);
-    });
-
-    // Continuous life loop — periodic behavior changes
-    setInterval(() => {
-        // Pick 3-6 random agents to change behavior
-        const count = 3 + Math.floor(Math.random() * 4);
-        for (let i = 0; i < count; i++) {
-            const id = agentIds[Math.floor(Math.random() * agentIds.length)];
-            const ag = agents[id];
-            const action = ACTIONS[Math.floor(Math.random() * ACTIONS.length)];
-            setAgentLife(ag, action);
-        }
-    }, 3000);
-
-    // Random conversations between agents
-    setInterval(() => {
-        const count = 1 + Math.floor(Math.random() * 3);
-        for (let i = 0; i < count; i++) {
-            triggerRandomChat(agentIds);
-        }
-    }, 4000);
-
-    // Random walks — agents visit other zones or each other
-    setInterval(() => {
-        const id = agentIds[Math.floor(Math.random() * agentIds.length)];
-        const ag = agents[id];
-        if (Math.random() < 0.4) {
-            // Walk to another agent in same zone or nearby
-            const candidates = agentIds.filter(oid => oid !== id);
-            const target = candidates[Math.floor(Math.random() * candidates.length)];
-            const tg = agents[target];
-            if (tg) {
-                ag.target = {
-                    x: tg.mesh.position.x + (Math.random() - 0.5) * 2,
-                    z: tg.mesh.position.z + (Math.random() - 0.5) * 2
-                };
-                // Walk back after a while
-                setTimeout(() => {
-                    ag.target = { x: ag.seat.x, z: ag.seat.z };
-                }, 5000 + Math.random() * 5000);
+    // Also connect to monitoring SSE for live mission counts
+    const monSSE = new EventSource('/sse/monitoring');
+    monSSE.onmessage = (e) => {
+        try {
+            const data = JSON.parse(e.data);
+            if (data.type === 'metrics' && data.agents_active !== undefined) {
+                document.getElementById('world-active-count').textContent = data.agents_active + ' actifs';
             }
-        } else if (Math.random() < 0.3) {
-            // Walk to chill zone (coffee break)
-            const chill = ZONES.find(z => z.id === 'chill');
-            ag.target = {
-                x: chill.x + (Math.random() - 0.5) * chill.w * 0.6,
-                z: chill.z + (Math.random() - 0.5) * chill.h * 0.6
-            };
-            setTimeout(() => {
-                ag.target = { x: ag.seat.x, z: ag.seat.z };
-            }, 8000 + Math.random() * 7000);
-        } else {
-            // Walk to meeting room
-            const meeting = ZONES.find(z => z.id === 'meeting');
-            ag.target = {
-                x: meeting.x + (Math.random() - 0.5) * 4,
-                z: meeting.z + (Math.random() - 0.5) * 4
-            };
-            setTimeout(() => {
-                ag.target = { x: ag.seat.x, z: ag.seat.z };
-            }, 6000 + Math.random() * 4000);
-        }
-    }, 2500);
-
-    // Initial feed burst
-    setTimeout(() => {
-        for (let i = 0; i < 5; i++) {
-            const id = agentIds[Math.floor(Math.random() * agentIds.length)];
-            addFeedItem(agents[id].data.name, 'acting', CHAT_LINES[Math.floor(Math.random() * CHAT_LINES.length)]);
-        }
-    }, 1000);
+        } catch(err) {}
+    };
+    monSSE.onerror = () => { monSSE.close(); setTimeout(() => {}, 10000); };
 }
 
-function setAgentLife(ag, action) {
-    const oldStatus = ag.status;
-    ag.status = action;
+// ═══════════════════════════════════════════════════════
+// LIVE DATA — seed from server + SSE for real-time
+// ═══════════════════════════════════════════════════════
+function seedLiveData() {
+    const messages = LIVE_DATA.messages || [];
+    const agentSessions = LIVE_DATA.agent_sessions || {};
+    const missions = LIVE_DATA.missions || [];
 
-    // Update plumbob
-    const plumbob = ag.mesh.children.find(c => c.userData.isPlumbob);
-    if (plumbob) {
-        const color = STATUS_COLORS[action] || STATUS_COLORS.idle;
-        plumbob.material.color.setHex(color);
-        plumbob.material.emissive.setHex(color);
-        plumbob.material.emissiveIntensity = action === 'acting' ? 0.9 : 0.7;
+    // Mark agents with their active session/mission
+    for (const [agentId, sessionId] of Object.entries(agentSessions)) {
+        if (agents[agentId]) {
+            agents[agentId].sessionId = sessionId;
+            // Find mission for this session
+            const mission = missions.find(m => m.session_id === sessionId);
+            if (mission) agents[agentId].missionName = mission.brief || mission.name;
+        }
     }
 
-    // Glow screens
-    if (action === 'acting' && oldStatus !== 'acting') {
-        glowNearbyScreen(ag.mesh.position, true);
-    } else if (action !== 'acting' && oldStatus === 'acting') {
-        glowNearbyScreen(ag.mesh.position, false);
+    // Show last N real messages in feed
+    const recentMsgs = messages.slice(0, 15);
+    for (const msg of recentMsgs.reverse()) {
+        const agName = agents[msg.from]?.data?.name || msg.from;
+        addFeedItem(agName, 'acting', msg.content);
     }
+
+    // Show real speech bubbles for most recent messages
+    for (const msg of messages.slice(0, 5)) {
+        if (agents[msg.from]) {
+            showSpeechBubble(msg.from, msg.content);
+        }
+        // If there's a target agent, trigger walk
+        if (msg.to && agents[msg.from] && agents[msg.to]) {
+            triggerDelegation(msg.from, msg.to);
+        }
+    }
+
+    // Cluster agents by session — agents in same session gather near each other
+    const sessionGroups = {};
+    for (const [aid, sid] of Object.entries(agentSessions)) {
+        if (!sessionGroups[sid]) sessionGroups[sid] = [];
+        sessionGroups[sid].push(aid);
+    }
+    // For groups ≥ 2, move them to meeting room area
+    const meetingZone = ZONES.find(z => z.id === 'meeting');
+    let clusterIdx = 0;
+    for (const [sid, agentIds] of Object.entries(sessionGroups)) {
+        if (agentIds.length < 2) continue;
+        const cx = meetingZone.x + (clusterIdx % 2) * 6 - 3;
+        const cz = meetingZone.z + Math.floor(clusterIdx / 2) * 4;
+        for (let i = 0; i < agentIds.length; i++) {
+            const ag = agents[agentIds[i]];
+            if (!ag) continue;
+            const angle = (i / agentIds.length) * Math.PI * 2;
+            ag.target = { x: cx + Math.cos(angle) * 1.5, z: cz + Math.sin(angle) * 1.5 };
+        }
+        clusterIdx++;
+    }
+
+    updateCounters();
+
+    // Periodic re-fetch of messages (poll every 30s for new activity)
+    setInterval(async () => {
+        try {
+            const resp = await fetch('/api/sessions');
+            if (!resp.ok) return;
+        } catch(e) { /* ignore */ }
+    }, 30000);
 }
 
-function triggerRandomChat(agentIds) {
-    const fromId = agentIds[Math.floor(Math.random() * agentIds.length)];
-    const toId = agentIds[Math.floor(Math.random() * agentIds.length)];
-    if (fromId === toId) return;
+// ═══════════════════════════════════════════════════════
+// DAY/NIGHT TOGGLE
+// ═══════════════════════════════════════════════════════
+function toggleDayNight() {
+    isDayMode = !isDayMode;
+    localStorage.setItem('world-day', isDayMode ? '1' : '0');
+    document.getElementById('btn-daynight').textContent = isDayMode ? '☀️' : '🌙';
+    applyDayNight(isDayMode, true);
+}
 
-    const from = agents[fromId];
-    const line = CHAT_LINES[Math.floor(Math.random() * CHAT_LINES.length)];
+function applyDayNight(day, animate) {
+    const t = day ? THEMES.day : THEMES.night;
 
-    showSpeechBubble(fromId, line);
-    addFeedItem(from.data.name, 'acting', line);
+    // Scene background + fog
+    scene.background = new THREE.Color(t.bg);
+    scene.fog = new THREE.FogExp2(t.fog, 0.006);
 
-    // Other agent responds after a delay
-    setTimeout(() => {
-        const to = agents[toId];
-        if (!to) return;
-        const reply = CHAT_LINES[Math.floor(Math.random() * CHAT_LINES.length)];
-        showSpeechBubble(toId, reply);
-        addFeedItem(to.data.name, 'thinking', reply);
-    }, 1500 + Math.random() * 2000);
+    // Lights
+    if (sceneRefs.ambient) { sceneRefs.ambient.color.setHex(t.ambient); sceneRefs.ambient.intensity = t.ambientI; }
+    if (sceneRefs.dir) { sceneRefs.dir.color.setHex(t.dirColor); sceneRefs.dir.intensity = t.dirI; }
+    if (sceneRefs.fill) { sceneRefs.fill.color.setHex(t.fillColor); sceneRefs.fill.intensity = t.fillI; }
+    if (sceneRefs.hemi) { sceneRefs.hemi.color.setHex(t.hemiSky); sceneRefs.hemi.groundColor.setHex(t.hemiGnd); sceneRefs.hemi.intensity = t.hemiI; }
+
+    // Floor
+    if (sceneRefs.floor) sceneRefs.floor.material.color.setHex(t.floor);
+
+    // Zone floors
+    for (const { mesh, zone } of sceneRefs.zoneMeshes) {
+        mesh.material.color.setHex(day ? zone.floorDay : zone.floorColor);
+    }
+
+    // Sky dome
+    if (sceneRefs.skyDome) sceneRefs.skyDome.material.color.setHex(day ? 0x87CEEB : 0x0a0820);
+
+    // Stars
+    if (sceneRefs.stars) sceneRefs.stars.visible = !day;
+    if (!day && !sceneRefs.stars) buildStars();
+
+    // Trees — greener in day
+    for (const tr of sceneRefs.trees) {
+        tr.trunk.material.color.setHex(day ? 0x8B5A2B : 0x4a3020);
+        tr.crown.material.color.setHex(day ? 0x4CAF50 : 0x1a5c30);
+    }
+
+    // Exposure
+    renderer.toneMappingExposure = t.exposure;
 }
 
 // ═══════════════════════════════════════════════════════

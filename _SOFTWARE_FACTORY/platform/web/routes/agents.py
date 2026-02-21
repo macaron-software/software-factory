@@ -485,11 +485,58 @@ async def generate_team(request: Request):
 
 @router.get("/world", response_class=HTMLResponse)
 async def agent_world_page(request: Request):
-    """3D Sims-like agent visualization."""
+    """3D Sims-like agent visualization with live data."""
     import json as _json
     from ...agents.store import AgentStore
-    store = AgentStore()
-    all_agents = store.list_all()
+    from ...missions.store import MissionRunStore
+    from ...sessions.store import SessionStore
+
+    agent_store = AgentStore()
+    mission_store = MissionRunStore()
+    session_store = SessionStore()
+    all_agents = agent_store.list_all()
+
+    # Active missions
+    all_runs = mission_store.list_runs(limit=50)
+    _s = lambda v: v.value if hasattr(v, 'value') else str(v) if v else 'pending'
+    active_missions = []
+    active_session_ids = set()
+    for mr in all_runs:
+        st = _s(mr.status)
+        if st in ('running', 'pending', 'paused'):
+            phases_done = sum(1 for p in (mr.phases or []) if _s(p.status) in ('completed', 'done'))
+            phases_total = len(mr.phases or [])
+            active_missions.append({
+                "id": mr.id, "name": mr.workflow_name or mr.workflow_id,
+                "brief": (mr.brief or '')[:100], "status": st,
+                "session_id": mr.session_id,
+                "phases_done": phases_done, "phases_total": phases_total,
+            })
+            if mr.session_id:
+                active_session_ids.add(mr.session_id)
+
+    # Recent messages from active sessions (last 30 messages across all)
+    recent_messages = []
+    agent_sessions = {}  # agent_id → session_id mapping
+    for sid in list(active_session_ids)[:10]:
+        try:
+            msgs = session_store.get_messages(sid, limit=20)
+            for m in msgs:
+                if m.from_agent and m.from_agent != 'user' and m.from_agent != 'system':
+                    agent_sessions[m.from_agent] = sid
+                    content = (m.content or '')[:120]
+                    if content and m.message_type not in ('system',):
+                        recent_messages.append({
+                            "from": m.from_agent, "to": m.to_agent or '',
+                            "content": content, "type": m.message_type or 'text',
+                            "session_id": sid, "ts": m.timestamp or '',
+                        })
+        except Exception:
+            pass
+    # Sort by timestamp desc, keep last 50
+    recent_messages.sort(key=lambda x: x['ts'], reverse=True)
+    recent_messages = recent_messages[:50]
+
     agents_json = _json.dumps([
         {
             "id": a.id, "name": a.name, "role": a.role,
@@ -499,8 +546,14 @@ async def agent_world_page(request: Request):
         }
         for a in all_agents
     ])
+    live_json = _json.dumps({
+        "missions": active_missions,
+        "messages": recent_messages,
+        "agent_sessions": agent_sessions,
+    })
     return _templates(request).TemplateResponse("agent_world.html", {
         "request": request, "page_title": "World",
         "agents": all_agents, "agents_json": agents_json,
+        "live_json": live_json,
     })
 
