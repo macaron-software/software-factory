@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 # Track which mission_ids have an active asyncio task running
 _active_mission_tasks: dict[str, asyncio.Task] = {}
 
-# Limit concurrent mission execution to avoid LLM rate limit cascades
-_mission_semaphore = asyncio.Semaphore(1)
+# Limit concurrent mission execution (2 allows parallelism while avoiding LLM rate limits)
+_mission_semaphore = asyncio.Semaphore(2)
 
 _AVATAR_DIR = Path(__file__).parent.parent / "static" / "avatars"
 

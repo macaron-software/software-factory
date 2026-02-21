@@ -152,6 +152,34 @@ async def create_mission(request: Request):
     return RedirectResponse(f"/missions/{m.id}", status_code=303)
 
 
+@router.get("/api/missions")
+async def list_missions_api(request: Request):
+    """JSON API: list all missions with run progress."""
+    from ...missions.store import get_mission_store, get_mission_run_store
+    mission_store = get_mission_store()
+    run_store = get_mission_run_store()
+    missions = mission_store.list_missions(limit=200)
+    runs = run_store.list_runs(limit=200)
+    runs_by_parent = {}
+    for r in runs:
+        if r.parent_mission_id:
+            runs_by_parent[r.parent_mission_id] = r
+        runs_by_parent[r.id] = r
+    result = []
+    for m in missions:
+        run = runs_by_parent.get(m.id)
+        phases_total = len(run.phases) if run and run.phases else 0
+        phases_done = sum(1 for p in (run.phases or []) if p.status.value in ("done", "done_with_issues")) if run else 0
+        result.append({
+            "id": m.id, "name": m.name, "status": m.status,
+            "type": m.type, "project_id": m.project_id,
+            "phases_total": phases_total, "phases_done": phases_done,
+            "current_phase": run.current_phase if run else "",
+            "run_status": run.status.value if run else "",
+        })
+    return JSONResponse({"missions": result, "total": len(result)})
+
+
 @router.post("/api/missions/{mission_id}/start")
 async def start_mission(mission_id: str):
     """Activate a mission."""
@@ -200,7 +228,67 @@ async def create_task(request: Request, mission_id: str):
     return JSONResponse({"ok": True, "task_id": task.id})
 
 
-@router.post("/api/missions/{mission_id}/launch-workflow")
+@router.patch("/api/tasks/{task_id}/status")
+async def update_task_status(request: Request, task_id: str):
+    """Update task status (drag-drop kanban)."""
+    from ...missions.store import get_mission_store
+    data = await request.json()
+    new_status = data.get("status", "").strip()
+    valid = {"pending", "assigned", "in_progress", "review", "done", "failed"}
+    if new_status not in valid:
+        return JSONResponse({"error": f"Invalid status. Must be one of: {valid}"}, status_code=400)
+    store = get_mission_store()
+    ok = store.update_task_status(task_id, new_status)
+    if not ok:
+        return JSONResponse({"error": "Task not found"}, status_code=404)
+    return JSONResponse({"ok": True, "task_id": task_id, "status": new_status})
+
+
+@router.patch("/api/features/{feature_id}")
+async def update_feature(request: Request, feature_id: str):
+    """Update feature fields (story points, acceptance criteria, priority, status)."""
+    from ...missions.product import get_product_backlog
+    data = await request.json()
+    backlog = get_product_backlog()
+    feat = backlog.get_feature(feature_id)
+    if not feat:
+        return JSONResponse({"error": "Feature not found"}, status_code=404)
+    from ...db.migrations import get_db
+    db = get_db()
+    updates, params = [], []
+    for field in ("story_points", "acceptance_criteria", "priority", "status", "name", "description"):
+        if field in data:
+            updates.append(f"{field} = ?")
+            params.append(data[field])
+    if not updates:
+        return JSONResponse({"error": "No fields to update"}, status_code=400)
+    params.append(feature_id)
+    db.execute(f"UPDATE features SET {', '.join(updates)} WHERE id = ?", params)
+    db.commit()
+    db.close()
+    return JSONResponse({"ok": True, "feature_id": feature_id})
+
+
+@router.patch("/api/stories/{story_id}")
+async def update_story(request: Request, story_id: str):
+    """Update user story fields (story points, acceptance criteria, status, sprint)."""
+    from ...missions.product import get_product_backlog
+    data = await request.json()
+    backlog = get_product_backlog()
+    from ...db.migrations import get_db
+    db = get_db()
+    updates, params = [], []
+    for field in ("story_points", "acceptance_criteria", "status", "sprint_id", "title", "description"):
+        if field in data:
+            updates.append(f"{field} = ?")
+            params.append(data[field])
+    if not updates:
+        return JSONResponse({"error": "No fields to update"}, status_code=400)
+    params.append(story_id)
+    db.execute(f"UPDATE user_stories SET {', '.join(updates)} WHERE id = ?", params)
+    db.commit()
+    db.close()
+    return JSONResponse({"ok": True, "story_id": story_id})
 async def launch_mission_workflow(request: Request, mission_id: str):
     """Create a session from mission's workflow and redirect to live view."""
     from ...missions.store import get_mission_store
