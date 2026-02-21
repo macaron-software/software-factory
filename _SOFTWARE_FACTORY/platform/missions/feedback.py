@@ -3,13 +3,35 @@
 - deploy_completed: activate TMA mission for the project
 - tma_recurring: create tech debt item after 3+ occurrences of same incident
 - security_alert: create priority bug for critical CVE
+- Reaction engine integration for CI/deploy/agent events
 """
 from __future__ import annotations
 
 import logging
 from typing import Optional
 
+from ..interfaces import EventPayload, ReactionEvent
+
 logger = logging.getLogger(__name__)
+
+
+def emit_reaction(event: ReactionEvent, project_id: str,
+                  session_id: str = "", mission_id: str = "",
+                  **details) -> None:
+    """Fire a reaction event (non-blocking). Used by deploy/CI/agent code."""
+    import asyncio
+    from ..reactions import get_reaction_engine
+    engine = get_reaction_engine()
+    payload = EventPayload(
+        event=event, project_id=project_id,
+        session_id=session_id, mission_id=mission_id,
+        details=details,
+    )
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(engine.emit(payload))
+    except RuntimeError:
+        pass  # No event loop — skip
 
 
 def on_deploy_completed(project_id: str, epic_mission_id: str):
@@ -27,6 +49,8 @@ def on_deploy_completed(project_id: str, epic_mission_id: str):
         ms.update_mission(tma)
         logger.info("Activated TMA mission %s for project %s after deploy of %s",
                      tma.id, project_id, epic_mission_id)
+        emit_reaction(ReactionEvent.DEPLOY_SUCCESS, project_id,
+                      mission_id=epic_mission_id, message="Deploy completed, TMA activated")
         return tma
 
     # Also activate security mission if still in planning

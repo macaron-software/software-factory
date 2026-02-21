@@ -1203,3 +1203,42 @@ async def i18n_catalog(lang: str):
     if lang not in SUPPORTED_LANGS:
         lang = "en"
     return JSONResponse(_catalog.get(lang, {}))
+
+
+# ── Reactions Engine ─────────────────────────────────────────────
+
+@router.get("/api/reactions/stats")
+async def reactions_stats():
+    """Get reaction engine statistics."""
+    from ...reactions import get_reaction_engine
+    engine = get_reaction_engine()
+    stats = engine.get_stats()
+    rules = {e.value: {"action": r.action.value, "auto": r.auto, "retries": r.retries}
+             for e, r in engine.rules.items()}
+    return JSONResponse({"stats": stats, "rules": rules})
+
+
+@router.get("/api/reactions/history")
+async def reactions_history(request: Request):
+    """Get reaction history."""
+    from ...reactions import get_reaction_engine
+    project_id = request.query_params.get("project", "")
+    limit = int(request.query_params.get("limit", "50"))
+    return JSONResponse(get_reaction_engine().get_history(project_id, limit))
+
+
+@router.get("/api/workspaces")
+async def list_workspaces():
+    """List active agent workspaces."""
+    from ...workspaces import get_workspace_manager
+    mgr = get_workspace_manager()
+    active = await mgr.list_active()
+    return JSONResponse([{
+        "session_id": w.session_id[:8],
+        "project_id": w.project_id,
+        "branch": w.branch,
+        "path": w.path,
+        "type": w.workspace_type.value,
+        "status": w.status.value,
+        "created_at": w.created_at,
+    } for w in active])
