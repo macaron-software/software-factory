@@ -120,7 +120,7 @@ class _RateLimiter:
 
 # Global rate limiter (shared across all agents in this process)
 _rate_limiter = _RateLimiter(
-    max_requests=int(os.environ.get("LLM_RATE_LIMIT_RPM", "6")),
+    max_requests=int(os.environ.get("LLM_RATE_LIMIT_RPM", "15")),
     window_seconds=60.0,
 )
 

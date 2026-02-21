@@ -201,7 +201,7 @@ class MissionOrchestrator:
             phase_key_check = wf_phase.name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
             is_dev_phase = "sprint" in phase_key_check or "dev" in phase_key_check
             is_retryable = is_dev_phase or "cicd" in phase_key_check or "qa" in phase_key_check or "architecture" in phase_key_check or "setup" in phase_key_check
-            max_sprints = wf_phase.config.get("max_iterations", 3) if is_dev_phase else (2 if is_retryable else 1)
+            max_sprints = wf_phase.config.get("max_iterations", 3) if is_dev_phase else 1
 
             phase_success = False
             phase_error = ""
@@ -292,7 +292,7 @@ class MissionOrchestrator:
                 try:
                     # Phase timeout: 10 minutes max per phase execution
                     PHASE_TIMEOUT = 600
-                    MAX_LLM_RETRIES = 3
+                    MAX_LLM_RETRIES = 2
                     LLM_RETRY_DELAY = 30  # seconds between retries on rate limit
 
                     for llm_attempt in range(1, MAX_LLM_RETRIES + 1):
@@ -553,6 +553,16 @@ class MissionOrchestrator:
                         on_deploy_completed(mission.project_id, mission.id)
                 except Exception as _fb_err:
                     logger.warning("Feedback on_deploy_completed failed: %s", _fb_err)
+
+            # Feedback loop: track TMA fix for recurring incident detection
+            if phase_success and phase.phase_id in ("fix", "tma-fix", "validate"):
+                if mission.type in ("bug", "program") and mission.project_id:
+                    try:
+                        from ..missions.feedback import on_tma_incident_fixed
+                        incident_key = (mission.config or {}).get("incident_key", mission.name)
+                        on_tma_incident_fixed(mission.project_id, incident_key)
+                    except Exception as _fb_err:
+                        logger.warning("Feedback on_tma_incident_fixed failed: %s", _fb_err)
 
             # CDP announces result
             if i < len(mission.phases) - 1:
