@@ -77,14 +77,40 @@ Deploy: rsync fails (permissions) → SCP to /tmp + sudo cp
         VM resize: az vm deallocate → az vm resize → az vm start
         Container rebuild: sudo docker compose up -d --build
 
-DR:   Blob: macaronbackups (GRS francecentral→francesouth)
-      Backup: platform/ops/run_backup.py — SQLite(7DBs)+PG(psycopg)+secrets→blob
-      Restore: platform/ops/run_restore.py — --list/--latest/--dry-run/--pg-only
-      Health: platform/ops/run_health.py — 5 checks (HTTP/PG/containers/disk/backup)
+DR:   L3 full — 14/14 checks verified, 100% coverage
+      Blob: macaronbackups (Standard_GRS francecentral→francesouth, secondary=available)
+      Containers: db-backups/ pg-dumps/ secrets/ (lifecycle: daily=90d, weekly=365d)
       Snapshots: vm-macaron-snap-* (incremental, keep 4)
-      Lifecycle: daily=90d, weekly=365d
-      Runbook: platform/ops/RUNBOOK.md
-      NOTE: run from /tmp or via run_*.py wrappers (avoid 'platform' package shadowing)
+      PG PITR: 7-day native (no geo-redundant on Burstable → compensated by blob GRS)
+
+      Commands (always run from /tmp or via run_*.py — avoid 'platform' package shadowing):
+        python3 platform/ops/run_backup.py [--tier daily|weekly] [--pg-only|--sqlite-only|--secrets-only]
+        python3 platform/ops/run_restore.py --list
+        python3 platform/ops/run_restore.py --latest --dry-run
+        python3 platform/ops/run_restore.py --latest [--pg-only|--sqlite-only|--secrets-only]
+        python3 platform/ops/run_restore.py --from-snapshot vm-macaron-snap-YYYYMMDD
+        python3 platform/ops/run_health.py [--watch] [--json]
+
+      Backup contents:
+        SQLite: 7 DBs (platform/factory/build_queue/metrics/project_context/rlm_cache/permissions_audit)
+        PG: 33 tables, ~1085 rows, psycopg dump (SELECT→INSERT ON CONFLICT DO NOTHING)
+        Secrets: 5 API keys (.key) + .env + docker-compose.yml → tar.gz
+        VM: 30GB disk incremental snapshot
+
+      Health monitor (5 checks): vm_http, pg_connectivity, vm_containers, vm_disk, backup_freshness
+
+      RTO/RPO:
+        PG:      RPO 24h (dump) + 7d PITR | RTO 15min
+        SQLite:  RPO 24h                   | RTO 5min
+        VM:      RPO 7d (weekly snapshot)  | RTO 30min
+        Secrets: RPO 24h                   | RTO 5min
+        Code:    RPO 0 (git)               | RTO 0
+
+      Cron (local Mac):
+        0 3 * * * cd /tmp && python3 /.../run_backup.py >> /tmp/macaron-backup.log 2>&1
+        0 2 * * 0 cd /tmp && python3 /.../run_backup.py --tier weekly >> /tmp/macaron-backup.log 2>&1
+
+      Runbook: platform/ops/RUNBOOK.md (5 scenarios: PG corruption, SQLite loss, VM loss, keys lost, full disaster)
 ```
 
 ## SF PIPELINE
