@@ -28,7 +28,7 @@ except Exception:
 @router.get("/api/health")
 async def health_check():
     """Liveness/readiness probe for Docker healthcheck."""
-    from ..db.migrations import get_db
+    from ...db.migrations import get_db
     try:
         db = get_db()
         db.execute("SELECT 1")

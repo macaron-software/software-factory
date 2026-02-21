@@ -5,6 +5,9 @@ services:
       dockerfile: platform/deploy/Dockerfile
     expose:
       - "8090"
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     env_file:
       - /opt/macaron/.env
     environment:
