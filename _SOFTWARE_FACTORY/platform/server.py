@@ -71,7 +71,40 @@ async def lifespan(app: FastAPI):
 
     # Seed projects from SF/MF registry into DB
     from .projects.manager import get_project_store
-    get_project_store().seed_from_registry()
+    ps = get_project_store()
+    ps.seed_from_registry()
+
+    # Auto-provision TMA/Security/Debt missions for projects missing them
+    from .missions.store import get_mission_store, MissionDef
+    ms = get_mission_store()
+    all_missions = ms.list_missions(limit=500)
+    _prov_count = 0
+    for proj in ps.list_all():
+        proj_missions = [m for m in all_missions if m.project_id == proj.id]
+        has_tma = any(m.type == 'program' or m.name.startswith('TMA') or '[TMA' in m.name for m in proj_missions)
+        if not has_tma:
+            try:
+                ps.auto_provision(proj.id, proj.name)
+                _prov_count += 1
+            except Exception as e:
+                logger.warning("auto_provision failed for %s: %s", proj.id, e)
+        else:
+            # Ensure security mission exists even if TMA already present
+            has_secu = any(m.type == 'security' or m.name.startswith('Sécu') for m in proj_missions)
+            if not has_secu:
+                try:
+                    ms.create_mission(MissionDef(
+                        name=f"Sécurité — {proj.name}", type="security", status="active",
+                        project_id=proj.id, workflow_id="review-cycle", wsjf_score=12,
+                        created_by="devsecops", config={"auto_provisioned": True, "schedule": "weekly"},
+                        description=f"Audit sécurité périodique pour {proj.name}.",
+                        goal="Score sécurité ≥ 80%, zéro CVE critique.",
+                    ))
+                    _prov_count += 1
+                except Exception as e:
+                    logger.warning("security provision failed for %s: %s", proj.id, e)
+    if _prov_count:
+        logger.warning("Auto-provisioned TMA/Security/Debt for %d projects", _prov_count)
 
     # Seed memory (global knowledge + project files)
     from .memory.seeder import seed_all as seed_memories
@@ -83,6 +116,10 @@ async def lifespan(app: FastAPI):
     from .agents.org import get_org_store
     get_org_store().seed_default()
     get_org_store().seed_additional_teams()
+
+    # Demo mode: seed sample data when no LLM keys configured
+    from .demo import seed_demo_data
+    seed_demo_data()
 
     # Mark orphaned "active" sessions as interrupted (no running task after restart)
     from .sessions.store import get_session_store
@@ -247,15 +284,19 @@ def create_app() -> FastAPI:
     """Application factory."""
     app = FastAPI(
         title="Macaron Agent Platform",
-        version="0.1.0",
+        description="Multi-Agent Software Factory — 94 AI agents orchestrating the full product lifecycle with SAFe, TDD, and auto-heal.",
+        version="1.1.0",
+        docs_url="/docs",
+        redoc_url="/redoc",
         lifespan=lifespan,
     )
 
     # ── Security: CORS ──────────────────────────────────────────────────────
     from starlette.middleware.cors import CORSMiddleware
+    _cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:8090,http://4.233.64.30").split(",")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:8090", "http://4.233.64.30"],
+        allow_origins=[o.strip() for o in _cors_origins],
         allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["*"],
         allow_credentials=True,
@@ -269,9 +310,30 @@ def create_app() -> FastAPI:
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self' *; img-src 'self' data: https:;"
         if request.url.scheme == "https":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
+
+    # ── Rate limiting (API endpoints, 60 req/min per IP) ───────────────
+    import time as _rl_time
+    from collections import defaultdict as _dd
+    _rate_buckets: dict[str, list[float]] = _dd(list)
+    _RATE_LIMIT = int(os.environ.get("API_RATE_LIMIT", "120"))  # per minute
+    _RATE_WINDOW = 60.0
+
+    @app.middleware("http")
+    async def rate_limit_middleware(request, call_next):
+        if request.url.path.startswith("/api/"):
+            client_ip = request.client.host if request.client else "unknown"
+            now = _rl_time.time()
+            bucket = _rate_buckets[client_ip]
+            bucket[:] = [t for t in bucket if now - t < _RATE_WINDOW]
+            if len(bucket) >= _RATE_LIMIT:
+                from starlette.responses import JSONResponse as _JR
+                return _JR({"error": "rate_limit_exceeded", "retry_after": 60}, status_code=429)
+            bucket.append(now)
+        return await call_next(request)
 
     # ── Trace ID middleware ─────────────────────────────────────────────
     @app.middleware("http")

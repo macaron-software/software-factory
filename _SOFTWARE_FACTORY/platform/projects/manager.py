@@ -116,15 +116,19 @@ class ProjectStore:
         conn.close()
 
     def list_all(self) -> list[Project]:
+        from ..cache import get as cache_get, put as cache_put
+        cached = cache_get("projects:all")
+        if cached is not None:
+            return cached
         conn = get_db()
         rows = conn.execute("SELECT * FROM projects ORDER BY name").fetchall()
         conn.close()
         projects = [self._row_to_project(r) for r in rows]
-        # Filter out personal projects on Azure deployment
         import os
         if os.environ.get("AZURE_DEPLOY", ""):
             from .registry import _PERSONAL_IDS
             projects = [p for p in projects if p.id not in _PERSONAL_IDS]
+        cache_put("projects:all", projects, ttl=60)
         return projects
 
     def get(self, project_id: str) -> Optional[Project]:
@@ -134,6 +138,7 @@ class ProjectStore:
         return self._row_to_project(row) if row else None
 
     def create(self, p: Project) -> Project:
+        from ..cache import invalidate
         if not p.id:
             p.id = p.name.lower().replace(" ", "-").replace("_", "-")[:30]
         conn = get_db()
@@ -147,6 +152,7 @@ class ProjectStore:
               p.lead_agent_id, json.dumps(p.agents), p.active_pattern_id, p.status))
         conn.commit()
         conn.close()
+        invalidate("projects:all")
         return p
 
     def auto_provision(self, project_id: str, project_name: str):
@@ -167,7 +173,7 @@ class ProjectStore:
                 name=f"Sécurité — {project_name}",
                 description=f"Audit sécurité périodique pour {project_name}. Scan OWASP, CVE watch, revue code sécurité.",
                 goal="Maintenir un score sécurité ≥ 80% et zéro CVE critique non corrigée.",
-                status="planning", type="security",
+                status="active", type="security",
                 project_id=project_id, workflow_id="review-cycle",
                 wsjf_score=12, created_by="devsecops",
                 config={"auto_provisioned": True, "schedule": "weekly"},

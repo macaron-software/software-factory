@@ -31,8 +31,8 @@ async def portfolio_page(request: Request):
 
     all_projects = project_store.list_all()
     all_agents = agent_store.list_all()
-    all_missions = mission_store.list_missions()
-    all_runs = run_store.list_runs(limit=100)
+    all_missions = mission_store.list_missions(limit=500)
+    all_runs = run_store.list_runs(limit=500)
     # Index runs by parent_mission_id for quick lookup
     runs_by_mission: dict = {}
     for r in all_runs:
@@ -105,9 +105,11 @@ async def portfolio_page(request: Request):
         active_count += p_active
 
         # Compute badges from mission names/types
-        tma_count = sum(1 for m in p_missions if '[TMA' in m.name and m.status == 'active')
-        tma_resolved = sum(1 for m in p_missions if '[TMA' in m.name and m.status == 'resolved')
-        has_secu = any('[TMA' in m.name and 'secur' in (m.name + (m.description or '')).lower() for m in p_missions) or p.factory_type == 'security'
+        def _is_tma(m):
+            return '[TMA' in m.name or m.name.startswith('TMA —') or m.type == 'program'
+        tma_count = sum(1 for m in p_missions if _is_tma(m) and m.status in ('active', 'running'))
+        tma_resolved = sum(1 for m in p_missions if _is_tma(m) and m.status == 'resolved')
+        has_secu = any(m.type == 'security' or m.name.startswith('Sécurité') or ('secur' in (m.name + (m.description or '')).lower()) for m in p_missions) or p.factory_type == 'security'
         has_cicd = p_total > 0 and any(
             run and any(ph.phase_id in ('cicd', 'deploy-prod') for ph in (run.phases or []))
             for m in p_missions
@@ -127,6 +129,7 @@ async def portfolio_page(request: Request):
             "team_avatars": team_avatars,
             "total_tasks": p_total, "done_tasks": p_done,
             "tma_active": tma_count, "tma_resolved": tma_resolved,
+            "has_tma": any(_is_tma(m) for m in p_missions),
             "has_secu": has_secu, "has_cicd": has_cicd,
             "running_phases": running_phases,
         })

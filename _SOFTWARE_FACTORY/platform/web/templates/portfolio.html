@@ -325,6 +325,8 @@
                     {% endif %}
                     {% if p.tma_active > 0 %}
                     <span class="pmc-badge tma"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> {{ p.tma_active }} TMA</span>
+                    {% elif p.has_tma %}
+                    <span class="pmc-badge nr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="16 10 11 15 8 12"/></svg> TMA</span>
                     {% endif %}
                     {% if p.tma_resolved > 0 %}
                     <span class="pmc-badge tma resolved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> {{ p.tma_resolved }} fixed</span>
