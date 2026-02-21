@@ -216,17 +216,20 @@ class LLMClient:
                 except Exception as exc:
                     last_exc = exc
                     err_str = repr(exc)
-                    # Retry on transient network errors
-                    if attempt < 2 and ("ReadError" in err_str or "ConnectError" in err_str or "RemoteProtocolError" in err_str):
-                        logger.warning("LLM %s/%s transient error (attempt %d): %s — retrying in 3s", prov, use_model, attempt+1, err_str)
-                        await asyncio.sleep(3)
+                    is_rate_limit = "429" in err_str or "RateLimitReached" in err_str
+                    is_transient = "ReadError" in err_str or "ConnectError" in err_str or "RemoteProtocolError" in err_str
+                    # Retry on transient errors or rate limits with backoff
+                    if attempt < 2 and (is_transient or is_rate_limit):
+                        delay = (2 ** attempt) * (10 if is_rate_limit else 3)
+                        logger.warning("LLM %s/%s %s (attempt %d): %s — retrying in %ds",
+                                       prov, use_model, "rate-limited" if is_rate_limit else "transient", attempt+1, err_str[:120], delay)
+                        await asyncio.sleep(delay)
                         continue
-                    logger.warning("LLM %s/%s failed: %s — trying next", prov, use_model, err_str)
+                    logger.warning("LLM %s/%s failed: %s — trying next", prov, use_model, err_str[:200])
                     self._stats["errors"] += 1
-                    # On 429, put provider in cooldown for 90s
-                    if "429" in err_str or "RateLimitReached" in err_str:
-                        self._provider_cooldown[prov] = time.monotonic() + 90
-                    logger.warning("LLM %s → cooldown 90s (rate limited)", prov)
+                    if is_rate_limit:
+                        self._provider_cooldown[prov] = time.monotonic() + 60
+                        logger.warning("LLM %s → cooldown 60s (rate limited)", prov)
                 continue
 
         raise RuntimeError(f"All LLM providers failed for {provider}/{model}")
@@ -388,9 +391,11 @@ class LLMClient:
                     yield chunk
                 return
             except Exception as exc:
-                logger.warning("LLM stream %s/%s failed: %s — trying next", prov, use_model, exc)
-                if "429" in repr(exc):
-                    self._provider_cooldown[prov] = time.monotonic() + 90
+                err_str = repr(exc)
+                is_rate_limit = "429" in err_str or "RateLimitReached" in err_str
+                logger.warning("LLM stream %s/%s failed: %s — trying next", prov, use_model, err_str[:200])
+                if is_rate_limit:
+                    self._provider_cooldown[prov] = time.monotonic() + 60
                 continue
 
         raise RuntimeError(f"All LLM providers failed for streaming {provider}/{model}")

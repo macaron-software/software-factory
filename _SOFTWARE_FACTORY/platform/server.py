@@ -85,6 +85,22 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("MCP Platform Server failed to start: %s", exc)
 
+    # Periodic WAL checkpoint to prevent data loss on crash
+    async def _wal_checkpoint_loop():
+        import asyncio, sqlite3
+        db_path = str(Path(__file__).parent.parent / "data" / "platform.db")
+        while True:
+            await asyncio.sleep(30)
+            try:
+                conn = sqlite3.connect(db_path)
+                conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+                conn.close()
+            except Exception:
+                pass
+
+    import asyncio
+    asyncio.create_task(_wal_checkpoint_loop())
+
     # Auto-resume stuck missions (status=running but no asyncio task after restart)
     try:
         from .missions.store import get_mission_run_store
@@ -179,6 +195,28 @@ def create_app() -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+
+    # ── Security: CORS ──────────────────────────────────────────────────────
+    from starlette.middleware.cors import CORSMiddleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:8090", "http://4.233.64.30"],
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_headers=["*"],
+        allow_credentials=True,
+    )
+
+    # ── Security: Response headers ──────────────────────────────────────────
+    @app.middleware("http")
+    async def security_headers(request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
 
     # Metrics + incident middleware
     @app.middleware("http")
