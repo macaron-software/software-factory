@@ -116,6 +116,47 @@ class MissionOrchestrator:
             aids = cfg.get("agent_ids", cfg.get("agents", []))
             pattern_type = wf_phase.pattern_id
 
+            # Dynamic team resolution: pick agents from graph nodes or defaults
+            if not aids and cfg.get("dynamic_team"):
+                wf_graph = (self.wf.config or {}).get("graph", {}) if self.wf.config else {}
+                graph_nodes = wf_graph.get("nodes", [])
+                phase_agents = []
+                for gn in graph_nodes:
+                    if gn.get("phase") == wf_phase.id and gn.get("agent_id"):
+                        aid = gn["agent_id"]
+                        if aid not in phase_agents and agent_store.get(aid):
+                            phase_agents.append(aid)
+                if phase_agents:
+                    aids = phase_agents
+                    logger.info("Dynamic team for %s: %s (from graph)", wf_phase.id, aids)
+                else:
+                    # Fallback: assign generic dev agents
+                    fallback = ["lead_dev", "lead_backend", "lead_frontend"]
+                    aids = [a for a in fallback if agent_store.get(a)][:3] or ["lead_dev"]
+                    logger.info("Dynamic team for %s: %s (fallback)", wf_phase.id, aids)
+
+            # Dynamic lead/reviewer resolution
+            if not aids and cfg.get("dynamic_lead"):
+                wf_graph = (self.wf.config or {}).get("graph", {}) if self.wf.config else {}
+                for gn in wf_graph.get("nodes", []):
+                    if gn.get("phase") == wf_phase.id and gn.get("agent_id"):
+                        aid = gn["agent_id"]
+                        if aid not in aids and agent_store.get(aid):
+                            aids.append(aid)
+                if not aids:
+                    aids = ["system-architect-art"]
+                logger.info("Dynamic lead for %s: %s", wf_phase.id, aids)
+
+            if not aids and cfg.get("dynamic_reviewers"):
+                aids = ["system-architect-art"]
+                logger.info("Dynamic reviewers for %s: %s", wf_phase.id, aids)
+
+            if not aids and cfg.get("dynamic_deployer"):
+                aids = ["ft-infra-lead"]
+                if not agent_store.get("ft-infra-lead"):
+                    aids = ["devops"]
+                logger.info("Dynamic deployer for %s: %s", wf_phase.id, aids)
+
             # Build CDP context: workspace state + previous phase summaries
             cdp_context = ""
             if mission.workspace_path:
