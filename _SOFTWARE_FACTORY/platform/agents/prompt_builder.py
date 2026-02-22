@@ -2,17 +2,16 @@
 
 Extracted from executor.py to keep the main file focused on the agent loop.
 """
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ..llm.client import LLMMessage
 
 # Re-export from tool_schemas for convenience
 from .tool_schemas import (
     _classify_agent_role,
-    _get_tools_for_agent,
-    _filter_schemas,
 )
 
 if TYPE_CHECKING:
@@ -48,8 +47,38 @@ CRITICAL: When the user asks you to DO something (lancer, fixer, chercher), USE 
    Example: memory_store(key="auth-strategy", value="JWT with refresh tokens, bcrypt for passwords, 15min access token TTL", category="architecture")
 3. What to store: decisions, technical choices, API contracts, blockers found, verdicts (GO/NOGO), risks identified.
 4. What NOT to store: greetings, process descriptions, "I will now examine...".""")
+
+        # Role-specific tool instructions
+        role_cat = _classify_agent_role(agent)
+        if role_cat == "qa":
+            parts.append("""
+## QA Tools — E2E Testing with Playwright (IMPORTANT)
+You MUST use Playwright MCP tools to verify the application visually:
+1. First, start the dev server: build(command="npm run dev -- --port 4173 &")
+2. Navigate: mcp_playwright_browser_navigate(url="http://localhost:4173")
+3. Screenshot: mcp_playwright_browser_screenshot(name="homepage")
+4. Inspect: mcp_playwright_browser_snapshot() → get accessibility tree
+5. Interact: mcp_playwright_browser_click(element="Login button", ref="ref_from_snapshot")
+6. Fill forms: mcp_playwright_browser_type(element="Email input", ref="ref", text="test@example.com")
+7. Screenshot again: mcp_playwright_browser_screenshot(name="after-login")
+
+EVERY QA validation MUST include at least:
+- 1 screenshot of the main page
+- 1 screenshot of a key user flow
+- build(command="npm test") to run unit tests
+Use create_ticket(title="...", severity="P2", description="...") for any bug found.""")
+        elif role_cat == "security":
+            parts.append("""
+## Security Tools (IMPORTANT)
+Run SAST scans on the codebase:
+- build(command="bandit -r . -f json") for Python projects
+- build(command="semgrep --config auto .") for any project
+- build(command="npm audit") for Node.js projects
+Report findings with severity ratings.""")
     else:
-        parts.append("\nYou do NOT have tools. Do NOT write [TOOL_CALL] or attempt to use tools. Focus on analysis, synthesis, and delegation to your team.")
+        parts.append(
+            "\nYou do NOT have tools. Do NOT write [TOOL_CALL] or attempt to use tools. Focus on analysis, synthesis, and delegation to your team."
+        )
 
     if ctx.skills_prompt:
         parts.append(f"\n## Skills\n{ctx.skills_prompt}")
@@ -93,10 +122,12 @@ def _build_messages(ctx: ExecutionContext, user_message: str) -> list[LLMMessage
     for h in ctx.history[-20:]:
         role = "assistant" if h.get("from_agent") != "user" else "user"
         name = h.get("from_agent")
-        messages.append(LLMMessage(
-            role=role,
-            content=h.get("content", ""),
-            name=name if name != "user" else None,
-        ))
+        messages.append(
+            LLMMessage(
+                role=role,
+                content=h.get("content", ""),
+                name=name if name != "user" else None,
+            )
+        )
     messages.append(LLMMessage(role="user", content=user_message))
     return messages
