@@ -1245,6 +1245,10 @@ def _classify_agent_role(agent: "AgentDef") -> str:
         return "devops"
     if any(k in combined for k in ("secur", "secu", "cyber", "license", "compliance officer", "scanner")):
         return "security"
+    if any(k in combined for k in ("contractual", "conformit", " ao ", "cctp", "recette")):
+        return "product"
+    if any(k in combined for k in ("migration", "etl", "migrat")):
+        return "devops"
     if any(k in combined for k in ("programme", "projet", "cdp", "scrum", "coach", "pm ")):
         return "cdp"
     if any(k in combined for k in ("dev", "lead", "engineer", "backend", "frontend", "fullstack")):

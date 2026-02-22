@@ -2613,4 +2613,223 @@ def get_builtin_workflows() -> list[WorkflowDef]:
         ),
     )
 
+    # 11. AO / Contractual Compliance (covers: legal-contrat)
+    builtins.append(
+        WorkflowDef(
+            id="ao-compliance",
+            name="AO & Contractual Compliance",
+            description="Appel d'Offres traceability: requirement mapping, SLA tracking, acceptance reports (PV de recette).",
+            icon="📋",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="ao-parse", pattern_id="sequential",
+                    name="AO Requirements Parsing",
+                    description="Parse CCTP/CCAP documents, extract all contractual requirements into traceable checklist",
+                    gate="All requirements inventoried with unique IDs",
+                    config={"agents": ["ao-compliance", "metier"]},
+                ),
+                WorkflowPhase(
+                    id="req-mapping", pattern_id="parallel",
+                    name="Requirement → Deliverable Mapping",
+                    description="Map each requirement to deliverables, acceptance criteria, and responsible team",
+                    gate="Compliance matrix complete (requirement → deliverable → proof → status)",
+                    config={"agents": ["ao-compliance", "architecte", "lead_dev"]},
+                ),
+                WorkflowPhase(
+                    id="sla-tracking", pattern_id="sequential",
+                    name="SLA Compliance Tracking",
+                    description="Verify SLA metrics: availability, response time, MTTR, MTBF against contractual targets",
+                    gate="All SLAs measured and documented",
+                    config={"agents": ["ao-compliance", "sre", "monitoring-ops"]},
+                ),
+                WorkflowPhase(
+                    id="acceptance-prep", pattern_id="sequential",
+                    name="Acceptance Report (PV de Recette)",
+                    description="Prepare formal acceptance report: test results, compliance matrix, non-conformity log",
+                    gate="PV de recette ready for client signature",
+                    config={"agents": ["ao-compliance", "doc-writer"]},
+                ),
+                WorkflowPhase(
+                    id="ao-review", pattern_id="human-in-the-loop",
+                    name="Client Review Checkpoint",
+                    description="Human review of compliance matrix and acceptance report before submission",
+                    gate="checkpoint",
+                    config={"agents": ["ao-compliance"]},
+                ),
+            ],
+            config={
+                "schedule": "per-milestone",
+                "graph": {
+                    "nodes": [
+                        {"id": "n1", "agent_id": "ao-compliance", "x": 100, "y": 150, "label": "Parse AO", "phase": "ao-parse"},
+                        {"id": "n2", "agent_id": "ao-compliance", "x": 300, "y": 100, "label": "Req Map", "phase": "req-mapping"},
+                        {"id": "n3", "agent_id": "sre", "x": 300, "y": 200, "label": "SLA Check", "phase": "sla-tracking"},
+                        {"id": "n4", "agent_id": "doc-writer", "x": 500, "y": 150, "label": "PV Recette", "phase": "acceptance-prep"},
+                        {"id": "n5", "agent_id": "ao-compliance", "x": 700, "y": 150, "label": "Client Review", "phase": "ao-review"},
+                    ],
+                    "edges": [
+                        {"from": "n1", "to": "n2", "label": "requirements", "color": "#6366f1"},
+                        {"from": "n1", "to": "n3", "label": "SLAs", "color": "#6366f1"},
+                        {"from": "n2", "to": "n4", "label": "matrix", "color": "#3fb950"},
+                        {"from": "n3", "to": "n4", "label": "SLA report", "color": "#3fb950"},
+                        {"from": "n4", "to": "n5", "label": "PV ready", "color": "#d29922"},
+                    ],
+                },
+            },
+        ),
+    )
+
+    # 12. Infrastructure as Code (covers: repro-env)
+    builtins.append(
+        WorkflowDef(
+            id="iac-pipeline",
+            name="Infrastructure as Code Pipeline",
+            description="IaC lifecycle: module creation, environment parity, drift detection, PR-based changes.",
+            icon="🏗️",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="iac-design", pattern_id="network",
+                    name="Infrastructure Design",
+                    description="Define infrastructure components, network topology, security groups, storage tiers",
+                    gate="Infrastructure architecture documented and approved",
+                    config={"agents": ["iac-engineer", "architecte", "securite"]},
+                ),
+                WorkflowPhase(
+                    id="iac-modules", pattern_id="sequential",
+                    name="IaC Module Development",
+                    description="Write Terraform/Pulumi modules: networking, compute, storage, monitoring, secrets",
+                    gate="All modules written with variables, outputs, and documentation",
+                    config={"agents": ["iac-engineer", "devops"]},
+                ),
+                WorkflowPhase(
+                    id="env-parity", pattern_id="parallel",
+                    name="Environment Parity",
+                    description="Create identical environments (dev/staging/prod) with only variable differences",
+                    gate="All environments deployable from same modules",
+                    config={"agents": ["iac-engineer"]},
+                ),
+                WorkflowPhase(
+                    id="drift-detect", pattern_id="sequential",
+                    name="Drift Detection",
+                    description="Implement automated drift detection: terraform plan in CI, alert on unexpected changes",
+                    gate="Drift detection automated with alerting",
+                    config={"agents": ["iac-engineer", "monitoring-ops"]},
+                ),
+                WorkflowPhase(
+                    id="iac-review", pattern_id="adversarial-pair",
+                    name="IaC Security Review",
+                    description="Security review of IaC: no hardcoded secrets, least privilege IAM, encryption at rest/transit",
+                    gate="Security review passed, no critical findings",
+                    config={"agents": ["securite", "iac-engineer"]},
+                ),
+            ],
+            config={
+                "graph": {
+                    "nodes": [
+                        {"id": "n1", "agent_id": "iac-engineer", "x": 100, "y": 150, "label": "Design", "phase": "iac-design"},
+                        {"id": "n2", "agent_id": "iac-engineer", "x": 300, "y": 150, "label": "Modules", "phase": "iac-modules"},
+                        {"id": "n3", "agent_id": "iac-engineer", "x": 500, "y": 100, "label": "Env Parity", "phase": "env-parity"},
+                        {"id": "n4", "agent_id": "monitoring-ops", "x": 500, "y": 200, "label": "Drift Detect", "phase": "drift-detect"},
+                        {"id": "n5", "agent_id": "securite", "x": 700, "y": 150, "label": "Security", "phase": "iac-review"},
+                    ],
+                    "edges": [
+                        {"from": "n1", "to": "n2", "label": "architecture", "color": "#0ea5e9"},
+                        {"from": "n2", "to": "n3", "label": "modules ready", "color": "#0ea5e9"},
+                        {"from": "n2", "to": "n4", "label": "modules ready", "color": "#0ea5e9"},
+                        {"from": "n3", "to": "n5", "label": "envs ok", "color": "#3fb950"},
+                        {"from": "n4", "to": "n5", "label": "drift ok", "color": "#3fb950"},
+                    ],
+                },
+            },
+        ),
+    )
+
+    # 13. Generic Data Migration (covers: data-migration)
+    builtins.append(
+        WorkflowDef(
+            id="data-migration",
+            name="Data Migration Pipeline",
+            description="Generic data migration: schema mapping, ETL, validation, zero-downtime with rollback.",
+            icon="🔄",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="migration-plan", pattern_id="network",
+                    name="Migration Planning",
+                    description="Inventory source/target schemas, define transformation rules, estimate volume, plan timeline",
+                    gate="Migration plan approved with go/no-go criteria",
+                    config={"agents": ["data-migrator", "architecte", "backup-ops"]},
+                ),
+                WorkflowPhase(
+                    id="pre-migration-backup", pattern_id="sequential",
+                    name="Pre-Migration Backup",
+                    description="Full backup of source and target databases, verify restore capability",
+                    gate="Backup verified with successful test restore",
+                    config={"agents": ["backup-ops", "data-migrator"]},
+                ),
+                WorkflowPhase(
+                    id="etl-dev", pattern_id="sequential",
+                    name="ETL Development",
+                    description="Write migration scripts: extract → transform → load, with reversible up/down migrations",
+                    gate="Migration scripts written and unit-tested",
+                    config={"agents": ["data-migrator", "lead_dev"]},
+                ),
+                WorkflowPhase(
+                    id="staging-run", pattern_id="sequential",
+                    name="Staging Migration Run",
+                    description="Execute migration on staging: measure duration, validate row counts, checksums, referential integrity",
+                    gate="Staging migration successful, metrics within targets",
+                    config={"agents": ["data-migrator", "testeur"]},
+                ),
+                WorkflowPhase(
+                    id="migration-go-nogo", pattern_id="human-in-the-loop",
+                    name="Production GO/NO-GO",
+                    description="Human checkpoint: review staging results, confirm production migration window",
+                    gate="checkpoint",
+                    config={"agents": ["data-migrator"]},
+                ),
+                WorkflowPhase(
+                    id="prod-migration", pattern_id="sequential",
+                    name="Production Migration",
+                    description="Execute production migration with zero-downtime (expand-contract/dual-write), validate post-migration",
+                    gate="Production data migrated and validated",
+                    config={"agents": ["data-migrator", "sre", "monitoring-ops"]},
+                ),
+                WorkflowPhase(
+                    id="post-validation", pattern_id="adversarial-pair",
+                    name="Post-Migration Validation",
+                    description="Full data validation: row counts, checksums, business rule verification, performance check",
+                    gate="All validation checks passed, rollback window closed",
+                    config={"agents": ["data-migrator", "testeur"]},
+                ),
+            ],
+            config={
+                "critical": True,
+                "requires_backup": True,
+                "graph": {
+                    "nodes": [
+                        {"id": "n1", "agent_id": "data-migrator", "x": 50, "y": 150, "label": "Plan", "phase": "migration-plan"},
+                        {"id": "n2", "agent_id": "backup-ops", "x": 180, "y": 150, "label": "Backup", "phase": "pre-migration-backup"},
+                        {"id": "n3", "agent_id": "data-migrator", "x": 310, "y": 150, "label": "ETL Dev", "phase": "etl-dev"},
+                        {"id": "n4", "agent_id": "data-migrator", "x": 440, "y": 150, "label": "Staging", "phase": "staging-run"},
+                        {"id": "n5", "agent_id": "data-migrator", "x": 540, "y": 150, "label": "GO/NOGO", "phase": "migration-go-nogo"},
+                        {"id": "n6", "agent_id": "sre", "x": 640, "y": 150, "label": "Prod Run", "phase": "prod-migration"},
+                        {"id": "n7", "agent_id": "testeur", "x": 770, "y": 150, "label": "Validate", "phase": "post-validation"},
+                    ],
+                    "edges": [
+                        {"from": "n1", "to": "n2", "label": "plan ok", "color": "#d946ef"},
+                        {"from": "n2", "to": "n3", "label": "backup ok", "color": "#3fb950"},
+                        {"from": "n3", "to": "n4", "label": "scripts ready", "color": "#d946ef"},
+                        {"from": "n4", "to": "n5", "label": "staging ok", "color": "#3fb950"},
+                        {"from": "n5", "to": "n6", "label": "approved", "color": "#3fb950"},
+                        {"from": "n6", "to": "n7", "label": "migrated", "color": "#d946ef"},
+                        {"from": "n6", "to": "n2", "label": "rollback", "color": "#ef4444", "style": "dashed"},
+                    ],
+                },
+            },
+        ),
+    )
+
     return builtins
