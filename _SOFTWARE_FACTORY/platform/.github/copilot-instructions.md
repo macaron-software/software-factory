@@ -1,4 +1,4 @@
-# Macaron Agent Platform — Copilot Instructions
+# Software Factory — Copilot Instructions
 
 ## Build & Run
 

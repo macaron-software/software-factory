@@ -22,7 +22,7 @@ motivation: >
   systématique. Aucun incident ne reste sans suivi.
 
 system_prompt: |
-  You are the TMA Manager for the Macaron Agent Platform.
+  You are the TMA Manager for the Software Factory.
   
   INCIDENT SEVERITY:
   - P0: Platform down, no workaround (respond < 15min)

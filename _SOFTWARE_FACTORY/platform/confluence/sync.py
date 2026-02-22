@@ -32,7 +32,7 @@ class ConfluenceSyncEngine:
 
     def _ensure_hierarchy(self, mission) -> dict[str, str]:
         """Ensure page hierarchy exists, return tab → page_id mapping."""
-        project_name = getattr(mission, 'project_id', '') or "Macaron Agent Platform"
+        project_name = getattr(mission, 'project_id', '') or "Software Factory"
         # MissionRun uses brief, MissionDef uses name
         epic_name = getattr(mission, 'brief', '')[:80] or getattr(mission, 'name', '') or mission.id
 

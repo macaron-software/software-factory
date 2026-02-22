@@ -12,6 +12,12 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Stre
 
 from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, _mission_semaphore, serve_workspace_file, _parse_body, _is_json_request
 from ...i18n import t
+from ..schemas import (
+    MissionOut, MissionListResponse, MissionCreate, MissionDetail,
+    FeatureOut, FeatureCreate, FeatureUpdate, FeatureDep,
+    StoryOut, StoryCreate, StoryUpdate, SprintOut, SprintCreate,
+    WsjfUpdate, BacklogReorder, OkResponse, ErrorResponse,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -135,7 +141,7 @@ async def mission_detail_page(request: Request, mission_id: str):
     })
 
 
-@router.post("/api/missions")
+@router.post("/api/missions", responses={200: {"model": OkResponse}})
 async def create_mission(request: Request):
     """Create a new mission."""
     from ...missions.store import get_mission_store, MissionDef
@@ -156,7 +162,7 @@ async def create_mission(request: Request):
     return RedirectResponse(f"/missions/{m.id}", status_code=303)
 
 
-@router.get("/api/missions")
+@router.get("/api/missions", responses={200: {"model": MissionListResponse}})
 async def list_missions_api(request: Request):
     """JSON API: list all missions with run progress."""
     from ...missions.store import get_mission_store, get_mission_run_store
@@ -184,7 +190,7 @@ async def list_missions_api(request: Request):
     return JSONResponse({"missions": result, "total": len(result)})
 
 
-@router.post("/api/missions/{mission_id}/start")
+@router.post("/api/missions/{mission_id}/start", responses={200: {"model": OkResponse}})
 async def start_mission(mission_id: str):
     """Activate a mission."""
     from ...missions.store import get_mission_store
@@ -192,7 +198,7 @@ async def start_mission(mission_id: str):
     return JSONResponse({"ok": True})
 
 
-@router.post("/api/missions/{mission_id}/sprints")
+@router.post("/api/missions/{mission_id}/sprints", responses={200: {"model": OkResponse}})
 async def create_sprint(mission_id: str):
     """Add a sprint to a mission."""
     from ...missions.store import get_mission_store, SprintDef
@@ -248,7 +254,7 @@ async def update_task_status(request: Request, task_id: str):
     return JSONResponse({"ok": True, "task_id": task_id, "status": new_status})
 
 
-@router.patch("/api/features/{feature_id}")
+@router.patch("/api/features/{feature_id}", responses={200: {"model": OkResponse}})
 async def update_feature(request: Request, feature_id: str):
     """Update feature fields (story points, acceptance criteria, priority, status)."""
     from ...missions.product import get_product_backlog
@@ -273,7 +279,7 @@ async def update_feature(request: Request, feature_id: str):
     return JSONResponse({"ok": True, "feature_id": feature_id})
 
 
-@router.patch("/api/stories/{story_id}")
+@router.patch("/api/stories/{story_id}", responses={200: {"model": OkResponse}})
 async def update_story(request: Request, story_id: str):
     """Update user story fields (story points, acceptance criteria, status, sprint)."""
     from ...missions.product import get_product_backlog
@@ -297,7 +303,7 @@ async def update_story(request: Request, story_id: str):
 
 # ── Feature / Story creation ─────────────────────────────────────
 
-@router.post("/api/epics/{epic_id}/features")
+@router.post("/api/epics/{epic_id}/features", responses={200: {"model": OkResponse}})
 async def create_feature_api(request: Request, epic_id: str):
     """Create a new feature under an epic."""
     from ...missions.product import get_product_backlog, FeatureDef
@@ -316,7 +322,7 @@ async def create_feature_api(request: Request, epic_id: str):
     return JSONResponse({"ok": True, "feature": {"id": feat.id, "name": feat.name}})
 
 
-@router.get("/api/stories")
+@router.get("/api/stories", responses={200: {"model": list[StoryOut]}})
 async def list_stories_api(feature_id: str = ""):
     """List user stories, optionally filtered by feature."""
     from ...db.migrations import get_db
@@ -332,7 +338,7 @@ async def list_stories_api(feature_id: str = ""):
     return JSONResponse([dict(r) for r in rows])
 
 
-@router.get("/api/features/{feature_id}/stories")
+@router.get("/api/features/{feature_id}/stories", responses={200: {"model": list[StoryOut]}})
 async def list_feature_stories_api(feature_id: str):
     """List user stories for a specific feature."""
     from ...db.migrations import get_db
@@ -343,7 +349,7 @@ async def list_feature_stories_api(feature_id: str):
     return JSONResponse([dict(r) for r in rows])
 
 
-@router.post("/api/features/{feature_id}/stories")
+@router.post("/api/features/{feature_id}/stories", responses={200: {"model": OkResponse}})
 async def create_story_api(request: Request, feature_id: str):
     """Create a new user story under a feature."""
     from ...missions.product import get_product_backlog, UserStoryDef
@@ -364,7 +370,7 @@ async def create_story_api(request: Request, feature_id: str):
 
 # ── Backlog priority reorder ─────────────────────────────────────
 
-@router.patch("/api/backlog/reorder")
+@router.patch("/api/backlog/reorder", responses={200: {"model": OkResponse}})
 async def reorder_backlog(request: Request):
     """Reorder features or stories by priority. Body: {type:'feature'|'story', ids:[ordered list]}"""
     from ...db.migrations import get_db
@@ -386,7 +392,7 @@ async def reorder_backlog(request: Request):
 
 # ── Feature dependencies ─────────────────────────────────────────
 
-@router.post("/api/features/{feature_id}/deps")
+@router.post("/api/features/{feature_id}/deps", responses={200: {"model": OkResponse}})
 async def add_feature_dep(request: Request, feature_id: str):
     """Add a dependency: feature_id depends on depends_on_id."""
     from ...db.migrations import get_db
@@ -406,7 +412,7 @@ async def add_feature_dep(request: Request, feature_id: str):
     return JSONResponse({"ok": True})
 
 
-@router.delete("/api/features/{feature_id}/deps/{depends_on}")
+@router.delete("/api/features/{feature_id}/deps/{depends_on}", responses={200: {"model": OkResponse}})
 async def remove_feature_dep(feature_id: str, depends_on: str):
     """Remove a feature dependency."""
     from ...db.migrations import get_db
@@ -442,7 +448,7 @@ async def list_feature_deps(feature_id: str):
 
 # ── Sprint planning: assign stories to sprint ────────────────────
 
-@router.post("/api/sprints/{sprint_id}/assign-stories")
+@router.post("/api/sprints/{sprint_id}/assign-stories", responses={200: {"model": OkResponse}})
 async def assign_stories_to_sprint(request: Request, sprint_id: str):
     """Assign multiple stories to a sprint. Body: {story_ids: [...]}"""
     from ...db.migrations import get_db
@@ -460,7 +466,7 @@ async def assign_stories_to_sprint(request: Request, sprint_id: str):
     return JSONResponse({"ok": True, "assigned": len(story_ids)})
 
 
-@router.delete("/api/sprints/{sprint_id}/stories/{story_id}")
+@router.delete("/api/sprints/{sprint_id}/stories/{story_id}", responses={200: {"model": OkResponse}})
 async def unassign_story_from_sprint(sprint_id: str, story_id: str):
     """Remove a story from a sprint."""
     from ...db.migrations import get_db
@@ -473,7 +479,7 @@ async def unassign_story_from_sprint(sprint_id: str, story_id: str):
     return JSONResponse({"ok": True})
 
 
-@router.get("/api/sprints/{sprint_id}/available-stories")
+@router.get("/api/sprints/{sprint_id}/available-stories", responses={200: {"model": list[StoryOut]}})
 async def available_stories_for_sprint(sprint_id: str):
     """List unassigned stories (backlog) available for sprint planning."""
     from ...db.migrations import get_db
@@ -546,7 +552,7 @@ async def launch_mission_workflow(request: Request, mission_id: str):
     return JSONResponse({"session_id": session.id, "workflow_id": wf_id})
 
 
-@router.post("/api/missions/{mission_id}/wsjf")
+@router.post("/api/missions/{mission_id}/wsjf", responses={200: {"model": OkResponse}})
 async def compute_wsjf(mission_id: str, request: Request):
     """Compute and store WSJF score from components."""
     from ...missions.store import get_mission_store
@@ -679,7 +685,7 @@ async def portfolio_kanban(request: Request):
     return HTMLResponse(html)
 
 
-@router.delete("/api/mission-runs/{run_id}")
+@router.delete("/api/mission-runs/{run_id}", responses={200: {"model": OkResponse}})
 async def delete_mission_run(run_id: str):
     """Delete a mission run and ALL associated data (cascade)."""
     from ...missions.store import get_mission_run_store
@@ -706,7 +712,7 @@ async def delete_mission_run(run_id: str):
     return JSONResponse({"status": "deleted"})
 
 
-@router.delete("/api/missions/{mission_id}")
+@router.delete("/api/missions/{mission_id}", responses={200: {"model": OkResponse}})
 async def delete_mission(mission_id: str):
     """Delete a mission (epic) and ALL its runs + associated data."""
     from ...db.migrations import get_db
@@ -750,7 +756,7 @@ async def delete_mission(mission_id: str):
     return JSONResponse({"status": "deleted", "name": mission[1]})
 
 
-@router.delete("/api/projects/{project_id}")
+@router.delete("/api/projects/{project_id}", responses={200: {"model": OkResponse}})
 async def delete_project(project_id: str):
     """Delete a project and ALL associated missions, sessions, memory, agents."""
     from ...db.migrations import get_db
@@ -1226,7 +1232,7 @@ async def mission_control_page(request: Request, mission_id: str):
     return _templates(request).TemplateResponse("mission_control.html", ctx)
 
 
-@router.get("/api/missions/{mission_id}")
+@router.get("/api/missions/{mission_id}", responses={200: {"model": MissionDetail}, 404: {"model": ErrorResponse}})
 async def api_mission_status(request: Request, mission_id: str):
     """Get mission status as JSON."""
     from ...missions.store import get_mission_run_store

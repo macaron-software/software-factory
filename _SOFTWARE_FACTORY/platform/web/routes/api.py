@@ -12,6 +12,11 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, FileResponse, PlainTextResponse
 
 from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, serve_workspace_file
+from ..schemas import (
+    HealthResponse, MemoryStats, LlmStatsResponse, DoraMetrics,
+    FeatureOut, IncidentOut, IncidentCreate, IncidentStats,
+    AutoHealStats, OkResponse, ErrorResponse,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -26,7 +31,7 @@ except Exception:
 
 # ── Health ────────────────────────────────────────────────────────
 
-@router.get("/api/health")
+@router.get("/api/health", responses={200: {"model": HealthResponse}})
 async def health_check():
     """Liveness/readiness probe for Docker healthcheck."""
     from ...db.migrations import get_db
@@ -39,7 +44,7 @@ async def health_check():
 
 # ── Memory API ───────────────────────────────────────────────────
 
-@router.get("/api/memory/stats")
+@router.get("/api/memory/stats", responses={200: {"model": MemoryStats}})
 async def memory_stats():
     """Memory layer statistics."""
     from ...memory.manager import get_memory_manager
@@ -48,7 +53,7 @@ async def memory_stats():
 
 # ── LLM Observability ──────────────────────────────────────────
 
-@router.get("/api/llm/stats")
+@router.get("/api/llm/stats", responses={200: {"model": LlmStatsResponse}})
 async def llm_stats(hours: int = 24, session_id: str = ""):
     """LLM usage statistics: calls, tokens, cost, by provider/agent."""
     from ...llm.observability import get_tracer
@@ -446,7 +451,7 @@ async def prometheus_metrics():
     return "\n".join(lines) + "\n"
 
 
-@router.get("/api/metrics/dora/{project_id}")
+@router.get("/api/metrics/dora/{project_id}", responses={200: {"model": DoraMetrics}})
 async def dora_api(request: Request, project_id: str):
     """DORA metrics JSON API."""
     from ...metrics.dora import get_dora_metrics
@@ -455,7 +460,7 @@ async def dora_api(request: Request, project_id: str):
     return JSONResponse(get_dora_metrics().summary(pid, period))
 
 
-@router.get("/api/epics/{epic_id}/features")
+@router.get("/api/epics/{epic_id}/features", responses={200: {"model": list[FeatureOut]}})
 async def epic_features(epic_id: str):
     """List features for an epic."""
     from ...db.migrations import get_db
@@ -1093,7 +1098,7 @@ async def rbac_check(request: Request):
 
 # ── Incidents ────────────────────────────────────────────────────
 
-@router.get("/api/incidents/stats")
+@router.get("/api/incidents/stats", responses={200: {"model": IncidentStats}})
 async def incidents_stats():
     """Incident counts by severity and status."""
     from ...db.migrations import get_db
@@ -1120,7 +1125,7 @@ async def incidents_stats():
         db.close()
 
 
-@router.get("/api/incidents")
+@router.get("/api/incidents", responses={200: {"model": list[IncidentOut]}})
 async def list_incidents(request: Request):
     """List incidents, optionally filtered by status/severity."""
     from ...db.migrations import get_db
@@ -1147,7 +1152,7 @@ async def list_incidents(request: Request):
         db.close()
 
 
-@router.post("/api/incidents")
+@router.post("/api/incidents", responses={200: {"model": OkResponse}})
 async def create_incident(request: Request):
     """Create a manual incident."""
     import uuid
@@ -1172,7 +1177,7 @@ async def create_incident(request: Request):
         db.close()
 
 
-@router.patch("/api/incidents/{incident_id}")
+@router.patch("/api/incidents/{incident_id}", responses={200: {"model": OkResponse}})
 async def update_incident(request: Request, incident_id: str):
     """Update incident status (resolve, close)."""
     from ...db.migrations import get_db
@@ -1201,7 +1206,7 @@ async def update_incident(request: Request, incident_id: str):
 
 # ── Auto-Heal API ────────────────────────────────────────────────────
 
-@router.get("/api/autoheal/stats")
+@router.get("/api/autoheal/stats", responses={200: {"model": AutoHealStats}})
 async def autoheal_stats():
     """Auto-heal engine statistics."""
     from ...ops.auto_heal import get_autoheal_stats
@@ -1823,7 +1828,7 @@ async def notification_test():
     payload = NotificationPayload(
         event="test",
         title="Test Notification",
-        message="This is a test notification from Macaron Agent Platform.",
+        message="This is a test notification from Software Factory.",
         severity="info",
     )
     await svc.notify(payload)

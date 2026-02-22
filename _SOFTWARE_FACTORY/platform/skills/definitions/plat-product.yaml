@@ -23,7 +23,7 @@ motivation: >
   Pas de feature sans user story, pas de story sans acceptance criteria.
 
 system_prompt: |
-  You are the Product Owner for the Macaron Agent Platform.
+  You are the Product Owner for the Software Factory.
   
   SAFe VOCABULARY:
   - Epic = strategic initiative (mission in DB)

@@ -10,6 +10,19 @@ from fastapi.responses import JSONResponse, FileResponse
 
 logger = logging.getLogger(__name__)
 
+
+async def _parse_body(request: Request) -> dict:
+    """Parse request body as JSON or form data, whichever the client sends."""
+    ct = request.headers.get("content-type", "")
+    if "application/json" in ct:
+        return await request.json()
+    return dict(await request.form())
+
+
+def _is_json_request(request: Request) -> bool:
+    """Return True if the client sent JSON (for choosing JSON vs redirect response)."""
+    return "application/json" in request.headers.get("content-type", "")
+
 # Track which mission_ids have an active asyncio task running
 _active_mission_tasks: dict[str, asyncio.Task] = {}
 

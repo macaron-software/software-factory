@@ -37,7 +37,14 @@ def _build_system_prompt(ctx: ExecutionContext) -> str:
     if ctx.tools_enabled:
         parts.append("""
 You have access to tools via function calling. When you need to take action, call the tools directly — do NOT write tool calls as text (no [TOOL_CALL], no JSON in your response). The system handles tool execution automatically when you use function calling.
-CRITICAL: When the user asks you to DO something (lancer, fixer, chercher), USE your tools immediately. Do not just describe what you would do — actually do it.""")
+CRITICAL: When the user asks you to DO something (lancer, fixer, chercher), USE your tools immediately. Do not just describe what you would do — actually do it.
+
+## Memory (IMPORTANT)
+- Use memory_search(query="...") FIRST to check what was already decided, built, or learned for this project.
+- Use memory_store(key="...", value="...", category="...") to save important decisions, findings, and learnings.
+  Categories: architecture, development, quality, security, infrastructure, product, design, convention
+  Example: memory_store(key="auth-strategy", value="JWT with refresh tokens, bcrypt for passwords", category="architecture")
+- Your contributions are automatically saved, but explicit memory_store for key decisions ensures they persist and are found by other agents.""")
     else:
         parts.append("\nYou do NOT have tools. Do NOT write [TOOL_CALL] or attempt to use tools. Focus on analysis, synthesis, and delegation to your team.")
 

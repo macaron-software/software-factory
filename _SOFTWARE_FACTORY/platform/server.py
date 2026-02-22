@@ -1,4 +1,4 @@
-"""Macaron Agent Platform — FastAPI web server.
+"""Software Factory — FastAPI web server.
 
 Serves the HTMX-based UI with SSE real-time updates.
 Runs on port 8090 (separate from Factory dashboard on 8080).
@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
             logger.warning("OpenTelemetry packages not installed, tracing disabled")
 
     cfg = get_config()
-    logger.info("Starting Macaron Agent Platform on port %s", cfg.server.port)
+    logger.info("Starting Software Factory on port %s", cfg.server.port)
     init_db()
 
     # Seed built-in agents
@@ -283,8 +283,8 @@ def _record_incident(path: str, status_code: int, detail: str = ""):
 def create_app() -> FastAPI:
     """Application factory."""
     app = FastAPI(
-        title="Macaron Agent Platform",
-        description="Multi-Agent Macaron Agent Platform — 94 AI agents orchestrating the full product lifecycle with SAFe, TDD, and auto-heal.",
+        title="Software Factory",
+        description="Multi-Agent Software Factory — 94 AI agents orchestrating the full product lifecycle with SAFe, TDD, and auto-heal.",
         version="1.1.0",
         docs_url="/docs",
         redoc_url="/redoc",

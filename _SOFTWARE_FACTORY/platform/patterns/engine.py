@@ -762,15 +762,30 @@ async def _execute_node(
             mem = get_memory_manager()
             import re as _re2
             clean = _re2.sub(r'\[.*?\]', '', content).strip()
-            # Extract structured decisions: [PR], architecture choices, tech decisions
-            decisions = []
+
+            # Extract structured facts from agent output
+            facts = []
             for line in content.split('\n'):
                 line_s = line.strip()
-                if line_s.startswith('[PR]'):
-                    decisions.append(line_s)
-                elif any(kw in line_s.lower() for kw in ('decision:', 'choix:', 'stack:', 'architecture:')):
-                    decisions.append(line_s)
-            summary = "\n".join(decisions[:5]) if decisions else clean[:300]
+                if not line_s or len(line_s) < 10:
+                    continue
+                # Structured markers: [PR], Decision:, etc.
+                if line_s.startswith('[PR]') or line_s.startswith('- ['):
+                    facts.append(line_s)
+                elif any(kw in line_s.lower() for kw in (
+                    'decision:', 'choix:', 'stack:', 'architecture:',
+                    'action:', 'conclusion:', 'recommandation:', 'verdict:',
+                    'risque:', 'blocage:', 'résultat:', 'created:', 'wrote:',
+                )):
+                    facts.append(line_s)
+            # Compact summary: facts first, then truncated clean text
+            if facts:
+                summary = "\n".join(facts[:8])
+            else:
+                # Take first substantive paragraph (skip greetings)
+                paragraphs = [p.strip() for p in clean.split('\n\n') if len(p.strip()) > 30]
+                summary = paragraphs[0][:300] if paragraphs else clean[:300]
+
             # Use semantic category based on agent role
             role_lower = (agent.role or "").lower()
             if "archi" in role_lower:
@@ -783,8 +798,10 @@ async def _execute_node(
                 cat = "security"
             elif "devops" in role_lower or "sre" in role_lower or "pipeline" in role_lower:
                 cat = "infrastructure"
-            elif "product" in role_lower or "business" in role_lower:
+            elif "product" in role_lower or "business" in role_lower or "po" in role_lower:
                 cat = "product"
+            elif "ux" in role_lower or "design" in role_lower:
+                cat = "design"
             else:
                 cat = "decisions"
             mem.project_store(
@@ -794,6 +811,16 @@ async def _execute_node(
                 category=cat,
                 source=agent.id,
             )
+
+            # Also store in pattern memory (session-level, for agents in same session)
+            mem.pattern_store(
+                run.session_id,
+                key=f"{agent.name}:{cat}",
+                value=summary[:500],
+                category=cat,
+                author=agent.id,
+            )
+
             await _sse(run, {
                 "type": "memory_stored",
                 "category": cat,
@@ -850,6 +877,22 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
                     )
         except Exception:
             pass
+
+    # Inject pattern memory (session-level: what other agents decided in THIS session)
+    try:
+        mem = get_memory_manager()
+        pattern_entries = mem.pattern_get(run.session_id, limit=15)
+        if pattern_entries:
+            # Only include entries from OTHER agents (not self)
+            other_entries = [e for e in pattern_entries if e.get("author_agent") != agent.id]
+            if other_entries:
+                session_mem = "\n".join(
+                    f"[{e.get('type','ctx')}] {e['key']}: {e['value'][:200]}"
+                    for e in other_entries[:10]
+                )
+                project_context += f"\n\n## Decisions from this session (other agents)\n{session_mem}"
+    except Exception:
+        pass
 
     # Fallback: use workspace_path from mission if project_path not found from registry
     if not project_path and run.project_path:

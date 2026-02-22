@@ -1,5 +1,5 @@
 """
-Macaron Agent Platform - Configuration
+Software Factory - Configuration
 =======================================
 100% local platform. LLM providers: Anthropic, MiniMax, GLM, Azure Foundry.
 Loads from ~/.config/factory/platform.yaml with env var overrides.

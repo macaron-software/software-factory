@@ -1,5 +1,5 @@
 """
-UI Agents for the Macaron Agent Platform.
+UI Agents for the Software Factory.
 
 Three specialized agents for IHM/UX/UI validation:
 1. DesignSystemValidator - Validates design token usage

@@ -3,7 +3,7 @@
 ## strat-cpo (CPO) - Vision Produit
 
 **Vision:**
-La RLM Macaron Agent Platform est une plateforme d'IA autonome qui automatise le cycle de vie complet du développement logiciel:
+La RLM Software Factory est une plateforme d'IA autonome qui automatise le cycle de vie complet du développement logiciel:
 - Analyse de code profonde (arXiv:2512.24601)
 - Génération de tests TDD
 - Déploiement automatique

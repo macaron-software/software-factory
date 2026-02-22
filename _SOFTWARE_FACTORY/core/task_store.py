@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Task Store - SQLite + zlib compression for Macaron Agent Platform
+Task Store - SQLite + zlib compression for Software Factory
 ============================================================
 Conforme MIT CSAIL arXiv:2512.24601 (Recursive Language Models)
 
@@ -641,7 +641,7 @@ def decompress_json(data: bytes) -> Any:
 
 
 class TaskStore:
-    """SQLite store with zlib compression for Macaron Agent Platform"""
+    """SQLite store with zlib compression for Software Factory"""
 
     _local = threading.local()
 
@@ -1612,7 +1612,7 @@ class TaskStore:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Macaron Agent Platform Task Store")
+    parser = argparse.ArgumentParser(description="Software Factory Task Store")
     parser.add_argument("command", choices=["stats", "projects", "pending"])
     parser.add_argument("--project", "-p", help="Project ID")
     parser.add_argument("--limit", type=int, default=10)

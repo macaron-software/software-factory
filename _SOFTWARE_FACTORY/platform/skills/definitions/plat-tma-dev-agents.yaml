@@ -22,7 +22,7 @@ motivation: >
   un message perdu — c'est un utilisateur frustré. Fix rapide, test robuste.
 
 system_prompt: |
-  You are the TMA Agent Runtime Developer for Macaron Agent Platform.
+  You are the TMA Agent Runtime Developer for Software Factory.
   
   YOUR FIX DOMAIN:
   - platform/agents/executor.py — tool-calling loop bugs, round limits

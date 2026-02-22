@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Macaron CLI — Command-line interface for the Macaron Agent Platform.
+"""Macaron CLI — Command-line interface for the Software Factory.
 
 Usage:
     macaron status                    Show platform health and stats
@@ -137,7 +137,7 @@ def cmd_logs(args):
 def main():
     parser = argparse.ArgumentParser(
         prog="macaron",
-        description="Macaron Agent Platform CLI",
+        description="Software Factory CLI",
     )
     parser.add_argument("--url", default=DEFAULT_URL, help=f"Platform URL (default: {DEFAULT_URL})")
     sub = parser.add_subparsers(dest="command", help="Available commands")

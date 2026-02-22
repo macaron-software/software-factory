@@ -247,7 +247,7 @@ class OrgStore:
         self.create_art(ART(
             id="art-platform", name="ART Platform & Core",
             portfolio_id="portfolio-dsi",
-            description="Plateformes internes: Factory, Macaron Agent Platform, Solaris Design System",
+            description="Plateformes internes: Factory, Software Factory, Solaris Design System",
             lead_agent_id="release_train_engineer",
             pi_cadence_weeks=10,
         ))
@@ -273,7 +273,7 @@ class OrgStore:
         # Teams — using real agent IDs matching skills/definitions/*.yaml
         platform_teams = [
             Team(id="team-factory", name="Team Factory", art_id="art-platform",
-                 description="Macaron Agent Platform self-improvement", scrum_master_id="scrum_master",
+                 description="Software Factory self-improvement", scrum_master_id="scrum_master",
                  members=[
                      {"agent_id": "lead_dev", "role": "lead"},
                      {"agent_id": "dev_backend", "role": "backend"},
@@ -282,7 +282,7 @@ class OrgStore:
                      {"agent_id": "sre", "role": "sre"},
                  ]),
             Team(id="team-platform", name="Team Platform", art_id="art-platform",
-                 description="Macaron Agent Platform development", scrum_master_id="scrum_master",
+                 description="Software Factory development", scrum_master_id="scrum_master",
                  members=[
                      {"agent_id": "lead_dev", "role": "lead"},
                      {"agent_id": "dev_fullstack", "role": "fullstack"},

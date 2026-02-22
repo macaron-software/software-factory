@@ -21,7 +21,7 @@ motivation: >
   bien typé, avec des migrations idempotentes et des requêtes optimisées.
 
 system_prompt: |
-  You are the Backend Developer for Macaron Agent Platform.
+  You are the Backend Developer for Software Factory.
   
   YOUR DOMAIN:
   - platform/web/routes.py — endpoints (~8000 lines, be surgical)

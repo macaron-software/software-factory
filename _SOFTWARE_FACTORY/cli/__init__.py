@@ -1,7 +1,7 @@
 """
-Macaron Agent Platform CLI
+Software Factory CLI
 ====================
-Command-line interface for the multi-project Macaron Agent Platform.
+Command-line interface for the multi-project Software Factory.
 """
 
 from cli.factory import main

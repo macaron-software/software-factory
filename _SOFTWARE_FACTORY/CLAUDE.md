@@ -3,10 +3,10 @@
 ## REPO STRUCTURE
 ```
 _FACTORY_CORE/          # Shared utils (subprocess, logging, LLM, daemon)
-_SOFTWARE_FACTORY/      # Macaron Agent Platform (SF) — TDD automation + Agent Platform
+_SOFTWARE_FACTORY/      # Software Factory (SF) — TDD automation + Agent Platform
   ├── cli/factory.py    # CLI: factory <project> <command>
   ├── core/             # Brain, TDD workers, adversarial, FRACTAL
-  ├── platform/         # Macaron Agent Platform — FastAPI web app
+  ├── platform/         # Software Factory — FastAPI web app
   │   ├── server.py     # App factory, port 8090 (public) / 8099 (dev)
   │   ├── web/routes/   # HTTP routes package (10 sub-modules, was 8800 LOC monolith)
   │   ├── a2a/          # Agent-to-Agent messaging (bus, negotiation, veto)

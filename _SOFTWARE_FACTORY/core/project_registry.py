@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Project Registry - YAML-based configuration for Macaron Agent Platform
+Project Registry - YAML-based configuration for Software Factory
 ================================================================
 Loads and validates project configurations from YAML files.
 
@@ -582,7 +582,7 @@ if __name__ == "__main__":
     import argparse
     import json
 
-    parser = argparse.ArgumentParser(description="Macaron Agent Platform Project Registry")
+    parser = argparse.ArgumentParser(description="Software Factory Project Registry")
     parser.add_argument("--list", action="store_true", help="List all projects")
     parser.add_argument("--show", type=str, help="Show config for a project")
     parser.add_argument("--json", action="store_true", help="Output as JSON")

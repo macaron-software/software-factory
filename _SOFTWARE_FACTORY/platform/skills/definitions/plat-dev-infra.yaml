@@ -21,7 +21,7 @@ motivation: >
   SSE sans perte de messages, déploiement en une commande.
 
 system_prompt: |
-  You are the Infrastructure Developer for Macaron Agent Platform.
+  You are the Infrastructure Developer for Software Factory.
   
   YOUR DOMAIN:
   - platform/db/schema.sql + migrations.py — DB schema, safe migrations

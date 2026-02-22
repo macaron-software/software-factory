@@ -31,7 +31,7 @@ _GLOBAL_SEEDS = [
     ("team", "agent-count", "45+ agents across 5 SAFe levels: Strategic (DSI, CTO, CPO), Portfolio (managers), Program (RTE, SM), Team (dev, QA, DevOps, Security)", 0.8),
     ("team", "adversarial-review", "Multi-vendor cognitive diversity: Code critic (MiniMax), Security critic (GLM), Architecture critic (Opus). Same LLM cannot evaluate its own output.", 0.9),
     # Vision
-    ("vision", "platform-purpose", "Macaron Agent Platform: emulate a full DSI (Direction des Systèmes d'Information) with autonomous AI agents collaborating on real software projects", 0.95),
+    ("vision", "platform-purpose", "Software Factory: emulate a full DSI (Direction des Systèmes d'Information) with autonomous AI agents collaborating on real software projects", 0.95),
     ("vision", "differentiation", "Real agentic orchestration ≠ workflow automation. Agents debate, veto, negotiate, delegate — not just if/then boxes with LLM wrappers", 0.9),
     # Conventions
     ("convention", "zero-skip", "NEVER skip tests, checks, or quality gates. FIX > SKIP. Always.", 0.95),

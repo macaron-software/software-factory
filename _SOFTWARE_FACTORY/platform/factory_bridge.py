@@ -1,4 +1,4 @@
-"""Factory bridge — integrates with existing Macaron Agent Platform core modules.
+"""Factory bridge — integrates with existing Software Factory core modules.
 
 Allows platform agents to use Factory tools: brain, cycle, adversarial,
 task_store, fractal, build_queue, etc.
@@ -18,7 +18,7 @@ if str(FACTORY_ROOT) not in sys.path:
 
 
 class FactoryBridge:
-    """Bridge between the Agent Platform and the existing Macaron Agent Platform."""
+    """Bridge between the Agent Platform and the existing Software Factory."""
 
     def __init__(self):
         self._task_store = None

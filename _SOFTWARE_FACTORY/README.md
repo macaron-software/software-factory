@@ -1,4 +1,4 @@
-# Macaron Agent Platform
+# Software Factory
 
 > Multi-agent AI platform for autonomous software development — 145 agents, SAFe methodology, full TDD pipeline.
 

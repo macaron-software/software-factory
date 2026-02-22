@@ -1,5 +1,5 @@
 """
-Macaron Agent Platform - Data Models
+Software Factory - Data Models
 =====================================
 Pydantic models for agents, messages, sessions, artifacts.
 """

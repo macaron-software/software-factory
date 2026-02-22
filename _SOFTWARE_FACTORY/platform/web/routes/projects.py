@@ -11,6 +11,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, FileResponse
 
 from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, serve_workspace_file, _parse_body, _is_json_request
+from ..schemas import ProjectOut, ProjectCreate, OkResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -479,7 +480,7 @@ async def project_board_page(request: Request, project_id: str):
 
 # ── API: Projects ────────────────────────────────────────────────
 
-@router.get("/api/projects")
+@router.get("/api/projects", responses={200: {"model": list[ProjectOut]}})
 async def api_projects():
     """List all projects (JSON)."""
     from ...projects.manager import get_project_store
@@ -492,7 +493,7 @@ async def api_projects():
     } for p in store.list_all()])
 
 
-@router.post("/api/projects")
+@router.post("/api/projects", responses={200: {"model": OkResponse}})
 async def create_project(request: Request):
     """Create a new project."""
     from ...projects.manager import get_project_store, Project

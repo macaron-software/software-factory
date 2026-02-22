@@ -1,4 +1,4 @@
-# 🍪 Macaron Agent Platform
+# 🍪 Software Factory
 
 **Multi-agent collaborative platform web** — agents spécialisés (Métier, Lead Dev, Testeur, Sécurité, DevOps...) qui dialoguent entre eux via le protocole A2A, orchestrés selon 8 patterns agentic, hébergé sur VM Azure avec Azure AI Foundry.
 

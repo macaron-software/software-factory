@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LLM Client - Unified LLM access for Macaron Agent Platform
+LLM Client - Unified LLM access for Software Factory
 =====================================================
 Supports multiple providers with automatic fallback chain.
 Config loaded from ~/.config/factory/llm.yaml
@@ -811,7 +811,7 @@ async def run_copilot_agent(
 # CONFIG TEMPLATE
 # ============================================================================
 
-CONFIG_TEMPLATE = """# Macaron Agent Platform LLM Configuration
+CONFIG_TEMPLATE = """# Software Factory LLM Configuration
 # ===================================
 # Location: ~/.config/factory/llm.yaml
 
@@ -867,7 +867,7 @@ def create_config_template(path: Path = None):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Macaron Agent Platform LLM Client")
+    parser = argparse.ArgumentParser(description="Software Factory LLM Client")
     parser.add_argument("--init", action="store_true", help="Create config template")
     parser.add_argument("--test", action="store_true", help="Test LLM providers")
     parser.add_argument("--role", type=str, default="wiggum", help="Role: brain, wiggum, sub")

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Macaron Agent Platform CLI
+Software Factory CLI
 ====================
-Unified command-line interface for the multi-project Macaron Agent Platform.
+Unified command-line interface for the multi-project Software Factory.
 
 Commands:
     factory brain run          # Run Brain analysis
@@ -39,7 +39,7 @@ except ImportError:
 # ============================================================================
 
 def get_factory_root() -> Path:
-    """Get the Macaron Agent Platform root directory"""
+    """Get the Software Factory root directory"""
     return Path(__file__).parent.parent
 
 
@@ -83,7 +83,7 @@ if CLICK_AVAILABLE:
     @click.option("--project", "-p", envvar="FACTORY_PROJECT", help="Project name")
     @click.pass_context
     def cli(ctx, project):
-        """Macaron Agent Platform - Multi-project RLM System"""
+        """Software Factory - Multi-project RLM System"""
         ctx.ensure_object(dict)
         ctx.obj["project"] = project
 
@@ -1208,7 +1208,7 @@ def main_fallback():
     """Fallback CLI without click"""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Macaron Agent Platform CLI")
+    parser = argparse.ArgumentParser(description="Software Factory CLI")
     parser.add_argument("--project", "-p", help="Project name")
 
     subparsers = parser.add_subparsers(dest="command")

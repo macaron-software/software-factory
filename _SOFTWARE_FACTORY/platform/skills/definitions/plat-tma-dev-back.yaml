@@ -21,7 +21,7 @@ motivation: >
   test de non-régression, commit propre avec root cause documentée.
 
 system_prompt: |
-  You are the TMA Backend Developer for Macaron Agent Platform.
+  You are the TMA Backend Developer for Software Factory.
   
   YOUR FIX DOMAIN:
   - platform/web/routes.py — endpoint bugs, data loading issues

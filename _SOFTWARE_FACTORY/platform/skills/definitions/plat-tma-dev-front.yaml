@@ -22,7 +22,7 @@ motivation: >
   un fix propre et testé.
 
 system_prompt: |
-  You are the TMA Frontend Developer for Macaron Agent Platform.
+  You are the TMA Frontend Developer for Software Factory.
   
   YOUR FIX DOMAIN:
   - platform/web/templates/*.html — template rendering bugs

@@ -354,20 +354,20 @@ class ProjectStore:
         self._seed_dsi_project()
 
     def _seed_dsi_project(self):
-        """Seed the Macaron Agent Platform as a DSI project pointing to its own codebase."""
+        """Seed the Software Factory as a DSI project pointing to its own codebase."""
         if self.get("software-factory"):
             return
         from ..config import PLATFORM_ROOT
         plat_path = str(PLATFORM_ROOT)
         p = Project(
             id="software-factory",
-            name="Macaron Agent Platform",
+            name="Software Factory",
             path=plat_path,
             description="Plateforme multi-agent SAFe. FastAPI + HTMX + SSE + SQLite. Self-improving: les agents lisent et écrivent dans leur propre codebase.",
             factory_type="standalone",
             domains=["backend", "frontend", "agents", "patterns", "infra"],
             vision=(
-                "Macaron Agent Platform — Real Agentic ≠ Workflow Automation.\n"
+                "Software Factory — Real Agentic ≠ Workflow Automation.\n"
                 "Agents collaborent (débat/véto/délégation) pour produire du code.\n"
                 "128 agents SAFe, 23 patterns, 12 workflows, 1222 skills.\n"
                 "Stack: FastAPI + Jinja2 + HTMX + SSE + SQLite (WAL + FTS5).\n"
@@ -471,8 +471,8 @@ _PROJECT_PM: dict[str, dict] = {
     "lpd": {"name": "Nathalie Renaud", "avatar": "user", "tagline": "Product Manager — LPD Data Platform"},
     "logs-facteur": {"name": "Thomas Girard", "avatar": "user", "tagline": "Product Manager — Logs Facteur Support N1"},
     "sharelook": {"name": "Claire Dubois", "avatar": "user", "tagline": "Product Manager — Sharelook Platform"},
-    "software-factory": {"name": "Émilie Laurent", "avatar": "user", "tagline": "Product Manager — Macaron Agent Platform"},
-    "factory": {"name": "Émilie Laurent", "avatar": "user", "tagline": "Product Manager — Macaron Agent Platform (Self)"},
+    "software-factory": {"name": "Émilie Laurent", "avatar": "user", "tagline": "Product Manager — Software Factory"},
+    "factory": {"name": "Émilie Laurent", "avatar": "user", "tagline": "Product Manager — Software Factory (Self)"},
     "solaris": {"name": "Julie Martin", "avatar": "user", "tagline": "Product Manager — Solaris Design System"},
     "veligo": {"name": "Antoine Lefèvre", "avatar": "user", "tagline": "Product Manager — Veligo Platform"},
     "fervenza": {"name": "Lucas Morel", "avatar": "user", "tagline": "Product Manager — Fervenza IoT"},

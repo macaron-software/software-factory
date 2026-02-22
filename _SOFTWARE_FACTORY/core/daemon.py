@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Daemon utilities for Macaron Agent Platform
+Daemon utilities for Software Factory
 =====================================
 Provides daemonization for Wiggum TDD and Deploy pools.
 
@@ -391,7 +391,7 @@ class Daemon:
 
 class DaemonManager:
     """
-    Manages multiple daemons for the Macaron Agent Platform.
+    Manages multiple daemons for the Software Factory.
 
     Provides unified interface to start/stop/status all daemons.
     """
@@ -689,7 +689,7 @@ def print_daemon_status(status: dict):
 def print_all_status(manager_status: dict):
     """Pretty print all daemons status"""
     print(f"\n{'=' * 50}")
-    print(f"Macaron Agent Platform Daemons - {manager_status['project']}")
+    print(f"Software Factory Daemons - {manager_status['project']}")
     print(f"{'=' * 50}")
 
     if not manager_status["daemons"]:

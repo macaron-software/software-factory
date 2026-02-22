@@ -65,6 +65,15 @@ class MemoryManager:
         conn.close()
         return [dict(r) for r in rows]
 
+    def pattern_search(self, session_id: str, query: str, limit: int = 20) -> list[dict]:
+        """Search pattern memory for a given session (LIKE fallback)."""
+        conn = get_db()
+        rows = conn.execute(
+            "SELECT * FROM memory_pattern WHERE session_id=? AND (key LIKE ? OR value LIKE ?) ORDER BY created_at DESC LIMIT ?",
+            (session_id, f"%{query}%", f"%{query}%", limit)).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
     # ── Project Memory (Layer 3) ────────────────────────────────
 
     def project_store(self, project_id: str, key: str, value: str,

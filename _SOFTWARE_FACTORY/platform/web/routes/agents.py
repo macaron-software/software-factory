@@ -11,6 +11,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, FileResponse
 
 from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, serve_workspace_file
+from ..schemas import AgentOut, AgentDetail, LlmProvider, OkResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -117,7 +118,7 @@ async def agent_delete(agent_id: str):
     return HTMLResponse("")
 
 
-@router.get("/api/agents/{agent_id}/details")
+@router.get("/api/agents/{agent_id}/details", responses={200: {"model": AgentDetail}})
 async def agent_details_json(agent_id: str):
     """Full agent details as JSON for modals."""
     from ...agents.store import get_agent_store
@@ -407,7 +408,7 @@ async def org_tree_api():
 
 # ── API: Agents ──────────────────────────────────────────────────
 
-@router.get("/api/agents")
+@router.get("/api/agents", responses={200: {"model": list[AgentOut]}})
 async def api_agents():
     """List all agents (JSON)."""
     from ...agents.store import get_agent_store
@@ -420,7 +421,7 @@ async def api_agents():
     } for a in agents])
 
 
-@router.get("/api/llm/providers")
+@router.get("/api/llm/providers", responses={200: {"model": list[LlmProvider]}})
 async def api_providers():
     """List LLM providers with availability (JSON)."""
     from ...llm.client import get_llm_client

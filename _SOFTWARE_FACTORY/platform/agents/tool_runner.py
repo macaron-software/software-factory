@@ -248,20 +248,25 @@ async def _tool_list_files(args: dict) -> str:
 
 
 async def _tool_memory_search(args: dict, ctx: ExecutionContext) -> str:
-    """Search project memory (scoped to project_id — agents cannot cross-project)."""
+    """Search project + session memory (scoped to project_id — agents cannot cross-project)."""
     from ..memory.manager import get_memory_manager
     mem = get_memory_manager()
     query = args.get("query", "")
     try:
-        # ISOLATION: always scope to project_id, ignore client "scope" param
+        results = []
+        # Search project memory
         if ctx.project_id:
-            results = mem.project_search(ctx.project_id, query, limit=10)
+            results = mem.project_search(ctx.project_id, query, limit=8)
         else:
-            # No project → global read-only (limited)
             results = mem.global_search(query, limit=5)
+        # Also search session pattern memory (what other agents decided in THIS session)
+        if ctx.session_id:
+            pattern_results = mem.pattern_search(ctx.session_id, query, limit=5)
+            for r in pattern_results:
+                results.append({"key": r.get("key", ""), "value": r.get("value", ""), "category": f"session:{r.get('type','')}"})
         if not results:
             return "No memory entries found."
-        return "\n".join(f"[{r.get('key','')}] {r.get('value','')[:300]}" for r in results)
+        return "\n".join(f"[{r.get('category', r.get('key',''))}] {r.get('key','')}: {r.get('value','')[:300]}" for r in results)
     except Exception as e:
         return f"Memory search error: {e}"
 
@@ -279,7 +284,7 @@ async def _tool_memory_store(args: dict, ctx: ExecutionContext) -> str:
         # ISOLATION: must have project_id, store with agent_id traceability
         if not ctx.project_id:
             return "Error: no project context — cannot store memory without project scope"
-        mem.project_store(ctx.project_id, key, value, category=category, author=ctx.agent.id)
+        mem.project_store(ctx.project_id, key, value, category=category, source=ctx.agent.id)
         return f"Stored in project memory: [{key}] (by {ctx.agent.id})"
     except Exception as e:
         return f"Memory store error: {e}"
@@ -675,7 +680,7 @@ async def _tool_fractal_code(args: dict, ctx: ExecutionContext, registry, llm) -
     """Spawn a focused sub-agent LLM to complete an atomic coding task.
     
     The sub-agent runs autonomously with code tools for up to 8 rounds.
-    Like wiggum TDD from the Macaron Agent Platform: write code → write tests → run → fix.
+    Like wiggum TDD from the Software Factory: write code → write tests → run → fix.
     """
     from ..llm.client import LLMMessage, LLMResponse
     from .tool_schemas import _get_tool_schemas, _filter_schemas

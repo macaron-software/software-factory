@@ -1,10 +1,10 @@
-# Macaron Agent Platform - Self-Improvement Configuration
+# Software Factory - Self-Improvement Configuration
 # =================================================
 # The factory treats itself as a project for continuous improvement
 
 project:
   name: factory
-  display_name: "Macaron Agent Platform (Self)"
+  display_name: "Software Factory (Self)"
   root_path: /Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY
   vision_doc: CLAUDE.md
 

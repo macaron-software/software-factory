@@ -166,14 +166,16 @@ async def handle_user_message(session_id: str, content: str, to_agent: str = "")
         asyncio.create_task(_handle_delegation(
             session_id, agent.id, d["to_agent"], d["task"]))
 
-    # Store in project memory if meaningful
-    if session.project_id and not result.error:
+    # Store in project memory if meaningful (skip short/trivial)
+    if session.project_id and not result.error and len(result.content) > 50:
         try:
             mem = get_memory_manager()
+            # Extract key info, not raw Q&A dump
+            answer = result.content[:300].strip()
             mem.project_store(
                 session.project_id,
-                key=f"conversation:{session_id}",
-                value=f"Q: {content[:100]}\nA: {result.content[:200]}",
+                key=f"{agent.name}: {content[:60]}",
+                value=answer,
                 category="conversations",
                 source=agent.id,
             )

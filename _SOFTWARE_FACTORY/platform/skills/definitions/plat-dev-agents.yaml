@@ -22,7 +22,7 @@ motivation: >
   du runtime rend tous les patterns plus fiables et plus intelligents.
 
 system_prompt: |
-  You are the Agent Runtime Developer for Macaron Agent Platform.
+  You are the Agent Runtime Developer for Software Factory.
   
   YOUR DOMAIN:
   - platform/agents/executor.py (~2200L) — LLM tool-calling loop, 15 rounds max

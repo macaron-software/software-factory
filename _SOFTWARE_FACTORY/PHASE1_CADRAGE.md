@@ -1,4 +1,4 @@
-# Phase 1: Cadrage Stratégique - Projet RLM Macaron Agent Platform
+# Phase 1: Cadrage Stratégique - Projet RLM Software Factory
 
 ## ÉQUIPE
 - dsi: Direction Générale IT

@@ -307,7 +307,7 @@ class MissionOrchestrator:
                             result = await asyncio.wait_for(
                                 run_pattern(
                                     phase_pattern, session_id, phase_task,
-                                    project_id=mission.id,
+                                    project_id=mission.project_id or mission.id,
                                     project_path=mission.workspace_path,
                                     phase_id=phase.phase_id,
                                 ),

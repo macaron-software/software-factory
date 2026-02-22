@@ -92,7 +92,7 @@ class NotificationService:
                     {"title": "Event", "value": payload.event, "short": True},
                     {"title": "Project", "value": payload.project_id or "—", "short": True},
                 ],
-                "footer": "Macaron Agent Platform",
+                "footer": "Software Factory",
             }]
         }
         if payload.url:
@@ -120,7 +120,7 @@ class NotificationService:
         </table>
         {f'<p><a href="{payload.url}" style="color:#7c3aed">View in Macaron</a></p>' if payload.url else ''}
         <hr style="margin-top:20px;border:none;border-top:1px solid #eee">
-        <p style="color:#aaa;font-size:12px">Macaron Agent Platform</p>
+        <p style="color:#aaa;font-size:12px">Software Factory</p>
         </div>"""
 
         msg.attach(MIMEText(text, "plain"))
