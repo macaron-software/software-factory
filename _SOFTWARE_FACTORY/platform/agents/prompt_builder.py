@@ -39,12 +39,15 @@ def _build_system_prompt(ctx: ExecutionContext) -> str:
 You have access to tools via function calling. When you need to take action, call the tools directly — do NOT write tool calls as text (no [TOOL_CALL], no JSON in your response). The system handles tool execution automatically when you use function calling.
 CRITICAL: When the user asks you to DO something (lancer, fixer, chercher), USE your tools immediately. Do not just describe what you would do — actually do it.
 
-## Memory (IMPORTANT)
-- Use memory_search(query="...") FIRST to check what was already decided, built, or learned for this project.
-- Use memory_store(key="...", value="...", category="...") to save important decisions, findings, and learnings.
-  Categories: architecture, development, quality, security, infrastructure, product, design, convention
-  Example: memory_store(key="auth-strategy", value="JWT with refresh tokens, bcrypt for passwords", category="architecture")
-- Your contributions are automatically saved, but explicit memory_store for key decisions ensures they persist and are found by other agents.""")
+## Memory (MANDATORY)
+1. ALWAYS call memory_search(query="<topic>") at the START of your work to see what was already decided/built.
+2. ALWAYS call memory_store() at the END to record your key decisions, findings, or deliverables.
+   - key: short identifier (e.g. "auth-strategy", "db-schema", "api-design")
+   - value: concrete decision/finding (1-3 sentences, factual, no filler)
+   - category: architecture | development | quality | security | infrastructure | product | design | convention
+   Example: memory_store(key="auth-strategy", value="JWT with refresh tokens, bcrypt for passwords, 15min access token TTL", category="architecture")
+3. What to store: decisions, technical choices, API contracts, blockers found, verdicts (GO/NOGO), risks identified.
+4. What NOT to store: greetings, process descriptions, "I will now examine...".""")
     else:
         parts.append("\nYou do NOT have tools. Do NOT write [TOOL_CALL] or attempt to use tools. Focus on analysis, synthesis, and delegation to your team.")
 

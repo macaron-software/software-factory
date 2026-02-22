@@ -254,19 +254,26 @@ async def _tool_memory_search(args: dict, ctx: ExecutionContext) -> str:
     query = args.get("query", "")
     try:
         results = []
-        # Search project memory
         if ctx.project_id:
+            # FTS search first
             results = mem.project_search(ctx.project_id, query, limit=8)
+            # If FTS yields nothing, fallback to recent entries from project
+            if not results:
+                results = mem.project_get(ctx.project_id, limit=8)
         else:
             results = mem.global_search(query, limit=5)
         # Also search session pattern memory (what other agents decided in THIS session)
         if ctx.session_id:
             pattern_results = mem.pattern_search(ctx.session_id, query, limit=5)
+            # Also get ALL recent pattern entries if search yielded nothing
+            if not pattern_results:
+                pattern_results = mem.pattern_get(ctx.session_id, limit=5)
             for r in pattern_results:
-                results.append({"key": r.get("key", ""), "value": r.get("value", ""), "category": f"session:{r.get('type','')}"})
+                if r.get("author_agent") != ctx.agent.id:  # skip self
+                    results.append({"key": r.get("key", ""), "value": r.get("value", ""), "category": f"session:{r.get('type','')}"})
         if not results:
-            return "No memory entries found."
-        return "\n".join(f"[{r.get('category', r.get('key',''))}] {r.get('key','')}: {r.get('value','')[:300]}" for r in results)
+            return "No memory entries found for this project yet."
+        return "\n".join(f"[{r.get('category', r.get('key',''))}] {r.get('key','')}: {r.get('value','')[:300]}" for r in results[:12])
     except Exception as e:
         return f"Memory search error: {e}"
 

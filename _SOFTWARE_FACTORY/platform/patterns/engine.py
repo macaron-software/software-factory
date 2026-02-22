@@ -761,29 +761,37 @@ async def _execute_node(
         try:
             mem = get_memory_manager()
             import re as _re2
-            clean = _re2.sub(r'\[.*?\]', '', content).strip()
+            # Strip tool call artifacts, JSON blobs, and filler
+            clean = _re2.sub(r'\{["\']path["\'].*?\}', '', content)
+            clean = _re2.sub(r'\[TOOL_CALL\].*?\[/TOOL_CALL\]', '', clean, flags=_re2.DOTALL)
+            clean = _re2.sub(r'Calling \w+.*?\.\.\.', '', clean)
+            clean = _re2.sub(r"(?:J'examine|Je vais|Let me|I'll inspect|I'll check).*?\n", '', clean)
+            clean = clean.strip()
+
+            if len(clean) < 20:
+                raise ValueError("content too short after cleaning")
 
             # Extract structured facts from agent output
+            _FACT_KEYWORDS = (
+                'decision:', 'choix:', 'stack:', 'architecture:',
+                'action:', 'conclusion:', 'recommandation:', 'verdict:',
+                'risque:', 'blocage:', 'résultat:', 'created:', 'wrote:',
+                'approve', 'veto', 'go ', 'nogo', 'request_changes',
+            )
             facts = []
-            for line in content.split('\n'):
+            for line in clean.split('\n'):
                 line_s = line.strip()
-                if not line_s or len(line_s) < 10:
+                if not line_s or len(line_s) < 15:
                     continue
-                # Structured markers: [PR], Decision:, etc.
                 if line_s.startswith('[PR]') or line_s.startswith('- ['):
                     facts.append(line_s)
-                elif any(kw in line_s.lower() for kw in (
-                    'decision:', 'choix:', 'stack:', 'architecture:',
-                    'action:', 'conclusion:', 'recommandation:', 'verdict:',
-                    'risque:', 'blocage:', 'résultat:', 'created:', 'wrote:',
-                )):
+                elif any(kw in line_s.lower() for kw in _FACT_KEYWORDS):
                     facts.append(line_s)
             # Compact summary: facts first, then truncated clean text
             if facts:
                 summary = "\n".join(facts[:8])
             else:
-                # Take first substantive paragraph (skip greetings)
-                paragraphs = [p.strip() for p in clean.split('\n\n') if len(p.strip()) > 30]
+                paragraphs = [p.strip() for p in clean.split('\n\n') if len(p.strip()) > 40]
                 summary = paragraphs[0][:300] if paragraphs else clean[:300]
 
             # Use semantic category based on agent role
@@ -869,11 +877,45 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
                 vision = project.vision[:3000] if project.vision else ""
                 project_path = getattr(project, "path", "") or ""
                 mem = get_memory_manager()
-                entries = mem.project_get(run.project_id, limit=10)
+                # Load role-relevant categories first, then recent entries
+                role_lower = (agent.role or "").lower()
+                _ROLE_CATS = {
+                    "archi": ["architecture", "infrastructure"],
+                    "dev": ["development", "architecture"],
+                    "lead": ["development", "architecture", "quality"],
+                    "qa": ["quality", "development"],
+                    "test": ["quality", "development"],
+                    "secu": ["security", "architecture"],
+                    "devops": ["infrastructure", "security"],
+                    "product": ["product", "design"],
+                    "ux": ["design", "product"],
+                    "po": ["product", "development"],
+                }
+                # Pick categories matching agent role
+                cats = []
+                for key, val in _ROLE_CATS.items():
+                    if key in role_lower:
+                        cats = val
+                        break
+                entries = []
+                seen_ids = set()
+                # Role-specific entries first
+                for cat in cats:
+                    for e in mem.project_get(run.project_id, category=cat, limit=5):
+                        eid = e.get("id")
+                        if eid not in seen_ids:
+                            entries.append(e)
+                            seen_ids.add(eid)
+                # Then recent entries from any category
+                for e in mem.project_get(run.project_id, limit=10):
+                    eid = e.get("id")
+                    if eid not in seen_ids:
+                        entries.append(e)
+                        seen_ids.add(eid)
                 if entries:
                     project_context = "\n".join(
                         f"[{e['category']}] {e['key']}: {e['value'][:200]}"
-                        for e in entries
+                        for e in entries[:15]
                     )
         except Exception:
             pass
