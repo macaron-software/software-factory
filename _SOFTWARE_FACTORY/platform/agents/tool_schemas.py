@@ -1239,11 +1239,11 @@ def _classify_agent_role(agent: "AgentDef") -> str:
         return "architecture"
     if any(k in combined for k in ("ux", "ui", "design", "ergon")):
         return "ux"
-    if any(k in combined for k in ("qa", "test", "qualit")):
+    if any(k in combined for k in ("qa", "test", "qualit", "fixture", "perf")):
         return "qa"
-    if any(k in combined for k in ("devops", "sre", "pipeline", "infra", "deploy")):
+    if any(k in combined for k in ("devops", "sre", "pipeline", "infra", "deploy", "backup", "recovery", "monitoring", "observ", "canary")):
         return "devops"
-    if any(k in combined for k in ("secur", "secu", "cyber")):
+    if any(k in combined for k in ("secur", "secu", "cyber", "license", "compliance officer", "scanner")):
         return "security"
     if any(k in combined for k in ("programme", "projet", "cdp", "scrum", "coach", "pm ")):
         return "cdp"

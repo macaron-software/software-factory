@@ -1976,4 +1976,641 @@ def get_builtin_workflows() -> list[WorkflowDef]:
         ),
     )
 
+    # ──────────────────────────────────────────────────────────────
+    # Audit-gap workflows — covering missing quality dimensions
+    # ──────────────────────────────────────────────────────────────
+
+    # 1. Documentation Pipeline (covers: doc-api, doc-user, lisib-doc, lisib-adr, lisib-changelog)
+    builtins.append(
+        WorkflowDef(
+            id="documentation-pipeline",
+            name="Documentation Pipeline",
+            description="End-to-end documentation generation: API specs, user guides, ADRs, changelog, onboarding docs.",
+            icon="📝",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="api-docs", pattern_id="sequential",
+                    name="API Documentation",
+                    description="Scan all routes/endpoints, generate OpenAPI specs, validate with examples",
+                    gate="OpenAPI spec generated and validated",
+                    config={"agents": ["doc-writer", "architecte"]},
+                ),
+                WorkflowPhase(
+                    id="adr-capture", pattern_id="sequential",
+                    name="ADR Capture",
+                    description="Review recent architecture decisions, create/update ADR records in docs/adr/",
+                    gate="All pending decisions documented as ADRs",
+                    config={"agents": ["adr-writer", "architecte"]},
+                ),
+                WorkflowPhase(
+                    id="changelog-gen", pattern_id="sequential",
+                    name="Changelog Generation",
+                    description="Analyze git history since last release, generate CHANGELOG.md and release notes",
+                    gate="CHANGELOG.md updated with all changes since last tag",
+                    config={"agents": ["changelog-gen"]},
+                ),
+                WorkflowPhase(
+                    id="user-guide", pattern_id="sequential",
+                    name="User Guide",
+                    description="Create/update user-facing documentation: getting started, tutorials, FAQ",
+                    gate="User guide covers all major features",
+                    config={"agents": ["doc-writer"]},
+                ),
+                WorkflowPhase(
+                    id="onboarding", pattern_id="sequential",
+                    name="Developer Onboarding",
+                    description="Generate CONTRIBUTING.md, dev setup guide, architecture overview for new developers",
+                    gate="New developer can set up and contribute within 30 minutes",
+                    config={"agents": ["doc-writer", "lead_dev"]},
+                ),
+                WorkflowPhase(
+                    id="doc-review", pattern_id="adversarial-pair",
+                    name="Documentation Review",
+                    description="Review all generated docs for accuracy, completeness, and clarity",
+                    gate="All docs reviewed and approved",
+                    config={"agents": ["doc-writer", "architecte"]},
+                ),
+            ],
+            config={
+                "graph": {
+                    "nodes": [
+                        {"id": "n1", "agent_id": "doc-writer", "x": 100, "y": 150, "label": "API Docs", "phase": "api-docs"},
+                        {"id": "n2", "agent_id": "adr-writer", "x": 300, "y": 100, "label": "ADR Capture", "phase": "adr-capture"},
+                        {"id": "n3", "agent_id": "changelog-gen", "x": 300, "y": 200, "label": "Changelog", "phase": "changelog-gen"},
+                        {"id": "n4", "agent_id": "doc-writer", "x": 500, "y": 100, "label": "User Guide", "phase": "user-guide"},
+                        {"id": "n5", "agent_id": "doc-writer", "x": 500, "y": 200, "label": "Onboarding", "phase": "onboarding"},
+                        {"id": "n6", "agent_id": "architecte", "x": 700, "y": 150, "label": "Doc Review", "phase": "doc-review"},
+                    ],
+                    "edges": [
+                        {"from": "n1", "to": "n6", "label": "review", "color": "#06b6d4"},
+                        {"from": "n2", "to": "n6", "label": "review", "color": "#8b5cf6"},
+                        {"from": "n3", "to": "n6", "label": "review", "color": "#f59e0b"},
+                        {"from": "n4", "to": "n6", "label": "review", "color": "#06b6d4"},
+                        {"from": "n5", "to": "n6", "label": "review", "color": "#06b6d4"},
+                    ],
+                },
+            },
+        ),
+    )
+
+    # 2. Backup & Disaster Recovery (covers: data-backup)
+    builtins.append(
+        WorkflowDef(
+            id="backup-restore",
+            name="Backup & Disaster Recovery",
+            description="Automated backup strategy, restore verification, and disaster recovery runbook.",
+            icon="💾",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="backup-strategy", pattern_id="sequential",
+                    name="Backup Strategy",
+                    description="Define RPO/RTO targets, backup types (full/incremental), retention policies",
+                    gate="RPO and RTO defined, strategy documented",
+                    config={"agents": ["backup-ops", "sre"]},
+                ),
+                WorkflowPhase(
+                    id="backup-impl", pattern_id="sequential",
+                    name="Backup Implementation",
+                    description="Create backup scripts, cron schedules, cloud storage sync, encryption",
+                    gate="Backup scripts created and scheduled",
+                    config={"agents": ["backup-ops", "devops"]},
+                ),
+                WorkflowPhase(
+                    id="restore-test", pattern_id="adversarial-pair",
+                    name="Restore Verification",
+                    description="Test restore procedure, verify data integrity, measure actual RTO",
+                    gate="Restore tested successfully, RTO within target",
+                    config={"agents": ["backup-ops", "testeur"]},
+                ),
+                WorkflowPhase(
+                    id="dr-runbook", pattern_id="sequential",
+                    name="DR Runbook",
+                    description="Document disaster recovery procedures, escalation paths, communication plan",
+                    gate="DR runbook complete with step-by-step instructions",
+                    config={"agents": ["backup-ops", "doc-writer"]},
+                ),
+            ],
+            config={
+                "critical": True,
+                "schedule": "weekly",
+                "graph": {
+                    "nodes": [
+                        {"id": "n1", "agent_id": "backup-ops", "x": 100, "y": 150, "label": "Strategy", "phase": "backup-strategy"},
+                        {"id": "n2", "agent_id": "backup-ops", "x": 300, "y": 150, "label": "Implement", "phase": "backup-impl"},
+                        {"id": "n3", "agent_id": "testeur", "x": 500, "y": 150, "label": "Test Restore", "phase": "restore-test"},
+                        {"id": "n4", "agent_id": "doc-writer", "x": 700, "y": 150, "label": "DR Runbook", "phase": "dr-runbook"},
+                    ],
+                    "edges": [
+                        {"from": "n1", "to": "n2", "label": "strategy defined", "color": "#ef4444"},
+                        {"from": "n2", "to": "n3", "label": "scripts ready", "color": "#f59e0b"},
+                        {"from": "n3", "to": "n4", "label": "restore ok", "color": "#3fb950"},
+                    ],
+                },
+            },
+        ),
+    )
+
+    # 3. Performance Testing (covers: perf-load, perf-optim)
+    builtins.append(
+        WorkflowDef(
+            id="performance-testing",
+            name="Performance Testing & Optimization",
+            description="Load testing with k6, bottleneck analysis, bundle optimization, SLO validation.",
+            icon="⚡",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="perf-plan", pattern_id="sequential",
+                    name="Performance Plan",
+                    description="Define SLOs, identify critical paths, create test scenarios (smoke/load/stress/soak)",
+                    gate="SLOs defined, test scenarios documented",
+                    config={"agents": ["perf-tester", "architecte"]},
+                ),
+                WorkflowPhase(
+                    id="load-tests", pattern_id="sequential",
+                    name="Load Test Execution",
+                    description="Write and run k6 scripts: progressive load 10→100→500→1000 VUs",
+                    gate="All load test scenarios executed",
+                    config={"agents": ["perf-tester"]},
+                ),
+                WorkflowPhase(
+                    id="bottleneck-analysis", pattern_id="parallel",
+                    name="Bottleneck Analysis",
+                    description="Analyze results: slow queries (N+1), memory leaks, bundle size, Core Web Vitals",
+                    gate="Bottlenecks identified and prioritized",
+                    config={"agents": ["perf-tester", "lead_dev", "performance_engineer"]},
+                ),
+                WorkflowPhase(
+                    id="perf-fix", pattern_id="loop",
+                    name="Performance Fixes",
+                    description="Implement optimizations: query tuning, caching, lazy loading, code splitting",
+                    gate="All SLOs met after optimization",
+                    config={"agents": ["lead_dev", "perf-tester"], "max_iterations": 5},
+                ),
+                WorkflowPhase(
+                    id="perf-report", pattern_id="sequential",
+                    name="Performance Report",
+                    description="Generate final report: before/after metrics, recommendations, performance budget",
+                    gate="Performance report published",
+                    config={"agents": ["perf-tester", "doc-writer"]},
+                ),
+            ],
+            config={
+                "graph": {
+                    "nodes": [
+                        {"id": "n1", "agent_id": "perf-tester", "x": 100, "y": 150, "label": "Plan", "phase": "perf-plan"},
+                        {"id": "n2", "agent_id": "perf-tester", "x": 300, "y": 150, "label": "Load Tests", "phase": "load-tests"},
+                        {"id": "n3", "agent_id": "lead_dev", "x": 500, "y": 100, "label": "Analysis", "phase": "bottleneck-analysis"},
+                        {"id": "n4", "agent_id": "lead_dev", "x": 500, "y": 200, "label": "Fix Loop", "phase": "perf-fix"},
+                        {"id": "n5", "agent_id": "doc-writer", "x": 700, "y": 150, "label": "Report", "phase": "perf-report"},
+                    ],
+                    "edges": [
+                        {"from": "n1", "to": "n2", "label": "scenarios ready", "color": "#f97316"},
+                        {"from": "n2", "to": "n3", "label": "results", "color": "#f97316"},
+                        {"from": "n3", "to": "n4", "label": "bottlenecks", "color": "#ef4444"},
+                        {"from": "n4", "to": "n2", "label": "re-test", "color": "#d29922", "style": "dashed"},
+                        {"from": "n4", "to": "n5", "label": "SLOs met", "color": "#3fb950"},
+                    ],
+                },
+            },
+        ),
+    )
+
+    # 4. License Compliance (covers: legal-licences)
+    builtins.append(
+        WorkflowDef(
+            id="license-compliance",
+            name="License & SBOM Compliance",
+            description="Automated dependency license scanning, SBOM generation, and vulnerability audit.",
+            icon="📜",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="dep-scan", pattern_id="parallel",
+                    name="Dependency Scan",
+                    description="Scan all dependency manifests (package.json, requirements.txt, Cargo.toml, go.mod)",
+                    gate="All dependencies inventoried with licenses",
+                    config={"agents": ["license-scanner"]},
+                ),
+                WorkflowPhase(
+                    id="license-audit", pattern_id="sequential",
+                    name="License Audit",
+                    description="Classify licenses (permissive/copyleft/proprietary), flag incompatibilities",
+                    gate="No license conflicts detected or exceptions documented",
+                    config={"agents": ["license-scanner", "compliance_officer"]},
+                ),
+                WorkflowPhase(
+                    id="sbom-gen", pattern_id="sequential",
+                    name="SBOM Generation",
+                    description="Generate Software Bill of Materials in SPDX/CycloneDX format",
+                    gate="SBOM generated and validated",
+                    config={"agents": ["license-scanner"]},
+                ),
+                WorkflowPhase(
+                    id="vuln-check", pattern_id="sequential",
+                    name="Vulnerability Check",
+                    description="Cross-reference dependencies against CVE databases (NVD, GitHub Advisory)",
+                    gate="No critical/high CVEs or mitigation plan in place",
+                    config={"agents": ["license-scanner", "securite"]},
+                ),
+            ],
+            config={
+                "schedule": "per-release",
+                "graph": {
+                    "nodes": [
+                        {"id": "n1", "agent_id": "license-scanner", "x": 100, "y": 150, "label": "Dep Scan", "phase": "dep-scan"},
+                        {"id": "n2", "agent_id": "license-scanner", "x": 300, "y": 100, "label": "License Audit", "phase": "license-audit"},
+                        {"id": "n3", "agent_id": "license-scanner", "x": 300, "y": 200, "label": "SBOM", "phase": "sbom-gen"},
+                        {"id": "n4", "agent_id": "securite", "x": 500, "y": 150, "label": "CVE Check", "phase": "vuln-check"},
+                    ],
+                    "edges": [
+                        {"from": "n1", "to": "n2", "label": "deps found", "color": "#10b981"},
+                        {"from": "n1", "to": "n3", "label": "inventory", "color": "#10b981"},
+                        {"from": "n2", "to": "n4", "label": "licenses ok", "color": "#3fb950"},
+                        {"from": "n3", "to": "n4", "label": "sbom ready", "color": "#3fb950"},
+                    ],
+                },
+            },
+        ),
+    )
+
+    # 5. Chaos Engineering Scheduled (covers: stab-chaos)
+    builtins.append(
+        WorkflowDef(
+            id="chaos-scheduled",
+            name="Scheduled Chaos Engineering",
+            description="Periodic resilience testing: inject failures, verify auto-recovery, validate SLOs under stress.",
+            icon="🐒",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="chaos-plan", pattern_id="sequential",
+                    name="Chaos Plan",
+                    description="Select failure scenarios: network partition, disk full, process kill, latency injection",
+                    gate="Chaos scenarios selected with blast radius defined",
+                    config={"agents": ["sre", "architecte"]},
+                ),
+                WorkflowPhase(
+                    id="steady-state", pattern_id="sequential",
+                    name="Steady State Baseline",
+                    description="Capture baseline metrics before chaos: latency, error rate, throughput",
+                    gate="Baseline metrics captured and SLOs verified",
+                    config={"agents": ["monitoring-ops", "sre"]},
+                ),
+                WorkflowPhase(
+                    id="chaos-inject", pattern_id="sequential",
+                    name="Fault Injection",
+                    description="Inject planned failures, observe system behavior, monitor auto-recovery",
+                    gate="Fault injected, system behavior observed",
+                    config={"agents": ["sre"]},
+                ),
+                WorkflowPhase(
+                    id="chaos-observe", pattern_id="parallel",
+                    name="Impact Observation",
+                    description="Monitor recovery: did autoheal trigger? Did SLOs hold? Any cascading failures?",
+                    gate="Recovery behavior documented",
+                    config={"agents": ["monitoring-ops", "sre", "perf-tester"]},
+                ),
+                WorkflowPhase(
+                    id="chaos-report", pattern_id="sequential",
+                    name="Resilience Report",
+                    description="Document findings, update runbooks, create hardening tickets for failures",
+                    gate="Resilience report published, action items created",
+                    config={"agents": ["sre", "doc-writer"]},
+                ),
+            ],
+            config={
+                "schedule": "bi-weekly",
+                "blast_radius": "staging",
+                "graph": {
+                    "nodes": [
+                        {"id": "n1", "agent_id": "sre", "x": 100, "y": 150, "label": "Plan", "phase": "chaos-plan"},
+                        {"id": "n2", "agent_id": "monitoring-ops", "x": 250, "y": 150, "label": "Baseline", "phase": "steady-state"},
+                        {"id": "n3", "agent_id": "sre", "x": 400, "y": 150, "label": "Inject", "phase": "chaos-inject"},
+                        {"id": "n4", "agent_id": "monitoring-ops", "x": 550, "y": 150, "label": "Observe", "phase": "chaos-observe"},
+                        {"id": "n5", "agent_id": "doc-writer", "x": 700, "y": 150, "label": "Report", "phase": "chaos-report"},
+                    ],
+                    "edges": [
+                        {"from": "n1", "to": "n2", "label": "scenarios", "color": "#ef4444"},
+                        {"from": "n2", "to": "n3", "label": "baseline ok", "color": "#3fb950"},
+                        {"from": "n3", "to": "n4", "label": "fault active", "color": "#ef4444"},
+                        {"from": "n4", "to": "n5", "label": "observed", "color": "#d29922"},
+                    ],
+                },
+            },
+        ),
+    )
+
+    # 6. Monitoring & Observability Setup (covers: stab-monitoring)
+    builtins.append(
+        WorkflowDef(
+            id="monitoring-setup",
+            name="Monitoring & Observability",
+            description="Setup monitoring stack: SLIs/SLOs, dashboards, alerting, structured logging, health checks.",
+            icon="📊",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="slo-define", pattern_id="network",
+                    name="SLI/SLO Definition",
+                    description="Define Service Level Indicators and Objectives for each service",
+                    gate="SLIs and SLOs documented and agreed upon",
+                    config={"agents": ["monitoring-ops", "sre", "architecte"]},
+                ),
+                WorkflowPhase(
+                    id="health-checks", pattern_id="sequential",
+                    name="Health Check Endpoints",
+                    description="Implement /health, /ready, /live endpoints with dependency checks",
+                    gate="All services have health check endpoints",
+                    config={"agents": ["monitoring-ops", "lead_dev"]},
+                ),
+                WorkflowPhase(
+                    id="logging-setup", pattern_id="sequential",
+                    name="Structured Logging",
+                    description="Implement JSON structured logging, correlation IDs, log levels",
+                    gate="Structured logging in place with correlation IDs",
+                    config={"agents": ["monitoring-ops", "lead_dev"]},
+                ),
+                WorkflowPhase(
+                    id="alerting", pattern_id="sequential",
+                    name="Alerting Rules",
+                    description="Create alerting rules, escalation policies, PagerDuty/Slack integration",
+                    gate="Alerts configured with proper thresholds and routing",
+                    config={"agents": ["monitoring-ops", "sre"]},
+                ),
+                WorkflowPhase(
+                    id="runbooks", pattern_id="sequential",
+                    name="Alert Runbooks",
+                    description="Create runbook for each alert: what to check, how to mitigate, escalation",
+                    gate="Every alert has a corresponding runbook",
+                    config={"agents": ["monitoring-ops", "doc-writer"]},
+                ),
+            ],
+            config={
+                "graph": {
+                    "nodes": [
+                        {"id": "n1", "agent_id": "monitoring-ops", "x": 100, "y": 150, "label": "SLO Def", "phase": "slo-define"},
+                        {"id": "n2", "agent_id": "lead_dev", "x": 300, "y": 100, "label": "Health", "phase": "health-checks"},
+                        {"id": "n3", "agent_id": "lead_dev", "x": 300, "y": 200, "label": "Logging", "phase": "logging-setup"},
+                        {"id": "n4", "agent_id": "monitoring-ops", "x": 500, "y": 150, "label": "Alerting", "phase": "alerting"},
+                        {"id": "n5", "agent_id": "doc-writer", "x": 700, "y": 150, "label": "Runbooks", "phase": "runbooks"},
+                    ],
+                    "edges": [
+                        {"from": "n1", "to": "n2", "label": "SLOs", "color": "#ec4899"},
+                        {"from": "n1", "to": "n3", "label": "SLOs", "color": "#ec4899"},
+                        {"from": "n2", "to": "n4", "label": "endpoints", "color": "#3fb950"},
+                        {"from": "n3", "to": "n4", "label": "logs ready", "color": "#3fb950"},
+                        {"from": "n4", "to": "n5", "label": "alerts defined", "color": "#d29922"},
+                    ],
+                },
+            },
+        ),
+    )
+
+    # 7. Canary Deployment (covers: stab-rollback)
+    builtins.append(
+        WorkflowDef(
+            id="canary-deployment",
+            name="Canary Deployment & Rollback",
+            description="Progressive canary deployment with automated metric-based rollback.",
+            icon="🐤",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="pre-deploy", pattern_id="sequential",
+                    name="Pre-Deploy Checks",
+                    description="Verify all tests pass, no blocking vulnerabilities, changelog updated",
+                    gate="All pre-deploy checks green",
+                    config={"agents": ["canary-deployer", "testeur"]},
+                ),
+                WorkflowPhase(
+                    id="canary-1pct", pattern_id="sequential",
+                    name="Canary 1% Rollout",
+                    description="Deploy to 1% of traffic, monitor error rate and latency for 10 minutes",
+                    gate="Error rate < 0.1%, p95 latency within SLO",
+                    config={"agents": ["canary-deployer", "monitoring-ops"]},
+                ),
+                WorkflowPhase(
+                    id="canary-10pct", pattern_id="sequential",
+                    name="Canary 10% Rollout",
+                    description="Expand to 10% traffic, monitor for 15 minutes",
+                    gate="Metrics stable at 10% traffic",
+                    config={"agents": ["canary-deployer", "monitoring-ops"]},
+                ),
+                WorkflowPhase(
+                    id="canary-50pct", pattern_id="human-in-the-loop",
+                    name="Canary 50% — Human Checkpoint",
+                    description="Expand to 50%, require human approval before full rollout",
+                    gate="checkpoint",
+                    config={"agents": ["canary-deployer", "sre"]},
+                ),
+                WorkflowPhase(
+                    id="full-rollout", pattern_id="sequential",
+                    name="Full Rollout (100%)",
+                    description="Complete rollout, post-deploy smoke tests, update release status",
+                    gate="100% traffic on new version, all smoke tests pass",
+                    config={"agents": ["canary-deployer", "testeur"]},
+                ),
+            ],
+            config={
+                "auto_rollback": True,
+                "rollback_triggers": {
+                    "error_rate_pct": 1.0,
+                    "p95_latency_ms": 500,
+                    "crash_rate_pct": 0.5,
+                },
+                "graph": {
+                    "nodes": [
+                        {"id": "n1", "agent_id": "canary-deployer", "x": 100, "y": 150, "label": "Pre-Deploy", "phase": "pre-deploy"},
+                        {"id": "n2", "agent_id": "canary-deployer", "x": 250, "y": 150, "label": "1%", "phase": "canary-1pct"},
+                        {"id": "n3", "agent_id": "canary-deployer", "x": 400, "y": 150, "label": "10%", "phase": "canary-10pct"},
+                        {"id": "n4", "agent_id": "sre", "x": 550, "y": 150, "label": "50% HITL", "phase": "canary-50pct"},
+                        {"id": "n5", "agent_id": "canary-deployer", "x": 700, "y": 150, "label": "100%", "phase": "full-rollout"},
+                    ],
+                    "edges": [
+                        {"from": "n1", "to": "n2", "label": "checks ok", "color": "#3fb950"},
+                        {"from": "n2", "to": "n3", "label": "1% stable", "color": "#3fb950"},
+                        {"from": "n3", "to": "n4", "label": "10% stable", "color": "#3fb950"},
+                        {"from": "n4", "to": "n5", "label": "approved", "color": "#3fb950"},
+                        {"from": "n2", "to": "n1", "label": "rollback", "color": "#ef4444", "style": "dashed"},
+                        {"from": "n3", "to": "n1", "label": "rollback", "color": "#ef4444", "style": "dashed"},
+                    ],
+                },
+            },
+        ),
+    )
+
+    # 8. Test Data & Fixtures (covers: repro-seed)
+    builtins.append(
+        WorkflowDef(
+            id="test-data-pipeline",
+            name="Test Data & Fixtures Pipeline",
+            description="Generate reproducible test data: factories, seeds, fixtures for all environments.",
+            icon="🧪",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="model-analysis", pattern_id="sequential",
+                    name="Domain Model Analysis",
+                    description="Analyze all domain models, relationships, constraints, and validation rules",
+                    gate="All models inventoried with relationships mapped",
+                    config={"agents": ["fixture-gen", "architecte"]},
+                ),
+                WorkflowPhase(
+                    id="factory-gen", pattern_id="sequential",
+                    name="Factory Generation",
+                    description="Create factory functions/classes for each model with realistic data (Faker)",
+                    gate="Factory for every model, referential integrity maintained",
+                    config={"agents": ["fixture-gen"]},
+                ),
+                WorkflowPhase(
+                    id="seed-scripts", pattern_id="sequential",
+                    name="Seed Scripts",
+                    description="Create SQL/script seeds for dev, staging, and test environments",
+                    gate="Seed scripts run without errors in all environments",
+                    config={"agents": ["fixture-gen", "devops"]},
+                ),
+                WorkflowPhase(
+                    id="edge-cases", pattern_id="sequential",
+                    name="Edge Case Datasets",
+                    description="Create pathological datasets: empty, max-length, unicode, concurrent access",
+                    gate="Edge case datasets covering all boundary conditions",
+                    config={"agents": ["fixture-gen", "testeur"]},
+                ),
+            ],
+            config={
+                "graph": {
+                    "nodes": [
+                        {"id": "n1", "agent_id": "fixture-gen", "x": 100, "y": 150, "label": "Models", "phase": "model-analysis"},
+                        {"id": "n2", "agent_id": "fixture-gen", "x": 300, "y": 150, "label": "Factories", "phase": "factory-gen"},
+                        {"id": "n3", "agent_id": "fixture-gen", "x": 500, "y": 100, "label": "Seeds", "phase": "seed-scripts"},
+                        {"id": "n4", "agent_id": "testeur", "x": 500, "y": 200, "label": "Edge Cases", "phase": "edge-cases"},
+                    ],
+                    "edges": [
+                        {"from": "n1", "to": "n2", "label": "models", "color": "#a855f7"},
+                        {"from": "n2", "to": "n3", "label": "factories", "color": "#a855f7"},
+                        {"from": "n2", "to": "n4", "label": "factories", "color": "#a855f7"},
+                    ],
+                },
+            },
+        ),
+    )
+
+    # 9. i18n Validation (covers: i18n-multi)
+    builtins.append(
+        WorkflowDef(
+            id="i18n-validation",
+            name="Internationalization Validation",
+            description="Validate i18n coverage: hardcoded strings, missing translations, RTL, date/number formatting.",
+            icon="🌍",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="string-scan", pattern_id="sequential",
+                    name="Hardcoded String Scan",
+                    description="Scan source code for user-facing hardcoded strings not going through i18n",
+                    gate="All hardcoded strings identified and flagged",
+                    config={"agents": ["i18n-checker"]},
+                ),
+                WorkflowPhase(
+                    id="translation-check", pattern_id="parallel",
+                    name="Translation Completeness",
+                    description="Check translation files for missing keys per locale, detect stale translations",
+                    gate="All locales at 100% key coverage or gaps documented",
+                    config={"agents": ["i18n-checker"]},
+                ),
+                WorkflowPhase(
+                    id="format-check", pattern_id="sequential",
+                    name="Format Validation",
+                    description="Verify date, time, number, currency formatting uses Intl API, check RTL support",
+                    gate="All formatting uses locale-aware APIs",
+                    config={"agents": ["i18n-checker", "ux_designer"]},
+                ),
+                WorkflowPhase(
+                    id="i18n-report", pattern_id="sequential",
+                    name="i18n Report",
+                    description="Generate coverage report per locale with fix recommendations",
+                    gate="i18n coverage report published",
+                    config={"agents": ["i18n-checker", "doc-writer"]},
+                ),
+            ],
+            config={
+                "graph": {
+                    "nodes": [
+                        {"id": "n1", "agent_id": "i18n-checker", "x": 100, "y": 150, "label": "String Scan", "phase": "string-scan"},
+                        {"id": "n2", "agent_id": "i18n-checker", "x": 300, "y": 100, "label": "Translations", "phase": "translation-check"},
+                        {"id": "n3", "agent_id": "i18n-checker", "x": 300, "y": 200, "label": "Formats", "phase": "format-check"},
+                        {"id": "n4", "agent_id": "doc-writer", "x": 500, "y": 150, "label": "Report", "phase": "i18n-report"},
+                    ],
+                    "edges": [
+                        {"from": "n1", "to": "n2", "label": "strings found", "color": "#3b82f6"},
+                        {"from": "n1", "to": "n3", "label": "strings found", "color": "#3b82f6"},
+                        {"from": "n2", "to": "n4", "label": "coverage", "color": "#3fb950"},
+                        {"from": "n3", "to": "n4", "label": "formats ok", "color": "#3fb950"},
+                    ],
+                },
+            },
+        ),
+    )
+
+    # 10. SAST Continuous Security Scan (covers: secu-sast)
+    builtins.append(
+        WorkflowDef(
+            id="sast-continuous",
+            name="SAST Continuous Security Scan",
+            description="Continuous static application security testing integrated into CI pipeline.",
+            icon="🔒",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="sast-scan", pattern_id="parallel",
+                    name="SAST Scan",
+                    description="Run static analysis tools: semgrep, bandit, eslint-security, CodeQL",
+                    gate="All SAST scanners completed",
+                    config={"agents": ["securite", "devsecops"]},
+                ),
+                WorkflowPhase(
+                    id="sast-triage", pattern_id="sequential",
+                    name="Finding Triage",
+                    description="Classify findings by severity (critical/high/medium/low), filter false positives",
+                    gate="All findings triaged, critical/high addressed",
+                    config={"agents": ["securite", "lead_dev"]},
+                ),
+                WorkflowPhase(
+                    id="sast-fix", pattern_id="loop",
+                    name="Security Fixes",
+                    description="Fix critical and high findings, verify fixes don't introduce regressions",
+                    gate="Zero critical/high findings remaining",
+                    config={"agents": ["securite", "lead_dev"], "max_iterations": 3},
+                ),
+                WorkflowPhase(
+                    id="sast-gate", pattern_id="sequential",
+                    name="Security Gate",
+                    description="Final security gate: verify all critical/high resolved, generate compliance report",
+                    gate="Security gate passed, report published",
+                    config={"agents": ["securite"]},
+                ),
+            ],
+            config={
+                "schedule": "per-commit",
+                "graph": {
+                    "nodes": [
+                        {"id": "n1", "agent_id": "securite", "x": 100, "y": 150, "label": "SAST Scan", "phase": "sast-scan"},
+                        {"id": "n2", "agent_id": "securite", "x": 300, "y": 150, "label": "Triage", "phase": "sast-triage"},
+                        {"id": "n3", "agent_id": "lead_dev", "x": 500, "y": 150, "label": "Fix Loop", "phase": "sast-fix"},
+                        {"id": "n4", "agent_id": "securite", "x": 700, "y": 150, "label": "Gate", "phase": "sast-gate"},
+                    ],
+                    "edges": [
+                        {"from": "n1", "to": "n2", "label": "findings", "color": "#ef4444"},
+                        {"from": "n2", "to": "n3", "label": "critical/high", "color": "#ef4444"},
+                        {"from": "n3", "to": "n1", "label": "re-scan", "color": "#d29922", "style": "dashed"},
+                        {"from": "n3", "to": "n4", "label": "all fixed", "color": "#3fb950"},
+                    ],
+                },
+            },
+        ),
+    )
+
     return builtins
