@@ -201,20 +201,21 @@
         <!-- Strategic committee graph -->
         {% if strat_graph and strat_graph.nodes %}
         <div class="strat-graph-wrap">
-            <div class="strat-graph-header">
+            <div class="strat-graph-header" onclick="toggleStratGraph()">
                 <div class="strat-graph-title">
                     <svg><use href="#icon-git-merge"/></svg> {{ _('governance_flow') }}
+                    <svg class="chevron-s strat-graph-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;transform:rotate(-90deg);transition:transform .2s"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
                 <div class="strat-graph-actions">
                     <a href="/workflows/strategic-committee/edit" class="strat-graph-btn" onclick="event.stopPropagation()">
                         <svg><use href="#icon-settings"/></svg> Workflow
                     </a>
-                    <button class="strat-graph-btn" onclick="launchStrategicCommittee()" id="btnLaunchComite" style="border-color:var(--purple);color:var(--purple)">
+                    <button class="strat-graph-btn" onclick="event.stopPropagation();launchStrategicCommittee()" id="btnLaunchComite" style="border-color:var(--purple);color:var(--purple)">
                         <svg><use href="#icon-play"/></svg> {{ _('launch_committee') }}
                     </button>
                 </div>
             </div>
-            <div class="strat-graph-body" id="stratGraphBody">
+            <div class="strat-graph-body" id="stratGraphBody" style="display:none;max-height:180px">
                 <svg id="stratSvg" viewBox="0 0 820 160" xmlns="http://www.w3.org/2000/svg"></svg>
             </div>
         </div>
@@ -658,8 +659,26 @@ async function launchStrategicCommittee(){
     }
 }
 
+// Toggle governance graph collapsed/expanded
+function toggleStratGraph(){
+    const body = document.getElementById('stratGraphBody');
+    const chev = document.querySelector('.strat-graph-chevron');
+    if(!body) return;
+    const open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    if(chev) chev.style.transform = open ? 'rotate(-90deg)' : 'rotate(0deg)';
+    localStorage.setItem('strat_graph_open', open ? '0' : '1');
+}
 // Auto-render graph on page load
-if(STRAT_GRAPH.nodes && STRAT_GRAPH.nodes.length) renderStratGraph();
+if(STRAT_GRAPH.nodes && STRAT_GRAPH.nodes.length){
+    renderStratGraph();
+    if(localStorage.getItem('strat_graph_open') === '1'){
+        const body = document.getElementById('stratGraphBody');
+        const chev = document.querySelector('.strat-graph-chevron');
+        if(body) body.style.display = 'block';
+        if(chev) chev.style.transform = 'rotate(0deg)';
+    }
+}
 
 // ── Collapsible sections with localStorage ──
 function togglePortSection(id){
