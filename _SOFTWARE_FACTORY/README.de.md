@@ -58,6 +58,23 @@ docker-compose up -d
 
 Öffnen Sie http://localhost:8099
 
+### LLM-Anbieter konfigurieren
+
+Die Plattform benötigt mindestens **einen LLM-Anbieter** für echte Code-Generierung. Ohne API-Key läuft sie im **Demo-Modus**.
+
+```bash
+cp .env.example .env
+# .env bearbeiten und API-Keys eintragen
+```
+
+| Anbieter | Umgebungsvariable | Kostenlos |
+|----------|------------------|-----------|
+| **MiniMax** | `MINIMAX_API_KEY` | ✅ |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌ |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | ✅ |
+
+`PLATFORM_LLM_PROVIDER` auf Ihren primären Anbieter setzen. Konfiguration auch über **Settings** (`/settings`).
+
 ## Funktionen
 
 - **145 KI-Agenten** in Teams organisiert
@@ -66,3 +83,16 @@ docker-compose up -d
 - **MCP Server** — 23 Tools
 - **Lizenz AGPL v3**
 
+
+## Tests
+
+```bash
+# Unit-Tests
+pytest tests/
+
+# E2E-Tests (Playwright)
+cd platform/tests/e2e
+npm install
+npx playwright install --with-deps chromium
+npm test
+```

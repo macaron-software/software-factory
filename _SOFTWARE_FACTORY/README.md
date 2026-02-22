@@ -92,6 +92,7 @@ Think of it as a **virtual software factory** where 158 AI agents collaborate th
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
+cp .env.example .env       # Configure LLM API keys (see Step 3 below)
 docker-compose up -d
 ```
 
@@ -106,16 +107,46 @@ cd software-factory
 
 # Install dependencies
 pip install -r requirements.txt
-
-# Configure API keys
-mkdir -p ~/.config/factory
-echo "sk-ant-..." > ~/.config/factory/anthropic.key
-
 # Start platform
 python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8099 --ws none
 ```
 
 Open http://localhost:8099
+
+### Step 3: Configure an LLM Provider
+
+The platform requires at least **one LLM provider** for agents to generate real code, tests, and decisions.
+Without a key, it runs in **demo mode** (mock responses — useful for UI exploration).
+
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit .env and add your API key(s)
+```
+
+| Provider | Env Variable | Models | Free Tier |
+|----------|-------------|--------|-----------|
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5, M2.1 | ✅ Yes |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini | ❌ |
+| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 | ❌ |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 | ✅ Yes |
+
+Set `PLATFORM_LLM_PROVIDER` to your primary provider (`minimax`, `azure-openai`, `azure-ai`, `nvidia`).
+The platform auto-falls back to other configured providers if the primary fails.
+
+```bash
+# Example: use MiniMax as primary
+PLATFORM_LLM_PROVIDER=minimax
+MINIMAX_API_KEY=sk-your-key-here
+
+# Example: use Azure OpenAI
+PLATFORM_LLM_PROVIDER=azure-openai
+AZURE_OPENAI_API_KEY=your-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+```
+
+You can also configure providers from the **Settings** page in the dashboard (`/settings`).
 
 ## Features
 
@@ -345,8 +376,10 @@ monitoring:
 # Run all tests
 make test
 
-# E2E tests (Playwright)
+# E2E tests (Playwright — requires install first)
 cd platform/tests/e2e
+npm install
+npx playwright install --with-deps chromium
 npm test
 
 # Unit tests

@@ -25,6 +25,8 @@ logs/
 # Deployment credentials (VPS, DNS, API keys)
 deploy/setup-dns.sh
 deploy/deploy-vps.sh
+deploy/MANUAL_DEPLOY.md
+deploy/QUICK_DEPLOY.md
 deploy/.env
 deploy/credentials.txt
 

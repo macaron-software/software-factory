@@ -55,6 +55,23 @@ docker-compose up -d
 
 Open http://localhost:8099
 
+### LLMプロバイダーの設定
+
+プラットフォームには少なくとも **1つのLLMプロバイダー** が必要です。APIキーなしでは **デモモード** で動作します。
+
+```bash
+cp .env.example .env
+# .envを編集してAPIキーを追加
+```
+
+| プロバイダー | 環境変数 | 無料 |
+|-------------|----------|------|
+| **MiniMax** | `MINIMAX_API_KEY` | ✅ |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌ |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | ✅ |
+
+`PLATFORM_LLM_PROVIDER` をプライマリプロバイダーに設定。ダッシュボードの **Settings**（`/settings`）からも設定可能。
+
 ## Features
 
 - **145 AI agents** organized in teams
@@ -63,3 +80,16 @@ Open http://localhost:8099
 - **MCP Server** — 23 tools
 - **License AGPL v3**
 
+
+## テスト
+
+```bash
+# ユニットテスト
+pytest tests/
+
+# E2Eテスト (Playwright)
+cd platform/tests/e2e
+npm install
+npx playwright install --with-deps chromium
+npm test
+```

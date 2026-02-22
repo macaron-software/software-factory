@@ -55,6 +55,23 @@ docker-compose up -d
 
 Open http://localhost:8099
 
+### Configurar provedor LLM
+
+A plataforma requer pelo menos **um provedor LLM** para gerar código real. Sem chave API, funciona em **modo demo**.
+
+```bash
+cp .env.example .env
+# Editar .env e adicionar chaves API
+```
+
+| Provedor | Variável de ambiente | Gratuito |
+|----------|---------------------|----------|
+| **MiniMax** | `MINIMAX_API_KEY` | ✅ |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌ |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | ✅ |
+
+Definir `PLATFORM_LLM_PROVIDER` como provedor principal. Configuração também em **Settings** (`/settings`).
+
 ## Features
 
 - **145 AI agents** organized in teams
@@ -63,3 +80,16 @@ Open http://localhost:8099
 - **MCP Server** — 23 tools
 - **License AGPL v3**
 
+
+## Testes
+
+```bash
+# Testes unitários
+pytest tests/
+
+# Testes E2E (Playwright)
+cd platform/tests/e2e
+npm install
+npx playwright install --with-deps chromium
+npm test
+```

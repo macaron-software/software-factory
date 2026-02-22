@@ -55,6 +55,23 @@ docker-compose up -d
 
 Open http://localhost:8099
 
+### LLM 제공업체 설정
+
+플랫폼은 최소 **하나의 LLM 제공업체**가 필요합니다. API 키 없이는 **데모 모드**로 작동합니다.
+
+```bash
+cp .env.example .env
+# .env를 편집하고 API 키 추가
+```
+
+| 제공업체 | 환경 변수 | 무료 |
+|---------|----------|------|
+| **MiniMax** | `MINIMAX_API_KEY` | ✅ |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌ |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | ✅ |
+
+`PLATFORM_LLM_PROVIDER`를 기본 제공업체로 설정. 대시보드 **Settings**(`/settings`)에서도 설정 가능.
+
 ## Features
 
 - **145 AI agents** organized in teams
@@ -63,3 +80,16 @@ Open http://localhost:8099
 - **MCP Server** — 23 tools
 - **License AGPL v3**
 
+
+## 테스트
+
+```bash
+# 유닛 테스트
+pytest tests/
+
+# E2E 테스트 (Playwright)
+cd platform/tests/e2e
+npm install
+npx playwright install --with-deps chromium
+npm test
+```

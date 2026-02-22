@@ -66,6 +66,7 @@ Imaginez une **usine logicielle virtuelle** où 158 agents IA collaborent à tra
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
+cp .env.example .env       # Configurer les clés LLM (voir Étape 3)
 docker-compose up -d
 ```
 
@@ -81,15 +82,41 @@ cd software-factory
 # Installer les dépendances
 pip install -r requirements.txt
 
-# Configurer les clés API
-mkdir -p ~/.config/factory
-echo "sk-ant-..." > ~/.config/factory/anthropic.key
-
 # Démarrer la plateforme
 python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
 ```
 
 Ouvrir http://localhost:8099
+
+### Étape 3 : Configurer un fournisseur LLM
+
+La plateforme nécessite au moins **un fournisseur LLM** pour que les agents génèrent du vrai code, des tests et des décisions.
+Sans clé API, elle tourne en **mode demo** (réponses simulées — utile pour explorer l'interface).
+
+```bash
+# Copier le fichier d'environnement exemple
+cp .env.example .env
+
+# Éditer .env et ajouter vos clés API
+```
+
+| Fournisseur | Variable d'env | Modèles | Gratuit |
+|-------------|---------------|---------|---------|
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5, M2.1 | ✅ Oui |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini | ❌ |
+| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 | ❌ |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 | ✅ Oui |
+
+Définir `PLATFORM_LLM_PROVIDER` sur votre fournisseur principal (`minimax`, `azure-openai`, `azure-ai`, `nvidia`).
+La plateforme bascule automatiquement sur les autres fournisseurs configurés en cas d'échec.
+
+```bash
+# Exemple : MiniMax comme fournisseur principal
+PLATFORM_LLM_PROVIDER=minimax
+MINIMAX_API_KEY=sk-votre-clé-ici
+```
+
+Vous pouvez aussi configurer les fournisseurs depuis la page **Settings** du dashboard (`/settings`).
 
 ## Fonctionnalités
 
@@ -278,6 +305,15 @@ python3 -m platform.mcp_platform.server
 - Tests chaos engineering
 - Tests E2E Playwright sur toutes les pages
 - Validation installation Debian 13
+
+#### Lancer les tests E2E (Playwright)
+
+```bash
+cd platform/tests/e2e
+npm install
+npx playwright install --with-deps chromium
+npm test
+```
 
 ### DevOps & Monitoring
 - Intégration webhooks GitHub

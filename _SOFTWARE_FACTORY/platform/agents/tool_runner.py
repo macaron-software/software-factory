@@ -1020,9 +1020,17 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
     # ── Resolve paths: project_path is the default for all file/git tools ──
     if ctx.project_path:
         # Git/build/deploy/test tools: inject cwd
-        if name in ("git_status", "git_log", "git_diff", "git_commit", "build", "test", "lint", "docker_build", "screenshot", "playwright_test", "browser_screenshot"):
-            if "cwd" not in args or args["cwd"] in (".", "", "./"):
+        if name in ("git_status", "git_log", "git_diff", "git_commit", "build", "test", "lint", "docker_build", "docker_deploy", "screenshot", "playwright_test", "browser_screenshot"):
+            cwd_val = args.get("cwd", "")
+            if not cwd_val or cwd_val in (".", "./"):
                 args["cwd"] = ctx.project_path
+            elif not os.path.isabs(cwd_val):
+                # Agent may pass workspace ID or relative path — resolve to project_path
+                ws_id = os.path.basename(ctx.project_path)
+                if cwd_val == ws_id or cwd_val == ws_id + "/":
+                    args["cwd"] = ctx.project_path
+                else:
+                    args["cwd"] = os.path.join(ctx.project_path, cwd_val)
         # File tools: resolve relative paths to project root
         if name in ("code_read", "code_search", "code_write", "code_edit", "list_files"):
             path = args.get("path", "")

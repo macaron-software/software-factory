@@ -59,6 +59,9 @@ class PatternStore:
         db = get_db()
         try:
             row = db.execute("SELECT * FROM patterns WHERE id = ?", (pattern_id,)).fetchone()
+            if not row:
+                # Fallback: lookup by type (workflow phases use type as pattern_id)
+                row = db.execute("SELECT * FROM patterns WHERE type = ? LIMIT 1", (pattern_id,)).fetchone()
             return _row_to_pattern(row) if row else None
         finally:
             db.close()

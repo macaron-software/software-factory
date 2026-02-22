@@ -55,6 +55,24 @@ docker-compose up -d
 
 Open http://localhost:8099
 
+### 配置 LLM 提供商
+
+平台需要至少 **一个 LLM 提供商** 才能让 AI 代理生成真实代码。没有 API 密钥时，以 **demo 模式** 运行。
+
+```bash
+cp .env.example .env
+# 编辑 .env 并添加 API 密钥
+```
+
+| 提供商 | 环境变量 | 免费 |
+|--------|----------|------|
+| **MiniMax** | `MINIMAX_API_KEY` | ✅ |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌ |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | ✅ |
+
+设置 `PLATFORM_LLM_PROVIDER` 为主提供商（`minimax`、`azure-openai`、`nvidia`）。
+也可以在仪表板的 **Settings** 页面（`/settings`）配置。
+
 ## Features
 
 - **145 AI agents** organized in teams
@@ -63,3 +81,16 @@ Open http://localhost:8099
 - **MCP Server** — 23 tools
 - **License AGPL v3**
 
+
+## 测试
+
+```bash
+# 单元测试
+pytest tests/
+
+# E2E 测试 (Playwright)
+cd platform/tests/e2e
+npm install
+npx playwright install --with-deps chromium
+npm test
+```
