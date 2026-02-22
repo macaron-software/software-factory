@@ -67,15 +67,17 @@
                 {% for msg in messages %}
                 <div class="chat-msg {{ 'chat-msg-user' if msg.from_agent == 'user' else 'chat-msg-agent' }}">
                     {% if msg.from_agent != 'user' %}
-                    <div class="chat-msg-avatar agent-avatar-sm" {% if lead_agent %}style="background:{{ lead_agent.color }};color:#fff;font-weight:700;font-size:0.7rem;display:flex;align-items:center;justify-content:center;border-radius:50%;width:32px;height:32px"{% endif %}>
-                        {% if lead_agent and lead_agent.avatar != 'bot' %}
+                    {% if lead_avatar_url %}
+                    <img src="{{ lead_avatar_url }}" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0">
+                    {% elif lead_agent and lead_agent.avatar != 'bot' %}
+                    <div class="chat-msg-avatar agent-avatar-sm" style="background:{{ lead_agent.color }};color:#fff;font-weight:700;font-size:0.7rem;display:flex;align-items:center;justify-content:center;border-radius:50%;width:32px;height:32px">
                         {{ lead_agent.name.split()[0][0] }}{{ lead_agent.name.split()[-1][0] if lead_agent.name.split()|length > 1 else '' }}
-                        {% elif lead_agent and lead_agent.avatar %}
-                        <svg class="icon icon-sm" style="color:{{ lead_agent.color }}"><use href="#icon-{{ lead_agent.avatar }}"/></svg>
-                        {% else %}
-                        <svg class="icon icon-sm"><use href="#icon-bot"/></svg>
-                        {% endif %}
                     </div>
+                    {% else %}
+                    <div class="chat-msg-avatar agent-avatar-sm">
+                        <svg class="icon icon-sm"><use href="#icon-bot"/></svg>
+                    </div>
+                    {% endif %}
                     {% endif %}
                     <div class="chat-msg-body">
                         {% if msg.from_agent != 'user' and msg.from_agent != 'system' %}
@@ -104,7 +106,9 @@
             {% else %}
                 <div class="chat-welcome">
                     <div class="chat-welcome-icon">
-                        {% if lead_agent and lead_agent.avatar != 'bot' %}
+                        {% if lead_avatar_url %}
+                        <img src="{{ lead_avatar_url }}" alt="{{ lead_agent.name }}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid {{ lead_agent.color or 'var(--purple)' }}">
+                        {% elif lead_agent and lead_agent.avatar != 'bot' %}
                         <div style="width:64px;height:64px;border-radius:50%;background:{{ lead_agent.color }};color:#fff;font-weight:700;font-size:1.4rem;display:flex;align-items:center;justify-content:center">
                             {{ lead_agent.name.split()[0][0] }}{{ lead_agent.name.split()[-1][0] if lead_agent.name.split()|length > 1 else '' }}
                         </div>
@@ -170,9 +174,13 @@
         <div class="ps-section">
             <h4>{{ _("lead_agent") }}</h4>
             <div style="display:flex;align-items:center;gap:0.5rem">
+                {% if lead_avatar_url %}
+                <img src="{{ lead_avatar_url }}" alt="{{ lead_agent.name }}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid {{ lead_agent.color or 'var(--purple)' }};flex-shrink:0">
+                {% else %}
                 <div style="width:28px;height:28px;border-radius:50%;background:{{ lead_agent.color }};color:#fff;font-weight:700;font-size:0.6rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">
                     {{ lead_agent.name.split()[0][0] }}{{ lead_agent.name.split()[-1][0] if lead_agent.name.split()|length > 1 else '' }}
                 </div>
+                {% endif %}
                 <div>
                     <div style="font-weight:600;font-size:0.8rem">{{ lead_agent.name }}</div>
                     <div style="font-size:0.65rem;color:var(--text-secondary)">{{ lead_agent.role }}</div>

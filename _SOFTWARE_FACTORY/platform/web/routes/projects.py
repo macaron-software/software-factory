@@ -212,6 +212,15 @@ async def project_detail(request: Request, project_id: str):
     agent_store = get_agent_store()
     agents = agent_store.list_all()
     lead = agent_store.get(project.lead_agent_id) if project.lead_agent_id else None
+    # Resolve lead avatar photo
+    lead_avatar_url = ""
+    if lead:
+        from pathlib import Path as _Path
+        _av_dir = _Path(__file__).parent.parent / "static" / "avatars"
+        for ext in ("jpg", "svg"):
+            if (_av_dir / f"{lead.id}.{ext}").exists():
+                lead_avatar_url = f"/static/avatars/{lead.id}.{ext}"
+                break
     # Get workflows linked to this project
     workflows = []
     try:
@@ -260,6 +269,7 @@ async def project_detail(request: Request, project_id: str):
         "active_session": active_session,
         "agents": agents,
         "lead_agent": lead,
+        "lead_avatar_url": lead_avatar_url,
         "messages": messages,
         "memory_files": memory_files,
         "workflows": workflows,

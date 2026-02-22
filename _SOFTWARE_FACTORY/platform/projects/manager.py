@@ -315,9 +315,9 @@ class ProjectStore:
                 agent_store.create(agent)
 
             if existing:
-                # Update lead_agent_id if missing
-                if not existing.lead_agent_id or existing.lead_agent_id != agent_id:
-                    from ..db import get_db
+                # Only set lead_agent_id if truly empty (don't overwrite user customizations)
+                if not existing.lead_agent_id:
+                    from ..db.migrations import get_db
                     conn = get_db()
                     conn.execute("UPDATE projects SET lead_agent_id = ? WHERE id = ?", (agent_id, existing.id))
                     conn.commit()
