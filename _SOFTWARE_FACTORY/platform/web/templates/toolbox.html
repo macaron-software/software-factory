@@ -14,110 +14,264 @@ function switchTab(btn){
     btn.classList.add('active');
 }
 
-function showAPITab(){
-    const content = document.getElementById('tab-content');
-    content.innerHTML = `
-        <div class="main-area" style="padding:24px">
-            <h2>API Testing</h2>
-            <div style="margin-top:16px">
-                <label style="display:block;margin-bottom:8px;font-weight:500">Command:</label>
-                <input type="text" id="api-command" placeholder="e.g., help" style="width:100%;padding:8px;margin-bottom:12px;border:1px solid #ddd;border-radius:4px">
-                
-                <label style="display:block;margin-bottom:8px;font-weight:500">Arguments (comma-separated):</label>
-                <input type="text" id="api-args" placeholder="e.g., test-skills" style="width:100%;padding:8px;margin-bottom:12px;border:1px solid #ddd;border-radius:4px">
-                
-                <button onclick="executeAPI()" style="padding:8px 16px;background:#0969da;color:white;border:none;border-radius:4px;cursor:pointer">Execute</button>
-            </div>
-            <div style="margin-top:24px">
-                <h3>Response:</h3>
-                <pre id="api-response" style="background:#f6f8fa;padding:16px;border-radius:4px;overflow-x:auto;min-height:200px"></pre>
-            </div>
-        </div>
-    `;
-}
-
-function showCLITab(){
-    const content = document.getElementById('tab-content');
-    content.innerHTML = `
-        <div class="main-area" style="padding:24px">
-            <h2>CLI Executor</h2>
-            <div style="margin-top:16px">
-                <label style="display:block;margin-bottom:8px;font-weight:500">Command:</label>
-                <input type="text" id="cli-command" placeholder="e.g., make, git, python3" style="width:100%;padding:8px;margin-bottom:12px;border:1px solid #ddd;border-radius:4px">
-                
-                <label style="display:block;margin-bottom:8px;font-weight:500">Arguments (comma-separated):</label>
-                <input type="text" id="cli-args" placeholder="e.g., test-skills, status" style="width:100%;padding:8px;margin-bottom:12px;border:1px solid #ddd;border-radius:4px">
-                
-                <button onclick="executeCLI()" style="padding:8px 16px;background:#0969da;color:white;border:none;border-radius:4px;cursor:pointer">Execute</button>
-                <button onclick="listCLICommands()" style="padding:8px 16px;background:#6c757d;color:white;border:none;border-radius:4px;cursor:pointer;margin-left:8px">List Commands</button>
-            </div>
-            <div style="margin-top:24px">
-                <h3>Output:</h3>
-                <pre id="cli-output" style="background:#f6f8fa;padding:16px;border-radius:4px;overflow-x:auto;min-height:200px"></pre>
+function showAPITab() {
+    document.getElementById('tab-content').innerHTML = `
+        <div class="main-area" style="padding:2rem">
+            <h1 style="font-size:1.8rem;font-weight:700;margin-bottom:0.5rem">
+                <svg style="width:28px;height:28px;vertical-align:-4px;margin-right:0.5rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M16 18l2-2-2-2M8 6l-2 2 2 2M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                </svg>
+                API Documentation
+            </h1>
+            <p style="color:var(--text-secondary);margin-bottom:2rem">
+                Documentation interactive Swagger de l'API REST. Testez les endpoints directement depuis l'interface.
+            </p>
+            
+            <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+                <div style="padding:1rem;background:var(--bg-tertiary);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+                    <div style="display:flex;align-items:center;gap:0.5rem">
+                        <svg style="width:20px;height:20px;color:var(--green)" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="12" cy="12" r="10"/>
+                        </svg>
+                        <span style="font-weight:600">Swagger UI</span>
+                    </div>
+                    <a href="/docs" target="_blank" style="padding:0.5rem 1rem;background:var(--purple);color:#fff;text-decoration:none;border-radius:6px;font-size:0.85rem;font-weight:600">
+                        Ouvrir dans nouvel onglet
+                        <svg style="width:14px;height:14px;vertical-align:-2px;margin-left:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                        </svg>
+                    </a>
+                </div>
+                <iframe src="/docs" style="width:100%;height:calc(100vh - 300px);border:none"></iframe>
             </div>
         </div>
     `;
 }
 
-async function executeAPI(){
-    const cmd = document.getElementById('api-command').value.trim();
-    const args = document.getElementById('api-args').value.trim();
-    const output = document.getElementById('api-response');
-    output.textContent = 'Executing...';
+function showCLITab() {
+    document.getElementById('tab-content').innerHTML = `
+        <div class="main-area" style="padding:2rem">
+            <h1 style="font-size:1.8rem;font-weight:700;margin-bottom:0.5rem">
+                <svg style="width:28px;height:28px;vertical-align:-4px;margin-right:0.5rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="4 17 10 11 4 5"></polyline>
+                    <line x1="12" y1="19" x2="20" y2="19"></line>
+                </svg>
+                CLI - Command Line Interface
+            </h1>
+            <p style="color:var(--text-secondary);margin-bottom:1.5rem">
+                Terminal interactif pour exécuter les commandes de la Software Factory. Tapez <code style="background:var(--bg-tertiary);padding:0.2rem 0.4rem;border-radius:4px">help</code> pour voir les commandes disponibles.
+            </p>
+
+            <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.1)">
+                <div style="padding:0.8rem 1rem;background:#2d2d30;border-bottom:1px solid #3e3e42;display:flex;align-items:center;justify-content:space-between">
+                    <div style="display:flex;align-items:center;gap:0.5rem">
+                        <svg style="width:18px;height:18px;color:#4ec9b0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="4 17 10 11 4 5"></polyline>
+                            <line x1="12" y1="19" x2="20" y2="19"></line>
+                        </svg>
+                        <span style="font-weight:600;color:#cccccc;font-size:0.9rem">sf-cli@production</span>
+                    </div>
+                    <div style="display:flex;gap:1rem;align-items:center">
+                        <button onclick="clearTerminal()" style="padding:0.3rem 0.8rem;background:#3e3e42;color:#cccccc;border:none;border-radius:4px;cursor:pointer;font-size:0.75rem;font-weight:500" title="Clear terminal">Clear</button>
+                        <button onclick="showCLIHelp()" style="padding:0.3rem 0.8rem;background:#3e3e42;color:#cccccc;border:none;border-radius:4px;cursor:pointer;font-size:0.75rem;font-weight:500" title="Show help">Help</button>
+                    </div>
+                </div>
+                <div id="cli-terminal" style="padding:1.5rem;background:#1e1e1e;color:#d4d4d4;font-family:'SF Mono', 'Consolas', 'Monaco', monospace;font-size:13px;line-height:1.6;min-height:500px;max-height:70vh;overflow-y:auto;cursor:text" onclick="document.getElementById('cli-input').focus()">
+                    <div style="color:#608b4e;margin-bottom:0.5rem">Welcome to Software Factory CLI v1.0.0</div>
+                    <div style="color:#608b4e;margin-bottom:1rem">Type 'help' for available commands, or start typing a command below.</div>
+                </div>
+                <div style="padding:0.8rem 1rem;background:#252526;border-top:1px solid #3e3e42;display:flex;align-items:center;gap:0.5rem">
+                    <span style="color:#4ec9b0;font-family:monospace;font-size:13px">sf$</span>
+                    <input 
+                        type="text" 
+                        id="cli-input" 
+                        placeholder="Tapez une commande..." 
+                        style="flex:1;background:transparent;border:none;color:#d4d4d4;font-family:'SF Mono', 'Consolas', monospace;font-size:13px;outline:none"
+                        onkeydown="handleCLIInput(event)"
+                        autocomplete="off"
+                        spellcheck="false"
+                    >
+                </div>
+            </div>
+        </div>
+    `;
     
-    try {
-        const response = await fetch('/api/cli/execute', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                command: cmd,
-                args: args ? args.split(',').map(a => a.trim()) : []
-            })
-        });
-        const data = await response.json();
-        output.textContent = JSON.stringify(data, null, 2);
-    } catch(e) {
-        output.textContent = 'Error: ' + e.message;
+    // Auto-focus on input
+    setTimeout(() => document.getElementById('cli-input').focus(), 100);
+    
+    // Initialize terminal history
+    if (!window.cliHistory) {
+        window.cliHistory = [];
+        window.cliHistoryIndex = -1;
     }
 }
 
-async function executeCLI(){
-    const cmd = document.getElementById('cli-command').value.trim();
-    const args = document.getElementById('cli-args').value.trim();
-    const output = document.getElementById('cli-output');
-    output.textContent = 'Executing...';
+// CLI Terminal functions
+function handleCLIInput(event) {
+    const input = event.target;
+    const command = input.value.trim();
     
-    try {
-        const response = await fetch('/api/cli/execute', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                command: cmd,
-                args: args ? args.split(',').map(a => a.trim()) : []
-            })
-        });
-        const data = await response.json();
-        if(data.success) {
-            output.textContent = data.output || data.error;
-        } else {
-            output.textContent = 'Error (exit ' + data.exit_code + '):\n' + data.error;
+    // Enter key - execute command
+    if (event.key === 'Enter' && command) {
+        window.cliHistory.push(command);
+        window.cliHistoryIndex = window.cliHistory.length;
+        executeCLICommand(command);
+        input.value = '';
+    }
+    
+    // Up arrow - previous command
+    if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (window.cliHistoryIndex > 0) {
+            window.cliHistoryIndex--;
+            input.value = window.cliHistory[window.cliHistoryIndex];
         }
-    } catch(e) {
-        output.textContent = 'Error: ' + e.message;
+    }
+    
+    // Down arrow - next command
+    if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        if (window.cliHistoryIndex < window.cliHistory.length - 1) {
+            window.cliHistoryIndex++;
+            input.value = window.cliHistory[window.cliHistoryIndex];
+        } else {
+            window.cliHistoryIndex = window.cliHistory.length;
+            input.value = '';
+        }
+    }
+    
+    // Tab - autocomplete (simple version)
+    if (event.key === 'Tab') {
+        event.preventDefault();
+        const commands = ['help', 'make', 'git', 'python3', 'ruff', 'pytest', 'ls', 'pwd', 'whoami', 'clear'];
+        const partial = input.value.toLowerCase();
+        const match = commands.find(cmd => cmd.startsWith(partial));
+        if (match) {
+            input.value = match + ' ';
+        }
     }
 }
 
-async function listCLICommands(){
-    const output = document.getElementById('cli-output');
-    output.textContent = 'Loading...';
+async function executeCLICommand(commandLine) {
+    const terminal = document.getElementById('cli-terminal');
+    
+    // Echo command
+    const cmdEcho = document.createElement('div');
+    cmdEcho.style.color = '#4ec9b0';
+    cmdEcho.style.marginTop = '0.8rem';
+    cmdEcho.textContent = `sf$ ${commandLine}`;
+    terminal.appendChild(cmdEcho);
+    
+    // Parse command and args
+    const parts = commandLine.split(/\s+/);
+    const command = parts[0];
+    const args = parts.slice(1);
+    
+    // Handle built-in commands
+    if (command === 'clear') {
+        clearTerminal();
+        return;
+    }
+    
+    if (command === 'help') {
+        showCLIHelp();
+        return;
+    }
+    
+    // Show loading
+    const loadingDiv = document.createElement('div');
+    loadingDiv.style.color = '#858585';
+    loadingDiv.style.marginLeft = '1rem';
+    loadingDiv.textContent = '⏳ Executing...';
+    terminal.appendChild(loadingDiv);
+    terminal.scrollTop = terminal.scrollHeight;
     
     try {
-        const response = await fetch('/api/cli/commands');
+        const response = await fetch('/api/cli/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command, args })
+        });
+        
         const data = await response.json();
-        output.textContent = JSON.stringify(data, null, 2);
-    } catch(e) {
-        output.textContent = 'Error: ' + e.message;
+        terminal.removeChild(loadingDiv);
+        
+        const outputDiv = document.createElement('div');
+        outputDiv.style.marginLeft = '1rem';
+        outputDiv.style.whiteSpace = 'pre-wrap';
+        outputDiv.style.wordBreak = 'break-word';
+        
+        if (data.success) {
+            outputDiv.style.color = '#d4d4d4';
+            outputDiv.textContent = data.output || '✓ Command executed successfully';
+        } else {
+            outputDiv.style.color = '#f48771';
+            outputDiv.innerHTML = `<strong>Error (exit ${data.exit_code}):</strong>\n${data.error || 'Unknown error'}`;
+        }
+        
+        terminal.appendChild(outputDiv);
+    } catch (error) {
+        terminal.removeChild(loadingDiv);
+        const errorDiv = document.createElement('div');
+        errorDiv.style.marginLeft = '1rem';
+        errorDiv.style.color = '#f48771';
+        errorDiv.textContent = `Error: ${error.message}`;
+        terminal.appendChild(errorDiv);
     }
+    
+    terminal.scrollTop = terminal.scrollHeight;
+}
+
+function clearTerminal() {
+    const terminal = document.getElementById('cli-terminal');
+    terminal.innerHTML = `
+        <div style="color:#608b4e;margin-bottom:0.5rem">Welcome to Software Factory CLI v1.0.0</div>
+        <div style="color:#608b4e;margin-bottom:1rem">Type 'help' for available commands.</div>
+    `;
+}
+
+function showCLIHelp() {
+    const terminal = document.getElementById('cli-terminal');
+    const helpDiv = document.createElement('div');
+    helpDiv.style.marginLeft = '1rem';
+    helpDiv.style.marginTop = '0.5rem';
+    helpDiv.innerHTML = `
+        <div style="color:#dcdcaa;font-weight:600;margin-bottom:0.8rem">Available Commands:</div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Development & Build:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">make</span> <span style="color:#858585">[install-hooks, test-skills, load-demo-skills, quality, test]</span><br>
+          <span style="color:#569cd6">python3</span> <span style="color:#858585">[-m skills_injection.test_real_missions, --version, --help]</span><br>
+          <span style="color:#569cd6">ruff</span> <span style="color:#858585">[check ., --version, --help]</span><br>
+          <span style="color:#569cd6">pytest</span> <span style="color:#858585">[--version, -v, --cov]</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Version Control:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">git</span> <span style="color:#858585">[status, log, diff, branch, --stat]</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">System:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">ls</span> <span style="color:#858585">[-la, -lh, -R]</span><br>
+          <span style="color:#569cd6">pwd</span> <span style="color:#858585">- Print working directory</span><br>
+          <span style="color:#569cd6">whoami</span> <span style="color:#858585">- Current user</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Terminal:</div>
+        <div style="margin-left:1rem;color:#d4d4d4">
+          <span style="color:#569cd6">clear</span> <span style="color:#858585">- Clear terminal</span><br>
+          <span style="color:#569cd6">help</span> <span style="color:#858585">- Show this help</span>
+        </div>
+        
+        <div style="margin-top:1rem;padding:0.8rem;background:#2d2d30;border-left:3px solid #4ec9b0;color:#858585;font-size:12px">
+          💡 <strong style="color:#dcdcaa">Tips:</strong> Use ↑/↓ arrows for command history, Tab for autocomplete
+        </div>
+    `;
+    terminal.appendChild(helpDiv);
+    terminal.scrollTop = terminal.scrollHeight;
 }
 </script>
 {% endblock %}
