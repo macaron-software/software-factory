@@ -57,15 +57,14 @@ def format_table(headers: list[str], rows: list[list[str]]) -> str:
 
 async def cmd_platform_status() -> SFCommandResponse:
     """Get platform status."""
-    from ....agents.store import get_agent_store
-    from ....missions.store import get_mission_run_store, get_mission_store
-    from ....projects.manager import get_project_store
-    from ....skills.library import get_skill_library
+    from platform.agents.store import get_agent_store
+    from platform.missions.store import get_mission_store
+    from platform.projects.manager import get_project_store
+    from platform.skills.library import get_skill_library
 
     try:
         agent_store = get_agent_store()
         mission_store = get_mission_store()
-        run_store = get_mission_run_store()
         project_store = get_project_store()
         skill_library = get_skill_library()
 
@@ -94,7 +93,7 @@ System:
   • Port:      8099 (dev) / 8090 (prod)
   • Status:    Operational
 
-Last check: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+Last check: {datetime.now(tz=None).strftime("%Y-%m-%d %H:%M:%S")}
 """
 
         return SFCommandResponse(
@@ -115,7 +114,7 @@ Last check: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 async def cmd_missions_list(args: list[str]) -> SFCommandResponse:
     """List missions with filters."""
-    from ....missions.store import get_mission_store
+    from platform.missions.store import get_mission_store
 
     try:
         store = get_mission_store()
@@ -167,7 +166,7 @@ async def cmd_missions_list(args: list[str]) -> SFCommandResponse:
 
 async def cmd_missions_show(mission_id: str) -> SFCommandResponse:
     """Show mission details."""
-    from ....missions.store import get_mission_store
+    from platform.missions.store import get_mission_store
 
     try:
         store = get_mission_store()
@@ -204,7 +203,7 @@ Context:
 
 async def cmd_agents_list(args: list[str]) -> SFCommandResponse:
     """List agents."""
-    from ....agents.store import get_agent_store
+    from platform.agents.store import get_agent_store
 
     try:
         store = get_agent_store()
@@ -250,7 +249,7 @@ async def cmd_agents_list(args: list[str]) -> SFCommandResponse:
 
 async def cmd_agents_show(agent_id: str) -> SFCommandResponse:
     """Show agent details."""
-    from ....agents.store import get_agent_store
+    from platform.agents.store import get_agent_store
 
     try:
         store = get_agent_store()
@@ -290,7 +289,7 @@ System Prompt:
 
 async def cmd_skills_sync() -> SFCommandResponse:
     """Sync GitHub skills."""
-    from ....skills.library import get_skill_library
+    from platform.skills.library import get_skill_library
 
     try:
         library = get_skill_library()
@@ -327,7 +326,7 @@ async def cmd_skills_sync() -> SFCommandResponse:
 
 async def cmd_skills_search(query: str) -> SFCommandResponse:
     """Search skills by keyword."""
-    from ....skills.library import get_skill_library
+    from platform.skills.library import get_skill_library
 
     try:
         library = get_skill_library()
@@ -368,7 +367,7 @@ async def cmd_skills_search(query: str) -> SFCommandResponse:
 
 async def cmd_projects_list() -> SFCommandResponse:
     """List projects."""
-    from ....projects.manager import get_project_store
+    from platform.projects.manager import get_project_store
 
     try:
         store = get_project_store()
@@ -401,7 +400,7 @@ async def cmd_projects_list() -> SFCommandResponse:
 
 async def cmd_db_status() -> SFCommandResponse:
     """Show database status."""
-    from ....db import get_db
+    from platform.db import get_db
 
     try:
         db = get_db()
