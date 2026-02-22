@@ -1,4 +1,4 @@
-.PHONY: setup run stop logs clean dev test install-hooks quality quality-full test-coverage
+.PHONY: setup run stop logs clean dev test install-hooks install-deps quality quality-full test-coverage test-skills
 
 # Quick start
 setup:
@@ -34,6 +34,10 @@ install-hooks:
 	@echo "Installing Git hooks + quality tools..."
 	@bash scripts/quality/install_hooks.sh
 
+install-deps:
+	@echo "Installing development dependencies..."
+	@bash scripts/quality/install_dependencies.sh
+
 quality:
 	@echo "Running quality checks on staged files..."
 	@bash scripts/quality/pre-commit || true
@@ -49,4 +53,13 @@ test-coverage:
 	@PYTHONPATH=$$(pwd) pytest --cov=platform --cov=skills_injection --cov-report=html --cov-report=term
 	@echo ""
 	@echo "Coverage report generated: htmlcov/index.html"
+
+# Skills Injection Testing
+test-skills:
+	@echo "Testing skills injection with real missions..."
+	@PYTHONPATH=$$(pwd) python3 -m skills_injection.test_real_missions
+
+test-skills-verbose:
+	@echo "Testing skills injection (verbose)..."
+	@PYTHONPATH=$$(pwd) python3 -m skills_injection.test_real_missions --verbose
 
