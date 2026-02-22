@@ -22,6 +22,12 @@ logs/
 .env.*
 *.key
 
+# Deployment credentials (VPS, DNS, API keys)
+deploy/setup-dns.sh
+deploy/deploy-vps.sh
+deploy/.env
+deploy/credentials.txt
+
 # IDE
 .idea/
 .vscode/
