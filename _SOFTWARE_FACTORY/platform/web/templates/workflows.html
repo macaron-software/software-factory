@@ -1,13 +1,12 @@
 {% extends "base.html" %}
 
-{% block topbar_actions %}
-{% include "partials/view_switcher.html" %}
-<a href="/workflows/new" class="btn btn-primary">
-    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> New
-</a>
-{% endblock %}
-
 {% block content %}
+<div class="tab-toolbar">
+    {% with page_title="templates" %}{% include "partials/view_switcher.html" %}{% endwith %}
+    <a href="/workflows/new" class="btn btn-primary btn-sm">
+        <svg class="icon icon-sm"><use href="#icon-plus"/></svg> New
+    </a>
+</div>
 <div class="item-grid" data-view-grid data-view="card">
     {% for wf in workflows %}
     <div class="item-card">

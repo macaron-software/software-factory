@@ -15,26 +15,35 @@
     </button>
 </div>
 <script>
-document.addEventListener('DOMContentLoaded', function(){
-  const sw = document.querySelector('.view-switcher');
-  if (!sw) return;
-  const page = sw.dataset.page;
-  const key = 'macaron_view_' + page;
-  const saved = localStorage.getItem(key) || 'card';
-  const grid = document.querySelector('[data-view-grid]');
-  if (!grid) return;
+(function(){
+  function initSwitcher(sw) {
+    if (sw._vsInit) return;
+    sw._vsInit = true;
+    const page = sw.dataset.page;
+    const key = 'macaron_view_' + page;
+    const saved = localStorage.getItem(key) || 'card';
+    const grid = sw.parentElement ? sw.parentElement.parentElement.querySelector('[data-view-grid]') || document.querySelector('[data-view-grid]') : null;
+    if (!grid) return;
 
-  function setMode(mode) {
-    grid.setAttribute('data-view', mode);
-    sw.querySelectorAll('.vs-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
-    localStorage.setItem(key, mode);
+    function setMode(mode) {
+      grid.setAttribute('data-view', mode);
+      sw.querySelectorAll('.vs-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+      localStorage.setItem(key, mode);
+    }
+
+    sw.addEventListener('click', e => {
+      const btn = e.target.closest('.vs-btn');
+      if (btn) setMode(btn.dataset.mode);
+    });
+
+    setMode(saved);
   }
 
-  sw.addEventListener('click', e => {
-    const btn = e.target.closest('.vs-btn');
-    if (btn) setMode(btn.dataset.mode);
+  // Init immediately (works for HTMX-loaded content)
+  document.querySelectorAll('.view-switcher:not([data-vs-init])').forEach(sw => { sw.dataset.vsInit='1'; initSwitcher(sw); });
+  // Also on DOMContentLoaded for full-page loads
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.view-switcher').forEach(initSwitcher);
   });
-
-  setMode(saved);
-});
+})();
 </script>

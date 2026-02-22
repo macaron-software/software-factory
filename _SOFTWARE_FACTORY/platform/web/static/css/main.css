@@ -814,6 +814,17 @@ body {
 }
 .empty-state .btn { margin-top: 12px; }
 
+/* ── Tab inline toolbar (view switcher + actions inside tab content) ── */
+.tab-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding: 0 4px;
+}
+.tab-toolbar .view-switcher { margin: 0; }
+
 /* ═══════════════════════════════════════════════════════════════
    VIEW MODES — Applied via data-view attribute on .item-grid
    ═══════════════════════════════════════════════════════════════ */
