@@ -68,7 +68,10 @@ class APIBackend:
     # ── Platform ──
 
     def health(self) -> dict:
-        return self._get("/api/health")
+        try:
+            return self._get("/api/health")
+        except Exception:
+            return {"status": "unknown", "url": self.base_url}
 
     def monitoring(self) -> dict:
         return self._get("/api/monitoring/live")

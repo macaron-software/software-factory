@@ -44,10 +44,14 @@ def get_backend(args):
     # Auto-detect: try API first
     try:
         import httpx
-        r = httpx.get(f"{args.url}/api/health", timeout=3)
-        if r.status_code == 200:
-            from cli._api import APIBackend
-            return APIBackend(args.url, getattr(args, "token", None))
+        for ep in ("/api/health", "/api/agents"):
+            try:
+                r = httpx.get(f"{args.url}{ep}", timeout=3)
+                if r.status_code in (200, 401):
+                    from cli._api import APIBackend
+                    return APIBackend(args.url, getattr(args, "token", None))
+            except Exception:
+                continue
     except Exception:
         pass
 
@@ -906,11 +910,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main():
-    # Handle ideation shortcut: sf ideation "prompt..."
-    # When there's no subcommand, treat remaining args as prompt
-    if len(sys.argv) >= 3 and sys.argv[1] == "ideation" and sys.argv[2] not in ("start", "create-epic", "list", "--help", "-h"):
-        # Insert "start" subcommand
-        sys.argv.insert(2, "start")
+    # Handle ideation shortcut: sf [options] ideation "prompt..."
+    # Find "ideation" anywhere in argv, then check next arg
+    try:
+        idx = sys.argv.index("ideation")
+        if idx + 1 < len(sys.argv) and sys.argv[idx + 1] not in ("start", "create-epic", "list", "--help", "-h"):
+            sys.argv.insert(idx + 1, "start")
+    except ValueError:
+        pass
 
     parser = build_parser()
     args = parser.parse_args()
