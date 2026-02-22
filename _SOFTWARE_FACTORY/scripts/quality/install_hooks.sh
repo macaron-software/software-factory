@@ -16,14 +16,16 @@ NC='\033[0m' # No Color
 # ============================================================================
 # 1. Check Git Repository
 # ============================================================================
-if [ ! -d ".git" ]; then
+# Find .git directory (could be in parent if this is a subdir)
+GIT_DIR=$(git rev-parse --git-dir 2>/dev/null)
+if [ -z "$GIT_DIR" ]; then
   echo "❌ Error: Not a git repository"
-  echo "Run this script from the project root"
+  echo "Run this script from within a git repository"
   exit 1
 fi
 
 echo ""
-echo "📂 Git repository found"
+echo "📂 Git repository found: $GIT_DIR"
 
 # ============================================================================
 # 2. Install Python Dependencies
@@ -32,8 +34,8 @@ echo ""
 echo "🐍 Installing Python quality tools..."
 if command -v python3 &> /dev/null; then
   if [ -f "requirements-dev.txt" ]; then
-    python3 -m pip install -q -r requirements-dev.txt
-    echo -e "${GREEN}✅ Python tools installed${NC}"
+    python3 -m pip install --user -q -r requirements-dev.txt 2>&1 | grep -v "Requirement already satisfied" || true
+    echo -e "${GREEN}✅ Python tools installed (--user)${NC}"
   else
     echo -e "${YELLOW}⚠️  requirements-dev.txt not found${NC}"
   fi
@@ -64,13 +66,14 @@ fi
 echo ""
 echo "🔗 Installing Git hooks..."
 
-# Copy hooks from scripts/quality/ to .git/hooks/
+# Copy hooks from scripts/quality/ to $GIT_DIR/hooks/
 HOOKS=("pre-commit" "commit-msg" "pre-push")
+SCRIPT_DIR=$(pwd)
 for hook in "${HOOKS[@]}"; do
   if [ -f "scripts/quality/$hook" ]; then
-    cp "scripts/quality/$hook" ".git/hooks/$hook"
-    chmod +x ".git/hooks/$hook"
-    echo -e "${GREEN}✅ Installed $hook${NC}"
+    cp "scripts/quality/$hook" "$GIT_DIR/hooks/$hook"
+    chmod +x "$GIT_DIR/hooks/$hook"
+    echo -e "${GREEN}✅ Installed $hook to $GIT_DIR/hooks/${NC}"
   else
     echo -e "${YELLOW}⚠️  $hook not found in scripts/quality/${NC}"
   fi
