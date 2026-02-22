@@ -142,14 +142,23 @@ function handleCLIInput(event) {
         }
     }
     
-    // Tab - autocomplete (simple version)
+    // Tab - autocomplete
     if (event.key === 'Tab') {
         event.preventDefault();
-        const commands = ['help', 'make', 'git', 'python3', 'ruff', 'pytest', 'ls', 'pwd', 'whoami', 'clear'];
+        const sfCommands = [
+            'help', 'clear', 
+            'platform status',
+            'missions list', 'missions show',
+            'agents list', 'agents show',
+            'skills sync', 'skills search',
+            'projects list',
+            'db status',
+            'make', 'git', 'python3', 'ruff', 'pytest', 'ls', 'pwd', 'whoami'
+        ];
         const partial = input.value.toLowerCase();
-        const match = commands.find(cmd => cmd.startsWith(partial));
+        const match = sfCommands.find(cmd => cmd.startsWith(partial));
         if (match) {
-            input.value = match + ' ';
+            input.value = match + (match.includes(' ') ? '' : ' ');
         }
     }
 }
@@ -180,6 +189,10 @@ async function executeCLICommand(commandLine) {
         return;
     }
     
+    // Detect SF native commands vs system commands
+    const sfCommands = ['platform', 'missions', 'agents', 'skills', 'projects', 'db'];
+    const isSFCommand = sfCommands.includes(command);
+    
     // Show loading
     const loadingDiv = document.createElement('div');
     loadingDiv.style.color = '#858585';
@@ -189,13 +202,29 @@ async function executeCLICommand(commandLine) {
     terminal.scrollTop = terminal.scrollHeight;
     
     try {
-        const response = await fetch('/api/cli/execute', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ command, args })
-        });
+        let response, data;
         
-        const data = await response.json();
+        if (isSFCommand) {
+            // Use SF commands API
+            response = await fetch('/api/sf/execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    command: commandLine,
+                    args: []
+                })
+            });
+            data = await response.json();
+        } else {
+            // Use generic CLI API
+            response = await fetch('/api/cli/execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command, args })
+            });
+            data = await response.json();
+        }
+        
         terminal.removeChild(loadingDiv);
         
         const outputDiv = document.createElement('div');
@@ -208,7 +237,7 @@ async function executeCLICommand(commandLine) {
             outputDiv.textContent = data.output || '✓ Command executed successfully';
         } else {
             outputDiv.style.color = '#f48771';
-            outputDiv.innerHTML = `<strong>Error (exit ${data.exit_code}):</strong>\n${data.error || 'Unknown error'}`;
+            outputDiv.innerHTML = `<strong>Error${data.exit_code ? ' (exit '+data.exit_code+')' : ''}:</strong>\n${data.error || 'Unknown error'}`;
         }
         
         terminal.appendChild(outputDiv);
@@ -238,36 +267,67 @@ function showCLIHelp() {
     helpDiv.style.marginLeft = '1rem';
     helpDiv.style.marginTop = '0.5rem';
     helpDiv.innerHTML = `
-        <div style="color:#dcdcaa;font-weight:600;margin-bottom:0.8rem">Available Commands:</div>
+        <div style="color:#dcdcaa;font-weight:600;margin-bottom:0.8rem">Software Factory CLI Commands</div>
         
-        <div style="color:#4ec9b0;margin-bottom:0.3rem">Development & Build:</div>
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">🏢 Platform:</div>
         <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
-          <span style="color:#569cd6">make</span> <span style="color:#858585">[install-hooks, test-skills, load-demo-skills, quality, test]</span><br>
-          <span style="color:#569cd6">python3</span> <span style="color:#858585">[-m skills_injection.test_real_missions, --version, --help]</span><br>
-          <span style="color:#569cd6">ruff</span> <span style="color:#858585">[check ., --version, --help]</span><br>
-          <span style="color:#569cd6">pytest</span> <span style="color:#858585">[--version, -v, --cov]</span>
+          <span style="color:#569cd6">platform status</span> <span style="color:#858585">- Platform status (agents, missions, projects, skills)</span>
         </div>
         
-        <div style="color:#4ec9b0;margin-bottom:0.3rem">Version Control:</div>
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">🎯 Missions:</div>
         <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
-          <span style="color:#569cd6">git</span> <span style="color:#858585">[status, log, diff, branch, --stat]</span>
+          <span style="color:#569cd6">missions list</span> <span style="color:#858585">- List all missions</span><br>
+          <span style="color:#569cd6">missions list --status=running</span> <span style="color:#858585">- Filter by status</span><br>
+          <span style="color:#569cd6">missions show &lt;id&gt;</span> <span style="color:#858585">- Show mission details</span>
         </div>
         
-        <div style="color:#4ec9b0;margin-bottom:0.3rem">System:</div>
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">🤖 Agents:</div>
         <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
-          <span style="color:#569cd6">ls</span> <span style="color:#858585">[-la, -lh, -R]</span><br>
+          <span style="color:#569cd6">agents list</span> <span style="color:#858585">- List all agents</span><br>
+          <span style="color:#569cd6">agents list --role=backend</span> <span style="color:#858585">- Filter by role</span><br>
+          <span style="color:#569cd6">agents show &lt;id&gt;</span> <span style="color:#858585">- Show agent details</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">💎 Skills:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">skills sync</span> <span style="color:#858585">- Sync GitHub skills</span><br>
+          <span style="color:#569cd6">skills search &lt;query&gt;</span> <span style="color:#858585">- Search skills by keyword</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">📦 Projects:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">projects list</span> <span style="color:#858585">- List all projects</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">🗄️ Database:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">db status</span> <span style="color:#858585">- Show tables and row counts</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">🛠️ Development:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">make</span> <span style="color:#858585">[install-hooks, test-skills, quality, test]</span><br>
+          <span style="color:#569cd6">git</span> <span style="color:#858585">[status, log, diff, branch]</span><br>
+          <span style="color:#569cd6">python3</span> <span style="color:#858585">[--version, -m module]</span><br>
+          <span style="color:#569cd6">ruff</span> <span style="color:#858585">[check .]</span><br>
+          <span style="color:#569cd6">pytest</span> <span style="color:#858585">[-v, --cov]</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">📁 System:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">ls</span> <span style="color:#858585">[-la, -lh]</span><br>
           <span style="color:#569cd6">pwd</span> <span style="color:#858585">- Print working directory</span><br>
           <span style="color:#569cd6">whoami</span> <span style="color:#858585">- Current user</span>
         </div>
         
-        <div style="color:#4ec9b0;margin-bottom:0.3rem">Terminal:</div>
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">🖥️ Terminal:</div>
         <div style="margin-left:1rem;color:#d4d4d4">
           <span style="color:#569cd6">clear</span> <span style="color:#858585">- Clear terminal</span><br>
           <span style="color:#569cd6">help</span> <span style="color:#858585">- Show this help</span>
         </div>
         
         <div style="margin-top:1rem;padding:0.8rem;background:#2d2d30;border-left:3px solid #4ec9b0;color:#858585;font-size:12px">
-          💡 <strong style="color:#dcdcaa">Tips:</strong> Use ↑/↓ arrows for command history, Tab for autocomplete
+          💡 <strong style="color:#dcdcaa">Tips:</strong> Use ↑/↓ for history, Tab for autocomplete, type command names for details
         </div>
     `;
     terminal.appendChild(helpDiv);
