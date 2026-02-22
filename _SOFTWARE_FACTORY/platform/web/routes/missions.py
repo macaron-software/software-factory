@@ -893,6 +893,9 @@ async def api_mission_start(request: Request):
     subprocess.run(["git", "config", "user.name", "Macaron Agents"], cwd=str(workspace_root), capture_output=True)
     readme = workspace_root / "README.md"
     readme.write_text(f"# {wf.name}\n\n{brief}\n\nMission ID: {mission_id}\n")
+    # Add .gitignore to prevent node_modules/dist/build from being committed
+    gitignore = workspace_root / ".gitignore"
+    gitignore.write_text("node_modules/\ndist/\nbuild/\n.env\n*.bak\n__pycache__/\n.DS_Store\n")
     subprocess.run(["git", "add", "."], cwd=str(workspace_root), capture_output=True)
     subprocess.run(["git", "commit", "-m", "Initial commit — mission workspace"], cwd=str(workspace_root), capture_output=True)
     workspace_path = str(workspace_root)

@@ -644,7 +644,7 @@ class MissionOrchestrator:
             })
 
             # Feedback loop: activate TMA after deploy phase
-            if phase_success and phase.phase_id in ("deploy-prod", "deploy", "tma-handoff"):
+            if phase_success and phase.phase_id in ("deploy-prod", "deploy", "deploy-feature", "tma-handoff"):
                 try:
                     from ..missions.feedback import on_deploy_completed
                     if mission.project_id:
@@ -653,7 +653,7 @@ class MissionOrchestrator:
                     logger.warning("Feedback on_deploy_completed failed: %s", _fb_err)
 
             # Feedback: create TMA incident on deploy failure
-            if not phase_success and phase.phase_id in ("deploy-prod", "deploy"):
+            if not phase_success and phase.phase_id in ("deploy-prod", "deploy", "deploy-feature"):
                 try:
                     from ..missions.feedback import on_deploy_failed
                     if mission.project_id:
