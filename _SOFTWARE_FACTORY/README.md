@@ -1,403 +1,305 @@
-# Software Factory
+<p align="center">
+  <a href="README.md">English</a> |
+  <a href="README.fr.md">Français</a> |
+  <a href="README.zh-CN.md">中文</a> |
+  <a href="README.es.md">Español</a> |
+  <a href="README.ja.md">日本語</a> |
+  <a href="README.pt.md">Português</a> |
+  <a href="README.de.md">Deutsch</a> |
+  <a href="README.ko.md">한국어</a>
+</p>
 
-[🇫🇷 Français](#français) | [🇬🇧 English](#english)
+<div align="center">
 
----
+# Macaron Software Factory
 
-## Français
+**Multi-Agent Software Factory — Autonomous AI agents orchestrating the full product lifecycle**
 
-> Plateforme multi-agents pour le développement logiciel autonome — 145 agents, méthodologie SAFe, pipeline TDD complet.
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 
-### Vue d'ensemble
+[Features](#features) · [Quick Start](#quick-start) · [Screenshots](#screenshots) · [Architecture](#architecture) · [Contributing](#contributing)
 
-**Software Factory** est une plateforme d'orchestration multi-agents qui planifie, développe, teste et déploie des logiciels de manière autonome. Elle combine :
-
-- **145 agents IA** (Product Manager, Architecte, Dev, QA, Sécurité, UX, DevOps...)
-- **Workflow SAFe** : Epics → Features → User Stories → Sprints → Code
-- **12 patterns d'orchestration** : solo, séquentiel, parallèle, hiérarchique, réseau, boucle...
-- **Multi-LLM** : Claude, GPT, MiniMax, GLM — avec fallback automatique
-- **Pipeline TDD complet** : Analyse Brain → Décomposition FRACTAL → Workers TDD → Revue adversariale → Déploiement
-
-### Screenshots
-
-![Dashboard](screenshots/02_dashboard.png)
-*Dashboard temps réel avec streaming SSE des conversations multi-agents*
-
-![Swagger API](screenshots/03_swagger.png)
-*94 endpoints REST auto-documentés*
-
-![CLI](screenshots/04_cli.png)
-*Interface en ligne de commande complète (22 groupes de commandes)*
-
-### Architecture
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  🧠 Brain (Claude Opus)                                          │
-│  Analyse Vision → Génération tâches → Priorisation WSJF         │
-└────────────────────────┬─────────────────────────────────────────┘
-                         │
-          ┌──────────────┴──────────────┐
-          ▼                             ▼
-┌─────────────────────┐      ┌─────────────────────┐
-│  Workers TDD × N    │      │  Pipeline Deploy    │
-│  FRACTAL decompose  │      │  Build → Stage →    │
-│  RED → GREEN →      │      │  E2E → Prod →       │
-│  VERIFY → COMMIT    │      │  Rollback           │
-└─────────────────────┘      └─────────────────────┘
-          │
-          ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  🔴 Gate Adversarial (revue multi-LLM en cascade)                │
-│  L0: Scan rapide → L1: Revue code → L2: Revue architecture      │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-### Démarrage rapide
-
-```bash
-# Clone
-git clone https://github.com/macaron-software/software-factory.git
-cd software-factory
-
-# Installation
-pip install -r requirements.txt
-
-# Configuration API keys
-mkdir -p ~/.config/factory
-echo "sk-ant-..." > ~/.config/factory/anthropic.key
-
-# Démarrer la plateforme
-python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
-```
-
-Ouvrir `http://localhost:8090` — le dashboard est prêt.
-
-### Trois interfaces
-
-#### 1. Dashboard Web (HTMX + SSE)
-
-Interface principale sur `http://localhost:8090` :
-- Conversations multi-agents en temps réel avec streaming SSE
-- PI Board, cycle de vie des missions, planification sprints
-- Gestion agents, monitoring, tableau de bord incidents
-
-#### 2. CLI (`sf`)
-
-Interface en ligne de commande complète miroir du dashboard :
-
-```bash
-# Installation (ajouter au PATH)
-ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
-
-# Navigation
-sf status                              # Santé plateforme
-sf projects list                       # Tous les projets
-sf missions list                       # Missions avec scores WSJF
-sf agents list                         # 145 agents
-sf features list <epic_id>             # Features d'un epic
-sf stories list --feature <id>         # User stories
-
-# Travail
-sf ideation "app e-commerce React"     # Idéation multi-agents (streamé)
-sf missions start <id>                 # Démarrer une mission
-sf metrics dora                        # Métriques DORA
-
-# Monitoring
-sf incidents list                      # Incidents
-sf llm stats                           # Usage LLM (tokens, coût)
-sf chaos status                        # Chaos engineering
-```
-
-**22 groupes de commandes** · Mode dual : API (serveur live) ou DB (offline) · Sortie JSON (`--json`) · Animations spinner · Rendu tables Markdown
-
-#### 3. API REST + Swagger
-
-94 endpoints API auto-documentés sur `/docs` (Swagger UI) :
-
-```bash
-# Exemples
-curl http://localhost:8090/api/projects
-curl http://localhost:8090/api/agents
-curl http://localhost:8090/api/missions
-curl -X POST http://localhost:8090/api/ideation \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "app GPS vélo"}'
-```
-
-Swagger UI : `http://localhost:8090/docs`
-
-### Organisation des agents
-
-| Équipe | Agents | Rôle |
-|--------|--------|------|
-| Product | Product Manager, Business Analyst, PO | Planification SAFe, WSJF |
-| Architecture | Solution Architect, Tech Lead | Décisions architecture |
-| Développement | Agents Dev (par stack) | Implémentation TDD |
-| Qualité | QA, Security Engineer | Tests, audit sécurité |
-| Design | UX Designer | Expérience utilisateur |
-| DevOps | DevOps, SRE | CI/CD, monitoring |
-| Management | Scrum Master, RTE | Cérémonies, facilitation |
-
-### Configuration projet
-
-Les projets sont définis dans `projects/*.yaml` :
-
-```yaml
-project:
-  name: mon-projet
-  root_path: /chemin/vers/projet
-  vision_doc: CLAUDE.md
-
-domains:
-  typescript:
-    paths: [src/]
-    build_cmd: npm run build
-    test_cmd: npm run test
-
-fractal:
-  max_files: 5
-  max_loc: 400
-
-adversarial:
-  threshold: 5
-```
-
-### Structure répertoires
-
-```
-├── cli/                     # sf CLI (5 fichiers, 2100+ LOC)
-│   ├── sf.py                # 22 groupes commandes, 40+ sous-commandes
-│   ├── _api.py              # Client REST httpx
-│   ├── _db.py               # Backend offline sqlite3
-│   ├── _output.py           # Tables ANSI, rendu markdown
-│   └── _stream.py           # Streaming SSE avec spinner
-│
-├── platform/                # Plateforme Agents (FastAPI + HTMX)
-│   ├── server.py            # Factory app, port 8090
-│   ├── agents/              # Agent loop, executor, store
-│   ├── a2a/                 # Bus messaging agent-to-agent
-│   ├── patterns/            # 12 patterns orchestration
-│   ├── missions/            # Cycle de vie mission SAFe
-│   ├── sessions/            # Runner conversation + SSE
-│   ├── web/                 # Routes + templates Jinja2
-│   ├── mcp_platform/        # Serveur MCP (23 tools)
-│   └── tools/               # Outils agents (code, git, deploy)
-│
-├── core/                    # Moteur TDD
-│   ├── brain.py             # RLM Brain (Claude Opus)
-│   ├── fractal.py           # Décomposition tâches
-│   ├── cycle_worker.py      # Workers TDD batch
-│   ├── adversarial.py       # Gate qualité multi-LLM
-│   └── task_store.py        # Stockage SQLite + zlib
-│
-├── projects/                # Configurations projets YAML
-├── data/                    # Base de données plateforme
-├── screenshots/             # Screenshots documentation
-└── tests/                   # Tests E2E
-```
+</div>
 
 ---
 
-## English
+## What is this?
 
-> Multi-agent AI platform for autonomous software development — 145 agents, SAFe methodology, full TDD pipeline.
+Macaron is an **autonomous multi-agent platform** that orchestrates the entire software development lifecycle — from ideation to deployment — using specialized AI agents working together.
 
-### Overview
+Think of it as a **virtual software factory** where 94 AI agents collaborate through structured workflows, following SAFe methodology, TDD practices, and automated quality gates.
 
-**Software Factory** is a multi-agent orchestration platform that plans, develops, tests, and deploys software autonomously. It combines:
+### Key Highlights
 
-- **145 AI agents** (Product Manager, Architect, Dev, QA, Security, UX, DevOps...)
-- **SAFe-aligned workflow**: Epics → Features → User Stories → Sprints → Code
-- **12 orchestration patterns**: solo, sequential, parallel, hierarchical, network, loop...
-- **Multi-LLM**: Claude, GPT, MiniMax, GLM — with automatic fallback chains
-- **Full TDD pipeline**: Brain analysis → FRACTAL decomposition → TDD workers → Adversarial review → Deploy
+- **94 specialized agents** — architects, developers, testers, SREs, security analysts, product owners
+- **12 orchestration patterns** — solo, parallel, hierarchical, network, adversarial-pair, human-in-the-loop
+- **SAFe-aligned lifecycle** — Portfolio → Epic → Feature → Story with PI cadence
+- **Auto-heal** — autonomous incident detection, triage, and self-repair
+- **Security-first** — prompt injection guard, RBAC, secret scrubbing, connection pooling
+- **DORA metrics** — deployment frequency, lead time, MTTR, change failure rate
 
-### Screenshots
+## Screenshots
 
-![Dashboard](screenshots/02_dashboard.png)
-*Real-time dashboard with SSE streaming of multi-agent conversations*
+<table>
+<tr>
+<td width="50%">
+<strong>Portfolio — Strategic Committee & Governance</strong><br>
+<img src="docs/screenshots/en/portfolio.png" alt="Portfolio Dashboard" width="100%">
+</td>
+<td width="50%">
+<strong>PI Board — Program Increment Planning</strong><br>
+<img src="docs/screenshots/en/pi_board.png" alt="PI Board" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Agents — 94 Specialized AI Agents</strong><br>
+<img src="docs/screenshots/en/agents.png" alt="Agent Teams" width="100%">
+</td>
+<td width="50%">
+<strong>Ideation Workshop — AI-Powered Brainstorming</strong><br>
+<img src="docs/screenshots/en/ideation.png" alt="Ideation" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Mission Control — Real-Time Execution Monitoring</strong><br>
+<img src="docs/screenshots/en/mission_control.png" alt="Mission Control" width="100%">
+</td>
+<td width="50%">
+<strong>Monitoring — System Health & Metrics</strong><br>
+<img src="docs/screenshots/en/monitoring.png" alt="Monitoring" width="100%">
+</td>
+</tr>
+</table>
 
-![Swagger API](screenshots/03_swagger.png)
-*94 auto-documented REST endpoints*
+## Quick Start
 
-![CLI](screenshots/04_cli.png)
-*Full-featured command-line interface (22 command groups)*
-
-### Architecture
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  🧠 Brain (Claude Opus)                                          │
-│  Vision analysis → Task generation → WSJF prioritization         │
-└────────────────────────┬─────────────────────────────────────────┘
-                         │
-          ┌──────────────┴──────────────┐
-          ▼                             ▼
-┌─────────────────────┐      ┌─────────────────────┐
-│  TDD Workers × N    │      │  Deploy Pipeline    │
-│  FRACTAL decompose  │      │  Build → Stage →    │
-│  RED → GREEN →      │      │  E2E → Prod →       │
-│  VERIFY → COMMIT    │      │  Rollback           │
-└─────────────────────┘      └─────────────────────┘
-          │
-          ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  🔴 Adversarial Gate (multi-LLM cascaded review)                 │
-│  L0: Fast scan → L1: Code review → L2: Architecture review      │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-### Quick Start
+### Option 1: Docker (Recommended)
 
 ```bash
-# Clone
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Set API keys
-mkdir -p ~/.config/factory
-echo "sk-ant-..." > ~/.config/factory/anthropic.key
+# Setup environment
+make setup
+# Edit .env with your LLM API key (OpenAI, Anthropic, or Azure OpenAI)
 
 # Start the platform
-python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
+make run
 ```
 
-Open `http://localhost:8090` — the platform UI is ready.
+Open **http://localhost:8090** in your browser.
 
-### Three Interfaces
-
-#### 1. Web Dashboard (HTMX + SSE)
-
-The main UI at `http://localhost:8090`:
-- Real-time multi-agent conversations with SSE streaming
-- PI Board, mission lifecycle, sprint planning
-- Agent management, monitoring, incident dashboard
-
-#### 2. CLI (`sf`)
-
-Full-featured command-line interface mirroring the dashboard:
+### Option 2: Docker Compose (Manual)
 
 ```bash
-# Install (add to PATH)
-ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
+git clone https://github.com/macaron-software/software-factory.git
+cd software-factory
 
-# Browse
-sf status                              # Platform health
-sf projects list                       # All projects
-sf missions list                       # Missions with WSJF scores
-sf agents list                         # 145 agents
-sf features list <epic_id>             # Epic features
-sf stories list --feature <id>         # User stories
+cp .env.example .env
+# Edit .env with your LLM API key
 
-# Work
-sf ideation "e-commerce app in React"  # Multi-agent ideation (streamed)
-sf missions start <id>                 # Start mission run
-sf metrics dora                        # DORA metrics
-
-# Monitor
-sf incidents list                      # Incidents
-sf llm stats                           # LLM usage (tokens, cost)
-sf chaos status                        # Chaos engineering
+docker compose up -d
 ```
 
-**22 command groups** · Dual mode: API (live server) or DB (offline) · JSON output (`--json`) · Spinner animations · Markdown table rendering
-
-#### 3. REST API + Swagger
-
-94 API endpoints auto-documented at `/docs` (Swagger UI):
+### Option 3: Local Development
 
 ```bash
-# Examples
-curl http://localhost:8090/api/projects
-curl http://localhost:8090/api/agents
-curl http://localhost:8090/api/missions
-curl -X POST http://localhost:8090/api/ideation \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "bike GPS tracker app"}'
+git clone https://github.com/macaron-software/software-factory.git
+cd software-factory
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r platform/requirements.txt
+
+# Set your LLM key
+export OPENAI_API_KEY=sk-...
+# or
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Start the server
+make dev
 ```
 
-Swagger UI: `http://localhost:8090/docs`
+### Verify Installation
 
-### Agent Organization
+```bash
+curl http://localhost:8090/api/health
+# → {"status": "healthy", ...}
+```
 
-| Team | Agents | Role |
-|------|--------|------|
-| Product | Product Manager, Business Analyst, PO | SAFe planning, WSJF |
-| Architecture | Solution Architect, Tech Lead | Architecture decisions |
-| Development | Dev agents (per stack) | TDD implementation |
-| Quality | QA, Security Engineer | Testing, security audit |
-| Design | UX Designer | User experience |
-| DevOps | DevOps, SRE | CI/CD, monitoring |
-| Management | Scrum Master, RTE | Ceremonies, facilitation |
+## Features
+
+### Multi-Agent Orchestration
+- **94 specialized agents** organized in 5 SAFe levels (Portfolio → Team)
+- **12 orchestration patterns** — solo, sequential, parallel, hierarchical, network, loop, router, aggregator, adversarial-pair, human-in-the-loop
+- **Agent-to-Agent messaging** — async message bus with priority routing, negotiation, and veto capabilities
+
+### Software Factory Pipeline
+```
+Brain (deep analysis) → FRACTAL decomposition → TDD Workers (parallel) → Adversarial Review → Build → Deploy
+```
+- **Brain**: Recursive project analysis, generates tasks with WSJF priority scoring
+- **FRACTAL**: Splits tasks into 3 concerns — feature, guards, failure handling
+- **TDD Workers**: N parallel workers write code test-first
+- **Adversarial Review**: Multi-LLM cascaded review (L0 fast → L1 code → L2 architecture)
+
+### SAFe-Aligned Product Lifecycle
+- **Full hierarchy**: Portfolio → Product Line → Product → Epic → Feature → Story → Task
+- **Mission Control**: Real-time monitoring of mission execution with phase management
+- **PI Board**: Program Increment planning and tracking
+- **Ceremony support**: Sprint planning, reviews, retrospectives
+- **4 built-in workflows**: product-lifecycle (11 phases), feature-request (6), tech-debt-reduction (5), tma-maintenance (4)
+
+### Auto-Heal & Self-Repair
+- **Incident detection**: Automatic error capture and classification (P0-P3)
+- **TMA workflow**: Diagnose → Fix → Verify → Close — fully autonomous
+- **Deduplication**: Prevents duplicate healing sessions
+- **Circuit breaker**: Max 3 concurrent heals, rate-limit aware
+
+### Ideation Workshop
+- **AI-powered brainstorming**: Describe an idea, get a structured project with backlog
+- **Multi-agent analysis**: Domain experts, architects, and POs collaborate on feasibility
+- **Auto-generation**: Creates Epic → Features → User Stories with acceptance criteria
+
+### Security & Resilience
+- **Prompt guard**: Input sanitization and injection detection
+- **RBAC**: Role-based access control for agents and humans
+- **Secret scrubbing**: Log sanitization, no hardcoded credentials
+- **Connection pooling**: PostgreSQL with psycopg pool
+- **Structured logging**: JSON logs with trace IDs
+
+### Observability
+- **DORA metrics**: Deployment frequency, lead time, change failure rate, MTTR
+- **Real-time SSE**: Server-Sent Events for live UI updates
+- **Health monitoring**: Container and service health checks
+- **Backup & DR**: Automated backup scripts with Azure Blob storage
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Web UI (HTMX + SSE)                  │
+├─────────────────────────────────────────────────────────┤
+│                  FastAPI Server (Python)                 │
+├──────────┬──────────┬──────────┬──────────┬─────────────┤
+│  Agent   │ Mission  │ Pattern  │ Workflow │   Tools     │
+│  Store   │  Store   │  Engine  │  Engine  │  Registry   │
+├──────────┴──────────┴──────────┴──────────┴─────────────┤
+│               Message Bus (A2A Protocol)                │
+├──────────┬──────────┬──────────┬────────────────────────┤
+│  LLM     │ Memory   │ Security │  Ops (Auto-Heal,      │
+│  Client  │ Manager  │ Module   │   Metrics, Deploy)    │
+├──────────┴──────────┴──────────┴────────────────────────┤
+│              SQLite / PostgreSQL + pgvector              │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Tech Stack
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Jinja2 + HTMX + SSE (zero JS build step) |
+| Backend | FastAPI (Python 3.10+) |
+| Database | SQLite (dev) / PostgreSQL + pgvector (prod) |
+| LLM Providers | OpenAI, Anthropic, Azure OpenAI, MiniMax, GLM |
+| Deployment | Docker Compose, Azure VM, nginx |
+| CI/CD | GitHub Actions |
+
+### Project Structure
+```
+├── platform/           # Agent Platform — FastAPI web app
+│   ├── server.py       # App factory, port 8090
+│   ├── web/            # Routes + Jinja2 templates
+│   ├── a2a/            # Agent-to-Agent messaging
+│   ├── agents/         # Agent loop, executor, store
+│   ├── patterns/       # 12 orchestration patterns
+│   ├── missions/       # SAFe-aligned mission lifecycle
+│   ├── llm/            # Multi-provider LLM client
+│   ├── tools/          # Agent tools (code, git, deploy, memory)
+│   ├── workflows/      # Built-in workflow definitions
+│   ├── ops/            # Auto-heal, metrics, deployment
+│   └── i18n/           # Internationalization (EN/FR)
+├── core/               # Factory engine (Brain, FRACTAL, TDD)
+├── skills/             # Agent skill definitions (YAML)
+├── projects/           # Per-project configurations
+├── cli/                # CLI entry point
+└── tests/              # Unit + E2E tests
+```
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# LLM Provider (at least one required)
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+AZURE_OPENAI_API_KEY=...
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+
+# Platform settings
+PLATFORM_LLM_PROVIDER=openai          # openai | anthropic | azure-openai | minimax
+PLATFORM_LLM_MODEL=gpt-4o             # Model for the selected provider
+```
+
+See [`.env.example`](.env.example) for all available options.
 
 ### Project Configuration
 
-Projects are defined in `projects/*.yaml`:
+Each managed project has a YAML config in `projects/`:
 
 ```yaml
 project:
   name: my-project
-  root_path: /path/to/project
-  vision_doc: CLAUDE.md
+  root: /path/to/project
+  language: python
 
-domains:
-  typescript:
-    paths: [src/]
-    build_cmd: npm run build
-    test_cmd: npm run test
+build:
+  command: python -m pytest
+  timeout: 300
 
-fractal:
-  max_files: 5
-  max_loc: 400
-
-adversarial:
-  threshold: 5
+brain:
+  phase: vision  # vision | fix | security | refactor
 ```
-
-### Directory Structure
-
-```
-├── cli/                     # sf CLI (5 files, 2100+ LOC)
-│   ├── sf.py                # 22 command groups, 40+ subcommands
-│   ├── _api.py              # httpx REST client
-│   ├── _db.py               # sqlite3 offline backend
-│   ├── _output.py           # ANSI tables, markdown rendering
-│   └── _stream.py           # SSE streaming with spinner
-│
-├── platform/                # Agent Platform (FastAPI + HTMX)
-│   ├── server.py            # App factory, port 8090
-│   ├── agents/              # Agent loop, executor, store
-│   ├── a2a/                 # Agent-to-agent messaging bus
-│   ├── patterns/            # 12 orchestration patterns
-│   ├── missions/            # SAFe mission lifecycle
-│   ├── sessions/            # Conversation runner + SSE
-│   ├── web/                 # Routes + Jinja2 templates
-│   ├── mcp_platform/        # MCP server (23 tools)
-│   └── tools/               # Agent tools (code, git, deploy)
-│
-├── core/                    # TDD engine
-│   ├── brain.py             # RLM Brain (Claude Opus)
-│   ├── fractal.py           # Task decomposition
-│   ├── cycle_worker.py      # Batch TDD workers
-│   ├── adversarial.py       # Multi-LLM quality gate
-│   └── task_store.py        # SQLite + zlib storage
-│
-├── projects/                # Project YAML configurations
-├── data/                    # Platform database
-├── screenshots/             # Documentation screenshots
-└── tests/                   # E2E tests
-```
-
----
-
-## License
-
-MIT License - See LICENSE file for details.
 
 ## Contributing
 
-Contributions are welcome! Please read CONTRIBUTING.md for guidelines.
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Development Setup
+
+```bash
+git clone https://github.com/macaron-software/software-factory.git
+cd software-factory
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r platform/requirements.txt
+
+# Run tests
+make test
+
+# Run platform in dev mode (with auto-reload)
+make dev
+```
+
+## License
+
+This project is licensed under the **GNU Affero General Public License v3.0** — see the [LICENSE](LICENSE) file for details.
+
+- Use, modify, and distribute freely
+- Commercial use allowed
+- Network use requires sharing source code
+- Derivative works must be AGPL v3
+
+---
+
+<div align="center">
+
+**Built with love by [Macaron Software](https://github.com/macaron-software)**
+
+[Report Bug](https://github.com/macaron-software/software-factory/issues) · [Request Feature](https://github.com/macaron-software/software-factory/issues)
+
+</div>
