@@ -519,7 +519,7 @@ async def launch_mission_workflow(request: Request, mission_id: str):
     wf_id = mission.workflow_id
     if not wf_id:
         # Pick a default workflow based on project type
-        wf_id = "feature-request"
+        wf_id = "product-lifecycle"
 
     wf_store = get_workflow_store()
     wf = wf_store.get(wf_id)
