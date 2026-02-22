@@ -173,7 +173,7 @@ body {
     align-items: center;
     justify-content: center;
     padding: 10px 0;
-    color: var(--text-secondary);
+    color: var(--gray-light);
     text-decoration: none;
     font-size: 0;
     transition: all 0.15s;
@@ -182,7 +182,7 @@ body {
 .nav-links a .icon { width: 20px; height: 20px; }
 
 .nav-links a:hover { background: var(--bg-tertiary); color: var(--text-primary); }
-.nav-links a.active { color: var(--purple); background: rgba(188,140,255,0.1); border-left: 3px solid var(--purple); }
+.nav-links a.active { color: #fff; background: var(--purple-deep); border-left: 3px solid var(--purple-light); }
 
 /* Tooltip on hover */
 .nav-links a::after {
@@ -407,7 +407,7 @@ body {
 .icon-logo { color: var(--accent); }
 
 .nav-links .icon { width: 20px; height: 20px; }
-.nav-links a.active .icon { color: var(--purple); }
+.nav-links a.active .icon { color: #fff; }
 
 .agent-avatar .icon { color: var(--accent); }
 .badge .icon { vertical-align: -2px; }
@@ -1510,7 +1510,7 @@ body {
     .nav-links li { width: auto; }
     .nav-links a { padding: 8px 12px; justify-content: center; border-left: none !important; }
     .nav-links a::after { display: none; }
-    .nav-links a.active { border-left: none; border-bottom: 3px solid var(--purple); }
+    .nav-links a.active { border-left: none; border-bottom: 3px solid var(--purple-light); }
 
     .main-content {
         padding-bottom: 64px;
