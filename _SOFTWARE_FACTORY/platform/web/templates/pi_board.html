@@ -260,7 +260,7 @@
             </div>
             <div class="tma-col-body">
             {% for t in tma_active %}
-            <div class="tma-card">
+            <div class="tma-card" style="cursor:pointer" onclick="openTMAModal('{{ t.id }}')" data-name="{{ t.name }}" data-type="{{ t.type }}" data-status="{{ t.status }}" data-project="{{ t.project_name }}" data-desc="{{ t.description }}" data-goal="{{ t.goal }}">
                 <div class="tma-card-header">
                     <span class="tma-status-dot s-active" title="Active"></span>
                     <div class="tma-type-icon {{ t.type }}">
@@ -290,7 +290,7 @@
             </div>
             <div class="tma-col-body">
             {% for t in tma_wip %}
-            <div class="tma-card">
+            <div class="tma-card" style="cursor:pointer" onclick="openTMAModal('{{ t.id }}')" data-name="{{ t.name }}" data-type="{{ t.type }}" data-status="{{ t.status }}" data-project="{{ t.project_name }}" data-desc="{{ t.description }}" data-goal="{{ t.goal }}">
                 <div class="tma-card-header">
                     <span class="tma-status-dot s-wip" title="En cours"></span>
                     <div class="tma-type-icon {{ t.type }}">
@@ -320,7 +320,7 @@
             </div>
             <div class="tma-col-body">
             {% for t in tma_resolved %}
-            <div class="tma-card">
+            <div class="tma-card" style="cursor:pointer" onclick="openTMAModal('{{ t.id }}')" data-name="{{ t.name }}" data-type="{{ t.type }}" data-status="{{ t.status }}" data-project="{{ t.project_name }}" data-desc="{{ t.description }}" data-goal="{{ t.goal }}">
                 <div class="tma-card-header">
                     <span class="tma-status-dot s-resolved" title="Resolved"></span>
                     <div class="tma-type-icon {{ t.type }}">
@@ -618,5 +618,27 @@ function debounceSearch(q) {
         el.innerHTML = html;
     } catch(e) { console.error('Release notes error:', e); }
 })();
+</script>
+
+<script>
+// TMA Ticket Modal Functions
+function openTMAModal(ticketId) {
+    const card = event.currentTarget;
+    const name = card.dataset.name || 'Ticket';
+    const type = card.dataset.type || 'unknown';
+    const status = card.dataset.status || 'active';
+    const project = card.dataset.project || '';
+    const desc = card.dataset.desc || '';
+    const goal = card.dataset.goal || '';
+    const modal = document.createElement('div');
+    modal.id = 'tmaModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10000;padding:1rem';
+    const typeColors = {'bug':'#ef4444','security':'#f59e0b','debt':'#8b5cf6','performance':'#06b6d4'};
+    const typeColor = typeColors[type] || '#6b7280';
+    modal.innerHTML = `<div style="background:var(--bg-primary);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.5);width:100%;max-width:700px;max-height:90vh;overflow-y:auto"><div style="padding:1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between"><h3 style="margin:0;display:flex;align-items:center;gap:0.8rem"><span style="width:12px;height:12px;border-radius:50%;background:${typeColor}"></span><span style="font-size:1.1rem;font-weight:600">${name}</span></h3><button onclick="closeTMAModal()" style="background:none;border:none;font-size:2rem;color:var(--text-secondary);cursor:pointer;padding:0;width:32px;height:32px">&times;</button></div><div style="padding:1.5rem"><div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem"><div><label style="font-size:0.7rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:0.3rem;display:block">Type</label><div style="padding:0.5rem;background:var(--bg-secondary);border-radius:6px;display:flex;align-items:center;gap:0.5rem"><span style="width:8px;height:8px;border-radius:50%;background:${typeColor}"></span><span style="font-size:0.85rem;font-weight:600;text-transform:capitalize">${type}</span></div></div><div><label style="font-size:0.7rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:0.3rem;display:block">Statut</label><div style="padding:0.5rem;background:var(--bg-secondary);border-radius:6px"><span style="font-size:0.85rem;font-weight:600;text-transform:capitalize">${status}</span></div></div></div>${project ? `<div style="margin-bottom:1.5rem"><label style="font-size:0.7rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:0.3rem;display:block">Projet</label><div style="padding:0.5rem;background:var(--bg-secondary);border-radius:6px;font-size:0.85rem">${project}</div></div>` : ''}${desc ? `<div style="margin-bottom:1.5rem"><label style="font-size:0.7rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:0.3rem;display:block">Description</label><div style="padding:0.8rem;background:var(--bg-secondary);border-radius:6px;font-size:0.85rem;line-height:1.6">${desc}</div></div>` : ''}${goal ? `<div style="margin-bottom:1.5rem"><label style="font-size:0.7rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:0.3rem;display:block">Objectif</label><div style="padding:0.8rem;background:var(--bg-tertiary);border-radius:6px;border-left:3px solid var(--purple);font-size:0.85rem;line-height:1.6">${goal}</div></div>` : ''}<div style="background:var(--bg-tertiary);padding:1rem;border-radius:8px;font-size:0.75rem;color:var(--text-secondary)"><strong>ID:</strong> ${ticketId}</div></div><div style="padding:1rem 1.5rem;border-top:1px solid var(--border);background:var(--bg-secondary);display:flex;gap:0.5rem;justify-content:flex-end"><button onclick="closeTMAModal()" style="background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);padding:0.6rem 1.2rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600">Fermer</button></div></div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeTMAModal(); });
+}
+function closeTMAModal() { const modal = document.getElementById('tmaModal'); if (modal) modal.remove(); }
 </script>
 {% endblock %}
