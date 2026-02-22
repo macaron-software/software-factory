@@ -67,7 +67,7 @@ echo ""
 echo "🔗 Installing Git hooks..."
 
 # Copy hooks from scripts/quality/ to $GIT_DIR/hooks/
-HOOKS=("pre-commit" "commit-msg" "pre-push")
+HOOKS=("pre-commit" "commit-msg" "post-commit" "pre-push")
 SCRIPT_DIR=$(pwd)
 for hook in "${HOOKS[@]}"; do
   if [ -f "scripts/quality/$hook" ]; then
@@ -106,6 +106,7 @@ echo ""
 echo "Installed hooks:"
 echo "  • pre-commit   - Linters + auto-fix + security"
 echo "  • commit-msg   - Conventional commits validation"
+echo "  • post-commit  - Quick tests feedback (non-blocking)"
 echo "  • pre-push     - Full tests + coverage + security scan"
 echo ""
 echo "Configuration files created:"

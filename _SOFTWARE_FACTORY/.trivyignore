@@ -1,0 +1,15 @@
+# Trivy Ignore File
+# Add CVE IDs or vulnerability patterns to ignore false positives
+# Format: CVE-YYYY-NNNNN or package-name
+
+# Example: Ignore a specific CVE in a dependency
+# CVE-2021-12345
+
+# Example: Ignore all vulnerabilities in a test dependency
+# test-package
+
+# Development dependencies (non-production)
+# pytest
+# pytest-cov
+
+# Known false positives can be added here after review
