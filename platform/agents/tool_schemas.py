@@ -1176,6 +1176,37 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "mcp_playwright_browser_screenshot",
+                "description": "Take a PNG screenshot of the current browser page. Use after browser_navigate to capture visual state for QA evidence.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "Screenshot name (e.g. 'homepage', 'login-form')"},
+                        "selector": {"type": "string", "description": "Optional CSS selector to screenshot a specific element"},
+                    },
+                    "required": ["name"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "mcp_playwright_browser_type",
+                "description": "Type text into an input field on the page.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "element": {"type": "string", "description": "Human-readable element description"},
+                        "ref": {"type": "string", "description": "Exact target element reference from snapshot"},
+                        "text": {"type": "string", "description": "Text to type"},
+                    },
+                    "required": ["element", "ref", "text"],
+                },
+            },
+        },
     ]
     _TOOL_SCHEMAS = schemas
     return schemas
@@ -1235,7 +1266,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "android_build", "android_test", "android_lint", "android_emulator_test",
         "mcp_fetch_fetch",
         "mcp_playwright_browser_navigate", "mcp_playwright_browser_snapshot",
-        "mcp_playwright_browser_click",
+        "mcp_playwright_browser_click", "mcp_playwright_browser_screenshot",
+        "mcp_playwright_browser_type",
         "mcp_memory_search_nodes",
     ],
     "devops": [
