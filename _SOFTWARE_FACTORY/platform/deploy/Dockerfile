@@ -15,6 +15,7 @@ COPY platform/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Playwright for browser screenshots (agent evidence)
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright-browsers
 RUN pip install --no-cache-dir playwright && \
     playwright install --with-deps chromium
 

@@ -1801,32 +1801,36 @@ async def _run_post_phase_hooks(
     # After dev sprint: auto screenshots for HTML files
     if "dev" in phase_key or "sprint" in phase_key:
         ws = Path(workspace)
-        html_files = list(ws.glob("*.html")) + list(ws.glob("public/*.html")) + list(ws.glob("src/*.html"))
+        html_files = list(ws.glob("*.html")) + list(ws.glob("public/*.html")) + list(ws.glob("src/*.html")) + list(ws.glob("client/*.html"))
         if html_files:
             screenshots_dir = ws / "screenshots"
             screenshots_dir.mkdir(exist_ok=True)
             shot_paths = []
-            for hf in html_files[:3]:
+            for hf in html_files[:5]:
                 fname = f"{hf.stem}.png"
                 shot_script = f"""
-const {{ chromium }} = require('playwright');
-(async () => {{
-    const browser = await chromium.launch();
-    const page = await browser.newPage({{ viewport: {{ width: 1280, height: 720 }} }});
-    await page.goto('file://{hf}', {{ waitUntil: 'load', timeout: 10000 }});
-    await page.screenshot({{ path: '{screenshots_dir / fname}' }});
-    await browser.close();
-}})();
+import asyncio
+from playwright.async_api import async_playwright
+async def main():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page(viewport={{"width": 1280, "height": 720}})
+        await page.goto("file://{hf}", wait_until="load", timeout=10000)
+        await page.screenshot(path="{screenshots_dir / fname}", full_page=True)
+        await browser.close()
+asyncio.run(main())
 """
                 try:
                     r = subprocess.run(
-                        ["node", "-e", shot_script],
+                        ["python3", "-c", shot_script],
                         capture_output=True, text=True, cwd=workspace, timeout=30
                     )
                     if r.returncode == 0 and (screenshots_dir / fname).exists():
                         shot_paths.append(f"screenshots/{fname}")
-                except Exception:
-                    pass
+                    else:
+                        logger.warning("Sprint screenshot failed for %s: %s", hf.name, r.stderr[:200] if r.stderr else "unknown")
+                except Exception as e:
+                    logger.warning("Sprint screenshot error for %s: %s", hf.name, e)
 
             if shot_paths:
                 shot_content = "Screenshots automatiques du workspace :\n" + "\n".join(
@@ -1898,7 +1902,104 @@ const {{ chromium }} = require('playwright');
         except Exception as e:
             logger.error("Post-phase build failed: %s", e)
 
-    # After deploy phase: Docker build+run + list workspace files as proof
+        # After sprint: start server, take screenshots, stop server
+        ws = Path(workspace)
+        if (ws / "package.json").exists():
+            try:
+                import json as _json2
+                pkg2 = _json2.loads((ws / "package.json").read_text())
+                scripts = pkg2.get("scripts") or {}
+                start_cmd = None
+                if "start" in scripts:
+                    start_cmd = "npm start"
+                elif "dev" in scripts:
+                    start_cmd = "npm run dev"
+                elif (ws / "src" / "server.ts").exists() or (ws / "src" / "server.js").exists() or (ws / "server.js").exists():
+                    main = pkg2.get("main", "")
+                    if main:
+                        start_cmd = f"node {main}"
+
+                if start_cmd:
+                    screenshots_dir = ws / "screenshots"
+                    screenshots_dir.mkdir(exist_ok=True)
+                    # Start server in background
+                    import signal
+                    server_env = {**dict(subprocess.os.environ), "PORT": "9050", "NODE_ENV": "production"}
+                    server_proc = subprocess.Popen(
+                        start_cmd, shell=True, cwd=workspace,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                        env=server_env, preexec_fn=subprocess.os.setsid
+                    )
+                    import time as _time
+                    _time.sleep(4)  # Wait for server to start
+                    # Check if server is up
+                    health = subprocess.run(
+                        ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "http://127.0.0.1:9050/"],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    http_code = health.stdout.strip()
+                    if http_code and http_code != "000":
+                        # Take multi-page screenshots
+                        pages_to_shot = [
+                            ("/", "homepage"),
+                        ]
+                        shot_paths_srv = []
+                        for url_path, shot_name in pages_to_shot:
+                            shot_script = f"""
+import asyncio
+from playwright.async_api import async_playwright
+async def main():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page(viewport={{"width": 1280, "height": 720}})
+        await page.goto("http://127.0.0.1:9050{url_path}", wait_until="networkidle", timeout=15000)
+        await page.screenshot(path="{screenshots_dir}/{shot_name}.png", full_page=True)
+        await browser.close()
+asyncio.run(main())
+"""
+                            try:
+                                r = subprocess.run(
+                                    ["python3", "-c", shot_script],
+                                    capture_output=True, text=True, timeout=30
+                                )
+                                if r.returncode == 0 and (screenshots_dir / f"{shot_name}.png").exists():
+                                    shot_paths_srv.append(f"screenshots/{shot_name}.png")
+                            except Exception:
+                                pass
+
+                        if shot_paths_srv:
+                            shot_msg = f"Screenshots du serveur (HTTP {http_code}) :\n" + "\n".join(
+                                f"[SCREENSHOT:{p}]" for p in shot_paths_srv
+                            )
+                            await push_sse(session_id, {
+                                "type": "message",
+                                "from_agent": "system",
+                                "from_name": "CI/CD",
+                                "from_role": "Pipeline",
+                                "content": shot_msg,
+                                "phase_id": phase_id,
+                                "msg_type": "text",
+                            })
+                        else:
+                            await push_sse(session_id, {
+                                "type": "message",
+                                "from_agent": "system",
+                                "from_name": "CI/CD",
+                                "from_role": "Pipeline",
+                                "content": f"Serveur démarré (HTTP {http_code}) mais screenshots échoués",
+                                "phase_id": phase_id,
+                                "msg_type": "text",
+                            })
+                    # Kill server
+                    try:
+                        subprocess.os.killpg(subprocess.os.getpgid(server_proc.pid), signal.SIGTERM)
+                    except Exception:
+                        try:
+                            server_proc.kill()
+                        except Exception:
+                            pass
+            except Exception as e:
+                logger.warning("Post-sprint server screenshot failed: %s", e)
     if "deploy" in phase_key:
         ws = Path(workspace)
         # Docker build + run if Dockerfile exists
