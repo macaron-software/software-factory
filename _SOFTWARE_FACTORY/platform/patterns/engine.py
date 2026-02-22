@@ -764,8 +764,8 @@ async def _execute_node(
             # Strip tool call artifacts, JSON blobs, and filler
             clean = _re2.sub(r'\{["\']path["\'].*?\}', '', content)
             clean = _re2.sub(r'\[TOOL_CALL\].*?\[/TOOL_CALL\]', '', clean, flags=_re2.DOTALL)
-            clean = _re2.sub(r'Calling \w+.*?\.\.\.', '', clean)
-            clean = _re2.sub(r"(?:J'examine|Je vais|Let me|I'll inspect|I'll check).*?\n", '', clean)
+            clean = _re2.sub(r'(?:Now |)(?:Calling|Searching|Looking|Reading|Inspecting)\s+\w+.*?(?:\n|\.\.\.)', '', clean)
+            clean = _re2.sub(r"(?:J'examine|Je vais|Let me|I'll inspect|I'll check|I will now).*?\n", '', clean)
             clean = clean.strip()
 
             if len(clean) < 20:
