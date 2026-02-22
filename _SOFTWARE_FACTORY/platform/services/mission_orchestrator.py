@@ -263,6 +263,8 @@ class MissionOrchestrator:
             is_dev_phase = "sprint" in phase_key_check or "dev" in phase_key_check or "features" in phase_key_check or "test" in phase_key_check
             is_retryable = is_dev_phase or "cicd" in phase_key_check or "qa" in phase_key_check or "architecture" in phase_key_check or "setup" in phase_key_check
             max_sprints = wf_phase.config.get("max_iterations", 5) if is_dev_phase else 1
+            if is_dev_phase:
+                logger.warning("ORCH phase=%s max_sprints=%d (from config=%s)", phase.phase_id, max_sprints, wf_phase.config.get("max_iterations"))
 
             phase_success = False
             phase_error = ""
