@@ -2122,7 +2122,7 @@ async def _run_post_phase_hooks(
 
     # Auto-commit after EVERY phase — agents never call git_commit reliably
     try:
-        result = subprocess.run(
+        git_add = subprocess.run(
             ["git", "add", "-A"], cwd=workspace, capture_output=True, text=True, timeout=10
         )
         status = subprocess.run(
