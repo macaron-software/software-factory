@@ -94,7 +94,7 @@ class MissionOrchestrator:
         # Evidence gate: acceptance criteria for dev phases
         from ..services.evidence import get_criteria_for_workflow, run_evidence_checks, format_evidence_report
         wf_config = wf.config if hasattr(wf, 'config') and isinstance(wf.config, dict) else {}
-        acceptance_criteria = get_criteria_for_workflow(wf.id, wf_config)
+        acceptance_criteria = get_criteria_for_workflow(wf.id, wf_config, workspace=workspace)
         if acceptance_criteria:
             logger.info("Evidence gate: %d acceptance criteria for workflow %s", len(acceptance_criteria), wf.id)
 

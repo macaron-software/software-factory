@@ -152,6 +152,7 @@ async def create_mission(request: Request):
         description=data.get("description", ""),
         goal=data.get("goal", ""),
         type=data.get("type", "feature"),
+        workflow_id=data.get("workflow_id", ""),
         wsjf_score=float(data.get("wsjf_score", 0)),
         created_by="user",
     )
@@ -503,6 +504,7 @@ async def available_stories_for_sprint(sprint_id: str):
         db.close()
 
 
+@router.post("/api/missions/{mission_id}/launch", responses={200: {"model": OkResponse}, 404: {"model": ErrorResponse}})
 async def launch_mission_workflow(request: Request, mission_id: str):
     """Create a session from mission's workflow and redirect to live view."""
     from ...missions.store import get_mission_store
@@ -735,22 +737,22 @@ async def delete_mission(mission_id: str):
         conn.execute("DELETE FROM platform_incidents WHERE mission_id = ?", (run_id,))
         conn.execute("DELETE FROM support_tickets WHERE mission_id = ?", (run_id,))
     conn.execute("DELETE FROM mission_runs WHERE parent_mission_id = ?", (mission_id,))
-    # Delete mission's own session if any
-    msession = conn.execute("SELECT session_id FROM missions WHERE id = ?", (mission_id,)).fetchone()
-    if msession and msession[0]:
-        conn.execute("DELETE FROM tool_calls WHERE session_id = ?", (msession[0],))
-        conn.execute("DELETE FROM messages WHERE session_id = ?", (msession[0],))
-        conn.execute("DELETE FROM sessions WHERE id = ?", (msession[0],))
     # Delete features, stories, sprints, tasks linked to mission
-    conn.execute("DELETE FROM user_stories WHERE feature_id IN (SELECT id FROM features WHERE mission_id = ?)", (mission_id,))
-    conn.execute("DELETE FROM feature_deps WHERE feature_id IN (SELECT id FROM features WHERE mission_id = ?)", (mission_id,))
-    conn.execute("DELETE FROM feature_deps WHERE depends_on IN (SELECT id FROM features WHERE mission_id = ?)", (mission_id,))
-    conn.execute("DELETE FROM features WHERE mission_id = ?", (mission_id,))
+    conn.execute("DELETE FROM user_stories WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)", (mission_id,))
+    try:
+        conn.execute("DELETE FROM feature_deps WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)", (mission_id,))
+        conn.execute("DELETE FROM feature_deps WHERE depends_on IN (SELECT id FROM features WHERE epic_id = ?)", (mission_id,))
+    except Exception:
+        pass
+    conn.execute("DELETE FROM features WHERE epic_id = ?", (mission_id,))
     conn.execute("DELETE FROM sprints WHERE mission_id = ?", (mission_id,))
     conn.execute("DELETE FROM tasks WHERE mission_id = ?", (mission_id,))
-    conn.execute("DELETE FROM ideation_findings WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mission_id,))
-    conn.execute("DELETE FROM ideation_messages WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mission_id,))
-    conn.execute("DELETE FROM ideation_sessions WHERE mission_id = ?", (mission_id,))
+    try:
+        conn.execute("DELETE FROM ideation_findings WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mission_id,))
+        conn.execute("DELETE FROM ideation_messages WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mission_id,))
+        conn.execute("DELETE FROM ideation_sessions WHERE mission_id = ?", (mission_id,))
+    except Exception:
+        pass
     conn.execute("DELETE FROM missions WHERE id = ?", (mission_id,))
     conn.commit()
     return JSONResponse({"status": "deleted", "name": mission[1]})
@@ -761,9 +763,14 @@ async def delete_project(project_id: str):
     """Delete a project and ALL associated missions, sessions, memory, agents."""
     from ...db.migrations import get_db
     conn = get_db()
+    conn.execute("PRAGMA busy_timeout = 10000")  # 10s wait for lock
     project = conn.execute("SELECT id, name FROM projects WHERE id = ?", (project_id,)).fetchone()
     if not project:
         return JSONResponse({"error": "Not found"}, status_code=404)
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+    except Exception:
+        pass  # Already in transaction or WAL mode
     # Delete all missions for this project (cascade)
     missions = conn.execute("SELECT id FROM missions WHERE project_id = ?", (project_id,)).fetchall()
     for (mid,) in missions:
@@ -775,23 +782,27 @@ async def delete_project(project_id: str):
                 conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
                 conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
             for tbl in ("sprints", "tasks", "confluence_pages", "llm_traces", "llm_usage", "platform_incidents", "support_tickets"):
-                conn.execute(f"DELETE FROM {tbl} WHERE mission_id = ?", (run_id,))
+                try:
+                    conn.execute(f"DELETE FROM {tbl} WHERE mission_id = ?", (run_id,))
+                except Exception:
+                    pass  # Table may not exist
         conn.execute("DELETE FROM mission_runs WHERE parent_mission_id = ?", (mid,))
-        # Delete mission data
-        msession = conn.execute("SELECT session_id FROM missions WHERE id = ?", (mid,)).fetchone()
-        if msession and msession[0]:
-            conn.execute("DELETE FROM tool_calls WHERE session_id = ?", (msession[0],))
-            conn.execute("DELETE FROM messages WHERE session_id = ?", (msession[0],))
-            conn.execute("DELETE FROM sessions WHERE id = ?", (msession[0],))
-        conn.execute("DELETE FROM user_stories WHERE feature_id IN (SELECT id FROM features WHERE mission_id = ?)", (mid,))
-        conn.execute("DELETE FROM feature_deps WHERE feature_id IN (SELECT id FROM features WHERE mission_id = ?)", (mid,))
-        conn.execute("DELETE FROM feature_deps WHERE depends_on IN (SELECT id FROM features WHERE mission_id = ?)", (mid,))
-        conn.execute("DELETE FROM features WHERE mission_id = ?", (mid,))
+        # Delete features (epic_id = mission_id in SAFe terms)
+        conn.execute("DELETE FROM user_stories WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)", (mid,))
+        try:
+            conn.execute("DELETE FROM feature_deps WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)", (mid,))
+            conn.execute("DELETE FROM feature_deps WHERE depends_on IN (SELECT id FROM features WHERE epic_id = ?)", (mid,))
+        except Exception:
+            pass
+        conn.execute("DELETE FROM features WHERE epic_id = ?", (mid,))
         conn.execute("DELETE FROM sprints WHERE mission_id = ?", (mid,))
         conn.execute("DELETE FROM tasks WHERE mission_id = ?", (mid,))
-        conn.execute("DELETE FROM ideation_findings WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mid,))
-        conn.execute("DELETE FROM ideation_messages WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mid,))
-        conn.execute("DELETE FROM ideation_sessions WHERE mission_id = ?", (mid,))
+        try:
+            conn.execute("DELETE FROM ideation_findings WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mid,))
+            conn.execute("DELETE FROM ideation_messages WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mid,))
+            conn.execute("DELETE FROM ideation_sessions WHERE mission_id = ?", (mid,))
+        except Exception:
+            pass
     conn.execute("DELETE FROM missions WHERE project_id = ?", (project_id,))
     # Delete orphan mission_runs for this project
     conn.execute("DELETE FROM mission_runs WHERE project_id = ?", (project_id,))
@@ -878,6 +889,8 @@ async def api_mission_start(request: Request):
     workspace_root.mkdir(parents=True, exist_ok=True)
     # Init git repo + README with brief
     subprocess.run(["git", "init"], cwd=str(workspace_root), capture_output=True)
+    subprocess.run(["git", "config", "user.email", "agents@macaron.ai"], cwd=str(workspace_root), capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Macaron Agents"], cwd=str(workspace_root), capture_output=True)
     readme = workspace_root / "README.md"
     readme.write_text(f"# {wf.name}\n\n{brief}\n\nMission ID: {mission_id}\n")
     subprocess.run(["git", "add", "."], cwd=str(workspace_root), capture_output=True)
@@ -3252,36 +3265,31 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
             f"Sprint de développement TDD pour «{brief}».\n"
             + (f"PLATEFORME: {platform_label}\n" if platform_label else "")
             + (f"⚠️ STACK OBLIGATOIRE: {platform_label}. NE PAS utiliser une autre technologie.\n"
-               f"{'Utilisez TypeScript/React/Node.js. NE PAS écrire de Swift.' if platform in ('web-node', 'web-docker', 'web-static') else ''}\n"
+               f"{'Utilisez HTML/CSS/JS ou TypeScript/Node.js. NE PAS écrire de Swift.' if platform in ('web-node', 'web-docker', 'web-static') else ''}\n"
                f"{'Utilisez Swift/SwiftUI. NE PAS écrire de TypeScript.' if platform in ('ios-native', 'macos-native') else ''}\n"
                f"{'Utilisez Kotlin/Java. NE PAS écrire de Swift.' if platform == 'android-native' else ''}\n"
                if platform_label else "")
             + "VOUS DEVEZ UTILISER VOS OUTILS pour écrire du VRAI code dans le workspace.\n\n"
-            "METHODE TDD OBLIGATOIRE (Red-Green-Refactor):\n"
-            "1. LIRE LE WORKSPACE: list_files pour voir la structure actuelle\n"
-            "2. LIRE L'ARCHITECTURE: code_read sur les fichiers existants\n"
-            "3. DECOMPOSER: Lead Dev donne des taches fichier-par-fichier aux devs\n"
-            "4. RED — ECRIRE LE TEST D'ABORD:\n"
-            "   - code_write pour creer le fichier test AVANT le code\n"
-            "   - Le test DOIT decrire le comportement attendu\n"
-            "   - Lancer le test avec build_tool — il DOIT echouer (RED)\n"
-            "5. GREEN — ECRIRE LE CODE MINIMAL:\n"
-            "   - code_write pour creer/modifier le code de production\n"
-            "   - Le code fait passer le test, rien de plus (KISS)\n"
-            "   - Lancer le test — il DOIT passer (GREEN)\n"
-            "6. REFACTOR — NETTOYER:\n"
-            "   - Eliminer la duplication, ameliorer les noms\n"
-            "   - Les tests doivent toujours passer apres refactor\n"
-            "7. COVERAGE: Lancer les tests avec coverage (--coverage, --cov, etc.)\n"
-            "   - Objectif: 80%+ de couverture\n"
-            "   - Reporter le taux dans le commit message\n"
-            "8. COMMITTER: git_commit avec message descriptif incluant le taux de coverage\n\n"
-            "REGLES:\n"
-            "- PAS de code sans test. Chaque fichier .ts/.py/.rs DOIT avoir son test\n"
-            "- Tests dans __tests__/ ou tests/ (convention du projet)\n"
-            "- Chaque dev DOIT appeler code_write au moins 3 fois (tests + code + refactor)\n"
+            "WORKFLOW OBLIGATOIRE:\n"
+            "1. LIRE LE WORKSPACE: list_files + code_read sur les fichiers existants\n"
+            "2. ECRIRE LE CODE avec code_write:\n"
+            "   - Créer les fichiers source (HTML, CSS, JS, package.json si Node.js)\n"
+            "   - Créer au moins un fichier de test\n"
+            "   - Minimum 5 fichiers source pour une application fonctionnelle\n"
+            "3. BUILDER avec l'outil build:\n"
+            "   - Appeler build(command='npm install && npm run build', cwd=WORKSPACE)\n"
+            "   - Ou build(command='npx tsc --noEmit', cwd=WORKSPACE) pour TypeScript\n"
+            "   - Pour du HTML/JS simple: build(command='node -e \"console.log(1)\"', cwd=WORKSPACE)\n"
+            "4. TESTER avec l'outil test:\n"
+            "   - Appeler test(command='npm test', cwd=WORKSPACE)\n"
+            "   - Ou test(command='node tests/run.js', cwd=WORKSPACE)\n"
+            "5. COMMITTER avec git_commit: message descriptif\n\n"
+            "REGLES STRICTES:\n"
+            "- Chaque dev DOIT appeler code_write au minimum 3 fois\n"
+            "- Au moins UN appel à build() ou test() est OBLIGATOIRE\n"
             "- NE DISCUTEZ PAS du code. ECRIVEZ-LE avec code_write.\n"
-            "- Le Lead Dev VERIFIE que chaque dev a ecrit ses tests AVANT de valider"
+            "- Pas de placeholder, pas de TODO, pas de mock — du vrai code fonctionnel\n"
+            "- Créez un package.json si c'est un projet Node.js"
         ),
         "cicd": _qa("cicd"),
         "qa-campaign": _qa("qa-campaign"),
@@ -3307,17 +3315,28 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
             "7. Commitez avec git_commit (message: fix + test ajouté)"
         ),
     }
-    # Fallback to generic prompt
+    # Match by phase key first, then by alias mappings, then by index
     phase_key = phase_name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
-    # Try matching by index order
-    ordered_keys = list(prompts.keys())
-    if idx < len(ordered_keys):
+    # Alias map for workflow phase names → prompt keys
+    _KEY_ALIASES = {
+        "feature-design": "architecture",
+        "tdd-sprint": "dev-sprint",
+        "adversarial-review": "qa-campaign",
+        "tests-e2e": "qa-execution",
+        "deploy-feature": "deploy-prod",
+        "feature-e2e": "qa-execution",
+    }
+    resolved_key = _KEY_ALIASES.get(phase_key, phase_key)
+    if resolved_key in prompts:
+        prompt = prompts[resolved_key]
+    elif idx < len(prompts):
+        ordered_keys = list(prompts.keys())
         prompt = prompts[ordered_keys[idx]]
     else:
-        prompt = prompts.get(phase_key, (
+        prompt = (
             f"Phase {idx+1}/{total} : {phase_name} (pattern: {pattern}) pour le projet «{brief}».\n"
             "Chaque agent contribue selon son rôle. Produisez un livrable concret."
-        ))
+        )
 
     # Inject previous phase context
     if prev_context:

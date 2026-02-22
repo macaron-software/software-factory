@@ -80,8 +80,8 @@ _TYPE_MAP = {
 }
 
 
-def get_criteria_for_workflow(workflow_id: str, workflow_config: dict | None = None) -> list[Criterion]:
-    """Get acceptance criteria — from workflow config or defaults."""
+def get_criteria_for_workflow(workflow_id: str, workflow_config: dict | None = None, workspace: str = "") -> list[Criterion]:
+    """Get acceptance criteria — from workflow config, auto-detect, or workspace scan."""
     # 1. Check workflow config for explicit criteria
     if workflow_config and "acceptance_criteria" in workflow_config:
         return [Criterion(**c) for c in workflow_config["acceptance_criteria"]]
@@ -93,10 +93,23 @@ def get_criteria_for_workflow(workflow_id: str, workflow_config: dict | None = N
             # Deep copy to avoid mutating defaults
             return [Criterion(c.id, c.description, c.check, dict(c.params)) for c in criteria]
 
-    # 3. Minimal fallback
+    # 3. Auto-detect from workspace contents
+    if workspace and os.path.isdir(workspace):
+        if _glob_recursive(workspace, "**/build.gradle*") or _glob_recursive(workspace, "**/*.kt"):
+            return [Criterion(c.id, c.description, c.check, dict(c.params)) for c in ANDROID_CRITERIA]
+        if _glob_recursive(workspace, "**/*.xcodeproj") or _glob_recursive(workspace, "**/*.swift"):
+            return [Criterion(c.id, c.description, c.check, dict(c.params)) for c in IOS_CRITERIA]
+        if _glob_recursive(workspace, "**/package.json"):
+            return [Criterion(c.id, c.description, c.check, dict(c.params)) for c in WEB_CRITERIA]
+
+    # 4. Generic fallback — works for any project type
     return [
-        Criterion("has-files", "Au moins 3 fichiers source créés", "file_count_min",
-                  {"pattern": "**/*.*", "min": 3}),
+        Criterion("source-files", "Au moins 3 fichiers source créés", "file_count_min",
+                  {"pattern": "**/*.{html,css,js,ts,tsx,jsx,py,rs,go,java,kt,swift,svelte,vue}", "min": 3}),
+        Criterion("no-empty-files", "Pas de fichiers vides (>50 bytes)", "no_fake_files",
+                  {"pattern": "**/*.{html,css,js,ts,py,rs}", "min_size": 50}),
+        Criterion("has-git-commits", "Au moins 1 commit git", "command_ok",
+                  {"command": "git log --oneline -1"}),
     ]
 
 

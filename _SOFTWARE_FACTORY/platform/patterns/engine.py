@@ -560,7 +560,7 @@ async def _execute_node(
     # If rejected, re-run agent with feedback (max 1 retry = 2 attempts total)
     # Coordinators and discussion patterns skip L1 (expensive LLM check)
     # Discussion patterns: agents brainstorm, quality varies — L1 wastes rate-limited calls
-    MAX_ADVERSARIAL_RETRIES = 0  # No retry loops — rejection = warning only, forward progress
+    MAX_ADVERSARIAL_RETRIES = 1  # 1 retry = 2 attempts total for execution patterns
     is_coordinator = protocol_override and "DECOMPOSE" in protocol_override
     _discussion_patterns = {"network", "human-in-the-loop", "debate", "aggregator"}
     is_discussion = run.pattern.type in _discussion_patterns
