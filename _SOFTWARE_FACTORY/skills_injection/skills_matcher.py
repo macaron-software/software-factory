@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 
+from .keyword_matcher import KeywordSkillsMatcher
 from .skills_indexer import SkillsIndexer
 from .skills_storage import SkillsStorage
 
@@ -16,6 +17,7 @@ class SkillsMatcher:
         self.storage = storage
         self.indexer = indexer
         self.similarity_threshold = 0.75
+        self.keyword_matcher = KeywordSkillsMatcher(storage)  # Fallback matcher
 
     def cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
         """Calculate cosine similarity between two vectors."""
@@ -47,12 +49,28 @@ class SkillsMatcher:
 
         # Generate embedding for context
         print("🔄 Generating context embedding...")
-        context_embedding = self.indexer.generate_embedding(context_query)
+        try:
+            context_embedding = self.indexer.generate_embedding(context_query)
+
+            # Check if embedding is valid (not all zeros)
+            if not context_embedding or all(v == 0.0 for v in context_embedding):
+                raise ValueError("Empty or zero embedding returned")
+
+        except Exception as e:
+            print(f"⚠️  Embedding generation failed: {e}")
+            print("🔄 Falling back to keyword-based matching...")
+            return self.keyword_matcher.find_matching_skills(context_query, context, top_k)
 
         # Get all skills with embeddings
         print("🔄 Loading skills from database...")
         all_skills = self.storage.get_all_skills_with_embeddings()
         print(f"✅ Loaded {len(all_skills)} skills")
+
+        # If no skills have embeddings, fall back to keyword matching
+        if not all_skills or all(all(v == 0.0 for v in s.get("embedding", [])) for s in all_skills):
+            print("⚠️  No valid embeddings found in database")
+            print("🔄 Falling back to keyword-based matching...")
+            return self.keyword_matcher.find_matching_skills(context_query, context, top_k)
 
         # Calculate similarities
         print("🔄 Calculating similarities...")

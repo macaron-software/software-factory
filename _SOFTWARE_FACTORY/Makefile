@@ -63,3 +63,7 @@ test-skills-verbose:
 	@echo "Testing skills injection (verbose)..."
 	@PYTHONPATH=$$(pwd) python3 -m skills_injection.test_real_missions --verbose
 
+load-demo-skills:
+	@echo "Loading demo skills from skills/ directory..."
+	@PYTHONPATH=$$(pwd) python3 -m skills_injection.load_demo_skills
+
