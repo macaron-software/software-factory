@@ -691,6 +691,19 @@ class MissionOrchestrator:
                 except Exception as _fb_err:
                     logger.warning("Feedback on_deploy_failed failed: %s", _fb_err)
 
+            # Create platform_incident for ANY failed phase (DORA tracking)
+            if not phase_success and phase_error:
+                try:
+                    from ..missions.feedback import on_phase_failed
+                    on_phase_failed(
+                        mission_id=mission.id,
+                        phase_name=wf_phase.name,
+                        phase_error=phase_error,
+                        project_id=mission.project_id or "",
+                    )
+                except Exception as _fb_err:
+                    logger.warning("Feedback on_phase_failed failed: %s", _fb_err)
+
             # Feedback loop: track TMA fix for recurring incident detection
             if phase_success and phase.phase_id in ("fix", "tma-fix", "validate"):
                 if mission.type in ("bug", "program") and mission.project_id:

@@ -2158,6 +2158,12 @@ asyncio.run(main())
         except Exception as e:
             logger.error("Post-phase QA screenshots failed: %s", e)
 
+        # Run real Playwright E2E test files if any exist
+        try:
+            e2e_results = await _run_real_e2e_tests(ws, session_id, phase_id, push_sse, mission)
+        except Exception as e:
+            logger.error("Post-phase E2E tests failed: %s", e)
+
     # Confluence sync — auto-sync after every phase
     try:
         from ...confluence.sync import get_sync_engine
@@ -2345,7 +2351,122 @@ Reponds UNIQUEMENT avec le contenu Markdown du fichier."""
         pass
 
 
-async def _auto_qa_screenshots(ws: "Path", platform_type: str) -> list[str]:
+async def _run_real_e2e_tests(ws: "Path", session_id: str, phase_id: str, push_sse, mission) -> dict:
+    """Run real Playwright/Jest/Vitest E2E test files if they exist in workspace. No LLM."""
+    import subprocess
+    results = {"ran": False, "passed": 0, "failed": 0, "errors": []}
+
+    # Find E2E test files
+    test_patterns = [
+        ws / "tests" / "e2e", ws / "test" / "e2e", ws / "e2e",
+        ws / "tests", ws / "test", ws / "__tests__",
+    ]
+    test_files = []
+    for td in test_patterns:
+        if td.exists():
+            test_files.extend(td.rglob("*.spec.ts"))
+            test_files.extend(td.rglob("*.spec.js"))
+            test_files.extend(td.rglob("*.test.ts"))
+            test_files.extend(td.rglob("*.test.js"))
+            test_files.extend(td.rglob("*.spec.py"))
+            test_files.extend(td.rglob("test_*.py"))
+
+    if not test_files:
+        return results
+
+    results["ran"] = True
+    await push_sse(session_id, {
+        "type": "message",
+        "from_agent": "system",
+        "from_name": "E2E Pipeline",
+        "from_role": "Real Tests",
+        "content": f"Running {len(test_files)} E2E test file(s)…",
+        "phase_id": phase_id,
+        "msg_type": "text",
+    })
+
+    # Determine test runner
+    has_playwright_config = (ws / "playwright.config.ts").exists() or (ws / "playwright.config.js").exists()
+    has_vitest = (ws / "vitest.config.ts").exists() or (ws / "vitest.config.js").exists()
+    has_jest = (ws / "jest.config.ts").exists() or (ws / "jest.config.js").exists()
+    has_pytest = any(f.suffix == ".py" for f in test_files)
+
+    test_cmds = []
+    if has_playwright_config:
+        test_cmds.append(("npx playwright test --reporter=list", "Playwright"))
+    elif has_vitest:
+        test_cmds.append(("npx vitest run --reporter=verbose", "Vitest"))
+    elif has_jest:
+        test_cmds.append(("npx jest --forceExit --verbose", "Jest"))
+    elif has_pytest:
+        test_cmds.append(("python3 -m pytest -v", "pytest"))
+    else:
+        # Fallback: try npx playwright test for .spec.ts files
+        ts_tests = [f for f in test_files if f.suffix in (".ts", ".js")]
+        py_tests = [f for f in test_files if f.suffix == ".py"]
+        if ts_tests:
+            test_cmds.append(("npx playwright test --reporter=list", "Playwright"))
+        if py_tests:
+            test_cmds.append(("python3 -m pytest -v", "pytest"))
+
+    for cmd, runner_name in test_cmds:
+        try:
+            env = {**__import__("os").environ, "CI": "true", "NODE_ENV": "test"}
+            r = subprocess.run(
+                cmd, shell=True, cwd=str(ws),
+                capture_output=True, text=True, timeout=120, env=env,
+            )
+            output = (r.stdout + "\n" + r.stderr)[-2000:]
+            if r.returncode == 0:
+                results["passed"] += 1
+                status = f"[OK] {runner_name} PASSED"
+            else:
+                results["failed"] += 1
+                results["errors"].append(output[-500:])
+                status = f"[FAIL] {runner_name} FAILED (exit {r.returncode})"
+
+            await push_sse(session_id, {
+                "type": "message",
+                "from_agent": "system",
+                "from_name": "E2E Pipeline",
+                "from_role": "Real Tests",
+                "content": f"{status}\n```\n{output[-1500:]}\n```",
+                "phase_id": phase_id,
+                "msg_type": "text",
+            })
+        except subprocess.TimeoutExpired:
+            results["failed"] += 1
+            results["errors"].append(f"{runner_name} timed out after 120s")
+            await push_sse(session_id, {
+                "type": "message",
+                "from_agent": "system",
+                "from_name": "E2E Pipeline",
+                "from_role": "Real Tests",
+                "content": f"[FAIL] {runner_name} timed out after 120s",
+                "phase_id": phase_id,
+                "msg_type": "text",
+            })
+        except Exception as exc:
+            results["errors"].append(str(exc)[:200])
+
+    # Create incident if E2E tests failed
+    if results["failed"] > 0:
+        try:
+            from ...missions.feedback import create_platform_incident
+            create_platform_incident(
+                title=f"E2E tests failed: {results['failed']} runner(s)",
+                severity="P3",
+                source="e2e_pipeline",
+                error_type="test_failure",
+                error_detail=f"Mission {mission.id}: {results['failed']} test runner(s) failed. "
+                             f"Errors: {'; '.join(results['errors'][:3])}",
+                mission_id=mission.id if hasattr(mission, 'id') else "",
+                project_id=mission.project_id if hasattr(mission, 'project_id') else "",
+            )
+        except Exception:
+            pass
+
+    return results
     """Deterministic screenshot pipeline — build, run, capture. No LLM."""
     screenshots_dir = ws / "screenshots"
     screenshots_dir.mkdir(exist_ok=True)

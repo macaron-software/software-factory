@@ -690,6 +690,21 @@ async def _execute_node(
                     db.close()
                 except Exception:
                     pass
+                # Create platform_incident for adversarial rejections (DORA tracking)
+                try:
+                    from ..missions.feedback import create_platform_incident
+                    create_platform_incident(
+                        title=f"Adversarial rejection: {agent.name}",
+                        severity="P3",
+                        source="adversarial_guard",
+                        error_type="quality_rejection",
+                        error_detail=f"Agent {agent.name} output rejected (score {guard_result.score}/10, {guard_result.level}). "
+                                     f"Issues: {'; '.join(guard_result.issues[:5])}",
+                        mission_id=run.project_id or "",
+                        agent_id=agent.id,
+                    )
+                except Exception:
+                    pass
 
     # Push final guard result to frontend
     if guard_result and guard_result.passed:
