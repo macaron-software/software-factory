@@ -466,6 +466,14 @@ class MissionOrchestrator:
                         phase_error = ""
                         continue
                     else:
+                        # Max sprints exhausted — continue pipeline with issues (don't block)
+                        await self._sse_orch_msg(
+                            f"Max iterations atteint ({max_sprints}) — poursuite avec avertissement.",
+                            phase.phase_id,
+                        )
+                        logger.warning("Phase %s max sprints exhausted — continuing with issues", phase.phase_id)
+                        phase_success = True
+                        phase_error = f"Max sprints exhausted ({max_sprints}): {phase_error[:200]}"
                         break
 
                 # ── Evidence Gate: check acceptance criteria after dev sprints ──
@@ -557,7 +565,9 @@ class MissionOrchestrator:
                     return
             else:
                 phase.status = PhaseStatus.DONE if phase_success else PhaseStatus.FAILED
-                if not phase_success and phase_error and "Evidence gate" in phase_error:
+                if not phase_success and phase_error and ("Evidence gate" in phase_error or "Max sprints" in phase_error):
+                    phase.status = PhaseStatus.DONE_WITH_ISSUES
+                elif phase_success and phase_error:
                     phase.status = PhaseStatus.DONE_WITH_ISSUES
 
             phase_actually_done = (phase.status in (PhaseStatus.DONE, PhaseStatus.DONE_WITH_ISSUES))
