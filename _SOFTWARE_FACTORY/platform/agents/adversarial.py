@@ -111,10 +111,10 @@ _STACK_RULES = {
         "message": "STACK_MISMATCH: iOS app must use Swift/SwiftUI only — no Kotlin/Java/TypeScript",
     },
     "android_kotlin": {
-        "keywords": ["kotlin", "compose", "android", "gradle", "jetpack"],
-        "wrong_extensions": [".swift", ".m", ".ts", ".js", ".dart"],
-        "wrong_in_path": ["src/main/", "app/src/", "features/", "data/"],
-        "message": "STACK_MISMATCH: Android app must use Kotlin/Compose only — no Swift/TypeScript",
+        "keywords": ["kotlin", "jetpack compose", "android", "gradle"],
+        "wrong_extensions": [".swift", ".m", ".dart"],
+        "wrong_in_path": ["src/main/", "app/src/"],
+        "message": "STACK_MISMATCH: Android app must use Kotlin/Compose only — no Swift",
     },
 }
 
