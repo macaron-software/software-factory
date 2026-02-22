@@ -1,7 +1,0 @@
-[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/bin/tonic-server.rs
-[94m[1m| [0m[90m veligo-rag_veligo_grep  [0m{"pattern":"rate_limiter.*\\.rs","file_type":"rs"}
-[94m[1m| [0m[90m Glob     [0m{"pattern":"**/rate_limiter*.rs"}
-[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/middleware/rate_limiter.rs
-[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/middleware/rate_limiter_grpc.rs
-[94m[1m| [0m[90m task     [0mVerify rate limiting configuration
-[91m[1mError: [0mError: Unable to connect. Is the computer able to access the url?

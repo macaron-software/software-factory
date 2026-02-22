@@ -1,7 +1,0 @@
-[0;34m[15:28:31][0m Starting Wiggum-TDD daemon...
-[0;34m[15:28:31][0m Queue: tdd
-[0;34m[15:28:31][0m Tasks dir: /Users/sylvain/_LAPOSTE/_VELIGO2/tools/ralph-wiggum/tasks
-[0;34m[15:28:31][0m Poll interval: 10s
-[0;34m[15:28:33][0m [Wiggum-TDD] No pending tasks, waiting...
-[0;34m[15:28:33][0m [Wiggum-TDD] No tasks found, exiting
-[0;34m[15:28:33][0m [Wiggum-TDD] Daemon stopped

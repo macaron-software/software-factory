@@ -1,7 +1,0 @@
-Je commence par analyser l'état actuel du rate limiting.
-[94m[1m| [0m[90m Glob     [0m{"pattern":"**/tonic-server.rs"}
-[94m[1m| [0m[90m Glob     [0m{"pattern":"**/rate_limiter.rs"}
-[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/middleware/rate_limiter.rs
-[96m[1m| [0m[90m Read     [0mveligo-platform/backend/src/bin/tonic-server.rs
-Je vois que `rate_limiter.rs` est complet avec la configuration (auth: 5/min, api: 30/min) mais c'est un middleware axum. Le fichier `tonic-server.rs` utilise tonic (gRPC), pas axum. Vérifions si le rate limiter est intégré.
-[94m[1m| [0m[90m Grep     [0mrate_limit|RateLimiter
