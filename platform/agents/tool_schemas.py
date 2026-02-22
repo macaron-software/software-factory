@@ -716,6 +716,41 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+        # ── Ticket/Incident management tools ──
+        {
+            "type": "function",
+            "function": {
+                "name": "create_ticket",
+                "description": "Create a support ticket or incident for TMA tracking. Persisted in platform DB.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string", "description": "Ticket title (concise)"},
+                        "description": {"type": "string", "description": "Detailed description of the issue"},
+                        "severity": {"type": "string", "enum": ["critical", "high", "medium", "low"], "description": "Severity level"},
+                        "category": {"type": "string", "enum": ["bug", "incident", "improvement", "security"], "description": "Ticket category"},
+                    },
+                    "required": ["title", "description", "severity"],
+                },
+            },
+        },
+        # ── Local CI pipeline (fallback when no GitHub Actions) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "local_ci",
+                "description": "Run a local CI pipeline: install deps → build → lint → test → commit. Auto-detects stack (npm/pip/cargo). Use this when no remote CI is configured.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "cwd": {"type": "string", "description": "Project workspace root directory"},
+                        "steps": {"type": "array", "items": {"type": "string"}, "description": "Steps to run: install, build, lint, test, commit (default: all)"},
+                        "commit_message": {"type": "string", "description": "Git commit message (if commit step included)"},
+                    },
+                    "required": ["cwd"],
+                },
+            },
+        },
         # ── Chaos & Load testing tools ──
         {
             "type": "function",
@@ -1180,6 +1215,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "memory_search", "memory_store", "get_project_context",
         "build", "test",
         "docker_deploy", "docker_status", "screenshot", "simulator_screenshot",
+        "create_ticket",
         "lrm_locate", "lrm_conventions", "lrm_build", "lrm_examples",
         "github_prs", "github_code_search",
         "android_build", "android_test", "android_lint",
@@ -1194,6 +1230,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "git_diff", "git_log",
         "github_issues", "github_prs",
         "jira_search", "jira_create",
+        "create_ticket",
         "chaos_test", "tmc_load_test",
         "android_build", "android_test", "android_lint", "android_emulator_test",
         "mcp_fetch_fetch",
@@ -1210,6 +1247,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "lrm_build",
         "github_actions", "github_prs",
         "infra_check", "chaos_test", "tmc_load_test",
+        "local_ci", "create_ticket",
         "get_si_blueprint",
     ],
     "security": [
@@ -1251,7 +1289,7 @@ def _classify_agent_role(agent: "AgentDef") -> str:
         return "architecture"
     if any(k in combined for k in ("ux", "ui", "design", "ergon")):
         return "ux"
-    if any(k in combined for k in ("qa", "test", "qualit", "fixture", "perf")):
+    if any(k in combined for k in ("qa", "test", "qualit", "fixture", "perf", "tma", "maintenance")):
         return "qa"
     if any(k in combined for k in ("devops", "sre", "pipeline", "infra", "deploy", "backup", "recovery", "monitoring", "observ", "canary")):
         return "devops"

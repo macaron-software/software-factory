@@ -27,7 +27,7 @@
 
 Software Factory ist eine **autonome Multi-Agenten-Plattform**, die den gesamten Software-Entwicklungszyklus orchestriert — von der Ideenfindung bis zur Bereitstellung — mithilfe spezialisierter KI-Agenten, die zusammenarbeiten.
 
-Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 145 KI-Agenten über strukturierte Workflows zusammenarbeiten, der SAFe-Methodik folgen, TDD-Praktiken anwenden und automatisierte Qualitätstorwerden nutzen.
+Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 158 KI-Agenten über strukturierte Workflows zusammenarbeiten, der SAFe-Methodik folgen, TDD-Praktiken anwenden und automatisierte Qualitätstorwerden nutzen.
 
 ### Hauptmerkmale
 
@@ -50,13 +50,16 @@ Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 145 KI-Agenten ü
 
 ## Schnellstart
 
+Das Docker-Image enthält: **Node.js 20**, **Playwright + Chromium**, **bandit**, **semgrep**, **ripgrep**.
+
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
+cp .env.example .env       # LLM-Schlüssel konfigurieren (siehe unten)
 docker-compose up -d
 ```
 
-Öffnen Sie http://localhost:8099
+Öffnen Sie http://localhost:8090
 
 ### LLM-Anbieter konfigurieren
 
@@ -77,7 +80,8 @@ cp .env.example .env
 
 ## Funktionen
 
-- **145 KI-Agenten** in Teams organisiert
+- **158 KI-Agenten** in Teams organisiert
+- **Integrierte Tools**: `code_write`, `build`, `local_ci`, `sast_scan`, `playwright_test`, `create_ticket`, `git_commit`
 - **Vollständiges CLI** — 40+ Befehle
 - **REST API** — 94 dokumentierte Endpunkte
 - **MCP Server** — 23 Tools

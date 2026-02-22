@@ -1671,7 +1671,7 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     gate="no_veto",
                     config={
                         "agents": [],
-                        "max_iterations": 10,
+                        "max_iterations": 3,
                         "dynamic_team": True,
                     },
                 ),
