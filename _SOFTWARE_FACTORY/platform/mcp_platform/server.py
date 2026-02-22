@@ -227,6 +227,72 @@ TOOLS = [
             "properties": {},
         },
     },
+    {
+        "name": "platform_projects",
+        "description": "List all projects or get details of one project. Returns id, name, path, status, type, vision.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "string", "description": "Optional project ID. Omit to list all."},
+            },
+        },
+    },
+    {
+        "name": "platform_features",
+        "description": "List features for an epic, or create a new feature.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "epic_id": {"type": "string", "description": "Epic/mission ID (required)"},
+                "action": {"type": "string", "enum": ["list", "create"], "description": "list or create (default: list)"},
+                "name": {"type": "string", "description": "Feature name (for create)"},
+                "story_points": {"type": "integer", "description": "Story points (for create, default 3)"},
+            },
+            "required": ["epic_id"],
+        },
+    },
+    {
+        "name": "platform_sprints",
+        "description": "List sprints for a mission.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "mission_id": {"type": "string", "description": "Mission ID (required)"},
+            },
+            "required": ["mission_id"],
+        },
+    },
+    {
+        "name": "platform_incidents",
+        "description": "List platform incidents or create a new one.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["list", "create"], "description": "list or create (default: list)"},
+                "title": {"type": "string", "description": "Incident title (for create)"},
+                "severity": {"type": "string", "enum": ["P0", "P1", "P2", "P3"], "description": "Severity (for create, default P2)"},
+            },
+        },
+    },
+    {
+        "name": "platform_llm",
+        "description": "Get LLM usage statistics: total calls, tokens, cost breakdown by provider and agent.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
+        "name": "platform_search",
+        "description": "Search across projects, missions, messages, and memory.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search query (required)"},
+            },
+            "required": ["query"],
+        },
+    },
 ]
 
 # Merge LRM tools at import time (lazy — added on first /tools call)
@@ -289,6 +355,18 @@ async def handle_tool(name: str, args: dict) -> str:
             return await _handle_code(args)
         elif name == "platform_metrics":
             return _handle_metrics(args)
+        elif name == "platform_projects":
+            return _handle_projects(args)
+        elif name == "platform_features":
+            return _handle_features(args)
+        elif name == "platform_sprints":
+            return _handle_sprints(args)
+        elif name == "platform_incidents":
+            return _handle_incidents(args)
+        elif name == "platform_llm":
+            return _handle_llm(args)
+        elif name == "platform_search":
+            return _handle_search(args)
         else:
             # Delegate to LRM server if tool exists there
             lrm = _get_lrm()
@@ -541,6 +619,140 @@ def _handle_metrics(args: dict) -> str:
         "messages": messages_count,
         "memory_entries": memory_count,
     })
+
+
+def _handle_projects(args: dict) -> str:
+    import sqlite3
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    project_id = args.get("project_id")
+    if project_id:
+        row = conn.execute(
+            "SELECT id, name, path, description, status, factory_type, vision, created_at FROM projects WHERE id=?",
+            (project_id,),
+        ).fetchone()
+        conn.close()
+        if not row:
+            return json.dumps({"error": f"Project {project_id} not found"})
+        return json.dumps(dict(row))
+    rows = conn.execute(
+        "SELECT id, name, path, status, factory_type, created_at FROM projects ORDER BY created_at DESC"
+    ).fetchall()
+    conn.close()
+    return json.dumps([dict(r) for r in rows])
+
+
+def _handle_features(args: dict) -> str:
+    import sqlite3
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    epic_id = args.get("epic_id", "")
+    action = args.get("action", "list")
+
+    if action == "create":
+        name = args.get("name", "New Feature")
+        sp = int(args.get("story_points", 3))
+        fid = str(uuid.uuid4())[:8]
+        conn.execute(
+            "INSERT INTO features (id, epic_id, name, story_points, status) VALUES (?,?,?,?,?)",
+            (fid, epic_id, name, sp, "backlog"),
+        )
+        conn.commit()
+        conn.close()
+        return json.dumps({"id": fid, "name": name, "status": "created"})
+
+    rows = conn.execute(
+        "SELECT id, name, status, story_points, priority, assigned_to FROM features WHERE epic_id=? ORDER BY priority",
+        (epic_id,),
+    ).fetchall()
+    conn.close()
+    return json.dumps([dict(r) for r in rows])
+
+
+def _handle_sprints(args: dict) -> str:
+    import sqlite3
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    mission_id = args.get("mission_id", "")
+    rows = conn.execute(
+        "SELECT id, number, name, status, velocity, planned_sp FROM sprints WHERE mission_id=? ORDER BY number",
+        (mission_id,),
+    ).fetchall()
+    conn.close()
+    return json.dumps([dict(r) for r in rows])
+
+
+def _handle_incidents(args: dict) -> str:
+    import sqlite3
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    action = args.get("action", "list")
+
+    if action == "create":
+        title = args.get("title", "New Incident")
+        severity = args.get("severity", "P2")
+        iid = str(uuid.uuid4())[:8]
+        conn.execute(
+            "INSERT INTO platform_incidents (id, title, severity, status, source, created_at) VALUES (?,?,?,?,?,datetime('now'))",
+            (iid, title, severity, "open", "mcp"),
+        )
+        conn.commit()
+        conn.close()
+        return json.dumps({"id": iid, "title": title, "status": "created"})
+
+    rows = conn.execute(
+        "SELECT id, title, severity, status, source, created_at FROM platform_incidents ORDER BY created_at DESC LIMIT 50"
+    ).fetchall()
+    conn.close()
+    return json.dumps([dict(r) for r in rows])
+
+
+def _handle_llm(args: dict) -> str:
+    import sqlite3
+    conn = sqlite3.connect(str(DB_PATH))
+    try:
+        traces = conn.execute(
+            "SELECT provider, model, COUNT(*) as calls, SUM(tokens_in) as tokens_in, SUM(tokens_out) as tokens_out "
+            "FROM llm_traces GROUP BY provider, model ORDER BY calls DESC"
+        ).fetchall()
+        result = {
+            "by_provider": [
+                {"provider": r[0], "model": r[1], "calls": r[2], "tokens_in": r[3], "tokens_out": r[4]}
+                for r in traces
+            ],
+            "total_calls": sum(r[2] for r in traces),
+            "total_tokens": sum((r[3] or 0) + (r[4] or 0) for r in traces),
+        }
+    except Exception as e:
+        result = {"error": str(e)}
+    conn.close()
+    return json.dumps(result)
+
+
+def _handle_search(args: dict) -> str:
+    import sqlite3
+    query = args.get("query", "")
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+
+    results = {}
+    # Search projects
+    rows = conn.execute("SELECT id, name FROM projects WHERE name LIKE ? LIMIT 5", (f"%{query}%",)).fetchall()
+    results["projects"] = [dict(r) for r in rows]
+    # Search missions
+    rows = conn.execute("SELECT id, name, status FROM missions WHERE name LIKE ? LIMIT 5", (f"%{query}%",)).fetchall()
+    results["missions"] = [dict(r) for r in rows]
+    # Search messages (FTS)
+    try:
+        rows = conn.execute(
+            "SELECT session_id, from_agent, content FROM messages WHERE content LIKE ? LIMIT 10",
+            (f"%{query}%",),
+        ).fetchall()
+        results["messages"] = [dict(r) for r in rows]
+    except Exception:
+        results["messages"] = []
+    conn.close()
+    return json.dumps(results)
 
 
 # ---------------------------------------------------------------------------
