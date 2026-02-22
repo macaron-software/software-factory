@@ -1,4 +1,4 @@
-.PHONY: setup run stop logs clean dev test
+.PHONY: setup run stop logs clean dev test install-hooks quality quality-full test-coverage
 
 # Quick start
 setup:
@@ -28,3 +28,25 @@ dev:
 
 test:
 	PYTHONPATH=$$(pwd) python3 -m pytest tests/test_cache.py tests/test_auto_heal.py tests/test_vectors.py tests/test_i18n.py tests/test_demo.py -v
+
+# Git Hooks + Quality Tools
+install-hooks:
+	@echo "Installing Git hooks + quality tools..."
+	@bash scripts/quality/install_hooks.sh
+
+quality:
+	@echo "Running quality checks on staged files..."
+	@bash scripts/quality/pre-commit || true
+
+quality-full:
+	@echo "Running full quality scan (all files)..."
+	@command -v ruff &> /dev/null && ruff check . || echo "⚠️  Ruff not installed"
+	@command -v eslint &> /dev/null && eslint . --ext .js,.ts,.jsx,.tsx || echo "⚠️  ESLint not installed"
+	@command -v bandit &> /dev/null && bandit -r platform/ skills_injection/ || echo "⚠️  Bandit not installed"
+
+test-coverage:
+	@echo "Running tests with coverage report..."
+	@PYTHONPATH=$$(pwd) pytest --cov=platform --cov=skills_injection --cov-report=html --cov-report=term
+	@echo ""
+	@echo "Coverage report generated: htmlcov/index.html"
+

@@ -92,9 +92,17 @@ Think of it as a **virtual software factory** where 158 AI agents collaborate th
 The Docker image includes: **Node.js 20**, **Playwright + Chromium**, **bandit**, **semgrep**, **ripgrep**.
 
 ```bash
+# 1. Clone
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
+
+# 2. Install Git hooks + quality tools (recommended)
+make install-hooks
+
+# 3. Configure environment
 cp .env.example .env       # Configure LLM API keys (see Step 3 below)
+
+# 4. Start platform
 docker-compose up -d
 ```
 

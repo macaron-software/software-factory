@@ -1,0 +1,48 @@
+# Ruff Configuration for Software Factory
+# https://docs.astral.sh/ruff/
+
+line-length = 100
+target-version = "py310"
+fix = true
+
+[lint]
+# Enable: Error, Flake8, Import sorting, Naming, pyupgrade, Security, Bugbear,
+# Comprehensions, Datetime, Debug statements, Return values, Simplify, Argument names
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "S",    # bandit security
+    "B",    # flake8-bugbear
+    "A",    # flake8-builtins
+    "C4",   # flake8-comprehensions
+    "DTZ",  # flake8-datetimez
+    "T20",  # flake8-print
+    "RET",  # flake8-return
+    "SIM",  # flake8-simplify
+    "ARG",  # flake8-unused-arguments
+]
+
+ignore = [
+    "E501",   # Line too long (handled by formatter)
+    "S101",   # Use of assert (OK in tests)
+    "S104",   # Binding to 0.0.0.0 (needed for Docker)
+    "S108",   # /tmp usage (acceptable for temp files)
+    "T201",   # print() allowed (for CLI tools)
+]
+
+# Allow autofix for all enabled rules
+fixable = ["ALL"]
+unfixable = []
+
+[lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "ARG"]  # Assert OK in tests, unused fixtures OK
+"scripts/**/*.py" = ["T201"]        # Print OK in scripts
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

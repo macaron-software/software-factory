@@ -1,0 +1,8 @@
+# Development Dependencies for Quality Tools
+ruff>=0.2.0
+bandit>=1.7.0
+safety>=3.0.0
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.21.0
+detect-secrets>=1.4.0
