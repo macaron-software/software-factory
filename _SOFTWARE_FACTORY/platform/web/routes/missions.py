@@ -2718,10 +2718,10 @@ async def _qa_screenshots_web(ws: "Path", shots_dir: "Path", platform_type: str)
             # Discover auth/RBAC users if any
             users = _discover_web_users(ws)
 
-            # Generate Playwright journey script
-            journey_script = _build_playwright_journey(port, routes, users, str(shots_dir))
+            # Generate Python Playwright journey script
+            journey_script = _build_playwright_journey_py(port, routes, users, str(shots_dir))
 
-            r = subprocess.run(["node", "-e", journey_script],
+            r = subprocess.run(["python3", "-c", journey_script],
                                capture_output=True, text=True, timeout=90,
                                cwd=str(ws))
 
@@ -3002,7 +3002,74 @@ const {{ chromium }} = require('playwright');
     return script
 
 
+def _build_playwright_journey_py(port: int, routes: list, users: list, shots_dir: str) -> str:
+    """Generate a Python Playwright script that screenshots each route."""
+    base = f"http://localhost:{port}"
 
+    steps = ""
+    step_num = 1
+
+    if users:
+        for user in users[:3]:
+            role = user["role"]
+            steps += f"""
+        # RBAC Journey: {role}
+        await page.goto("{base}/", wait_until="networkidle", timeout=10000)
+        await page.screenshot(path="{shots_dir}/{step_num:02d}_{role}_before_login.png", full_page=True)
+"""
+            step_num += 1
+            for route in routes[:5]:
+                steps += f"""
+        try:
+            await page.goto("{base}{route['path']}", wait_until="networkidle", timeout=10000)
+            await page.screenshot(path="{shots_dir}/{step_num:02d}_{role}_{route['label']}.png", full_page=True)
+        except Exception:
+            pass
+"""
+                step_num += 1
+            steps += "        await context.clear_cookies()\n"
+    else:
+        for route in routes[:10]:
+            label = route["label"]
+            steps += f"""
+        try:
+            await page.goto("{base}{route['path']}", wait_until="networkidle", timeout=10000)
+            await page.screenshot(path="{shots_dir}/{step_num:02d}_{label}.png", full_page=True)
+        except Exception:
+            pass
+"""
+            step_num += 1
+
+    # Mobile viewport
+    steps += f"""
+        await page.set_viewport_size({{"width": 375, "height": 812}})
+        await page.goto("{base}/", wait_until="networkidle", timeout=10000)
+        await page.screenshot(path="{shots_dir}/{step_num:02d}_mobile_home.png", full_page=True)
+"""
+
+    script = f"""
+import asyncio
+from playwright.async_api import async_playwright
+
+async def main():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        context = await browser.new_context(viewport={{"width": 1280, "height": 720}})
+        page = await context.new_page()
+        errors = []
+        page.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" else None)
+        try:
+{steps}
+        except Exception as e:
+            print(f"Journey error: {{e}}")
+        if errors:
+            with open("{shots_dir}/console_errors.txt", "w") as f:
+                f.write("\\n".join(str(e) for e in errors))
+        await browser.close()
+
+asyncio.run(main())
+"""
+    return script
 def _write_status_png(path: "Path", title: str, body: str,
                       bg_color: tuple = (26, 17, 40), width: int = 800, height: int = 400):
     """Generate a status PNG with readable text using Pillow."""
