@@ -1008,6 +1008,127 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+        # ── MCP Dynamic Tools ──────────────────────────────────────────
+        {
+            "type": "function",
+            "function": {
+                "name": "mcp_fetch_fetch",
+                "description": "Fetch a URL and return its content as markdown. Use for web research, API calls, documentation lookup.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "URL to fetch"},
+                        "max_length": {"type": "integer", "description": "Max response chars (default 5000)"},
+                        "raw": {"type": "boolean", "description": "Return raw HTML instead of markdown"},
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "mcp_memory_create_entities",
+                "description": "Create entities in the knowledge graph memory. Store concepts, decisions, architecture choices.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "entities": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {"type": "string"},
+                                    "entityType": {"type": "string"},
+                                    "observations": {"type": "array", "items": {"type": "string"}},
+                                },
+                            },
+                            "description": "Entities to create [{name, entityType, observations}]",
+                        },
+                    },
+                    "required": ["entities"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "mcp_memory_search_nodes",
+                "description": "Search the knowledge graph memory by query string.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Search query"},
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "mcp_memory_create_relations",
+                "description": "Create relations between entities in the knowledge graph.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "relations": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "from": {"type": "string"},
+                                    "to": {"type": "string"},
+                                    "relationType": {"type": "string"},
+                                },
+                            },
+                            "description": "Relations [{from, to, relationType}]",
+                        },
+                    },
+                    "required": ["relations"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "mcp_playwright_browser_navigate",
+                "description": "Navigate browser to URL for E2E testing. Returns page snapshot.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "URL to navigate to"},
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "mcp_playwright_browser_snapshot",
+                "description": "Take accessibility snapshot of current browser page for E2E assertions.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "mcp_playwright_browser_click",
+                "description": "Click an element on the page by CSS selector or text.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "element": {"type": "string", "description": "Human-readable element description from snapshot"},
+                        "ref": {"type": "string", "description": "Exact target element reference from snapshot"},
+                    },
+                    "required": ["element", "ref"],
+                },
+            },
+        },
     ]
     _TOOL_SCHEMAS = schemas
     return schemas
@@ -1020,6 +1141,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "get_project_context", "screenshot",
         "github_issues", "github_prs",
         "jira_search", "jira_create", "confluence_read",
+        "mcp_fetch_fetch", "mcp_memory_create_entities", "mcp_memory_search_nodes",
+        "mcp_memory_create_relations",
     ],
     "architecture": [
         "code_read", "code_search", "list_files", "deep_search",
@@ -1029,6 +1152,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "github_code_search",
         "get_si_blueprint",
         "compose_workflow", "create_team", "create_sub_mission", "list_sub_missions", "set_constraints",
+        "mcp_fetch_fetch", "mcp_memory_create_entities", "mcp_memory_search_nodes",
+        "mcp_memory_create_relations",
     ],
     "ux": [
         "code_read", "code_search", "list_files", "screenshot",
@@ -1046,6 +1171,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "lrm_locate", "lrm_conventions", "lrm_build", "lrm_examples",
         "github_prs", "github_code_search",
         "android_build", "android_test", "android_lint",
+        "mcp_fetch_fetch", "mcp_memory_create_entities", "mcp_memory_search_nodes",
+        "mcp_memory_create_relations",
     ],
     "qa": [
         "code_read", "code_write", "code_search", "list_files", "deep_search",
@@ -1057,6 +1184,10 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "jira_search", "jira_create",
         "chaos_test", "tmc_load_test",
         "android_build", "android_test", "android_lint", "android_emulator_test",
+        "mcp_fetch_fetch",
+        "mcp_playwright_browser_navigate", "mcp_playwright_browser_snapshot",
+        "mcp_playwright_browser_click",
+        "mcp_memory_search_nodes",
     ],
     "devops": [
         "code_read", "code_write", "code_edit", "code_search",

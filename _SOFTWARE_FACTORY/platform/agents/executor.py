@@ -249,7 +249,11 @@ class AgentExecutor:
 
                 # Limit message window to prevent OOM (keep first 2 + last 15)
                 if len(messages) > 20:
-                    messages = messages[:2] + messages[-15:]
+                    tail = messages[-15:]
+                    # Don't start tail with orphaned tool results
+                    while tail and getattr(tail[0], 'role', '') == 'tool':
+                        tail = tail[1:]
+                    messages = messages[:2] + tail
 
                 # On penultimate round, disable tools to force synthesis next iteration
                 if round_num >= MAX_TOOL_ROUNDS - 2 and tools is not None:
@@ -459,7 +463,11 @@ class AgentExecutor:
 
                 # Limit message window to prevent OOM
                 if len(messages) > 20:
-                    messages = messages[:2] + messages[-15:]
+                    tail = messages[-15:]
+                    # Don't start tail with orphaned tool results
+                    while tail and getattr(tail[0], 'role', '') == 'tool':
+                        tail = tail[1:]
+                    messages = messages[:2] + tail
 
                 if deep_search_used:
                     tools = None
