@@ -1,0 +1,22 @@
+{
+  "name": "macaron-software-factory",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "lint": "eslint . --ext .js,.ts,.tsx --max-warnings 0",
+    "lint:fix": "eslint . --ext .js,.ts,.tsx --fix",
+    "format": "prettier --write \"**/*.{js,ts,tsx,json,css,md}\"",
+    "format:check": "prettier --check \"**/*.{js,ts,tsx,json,css,md}\"",
+    "test": "jest",
+    "test:coverage": "jest --coverage"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.50.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.0.0"
+  }
+}

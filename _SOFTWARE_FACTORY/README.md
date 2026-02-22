@@ -491,6 +491,28 @@ ENABLE_AUTH=true
 
 We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+### Quality & CI/CD
+
+This project uses automated quality gates on every push/PR:
+
+- **Python**: Ruff (linting + formatting), Bandit (security)
+- **JavaScript/TypeScript**: ESLint, Prettier
+- **Security**: Trivy (vulnerabilities), TruffleHog (secrets detection)
+- **Tests**: Pytest with coverage tracking
+
+[![Code Quality](https://github.com/macaron-software/software-factory/actions/workflows/quality.yml/badge.svg)](https://github.com/macaron-software/software-factory/actions/workflows/quality.yml)
+
+**Local development setup:**
+```bash
+# Install all quality tools and git hooks
+make install-hooks
+
+# Run quality checks locally
+make quality        # Fast: only staged files
+make quality-full   # Complete: all files
+make test-coverage  # Run tests with coverage report
+```
+
 ## License
 
 This project is licensed under the AGPL v3 License - see the [LICENSE](LICENSE) file for details.
