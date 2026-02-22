@@ -135,12 +135,12 @@ async def lifespan(app: FastAPI):
         from .db.migrations import get_db as _gdb
         _rdb = _gdb()
         _stale = _rdb.execute(
-            "UPDATE mission_runs SET status='failed' WHERE status='running'"
+            "UPDATE mission_runs SET status='paused' WHERE status='running'"
         ).rowcount
         _rdb.commit()
         _rdb.close()
         if _stale:
-            logger.warning("Reset %d stale running mission_runs to failed", _stale)
+            logger.warning("Reset %d stale running mission_runs to paused (container restart)", _stale)
     except Exception as e:
         logger.warning("Failed to reset stale missions: %s", e)
 
