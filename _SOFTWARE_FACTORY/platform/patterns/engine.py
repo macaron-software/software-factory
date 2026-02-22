@@ -16,6 +16,7 @@ Agents within a wave run in parallel, waves run sequentially.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import sys
 from dataclasses import dataclass, field
@@ -762,11 +763,15 @@ async def _execute_node(
             mem = get_memory_manager()
             import re as _re2
             # Strip tool call artifacts, JSON blobs, and filler
-            clean = _re2.sub(r'\{["\']path["\'].*?\}', '', content)
+            clean = _re2.sub(r'\{["\'](?:path|name|command|args)["\'].*?\}', '', content)
             clean = _re2.sub(r'\[TOOL_CALL\].*?\[/TOOL_CALL\]', '', clean, flags=_re2.DOTALL)
             clean = _re2.sub(r'(?:Now |)(?:Calling|Searching|Looking|Reading|Inspecting)\s+\w+.*?(?:\n|\.\.\.)', '', clean)
             clean = _re2.sub(r"(?:J'examine|Je vais|Let me|I'll inspect|I'll check|I will now).*?\n", '', clean)
             clean = clean.strip()
+
+            # Skip adversarial warnings/rejections — these aren't decisions
+            if clean.startswith('[ADVERSARIAL') or 'ADVERSARIAL WARNING' in clean[:100]:
+                raise ValueError("adversarial output, not a decision")
 
             if len(clean) < 20:
                 raise ValueError("content too short after cleaning")
@@ -836,6 +841,20 @@ async def _execute_node(
                 "value": summary[:200],
                 "agent_id": agent.id,
             })
+            # Record as tool_call for monitoring (auto-store counts as memory_store)
+            try:
+                from ..db.migrations import get_db as _get_db2
+                _db2 = _get_db2()
+                _db2.execute(
+                    "INSERT INTO tool_calls (agent_id, session_id, tool_name, parameters_json, result_json, success, timestamp) "
+                    "VALUES (?, ?, 'memory_store', ?, ?, 1, datetime('now'))",
+                    (agent.id, run.session_id,
+                     json.dumps({"key": f"{agent.name}:{cat}", "category": cat, "auto": True})[:1000],
+                     f"Auto-stored: {summary[:200]}"),
+                )
+                _db2.commit()
+            except Exception:
+                pass
         except Exception:
             pass
 
