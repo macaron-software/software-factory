@@ -1550,7 +1550,7 @@ Keep patches minimal and surgical.
             "domain_success": stats.get('domain_success', []),
         }
         
-        prompt = f"""You are the Experience Learning Agent for a Software Factory.
+        prompt = f"""You are the Experience Learning Agent for a Macaron Agent Platform.
 
 Analyze this factory telemetry and identify:
 1. FAILURE PATTERNS: What keeps failing and why?

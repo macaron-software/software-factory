@@ -212,7 +212,7 @@ class PatternStore:
             ),
             PatternDef(
                 id="sf-tdd", name="SF TDD Pipeline", type="sequential",
-                description="Software Factory complète : Brain → TDD → Adversarial → Deploy.",
+                description="Macaron Agent Platform complète : Brain → TDD → Adversarial → Deploy.",
                 icon="rocket", is_builtin=True,
                 agents=[
                     {"id": "n1", "agent_id": "brain", "label": "Brain", "x": 50, "y": 200},

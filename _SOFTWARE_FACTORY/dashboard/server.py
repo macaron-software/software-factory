@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Software Factory Dashboard - Local Web Interface
+Macaron Agent Platform Dashboard - Local Web Interface
 ================================================
 
-A simple FastAPI dashboard to monitor the Software Factory.
+A simple FastAPI dashboard to monitor the Macaron Agent Platform.
 
 Usage:
     python3 -m dashboard.server
@@ -39,7 +39,7 @@ PROJECTS_DIR = BASE_DIR / "projects"
 PID_DIR = Path("/tmp/factory")
 
 # FastAPI app
-app = FastAPI(title="Software Factory Dashboard", version="1.0.0")
+app = FastAPI(title="Macaron Agent Platform Dashboard", version="1.0.0")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
@@ -522,7 +522,7 @@ def main():
     import uvicorn
 
     port = int(os.environ.get("PORT", 8080))
-    print(f"\n🏭 Software Factory Dashboard")
+    print(f"\n🏭 Macaron Agent Platform Dashboard")
     print(f"   http://localhost:{port}\n")
 
     uvicorn.run(

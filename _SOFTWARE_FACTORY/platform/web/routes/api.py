@@ -1823,7 +1823,7 @@ async def notification_test():
     payload = NotificationPayload(
         event="test",
         title="Test Notification",
-        message="This is a test notification from Macaron Software Factory.",
+        message="This is a test notification from Macaron Agent Platform.",
         severity="info",
     )
     await svc.notify(payload)

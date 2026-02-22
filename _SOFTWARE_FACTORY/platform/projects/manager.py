@@ -354,14 +354,14 @@ class ProjectStore:
         self._seed_dsi_project()
 
     def _seed_dsi_project(self):
-        """Seed the Software Factory as a DSI project pointing to its own codebase."""
+        """Seed the Macaron Agent Platform as a DSI project pointing to its own codebase."""
         if self.get("software-factory"):
             return
         from ..config import PLATFORM_ROOT
         plat_path = str(PLATFORM_ROOT)
         p = Project(
             id="software-factory",
-            name="Software Factory",
+            name="Macaron Agent Platform",
             path=plat_path,
             description="Plateforme multi-agent SAFe. FastAPI + HTMX + SSE + SQLite. Self-improving: les agents lisent et écrivent dans leur propre codebase.",
             factory_type="standalone",
@@ -471,8 +471,8 @@ _PROJECT_PM: dict[str, dict] = {
     "lpd": {"name": "Nathalie Renaud", "avatar": "user", "tagline": "Product Manager — LPD Data Platform"},
     "logs-facteur": {"name": "Thomas Girard", "avatar": "user", "tagline": "Product Manager — Logs Facteur Support N1"},
     "sharelook": {"name": "Claire Dubois", "avatar": "user", "tagline": "Product Manager — Sharelook Platform"},
-    "software-factory": {"name": "Émilie Laurent", "avatar": "user", "tagline": "Product Manager — Software Factory"},
-    "factory": {"name": "Émilie Laurent", "avatar": "user", "tagline": "Product Manager — Software Factory (Self)"},
+    "software-factory": {"name": "Émilie Laurent", "avatar": "user", "tagline": "Product Manager — Macaron Agent Platform"},
+    "factory": {"name": "Émilie Laurent", "avatar": "user", "tagline": "Product Manager — Macaron Agent Platform (Self)"},
     "solaris": {"name": "Julie Martin", "avatar": "user", "tagline": "Product Manager — Solaris Design System"},
     "veligo": {"name": "Antoine Lefèvre", "avatar": "user", "tagline": "Product Manager — Veligo Platform"},
     "fervenza": {"name": "Lucas Morel", "avatar": "user", "tagline": "Product Manager — Fervenza IoT"},

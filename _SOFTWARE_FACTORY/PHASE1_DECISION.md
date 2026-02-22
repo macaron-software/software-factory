@@ -1,4 +1,4 @@
-# PHASE 1 : Cadrage Stratégique - RLM Software Factory
+# PHASE 1 : Cadrage Stratégique - RLM Macaron Agent Platform
 ## Date: 2025-02-12
 ## Équipe: dsi, strat-cpo, strat-cto, architecte, strat-portfolio
 
@@ -7,7 +7,7 @@
 ## 📋 LIVRABLE 1 : Vision Validée
 
 ### Vision du Projet
-**RLM Software Factory** - Usine logicielle autonome basée sur MIT CSAIL arXiv:2512.24601 "Recursive Language Models"
+**RLM Macaron Agent Platform** - Usine logicielle autonome basée sur MIT CSAIL arXiv:2512.24601 "Recursive Language Models"
 
 ### Fonctionnalités Clés Validées
 

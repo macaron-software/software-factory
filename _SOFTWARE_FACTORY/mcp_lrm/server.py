@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MCP LRM Server - Model Context Protocol for Software Factory
+MCP LRM Server - Model Context Protocol for Macaron Agent Platform
 ============================================================
 Provides project context access to LLM agents.
 

@@ -1,7 +1,7 @@
 """
-Software Factory Core
+Macaron Agent Platform Core
 =====================
-Core modules for the multi-project Software Factory.
+Core modules for the multi-project Macaron Agent Platform.
 """
 
 from core.project_registry import get_project, list_projects, ProjectConfig

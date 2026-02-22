@@ -1,5 +1,5 @@
 """
-MCP LRM - Model Context Protocol for Software Factory
+MCP LRM - Model Context Protocol for Macaron Agent Platform
 =====================================================
 Provides project context access to LLM agents.
 """

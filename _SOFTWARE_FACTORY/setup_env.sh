@@ -1,5 +1,5 @@
 #!/bin/bash
-# Setup environment for Software Factory
+# Setup environment for Macaron Agent Platform
 # Source this file before running factory commands
 
 # Add parent directory to PYTHONPATH so we can import _FACTORY_CORE

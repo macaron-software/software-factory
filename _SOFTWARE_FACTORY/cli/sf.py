@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""sf — Macaron Software Factory CLI.
+"""sf — Macaron Agent Platform CLI.
 
 Full-featured CLI mirroring all web dashboard functionality.
 Dual mode: API (server) or DB (offline/direct sqlite3).
@@ -545,7 +545,7 @@ def cmd_runs_stop(args):
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="sf",
-        description="Macaron Software Factory CLI",
+        description="Macaron Agent Platform CLI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
   sf status                                    Platform health

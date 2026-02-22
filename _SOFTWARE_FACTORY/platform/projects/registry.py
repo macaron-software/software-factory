@@ -43,7 +43,7 @@ class ProjectInfo:
 _PERSONAL_IDS = {"fervenza", "finary", "popinz", "psy", "yolonow", "sharelook-2"}
 
 _MANUAL_PROJECTS: list[dict] = [
-    {"id": "factory", "name": "Software Factory (Self)", "path": "", "factory_type": "sf",
+    {"id": "factory", "name": "Macaron Agent Platform (Self)", "path": "", "factory_type": "sf",
      "domains": ["python"], "description": "Self-improving software factory"},
     {"id": "fervenza", "name": "Fervenza IoT Platform", "path": "", "factory_type": "sf",
      "domains": ["rust", "typescript"], "description": "IoT sensor platform"},
@@ -86,7 +86,7 @@ class ProjectRegistry:
     def load(self) -> None:
         self._projects.clear()
 
-        # Software Factory projects
+        # Macaron Agent Platform projects
         sf_dir = Path(self._sf_root) / "projects"
         if sf_dir.is_dir():
             for f in sorted(sf_dir.glob("*.yaml")):

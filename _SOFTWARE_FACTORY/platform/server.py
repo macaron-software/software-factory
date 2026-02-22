@@ -284,7 +284,7 @@ def create_app() -> FastAPI:
     """Application factory."""
     app = FastAPI(
         title="Macaron Agent Platform",
-        description="Multi-Agent Software Factory — 94 AI agents orchestrating the full product lifecycle with SAFe, TDD, and auto-heal.",
+        description="Multi-Agent Macaron Agent Platform — 94 AI agents orchestrating the full product lifecycle with SAFe, TDD, and auto-heal.",
         version="1.1.0",
         docs_url="/docs",
         redoc_url="/redoc",

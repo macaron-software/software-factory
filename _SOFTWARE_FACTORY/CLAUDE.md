@@ -3,7 +3,7 @@
 ## REPO STRUCTURE
 ```
 _FACTORY_CORE/          # Shared utils (subprocess, logging, LLM, daemon)
-_SOFTWARE_FACTORY/      # Software Factory (SF) — TDD automation + Agent Platform
+_SOFTWARE_FACTORY/      # Macaron Agent Platform (SF) — TDD automation + Agent Platform
   ├── cli/factory.py    # CLI: factory <project> <command>
   ├── core/             # Brain, TDD workers, adversarial, FRACTAL
   ├── platform/         # Macaron Agent Platform — FastAPI web app

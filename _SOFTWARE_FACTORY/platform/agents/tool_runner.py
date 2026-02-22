@@ -675,7 +675,7 @@ async def _tool_fractal_code(args: dict, ctx: ExecutionContext, registry, llm) -
     """Spawn a focused sub-agent LLM to complete an atomic coding task.
     
     The sub-agent runs autonomously with code tools for up to 8 rounds.
-    Like wiggum TDD from the Software Factory: write code → write tests → run → fix.
+    Like wiggum TDD from the Macaron Agent Platform: write code → write tests → run → fix.
     """
     from ..llm.client import LLMMessage, LLMResponse
     from .tool_schemas import _get_tool_schemas, _filter_schemas
@@ -966,6 +966,38 @@ async def _tool_mcp_jira(name: str, args: dict, ctx: ExecutionContext) -> str:
     return f"Unknown JIRA tool: {name}"
 
 
+async def _tool_mcp_dynamic(name: str, args: dict, ctx: ExecutionContext) -> str:
+    """Route tool calls to running MCP servers. Format: mcp_<server>_<tool>."""
+    from ..mcps.manager import get_mcp_manager
+    manager = get_mcp_manager()
+
+    # Parse: mcp_fetch_fetch, mcp_memory_search_nodes, mcp_playwright_browser_navigate
+    parts = name.split("_", 2)  # ['mcp', 'server', 'tool_name']
+    if len(parts) < 3:
+        return f"Invalid MCP tool format: {name}. Use mcp_<server>_<tool>"
+
+    # Map short names to MCP IDs
+    server_short = parts[1]
+    tool_name = parts[2]
+    mcp_id_map = {
+        "fetch": "mcp-fetch",
+        "memory": "mcp-memory",
+        "playwright": "mcp-playwright",
+        "github": "mcp-github",
+    }
+    mcp_id = mcp_id_map.get(server_short, f"mcp-{server_short}")
+
+    # Auto-start if not running
+    if mcp_id not in manager.get_running_ids():
+        ok, msg = await manager.start(mcp_id)
+        if not ok:
+            return f"Failed to start MCP {mcp_id}: {msg}"
+
+    timeout = 60 if server_short == "playwright" else 30
+    result = await manager.call_tool(mcp_id, tool_name, args, timeout=timeout)
+    return result[:8000] if result else "No response from MCP"
+
+
 # ── Main tool dispatcher ─────────────────────────────────────────
 
 async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=None) -> str:
@@ -1070,6 +1102,10 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
         return await _tool_mcp_github(name, args, ctx)
     if name.startswith("jira_") or name == "confluence_read":
         return await _tool_mcp_jira(name, args, ctx)
+
+    # ── Dynamic MCP tools (mcp_<server-id>_<tool>) ──
+    if name.startswith("mcp_"):
+        return await _tool_mcp_dynamic(name, args, ctx)
 
     # Registry tools
     # Inject agent context for git branch isolation

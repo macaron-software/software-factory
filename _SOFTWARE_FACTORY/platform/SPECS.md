@@ -237,7 +237,7 @@ Dev (implémente) → Code Critic → Security Critic → Arch Critic
                          ↓ VETO           ↓ VETO        ↓ VETO
                     Feedback → Dev (fix) → retry cascade
 ```
-Cascade de critics multi-vendor (cf. Swiss Cheese Model de la Software Factory). Chaque critic a un LLM différent pour diversité cognitive.
+Cascade de critics multi-vendor (cf. Swiss Cheese Model de la Macaron Agent Platform). Chaque critic a un LLM différent pour diversité cognitive.
 
 #### 3.2.7 Sprint Planning (Aggregator)
 ```
@@ -251,7 +251,7 @@ Brain (recursive) → [Locate → Summarize → Analyze → Plan] × N fichiers
                                                                ↓
                                                      Tâches WSJF priorisées
 ```
-Analyse récursive profonde du codebase via MCP tools (lrm_locate, lrm_summarize, etc.). Comme le Brain de la Software Factory.
+Analyse récursive profonde du codebase via MCP tools (lrm_locate, lrm_summarize, etc.). Comme le Brain de la Macaron Agent Platform.
 
 #### 3.2.9 Deploy Pipeline (SF-style)
 ```
@@ -315,7 +315,7 @@ Workflow:
 
 ### 4.2 Workflows Prédéfinis
 
-#### 4.2.1 Software Factory (SF)
+#### 4.2.1 Macaron Agent Platform (SF)
 ```
 Phase 1: RLM Deep Analysis (Brain)
     ↓ tâches WSJF
@@ -403,7 +403,7 @@ L'utilisateur peut :
 │   Contenu: architecture, conventions, décisions, lessons │
 │   Accès: tous les agents du projet                       │
 │   Tech: SQLite + FTS5 (memory_project)                   │
-│   Bridge: ProjectContext RAG de la Software Factory       │
+│   Bridge: ProjectContext RAG de la Macaron Agent Platform       │
 ├─────────────────────────────────────────────────────────┤
 │ Layer 4: GLOBAL MEMORY (cross-projet)                    │
 │   Portée: tous les projets                               │
@@ -411,7 +411,7 @@ L'utilisateur peut :
 │   Contenu: patterns systémiques, erreurs récurrentes     │
 │   Accès: Brain, agents avec permission                   │
 │   Tech: SQLite + FTS5 (memory_global)                    │
-│   Bridge: meta_awareness de la Software Factory          │
+│   Bridge: meta_awareness de la Macaron Agent Platform          │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -766,7 +766,7 @@ Toutes les actions sont tracées dans `tool_calls` et `messages` :
 
 ### 13.1 Bridge SF → Platform
 
-La plateforme peut piloter la Software Factory existante :
+La plateforme peut piloter la Macaron Agent Platform existante :
 
 | Fonction SF | Mapping Platform |
 |-------------|-----------------|

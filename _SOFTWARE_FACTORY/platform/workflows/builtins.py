@@ -1,4 +1,4 @@
-"""Builtin workflow definitions for the Software Factory platform."""
+"""Builtin workflow definitions for the Macaron Agent Platform platform."""
 from __future__ import annotations
 
 from .store import WorkflowDef, WorkflowPhase
@@ -8,7 +8,7 @@ def get_builtin_workflows() -> list[WorkflowDef]:
     """Return all builtin WorkflowDef instances."""
     builtins = [
         WorkflowDef(
-            id="sf-pipeline", name="Software Factory Pipeline",
+            id="sf-pipeline", name="Macaron Agent Platform Pipeline",
             description="Full SF cycle: Brain analysis → TDD development → Adversarial review → Deploy.",
             icon="rocket", is_builtin=True,
             phases=[
