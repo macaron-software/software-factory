@@ -89,6 +89,8 @@ Think of it as a **virtual software factory** where 158 AI agents collaborate th
 
 ### Option 1: Docker (Recommended)
 
+The Docker image includes: **Node.js 20**, **Playwright + Chromium**, **bandit**, **semgrep**, **ripgrep**.
+
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
@@ -96,7 +98,7 @@ cp .env.example .env       # Configure LLM API keys (see Step 3 below)
 docker-compose up -d
 ```
 
-Open http://localhost:8099
+Open http://localhost:8090
 
 ### Option 2: Local Installation
 
@@ -111,7 +113,7 @@ pip install -r requirements.txt
 python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8099 --ws none
 ```
 
-Open http://localhost:8099
+Open http://localhost:8090
 
 ### Step 3: Configure an LLM Provider
 
@@ -206,11 +208,26 @@ Full Portfolio → Epic → Feature → Story hierarchy with:
 - **Real-time dashboards** — Chart.js visualizations
 - **Prometheus metrics** — /metrics endpoint
 
+### 🔧 Built-in Agent Tools
+
+The Docker image includes everything agents need to work autonomously:
+
+| Category | Tools | Description |
+|----------|-------|-------------|
+| **Code** | `code_read`, `code_write`, `code_edit`, `code_search`, `list_files` | Read, write, and search project files |
+| **Build** | `build`, `test`, `local_ci` | Run builds, tests, and local CI pipelines (npm/pip/cargo auto-detected) |
+| **Git** | `git_commit`, `git_diff`, `git_log`, `git_status` | Version control with agent branch isolation |
+| **Security** | `sast_scan`, `dependency_audit`, `secrets_scan` | SAST via bandit/semgrep, CVE audit, secret detection |
+| **QA** | `playwright_test`, `browser_screenshot`, `screenshot` | Playwright E2E tests and screenshots (Chromium included) |
+| **Tickets** | `create_ticket`, `jira_search`, `jira_create` | Create incidents/tickets for TMA tracking |
+| **Deploy** | `docker_deploy`, `docker_status`, `github_actions` | Container deployment and CI/CD status |
+| **Memory** | `memory_store`, `memory_search`, `deep_search` | Persistent project memory across sessions |
+
 ## Four Interfaces
 
 ### 1. Web Dashboard (HTMX + SSE)
 
-Main UI at http://localhost:8099:
+Main UI at http://localhost:8090:
 
 - **Real-time multi-agent conversations** with SSE streaming
 - **PI Board** — program increment planning
@@ -254,15 +271,15 @@ sf chaos status                        # Chaos engineering
 
 ```bash
 # Examples
-curl http://localhost:8099/api/projects
-curl http://localhost:8099/api/agents
-curl http://localhost:8099/api/missions
-curl -X POST http://localhost:8099/api/ideation \
+curl http://localhost:8090/api/projects
+curl http://localhost:8090/api/agents
+curl http://localhost:8090/api/missions
+curl -X POST http://localhost:8090/api/ideation \
   -H "Content-Type: application/json" \
   -d '{"prompt": "bike GPS tracker app"}'
 ```
 
-Swagger UI: http://localhost:8099/docs
+Swagger UI: http://localhost:8090/docs
 
 ### 4. MCP Server (Model Context Protocol)
 
@@ -395,6 +412,9 @@ python3 tests/test_endurance.py
 ## Deployment
 
 ### Docker
+
+The Docker image includes: **Node.js 20**, **Playwright + Chromium**, **bandit**, **semgrep**, **ripgrep**.
+Agents can build projects, run E2E tests with screenshots, and perform SAST security scans out of the box.
 
 ```bash
 docker-compose up -d

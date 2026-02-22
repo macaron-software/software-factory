@@ -47,13 +47,16 @@ Software Factory is an autonomous multi-agent platform that orchestrates the ent
 
 ## Quick Start
 
+Docker イメージ内蔵: **Node.js 20**, **Playwright + Chromium**, **bandit**, **semgrep**, **ripgrep**。
+
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
+cp .env.example .env       # LLMキーを設定（下記参照）
 docker-compose up -d
 ```
 
-Open http://localhost:8099
+Open http://localhost:8090
 
 ### LLMプロバイダーの設定
 
@@ -74,7 +77,8 @@ cp .env.example .env
 
 ## Features
 
-- **145 AI agents** organized in teams
+- **158 AI agents** organized in teams
+- **Built-in tools**: `code_write`, `build`, `local_ci`, `sast_scan`, `playwright_test`, `create_ticket`, `git_commit`
 - **Complete CLI** — 40+ commands
 - **REST API** — 94 documented endpoints
 - **MCP Server** — 23 tools

@@ -638,6 +638,87 @@ async def _tool_security_chaos(name: str, args: dict, ctx: ExecutionContext) -> 
         return f"[{name}] ERROR: {e}"
 
 
+async def _tool_create_ticket(args: dict, ctx: ExecutionContext) -> str:
+    """Create a support ticket in the platform DB."""
+    import uuid
+    from ..db import get_db
+    title = args.get("title", "")
+    desc = args.get("description", "")
+    severity = args.get("severity", "medium")
+    category = args.get("category", "bug")
+    if not title:
+        return "Error: ticket title required"
+    tid = str(uuid.uuid4())[:8]
+    agent_id = ctx.agent.id if ctx.agent else "unknown"
+    mission_id = getattr(ctx, "mission_run_id", "") or ""
+    try:
+        db = get_db()
+        db.execute(
+            "INSERT INTO support_tickets (id, mission_id, title, description, severity, category, reporter, status) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, 'open')",
+            (tid, mission_id, title, desc, severity, category, agent_id),
+        )
+        db.commit()
+        db.close()
+        return f"Ticket {tid} created: [{severity}] {title}"
+    except Exception as e:
+        return f"Error creating ticket: {e}"
+
+
+async def _tool_local_ci(args: dict, ctx: ExecutionContext) -> str:
+    """Run local CI pipeline: install → build → lint → test → commit."""
+    import subprocess, os
+    cwd = args.get("cwd", ctx.project_path or ".")
+    steps = args.get("steps", ["install", "build", "lint", "test", "commit"])
+    commit_msg = args.get("commit_message", "ci: automated build pass")
+    results = []
+
+    # Auto-detect stack
+    has_pkg = os.path.isfile(os.path.join(cwd, "package.json"))
+    has_req = os.path.isfile(os.path.join(cwd, "requirements.txt"))
+    has_cargo = os.path.isfile(os.path.join(cwd, "Cargo.toml"))
+
+    cmds = {}
+    if has_pkg:
+        cmds = {"install": "npm install", "build": "npm run build", "lint": "npm run lint", "test": "npm test"}
+    elif has_req:
+        cmds = {"install": "pip install -r requirements.txt", "build": "python -m py_compile *.py", "lint": "python -m flake8 . --max-line-length=120 --count", "test": "python -m pytest -v"}
+    elif has_cargo:
+        cmds = {"install": "cargo fetch", "build": "cargo build", "lint": "cargo clippy -- -D warnings", "test": "cargo test"}
+    else:
+        return "Error: no package.json, requirements.txt, or Cargo.toml found — cannot detect stack"
+
+    for step in steps:
+        if step == "commit":
+            try:
+                subprocess.run(["git", "add", "-A"], cwd=cwd, timeout=10, capture_output=True)
+                r = subprocess.run(["git", "commit", "-m", commit_msg], cwd=cwd, timeout=30, capture_output=True, text=True)
+                results.append(f"[commit] {'OK' if r.returncode == 0 else 'SKIP (nothing to commit)'}")
+            except Exception as e:
+                results.append(f"[commit] ERROR: {e}")
+            continue
+
+        cmd = cmds.get(step)
+        if not cmd:
+            results.append(f"[{step}] SKIP (unknown step)")
+            continue
+        try:
+            r = subprocess.run(cmd, shell=True, cwd=cwd, timeout=300, capture_output=True, text=True)
+            status = "OK" if r.returncode == 0 else f"FAIL (exit {r.returncode})"
+            output = (r.stdout[-500:] if r.returncode == 0 else (r.stderr[-500:] or r.stdout[-500:])).strip()
+            results.append(f"[{step}] {status}\n{output}" if output else f"[{step}] {status}")
+            if r.returncode != 0 and step in ("build", "test"):
+                results.append(f"⛔ Pipeline stopped at '{step}'")
+                break
+        except subprocess.TimeoutExpired:
+            results.append(f"[{step}] TIMEOUT (300s)")
+            break
+        except Exception as e:
+            results.append(f"[{step}] ERROR: {e}")
+
+    return "\n".join(results)
+
+
 async def _tool_si_blueprint(args: dict, ctx: ExecutionContext) -> str:
     """Read the SI blueprint for a project."""
     import yaml
@@ -1099,6 +1180,15 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
     if name in ("sast_scan", "dependency_audit", "secrets_scan",
                  "chaos_test", "tmc_load_test", "infra_check"):
         return await _tool_security_chaos(name, args, ctx)
+
+    # ── Ticket/Incident management ──
+    if name == "create_ticket":
+        return await _tool_create_ticket(args, ctx)
+
+    # ── Local CI pipeline ──
+    if name == "local_ci":
+        return await _tool_local_ci(args, ctx)
+
     if name == "get_si_blueprint":
         return await _tool_si_blueprint(args, ctx)
 

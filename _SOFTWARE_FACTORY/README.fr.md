@@ -63,6 +63,8 @@ Imaginez une **usine logicielle virtuelle** où 158 agents IA collaborent à tra
 
 ### Option 1 : Docker (Recommandé)
 
+L'image inclut : **Node.js 20**, **Playwright + Chromium**, **bandit**, **semgrep**, **ripgrep**.
+
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
@@ -70,7 +72,7 @@ cp .env.example .env       # Configurer les clés LLM (voir Étape 3)
 docker-compose up -d
 ```
 
-Ouvrir http://localhost:8099
+Ouvrir http://localhost:8090
 
 ### Option 2 : Installation locale
 
@@ -86,7 +88,7 @@ pip install -r requirements.txt
 python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
 ```
 
-Ouvrir http://localhost:8099
+Ouvrir http://localhost:8090
 
 ### Étape 3 : Configurer un fournisseur LLM
 
@@ -176,11 +178,26 @@ Hiérarchie complète Portfolio → Epic → Feature → Story avec :
 - **Dashboards temps réel** — visualisations Chart.js
 - **Métriques Prometheus** — endpoint /metrics
 
+### 🔧 Outils Intégrés des Agents
+
+L'image Docker inclut tout le nécessaire pour que les agents travaillent en autonomie :
+
+| Catégorie | Outils | Description |
+|-----------|--------|-------------|
+| **Code** | `code_read`, `code_write`, `code_edit`, `code_search` | Lecture, écriture et recherche de fichiers |
+| **Build** | `build`, `test`, `local_ci` | Builds, tests, pipeline CI local (npm/pip/cargo auto-détecté) |
+| **Git** | `git_commit`, `git_diff`, `git_log` | Contrôle de version avec isolation par branche agent |
+| **Sécurité** | `sast_scan`, `dependency_audit`, `secrets_scan` | SAST via bandit/semgrep, audit CVE, détection de secrets |
+| **QA** | `playwright_test`, `browser_screenshot` | Tests E2E Playwright et captures d'écran (Chromium inclus) |
+| **Tickets** | `create_ticket`, `jira_search`, `jira_create` | Création d'incidents/tickets pour le suivi TMA |
+| **Deploy** | `docker_deploy`, `github_actions` | Déploiement conteneur et statut CI/CD |
+| **Mémoire** | `memory_store`, `memory_search`, `deep_search` | Mémoire projet persistante entre sessions |
+
 ## Quatre Interfaces
 
 ### 1. Dashboard Web (HTMX + SSE)
 
-Interface principale sur http://localhost:8099 :
+Interface principale sur http://localhost:8090 :
 
 - **Conversations multi-agents temps réel** avec streaming SSE
 - **PI Board** — planification program increment
@@ -224,15 +241,15 @@ sf chaos status                        # Chaos engineering
 
 ```bash
 # Exemples
-curl http://localhost:8099/api/projects
-curl http://localhost:8099/api/agents
-curl http://localhost:8099/api/missions
-curl -X POST http://localhost:8099/api/ideation \
+curl http://localhost:8090/api/projects
+curl http://localhost:8090/api/agents
+curl http://localhost:8090/api/missions
+curl -X POST http://localhost:8090/api/ideation \
   -H "Content-Type: application/json" \
   -d '{"prompt": "app GPS vélo"}'
 ```
 
-Swagger UI : http://localhost:8099/docs
+Swagger UI : http://localhost:8090/docs
 
 ### 4. Serveur MCP (Model Context Protocol)
 

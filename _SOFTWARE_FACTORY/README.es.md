@@ -27,11 +27,11 @@
 
 Software Factory es una **plataforma multi-agente autónoma** que orquesta todo el ciclo de desarrollo de software — desde la ideación hasta el despliegue — usando agentes IA especializados trabajando juntos.
 
-Piensa en ello como una **fábrica de software virtual** donde 145 agentes IA colaboran a través de flujos estructurados, siguiendo metodología SAFe, prácticas TDD y puertas de calidad automatizadas.
+Piensa en ello como una **fábrica de software virtual** donde 158 agentes IA colaboran a través de flujos estructurados, siguiendo metodología SAFe, prácticas TDD y puertas de calidad automatizadas.
 
 ### Puntos clave
 
-- **145 agentes especializados** — arquitectos, desarrolladores, testers, SRE, analistas de seguridad, product owners
+- **158 agentes especializados** — arquitectos, desarrolladores, testers, SRE, analistas de seguridad, product owners
 - **12 patrones de orquestación** — solo, paralelo, jerárquico, red, adversarial-pair, human-in-the-loop
 - **Ciclo de vida SAFe** — Portfolio → Epic → Feature → Story con cadencia PI
 - **Auto-reparación** — detección autónoma de incidentes, triage y auto-reparación
@@ -50,13 +50,16 @@ Piensa en ello como una **fábrica de software virtual** donde 145 agentes IA co
 
 ## Inicio rápido
 
+La imagen Docker incluye: **Node.js 20**, **Playwright + Chromium**, **bandit**, **semgrep**, **ripgrep**.
+
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
+cp .env.example .env       # Configurar claves LLM (ver abajo)
 docker-compose up -d
 ```
 
-Abrir http://localhost:8099
+Abrir http://localhost:8090
 
 ### Configurar un proveedor LLM
 
@@ -77,7 +80,8 @@ Establecer `PLATFORM_LLM_PROVIDER` como proveedor principal. Configuración tamb
 
 ## Características
 
-- **145 agentes IA** organizados en equipos
+- **158 agentes IA** organizados en equipos
+- **Herramientas integradas**: `code_write`, `build`, `local_ci`, `sast_scan`, `playwright_test`, `create_ticket`, `git_commit`
 - **CLI completa** — 40+ comandos
 - **API REST** — 94 endpoints documentados
 - **Servidor MCP** — 23 herramientas
