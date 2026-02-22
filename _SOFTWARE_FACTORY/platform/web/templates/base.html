@@ -203,5 +203,67 @@
 
     <script src="/static/js/workspace.js" defer></script>
     {% block scripts %}{% endblock %}
+
+<!-- DigitalOcean-style Delete Confirmation Modal -->
+<div id="deleteConfirmModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.65);align-items:center;justify-content:center">
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;max-width:460px;width:90%;padding:1.5rem;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem">
+      <div style="width:36px;height:36px;border-radius:8px;background:rgba(239,68,68,.12);color:var(--red);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg style="width:20px;height:20px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+      </div>
+      <div>
+        <h3 id="dcm-title" style="margin:0;font-size:1rem;color:var(--text-primary)">Supprimer</h3>
+        <p id="dcm-subtitle" style="margin:0;font-size:0.78rem;color:var(--text-secondary)">Cette action est irréversible</p>
+      </div>
+    </div>
+    <p id="dcm-warning" style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem;line-height:1.5"></p>
+    <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:0.4rem">
+      Tapez <strong id="dcm-expected" style="color:var(--red)"></strong> pour confirmer
+    </label>
+    <input id="dcm-input" type="text" autocomplete="off" spellcheck="false"
+      style="width:100%;padding:0.5rem 0.7rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:0.85rem;font-family:var(--font-mono);box-sizing:border-box"
+      oninput="document.getElementById('dcm-confirm-btn').disabled=(this.value!==this.dataset.expected)">
+    <div style="display:flex;gap:0.6rem;margin-top:1rem;justify-content:flex-end">
+      <button onclick="closeDeleteModal()" style="padding:0.45rem 1rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:0.82rem">Annuler</button>
+      <button id="dcm-confirm-btn" disabled onclick="executeDelete()"
+        style="padding:0.45rem 1rem;border-radius:6px;border:1px solid var(--red);background:rgba(239,68,68,.15);color:var(--red);cursor:pointer;font-size:0.82rem;font-weight:600;transition:all .15s">
+        Supprimer
+      </button>
+    </div>
+  </div>
+</div>
+<script>
+let _dcmCallback = null;
+function openDeleteModal({title, subtitle, warning, expectedName, onConfirm}) {
+    document.getElementById('dcm-title').textContent = title || 'Supprimer';
+    document.getElementById('dcm-subtitle').textContent = subtitle || 'Cette action est irréversible';
+    document.getElementById('dcm-warning').innerHTML = warning || '';
+    document.getElementById('dcm-expected').textContent = expectedName;
+    const input = document.getElementById('dcm-input');
+    input.value = '';
+    input.dataset.expected = expectedName;
+    document.getElementById('dcm-confirm-btn').disabled = true;
+    _dcmCallback = onConfirm;
+    document.getElementById('deleteConfirmModal').style.display = 'flex';
+    setTimeout(() => input.focus(), 100);
+}
+function closeDeleteModal() {
+    document.getElementById('deleteConfirmModal').style.display = 'none';
+    _dcmCallback = null;
+}
+async function executeDelete() {
+    if (_dcmCallback) {
+        const btn = document.getElementById('dcm-confirm-btn');
+        btn.disabled = true;
+        btn.textContent = 'Suppression...';
+        try { await _dcmCallback(); }
+        catch(e) { alert(e); }
+        finally { btn.textContent = 'Supprimer'; closeDeleteModal(); }
+    }
+}
+document.getElementById('deleteConfirmModal').addEventListener('click', function(e) {
+    if (e.target === this) closeDeleteModal();
+});
+</script>
 </body>
 </html>

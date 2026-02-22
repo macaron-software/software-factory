@@ -681,7 +681,7 @@ async def portfolio_kanban(request: Request):
 
 @router.delete("/api/mission-runs/{run_id}")
 async def delete_mission_run(run_id: str):
-    """Delete a mission run and its associated session/messages."""
+    """Delete a mission run and ALL associated data (cascade)."""
     from ...missions.store import get_mission_run_store
     from ...db.migrations import get_db
     store = get_mission_run_store()
@@ -689,13 +689,120 @@ async def delete_mission_run(run_id: str):
     if not run:
         return JSONResponse({"error": "Not found"}, status_code=404)
     conn = get_db()
+    # Cascade: messages, tool_calls, sessions, sprints, tasks, traces, incidents, confluence
     if run.session_id:
+        conn.execute("DELETE FROM tool_calls WHERE session_id = ?", (run.session_id,))
         conn.execute("DELETE FROM messages WHERE session_id = ?", (run.session_id,))
         conn.execute("DELETE FROM sessions WHERE id = ?", (run.session_id,))
-    conn.execute("DELETE FROM mission_runs WHERE id = ?", (run_id,))
+    conn.execute("DELETE FROM sprints WHERE mission_id = ?", (run_id,))
+    conn.execute("DELETE FROM tasks WHERE mission_id = ?", (run_id,))
     conn.execute("DELETE FROM confluence_pages WHERE mission_id = ?", (run_id,))
+    conn.execute("DELETE FROM llm_traces WHERE mission_id = ?", (run_id,))
+    conn.execute("DELETE FROM llm_usage WHERE mission_id = ?", (run_id,))
+    conn.execute("DELETE FROM platform_incidents WHERE mission_id = ?", (run_id,))
+    conn.execute("DELETE FROM support_tickets WHERE mission_id = ?", (run_id,))
+    conn.execute("DELETE FROM mission_runs WHERE id = ?", (run_id,))
     conn.commit()
     return JSONResponse({"status": "deleted"})
+
+
+@router.delete("/api/missions/{mission_id}")
+async def delete_mission(mission_id: str):
+    """Delete a mission (epic) and ALL its runs + associated data."""
+    from ...db.migrations import get_db
+    conn = get_db()
+    mission = conn.execute("SELECT id, name FROM missions WHERE id = ?", (mission_id,)).fetchone()
+    if not mission:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    # Delete all runs for this mission
+    runs = conn.execute("SELECT id, session_id FROM mission_runs WHERE parent_mission_id = ?", (mission_id,)).fetchall()
+    for run_id, session_id in runs:
+        if session_id:
+            conn.execute("DELETE FROM tool_calls WHERE session_id = ?", (session_id,))
+            conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+            conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+        conn.execute("DELETE FROM sprints WHERE mission_id = ?", (run_id,))
+        conn.execute("DELETE FROM tasks WHERE mission_id = ?", (run_id,))
+        conn.execute("DELETE FROM confluence_pages WHERE mission_id = ?", (run_id,))
+        conn.execute("DELETE FROM llm_traces WHERE mission_id = ?", (run_id,))
+        conn.execute("DELETE FROM llm_usage WHERE mission_id = ?", (run_id,))
+        conn.execute("DELETE FROM platform_incidents WHERE mission_id = ?", (run_id,))
+        conn.execute("DELETE FROM support_tickets WHERE mission_id = ?", (run_id,))
+    conn.execute("DELETE FROM mission_runs WHERE parent_mission_id = ?", (mission_id,))
+    # Delete mission's own session if any
+    msession = conn.execute("SELECT session_id FROM missions WHERE id = ?", (mission_id,)).fetchone()
+    if msession and msession[0]:
+        conn.execute("DELETE FROM tool_calls WHERE session_id = ?", (msession[0],))
+        conn.execute("DELETE FROM messages WHERE session_id = ?", (msession[0],))
+        conn.execute("DELETE FROM sessions WHERE id = ?", (msession[0],))
+    # Delete features, stories, sprints, tasks linked to mission
+    conn.execute("DELETE FROM user_stories WHERE feature_id IN (SELECT id FROM features WHERE mission_id = ?)", (mission_id,))
+    conn.execute("DELETE FROM feature_deps WHERE feature_id IN (SELECT id FROM features WHERE mission_id = ?)", (mission_id,))
+    conn.execute("DELETE FROM feature_deps WHERE depends_on IN (SELECT id FROM features WHERE mission_id = ?)", (mission_id,))
+    conn.execute("DELETE FROM features WHERE mission_id = ?", (mission_id,))
+    conn.execute("DELETE FROM sprints WHERE mission_id = ?", (mission_id,))
+    conn.execute("DELETE FROM tasks WHERE mission_id = ?", (mission_id,))
+    conn.execute("DELETE FROM ideation_findings WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mission_id,))
+    conn.execute("DELETE FROM ideation_messages WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mission_id,))
+    conn.execute("DELETE FROM ideation_sessions WHERE mission_id = ?", (mission_id,))
+    conn.execute("DELETE FROM missions WHERE id = ?", (mission_id,))
+    conn.commit()
+    return JSONResponse({"status": "deleted", "name": mission[1]})
+
+
+@router.delete("/api/projects/{project_id}")
+async def delete_project(project_id: str):
+    """Delete a project and ALL associated missions, sessions, memory, agents."""
+    from ...db.migrations import get_db
+    conn = get_db()
+    project = conn.execute("SELECT id, name FROM projects WHERE id = ?", (project_id,)).fetchone()
+    if not project:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    # Delete all missions for this project (cascade)
+    missions = conn.execute("SELECT id FROM missions WHERE project_id = ?", (project_id,)).fetchall()
+    for (mid,) in missions:
+        # Delete runs
+        runs = conn.execute("SELECT id, session_id FROM mission_runs WHERE parent_mission_id = ?", (mid,)).fetchall()
+        for run_id, session_id in runs:
+            if session_id:
+                conn.execute("DELETE FROM tool_calls WHERE session_id = ?", (session_id,))
+                conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+                conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+            for tbl in ("sprints", "tasks", "confluence_pages", "llm_traces", "llm_usage", "platform_incidents", "support_tickets"):
+                conn.execute(f"DELETE FROM {tbl} WHERE mission_id = ?", (run_id,))
+        conn.execute("DELETE FROM mission_runs WHERE parent_mission_id = ?", (mid,))
+        # Delete mission data
+        msession = conn.execute("SELECT session_id FROM missions WHERE id = ?", (mid,)).fetchone()
+        if msession and msession[0]:
+            conn.execute("DELETE FROM tool_calls WHERE session_id = ?", (msession[0],))
+            conn.execute("DELETE FROM messages WHERE session_id = ?", (msession[0],))
+            conn.execute("DELETE FROM sessions WHERE id = ?", (msession[0],))
+        conn.execute("DELETE FROM user_stories WHERE feature_id IN (SELECT id FROM features WHERE mission_id = ?)", (mid,))
+        conn.execute("DELETE FROM feature_deps WHERE feature_id IN (SELECT id FROM features WHERE mission_id = ?)", (mid,))
+        conn.execute("DELETE FROM feature_deps WHERE depends_on IN (SELECT id FROM features WHERE mission_id = ?)", (mid,))
+        conn.execute("DELETE FROM features WHERE mission_id = ?", (mid,))
+        conn.execute("DELETE FROM sprints WHERE mission_id = ?", (mid,))
+        conn.execute("DELETE FROM tasks WHERE mission_id = ?", (mid,))
+        conn.execute("DELETE FROM ideation_findings WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mid,))
+        conn.execute("DELETE FROM ideation_messages WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mid,))
+        conn.execute("DELETE FROM ideation_sessions WHERE mission_id = ?", (mid,))
+    conn.execute("DELETE FROM missions WHERE project_id = ?", (project_id,))
+    # Delete orphan mission_runs for this project
+    conn.execute("DELETE FROM mission_runs WHERE project_id = ?", (project_id,))
+    # Delete project sessions
+    proj_sessions = conn.execute("SELECT id FROM sessions WHERE project_id = ?", (project_id,)).fetchall()
+    for (sid,) in proj_sessions:
+        conn.execute("DELETE FROM tool_calls WHERE session_id = ?", (sid,))
+        conn.execute("DELETE FROM messages WHERE session_id = ?", (sid,))
+    conn.execute("DELETE FROM sessions WHERE project_id = ?", (project_id,))
+    # Delete project memory
+    conn.execute("DELETE FROM memory_project WHERE project_id = ?", (project_id,))
+    # Delete project agents (agent-{project_id})
+    conn.execute("DELETE FROM agents WHERE id = ?", (f"agent-{project_id}",))
+    # Delete project
+    conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+    conn.commit()
+    return JSONResponse({"status": "deleted", "name": project[1]})
 
 
 @router.get("/missions/start/{workflow_id}", response_class=HTMLResponse)

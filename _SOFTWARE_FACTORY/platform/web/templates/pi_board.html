@@ -211,6 +211,9 @@
                 <button class="epic-toggle" onclick="event.stopPropagation();this.closest('.epic-card').querySelector('.epic-features').classList.toggle('hidden')">
                     <svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-chevron-down"/></svg> features
                 </button>
+                <button class="btn btn-sm btn-danger" style="padding:2px 6px" onclick="event.stopPropagation();deleteMission('{{ e.id }}','{{ e.name[:30]|replace(\"'\",\"\\\\'\") }}')" title="Supprimer cette epic">
+                    <svg style="width:12px;height:12px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
             </div>
         </div>
         {% if e.description %}<div class="epic-desc">{{ e.description }}</div>{% endif %}
@@ -539,13 +542,32 @@ async function runPhase(runId) {
     } catch(err) { alert(err); }
 }
 
-async function deleteRun(runId) {
-    if (!confirm('Supprimer cette mission ?')) return;
-    try {
-        const r = await fetch(`/api/mission-runs/${runId}`, {method:'DELETE'});
-        if (r.ok) location.reload();
-        else { const j = await r.json(); alert(j.error || 'Erreur'); }
-    } catch(err) { alert(err); }
+async function deleteRun(runId, runName) {
+    openDeleteModal({
+        title: 'Supprimer cette mission',
+        subtitle: 'Supprime la mission et toutes les données associées',
+        warning: 'Sprints, tâches, sessions, messages, traces LLM et artefacts seront définitivement supprimés.',
+        expectedName: runName || runId.slice(0,8),
+        onConfirm: async () => {
+            const r = await fetch(`/api/mission-runs/${runId}`, {method:'DELETE'});
+            if (r.ok) location.reload();
+            else { const j = await r.json(); throw j.error || 'Erreur'; }
+        }
+    });
+}
+
+async function deleteMission(missionId, missionName) {
+    openDeleteModal({
+        title: 'Supprimer cette epic',
+        subtitle: 'Supprime l\'epic et toutes ses missions, features et données',
+        warning: 'Toutes les missions (runs), features, user stories, sprints, tâches et sessions associées seront définitivement supprimées.',
+        expectedName: missionName || missionId.slice(0,8),
+        onConfirm: async () => {
+            const r = await fetch(`/api/missions/${missionId}`, {method:'DELETE'});
+            if (r.ok) location.reload();
+            else { const j = await r.json(); throw j.error || 'Erreur'; }
+        }
+    });
 }
 
 let _searchTimer;

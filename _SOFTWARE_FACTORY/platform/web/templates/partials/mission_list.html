@@ -43,7 +43,7 @@
         <a href="/missions/{{ run.id }}/control" class="btn btn-sm btn-ghost" title="Mission Control">
             <svg class="icon icon-xs"><use href="#icon-monitor"/></svg> Control
         </a>
-        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteRun('{{ run.id }}')" title="{{ _('delete') }}">
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteRun('{{ run.id }}','{{ run.brief[:30]|replace("'","\\'") }}')" title="{{ _('delete') }}">
             <svg class="icon icon-xs"><use href="#icon-trash"/></svg>
         </button>
     </div>
