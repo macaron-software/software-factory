@@ -4,12 +4,120 @@
     <button class="tab active" hx-get="/skills" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click, load" onclick="switchTab(this)">{{ _("skills") }}</button>
     <button class="tab" hx-get="/memory" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("memory") }}</button>
     <button class="tab" hx-get="/mcps" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("mcps") }}</button>
+    <button class="tab" onclick="switchTab(this); showAPITab()">API</button>
+    <button class="tab" onclick="switchTab(this); showCLITab()">CLI</button>
 </div>
 <div id="tab-content"></div>
 <script>
 function switchTab(btn){
     document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.remove('active'));
     btn.classList.add('active');
+}
+
+function showAPITab(){
+    const content = document.getElementById('tab-content');
+    content.innerHTML = `
+        <div class="main-area" style="padding:24px">
+            <h2>API Testing</h2>
+            <div style="margin-top:16px">
+                <label style="display:block;margin-bottom:8px;font-weight:500">Command:</label>
+                <input type="text" id="api-command" placeholder="e.g., help" style="width:100%;padding:8px;margin-bottom:12px;border:1px solid #ddd;border-radius:4px">
+                
+                <label style="display:block;margin-bottom:8px;font-weight:500">Arguments (comma-separated):</label>
+                <input type="text" id="api-args" placeholder="e.g., test-skills" style="width:100%;padding:8px;margin-bottom:12px;border:1px solid #ddd;border-radius:4px">
+                
+                <button onclick="executeAPI()" style="padding:8px 16px;background:#0969da;color:white;border:none;border-radius:4px;cursor:pointer">Execute</button>
+            </div>
+            <div style="margin-top:24px">
+                <h3>Response:</h3>
+                <pre id="api-response" style="background:#f6f8fa;padding:16px;border-radius:4px;overflow-x:auto;min-height:200px"></pre>
+            </div>
+        </div>
+    `;
+}
+
+function showCLITab(){
+    const content = document.getElementById('tab-content');
+    content.innerHTML = `
+        <div class="main-area" style="padding:24px">
+            <h2>CLI Executor</h2>
+            <div style="margin-top:16px">
+                <label style="display:block;margin-bottom:8px;font-weight:500">Command:</label>
+                <input type="text" id="cli-command" placeholder="e.g., make, git, python3" style="width:100%;padding:8px;margin-bottom:12px;border:1px solid #ddd;border-radius:4px">
+                
+                <label style="display:block;margin-bottom:8px;font-weight:500">Arguments (comma-separated):</label>
+                <input type="text" id="cli-args" placeholder="e.g., test-skills, status" style="width:100%;padding:8px;margin-bottom:12px;border:1px solid #ddd;border-radius:4px">
+                
+                <button onclick="executeCLI()" style="padding:8px 16px;background:#0969da;color:white;border:none;border-radius:4px;cursor:pointer">Execute</button>
+                <button onclick="listCLICommands()" style="padding:8px 16px;background:#6c757d;color:white;border:none;border-radius:4px;cursor:pointer;margin-left:8px">List Commands</button>
+            </div>
+            <div style="margin-top:24px">
+                <h3>Output:</h3>
+                <pre id="cli-output" style="background:#f6f8fa;padding:16px;border-radius:4px;overflow-x:auto;min-height:200px"></pre>
+            </div>
+        </div>
+    `;
+}
+
+async function executeAPI(){
+    const cmd = document.getElementById('api-command').value.trim();
+    const args = document.getElementById('api-args').value.trim();
+    const output = document.getElementById('api-response');
+    output.textContent = 'Executing...';
+    
+    try {
+        const response = await fetch('/api/cli/execute', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                command: cmd,
+                args: args ? args.split(',').map(a => a.trim()) : []
+            })
+        });
+        const data = await response.json();
+        output.textContent = JSON.stringify(data, null, 2);
+    } catch(e) {
+        output.textContent = 'Error: ' + e.message;
+    }
+}
+
+async function executeCLI(){
+    const cmd = document.getElementById('cli-command').value.trim();
+    const args = document.getElementById('cli-args').value.trim();
+    const output = document.getElementById('cli-output');
+    output.textContent = 'Executing...';
+    
+    try {
+        const response = await fetch('/api/cli/execute', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                command: cmd,
+                args: args ? args.split(',').map(a => a.trim()) : []
+            })
+        });
+        const data = await response.json();
+        if(data.success) {
+            output.textContent = data.output || data.error;
+        } else {
+            output.textContent = 'Error (exit ' + data.exit_code + '):\n' + data.error;
+        }
+    } catch(e) {
+        output.textContent = 'Error: ' + e.message;
+    }
+}
+
+async function listCLICommands(){
+    const output = document.getElementById('cli-output');
+    output.textContent = 'Loading...';
+    
+    try {
+        const response = await fetch('/api/cli/commands');
+        const data = await response.json();
+        output.textContent = JSON.stringify(data, null, 2);
+    } catch(e) {
+        output.textContent = 'Error: ' + e.message;
+    }
 }
 </script>
 {% endblock %}
