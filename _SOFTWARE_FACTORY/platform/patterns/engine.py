@@ -970,8 +970,8 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
     except Exception:
         pass
 
-    # Fallback: use workspace_path from mission if project_path not found from registry
-    if not project_path and run.project_path:
+    # For missions: prefer workspace_path (actual code) over project registry path
+    if run.project_path:
         project_path = run.project_path
 
     skills_prompt = ""
