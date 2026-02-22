@@ -153,3 +153,117 @@ def _term_width() -> int:
 def _strip_ansi(s: str) -> str:
     import re
     return re.sub(r'\033\[[0-9;]*m', '', s)
+
+
+# ── Markdown rendering for streamed content ──
+
+def render_md(text: str) -> str:
+    """Render markdown text for terminal: tables, headers, bold, lists."""
+    lines = text.split("\n")
+    out_lines = []
+    i = 0
+    while i < len(lines):
+        # Detect markdown table (row starting with |)
+        if lines[i].strip().startswith("|"):
+            table_lines = []
+            while i < len(lines) and lines[i].strip().startswith("|"):
+                table_lines.append(lines[i])
+                i += 1
+            out_lines.append(_render_md_table(table_lines))
+            continue
+        out_lines.append(_render_md_line(lines[i]))
+        i += 1
+    return "\n".join(out_lines)
+
+
+def _render_md_table(lines: list[str]) -> str:
+    """Render a markdown table with aligned columns and box drawing."""
+    # Parse cells
+    rows = []
+    sep_idx = -1
+    for idx, line in enumerate(lines):
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if cells and all(c.replace("-", "").replace(":", "") == "" for c in cells):
+            sep_idx = idx
+            continue
+        rows.append(cells)
+    if not rows:
+        return "\n".join(lines)
+
+    # Normalize column count
+    n_cols = max(len(r) for r in rows)
+    for r in rows:
+        while len(r) < n_cols:
+            r.append("")
+
+    # Apply inline markdown to cells
+    for r in rows:
+        for j in range(len(r)):
+            r[j] = _render_md_inline(r[j])
+
+    # Compute column widths (on stripped text)
+    widths = [0] * n_cols
+    for r in rows:
+        for j, cell in enumerate(r):
+            widths[j] = max(widths[j], len(_strip_ansi(cell)))
+
+    # Render
+    result = []
+    # Top border
+    top = "  ┌" + "┬".join("─" * (w + 2) for w in widths) + "┐"
+    result.append(dim(top))
+
+    for ri, r in enumerate(rows):
+        parts = []
+        for j, cell in enumerate(r):
+            raw_len = len(_strip_ansi(cell))
+            pad = widths[j] - raw_len
+            parts.append(f" {cell}{' ' * pad} ")
+        line = dim("  │") + dim("│").join(parts) + dim("│")
+        result.append(line)
+        # Header separator after first row
+        if ri == 0 and len(rows) > 1:
+            sep = "  ├" + "┼".join("─" * (w + 2) for w in widths) + "┤"
+            result.append(dim(sep))
+
+    # Bottom border
+    bot = "  └" + "┴".join("─" * (w + 2) for w in widths) + "┘"
+    result.append(dim(bot))
+    return "\n".join(result)
+
+
+def _render_md_inline(text: str) -> str:
+    """Render inline markdown: **bold**, `code`, *italic*."""
+    import re
+    # Bold **text**
+    text = re.sub(r'\*\*(.+?)\*\*', lambda m: bold(m.group(1)), text)
+    # Code `text`
+    text = re.sub(r'`([^`]+)`', lambda m: c(m.group(1), _CYAN), text)
+    # Italic *text* (but not inside bold)
+    text = re.sub(r'(?<!\*)\*([^*]+)\*(?!\*)', lambda m: c(m.group(1), _DIM), text)
+    return text
+
+
+def _render_md_line(line: str) -> str:
+    """Render a single markdown line: headers, bullets, hr."""
+    stripped = line.strip()
+    # Headers
+    if stripped.startswith("### "):
+        return "  " + bold(stripped[4:])
+    if stripped.startswith("## "):
+        return "\n  " + c(stripped[3:], _BOLD + _MAGENTA)
+    if stripped.startswith("# "):
+        return "\n  " + c(stripped[2:], _BOLD + _CYAN)
+    # Horizontal rule
+    if stripped in ("---", "***", "___"):
+        tw = _term_width()
+        return "  " + dim("─" * min(tw - 4, 60))
+    # Bullets
+    if stripped.startswith("- ") or stripped.startswith("* "):
+        return "  • " + _render_md_inline(stripped[2:])
+    # Numbered lists
+    import re
+    m = re.match(r'^(\d+)\.\s+(.+)', stripped)
+    if m:
+        return f"  {dim(m.group(1) + '.')} {_render_md_inline(m.group(2))}"
+    return _render_md_inline(line)

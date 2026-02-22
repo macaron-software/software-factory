@@ -178,6 +178,17 @@ class DBBackend:
 
     # ── Stories ──
 
+    def stories_list(self, feature_id: str | None = None) -> list:
+        if feature_id:
+            rows = self._conn.execute(
+                "SELECT id, feature_id, title, story_points, status, sprint_id FROM user_stories WHERE feature_id=?",
+                (feature_id,)).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT id, feature_id, title, story_points, status, sprint_id FROM user_stories ORDER BY feature_id, id"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
     def story_create(self, feature_id: str, title: str, sp: int = 2) -> dict:
         import uuid
         sid = str(uuid.uuid4())[:8]

@@ -316,6 +316,33 @@ async def create_feature_api(request: Request, epic_id: str):
     return JSONResponse({"ok": True, "feature": {"id": feat.id, "name": feat.name}})
 
 
+@router.get("/api/stories")
+async def list_stories_api(feature_id: str = ""):
+    """List user stories, optionally filtered by feature."""
+    from ...db.migrations import get_db
+    db = get_db()
+    if feature_id:
+        rows = db.execute(
+            "SELECT id, feature_id, title, story_points, status, sprint_id FROM user_stories WHERE feature_id=?",
+            (feature_id,)).fetchall()
+    else:
+        rows = db.execute(
+            "SELECT id, feature_id, title, story_points, status, sprint_id FROM user_stories ORDER BY feature_id, id"
+        ).fetchall()
+    return JSONResponse([dict(r) for r in rows])
+
+
+@router.get("/api/features/{feature_id}/stories")
+async def list_feature_stories_api(feature_id: str):
+    """List user stories for a specific feature."""
+    from ...db.migrations import get_db
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, feature_id, title, story_points, status, sprint_id FROM user_stories WHERE feature_id=?",
+        (feature_id,)).fetchall()
+    return JSONResponse([dict(r) for r in rows])
+
+
 @router.post("/api/features/{feature_id}/stories")
 async def create_story_api(request: Request, feature_id: str):
     """Create a new user story under a feature."""

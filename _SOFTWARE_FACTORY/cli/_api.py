@@ -176,6 +176,11 @@ class APIBackend:
 
     # ── Stories ──
 
+    def stories_list(self, feature_id: str | None = None) -> list:
+        if feature_id:
+            return self._get(f"/api/features/{feature_id}/stories")
+        return self._get("/api/stories")
+
     def story_create(self, feature_id: str, title: str, sp: int = 2) -> dict:
         return self._post(f"/api/features/{feature_id}/stories", {
             "title": title, "story_points": sp,

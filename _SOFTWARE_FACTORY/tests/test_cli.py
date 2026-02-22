@@ -189,6 +189,12 @@ class TestFeatures:
             assert rc == 0
 
 
+class TestStories:
+    def test_list(self):
+        rc, out, _ = sf("stories", "list")
+        assert rc == 0
+
+
 class TestIdeation:
     def test_list(self):
         rc, out, _ = sf("ideation", "list")

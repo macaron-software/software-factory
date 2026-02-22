@@ -229,6 +229,11 @@ def cmd_features_rm_dep(args):
 
 # ── Stories ──
 
+def cmd_stories_list(args):
+    b = get_backend(args)
+    fid = getattr(args, "feature_id", None)
+    output(args, b.stories_list(fid))
+
 def cmd_stories_create(args):
     b = get_backend(args)
     output(args, b.story_create(args.feature_id, args.name, getattr(args, "sp", 2)))
@@ -681,6 +686,10 @@ def build_parser() -> argparse.ArgumentParser:
     # ── stories ──
     stor = sub.add_parser("stories", help="User story management")
     stor_sub = stor.add_subparsers(dest="subcmd")
+
+    sl = stor_sub.add_parser("list", help="List stories")
+    sl.add_argument("--feature", dest="feature_id", help="Filter by feature ID")
+    sl.set_defaults(func=cmd_stories_list)
 
     sc = stor_sub.add_parser("create", help="Create story")
     sc.add_argument("feature_id")
