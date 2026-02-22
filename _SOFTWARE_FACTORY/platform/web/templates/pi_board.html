@@ -124,6 +124,11 @@
 .tma-card-footer{display:flex;align-items:center;justify-content:space-between;gap:0.4rem}
 .tma-card-project{font-size:0.68rem;font-weight:500;background:var(--bg-tertiary);color:var(--text-secondary);padding:0.1rem 0.4rem;border-radius:3px}
 .tma-card-date{font-size:0.68rem;color:var(--text-secondary)}
+.tma-status-dot{display:none;width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.tma-status-dot.s-active{background:var(--purple)}
+.tma-status-dot.s-wip{background:#f59e0b}
+.tma-status-dot.s-resolved{background:var(--green)}
+.pi-section-body.view-list .tma-status-dot,.pi-section-body.view-compact .tma-status-dot{display:block}
 .tma-empty{font-size:0.78rem;color:var(--text-secondary);text-align:center;padding:1.5rem 0;opacity:0.6}
 /* View mode toggle buttons */
 .view-toggle{display:flex;gap:2px;margin-left:auto;flex-shrink:0}
@@ -137,10 +142,11 @@
 .pi-section-body.view-list .epic-desc,.pi-section-body.view-list .epic-features{display:none}
 .pi-section-body.view-list .epic-stats{margin:0;gap:0.8rem}
 .pi-section-body.view-list .epic-progress{max-width:160px}
-.pi-section-body.view-list .tma-board{display:flex;flex-direction:column;gap:0.5rem}
-.pi-section-body.view-list .tma-col{flex-direction:row;flex-wrap:wrap;gap:0.35rem}
-.pi-section-body.view-list .tma-col-header{border-bottom:none;margin-bottom:0;width:100%;padding:0.3rem 0.6rem;background:var(--bg-tertiary);border-radius:6px}
-.pi-section-body.view-list .tma-card{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:0.6rem;padding:0.5rem 0.8rem;border-radius:6px;width:100%}
+.pi-section-body.view-list .tma-board{display:flex;flex-direction:column;gap:0}
+.pi-section-body.view-list .tma-col-header{display:none}
+.pi-section-body.view-list .tma-col{display:contents}
+.pi-section-body.view-list .tma-col-body{display:contents}
+.pi-section-body.view-list .tma-card{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:0.6rem;padding:0.5rem 0.8rem;border-radius:6px;width:100%;margin-bottom:0.35rem}
 .pi-section-body.view-list .tma-card-desc{display:none}
 .pi-section-body.view-list .tma-card-header{margin-bottom:0}
 .pi-section-body.view-list .tma-card-footer{margin:0}
@@ -156,8 +162,9 @@
 .pi-section-body.view-compact .epic-desc,.pi-section-body.view-compact .epic-features,.pi-section-body.view-compact .epic-toggle,.pi-section-body.view-compact .epic-stats{display:none}
 .pi-section-body.view-compact .epic-header>div:last-child{flex-shrink:0}
 .pi-section-body.view-compact .tma-board{display:flex;flex-direction:column;gap:0}
-.pi-section-body.view-compact .tma-col-header{font-size:0.7rem;padding:0.2rem 0.6rem;margin-bottom:0;border-bottom:1px solid var(--border)}
-.pi-section-body.view-compact .tma-col-body{gap:0}
+.pi-section-body.view-compact .tma-col-header{display:none}
+.pi-section-body.view-compact .tma-col{display:contents}
+.pi-section-body.view-compact .tma-col-body{display:contents;gap:0}
 .pi-section-body.view-compact .tma-card{display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0.8rem;border-radius:0;border:none;border-bottom:1px solid var(--border);background:transparent}
 .pi-section-body.view-compact .tma-card:hover{background:var(--bg-secondary)}
 .pi-section-body.view-compact .tma-card-desc,.pi-section-body.view-compact .tma-card-footer{display:none}
@@ -252,6 +259,7 @@
             {% for t in tma_active %}
             <div class="tma-card">
                 <div class="tma-card-header">
+                    <span class="tma-status-dot s-active" title="Active"></span>
                     <div class="tma-type-icon {{ t.type }}">
                         {% if t.type == 'bug' %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-alert-triangle"/></svg>
                         {% elif t.type == 'security' %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-shield"/></svg>
@@ -281,6 +289,7 @@
             {% for t in tma_wip %}
             <div class="tma-card">
                 <div class="tma-card-header">
+                    <span class="tma-status-dot s-wip" title="En cours"></span>
                     <div class="tma-type-icon {{ t.type }}">
                         {% if t.type == 'bug' %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-alert-triangle"/></svg>
                         {% elif t.type == 'security' %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-shield"/></svg>
@@ -310,6 +319,7 @@
             {% for t in tma_resolved %}
             <div class="tma-card">
                 <div class="tma-card-header">
+                    <span class="tma-status-dot s-resolved" title="Resolved"></span>
                     <div class="tma-type-icon {{ t.type }}">
                         {% if t.type == 'bug' %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-alert-triangle"/></svg>
                         {% elif t.type == 'security' %}<svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-shield"/></svg>
