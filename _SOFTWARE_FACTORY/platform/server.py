@@ -209,37 +209,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Auto-heal loop failed to start: %s", e)
 
-    # Auto-resume missions after restart (running OR paused with phases remaining)
+    # Log paused missions (no auto-resume — paused missions stay paused until manually restarted)
     try:
         from .missions.store import get_mission_run_store
         _mrs = get_mission_run_store()
         _all_runs = _mrs.list_runs(limit=50)
-        _resumable = [m for m in _all_runs if m.status.value in ("running", "paused")]
-        if _resumable:
-            logger.warning("Found %d resumable missions after restart: %s",
-                           len(_resumable), [m.id for m in _resumable])
-
-            async def _auto_resume():
-                """Resume ALL resumable missions — semaphore serializes them."""
-                import asyncio
-                await asyncio.sleep(15)
-                from .web.routes import api_mission_run
-                from starlette.requests import Request
-                scope = {"type": "http", "method": "POST", "path": "/",
-                         "headers": [], "query_string": b""}
-                fake_req = Request(scope)
-                for m in _resumable:
-                    try:
-                        resp = await api_mission_run(fake_req, m.id)
-                        logger.warning("Auto-resumed mission %s: %s", m.id,
-                                       getattr(resp, 'body', b'')[:100])
-                    except Exception as exc:
-                        logger.warning("Failed to auto-resume mission %s: %s", m.id, exc)
-
-            import asyncio
-            asyncio.create_task(_auto_resume())
+        _paused = [m for m in _all_runs if m.status.value == "paused"]
+        if _paused:
+            logger.warning("Found %d paused missions (restart manually if needed): %s",
+                           len(_paused), [m.id for m in _paused])
     except Exception as exc:
-        logger.warning("Auto-resume check failed: %s", exc)
+        logger.warning("Mission check failed: %s", exc)
 
     yield
 
