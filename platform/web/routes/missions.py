@@ -1801,32 +1801,36 @@ async def _run_post_phase_hooks(
     # After dev sprint: auto screenshots for HTML files
     if "dev" in phase_key or "sprint" in phase_key:
         ws = Path(workspace)
-        html_files = list(ws.glob("*.html")) + list(ws.glob("public/*.html")) + list(ws.glob("src/*.html"))
+        html_files = list(ws.glob("*.html")) + list(ws.glob("public/*.html")) + list(ws.glob("src/*.html")) + list(ws.glob("client/*.html"))
         if html_files:
             screenshots_dir = ws / "screenshots"
             screenshots_dir.mkdir(exist_ok=True)
             shot_paths = []
-            for hf in html_files[:3]:
+            for hf in html_files[:5]:
                 fname = f"{hf.stem}.png"
                 shot_script = f"""
-const {{ chromium }} = require('playwright');
-(async () => {{
-    const browser = await chromium.launch();
-    const page = await browser.newPage({{ viewport: {{ width: 1280, height: 720 }} }});
-    await page.goto('file://{hf}', {{ waitUntil: 'load', timeout: 10000 }});
-    await page.screenshot({{ path: '{screenshots_dir / fname}' }});
-    await browser.close();
-}})();
+import asyncio
+from playwright.async_api import async_playwright
+async def main():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page(viewport={{"width": 1280, "height": 720}})
+        await page.goto("file://{hf}", wait_until="load", timeout=10000)
+        await page.screenshot(path="{screenshots_dir / fname}", full_page=True)
+        await browser.close()
+asyncio.run(main())
 """
                 try:
                     r = subprocess.run(
-                        ["node", "-e", shot_script],
+                        ["python3", "-c", shot_script],
                         capture_output=True, text=True, cwd=workspace, timeout=30
                     )
                     if r.returncode == 0 and (screenshots_dir / fname).exists():
                         shot_paths.append(f"screenshots/{fname}")
-                except Exception:
-                    pass
+                    else:
+                        logger.warning("Sprint screenshot failed for %s: %s", hf.name, r.stderr[:200] if r.stderr else "unknown")
+                except Exception as e:
+                    logger.warning("Sprint screenshot error for %s: %s", hf.name, e)
 
             if shot_paths:
                 shot_content = "Screenshots automatiques du workspace :\n" + "\n".join(
@@ -1842,8 +1846,8 @@ const {{ chromium }} = require('playwright');
                     "msg_type": "text",
                 })
 
-    # After CI/CD phase: run build if package.json or Dockerfile exists
-    if "cicd" in phase_key or "pipeline" in phase_key:
+    # After CI/CD or TDD Sprint phase: run build if package.json or Dockerfile exists
+    if any(k in phase_key for k in ("cicd", "pipeline", "sprint", "dev")):
         ws = Path(workspace)
         try:
             if (ws / "package.json").exists():
@@ -1860,26 +1864,255 @@ const {{ chromium }} = require('playwright');
                     "phase_id": phase_id,
                     "msg_type": "text",
                 })
-            if (ws / "Dockerfile").exists():
-                result = subprocess.run(
-                    ["docker", "build", "-t", f"mission-{mission.id}", "."],
-                    cwd=workspace, capture_output=True, text=True, timeout=300
-                )
-                build_msg = f"Docker image mission-{mission.id} construite" if result.returncode == 0 else f"Docker build échoué: {result.stderr[:200]}"
-                await push_sse(session_id, {
-                    "type": "message",
-                    "from_agent": "system",
-                    "from_name": "CI/CD",
-                    "from_role": "Pipeline",
-                    "content": build_msg,
-                    "phase_id": phase_id,
-                    "msg_type": "text",
-                })
+                # Run build script if exists
+                import json as _json
+                try:
+                    pkg = _json.loads((ws / "package.json").read_text())
+                    if "build" in (pkg.get("scripts") or {}):
+                        build_result = subprocess.run(
+                            ["npm", "run", "build"], cwd=workspace, capture_output=True, text=True, timeout=120
+                        )
+                        build_status = "réussi" if build_result.returncode == 0 else f"échoué: {build_result.stderr[:200]}"
+                        await push_sse(session_id, {
+                            "type": "message",
+                            "from_agent": "system",
+                            "from_name": "CI/CD",
+                            "from_role": "Pipeline",
+                            "content": f"npm run build {build_status}",
+                            "phase_id": phase_id,
+                            "msg_type": "text",
+                        })
+                    if "test" in (pkg.get("scripts") or {}):
+                        test_result = subprocess.run(
+                            ["npm", "test"], cwd=workspace, capture_output=True, text=True, timeout=120,
+                            env={**dict(subprocess.os.environ), "CI": "true"},
+                        )
+                        test_status = "réussi" if test_result.returncode == 0 else f"échoué: {test_result.stderr[:200]}"
+                        await push_sse(session_id, {
+                            "type": "message",
+                            "from_agent": "system",
+                            "from_name": "CI/CD",
+                            "from_role": "Pipeline",
+                            "content": f"npm test {test_status}",
+                            "phase_id": phase_id,
+                            "msg_type": "text",
+                        })
+                except Exception:
+                    pass
         except Exception as e:
             logger.error("Post-phase build failed: %s", e)
 
-    # After deploy phase: list workspace files as proof
+        # After sprint: start server, take screenshots, stop server
+        ws = Path(workspace)
+        if (ws / "package.json").exists():
+            try:
+                import json as _json2
+                pkg2 = _json2.loads((ws / "package.json").read_text())
+                scripts = pkg2.get("scripts") or {}
+                start_cmd = None
+                if "start" in scripts:
+                    start_cmd = "npm start"
+                elif "dev" in scripts:
+                    start_cmd = "npm run dev"
+                elif (ws / "src" / "server.ts").exists() or (ws / "src" / "server.js").exists() or (ws / "server.js").exists():
+                    main = pkg2.get("main", "")
+                    if main:
+                        start_cmd = f"node {main}"
+
+                if start_cmd:
+                    screenshots_dir = ws / "screenshots"
+                    screenshots_dir.mkdir(exist_ok=True)
+                    # Start server in background
+                    import signal
+                    server_env = {**dict(subprocess.os.environ), "PORT": "9050", "NODE_ENV": "production"}
+                    server_proc = subprocess.Popen(
+                        start_cmd, shell=True, cwd=workspace,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                        env=server_env, preexec_fn=subprocess.os.setsid
+                    )
+                    import time as _time
+                    _time.sleep(4)  # Wait for server to start
+                    # Check if server is up
+                    health = subprocess.run(
+                        ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "http://127.0.0.1:9050/"],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    http_code = health.stdout.strip()
+                    if http_code and http_code != "000":
+                        # Take multi-page screenshots
+                        pages_to_shot = [
+                            ("/", "homepage"),
+                        ]
+                        shot_paths_srv = []
+                        for url_path, shot_name in pages_to_shot:
+                            shot_script = f"""
+import asyncio
+from playwright.async_api import async_playwright
+async def main():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page(viewport={{"width": 1280, "height": 720}})
+        await page.goto("http://127.0.0.1:9050{url_path}", wait_until="networkidle", timeout=15000)
+        await page.screenshot(path="{screenshots_dir}/{shot_name}.png", full_page=True)
+        await browser.close()
+asyncio.run(main())
+"""
+                            try:
+                                r = subprocess.run(
+                                    ["python3", "-c", shot_script],
+                                    capture_output=True, text=True, timeout=30
+                                )
+                                if r.returncode == 0 and (screenshots_dir / f"{shot_name}.png").exists():
+                                    shot_paths_srv.append(f"screenshots/{shot_name}.png")
+                            except Exception:
+                                pass
+
+                        if shot_paths_srv:
+                            shot_msg = f"Screenshots du serveur (HTTP {http_code}) :\n" + "\n".join(
+                                f"[SCREENSHOT:{p}]" for p in shot_paths_srv
+                            )
+                            await push_sse(session_id, {
+                                "type": "message",
+                                "from_agent": "system",
+                                "from_name": "CI/CD",
+                                "from_role": "Pipeline",
+                                "content": shot_msg,
+                                "phase_id": phase_id,
+                                "msg_type": "text",
+                            })
+                        else:
+                            await push_sse(session_id, {
+                                "type": "message",
+                                "from_agent": "system",
+                                "from_name": "CI/CD",
+                                "from_role": "Pipeline",
+                                "content": f"Serveur démarré (HTTP {http_code}) mais screenshots échoués",
+                                "phase_id": phase_id,
+                                "msg_type": "text",
+                            })
+                    # Kill server
+                    try:
+                        subprocess.os.killpg(subprocess.os.getpgid(server_proc.pid), signal.SIGTERM)
+                    except Exception:
+                        try:
+                            server_proc.kill()
+                        except Exception:
+                            pass
+            except Exception as e:
+                logger.warning("Post-sprint server screenshot failed: %s", e)
     if "deploy" in phase_key:
+        ws = Path(workspace)
+        # Docker build + run if Dockerfile exists
+        if (ws / "Dockerfile").exists():
+            container_name = f"mission-{mission.id}"
+            try:
+                # Build Docker image
+                build_result = subprocess.run(
+                    ["docker", "build", "-t", container_name, "."],
+                    cwd=workspace, capture_output=True, text=True, timeout=300
+                )
+                if build_result.returncode == 0:
+                    await push_sse(session_id, {
+                        "type": "message",
+                        "from_agent": "system",
+                        "from_name": "CI/CD",
+                        "from_role": "Pipeline",
+                        "content": f"Docker image {container_name} construite avec succès",
+                        "phase_id": phase_id,
+                        "msg_type": "text",
+                    })
+                    # Stop existing container if any
+                    subprocess.run(
+                        ["docker", "rm", "-f", container_name],
+                        capture_output=True, timeout=10
+                    )
+                    # Find free port
+                    import socket
+                    port = 9100
+                    for p in range(9100, 9200):
+                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                            if s.connect_ex(("127.0.0.1", p)) != 0:
+                                port = p
+                                break
+                    # Run container
+                    run_result = subprocess.run(
+                        ["docker", "run", "-d", "--name", container_name,
+                         "-p", f"{port}:3000",
+                         "--restart", "unless-stopped",
+                         container_name],
+                        capture_output=True, text=True, timeout=30
+                    )
+                    if run_result.returncode == 0:
+                        import time
+                        time.sleep(3)  # Wait for container to start
+                        # Health check
+                        health = subprocess.run(
+                            ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
+                             f"http://127.0.0.1:{port}/"],
+                            capture_output=True, text=True, timeout=10
+                        )
+                        status_code = health.stdout.strip()
+                        deploy_msg = f"Container {container_name} déployé sur port {port} — HTTP {status_code}"
+                        await push_sse(session_id, {
+                            "type": "message",
+                            "from_agent": "system",
+                            "from_name": "CI/CD",
+                            "from_role": "Pipeline",
+                            "content": deploy_msg,
+                            "phase_id": phase_id,
+                            "msg_type": "text",
+                        })
+                        # Take screenshot of deployed app
+                        screenshots_dir = ws / "screenshots"
+                        screenshots_dir.mkdir(exist_ok=True)
+                        shot_script = f"""
+import asyncio
+from playwright.async_api import async_playwright
+async def main():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page(viewport={{"width": 1280, "height": 720}})
+        await page.goto("http://127.0.0.1:{port}/", wait_until="networkidle", timeout=15000)
+        await page.screenshot(path="{screenshots_dir}/deployed.png", full_page=True)
+        await browser.close()
+asyncio.run(main())
+"""
+                        shot_result = subprocess.run(
+                            ["python3", "-c", shot_script],
+                            capture_output=True, text=True, cwd=workspace, timeout=30
+                        )
+                        if shot_result.returncode == 0 and (screenshots_dir / "deployed.png").exists():
+                            await push_sse(session_id, {
+                                "type": "message",
+                                "from_agent": "system",
+                                "from_name": "CI/CD",
+                                "from_role": "Pipeline",
+                                "content": f"Screenshot du site déployé : [SCREENSHOT:screenshots/deployed.png]",
+                                "phase_id": phase_id,
+                                "msg_type": "text",
+                            })
+                    else:
+                        await push_sse(session_id, {
+                            "type": "message",
+                            "from_agent": "system",
+                            "from_name": "CI/CD",
+                            "from_role": "Pipeline",
+                            "content": f"Docker run échoué: {run_result.stderr[:200]}",
+                            "phase_id": phase_id,
+                            "msg_type": "text",
+                        })
+                else:
+                    await push_sse(session_id, {
+                        "type": "message",
+                        "from_agent": "system",
+                        "from_name": "CI/CD",
+                        "from_role": "Pipeline",
+                        "content": f"Docker build échoué: {build_result.stderr[:200]}",
+                        "phase_id": phase_id,
+                        "msg_type": "text",
+                    })
+            except Exception as e:
+                logger.warning("Docker deploy failed for %s: %s", mission.id, e)
         ws = Path(workspace)
         try:
             files = list(ws.rglob("*"))
@@ -2485,10 +2718,10 @@ async def _qa_screenshots_web(ws: "Path", shots_dir: "Path", platform_type: str)
             # Discover auth/RBAC users if any
             users = _discover_web_users(ws)
 
-            # Generate Playwright journey script
-            journey_script = _build_playwright_journey(port, routes, users, str(shots_dir))
+            # Generate Python Playwright journey script
+            journey_script = _build_playwright_journey_py(port, routes, users, str(shots_dir))
 
-            r = subprocess.run(["node", "-e", journey_script],
+            r = subprocess.run(["python3", "-c", journey_script],
                                capture_output=True, text=True, timeout=90,
                                cwd=str(ws))
 
@@ -2769,7 +3002,74 @@ const {{ chromium }} = require('playwright');
     return script
 
 
+def _build_playwright_journey_py(port: int, routes: list, users: list, shots_dir: str) -> str:
+    """Generate a Python Playwright script that screenshots each route."""
+    base = f"http://localhost:{port}"
 
+    steps = ""
+    step_num = 1
+
+    if users:
+        for user in users[:3]:
+            role = user["role"]
+            steps += f"""
+        # RBAC Journey: {role}
+        await page.goto("{base}/", wait_until="networkidle", timeout=10000)
+        await page.screenshot(path="{shots_dir}/{step_num:02d}_{role}_before_login.png", full_page=True)
+"""
+            step_num += 1
+            for route in routes[:5]:
+                steps += f"""
+        try:
+            await page.goto("{base}{route['path']}", wait_until="networkidle", timeout=10000)
+            await page.screenshot(path="{shots_dir}/{step_num:02d}_{role}_{route['label']}.png", full_page=True)
+        except Exception:
+            pass
+"""
+                step_num += 1
+            steps += "        await context.clear_cookies()\n"
+    else:
+        for route in routes[:10]:
+            label = route["label"]
+            steps += f"""
+        try:
+            await page.goto("{base}{route['path']}", wait_until="networkidle", timeout=10000)
+            await page.screenshot(path="{shots_dir}/{step_num:02d}_{label}.png", full_page=True)
+        except Exception:
+            pass
+"""
+            step_num += 1
+
+    # Mobile viewport
+    steps += f"""
+        await page.set_viewport_size({{"width": 375, "height": 812}})
+        await page.goto("{base}/", wait_until="networkidle", timeout=10000)
+        await page.screenshot(path="{shots_dir}/{step_num:02d}_mobile_home.png", full_page=True)
+"""
+
+    script = f"""
+import asyncio
+from playwright.async_api import async_playwright
+
+async def main():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        context = await browser.new_context(viewport={{"width": 1280, "height": 720}})
+        page = await context.new_page()
+        errors = []
+        page.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" else None)
+        try:
+{steps}
+        except Exception as e:
+            print(f"Journey error: {{e}}")
+        if errors:
+            with open("{shots_dir}/console_errors.txt", "w") as f:
+                f.write("\\n".join(str(e) for e in errors))
+        await browser.close()
+
+asyncio.run(main())
+"""
+    return script
 def _write_status_png(path: "Path", title: str, body: str,
                       bg_color: tuple = (26, 17, 40), width: int = 800, height: int = 400):
     """Generate a status PNG with readable text using Pillow."""

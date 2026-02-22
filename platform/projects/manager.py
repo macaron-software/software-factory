@@ -198,7 +198,7 @@ class ProjectStore:
         for m in provisions:
             try:
                 created.append(ms.create_mission(m))
-                logger.info("Auto-provisioned %s for project %s", m.type, project_id)
+                logger.warning("Auto-provisioned %s for project %s", m.type, project_id)
             except Exception as e:
                 logger.warning("Failed to auto-provision %s for %s: %s", m.type, project_id, e)
         return created

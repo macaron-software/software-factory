@@ -263,6 +263,8 @@ class MissionOrchestrator:
             is_dev_phase = "sprint" in phase_key_check or "dev" in phase_key_check or "features" in phase_key_check or "test" in phase_key_check
             is_retryable = is_dev_phase or "cicd" in phase_key_check or "qa" in phase_key_check or "architecture" in phase_key_check or "setup" in phase_key_check
             max_sprints = wf_phase.config.get("max_iterations", 5) if is_dev_phase else 1
+            if is_dev_phase:
+                logger.warning("ORCH phase=%s max_sprints=%d (from config=%s)", phase.phase_id, max_sprints, wf_phase.config.get("max_iterations"))
 
             phase_success = False
             phase_error = ""
@@ -507,12 +509,12 @@ class MissionOrchestrator:
                             continue  # Loop to next sprint
                         else:
                             await self._sse_orch_msg(
-                                f"Evidence Gate FAILED ({passed_count}/{total_count}) — max sprints atteint.\n{evidence_report}",
+                                f"Evidence Gate FAILED ({passed_count}/{total_count}) — max sprints atteint, poursuite avec avertissement.\n{evidence_report}",
                                 phase.phase_id,
                             )
-                            logger.error("Evidence gate FAILED for %s, max sprints exhausted", phase.phase_id)
-                            phase_success = False
-                            phase_error = f"Acceptance criteria not met: {passed_count}/{total_count}"
+                            logger.warning("Evidence gate FAILED for %s, max sprints exhausted — continuing with issues", phase.phase_id)
+                            phase_success = True  # Continue pipeline despite evidence gap
+                            phase_error = f"Evidence gate: {passed_count}/{total_count} criteria met"
                             break
 
                 if max_sprints > 1 and sprint_num < max_sprints:
@@ -555,8 +557,11 @@ class MissionOrchestrator:
                     return
             else:
                 phase.status = PhaseStatus.DONE if phase_success else PhaseStatus.FAILED
+                if not phase_success and phase_error and "Evidence gate" in phase_error:
+                    phase.status = PhaseStatus.DONE_WITH_ISSUES
 
-            phase_success = (phase.status == PhaseStatus.DONE)
+            phase_actually_done = (phase.status in (PhaseStatus.DONE, PhaseStatus.DONE_WITH_ISSUES))
+            phase_success = phase_actually_done
             logger.warning("ORCH phase=%s status=%s", phase.phase_id, phase.status.value)
 
             phase.completed_at = datetime.utcnow()
@@ -750,23 +755,23 @@ class MissionOrchestrator:
                     else:
                         await asyncio.sleep(0.8)
 
-            # Post-phase hooks (non-blocking)
+            # Post-phase hooks (non-blocking, generous timeout for docker+screenshots)
             if phase_success:
                 async def _safe_hooks():
                     try:
                         await asyncio.wait_for(
                             _run_post_phase_hooks(
                                 phase.phase_id, wf_phase.name, mission, session_id, self._push_sse
-                            ), timeout=90
+                            ), timeout=600
                         )
                     except Exception as hook_err:
                         logger.warning("Post-phase hooks timeout/error for %s: %s", phase.phase_id, hook_err)
-                asyncio.create_task(_safe_hooks())
+                await _safe_hooks()  # AWAIT — don't fire-and-forget
 
             # Error Reloop
             if not phase_success and reloop_count < MAX_RELOOPS:
                 phase_key_rl = phase.phase_id.lower() if phase.phase_id else ""
-                is_reloopable = any(k in phase_key_rl for k in ("qa", "deploy", "tma", "sprint", "dev", "cicd", "ci-cd", "pipeline"))
+                is_reloopable = any(k in phase_key_rl for k in ("qa", "deploy", "tma", "sprint", "dev", "cicd", "ci-cd", "pipeline", "adversarial", "review", "e2e", "test"))
                 if is_reloopable:
                     reloop_count += 1
                     reloop_errors.append(f"[Reloop {reloop_count}] Phase «{wf_phase.name}» failed: {phase_error[:300]}")

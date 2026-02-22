@@ -2,20 +2,22 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# System deps + Node.js 20 + security scanners
+# System deps + Node.js 20 + Playwright browser
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl gnupg ripgrep && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
-    rm -rf /var/lib/apt/lists/*
+    npm install -g @playwright/test && \
+    mkdir -p $PLAYWRIGHT_BROWSERS_PATH && \
+    npx playwright install --with-deps chromium && \
+    chmod -R 755 $PLAYWRIGHT_BROWSERS_PATH && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache
 
 # Python deps + SAST tools
 COPY platform/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt \
     bandit semgrep
-
-# Playwright (chromium only, minimal)
-RUN npx -y playwright install --with-deps chromium
 
 # Copy platform code
 COPY platform/ /app/platform/
