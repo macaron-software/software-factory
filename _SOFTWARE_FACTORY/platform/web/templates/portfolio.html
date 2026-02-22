@@ -215,8 +215,8 @@
                     </button>
                 </div>
             </div>
-            <div class="strat-graph-body" id="stratGraphBody" style="display:none;max-height:180px">
-                <svg id="stratSvg" viewBox="0 0 820 160" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div class="strat-graph-body" id="stratGraphBody" style="max-height:0;overflow:hidden;transition:max-height .3s ease">
+                <svg id="stratSvg" viewBox="0 0 820 180" xmlns="http://www.w3.org/2000/svg"></svg>
             </div>
         </div>
         {% endif %}
@@ -250,6 +250,7 @@
                 <div class="metric-value">{{ total_agents }}</div>
                 <div class="metric-label">{{ _("active_agents") }}</div>
             </div>
+        </div>
         </div><!-- /section-body metrics -->
     </div>
 
@@ -341,6 +342,7 @@
                 </div>
             </a>
             {% endfor %}
+        </div>
         </div><!-- /section-body projects -->
     </div>
 
@@ -398,13 +400,15 @@
                 <div class="gantt-row">
                     <div class="gantt-label" title="{{ e.name }}">{{ e.name[:20] }}{% if e.name|length > 20 %}…{% endif %}</div>
                     <div class="gantt-track">
-                        <div class="gantt-bar" style="left:{{ (loop.index0 * 8)|int }}%;width:{{ e.pct|int + 15 }}%;background:{{ colors[loop.index0 % 6] }}">
+                        {% set bar_width = [e.pct|int, 8]|max %}
+                        <div class="gantt-bar" style="left:0;width:{{ bar_width }}%;background:{{ colors[loop.index0 % 6] }}">
                             {{ e.pct }}%
                         </div>
                     </div>
                 </div>
                 {% endfor %}
             </div>
+        </div>
         </div><!-- /section-body milestones -->
     </div>
     {% endif %}
@@ -664,8 +668,8 @@ function toggleStratGraph(){
     const body = document.getElementById('stratGraphBody');
     const chev = document.querySelector('.strat-graph-chevron');
     if(!body) return;
-    const open = body.style.display !== 'none';
-    body.style.display = open ? 'none' : 'block';
+    const open = body.style.maxHeight !== '0px';
+    body.style.maxHeight = open ? '0px' : '250px';
     if(chev) chev.style.transform = open ? 'rotate(-90deg)' : 'rotate(0deg)';
     localStorage.setItem('strat_graph_open', open ? '0' : '1');
 }
@@ -675,7 +679,7 @@ if(STRAT_GRAPH.nodes && STRAT_GRAPH.nodes.length){
     if(localStorage.getItem('strat_graph_open') === '1'){
         const body = document.getElementById('stratGraphBody');
         const chev = document.querySelector('.strat-graph-chevron');
-        if(body) body.style.display = 'block';
+        if(body) body.style.maxHeight = '250px';
         if(chev) chev.style.transform = 'rotate(0deg)';
     }
 }

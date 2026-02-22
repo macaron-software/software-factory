@@ -135,8 +135,17 @@ async def portfolio_page(request: Request):
         })
 
     # Build epics progression table (from live phase data)
+    # Filter out spam/invalid missions (xxxx, empty names, duplicates)
     epics_data = []
+    seen_names: set = set()
     for m in all_missions:
+        # Skip spam/invalid
+        if not m.name or len(set(m.name[:20])) <= 2:
+            continue
+        # Skip duplicates by name
+        if m.name in seen_names:
+            continue
+        seen_names.add(m.name)
         run = runs_by_mission.get(m.id)
         if run and run.phases:
             t_total = len(run.phases)
@@ -160,7 +169,11 @@ async def portfolio_page(request: Request):
             "current_phase": current_name,
             "run_status": run_status,
         })
-    epics_data.sort(key=lambda e: e["pct"], reverse=True)
+    epics_data.sort(key=lambda e: (
+        0 if e["run_status"] in ("running", "in_progress") else 1,
+        -e["pct"], e["name"]
+    ))
+    epics_data = epics_data[:20]  # Cap at 20 for readability
 
     # Load strategic committee graph from workflow
     strat_graph = {"nodes": [], "edges": []}
