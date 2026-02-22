@@ -143,9 +143,9 @@
 .pi-section-body.view-list .epic-stats{margin:0;gap:0.8rem}
 .pi-section-body.view-list .epic-progress{max-width:160px}
 .pi-section-body.view-list .tma-board{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;gap:1rem}
-.pi-section-body.view-list .tma-col-header{display:none}
-.pi-section-body.view-list .tma-col{display:contents}
-.pi-section-body.view-list .tma-col-body{display:contents}
+.pi-section-body.view-list .tma-col-header{display:flex!important;align-items:center;gap:0.4rem}
+.pi-section-body.view-list .tma-col{display:flex!important;flex-direction:column}
+.pi-section-body.view-list .tma-col-body{display:flex!important;flex-direction:column;gap:0.5rem}
 .pi-section-body.view-list .tma-card{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:0.6rem;padding:0.5rem 0.8rem;border-radius:6px;width:100%;margin-bottom:0.35rem}
 .pi-section-body.view-list .tma-card-desc{display:none}
 .pi-section-body.view-list .tma-card-header{margin-bottom:0}
@@ -162,9 +162,9 @@
 .pi-section-body.view-compact .epic-desc,.pi-section-body.view-compact .epic-features,.pi-section-body.view-compact .epic-toggle,.pi-section-body.view-compact .epic-stats{display:none}
 .pi-section-body.view-compact .epic-header>div:last-child{flex-shrink:0}
 .pi-section-body.view-compact .tma-board{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;gap:1rem}
-.pi-section-body.view-compact .tma-col-header{display:none}
-.pi-section-body.view-compact .tma-col{display:contents}
-.pi-section-body.view-compact .tma-col-body{display:contents;gap:0}
+.pi-section-body.view-compact .tma-col-header{display:flex!important;align-items:center;gap:0.4rem;font-size:0.75rem}
+.pi-section-body.view-compact .tma-col{display:flex!important;flex-direction:column}
+.pi-section-body.view-compact .tma-col-body{display:flex!important;flex-direction:column;gap:0.35rem}
 .pi-section-body.view-compact .tma-card{display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0.8rem;border-radius:0;border:none;border-bottom:1px solid var(--border);background:transparent}
 .pi-section-body.view-compact .tma-card:hover{background:var(--bg-secondary)}
 .pi-section-body.view-compact .tma-card-desc,.pi-section-body.view-compact .tma-card-footer{display:none}
