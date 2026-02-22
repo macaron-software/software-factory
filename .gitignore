@@ -1,53 +1,48 @@
-# Monorepo private directories (NEVER push these)
+
+__pycache__/
 _FACTORY_CORE/
 _FINARY/
 _MIGRATION_FACTORY/
+_SOFTWARE_FACTORY-old/
 _SOFTWARE_FACTORY/
-
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.egg-info/
+!.env.example
+.DS_Store
 .eggs/
-dist/
-build/
-
-# Data (SQLite DBs, logs, workspaces — too large for git)
-data/
-*.db
-*.db-wal
-*.db-shm
-
-# Logs
-*.log
-logs/
-
-# Environment secrets
 .env
 .env.*
-!.env.example
+.github/copilot-instructions.md
+.idea/
+.vscode/
+*.db
+*.db-shm
+*.db-wal
+*.egg-info/
 *.key
-
+*.log
+*.pyc
+*.pyo
+*.swo
+*.swp
+*~
+# Data (SQLite DBs, logs, workspaces — too large for git)
 # Deployment credentials (VPS, DNS, API keys)
-deploy/setup-dns.sh
+# Environment secrets
+# IDE
+# Logs
+# Monorepo private directories (NEVER push these)
+# OS
+# Python
+build/
+CLAUDE.md
+data/
+deploy/.env
+deploy/credentials.txt
 deploy/deploy-vps.sh
 deploy/MANUAL_DEPLOY.md
 deploy/QUICK_DEPLOY.md
-deploy/.env
-deploy/credentials.txt
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-platform/tests/e2e/test-results/
+deploy/setup-dns.sh
+dist/
+logs/
 platform/tests/e2e/playwright-report/
-CLAUDE.md
-.github/copilot-instructions.md
+platform/tests/e2e/test-results/
+Thumbs.db
