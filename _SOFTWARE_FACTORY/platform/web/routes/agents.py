@@ -310,11 +310,68 @@ async def skill_detail(request: Request, skill_id: str):
 @router.get("/mcps", response_class=HTMLResponse)
 async def mcps_page(request: Request):
     """MCP registry."""
+    from ...mcps.store import get_mcp_store
+    from ...mcps.manager import get_mcp_manager
+    store = get_mcp_store()
+    manager = get_mcp_manager()
+    mcps = store.list()
+    # Enrich with live status
+    for mcp in mcps:
+        proc = manager._processes.get(mcp.id)
+        if proc and proc.is_running:
+            mcp.status = "running"
     return _templates(request).TemplateResponse("mcps.html", {
         "request": request,
         "page_title": "MCPs",
-        "mcps": [],  # TODO: MCPStore
+        "mcps": mcps,
     })
+
+
+@router.post("/api/mcps/{mcp_id}/start")
+async def api_mcp_start(mcp_id: str):
+    """Start an MCP server."""
+    from ...mcps.manager import get_mcp_manager
+    manager = get_mcp_manager()
+    ok, msg = await manager.start(mcp_id)
+    return {"ok": ok, "message": msg}
+
+
+@router.post("/api/mcps/{mcp_id}/stop")
+async def api_mcp_stop(mcp_id: str):
+    """Stop an MCP server."""
+    from ...mcps.manager import get_mcp_manager
+    manager = get_mcp_manager()
+    ok, msg = await manager.stop(mcp_id)
+    return {"ok": ok, "message": msg}
+
+
+@router.post("/api/mcps/{mcp_id}/test")
+async def api_mcp_test(mcp_id: str):
+    """Test an MCP server — start, discover tools, test call."""
+    from ...mcps.manager import get_mcp_manager
+    manager = get_mcp_manager()
+    result = await manager.test(mcp_id)
+    return result
+
+
+@router.post("/api/mcps/{mcp_id}/call")
+async def api_mcp_call(mcp_id: str, request: Request):
+    """Call a tool on a running MCP server."""
+    from ...mcps.manager import get_mcp_manager
+    body = await request.json()
+    tool_name = body.get("tool", "")
+    arguments = body.get("arguments", {})
+    manager = get_mcp_manager()
+    result = await manager.call_tool(mcp_id, tool_name, arguments)
+    return {"result": result}
+
+
+@router.get("/api/mcps/status")
+async def api_mcps_status():
+    """Get status of all MCP servers."""
+    from ...mcps.manager import get_mcp_manager
+    manager = get_mcp_manager()
+    return {"mcps": manager.status()}
 
 
 # ── Org Tree ─────────────────────────────────────────────────────
