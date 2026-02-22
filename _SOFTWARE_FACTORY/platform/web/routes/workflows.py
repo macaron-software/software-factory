@@ -51,6 +51,12 @@ async def workflow_new(request: Request):
     })
 
 
+@router.get("/workflows/{wf_id}", response_class=HTMLResponse)
+async def workflow_detail(request: Request, wf_id: str):
+    """Redirect to edit view (detail = edit for workflows)."""
+    return RedirectResponse(f"/workflows/{wf_id}/edit", status_code=302)
+
+
 @router.get("/workflows/{wf_id}/edit", response_class=HTMLResponse)
 async def workflow_edit(request: Request, wf_id: str):
     """Edit workflow form."""
