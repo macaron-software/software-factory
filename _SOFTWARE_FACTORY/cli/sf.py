@@ -58,7 +58,7 @@ def get_backend(args):
     # Fallback to DB
     try:
         from cli._db import DBBackend
-        db_path = getattr(args, "db_path", None)
+        db_path = getattr(args, "db_path", None) or os.environ.get("SF_DB_PATH")
         return DBBackend(db_path)
     except FileNotFoundError:
         out.error(f"No server at {args.url} and no local DB found")
