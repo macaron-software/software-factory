@@ -1842,8 +1842,8 @@ const {{ chromium }} = require('playwright');
                     "msg_type": "text",
                 })
 
-    # After CI/CD phase: run build if package.json or Dockerfile exists
-    if "cicd" in phase_key or "pipeline" in phase_key:
+    # After CI/CD or TDD Sprint phase: run build if package.json or Dockerfile exists
+    if any(k in phase_key for k in ("cicd", "pipeline", "sprint", "dev")):
         ws = Path(workspace)
         try:
             if (ws / "package.json").exists():
@@ -1860,26 +1860,158 @@ const {{ chromium }} = require('playwright');
                     "phase_id": phase_id,
                     "msg_type": "text",
                 })
-            if (ws / "Dockerfile").exists():
-                result = subprocess.run(
-                    ["docker", "build", "-t", f"mission-{mission.id}", "."],
-                    cwd=workspace, capture_output=True, text=True, timeout=300
-                )
-                build_msg = f"Docker image mission-{mission.id} construite" if result.returncode == 0 else f"Docker build échoué: {result.stderr[:200]}"
-                await push_sse(session_id, {
-                    "type": "message",
-                    "from_agent": "system",
-                    "from_name": "CI/CD",
-                    "from_role": "Pipeline",
-                    "content": build_msg,
-                    "phase_id": phase_id,
-                    "msg_type": "text",
-                })
+                # Run build script if exists
+                import json as _json
+                try:
+                    pkg = _json.loads((ws / "package.json").read_text())
+                    if "build" in (pkg.get("scripts") or {}):
+                        build_result = subprocess.run(
+                            ["npm", "run", "build"], cwd=workspace, capture_output=True, text=True, timeout=120
+                        )
+                        build_status = "réussi" if build_result.returncode == 0 else f"échoué: {build_result.stderr[:200]}"
+                        await push_sse(session_id, {
+                            "type": "message",
+                            "from_agent": "system",
+                            "from_name": "CI/CD",
+                            "from_role": "Pipeline",
+                            "content": f"npm run build {build_status}",
+                            "phase_id": phase_id,
+                            "msg_type": "text",
+                        })
+                    if "test" in (pkg.get("scripts") or {}):
+                        test_result = subprocess.run(
+                            ["npm", "test"], cwd=workspace, capture_output=True, text=True, timeout=120,
+                            env={**dict(subprocess.os.environ), "CI": "true"},
+                        )
+                        test_status = "réussi" if test_result.returncode == 0 else f"échoué: {test_result.stderr[:200]}"
+                        await push_sse(session_id, {
+                            "type": "message",
+                            "from_agent": "system",
+                            "from_name": "CI/CD",
+                            "from_role": "Pipeline",
+                            "content": f"npm test {test_status}",
+                            "phase_id": phase_id,
+                            "msg_type": "text",
+                        })
+                except Exception:
+                    pass
         except Exception as e:
             logger.error("Post-phase build failed: %s", e)
 
-    # After deploy phase: list workspace files as proof
+    # After deploy phase: Docker build+run + list workspace files as proof
     if "deploy" in phase_key:
+        ws = Path(workspace)
+        # Docker build + run if Dockerfile exists
+        if (ws / "Dockerfile").exists():
+            container_name = f"mission-{mission.id}"
+            try:
+                # Build Docker image
+                build_result = subprocess.run(
+                    ["docker", "build", "-t", container_name, "."],
+                    cwd=workspace, capture_output=True, text=True, timeout=300
+                )
+                if build_result.returncode == 0:
+                    await push_sse(session_id, {
+                        "type": "message",
+                        "from_agent": "system",
+                        "from_name": "CI/CD",
+                        "from_role": "Pipeline",
+                        "content": f"Docker image {container_name} construite avec succès",
+                        "phase_id": phase_id,
+                        "msg_type": "text",
+                    })
+                    # Stop existing container if any
+                    subprocess.run(
+                        ["docker", "rm", "-f", container_name],
+                        capture_output=True, timeout=10
+                    )
+                    # Find free port
+                    import socket
+                    port = 9100
+                    for p in range(9100, 9200):
+                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                            if s.connect_ex(("127.0.0.1", p)) != 0:
+                                port = p
+                                break
+                    # Run container
+                    run_result = subprocess.run(
+                        ["docker", "run", "-d", "--name", container_name,
+                         "-p", f"{port}:3000",
+                         "--restart", "unless-stopped",
+                         container_name],
+                        capture_output=True, text=True, timeout=30
+                    )
+                    if run_result.returncode == 0:
+                        import time
+                        time.sleep(3)  # Wait for container to start
+                        # Health check
+                        health = subprocess.run(
+                            ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
+                             f"http://127.0.0.1:{port}/"],
+                            capture_output=True, text=True, timeout=10
+                        )
+                        status_code = health.stdout.strip()
+                        deploy_msg = f"Container {container_name} déployé sur port {port} — HTTP {status_code}"
+                        await push_sse(session_id, {
+                            "type": "message",
+                            "from_agent": "system",
+                            "from_name": "CI/CD",
+                            "from_role": "Pipeline",
+                            "content": deploy_msg,
+                            "phase_id": phase_id,
+                            "msg_type": "text",
+                        })
+                        # Take screenshot of deployed app
+                        screenshots_dir = ws / "screenshots"
+                        screenshots_dir.mkdir(exist_ok=True)
+                        shot_script = f"""
+import asyncio
+from playwright.async_api import async_playwright
+async def main():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page(viewport={{"width": 1280, "height": 720}})
+        await page.goto("http://127.0.0.1:{port}/", wait_until="networkidle", timeout=15000)
+        await page.screenshot(path="{screenshots_dir}/deployed.png", full_page=True)
+        await browser.close()
+asyncio.run(main())
+"""
+                        shot_result = subprocess.run(
+                            ["python3", "-c", shot_script],
+                            capture_output=True, text=True, cwd=workspace, timeout=30
+                        )
+                        if shot_result.returncode == 0 and (screenshots_dir / "deployed.png").exists():
+                            await push_sse(session_id, {
+                                "type": "message",
+                                "from_agent": "system",
+                                "from_name": "CI/CD",
+                                "from_role": "Pipeline",
+                                "content": f"Screenshot du site déployé : [SCREENSHOT:screenshots/deployed.png]",
+                                "phase_id": phase_id,
+                                "msg_type": "text",
+                            })
+                    else:
+                        await push_sse(session_id, {
+                            "type": "message",
+                            "from_agent": "system",
+                            "from_name": "CI/CD",
+                            "from_role": "Pipeline",
+                            "content": f"Docker run échoué: {run_result.stderr[:200]}",
+                            "phase_id": phase_id,
+                            "msg_type": "text",
+                        })
+                else:
+                    await push_sse(session_id, {
+                        "type": "message",
+                        "from_agent": "system",
+                        "from_name": "CI/CD",
+                        "from_role": "Pipeline",
+                        "content": f"Docker build échoué: {build_result.stderr[:200]}",
+                        "phase_id": phase_id,
+                        "msg_type": "text",
+                    })
+            except Exception as e:
+                logger.warning("Docker deploy failed for %s: %s", mission.id, e)
         ws = Path(workspace)
         try:
             files = list(ws.rglob("*"))

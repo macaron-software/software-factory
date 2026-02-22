@@ -766,7 +766,7 @@ class MissionOrchestrator:
             # Error Reloop
             if not phase_success and reloop_count < MAX_RELOOPS:
                 phase_key_rl = phase.phase_id.lower() if phase.phase_id else ""
-                is_reloopable = any(k in phase_key_rl for k in ("qa", "deploy", "tma", "sprint", "dev", "cicd", "ci-cd", "pipeline"))
+                is_reloopable = any(k in phase_key_rl for k in ("qa", "deploy", "tma", "sprint", "dev", "cicd", "ci-cd", "pipeline", "adversarial", "review", "e2e", "test"))
                 if is_reloopable:
                     reloop_count += 1
                     reloop_errors.append(f"[Reloop {reloop_count}] Phase «{wf_phase.name}» failed: {phase_error[:300]}")

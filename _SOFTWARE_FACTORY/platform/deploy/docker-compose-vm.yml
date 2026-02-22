@@ -23,7 +23,7 @@ services:
     volumes:
       - platform-data:/app/data
       - /opt/macaron/.factory-keys:/app/.config/factory:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock
       - /opt/macaron/repos:/opt/macaron/repos
     restart: unless-stopped
     healthcheck:
