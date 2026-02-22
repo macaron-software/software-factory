@@ -185,31 +185,43 @@ def _get_tool_schemas() -> list[dict]:
         {
             "type": "function",
             "function": {
-                "name": "docker_build",
-                "description": "Build a Docker image from a project directory containing a Dockerfile.",
+                "name": "docker_deploy",
+                "description": "Build and run the workspace project as a Docker container. Auto-generates Dockerfile if missing, installs deps, builds image, starts container, health-checks. Returns live URL. Use this to ACTUALLY deploy generated code.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "cwd": {"type": "string", "description": "Project directory containing the Dockerfile"},
-                        "image_name": {"type": "string", "description": "Name for the Docker image (e.g. 'macaron-iot-dashboard')"},
+                        "cwd": {"type": "string", "description": "Project workspace directory containing the code to deploy"},
+                        "mission_id": {"type": "string", "description": "Mission ID (used for container naming and tracking)"},
                     },
-                    "required": ["cwd", "image_name"],
+                    "required": ["cwd"],
                 },
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "deploy_azure",
-                "description": "Deploy a Docker image to the Azure VM (4.233.64.30). Saves the image, transfers via SCP, loads and runs on the VM. Returns the public URL.",
+                "name": "docker_stop",
+                "description": "Stop and remove a deployed container.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "image_name": {"type": "string", "description": "Docker image name to deploy (must be built first)"},
-                        "container_port": {"type": "integer", "description": "Port the app listens on inside the container (e.g. 8080)"},
-                        "host_port": {"type": "integer", "description": "Port to expose on the VM (0 = auto-assign)"},
+                        "mission_id": {"type": "string", "description": "Mission ID of the container to stop"},
+                        "container": {"type": "string", "description": "Container name (alternative to mission_id)"},
                     },
-                    "required": ["image_name", "container_port"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "docker_status",
+                "description": "Check status of a deployed container (running/stopped, URL, recent logs).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "mission_id": {"type": "string", "description": "Mission ID to check"},
+                        "container": {"type": "string", "description": "Container name (alternative to mission_id)"},
+                    },
                 },
             },
         },
@@ -1167,7 +1179,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "list_files", "deep_search", "fractal_code",
         "memory_search", "memory_store", "get_project_context",
         "build", "test",
-        "docker_build", "screenshot", "simulator_screenshot",
+        "docker_deploy", "docker_status", "screenshot", "simulator_screenshot",
         "lrm_locate", "lrm_conventions", "lrm_build", "lrm_examples",
         "github_prs", "github_code_search",
         "android_build", "android_test", "android_lint",
@@ -1192,7 +1204,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
     "devops": [
         "code_read", "code_write", "code_edit", "code_search",
         "git_status", "git_log", "git_diff", "git_commit",
-        "list_files", "docker_build", "deploy_azure",
+        "list_files", "docker_deploy", "docker_stop", "docker_status",
         "build", "test", "browser_screenshot",
         "memory_search", "memory_store", "get_project_context",
         "lrm_build",

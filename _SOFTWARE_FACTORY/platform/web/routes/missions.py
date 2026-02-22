@@ -3102,10 +3102,14 @@ _WEB_QA = {
     ),
     "deploy-prod": (
         "TYPE: Application web\n"
-        "1. docker_build pour image\n"
-        "2. deploy_azure\n"
-        "3. screenshot url=URL_DEPLOYEE filename='deploy_final.png'\n"
-        "4. Validation finale"
+        "DEPLOIEMENT REEL — Utilisez docker_deploy pour builder+run le container:\n"
+        "1. docker_deploy cwd=WORKSPACE_PATH mission_id=MISSION_ID\n"
+        "   → Auto-genere Dockerfile si absent, installe deps, build image, run container\n"
+        "   → Retourne l'URL live du container\n"
+        "2. docker_status mission_id=MISSION_ID pour verifier le container\n"
+        "3. screenshot url=URL_RETOURNEE filename='deploy_final.png'\n"
+        "4. Si health check echoue: docker_status pour les logs, corrigez, recommencez\n"
+        "IMPORTANT: PAS de discussion sur le deploiement. EXECUTEZ docker_deploy."
     ),
     "cicd": (
         "TYPE: Application web\n"
@@ -3322,6 +3326,10 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
             f"{prev_context}\n"
             "Utilisez ce contexte. Lisez le workspace avec list_files et code_read pour voir le travail déjà fait."
         )
+
+    # Inject workspace path so agents know where to work
+    if workspace_path:
+        prompt += f"\n\nWORKSPACE: {workspace_path}\nUtilisez ce chemin pour cwd dans vos outils (code_write, build, docker_deploy, etc.)."
 
     return prompt
 

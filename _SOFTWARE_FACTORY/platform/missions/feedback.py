@@ -106,6 +106,39 @@ def on_tma_incident_fixed(project_id: str, incident_key: str):
     return None
 
 
+def on_deploy_failed(project_id: str, epic_mission_id: str, error: str = ""):
+    """Post-deploy failure: create a TMA incident ticket with error details."""
+    from .store import get_mission_store, MissionDef
+    ms = get_mission_store()
+    missions = ms.list_missions(project_id=project_id)
+
+    # Find TMA mission, activate it
+    tma = next((m for m in missions if m.type == "program"
+                and (m.config or {}).get("auto_provisioned")
+                and "tma" in m.workflow_id.lower()), None)
+    if tma and tma.status != "active":
+        tma.status = "active"
+        ms.update_mission(tma)
+
+    # Create incident bug mission
+    incident = MissionDef(
+        name=f"Deploy failure: {error[:80]}",
+        description=f"Docker deployment failed for mission {epic_mission_id}.\nError: {error[:500]}",
+        goal="Fix the deployment error and redeploy successfully.",
+        status="active", type="bug",
+        project_id=project_id, workflow_id="sf-pipeline",
+        parent_mission_id=tma.id if tma else None,
+        wsjf_score=18,
+        created_by="deploy_pipeline",
+        config={"auto_created": True, "deploy_error": True, "source_mission": epic_mission_id},
+    )
+    incident = ms.create_mission(incident)
+    logger.info("Created deploy failure incident %s for project %s", incident.id, project_id)
+    emit_reaction(ReactionEvent.DEPLOY_FAILED, project_id,
+                  mission_id=epic_mission_id, message=f"Deploy failed: {error[:200]}")
+    return incident
+
+
 def on_security_alert(project_id: str, cve_id: str, severity: str = "critical",
                       description: str = ""):
     """Create a priority bug mission for critical security vulnerabilities."""

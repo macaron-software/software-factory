@@ -203,6 +203,7 @@ class MissionOrchestrator:
             )
 
             phase_task = _build_phase_prompt(wf_phase.name, pattern_type, mission.brief, i, len(mission.phases), prev_context, workspace_path=workspace)
+            phase_task += f"\nMISSION_ID: {mission.id}"
 
             # Sprint loop
             phase_key_check = wf_phase.name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
@@ -609,6 +610,15 @@ class MissionOrchestrator:
                         on_deploy_completed(mission.project_id, mission.id)
                 except Exception as _fb_err:
                     logger.warning("Feedback on_deploy_completed failed: %s", _fb_err)
+
+            # Feedback: create TMA incident on deploy failure
+            if not phase_success and phase.phase_id in ("deploy-prod", "deploy"):
+                try:
+                    from ..missions.feedback import on_deploy_failed
+                    if mission.project_id:
+                        on_deploy_failed(mission.project_id, mission.id, phase_error or "Deploy phase failed")
+                except Exception as _fb_err:
+                    logger.warning("Feedback on_deploy_failed failed: %s", _fb_err)
 
             # Feedback loop: track TMA fix for recurring incident detection
             if phase_success and phase.phase_id in ("fix", "tma-fix", "validate"):
