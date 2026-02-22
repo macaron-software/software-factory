@@ -304,7 +304,7 @@
         <!-- Danger Zone -->
         <div style="margin-top:2rem;padding-top:1rem;border-top:1px solid rgba(239,68,68,.2)">
             <h4 style="font-size:0.72rem;text-transform:uppercase;color:var(--red);opacity:.7;margin-bottom:0.5rem;letter-spacing:0.05em">Zone dangereuse</h4>
-            <button class="btn btn-sm btn-danger" style="width:100%" onclick="deleteProject('{{ project.id }}','{{ project.name|replace(\"'\",\"\\\\'\") }}')">
+            <button class="btn btn-sm btn-danger" style="width:100%" onclick="deleteProject('{{ project.id }}','{{ project.name|replace("'","&#39;") }}')">
                 <svg style="width:13px;height:13px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 Supprimer ce projet
             </button>
