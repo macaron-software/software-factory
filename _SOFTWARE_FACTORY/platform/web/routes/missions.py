@@ -950,9 +950,16 @@ async def api_mission_start(request: Request):
 
     # Auto-provision TMA, Security, Debt missions for the project
     try:
-        from ...projects.manager import get_project_store
+        from ...projects.manager import get_project_store, Project
         _ps = get_project_store()
-        if project_id and _ps.get(project_id):
+        if project_id and not _ps.get(project_id):
+            _ps.create(Project(
+                id=project_id,
+                name=brief[:60] or wf.name,
+                path=workspace_path,
+                description=brief[:200],
+            ))
+        if project_id:
             _ps.auto_provision(project_id, brief[:60] or wf.name)
     except Exception as _prov_err:
         logger.warning("auto_provision failed for %s: %s", project_id, _prov_err)
