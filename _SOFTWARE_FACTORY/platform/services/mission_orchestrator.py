@@ -262,7 +262,9 @@ class MissionOrchestrator:
             phase_key_check = wf_phase.name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
             is_dev_phase = "sprint" in phase_key_check or "dev" in phase_key_check or "features" in phase_key_check or "test" in phase_key_check
             is_retryable = is_dev_phase or "cicd" in phase_key_check or "qa" in phase_key_check or "architecture" in phase_key_check or "setup" in phase_key_check
-            max_sprints = wf_phase.config.get("max_iterations", 5) if is_dev_phase else 1
+            # Evidence gate only for TDD sprints (not E2E/QA which can't run tests)
+            is_evidence_gated = "sprint" in phase_key_check and "e2e" not in phase_key_check
+            max_sprints = wf_phase.config.get("max_iterations", 5 if is_evidence_gated else 2) if is_dev_phase else 1
             if is_dev_phase:
                 logger.warning("ORCH phase=%s max_sprints=%d (from config=%s)", phase.phase_id, max_sprints, wf_phase.config.get("max_iterations"))
 
@@ -477,7 +479,7 @@ class MissionOrchestrator:
                         break
 
                 # ── Evidence Gate: check acceptance criteria after dev sprints ──
-                if is_dev_phase and acceptance_criteria and workspace:
+                if is_evidence_gated and acceptance_criteria and workspace:
                     # Reset criteria for fresh check
                     for c in acceptance_criteria:
                         c.passed = False

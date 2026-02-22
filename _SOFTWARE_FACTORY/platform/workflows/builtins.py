@@ -1694,6 +1694,7 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     gate="all_approved",
                     config={
                         "agents": ["ft-e2e-api", "ft-e2e-ihm"],
+                        "max_iterations": 2,
                     },
                 ),
                 WorkflowPhase(
