@@ -16,6 +16,7 @@ from .sessions import router as sessions_router
 from .workflows import router as workflows_router
 from .ideation import router as ideation_router
 from .api import router as api_router
+from .cli import router as cli_router  # NEW: CLI API
 
 router.include_router(pages_router)
 router.include_router(projects_router)
@@ -25,6 +26,7 @@ router.include_router(sessions_router)
 router.include_router(workflows_router)
 router.include_router(ideation_router)
 router.include_router(api_router)
+router.include_router(cli_router)  # NEW: CLI routes
 
 # Workspace file serving (needs to be on the main router)
 router.add_api_route("/workspace/{path:path}", serve_workspace_file, methods=["GET"])
