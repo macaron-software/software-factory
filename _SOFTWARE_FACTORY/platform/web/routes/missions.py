@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, FileResponse
 
-from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, _mission_semaphore, serve_workspace_file
+from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, _mission_semaphore, serve_workspace_file, _parse_body, _is_json_request
 from ...i18n import t
 
 router = APIRouter()
@@ -139,16 +139,20 @@ async def mission_detail_page(request: Request, mission_id: str):
 async def create_mission(request: Request):
     """Create a new mission."""
     from ...missions.store import get_mission_store, MissionDef
-    form = await request.form()
+    data = await _parse_body(request)
     m = MissionDef(
-        project_id=form.get("project_id", ""),
-        name=form.get("name", t("mission_default_name", lang=getattr(request.state, "lang", "en"))),
-        goal=form.get("goal", ""),
-        wsjf_score=float(form.get("wsjf_score", 0)),
+        project_id=data.get("project_id", ""),
+        name=data.get("name", t("mission_default_name", lang=getattr(request.state, "lang", "en"))),
+        description=data.get("description", ""),
+        goal=data.get("goal", ""),
+        type=data.get("type", "feature"),
+        wsjf_score=float(data.get("wsjf_score", 0)),
         created_by="user",
     )
     mission_store = get_mission_store()
     m = mission_store.create_mission(m)
+    if _is_json_request(request):
+        return JSONResponse({"ok": True, "mission": {"id": m.id, "name": m.name}})
     return RedirectResponse(f"/missions/{m.id}", status_code=303)
 
 
@@ -692,21 +696,21 @@ async def api_mission_start(request: Request):
     import uuid
     from datetime import datetime
 
-    form = await request.form()
-    workflow_id = str(form.get("workflow_id", ""))
-    brief = str(form.get("brief", "")).strip()
+    data = await _parse_body(request)
+    workflow_id = str(data.get("workflow_id", ""))
+    brief = str(data.get("brief", "")).strip()
     # Fix double-encoded UTF-8 (curl sends UTF-8 bytes interpreted as latin-1)
     try:
         brief = brief.encode("latin-1").decode("utf-8")
     except (UnicodeDecodeError, UnicodeEncodeError):
         pass
-    project_id = str(form.get("project_id", ""))
+    project_id = str(data.get("project_id", ""))
 
     # WSJF components from form (SAFe prioritization)
-    bv = float(form.get("business_value", 5))
-    tc = float(form.get("time_criticality", 5))
-    rr = float(form.get("risk_reduction", 3))
-    jd = max(float(form.get("job_duration", 3)), 0.1)
+    bv = float(data.get("business_value", 5))
+    tc = float(data.get("time_criticality", 5))
+    rr = float(data.get("risk_reduction", 3))
+    jd = max(float(data.get("job_duration", 3)), 0.1)
     wsjf_score = round((bv + tc + rr) / jd, 1)
 
     wf = get_workflow_store().get(workflow_id)
@@ -831,8 +835,8 @@ async def mission_chat_stream(request: Request, mission_id: str):
     from ...sessions.runner import _build_context
     from ...memory.manager import get_memory_manager
 
-    form = await request.form()
-    content = str(form.get("content", "")).strip()
+    data = await _parse_body(request)
+    content = str(data.get("content", "")).strip()
     if not content:
         return HTMLResponse("")
 
@@ -841,14 +845,14 @@ async def mission_chat_stream(request: Request, mission_id: str):
     if not mission:
         return HTMLResponse("Mission not found", status_code=404)
 
-    session_id = str(form.get("session_id", "")).strip() or mission.session_id
+    session_id = str(data.get("session_id", "")).strip() or mission.session_id
     sess_store = get_session_store()
     session = sess_store.get(session_id) if session_id else None
     if not session:
         return HTMLResponse("Session not found", status_code=404)
 
     agent_store = get_agent_store()
-    agent_id = str(form.get("agent_id", "")).strip() or "chef_de_programme"
+    agent_id = str(data.get("agent_id", "")).strip() or "chef_de_programme"
     agent = agent_store.get(agent_id)
     if not agent:
         agent = agent_store.get("chef_de_programme")
@@ -1175,8 +1179,8 @@ async def api_mission_validate(request: Request, mission_id: str):
     from ...a2a.bus import get_bus
     from ...models import A2AMessage, MessageType, PhaseStatus
 
-    form = await request.form()
-    decision = str(form.get("decision", "GO")).upper()
+    data = await _parse_body(request)
+    decision = str(data.get("decision", "GO")).upper()
 
     run_store = get_mission_run_store()
     mission = run_store.get(mission_id)
@@ -1715,7 +1719,7 @@ const {{ chromium }} = require('playwright');
     if "qa" in phase_key or "test" in phase_key:
         ws = Path(workspace)
         try:
-            platform_type = _detect_project_platform(str(ws))
+            platform_type = _detect_project_platform(str(ws), brief=mission.brief if hasattr(mission, 'brief') else "")
             screenshots = await _auto_qa_screenshots(ws, platform_type)
             if screenshots:
                 shot_content = f"📸 QA Screenshots ({platform_type}) — {len(screenshots)} captures :\n"
@@ -2716,11 +2720,44 @@ def _write_status_png(path: "Path", title: str, body: str,
     path.with_suffix(".txt").write_text(f"=== {title} ===\n\n{body}")
 
 
-def _detect_project_platform(workspace_path: str) -> str:
-    """Detect project platform from workspace files.
+def _detect_project_platform(workspace_path: str, brief: str = "") -> str:
+    """Detect project platform from brief first, then workspace files.
 
     Returns one of: macos-native, ios-native, android-native, web-docker, web-node, web-static, unknown
     """
+    # --- Priority 1: Check brief/mission text for explicit stack ---
+    if brief:
+        bl = brief.lower()
+        # Explicit web indicators override file detection
+        web_kw = ("react", "vue", "svelte", "angular", "next.js", "nextjs", "nuxt", "vite",
+                  "node.js", "nodejs", "express", "fastapi", "django", "flask", "typescript",
+                  "html", "css", "tailwind", "web app", "webapp", "site web", "website",
+                  "clone", "saas", "dashboard", "figma", "frontend", "full-stack", "fullstack")
+        if any(kw in bl for kw in web_kw):
+            return "web-node"
+        ios_kw = ("ios", "iphone", "ipad", "swiftui", "uikit", "swift app", "apple", "xcode")
+        if any(kw in bl for kw in ios_kw):
+            return "ios-native"
+        macos_kw = ("macos", "mac app", "appkit", "cocoa")
+        if any(kw in bl for kw in macos_kw):
+            return "macos-native"
+        android_kw = ("android", "kotlin", "jetpack", "gradle")
+        if any(kw in bl for kw in android_kw):
+            return "android-native"
+
+    # --- Priority 2: Check .stack file (written by ideation/architecture phase) ---
+    if workspace_path:
+        ws = Path(workspace_path)
+        stack_file = ws / ".stack"
+        if stack_file.exists():
+            try:
+                stack = stack_file.read_text().strip().lower()
+                if stack in ("web-node", "web-docker", "web-static", "ios-native", "macos-native", "android-native"):
+                    return stack
+            except Exception:
+                pass
+
+    # --- Priority 3: Fallback to file detection ---
     if not workspace_path:
         return "unknown"
     ws = Path(workspace_path)
@@ -2734,9 +2771,18 @@ def _detect_project_platform(workspace_path: str) -> str:
     has_node = (ws / "package.json").exists()
     has_docker = (ws / "Dockerfile").exists() or (ws / "docker-compose.yml").exists()
 
-    # Check Swift targets: iOS vs macOS
+    # Web indicators take priority over Swift (prevents accidental Swift bias)
+    if has_node:
+        return "web-node"
+
+    if has_docker:
+        return "web-docker"
+
+    if (ws / "index.html").exists():
+        return "web-static"
+
+    # Swift/Xcode detection only if NO web indicators
     if has_swift or has_xcode:
-        # Look for iOS-specific indicators
         is_ios = False
         for f in [ws / "Package.swift", ws / "project.yml"]:
             if f.exists():
@@ -2746,7 +2792,6 @@ def _detect_project_platform(workspace_path: str) -> str:
                         is_ios = True
                 except Exception:
                     pass
-        # Check source files for UIKit/SwiftUI with iOS patterns
         if not is_ios:
             for src in list((ws / "Sources").rglob("*.swift"))[:20] if (ws / "Sources").exists() else []:
                 try:
@@ -2760,15 +2805,6 @@ def _detect_project_platform(workspace_path: str) -> str:
 
     if has_android or (has_kotlin and not has_node):
         return "android-native"
-
-    if has_docker:
-        return "web-docker"
-
-    if has_node:
-        return "web-node"
-
-    if (ws / "index.html").exists():
-        return "web-static"
 
     return "unknown"
 
@@ -3006,7 +3042,7 @@ async def _extract_features_from_phase(
 
 def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, total: int, prev_context: str = "", workspace_path: str = "") -> str:
     """Build a contextual task prompt for each lifecycle phase."""
-    platform = _detect_project_platform(workspace_path)
+    platform = _detect_project_platform(workspace_path, brief=brief)
 
     # Get platform-specific QA/deploy/cicd prompts
     platform_prompts = _PLATFORM_QA.get(platform, {})
@@ -3065,6 +3101,11 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
         "dev-sprint": (
             f"Sprint de développement TDD pour «{brief}».\n"
             + (f"PLATEFORME: {platform_label}\n" if platform_label else "")
+            + (f"⚠️ STACK OBLIGATOIRE: {platform_label}. NE PAS utiliser une autre technologie.\n"
+               f"{'Utilisez TypeScript/React/Node.js. NE PAS écrire de Swift.' if platform in ('web-node', 'web-docker', 'web-static') else ''}\n"
+               f"{'Utilisez Swift/SwiftUI. NE PAS écrire de TypeScript.' if platform in ('ios-native', 'macos-native') else ''}\n"
+               f"{'Utilisez Kotlin/Java. NE PAS écrire de Swift.' if platform == 'android-native' else ''}\n"
+               if platform_label else "")
             + "VOUS DEVEZ UTILISER VOS OUTILS pour écrire du VRAI code dans le workspace.\n\n"
             "METHODE TDD OBLIGATOIRE (Red-Green-Refactor):\n"
             "1. LIRE LE WORKSPACE: list_files pour voir la structure actuelle\n"
@@ -3086,7 +3127,7 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
             "   - Reporter le taux dans le commit message\n"
             "8. COMMITTER: git_commit avec message descriptif incluant le taux de coverage\n\n"
             "REGLES:\n"
-            "- PAS de code sans test. Chaque fichier .ts/.py/.rs/.swift DOIT avoir son test\n"
+            "- PAS de code sans test. Chaque fichier .ts/.py/.rs DOIT avoir son test\n"
             "- Tests dans __tests__/ ou tests/ (convention du projet)\n"
             "- Chaque dev DOIT appeler code_write au moins 3 fois (tests + code + refactor)\n"
             "- NE DISCUTEZ PAS du code. ECRIVEZ-LE avec code_write.\n"

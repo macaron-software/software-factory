@@ -127,22 +127,21 @@ WORKFLOW:
 3. memory_search(query="conventions, decisions") → learn past decisions
 4. THEN code_write per file → REAL build → git_commit
 
-TOOL: code_write(path="relative/path.swift", content="full source code here")
+TOOL: code_write(path="src/module.ts", content="full source code here")
 
 RULES:
 - ALWAYS read existing code BEFORE writing. Do NOT recreate files that exist.
 - code_write EACH file. 30+ lines per file. No stubs. No placeholders. No fake scripts.
-- Relative paths (Sources/Core/File.swift). Auto-resolved.
+- Use paths matching the project stack (src/ for web, app/ for mobile). Auto-resolved.
+- FOLLOW THE STACK DECIDED IN ARCHITECTURE PHASE. Do NOT switch language.
 - Do NOT describe changes. DO them via code_write.
 - NEVER create fake build scripts (gradlew, Makefile) that do nothing.
 - AFTER writing code, verify with REAL build tools:
+  - Web/Node.js: build(command="npm install && npm run build")
+  - Python: build(command="python3 -m py_compile file.py")
   - Android/Kotlin: android_build() — compiles via Gradle in real SDK container
   - Android tests: android_test() — runs real unit tests
-  - Android lint: android_lint() — static analysis
-  - Android E2E: android_emulator_test() — real emulator tests
-  - Python: build(command="python3 -m py_compile file.py")
-  - Node.js: build(command="npm install && npm run build")
-  - Swift/iOS: build(command="swiftc -parse Sources/*.swift")
+  - Swift/iOS: build(command="swift build") — only for iOS/macOS projects
   - Docker: build(command="docker build -t test .")
 - If build fails, FIX the code and retry. Do NOT commit broken code.
 - Do NOT use generic build() for Android — use android_build() instead."""

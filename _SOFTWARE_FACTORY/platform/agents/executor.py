@@ -476,7 +476,7 @@ class AgentExecutor:
                     messages.append(LLMMessage(
                         role="system",
                         content="⚠️ STOP reading. Call code_write NOW.\n"
-                                "code_write(path=\"Sources/Core/File.swift\", content=\"import Foundation\\n...\")",
+                                "code_write(path=\"src/index.ts\", content=\"// your code here\\n...\")",
                     ))
                 elif round_num >= 2 and has_written and write_count < 2 and tools is not None:
                     messages.append(LLMMessage(
