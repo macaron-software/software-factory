@@ -45,6 +45,12 @@ class CodeWriteTool(BaseTool):
         content = params.get("content", "")
         if not path:
             return "Error: path required"
+        # Reject placeholder/slop content
+        stripped = content.strip()
+        if stripped in ("// your code here\n...", "// your code here", "// TODO", "..."):
+            return "Error: placeholder content rejected — write real implementation code"
+        if len(stripped) < 10 and not path.endswith((".env", ".gitignore", ".gitkeep")):
+            return f"Error: content too short ({len(stripped)} chars) — write real code"
         # Resolve symlinks to prevent path traversal
         path = os.path.realpath(path)
         try:

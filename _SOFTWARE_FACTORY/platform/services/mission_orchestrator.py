@@ -620,7 +620,7 @@ class MissionOrchestrator:
                     if phase.phase_id in ("dev-sprint",):
                         _fdb.execute("UPDATE features SET status='in_progress' WHERE epic_id=? AND status='backlog'", (mission.id,))
                         _fdb.commit()
-                    elif phase.phase_id in ("qa-campaign", "qa-execution", "deploy-prod"):
+                    elif phase.phase_id in ("qa-campaign", "qa-execution", "deploy-prod", "feature-deploy"):
                         _fdb.execute("UPDATE features SET status='done' WHERE epic_id=? AND status='in_progress'", (mission.id,))
                         _fdb.commit()
                     rows = _fdb.execute("SELECT name, status, priority, story_points FROM features WHERE epic_id=?", (mission.id,)).fetchall()
@@ -644,7 +644,7 @@ class MissionOrchestrator:
             })
 
             # Feedback loop: activate TMA after deploy phase
-            if phase_success and phase.phase_id in ("deploy-prod", "deploy", "deploy-feature", "tma-handoff"):
+            if phase_success and phase.phase_id in ("deploy-prod", "deploy", "deploy-feature", "feature-deploy", "tma-handoff"):
                 try:
                     from ..missions.feedback import on_deploy_completed
                     if mission.project_id:
@@ -653,7 +653,7 @@ class MissionOrchestrator:
                     logger.warning("Feedback on_deploy_completed failed: %s", _fb_err)
 
             # Feedback: create TMA incident on deploy failure
-            if not phase_success and phase.phase_id in ("deploy-prod", "deploy", "deploy-feature"):
+            if not phase_success and phase.phase_id in ("deploy-prod", "deploy", "deploy-feature", "feature-deploy"):
                 try:
                     from ..missions.feedback import on_deploy_failed
                     if mission.project_id:
