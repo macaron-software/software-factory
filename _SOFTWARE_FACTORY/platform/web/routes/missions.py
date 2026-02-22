@@ -1,28 +1,41 @@
 """Web routes — Mission lifecycle and execution."""
+
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
-from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, FileResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 
-from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, _mission_semaphore, serve_workspace_file, _parse_body, _is_json_request
 from ...i18n import t
 from ..schemas import (
-    MissionOut, MissionListResponse, MissionCreate, MissionDetail,
-    FeatureOut, FeatureCreate, FeatureUpdate, FeatureDep,
-    StoryOut, StoryCreate, StoryUpdate, SprintOut, SprintCreate,
-    WsjfUpdate, BacklogReorder, OkResponse, ErrorResponse,
+    ErrorResponse,
+    MissionDetail,
+    MissionListResponse,
+    OkResponse,
+    StoryOut,
+)
+from .helpers import (
+    _active_mission_tasks,
+    _is_json_request,
+    _mission_semaphore,
+    _parse_body,
+    _templates,
 )
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 # ── Missions ─────────────────────────────────────────────────────
+
 
 @router.get("/missions", response_class=HTMLResponse)
 async def missions_page(request: Request):
@@ -57,36 +70,43 @@ async def missions_page(request: Request):
         current = next((s.number for s in sprints if s.status == "active"), len(sprints))
         total_t = stats.get("total", 0)
         done_t = stats.get("done", 0)
-        mission_cards.append({
-            "mission": m,
-            "project_name": project_names.get(m.project_id, m.project_id),
-            "sprint_count": len(sprints),
-            "current_sprint": current,
-            "total_tasks": total_t,
-            "done_tasks": done_t,
-            "progress_pct": round(done_t / total_t * 100) if total_t > 0 else 0,
-        })
+        mission_cards.append(
+            {
+                "mission": m,
+                "project_name": project_names.get(m.project_id, m.project_id),
+                "sprint_count": len(sprints),
+                "current_sprint": current,
+                "total_tasks": total_t,
+                "done_tasks": done_t,
+                "progress_pct": round(done_t / total_t * 100) if total_t > 0 else 0,
+            }
+        )
 
     from ...workflows.store import get_workflow_store
+
     all_workflows = get_workflow_store().list_all()
 
-    return _templates(request).TemplateResponse("missions.html", {
-        "request": request, "page_title": "PI Board",
-        "missions": mission_cards,
-        "project_ids": project_ids,
-        "filter_status": filter_status,
-        "filter_project": filter_project,
-        "show_new_form": show_new,
-        "workflows": all_workflows,
-    })
+    return _templates(request).TemplateResponse(
+        "missions.html",
+        {
+            "request": request,
+            "page_title": "PI Board",
+            "missions": mission_cards,
+            "project_ids": project_ids,
+            "filter_status": filter_status,
+            "filter_project": filter_project,
+            "show_new_form": show_new,
+            "workflows": all_workflows,
+        },
+    )
 
 
 @router.get("/missions/{mission_id}", response_class=HTMLResponse)
 async def mission_detail_page(request: Request, mission_id: str):
     """Mission cockpit — sprints, board, team."""
+    from ...agents.store import get_agent_store
     from ...missions.store import get_mission_store
     from ...projects.manager import get_project_store
-    from ...agents.store import get_agent_store
 
     mission_store = get_mission_store()
     mission = mission_store.get_mission(mission_id)
@@ -112,7 +132,9 @@ async def mission_detail_page(request: Request, mission_id: str):
     if selected_sprint:
         tasks = mission_store.list_tasks(sprint_id=selected_sprint.id)
         for t in tasks:
-            col = t.status if t.status in ("pending", "in_progress", "review", "done") else "pending"
+            col = (
+                t.status if t.status in ("pending", "in_progress", "review", "done") else "pending"
+            )
             tasks_by_status.setdefault(col, []).append(t)
 
     # Velocity history (live from DB)
@@ -125,26 +147,37 @@ async def mission_detail_page(request: Request, mission_id: str):
     agent_store = get_agent_store()
     prefix = mission.project_id[:4] if len(mission.project_id) >= 4 else mission.project_id
     all_agents = agent_store.list_all()
-    team_agents = [a for a in all_agents if a.id.startswith(prefix + '-') or a.id.startswith(mission.project_id + '-')]
+    team_agents = [
+        a
+        for a in all_agents
+        if a.id.startswith(prefix + "-") or a.id.startswith(mission.project_id + "-")
+    ]
 
-    return _templates(request).TemplateResponse("mission_detail.html", {
-        "request": request, "page_title": "PI",
-        "mission": mission, "project": project,
-        "sprints": sprints, "stats": stats,
-        "selected_sprint": selected_sprint,
-        "tasks_by_status": tasks_by_status,
-        "team_agents": team_agents,
-        "velocity_history": velocity_history,
-        "total_velocity": total_velocity,
-        "total_planned": total_planned,
-        "avg_velocity": avg_velocity,
-    })
+    return _templates(request).TemplateResponse(
+        "mission_detail.html",
+        {
+            "request": request,
+            "page_title": "PI",
+            "mission": mission,
+            "project": project,
+            "sprints": sprints,
+            "stats": stats,
+            "selected_sprint": selected_sprint,
+            "tasks_by_status": tasks_by_status,
+            "team_agents": team_agents,
+            "velocity_history": velocity_history,
+            "total_velocity": total_velocity,
+            "total_planned": total_planned,
+            "avg_velocity": avg_velocity,
+        },
+    )
 
 
 @router.post("/api/missions", responses={200: {"model": OkResponse}})
 async def create_mission(request: Request):
     """Create a new mission."""
-    from ...missions.store import get_mission_store, MissionDef
+    from ...missions.store import MissionDef, get_mission_store
+
     data = await _parse_body(request)
     m = MissionDef(
         project_id=data.get("project_id", ""),
@@ -166,7 +199,8 @@ async def create_mission(request: Request):
 @router.get("/api/missions", responses={200: {"model": MissionListResponse}})
 async def list_missions_api(request: Request):
     """JSON API: list all missions with run progress."""
-    from ...missions.store import get_mission_store, get_mission_run_store
+    from ...missions.store import get_mission_run_store, get_mission_store
+
     mission_store = get_mission_store()
     run_store = get_mission_run_store()
     missions = mission_store.list_missions(limit=200)
@@ -180,14 +214,24 @@ async def list_missions_api(request: Request):
     for m in missions:
         run = runs_by_parent.get(m.id)
         phases_total = len(run.phases) if run and run.phases else 0
-        phases_done = sum(1 for p in (run.phases or []) if p.status.value in ("done", "done_with_issues")) if run else 0
-        result.append({
-            "id": m.id, "name": m.name, "status": m.status,
-            "type": m.type, "project_id": m.project_id,
-            "phases_total": phases_total, "phases_done": phases_done,
-            "current_phase": run.current_phase if run else "",
-            "run_status": run.status.value if run else "",
-        })
+        phases_done = (
+            sum(1 for p in (run.phases or []) if p.status.value in ("done", "done_with_issues"))
+            if run
+            else 0
+        )
+        result.append(
+            {
+                "id": m.id,
+                "name": m.name,
+                "status": m.status,
+                "type": m.type,
+                "project_id": m.project_id,
+                "phases_total": phases_total,
+                "phases_done": phases_done,
+                "current_phase": run.current_phase if run else "",
+                "run_status": run.status.value if run else "",
+            }
+        )
     return JSONResponse({"missions": result, "total": len(result)})
 
 
@@ -195,6 +239,7 @@ async def list_missions_api(request: Request):
 async def start_mission(mission_id: str):
     """Activate a mission."""
     from ...missions.store import get_mission_store
+
     get_mission_store().update_mission_status(mission_id, "active")
     return JSONResponse({"ok": True})
 
@@ -202,7 +247,8 @@ async def start_mission(mission_id: str):
 @router.post("/api/missions/{mission_id}/sprints", responses={200: {"model": OkResponse}})
 async def create_sprint(mission_id: str):
     """Add a sprint to a mission."""
-    from ...missions.store import get_mission_store, SprintDef
+    from ...missions.store import SprintDef, get_mission_store
+
     store = get_mission_store()
     existing = store.list_sprints(mission_id)
     num = len(existing) + 1
@@ -214,7 +260,8 @@ async def create_sprint(mission_id: str):
 @router.post("/api/missions/{mission_id}/tasks")
 async def create_task(request: Request, mission_id: str):
     """Create a task in a mission sprint (inline kanban creation)."""
-    from ...missions.store import get_mission_store, TaskDef
+    from ...missions.store import TaskDef, get_mission_store
+
     data = await request.json()
     title = data.get("title", "").strip()
     if not title:
@@ -243,6 +290,7 @@ async def create_task(request: Request, mission_id: str):
 async def update_task_status(request: Request, task_id: str):
     """Update task status (drag-drop kanban)."""
     from ...missions.store import get_mission_store
+
     data = await request.json()
     new_status = data.get("status", "").strip()
     valid = {"pending", "assigned", "in_progress", "review", "done", "failed"}
@@ -259,15 +307,24 @@ async def update_task_status(request: Request, task_id: str):
 async def update_feature(request: Request, feature_id: str):
     """Update feature fields (story points, acceptance criteria, priority, status)."""
     from ...missions.product import get_product_backlog
+
     data = await request.json()
     backlog = get_product_backlog()
     feat = backlog.get_feature(feature_id)
     if not feat:
         return JSONResponse({"error": "Feature not found"}, status_code=404)
     from ...db.migrations import get_db
+
     db = get_db()
     updates, params = [], []
-    for field in ("story_points", "acceptance_criteria", "priority", "status", "name", "description"):
+    for field in (
+        "story_points",
+        "acceptance_criteria",
+        "priority",
+        "status",
+        "name",
+        "description",
+    ):
         if field in data:
             updates.append(f"{field} = ?")
             params.append(data[field])
@@ -284,12 +341,21 @@ async def update_feature(request: Request, feature_id: str):
 async def update_story(request: Request, story_id: str):
     """Update user story fields (story points, acceptance criteria, status, sprint)."""
     from ...missions.product import get_product_backlog
+
     data = await request.json()
     backlog = get_product_backlog()
     from ...db.migrations import get_db
+
     db = get_db()
     updates, params = [], []
-    for field in ("story_points", "acceptance_criteria", "status", "sprint_id", "title", "description"):
+    for field in (
+        "story_points",
+        "acceptance_criteria",
+        "status",
+        "sprint_id",
+        "title",
+        "description",
+    ):
         if field in data:
             updates.append(f"{field} = ?")
             params.append(data[field])
@@ -304,22 +370,27 @@ async def update_story(request: Request, story_id: str):
 
 # ── Feature / Story creation ─────────────────────────────────────
 
+
 @router.post("/api/epics/{epic_id}/features", responses={200: {"model": OkResponse}})
 async def create_feature_api(request: Request, epic_id: str):
     """Create a new feature under an epic."""
-    from ...missions.product import get_product_backlog, FeatureDef
+    from ...missions.product import FeatureDef, get_product_backlog
+
     data = await request.json()
     name = data.get("name", "").strip()
     if not name:
         return JSONResponse({"error": "Name required"}, status_code=400)
     backlog = get_product_backlog()
-    feat = backlog.create_feature(FeatureDef(
-        epic_id=epic_id, name=name,
-        description=data.get("description", ""),
-        acceptance_criteria=data.get("acceptance_criteria", ""),
-        story_points=int(data.get("story_points", 0)),
-        priority=int(data.get("priority", 5)),
-    ))
+    feat = backlog.create_feature(
+        FeatureDef(
+            epic_id=epic_id,
+            name=name,
+            description=data.get("description", ""),
+            acceptance_criteria=data.get("acceptance_criteria", ""),
+            story_points=int(data.get("story_points", 0)),
+            priority=int(data.get("priority", 5)),
+        )
+    )
     return JSONResponse({"ok": True, "feature": {"id": feat.id, "name": feat.name}})
 
 
@@ -327,11 +398,13 @@ async def create_feature_api(request: Request, epic_id: str):
 async def list_stories_api(feature_id: str = ""):
     """List user stories, optionally filtered by feature."""
     from ...db.migrations import get_db
+
     db = get_db()
     if feature_id:
         rows = db.execute(
             "SELECT id, feature_id, title, story_points, status, sprint_id FROM user_stories WHERE feature_id=?",
-            (feature_id,)).fetchall()
+            (feature_id,),
+        ).fetchall()
     else:
         rows = db.execute(
             "SELECT id, feature_id, title, story_points, status, sprint_id FROM user_stories ORDER BY feature_id, id"
@@ -343,38 +416,46 @@ async def list_stories_api(feature_id: str = ""):
 async def list_feature_stories_api(feature_id: str):
     """List user stories for a specific feature."""
     from ...db.migrations import get_db
+
     db = get_db()
     rows = db.execute(
         "SELECT id, feature_id, title, story_points, status, sprint_id FROM user_stories WHERE feature_id=?",
-        (feature_id,)).fetchall()
+        (feature_id,),
+    ).fetchall()
     return JSONResponse([dict(r) for r in rows])
 
 
 @router.post("/api/features/{feature_id}/stories", responses={200: {"model": OkResponse}})
 async def create_story_api(request: Request, feature_id: str):
     """Create a new user story under a feature."""
-    from ...missions.product import get_product_backlog, UserStoryDef
+    from ...missions.product import UserStoryDef, get_product_backlog
+
     data = await request.json()
     title = data.get("title", "").strip()
     if not title:
         return JSONResponse({"error": "Title required"}, status_code=400)
     backlog = get_product_backlog()
-    story = backlog.create_story(UserStoryDef(
-        feature_id=feature_id, title=title,
-        description=data.get("description", ""),
-        acceptance_criteria=data.get("acceptance_criteria", ""),
-        story_points=int(data.get("story_points", 0)),
-        priority=int(data.get("priority", 5)),
-    ))
+    story = backlog.create_story(
+        UserStoryDef(
+            feature_id=feature_id,
+            title=title,
+            description=data.get("description", ""),
+            acceptance_criteria=data.get("acceptance_criteria", ""),
+            story_points=int(data.get("story_points", 0)),
+            priority=int(data.get("priority", 5)),
+        )
+    )
     return JSONResponse({"ok": True, "story": {"id": story.id, "title": story.title}})
 
 
 # ── Backlog priority reorder ─────────────────────────────────────
 
+
 @router.patch("/api/backlog/reorder", responses={200: {"model": OkResponse}})
 async def reorder_backlog(request: Request):
     """Reorder features or stories by priority. Body: {type:'feature'|'story', ids:[ordered list]}"""
     from ...db.migrations import get_db
+
     data = await request.json()
     item_type = data.get("type", "feature")
     ids = data.get("ids", [])
@@ -393,10 +474,12 @@ async def reorder_backlog(request: Request):
 
 # ── Feature dependencies ─────────────────────────────────────────
 
+
 @router.post("/api/features/{feature_id}/deps", responses={200: {"model": OkResponse}})
 async def add_feature_dep(request: Request, feature_id: str):
     """Add a dependency: feature_id depends on depends_on_id."""
     from ...db.migrations import get_db
+
     data = await request.json()
     depends_on = data.get("depends_on", "").strip()
     if not depends_on or depends_on == feature_id:
@@ -413,13 +496,19 @@ async def add_feature_dep(request: Request, feature_id: str):
     return JSONResponse({"ok": True})
 
 
-@router.delete("/api/features/{feature_id}/deps/{depends_on}", responses={200: {"model": OkResponse}})
+@router.delete(
+    "/api/features/{feature_id}/deps/{depends_on}", responses={200: {"model": OkResponse}}
+)
 async def remove_feature_dep(feature_id: str, depends_on: str):
     """Remove a feature dependency."""
     from ...db.migrations import get_db
+
     db = get_db()
     try:
-        db.execute("DELETE FROM feature_deps WHERE feature_id = ? AND depends_on = ?", (feature_id, depends_on))
+        db.execute(
+            "DELETE FROM feature_deps WHERE feature_id = ? AND depends_on = ?",
+            (feature_id, depends_on),
+        )
         db.commit()
     finally:
         db.close()
@@ -430,6 +519,7 @@ async def remove_feature_dep(feature_id: str, depends_on: str):
 async def list_feature_deps(feature_id: str):
     """List dependencies for a feature."""
     from ...db.migrations import get_db
+
     db = get_db()
     try:
         rows = db.execute(
@@ -438,21 +528,31 @@ async def list_feature_deps(feature_id: str):
                WHERE fd.feature_id = ?""",
             (feature_id,),
         ).fetchall()
-        return JSONResponse({"deps": [
-            {"depends_on": r["depends_on"], "dep_type": r["dep_type"],
-             "name": r["name"] or r["depends_on"], "status": r["status"] or "unknown"}
-            for r in rows
-        ]})
+        return JSONResponse(
+            {
+                "deps": [
+                    {
+                        "depends_on": r["depends_on"],
+                        "dep_type": r["dep_type"],
+                        "name": r["name"] or r["depends_on"],
+                        "status": r["status"] or "unknown",
+                    }
+                    for r in rows
+                ]
+            }
+        )
     finally:
         db.close()
 
 
 # ── Sprint planning: assign stories to sprint ────────────────────
 
+
 @router.post("/api/sprints/{sprint_id}/assign-stories", responses={200: {"model": OkResponse}})
 async def assign_stories_to_sprint(request: Request, sprint_id: str):
     """Assign multiple stories to a sprint. Body: {story_ids: [...]}"""
     from ...db.migrations import get_db
+
     data = await request.json()
     story_ids = data.get("story_ids", [])
     if not story_ids:
@@ -467,23 +567,32 @@ async def assign_stories_to_sprint(request: Request, sprint_id: str):
     return JSONResponse({"ok": True, "assigned": len(story_ids)})
 
 
-@router.delete("/api/sprints/{sprint_id}/stories/{story_id}", responses={200: {"model": OkResponse}})
+@router.delete(
+    "/api/sprints/{sprint_id}/stories/{story_id}", responses={200: {"model": OkResponse}}
+)
 async def unassign_story_from_sprint(sprint_id: str, story_id: str):
     """Remove a story from a sprint."""
     from ...db.migrations import get_db
+
     db = get_db()
     try:
-        db.execute("UPDATE user_stories SET sprint_id = '' WHERE id = ? AND sprint_id = ?", (story_id, sprint_id))
+        db.execute(
+            "UPDATE user_stories SET sprint_id = '' WHERE id = ? AND sprint_id = ?",
+            (story_id, sprint_id),
+        )
         db.commit()
     finally:
         db.close()
     return JSONResponse({"ok": True})
 
 
-@router.get("/api/sprints/{sprint_id}/available-stories", responses={200: {"model": list[StoryOut]}})
+@router.get(
+    "/api/sprints/{sprint_id}/available-stories", responses={200: {"model": list[StoryOut]}}
+)
 async def available_stories_for_sprint(sprint_id: str):
     """List unassigned stories (backlog) available for sprint planning."""
     from ...db.migrations import get_db
+
     db = get_db()
     try:
         # Get the mission for this sprint
@@ -504,11 +613,14 @@ async def available_stories_for_sprint(sprint_id: str):
         db.close()
 
 
-@router.post("/api/missions/{mission_id}/launch", responses={200: {"model": OkResponse}, 404: {"model": ErrorResponse}})
+@router.post(
+    "/api/missions/{mission_id}/launch",
+    responses={200: {"model": OkResponse}, 404: {"model": ErrorResponse}},
+)
 async def launch_mission_workflow(request: Request, mission_id: str):
     """Create a session from mission's workflow and redirect to live view."""
     from ...missions.store import get_mission_store
-    from ...sessions.store import get_session_store, SessionDef, MessageDef
+    from ...sessions.store import MessageDef, SessionDef, get_session_store
     from ...workflows.store import get_workflow_store
 
     mission_store = get_mission_store()
@@ -538,18 +650,24 @@ async def launch_mission_workflow(request: Request, mission_id: str):
         },
     )
     session = session_store.create(session)
-    session_store.add_message(MessageDef(
-        session_id=session.id,
-        from_agent="system",
-        message_type="system",
-        content=f"Workflow \"{wf_id}\" lancé pour la mission \"{mission.name}\". Goal: {mission.goal or 'not specified'}",
-    ))
+    session_store.add_message(
+        MessageDef(
+            session_id=session.id,
+            from_agent="system",
+            message_type="system",
+            content=f'Workflow "{wf_id}" lancé pour la mission "{mission.name}". Goal: {mission.goal or "not specified"}',
+        )
+    )
 
     # Auto-start workflow execution — agents will dialogue via patterns
-    from .workflows import _run_workflow_background
     import asyncio
+
+    from .workflows import _run_workflow_background
+
     task_desc = mission.goal or mission.description or mission.name
-    asyncio.create_task(_run_workflow_background(wf, session.id, task_desc, mission.project_id or ""))
+    asyncio.create_task(
+        _run_workflow_background(wf, session.id, task_desc, mission.project_id or "")
+    )
 
     return JSONResponse({"session_id": session.id, "workflow_id": wf_id})
 
@@ -557,8 +675,8 @@ async def launch_mission_workflow(request: Request, mission_id: str):
 @router.post("/api/missions/{mission_id}/wsjf", responses={200: {"model": OkResponse}})
 async def compute_wsjf(mission_id: str, request: Request):
     """Compute and store WSJF score from components."""
-    from ...missions.store import get_mission_store
     from ...db.migrations import get_db as _gdb
+
     data = await request.json()
     bv = float(data.get("business_value", 0))
     tc = float(data.get("time_criticality", 0))
@@ -571,7 +689,8 @@ async def compute_wsjf(mission_id: str, request: Request):
     try:
         db.execute(
             "UPDATE missions SET wsjf_score=?, business_value=?, time_criticality=?, risk_reduction=?, job_duration=? WHERE id=?",
-            (wsjf, bv, tc, rr, jd, mission_id))
+            (wsjf, bv, tc, rr, jd, mission_id),
+        )
         db.commit()
     finally:
         db.close()
@@ -582,6 +701,7 @@ async def compute_wsjf(mission_id: str, request: Request):
 async def mission_board_partial(request: Request, mission_id: str):
     """HTMX partial — kanban board for a sprint."""
     from ...missions.store import get_mission_store
+
     store = get_mission_store()
     sprint_id = request.query_params.get("sprint")
     if not sprint_id:
@@ -592,27 +712,35 @@ async def mission_board_partial(request: Request, mission_id: str):
         col = t.status if t.status in ("pending", "in_progress", "review", "done") else "pending"
         tasks_by_status.setdefault(col, []).append(t)
 
-    cols = [("pending", "Backlog", "clipboard"), ("in_progress", "In Progress", "zap"),
-            ("review", "Review", "eye"), ("done", "Done", "check")]
+    cols = [
+        ("pending", "Backlog", "clipboard"),
+        ("in_progress", "In Progress", "zap"),
+        ("review", "Review", "eye"),
+        ("done", "Done", "check"),
+    ]
     html_parts = []
     for col_status, col_name, col_icon in cols:
         col_tasks = tasks_by_status.get(col_status, [])
         cards = ""
         for t in col_tasks:
-            agent = f'<span class="kanban-task-agent"><svg class="icon icon-xs"><use href="#icon-user"/></svg> {t.assigned_to}</span>' if t.assigned_to else ""
+            agent = (
+                f'<span class="kanban-task-agent"><svg class="icon icon-xs"><use href="#icon-user"/></svg> {t.assigned_to}</span>'
+                if t.assigned_to
+                else ""
+            )
             domain = f"<span>{t.domain}</span>" if t.domain else ""
-            cards += f'''<div class="kanban-task">
+            cards += f"""<div class="kanban-task">
                 <div class="kanban-task-title">{t.title}</div>
                 <div class="kanban-task-meta">
                     <span class="kanban-task-type {t.type}">{t.type}</span>
                     {domain}{agent}
-                </div></div>'''
+                </div></div>"""
         if not cards:
             cards = '<div class="kanban-empty">—</div>'
-        html_parts.append(f'''<div class="kanban-col">
+        html_parts.append(f"""<div class="kanban-col">
             <div class="kanban-col-title"><svg class="icon icon-xs"><use href="#icon-{col_icon}"/></svg> {col_name}
                 <span class="kanban-col-count">{len(col_tasks)}</span>
-            </div>{cards}</div>''')
+            </div>{cards}</div>""")
     return HTMLResponse("".join(html_parts))
 
 
@@ -620,40 +748,53 @@ async def mission_board_partial(request: Request, mission_id: str):
 #  MISSION CONTROL — CDP orchestrator dashboard
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @router.get("/mission-control", response_class=HTMLResponse)
 async def missions_list_page(request: Request):
     """List all mission runs."""
     from ...missions.store import get_mission_run_store
     from ...projects.manager import get_project_store
     from ...workflows.store import get_workflow_store
+
     store = get_mission_run_store()
     runs = store.list_runs(limit=50)
     projects = get_project_store().list_all()
     workflows = get_workflow_store().list_all()
-    return _templates(request).TemplateResponse("mission_control_list.html", {
-        "request": request, "page_title": "Epic Control",
-        "runs": runs,
-        "projects": projects,
-        "workflows": workflows,
-    })
+    return _templates(request).TemplateResponse(
+        "mission_control_list.html",
+        {
+            "request": request,
+            "page_title": "Epic Control",
+            "runs": runs,
+            "projects": projects,
+            "workflows": workflows,
+        },
+    )
 
 
 @router.get("/api/missions/list-partial", response_class=HTMLResponse)
 async def missions_list_partial(request: Request):
     """HTMX partial: refreshes mission list every 15s."""
     from ...missions.store import get_mission_run_store
+
     runs = get_mission_run_store().list_runs(limit=50)
     # Detect stuck missions: status=running but no active asyncio task
     active_ids = {mid for mid, t in _active_mission_tasks.items() if not t.done()}
-    return _templates(request).TemplateResponse("partials/mission_list.html", {
-        "request": request, "runs": runs, "active_ids": active_ids,
-    })
+    return _templates(request).TemplateResponse(
+        "partials/mission_list.html",
+        {
+            "request": request,
+            "runs": runs,
+            "active_ids": active_ids,
+        },
+    )
 
 
 @router.get("/api/portfolio/kanban", response_class=HTMLResponse)
 async def portfolio_kanban(request: Request):
     """SAFe Portfolio Kanban — epics by kanban_status."""
     from ...db.migrations import get_db
+
     db = get_db()
     try:
         rows = db.execute(
@@ -670,28 +811,39 @@ async def portfolio_kanban(request: Request):
     wip_limit = 3
     wip_over = len(columns["implementing"]) > wip_limit
     html = '<div style="display:flex;gap:12px;overflow-x:auto;padding:16px;">'
-    for col_name, label in [("funnel", "Funnel"), ("analyzing", "Analyzing"), ("backlog", "Backlog"), ("implementing", "Implementing"), ("done", "Done")]:
+    for col_name, label in [
+        ("funnel", "Funnel"),
+        ("analyzing", "Analyzing"),
+        ("backlog", "Backlog"),
+        ("implementing", "Implementing"),
+        ("done", "Done"),
+    ]:
         items = columns[col_name]
         border_color = "var(--red)" if col_name == "implementing" and wip_over else "var(--border)"
         html += f'<div style="flex:1;min-width:180px;background:var(--bg-secondary);border:1px solid {border_color};border-radius:var(--radius);padding:10px;">'
-        wip_tag = f' <span style="color:var(--red);font-size:0.7rem;">WIP {len(items)}/{wip_limit}</span>' if col_name == "implementing" else ""
+        wip_tag = (
+            f' <span style="color:var(--red);font-size:0.7rem;">WIP {len(items)}/{wip_limit}</span>'
+            if col_name == "implementing"
+            else ""
+        )
         html += f'<h4 style="margin:0 0 8px;font-size:0.85rem;color:var(--text-secondary)">{label} ({len(items)}){wip_tag}</h4>'
         for item in items:
             wsjf = item.get("wsjf_score", 0) or 0
-            html += f'<div style="background:var(--bg-tertiary);border-radius:6px;padding:8px;margin-bottom:6px;font-size:0.8rem;">'
+            html += '<div style="background:var(--bg-tertiary);border-radius:6px;padding:8px;margin-bottom:6px;font-size:0.8rem;">'
             html += f'<a href="/missions/{item["id"]}" style="color:var(--purple-light);text-decoration:none">{item["name"][:40]}</a>'
-            html += f'<div style="color:var(--text-muted);font-size:0.7rem;">WSJF: {wsjf:.0f} | {item.get("project_id","")}</div>'
-            html += '</div>'
-        html += '</div>'
-    html += '</div>'
+            html += f'<div style="color:var(--text-muted);font-size:0.7rem;">WSJF: {wsjf:.0f} | {item.get("project_id", "")}</div>'
+            html += "</div>"
+        html += "</div>"
+    html += "</div>"
     return HTMLResponse(html)
 
 
 @router.delete("/api/mission-runs/{run_id}", responses={200: {"model": OkResponse}})
 async def delete_mission_run(run_id: str):
     """Delete a mission run and ALL associated data (cascade)."""
-    from ...missions.store import get_mission_run_store
     from ...db.migrations import get_db
+    from ...missions.store import get_mission_run_store
+
     store = get_mission_run_store()
     run = store.get(run_id)
     if not run:
@@ -718,12 +870,15 @@ async def delete_mission_run(run_id: str):
 async def delete_mission(mission_id: str):
     """Delete a mission (epic) and ALL its runs + associated data."""
     from ...db.migrations import get_db
+
     conn = get_db()
     mission = conn.execute("SELECT id, name FROM missions WHERE id = ?", (mission_id,)).fetchone()
     if not mission:
         return JSONResponse({"error": "Not found"}, status_code=404)
     # Delete all runs for this mission
-    runs = conn.execute("SELECT id, session_id FROM mission_runs WHERE parent_mission_id = ?", (mission_id,)).fetchall()
+    runs = conn.execute(
+        "SELECT id, session_id FROM mission_runs WHERE parent_mission_id = ?", (mission_id,)
+    ).fetchall()
     for run_id, session_id in runs:
         if session_id:
             conn.execute("DELETE FROM tool_calls WHERE session_id = ?", (session_id,))
@@ -738,18 +893,33 @@ async def delete_mission(mission_id: str):
         conn.execute("DELETE FROM support_tickets WHERE mission_id = ?", (run_id,))
     conn.execute("DELETE FROM mission_runs WHERE parent_mission_id = ?", (mission_id,))
     # Delete features, stories, sprints, tasks linked to mission
-    conn.execute("DELETE FROM user_stories WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)", (mission_id,))
+    conn.execute(
+        "DELETE FROM user_stories WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)",
+        (mission_id,),
+    )
     try:
-        conn.execute("DELETE FROM feature_deps WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)", (mission_id,))
-        conn.execute("DELETE FROM feature_deps WHERE depends_on IN (SELECT id FROM features WHERE epic_id = ?)", (mission_id,))
+        conn.execute(
+            "DELETE FROM feature_deps WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)",
+            (mission_id,),
+        )
+        conn.execute(
+            "DELETE FROM feature_deps WHERE depends_on IN (SELECT id FROM features WHERE epic_id = ?)",
+            (mission_id,),
+        )
     except Exception:
         pass
     conn.execute("DELETE FROM features WHERE epic_id = ?", (mission_id,))
     conn.execute("DELETE FROM sprints WHERE mission_id = ?", (mission_id,))
     conn.execute("DELETE FROM tasks WHERE mission_id = ?", (mission_id,))
     try:
-        conn.execute("DELETE FROM ideation_findings WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mission_id,))
-        conn.execute("DELETE FROM ideation_messages WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mission_id,))
+        conn.execute(
+            "DELETE FROM ideation_findings WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)",
+            (mission_id,),
+        )
+        conn.execute(
+            "DELETE FROM ideation_messages WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)",
+            (mission_id,),
+        )
         conn.execute("DELETE FROM ideation_sessions WHERE mission_id = ?", (mission_id,))
     except Exception:
         pass
@@ -762,6 +932,7 @@ async def delete_mission(mission_id: str):
 async def delete_project(project_id: str):
     """Delete a project and ALL associated missions, sessions, memory, agents."""
     from ...db.migrations import get_db
+
     conn = get_db()
     conn.execute("PRAGMA busy_timeout = 10000")  # 10s wait for lock
     project = conn.execute("SELECT id, name FROM projects WHERE id = ?", (project_id,)).fetchone()
@@ -772,34 +943,61 @@ async def delete_project(project_id: str):
     except Exception:
         pass  # Already in transaction or WAL mode
     # Delete all missions for this project (cascade)
-    missions = conn.execute("SELECT id FROM missions WHERE project_id = ?", (project_id,)).fetchall()
+    missions = conn.execute(
+        "SELECT id FROM missions WHERE project_id = ?", (project_id,)
+    ).fetchall()
     for (mid,) in missions:
         # Delete runs
-        runs = conn.execute("SELECT id, session_id FROM mission_runs WHERE parent_mission_id = ?", (mid,)).fetchall()
+        runs = conn.execute(
+            "SELECT id, session_id FROM mission_runs WHERE parent_mission_id = ?", (mid,)
+        ).fetchall()
         for run_id, session_id in runs:
             if session_id:
                 conn.execute("DELETE FROM tool_calls WHERE session_id = ?", (session_id,))
                 conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
                 conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
-            for tbl in ("sprints", "tasks", "confluence_pages", "llm_traces", "llm_usage", "platform_incidents", "support_tickets"):
+            for tbl in (
+                "sprints",
+                "tasks",
+                "confluence_pages",
+                "llm_traces",
+                "llm_usage",
+                "platform_incidents",
+                "support_tickets",
+            ):
                 try:
                     conn.execute(f"DELETE FROM {tbl} WHERE mission_id = ?", (run_id,))
                 except Exception:
                     pass  # Table may not exist
         conn.execute("DELETE FROM mission_runs WHERE parent_mission_id = ?", (mid,))
         # Delete features (epic_id = mission_id in SAFe terms)
-        conn.execute("DELETE FROM user_stories WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)", (mid,))
+        conn.execute(
+            "DELETE FROM user_stories WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)",
+            (mid,),
+        )
         try:
-            conn.execute("DELETE FROM feature_deps WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)", (mid,))
-            conn.execute("DELETE FROM feature_deps WHERE depends_on IN (SELECT id FROM features WHERE epic_id = ?)", (mid,))
+            conn.execute(
+                "DELETE FROM feature_deps WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)",
+                (mid,),
+            )
+            conn.execute(
+                "DELETE FROM feature_deps WHERE depends_on IN (SELECT id FROM features WHERE epic_id = ?)",
+                (mid,),
+            )
         except Exception:
             pass
         conn.execute("DELETE FROM features WHERE epic_id = ?", (mid,))
         conn.execute("DELETE FROM sprints WHERE mission_id = ?", (mid,))
         conn.execute("DELETE FROM tasks WHERE mission_id = ?", (mid,))
         try:
-            conn.execute("DELETE FROM ideation_findings WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mid,))
-            conn.execute("DELETE FROM ideation_messages WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mid,))
+            conn.execute(
+                "DELETE FROM ideation_findings WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)",
+                (mid,),
+            )
+            conn.execute(
+                "DELETE FROM ideation_messages WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)",
+                (mid,),
+            )
             conn.execute("DELETE FROM ideation_sessions WHERE mission_id = ?", (mid,))
         except Exception:
             pass
@@ -807,7 +1005,9 @@ async def delete_project(project_id: str):
     # Delete orphan mission_runs for this project
     conn.execute("DELETE FROM mission_runs WHERE project_id = ?", (project_id,))
     # Delete project sessions
-    proj_sessions = conn.execute("SELECT id FROM sessions WHERE project_id = ?", (project_id,)).fetchall()
+    proj_sessions = conn.execute(
+        "SELECT id FROM sessions WHERE project_id = ?", (project_id,)
+    ).fetchall()
     for (sid,) in proj_sessions:
         conn.execute("DELETE FROM tool_calls WHERE session_id = ?", (sid,))
         conn.execute("DELETE FROM messages WHERE session_id = ?", (sid,))
@@ -826,26 +1026,30 @@ async def delete_project(project_id: str):
 async def mission_start_page(request: Request, workflow_id: str):
     """Start a new mission — show brief form."""
     from ...workflows.store import get_workflow_store
+
     wf = get_workflow_store().get(workflow_id)
     if not wf:
         return RedirectResponse("/pi", status_code=302)
-    return _templates(request).TemplateResponse("mission_start.html", {
-        "request": request, "page_title": f"New Epic — {wf.name}",
-        "workflow": wf,
-    })
+    return _templates(request).TemplateResponse(
+        "mission_start.html",
+        {
+            "request": request,
+            "page_title": f"New Epic — {wf.name}",
+            "workflow": wf,
+        },
+    )
 
 
 @router.post("/api/missions/start")
 async def api_mission_start(request: Request):
     """Create a mission run and start the CDP agent."""
-    from ...missions.store import get_mission_run_store
-    from ...workflows.store import get_workflow_store
-    from ...sessions.store import get_session_store, SessionDef, MessageDef
-    from ...agents.loop import get_loop_manager
-    from ...agents.store import get_agent_store
-    from ...models import PhaseRun, PhaseStatus, MissionRun, MissionStatus
     import uuid
-    from datetime import datetime
+
+    from ...agents.loop import get_loop_manager
+    from ...missions.store import get_mission_run_store
+    from ...models import MissionRun, MissionStatus, PhaseRun, PhaseStatus
+    from ...sessions.store import MessageDef, SessionDef, get_session_store
+    from ...workflows.store import get_workflow_store
 
     data = await _parse_body(request)
     workflow_id = str(data.get("workflow_id", ""))
@@ -873,31 +1077,48 @@ async def api_mission_start(request: Request):
     # Build phase runs from workflow
     phases = []
     for wp in wf.phases:
-        phases.append(PhaseRun(
-            phase_id=wp.id,
-            phase_name=wp.name,
-            pattern_id=wp.pattern_id,
-            status=PhaseStatus.PENDING,
-        ))
+        phases.append(
+            PhaseRun(
+                phase_id=wp.id,
+                phase_name=wp.name,
+                pattern_id=wp.pattern_id,
+                status=PhaseStatus.PENDING,
+            )
+        )
 
     mission_id = uuid.uuid4().hex[:8]
 
     # Create workspace directory for agent tools (code, git, docker)
     import subprocess
     from pathlib import Path
-    workspace_root = Path(__file__).resolve().parent.parent.parent.parent / "data" / "workspaces" / mission_id
+
+    workspace_root = (
+        Path(__file__).resolve().parent.parent.parent.parent / "data" / "workspaces" / mission_id
+    )
     workspace_root.mkdir(parents=True, exist_ok=True)
     # Init git repo + README with brief
     subprocess.run(["git", "init"], cwd=str(workspace_root), capture_output=True)
-    subprocess.run(["git", "config", "user.email", "agents@macaron.ai"], cwd=str(workspace_root), capture_output=True)
-    subprocess.run(["git", "config", "user.name", "Macaron Agents"], cwd=str(workspace_root), capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "agents@macaron.ai"],
+        cwd=str(workspace_root),
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Macaron Agents"],
+        cwd=str(workspace_root),
+        capture_output=True,
+    )
     readme = workspace_root / "README.md"
     readme.write_text(f"# {wf.name}\n\n{brief}\n\nMission ID: {mission_id}\n")
     # Add .gitignore to prevent node_modules/dist/build from being committed
     gitignore = workspace_root / ".gitignore"
     gitignore.write_text("node_modules/\ndist/\nbuild/\n.env\n*.bak\n__pycache__/\n.DS_Store\n")
     subprocess.run(["git", "add", "."], cwd=str(workspace_root), capture_output=True)
-    subprocess.run(["git", "commit", "-m", "Initial commit — mission workspace"], cwd=str(workspace_root), capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Initial commit — mission workspace"],
+        cwd=str(workspace_root),
+        capture_output=True,
+    )
     workspace_path = str(workspace_root)
 
     # Determine orchestrator agent (workflow config or default CDP)
@@ -920,7 +1141,8 @@ async def api_mission_start(request: Request):
 
     # Create Epic record in missions table (SAFe backlog item) with WSJF
     try:
-        from ...missions.store import get_mission_store, MissionDef
+        from ...missions.store import MissionDef, get_mission_store
+
         epic = MissionDef(
             id=mission_id,
             project_id=project_id or mission_id,
@@ -937,11 +1159,13 @@ async def api_mission_start(request: Request):
         ms.create_mission(epic)
         # Store WSJF components
         from ...db.migrations import get_db as _gdb
+
         db = _gdb()
         try:
             db.execute(
                 "UPDATE missions SET business_value=?, time_criticality=?, risk_reduction=?, job_duration=? WHERE id=?",
-                (bv, tc, rr, jd, mission_id))
+                (bv, tc, rr, jd, mission_id),
+            )
             db.commit()
         finally:
             db.close()
@@ -950,15 +1174,18 @@ async def api_mission_start(request: Request):
 
     # Auto-provision TMA, Security, Debt missions for the project
     try:
-        from ...projects.manager import get_project_store, Project
+        from ...projects.manager import Project, get_project_store
+
         _ps = get_project_store()
         if project_id and not _ps.get(project_id):
-            _ps.create(Project(
-                id=project_id,
-                name=brief[:60] or wf.name,
-                path=workspace_path,
-                description=brief[:200],
-            ))
+            _ps.create(
+                Project(
+                    id=project_id,
+                    name=brief[:60] or wf.name,
+                    path=workspace_path,
+                    description=brief[:200],
+                )
+            )
         if project_id:
             _ps.auto_provision(project_id, brief[:60] or wf.name)
     except Exception as _prov_err:
@@ -967,24 +1194,28 @@ async def api_mission_start(request: Request):
     # Create a session for the orchestrator agent
     session_store = get_session_store()
     session_id = uuid.uuid4().hex[:8]
-    session_store.create(SessionDef(
-        id=session_id,
-        name=f"Epic: {wf.name}",
-        project_id=mission.project_id or None,
-        status="active",
-    ))
+    session_store.create(
+        SessionDef(
+            id=session_id,
+            name=f"Epic: {wf.name}",
+            project_id=mission.project_id or None,
+            status="active",
+        )
+    )
     # Update mission with session_id
     mission.session_id = session_id
     run_store.update(mission)
 
     # Send the brief as initial message
-    session_store.add_message(MessageDef(
-        session_id=session_id,
-        from_agent="user",
-        to_agent=orchestrator_id,
-        message_type="instruction",
-        content=brief,
-    ))
+    session_store.add_message(
+        MessageDef(
+            session_id=session_id,
+            from_agent="user",
+            to_agent=orchestrator_id,
+            message_type="instruction",
+            content=brief,
+        )
+    )
 
     # Start the orchestrator agent loop with workspace path
     mgr = get_loop_manager()
@@ -993,19 +1224,24 @@ async def api_mission_start(request: Request):
     except Exception as e:
         logger.error("Failed to start CDP agent: %s", e)
 
-    return JSONResponse({"mission_id": mission_id, "session_id": session_id,
-                         "redirect": f"/missions/{mission_id}/control"})
+    return JSONResponse(
+        {
+            "mission_id": mission_id,
+            "session_id": session_id,
+            "redirect": f"/missions/{mission_id}/control",
+        }
+    )
 
 
 @router.post("/api/missions/{mission_id}/chat/stream")
 async def mission_chat_stream(request: Request, mission_id: str):
     """Stream a conversation with the CDP agent in mission context."""
-    from ...missions.store import get_mission_run_store
-    from ...sessions.store import get_session_store, MessageDef
+    from ...agents.executor import get_executor
     from ...agents.store import get_agent_store
-    from ...agents.executor import get_executor, ExecutionContext
-    from ...sessions.runner import _build_context
     from ...memory.manager import get_memory_manager
+    from ...missions.store import get_mission_run_store
+    from ...sessions.runner import _build_context
+    from ...sessions.store import MessageDef, get_session_store
 
     data = await _parse_body(request)
     content = str(data.get("content", "")).strip()
@@ -1035,16 +1271,23 @@ async def mission_chat_stream(request: Request, mission_id: str):
         return HTMLResponse("No agent", status_code=500)
 
     # Store user message
-    sess_store.add_message(MessageDef(
-        session_id=session_id, from_agent="user",
-        to_agent=agent_id, message_type="text", content=content,
-    ))
+    sess_store.add_message(
+        MessageDef(
+            session_id=session_id,
+            from_agent="user",
+            to_agent=agent_id,
+            message_type="text",
+            content=content,
+        )
+    )
 
     # Build mission-specific context summary
     phase_summary = []
     if mission.phases:
         for p in mission.phases:
-            phase_summary.append(f"- {p.phase_id}: {p.status.value if hasattr(p.status, 'value') else p.status}")
+            phase_summary.append(
+                f"- {p.phase_id}: {p.status.value if hasattr(p.status, 'value') else p.status}"
+            )
     phases_str = "\n".join(phase_summary) if phase_summary else "No phases yet"
 
     # Gather memory
@@ -1053,7 +1296,9 @@ async def mission_chat_stream(request: Request, mission_id: str):
         mem = get_memory_manager()
         entries = mem.project_get(mission_id, limit=20)
         if entries:
-            mem_ctx = "\n".join(f"[{e['category']}] {e['key']}: {e['value'][:200]}" for e in entries)
+            mem_ctx = "\n".join(
+                f"[{e['category']}] {e['key']}: {e['value'][:200]}" for e in entries
+            )
     except Exception:
         pass
 
@@ -1065,15 +1310,15 @@ async def mission_chat_stream(request: Request, mission_id: str):
             agent_msgs.append(f"[{m.from_agent}] {m.content[:300]}")
     agent_conv = "\n".join(agent_msgs[-10:]) if agent_msgs else "No agent conversations yet"
 
-    mission_context = f"""MISSION BRIEF: {mission.brief or 'N/A'}
-MISSION STATUS: {mission.status.value if hasattr(mission.status, 'value') else mission.status}
-WORKSPACE: {mission.workspace_path or 'N/A'}
+    mission_context = f"""MISSION BRIEF: {mission.brief or "N/A"}
+MISSION STATUS: {mission.status.value if hasattr(mission.status, "value") else mission.status}
+WORKSPACE: {mission.workspace_path or "N/A"}
 
 PHASES STATUS:
 {phases_str}
 
 PROJECT MEMORY (knowledge from agents):
-{mem_ctx or 'No memory entries yet'}
+{mem_ctx or "No memory entries yet"}
 
 RECENT AGENT CONVERSATIONS (last 10):
 {agent_conv}
@@ -1123,11 +1368,13 @@ WORKFLOW: Quand on te dit "go" ou "lance":
 
 N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function calling.""",
     }
-    role_instruction = _role_instructions.get(agent_id, "\n\nTu peux LIRE et MODIFIER les fichiers du projet avec code_read, code_write, code_edit, git_commit, et sauvegarder des connaissances avec memory_store.")
+    role_instruction = _role_instructions.get(
+        agent_id,
+        "\n\nTu peux LIRE et MODIFIER les fichiers du projet avec code_read, code_write, code_edit, git_commit, et sauvegarder des connaissances avec memory_store.",
+    )
     mission_context += role_instruction
 
     async def event_generator():
-        import html as html_mod
         import markdown as md_lib
 
         def sse(event: str, data: dict) -> str:
@@ -1145,25 +1392,37 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
             ctx.tools_enabled = True
             # Base tools for all agents
             _platform_tools = [
-                "platform_agents", "platform_missions", "platform_memory_search",
-                "platform_metrics", "platform_sessions", "platform_workflows",
+                "platform_agents",
+                "platform_missions",
+                "platform_memory_search",
+                "platform_metrics",
+                "platform_sessions",
+                "platform_workflows",
             ]
             base_tools = [
-                "memory_search", "memory_store",
-                "code_read", "code_search", "list_files",
-                "git_log", "git_status", "git_diff",
+                "memory_search",
+                "memory_store",
+                "code_read",
+                "code_search",
+                "list_files",
+                "git_log",
+                "git_status",
+                "git_diff",
                 "get_project_context",
             ] + _platform_tools
             # CDP gets orchestration tools
             if agent_id in ("chef_de_programme", "chef_projet"):
                 ctx.allowed_tools = base_tools + [
-                    "get_phase_status", "list_phases",
-                    "run_phase", "request_validation",
+                    "get_phase_status",
+                    "list_phases",
+                    "run_phase",
+                    "request_validation",
                 ]
             else:
                 # Dev/Archi/QA/Wiki agents get write tools
                 ctx.allowed_tools = base_tools + [
-                    "code_write", "code_edit",
+                    "code_write",
+                    "code_edit",
                     "git_commit",
                 ]
 
@@ -1177,10 +1436,11 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
                     raw_accumulated += data_s
                     # Strip all <think>...</think> blocks from accumulated so far
                     import re as _re
-                    clean = _re.sub(r'<think>[\s\S]*?</think>\s*', '', raw_accumulated)
+
+                    clean = _re.sub(r"<think>[\s\S]*?</think>\s*", "", raw_accumulated)
                     # If still inside an unclosed <think>, don't send yet
-                    if '<think>' in clean and '</think>' not in clean.split('<think>')[-1]:
-                        clean = clean[:clean.rfind('<think>')]
+                    if "<think>" in clean and "</think>" not in clean.split("<think>")[-1]:
+                        clean = clean[: clean.rfind("<think>")]
                     clean = clean.strip()
                     # Send only newly revealed characters
                     if len(clean) > _sent_count:
@@ -1190,7 +1450,9 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
                 elif evt == "tool":
                     # Tool being called — show in UI
                     tool_labels = {
-                        "memory_search": t("tool_memory_search", lang=getattr(request.state, "lang", "en")),
+                        "memory_search": t(
+                            "tool_memory_search", lang=getattr(request.state, "lang", "en")
+                        ),
                         "memory_store": "Sauvegarde mémoire",
                         "get_phase_status": "Statut des phases",
                         "list_phases": "Liste des phases",
@@ -1199,7 +1461,9 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
                         "code_read": "Lecture de code",
                         "code_write": "Écriture de code",
                         "code_edit": "Modification de code",
-                        "code_search": t("tool_code_search", lang=getattr(request.state, "lang", "en")),
+                        "code_search": t(
+                            "tool_code_search", lang=getattr(request.state, "lang", "en")
+                        ),
                         "list_files": "Liste des fichiers",
                         "git_log": "Historique Git",
                         "git_status": "Statut Git",
@@ -1222,7 +1486,8 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
                         raw_accumulated = data_s.content
 
             import re as _re
-            accumulated = _re.sub(r'<think>[\s\S]*?</think>\s*', '', raw_accumulated).strip()
+
+            accumulated = _re.sub(r"<think>[\s\S]*?</think>\s*", "", raw_accumulated).strip()
 
             # If LLM failed and no real content, send error
             if llm_error and not accumulated:
@@ -1231,12 +1496,21 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
 
             # Store agent response
             if accumulated:
-                sess_store.add_message(MessageDef(
-                    session_id=session_id, from_agent="chef_de_programme",
-                    to_agent="user", message_type="text", content=accumulated,
-                ))
+                sess_store.add_message(
+                    MessageDef(
+                        session_id=session_id,
+                        from_agent="chef_de_programme",
+                        to_agent="user",
+                        message_type="text",
+                        content=accumulated,
+                    )
+                )
 
-            rendered = md_lib.markdown(accumulated, extensions=["fenced_code", "tables", "nl2br"]) if accumulated else ""
+            rendered = (
+                md_lib.markdown(accumulated, extensions=["fenced_code", "tables", "nl2br"])
+                if accumulated
+                else ""
+            )
             yield sse("done", {"html": rendered})
 
         except Exception as exc:
@@ -1264,10 +1538,14 @@ async def mission_control_page(request: Request, mission_id: str):
     return _templates(request).TemplateResponse("mission_control.html", ctx)
 
 
-@router.get("/api/missions/{mission_id}", responses={200: {"model": MissionDetail}, 404: {"model": ErrorResponse}})
+@router.get(
+    "/api/missions/{mission_id}",
+    responses={200: {"model": MissionDetail}, 404: {"model": ErrorResponse}},
+)
 async def api_mission_status(request: Request, mission_id: str):
     """Get mission status as JSON."""
     from ...missions.store import get_mission_run_store
+
     store = get_mission_run_store()
     mission = store.get(mission_id)
     if not mission:
@@ -1279,20 +1557,29 @@ async def api_mission_status(request: Request, mission_id: str):
 async def api_mission_children(request: Request, mission_id: str):
     """List sub-missions (Features) of a parent mission (Epic)."""
     from ...missions.store import get_mission_run_store, get_mission_store
+
     run_store = get_mission_run_store()
     mission_store = get_mission_store()
     # Get children from both stores
     run_children = run_store.list_children_runs(mission_id)
     def_children = mission_store.list_children(mission_id)
-    return JSONResponse({
-        "parent_id": mission_id,
-        "sub_mission_runs": [r.model_dump(mode="json") for r in run_children],
-        "sub_mission_defs": [
-            {"id": c.id, "name": c.name, "type": c.type, "status": c.status,
-             "wsjf_score": c.wsjf_score, "workflow_id": c.workflow_id}
-            for c in def_children
-        ],
-    })
+    return JSONResponse(
+        {
+            "parent_id": mission_id,
+            "sub_mission_runs": [r.model_dump(mode="json") for r in run_children],
+            "sub_mission_defs": [
+                {
+                    "id": c.id,
+                    "name": c.name,
+                    "type": c.type,
+                    "status": c.status,
+                    "wsjf_score": c.wsjf_score,
+                    "workflow_id": c.workflow_id,
+                }
+                for c in def_children
+            ],
+        }
+    )
 
 
 @router.post("/api/missions/{mission_id}/exec")
@@ -1300,7 +1587,9 @@ async def api_mission_exec(request: Request, mission_id: str):
     """Execute a command in the mission workspace. Returns JSON {stdout, stderr, returncode}."""
     import os as _os
     import subprocess as _sp
+
     from ...missions.store import get_mission_run_store
+
     store = get_mission_run_store()
     mission = store.get(mission_id)
     if not mission:
@@ -1321,22 +1610,36 @@ async def api_mission_exec(request: Request, mission_id: str):
 
     # Adaptive timeout: build commands need more time
     timeout = 60
-    build_keywords = ("xcodebuild", "xcodegen", "gradle", "cargo build", "npm run build", "docker build", "swift build")
+    build_keywords = (
+        "xcodebuild",
+        "xcodegen",
+        "gradle",
+        "cargo build",
+        "npm run build",
+        "docker build",
+        "swift build",
+    )
     if any(bk in cmd for bk in build_keywords):
         timeout = 300  # 5 minutes for builds
 
     try:
         result = _sp.run(
-            cmd, shell=True, cwd=ws,
-            capture_output=True, text=True, timeout=timeout,
+            cmd,
+            shell=True,
+            cwd=ws,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
             env={**_os.environ, "TERM": "dumb"},
         )
-        return JSONResponse({
-            "stdout": result.stdout[-5000:],
-            "stderr": result.stderr[-2000:],
-            "returncode": result.returncode,
-            "command": cmd,
-        })
+        return JSONResponse(
+            {
+                "stdout": result.stdout[-5000:],
+                "stderr": result.stderr[-2000:],
+                "returncode": result.returncode,
+                "command": cmd,
+            }
+        )
     except _sp.TimeoutExpired:
         return JSONResponse({"error": f"Timeout ({timeout}s)", "command": cmd}, status_code=408)
     except Exception as e:
@@ -1346,10 +1649,10 @@ async def api_mission_exec(request: Request, mission_id: str):
 @router.post("/api/missions/{mission_id}/validate")
 async def api_mission_validate(request: Request, mission_id: str):
     """Human validates a checkpoint (GO/NOGO/PIVOT)."""
-    from ...missions.store import get_mission_run_store
-    from ...sessions.store import get_session_store, MessageDef
     from ...a2a.bus import get_bus
+    from ...missions.store import get_mission_run_store
     from ...models import A2AMessage, MessageType, PhaseStatus
+    from ...sessions.store import MessageDef, get_session_store
 
     data = await _parse_body(request)
     decision = str(data.get("decision", "GO")).upper()
@@ -1363,7 +1666,10 @@ async def api_mission_validate(request: Request, mission_id: str):
     updated_phase = False
     if mission.current_phase:
         for p in mission.phases:
-            if p.phase_id == mission.current_phase and p.status in (PhaseStatus.WAITING_VALIDATION, "waiting_validation"):
+            if p.phase_id == mission.current_phase and p.status in (
+                PhaseStatus.WAITING_VALIDATION,
+                "waiting_validation",
+            ):
                 p.status = PhaseStatus.DONE if decision == "GO" else PhaseStatus.FAILED
                 updated_phase = True
         run_store.update(mission)
@@ -1376,26 +1682,31 @@ async def api_mission_validate(request: Request, mission_id: str):
     orch_id = mission.cdp_agent_id or "chef_de_programme"
     if mission.session_id:
         session_store = get_session_store()
-        session_store.add_message(MessageDef(
-            session_id=mission.session_id,
-            from_agent="user",
-            to_agent=orch_id,
-            message_type="response",
-            content=f"DECISION: {decision}",
-        ))
+        session_store.add_message(
+            MessageDef(
+                session_id=mission.session_id,
+                from_agent="user",
+                to_agent=orch_id,
+                message_type="response",
+                content=f"DECISION: {decision}",
+            )
+        )
         # Also publish to bus for agent loop
         bus = get_bus()
         import uuid
         from datetime import datetime
-        await bus.publish(A2AMessage(
-            id=uuid.uuid4().hex[:8],
-            session_id=mission.session_id,
-            from_agent="user",
-            to_agent=orch_id,
-            message_type=MessageType.RESPONSE,
-            content=f"DECISION: {decision}",
-            timestamp=datetime.utcnow(),
-        ))
+
+        await bus.publish(
+            A2AMessage(
+                id=uuid.uuid4().hex[:8],
+                session_id=mission.session_id,
+                from_agent="user",
+                to_agent=orch_id,
+                message_type=MessageType.RESPONSE,
+                content=f"DECISION: {decision}",
+                timestamp=datetime.utcnow(),
+            )
+        )
 
     return JSONResponse({"decision": decision, "phase": mission.current_phase})
 
@@ -1404,9 +1715,9 @@ async def api_mission_validate(request: Request, mission_id: str):
 async def api_mission_reset(request: Request, mission_id: str):
     """Reset a mission: all phases back to pending, clear messages, ready to re-run."""
     from ...missions.store import get_mission_run_store
-    from ...sessions.store import get_session_store, MessageDef
-    from ...models import PhaseStatus, MissionStatus
+    from ...models import MissionStatus, PhaseStatus
     from ...sessions.runner import _push_sse
+    from ...sessions.store import MessageDef, get_session_store
 
     run_store = get_mission_run_store()
     mission = run_store.get(mission_id)
@@ -1434,6 +1745,7 @@ async def api_mission_reset(request: Request, mission_id: str):
     # Clear session messages (keep the session itself)
     if mission.session_id:
         from ...db.migrations import get_db
+
         conn = get_db()
         conn.execute("DELETE FROM messages WHERE session_id = ?", (mission.session_id,))
         conn.commit()
@@ -1441,30 +1753,37 @@ async def api_mission_reset(request: Request, mission_id: str):
 
         # Add reset marker
         store = get_session_store()
-        store.add_message(MessageDef(
-            session_id=mission.session_id,
-            from_agent="system",
-            to_agent="all",
-            message_type="system",
-            content="Epic réinitialisée — prête pour une nouvelle exécution.",
-        ))
+        store.add_message(
+            MessageDef(
+                session_id=mission.session_id,
+                from_agent="system",
+                to_agent="all",
+                message_type="system",
+                content="Epic réinitialisée — prête pour une nouvelle exécution.",
+            )
+        )
 
         # Notify frontend
-        await _push_sse(mission.session_id, {
-            "type": "mission_reset",
-            "mission_id": mission_id,
-        })
+        await _push_sse(
+            mission.session_id,
+            {
+                "type": "mission_reset",
+                "mission_id": mission_id,
+            },
+        )
 
     return JSONResponse({"status": "reset", "mission_id": mission_id})
 
 
 # ── Confluence Sync ──────────────────────────────────────────
 
+
 @router.post("/api/missions/{mission_id}/confluence/sync")
 async def api_confluence_sync_all(mission_id: str):
     """Sync all mission tabs to Confluence."""
     try:
         from ...confluence.sync import get_sync_engine
+
         engine = get_sync_engine()
         results = engine.sync_mission(mission_id)
         return JSONResponse(results)
@@ -1480,6 +1799,7 @@ async def api_confluence_sync_tab(mission_id: str, tab: str):
     """Sync a single tab to Confluence."""
     try:
         from ...confluence.sync import get_sync_engine
+
         engine = get_sync_engine()
         result = engine.sync_tab(mission_id, tab)
         return JSONResponse(result)
@@ -1495,6 +1815,7 @@ async def api_confluence_status(mission_id: str):
     """Get Confluence sync status for a mission."""
     try:
         from ...confluence.sync import get_sync_engine
+
         engine = get_sync_engine()
         status = engine.get_sync_status(mission_id)
         healthy = engine.client.health_check()
@@ -1507,20 +1828,24 @@ async def api_confluence_status(mission_id: str):
 
 # ── Support Tickets API (TMA) ──
 
+
 @router.get("/api/missions/{mission_id}/tickets")
 async def api_list_tickets(mission_id: str, status: str = ""):
     from ...db.migrations import get_db
+
     db = get_db()
     if status:
         rows = db.execute(
             "SELECT * FROM support_tickets WHERE mission_id=? AND status=? ORDER BY "
             "CASE severity WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END, created_at DESC",
-            (mission_id, status)).fetchall()
+            (mission_id, status),
+        ).fetchall()
     else:
         rows = db.execute(
             "SELECT * FROM support_tickets WHERE mission_id=? ORDER BY "
             "CASE severity WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END, created_at DESC",
-            (mission_id,)).fetchall()
+            (mission_id,),
+        ).fetchall()
     db.close()
     return JSONResponse([dict(r) for r in rows])
 
@@ -1528,16 +1853,26 @@ async def api_list_tickets(mission_id: str, status: str = ""):
 @router.post("/api/missions/{mission_id}/tickets")
 async def api_create_ticket(request: Request, mission_id: str):
     import uuid
+
     from ...db.migrations import get_db
+
     body = await request.json()
     tid = str(uuid.uuid4())[:8]
     db = get_db()
     db.execute(
         "INSERT INTO support_tickets (id, mission_id, title, description, severity, category, reporter, assignee) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (tid, mission_id, body.get("title", ""), body.get("description", ""),
-         body.get("severity", "P3"), body.get("category", "incident"),
-         body.get("reporter", ""), body.get("assignee", "")))
+        (
+            tid,
+            mission_id,
+            body.get("title", ""),
+            body.get("description", ""),
+            body.get("severity", "P3"),
+            body.get("category", "incident"),
+            body.get("reporter", ""),
+            body.get("assignee", ""),
+        ),
+    )
     db.commit()
     row = db.execute("SELECT * FROM support_tickets WHERE id=?", (tid,)).fetchone()
     db.close()
@@ -1547,10 +1882,19 @@ async def api_create_ticket(request: Request, mission_id: str):
 @router.patch("/api/missions/{mission_id}/tickets/{ticket_id}")
 async def api_update_ticket(request: Request, mission_id: str, ticket_id: str):
     from ...db.migrations import get_db
+
     body = await request.json()
     db = get_db()
     sets, vals = [], []
-    for field in ("status", "severity", "assignee", "resolution", "title", "description", "category"):
+    for field in (
+        "status",
+        "severity",
+        "assignee",
+        "resolution",
+        "title",
+        "description",
+        "category",
+    ):
         if field in body:
             sets.append(f"{field}=?")
             vals.append(body[field])
@@ -1569,6 +1913,7 @@ async def api_update_ticket(request: Request, mission_id: str, ticket_id: str):
         return JSONResponse({"error": "Not found"}, status_code=404)
     return JSONResponse(dict(row))
 
+
 @router.post("/api/missions/{mission_id}/run")
 async def api_mission_run(request: Request, mission_id: str):
     """Drive mission execution: CDP orchestrates phases sequentially.
@@ -1577,12 +1922,13 @@ async def api_mission_run(request: Request, mission_id: str):
     think with LLM, stream their responses, and interact per pattern type.
     """
     import asyncio
-    from ...missions.store import get_mission_run_store
-    from ...workflows.store import get_workflow_store
+
     from ...agents.store import get_agent_store
+    from ...missions.store import get_mission_run_store
     from ...models import MissionStatus
-    from ...sessions.runner import _push_sse
     from ...services.mission_orchestrator import MissionOrchestrator
+    from ...sessions.runner import _push_sse
+    from ...workflows.store import get_workflow_store
 
     run_store = get_mission_run_store()
     mission = run_store.get(mission_id)
@@ -1592,7 +1938,9 @@ async def api_mission_run(request: Request, mission_id: str):
     # Prevent double-launch: check if an asyncio task is already running
     existing_task = _active_mission_tasks.get(mission_id)
     if existing_task and not existing_task.done():
-        return JSONResponse({"status": "running", "mission_id": mission_id, "info": "already running"})
+        return JSONResponse(
+            {"status": "running", "mission_id": mission_id, "info": "already running"}
+        )
 
     wf = get_workflow_store().get(mission.workflow_id)
     if not wf:
@@ -1607,10 +1955,16 @@ async def api_mission_run(request: Request, mission_id: str):
     orch_avatar = f"/static/avatars/{orch_id}.svg"
 
     orchestrator = MissionOrchestrator(
-        mission=mission, workflow=wf, run_store=run_store,
-        agent_store=agent_store, session_id=session_id,
-        orch_id=orch_id, orch_name=orch_name, orch_role=orch_role,
-        orch_avatar=orch_avatar, push_sse=_push_sse,
+        mission=mission,
+        workflow=wf,
+        run_store=run_store,
+        agent_store=agent_store,
+        session_id=session_id,
+        orch_id=orch_id,
+        orch_name=orch_name,
+        orch_role=orch_role,
+        orch_avatar=orch_avatar,
+        push_sse=_push_sse,
     )
 
     async def _safe_run():
@@ -1621,19 +1975,23 @@ async def api_mission_run(request: Request, mission_id: str):
                 logger.warning("ORCH mission=%s completed normally", mission_id)
         except Exception as exc:
             import traceback
+
             logger.error("ORCH mission=%s CRASHED: %s\n%s", mission_id, exc, traceback.format_exc())
             try:
                 mission.status = MissionStatus.FAILED
                 run_store.update(mission)
-                await _push_sse(session_id, {
-                    "type": "message",
-                    "from_agent": orch_id,
-                    "from_name": orch_name,
-                    "from_role": orch_role,
-                    "from_avatar": orch_avatar,
-                    "content": f"Internal error: {exc}",
-                    "msg_type": "text",
-                })
+                await _push_sse(
+                    session_id,
+                    {
+                        "type": "message",
+                        "from_agent": orch_id,
+                        "from_name": orch_name,
+                        "from_role": orch_role,
+                        "from_avatar": orch_avatar,
+                        "content": f"Internal error: {exc}",
+                        "msg_type": "text",
+                    },
+                )
             except Exception:
                 pass
 
@@ -1650,10 +2008,11 @@ async def api_mission_run(request: Request, mission_id: str):
 
 async def _auto_retrospective(mission, session_id: str, phase_summaries: list, push_sse):
     """Auto-generate retrospective when epic completes, store lessons in global memory."""
+    import json as _json
+
+    from ...llm.client import LLMMessage, get_llm_client
     from ...memory.manager import get_memory_manager
     from ...sessions.store import get_session_store
-    from ...llm.client import get_llm_client, LLMMessage
-    import json as _json
 
     ss = get_session_store()
     msgs = ss.get_messages(session_id, limit=500)
@@ -1688,7 +2047,8 @@ Sois CONCRET, TECHNIQUE et ACTIONNABLE. Réponds UNIQUEMENT avec le JSON."""
         resp = await client.chat(
             messages=[LLMMessage(role="user", content=prompt)],
             system_prompt="Coach Agile expert en rétrospectives SAFe. Analyse factuelle.",
-            temperature=0.4, max_tokens=1500,
+            temperature=0.4,
+            max_tokens=1500,
         )
         raw = resp.content.strip()
         if "```json" in raw:
@@ -1700,7 +2060,8 @@ Sois CONCRET, TECHNIQUE et ACTIONNABLE. Réponds UNIQUEMENT avec le JSON."""
         retro = {
             "successes": ["Epic completed"],
             "lessons": ["Auto-retrospective needs LLM availability"],
-            "failures": [], "improvements": [],
+            "failures": [],
+            "improvements": [],
         }
 
     # Store lessons + improvements in global memory
@@ -1731,26 +2092,31 @@ Sois CONCRET, TECHNIQUE et ACTIONNABLE. Réponds UNIQUEMENT avec le JSON."""
     if retro.get("improvements"):
         retro_text += "**Améliorations:**\n" + "\n".join(f"- {i}" for i in retro["improvements"])
 
-    await push_sse(session_id, {
-        "type": "message",
-        "from_agent": "scrum_master",
-        "from_name": "Retrospective",
-        "from_role": "Scrum Master",
-        "content": retro_text,
-        "msg_type": "text",
-    })
+    await push_sse(
+        session_id,
+        {
+            "type": "message",
+            "from_agent": "scrum_master",
+            "from_name": "Retrospective",
+            "from_role": "Scrum Master",
+            "content": retro_text,
+            "msg_type": "text",
+        },
+    )
 
 
 async def _run_post_phase_hooks(
     phase_id: str, phase_name: str, mission, session_id: str, push_sse
-):
-    """Run real CI/CD actions after phase completion based on phase type."""
+) -> dict:
+    """Run real CI/CD actions after phase completion based on phase type.
+    Returns dict with build_ok, test_ok, deploy_ok booleans for gate decisions."""
     import subprocess
     from pathlib import Path
 
+    result = {"build_ok": True, "test_ok": True, "deploy_ok": True}
     workspace = mission.workspace_path
     if not workspace or not Path(workspace).is_dir():
-        return
+        return result
 
     phase_key = phase_name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
 
@@ -1760,24 +2126,34 @@ async def _run_post_phase_hooks(
             ["git", "add", "-A"], cwd=workspace, capture_output=True, text=True, timeout=10
         )
         status = subprocess.run(
-            ["git", "status", "--porcelain"], cwd=workspace, capture_output=True, text=True, timeout=10
+            ["git", "status", "--porcelain"],
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if status.stdout.strip():
             file_count = status.stdout.strip().count("\n") + 1
             commit_msg = f"chore({phase_key}): {phase_name} — {file_count} files"
             subprocess.run(
                 ["git", "commit", "-m", commit_msg],
-                cwd=workspace, capture_output=True, text=True, timeout=10
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
-            await push_sse(session_id, {
-                "type": "message",
-                "from_agent": "system",
-                "from_name": "CI/CD",
-                "from_role": "Pipeline",
-                "content": f"Auto-commit: {file_count} fichiers ({phase_name})",
-                "phase_id": phase_id,
-                "msg_type": "text",
-            })
+            await push_sse(
+                session_id,
+                {
+                    "type": "message",
+                    "from_agent": "system",
+                    "from_name": "CI/CD",
+                    "from_role": "Pipeline",
+                    "content": f"Auto-commit: {file_count} fichiers ({phase_name})",
+                    "phase_id": phase_id,
+                    "msg_type": "text",
+                },
+            )
     except Exception as e:
         logger.warning("Auto-commit failed for phase %s: %s", phase_id, e)
 
@@ -1801,7 +2177,12 @@ async def _run_post_phase_hooks(
     # After dev sprint: auto screenshots for HTML files
     if "dev" in phase_key or "sprint" in phase_key:
         ws = Path(workspace)
-        html_files = list(ws.glob("*.html")) + list(ws.glob("public/*.html")) + list(ws.glob("src/*.html")) + list(ws.glob("client/*.html"))
+        html_files = (
+            list(ws.glob("*.html"))
+            + list(ws.glob("public/*.html"))
+            + list(ws.glob("src/*.html"))
+            + list(ws.glob("client/*.html"))
+        )
         if html_files:
             screenshots_dir = ws / "screenshots"
             screenshots_dir.mkdir(exist_ok=True)
@@ -1823,12 +2204,19 @@ asyncio.run(main())
                 try:
                     r = subprocess.run(
                         ["python3", "-c", shot_script],
-                        capture_output=True, text=True, cwd=workspace, timeout=30
+                        capture_output=True,
+                        text=True,
+                        cwd=workspace,
+                        timeout=30,
                     )
                     if r.returncode == 0 and (screenshots_dir / fname).exists():
                         shot_paths.append(f"screenshots/{fname}")
                     else:
-                        logger.warning("Sprint screenshot failed for %s: %s", hf.name, r.stderr[:200] if r.stderr else "unknown")
+                        logger.warning(
+                            "Sprint screenshot failed for %s: %s",
+                            hf.name,
+                            r.stderr[:200] if r.stderr else "unknown",
+                        )
                 except Exception as e:
                     logger.warning("Sprint screenshot error for %s: %s", hf.name, e)
 
@@ -1836,69 +2224,164 @@ asyncio.run(main())
                 shot_content = "Screenshots automatiques du workspace :\n" + "\n".join(
                     f"[SCREENSHOT:{p}]" for p in shot_paths
                 )
-                await push_sse(session_id, {
-                    "type": "message",
-                    "from_agent": "system",
-                    "from_name": "CI/CD",
-                    "from_role": "Pipeline",
-                    "content": shot_content,
-                    "phase_id": phase_id,
-                    "msg_type": "text",
-                })
+                await push_sse(
+                    session_id,
+                    {
+                        "type": "message",
+                        "from_agent": "system",
+                        "from_name": "CI/CD",
+                        "from_role": "Pipeline",
+                        "content": shot_content,
+                        "phase_id": phase_id,
+                        "msg_type": "text",
+                    },
+                )
 
     # After CI/CD or TDD Sprint phase: run build if package.json or Dockerfile exists
     if any(k in phase_key for k in ("cicd", "pipeline", "sprint", "dev")):
         ws = Path(workspace)
         try:
             if (ws / "package.json").exists():
-                result = subprocess.run(
+                npm_r = subprocess.run(
                     ["npm", "install"], cwd=workspace, capture_output=True, text=True, timeout=120
                 )
-                build_msg = "npm install réussi" if result.returncode == 0 else f"npm install échoué: {result.stderr[:200]}"
-                await push_sse(session_id, {
-                    "type": "message",
-                    "from_agent": "system",
-                    "from_name": "CI/CD",
-                    "from_role": "Pipeline",
-                    "content": build_msg,
-                    "phase_id": phase_id,
-                    "msg_type": "text",
-                })
+                build_msg = (
+                    "npm install réussi"
+                    if npm_r.returncode == 0
+                    else f"npm install échoué: {npm_r.stderr[:200]}"
+                )
+                if npm_r.returncode != 0:
+                    result["build_ok"] = False
+                await push_sse(
+                    session_id,
+                    {
+                        "type": "message",
+                        "from_agent": "system",
+                        "from_name": "CI/CD",
+                        "from_role": "Pipeline",
+                        "content": build_msg,
+                        "phase_id": phase_id,
+                        "msg_type": "text",
+                    },
+                )
                 # Run build script if exists
                 import json as _json
+
                 try:
                     pkg = _json.loads((ws / "package.json").read_text())
                     if "build" in (pkg.get("scripts") or {}):
-                        build_result = subprocess.run(
-                            ["npm", "run", "build"], cwd=workspace, capture_output=True, text=True, timeout=120
+                        build_r = subprocess.run(
+                            ["npm", "run", "build"],
+                            cwd=workspace,
+                            capture_output=True,
+                            text=True,
+                            timeout=120,
                         )
-                        build_status = "réussi" if build_result.returncode == 0 else f"échoué: {build_result.stderr[:200]}"
-                        await push_sse(session_id, {
-                            "type": "message",
-                            "from_agent": "system",
-                            "from_name": "CI/CD",
-                            "from_role": "Pipeline",
-                            "content": f"npm run build {build_status}",
-                            "phase_id": phase_id,
-                            "msg_type": "text",
-                        })
+                        build_status = (
+                            "réussi"
+                            if build_r.returncode == 0
+                            else f"échoué: {build_r.stderr[:200]}"
+                        )
+                        if build_r.returncode != 0:
+                            result["build_ok"] = False
+                        await push_sse(
+                            session_id,
+                            {
+                                "type": "message",
+                                "from_agent": "system",
+                                "from_name": "CI/CD",
+                                "from_role": "Pipeline",
+                                "content": f"npm run build {build_status}",
+                                "phase_id": phase_id,
+                                "msg_type": "text",
+                            },
+                        )
                     if "test" in (pkg.get("scripts") or {}):
-                        test_result = subprocess.run(
-                            ["npm", "test"], cwd=workspace, capture_output=True, text=True, timeout=120,
+                        test_r = subprocess.run(
+                            ["npm", "test"],
+                            cwd=workspace,
+                            capture_output=True,
+                            text=True,
+                            timeout=120,
                             env={**dict(subprocess.os.environ), "CI": "true"},
                         )
-                        test_status = "réussi" if test_result.returncode == 0 else f"échoué: {test_result.stderr[:200]}"
-                        await push_sse(session_id, {
+                        test_status = (
+                            "réussi" if test_r.returncode == 0 else f"échoué: {test_r.stderr[:200]}"
+                        )
+                        if test_r.returncode != 0:
+                            result["test_ok"] = False
+                        await push_sse(
+                            session_id,
+                            {
+                                "type": "message",
+                                "from_agent": "system",
+                                "from_name": "CI/CD",
+                                "from_role": "Pipeline",
+                                "content": f"npm test {test_status}",
+                                "phase_id": phase_id,
+                                "msg_type": "text",
+                            },
+                        )
+                except Exception:
+                    pass
+            # Python project support: requirements.txt + pytest
+            elif (ws / "requirements.txt").exists():
+                result_pip = subprocess.run(
+                    ["pip", "install", "-r", "requirements.txt"],
+                    cwd=workspace,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+                pip_msg = (
+                    "pip install réussi"
+                    if result_pip.returncode == 0
+                    else f"pip install échoué: {result_pip.stderr[:200]}"
+                )
+                if result_pip.returncode != 0:
+                    result["build_ok"] = False
+                await push_sse(
+                    session_id,
+                    {
+                        "type": "message",
+                        "from_agent": "system",
+                        "from_name": "CI/CD",
+                        "from_role": "Pipeline",
+                        "content": pip_msg,
+                        "phase_id": phase_id,
+                        "msg_type": "text",
+                    },
+                )
+                # Run pytest if test files exist
+                test_files = list(ws.glob("test_*.py")) + list(ws.glob("tests/*.py"))
+                if test_files:
+                    pytest_result = subprocess.run(
+                        ["python3", "-m", "pytest", "-v", "--tb=short"],
+                        cwd=workspace,
+                        capture_output=True,
+                        text=True,
+                        timeout=120,
+                        env={**dict(subprocess.os.environ), "CI": "true"},
+                    )
+                    test_status = (
+                        "réussi"
+                        if pytest_result.returncode == 0
+                        else f"échoué: {pytest_result.stdout[-300:]}"
+                    )
+                    if pytest_result.returncode != 0:
+                        result["test_ok"] = False
+                    await push_sse(
+                        session_id,
+                        {
                             "type": "message",
                             "from_agent": "system",
                             "from_name": "CI/CD",
                             "from_role": "Pipeline",
-                            "content": f"npm test {test_status}",
+                            "content": f"pytest {test_status}",
                             "phase_id": phase_id,
                             "msg_type": "text",
-                        })
-                except Exception:
-                    pass
+                        },
+                    )
         except Exception as e:
             logger.error("Post-phase build failed: %s", e)
 
@@ -1907,6 +2390,7 @@ asyncio.run(main())
         if (ws / "package.json").exists():
             try:
                 import json as _json2
+
                 pkg2 = _json2.loads((ws / "package.json").read_text())
                 scripts = pkg2.get("scripts") or {}
                 start_cmd = None
@@ -1914,7 +2398,11 @@ asyncio.run(main())
                     start_cmd = "npm start"
                 elif "dev" in scripts:
                     start_cmd = "npm run dev"
-                elif (ws / "src" / "server.ts").exists() or (ws / "src" / "server.js").exists() or (ws / "server.js").exists():
+                elif (
+                    (ws / "src" / "server.ts").exists()
+                    or (ws / "src" / "server.js").exists()
+                    or (ws / "server.js").exists()
+                ):
                     main = pkg2.get("main", "")
                     if main:
                         start_cmd = f"node {main}"
@@ -1924,18 +2412,38 @@ asyncio.run(main())
                     screenshots_dir.mkdir(exist_ok=True)
                     # Start server in background
                     import signal
-                    server_env = {**dict(subprocess.os.environ), "PORT": "9050", "NODE_ENV": "production"}
+
+                    server_env = {
+                        **dict(subprocess.os.environ),
+                        "PORT": "9050",
+                        "NODE_ENV": "production",
+                    }
                     server_proc = subprocess.Popen(
-                        start_cmd, shell=True, cwd=workspace,
-                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                        env=server_env, preexec_fn=subprocess.os.setsid
+                        start_cmd,
+                        shell=True,
+                        cwd=workspace,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        env=server_env,
+                        preexec_fn=subprocess.os.setsid,
                     )
                     import time as _time
+
                     _time.sleep(4)  # Wait for server to start
                     # Check if server is up
                     health = subprocess.run(
-                        ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "http://127.0.0.1:9050/"],
-                        capture_output=True, text=True, timeout=5
+                        [
+                            "curl",
+                            "-s",
+                            "-o",
+                            "/dev/null",
+                            "-w",
+                            "%{http_code}",
+                            "http://127.0.0.1:9050/",
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
                     )
                     http_code = health.stdout.strip()
                     if http_code and http_code != "000":
@@ -1960,9 +2468,14 @@ asyncio.run(main())
                             try:
                                 r = subprocess.run(
                                     ["python3", "-c", shot_script],
-                                    capture_output=True, text=True, timeout=30
+                                    capture_output=True,
+                                    text=True,
+                                    timeout=30,
                                 )
-                                if r.returncode == 0 and (screenshots_dir / f"{shot_name}.png").exists():
+                                if (
+                                    r.returncode == 0
+                                    and (screenshots_dir / f"{shot_name}.png").exists()
+                                ):
                                     shot_paths_srv.append(f"screenshots/{shot_name}.png")
                             except Exception:
                                 pass
@@ -1971,25 +2484,31 @@ asyncio.run(main())
                             shot_msg = f"Screenshots du serveur (HTTP {http_code}) :\n" + "\n".join(
                                 f"[SCREENSHOT:{p}]" for p in shot_paths_srv
                             )
-                            await push_sse(session_id, {
-                                "type": "message",
-                                "from_agent": "system",
-                                "from_name": "CI/CD",
-                                "from_role": "Pipeline",
-                                "content": shot_msg,
-                                "phase_id": phase_id,
-                                "msg_type": "text",
-                            })
+                            await push_sse(
+                                session_id,
+                                {
+                                    "type": "message",
+                                    "from_agent": "system",
+                                    "from_name": "CI/CD",
+                                    "from_role": "Pipeline",
+                                    "content": shot_msg,
+                                    "phase_id": phase_id,
+                                    "msg_type": "text",
+                                },
+                            )
                         else:
-                            await push_sse(session_id, {
-                                "type": "message",
-                                "from_agent": "system",
-                                "from_name": "CI/CD",
-                                "from_role": "Pipeline",
-                                "content": f"Serveur démarré (HTTP {http_code}) mais screenshots échoués",
-                                "phase_id": phase_id,
-                                "msg_type": "text",
-                            })
+                            await push_sse(
+                                session_id,
+                                {
+                                    "type": "message",
+                                    "from_agent": "system",
+                                    "from_name": "CI/CD",
+                                    "from_role": "Pipeline",
+                                    "content": f"Serveur démarré (HTTP {http_code}) mais screenshots échoués",
+                                    "phase_id": phase_id,
+                                    "msg_type": "text",
+                                },
+                            )
                     # Kill server
                     try:
                         subprocess.os.killpg(subprocess.os.getpgid(server_proc.pid), signal.SIGTERM)
@@ -2009,25 +2528,31 @@ asyncio.run(main())
                 # Build Docker image
                 build_result = subprocess.run(
                     ["docker", "build", "-t", container_name, "."],
-                    cwd=workspace, capture_output=True, text=True, timeout=300
+                    cwd=workspace,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
                 )
                 if build_result.returncode == 0:
-                    await push_sse(session_id, {
-                        "type": "message",
-                        "from_agent": "system",
-                        "from_name": "CI/CD",
-                        "from_role": "Pipeline",
-                        "content": f"Docker image {container_name} construite avec succès",
-                        "phase_id": phase_id,
-                        "msg_type": "text",
-                    })
+                    await push_sse(
+                        session_id,
+                        {
+                            "type": "message",
+                            "from_agent": "system",
+                            "from_name": "CI/CD",
+                            "from_role": "Pipeline",
+                            "content": f"Docker image {container_name} construite avec succès",
+                            "phase_id": phase_id,
+                            "msg_type": "text",
+                        },
+                    )
                     # Stop existing container if any
                     subprocess.run(
-                        ["docker", "rm", "-f", container_name],
-                        capture_output=True, timeout=10
+                        ["docker", "rm", "-f", container_name], capture_output=True, timeout=10
                     )
                     # Find free port
                     import socket
+
                     port = 9100
                     for p in range(9100, 9200):
                         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -2036,32 +2561,55 @@ asyncio.run(main())
                                 break
                     # Run container
                     run_result = subprocess.run(
-                        ["docker", "run", "-d", "--name", container_name,
-                         "-p", f"{port}:3000",
-                         "--restart", "unless-stopped",
-                         container_name],
-                        capture_output=True, text=True, timeout=30
+                        [
+                            "docker",
+                            "run",
+                            "-d",
+                            "--name",
+                            container_name,
+                            "-p",
+                            f"{port}:3000",
+                            "--restart",
+                            "unless-stopped",
+                            container_name,
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
                     )
                     if run_result.returncode == 0:
                         import time
+
                         time.sleep(3)  # Wait for container to start
                         # Health check
                         health = subprocess.run(
-                            ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-                             f"http://127.0.0.1:{port}/"],
-                            capture_output=True, text=True, timeout=10
+                            [
+                                "curl",
+                                "-s",
+                                "-o",
+                                "/dev/null",
+                                "-w",
+                                "%{http_code}",
+                                f"http://127.0.0.1:{port}/",
+                            ],
+                            capture_output=True,
+                            text=True,
+                            timeout=10,
                         )
                         status_code = health.stdout.strip()
                         deploy_msg = f"Container {container_name} déployé sur port {port} — HTTP {status_code}"
-                        await push_sse(session_id, {
-                            "type": "message",
-                            "from_agent": "system",
-                            "from_name": "CI/CD",
-                            "from_role": "Pipeline",
-                            "content": deploy_msg,
-                            "phase_id": phase_id,
-                            "msg_type": "text",
-                        })
+                        await push_sse(
+                            session_id,
+                            {
+                                "type": "message",
+                                "from_agent": "system",
+                                "from_name": "CI/CD",
+                                "from_role": "Pipeline",
+                                "content": deploy_msg,
+                                "phase_id": phase_id,
+                                "msg_type": "text",
+                            },
+                        )
                         # Take screenshot of deployed app
                         screenshots_dir = ws / "screenshots"
                         screenshots_dir.mkdir(exist_ok=True)
@@ -2079,38 +2627,55 @@ asyncio.run(main())
 """
                         shot_result = subprocess.run(
                             ["python3", "-c", shot_script],
-                            capture_output=True, text=True, cwd=workspace, timeout=30
+                            capture_output=True,
+                            text=True,
+                            cwd=workspace,
+                            timeout=30,
                         )
-                        if shot_result.returncode == 0 and (screenshots_dir / "deployed.png").exists():
-                            await push_sse(session_id, {
+                        if (
+                            shot_result.returncode == 0
+                            and (screenshots_dir / "deployed.png").exists()
+                        ):
+                            await push_sse(
+                                session_id,
+                                {
+                                    "type": "message",
+                                    "from_agent": "system",
+                                    "from_name": "CI/CD",
+                                    "from_role": "Pipeline",
+                                    "content": "Screenshot du site déployé : [SCREENSHOT:screenshots/deployed.png]",
+                                    "phase_id": phase_id,
+                                    "msg_type": "text",
+                                },
+                            )
+                    else:
+                        result["deploy_ok"] = False
+                        await push_sse(
+                            session_id,
+                            {
                                 "type": "message",
                                 "from_agent": "system",
                                 "from_name": "CI/CD",
                                 "from_role": "Pipeline",
-                                "content": f"Screenshot du site déployé : [SCREENSHOT:screenshots/deployed.png]",
+                                "content": f"Docker run échoué: {run_result.stderr[:200]}",
                                 "phase_id": phase_id,
                                 "msg_type": "text",
-                            })
-                    else:
-                        await push_sse(session_id, {
+                            },
+                        )
+                else:
+                    result["deploy_ok"] = False
+                    await push_sse(
+                        session_id,
+                        {
                             "type": "message",
                             "from_agent": "system",
                             "from_name": "CI/CD",
                             "from_role": "Pipeline",
-                            "content": f"Docker run échoué: {run_result.stderr[:200]}",
+                            "content": f"Docker build échoué: {build_result.stderr[:200]}",
                             "phase_id": phase_id,
                             "msg_type": "text",
-                        })
-                else:
-                    await push_sse(session_id, {
-                        "type": "message",
-                        "from_agent": "system",
-                        "from_name": "CI/CD",
-                        "from_role": "Pipeline",
-                        "content": f"Docker build échoué: {build_result.stderr[:200]}",
-                        "phase_id": phase_id,
-                        "msg_type": "text",
-                    })
+                        },
+                    )
             except Exception as e:
                 logger.warning("Docker deploy failed for %s: %s", mission.id, e)
         ws = Path(workspace)
@@ -2118,22 +2683,29 @@ asyncio.run(main())
             files = list(ws.rglob("*"))
             real_files = [f.relative_to(ws) for f in files if f.is_file() and ".git" not in str(f)]
             git_log = subprocess.run(
-                ["git", "log", "--oneline", "-10"], cwd=workspace, capture_output=True, text=True, timeout=10
+                ["git", "log", "--oneline", "-10"],
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             summary = f"Workspace: {len(real_files)} fichiers\n"
             if real_files:
                 summary += "```\n" + "\n".join(str(f) for f in sorted(real_files)[:20]) + "\n```\n"
             if git_log.stdout:
                 summary += f"\nGit log:\n```\n{git_log.stdout.strip()}\n```"
-            await push_sse(session_id, {
-                "type": "message",
-                "from_agent": "system",
-                "from_name": "CI/CD",
-                "from_role": "Pipeline",
-                "content": summary,
-                "phase_id": phase_id,
-                "msg_type": "text",
-            })
+            await push_sse(
+                session_id,
+                {
+                    "type": "message",
+                    "from_agent": "system",
+                    "from_name": "CI/CD",
+                    "from_role": "Pipeline",
+                    "content": summary,
+                    "phase_id": phase_id,
+                    "msg_type": "text",
+                },
+            )
         except Exception as e:
             logger.error("Post-phase deploy summary failed: %s", e)
 
@@ -2141,20 +2713,27 @@ asyncio.run(main())
     if "qa" in phase_key or "test" in phase_key:
         ws = Path(workspace)
         try:
-            platform_type = _detect_project_platform(str(ws), brief=mission.brief if hasattr(mission, 'brief') else "")
+            platform_type = _detect_project_platform(
+                str(ws), brief=mission.brief if hasattr(mission, "brief") else ""
+            )
             screenshots = await _auto_qa_screenshots(ws, platform_type)
             if screenshots:
-                shot_content = f"📸 QA Screenshots ({platform_type}) — {len(screenshots)} captures :\n"
+                shot_content = (
+                    f"📸 QA Screenshots ({platform_type}) — {len(screenshots)} captures :\n"
+                )
                 shot_content += "\n".join(f"[SCREENSHOT:{s}]" for s in screenshots)
-                await push_sse(session_id, {
-                    "type": "message",
-                    "from_agent": "system",
-                    "from_name": "QA Pipeline",
-                    "from_role": "Automated QA",
-                    "content": shot_content,
-                    "phase_id": phase_id,
-                    "msg_type": "text",
-                })
+                await push_sse(
+                    session_id,
+                    {
+                        "type": "message",
+                        "from_agent": "system",
+                        "from_name": "QA Pipeline",
+                        "from_role": "Automated QA",
+                        "content": shot_content,
+                        "phase_id": phase_id,
+                        "msg_type": "text",
+                    },
+                )
         except Exception as e:
             logger.error("Post-phase QA screenshots failed: %s", e)
 
@@ -2167,33 +2746,38 @@ asyncio.run(main())
     # Confluence sync — auto-sync after every phase
     try:
         from ...confluence.sync import get_sync_engine
+
         engine = get_sync_engine()
         if engine.client.health_check():
-            results = engine.sync_mission(mission.id if hasattr(mission, 'id') else str(mission))
+            results = engine.sync_mission(mission.id if hasattr(mission, "id") else str(mission))
             synced = [t for t, r in results.items() if r.get("status") == "ok"]
             if synced:
-                await push_sse(session_id, {
-                    "type": "message",
-                    "from_agent": "system",
-                    "from_name": "Confluence",
-                    "from_role": "Sync",
-                    "content": f"Sync Confluence: {', '.join(synced)} ({len(synced)} pages)",
-                    "phase_id": phase_id,
-                    "msg_type": "text",
-                })
+                await push_sse(
+                    session_id,
+                    {
+                        "type": "message",
+                        "from_agent": "system",
+                        "from_name": "Confluence",
+                        "from_role": "Sync",
+                        "content": f"Sync Confluence: {', '.join(synced)} ({len(synced)} pages)",
+                        "phase_id": phase_id,
+                        "msg_type": "text",
+                    },
+                )
     except FileNotFoundError:
         pass  # No PAT configured — skip
     except Exception as e:
         logger.warning("Confluence sync failed: %s", e)
 
+    return result
 
 
 async def _update_docs_post_phase(
     phase_id: str, phase_name: str, mission, session_id: str, push_sse
 ):
     """Call LLM to update Architecture.md and README.md after each phase."""
-    from pathlib import Path
     import subprocess
+    from pathlib import Path
 
     workspace = mission.workspace_path
     if not workspace or not Path(workspace).is_dir():
@@ -2205,7 +2789,10 @@ async def _update_docs_post_phase(
     try:
         file_list = subprocess.run(
             ["find", ".", "-type", "f", "-not", "-path", "./.git/*", "-not", "-name", "*.bak"],
-            cwd=workspace, capture_output=True, text=True, timeout=5
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=5,
         ).stdout.strip()
     except Exception:
         file_list = ""
@@ -2229,7 +2816,12 @@ async def _update_docs_post_phase(
 
     # Read key source files for context (first 200 lines of main files)
     code_context = ""
-    code_files = list(ws.glob("**/*.swift"))[:3] + list(ws.glob("**/*.ts"))[:3] + list(ws.glob("**/*.py"))[:3] + list(ws.glob("**/*.svelte"))[:3]
+    code_files = (
+        list(ws.glob("**/*.swift"))[:3]
+        + list(ws.glob("**/*.ts"))[:3]
+        + list(ws.glob("**/*.py"))[:3]
+        + list(ws.glob("**/*.svelte"))[:3]
+    )
     for cf in code_files[:4]:
         try:
             content = cf.read_text()[:1500]
@@ -2240,7 +2832,7 @@ async def _update_docs_post_phase(
     if not file_list and not code_context:
         return
 
-    from ...llm.client import get_llm_client, LLMMessage
+    from ...llm.client import LLMMessage, get_llm_client
 
     client = get_llm_client()
 
@@ -2267,11 +2859,15 @@ Genere un Architecture.md complet et a jour avec:
 
 Reponds UNIQUEMENT avec le contenu Markdown du fichier."""
 
-        resp = await asyncio.wait_for(client.chat(
-            messages=[LLMMessage(role="user", content=archi_prompt)],
-            system_prompt="Architecte logiciel senior. Documentation technique concise et precise.",
-            temperature=0.3, max_tokens=2000,
-        ), timeout=60)
+        resp = await asyncio.wait_for(
+            client.chat(
+                messages=[LLMMessage(role="user", content=archi_prompt)],
+                system_prompt="Architecte logiciel senior. Documentation technique concise et precise.",
+                temperature=0.3,
+                max_tokens=2000,
+            ),
+            timeout=60,
+        )
         archi_text = resp.content.strip()
         # Strip markdown fences if present
         if archi_text.startswith("```"):
@@ -2281,15 +2877,18 @@ Reponds UNIQUEMENT avec le contenu Markdown du fichier."""
 
         if len(archi_text) > 100:
             archi_path.write_text(archi_text)
-            await push_sse(session_id, {
-                "type": "message",
-                "from_agent": "architecte",
-                "from_name": "Architecte",
-                "from_role": "Architecture",
-                "content": f"Architecture.md mis a jour ({len(archi_text)} chars)",
-                "phase_id": phase_id,
-                "msg_type": "text",
-            })
+            await push_sse(
+                session_id,
+                {
+                    "type": "message",
+                    "from_agent": "architecte",
+                    "from_name": "Architecte",
+                    "from_role": "Architecture",
+                    "content": f"Architecture.md mis a jour ({len(archi_text)} chars)",
+                    "phase_id": phase_id,
+                    "msg_type": "text",
+                },
+            )
     except Exception as e:
         logger.warning("Architecture update failed: %s", e)
 
@@ -2313,11 +2912,15 @@ Genere un README.md a jour avec:
 
 Reponds UNIQUEMENT avec le contenu Markdown du fichier."""
 
-        resp = await asyncio.wait_for(client.chat(
-            messages=[LLMMessage(role="user", content=readme_prompt)],
-            system_prompt="Technical writer. Documentation claire et actionnable.",
-            temperature=0.3, max_tokens=1500,
-        ), timeout=60)
+        resp = await asyncio.wait_for(
+            client.chat(
+                messages=[LLMMessage(role="user", content=readme_prompt)],
+                system_prompt="Technical writer. Documentation claire et actionnable.",
+                temperature=0.3,
+                max_tokens=1500,
+            ),
+            timeout=60,
+        )
         readme_text = resp.content.strip()
         if readme_text.startswith("```"):
             readme_text = readme_text.split("\n", 1)[1] if "\n" in readme_text else readme_text
@@ -2326,40 +2929,68 @@ Reponds UNIQUEMENT avec le contenu Markdown du fichier."""
 
         if len(readme_text) > 80:
             readme_path.write_text(readme_text)
-            await push_sse(session_id, {
-                "type": "message",
-                "from_agent": "tech_writer",
-                "from_name": "Tech Writer",
-                "from_role": "Documentation",
-                "content": f"README.md mis a jour ({len(readme_text)} chars)",
-                "phase_id": phase_id,
-                "msg_type": "text",
-            })
+            await push_sse(
+                session_id,
+                {
+                    "type": "message",
+                    "from_agent": "tech_writer",
+                    "from_name": "Tech Writer",
+                    "from_role": "Documentation",
+                    "content": f"README.md mis a jour ({len(readme_text)} chars)",
+                    "phase_id": phase_id,
+                    "msg_type": "text",
+                },
+            )
     except Exception as e:
         logger.warning("README update failed: %s", e)
 
     # Auto-commit docs update
     try:
-        subprocess.run(["git", "add", "Architecture.md", "README.md"], cwd=workspace, capture_output=True, text=True, timeout=5)
-        status = subprocess.run(["git", "status", "--porcelain"], cwd=workspace, capture_output=True, text=True, timeout=5)
+        subprocess.run(
+            ["git", "add", "Architecture.md", "README.md"],
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
         if status.stdout.strip():
             subprocess.run(
-                ["git", "commit", "-m", f"docs({phase_name.lower().replace(' ', '-')}): update Architecture.md + README.md"],
-                cwd=workspace, capture_output=True, text=True, timeout=10
+                [
+                    "git",
+                    "commit",
+                    "-m",
+                    f"docs({phase_name.lower().replace(' ', '-')}): update Architecture.md + README.md",
+                ],
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
     except Exception:
         pass
 
 
-async def _run_real_e2e_tests(ws: "Path", session_id: str, phase_id: str, push_sse, mission) -> dict:
+async def _run_real_e2e_tests(ws: Path, session_id: str, phase_id: str, push_sse, mission) -> dict:
     """Run real Playwright/Jest/Vitest E2E test files if they exist in workspace. No LLM."""
     import subprocess
+
     results = {"ran": False, "passed": 0, "failed": 0, "errors": []}
 
     # Find E2E test files
     test_patterns = [
-        ws / "tests" / "e2e", ws / "test" / "e2e", ws / "e2e",
-        ws / "tests", ws / "test", ws / "__tests__",
+        ws / "tests" / "e2e",
+        ws / "test" / "e2e",
+        ws / "e2e",
+        ws / "tests",
+        ws / "test",
+        ws / "__tests__",
     ]
     test_files = []
     for td in test_patterns:
@@ -2375,18 +3006,23 @@ async def _run_real_e2e_tests(ws: "Path", session_id: str, phase_id: str, push_s
         return results
 
     results["ran"] = True
-    await push_sse(session_id, {
-        "type": "message",
-        "from_agent": "system",
-        "from_name": "E2E Pipeline",
-        "from_role": "Real Tests",
-        "content": f"Running {len(test_files)} E2E test file(s)…",
-        "phase_id": phase_id,
-        "msg_type": "text",
-    })
+    await push_sse(
+        session_id,
+        {
+            "type": "message",
+            "from_agent": "system",
+            "from_name": "E2E Pipeline",
+            "from_role": "Real Tests",
+            "content": f"Running {len(test_files)} E2E test file(s)…",
+            "phase_id": phase_id,
+            "msg_type": "text",
+        },
+    )
 
     # Determine test runner
-    has_playwright_config = (ws / "playwright.config.ts").exists() or (ws / "playwright.config.js").exists()
+    has_playwright_config = (ws / "playwright.config.ts").exists() or (
+        ws / "playwright.config.js"
+    ).exists()
     has_vitest = (ws / "vitest.config.ts").exists() or (ws / "vitest.config.js").exists()
     has_jest = (ws / "jest.config.ts").exists() or (ws / "jest.config.js").exists()
     has_pytest = any(f.suffix == ".py" for f in test_files)
@@ -2413,8 +3049,13 @@ async def _run_real_e2e_tests(ws: "Path", session_id: str, phase_id: str, push_s
         try:
             env = {**__import__("os").environ, "CI": "true", "NODE_ENV": "test"}
             r = subprocess.run(
-                cmd, shell=True, cwd=str(ws),
-                capture_output=True, text=True, timeout=120, env=env,
+                cmd,
+                shell=True,
+                cwd=str(ws),
+                capture_output=True,
+                text=True,
+                timeout=120,
+                env=env,
             )
             output = (r.stdout + "\n" + r.stderr)[-2000:]
             if r.returncode == 0:
@@ -2425,27 +3066,33 @@ async def _run_real_e2e_tests(ws: "Path", session_id: str, phase_id: str, push_s
                 results["errors"].append(output[-500:])
                 status = f"[FAIL] {runner_name} FAILED (exit {r.returncode})"
 
-            await push_sse(session_id, {
-                "type": "message",
-                "from_agent": "system",
-                "from_name": "E2E Pipeline",
-                "from_role": "Real Tests",
-                "content": f"{status}\n```\n{output[-1500:]}\n```",
-                "phase_id": phase_id,
-                "msg_type": "text",
-            })
+            await push_sse(
+                session_id,
+                {
+                    "type": "message",
+                    "from_agent": "system",
+                    "from_name": "E2E Pipeline",
+                    "from_role": "Real Tests",
+                    "content": f"{status}\n```\n{output[-1500:]}\n```",
+                    "phase_id": phase_id,
+                    "msg_type": "text",
+                },
+            )
         except subprocess.TimeoutExpired:
             results["failed"] += 1
             results["errors"].append(f"{runner_name} timed out after 120s")
-            await push_sse(session_id, {
-                "type": "message",
-                "from_agent": "system",
-                "from_name": "E2E Pipeline",
-                "from_role": "Real Tests",
-                "content": f"[FAIL] {runner_name} timed out after 120s",
-                "phase_id": phase_id,
-                "msg_type": "text",
-            })
+            await push_sse(
+                session_id,
+                {
+                    "type": "message",
+                    "from_agent": "system",
+                    "from_name": "E2E Pipeline",
+                    "from_role": "Real Tests",
+                    "content": f"[FAIL] {runner_name} timed out after 120s",
+                    "phase_id": phase_id,
+                    "msg_type": "text",
+                },
+            )
         except Exception as exc:
             results["errors"].append(str(exc)[:200])
 
@@ -2453,15 +3100,16 @@ async def _run_real_e2e_tests(ws: "Path", session_id: str, phase_id: str, push_s
     if results["failed"] > 0:
         try:
             from ...missions.feedback import create_platform_incident
+
             create_platform_incident(
                 title=f"E2E tests failed: {results['failed']} runner(s)",
                 severity="P3",
                 source="e2e_pipeline",
                 error_type="test_failure",
                 error_detail=f"Mission {mission.id}: {results['failed']} test runner(s) failed. "
-                             f"Errors: {'; '.join(results['errors'][:3])}",
-                mission_id=mission.id if hasattr(mission, 'id') else "",
-                project_id=mission.project_id if hasattr(mission, 'project_id') else "",
+                f"Errors: {'; '.join(results['errors'][:3])}",
+                mission_id=mission.id if hasattr(mission, "id") else "",
+                project_id=mission.project_id if hasattr(mission, "project_id") else "",
             )
         except Exception:
             pass
@@ -2484,10 +3132,10 @@ async def _run_real_e2e_tests(ws: "Path", session_id: str, phase_id: str, push_s
     return [r for r in results if (ws / r).exists() and (ws / r).stat().st_size > 1000]
 
 
-async def _qa_screenshots_macos(ws: "Path", shots_dir: "Path") -> list[str]:
+async def _qa_screenshots_macos(ws: Path, shots_dir: Path) -> list[str]:
     """Build Swift app → launch → AppleScript navigation → multi-step screenshots."""
-    import subprocess
     import asyncio as _aio
+    import subprocess
 
     results = []
 
@@ -2501,6 +3149,7 @@ async def _qa_screenshots_macos(ws: "Path", shots_dir: "Path") -> list[str]:
 
         # Detect duplicate filenames and .bak files to exclude
         from collections import Counter
+
         swift_files = list((ws / "Sources").rglob("*.swift"))
         name_counts = Counter(f.name for f in swift_files)
         excludes = []
@@ -2519,40 +3168,53 @@ async def _qa_screenshots_macos(ws: "Path", shots_dir: "Path") -> list[str]:
 
         exclude_clause = ""
         if excludes:
-            exclude_clause = f',\n            exclude: [{", ".join(excludes)}]'
+            exclude_clause = f",\n            exclude: [{', '.join(excludes)}]"
 
         pkg.write_text(
-            f'// swift-tools-version:5.9\n'
-            f'import PackageDescription\n\n'
-            f'let package = Package(\n'
+            f"// swift-tools-version:5.9\n"
+            f"import PackageDescription\n\n"
+            f"let package = Package(\n"
             f'    name: "{app_name}",\n'
-            f'    platforms: [.macOS(.v14)],\n'
-            f'    targets: [\n'
-            f'        .executableTarget(\n'
+            f"    platforms: [.macOS(.v14)],\n"
+            f"    targets: [\n"
+            f"        .executableTarget(\n"
             f'            name: "{app_name}",\n'
             f'            path: "Sources"{exclude_clause}\n'
-            f'        ),\n'
-            f'    ]\n'
-            f')\n'
+            f"        ),\n"
+            f"    ]\n"
+            f")\n"
         )
-        logger.info("Auto-generated Package.swift for %s (excluding %d files)", app_name, len(excludes))
+        logger.info(
+            "Auto-generated Package.swift for %s (excluding %d files)", app_name, len(excludes)
+        )
 
     # 2. Build
     build_result = subprocess.run(
         ["xcrun", "swift", "build"],
-        cwd=str(ws), capture_output=True, text=True, timeout=120,
+        cwd=str(ws),
+        capture_output=True,
+        text=True,
+        timeout=120,
     )
     build_log = (build_result.stdout + "\n" + build_result.stderr)[-3000:]
     (shots_dir / "build_log.txt").write_text(build_log)
 
     if build_result.returncode != 0:
-        _write_status_png(shots_dir / "01_build_failed.png", "BUILD FAILED ❌",
-                          build_log[-1200:], bg_color=(40, 10, 10))
+        _write_status_png(
+            shots_dir / "01_build_failed.png",
+            "BUILD FAILED ❌",
+            build_log[-1200:],
+            bg_color=(40, 10, 10),
+        )
         results.append("screenshots/01_build_failed.png")
         return results
 
-    _write_status_png(shots_dir / "01_build_success.png", "BUILD SUCCESS ✅",
-                      build_log[-400:], bg_color=(10, 40, 10))
+    _write_status_png(
+        shots_dir / "01_build_success.png",
+        "BUILD SUCCESS ✅",
+        build_log[-400:],
+        bg_color=(10, 40, 10),
+    )
     results.append("screenshots/01_build_success.png")
 
     # 3. Find the built binary
@@ -2560,15 +3222,24 @@ async def _qa_screenshots_macos(ws: "Path", shots_dir: "Path") -> list[str]:
     for d in [ws / ".build" / "debug", ws / ".build" / "release"]:
         if d.exists():
             for f in d.iterdir():
-                if f.is_file() and f.stat().st_mode & 0o111 and not f.suffix and f.name != "ModuleCache":
+                if (
+                    f.is_file()
+                    and f.stat().st_mode & 0o111
+                    and not f.suffix
+                    and f.name != "ModuleCache"
+                ):
                     binary = f
                     break
             if binary:
                 break
 
     if not binary:
-        _write_status_png(shots_dir / "02_no_binary.png", "NO EXECUTABLE",
-                          "Build produced no runnable binary.", bg_color=(40, 30, 10))
+        _write_status_png(
+            shots_dir / "02_no_binary.png",
+            "NO EXECUTABLE",
+            "Build produced no runnable binary.",
+            bg_color=(40, 30, 10),
+        )
         results.append("screenshots/02_no_binary.png")
         return results
 
@@ -2579,8 +3250,10 @@ async def _qa_screenshots_macos(ws: "Path", shots_dir: "Path") -> list[str]:
     proc = None
     try:
         proc = subprocess.Popen(
-            [str(binary)], cwd=str(ws),
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            [str(binary)],
+            cwd=str(ws),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
         await _aio.sleep(3)
@@ -2612,13 +3285,15 @@ async def _qa_screenshots_macos(ws: "Path", shots_dir: "Path") -> list[str]:
             results.append(f"screenshots/{step:02d}_final_state.png")
 
     except Exception as e:
-        _write_status_png(shots_dir / "02_launch_error.png", "LAUNCH FAILED",
-                          str(e)[:500], bg_color=(40, 10, 10))
+        _write_status_png(
+            shots_dir / "02_launch_error.png", "LAUNCH FAILED", str(e)[:500], bg_color=(40, 10, 10)
+        )
         results.append("screenshots/02_launch_error.png")
     finally:
         if proc:
             try:
                 import os
+
                 os.killpg(os.getpgid(proc.pid), 9)
             except Exception:
                 try:
@@ -2628,7 +3303,7 @@ async def _qa_screenshots_macos(ws: "Path", shots_dir: "Path") -> list[str]:
     return results
 
 
-def _discover_macos_views(ws: "Path") -> list[dict]:
+def _discover_macos_views(ws: Path) -> list[dict]:
     """Scan Swift sources to discover views/screens for screenshot journey."""
     views = []
     seen = set()
@@ -2652,44 +3327,52 @@ def _discover_macos_views(ws: "Path") -> list[dict]:
             # Extract keyboard shortcut if any
             shortcut = None
             import re
+
             ks = re.search(r'\.keyboardShortcut\("(\w)"', code)
             if ks:
                 shortcut = ks.group(1)
-            views.append({"id": name.lower(), "name": name, "type": view_type, "shortcut": shortcut})
+            views.append(
+                {"id": name.lower(), "name": name, "type": view_type, "shortcut": shortcut}
+            )
             seen.add(name)
     return views
 
 
-def _capture_app_screenshot(app_name: str, output_path: "Path"):
+def _capture_app_screenshot(app_name: str, output_path: Path):
     """Capture app window screenshot via screencapture -l (window ID)."""
     import subprocess
+
     try:
         # Get window ID via AppleScript
         script = (
             'tell application "System Events"\n'
             f'  set appProc to first process whose name contains "{app_name}"\n'
-            '  set wID to id of first window of appProc\n'
-            '  return wID\n'
-            'end tell'
+            "  set wID to id of first window of appProc\n"
+            "  return wID\n"
+            "end tell"
         )
-        r = subprocess.run(["osascript", "-e", script],
-                           capture_output=True, text=True, timeout=10)
+        r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=10)
         if r.returncode == 0 and r.stdout.strip():
-            subprocess.run(["screencapture", "-l", r.stdout.strip(), str(output_path)],
-                           timeout=10, capture_output=True)
+            subprocess.run(
+                ["screencapture", "-l", r.stdout.strip(), str(output_path)],
+                timeout=10,
+                capture_output=True,
+            )
         else:
             # Fallback: full screen
-            subprocess.run(["screencapture", "-x", str(output_path)],
-                           timeout=10, capture_output=True)
+            subprocess.run(
+                ["screencapture", "-x", str(output_path)], timeout=10, capture_output=True
+            )
     except Exception:
         import subprocess as _sp
-        _sp.run(["screencapture", "-x", str(output_path)],
-                timeout=10, capture_output=True)
+
+        _sp.run(["screencapture", "-x", str(output_path)], timeout=10, capture_output=True)
 
 
 def _applescript_navigate(app_name: str, view: dict):
     """Navigate to a view via AppleScript (keyboard shortcuts, menu clicks, tabs)."""
     import subprocess
+
     try:
         if view.get("shortcut"):
             # Use keyboard shortcut
@@ -2697,7 +3380,7 @@ def _applescript_navigate(app_name: str, view: dict):
                 f'tell application "{app_name}" to activate\n'
                 f'tell application "System Events"\n'
                 f'  keystroke "{view["shortcut"]}" using command down\n'
-                f'end tell'
+                f"end tell"
             )
         elif view["type"] == "menu":
             # Click menu bar icon
@@ -2705,15 +3388,15 @@ def _applescript_navigate(app_name: str, view: dict):
                 f'tell application "{app_name}" to activate\n'
                 f'tell application "System Events"\n'
                 f'  click menu bar item 1 of menu bar 2 of process "{app_name}"\n'
-                f'end tell'
+                f"end tell"
             )
         elif view["type"] == "tab" or view["type"] == "tabview":
             # Try Tab key navigation
             script = (
                 f'tell application "{app_name}" to activate\n'
                 f'tell application "System Events"\n'
-                f'  keystroke tab\n'
-                f'end tell'
+                f"  keystroke tab\n"
+                f"end tell"
             )
         elif view["type"] == "sheet":
             # Try Cmd+N for new item (common pattern)
@@ -2721,15 +3404,15 @@ def _applescript_navigate(app_name: str, view: dict):
                 f'tell application "{app_name}" to activate\n'
                 f'tell application "System Events"\n'
                 f'  keystroke "n" using command down\n'
-                f'end tell'
+                f"end tell"
             )
         elif view["type"] == "navigation":
             # Try arrow keys to navigate list
             script = (
                 f'tell application "{app_name}" to activate\n'
                 f'tell application "System Events"\n'
-                f'  key code 125\n'
-                f'end tell'
+                f"  key code 125\n"
+                f"end tell"
             )
         else:
             return
@@ -2738,47 +3421,69 @@ def _applescript_navigate(app_name: str, view: dict):
         pass
 
 
-async def _qa_screenshots_ios(ws: "Path", shots_dir: "Path") -> list[str]:
+async def _qa_screenshots_ios(ws: Path, shots_dir: Path) -> list[str]:
     """Build iOS app for simulator, boot sim, screenshot."""
-    import subprocess
     import asyncio as _aio
+    import subprocess
 
     results = []
     has_xcproj = any(ws.glob("*.xcodeproj")) or any(ws.glob("*.xcworkspace"))
 
     if has_xcproj:
         build_result = subprocess.run(
-            ["xcodebuild", "-scheme", "App", "-sdk", "iphonesimulator",
-             "-destination", "platform=iOS Simulator,name=iPhone 16",
-             "-derivedDataPath", str(ws / ".build"), "build"],
-            cwd=str(ws), capture_output=True, text=True, timeout=180,
+            [
+                "xcodebuild",
+                "-scheme",
+                "App",
+                "-sdk",
+                "iphonesimulator",
+                "-destination",
+                "platform=iOS Simulator,name=iPhone 16",
+                "-derivedDataPath",
+                str(ws / ".build"),
+                "build",
+            ],
+            cwd=str(ws),
+            capture_output=True,
+            text=True,
+            timeout=180,
         )
     else:
         build_result = subprocess.run(
             ["xcrun", "swift", "build"],
-            cwd=str(ws), capture_output=True, text=True, timeout=120,
+            cwd=str(ws),
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
 
     build_log = (build_result.stdout + "\n" + build_result.stderr)[-2000:]
     if build_result.returncode != 0:
-        _write_status_png(shots_dir / "01_ios_build_failed.png", "iOS BUILD FAILED ❌",
-                          build_log[-1000:], bg_color=(40, 10, 10))
+        _write_status_png(
+            shots_dir / "01_ios_build_failed.png",
+            "iOS BUILD FAILED ❌",
+            build_log[-1000:],
+            bg_color=(40, 10, 10),
+        )
         results.append("screenshots/01_ios_build_failed.png")
         return results
 
-    _write_status_png(shots_dir / "01_ios_build_success.png", "iOS BUILD ✅",
-                      build_log[-400:], bg_color=(10, 40, 10))
+    _write_status_png(
+        shots_dir / "01_ios_build_success.png",
+        "iOS BUILD ✅",
+        build_log[-400:],
+        bg_color=(10, 40, 10),
+    )
     results.append("screenshots/01_ios_build_success.png")
 
     # Boot simulator + screenshot
     try:
-        subprocess.run(["xcrun", "simctl", "boot", "iPhone 16"],
-                       capture_output=True, timeout=30)
+        subprocess.run(["xcrun", "simctl", "boot", "iPhone 16"], capture_output=True, timeout=30)
         await _aio.sleep(3)
         subprocess.run(
-            ["xcrun", "simctl", "io", "booted", "screenshot",
-             str(shots_dir / "02_simulator.png")],
-            capture_output=True, timeout=15,
+            ["xcrun", "simctl", "io", "booted", "screenshot", str(shots_dir / "02_simulator.png")],
+            capture_output=True,
+            timeout=15,
         )
         if (shots_dir / "02_simulator.png").exists():
             results.append("screenshots/02_simulator.png")
@@ -2787,10 +3492,10 @@ async def _qa_screenshots_ios(ws: "Path", shots_dir: "Path") -> list[str]:
     return results
 
 
-async def _qa_screenshots_web(ws: "Path", shots_dir: "Path", platform_type: str) -> list[str]:
+async def _qa_screenshots_web(ws: Path, shots_dir: Path, platform_type: str) -> list[str]:
     """Start web server → Playwright multi-step journey screenshots (routes + interactions + RBAC)."""
-    import subprocess
     import asyncio as _aio
+    import subprocess
 
     results = []
     proc = None
@@ -2801,33 +3506,54 @@ async def _qa_screenshots_web(ws: "Path", shots_dir: "Path", platform_type: str)
         if platform_type == "web-docker":
             r = subprocess.run(
                 ["docker", "build", "-t", "qa-screenshot-app", "."],
-                cwd=str(ws), capture_output=True, text=True, timeout=180,
+                cwd=str(ws),
+                capture_output=True,
+                text=True,
+                timeout=180,
             )
             if r.returncode == 0:
                 proc = subprocess.Popen(
-                    ["docker", "run", "--rm", "--name", "qa-screenshot-app",
-                     "-p", f"{port}:8080", "qa-screenshot-app"],
-                    cwd=str(ws), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    [
+                        "docker",
+                        "run",
+                        "--rm",
+                        "--name",
+                        "qa-screenshot-app",
+                        "-p",
+                        f"{port}:8080",
+                        "qa-screenshot-app",
+                    ],
+                    cwd=str(ws),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                     start_new_session=True,
                 )
             else:
                 build_log = (r.stdout + "\n" + r.stderr)[-1200:]
-                _write_status_png(shots_dir / "01_docker_build_failed.png",
-                                  "DOCKER BUILD FAILED ❌", build_log, bg_color=(40, 10, 10))
+                _write_status_png(
+                    shots_dir / "01_docker_build_failed.png",
+                    "DOCKER BUILD FAILED ❌",
+                    build_log,
+                    bg_color=(40, 10, 10),
+                )
                 results.append("screenshots/01_docker_build_failed.png")
                 return results
         elif platform_type == "web-node":
             subprocess.run(["npm", "install"], cwd=str(ws), capture_output=True, timeout=60)
             proc = subprocess.Popen(
-                ["npm", "start"], cwd=str(ws),
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                ["npm", "start"],
+                cwd=str(ws),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 start_new_session=True,
                 env={**__import__("os").environ, "PORT": str(port)},
             )
         elif platform_type == "web-static":
             proc = subprocess.Popen(
                 ["python3", "-m", "http.server", str(port)],
-                cwd=str(ws), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                cwd=str(ws),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 start_new_session=True,
             )
 
@@ -2842,9 +3568,13 @@ async def _qa_screenshots_web(ws: "Path", shots_dir: "Path", platform_type: str)
             # Generate Python Playwright journey script
             journey_script = _build_playwright_journey_py(port, routes, users, str(shots_dir))
 
-            r = subprocess.run(["python3", "-c", journey_script],
-                               capture_output=True, text=True, timeout=90,
-                               cwd=str(ws))
+            r = subprocess.run(
+                ["python3", "-c", journey_script],
+                capture_output=True,
+                text=True,
+                timeout=90,
+                cwd=str(ws),
+            )
 
             # Collect all generated screenshots
             if shots_dir.exists():
@@ -2855,19 +3585,28 @@ async def _qa_screenshots_web(ws: "Path", shots_dir: "Path", platform_type: str)
             # If no screenshots, write error
             if not results:
                 err = (r.stderr or r.stdout or "No output")[-800:]
-                _write_status_png(shots_dir / "01_playwright_error.png",
-                                  "PLAYWRIGHT FAILED", err, bg_color=(40, 10, 10))
+                _write_status_png(
+                    shots_dir / "01_playwright_error.png",
+                    "PLAYWRIGHT FAILED",
+                    err,
+                    bg_color=(40, 10, 10),
+                )
                 results.append("screenshots/01_playwright_error.png")
 
     except Exception as e:
         logger.error("Web screenshot pipeline failed: %s", e)
-        _write_status_png(shots_dir / "01_web_error.png", "WEB PIPELINE FAILED",
-                          str(e)[:500], bg_color=(40, 10, 10))
+        _write_status_png(
+            shots_dir / "01_web_error.png",
+            "WEB PIPELINE FAILED",
+            str(e)[:500],
+            bg_color=(40, 10, 10),
+        )
         results.append("screenshots/01_web_error.png")
     finally:
         if proc:
             try:
                 import os
+
                 os.killpg(os.getpgid(proc.pid), 9)
             except Exception:
                 try:
@@ -2875,14 +3614,16 @@ async def _qa_screenshots_web(ws: "Path", shots_dir: "Path", platform_type: str)
                 except Exception:
                     pass
             if platform_type == "web-docker":
-                subprocess.run(["docker", "rm", "-f", "qa-screenshot-app"],
-                               capture_output=True, timeout=10)
+                subprocess.run(
+                    ["docker", "rm", "-f", "qa-screenshot-app"], capture_output=True, timeout=10
+                )
     return results
 
 
-def _discover_web_routes(ws: "Path") -> list[dict]:
+def _discover_web_routes(ws: Path) -> list[dict]:
     """Scan codebase to find web routes for screenshot journey."""
     import re
+
     routes = [{"path": "/", "label": "homepage", "actions": []}]
     seen = {"/"}
 
@@ -2893,7 +3634,9 @@ def _discover_web_routes(ws: "Path") -> list[dict]:
                 rel = str(f.parent.relative_to(routes_dir)).replace("\\", "/")
                 if rel == ".":
                     continue
-                route = "/" + rel.replace("(", "").replace(")", "").replace("[", ":").replace("]", "")
+                route = "/" + rel.replace("(", "").replace(")", "").replace("[", ":").replace(
+                    "]", ""
+                )
                 if route not in seen and "+page" in f.name or "index" in f.name or "page" in f.name:
                     label = rel.strip("/").replace("/", "_").replace("-", "_")
                     routes.append({"path": route, "label": label, "actions": []})
@@ -2911,14 +3654,26 @@ def _discover_web_routes(ws: "Path") -> list[dict]:
             # Python: @app.get("/path") or @router.get("/path")
             for m in re.finditer(r'@(?:app|router)\.\w+\(["\'](/[^"\']*)["\']', code):
                 path = m.group(1)
-                if path not in seen and not re.search(r':\w+|{\w+}', path):
-                    routes.append({"path": path, "label": path.strip("/").replace("/", "_") or "root", "actions": []})
+                if path not in seen and not re.search(r":\w+|{\w+}", path):
+                    routes.append(
+                        {
+                            "path": path,
+                            "label": path.strip("/").replace("/", "_") or "root",
+                            "actions": [],
+                        }
+                    )
                     seen.add(path)
             # Express: app.get('/path', ...)
             for m in re.finditer(r"(?:app|router)\.(?:get|post|use)\(['\"](/[^'\"]*)['\"]", code):
                 path = m.group(1)
-                if path not in seen and not re.search(r':\w+', path):
-                    routes.append({"path": path, "label": path.strip("/").replace("/", "_") or "root", "actions": []})
+                if path not in seen and not re.search(r":\w+", path):
+                    routes.append(
+                        {
+                            "path": path,
+                            "label": path.strip("/").replace("/", "_") or "root",
+                            "actions": [],
+                        }
+                    )
                     seen.add(path)
 
     # HTML files as fallback
@@ -2928,7 +3683,9 @@ def _discover_web_routes(ws: "Path") -> list[dict]:
         rel = str(hf.relative_to(ws))
         path = f"/{rel}"
         if path not in seen:
-            routes.append({"path": path, "label": rel.replace("/", "_").replace(".html", ""), "actions": []})
+            routes.append(
+                {"path": path, "label": rel.replace("/", "_").replace(".html", ""), "actions": []}
+            )
             seen.add(path)
 
     # Discover forms/buttons for interaction steps
@@ -2938,9 +3695,10 @@ def _discover_web_routes(ws: "Path") -> list[dict]:
     return routes[:15]
 
 
-def _enrich_route_actions(ws: "Path", route: dict):
+def _enrich_route_actions(ws: Path, route: dict):
     """Detect interactive elements (forms, buttons, modals) in route files."""
     import re
+
     actions = []
     # Search for form elements, buttons, links in HTML/template files
     for ext in ("*.html", "*.svelte", "*.tsx", "*.jsx", "*.vue"):
@@ -2960,7 +3718,7 @@ def _enrich_route_actions(ws: "Path", route: dict):
             if 'type="password"' in code or 'type="email"' in code:
                 actions.append({"type": "login", "selector": "form"})
             # Buttons with text
-            for m in re.finditer(r'<button[^>]*>([^<]+)</button>', code):
+            for m in re.finditer(r"<button[^>]*>([^<]+)</button>", code):
                 btn_text = m.group(1).strip()
                 if len(btn_text) < 30:
                     actions.append({"type": "click", "selector": f"button:has-text('{btn_text}')"})
@@ -2973,9 +3731,10 @@ def _enrich_route_actions(ws: "Path", route: dict):
     route["actions"] = actions[:5]
 
 
-def _discover_web_users(ws: "Path") -> list[dict]:
+def _discover_web_users(ws: Path) -> list[dict]:
     """Scan codebase for auth/RBAC test users (env, fixtures, seed)."""
     import re
+
     users = []
     # Check for seed/fixture files
     for pattern in ("*seed*", "*fixture*", "*mock*", ".env*", "*test*"):
@@ -2985,9 +3744,15 @@ def _discover_web_users(ws: "Path") -> list[dict]:
             except Exception:
                 continue
             # Look for user/password patterns
-            for m in re.finditer(r'(?:email|user(?:name)?)\s*[:=]\s*["\']([^"\']+)["\']', code, re.I):
+            for m in re.finditer(
+                r'(?:email|user(?:name)?)\s*[:=]\s*["\']([^"\']+)["\']', code, re.I
+            ):
                 email = m.group(1)
-                pw_match = re.search(r'(?:password|pass|pwd)\s*[:=]\s*["\']([^"\']+)["\']', code[m.start():m.start()+200], re.I)
+                pw_match = re.search(
+                    r'(?:password|pass|pwd)\s*[:=]\s*["\']([^"\']+)["\']',
+                    code[m.start() : m.start() + 200],
+                    re.I,
+                )
                 if pw_match:
                     role = "user"
                     if "admin" in email.lower():
@@ -3018,7 +3783,7 @@ def _build_playwright_journey(port: int, routes: list, users: list, shots_dir: s
         for user in users[:3]:
             role = user["role"]
             steps_js += f"""
-    // --- RBAC Journey: {role} ({user['email']}) ---
+    // --- RBAC Journey: {role} ({user["email"]}) ---
     console.log('Journey: {role}');
     await page.goto('{base}/', {{ waitUntil: 'networkidle', timeout: 10000 }}).catch(() => {{}});
     await page.screenshot({{ path: '{shots_dir}/{step_num:02d}_{role}_00_before_login.png', fullPage: true }});
@@ -3052,7 +3817,7 @@ def _build_playwright_journey(port: int, routes: list, users: list, shots_dir: s
 """
                 step_num += 1
             # Clear session
-            steps_js += f"""
+            steps_js += """
     await context.clearCookies();
 """
     else:
@@ -3060,7 +3825,7 @@ def _build_playwright_journey(port: int, routes: list, users: list, shots_dir: s
         for route in routes[:10]:
             label = route["label"]
             steps_js += f"""
-    // Route: {route['path']}
+    // Route: {route["path"]}
     await page.goto('{base}{route["path"]}', {{ waitUntil: 'networkidle', timeout: 10000 }}).catch(() => {{}});
     await page.screenshot({{ path: '{shots_dir}/{step_num:02d}_{label}.png', fullPage: true }});
 """
@@ -3142,8 +3907,8 @@ def _build_playwright_journey_py(port: int, routes: list, users: list, shots_dir
             for route in routes[:5]:
                 steps += f"""
         try:
-            await page.goto("{base}{route['path']}", wait_until="networkidle", timeout=10000)
-            await page.screenshot(path="{shots_dir}/{step_num:02d}_{role}_{route['label']}.png", full_page=True)
+            await page.goto("{base}{route["path"]}", wait_until="networkidle", timeout=10000)
+            await page.screenshot(path="{shots_dir}/{step_num:02d}_{role}_{route["label"]}.png", full_page=True)
         except Exception:
             pass
 """
@@ -3154,7 +3919,7 @@ def _build_playwright_journey_py(port: int, routes: list, users: list, shots_dir
             label = route["label"]
             steps += f"""
         try:
-            await page.goto("{base}{route['path']}", wait_until="networkidle", timeout=10000)
+            await page.goto("{base}{route["path"]}", wait_until="networkidle", timeout=10000)
             await page.screenshot(path="{shots_dir}/{step_num:02d}_{label}.png", full_page=True)
         except Exception:
             pass
@@ -3191,8 +3956,16 @@ async def main():
 asyncio.run(main())
 """
     return script
-def _write_status_png(path: "Path", title: str, body: str,
-                      bg_color: tuple = (26, 17, 40), width: int = 800, height: int = 400):
+
+
+def _write_status_png(
+    path: Path,
+    title: str,
+    body: str,
+    bg_color: tuple = (26, 17, 40),
+    width: int = 800,
+    height: int = 400,
+):
     """Generate a status PNG with readable text using Pillow."""
     try:
         from PIL import Image, ImageDraw, ImageFont
@@ -3244,14 +4017,18 @@ def _write_status_png(path: "Path", title: str, body: str,
         img.save(str(path), "PNG")
     except ImportError:
         # Fallback: minimal PNG without text
-        import struct, zlib
+        import struct
+        import zlib
+
         img_w, img_h = 400, 100
         raw = b""
         for y in range(img_h):
             raw += b"\x00" + bytes(bg_color) * img_w
+
         def _ch(ct, d):
             c = ct + d
-            return struct.pack(">I", len(d)) + c + struct.pack(">I", zlib.crc32(c) & 0xffffffff)
+            return struct.pack(">I", len(d)) + c + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
+
         ihdr = struct.pack(">IIBBBBB", img_w, img_h, 8, 2, 0, 0, 0)
         with open(str(path), "wb") as f:
             f.write(b"\x89PNG\r\n\x1a\n")
@@ -3272,10 +4049,37 @@ def _detect_project_platform(workspace_path: str, brief: str = "") -> str:
     if brief:
         bl = brief.lower()
         # Explicit web indicators override file detection
-        web_kw = ("react", "vue", "svelte", "angular", "next.js", "nextjs", "nuxt", "vite",
-                  "node.js", "nodejs", "express", "fastapi", "django", "flask", "typescript",
-                  "html", "css", "tailwind", "web app", "webapp", "site web", "website",
-                  "clone", "saas", "dashboard", "figma", "frontend", "full-stack", "fullstack")
+        web_kw = (
+            "react",
+            "vue",
+            "svelte",
+            "angular",
+            "next.js",
+            "nextjs",
+            "nuxt",
+            "vite",
+            "node.js",
+            "nodejs",
+            "express",
+            "fastapi",
+            "django",
+            "flask",
+            "typescript",
+            "html",
+            "css",
+            "tailwind",
+            "web app",
+            "webapp",
+            "site web",
+            "website",
+            "clone",
+            "saas",
+            "dashboard",
+            "figma",
+            "frontend",
+            "full-stack",
+            "fullstack",
+        )
         if any(kw in bl for kw in web_kw):
             return "web-node"
         ios_kw = ("ios", "iphone", "ipad", "swiftui", "uikit", "swift app", "apple", "xcode")
@@ -3295,7 +4099,14 @@ def _detect_project_platform(workspace_path: str, brief: str = "") -> str:
         if stack_file.exists():
             try:
                 stack = stack_file.read_text().strip().lower()
-                if stack in ("web-node", "web-docker", "web-static", "ios-native", "macos-native", "android-native"):
+                if stack in (
+                    "web-node",
+                    "web-docker",
+                    "web-static",
+                    "ios-native",
+                    "macos-native",
+                    "android-native",
+                ):
                     return stack
             except Exception:
                 pass
@@ -3308,9 +4119,17 @@ def _detect_project_platform(workspace_path: str, brief: str = "") -> str:
         return "unknown"
 
     has_swift = (ws / "Package.swift").exists() or (ws / "Sources").exists()
-    has_xcode = any(ws.glob("*.xcodeproj")) or any(ws.glob("*.xcworkspace")) or (ws / "project.yml").exists()
+    has_xcode = (
+        any(ws.glob("*.xcodeproj"))
+        or any(ws.glob("*.xcworkspace"))
+        or (ws / "project.yml").exists()
+    )
     has_kotlin = (ws / "build.gradle").exists() or (ws / "build.gradle.kts").exists()
-    has_android = (ws / "app" / "build.gradle").exists() or (ws / "app" / "build.gradle.kts").exists() or (ws / "AndroidManifest.xml").exists()
+    has_android = (
+        (ws / "app" / "build.gradle").exists()
+        or (ws / "app" / "build.gradle.kts").exists()
+        or (ws / "AndroidManifest.xml").exists()
+    )
     has_node = (ws / "package.json").exists()
     has_docker = (ws / "Dockerfile").exists() or (ws / "docker-compose.yml").exists()
 
@@ -3336,7 +4155,9 @@ def _detect_project_platform(workspace_path: str, brief: str = "") -> str:
                 except Exception:
                     pass
         if not is_ios:
-            for src in list((ws / "Sources").rglob("*.swift"))[:20] if (ws / "Sources").exists() else []:
+            for src in (
+                list((ws / "Sources").rglob("*.swift"))[:20] if (ws / "Sources").exists() else []
+            ):
                 try:
                     txt = src.read_text()[:500].lower()
                     if "uiapplication" in txt or "uiscene" in txt or "uidevice" in txt:
@@ -3519,40 +4340,56 @@ _WEB_QA = {
 
 
 async def _extract_features_from_phase(
-    mission_id: str, session_id: str, phase_id: str,
-    phase_name: str, summary: str, pre_msg_count: int
+    mission_id: str,
+    session_id: str,
+    phase_id: str,
+    phase_name: str,
+    summary: str,
+    pre_msg_count: int,
 ):
     """Extract features/user stories from phase output and insert into features table."""
     import uuid
+
     try:
-        from ...sessions.store import get_session_store
-        from ...llm.client import get_llm_client, LLMMessage
         from ...db.migrations import get_db
+        from ...llm.client import LLMMessage, get_llm_client
+        from ...sessions.store import get_session_store
 
         ss = get_session_store()
         msgs = ss.get_messages(session_id, limit=1000)
         phase_msgs = msgs[pre_msg_count:]
         transcript_parts = []
         for m in phase_msgs:
-            txt = (getattr(m, 'content', '') or '').strip()
+            txt = (getattr(m, "content", "") or "").strip()
             if txt and len(txt) > 30:
-                name = getattr(m, 'from_name', '') or getattr(m, 'from_agent', '') or ''
+                name = getattr(m, "from_name", "") or getattr(m, "from_agent", "") or ""
                 transcript_parts.append(f"{name}: {txt[:600]}")
         if not transcript_parts and not summary:
             return
         transcript = "\n".join(transcript_parts[-20:])
 
         llm = get_llm_client()
-        resp = await asyncio.wait_for(llm.chat([
-            LLMMessage(role="user", content=(
-                "Extract actionable features/user stories from this phase output. "
-                "Return a JSON array of objects with keys: name (short title), description, priority (1-5, 1=highest), story_points (1,2,3,5,8,13). "
-                "If no features found, return []. Only valid JSON, no markdown.\n\n"
-                f"Phase: {phase_name}\nSummary: {summary}\n\nTranscript:\n{transcript[:3000]}"
-            ))
-        ], max_tokens=500, temperature=0.2), timeout=30)
+        resp = await asyncio.wait_for(
+            llm.chat(
+                [
+                    LLMMessage(
+                        role="user",
+                        content=(
+                            "Extract actionable features/user stories from this phase output. "
+                            "Return a JSON array of objects with keys: name (short title), description, priority (1-5, 1=highest), story_points (1,2,3,5,8,13). "
+                            "If no features found, return []. Only valid JSON, no markdown.\n\n"
+                            f"Phase: {phase_name}\nSummary: {summary}\n\nTranscript:\n{transcript[:3000]}"
+                        ),
+                    )
+                ],
+                max_tokens=500,
+                temperature=0.2,
+            ),
+            timeout=30,
+        )
 
         import json as _json
+
         raw = (resp.content or "").strip()
         # Strip markdown fences
         if raw.startswith("```"):
@@ -3569,25 +4406,50 @@ async def _extract_features_from_phase(
             fid = str(uuid.uuid4())[:8]
             db.execute(
                 "INSERT OR IGNORE INTO features (id, epic_id, name, description, priority, status, story_points) VALUES (?,?,?,?,?,?,?)",
-                (fid, mission_id, feat["name"][:120], feat.get("description", "")[:500],
-                 feat.get("priority", 5), "backlog", feat.get("story_points", 3))
+                (
+                    fid,
+                    mission_id,
+                    feat["name"][:120],
+                    feat.get("description", "")[:500],
+                    feat.get("priority", 5),
+                    "backlog",
+                    feat.get("story_points", 3),
+                ),
             )
-            inserted.append({"id": fid, "name": feat["name"][:120], "priority": feat.get("priority", 5),
-                           "story_points": feat.get("story_points", 3), "status": "backlog"})
+            inserted.append(
+                {
+                    "id": fid,
+                    "name": feat["name"][:120],
+                    "priority": feat.get("priority", 5),
+                    "story_points": feat.get("story_points", 3),
+                    "status": "backlog",
+                }
+            )
         db.commit()
 
         if inserted:
-            await _push_sse(session_id, {
-                "type": "backlog_update",
-                "mission_id": mission_id,
-                "phase_id": phase_id,
-                "features": inserted,
-            })
+            await _push_sse(
+                session_id,
+                {
+                    "type": "backlog_update",
+                    "mission_id": mission_id,
+                    "phase_id": phase_id,
+                    "features": inserted,
+                },
+            )
     except Exception:
         pass
 
 
-def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, total: int, prev_context: str = "", workspace_path: str = "") -> str:
+def _build_phase_prompt(
+    phase_name: str,
+    pattern: str,
+    brief: str,
+    idx: int,
+    total: int,
+    prev_context: str = "",
+    workspace_path: str = "",
+) -> str:
     """Build a contextual task prompt for each lifecycle phase."""
     platform = _detect_project_platform(workspace_path, brief=brief)
 
@@ -3648,11 +4510,14 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
         "dev-sprint": (
             f"Sprint de développement TDD pour «{brief}».\n"
             + (f"PLATEFORME: {platform_label}\n" if platform_label else "")
-            + (f"⚠️ STACK OBLIGATOIRE: {platform_label}. NE PAS utiliser une autre technologie.\n"
-               f"{'Utilisez HTML/CSS/JS ou TypeScript/Node.js. NE PAS écrire de Swift.' if platform in ('web-node', 'web-docker', 'web-static') else ''}\n"
-               f"{'Utilisez Swift/SwiftUI. NE PAS écrire de TypeScript.' if platform in ('ios-native', 'macos-native') else ''}\n"
-               f"{'Utilisez Kotlin/Java. NE PAS écrire de Swift.' if platform == 'android-native' else ''}\n"
-               if platform_label else "")
+            + (
+                f"⚠️ STACK OBLIGATOIRE: {platform_label}. NE PAS utiliser une autre technologie.\n"
+                f"{'Utilisez HTML/CSS/JS ou TypeScript/Node.js. NE PAS écrire de Swift.' if platform in ('web-node', 'web-docker', 'web-static') else ''}\n"
+                f"{'Utilisez Swift/SwiftUI. NE PAS écrire de TypeScript.' if platform in ('ios-native', 'macos-native') else ''}\n"
+                f"{'Utilisez Kotlin/Java. NE PAS écrire de Swift.' if platform == 'android-native' else ''}\n"
+                if platform_label
+                else ""
+            )
             + "VOUS DEVEZ UTILISER VOS OUTILS pour écrire du VRAI code dans le workspace.\n\n"
             "WORKFLOW OBLIGATOIRE:\n"
             "1. LIRE LE WORKSPACE: list_files + code_read sur les fichiers existants\n"
@@ -3718,7 +4583,7 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
         prompt = prompts[ordered_keys[idx]]
     else:
         prompt = (
-            f"Phase {idx+1}/{total} : {phase_name} (pattern: {pattern}) pour le projet «{brief}».\n"
+            f"Phase {idx + 1}/{total} : {phase_name} (pattern: {pattern}) pour le projet «{brief}».\n"
             "Chaque agent contribue selon son rôle. Produisez un livrable concret."
         )
 
@@ -3739,10 +4604,12 @@ def _build_phase_prompt(phase_name: str, pattern: str, brief: str, idx: int, tot
 
 # ── Feedback Loop API ──────────────────────────────────────────────
 
+
 @router.post("/api/projects/{project_id}/feedback/security-alert")
 async def api_security_alert(request: Request, project_id: str):
     """Create a priority bug for a security vulnerability."""
     from ...missions.feedback import on_security_alert
+
     data = await request.json()
     cve_id = data.get("cve_id", "UNKNOWN")
     severity = data.get("severity", "critical")
@@ -3757,12 +4624,19 @@ async def api_security_alert(request: Request, project_id: str):
 async def api_tma_incident(request: Request, project_id: str):
     """Track a recurring TMA incident. Creates debt item after 3+ occurrences."""
     from ...missions.feedback import on_tma_incident_fixed
+
     data = await request.json()
     incident_key = data.get("incident_key", "unknown")
     result = on_tma_incident_fixed(project_id, incident_key)
     if result:
-        return JSONResponse({"ok": True, "mission_id": result.id, "name": result.name,
-                             "message": "Root-cause fix mission created"})
+        return JSONResponse(
+            {
+                "ok": True,
+                "mission_id": result.id,
+                "name": result.name,
+                "message": "Root-cause fix mission created",
+            }
+        )
     return JSONResponse({"ok": True, "message": "Incident tracked, below threshold"})
 
 
@@ -3770,9 +4644,12 @@ async def api_tma_incident(request: Request, project_id: str):
 async def api_project_provision(request: Request, project_id: str):
     """Manually trigger auto-provision (TMA+security+debt) for an existing project."""
     from ...projects.manager import get_project_store
+
     store = get_project_store()
     project = store.get(project_id)
     if not project:
         return JSONResponse({"ok": False, "reason": "Project not found"}, status_code=404)
     created = store.auto_provision(project_id, project.name)
-    return JSONResponse({"ok": True, "created": [{"id": m.id, "type": m.type, "name": m.name} for m in created]})
+    return JSONResponse(
+        {"ok": True, "created": [{"id": m.id, "type": m.type, "name": m.name} for m in created]}
+    )
