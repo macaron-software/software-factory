@@ -1188,11 +1188,17 @@ async def api_mission_validate(request: Request, mission_id: str):
         return JSONResponse({"error": "Not found"}, status_code=404)
 
     # Update phase status
+    updated_phase = False
     if mission.current_phase:
         for p in mission.phases:
-            if p.phase_id == mission.current_phase and p.status == PhaseStatus.WAITING_VALIDATION:
+            if p.phase_id == mission.current_phase and p.status in (PhaseStatus.WAITING_VALIDATION, "waiting_validation"):
                 p.status = PhaseStatus.DONE if decision == "GO" else PhaseStatus.FAILED
+                updated_phase = True
         run_store.update(mission)
+        # Belt-and-suspenders: also update via update_phase to ensure DB write
+        if updated_phase:
+            new_status = "done" if decision == "GO" else "failed"
+            run_store.update_phase(mission.id, mission.current_phase, status=new_status)
 
     # Send decision to orchestrator agent via bus
     orch_id = mission.cdp_agent_id or "chef_de_programme"
