@@ -83,18 +83,6 @@
                         <svg class="icon icon-xs theme-icon-moon"><use href="#icon-moon"/></svg>
                     </button>
                 </div>
-                <!-- View mode switcher -->
-                <div class="sidebar-view-switch">
-                    <button class="view-switch-btn" data-mode="all" title="{{ _("tt_all") }}">
-                        <svg class="icon icon-xs"><use href="#icon-grid"/></svg>
-                    </button>
-                    <button class="view-switch-btn" data-mode="strategy" title="{{ _("tt_strategy") }}">
-                        <svg class="icon icon-xs"><use href="#icon-layers"/></svg>
-                    </button>
-                    <button class="view-switch-btn" data-mode="engineering" title="{{ _("tt_engineering") }}">
-                        <svg class="icon icon-xs"><use href="#icon-settings"/></svg>
-                    </button>
-                </div>
                 <ul class="nav-links">
                     <li><a href="/settings" data-tooltip="Settings" class="{% if page_title == 'Settings' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-settings"/></svg>
@@ -161,43 +149,18 @@
     </script>
     <script>
     (function(){
-      // Auto-detect view from current page
-      const PAGE_VIEW_MAP = {
-        'Portfolio': 'strategy',
-        'Backlog': 'strategy',
-        'PI Board': 'strategy',
-        'Metrics': 'strategy',
-        'Ceremonies': 'engineering',
-        'Live': 'engineering',
-        'ART': 'engineering',
-        'Toolbox': 'engineering',
-      };
-      const pageTitle = document.querySelector('.topbar h2')?.textContent?.trim() || '';
-      const autoView = PAGE_VIEW_MAP[pageTitle] || null;
-      const savedView = localStorage.getItem('sidebar_view') || 'all';
-      const currentView = autoView || savedView;
+      // Force "all" view mode permanently
+      const currentView = 'all';
 
       function applyView(mode){
-        localStorage.setItem('sidebar_view', mode);
-        // Toggle nav items
+        // Always show all nav items
         document.querySelectorAll('.nav-links a[data-views]').forEach(a=>{
-          const views = a.dataset.views.split(',');
-          const show = mode === 'all' || views.includes(mode) || views.includes('all');
-          a.closest('li').classList.toggle('view-hidden', !show);
-        });
-        // Toggle active button
-        document.querySelectorAll('.view-switch-btn').forEach(b=>{
-          b.classList.toggle('active', b.dataset.mode === mode);
+          a.closest('li').classList.remove('view-hidden');
         });
       }
 
       // Init
       applyView(currentView);
-
-      // Click handlers
-      document.querySelectorAll('.view-switch-btn').forEach(btn=>{
-        btn.addEventListener('click', ()=> applyView(btn.dataset.mode));
-      });
     })();
     </script>
 
