@@ -29,11 +29,11 @@
 
 Software Factory is an **autonomous multi-agent platform** that orchestrates the entire software development lifecycle — from ideation to deployment — using specialized AI agents working together.
 
-Think of it as a **virtual software factory** where 145 AI agents collaborate through structured workflows, following SAFe methodology, TDD practices, and automated quality gates.
+Think of it as a **virtual software factory** where 158 AI agents collaborate through structured workflows, following SAFe methodology, TDD practices, and automated quality gates.
 
 ### Key Highlights
 
-- **145 specialized agents** — architects, developers, testers, SREs, security analysts, product owners
+- **158 specialized agents** — architects, developers, testers, SREs, security analysts, product owners
 - **12 orchestration patterns** — solo, parallel, hierarchical, network, adversarial-pair, human-in-the-loop
 - **SAFe-aligned lifecycle** — Portfolio → Epic → Feature → Story with PI cadence
 - **Auto-heal** — autonomous incident detection, triage, and self-repair
@@ -44,15 +44,41 @@ Think of it as a **virtual software factory** where 145 AI agents collaborate th
 
 <table>
 <tr>
-<td width="33%">
-<strong>Dashboard — Real-time SSE Streaming</strong><br>
-<img src="docs/screenshots/en/dashboard.png" alt="Dashboard" width="100%">
+<td width="50%">
+<strong>Portfolio — Strategic Committee & Governance</strong><br>
+<img src="docs/screenshots/en/portfolio.png" alt="Portfolio Dashboard" width="100%">
 </td>
-<td width="33%">
+<td width="50%">
+<strong>PI Board — Program Increment Planning</strong><br>
+<img src="docs/screenshots/en/pi_board.png" alt="PI Board" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Agents — 158 Specialized AI Agents</strong><br>
+<img src="docs/screenshots/en/agents.png" alt="Agent Teams" width="100%">
+</td>
+<td width="50%">
+<strong>Ideation Workshop — AI-Powered Brainstorming</strong><br>
+<img src="docs/screenshots/en/ideation.png" alt="Ideation" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Mission Control — Real-Time Execution Monitoring</strong><br>
+<img src="docs/screenshots/en/mission_control.png" alt="Mission Control" width="100%">
+</td>
+<td width="50%">
+<strong>Monitoring — System Health & Metrics</strong><br>
+<img src="docs/screenshots/en/monitoring.png" alt="Monitoring" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
 <strong>Swagger API — 94 REST Endpoints</strong><br>
 <img src="docs/screenshots/en/swagger.png" alt="Swagger API" width="100%">
 </td>
-<td width="33%">
+<td width="50%">
 <strong>CLI — 40+ Commands</strong><br>
 <img src="docs/screenshots/en/cli.png" alt="CLI" width="100%">
 </td>
@@ -69,7 +95,7 @@ cd software-factory
 docker-compose up -d
 ```
 
-Open http://localhost:8090
+Open http://localhost:8099
 
 ### Option 2: Local Installation
 
@@ -86,14 +112,14 @@ mkdir -p ~/.config/factory
 echo "sk-ant-..." > ~/.config/factory/anthropic.key
 
 # Start platform
-python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
+python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8099 --ws none
 ```
 
-Open http://localhost:8090
+Open http://localhost:8099
 
 ## Features
 
-### 🤖 145 Specialized AI Agents
+### 🤖 158 Specialized AI Agents
 
 Agents are organized in teams mirroring real software organizations:
 
@@ -153,7 +179,7 @@ Full Portfolio → Epic → Feature → Story hierarchy with:
 
 ### 1. Web Dashboard (HTMX + SSE)
 
-Main UI at http://localhost:8090:
+Main UI at http://localhost:8099:
 
 - **Real-time multi-agent conversations** with SSE streaming
 - **PI Board** — program increment planning
@@ -197,15 +223,15 @@ sf chaos status                        # Chaos engineering
 
 ```bash
 # Examples
-curl http://localhost:8090/api/projects
-curl http://localhost:8090/api/agents
-curl http://localhost:8090/api/missions
-curl -X POST http://localhost:8090/api/ideation \
+curl http://localhost:8099/api/projects
+curl http://localhost:8099/api/agents
+curl http://localhost:8099/api/missions
+curl -X POST http://localhost:8099/api/ideation \
   -H "Content-Type: application/json" \
   -d '{"prompt": "bike GPS tracker app"}'
 ```
 
-Swagger UI: http://localhost:8090/docs
+Swagger UI: http://localhost:8099/docs
 
 ### 4. MCP Server (Model Context Protocol)
 

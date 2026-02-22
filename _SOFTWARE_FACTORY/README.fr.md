@@ -29,11 +29,11 @@
 
 Software Factory est une **plateforme multi-agents autonome** qui orchestre l'intégralité du cycle de développement logiciel — de l'idéation au déploiement — en utilisant des agents IA spécialisés travaillant ensemble.
 
-Imaginez une **usine logicielle virtuelle** où 145 agents IA collaborent à travers des workflows structurés, suivant la méthodologie SAFe, les pratiques TDD et des portes de qualité automatisées.
+Imaginez une **usine logicielle virtuelle** où 158 agents IA collaborent à travers des workflows structurés, suivant la méthodologie SAFe, les pratiques TDD et des portes de qualité automatisées.
 
 ### Points clés
 
-- **145 agents spécialisés** — architectes, développeurs, testeurs, SRE, analystes sécurité, product owners
+- **158 agents spécialisés** — architectes, développeurs, testeurs, SRE, analystes sécurité, product owners
 - **12 patterns d'orchestration** — solo, parallèle, hiérarchique, réseau, adversarial-pair, human-in-the-loop
 - **Cycle de vie SAFe** — Portfolio → Epic → Feature → Story avec cadence PI
 - **Auto-réparation** — détection autonome d'incidents, triage et auto-réparation
@@ -69,7 +69,7 @@ cd software-factory
 docker-compose up -d
 ```
 
-Ouvrir http://localhost:8090
+Ouvrir http://localhost:8099
 
 ### Option 2 : Installation locale
 
@@ -89,7 +89,7 @@ echo "sk-ant-..." > ~/.config/factory/anthropic.key
 python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
 ```
 
-Ouvrir http://localhost:8090
+Ouvrir http://localhost:8099
 
 ## Fonctionnalités
 
@@ -153,7 +153,7 @@ Hiérarchie complète Portfolio → Epic → Feature → Story avec :
 
 ### 1. Dashboard Web (HTMX + SSE)
 
-Interface principale sur http://localhost:8090 :
+Interface principale sur http://localhost:8099 :
 
 - **Conversations multi-agents temps réel** avec streaming SSE
 - **PI Board** — planification program increment
@@ -174,7 +174,7 @@ ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
 sf status                              # Santé plateforme
 sf projects list                       # Tous les projets
 sf missions list                       # Missions avec scores WSJF
-sf agents list                         # 145 agents
+sf agents list                         # 158 agents
 sf features list <epic_id>             # Features d'un epic
 sf stories list --feature <id>         # User stories
 
@@ -197,15 +197,15 @@ sf chaos status                        # Chaos engineering
 
 ```bash
 # Exemples
-curl http://localhost:8090/api/projects
-curl http://localhost:8090/api/agents
-curl http://localhost:8090/api/missions
-curl -X POST http://localhost:8090/api/ideation \
+curl http://localhost:8099/api/projects
+curl http://localhost:8099/api/agents
+curl http://localhost:8099/api/missions
+curl -X POST http://localhost:8099/api/ideation \
   -H "Content-Type: application/json" \
   -d '{"prompt": "app GPS vélo"}'
 ```
 
-Swagger UI : http://localhost:8090/docs
+Swagger UI : http://localhost:8099/docs
 
 ### 4. Serveur MCP (Model Context Protocol)
 
