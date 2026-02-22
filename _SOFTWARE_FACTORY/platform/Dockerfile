@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl gnupg ripgrep && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
-    npm install -g @playwright/test && \
+    npm install -g @playwright/test @playwright/mcp && \
     mkdir -p $PLAYWRIGHT_BROWSERS_PATH && \
     npx playwright install --with-deps chromium && \
     chmod -R 755 $PLAYWRIGHT_BROWSERS_PATH && \

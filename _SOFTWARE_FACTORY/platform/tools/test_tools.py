@@ -167,7 +167,7 @@ class PlaywrightTestTool(BaseTool):
             f"npx playwright test {spec} "
             f"--reporter=line "
             f"--output={screenshots_dir} "
-            f"--screenshot=on "
+            f"--screenshot on "
             f"--retries=0"
         )
         try:

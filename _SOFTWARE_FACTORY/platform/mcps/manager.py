@@ -12,6 +12,7 @@ import logging
 import os
 import shutil
 from typing import Optional
+from pathlib import Path
 
 from .store import MCPServer, get_mcp_store
 
@@ -120,7 +121,20 @@ class MCPProcess:
                     if isinstance(item, dict) and item.get("type") == "text":
                         texts.append(item.get("text", ""))
                     elif isinstance(item, dict) and item.get("type") == "image":
-                        texts.append(f"[image: {item.get('mimeType', 'image/png')}]")
+                        # Save screenshot to workspace
+                        import base64
+                        b64 = item.get("data", "")
+                        if b64:
+                            img_name = arguments.get("name", f"mcp_screenshot_{tool_name}")
+                            ws = os.environ.get("WORKSPACE_ROOT", "/app/workspace")
+                            ss_dir = Path(ws) / "screenshots"
+                            ss_dir.mkdir(parents=True, exist_ok=True)
+                            ext = "png" if "png" in item.get("mimeType", "png") else "jpg"
+                            fpath = ss_dir / f"{img_name}.{ext}"
+                            fpath.write_bytes(base64.b64decode(b64))
+                            texts.append(f"[SCREENSHOT:{fpath}] ({fpath.stat().st_size // 1024}KB)")
+                        else:
+                            texts.append(f"[image: {item.get('mimeType', 'image/png')}]")
                     else:
                         texts.append(str(item))
                 return "\n".join(texts) if texts else str(result)
