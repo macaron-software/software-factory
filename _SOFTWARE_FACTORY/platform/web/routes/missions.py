@@ -948,6 +948,15 @@ async def api_mission_start(request: Request):
     except Exception as e:
         logger.warning("Could not create epic record: %s", e)
 
+    # Auto-provision TMA, Security, Debt missions for the project
+    try:
+        from ...projects.manager import get_project_store
+        _ps = get_project_store()
+        if project_id and _ps.get(project_id):
+            _ps.auto_provision(project_id, brief[:60] or wf.name)
+    except Exception as _prov_err:
+        logger.warning("auto_provision failed for %s: %s", project_id, _prov_err)
+
     # Create a session for the orchestrator agent
     session_store = get_session_store()
     session_id = uuid.uuid4().hex[:8]
