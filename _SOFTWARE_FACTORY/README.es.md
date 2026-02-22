@@ -11,7 +11,7 @@
 
 <div align="center">
 
-# Macaron Software Factory
+# Software Factory
 
 **Fábrica de Software Multi-Agente — Agentes IA autónomos orquestando el ciclo de vida completo del producto**
 
@@ -19,125 +19,50 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 
-[Características](#características) · [Inicio Rápido](#inicio-rápido) · [Capturas](#capturas-de-pantalla) · [Arquitectura](#arquitectura) · [Contribuir](#contribuir)
-
 </div>
 
 ---
 
 ## ¿Qué es esto?
 
-Macaron es una **plataforma multi-agente autónoma** que orquesta todo el ciclo de vida del desarrollo de software — desde la ideación hasta el despliegue — utilizando agentes IA especializados que trabajan juntos.
+Software Factory es una **plataforma multi-agente autónoma** que orquesta todo el ciclo de desarrollo de software — desde la ideación hasta el despliegue — usando agentes IA especializados trabajando juntos.
 
-Piensálo como una **fábrica de software virtual** donde 94 agentes IA colaboran a través de flujos de trabajo estructurados, siguiendo la metodología SAFe, prácticas TDD y puertas de calidad automatizadas.
+Piensa en ello como una **fábrica de software virtual** donde 145 agentes IA colaboran a través de flujos estructurados, siguiendo metodología SAFe, prácticas TDD y puertas de calidad automatizadas.
 
 ### Puntos clave
 
-- **94 agentes especializados** — arquitectos, desarrolladores, testers, SREs, analistas de seguridad, product owners
+- **145 agentes especializados** — arquitectos, desarrolladores, testers, SRE, analistas de seguridad, product owners
 - **12 patrones de orquestación** — solo, paralelo, jerárquico, red, adversarial-pair, human-in-the-loop
-- **Ciclo de vida alineado con SAFe** — Portfolio → Epic → Feature → Story con cadencia PI
-- **Auto-reparación** — detección de incidentes, triaje y reparación autónomos
-- **Seguridad primero** — protección contra inyección, RBAC, limpieza de secretos, pool de conexiones
-- **Métricas DORA** — frecuencia de despliegue, lead time, MTTR, tasa de fallos
+- **Ciclo de vida SAFe** — Portfolio → Epic → Feature → Story con cadencia PI
+- **Auto-reparación** — detección autónoma de incidentes, triage y auto-reparación
+- **Seguridad prioritaria** — guardia inyección de prompt, RBAC, enmascaramiento secretos
+- **Métricas DORA** — frecuencia despliegue, lead time, MTTR, tasa fallo cambios
 
 ## Capturas de pantalla
 
 <table>
 <tr>
-<td width="50%">
-<strong>Portfolio — Comité Estratégico y Gobernanza</strong><br>
-<img src="docs/screenshots/es/portfolio.png" alt="Portfolio" width="100%">
-</td>
-<td width="50%">
-<strong>PI Board — Planificación de Incrementos de Programa</strong><br>
-<img src="docs/screenshots/es/pi_board.png" alt="PI Board" width="100%">
-</td>
-</tr>
-<tr>
-<td width="50%">
-<strong>Agentes — 94 Agentes IA Especializados</strong><br>
-<img src="docs/screenshots/es/agents.png" alt="Agents" width="100%">
-</td>
-<td width="50%">
-<strong>Taller de Ideación — Brainstorming con IA</strong><br>
-<img src="docs/screenshots/es/ideation.png" alt="Ideation" width="100%">
-</td>
-</tr>
-<tr>
-<td width="50%">
-<strong>Control de Misión — Monitoreo de ejecución en tiempo real</strong><br>
-<img src="docs/screenshots/es/mission_control.png" alt="Mission Control" width="100%">
-</td>
-<td width="50%">
-<strong>Monitoreo — Salud del sistema y métricas</strong><br>
-<img src="docs/screenshots/es/monitoring.png" alt="Monitoring" width="100%">
-</td>
+<td width="33%"><strong>Dashboard</strong><br><img src="docs/screenshots/es/dashboard.png" width="100%"></td>
+<td width="33%"><strong>API Swagger</strong><br><img src="docs/screenshots/es/swagger.png" width="100%"></td>
+<td width="33%"><strong>CLI</strong><br><img src="docs/screenshots/es/cli.png" width="100%"></td>
 </tr>
 </table>
 
-## Inicio Rápido
-
-### Opción 1: Docker (Recomendado)
+## Inicio rápido
 
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
-
-make setup
-# Edit .env with your LLM API key
-
-make run
+docker-compose up -d
 ```
 
-Open **http://localhost:8090**
+Abrir http://localhost:8090
 
-### Opción 2: Docker Compose (Manual)
+## Características
 
-```bash
-git clone https://github.com/macaron-software/software-factory.git
-cd software-factory
+- **145 agentes IA** organizados en equipos
+- **CLI completa** — 40+ comandos
+- **API REST** — 94 endpoints documentados
+- **Servidor MCP** — 23 herramientas
+- **Licencia AGPL v3**
 
-cp .env.example .env
-# Edit .env with your LLM API key
-
-docker compose up -d
-```
-
-### Opción 3: Desarrollo local
-
-```bash
-git clone https://github.com/macaron-software/software-factory.git
-cd software-factory
-
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r platform/requirements.txt
-
-export OPENAI_API_KEY=sk-...
-
-make dev
-```
-
-### Verificar instalación
-
-```bash
-curl http://localhost:8090/api/health
-```
-
-## Contribuir
-
-¡Las contribuciones son bienvenidas! Consulta [CONTRIBUTING.md](CONTRIBUTING.md) para las directrices.
-
-## Licencia
-
-**GNU Affero General Public License v3.0** — [LICENSE](LICENSE)
-
----
-
-<div align="center">
-
-**Construido con amor por [Macaron Software](https://github.com/macaron-software)**
-
-[Reportar bug](https://github.com/macaron-software/software-factory/issues) · [Solicitar funcionalidad](https://github.com/macaron-software/software-factory/issues)
-
-</div>

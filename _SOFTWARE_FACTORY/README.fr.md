@@ -11,9 +11,9 @@
 
 <div align="center">
 
-# Macaron Software Factory
+# Software Factory
 
-**Usine Logicielle Multi-Agents — Des agents IA autonomes orchestrant le cycle de vie produit complet**
+**Usine Logicielle Multi-Agents — Agents IA autonomes orchestrant le cycle de vie complet des produits**
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -25,52 +25,36 @@
 
 ---
 
-## Qu'est-ce que c'est ?
+## C'est quoi ?
 
-Macaron est une **plateforme multi-agents autonome** qui orchestre l'ensemble du cycle de vie du développement logiciel — de l'idéation au déploiement — en utilisant des agents IA spécialisés qui collaborent.
+Software Factory est une **plateforme multi-agents autonome** qui orchestre l'intégralité du cycle de développement logiciel — de l'idéation au déploiement — en utilisant des agents IA spécialisés travaillant ensemble.
 
-Imaginez une **usine logicielle virtuelle** où 94 agents IA collaborent via des workflows structurés, suivant la méthodologie SAFe, les pratiques TDD et des portails qualité automatisés.
+Imaginez une **usine logicielle virtuelle** où 145 agents IA collaborent à travers des workflows structurés, suivant la méthodologie SAFe, les pratiques TDD et des portes de qualité automatisées.
 
 ### Points clés
 
-- **94 agents spécialisés** — architectes, développeurs, testeurs, SRE, analystes sécurité, product owners
+- **145 agents spécialisés** — architectes, développeurs, testeurs, SRE, analystes sécurité, product owners
 - **12 patterns d'orchestration** — solo, parallèle, hiérarchique, réseau, adversarial-pair, human-in-the-loop
-- **Cycle de vie aligné SAFe** — Portfolio → Epic → Feature → Story avec cadence PI
-- **Auto-réparation** — détection d'incidents, triage et réparation autonomes
-- **Sécurité d'abord** — protection injection, RBAC, nettoyage des secrets, pool de connexions
-- **Métriques DORA** — fréquence de déploiement, lead time, MTTR, taux d'échec
+- **Cycle de vie SAFe** — Portfolio → Epic → Feature → Story avec cadence PI
+- **Auto-réparation** — détection autonome d'incidents, triage et auto-réparation
+- **Sécurité prioritaire** — garde injection de prompt, RBAC, masquage secrets, connection pooling
+- **Métriques DORA** — fréquence déploiement, lead time, MTTR, taux échec changements
 
 ## Captures d'écran
 
 <table>
 <tr>
-<td width="50%">
-<strong>Portfolio — Comité Stratégique & Gouvernance</strong><br>
-<img src="docs/screenshots/fr/portfolio.png" alt="Portfolio" width="100%">
+<td width="33%">
+<strong>Dashboard — Streaming SSE Temps Réel</strong><br>
+<img src="docs/screenshots/fr/dashboard.png" alt="Dashboard" width="100%">
 </td>
-<td width="50%">
-<strong>PI Board — Planification des Incréments Programme</strong><br>
-<img src="docs/screenshots/fr/pi_board.png" alt="PI Board" width="100%">
+<td width="33%">
+<strong>API Swagger — 94 Endpoints REST</strong><br>
+<img src="docs/screenshots/fr/swagger.png" alt="API Swagger" width="100%">
 </td>
-</tr>
-<tr>
-<td width="50%">
-<strong>Agents — 94 Agents IA Spécialisés</strong><br>
-<img src="docs/screenshots/fr/agents.png" alt="Agents" width="100%">
-</td>
-<td width="50%">
-<strong>Atelier d'Idéation — Brainstorming assisté par IA</strong><br>
-<img src="docs/screenshots/fr/ideation.png" alt="Ideation" width="100%">
-</td>
-</tr>
-<tr>
-<td width="50%">
-<strong>Contrôle de Mission — Suivi d'exécution en temps réel</strong><br>
-<img src="docs/screenshots/fr/mission_control.png" alt="Mission Control" width="100%">
-</td>
-<td width="50%">
-<strong>Monitoring — Santé système & Métriques</strong><br>
-<img src="docs/screenshots/fr/monitoring.png" alt="Monitoring" width="100%">
+<td width="33%">
+<strong>CLI — 40+ Commandes</strong><br>
+<img src="docs/screenshots/fr/cli.png" alt="CLI" width="100%">
 </td>
 </tr>
 </table>
@@ -82,62 +66,242 @@ Imaginez une **usine logicielle virtuelle** où 94 agents IA collaborent via des
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
-
-make setup
-# Edit .env with your LLM API key
-
-make run
+docker-compose up -d
 ```
 
-Open **http://localhost:8090**
+Ouvrir http://localhost:8090
 
-### Option 2 : Docker Compose (Manuel)
+### Option 2 : Installation locale
 
 ```bash
+# Cloner le dépôt
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
 
-cp .env.example .env
-# Edit .env with your LLM API key
+# Installer les dépendances
+pip install -r requirements.txt
 
-docker compose up -d
+# Configurer les clés API
+mkdir -p ~/.config/factory
+echo "sk-ant-..." > ~/.config/factory/anthropic.key
+
+# Démarrer la plateforme
+python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
 ```
 
-### Option 3 : Développement local
+Ouvrir http://localhost:8090
+
+## Fonctionnalités
+
+### 🤖 145 Agents IA Spécialisés
+
+Les agents sont organisés en équipes reflétant de vraies organisations logicielles :
+
+| Équipe | Agents | Rôle |
+|--------|--------|------|
+| **Product** | Product Manager, Business Analyst, PO | Planification SAFe, priorisation WSJF |
+| **Architecture** | Solution Architect, Tech Lead, System Architect | Décisions architecture, design patterns |
+| **Développement** | Backend/Frontend/Mobile/Data Engineers | Implémentation TDD par stack |
+| **Qualité** | QA Engineers, Security Analysts, Test Automation | Tests, audits sécurité, tests pénétration |
+| **Design** | UX Designer, UI Designer | Expérience utilisateur, design visuel |
+| **DevOps** | DevOps Engineer, SRE, Platform Engineer | CI/CD, monitoring, infrastructure |
+| **Management** | Scrum Master, RTE, Agile Coach | Cérémonies, facilitation, levée obstacles |
+
+### 🎯 12 Patterns d'Orchestration
+
+- **Solo** — un seul agent pour tâches simples
+- **Séquentiel** — pipeline d'agents exécutant dans l'ordre
+- **Parallèle** — plusieurs agents travaillant simultanément
+- **Hiérarchique** — manager déléguant à sous-agents
+- **Réseau** — agents collaborant peer-to-peer
+- **Adversarial-pair** — un agent génère, un autre critique
+- **Human-in-the-loop** — agent propose, humain valide
+- **Ensemble** — plusieurs agents votent sur décisions
+- **Récursif** — agent spawne sous-agents récursivement
+- **Boucle** — agent itère jusqu'à condition remplie
+- **Saga** — transaction distribuée avec compensations
+- **Event-driven** — agents réagissent aux événements de manière asynchrone
+
+### 📊 Cycle de Vie Aligné SAFe
+
+Hiérarchie complète Portfolio → Epic → Feature → Story avec :
+
+- **Portfolio Stratégique** — canvas portfolio, thèmes stratégiques, value streams
+- **Program Increment** — planification PI, objectifs, dépendances
+- **Team Backlog** — user stories, tâches, critères d'acceptation
+- **Sprint Execution** — daily standups, sprint reviews, rétrospectives
+
+### 🛡️ Sécurité & Conformité
+
+- **Authentification** — auth JWT avec RBAC
+- **Garde injection prompt** — détection et blocage prompts malveillants
+- **Masquage secrets** — redaction automatique données sensibles
+- **CSP (Content Security Policy)** — headers durcis
+- **Rate limiting** — quotas API par utilisateur
+- **Audit logging** — logs d'activité complets
+
+### 📈 Métriques DORA & Monitoring
+
+- **Deployment frequency** — fréquence du code en production
+- **Lead time** — durée commit vers déploiement
+- **MTTR** — temps moyen de récupération des incidents
+- **Change failure rate** — pourcentage de déploiements échoués
+- **Dashboards temps réel** — visualisations Chart.js
+- **Métriques Prometheus** — endpoint /metrics
+
+## Quatre Interfaces
+
+### 1. Dashboard Web (HTMX + SSE)
+
+Interface principale sur http://localhost:8090 :
+
+- **Conversations multi-agents temps réel** avec streaming SSE
+- **PI Board** — planification program increment
+- **Mission Control** — monitoring d'exécution
+- **Gestion Agents** — voir, configurer, monitorer agents
+- **Dashboard Incidents** — triage auto-réparation
+- **Responsive mobile** — fonctionne sur tablettes et téléphones
+
+### 2. CLI (`sf`)
+
+Interface ligne de commande complète :
 
 ```bash
-git clone https://github.com/macaron-software/software-factory.git
-cd software-factory
+# Installation (ajouter au PATH)
+ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
 
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r platform/requirements.txt
+# Navigation
+sf status                              # Santé plateforme
+sf projects list                       # Tous les projets
+sf missions list                       # Missions avec scores WSJF
+sf agents list                         # 145 agents
+sf features list <epic_id>             # Features d'un epic
+sf stories list --feature <id>         # User stories
 
-export OPENAI_API_KEY=sk-...
+# Travail
+sf ideation "app e-commerce React"     # Idéation multi-agents (streamé)
+sf missions start <id>                 # Démarrer une mission
+sf metrics dora                        # Métriques DORA
 
-make dev
+# Monitoring
+sf incidents list                      # Incidents
+sf llm stats                           # Usage LLM (tokens, coût)
+sf chaos status                        # Chaos engineering
 ```
 
-### Vérifier l'installation
+**22 groupes de commandes** · Mode dual : API (serveur live) ou DB (offline) · Sortie JSON (`--json`) · Animations spinner · Rendu tables Markdown
+
+### 3. API REST + Swagger
+
+94 endpoints API auto-documentés sur `/docs` (Swagger UI) :
 
 ```bash
-curl http://localhost:8090/api/health
+# Exemples
+curl http://localhost:8090/api/projects
+curl http://localhost:8090/api/agents
+curl http://localhost:8090/api/missions
+curl -X POST http://localhost:8090/api/ideation \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "app GPS vélo"}'
 ```
+
+Swagger UI : http://localhost:8090/docs
+
+### 4. Serveur MCP (Model Context Protocol)
+
+23 outils MCP pour intégration agents IA (port 9501) :
+
+```bash
+# Démarrer serveur MCP
+python3 -m platform.mcp_platform.server
+
+# Outils disponibles :
+# platform_agents, platform_projects, platform_missions,
+# platform_features, platform_sprints, platform_stories,
+# platform_incidents, platform_llm, platform_search, ...
+```
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  🎯 Portfolio Stratégique (Canvas Portfolio, Value Streams)     │
+│  Vision, Thèmes, Epics → Priorisation WSJF                      │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+          ┌──────────────┴──────────────┐
+          ▼                             ▼
+┌─────────────────────┐      ┌─────────────────────┐
+│  PI Planning Board  │      │  Mission Execution  │
+│  Program Increment  │      │  145 Agents         │
+│  Features → Stories │      │  12 Patterns        │
+│  Dépendances        │      │  Pipeline TDD       │
+└─────────────────────┘      └─────────────────────┘
+          │                             │
+          ▼                             ▼
+┌─────────────────────┐      ┌─────────────────────┐
+│  Sprint Backlog     │      │  Deploy Pipeline    │
+│  Daily Standups     │      │  Build → Stage →    │
+│  Reviews            │      │  E2E → Prod         │
+└─────────────────────┘      └─────────────────────┘
+          │                             │
+          └──────────────┬──────────────┘
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  🔴 Portes Qualité + Auto-Réparation                             │
+│  Tests, Sécurité, Performance → Détection Incidents → Auto-Fix  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+## Nouveautés v1.2.0 (21-22 fév 2026)
+
+### CLI 'sf' - Interface Ligne de Commande Complète
+- 40+ commandes miroir de toutes les fonctionnalités du dashboard web
+- Mode dual : API (serveur live) ou DB (offline)
+- Streaming SSE avec sortie colorée par agent
+- Sortie JSON pour scripting
+- 52 tests automatisés
+
+### Améliorations Product Management
+- 11 nouvelles capacités PM
+- Algorithmes de priorisation WSJF
+- Cartographie value stream
+
+### Durcissement Sécurité
+- AuthMiddleware activé par défaut
+- Headers CSP renforcés
+- Masquage secrets dans logs et réponses API
+- Rate limiting par utilisateur
+
+### Tests & Qualité
+- Suite de tests d'endurance
+- Tests chaos engineering
+- Tests E2E Playwright sur toutes les pages
+- Validation installation Debian 13
+
+### DevOps & Monitoring
+- Intégration webhooks GitHub
+- Chart Helm pour Kubernetes
+- Endpoint métriques Prometheus
+- Dashboards Grafana
+- Automatisation pipeline CD
+
+### Améliorations UI
+- Notifications temps réel
+- Visualisations analytics Chart.js
+- Design responsive mobile
+- Stabilité streaming SSE améliorée
 
 ## Contribuer
 
-Les contributions sont les bienvenues ! Consultez [CONTRIBUTING.md](CONTRIBUTING.md) pour les directives.
+Les contributions sont bienvenues ! Veuillez lire [CONTRIBUTING.md](CONTRIBUTING.md) pour les directives.
 
 ## Licence
 
-**GNU Affero General Public License v3.0** — [LICENSE](LICENSE)
+Ce projet est sous licence AGPL v3 - voir le fichier [LICENSE](LICENSE) pour détails.
 
----
+## Support
 
-<div align="center">
-
-**Construit avec amour par [Macaron Software](https://github.com/macaron-software)**
-
-[Signaler un bug](https://github.com/macaron-software/software-factory/issues) · [Demander une fonctionnalité](https://github.com/macaron-software/software-factory/issues)
-
-</div>
+- Documentation : https://docs.software-factory.dev
+- Issues : https://github.com/macaron-software/software-factory/issues
+- Discussions : https://github.com/macaron-software/software-factory/discussions
