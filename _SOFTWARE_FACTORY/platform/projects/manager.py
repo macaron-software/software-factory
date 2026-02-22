@@ -141,6 +141,12 @@ class ProjectStore:
         from ..cache import invalidate
         if not p.id:
             p.id = p.name.lower().replace(" ", "-").replace("_", "-")[:30]
+        # Auto-create workspace directory if path not provided
+        if not p.path:
+            import os
+            workspace = os.path.join(os.environ.get("WORKSPACE_ROOT", "/app/workspace"), p.id)
+            os.makedirs(workspace, exist_ok=True)
+            p.path = workspace
         conn = get_db()
         conn.execute("""
             INSERT OR REPLACE INTO projects
