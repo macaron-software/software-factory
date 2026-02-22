@@ -1,0 +1,8 @@
+<!-- Agent cards list partial — HTMX target for /api/agents/status -->
+{% if agents %}
+{% for agent in agents %}
+{% include "partials/agent_card.html" %}
+{% endfor %}
+{% else %}
+<p class="empty-state">{{ _("no_agents_running") }}</p>
+{% endif %}

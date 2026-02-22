@@ -1,1 +1,1 @@
-../_SOFTWARE_FACTORY/CLAUDE.md
+../CLAUDE.md

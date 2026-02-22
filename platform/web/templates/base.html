@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="{{ request.state.lang|default('en') }}" data-theme="dark">
+<head>
+    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('macaron_theme') || 'dark')</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title }} — Software Factory</title>
+    <link rel="stylesheet" href="/static/css/main.css?v=20260220b">
+    <link rel="stylesheet" href="/static/css/components.css?v=20260220">
+    <link rel="stylesheet" href="/static/css/agents.css?v=20260220">
+    <link rel="stylesheet" href="/static/css/projects.css?v=20260220">
+    <script src="/static/js/htmx.min.js"></script>
+    <script src="/static/js/sse.js" defer></script>
+</head>
+<body>
+    {% include "partials/svg_sprites.html" %}
+    <div class="layout">
+        <!-- Sidebar (icon-only) -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="logo"><svg class="icon icon-logo"><use href="#icon-macaron"/></svg></h1>
+            </div>
+
+            <div class="sidebar-section">
+                <ul class="nav-links">
+                    <li><a href="/" data-tooltip="Portfolio" data-views="strategy,all" class="{% if page_title in ('Portfolio', 'Projects', 'DSI Board', 'Vue Métier') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-home"/></svg>
+                    </a></li>
+                    <li><a href="/backlog" data-tooltip="Backlog" data-views="strategy,all" class="{% if page_title in ('Backlog', 'Product', 'Idéation') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-layers"/></svg>
+                    </a></li>
+                    <li><a href="/product-line" data-tooltip="Ligne de Produit" data-views="strategy,all" class="{% if page_title == 'Ligne de Produit' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-briefcase"/></svg>
+                    </a></li>
+                    <li><a href="/pi" data-tooltip="PI Board" data-views="strategy,all" class="{% if page_title in ('PI Board', 'Program Increment', 'Epics', 'Epic', 'Epic Control') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-rocket"/></svg>
+                    </a></li>
+                    <li><a href="/ceremonies" data-tooltip="Ceremonies" data-views="engineering,all" class="{% if page_title in ('Ceremonies', 'Workflows', 'Patterns') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-workflow"/></svg>
+                    </a></li>
+                    <li><a href="/live" data-tooltip="Live" data-views="engineering,all" class="{% if page_title in ('Live', 'Sessions') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-message-circle"/></svg>
+                    </a></li>
+                    <li><a href="/art" data-tooltip="ART" data-views="engineering,all" class="{% if page_title in ('ART', 'Agents', 'Organisation SAFe', 'Team Generator') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-users"/></svg>
+                    </a></li>
+                    <li><a href="/toolbox" data-tooltip="Toolbox" data-views="engineering" class="{% if page_title in ('Toolbox', 'Skills', 'Memory', 'MCPs') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-plug"/></svg>
+                    </a></li>
+                    <li><a href="/design-system" data-tooltip="Design System" data-views="engineering" class="{% if page_title == 'Design System' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-palette"/></svg>
+                    </a></li>
+                    <li><a href="/world" data-tooltip="World 3D" data-views="engineering,all" class="{% if page_title == 'World' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-globe"/></svg>
+                    </a></li>
+                    <li><a href="/metrics" data-tooltip="Metrics" data-views="strategy,all" class="{% if page_title == 'Metrics' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-chart"/></svg>
+                    </a></li>
+                    <li><a href="/monitoring" data-tooltip="Monitoring" data-views="engineering,all" class="{% if page_title == 'Monitoring' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-activity"/></svg>
+                    </a></li>
+                </ul>
+            </div>
+
+            <div class="sidebar-section" style="margin-top: auto">
+                <!-- Language selector -->
+                <div class="sidebar-view-switch" style="margin-bottom:0.2rem">
+                    <select id="langSelect" title="{{ _("tt_language") }}" style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:2px 4px;font-size:0.7rem;width:100%;cursor:pointer;text-align:center">
+                        <option value="en" {% if request.state.lang|default('en') == 'en' %}selected{% endif %}>{{ _("en") }}</option>
+                        <option value="fr" {% if request.state.lang|default('en') == 'fr' %}selected{% endif %}>{{ _("fr") }}</option>
+                        <option value="zh" {% if request.state.lang|default('en') == 'zh' %}selected{% endif %}>中文</option>
+                        <option value="es" {% if request.state.lang|default('en') == 'es' %}selected{% endif %}>{{ _("es") }}</option>
+                        <option value="ja" {% if request.state.lang|default('en') == 'ja' %}selected{% endif %}>日本</option>
+                        <option value="pt" {% if request.state.lang|default('en') == 'pt' %}selected{% endif %}>{{ _("pt") }}</option>
+                        <option value="de" {% if request.state.lang|default('en') == 'de' %}selected{% endif %}>{{ _("de") }}</option>
+                        <option value="ko" {% if request.state.lang|default('en') == 'ko' %}selected{% endif %}>한국</option>
+                    </select>
+                </div>
+                <!-- Theme toggle -->
+                <div class="sidebar-view-switch" style="margin-bottom:0.2rem">
+                    <button class="view-switch-btn theme-toggle-btn" id="themeToggle" title="Changer le theme">
+                        <svg class="icon icon-xs theme-icon-sun"><use href="#icon-sun"/></svg>
+                        <svg class="icon icon-xs theme-icon-moon"><use href="#icon-moon"/></svg>
+                    </button>
+                </div>
+                <!-- View mode switcher -->
+                <div class="sidebar-view-switch">
+                    <button class="view-switch-btn" data-mode="all" title="{{ _("tt_all") }}">
+                        <svg class="icon icon-xs"><use href="#icon-grid"/></svg>
+                    </button>
+                    <button class="view-switch-btn" data-mode="strategy" title="{{ _("tt_strategy") }}">
+                        <svg class="icon icon-xs"><use href="#icon-layers"/></svg>
+                    </button>
+                    <button class="view-switch-btn" data-mode="engineering" title="{{ _("tt_engineering") }}">
+                        <svg class="icon icon-xs"><use href="#icon-settings"/></svg>
+                    </button>
+                </div>
+                <ul class="nav-links">
+                    <li><a href="/settings" data-tooltip="Settings" class="{% if page_title == 'Settings' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-settings"/></svg>
+                    </a></li>
+                </ul>
+            </div>
+
+            <div class="sidebar-footer">
+                <span class="status-dot active"></span>
+            </div>
+        </nav>
+
+        <!-- Main content -->
+        <main class="content">
+            <header class="topbar">
+                <h2>{{ page_title }}</h2>
+                <div class="topbar-right">
+                    {% block topbar_actions %}{% endblock %}
+                    <button class="topbar-bell">
+                        <svg class="icon icon-sm"><use href="#icon-activity"/></svg>
+                    </button>
+                    <div class="topbar-avatar">S</div>
+                </div>
+            </header>
+            <div class="main-area">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <style>
+    .sidebar-view-switch{display:flex;justify-content:center;gap:2px;padding:0.3rem 0.4rem;margin:0 0.3rem 0.3rem;background:var(--bg-tertiary);border-radius:8px}
+    .view-switch-btn{background:none;border:none;color:var(--text-secondary);padding:0.3rem;border-radius:6px;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center}
+    .view-switch-btn:hover{color:var(--text-primary);background:var(--bg-secondary)}
+    .view-switch-btn.active{color:#fff;background:var(--purple)}
+    .nav-links li.view-hidden{display:none}
+    /* Theme toggle */
+    .theme-toggle-btn{position:relative;width:28px;height:28px;overflow:hidden}
+    .theme-icon-sun,.theme-icon-moon{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);transition:opacity .2s,transform .3s}
+    [data-theme="dark"] .theme-icon-sun{opacity:1;transform:translate(-50%,-50%) rotate(0deg)}
+    [data-theme="dark"] .theme-icon-moon{opacity:0;transform:translate(-50%,-50%) rotate(90deg)}
+    [data-theme="light"] .theme-icon-sun{opacity:0;transform:translate(-50%,-50%) rotate(-90deg)}
+    [data-theme="light"] .theme-icon-moon{opacity:1;transform:translate(-50%,-50%) rotate(0deg)}
+    </style>
+    <script>
+    /* Theme toggle (light/dark) — persists in localStorage */
+    (function(){
+      const html = document.documentElement;
+      const saved = localStorage.getItem('macaron_theme') || 'dark';
+      html.setAttribute('data-theme', saved);
+
+      document.getElementById('themeToggle')?.addEventListener('click', function(){
+        const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('macaron_theme', next);
+      });
+    })();
+    </script>
+    <script>
+    /* Language selector */
+    document.getElementById('langSelect')?.addEventListener('change', function(){
+      fetch('/api/set-lang/' + this.value).then(function(){ location.reload(); });
+    });
+    </script>
+    <script>
+    (function(){
+      // Auto-detect view from current page
+      const PAGE_VIEW_MAP = {
+        'Portfolio': 'strategy',
+        'Backlog': 'strategy',
+        'PI Board': 'strategy',
+        'Metrics': 'strategy',
+        'Ceremonies': 'engineering',
+        'Live': 'engineering',
+        'ART': 'engineering',
+        'Toolbox': 'engineering',
+      };
+      const pageTitle = document.querySelector('.topbar h2')?.textContent?.trim() || '';
+      const autoView = PAGE_VIEW_MAP[pageTitle] || null;
+      const savedView = localStorage.getItem('sidebar_view') || 'all';
+      const currentView = autoView || savedView;
+
+      function applyView(mode){
+        localStorage.setItem('sidebar_view', mode);
+        // Toggle nav items
+        document.querySelectorAll('.nav-links a[data-views]').forEach(a=>{
+          const views = a.dataset.views.split(',');
+          const show = mode === 'all' || views.includes(mode) || views.includes('all');
+          a.closest('li').classList.toggle('view-hidden', !show);
+        });
+        // Toggle active button
+        document.querySelectorAll('.view-switch-btn').forEach(b=>{
+          b.classList.toggle('active', b.dataset.mode === mode);
+        });
+      }
+
+      // Init
+      applyView(currentView);
+
+      // Click handlers
+      document.querySelectorAll('.view-switch-btn').forEach(btn=>{
+        btn.addEventListener('click', ()=> applyView(btn.dataset.mode));
+      });
+    })();
+    </script>
+
+    <script src="/static/js/workspace.js" defer></script>
+    {% block scripts %}{% endblock %}
+
+<!-- DigitalOcean-style Delete Confirmation Modal -->
+<div id="deleteConfirmModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.65);align-items:center;justify-content:center">
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;max-width:460px;width:90%;padding:1.5rem;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem">
+      <div style="width:36px;height:36px;border-radius:8px;background:rgba(239,68,68,.12);color:var(--red);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg style="width:20px;height:20px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+      </div>
+      <div>
+        <h3 id="dcm-title" style="margin:0;font-size:1rem;color:var(--text-primary)">Supprimer</h3>
+        <p id="dcm-subtitle" style="margin:0;font-size:0.78rem;color:var(--text-secondary)">Cette action est irréversible</p>
+      </div>
+    </div>
+    <p id="dcm-warning" style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem;line-height:1.5"></p>
+    <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:0.4rem">
+      Tapez <strong id="dcm-expected" style="color:var(--red)"></strong> pour confirmer
+    </label>
+    <input id="dcm-input" type="text" autocomplete="off" spellcheck="false"
+      style="width:100%;padding:0.5rem 0.7rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:0.85rem;font-family:var(--font-mono);box-sizing:border-box"
+      oninput="document.getElementById('dcm-confirm-btn').disabled=(this.value!==this.dataset.expected)">
+    <div style="display:flex;gap:0.6rem;margin-top:1rem;justify-content:flex-end">
+      <button onclick="closeDeleteModal()" style="padding:0.45rem 1rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:0.82rem">Annuler</button>
+      <button id="dcm-confirm-btn" disabled onclick="executeDelete()"
+        style="padding:0.45rem 1rem;border-radius:6px;border:1px solid var(--red);background:rgba(239,68,68,.15);color:var(--red);cursor:pointer;font-size:0.82rem;font-weight:600;transition:all .15s">
+        Supprimer
+      </button>
+    </div>
+  </div>
+</div>
+<script>
+let _dcmCallback = null;
+function openDeleteModal({title, subtitle, warning, expectedName, onConfirm}) {
+    document.getElementById('dcm-title').textContent = title || 'Supprimer';
+    document.getElementById('dcm-subtitle').textContent = subtitle || 'Cette action est irréversible';
+    document.getElementById('dcm-warning').innerHTML = warning || '';
+    document.getElementById('dcm-expected').textContent = expectedName;
+    const input = document.getElementById('dcm-input');
+    input.value = '';
+    input.dataset.expected = expectedName;
+    document.getElementById('dcm-confirm-btn').disabled = true;
+    _dcmCallback = onConfirm;
+    document.getElementById('deleteConfirmModal').style.display = 'flex';
+    setTimeout(() => input.focus(), 100);
+}
+function closeDeleteModal() {
+    document.getElementById('deleteConfirmModal').style.display = 'none';
+    _dcmCallback = null;
+}
+async function executeDelete() {
+    if (_dcmCallback) {
+        const btn = document.getElementById('dcm-confirm-btn');
+        btn.disabled = true;
+        btn.textContent = 'Suppression...';
+        try { await _dcmCallback(); }
+        catch(e) { alert(e); }
+        finally { btn.textContent = 'Supprimer'; closeDeleteModal(); }
+    }
+}
+document.getElementById('deleteConfirmModal').addEventListener('click', function(e) {
+    if (e.target === this) closeDeleteModal();
+});
+</script>
+</body>
+</html>

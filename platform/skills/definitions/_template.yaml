@@ -1,0 +1,50 @@
+# Template for custom agent role definitions
+# Copy this file and customize for your needs
+
+id: my_custom_agent
+name: "My Custom Agent"
+version: "1.0"
+
+persona:
+  description: >
+    Description of the agent's personality and expertise.
+  traits:
+    - Trait 1
+    - Trait 2
+
+system_prompt: |
+  You are [role description]. Your responsibilities:
+  1. ...
+  2. ...
+
+skills:
+  - tdd
+
+tools:
+  - code_read
+  - code_search
+
+llm:
+  model: MiniMax-M2.5
+  temperature: 0.7
+  max_tokens: 4096
+  fallback_model: MiniMax-M2.5
+
+permissions:
+  can_veto: false
+  can_delegate: false
+  can_approve: false
+  escalation_to: null
+
+communication:
+  responds_to: []
+  can_contact: []
+  broadcast_channels: []
+
+triggers: []
+
+constraints:
+  max_concurrent_tasks: 3
+  max_tokens_per_day: 200000
+
+tags: []

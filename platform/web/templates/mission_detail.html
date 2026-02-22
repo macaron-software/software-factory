@@ -1,0 +1,494 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<div style="display:flex;align-items:center;gap:12px;">
+    <span class="badge {% if mission.status == 'active' %}badge-green{% elif mission.status == 'completed' %}badge-blue{% elif mission.status == 'blocked' or mission.status == 'failed' %}badge-red{% else %}badge-yellow{% endif %}">
+        {{ mission.status }}
+    </span>
+    {% if mission.status == 'planning' %}
+    <button class="btn btn-sm btn-primary"
+            hx-post="/api/missions/{{ mission.id }}/start"
+            hx-swap="none"
+            hx-on::after-request="location.reload()">
+        <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch') }}
+    </button>
+    {% elif mission.status == 'active' %}
+    <a href="/missions/{{ mission.id }}/live" class="btn btn-sm btn-primary">
+        <svg class="icon icon-sm"><use href="#icon-zap"/></svg> Live
+    </a>
+    <button class="btn btn-sm btn-ghost" id="btnLaunchWorkflow"
+            onclick="launchWorkflow()">
+        <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch_workflow') }}
+    </button>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.mission-layout{display:grid;grid-template-columns:1fr 320px;gap:1.25rem;height:calc(100vh - 56px);overflow:hidden}
+@media(max-width:900px){.mission-layout{grid-template-columns:1fr;height:auto;overflow:auto}}
+
+/* ── Left: Timeline + Board ── */
+.mission-main{overflow-y:auto;padding:0.5rem 0}
+
+.mission-header{margin-bottom:1.25rem}
+.mission-name{font-size:1.3rem;font-weight:700;color:var(--text-primary);margin:0}
+.mission-project{font-size:0.82rem;color:var(--text-secondary);margin-top:0.2rem}
+.mission-goal{font-size:0.85rem;color:var(--text-secondary);margin-top:0.5rem;padding:0.75rem;background:var(--bg-secondary);border-left:3px solid var(--purple);border-radius:0 6px 6px 0}
+
+/* Sprint timeline */
+.sprint-timeline{display:flex;gap:0.5rem;margin-bottom:1.5rem;overflow-x:auto;padding-bottom:0.3rem}
+.sprint-chip{display:flex;align-items:center;gap:0.4rem;padding:0.45rem 0.85rem;border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);white-space:nowrap;text-decoration:none}
+.sprint-chip:hover{border-color:var(--purple);color:var(--text-primary)}
+.sprint-chip.active-sprint{background:var(--purple);color:#fff;border-color:var(--purple)}
+.sprint-chip.completed{background:rgba(52,211,153,.1);color:#34d399;border-color:rgba(52,211,153,.3)}
+.sprint-chip.selected{box-shadow:0 0 0 2px var(--purple)}
+.sprint-chip .sprint-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sprint-chip .sprint-dot.active{background:var(--green);box-shadow:0 0 5px var(--green)}
+.sprint-chip .sprint-dot.planning{background:var(--yellow)}
+.sprint-chip .sprint-dot.completed{background:var(--green)}
+.sprint-chip .sprint-dot.review{background:var(--blue)}
+
+/* Kanban board */
+.kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;min-height:300px}
+@media(max-width:1100px){.kanban{grid-template-columns:repeat(2,1fr)}}
+.kanban-col{background:var(--bg-secondary);border-radius:var(--radius);padding:0.75rem;border:1px solid var(--border)}
+.kanban-col-title{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);margin-bottom:0.65rem;display:flex;align-items:center;justify-content:space-between}
+.kanban-col-count{background:var(--bg-tertiary);padding:0.1rem 0.4rem;border-radius:4px;font-size:0.65rem}
+.kanban-task{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:0.6rem;margin-bottom:0.5rem;transition:border-color .15s}
+.kanban-task:hover{border-color:var(--purple)}
+.kanban-task-ghost{opacity:0.4;background:var(--purple) !important;border-color:var(--purple) !important}
+.kanban-task-chosen{box-shadow:0 4px 12px rgba(124,58,237,0.3);transform:rotate(2deg)}
+.kanban-task-title{font-size:0.8rem;font-weight:600;color:var(--text-primary);margin-bottom:0.25rem}
+.kanban-task-meta{display:flex;align-items:center;gap:0.4rem;font-size:0.68rem;color:var(--text-secondary)}
+.kanban-task-type{padding:0.1rem 0.35rem;border-radius:3px;font-size:0.62rem;font-weight:600}
+.kanban-task-type.feature{background:rgba(168,85,247,.15);color:#a855f7}
+.kanban-task-type.fix{background:rgba(248,113,113,.15);color:#f87171}
+.kanban-task-type.refactor{background:rgba(96,165,250,.15);color:#60a5fa}
+.kanban-task-type.test{background:rgba(52,211,153,.15);color:#34d399}
+.kanban-task-type.security{background:rgba(251,191,36,.15);color:#fbbf24}
+.kanban-task-agent{display:flex;align-items:center;gap:0.25rem}
+.kanban-empty{font-size:0.75rem;color:var(--text-secondary);font-style:italic;text-align:center;padding:1rem 0}
+
+/* ── Right sidebar ── */
+.mission-sidebar{overflow-y:auto;border-left:1px solid var(--border);padding:0.75rem}
+.ms-section{margin-bottom:1.25rem}
+.ms-section h4{font-size:0.78rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin:0 0 0.5rem}
+.ms-stat{display:flex;justify-content:space-between;padding:0.3rem 0;font-size:0.82rem;border-bottom:1px solid rgba(255,255,255,.03)}
+.ms-stat-label{color:var(--text-secondary)}
+.ms-stat-value{color:var(--text-primary);font-weight:600}
+.ms-agent{display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0}
+.ms-agent-avatar{font-size:1.1rem}
+.ms-agent-info{flex:1}
+.ms-agent-name{font-size:0.8rem;font-weight:600;color:var(--text-primary)}
+.ms-agent-role{font-size:0.68rem;color:var(--text-secondary)}
+</style>
+
+<div class="mission-layout">
+    <!-- Main area: timeline + board -->
+    <div class="mission-main">
+        <div class="mission-header">
+            <h1 class="mission-name">{{ mission.name }}</h1>
+            <div class="mission-project">
+                <span class="project-type-dot {{ project.factory_type if project else '' }}"></span>
+                {{ project.name if project else mission.project_id }}
+                {% if mission.wsjf_score > 0 %} · WSJF {{ mission.wsjf_score|round(1) }}{% endif %}
+                {% if mission.created_by %} · {{ _('created_by') }} {{ mission.created_by }}{% endif %}
+            </div>
+            {% if mission.goal %}
+            <div class="mission-goal"><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-target"/></svg>{{ mission.goal }}</div>
+            {% endif %}
+
+            <!-- WSJF inline calculator -->
+            <div style="margin-top:0.5rem;display:flex;align-items:center;gap:0.5rem">
+                <button class="btn btn-sm btn-ghost" onclick="document.getElementById('wsjfInline').classList.toggle('open')" style="font-size:0.72rem">
+                    <svg class="icon icon-xs"><use href="#icon-chart"/></svg> WSJF {% if mission.wsjf_score > 0 %}({{ mission.wsjf_score|round(1) }}){% endif %}
+                </button>
+            </div>
+            <div id="wsjfInline" style="display:none;margin-top:0.5rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;padding:0.75rem">
+                <style>#wsjfInline.open{display:block !important}
+                .wsjf-row{display:flex;align-items:center;gap:0.5rem;margin:0.3rem 0;font-size:0.78rem}
+                .wsjf-row label{flex:0 0 140px;color:var(--text-secondary)}
+                .wsjf-row input[type=range]{flex:1;accent-color:var(--purple)}
+                .wsjf-row .wsjf-val{min-width:25px;text-align:right;font-weight:700;color:var(--text-primary)}
+                </style>
+                <div class="wsjf-row"><label>Business Value</label><input type="range" min="1" max="21" value="{{ mission.business_value|default(1)|int }}" id="md-wsjf-bv" oninput="mdWSJF()"><span class="wsjf-val" id="md-bv-v">{{ mission.business_value|default(1)|int }}</span></div>
+                <div class="wsjf-row"><label>Time Criticality</label><input type="range" min="1" max="21" value="{{ mission.time_criticality|default(1)|int }}" id="md-wsjf-tc" oninput="mdWSJF()"><span class="wsjf-val" id="md-tc-v">{{ mission.time_criticality|default(1)|int }}</span></div>
+                <div class="wsjf-row"><label>Risk Reduction</label><input type="range" min="1" max="21" value="{{ mission.risk_reduction|default(1)|int }}" id="md-wsjf-rr" oninput="mdWSJF()"><span class="wsjf-val" id="md-rr-v">{{ mission.risk_reduction|default(1)|int }}</span></div>
+                <div class="wsjf-row"><label>Job Duration</label><input type="range" min="1" max="21" value="{{ mission.job_duration|default(1)|int }}" id="md-wsjf-jd" oninput="mdWSJF()"><span class="wsjf-val" id="md-jd-v">{{ mission.job_duration|default(1)|int }}</span></div>
+                <div style="text-align:center;margin-top:0.5rem;padding:0.4rem;background:var(--bg-tertiary);border-radius:4px">
+                    <span style="font-size:0.72rem;color:var(--text-secondary)">WSJF =</span>
+                    <span style="font-size:1.2rem;font-weight:700;color:var(--purple)" id="md-wsjf-score">{{ mission.wsjf_score|default(0)|round(1) }}</span>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="saveMdWSJF()" style="width:100%;margin-top:0.5rem">Save WSJF</button>
+            </div>
+        </div>
+
+        <!-- Sprint timeline -->
+        {% if sprints %}
+        <div class="sprint-timeline">
+            {% for s in sprints %}
+            <a href="/missions/{{ mission.id }}?sprint={{ s.id }}" class="sprint-chip {{ s.status }}{% if s.status == 'active' %} active-sprint{% endif %}{% if selected_sprint and selected_sprint.id == s.id %} selected{% endif %}">
+                <span class="sprint-dot {{ s.status }}"></span>
+                Sprint {{ s.number }}{% if s.name %}: {{ s.name }}{% endif %}
+            </a>
+            {% endfor %}
+            {% if mission.status in ('planning', 'active') %}
+            <button class="sprint-chip" style="border-style:dashed"
+                    hx-post="/api/missions/{{ mission.id }}/sprints"
+                    hx-swap="none"
+                    hx-on::after-request="location.reload()">
+                <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Sprint
+            </button>
+            {% endif %}
+        </div>
+        {% else %}
+        <div style="text-align:center;padding:2rem;color:var(--text-secondary)">
+            <p>{{ _('no_sprint') }}</p>
+            <button class="btn btn-primary"
+                    hx-post="/api/missions/{{ mission.id }}/sprints"
+                    hx-swap="none"
+                    hx-on::after-request="location.reload()">
+                <svg class="icon icon-sm"><use href="#icon-plus"/></svg> {{ _('new_sprint') }}
+            </button>
+        </div>
+        {% endif %}
+
+        <!-- Kanban board (for selected sprint) -->
+        {% if selected_sprint %}
+
+        <!-- Sprint Planning Panel -->
+        <div style="margin-bottom:1rem">
+            <button class="btn btn-sm btn-ghost" onclick="document.getElementById('sprintPlanPanel').classList.toggle('open')" style="font-size:0.78rem">
+                <svg class="icon icon-xs"><use href="#icon-layers"/></svg> Sprint Planning
+            </button>
+            <div id="sprintPlanPanel" style="display:none;margin-top:0.5rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                    <h4 style="margin:0;font-size:0.82rem;color:var(--text-primary)">Available Stories (Backlog)</h4>
+                    <span id="sprintCapacity" style="font-size:0.72rem;color:var(--text-secondary)"></span>
+                </div>
+                <div id="availableStories" style="max-height:250px;overflow-y:auto;min-height:40px">
+                    <div style="font-size:0.75rem;color:var(--text-secondary);font-style:italic;text-align:center;padding:1rem">Loading...</div>
+                </div>
+            </div>
+        </div>
+        <style>
+        #sprintPlanPanel.open{display:block !important}
+        .avail-story{display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.5rem;border:1px solid var(--border);border-radius:4px;margin-bottom:0.3rem;font-size:0.78rem;background:var(--bg-tertiary);cursor:pointer;transition:border-color .15s}
+        .avail-story:hover{border-color:var(--purple)}
+        .avail-story-sp{font-size:0.68rem;background:var(--bg-primary);padding:0.05rem 0.3rem;border-radius:3px;color:var(--text-secondary)}
+        .avail-story-feat{font-size:0.65rem;color:var(--text-secondary)}
+        .avail-story-assign{margin-left:auto;font-size:0.68rem;color:var(--purple);cursor:pointer;padding:0.15rem 0.4rem;border:1px solid var(--purple);border-radius:4px;background:transparent}
+        .avail-story-assign:hover{background:rgba(124,58,237,.1)}
+        </style>
+        <script>
+        (function(){
+            const panel = document.getElementById('sprintPlanPanel');
+            const container = document.getElementById('availableStories');
+            const sprintId = '{{ selected_sprint.id }}';
+            let loaded = false;
+            document.querySelector('[onclick*="sprintPlanPanel"]').addEventListener('click', function() {
+                if (loaded) return;
+                loaded = true;
+                fetch(`/api/sprints/${sprintId}/available-stories`).then(r=>r.json()).then(data => {
+                    if (!data.stories || data.stories.length === 0) {
+                        container.innerHTML = '<div style="font-size:0.75rem;color:var(--text-secondary);font-style:italic;text-align:center;padding:1rem">All stories assigned</div>';
+                        return;
+                    }
+                    const totalSP = data.stories.reduce((a,s) => a + (s.story_points||0), 0);
+                    document.getElementById('sprintCapacity').textContent = `${data.stories.length} stories · ${totalSP} SP available`;
+                    container.innerHTML = data.stories.map(s =>
+                        `<div class="avail-story" data-story-id="${s.id}">
+                            <span style="color:var(--text-primary)">${s.title}</span>
+                            ${s.story_points ? `<span class="avail-story-sp">${s.story_points} SP</span>` : ''}
+                            <span class="avail-story-feat">${s.feature_name || ''}</span>
+                            <button class="avail-story-assign" onclick="assignToSprint('${s.id}',this)">+ Sprint</button>
+                        </div>`
+                    ).join('');
+                }).catch(() => {
+                    container.innerHTML = '<div style="color:var(--red);font-size:0.75rem">Error loading stories</div>';
+                });
+            });
+        })();
+        async function assignToSprint(storyId, btn) {
+            btn.disabled = true; btn.textContent = '...';
+            try {
+                await fetch(`/api/sprints/{{ selected_sprint.id }}/assign-stories`, {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({story_ids: [storyId]}),
+                });
+                btn.closest('.avail-story').remove();
+            } catch(e) { btn.disabled = false; btn.textContent = '+ Sprint'; }
+        }
+        </script>
+
+        <div class="kanban"
+             hx-get="/api/missions/{{ mission.id }}/board?sprint={{ selected_sprint.id }}"
+             hx-trigger="every 10s"
+             hx-swap="innerHTML">
+            {% set cols = [('pending', 'Backlog', 'clipboard'), ('in_progress', 'In Progress', 'zap'), ('review', 'Review', 'eye'), ('done', 'Done', 'check')] %}
+            {% for col_status, col_name, col_icon in cols %}
+            <div class="kanban-col" data-status="{{ col_status }}">
+                <div class="kanban-col-title">
+                    <svg class="icon icon-xs"><use href="#icon-{{ col_icon }}"/></svg> {{ col_name }}
+                    <span class="kanban-col-count">{{ tasks_by_status.get(col_status, [])|length }}</span>
+                </div>
+                <div class="kanban-col-tasks" data-status="{{ col_status }}">
+                {% for t in tasks_by_status.get(col_status, []) %}
+                <div class="kanban-task" data-task-id="{{ t.id }}">
+                    <div class="kanban-task-title">{{ t.title }}</div>
+                    <div class="kanban-task-meta">
+                        <span class="kanban-task-type {{ t.type }}">{{ t.type }}</span>
+                        {% if t.domain %}<span>{{ t.domain }}</span>{% endif %}
+                        {% if t.assigned_to %}
+                        <span class="kanban-task-agent"><svg class="icon icon-xs"><use href="#icon-user"/></svg> {{ t.assigned_to }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="kanban-empty">—</div>
+                {% endfor %}
+                </div>
+                {% if col_status == 'pending' %}
+                <div class="inline-form" id="addTaskForm">
+                    <input class="inline-form__input" id="newTaskTitle" placeholder="{{ _('new_task') }}" onkeydown="if(event.key==='Enter'){addTask()}">
+                    <button class="inline-form__btn" onclick="addTask()">
+                        <svg class="icon icon-xs"><use href="#icon-plus"/></svg>
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right sidebar: stats + velocity + retro + team -->
+    <aside class="mission-sidebar">
+        <div class="ms-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-chart"/></svg> Progression</h4>
+            <div class="ms-stat"><span class="ms-stat-label">{{ _("sprints") }}</span><span class="ms-stat-value">{{ sprints|length }}</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">{{ _("tasks_total") }}</span><span class="ms-stat-value">{{ stats.get('total', 0) }}</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">{{ _("done") }}</span><span class="ms-stat-value" style="color:var(--green)">{{ stats.get('done', 0) }}</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">{{ _("in_progress") }}</span><span class="ms-stat-value" style="color:var(--yellow)">{{ stats.get('in_progress', 0) }}</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">{{ _("failed") }}</span><span class="ms-stat-value" style="color:var(--red)">{{ stats.get('failed', 0) }}</span></div>
+        </div>
+
+        {% if velocity_history %}
+        <div class="ms-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-trending-up"/></svg> {{ _("velocity") }}</h4>
+            <div class="ms-stat"><span class="ms-stat-label">{{ _("moyenne") }}</span><span class="ms-stat-value">{{ avg_velocity }} SP</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">{{ _("total_livre") }}</span><span class="ms-stat-value" style="color:var(--green)">{{ total_velocity }} SP</span></div>
+            <div class="ms-stat"><span class="ms-stat-label">{{ _("total_planifie") }}</span><span class="ms-stat-value">{{ total_planned }} SP</span></div>
+            <canvas id="velocityChart" height="120" style="margin-top:0.5rem"></canvas>
+            {% if total_planned > 0 %}
+            <div style="margin-top:0.4rem;font-size:0.72rem;color:var(--text-secondary)">
+                Predictability: <strong style="color:{% if total_velocity >= total_planned %}var(--green){% else %}var(--yellow){% endif %}">{{ ((total_velocity / total_planned) * 100)|int }}%</strong>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Burndown chart -->
+        <div class="ms-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-activity"/></svg> Burndown</h4>
+            <canvas id="burndownChart" height="120" style="margin-top:0.5rem"></canvas>
+        </div>
+
+        {% if selected_sprint and selected_sprint.retro_notes %}
+        <div class="ms-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-message-circle"/></svg> Rétrospective</h4>
+            <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.5;max-height:200px;overflow-y:auto">
+                {{ selected_sprint.retro_notes | markdown | safe }}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if team_agents %}
+        <div class="ms-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-users"/></svg> Équipe</h4>
+            {% for a in team_agents %}
+            <div class="ms-agent">
+                <span class="ms-agent-avatar" style="background:{{ a.color }}20;border-color:{{ a.color }}">
+                    <svg class="icon icon-xs" style="color:{{ a.color }}"><use href="#icon-{{ a.avatar or a.icon or 'bot' }}"/></svg>
+                </span>
+                <div class="ms-agent-info">
+                    <div class="ms-agent-name">{{ a.name }}</div>
+                    <div class="ms-agent-role">{{ a.role }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if mission.workflow_id %}
+        <div class="ms-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-zap"/></svg> Workflow</h4>
+            <a href="/workflows/{{ mission.workflow_id }}/edit" class="btn btn-sm btn-ghost" style="width:100%">
+                {{ mission.workflow_id }}
+            </a>
+        </div>
+        {% endif %}
+
+        {% if selected_sprint and selected_sprint.goal %}
+        <div class="ms-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-target"/></svg> Sprint Goal</h4>
+            <p style="font-size:0.82rem;color:var(--text-secondary)">{{ selected_sprint.goal }}</p>
+        </div>
+        {% endif %}
+    </aside>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+async function addTask() {
+    const input = document.getElementById('newTaskTitle');
+    const title = input.value.trim();
+    if (!title) return;
+    input.value = '';
+    try {
+        await fetch('/api/missions/{{ mission.id }}/tasks', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                title: title,
+                sprint_id: '{{ selected_sprint.id if selected_sprint else "" }}',
+            }),
+        });
+        location.reload();
+    } catch(e) { console.error('addTask error:', e); }
+}
+
+async function launchWorkflow() {
+    const btn = document.getElementById('btnLaunchWorkflow');
+    btn.disabled = true;
+    btn.textContent = 'Création...';
+    try {
+        const resp = await fetch('/api/missions/{{ mission.id }}/launch-workflow', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+        });
+        const data = await resp.json();
+        if (data.session_id) {
+            window.location.href = `/sessions/${data.session_id}/live`;
+        } else {
+            alert(data.error || 'Erreur');
+            btn.disabled = false;
+            btn.textContent = 'Launch';
+        }
+    } catch(e) {
+        alert('Error: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = 'Launch';
+    }
+}
+
+// ── Drag-drop Kanban ──
+document.querySelectorAll('.kanban-col-tasks').forEach(col => {
+    new Sortable(col, {
+        group: 'kanban',
+        animation: 150,
+        ghostClass: 'kanban-task-ghost',
+        chosenClass: 'kanban-task-chosen',
+        onEnd: async function(evt) {
+            const taskId = evt.item.dataset.taskId;
+            const newStatus = evt.to.dataset.status;
+            if (!taskId || !newStatus) return;
+            try {
+                await fetch(`/api/tasks/${taskId}/status`, {
+                    method: 'PATCH',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({status: newStatus}),
+                });
+                // Update column counts
+                document.querySelectorAll('.kanban-col').forEach(c => {
+                    const tasks = c.querySelector('.kanban-col-tasks');
+                    const count = c.querySelector('.kanban-col-count');
+                    if (tasks && count) count.textContent = tasks.children.length;
+                });
+            } catch(e) { console.error('Drag update error:', e); }
+        }
+    });
+});
+
+// ── Velocity Chart ──
+const velCanvas = document.getElementById('velocityChart');
+if (velCanvas && typeof Chart !== 'undefined') {
+    const velData = {{ velocity_history | tojson if velocity_history else '[]' }};
+    const chartOpts = {responsive:true, plugins:{legend:{display:false}}, scales:{
+        x:{ticks:{color:'rgba(255,255,255,0.5)',font:{size:9}},grid:{display:false}},
+        y:{ticks:{color:'rgba(255,255,255,0.5)',font:{size:9}},grid:{color:'rgba(255,255,255,0.06)'}}
+    }};
+    new Chart(velCanvas, {
+        type: 'bar',
+        data: {
+            labels: velData.map(v => 'S' + v.sprint),
+            datasets: [
+                {label: 'Actual', data: velData.map(v => v.velocity), backgroundColor: 'rgba(124,58,237,0.7)', borderRadius: 3},
+                {label: 'Planned', data: velData.map(v => v.planned_sp), backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3}
+            ]
+        },
+        options: chartOpts,
+    });
+}
+
+// ── Burndown Chart ──
+const bdCanvas = document.getElementById('burndownChart');
+if (bdCanvas && typeof Chart !== 'undefined') {
+    fetch('/api/metrics/burndown/{{ mission.id }}').then(r => r.json()).then(data => {
+        if (!data.burndown || data.burndown.length === 0) {
+            bdCanvas.parentElement.querySelector('h4').insertAdjacentHTML('afterend',
+                '<p style="font-size:0.75rem;color:var(--text-muted);text-align:center">No data yet</p>');
+            bdCanvas.style.display = 'none';
+            return;
+        }
+        const bd = data.burndown;
+        const ideal = bd.map((_, i) => data.total - (data.total / (bd.length - 1)) * i);
+        new Chart(bdCanvas, {
+            type: 'line',
+            data: {
+                labels: bd.map(p => p.date.slice(5)),
+                datasets: [
+                    {label: 'Remaining', data: bd.map(p => p.remaining), borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.1)', fill: true, tension: 0.3, pointRadius: 2},
+                    {label: 'Ideal', data: ideal, borderColor: 'rgba(255,255,255,0.2)', borderDash: [5,5], pointRadius: 0, fill: false}
+                ]
+            },
+            options: {responsive:true, plugins:{legend:{display:false}}, scales:{
+                x:{ticks:{color:'rgba(255,255,255,0.5)',font:{size:8}},grid:{display:false}},
+                y:{ticks:{color:'rgba(255,255,255,0.5)',font:{size:9}},grid:{color:'rgba(255,255,255,0.06)'}}
+            }}
+        });
+    }).catch(() => { bdCanvas.style.display = 'none'; });
+}
+
+// ── WSJF inline calculator ──
+function mdWSJF() {
+    const bv = parseInt(document.getElementById('md-wsjf-bv').value);
+    const tc = parseInt(document.getElementById('md-wsjf-tc').value);
+    const rr = parseInt(document.getElementById('md-wsjf-rr').value);
+    const jd = Math.max(parseInt(document.getElementById('md-wsjf-jd').value), 1);
+    document.getElementById('md-bv-v').textContent = bv;
+    document.getElementById('md-tc-v').textContent = tc;
+    document.getElementById('md-rr-v').textContent = rr;
+    document.getElementById('md-jd-v').textContent = jd;
+    document.getElementById('md-wsjf-score').textContent = ((bv + tc + rr) / jd).toFixed(1);
+}
+async function saveMdWSJF() {
+    const body = {
+        business_value: parseInt(document.getElementById('md-wsjf-bv').value),
+        time_criticality: parseInt(document.getElementById('md-wsjf-tc').value),
+        risk_reduction: parseInt(document.getElementById('md-wsjf-rr').value),
+        job_duration: parseInt(document.getElementById('md-wsjf-jd').value),
+    };
+    try {
+        const resp = await fetch('/api/missions/{{ mission.id }}/wsjf', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        document.getElementById('md-wsjf-score').textContent = data.wsjf;
+    } catch(e) { console.error(e); }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+{% include "partials/view_switcher.html" %}
+<button class="btn btn-sm btn-ghost" hx-post="/api/skills/github/sync" hx-target="#gh-sync-status" hx-swap="innerHTML" hx-indicator="#sync-spinner" title="Sync all GitHub sources">
+    <svg class="icon icon-sm"><use href="#icon-refresh"/></svg> Sync GitHub
+</button>
+<button class="btn btn-sm btn-ghost" hx-post="/api/skills/reload" hx-swap="none" title="Reload local files">
+    <svg class="icon icon-sm"><use href="#icon-refresh"/></svg> Reload
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- GitHub Sources (collapsible) -->
+<details class="gh-sources-panel">
+    <summary class="gh-sources-header">
+        <h4 style="margin:0;display:inline">
+            <svg class="icon icon-sm" style="vertical-align:-2px"><use href="#icon-folder"/></svg>
+            GitHub Sources ({{ github_sources|length }})
+        </h4>
+        <span id="gh-sync-status"></span>
+        <span id="sync-spinner" class="htmx-indicator" style="font-size:0.75rem;color:var(--purple)">{{ _("syncing") }}</span>
+    </summary>
+    <div class="gh-sources-list" id="gh-sources-list">
+        {% for src in github_sources %}
+        <div class="gh-source-item">
+            <a href="https://github.com/{{ src.repo }}" target="_blank" class="gh-source-repo">{{ src.repo }}</a>
+            {% if src.path %}<span class="gh-source-path">/{{ src.path }}</span>{% endif %}
+            <span class="gh-source-meta">{{ src.files_count }} files · {{ src.fetched_at[:10] if src.fetched_at != 'never' else 'not synced' }}</span>
+            <form style="display:inline" hx-post="/api/skills/github/remove" hx-target="closest .gh-source-item" hx-swap="outerHTML">
+                <input type="hidden" name="repo" value="{{ src.repo }}">
+                <button type="submit" class="gh-source-remove" title="{{ _("tt_remove") }}"><svg class="icon icon-xs"><use href="#icon-x"/></svg></button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    <form class="gh-add-form" hx-post="/api/skills/github/add" hx-target="#gh-sync-status" hx-swap="innerHTML" hx-on::after-request="if(event.detail.successful) setTimeout(()=>location.reload(), 800)">
+        <input type="text" name="repo" placeholder="{{ _("ph_owner_repo") }}" class="gh-add-input" required>
+        <input type="text" name="path" placeholder="path (optional)" class="gh-add-input gh-add-path">
+        <input type="text" name="branch" placeholder="{{ _("ph_main") }}" class="gh-add-input gh-add-branch" value="main">
+        <button type="submit" class="btn btn-sm btn-primary">+ Add</button>
+    </form>
+</details>
+
+<!-- Search & Filters Bar -->
+<div class="skills-toolbar">
+    <div class="skills-search">
+        <input type="search" id="skills-q" name="q" value="{{ q }}" placeholder="Search {{ total_all }} skills…"
+               class="search-input"
+               hx-get="/skills" hx-target="#skills-grid" hx-swap="innerHTML"
+               hx-trigger="input changed delay:300ms, keyup[key=='Enter']"
+               hx-include="#skills-filters"
+               hx-push-url="true">
+    </div>
+    <div class="skills-filters" id="skills-filters">
+        <select name="source" class="filter-select" hx-get="/skills" hx-target="#skills-grid" hx-swap="innerHTML" hx-include="#skills-q, [name=repo]" hx-push-url="true">
+            <option value="">All sources ({{ total_all }})</option>
+            <option value="local-md" {% if source_filter == 'local-md' %}selected{% endif %}><svg class="icon icon-xs"><use href="#icon-file-text"/></svg> Local skills ({{ source_counts.get('local-md', 0) }})</option>
+            <option value="local-yaml" {% if source_filter == 'local-yaml' %}selected{% endif %}><svg class="icon icon-xs"><use href="#icon-bot"/></svg> Roles ({{ source_counts.get('local-yaml', 0) }})</option>
+            <option value="github" {% if source_filter == 'github' %}selected{% endif %}><svg class="icon icon-xs"><use href="#icon-git-branch"/></svg> GitHub ({{ source_counts.get('github', 0) }})</option>
+        </select>
+        <select name="repo" class="filter-select" hx-get="/skills" hx-target="#skills-grid" hx-swap="innerHTML" hx-include="#skills-q, [name=source]" hx-push-url="true">
+            <option value="">{{ _("all_repos") }}</option>
+            {% for r in repos %}
+            <option value="{{ r }}" {% if repo_filter == r %}selected{% endif %}>{{ r.split('/')[1][:25] }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="skills-count">
+        <span>{{ total }} skill{{ 's' if total != 1 else '' }}</span>
+    </div>
+</div>
+
+<!-- Skills Grid (HTMX target) -->
+<div id="skills-grid">
+    {% include "partials/skills_grid.html" %}
+</div>
+
+<div id="skill-preview" class="skill-preview-panel">
+    <p class="text-secondary" style="padding:24px;text-align:center;font-size:13px;">
+        Click a skill to preview its content.
+    </p>
+</div>
+{% endblock %}

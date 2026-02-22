@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(for proj in ppz psy fervenza solaris)",
+      "Bash(do python3 cli/factory.py -p $proj cycle stop)",
+      "Bash(done)",
+      "Bash(sqlite3:*)",
+      "Bash(python3:*)",
+      "Bash(grep:*)",
+      "Bash(tail:*)",
+      "Bash(timeout 300 python3:*)",
+      "Bash(echo:*)",
+      "Bash(timeout 30 claude:*)",
+      "Bash(timeout 600 python3:*)"
+    ]
+  }
+}

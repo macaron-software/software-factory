@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+.ms-container{max-width:640px;margin:0 auto}
+.ms-header{margin-bottom:1.5rem}
+.ms-header h2{font-size:1.2rem;color:var(--text-primary);margin:0 0 0.3rem}
+.ms-header p{color:var(--text-secondary);font-size:0.85rem;margin:0}
+.ms-phases{display:flex;flex-wrap:wrap;gap:0.4rem;margin:1rem 0}
+.ms-phase{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:0.3rem 0.6rem;font-size:0.72rem;color:var(--text-secondary)}
+.ms-phase .pat{color:var(--purple);font-weight:600}
+.ms-form{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem}
+.ms-field{margin-bottom:1rem}
+.ms-field label{display:block;font-size:0.78rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.3rem}
+.ms-field textarea{width:100%;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.75rem;font-size:0.85rem;font-family:inherit;outline:none;resize:vertical;min-height:100px}
+.ms-field textarea:focus{border-color:var(--purple)}
+.ms-actions{display:flex;gap:0.5rem;justify-content:flex-end}
+</style>
+
+<div class="ms-container">
+    <div class="ms-header">
+        <h2>{{ workflow.name }}</h2>
+        <p>{{ workflow.description[:200] }}</p>
+    </div>
+
+    <div class="ms-phases">
+        {% for p in workflow.phases %}
+        <div class="ms-phase">{{ loop.index }}. {{ p.name }} <span class="pat">({{ p.pattern_id }})</span></div>
+        {% endfor %}
+    </div>
+
+    <form class="ms-form" id="missionForm">
+        <input type="hidden" name="workflow_id" value="{{ workflow.id }}">
+        <div class="ms-field">
+            <label>{{ _("brief_de_l_epic") }}</label>
+            <textarea name="brief" placeholder="Décrivez le besoin métier, le contexte projet, et les objectifs à atteindre..." required></textarea>
+        </div>
+
+        <div style="margin:1rem 0 0.5rem;font-size:0.78rem;font-weight:600;color:var(--text-secondary)">{{ _("priorisation_wsjf") }}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem">
+            <div class="ms-field" style="margin:0">
+                <label>Business Value <span id="bv-val" style="color:var(--purple)">5</span>/10</label>
+                <input type="range" name="business_value" min="1" max="10" value="5" oninput="document.getElementById('bv-val').textContent=this.value;computeWsjf()" style="width:100%">
+            </div>
+            <div class="ms-field" style="margin:0">
+                <label>Time Criticality <span id="tc-val" style="color:var(--purple)">5</span>/10</label>
+                <input type="range" name="time_criticality" min="1" max="10" value="5" oninput="document.getElementById('tc-val').textContent=this.value;computeWsjf()" style="width:100%">
+            </div>
+            <div class="ms-field" style="margin:0">
+                <label>Risk Reduction <span id="rr-val" style="color:var(--purple)">3</span>/10</label>
+                <input type="range" name="risk_reduction" min="1" max="10" value="3" oninput="document.getElementById('rr-val').textContent=this.value;computeWsjf()" style="width:100%">
+            </div>
+            <div class="ms-field" style="margin:0">
+                <label>Job Duration <span id="jd-val" style="color:var(--purple)">3</span>/10</label>
+                <input type="range" name="job_duration" min="1" max="10" value="3" oninput="document.getElementById('jd-val').textContent=this.value;computeWsjf()" style="width:100%">
+            </div>
+        </div>
+        <div style="text-align:right;font-size:0.85rem;color:var(--text-primary);margin:0.3rem 0 1rem">
+            WSJF = <strong id="wsjf-score" style="color:var(--purple);font-size:1.1rem">4.3</strong>
+            <span style="color:var(--text-muted);font-size:0.72rem;margin-left:0.4rem">(CoD / Job Duration)</span>
+        </div>
+
+        <div class="ms-actions">
+            <a href="/missions" class="btn btn-ghost">{{ _("cancel") }}</a>
+            <button type="submit" class="btn btn-primary">
+                <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch_epic') }}
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function computeWsjf() {
+    const bv = +document.querySelector('[name=business_value]').value;
+    const tc = +document.querySelector('[name=time_criticality]').value;
+    const rr = +document.querySelector('[name=risk_reduction]').value;
+    const jd = Math.max(+document.querySelector('[name=job_duration]').value, 0.1);
+    const wsjf = ((bv + tc + rr) / jd).toFixed(1);
+    document.getElementById('wsjf-score').textContent = wsjf;
+}
+computeWsjf();
+
+document.getElementById('missionForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = e.target.querySelector('[type=submit]');
+    btn.disabled = true;
+    btn.textContent = 'Lancement...';
+    try {
+        const r = await fetch('/api/missions/start', {method:'POST', body: fd});
+        const j = await r.json();
+        if (j.redirect) location.href = j.redirect;
+        else alert(j.error || 'Error');
+    } catch(err) { alert(err); }
+    btn.disabled = false;
+    btn.textContent = _('launch_epic');
+});
+</script>
+{% endblock %}

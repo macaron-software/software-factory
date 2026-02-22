@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<button onclick="testAllMcps()" class="btn btn-secondary" style="margin-right: 0.5rem">
+    <svg class="icon icon-sm"><use href="#icon-play"/></svg> Test All
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="mcps-grid">
+    {% for mcp in mcps %}
+    <div class="mcp-card" data-id="{{ mcp.id }}" id="mcp-{{ mcp.id }}">
+        <div class="mcp-card-header">
+            <svg class="icon icon-lg" style="color: var(--green)"><use href="#icon-plug"/></svg>
+            <div style="flex:1">
+                <h3>{{ mcp.name }}</h3>
+                <span class="badge {% if mcp.status == 'running' %}badge-green{% elif mcp.status == 'error' %}badge-red{% else %}badge-yellow{% endif %}" id="status-{{ mcp.id }}">{{ mcp.status }}</span>
+                {% if mcp.is_builtin %}<span class="badge badge-blue">builtin</span>{% endif %}
+            </div>
+        </div>
+        <p class="agent-desc">{{ mcp.description }}</p>
+        <div class="agent-meta">
+            <code class="tag">{{ mcp.command }} {{ mcp.args | join(' ') }}</code>
+            <span class="tag">{{ mcp.tools | length }} tools</span>
+        </div>
+        {% if mcp.tools %}
+        <div style="margin-top: 0.5rem; font-size: 0.75rem; opacity: 0.7">
+            {% for t in mcp.tools %}
+            <span class="tag" style="margin: 2px">{{ t.name if t.name is defined else t.get('name', '?') }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem">
+            <button onclick="mcpAction('{{ mcp.id }}', 'start')" class="btn btn-sm btn-primary">▶ Start</button>
+            <button onclick="mcpAction('{{ mcp.id }}', 'stop')" class="btn btn-sm btn-secondary">⏹ Stop</button>
+            <button onclick="mcpAction('{{ mcp.id }}', 'test')" class="btn btn-sm btn-secondary">🧪 Test</button>
+        </div>
+        <pre id="output-{{ mcp.id }}" style="display:none; margin-top:0.5rem; font-size:0.7rem; max-height:200px; overflow:auto; background:rgba(0,0,0,0.3); padding:0.5rem; border-radius:6px"></pre>
+    </div>
+    {% endfor %}
+
+    {% if not mcps %}
+    <div class="empty-state">
+        <svg class="icon icon-xl"><use href="#icon-plug"/></svg>
+        <h3>{{ _("no_mcps_configured") }}</h3>
+        <p>{{ _("mcp_servers_provide_tools_to_agents") }}</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+async function mcpAction(id, action) {
+    const out = document.getElementById('output-' + id);
+    const badge = document.getElementById('status-' + id);
+    out.style.display = 'block';
+    out.textContent = action + 'ing...';
+    try {
+        const resp = await fetch('/api/mcps/' + id + '/' + action, {method: 'POST'});
+        const data = await resp.json();
+        out.textContent = JSON.stringify(data, null, 2);
+        if (data.ok) {
+            badge.textContent = action === 'stop' ? 'stopped' : 'running';
+            badge.className = 'badge ' + (action === 'stop' ? 'badge-yellow' : 'badge-green');
+        } else {
+            badge.textContent = 'error';
+            badge.className = 'badge badge-red';
+        }
+    } catch(e) {
+        out.textContent = 'Error: ' + e.message;
+    }
+}
+async function testAllMcps() {
+    const cards = document.querySelectorAll('.mcp-card');
+    for (const card of cards) {
+        const id = card.dataset.id;
+        await mcpAction(id, 'test');
+    }
+}
+</script>
+{% endblock %}

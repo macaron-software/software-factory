@@ -1,0 +1,15 @@
+apiVersion: v2
+name: macaron-platform
+description: Software Factory — Multi-Agent AI Platform
+type: application
+version: 1.1.0
+appVersion: "1.1.0"
+keywords:
+  - ai
+  - agents
+  - safe
+  - devops
+  - software-factory
+maintainers:
+  - name: Macaron Software
+    url: https://github.com/macaron-software

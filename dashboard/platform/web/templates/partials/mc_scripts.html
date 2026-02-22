@@ -1,0 +1,1274 @@
+<script>
+const MISSION_ID = "{{ mission.id }}";
+const SESSION_ID = "{{ session_id }}";
+const PHASE_AGENTS = {{ phase_agents | tojson }};
+const PHASE_GRAPHS = {{ phase_graphs | tojson }};
+
+/* ── Tab switching ── */
+function switchTab(tab) {
+    document.querySelectorAll('.mc-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    document.querySelectorAll('.mc-tab-panel').forEach(p => p.style.display = p.dataset.tab === tab ? '' : 'none');
+    const active = document.querySelector(`.mc-tab-panel[data-tab="${tab}"]`);
+    if (active) active.style.display = 'block';
+}
+
+/* ── TMA Ticket functions ── */
+async function submitTicket() {
+    const title = document.getElementById('tmaTicketTitle');
+    const desc = document.getElementById('tmaTicketDesc');
+    const sev = document.getElementById('tmaTicketSev');
+    const cat = document.getElementById('tmaTicketCat');
+    if (!title || !title.value.trim()) return;
+    try {
+        const res = await fetch(`/api/missions/{{ mission.id }}/tickets`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({title: title.value.trim(), description: desc.value.trim(), severity: sev.value, category: cat.value})
+        });
+        if (res.ok) {
+            const t = await res.json();
+            const list = document.getElementById('tmaTicketList');
+            const empty = list.querySelector('.mc-tma-empty');
+            if (empty) empty.remove();
+            const div = document.createElement('div');
+            div.className = 'mc-tma-ticket';
+            div.dataset.sev = t.severity;
+            div.dataset.id = t.id;
+            div.onclick = function(){ toggleTicketDetail(this) };
+            div.innerHTML = `<span class="mc-tma-sev" data-sev="${t.severity}">${t.severity}</span>`
+                + `<span class="mc-tma-ticket-title">${t.title}</span>`
+                + `<span class="mc-tma-ticket-cat">${t.category}</span>`
+                + `<span class="mc-tma-ticket-status" data-st="open">open</span>`;
+            list.prepend(div);
+            title.value = ''; desc.value = '';
+            // Update SLA counts
+            const openCount = list.querySelectorAll('.mc-tma-ticket:not([style*="opacity"])').length;
+            const slaOpen = document.querySelector('.mc-tma-sla-val[style*="ef4444"]');
+            if (slaOpen) slaOpen.textContent = openCount;
+        }
+    } catch(e) { console.error('Ticket creation failed:', e); }
+}
+
+function toggleTicketDetail(el) {
+    const existing = el.querySelector('.mc-tma-ticket-detail');
+    if (existing) { existing.remove(); return; }
+    const id = el.dataset.id;
+    const detail = document.createElement('div');
+    detail.className = 'mc-tma-ticket-detail';
+    detail.style.cssText = 'width:100%;margin-top:0.4rem;padding:0.4rem;background:var(--bg-primary);border-radius:6px;font-size:0.68rem;color:var(--text-secondary)';
+    detail.innerHTML = '<div style="display:flex;gap:0.3rem;margin-top:0.3rem">'
+        + `<button onclick="event.stopPropagation();updateTicketStatus('${id}','in_progress',this)" style="background:#3b82f6;color:#fff;border:none;border-radius:4px;padding:0.2rem 0.5rem;font-size:0.6rem;cursor:pointer">En cours</button>`
+        + `<button onclick="event.stopPropagation();updateTicketStatus('${id}','resolved',this)" style="background:#10b981;color:#fff;border:none;border-radius:4px;padding:0.2rem 0.5rem;font-size:0.6rem;cursor:pointer">Resolu</button>`
+        + `<button onclick="event.stopPropagation();updateTicketStatus('${id}','closed',this)" style="background:#6b7280;color:#fff;border:none;border-radius:4px;padding:0.2rem 0.5rem;font-size:0.6rem;cursor:pointer">{{ _('close') }}</button>`
+        + '</div>';
+    el.appendChild(detail);
+}
+
+async function updateTicketStatus(ticketId, status, btn) {
+    try {
+        const res = await fetch(`/api/missions/{{ mission.id }}/tickets/${ticketId}`, {
+            method: 'PATCH', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({status: status})
+        });
+        if (res.ok) {
+            const ticket = btn.closest('.mc-tma-ticket');
+            const statusEl = ticket.querySelector('.mc-tma-ticket-status');
+            if (statusEl) { statusEl.dataset.st = status; statusEl.textContent = status.replace('_',' '); }
+            if (status === 'closed') { ticket.style.opacity = '.4'; ticket.style.pointerEvents = 'none'; }
+            const detail = ticket.querySelector('.mc-tma-ticket-detail');
+            if (detail) detail.remove();
+        }
+    } catch(e) { console.error('Status update failed:', e); }
+}
+
+/* ── Execute command in workspace ── */
+document.querySelectorAll('.mc-exec-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        // Extract raw command (strip emoji prefix)
+        const rawCmd = this.dataset.cmd;
+        const term = document.getElementById('mc-terminal');
+        const termCmd = document.getElementById('mc-terminal-cmd');
+        const termStatus = document.getElementById('mc-terminal-status');
+        const termOut = document.getElementById('mc-terminal-output');
+
+        // Show terminal
+        term.style.display = 'block';
+        termCmd.textContent = '$ ' + rawCmd;
+        const isBuild = /xcodebuild|gradle|cargo build|npm run build|docker build|swift build/.test(rawCmd);
+        termStatus.textContent = isBuild ? '⏳ Building... (peut prendre quelques minutes)' : '⏳ Running...';
+        termStatus.style.color = 'var(--purple-light)';
+        termOut.textContent = '';
+
+        // Highlight active button
+        document.querySelectorAll('.mc-exec-btn').forEach(b => b.style.opacity = '0.5');
+        this.style.opacity = '1';
+
+        try {
+            const resp = await fetch(`/api/missions/${MISSION_ID}/exec`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({command: rawCmd})
+            });
+            const data = await resp.json();
+            if (resp.ok) {
+                const output = (data.stdout || '') + (data.stderr ? '\n' + data.stderr : '');
+                termOut.textContent = output || '(no output)';
+                if (data.returncode === 0) {
+                    termStatus.textContent = '✅ Success (exit 0)';
+                    termStatus.style.color = 'var(--green)';
+                } else {
+                    termStatus.textContent = `❌ Failed (exit ${data.returncode})`;
+                    termStatus.style.color = '#f85149';
+                }
+            } else {
+                termOut.textContent = data.error || 'Error';
+                termStatus.textContent = '❌ Error';
+                termStatus.style.color = '#f85149';
+            }
+        } catch (e) {
+            termOut.textContent = e.message;
+            termStatus.textContent = '❌ Network error';
+            termStatus.style.color = '#f85149';
+        }
+        document.querySelectorAll('.mc-exec-btn').forEach(b => b.style.opacity = '1');
+        // Auto-scroll terminal
+        term.scrollTop = term.scrollHeight;
+    });
+});
+
+/* ── Agent name lookup (from phase_agents data) ── */
+const AGENT_INFO = {};
+const AGENT_PHASE = {};  // agent_id → phase_id (for routing SSE events)
+for (const [pid, agents] of Object.entries(PHASE_AGENTS)) {
+    for (const a of agents) {
+        if (a.id && !AGENT_INFO[a.id]) {
+            AGENT_INFO[a.id] = {
+                name: a.name || a.id,
+                role: a.role || '',
+                avatar: a.avatar_url || `/static/avatars/${a.id}.jpg`,
+                color: a.color || '#8b949e',
+                tagline: a.tagline || '',
+                persona: a.persona || '',
+                motivation: a.motivation || '',
+                skills: a.skills || [],
+                tools: a.tools || [],
+                model: a.model || '',
+                provider: a.provider || '',
+            };
+        }
+        if (a.id) AGENT_PHASE[a.id] = pid;
+    }
+}
+
+/* ── Agent Chat Modal (generic — CDP + tab agents) ── */
+const CDP_AVATAR = '{{ cdp["avatar_url"] if cdp else "/static/avatars/" + (orchestrator_id|default("chef_de_programme")) + ".svg" }}' || '/static/avatars/{{ orchestrator_id|default("chef_de_programme") }}.svg';
+const CDP_NAME = '{{ cdp["name"] if cdp else "Orchestrateur" }}';
+const CDP_ROLE = '{{ cdp["role"] if cdp else "Orchestrateur" }}';
+let _chatAgentId = '{{ orchestrator_id|default("chef_de_programme") }}';
+let _chatAgentName = CDP_NAME;
+let _chatAgentRole = CDP_ROLE;
+let _chatAgentAvatar = CDP_AVATAR;
+
+function miniMarkdown(s) {
+    if (!s) return '';
+    let h = s
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        .replace(/^\- (.+)$/gm, '<li>$1</li>')
+        .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+        .replace(/<\/ul>\s*<ul>/g, '')
+        .replace(/\n/g, '<br>');
+    return h;
+}
+function openAgentChat(agentId, name, role, avatarUrl) {
+    _chatAgentId = agentId || 'chef_de_programme';
+    _chatAgentName = name || CDP_NAME;
+    _chatAgentRole = role || CDP_ROLE;
+    _chatAgentAvatar = avatarUrl || CDP_AVATAR;
+    const el = id => document.getElementById(id);
+    el('mcChatAvatar').src = _chatAgentAvatar;
+    el('mcChatName').textContent = _chatAgentName;
+    el('mcChatRole').textContent = _chatAgentRole;
+    el('mcChatWelcome').textContent = 'Discutez avec ' + _chatAgentName + '. Il peut chercher dans le code, les conversations des agents, le git, la memoire, les PRs et les features.';
+    const msgs = el('mcChatMsgs');
+    while (msgs.children.length > 1) msgs.removeChild(msgs.lastChild);
+    el('mcChatOverlay').classList.add('open');
+    el('mcChatInput').focus();
+}
+function openCdpChat() {
+    openAgentChat('{{ orchestrator_id|default("chef_de_programme") }}', CDP_NAME, CDP_ROLE, CDP_AVATAR);
+}
+function closeCdpChat() {
+    document.getElementById('mcChatOverlay').classList.remove('open');
+}
+
+function _chatTime() {
+    const d = new Date();
+    return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+}
+
+function _addChatMsg(type, content, opts = {}) {
+    const msgs = document.getElementById('mcChatMsgs');
+    const wrapper = document.createElement('div');
+    wrapper.className = `mc-chat-msg ${type}`;
+
+    if (type === 'agent') {
+        const av = document.createElement('img');
+        av.className = 'mc-chat-msg-avatar';
+        av.src = _chatAgentAvatar;
+        av.onerror = function(){ this.src = '/static/avatars/{{ orchestrator_id|default("chef_de_programme") }}.svg'; };
+        wrapper.appendChild(av);
+    } else if (type === 'user') {
+        const av = document.createElement('div');
+        av.className = 'mc-chat-msg-avatar user-av';
+        av.textContent = 'S';
+        wrapper.appendChild(av);
+    }
+
+    const bubble = document.createElement('div');
+    bubble.className = 'mc-chat-bubble';
+
+    if (type === 'agent') {
+        const sender = document.createElement('div');
+        sender.className = 'mu__sender';
+        sender.innerHTML = `<span class="mu__name">${_chatAgentName}</span><span class="mu__role">${_chatAgentRole}</span>`;
+        bubble.appendChild(sender);
+    }
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'mu__content';
+    if (opts.isMarkdown) {
+        contentDiv.classList.add('md-rendered');
+        contentDiv.innerHTML = content;
+    } else {
+        contentDiv.textContent = content;
+    }
+    bubble.appendChild(contentDiv);
+
+    if (type !== 'system') {
+        const footer = document.createElement('div');
+        footer.className = 'mu__footer';
+        footer.innerHTML = `<span class="mu__time">${_chatTime()}</span>`;
+        bubble.appendChild(footer);
+    }
+
+    wrapper.appendChild(bubble);
+    msgs.appendChild(wrapper);
+    msgs.scrollTop = msgs.scrollHeight;
+    return { wrapper, bubble, contentDiv };
+}
+
+let _cdpChatBusy = false;
+async function sendCdpMessage() {
+    if (_cdpChatBusy) return;
+    const input = document.getElementById('mcChatInput');
+    const content = input.value.trim();
+    if (!content) return;
+    input.value = '';
+    input.style.height = 'auto';
+    _cdpChatBusy = true;
+    document.getElementById('mcChatSend').disabled = true;
+    const msgs = document.getElementById('mcChatMsgs');
+
+    // User bubble
+    _addChatMsg('user', content);
+
+    // Thinking indicator with animated dots
+    const think = document.createElement('div');
+    think.className = 'mc-chat-thinking';
+    think.innerHTML = `<span class="mc-chat-thinking-text">Analyse en cours</span><span class="mc-chat-dots"><span></span><span></span><span></span></span>`;
+    msgs.appendChild(think);
+    msgs.scrollTop = msgs.scrollHeight;
+
+    try {
+        const fd = new FormData();
+        fd.append('content', content);
+        fd.append('session_id', SESSION_ID);
+        fd.append('agent_id', _chatAgentId);
+        const resp = await fetch(`/api/missions/${MISSION_ID}/chat/stream`, {method:'POST', body:fd});
+        if (!resp.ok) throw new Error(resp.statusText);
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulated = '';
+        let buf = '';
+        let agentMsg = null; // { wrapper, bubble, contentDiv }
+        let toolsDiv = null;
+        let evtType = null;
+
+        while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, {stream: true});
+            const lines = buf.split('\n');
+            buf = lines.pop() || '';
+            for (const line of lines) {
+                if (line.startsWith('event: ')) {
+                    evtType = line.slice(7).trim();
+                } else if (line.startsWith('data: ') && evtType) {
+                    try {
+                        const d = JSON.parse(line.slice(6));
+                        if (evtType === 'status') {
+                            const txt = think.querySelector('.mc-chat-thinking-text');
+                            if (txt) txt.textContent = d.label || 'Analyse';
+                        } else if (evtType === 'chunk') {
+                            // First chunk: replace thinking with agent bubble
+                            if (!agentMsg) {
+                                think.remove();
+                                agentMsg = _addChatMsg('agent', '', { isMarkdown: true });
+                                agentMsg.bubble.classList.add('streaming');
+                                agentMsg.contentDiv.classList.add('mu--streaming');
+                            }
+                            accumulated += d.text || '';
+                            agentMsg.contentDiv.innerHTML = miniMarkdown(accumulated);
+                            agentMsg.contentDiv.classList.add('mu--streaming');
+                            msgs.scrollTop = msgs.scrollHeight;
+                        } else if (evtType === 'tool') {
+                            // Show tool being used
+                            if (agentMsg) {
+                                if (!toolsDiv) {
+                                    toolsDiv = document.createElement('div');
+                                    toolsDiv.className = 'mc-chat-tools';
+                                    agentMsg.bubble.insertBefore(toolsDiv, agentMsg.bubble.querySelector('.mu__footer'));
+                                }
+                                toolsDiv.innerHTML += `<span class="mc-chat-tool-pill">${d.label||d.name||''}</span>`;
+                            } else {
+                                const txt = think.querySelector('.mc-chat-thinking-text');
+                                if (txt) txt.textContent = d.label || d.name || 'Outil';
+                            }
+                        } else if (evtType === 'done') {
+                            if (!agentMsg) {
+                                think.remove();
+                                agentMsg = _addChatMsg('agent', d.html || miniMarkdown(accumulated), { isMarkdown: true });
+                            } else {
+                                agentMsg.contentDiv.innerHTML = d.html || miniMarkdown(accumulated);
+                                agentMsg.contentDiv.classList.remove('mu--streaming');
+                                agentMsg.bubble.classList.remove('streaming');
+                            }
+                        } else if (evtType === 'error') {
+                            if (document.contains(think)) think.remove();
+                            if (agentMsg) {
+                                agentMsg.contentDiv.innerHTML = `<span style="color:var(--red)">${d.message||_('error_generic')}</span>`;
+                                agentMsg.contentDiv.classList.remove('mu--streaming');
+                                agentMsg.bubble.classList.remove('streaming');
+                            } else {
+                                _addChatMsg('system', d.message || _('error_generic'));
+                            }
+                        }
+                    } catch(e){}
+                    evtType = null;
+                }
+            }
+        }
+        // End of stream: remove streaming classes
+        if (agentMsg) {
+            agentMsg.contentDiv.classList.remove('mu--streaming');
+            agentMsg.bubble.classList.remove('streaming');
+            if (!agentMsg.contentDiv.innerHTML.trim()) {
+                agentMsg.contentDiv.innerHTML = miniMarkdown(accumulated) || '<span style="color:var(--text-secondary);font-style:italic">Pas de reponse</span>';
+            }
+        }
+        // If we never got a chunk (e.g., empty response)
+        if (!agentMsg && think.parentNode) {
+            think.remove();
+            _addChatMsg('system', 'Pas de reponse');
+        }
+        msgs.scrollTop = msgs.scrollHeight;
+    } catch(err) {
+        if (document.contains(think)) think.remove();
+        const msg = (err.message || '').toLowerCase().includes('network') || (err.message || '').toLowerCase().includes('fetch')
+            ? 'Le serveur ne repond pas. Verifiez qu\'il est en cours d\'execution.'
+            : err.message || _('error_unknown');
+        _addChatMsg('system', msg);
+    }
+    _cdpChatBusy = false;
+    document.getElementById('mcChatSend').disabled = false;
+}
+// Auto-resize textarea
+document.getElementById('mcChatInput')?.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+/* ── Render session_live style flow graphs per phase ── */
+const MC_NW = 200, MC_NH = 80;
+const MC_PATTERN_STYLES = {
+    sequential:   {color:'#3b82f6', dash:'',        icon:'→'},
+    hierarchical: {color:'#f59e0b', dash:'',        icon:'⬡'},
+    parallel:     {color:'#10b981', dash:'6 3',     icon:'⇉'},
+    loop:         {color:'#ec4899', dash:'4 4',     icon:'↻'},
+    network:      {color:'#8b5cf6', dash:'2 4 8 4', icon:'⬡'},
+    router:       {color:'#f97316', dash:'',        icon:'⬢'},
+    aggregator:   {color:'#06b6d4', dash:'3 3',     icon:'◈'},
+    'human-in-the-loop': {color:'#eab308', dash:'6 2', icon:'H'},
+};
+/* Edge color → dash style mapping (multi-pattern edges) */
+const MC_EDGE_DASHES = {
+    '#f59e0b': '',          // hierarchical: solid
+    '#8b5cf6': '2 4 8 4',  // network discussion: dot-dash
+    '#3b82f6': '',          // sequential: solid
+    '#ec4899': '4 4',       // loop/feedback: dashed
+    '#10b981': '6 3',       // parallel: long dash
+    '#ef4444': '2 2',       // gate/veto: dotted
+    '#06b6d4': '3 3',       // aggregation: short dash
+    '#f97316': '8 3',       // routing: long dash
+};
+/* Edge color → legend label */
+const MC_EDGE_LABELS = {
+    '#f59e0b': '⬡ délégation',
+    '#8b5cf6': '⬡ discussion',
+    '#3b82f6': '→ séquence',
+    '#ec4899': '↻ feedback',
+    '#10b981': '⇉ parallèle',
+    '#ef4444': '⊘ gate/veto',
+    '#06b6d4': '◈ agrégation',
+    '#f97316': '⬢ routage',
+};
+
+function renderPhaseGraphs() {
+    for (const [phaseId, graph] of Object.entries(PHASE_GRAPHS)) {
+        const container = document.getElementById(`graph-${phaseId}`);
+        if (!container || !graph.nodes.length) continue;
+        const nodes = graph.nodes.map(n => ({...n}));
+        const edges = graph.edges || [];
+        const N = nodes.length;
+
+        // Get phase pattern
+        const phaseEl = container.closest('.mc-phase');
+        const patternId = phaseEl ? (phaseEl.querySelector('.mc-phase-pattern')?.textContent || '') : '';
+        const pStyle = MC_PATTERN_STYLES[patternId.trim()] || MC_PATTERN_STYLES['sequential'];
+
+        // Auto-layout: organize by hierarchy_rank
+        const sorted = nodes.slice().sort((a,b)=> (a.hierarchy_rank||50) - (b.hierarchy_rank||50));
+        const layerMap = new Map();
+        sorted.forEach(n => {
+            const rank = n.hierarchy_rank || 50;
+            if(!layerMap.has(rank)) layerMap.set(rank, []);
+            layerMap.get(rank).push(n);
+        });
+        const layers = [...layerMap.values()];
+        // More gap when many bidirectional edges (multi-pattern)
+        const hasBidi = edges.some(e => edges.some(r => r.from===e.to && r.to===e.from));
+        const layerGap = hasBidi ? Math.max(MC_NH + 50, 130) : Math.max(MC_NH + 30, 110);
+        const maxCols = Math.max(...layers.map(l=>l.length));
+        const W = Math.max(maxCols * (MC_NW + 40) + 60, 500);
+        const H = layers.length * layerGap + 40;
+
+        layers.forEach((layer, li) => {
+            const y = 20 + li * layerGap;
+            const gap = Math.min(MC_NW + 50, (W - 40) / (layer.length || 1));
+            const startX = Math.max(10, (W - gap*(layer.length-1) - MC_NW) / 2);
+            layer.forEach((n, i) => { n.x = startX + i * gap; n.y = y; });
+        });
+
+        const nodeById = {};
+        nodes.forEach(n => { nodeById[n.id] = n; });
+
+        container.style.minHeight = '0';
+        let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="max-height:${Math.min(H, 600)}px">`;
+
+        // Generate per-color arrow markers
+        const edgeColors = new Set(edges.map(e => e.color || pStyle.color));
+        edgeColors.forEach(c => {
+            const id = c.replace('#','');
+            svg += `<defs><marker id="mc-arrow-${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="${c}"/></marker></defs>`;
+        });
+
+        // Edges with bezier curves
+        edges.forEach(e => {
+            const fn = nodeById[e.from], tn = nodeById[e.to];
+            if (!fn || !tn) return;
+            const eColor = e.color || pStyle.color;
+            const eDash = MC_EDGE_DASHES[eColor] || '';
+            const hasReverse = edges.some(re => re.from===e.to && re.to===e.from);
+            const offset = hasReverse ? 10 : 0;
+            let x1f, y1f, x2f, y2f, d;
+            const dy = tn.y - fn.y, dx = tn.x - fn.x;
+
+            if(Math.abs(dy) < MC_NH * 0.8){
+                if(dx > 0){
+                    x1f = fn.x + MC_NW; y1f = fn.y + MC_NH/2 - offset;
+                    x2f = tn.x;          y2f = tn.y + MC_NH/2 + offset;
+                } else {
+                    x1f = fn.x;          y1f = fn.y + MC_NH/2 - offset;
+                    x2f = tn.x + MC_NW;  y2f = tn.y + MC_NH/2 + offset;
+                }
+                const midY = Math.min(y1f, y2f) - 30;
+                d = `M${x1f},${y1f} C${x1f},${midY} ${x2f},${midY} ${x2f},${y2f}`;
+            } else if(dy > 0){
+                x1f = fn.x + MC_NW/2 + offset; y1f = fn.y + MC_NH;
+                x2f = tn.x + MC_NW/2 - offset; y2f = tn.y;
+                const co = Math.max(25, Math.abs(y2f-y1f)*0.3);
+                d = `M${x1f},${y1f} C${x1f},${y1f+co} ${x2f},${y2f-co} ${x2f},${y2f}`;
+            } else {
+                x1f = fn.x + MC_NW/2 - offset; y1f = fn.y;
+                x2f = tn.x + MC_NW/2 + offset; y2f = tn.y + MC_NH;
+                const co = Math.max(25, Math.abs(y2f-y1f)*0.3);
+                d = `M${x1f},${y1f} C${x1f},${y1f-co} ${x2f},${y2f+co} ${x2f},${y2f}`;
+            }
+            svg += `<path d="${d}" class="mc-edge-line" style="stroke:${eColor};marker-end:url(#mc-arrow-${eColor.replace('#','')})${eDash?`;stroke-dasharray:${eDash}`:''}"/>`;
+            if (e.label) {
+                const mx = (x1f+x2f)/2, my = (y1f+y2f)/2 - 5;
+                svg += `<text x="${mx}" y="${my}" class="mc-edge-count" style="fill:${eColor}">${esc(e.label)}</text>`;
+            }
+        });
+
+        // Nodes as full cards
+        nodes.forEach(n => {
+            const aid = n.agent_id || n.id;
+            const info = AGENT_INFO[aid] || {};
+            const col = pStyle.color;
+            const name = info.name || n.label || n.id;
+            const role = info.role || n.role || '';
+            const avatar = info.avatar || n.avatar || '';
+            const status = 'idle';
+            const avatarR = 16, avatarCx = 24, avatarCy = 30;
+            const textX = avatarCx + avatarR + 10;
+
+            const avatarSvg = avatar
+                ? `<clipPath id="mcclip-${phaseId}-${n.id}"><circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}"/></clipPath>
+                   <image href="${esc(avatar)}" x="${avatarCx-avatarR}" y="${avatarCy-avatarR}" width="${avatarR*2}" height="${avatarR*2}" clip-path="url(#mcclip-${phaseId}-${n.id})" preserveAspectRatio="xMidYMid slice"/>`
+                : `<circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}" fill="${col}" opacity="0.25"/>
+                   <text x="${avatarCx}" y="${avatarCy+4}" text-anchor="middle" style="font-size:13px;fill:${col};font-weight:700">${esc(name.substring(0,2))}</text>`;
+
+            svg += `<g class="mc-live-node" data-agent-id="${esc(n.agent_id||n.id)}" transform="translate(${n.x},${n.y})" style="cursor:pointer">`;
+            svg += `<rect class="mc-live-node-bg" width="${MC_NW}" height="${MC_NH}"/>`;
+            svg += `<line class="mc-live-node-bar" x1="0" y1="0" x2="${MC_NW}" y2="0" stroke="${col}" stroke-width="3"/>`;
+            svg += avatarSvg;
+            svg += `<text class="mc-live-node-name" x="${textX}" y="24">${esc(name.length>20?name.substring(0,19)+'…':name)}</text>`;
+            svg += `<text class="mc-live-node-role" x="${textX}" y="36">${esc(role.length>25?role.substring(0,24)+'…':role)}</text>`;
+            svg += `<circle class="mc-node-status--${status}" cx="${MC_NW-14}" cy="16" r="5"/>`;
+            svg += `<text class="mc-live-node-status" x="${MC_NW-14}" y="30">${status}</text>`;
+            svg += `</g>`;
+        });
+
+        // Legend — show all unique edge interaction types
+        let legendX = 8;
+        svg += `<g transform="translate(0,${H-18})">`;
+        edgeColors.forEach(c => {
+            const lbl = MC_EDGE_LABELS[c] || c;
+            const dash = MC_EDGE_DASHES[c] || '';
+            svg += `<line x1="${legendX}" y1="5" x2="${legendX+14}" y2="5" stroke="${c}" stroke-width="2"${dash?` stroke-dasharray="${dash}"`:''}/>`; 
+            svg += `<text x="${legendX+18}" y="9" style="font-size:8px;fill:${c}">${esc(lbl)}</text>`;
+            legendX += lbl.length * 5 + 30;
+        });
+        svg += `</g>`;
+
+        svg += `</svg>`;
+        container.innerHTML = svg;
+    }
+}
+
+/* ── Git contribution graph cells ── */
+(function(){
+    const g = document.getElementById('mc-git-graph');
+    if (!g) return;
+    for(let i=0;i<56;i++){
+        const c = document.createElement('div');
+        c.className = 'mc-git-cell';
+        g.appendChild(c);
+    }
+})();
+
+/* ── Accordion toggle ── */
+function togglePhase(header) {
+    const phase = header.closest('.mc-phase');
+    phase.classList.toggle('open');
+}
+
+/* ── SSE ── */
+if (SESSION_ID) {
+    const es = new EventSource(`/sse/session/${SESSION_ID}`);
+    es.onmessage = e => { try { handleSSE(JSON.parse(e.data)); } catch(err){ console.error('SSE handler error:', err, e.data?.substring(0,100)); } };
+}
+
+function handleSSE(d) {
+    if (d.type === 'phase_started') {
+        updatePhaseStatus(d.phase_id, 'running');
+        openPhase(d.phase_id);
+        addActivity(`Phase «${d.phase_name}» démarrée (${d.pattern})`, 'tool');
+    }
+    else if (d.type === 'phase_completed') {
+        updatePhaseStatus(d.phase_id, d.success ? 'done' : 'failed');
+        addActivity(`${d.success ? '✓' : '✗'} Phase terminée`, 'tool');
+        updateStats();
+        generatePhaseSummary(d.phase_id);
+    }
+    else if (d.type === 'phase_failed') {
+        updatePhaseStatus(d.phase_id, 'failed');
+        addActivity('Phase échouée', 'system');
+    }
+    else if (d.type === 'phase_reset') {
+        updatePhaseStatus(d.phase_id, 'pending');
+    }
+    else if (d.type === 'reloop') {
+        addActivity(`RELOOP ${d.reloop_count}/${d.max_reloops} — Back to dev sprint`, 'system');
+        // Reset downstream phase statuses in UI
+        (d.reset_phases || []).forEach(pid => updatePhaseStatus(pid, 'pending'));
+    }
+    else if (d.type === 'mission_failed') {
+        addActivity('Epic arrêtée — phase échouée', 'system');
+        // Disable run button, show reset
+        const runBtn = document.querySelector('.mc-run-btn');
+        if (runBtn) { runBtn.disabled = true; runBtn.textContent = 'Epic échouée'; }
+    }
+    else if (d.type === 'checkpoint') {
+        updatePhaseStatus(d.phase_id, 'waiting_validation');
+        openPhase(d.phase_id);
+        showCheckpoint(d.phase_id, d.question);
+        addActivity(`CHECKPOINT: ${d.question}`, 'system');
+    }
+    else if (d.type === 'message') {
+        if (d.from_agent === '{{ orchestrator_id|default("chef_de_programme") }}') addActivity(d.content, '');
+        const phaseId = d.phase_id || currentRunningPhase();
+        if (phaseId) addDiscussionMsg(phaseId, d);
+        if (d.msg_type === 'tool_result') addActivity(d.content?.substring(0, 200), 'tool');
+    }
+    else if (d.type === 'stream_start') {
+        const phaseId = d.phase_id || currentRunningPhase();
+        if (phaseId) {
+            const container = document.getElementById(`discuss-${phaseId}`);
+            if (container) {
+                container.querySelector('.mc-discuss-empty')?.remove();
+                container.querySelector(`.mc-stream-bubble[data-agent="${d.agent_id}"]`)?.remove();
+                const info = AGENT_INFO[d.agent_id] || {};
+                const color = info.color || 'var(--purple)';
+                const avatar = info.avatar || `/static/avatars/${d.agent_id}.jpg`;
+                const name = d.agent_name || info.name || d.agent_id;
+                const role = info.role || '';
+                const patternType = d.pattern_type || '';
+                const toAgent = d.to_agent || 'all';
+                let targetHtml = '';
+                if (toAgent === 'all' || toAgent === 'session') {
+                    targetHtml = '<span class="mu__arrow">→</span><span class="mu__target">Équipe</span>';
+                } else {
+                    const targets = toAgent.split(',').map(t => t.trim()).filter(Boolean);
+                    const parts = targets.map(t => {
+                        const ti = AGENT_INFO[t];
+                        return ti ? `<span class="mu__target" style="color:${ti.color||'var(--text-secondary)'}">@${esc(ti.name)}</span>` : `<span class="mu__target">@${esc(t)}</span>`;
+                    });
+                    if (parts.length) targetHtml = '<span class="mu__arrow">→</span>' + parts.join(' ');
+                }
+
+                const div = document.createElement('div');
+                div.className = 'mu mu--chat mu--agent mc-stream-bubble';
+                div.dataset.agent = d.agent_id;
+                div.innerHTML = `
+                    <div class="mu__avatar" style="background:${color}20;border-color:${color}">
+                        <img src="${avatar}" alt="${esc(name)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover" onerror="this.outerHTML='${esc(name.substring(0,2))}'">
+                    </div>
+                    <div class="mu__bubble mu__bubble--agent mc-streaming">
+                        <div class="mu__sender">
+                            <span class="mu__name" style="color:${color}">${esc(name)}</span>
+                            ${role ? `<span class="mu__role">${esc(role)}</span>` : ''}
+                            ${patternType ? `<span class="mu__pattern">(${esc(patternType)})</span>` : ''}
+                            ${targetHtml}
+                            <span class="mc-thinking-badge">réfléchit…</span>
+                        </div>
+                        <div class="mu__content"><span class="mc-stream-content"></span><span class="mc-typing-cursor">▊</span></div>
+                    </div>`;
+                container.appendChild(div);
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+        const info = AGENT_INFO[d.agent_id] || {};
+        addActivity(`${d.agent_name || info.name || d.agent_id} réfléchit…`, 'tool');
+    }
+    else if (d.type === 'stream_delta') {
+        // Streaming text chunk from agent
+        const phaseId = d.phase_id || currentRunningPhase();
+        if (phaseId) {
+            const container = document.getElementById(`discuss-${phaseId}`);
+            if (container) {
+                const bubble = container.querySelector(`.mc-stream-bubble[data-agent="${d.agent_id}"] .mc-stream-content`);
+                if (bubble) {
+                    bubble.textContent += d.delta;
+                    container.scrollTop = container.scrollHeight;
+                    // Update thinking badge to "parle…"
+                    const badge = container.querySelector(`.mc-stream-bubble[data-agent="${d.agent_id}"] .mc-thinking-badge`);
+                    if (badge && badge.textContent === 'réfléchit…') badge.textContent = 'parle…';
+                } else {
+                    console.warn('stream_delta: no bubble found for', d.agent_id, 'in discuss-'+phaseId,
+                        'bubbles:', container.querySelectorAll('.mc-stream-bubble').length,
+                        'agents:', Array.from(container.querySelectorAll('.mc-stream-bubble')).map(b=>b.dataset.agent));
+                }
+            }
+        }
+    }
+    else if (d.type === 'stream_end') {
+        // Streaming finished — finalize bubble (keep visible until message event replaces it)
+        const phaseId = d.phase_id || currentRunningPhase();
+        if (phaseId) {
+            const container = document.getElementById(`discuss-${phaseId}`);
+            if (container) {
+                const bubble = container.querySelector(`.mc-stream-bubble[data-agent="${d.agent_id}"]`);
+                if (bubble) {
+                    bubble.querySelector('.mc-typing-cursor')?.remove();
+                    bubble.querySelector('.mc-thinking-badge')?.remove();
+                    bubble.classList.remove('mc-streaming');
+                }
+            }
+        }
+    }
+    else if (d.type === 'stream_thinking') {
+        // Agent is in <think> mode or using a tool — pulse the indicator
+        const phaseId = d.phase_id || currentRunningPhase();
+        if (phaseId) {
+            const container = document.getElementById(`discuss-${phaseId}`);
+            if (container) {
+                // If no bubble yet for this agent, create one
+                let bubble = container.querySelector(`.mc-stream-bubble[data-agent="${d.agent_id}"]`);
+                if (!bubble) {
+                    // Create a thinking bubble — same as stream_start
+                    container.querySelector('.mc-discuss-empty')?.remove();
+                    const info = AGENT_INFO[d.agent_id] || {};
+                    const color = info.color || 'var(--purple)';
+                    const avatar = info.avatar || `/static/avatars/${d.agent_id}.jpg`;
+                    const name = info.name || d.agent_id;
+                    const role = info.role || '';
+                    const div = document.createElement('div');
+                    div.className = 'mu mu--chat mu--agent mc-stream-bubble';
+                    div.dataset.agent = d.agent_id;
+                    div.innerHTML = `
+                        <div class="mu__avatar" style="background:${color}20;border-color:${color}">
+                            <img src="${avatar}" alt="${esc(name)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover" onerror="this.outerHTML='${esc(name.substring(0,2))}'">
+                        </div>
+                        <div class="mu__bubble mu__bubble--agent mc-streaming">
+                            <div class="mu__sender">
+                                <span class="mu__name" style="color:${color}">${esc(name)}</span>
+                                ${role ? `<span class="mu__role">${esc(role)}</span>` : ''}
+                                <span class="mc-thinking-badge">réfléchit…</span>
+                            </div>
+                            <div class="mu__content"><span class="mc-stream-content"></span><span class="mc-typing-cursor">▊</span></div>
+                        </div>`;
+                    container.appendChild(div);
+                    container.scrollTop = container.scrollHeight;
+                }
+                const badge = container.querySelector(`.mc-stream-bubble[data-agent="${d.agent_id}"] .mc-thinking-badge`);
+                if (badge) {
+                    const toolName = d.tool_name;
+                    if (toolName) {
+                        const toolLabels = {code_read:'lit le code',code_search:'cherche',code_write:'écrit',code_edit:'modifie',list_files:'explore',git_status:'git status',git_diff:'git diff',deep_search:'analyse approfondie',memory_search:'mémoire'};
+                        badge.textContent = toolLabels[toolName] || toolName + '…';
+                    } else {
+                        badge.textContent = 'réfléchit…';
+                    }
+                }
+            }
+        }
+    }
+    else if (d.type === 'agent_status') {
+        const phaseId = d.phase_id || currentRunningPhase();
+        if (d.status === 'thinking') {
+            addActivity(`${d.agent_id} analyse…`, 'tool');
+        }
+    }
+    else if (d.type === 'adversarial') {
+        const icon = d.passed ? '✓' : '✗';
+        const cls = d.passed ? 'pass' : 'fail';
+        const label = d.passed ? 'APPROVED' : `REJECTED (${d.score}/10)`;
+        const name = d.agent_name || d.agent_id;
+        addActivity(`${icon} Guard ${d.level}: ${name} — ${label}`, d.passed ? 'info' : 'alert');
+        // Append guard badge to the agent's last message bubble
+        const phaseId = d.phase_id || currentRunningPhase();
+        if (phaseId && !d.passed) {
+            const container = document.getElementById(`discuss-${phaseId}`);
+            if (container) {
+                const bubbles = container.querySelectorAll(`.mc-msg`);
+                const lastBubble = bubbles[bubbles.length - 1];
+                if (lastBubble) {
+                    const detail = document.createElement('div');
+                    detail.className = 'mc-guard-detail show';
+                    detail.innerHTML = `<span class="mc-guard fail">${icon} ${label}</span> ` +
+                        (d.issues || []).map(i => `<br>• ${i}`).join('');
+                    lastBubble.appendChild(detail);
+                }
+            }
+        }
+    }
+    else if (d.type === 'backlog_update') {
+        // Update PO kanban live — append new features
+        const col = document.querySelector('.mc-kanban-col[data-col="backlog"]');
+        if (col && d.features) {
+            const countEl = col.querySelector('.mc-kanban-count');
+            d.features.forEach(f => {
+                const card = document.createElement('div');
+                card.className = 'mc-kanban-card new-card';
+                card.innerHTML = `<div class="mc-kanban-card-title">${f.name}</div>
+                    <div class="mc-kanban-card-meta">
+                        ${f.story_points ? `<span class="mc-kanban-sp">${f.story_points} SP</span>` : ''}
+                        <span class="mc-kanban-priority p${f.priority||5}">P${f.priority||5}</span>
+                    </div>`;
+                col.appendChild(card);
+            });
+            if (countEl) {
+                const cur = parseInt(countEl.textContent) || 0;
+                countEl.textContent = cur + d.features.length;
+            }
+            addActivity(`+${d.features.length} features extraites de la phase ${d.phase_id}`, 'tool');
+        }
+    }
+    else if (d.type === 'kanban_refresh') {
+        // Full kanban refresh — rebuild all columns
+        ['backlog','sprint','done'].forEach(col => {
+            const el = document.querySelector(`.mc-kanban-col[data-col="${col}"]`);
+            if (!el) return;
+            el.querySelectorAll('.mc-kanban-card').forEach(c => c.remove());
+            const items = d[col] || [];
+            const countEl = el.querySelector('.mc-kanban-count');
+            if (countEl) countEl.textContent = items.length;
+            items.forEach(f => {
+                const card = document.createElement('div');
+                card.className = 'mc-kanban-card' + (col === 'done' ? ' done' : ' new-card');
+                card.innerHTML = `<div class="mc-kanban-card-title">${f.name}</div>` +
+                    (col !== 'done' ? `<div class="mc-kanban-card-meta">
+                        ${f.story_points ? `<span class="mc-kanban-sp">${f.story_points} SP</span>` : ''}
+                        <span class="mc-kanban-priority p${f.priority||5}">P${f.priority||5}</span>
+                    </div>` : '');
+                el.appendChild(card);
+            });
+        });
+        addActivity('Kanban PO mis a jour', 'tool');
+    }
+    else if (d.type === 'agent_message' || d.type === 'agent_response') {
+        const phaseId = d.phase_id || currentRunningPhase();
+        if (phaseId) {
+            // Remove streaming bubble for this agent — replace with final message
+            const container = document.getElementById(`discuss-${phaseId}`);
+            if (container) {
+                container.querySelector(`.mc-stream-bubble[data-agent="${d.from_agent||d.agent_id}"]`)?.remove();
+            }
+            addDiscussionMsg(phaseId, d);
+        }
+    }
+    else if (d.type === 'pattern_start') {
+        addActivity(`Pattern «${d.pattern_name}» lancé`, 'tool');
+    }
+    else if (d.type === 'pattern_end') {
+        addActivity(`${d.success ? '✓' : '✗'} Pattern terminé${d.error ? ': '+d.error : ''}`, d.success ? 'tool' : 'system');
+    }
+    if (d.type === 'commit') addCommit(d);
+    if (d.type === 'memory_stored') addMemory(d);
+    if (d.type === 'pr' || d.type === 'pull_request') addPR(d);
+}
+
+function currentRunningPhase() {
+    const el = document.querySelector('.mc-phase[data-status="running"]');
+    return el ? el.dataset.phaseId : null;
+}
+
+function openPhase(phaseId) {
+    document.querySelector(`.mc-phase[data-phase-id="${phaseId}"]`)?.classList.add('open');
+}
+
+function updatePhaseStatus(phaseId, status) {
+    const el = document.querySelector(`.mc-phase[data-phase-id="${phaseId}"]`);
+    if (!el) return;
+    el.dataset.status = status;
+    const badge = el.querySelector('.mc-phase-status-badge');
+    if (badge) { badge.className = `mc-phase-status-badge ${status}`; badge.textContent = status; }
+}
+
+function addDiscussionMsg(phaseId, d) {
+    const container = document.getElementById(`discuss-${phaseId}`);
+    if (!container) return;
+    container.querySelector('.mc-discuss-empty')?.remove();
+    const aid = d.from_agent || d.agent_id || '';
+    container.querySelector(`.mc-stream-bubble[data-agent="${aid}"]`)?.remove();
+
+    const info = AGENT_INFO[aid] || {};
+    const color = info.color || 'var(--purple)';
+    const avatar = d.from_avatar || info.avatar || `/static/avatars/${aid}.jpg`;
+    const name = d.from_name || info.name || aid || '?';
+    const role = d.from_role || info.role || '';
+    const patternType = d.pattern_type || '';
+    const toAgent = d.to_agent || '';
+
+    // Build target(s) — can be "all", single agent, or comma-separated
+    let targetHtml = '';
+    if (toAgent === 'all' || toAgent === 'session') {
+        targetHtml = '<span class="mu__arrow">→</span><span class="mu__target">Équipe</span>';
+    } else if (toAgent) {
+        const targets = toAgent.split(',').map(t => t.trim()).filter(Boolean);
+        const parts = targets.map(t => {
+            const ti = AGENT_INFO[t];
+            return ti ? `<span class="mu__target" style="color:${ti.color||'var(--text-secondary)'}">@${esc(ti.name)}</span>` : `<span class="mu__target">@${esc(t)}</span>`;
+        });
+        if (parts.length) targetHtml = '<span class="mu__arrow">→</span>' + parts.join(' ');
+    }
+
+    // Render markdown content
+    const rendered = md(d.content || '');
+
+    const div = document.createElement('div');
+    div.className = 'mu mu--chat mu--agent';
+    div.innerHTML = `
+        <div class="mu__avatar" style="background:${color}20;border-color:${color}">
+            <img src="${avatar}" alt="${esc(name)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover" onerror="this.outerHTML='${esc(name.substring(0,2))}'">
+        </div>
+        <div class="mu__bubble mu__bubble--agent">
+            <div class="mu__sender">
+                <span class="mu__name" style="color:${color}">${esc(name)}</span>
+                ${role ? `<span class="mu__role">${esc(role)}</span>` : ''}
+                ${patternType ? `<span class="mu__pattern">(${esc(patternType)})</span>` : ''}
+                ${targetHtml}
+            </div>
+            <div class="mu__content md-rendered">${rendered}</div>
+        </div>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+function addActivity(text, cls) {
+    if (!text) return;
+    const div = document.createElement('div');
+    div.className = `mc-msg ${cls || ''}`;
+    const t = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    div.innerHTML = `<div class="mc-msg-time">${t}</div><div class="mc-msg-content">${esc(text.substring(0,500))}</div>`;
+    const act = document.getElementById('mc-activity');
+    act.appendChild(div);
+    act.scrollTop = act.scrollHeight;
+}
+
+function showCheckpoint(phaseId, question) {
+    const el = document.querySelector(`.mc-phase[data-phase-id="${phaseId}"] .mc-phase-card`);
+    if (!el) return;
+    el.querySelector('.mc-checkpoint')?.remove();
+    const cp = document.createElement('div');
+    cp.className = 'mc-checkpoint';
+    cp.innerHTML = `<h4>${esc(question||'Validation requise')}</h4>
+        <div class="mc-checkpoint-actions">
+            <button class="mc-btn-go" onclick="validateMission('GO')">GO</button>
+            <button class="mc-btn-nogo" onclick="validateMission('NOGO')">NOGO</button>
+            <button class="mc-btn-pivot" onclick="validateMission('PIVOT')">PIVOT</button>
+        </div>`;
+    el.appendChild(cp);
+}
+
+function addCommit(d) {
+    const c = document.getElementById('mc-commits');
+    c.querySelector('[style]')?.remove();
+    const div = document.createElement('div');
+    div.className = 'mc-commit';
+    div.innerHTML = `<span class="mc-commit-hash">${(d.sha||'').substring(0,7)}</span>
+        <span class="mc-commit-msg">${esc(d.message||'')}</span>
+        <span class="mc-commit-time">${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</span>`;
+    c.prepend(div);
+    const cells = document.querySelectorAll('.mc-git-cell:not(.l1):not(.l2):not(.l3):not(.l4)');
+    if (cells.length) cells[Math.floor(Math.random()*cells.length)].classList.add(['l1','l2','l3','l4'][Math.floor(Math.random()*4)]);
+}
+
+function addMemory(d) {
+    const m = document.getElementById('mc-memory');
+    const cat = d.category || 'general';
+    let group = m.querySelector(`.mc-mem-group[data-cat="${cat}"]`);
+    if (!group) {
+        group = document.createElement('div');
+        group.className = 'mc-mem-group';
+        group.dataset.cat = cat;
+        group.innerHTML = `<div class="mc-mem-group-title" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">▸ ${esc(cat)} <span class="mc-mem-group-count">(1)</span></div><div class="mc-mem-group-items"></div>`;
+        m.prepend(group);
+        m.querySelector('.mc-mem-empty')?.remove();
+    } else {
+        const cnt = group.querySelector('.mc-mem-group-count');
+        cnt.textContent = `(${group.querySelectorAll('.mc-mem-entry').length + 1})`;
+    }
+    const items = group.querySelector('.mc-mem-group-items');
+    const div = document.createElement('div');
+    div.className = 'mc-mem-entry';
+    div.dataset.key = d.key || '';
+    const conf = d.confidence ? `<div class="mc-mem-meta"><div class="mc-mem-confidence"><div class="mc-mem-confidence-bar" style="width:${Math.round((d.confidence||0)*100)}%"></div></div></div>` : '';
+    div.innerHTML = `<div class="mc-mem-key">${esc(d.key||'')}</div><div class="mc-mem-val">${esc((d.value||'').substring(0,160))}</div>${conf}`;
+    items.prepend(div);
+}
+
+function filterMemory(q) {
+    const entries = document.querySelectorAll('.mc-mem-entry');
+    const groups = document.querySelectorAll('.mc-mem-group');
+    const ql = q.toLowerCase();
+    entries.forEach(e => {
+        const match = !q || (e.dataset.key||'').toLowerCase().includes(ql) || e.textContent.toLowerCase().includes(ql);
+        e.style.display = match ? '' : 'none';
+    });
+    groups.forEach(g => {
+        const visible = g.querySelectorAll('.mc-mem-entry:not([style*="display: none"])').length;
+        g.style.display = visible ? '' : 'none';
+    });
+}
+
+async function addMemoryEntry() {
+    const cat = prompt('Catégorie (architecture, vision, team, process, backlog):', 'vision');
+    if (!cat) return;
+    const key = prompt('Clé:', '');
+    if (!key) return;
+    const val = prompt('Valeur:', '');
+    if (!val) return;
+    try {
+        await fetch('/api/memory/global', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({category: cat, key: key, value: val})
+        });
+        addMemory({category: cat, key: key, value: val, confidence: 0.8});
+    } catch(e) { console.error('Memory add failed', e); }
+}
+
+function addPR(d) {
+    const c = document.getElementById('mc-prs');
+    c.querySelector('.mc-pr-empty')?.remove();
+    const div = document.createElement('div');
+    div.className = 'mc-pr';
+    const status = (d.status||'open').toLowerCase();
+    div.innerHTML = `<span class="mc-pr-icon ${status}"><svg class="icon icon-xs"><use href="#icon-git-pull-request"/></svg></span>
+        <span class="mc-pr-title" title="${esc(d.title||'')}">#${d.number||'?'} ${esc((d.title||'').substring(0,30))}</span>
+        <span class="mc-pr-status ${status}">${esc(d.status||'Open')}</span>`;
+    c.prepend(div);
+}
+
+function updateStats() {
+    const phases = document.querySelectorAll('.mc-phase');
+    let done = 0;
+    phases.forEach(p => { if (p.dataset.status === 'done') done++; });
+    document.getElementById('mc-done-count').textContent = done;
+    const pct = Math.round(done / phases.length * 100);
+    document.getElementById('mc-progress').textContent = pct + '%';
+    document.getElementById('mc-progress-bar').style.width = pct + '%';
+}
+
+async function validateMission(decision) {
+    const fd = new FormData();
+    fd.set('decision', decision);
+    try {
+        await fetch(`/api/missions/${MISSION_ID}/validate`, {method:'POST', body: fd});
+        document.querySelectorAll('.mc-checkpoint').forEach(el => el.remove());
+        addActivity(`Décision: ${decision}`, 'system');
+    } catch(err) { console.error(err); }
+}
+
+async function startMissionExecution() {
+    const btn = document.getElementById('mc-run-btn');
+    btn.disabled = true;
+    btn.innerHTML = 'Exécution en cours…';
+    btn.style.opacity = '0.6';
+    addActivity('Lancement du mega-workflow par le CDP…', 'system');
+    try {
+        await fetch(`/api/missions/${MISSION_ID}/run`, {method:'POST'});
+    } catch(err) { console.error(err); }
+}
+
+async function resetMission() {
+    if (!confirm('Réinitialiser l\'epic ? Toutes les discussions seront effacées.')) return;
+    try {
+        const resp = await fetch(`/api/missions/${MISSION_ID}/reset`, {method:'POST'});
+        if (resp.ok) {
+            window.location.reload();
+        } else {
+            alert(_('error_reset'));
+        }
+    } catch(err) { console.error(err); alert(_('error_network')); }
+}
+
+async function syncConfluence() {
+    const btn = document.getElementById('mc-confluence-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="icon icon-xs" style="width:12px;height:12px;vertical-align:middle;margin-right:3px"><use href="#icon-loader"/></svg>Sync...';
+    try {
+        const resp = await fetch(`/api/missions/${MISSION_ID}/confluence/sync`, {method:'POST'});
+        const data = await resp.json();
+        if (resp.ok) {
+            const synced = Object.entries(data).filter(([,v]) => v.status === 'ok').map(([k]) => k);
+            const failed = Object.entries(data).filter(([,v]) => v.status === 'error').map(([k]) => k);
+            let msg = synced.length ? `Sync OK: ${synced.join(', ')}` : '';
+            if (failed.length) msg += (msg ? '\n' : '') + `${_('error')}: ${failed.join(', ')}`;
+            alert(msg || _('no_sync_content'));
+        } else {
+            alert(data.error || _('error_confluence'));
+        }
+    } catch(err) { console.error(err); alert(_('error_network')); }
+    finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="icon icon-xs" style="width:12px;height:12px;vertical-align:middle;margin-right:3px"><use href="#icon-upload-cloud"/></svg>Sync Confluence';
+    }
+}
+
+function esc(t) { return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ── Agent Popover ── */
+function showMcPopover(agentId, ev) {
+    ev && ev.stopPropagation();
+    const a = AGENT_INFO[agentId];
+    if (!a) return;
+    const pop = document.getElementById('mcPopover');
+    const overlay = document.getElementById('mcPopoverOverlay');
+    const photo = a.avatar
+        ? `<img class="mc-popover-photo" src="${a.avatar}" alt="${esc(a.name)}" onerror="this.outerHTML='<div class=mc-popover-photo-fallback style=background:${a.color}>${esc(a.name.substring(0,2))}</div>'">`
+        : `<div class="mc-popover-photo-fallback" style="background:${a.color}">${esc(a.name.substring(0,2))}</div>`;
+    document.getElementById('mcPopHeader').innerHTML = `${photo}<div>
+        <div class="mc-popover-name">${esc(a.name)}</div>
+        <div class="mc-popover-role">${esc(a.role)}</div>
+        ${a.tagline ? `<div class="mc-popover-tagline">${esc(a.tagline)}</div>` : ''}
+    </div>`;
+    let html = '';
+    if (a.persona) html += `<div class="mc-popover-section"><div class="mc-popover-section-title">Persona</div><div class="mc-popover-text">${esc(a.persona.substring(0,400))}${a.persona.length>400?'…':''}</div></div>`;
+    if (a.motivation) html += `<div class="mc-popover-section"><div class="mc-popover-section-title">Motivation</div><div class="mc-popover-text">${esc(a.motivation)}</div></div>`;
+    if (a.skills?.length) html += `<div class="mc-popover-section"><div class="mc-popover-section-title">Skills (${a.skills.length})</div><div class="mc-popover-tags">${a.skills.map(s=>`<span class="mc-popover-tag skill">${esc(s)}</span>`).join('')}</div></div>`;
+    if (a.tools?.length) html += `<div class="mc-popover-section"><div class="mc-popover-section-title">Tools (${a.tools.length})</div><div class="mc-popover-tags">${a.tools.map(t=>`<span class="mc-popover-tag ${t.startsWith('mcp:')?'mcp':'tool'}">${esc(t.startsWith('mcp:')?t.slice(4):t)}</span>`).join('')}</div></div>`;
+    if (a.model || a.provider) html += `<div class="mc-popover-model">${esc(a.provider||'')} ${esc(a.model||'default')}</div>`;
+    document.getElementById('mcPopBody').innerHTML = html;
+    // Position near click
+    const x = ev ? ev.clientX : window.innerWidth/2;
+    const y = ev ? ev.clientY : window.innerHeight/2;
+    let top = y + 10, left = x - 170;
+    if (top + 380 > window.innerHeight) top = y - 390;
+    if (left + 340 > window.innerWidth) left = window.innerWidth - 350;
+    if (left < 10) left = 10;
+    pop.style.top = Math.max(10, top) + 'px';
+    pop.style.left = Math.max(10, left) + 'px';
+    pop.classList.add('open');
+    overlay.classList.add('open');
+}
+function closeMcPopover() {
+    document.getElementById('mcPopover').classList.remove('open');
+    document.getElementById('mcPopoverOverlay').classList.remove('open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMcPopover(); });
+
+function cleanLLM(s){
+  s = s.replace(/<think>[\s\S]*?<\/think>/g, '');
+  s = s.replace(/<think>[\s\S]*$/, '');
+  s = s.replace(/\[TOOL_CALL\][\s\S]*?\[\/TOOL_CALL\]/g, '');
+  s = s.replace(/\[TOOL_CALL\][\s\S]*$/, '');
+  s = s.replace(/\[(DELEGATE|VETO|APPROVE|ASK|ESCALATE)[^\]]*\]/g, '');
+  return s.trim();
+}
+function md(s){
+  s = cleanLLM(s);
+  if (!s) return '';
+  let h = esc(s);
+  h = h.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+  h = h.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+  h = h.replace(/^# (.+)$/gm, '<h2>$1</h2>');
+  h = h.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+  h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  h = h.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  h = h.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  h = h.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)*)/gm, (m, hdr, sep, body)=>{
+    const th = hdr.split('|').filter(c=>c.trim()).map(c=>`<th>${c.trim()}</th>`).join('');
+    const rows = body.trim().split('\n').map(r=>{
+      const cells = r.split('|').filter(c=>c.trim()).map(c=>`<td>${c.trim()}</td>`).join('');
+      return `<tr>${cells}</tr>`;
+    }).join('');
+    return `<table><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table>`;
+  });
+  h = h.replace(/^---$/gm, '<hr>');
+  h = h.replace(/^- (.+)$/gm, '<li>$1</li>');
+  h = h.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
+  h = h.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+  h = h.replace(/@(\w[\w\s]*?)(?=[\s,.:!?<]|$)/g, '<span style="color:var(--purple);font-weight:600">@$1</span>');
+  // Render [SCREENSHOT:path] markers as images
+  h = h.replace(/\[SCREENSHOT:([^\]]+)\]/g, (m, path) => {
+    const clean = path.replace(/^\.?\//, '');
+    // Try mission-scoped workspace first, then generic
+    const src = `/workspace/${MISSION_ID}/${clean}`;
+    return `<div class="mc-screenshot"><img src="${src}" alt="Screenshot" loading="lazy" onerror="this.src='/workspace/${clean}'" style="max-width:100%;border-radius:var(--radius-lg);margin:0.5rem 0;border:1px solid var(--border-subtle);cursor:pointer" onclick="window.open(this.src)"><div style="font-size:0.65rem;color:var(--text-tertiary);margin-top:2px">${clean}</div></div>`;
+  });
+  h = h.replace(/\n/g, '<br>');
+  return h;
+}
+
+function generatePhaseSummary(phaseId) {
+    const summaryEl = document.getElementById(`summary-${phaseId}`);
+    if (!summaryEl || summaryEl.innerHTML.trim()) return; // DB summary already rendered
+
+    const container = document.getElementById(`discuss-${phaseId}`);
+    if (!container) return;
+    const msgs = container.querySelectorAll('.mu--chat');
+    if (msgs.length === 0) return;
+
+    // Collect all substantive content per agent
+    const byAgent = new Map();
+    msgs.forEach(msg => {
+        const nameEl = msg.querySelector('.mu__name');
+        const contentEl = msg.querySelector('.mu__content');
+        if (!nameEl || !contentEl) return;
+        const name = nameEl.textContent.trim();
+        const text = contentEl.textContent.trim();
+        if (!text) return;
+        if (!byAgent.has(name)) byAgent.set(name, []);
+        byAgent.get(name).push(text);
+    });
+
+    if (byAgent.size === 0) return;
+
+    // Noise patterns to skip
+    const noise = /^(merci|bonjour|ok|d'accord|bien reçu|réaction de|réponse de|lancement phase|workspace:|connected|agent_status)/i;
+
+    let html = '';
+    byAgent.forEach((texts, name) => {
+        // Merge all messages, extract key sentences
+        const all = texts.join(' ');
+        const sentences = all.split(/[.!?\n]/)
+            .map(s => s.trim())
+            .filter(s => s.length > 25 && !noise.test(s));
+        if (sentences.length === 0) return;
+        // Pick most substantive (longest) sentence as summary
+        const best = sentences.reduce((a, b) => b.length > a.length ? b : a, sentences[0]);
+        const excerpt = best.length > 200 ? best.substring(0, 197) + '...' : best;
+        html += `<div class="mc-summary-line"><span class="mc-summary-agent">${esc(name)}:</span><span class="mc-summary-text">${esc(excerpt)}</span></div>`;
+    });
+    if (!html) html = `<div class="mc-summary-line"><span class="mc-summary-text" style="font-style:italic">${msgs.length} messages</span></div>`;
+
+    // Collect screenshot images from phase messages
+    const screenshots = container.querySelectorAll('.mc-screenshot img');
+    if (screenshots.length > 0) {
+        html += `<div class="mc-phase-thumbs">`;
+        screenshots.forEach((img, i) => {
+            if (i < 6) html += `<img class="mc-phase-thumb" src="${img.src}" alt="Screenshot" loading="lazy" onclick="window.open(this.src)">`;
+        });
+        html += `</div>`;
+    }
+
+    summaryEl.innerHTML = html;
+}
+
+/* Init */
+renderPhaseGraphs();
+// Generate summaries for already-completed phases
+document.querySelectorAll('.mc-phase[data-status="done"], .mc-phase[data-status="failed"]').forEach(el => {
+    generatePhaseSummary(el.dataset.phaseId);
+});
+
+/* Event delegation for agent popover clicks on SVG graph nodes */
+document.querySelectorAll('.mc-phase-graph').forEach(container => {
+    container.addEventListener('click', e => {
+        let el = e.target;
+        /* Walk up to find mc-live-node group (works in both HTML and SVG namespaces) */
+        while (el && el !== container) {
+            if (el.classList && el.classList.contains('mc-live-node')) {
+                const agentId = el.getAttribute('data-agent-id');
+                if (agentId) {
+                    e.stopPropagation();
+                    showMcPopover(agentId, e);
+                }
+                return;
+            }
+            el = el.parentElement || el.parentNode;
+        }
+    });
+});
+
+/* Poll fallback */
+setInterval(async () => {
+    try {
+        const r = await fetch(`/api/missions/${MISSION_ID}`);
+        const m = await r.json();
+        if (m.phases) { m.phases.forEach(p => updatePhaseStatus(p.phase_id, p.status)); updateStats(); }
+    } catch(err){}
+}, 10000);
+</script>

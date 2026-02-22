@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}{{ config.project.display_name }} - Software Factory{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<nav class="mb-4">
+    <a href="/" class="text-blue-600 dark:text-blue-400 hover:underline">Dashboard</a>
+    <span class="mx-2 text-gray-400">/</span>
+    <span>{{ config.project.display_name }}</span>
+</nav>
+
+<!-- Project Header -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center space-x-3">
+            {% if daemons.cycle.running %}
+            <span class="w-4 h-4 bg-green-500 rounded-full animate-pulse-green"></span>
+            {% else %}
+            <span class="w-4 h-4 bg-gray-400 rounded-full"></span>
+            {% endif %}
+            <h1 class="text-2xl font-bold">{{ config.project.display_name }}</h1>
+        </div>
+        <div class="flex space-x-2">
+            {% if daemons.cycle.running %}
+            <button
+                hx-post="/api/daemons/{{ project_id }}/cycle/stop"
+                hx-swap="none"
+                hx-on::after-request="location.reload()"
+                class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">
+                Stop Cycle
+            </button>
+            {% else %}
+            <button
+                hx-post="/api/daemons/{{ project_id }}/cycle/start"
+                hx-swap="none"
+                hx-on::after-request="location.reload()"
+                class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+                Start Cycle
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+        <span class="font-mono">{{ config.project.root_path }}</span>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="grid grid-cols-5 gap-4 text-center">
+        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+            <div class="text-2xl font-bold">{{ "{:,}".format(stats.total) }}</div>
+            <div class="text-xs text-gray-500">Total</div>
+        </div>
+        <div class="bg-green-50 dark:bg-green-900/30 rounded-lg p-3">
+            <div class="text-2xl font-bold text-green-600 dark:text-green-400">{{ "{:,}".format(stats.deployed) }}</div>
+            <div class="text-xs text-gray-500">Deployed</div>
+        </div>
+        <div class="bg-yellow-50 dark:bg-yellow-900/30 rounded-lg p-3">
+            <div class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{{ "{:,}".format(stats.pending) }}</div>
+            <div class="text-xs text-gray-500">Pending</div>
+        </div>
+        <div class="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-3">
+            <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ "{:,}".format(stats.in_progress) }}</div>
+            <div class="text-xs text-gray-500">In Progress</div>
+        </div>
+        <div class="bg-red-50 dark:bg-red-900/30 rounded-lg p-3">
+            <div class="text-2xl font-bold text-red-600 dark:text-red-400">{{ "{:,}".format(stats.failed) }}</div>
+            <div class="text-xs text-gray-500">Failed</div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Daemons Status -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h2 class="text-lg font-bold mb-4">Daemons</h2>
+        <div class="space-y-3">
+            {% for daemon_name, daemon_info in daemons.items() %}
+            <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div class="flex items-center space-x-3">
+                    {% if daemon_info.running %}
+                    <span class="w-3 h-3 bg-green-500 rounded-full"></span>
+                    {% else %}
+                    <span class="w-3 h-3 bg-gray-400 rounded-full"></span>
+                    {% endif %}
+                    <span class="font-medium capitalize">{{ daemon_name }}</span>
+                    {% if daemon_info.pid %}
+                    <span class="text-xs text-gray-500">PID: {{ daemon_info.pid }}</span>
+                    {% endif %}
+                </div>
+                <div>
+                    {% if daemon_info.running %}
+                    <button
+                        hx-post="/api/daemons/{{ project_id }}/{{ daemon_name }}/stop"
+                        hx-swap="none"
+                        hx-on::after-request="location.reload()"
+                        class="text-xs bg-red-100 hover:bg-red-200 dark:bg-red-900 dark:hover:bg-red-800 text-red-800 dark:text-red-200 px-3 py-1 rounded">
+                        Stop
+                    </button>
+                    {% else %}
+                    <button
+                        hx-post="/api/daemons/{{ project_id }}/{{ daemon_name }}/start"
+                        hx-swap="none"
+                        hx-on::after-request="location.reload()"
+                        class="text-xs bg-green-100 hover:bg-green-200 dark:bg-green-900 dark:hover:bg-green-800 text-green-800 dark:text-green-200 px-3 py-1 rounded">
+                        Start
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Team of Rivals Metrics -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h2 class="text-lg font-bold mb-4">Quality Metrics (Team of Rivals)</h2>
+        <div class="space-y-4">
+            {% for layer, data in metrics.items() if layer != 'final' %}
+            <div>
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-sm font-medium">
+                        {% if layer == 'l0' %}L0: Fast Checks
+                        {% elif layer == 'l1_code' %}L1a: Code Critic
+                        {% elif layer == 'l1_security' %}L1b: Security
+                        {% elif layer == 'l2_arch' %}L2: Architecture
+                        {% endif %}
+                    </span>
+                    <span class="text-sm">
+                        {{ data.rejected }}/{{ data.total }}
+                        <span class="text-gray-500">({{ data.catch_rate }}%)</span>
+                    </span>
+                </div>
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div class="bg-blue-600 h-2 rounded-full" style="width: {{ data.catch_rate }}%"></div>
+                </div>
+            </div>
+            {% endfor %}
+
+            {% if metrics.final %}
+            <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div class="flex justify-between items-center">
+                    <span class="font-medium">Final Success Rate</span>
+                    <span class="text-lg font-bold text-green-600 dark:text-green-400">
+                        {{ metrics.final.success_rate }}%
+                    </span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Domains -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mt-6">
+    <h2 class="text-lg font-bold mb-4">Domains</h2>
+    <div class="flex flex-wrap gap-2">
+        {% for domain, domain_config in config.get('domains', {}).items() %}
+        <div class="bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2">
+            <span class="font-medium">{{ domain }}</span>
+            {% if domain_config.get('extensions') %}
+            <span class="text-xs text-gray-500 ml-2">{{ domain_config.extensions | join(', ') }}</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Live Logs -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mt-6">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold">Live Logs</h2>
+        <button onclick="toggleLogs()" class="text-sm text-blue-600 dark:text-blue-400">Toggle</button>
+    </div>
+    <div id="log-container" class="log-container bg-gray-900 text-gray-100 rounded-lg p-4 h-64 overflow-y-auto hidden">
+        <div id="log-content"></div>
+    </div>
+</div>
+
+<!-- Recent Tasks -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mt-6">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold">Recent Tasks</h2>
+        <a href="/tasks?project={{ project_id }}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+            View all
+        </a>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-left text-gray-500 border-b border-gray-200 dark:border-gray-700">
+                    <th class="pb-2">Status</th>
+                    <th class="pb-2">Domain</th>
+                    <th class="pb-2">Description</th>
+                    <th class="pb-2">WSJF</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in tasks[:20] %}
+                <tr class="border-b border-gray-100 dark:border-gray-700">
+                    <td class="py-2">
+                        <span class="px-2 py-0.5 text-xs rounded-full
+                            {% if task.status == 'deployed' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                            {% elif task.status == 'pending' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                            {% elif 'failed' in task.status %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200
+                            {% elif 'progress' in task.status %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200
+                            {% else %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200
+                            {% endif %}">
+                            {{ task.status }}
+                        </span>
+                    </td>
+                    <td class="py-2">
+                        <span class="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
+                            {{ task.domain }}
+                        </span>
+                    </td>
+                    <td class="py-2 max-w-md truncate">{{ task.description[:80] }}...</td>
+                    <td class="py-2 text-gray-500">{{ task.wsjf_score }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let eventSource = null;
+
+    function toggleLogs() {
+        const container = document.getElementById('log-container');
+        container.classList.toggle('hidden');
+
+        if (!container.classList.contains('hidden') && !eventSource) {
+            startLogStream();
+        } else if (container.classList.contains('hidden') && eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
+    }
+
+    function startLogStream() {
+        const content = document.getElementById('log-content');
+        eventSource = new EventSource('/api/logs/{{ project_id }}/stream');
+
+        eventSource.onmessage = function(event) {
+            const line = document.createElement('div');
+            line.textContent = event.data;
+
+            // Color coding
+            if (event.data.includes('[ERROR]')) {
+                line.className = 'text-red-400';
+            } else if (event.data.includes('[WARN]')) {
+                line.className = 'text-yellow-400';
+            } else if (event.data.includes('SUCCESS') || event.data.includes('deployed')) {
+                line.className = 'text-green-400';
+            }
+
+            content.appendChild(line);
+
+            // Keep only last 200 lines
+            while (content.children.length > 200) {
+                content.removeChild(content.firstChild);
+            }
+
+            // Auto-scroll
+            const container = document.getElementById('log-container');
+            container.scrollTop = container.scrollHeight;
+        };
+
+        eventSource.onerror = function() {
+            content.innerHTML += '<div class="text-red-400">Connection lost. Retrying...</div>';
+        };
+    }
+</script>
+{% endblock %}

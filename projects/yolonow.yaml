@@ -1,0 +1,190 @@
+project:
+  name: yolonow
+  display_name: "YoloNow - Event Discovery Platform"
+  root_path: /Users/sylvain/_MACARON-SOFTWARE/YOLONOW
+  vision_doc: README.md
+
+# CLI Configuration
+cli:
+  binary: yolonow
+  build:
+    all: yolonow build all
+    rust: yolonow build rust
+    python: yolonow build python
+    typescript: yolonow build web
+    sveltekit: yolonow build sveltekit
+    swift: yolonow build ios
+    kotlin: yolonow build android
+    mobile: yolonow build mobile
+  test:
+    all: yolonow test all
+    rust: yolonow test rust
+    python: yolonow test python
+    typescript: yolonow test web
+    swift: yolonow test ios
+    kotlin: yolonow test android
+    mobile: yolonow test mobile
+  lint:
+    all: yolonow lint all
+    rust: yolonow lint rust
+    python: yolonow lint python
+    typescript: yolonow lint web
+    swift: yolonow lint ios
+    kotlin: yolonow lint android
+  deploy:
+    staging: yolonow check all
+    prod: yolonow build all
+    rollback: echo "YoloNow rollback - manual"
+  e2e:
+    smoke: yolonow test all
+    journeys: yolonow test all
+    mobile_ios: yolonow test ios
+    mobile_android: yolonow test android
+env:
+  YOLONOW_API_KEY: factory-token-yolonow-build-1234
+  YOLONOW_PERMISSION_LEVEL: build
+
+domains:
+  rust:
+    paths: [backend/src/]
+    extensions: [.rs]
+    build_cmd: yolonow build rust
+    test_cmd: yolonow test rust
+    lint_cmd: yolonow lint rust
+
+  python:
+    paths: [backend/scrapers/, backend/tests/]
+    extensions: [.py]
+    build_cmd: yolonow build python
+    test_cmd: yolonow test python
+    lint_cmd: yolonow lint python
+
+  typescript:
+    paths: [frontend/web/, frontend/sveltekit/]
+    extensions: [.ts, .tsx, .svelte]
+    build_cmd: yolonow build web
+    test_cmd: yolonow test web
+    lint_cmd: yolonow lint web
+
+  swift:
+    paths: [mobile/ios/]
+    extensions: [.swift]
+    build_cmd: yolonow build ios
+    test_cmd: yolonow test ios
+    lint_cmd: yolonow lint ios
+
+  kotlin:
+    paths: [mobile/android/]
+    extensions: [.kt]
+    build_cmd: yolonow build android
+    test_cmd: yolonow test android
+    lint_cmd: yolonow lint android
+
+  proto:
+    paths: [backend/proto/]
+    extensions: [.proto]
+    build_cmd: yolonow build rust
+
+# Deploy configuration - AUTO deploy enabled
+deploy:
+  strategy: blue-green
+  auto_prod: true       # AUTO deploy enabled
+  rollback_on_fail: true
+  post_deploy:
+    e2e_prod:
+      enabled: true
+      seed_cmd: "yolonow test seed"
+      smoke: true
+      journeys: true
+      rbac: true
+      console_check: true
+      pages: ["/", "/login", "/discover", "/events"]
+      console_whitelist: ["chrome-extension://", "matomo", "analytics"]
+      network_whitelist: ["/api/analytics/", "matomo.js"]
+      timeout_sec: 600
+    tmc:
+      enabled: false
+    chaos:
+      enabled: false
+
+# Fractal (seuils de decomposition)
+fractal:
+  max_files: 5
+  max_loc: 400
+  max_items: 10
+  max_depth: 3
+
+# Adversarial (patterns projet-specifiques)
+adversarial:
+  # Threshold elevated to 30 to account for pre-existing unwrap()/panic! in codebase
+  # TODO: implement incremental adversarial checking (only new code)
+  threshold: 30
+  core_patterns: true
+  custom_patterns:
+    # Rust specific
+    - pattern: '\.unwrap\(\)'
+      score: 2
+      message: "unwrap() sans gestion d'erreur"
+      max_occurrences: 3
+    - pattern: 'panic!'
+      score: 5
+      message: "panic! interdit en production"
+    # Python specific
+    - pattern: 'except:'
+      score: 3
+      message: "Bare except clause - specify exception type"
+    # print() OK dans CLI scripts (add_facebook_page.py, etc.)
+    # Security
+    - pattern: "password.*=.*[\"']"
+      score: 5
+      message: "Hardcoded password detected"
+    # Geospatial specific
+    - pattern: 'ST_Distance.*<'
+      score: 2
+      message: "Use ST_DWithin for geo queries (uses spatial index)"
+
+# Error Capture Configuration (RLM Feedback Loop)
+error_capture:
+  enabled: true
+  feedback_to_backlog: true
+  deduplicate: true
+
+  build:
+    enabled: true
+    domains: [rust, python, typescript, swift, kotlin]
+
+  e2e:
+    enabled: true
+    playwright:
+      report_path: frontend/web/playwright-report/
+      fail_on_console_error: true
+      capture_grpc: true
+
+  # Mobile error capture for YoloNow iOS/Android apps
+  mobile:
+    enabled: true
+    ios:
+      bundle_id: com.yolonow.app
+      capture_duration: 15
+    android:
+      package_name: com.yolonow.app
+      capture_duration: 15
+
+  severity:
+    create_task_min: medium
+
+# Analyzers to enable
+analyzers: [rust, python, typescript, security]
+
+# Integrator (cross-layer wiring)
+integrator:
+  enabled: true
+  verify_timeout: 300
+  max_iterations: 5
+  priority_types:
+    - bootstrap
+    - migration
+    - proto_gen
+    - api_connection
+    - proxy
+    - config

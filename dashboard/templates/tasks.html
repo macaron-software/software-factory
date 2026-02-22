@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Tasks - Software Factory{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">Tasks</h1>
+    <div class="text-sm text-gray-500">
+        Showing {{ tasks|length }} tasks
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
+    <form method="get" class="flex flex-wrap gap-4">
+        <!-- Project Filter -->
+        <div>
+            <label class="block text-sm font-medium mb-1">Project</label>
+            <select name="project" class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm">
+                <option value="">All Projects</option>
+                {% for project in projects %}
+                <option value="{{ project.id }}" {% if filter_project == project.id %}selected{% endif %}>
+                    {{ project.display_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Status Filter -->
+        <div>
+            <label class="block text-sm font-medium mb-1">Status</label>
+            <select name="status" class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm">
+                <option value="">All Statuses</option>
+                <option value="pending" {% if filter_status == 'pending' %}selected{% endif %}>Pending</option>
+                <option value="deployed" {% if filter_status == 'deployed' %}selected{% endif %}>Deployed</option>
+                <option value="tdd_in_progress" {% if filter_status == 'tdd_in_progress' %}selected{% endif %}>TDD In Progress</option>
+                <option value="code_written" {% if filter_status == 'code_written' %}selected{% endif %}>Code Written</option>
+                <option value="build_failed" {% if filter_status == 'build_failed' %}selected{% endif %}>Build Failed</option>
+                <option value="completed" {% if filter_status == 'completed' %}selected{% endif %}>Completed</option>
+                <option value="decomposed" {% if filter_status == 'decomposed' %}selected{% endif %}>Decomposed</option>
+            </select>
+        </div>
+
+        <div class="flex items-end">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+                Filter
+            </button>
+        </div>
+
+        {% if filter_project or filter_status %}
+        <div class="flex items-end">
+            <a href="/tasks" class="text-blue-600 dark:text-blue-400 hover:underline text-sm">
+                Clear filters
+            </a>
+        </div>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Tasks Table -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+                <tr class="text-left">
+                    <th class="px-4 py-3 font-medium">Status</th>
+                    <th class="px-4 py-3 font-medium">Project</th>
+                    <th class="px-4 py-3 font-medium">Domain</th>
+                    <th class="px-4 py-3 font-medium">Type</th>
+                    <th class="px-4 py-3 font-medium">Description</th>
+                    <th class="px-4 py-3 font-medium">WSJF</th>
+                    <th class="px-4 py-3 font-medium">Attempts</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for task in tasks %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-0.5 text-xs rounded-full
+                            {% if task.status == 'deployed' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                            {% elif task.status == 'pending' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                            {% elif 'failed' in task.status %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200
+                            {% elif 'progress' in task.status %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200
+                            {% elif task.status == 'completed' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                            {% elif task.status == 'decomposed' %}bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200
+                            {% else %}bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200
+                            {% endif %}">
+                            {{ task.status }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3">
+                        <a href="/project/{{ task.project_id }}" class="text-blue-600 dark:text-blue-400 hover:underline">
+                            {{ task.project_id }}
+                        </a>
+                    </td>
+                    <td class="px-4 py-3">
+                        <span class="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
+                            {{ task.domain }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3">
+                        <span class="text-xs
+                            {% if task.type == 'fix' %}text-red-600 dark:text-red-400
+                            {% elif task.type == 'feature' %}text-green-600 dark:text-green-400
+                            {% elif task.type == 'refactor' %}text-purple-600 dark:text-purple-400
+                            {% else %}text-gray-600 dark:text-gray-400
+                            {% endif %}">
+                            {{ task.type }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 max-w-md">
+                        <div class="truncate" title="{{ task.description }}">
+                            {{ task.description[:100] }}{% if task.description|length > 100 %}...{% endif %}
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 text-gray-500">
+                        {{ task.wsjf_score or '-' }}
+                    </td>
+                    <td class="px-4 py-3 text-center text-gray-500">
+                        {{ task.tdd_attempts or 0 }}
+                    </td>
+                </tr>
+                {% endfor %}
+
+                {% if not tasks %}
+                <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                        No tasks found matching your filters.
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Stats Summary -->
+<div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+    {% set status_counts = {} %}
+    {% for task in tasks %}
+        {% if task.status in status_counts %}
+            {% set _ = status_counts.update({task.status: status_counts[task.status] + 1}) %}
+        {% else %}
+            {% set _ = status_counts.update({task.status: 1}) %}
+        {% endif %}
+    {% endfor %}
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <div class="text-2xl font-bold text-green-600 dark:text-green-400">
+            {{ status_counts.get('deployed', 0) }}
+        </div>
+        <div class="text-sm text-gray-500">Deployed</div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <div class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+            {{ status_counts.get('pending', 0) }}
+        </div>
+        <div class="text-sm text-gray-500">Pending</div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            {{ status_counts.get('tdd_in_progress', 0) + status_counts.get('code_written', 0) }}
+        </div>
+        <div class="text-sm text-gray-500">In Progress</div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <div class="text-2xl font-bold text-red-600 dark:text-red-400">
+            {{ status_counts.get('build_failed', 0) + status_counts.get('tdd_failed', 0) }}
+        </div>
+        <div class="text-sm text-gray-500">Failed</div>
+    </div>
+</div>
+{% endblock %}

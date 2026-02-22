@@ -1,0 +1,1156 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.ds{max-width:1200px}
+.ds-section{margin-bottom:2.5rem}
+.ds-section-title{font-size:1rem;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:1rem;padding-bottom:0.4rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0.5rem}
+.ds-section-title svg{width:18px;height:18px}
+.ds-grid{display:grid;gap:0.75rem}
+.ds-grid--tokens{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+.ds-grid--colors{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+.ds-grid--icons{grid-template-columns:repeat(auto-fill,minmax(90px,1fr))}
+.ds-grid--components{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+
+/* Token card */
+.ds-token{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.65rem 0.8rem;transition:border-color .15s}
+.ds-token:hover{border-color:var(--purple)}
+.ds-token__name{font-size:0.72rem;font-weight:600;color:var(--purple);font-family:'JetBrains Mono','SF Mono',monospace;margin-bottom:0.2rem}
+.ds-token__value{font-size:0.68rem;color:var(--text-secondary);font-family:'JetBrains Mono','SF Mono',monospace}
+.ds-token__preview{margin-top:0.35rem}
+
+/* Color swatch */
+.ds-swatch{border-radius:8px;overflow:hidden;border:1px solid var(--border);transition:transform .15s}
+.ds-swatch:hover{transform:scale(1.03)}
+.ds-swatch__color{height:60px;display:flex;align-items:flex-end;padding:0.3rem 0.5rem}
+.ds-swatch__meta{background:var(--bg-secondary);padding:0.4rem 0.5rem}
+.ds-swatch__name{font-size:0.72rem;font-weight:600;color:var(--text-primary)}
+.ds-swatch__hex{font-size:0.65rem;color:var(--text-secondary);font-family:'JetBrains Mono',monospace}
+
+/* Icon tile */
+.ds-icon-tile{display:flex;flex-direction:column;align-items:center;gap:0.35rem;padding:0.65rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;transition:border-color .15s;cursor:default}
+.ds-icon-tile:hover{border-color:var(--purple);background:var(--bg-tertiary)}
+.ds-icon-tile svg{width:22px;height:22px;color:var(--text-primary)}
+.ds-icon-tile__name{font-size:0.58rem;color:var(--text-secondary);text-align:center;word-break:break-all}
+
+/* Component showcase */
+.ds-showcase{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1rem;transition:border-color .15s}
+.ds-showcase:hover{border-color:var(--purple)}
+.ds-showcase__title{font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:0.15rem}
+.ds-showcase__desc{font-size:0.68rem;color:var(--text-secondary);margin-bottom:0.65rem}
+.ds-showcase__demo{padding:0.75rem;background:var(--bg-primary);border-radius:6px;margin-bottom:0.5rem;display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center}
+.ds-showcase__code{font-size:0.65rem;color:var(--text-secondary);font-family:'JetBrains Mono',monospace;background:var(--bg-primary);padding:0.4rem 0.6rem;border-radius:4px;overflow-x:auto;white-space:pre}
+
+/* Typography specimen */
+.ds-type{padding:0.5rem 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.ds-type__label{font-size:0.65rem;color:var(--text-secondary);font-family:monospace;margin-bottom:0.15rem}
+
+/* Spacing scale */
+.ds-spacing-bar{height:10px;background:linear-gradient(90deg,var(--purple),rgba(188,140,255,.3));border-radius:3px;transition:width .3s}
+
+/* Nav tabs */
+.ds-nav{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:1.5rem;flex-wrap:wrap}
+.ds-nav__item{padding:0.5rem 1rem;font-size:0.78rem;color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;background:none;border-top:none;border-left:none;border-right:none;white-space:nowrap}
+.ds-nav__item:hover{color:var(--text-primary)}
+.ds-nav__item.active{color:var(--purple);border-bottom-color:var(--purple)}
+.ds-panel{display:none}
+.ds-panel.active{display:block}
+</style>
+
+<div class="ds">
+    <!-- Sub-navigation -->
+    <nav class="ds-nav">
+        <button class="ds-nav__item active" onclick="showDsPanel('tokens',this)">Tokens</button>
+        <button class="ds-nav__item" onclick="showDsPanel('colors',this)">Couleurs</button>
+        <button class="ds-nav__item" onclick="showDsPanel('typography',this)">Typographie</button>
+        <button class="ds-nav__item" onclick="showDsPanel('spacing',this)">Espacements</button>
+        <button class="ds-nav__item" onclick="showDsPanel('icons',this)">Icons SVG</button>
+        <button class="ds-nav__item" onclick="showDsPanel('atoms',this)">Atoms</button>
+        <button class="ds-nav__item" onclick="showDsPanel('molecules',this)">Molecules</button>
+        <button class="ds-nav__item" onclick="showDsPanel('patterns',this)">Patterns</button>
+        <button class="ds-nav__item" onclick="showDsPanel('conversation',this)">Conversation</button>
+        <button class="ds-nav__item" onclick="showDsPanel('graph',this)">Agent Graph</button>
+        <button class="ds-nav__item" onclick="showDsPanel('kanban',this)">Kanban</button>
+        <button class="ds-nav__item" onclick="showDsPanel('backlog',this)">Backlog</button>
+    </nav>
+
+    <!-- ═══════════ TOKENS ═══════════ -->
+    <div id="ds-tokens" class="ds-panel active">
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-settings"/></svg> CSS Custom Properties — Dark</h3>
+            <div class="ds-grid ds-grid--tokens">
+                <div class="ds-token">
+                    <div class="ds-token__name">--bg-primary</div>
+                    <div class="ds-token__value">dark: #0f0a1a</div>
+                    <div class="ds-token__preview" style="height:20px;border-radius:4px;background:#0f0a1a;border:1px solid var(--border)"></div>
+                </div>
+                <div class="ds-token">
+                    <div class="ds-token__name">--bg-secondary</div>
+                    <div class="ds-token__value">dark: #1a1225</div>
+                    <div class="ds-token__preview" style="height:20px;border-radius:4px;background:#1a1225;border:1px solid var(--border)"></div>
+                </div>
+                <div class="ds-token">
+                    <div class="ds-token__name">--bg-tertiary</div>
+                    <div class="ds-token__value">dark: #251d33</div>
+                    <div class="ds-token__preview" style="height:20px;border-radius:4px;background:#251d33;border:1px solid var(--border)"></div>
+                </div>
+                <div class="ds-token">
+                    <div class="ds-token__name">--border</div>
+                    <div class="ds-token__value">dark: #352d45</div>
+                    <div class="ds-token__preview" style="height:20px;border-radius:4px;background:#352d45"></div>
+                </div>
+                <div class="ds-token">
+                    <div class="ds-token__name">--text-primary</div>
+                    <div class="ds-token__value">dark: #e6edf3</div>
+                    <div class="ds-token__preview" style="height:20px;border-radius:4px;background:#e6edf3"></div>
+                </div>
+                <div class="ds-token">
+                    <div class="ds-token__name">--text-secondary</div>
+                    <div class="ds-token__value">dark: #9e95b0</div>
+                    <div class="ds-token__preview" style="height:20px;border-radius:4px;background:#9e95b0"></div>
+                </div>
+                <div class="ds-token">
+                    <div class="ds-token__name">--radius</div>
+                    <div class="ds-token__value">10px</div>
+                    <div class="ds-token__preview" style="height:20px;width:60px;border-radius:var(--radius);background:var(--purple);opacity:.3"></div>
+                </div>
+                <div class="ds-token">
+                    <div class="ds-token__name">--sidebar-width</div>
+                    <div class="ds-token__value">56px</div>
+                </div>
+            </div>
+        </div>
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-sun"/></svg> CSS Custom Properties — Light</h3>
+            <div class="ds-grid ds-grid--tokens">
+                <div class="ds-token" style="background:#fff;border-color:#d8d0e5">
+                    <div class="ds-token__name">--bg-primary</div>
+                    <div class="ds-token__value" style="color:#5c5470">light: #f8f6fb</div>
+                    <div class="ds-token__preview" style="height:20px;border-radius:4px;background:#f8f6fb;border:1px solid #d8d0e5"></div>
+                </div>
+                <div class="ds-token" style="background:#fff;border-color:#d8d0e5">
+                    <div class="ds-token__name">--bg-secondary</div>
+                    <div class="ds-token__value" style="color:#5c5470">light: #ffffff</div>
+                    <div class="ds-token__preview" style="height:20px;border-radius:4px;background:#ffffff;border:1px solid #d8d0e5"></div>
+                </div>
+                <div class="ds-token" style="background:#fff;border-color:#d8d0e5">
+                    <div class="ds-token__name">--bg-tertiary</div>
+                    <div class="ds-token__value" style="color:#5c5470">light: #f0ecf5</div>
+                    <div class="ds-token__preview" style="height:20px;border-radius:4px;background:#f0ecf5;border:1px solid #d8d0e5"></div>
+                </div>
+                <div class="ds-token" style="background:#fff;border-color:#d8d0e5">
+                    <div class="ds-token__name">--border</div>
+                    <div class="ds-token__value" style="color:#5c5470">light: #d8d0e5</div>
+                    <div class="ds-token__preview" style="height:20px;border-radius:4px;background:#d8d0e5"></div>
+                </div>
+                <div class="ds-token" style="background:#fff;border-color:#d8d0e5">
+                    <div class="ds-token__name">--text-primary</div>
+                    <div class="ds-token__value" style="color:#5c5470">light: #1a1225</div>
+                    <div class="ds-token__preview" style="height:20px;border-radius:4px;background:#1a1225"></div>
+                </div>
+                <div class="ds-token" style="background:#fff;border-color:#d8d0e5">
+                    <div class="ds-token__name">--text-secondary</div>
+                    <div class="ds-token__value" style="color:#5c5470">light: #5c5470</div>
+                    <div class="ds-token__preview" style="height:20px;border-radius:4px;background:#5c5470"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ COLORS ═══════════ -->
+    <div id="ds-colors" class="ds-panel">
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-palette"/></svg> Palette</h3>
+            <div class="ds-grid ds-grid--colors">
+                <div class="ds-swatch">
+                    <div class="ds-swatch__color" style="background:var(--accent)"></div>
+                    <div class="ds-swatch__meta"><div class="ds-swatch__name">Accent</div><div class="ds-swatch__hex">--accent · #f78166</div></div>
+                </div>
+                <div class="ds-swatch">
+                    <div class="ds-swatch__color" style="background:var(--accent-hover)"></div>
+                    <div class="ds-swatch__meta"><div class="ds-swatch__name">Accent Hover</div><div class="ds-swatch__hex">--accent-hover · #ffa28b</div></div>
+                </div>
+                <div class="ds-swatch">
+                    <div class="ds-swatch__color" style="background:var(--purple)"></div>
+                    <div class="ds-swatch__meta"><div class="ds-swatch__name">Purple</div><div class="ds-swatch__hex">--purple · #bc8cff</div></div>
+                </div>
+                <div class="ds-swatch">
+                    <div class="ds-swatch__color" style="background:var(--blue)"></div>
+                    <div class="ds-swatch__meta"><div class="ds-swatch__name">Blue</div><div class="ds-swatch__hex">--blue · #7c8aff</div></div>
+                </div>
+                <div class="ds-swatch">
+                    <div class="ds-swatch__color" style="background:var(--green)"></div>
+                    <div class="ds-swatch__meta"><div class="ds-swatch__name">Green</div><div class="ds-swatch__hex">--green · #3fb950</div></div>
+                </div>
+                <div class="ds-swatch">
+                    <div class="ds-swatch__color" style="background:var(--red)"></div>
+                    <div class="ds-swatch__meta"><div class="ds-swatch__name">Red</div><div class="ds-swatch__hex">--red · #f85149</div></div>
+                </div>
+                <div class="ds-swatch">
+                    <div class="ds-swatch__color" style="background:var(--yellow)"></div>
+                    <div class="ds-swatch__meta"><div class="ds-swatch__name">Yellow</div><div class="ds-swatch__hex">--yellow · #d29922</div></div>
+                </div>
+                <div class="ds-swatch">
+                    <div class="ds-swatch__color" style="background:var(--user-bubble)"></div>
+                    <div class="ds-swatch__meta"><div class="ds-swatch__name">User Bubble</div><div class="ds-swatch__hex">--user-bubble · #1d4a2a</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title">Sémantique</h3>
+            <div class="ds-grid ds-grid--colors">
+                <div class="ds-swatch">
+                    <div class="ds-swatch__color" style="background:rgba(63,185,80,0.2)"><span class="badge badge-green" style="font-size:.65rem">success</span></div>
+                    <div class="ds-swatch__meta"><div class="ds-swatch__name">Success</div><div class="ds-swatch__hex">badge-green</div></div>
+                </div>
+                <div class="ds-swatch">
+                    <div class="ds-swatch__color" style="background:rgba(248,81,73,0.2)"><span class="badge badge-red" style="font-size:.65rem">error</span></div>
+                    <div class="ds-swatch__meta"><div class="ds-swatch__name">Error</div><div class="ds-swatch__hex">badge-red</div></div>
+                </div>
+                <div class="ds-swatch">
+                    <div class="ds-swatch__color" style="background:rgba(210,153,34,0.2)"><span class="badge badge-yellow" style="font-size:.65rem">warning</span></div>
+                    <div class="ds-swatch__meta"><div class="ds-swatch__name">Warning</div><div class="ds-swatch__hex">badge-yellow</div></div>
+                </div>
+                <div class="ds-swatch">
+                    <div class="ds-swatch__color" style="background:rgba(124,138,255,0.2)"><span class="badge badge-blue" style="font-size:.65rem">info</span></div>
+                    <div class="ds-swatch__meta"><div class="ds-swatch__name">Info</div><div class="ds-swatch__hex">badge-blue</div></div>
+                </div>
+                <div class="ds-swatch">
+                    <div class="ds-swatch__color" style="background:rgba(188,140,255,0.2)"><span class="badge badge-purple" style="font-size:.65rem">feature</span></div>
+                    <div class="ds-swatch__meta"><div class="ds-swatch__name">Feature</div><div class="ds-swatch__hex">badge-purple</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ TYPOGRAPHY ═══════════ -->
+    <div id="ds-typography" class="ds-panel">
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-filetext"/></svg> Type Scale</h3>
+
+            <div class="ds-type">
+                <div class="ds-type__label">h1 / page-title — 16px / 600</div>
+                <div style="font-size:16px;font-weight:600">The quick brown fox jumps over the lazy dog</div>
+            </div>
+            <div class="ds-type">
+                <div class="ds-type__label">h2 / section-title — 0.82rem / 700 / uppercase</div>
+                <div class="section-title" style="margin:0">Section Title Example</div>
+            </div>
+            <div class="ds-type">
+                <div class="ds-type__label">h3 / card-title — 1rem / 700</div>
+                <div style="font-size:1rem;font-weight:700">Card Title Example</div>
+            </div>
+            <div class="ds-type">
+                <div class="ds-type__label">body — 0.85rem / 400</div>
+                <div style="font-size:0.85rem">Corps de texte principal utilisé dans les zones de contenu des cartes et panneaux.</div>
+            </div>
+            <div class="ds-type">
+                <div class="ds-type__label">body-sm — 0.78rem / 400</div>
+                <div style="font-size:0.78rem;color:var(--text-secondary)">Texte secondaire plus petit pour les métadonnées et descriptions.</div>
+            </div>
+            <div class="ds-type">
+                <div class="ds-type__label">caption — 0.72rem / 400</div>
+                <div style="font-size:0.72rem;color:var(--text-secondary)">Légendes, timestamps, labels de formulaire.</div>
+            </div>
+            <div class="ds-type">
+                <div class="ds-type__label">micro — 0.68rem / 400</div>
+                <div style="font-size:0.68rem;color:var(--text-secondary)">Pills, badges, tags très petits.</div>
+            </div>
+            <div class="ds-type">
+                <div class="ds-type__label">code / mono — 'JetBrains Mono', 'SF Mono', monospace</div>
+                <div style="font-family:'JetBrains Mono','SF Mono',monospace;font-size:0.82rem;background:var(--bg-primary);padding:0.3rem 0.5rem;border-radius:4px;display:inline-block">const x = await fetch('/api/v1/agents')</div>
+            </div>
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title">Font Stack</h3>
+            <div class="ds-token" style="max-width:600px">
+                <div class="ds-token__name">font-family (system)</div>
+                <div class="ds-token__value">-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif</div>
+            </div>
+            <div class="ds-token" style="max-width:600px;margin-top:0.5rem">
+                <div class="ds-token__name">font-family (code)</div>
+                <div class="ds-token__value">'JetBrains Mono', 'SF Mono', monospace</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ SPACING ═══════════ -->
+    <div id="ds-spacing" class="ds-panel">
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-columns"/></svg> Spacing Scale</h3>
+            <div style="display:flex;flex-direction:column;gap:0.65rem;max-width:500px">
+                {% set spacings = [
+                    ('0.25rem', '4px', 'gap-xs'),
+                    ('0.5rem', '8px', 'gap-sm / mt-sm'),
+                    ('0.75rem', '12px', 'gap-md / mt-md'),
+                    ('1rem', '16px', 'gap-lg / padding'),
+                    ('1.25rem', '20px', 'mt-lg'),
+                    ('1.5rem', '24px', 'main-area padding'),
+                    ('2.5rem', '40px', 'section margin'),
+                ] %}
+                {% for size, px, usage in spacings %}
+                <div style="display:grid;grid-template-columns:80px 60px 1fr 120px;align-items:center;gap:0.5rem">
+                    <span style="font-size:0.68rem;font-family:monospace;color:var(--purple)">{{ size }}</span>
+                    <span style="font-size:0.65rem;color:var(--text-secondary)">{{ px }}</span>
+                    <div class="ds-spacing-bar" style="width:{{ px }}"></div>
+                    <span style="font-size:0.62rem;color:var(--text-secondary)">{{ usage }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title">Border Radius</h3>
+            <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:end">
+                {% set radii = [('4px', 'pill, badge'), ('6px', 'btn, input'), ('8px', 'dropdown'), ('10px', '--radius (card)'), ('12px', 'bubble'), ('50%', 'avatar')] %}
+                {% for r, label in radii %}
+                <div style="text-align:center">
+                    <div style="width:50px;height:50px;border:2px solid var(--purple);border-radius:{{ r }};background:rgba(188,140,255,.1)"></div>
+                    <div style="font-size:0.6rem;color:var(--text-secondary);margin-top:0.25rem">{{ r }}</div>
+                    <div style="font-size:0.55rem;color:var(--purple)">{{ label }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ ICONS SVG ═══════════ -->
+    <div id="ds-icons" class="ds-panel">
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-palette"/></svg> SVG Sprite Icons ({{ icons|length }})</h3>
+            <div class="ds-grid ds-grid--icons">
+                {% for icon in icons %}
+                <div class="ds-icon-tile" title="{{ icon }}">
+                    <svg class="icon" style="width:22px;height:22px"><use href="#icon-{{ icon }}"/></svg>
+                    <span class="ds-icon-tile__name">{{ icon }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ ATOMS ═══════════ -->
+    <div id="ds-atoms" class="ds-panel">
+
+        <!-- Buttons -->
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-zap"/></svg> Buttons</h3>
+            <div class="ds-grid ds-grid--components">
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Default / Primary / Danger / Ghost</div>
+                    <div class="ds-showcase__desc">.btn, .btn-primary, .btn-danger, .btn-ghost</div>
+                    <div class="ds-showcase__demo">
+                        <button class="btn">Default</button>
+                        <button class="btn btn-primary">Primary</button>
+                        <button class="btn btn-danger">Danger</button>
+                        <button class="btn btn-ghost">Ghost</button>
+                        <button class="btn btn-purple">Purple</button>
+                    </div>
+                    <div class="ds-showcase__demo">
+                        <button class="btn btn-sm">Small</button>
+                        <button class="btn">Medium</button>
+                        <button class="btn btn-lg">Large</button>
+                    </div>
+                    <div class="ds-showcase__code">&lt;button class="btn btn-primary"&gt;…&lt;/button&gt;</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Badges -->
+        <div class="ds-section">
+            <h3 class="ds-section-title">Badges & Pills</h3>
+            <div class="ds-grid ds-grid--components">
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Badges</div>
+                    <div class="ds-showcase__desc">.badge, .badge-{color}</div>
+                    <div class="ds-showcase__demo">
+                        <span class="badge">Default</span>
+                        <span class="badge badge-green">Success</span>
+                        <span class="badge badge-red">Error</span>
+                        <span class="badge badge-yellow">Warning</span>
+                        <span class="badge badge-blue">Info</span>
+                        <span class="badge badge-purple">Feature</span>
+                    </div>
+                    <div class="ds-showcase__code">&lt;span class="badge badge-green"&gt;…&lt;/span&gt;</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Pills (tags)</div>
+                    <div class="ds-showcase__desc">.pill, .pill--{type}</div>
+                    <div class="ds-showcase__demo">
+                        <span class="pill">Default</span>
+                        <span class="pill pill--skill">Skill</span>
+                        <span class="pill pill--tool">Tool</span>
+                        <span class="pill pill--mcp">MCP</span>
+                        <span class="pill pill--domain">Domain</span>
+                        <span class="pill pill--feature">Feature</span>
+                        <span class="pill pill--fix">Fix</span>
+                        <span class="pill pill--refactor">Refactor</span>
+                        <span class="pill pill--test">Test</span>
+                        <span class="pill pill--security">Security</span>
+                    </div>
+                    <div class="ds-showcase__code">&lt;span class="pill pill--skill"&gt;…&lt;/span&gt;</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status dots -->
+        <div class="ds-section">
+            <h3 class="ds-section-title">Status Dots</h3>
+            <div class="ds-grid ds-grid--components">
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Agent / Task Status</div>
+                    <div class="ds-showcase__desc">.dot, .dot--{state} | .status-dot</div>
+                    <div class="ds-showcase__demo">
+                        <span style="display:flex;align-items:center;gap:0.4rem"><span class="dot dot--active"></span><span style="font-size:.72rem">Active</span></span>
+                        <span style="display:flex;align-items:center;gap:0.4rem"><span class="dot dot--idle"></span><span style="font-size:.72rem">Idle</span></span>
+                        <span style="display:flex;align-items:center;gap:0.4rem"><span class="dot dot--thinking"></span><span style="font-size:.72rem">Thinking</span></span>
+                        <span style="display:flex;align-items:center;gap:0.4rem"><span class="dot dot--error"></span><span style="font-size:.72rem">Error</span></span>
+                        <span style="display:flex;align-items:center;gap:0.4rem"><span class="dot dot--completed"></span><span style="font-size:.72rem">Completed</span></span>
+                        <span style="display:flex;align-items:center;gap:0.4rem"><span class="dot dot--blocked"></span><span style="font-size:.72rem">Blocked</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Avatars -->
+        <div class="ds-section">
+            <h3 class="ds-section-title">Avatars</h3>
+            <div class="ds-grid ds-grid--components">
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Sizes</div>
+                    <div class="ds-showcase__desc">.avatar, .avatar--{xs|sm|md|lg|xl}</div>
+                    <div class="ds-showcase__demo">
+                        <div class="avatar avatar--xs">S</div>
+                        <div class="avatar avatar--sm">S</div>
+                        <div class="avatar avatar--md">S</div>
+                        <div class="avatar avatar--lg">S</div>
+                        <div class="avatar avatar--xl">S</div>
+                    </div>
+                    <div class="ds-showcase__code">&lt;div class="avatar avatar--md"&gt;S&lt;/div&gt;</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="ds-section">
+            <h3 class="ds-section-title">Progress Bar</h3>
+            <div class="ds-grid ds-grid--components">
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Fill variants</div>
+                    <div class="ds-showcase__desc">.progress > .progress__fill</div>
+                    <div class="ds-showcase__demo" style="flex-direction:column;width:100%">
+                        <div style="width:100%">
+                            <div style="font-size:.65rem;color:var(--text-secondary);margin-bottom:.2rem">25%</div>
+                            <div class="progress"><div class="progress__fill" style="width:25%"></div></div>
+                        </div>
+                        <div style="width:100%">
+                            <div style="font-size:.65rem;color:var(--text-secondary);margin-bottom:.2rem">60%</div>
+                            <div class="progress"><div class="progress__fill" style="width:60%"></div></div>
+                        </div>
+                        <div style="width:100%">
+                            <div style="font-size:.65rem;color:var(--text-secondary);margin-bottom:.2rem">100%</div>
+                            <div class="progress"><div class="progress__fill" style="width:100%"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Forms -->
+        <div class="ds-section">
+            <h3 class="ds-section-title">Form Elements</h3>
+            <div class="ds-grid ds-grid--components">
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Input / Textarea / Select</div>
+                    <div class="ds-showcase__desc">.form-group > label + input|textarea|select</div>
+                    <div class="ds-showcase__demo" style="flex-direction:column;width:100%">
+                        <div class="form-group" style="margin:0">
+                            <label>Text input</label>
+                            <input type="text" placeholder="Enter value…" value="Software Factory">
+                        </div>
+                        <div class="form-group" style="margin:0">
+                            <label>Select</label>
+                            <select><option>Option A</option><option>Option B</option></select>
+                        </div>
+                    </div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Inline Form</div>
+                    <div class="ds-showcase__desc">.inline-form > .inline-form__input + .inline-form__btn</div>
+                    <div class="ds-showcase__demo" style="padding:0;width:100%">
+                        <div class="inline-form" style="width:100%">
+                            <input class="inline-form__input" placeholder="New item…">
+                            <button class="inline-form__btn">+ Add</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ MOLECULES ═══════════ -->
+    <div id="ds-molecules" class="ds-panel">
+
+        <!-- Cards -->
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-grid"/></svg> Cards</h3>
+            <div class="ds-grid ds-grid--components">
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Base Card</div>
+                    <div class="ds-showcase__desc">.card > .card__header + .card__body + .card__footer</div>
+                    <div class="ds-showcase__demo" style="flex-direction:column">
+                        <div class="card" style="width:100%">
+                            <div class="card__header">
+                                <div class="card__title"><svg class="icon" style="width:16px;height:16px"><use href="#icon-rocket"/></svg> Epic Alpha</div>
+                                <span class="badge badge-green">Active</span>
+                            </div>
+                            <div class="card__subtitle">Sprint 1 — Authentification et setup</div>
+                            <div class="card__body" style="margin-top:0.5rem">
+                                <div class="progress"><div class="progress__fill" style="width:45%"></div></div>
+                            </div>
+                            <div class="card__footer">
+                                <span class="pill pill--feature">Feature</span>
+                                <span class="pill pill--domain">Auth</span>
+                                <span style="margin-left:auto;font-size:.68rem;color:var(--text-secondary)">3 agents</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ds-showcase__code">&lt;div class="card"&gt;…&lt;/div&gt;</div>
+                </div>
+
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Metric Card</div>
+                    <div class="ds-showcase__desc">.metric > .metric__value + .metric__label</div>
+                    <div class="ds-showcase__demo">
+                        <div class="metric">
+                            <div class="metric__value">42</div>
+                            <div class="metric__label">Agents</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric__value" style="color:var(--green)">94%</div>
+                            <div class="metric__label">Coverage</div>
+                        </div>
+                        <div class="metric metric--sm">
+                            <div class="metric__value">7.2</div>
+                            <div class="metric__label">Score</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="ds-section">
+            <h3 class="ds-section-title">Tabs</h3>
+            <div class="ds-grid ds-grid--components">
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Tab Bar</div>
+                    <div class="ds-showcase__desc">.tabs > .tab.active</div>
+                    <div class="ds-showcase__demo" style="flex-direction:column;width:100%;padding:0">
+                        <div class="tabs" style="margin:0.5rem 0.75rem 0">
+                            <button class="tab active">Skills</button>
+                            <button class="tab">Memory</button>
+                            <button class="tab">MCPs</button>
+                        </div>
+                    </div>
+                    <div class="ds-showcase__code">&lt;div class="tabs"&gt;&lt;button class="tab active"&gt;…&lt;/button&gt;&lt;/div&gt;</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Popover -->
+        <div class="ds-section">
+            <h3 class="ds-section-title">Popover</h3>
+            <div class="ds-grid ds-grid--components">
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Agent Detail Popover</div>
+                    <div class="ds-showcase__desc">.popover > .popover__header + .popover__section</div>
+                    <div class="ds-showcase__demo" style="position:relative;min-height:160px">
+                        <div class="popover visible" style="position:relative;display:block;width:100%">
+                            <div class="popover__header">
+                                <div class="avatar avatar--sm" style="border-color:var(--purple)">T</div>
+                                <div>
+                                    <div class="popover__name">Thomas Dubois</div>
+                                    <div class="popover__role">Lead Développeur</div>
+                                </div>
+                            </div>
+                            <div class="popover__tagline">Architecture et qualité du code</div>
+                            <div class="popover__section">
+                                <div class="popover__section-title">Skills</div>
+                                <div class="popover__tags">
+                                    <span class="pill pill--skill">Rust</span>
+                                    <span class="pill pill--skill">TypeScript</span>
+                                    <span class="pill pill--tool">Git</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kanban preview -->
+        <div class="ds-section">
+            <h3 class="ds-section-title">Kanban</h3>
+            <div class="ds-grid ds-grid--components" style="grid-template-columns:1fr">
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Board</div>
+                    <div class="ds-showcase__desc">.kanban > .kanban__col > .kanban__item</div>
+                    <div class="ds-showcase__demo" style="padding:0;overflow-x:auto">
+                        <div class="kanban" style="grid-template-columns:repeat(4,180px);min-height:auto;padding:0.5rem">
+                            <div class="kanban__col" style="padding:0.5rem">
+                                <div class="kanban__col-title">Backlog <span class="kanban__count">2</span></div>
+                                <div class="kanban__item"><div class="kanban__item-title">Setup CI</div><div class="kanban__item-meta"><span class="dot dot--idle"></span> DevOps</div></div>
+                                <div class="kanban__item"><div class="kanban__item-title">Auth API</div><div class="kanban__item-meta"><span class="dot dot--idle"></span> Backend</div></div>
+                            </div>
+                            <div class="kanban__col" style="padding:0.5rem">
+                                <div class="kanban__col-title">In Progress <span class="kanban__count">1</span></div>
+                                <div class="kanban__item"><div class="kanban__item-title">DB Schema</div><div class="kanban__item-meta"><span class="dot dot--thinking"></span> Active</div></div>
+                            </div>
+                            <div class="kanban__col" style="padding:0.5rem">
+                                <div class="kanban__col-title">Review <span class="kanban__count">1</span></div>
+                                <div class="kanban__item"><div class="kanban__item-title">Tests E2E</div><div class="kanban__item-meta"><span class="dot dot--completed"></span> QA</div></div>
+                            </div>
+                            <div class="kanban__col" style="padding:0.5rem">
+                                <div class="kanban__col-title">Done <span class="kanban__count">0</span></div>
+                                <div class="kanban__empty">{{ _('no_item') }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Empty state -->
+        <div class="ds-section">
+            <h3 class="ds-section-title">Empty State</h3>
+            <div class="ds-grid ds-grid--components">
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Placeholder vide</div>
+                    <div class="ds-showcase__desc">.empty > .empty__title + .empty__subtitle</div>
+                    <div class="ds-showcase__demo" style="flex-direction:column">
+                        <div class="empty" style="padding:1rem">
+                            <svg class="icon" style="width:32px;height:32px;opacity:.25"><use href="#icon-layers"/></svg>
+                            <div class="empty__title">{{ _('no_result') }}</div>
+                            <div class="empty__subtitle">Lancez une epic pour voir les agents collaborer ici.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ PATTERNS ═══════════ -->
+    <div id="ds-patterns" class="ds-panel">
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-workflow"/></svg> Layout Patterns</h3>
+            <div class="ds-grid ds-grid--components" style="grid-template-columns:1fr">
+
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Split Layout (main + sidebar)</div>
+                    <div class="ds-showcase__desc">.split.split--sidebar-right > .split__main + .split__aside</div>
+                    <div class="ds-showcase__demo" style="padding:0;min-height:120px">
+                        <div style="display:grid;grid-template-columns:1fr 200px;width:100%;height:120px">
+                            <div style="background:var(--bg-primary);padding:0.5rem;border-right:1px solid var(--border);font-size:.68rem;color:var(--text-secondary);display:flex;align-items:center;justify-content:center">
+                                .split__main
+                            </div>
+                            <div style="background:var(--bg-secondary);padding:0.5rem;font-size:.68rem;color:var(--text-secondary);display:flex;align-items:center;justify-content:center">
+                                .split__aside
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Metrics Grid</div>
+                    <div class="ds-showcase__desc">.metrics-grid > .metric × N</div>
+                    <div class="ds-showcase__demo" style="flex-direction:column">
+                        <div class="metrics-grid" style="margin:0;width:100%">
+                            <div class="metric"><div class="metric__value">12</div><div class="metric__label">Epics</div></div>
+                            <div class="metric"><div class="metric__value" style="color:var(--green)">87%</div><div class="metric__label">Success</div></div>
+                            <div class="metric"><div class="metric__value" style="color:var(--blue)">3.2h</div><div class="metric__label">Cycle Time</div></div>
+                            <div class="metric"><div class="metric__value" style="color:var(--yellow)">2</div><div class="metric__label">Blocked</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Cards Grid</div>
+                    <div class="ds-showcase__desc">.cards-grid > .card × N</div>
+                    <div class="ds-showcase__demo" style="flex-direction:column">
+                        <div class="cards-grid cards-grid--compact" style="width:100%">
+                            <div class="card"><div class="card__title">Auth Module</div><div class="card__subtitle">JWT + refresh tokens</div></div>
+                            <div class="card"><div class="card__title">API Gateway</div><div class="card__subtitle">Rate limiting + routing</div></div>
+                            <div class="card"><div class="card__title">CI Pipeline</div><div class="card__subtitle">GitHub Actions + Docker</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title">Message Components (.mu)</h3>
+            <div class="ds-grid ds-grid--components" style="grid-template-columns:1fr">
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Thread / Chat / Compact modes</div>
+                    <div class="ds-showcase__desc">.mu--thread | .mu--chat | .mu--compact</div>
+                    <div class="ds-showcase__demo" style="flex-direction:column;gap:0">
+                        <!-- Thread -->
+                        <div class="mu mu--thread">
+                            <div class="mu__avatar" style="border-color:var(--purple);background:var(--bg-tertiary)">T</div>
+                            <div style="flex:1">
+                                <div class="mu__sender">
+                                    <span class="mu__name">Thomas Dubois</span>
+                                    <span class="mu__role">Lead Dev</span>
+                                    <span class="mu__arrow">→</span>
+                                    <span class="mu__target">all</span>
+                                    <span class="mu__badge">hierarchical</span>
+                                </div>
+                                <div class="mu__content">Voici mon analyse de l'architecture proposée…</div>
+                                <div class="mu__footer"><span class="mu__time">il y a 2 min</span><span class="mu__model">minimax</span></div>
+                            </div>
+                        </div>
+                        <!-- Compact -->
+                        <div class="mu mu--compact">
+                            <div class="mu__avatar mu__avatar--sm" style="border-color:var(--green);background:var(--bg-tertiary)">C</div>
+                            <div style="flex:1">
+                                <div class="mu__sender"><span class="mu__name mu__name--sm">Camille Durand</span><span class="mu__role mu__role--sm">BA</span></div>
+                                <div class="mu__text">Analyse métier terminée…</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title">Utilities</h3>
+            <div class="ds-grid ds-grid--tokens" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">
+                {% set utils = [
+                    ('.flex', 'display:flex'),
+                    ('.flex-col', 'flex-direction:column'),
+                    ('.flex-wrap', 'flex-wrap:wrap'),
+                    ('.items-center', 'align-items:center'),
+                    ('.justify-between', 'justify-content:space-between'),
+                    ('.gap-xs', 'gap:0.25rem'),
+                    ('.gap-sm', 'gap:0.5rem'),
+                    ('.gap-md', 'gap:0.75rem'),
+                    ('.gap-lg', 'gap:1rem'),
+                    ('.text-xs', 'font-size:0.68rem'),
+                    ('.text-sm', 'font-size:0.78rem'),
+                    ('.text-muted', 'color:--text-secondary'),
+                    ('.text-purple', 'color:--purple'),
+                    ('.truncate', 'text-overflow:ellipsis'),
+                    ('.font-bold', 'font-weight:700'),
+                    ('.font-mono', 'JetBrains Mono'),
+                ] %}
+                {% for cls, val in utils %}
+                <div class="ds-token">
+                    <div class="ds-token__name">{{ cls }}</div>
+                    <div class="ds-token__value">{{ val }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ CONVERSATION TEMPLATE ═══════════ -->
+    <div id="ds-conversation" class="ds-panel">
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-message-square"/></svg> Conversation Thread</h3>
+            <p style="font-size:var(--text-base);color:var(--text-secondary);margin-bottom:1rem">Template complet d'un fil de discussion multi-agents avec les differents types de messages.</p>
+
+            <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-xl);overflow:hidden;max-width:800px">
+                <!-- Header -->
+                <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border);background:var(--bg-secondary)">
+                    <svg class="icon-sm" style="color:var(--purple)"><use href="#icon-message-square"/></svg>
+                    <span style="font-size:var(--text-lg);font-weight:600">Sprint Planning - Auth Module</span>
+                    <span class="pill pill--feature" style="margin-left:auto">network</span>
+                </div>
+
+                <!-- Messages -->
+                <div style="padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-4)">
+                    <!-- System message -->
+                    <div class="mu mu--system" style="text-align:center;padding:var(--space-2) 0">
+                        <span style="font-size:var(--text-sm);color:var(--text-muted);font-style:italic">Session demarree -- 5 agents actifs</span>
+                    </div>
+
+                    <!-- Agent: CDP brief -->
+                    <div class="mu mu--thread">
+                        <div class="mu__avatar" style="border-color:var(--purple);background:var(--bg-tertiary)">AF</div>
+                        <div style="flex:1">
+                            <div class="mu__sender">
+                                <span class="mu__name" style="color:var(--purple)">Alexandre Faure</span>
+                                <span class="mu__role">CDP</span>
+                                <span class="mu__arrow">&rarr;</span>
+                                <span class="mu__target">all</span>
+                                <span class="mu__badge">brief</span>
+                            </div>
+                            <div class="mu__content">
+                                <p style="margin:0 0 0.4rem"><strong>Objectif sprint :</strong> Implementer le module d'authentification JWT avec refresh token, RBAC et integration LDAP.</p>
+                                <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)">Priorite WSJF : 85 -- Bloque 3 epics downstream. Deadline PI 14.2.</p>
+                            </div>
+                            <div class="mu__footer"><span class="mu__time">il y a 5 min</span><span class="mu__model">azure-gpt4</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Agent: Architecte analysis -->
+                    <div class="mu mu--thread">
+                        <div class="mu__avatar" style="border-color:var(--blue);background:var(--bg-tertiary)">PD</div>
+                        <div style="flex:1">
+                            <div class="mu__sender">
+                                <span class="mu__name" style="color:var(--blue)">Pierre Duval</span>
+                                <span class="mu__role">Architecte</span>
+                                <span class="mu__arrow">&rarr;</span>
+                                <span class="mu__target">Alexandre</span>
+                            </div>
+                            <div class="mu__content">
+                                <p style="margin:0 0 0.4rem">Proposition d'architecture : service auth isole, token store Redis, middleware axum pour validation.</p>
+                                <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);font-family:var(--font-mono);font-size:var(--text-sm);margin-top:var(--space-2)">
+POST /auth/login &rarr; JWT (15min) + refresh (7d)<br>
+POST /auth/refresh &rarr; new JWT<br>
+GET /auth/me &rarr; user profile + roles
+                                </div>
+                            </div>
+                            <div class="mu__footer"><span class="mu__time">il y a 3 min</span><span class="mu__model">minimax</span><span class="mu__tokens">1.2k tokens</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Agent: Security VETO -->
+                    <div class="mu mu--thread" style="border-left:2px solid var(--red)">
+                        <div class="mu__avatar" style="border-color:var(--red);background:var(--bg-tertiary)">NB</div>
+                        <div style="flex:1">
+                            <div class="mu__sender">
+                                <span class="mu__name" style="color:var(--red)">Nadia Benali</span>
+                                <span class="mu__role">Securite</span>
+                                <span class="mu__badge" style="background:rgba(248,81,73,.15);color:var(--red)">VETO</span>
+                            </div>
+                            <div class="mu__content">
+                                <p style="margin:0"><strong>Risque :</strong> Le refresh token en Redis sans rotation expose a du token replay. Exigence : rotation obligatoire a chaque refresh + blacklist du token precedent.</p>
+                            </div>
+                            <div class="mu__footer"><span class="mu__time">il y a 2 min</span><span class="mu__model">glm-4.7</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Agent: Lead Dev delegation -->
+                    <div class="mu mu--thread">
+                        <div class="mu__avatar" style="border-color:var(--green);background:var(--bg-tertiary)">TD</div>
+                        <div style="flex:1">
+                            <div class="mu__sender">
+                                <span class="mu__name" style="color:var(--green)">Thomas Dubois</span>
+                                <span class="mu__role">Lead Dev</span>
+                                <span class="mu__badge" style="background:rgba(63,185,80,.15);color:var(--green)">APPROVE</span>
+                            </div>
+                            <div class="mu__content">
+                                <p style="margin:0 0 0.4rem">Agree avec le veto de Nadia. J'integre la rotation dans le design.</p>
+                                <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;margin-top:var(--space-2)">
+                                    <span class="pill pill--feature">auth-service</span>
+                                    <span class="pill pill--refactor">token-rotation</span>
+                                    <span class="pill pill--security">rbac-middleware</span>
+                                </div>
+                            </div>
+                            <div class="mu__footer"><span class="mu__time">il y a 1 min</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Tool call -->
+                    <div class="mu mu--thread" style="opacity:0.7">
+                        <div class="mu__avatar mu__avatar--sm" style="border-color:var(--green);background:var(--bg-tertiary)">TD</div>
+                        <div style="flex:1">
+                            <div class="msg-tools" style="border:none;padding:0">
+                                <div class="msg-tool-call">
+                                    <span class="msg-tool-icon">></span>
+                                    <span class="msg-tool-name">code_edit</span>
+                                    <span class="msg-tool-result">src/auth/middleware.rs -- Added RBAC extraction layer</span>
+                                </div>
+                                <div class="msg-tool-call">
+                                    <span class="msg-tool-icon">></span>
+                                    <span class="msg-tool-name">git_commit</span>
+                                    <span class="msg-tool-result">feat(auth): add JWT middleware with role extraction</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input bar -->
+                <div style="display:flex;gap:var(--space-2);padding:var(--space-3) var(--space-4);border-top:1px solid var(--border);background:var(--bg-secondary)">
+                    <input type="text" placeholder="Message aux agents..." style="flex:1;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-2) var(--space-3);color:var(--text-primary);font-size:var(--text-base)" disabled>
+                    <button class="btn btn-primary btn-sm" disabled>Envoyer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ AGENT GRAPH TEMPLATE ═══════════ -->
+    <div id="ds-graph" class="ds-panel">
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-share"/></svg> Agent Graph</h3>
+            <p style="font-size:var(--text-base);color:var(--text-secondary);margin-bottom:1rem">Graphe SVG interactif montrant les agents, leurs connexions et etats en temps reel.</p>
+
+            <div style="display:grid;grid-template-columns:1fr 240px;gap:0;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-xl);overflow:hidden;max-width:960px;height:480px">
+                <!-- Graph canvas -->
+                <div style="position:relative;overflow:hidden">
+                    <!-- Controls -->
+                    <div style="position:absolute;top:var(--space-3);right:var(--space-3);display:flex;gap:var(--space-1);z-index:2">
+                        <button class="btn btn-sm" style="background:var(--bg-secondary);padding:var(--space-1) var(--space-2);font-size:var(--text-sm)">+</button>
+                        <button class="btn btn-sm" style="background:var(--bg-secondary);padding:var(--space-1) var(--space-2);font-size:var(--text-sm)">-</button>
+                        <button class="btn btn-sm" style="background:var(--bg-secondary);padding:var(--space-1) var(--space-2);font-size:var(--text-sm)">Fit</button>
+                    </div>
+                    <!-- Legend -->
+                    <div style="position:absolute;bottom:var(--space-3);left:var(--space-3);background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-2) var(--space-3);font-size:var(--text-xs);display:flex;gap:var(--space-3);z-index:2">
+                        <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:2px;background:var(--blue);display:inline-block"></span> sequential</span>
+                        <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:2px;background:var(--yellow);display:inline-block"></span> hierarchical</span>
+                        <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:2px;background:var(--purple);display:inline-block"></span> network</span>
+                    </div>
+
+                    <svg viewBox="0 0 600 440" style="width:100%;height:100%">
+                        <!-- Edges -->
+                        <line x1="300" y1="80" x2="140" y2="200" stroke="var(--yellow)" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="300" y1="80" x2="300" y2="200" stroke="var(--yellow)" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="300" y1="80" x2="460" y2="200" stroke="var(--yellow)" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="140" y1="200" x2="300" y2="200" stroke="var(--purple)" stroke-width="1" opacity="0.3" stroke-dasharray="4"/>
+                        <line x1="300" y1="200" x2="460" y2="200" stroke="var(--purple)" stroke-width="1" opacity="0.3" stroke-dasharray="4"/>
+                        <line x1="140" y1="200" x2="140" y2="340" stroke="var(--blue)" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="300" y1="200" x2="300" y2="340" stroke="var(--blue)" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="460" y1="200" x2="460" y2="340" stroke="var(--blue)" stroke-width="1.5" opacity="0.5"/>
+
+                        <!-- Node: Lead (top) -->
+                        <g transform="translate(220,30)">
+                            <rect width="160" height="80" rx="10" fill="var(--bg-secondary)" stroke="var(--green)" stroke-width="2"/>
+                            <circle cx="30" cy="28" r="14" fill="var(--bg-tertiary)" stroke="var(--green)" stroke-width="1.5"/>
+                            <text x="30" y="32" text-anchor="middle" fill="var(--text-on-accent)" font-size="11" font-weight="600">TD</text>
+                            <text x="52" y="26" fill="var(--text-primary)" font-size="12" font-weight="600">Thomas Dubois</text>
+                            <text x="52" y="40" fill="var(--text-secondary)" font-size="9">Lead Dev</text>
+                            <!-- Status: thinking -->
+                            <circle cx="140" cy="16" r="5" fill="var(--yellow)">
+                                <animate attributeName="opacity" values="1;0.4;1" dur="1.5s" repeatCount="indefinite"/>
+                            </circle>
+                            <text x="16" y="68" fill="var(--text-muted)" font-size="8">code_edit  git  deploy</text>
+                        </g>
+
+                        <!-- Node: Backend -->
+                        <g transform="translate(60,170)">
+                            <rect width="160" height="70" rx="10" fill="var(--bg-secondary)" stroke="var(--blue)" stroke-width="1.5"/>
+                            <circle cx="30" cy="24" r="14" fill="var(--bg-tertiary)" stroke="var(--blue)" stroke-width="1.5"/>
+                            <text x="30" y="28" text-anchor="middle" fill="var(--text-on-accent)" font-size="11" font-weight="600">JP</text>
+                            <text x="52" y="22" fill="var(--text-primary)" font-size="12" font-weight="600">Julien Petit</text>
+                            <text x="52" y="36" fill="var(--text-secondary)" font-size="9">Backend Dev</text>
+                            <circle cx="140" cy="14" r="5" fill="var(--green)"/>
+                            <text x="16" y="60" fill="var(--text-muted)" font-size="8">code_edit  code_search</text>
+                        </g>
+
+                        <!-- Node: Frontend -->
+                        <g transform="translate(220,170)">
+                            <rect width="160" height="70" rx="10" fill="var(--bg-secondary)" stroke="var(--purple)" stroke-width="1.5"/>
+                            <circle cx="30" cy="24" r="14" fill="var(--bg-tertiary)" stroke="var(--purple)" stroke-width="1.5"/>
+                            <text x="30" y="28" text-anchor="middle" fill="var(--text-on-accent)" font-size="11" font-weight="600">LM</text>
+                            <text x="52" y="22" fill="var(--text-primary)" font-size="12" font-weight="600">Lucas Moreau</text>
+                            <text x="52" y="36" fill="var(--text-secondary)" font-size="9">Frontend Dev</text>
+                            <circle cx="140" cy="14" r="5" fill="var(--green)"/>
+                            <text x="16" y="60" fill="var(--text-muted)" font-size="8">code_edit  figma</text>
+                        </g>
+
+                        <!-- Node: QA -->
+                        <g transform="translate(380,170)">
+                            <rect width="160" height="70" rx="10" fill="var(--bg-secondary)" stroke="var(--red)" stroke-width="1.5"/>
+                            <circle cx="30" cy="24" r="14" fill="var(--bg-tertiary)" stroke="var(--red)" stroke-width="1.5"/>
+                            <text x="30" y="28" text-anchor="middle" fill="var(--text-on-accent)" font-size="11" font-weight="600">YE</text>
+                            <text x="52" y="22" fill="var(--text-primary)" font-size="12" font-weight="600">Yassine El Ouardi</text>
+                            <text x="52" y="36" fill="var(--text-secondary)" font-size="9">QA Engineer</text>
+                            <circle cx="140" cy="14" r="5" fill="var(--text-secondary)"/>
+                            <text x="16" y="60" fill="var(--text-muted)" font-size="8">code_search  security</text>
+                        </g>
+
+                        <!-- Bottom nodes (task outputs) -->
+                        <g transform="translate(80,310)">
+                            <rect width="120" height="40" rx="6" fill="var(--bg-tertiary)" stroke="var(--border)" stroke-width="1"/>
+                            <text x="60" y="24" text-anchor="middle" fill="var(--text-secondary)" font-size="10">auth-service.rs</text>
+                        </g>
+                        <g transform="translate(240,310)">
+                            <rect width="120" height="40" rx="6" fill="var(--bg-tertiary)" stroke="var(--border)" stroke-width="1"/>
+                            <text x="60" y="24" text-anchor="middle" fill="var(--text-secondary)" font-size="10">LoginPage.svelte</text>
+                        </g>
+                        <g transform="translate(400,310)">
+                            <rect width="120" height="40" rx="6" fill="var(--bg-tertiary)" stroke="var(--border)" stroke-width="1"/>
+                            <text x="60" y="24" text-anchor="middle" fill="var(--text-secondary)" font-size="10">auth.spec.ts</text>
+                        </g>
+                    </svg>
+                </div>
+
+                <!-- Memory sidebar -->
+                <div style="border-left:1px solid var(--border);background:var(--bg-secondary);padding:var(--space-3);overflow-y:auto;display:flex;flex-direction:column;gap:var(--space-3)">
+                    <div style="font-size:var(--text-lg);font-weight:600;color:var(--text-primary);margin-bottom:var(--space-1)">Memoire</div>
+
+                    <div style="padding:var(--space-2);background:var(--bg-tertiary);border-radius:var(--radius-md)">
+                        <div style="font-size:var(--text-xs);color:var(--purple);font-weight:600;margin-bottom:2px">architecture</div>
+                        <div style="font-size:var(--text-sm);color:var(--text-secondary)">JWT + Redis token store, rotation on refresh</div>
+                    </div>
+                    <div style="padding:var(--space-2);background:var(--bg-tertiary);border-radius:var(--radius-md)">
+                        <div style="font-size:var(--text-xs);color:var(--red);font-weight:600;margin-bottom:2px">securite</div>
+                        <div style="font-size:var(--text-sm);color:var(--text-secondary)">Token replay attack mitige par rotation obligatoire</div>
+                    </div>
+                    <div style="padding:var(--space-2);background:var(--bg-tertiary);border-radius:var(--radius-md)">
+                        <div style="font-size:var(--text-xs);color:var(--green);font-weight:600;margin-bottom:2px">decision</div>
+                        <div style="font-size:var(--text-sm);color:var(--text-secondary)">RBAC middleware dans axum, roles en claims JWT</div>
+                    </div>
+                    <div style="padding:var(--space-2);background:var(--bg-tertiary);border-radius:var(--radius-md)">
+                        <div style="font-size:var(--text-xs);color:var(--blue);font-weight:600;margin-bottom:2px">convention</div>
+                        <div style="font-size:var(--text-sm);color:var(--text-secondary)">Rust error types dans crates/auth-error/</div>
+                    </div>
+
+                    <div style="margin-top:auto;font-size:var(--text-xs);color:var(--text-muted)">4 entrees -- mis a jour il y a 1 min</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ KANBAN TEMPLATE ═══════════ -->
+    <div id="ds-kanban" class="ds-panel">
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-layout"/></svg> Kanban Board</h3>
+            <p style="font-size:var(--text-base);color:var(--text-secondary);margin-bottom:1rem">Board 4 colonnes avec cartes de taches, assignation agents et indicateurs de statut.</p>
+
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-3);max-width:1100px">
+                {% set kanban_cols = [
+                    ('Backlog', 'text-secondary', [
+                        ('Audit dependances', 'securite', 'NB', 'red', 'WSJF 72'),
+                        ('Refactor token store', 'refactor', 'PD', 'blue', 'WSJF 45'),
+                        ('Documentation API', 'feature', 'AF', 'purple', 'WSJF 30'),
+                    ]),
+                    ('En cours', 'blue', [
+                        ('Auth middleware RBAC', 'feature', 'TD', 'green', 'WSJF 85'),
+                        ('Login page Svelte', 'feature', 'LM', 'purple', 'WSJF 80'),
+                    ]),
+                    ('Review', 'yellow', [
+                        ('E2E tests auth flow', 'test', 'YE', 'red', 'WSJF 78'),
+                    ]),
+                    ('Done', 'green', [
+                        ('Schema migration users', 'feature', 'JP', 'blue', 'WSJF 90'),
+                        ('JWT signing service', 'feature', 'JP', 'blue', 'WSJF 88'),
+                    ]),
+                ] %}
+
+                {% for col_name, col_color, tasks in kanban_cols %}
+                <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+                    <!-- Column header -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-2) var(--space-3);background:var(--bg-secondary);border-radius:var(--radius-lg);border:1px solid var(--border)">
+                        <div style="display:flex;align-items:center;gap:var(--space-2)">
+                            <span style="width:8px;height:8px;border-radius:var(--radius-full);background:var(--{{ col_color }})"></span>
+                            <span style="font-size:var(--text-lg);font-weight:600">{{ col_name }}</span>
+                        </div>
+                        <span style="font-size:var(--text-sm);color:var(--text-muted);background:var(--bg-tertiary);padding:1px 6px;border-radius:var(--radius-lg)">{{ tasks|length }}</span>
+                    </div>
+
+                    <!-- Task cards -->
+                    {% for title, type, initials, agent_color, wsjf in tasks %}
+                    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-3);display:flex;flex-direction:column;gap:var(--space-2);transition:border-color .15s;cursor:pointer" onmouseover="this.style.borderColor='var(--purple)'" onmouseout="this.style.borderColor='var(--border)'">
+                        <div style="display:flex;align-items:center;justify-content:space-between">
+                            <span class="pill pill--{{ type }}" style="font-size:var(--text-xs)">{{ type }}</span>
+                            <span style="font-size:var(--text-xs);color:var(--text-muted)">{{ wsjf }}</span>
+                        </div>
+                        <div style="font-size:var(--text-lg);font-weight:500;color:var(--text-primary)">{{ title }}</div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:var(--space-1)">
+                            <div style="width:24px;height:24px;border-radius:var(--radius-full);background:var(--bg-tertiary);border:1.5px solid var(--{{ agent_color }});display:flex;align-items:center;justify-content:center;font-size:var(--text-2xs);font-weight:600;color:var(--text-on-accent)">{{ initials }}</div>
+                            {% if col_name == 'En cours' %}
+                            <div style="flex:1;margin:0 var(--space-2);height:3px;background:var(--bg-tertiary);border-radius:2px;overflow:hidden">
+                                <div style="width:65%;height:100%;background:var(--purple);border-radius:2px"></div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ BACKLOG TEMPLATE ═══════════ -->
+    <div id="ds-backlog" class="ds-panel">
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-list"/></svg> Backlog Table</h3>
+            <p style="font-size:var(--text-base);color:var(--text-secondary);margin-bottom:1rem">Vue tabulaire du backlog avec tri, filtres, priorite WSJF et assignation.</p>
+
+            <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-xl);overflow:hidden;max-width:1000px">
+                <!-- Toolbar -->
+                <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border)">
+                    <input type="text" placeholder="Filtrer les taches..." style="flex:1;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--space-1) var(--space-3);color:var(--text-primary);font-size:var(--text-sm)" disabled>
+                    <div style="display:flex;gap:var(--space-1)">
+                        <button class="btn btn-sm" style="background:var(--bg-tertiary);font-size:var(--text-sm)" disabled>Type</button>
+                        <button class="btn btn-sm" style="background:var(--bg-tertiary);font-size:var(--text-sm)" disabled>Status</button>
+                        <button class="btn btn-sm" style="background:var(--bg-tertiary);font-size:var(--text-sm)" disabled>Agent</button>
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <table style="width:100%;border-collapse:collapse;font-size:var(--text-base)">
+                    <thead>
+                        <tr style="border-bottom:1px solid var(--border);background:var(--bg-tertiary)">
+                            <th style="text-align:left;padding:var(--space-2) var(--space-3);font-size:var(--text-sm);font-weight:600;color:var(--text-secondary);width:40px">WSJF</th>
+                            <th style="text-align:left;padding:var(--space-2) var(--space-3);font-size:var(--text-sm);font-weight:600;color:var(--text-secondary)">Tache</th>
+                            <th style="text-align:left;padding:var(--space-2) var(--space-3);font-size:var(--text-sm);font-weight:600;color:var(--text-secondary);width:90px">Type</th>
+                            <th style="text-align:left;padding:var(--space-2) var(--space-3);font-size:var(--text-sm);font-weight:600;color:var(--text-secondary);width:90px">Status</th>
+                            <th style="text-align:left;padding:var(--space-2) var(--space-3);font-size:var(--text-sm);font-weight:600;color:var(--text-secondary);width:120px">Agent</th>
+                            <th style="text-align:left;padding:var(--space-2) var(--space-3);font-size:var(--text-sm);font-weight:600;color:var(--text-secondary);width:80px">Domaine</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set backlog_items = [
+                            (90, 'Schema migration users table', 'feature', 'done', 'Julien Petit', 'backend', 'blue'),
+                            (88, 'JWT signing service + key rotation', 'feature', 'done', 'Julien Petit', 'backend', 'blue'),
+                            (85, 'Auth middleware RBAC extraction', 'feature', 'active', 'Thomas Dubois', 'backend', 'green'),
+                            (80, 'Login page + form validation', 'feature', 'active', 'Lucas Moreau', 'frontend', 'purple'),
+                            (78, 'E2E tests auth flow complet', 'test', 'review', 'Yassine El Ouardi', 'qa', 'red'),
+                            (72, 'Audit dependances securite', 'security', 'pending', 'Nadia Benali', 'securite', 'red'),
+                            (65, 'Rate limiting login endpoint', 'feature', 'pending', 'Non assigne', 'backend', 'text-secondary'),
+                            (45, 'Refactor token store interface', 'refactor', 'pending', 'Pierre Duval', 'backend', 'blue'),
+                            (30, 'Documentation API auth endpoints', 'feature', 'pending', 'Non assigne', 'docs', 'text-secondary'),
+                            (25, 'Smoke tests pages protegees', 'test', 'pending', 'Non assigne', 'qa', 'text-secondary'),
+                        ] %}
+
+                        {% for wsjf, title, type, status, agent, domain, color in backlog_items %}
+                        <tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='transparent'">
+                            <td style="padding:var(--space-2) var(--space-3);font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;color:{% if wsjf >= 80 %}var(--purple){% elif wsjf >= 60 %}var(--blue){% else %}var(--text-secondary){% endif %}">{{ wsjf }}</td>
+                            <td style="padding:var(--space-2) var(--space-3);font-weight:500;color:var(--text-primary)">{{ title }}</td>
+                            <td style="padding:var(--space-2) var(--space-3)"><span class="pill pill--{{ type }}">{{ type }}</span></td>
+                            <td style="padding:var(--space-2) var(--space-3)">
+                                <span style="display:inline-flex;align-items:center;gap:4px;font-size:var(--text-sm)">
+                                    <span style="width:6px;height:6px;border-radius:var(--radius-full);background:{% if status == 'done' %}var(--green){% elif status == 'active' %}var(--blue){% elif status == 'review' %}var(--yellow){% else %}var(--text-secondary){% endif %}"></span>
+                                    <span style="color:var(--text-secondary)">{{ status }}</span>
+                                </span>
+                            </td>
+                            <td style="padding:var(--space-2) var(--space-3)">
+                                <span style="display:inline-flex;align-items:center;gap:var(--space-1)">
+                                    {% if agent != 'Non assigne' %}
+                                    <span style="width:20px;height:20px;border-radius:var(--radius-full);background:var(--bg-tertiary);border:1px solid var(--{{ color }});display:inline-flex;align-items:center;justify-content:center;font-size:7px;font-weight:600;color:var(--text-on-accent)">{{ agent[:1] }}{{ agent.split(' ')[-1][:1] }}</span>
+                                    {% endif %}
+                                    <span style="font-size:var(--text-sm);color:var(--text-secondary)">{{ agent }}</span>
+                                </span>
+                            </td>
+                            <td style="padding:var(--space-2) var(--space-3);font-size:var(--text-sm);color:var(--text-muted)">{{ domain }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <!-- Footer -->
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-2) var(--space-4);background:var(--bg-tertiary);font-size:var(--text-sm);color:var(--text-muted)">
+                    <span>10 taches -- 4 types -- 5 agents</span>
+                    <span>Tri : WSJF decroissant</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showDsPanel(id, btn) {
+    document.querySelectorAll('.ds-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.ds-nav__item').forEach(b => b.classList.remove('active'));
+    document.getElementById('ds-' + id)?.classList.add('active');
+    btn.classList.add('active');
+}
+</script>
+{% endblock %}

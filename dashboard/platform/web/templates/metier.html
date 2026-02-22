@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<a href="/ideation" class="btn btn-primary">
+    <svg class="icon icon-sm"><use href="#icon-compass"/></svg> {{ _('new_idea') }}
+</a>
+{% endblock %}
+
+{% block content %}
+<style>
+/* ── Vue Métier — SAFe / LEAN ── */
+.met-layout{display:grid;grid-template-columns:1fr 320px;gap:1.2rem}
+@media(max-width:1000px){.met-layout{grid-template-columns:1fr}}
+
+.met-panel{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.met-panel-header{display:flex;align-items:center;justify-content:space-between;padding:0.7rem 0.9rem;border-bottom:1px solid var(--border)}
+.met-panel-title{font-size:0.82rem;font-weight:700;display:flex;align-items:center;gap:0.4rem}
+.met-panel-title svg{width:15px;height:15px;color:var(--purple)}
+.met-panel-body{padding:0.8rem 0.9rem}
+
+/* Flow KPIs row */
+.met-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:0.8rem;margin-bottom:1.2rem}
+.met-kpi{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.7rem 0.8rem;text-align:center}
+.met-kpi-value{font-size:1.4rem;font-weight:800;color:var(--text-primary);line-height:1}
+.met-kpi-label{font-size:0.62rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-top:0.25rem}
+.met-kpi.kpi-wip .met-kpi-value{color:var(--purple)}
+.met-kpi.kpi-done .met-kpi-value{color:var(--green,#22c55e)}
+.met-kpi.kpi-fail .met-kpi-value{color:var(--red,#ef4444)}
+.met-kpi.kpi-time .met-kpi-value{color:var(--blue,#3b82f6)}
+
+/* Epic pipeline */
+.met-epic{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:0.7rem;overflow:hidden;transition:border-color .15s}
+.met-epic:hover{border-color:var(--purple-light,#a78bfa)}
+.met-epic-header{display:flex;align-items:center;justify-content:space-between;padding:0.6rem 0.8rem;gap:0.6rem}
+.met-epic-name{font-size:0.78rem;font-weight:700;color:var(--text-primary);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.met-epic-brief{font-size:0.62rem;color:var(--text-muted);padding:0 0.8rem;margin-top:-0.3rem;margin-bottom:0.4rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.met-badge{font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:0.15rem 0.4rem;border-radius:3px;flex-shrink:0}
+.met-badge.running{background:rgba(124,58,237,.15);color:var(--purple)}
+.met-badge.completed,.met-badge.done{background:rgba(34,197,94,.12);color:var(--green,#22c55e)}
+.met-badge.failed{background:rgba(239,68,68,.12);color:var(--red,#ef4444)}
+.met-badge.pending{background:var(--bg-tertiary);color:var(--text-muted)}
+.met-badge.paused{background:rgba(251,191,36,.12);color:var(--yellow,#eab308)}
+
+/* Phase pipeline inside epic */
+.met-phases{display:flex;align-items:center;gap:0;padding:0 0.8rem 0.6rem;overflow-x:auto}
+.met-phase{display:flex;align-items:center;gap:0;flex-shrink:0}
+.met-phase-dot{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;background:var(--bg-tertiary);font-size:0.55rem;font-weight:700;color:var(--text-muted);transition:all .2s;position:relative}
+.met-phase-dot.done{border-color:var(--green,#22c55e);background:rgba(34,197,94,.1);color:var(--green,#22c55e)}
+.met-phase-dot.done_with_issues{border-color:var(--yellow,#eab308);background:rgba(251,191,36,.1);color:var(--yellow,#eab308)}
+.met-phase-dot.running{border-color:var(--purple);background:rgba(124,58,237,.1);color:var(--purple);animation:met-pulse 1.5s infinite}
+.met-phase-dot.failed{border-color:var(--red,#ef4444);background:rgba(239,68,68,.1);color:var(--red,#ef4444)}
+.met-phase-dot svg{width:13px;height:13px}
+.met-phase-label{font-size:0.55rem;color:var(--text-muted);position:absolute;top:30px;white-space:nowrap;max-width:60px;overflow:hidden;text-overflow:ellipsis}
+.met-phase-line{width:18px;height:2px;background:var(--border);flex-shrink:0}
+.met-phase-line.done{background:var(--green,#22c55e)}
+.met-phase-line.running{background:var(--purple)}
+
+/* Progress bar under header */
+.met-progress-bar{height:3px;background:var(--bg-tertiary)}
+.met-progress-fill{height:100%;background:linear-gradient(90deg,var(--purple),var(--purple-light,#a78bfa));transition:width .4s}
+
+/* Lead time tag */
+.met-lead-time{font-size:0.58rem;color:var(--text-muted);display:flex;align-items:center;gap:0.2rem;flex-shrink:0}
+.met-lead-time svg{width:11px;height:11px}
+
+@keyframes met-pulse{0%,100%{box-shadow:0 0 0 0 rgba(124,58,237,.3)}50%{box-shadow:0 0 0 5px rgba(124,58,237,0)}}
+
+/* Agent velocity bar chart */
+.met-vel{display:flex;flex-direction:column;gap:0.35rem}
+.met-vel-row{display:flex;align-items:center;gap:0.5rem}
+.met-vel-avatar{width:22px;height:22px;border-radius:50%;background:var(--bg-tertiary);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:0.55rem;font-weight:700;color:var(--text-muted);flex-shrink:0;overflow:hidden}
+.met-vel-avatar img{width:100%;height:100%;object-fit:cover}
+.met-vel-info{flex:1;min-width:0}
+.met-vel-name{font-size:0.68rem;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.met-vel-role{font-size:0.55rem;color:var(--text-muted)}
+.met-vel-bar{flex:0 0 60px;height:10px;background:var(--bg-tertiary);border-radius:2px;overflow:hidden}
+.met-vel-fill{height:100%;background:var(--purple);border-radius:2px;transition:width .5s}
+.met-vel-count{font-size:0.6rem;font-weight:700;color:var(--text-secondary);width:28px;text-align:right;flex-shrink:0}
+
+/* Calendar heatmap */
+.met-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;padding:0.5rem 0}
+.met-cal-day{width:100%;aspect-ratio:1;border-radius:3px;font-size:0.6rem;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);cursor:default;position:relative}
+.met-cal-day.l0{background:var(--bg-tertiary)}
+.met-cal-day.l1{background:rgba(124,58,237,.15);color:var(--purple-light)}
+.met-cal-day.l2{background:rgba(124,58,237,.3);color:var(--purple-light)}
+.met-cal-day.l3{background:rgba(124,58,237,.5);color:white}
+.met-cal-day.l4{background:var(--purple);color:white}
+.met-cal-header{font-size:0.55rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:center}
+
+/* Empty state */
+.met-empty{padding:2rem;text-align:center;color:var(--text-muted)}
+.met-empty svg{width:40px;height:40px;margin-bottom:0.6rem;opacity:.4}
+.met-empty-text{font-size:0.78rem;margin-bottom:0.3rem}
+.met-empty-sub{font-size:0.65rem}
+
+/* Workflow catalog mini cards */
+.met-wf-grid{display:flex;flex-direction:column;gap:0.4rem}
+.met-wf-card{display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.5rem;background:var(--bg-tertiary);border-radius:6px;cursor:pointer;transition:background .15s}
+.met-wf-card:hover{background:rgba(124,58,237,.08)}
+.met-wf-icon{width:24px;height:24px;border-radius:6px;background:rgba(124,58,237,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.met-wf-icon svg{width:13px;height:13px;color:var(--purple)}
+.met-wf-name{font-size:0.68rem;font-weight:600;color:var(--text-primary);flex:1}
+.met-wf-meta{font-size:0.58rem;color:var(--text-muted)}
+</style>
+
+<!-- ── LEAN Flow KPIs ── -->
+<div class="met-kpis">
+    <div class="met-kpi kpi-wip">
+        <div class="met-kpi-value">{{ wip }}</div>
+        <div class="met-kpi-label">{{ _("wip_en_cours") }}</div>
+    </div>
+    <div class="met-kpi kpi-done">
+        <div class="met-kpi-value">{{ completed }}</div>
+        <div class="met-kpi-label">{{ _("completed") }}</div>
+    </div>
+    <div class="met-kpi kpi-fail">
+        <div class="met-kpi-value">{{ failed }}</div>
+        <div class="met-kpi-label">{{ _("failed") }}</div>
+    </div>
+    <div class="met-kpi kpi-time">
+        <div class="met-kpi-value">{{ avg_lead_time }}h</div>
+        <div class="met-kpi-label">{{ _("lead_time_moy") }}</div>
+    </div>
+</div>
+
+<div class="met-layout">
+    <!-- Left: Epic Value Stream -->
+    <div style="display:flex;flex-direction:column;gap:1.2rem">
+        <!-- Epics pipeline -->
+        <div class="met-panel">
+            <div class="met-panel-header">
+                <div class="met-panel-title"><svg><use href="#icon-git-merge"/></svg> Value Stream — Epics</div>
+                <span style="font-size:0.62rem;color:var(--text-muted)">{{ total }} mission{{ 's' if total != 1 else '' }}</span>
+            </div>
+            <div class="met-panel-body" style="padding:0.6rem">
+                {% if epics %}
+                {% for epic in epics %}
+                <a href="/missions/{{ epic.id }}/control" style="text-decoration:none;color:inherit;display:block">
+                <div class="met-epic">
+                    <div class="met-epic-header">
+                        <div class="met-epic-name">{{ epic.name }}</div>
+                        {% if epic.lead_time_h is not none %}
+                        <div class="met-lead-time">
+                            <svg><use href="#icon-clock"/></svg> {{ epic.lead_time_h }}h
+                        </div>
+                        {% endif %}
+                        <div class="met-badge {{ epic.status }}">{{ epic.status }}</div>
+                    </div>
+                    {% if epic.brief %}
+                    <div class="met-epic-brief">{{ epic.brief }}</div>
+                    {% endif %}
+                    <div class="met-progress-bar">
+                        <div class="met-progress-fill" style="width:{{ epic.progress }}%"></div>
+                    </div>
+                    {% if epic.phase_nodes %}
+                    <div class="met-phases" style="padding-top:0.5rem;padding-bottom:0.8rem">
+                        {% for phase in epic.phase_nodes %}
+                        {% if not loop.first %}
+                        <div class="met-phase-line {{ phase.status if phase.status in ('done','done_with_issues','running') else '' }}"></div>
+                        {% endif %}
+                        <div class="met-phase">
+                            <div class="met-phase-dot {{ phase.status }}" title="{{ phase.name }} ({{ phase.pattern }})">
+                                {% if phase.status == 'done' %}
+                                <svg><use href="#icon-check"/></svg>
+                                {% elif phase.status == 'running' %}
+                                <svg><use href="#icon-play"/></svg>
+                                {% elif phase.status == 'failed' %}
+                                <svg><use href="#icon-x"/></svg>
+                                {% else %}
+                                {{ loop.index }}
+                                {% endif %}
+                                <div class="met-phase-label">{{ phase.name[:12] }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                </a>
+                {% endfor %}
+                {% else %}
+                <div class="met-empty">
+                    <svg><use href="#icon-inbox"/></svg>
+                    <div class="met-empty-text">{{ _('no_mission_active') }}</div>
+                    <div class="met-empty-sub">{{ _("launch_a_mission_from_pi_board") }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Workflow Catalog -->
+        <div class="met-panel">
+            <div class="met-panel-header">
+                <div class="met-panel-title"><svg><use href="#icon-layers"/></svg> Catalogue Workflows SAFe</div>
+            </div>
+            <div class="met-panel-body">
+                <div class="met-wf-grid">
+                    {% for wf in workflows %}
+                    <a href="/workflows/{{ wf.id }}" style="text-decoration:none;color:inherit">
+                    <div class="met-wf-card">
+                        <div class="met-wf-icon"><svg><use href="#icon-git-merge"/></svg></div>
+                        <div class="met-wf-name">{{ wf.name }}</div>
+                        <div class="met-wf-meta">{{ wf.phases_count }} phases · {{ wf.mission_count }} run{{ 's' if wf.mission_count != 1 else '' }}</div>
+                    </div>
+                    </a>
+                    {% endfor %}
+                    {% if not workflows %}
+                    <div style="font-size:0.68rem;color:var(--text-muted);padding:0.5rem">{{ _('no_workflow') }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right sidebar -->
+    <div style="display:flex;flex-direction:column;gap:1.2rem">
+        <!-- Throughput -->
+        <div class="met-panel">
+            <div class="met-panel-header">
+                <div class="met-panel-title"><svg><use href="#icon-trending-up"/></svg> Flow Metrics</div>
+            </div>
+            <div class="met-panel-body">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.6rem">
+                    <div style="text-align:center">
+                        <div style="font-size:1.1rem;font-weight:800;color:var(--purple)">{{ throughput_pct }}%</div>
+                        <div style="font-size:0.58rem;color:var(--text-muted);text-transform:uppercase">{{ _("throughput") }}</div>
+                    </div>
+                    <div style="text-align:center">
+                        <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary)">{{ agents_total }}</div>
+                        <div style="font-size:0.58rem;color:var(--text-muted);text-transform:uppercase">{{ _("agents_art") }}</div>
+                    </div>
+                </div>
+                <div style="height:1px;background:var(--border);margin:0.4rem 0"></div>
+                <div style="font-size:0.65rem;color:var(--text-muted);display:flex;justify-content:space-between;padding-top:0.3rem">
+                    <span>{{ _("wip_limit") }}</span>
+                    <span style="font-weight:700;color:{{ 'var(--red,#ef4444)' if wip > 5 else 'var(--green,#22c55e)' }}">{{ wip }}/5</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Agent velocity -->
+        <div class="met-panel">
+            <div class="met-panel-header">
+                <div class="met-panel-title"><svg><use href="#icon-users"/></svg> Vélocité Agents</div>
+            </div>
+            <div class="met-panel-body">
+                {% if agent_velocity %}
+                <div class="met-vel">
+                    {% for agent in agent_velocity %}
+                    <div class="met-vel-row">
+                        <div class="met-vel-avatar">
+                            {% if agent.avatar %}
+                            <img src="{{ agent.avatar }}" alt="">
+                            {% else %}
+                            {{ agent.name[:1] }}
+                            {% endif %}
+                        </div>
+                        <div class="met-vel-info">
+                            <div class="met-vel-name">{{ agent.name }}</div>
+                            <div class="met-vel-role">{{ agent.role }}</div>
+                        </div>
+                        <div class="met-vel-bar"><div class="met-vel-fill" style="width:{{ agent.pct }}%"></div></div>
+                        <div class="met-vel-count">{{ agent.count }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div style="font-size:0.68rem;color:var(--text-muted);padding:0.5rem;text-align:center">{{ _('no_activity') }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Activity heatmap -->
+        <div class="met-panel">
+            <div class="met-panel-header">
+                <div class="met-panel-title"><svg><use href="#icon-calendar"/></svg> Activité (28j)</div>
+            </div>
+            <div class="met-panel-body">
+                <div class="met-cal">
+                    <div class="met-cal-header">{{ _("lun") }}</div>
+                    <div class="met-cal-header">{{ _("mar") }}</div>
+                    <div class="met-cal-header">{{ _("mer") }}</div>
+                    <div class="met-cal-header">{{ _("jeu") }}</div>
+                    <div class="met-cal-header">{{ _("ven") }}</div>
+                    <div class="met-cal-header">{{ _("sam") }}</div>
+                    <div class="met-cal-header">{{ _("dim") }}</div>
+                    {% for day in calendar_days %}
+                    <div class="met-cal-day l{{ day.level }}" title="{{ day.count }} messages">{{ day.num }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

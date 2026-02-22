@@ -1,0 +1,159 @@
+"""
+Platform Tools — Expose platform internals (agents, missions, memory, metrics)
+as native executor tools. Same handlers as mcp_platform/server.py but in-process.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+from ..models import AgentInstance
+from .registry import BaseTool
+
+logger = logging.getLogger(__name__)
+
+
+class PlatformAgentsTool(BaseTool):
+    name = "platform_agents"
+    description = "List all platform agents or get details of one. Returns id, name, role, skills, tools, persona."
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..agents.store import get_agent_store
+        store = get_agent_store()
+        agent_id = params.get("agent_id")
+        if agent_id:
+            a = store.get(agent_id)
+            if not a:
+                return json.dumps({"error": f"Agent {agent_id} not found"})
+            return json.dumps({
+                "id": a.id, "name": a.name, "role": a.role,
+                "model": a.model, "provider": a.provider,
+                "skills": (a.skills or [])[:10],
+                "tools": (a.tools or [])[:10],
+                "persona": (a.persona or "")[:300],
+                "tagline": getattr(a, "tagline", ""),
+            })
+        agents = store.list_all()
+        return json.dumps([{
+            "id": a.id, "name": a.name, "role": a.role,
+        } for a in agents[:50]])
+
+
+class PlatformMissionsTool(BaseTool):
+    name = "platform_missions"
+    description = "List all missions/epics or get details of one, including phase statuses."
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..missions.store import get_mission_run_store
+        store = get_mission_run_store()
+        mission_id = params.get("mission_id")
+        if mission_id:
+            m = store.get(mission_id)
+            if not m:
+                return json.dumps({"error": f"Mission {mission_id} not found"})
+            phases = []
+            if m.phases:
+                for p in m.phases:
+                    phases.append({
+                        "phase_id": p.phase_id,
+                        "status": p.status.value if hasattr(p.status, "value") else str(p.status),
+                        "result": (p.result or "")[:200] if hasattr(p, "result") else "",
+                    })
+            return json.dumps({
+                "id": m.id, "brief": (m.brief or "")[:500],
+                "status": m.status.value if hasattr(m.status, "value") else str(m.status),
+                "workspace": m.workspace_path, "phases": phases,
+            })
+        runs = store.list_all()
+        return json.dumps([{
+            "id": m.id, "brief": (m.brief or "")[:100],
+            "status": m.status.value if hasattr(m.status, "value") else str(m.status),
+        } for m in (runs or [])[:20]])
+
+
+class PlatformMemoryTool(BaseTool):
+    name = "platform_memory_search"
+    description = "Search platform memory (project or global). FTS5 full-text search across all knowledge."
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..memory.manager import get_memory_manager
+        mem = get_memory_manager()
+        query = params.get("query", "")
+        project_id = params.get("project_id")
+        category = params.get("category")
+        limit = int(params.get("limit", 20))
+        if query:
+            entries = mem.search(query, limit=limit)
+        elif project_id:
+            entries = mem.project_get(project_id, category=category, limit=limit)
+        else:
+            entries = mem.global_get(category=category, limit=limit)
+        return json.dumps(entries[:limit], default=str)
+
+
+class PlatformMetricsTool(BaseTool):
+    name = "platform_metrics"
+    description = "Get platform statistics: agent count, missions, sessions, messages, memory entries."
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..db.migrations import get_db
+        db = get_db()
+        counts = {}
+        for table in ("agents", "mission_runs", "sessions", "messages"):
+            try:
+                counts[table] = db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            except Exception:
+                counts[table] = 0
+        return json.dumps(counts)
+
+
+class PlatformSessionsTool(BaseTool):
+    name = "platform_sessions"
+    description = "List recent sessions/ceremonies or get messages from a specific session."
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..sessions.store import get_session_store
+        store = get_session_store()
+        session_id = params.get("session_id")
+        if session_id:
+            limit = int(params.get("limit", 30))
+            msgs = store.get_messages(session_id, limit=limit)
+            return json.dumps([{
+                "from": m.from_agent, "to": m.to_agent,
+                "content": (m.content or "")[:400],
+            } for m in msgs])
+        sessions = store.list_recent(limit=20)
+        return json.dumps([{
+            "id": s.id, "name": s.name, "project_id": s.project_id,
+        } for s in sessions])
+
+
+class PlatformWorkflowsTool(BaseTool):
+    name = "platform_workflows"
+    description = "List available ceremony templates (workflows) with their phases, patterns, and agents."
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..workflows.store import get_workflow_store
+        store = get_workflow_store()
+        workflows = store.list_all()
+        return json.dumps([{
+            "id": w.id, "name": w.name,
+            "phases": len(w.phases) if w.phases else 0,
+        } for w in (workflows or [])[:20]])
+
+
+def register_platform_tools(registry):
+    """Register all platform introspection tools."""
+    registry.register(PlatformAgentsTool())
+    registry.register(PlatformMissionsTool())
+    registry.register(PlatformMemoryTool())
+    registry.register(PlatformMetricsTool())
+    registry.register(PlatformSessionsTool())
+    registry.register(PlatformWorkflowsTool())

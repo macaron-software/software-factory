@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#60a5fa"/><stop offset="100%" stop-color="#1d4ed8"/></linearGradient>
+<linearGradient id="skin" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c8956c"/><stop offset="100%" stop-color="#a87850"/></linearGradient>
+</defs>
+<circle cx="60" cy="60" r="60" fill="url(#bg)"/>
+<!-- Neck -->
+<path d="M48,82 Q48,90 46,96 L74,96 Q72,90 72,82 Z" fill="url(#skin)"/>
+<!-- Suit -->
+<path d="M28,120 Q28,95 46,96 L60,108 L74,96 Q92,95 92,120 Z" fill="#1e293b"/>
+<!-- Tie -->
+<path d="M56,96 L60,110 L64,96 Z" fill="#3b82f6"/>
+<!-- Shirt collar -->
+<path d="M46,96 L56,96 L58,100 L54,98 Z" fill="white"/>
+<path d="M74,96 L64,96 L62,100 L66,98 Z" fill="white"/>
+<!-- Face -->
+<ellipse cx="60" cy="58" rx="23" ry="27" fill="url(#skin)"/>
+<!-- Beard shadow -->
+<path d="M42,68 Q42,82 60,85 Q78,82 78,68 Q75,72 60,74 Q45,72 42,68 Z" fill="#2a1a0a" opacity="0.3"/>
+<!-- Hair short -->
+<path d="M37,48 Q37,28 60,26 Q83,28 83,48 L81,44 Q79,32 60,30 Q41,32 39,44 Z" fill="#1a0f06"/>
+<!-- Eyes -->
+<ellipse cx="49" cy="56" rx="3.5" ry="2.8" fill="#1a1a2e"/>
+<ellipse cx="71" cy="56" rx="3.5" ry="2.8" fill="#1a1a2e"/>
+<circle cx="50" cy="55.5" r="1" fill="white" opacity="0.6"/>
+<circle cx="72" cy="55.5" r="1" fill="white" opacity="0.6"/>
+<!-- Eyebrows thick -->
+<path d="M44,50 Q49,47 55,50" stroke="#1a0f06" stroke-width="1.8" fill="none"/>
+<path d="M65,50 Q71,47 76,50" stroke="#1a0f06" stroke-width="1.8" fill="none"/>
+<!-- Nose -->
+<path d="M60,58 Q57,66 56,68 Q60,69 64,68 Q63,66 60,58" fill="#b07850" opacity="0.4"/>
+<!-- Mouth -->
+<path d="M53,74 Q60,77 67,74" stroke="#8a6040" stroke-width="1.2" fill="none"/>
+<!-- Glasses -->
+<rect x="42" y="51" width="15" height="11" rx="3" fill="none" stroke="#334155" stroke-width="1.5"/>
+<rect x="63" y="51" width="15" height="11" rx="3" fill="none" stroke="#334155" stroke-width="1.5"/>
+<line x1="57" y1="56" x2="63" y2="56" stroke="#334155" stroke-width="1.2"/>
+</svg>

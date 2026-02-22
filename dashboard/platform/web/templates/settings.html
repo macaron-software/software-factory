@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="settings-page">
+    <section class="settings-section">
+        <h3>{{ _("llm_providers") }}</h3>
+        {% for p in providers %}
+        <div class="form-group" style="margin-bottom:12px;">
+            <label>{{ p.name }} <span class="badge {% if p.enabled %}badge-green{% else %}badge-red{% endif %}">{% if p.enabled %}active{% else %}no key{% endif %}</span></label>
+            <div style="font-size:13px;color:var(--text-secondary);">
+                {{ p.models|length }} models — default: {{ p.default_model }}
+            </div>
+        </div>
+        {% endfor %}
+    </section>
+
+    <section class="settings-section">
+        <h3>{{ _("server") }}</h3>
+        <div class="form-group">
+            <label>{{ _("host") }}</label>
+            <input type="text" value="{{ config.server.host }}" readonly>
+        </div>
+        <div class="form-group">
+            <label>{{ _("port") }}</label>
+            <input type="number" value="{{ config.server.port }}" readonly>
+        </div>
+    </section>
+
+    <section class="settings-section">
+        <h3>{{ _("orchestrator") }}</h3>
+        <div class="form-group">
+            <label>{{ _("default_pattern") }}</label>
+            <input type="text" value="{{ config.orchestrator.default_pattern }}" readonly>
+        </div>
+        <div class="form-group">
+            <label>{{ _("max_concurrent_sessions") }}</label>
+            <input type="number" value="{{ config.orchestrator.max_concurrent_sessions }}" readonly>
+        </div>
+    </section>
+
+    <p class="settings-note">
+        Set environment variables like <code>ANTHROPIC_API_KEY</code>, <code>AZURE_OPENAI_API_KEY</code> to enable providers.
+    </p>
+</div>
+{% endblock %}

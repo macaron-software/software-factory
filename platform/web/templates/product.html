@@ -1,0 +1,492 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<a href="/missions?action=new" class="btn btn-primary">
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Nouvel Epic
+</a>
+{% endblock %}
+
+{% block content %}
+<style>
+/* ── Product Management ── */
+.pm-grid{display:grid;grid-template-columns:1fr;gap:1.5rem;padding:0.5rem 0}
+.pm-filters{display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem}
+.pm-filter{padding:0.35rem 0.7rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);font-size:0.78rem;cursor:pointer;text-decoration:none;transition:all .15s}
+.pm-filter:hover,.pm-filter.active{border-color:var(--purple);color:var(--purple);background:rgba(124,58,237,.08)}
+
+/* Epic cards */
+.pm-epics{display:grid;gap:0.75rem}
+.pm-epic{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color .15s}
+.pm-epic:hover{border-color:var(--purple)}
+.pm-epic-header{padding:0.85rem 1rem;display:flex;align-items:center;gap:0.75rem;cursor:pointer}
+.pm-epic-header:hover{background:var(--bg-tertiary)}
+.pm-epic-chevron{width:16px;height:16px;color:var(--text-secondary);transition:transform .2s;flex-shrink:0}
+.pm-epic.open .pm-epic-chevron{transform:rotate(90deg)}
+.pm-epic-title{font-size:0.92rem;font-weight:700;flex:1;color:var(--text-primary)}
+.pm-epic-project{font-size:0.7rem;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.1rem 0.4rem;border-radius:4px}
+.pm-epic-stats{display:flex;gap:0.5rem;align-items:center}
+.pm-epic-stat{font-size:0.7rem;color:var(--text-secondary);display:flex;align-items:center;gap:0.2rem}
+.pm-epic-stat svg{width:12px;height:12px}
+.pm-epic-progress{width:60px;height:4px;background:var(--bg-tertiary);border-radius:2px;overflow:hidden}
+.pm-epic-progress-fill{height:100%;background:var(--green);border-radius:2px}
+.pm-epic-status{font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:4px;font-weight:600;text-transform:uppercase}
+.pm-epic-status.planning{background:rgba(251,191,36,.15);color:#fbbf24}
+.pm-epic-status.active{background:rgba(52,211,153,.15);color:#34d399}
+.pm-epic-status.completed{background:rgba(96,165,250,.15);color:#60a5fa}
+.pm-epic-status.blocked{background:rgba(248,113,113,.15);color:#f87171}
+.pm-wsjf-badge{font-size:0.65rem;padding:0.1rem 0.35rem;border-radius:4px;font-weight:700;background:rgba(124,58,237,.12);color:var(--purple);cursor:pointer}
+
+/* Features list */
+.pm-features{border-top:1px solid var(--border);display:none}
+.pm-epic.open .pm-features{display:block}
+.pm-feat{display:grid;grid-template-columns:auto 1fr auto auto auto auto;align-items:center;gap:0.6rem;padding:0.55rem 1rem 0.55rem 2rem;border-bottom:1px solid rgba(255,255,255,.04);font-size:0.82rem}
+.pm-feat:last-child{border-bottom:none}
+.pm-feat:hover{background:rgba(255,255,255,.02)}
+.pm-feat-icon{width:14px;height:14px;color:var(--text-secondary)}
+.pm-feat-name{color:var(--text-primary);font-weight:500}
+.pm-feat-points{font-size:0.7rem;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.1rem 0.35rem;border-radius:4px;min-width:30px;text-align:center}
+.pm-feat-assignee{font-size:0.7rem;color:var(--text-secondary)}
+.pm-feat-status{font-size:0.65rem;padding:0.1rem 0.35rem;border-radius:4px;font-weight:600}
+.pm-feat-status.backlog{background:rgba(107,114,128,.15);color:#9ca3af}
+.pm-feat-status.ready{background:rgba(251,191,36,.15);color:#fbbf24}
+.pm-feat-status.in_progress{background:rgba(59,130,246,.15);color:#60a5fa}
+.pm-feat-status.done{background:rgba(52,211,153,.15);color:#34d399}
+.pm-feat-status.blocked{background:rgba(248,113,113,.15);color:#f87171}
+
+/* Dependencies indicator */
+.pm-dep-badge{font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;cursor:pointer}
+.pm-dep-badge.has-deps{background:rgba(248,113,113,.12);color:#f87171}
+.pm-dep-badge.depended{background:rgba(96,165,250,.12);color:#60a5fa}
+
+/* Stories */
+.pm-stories{padding:0.25rem 0 0.25rem 3.5rem}
+.pm-story{display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0;font-size:0.78rem;color:var(--text-secondary)}
+.pm-story-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.pm-story-dot.backlog{background:#6b7280}
+.pm-story-dot.ready{background:var(--yellow)}
+.pm-story-dot.in_progress{background:var(--blue)}
+.pm-story-dot.done{background:var(--green)}
+.pm-story-title{flex:1}
+.pm-story-sp{font-size:0.68rem;background:var(--bg-tertiary);padding:0.05rem 0.3rem;border-radius:3px}
+
+/* Summary */
+.pm-summary{display:flex;gap:1.5rem;flex-wrap:wrap;padding:0.5rem 0;margin-bottom:0.5rem}
+.pm-summary-item{display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;color:var(--text-secondary)}
+.pm-summary-item svg{width:14px;height:14px}
+.pm-summary-value{font-weight:700;color:var(--text-primary)}
+
+.pm-empty{text-align:center;padding:3rem;color:var(--text-secondary);font-size:0.85rem}
+.pm-empty svg{width:48px;height:48px;margin-bottom:1rem;opacity:.3}
+
+.section-title{font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:0.75rem;display:flex;align-items:center;gap:0.5rem}
+.section-title svg{width:16px;height:16px}
+
+/* Inline create forms */
+.pm-add-btn{font-size:0.7rem;color:var(--purple);cursor:pointer;display:inline-flex;align-items:center;gap:0.25rem;padding:0.3rem 0.6rem;border:1px dashed var(--purple);border-radius:4px;background:transparent;margin:0.3rem 0 0.3rem 2rem;transition:background .15s}
+.pm-add-btn:hover{background:rgba(124,58,237,.08)}
+.pm-add-story-btn{margin-left:3.5rem}
+.pm-inline-form{display:none;padding:0.5rem 1rem 0.5rem 2rem;background:var(--bg-tertiary);border-bottom:1px solid var(--border)}
+.pm-inline-form.open{display:grid;grid-template-columns:1fr auto;gap:0.5rem;align-items:end}
+.pm-inline-form.story-form{padding-left:3.5rem}
+.pm-inline-form input,.pm-inline-form textarea{background:var(--bg-primary);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);padding:0.35rem 0.5rem;font-size:0.78rem;width:100%}
+.pm-inline-form input:focus,.pm-inline-form textarea:focus{border-color:var(--purple);outline:none}
+
+/* WSJF modal */
+.pm-modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center}
+.pm-modal-overlay.open{display:flex}
+.pm-modal{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;width:400px;max-width:90vw}
+.pm-modal h3{margin:0 0 1rem;font-size:1rem;color:var(--text-primary)}
+.pm-modal label{font-size:0.78rem;color:var(--text-secondary);display:block;margin:0.5rem 0 0.2rem}
+.pm-modal input[type=range]{width:100%;accent-color:var(--purple)}
+.pm-modal .pm-modal-row{display:flex;align-items:center;gap:0.5rem}
+.pm-modal .pm-modal-val{font-size:0.82rem;font-weight:700;color:var(--text-primary);min-width:30px;text-align:right}
+.pm-modal .pm-modal-actions{display:flex;gap:0.5rem;margin-top:1rem;justify-content:flex-end}
+.pm-modal .pm-wsjf-result{text-align:center;padding:0.75rem;background:var(--bg-tertiary);border-radius:6px;margin-top:0.75rem}
+.pm-modal .pm-wsjf-score{font-size:1.5rem;font-weight:700;color:var(--purple)}
+
+/* Drag-drop sortable */
+.pm-sortable-ghost{opacity:0.4;background:rgba(124,58,237,.1) !important}
+.pm-sortable-chosen{box-shadow:0 2px 8px rgba(124,58,237,0.3)}
+.pm-feat-drag{cursor:grab;color:var(--text-secondary);opacity:0.4;font-size:0.7rem}
+.pm-feat-drag:hover{opacity:1;color:var(--purple)}
+
+/* Dep modal */
+.pm-dep-list{max-height:200px;overflow-y:auto;margin:0.5rem 0}
+.pm-dep-item{display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0;font-size:0.78rem;border-bottom:1px solid rgba(255,255,255,.04)}
+.pm-dep-item .pm-dep-rm{cursor:pointer;color:var(--red);font-size:0.7rem}
+</style>
+
+<div class="pm-grid">
+
+    <!-- Summary stats -->
+    <div class="pm-summary">
+        <div class="pm-summary-item">
+            <svg><use href="#icon-rocket"/></svg>
+            <span class="pm-summary-value">{{ summary.epics }}</span> Epics
+        </div>
+        <div class="pm-summary-item">
+            <svg><use href="#icon-layers"/></svg>
+            <span class="pm-summary-value">{{ summary.features }}</span> Features
+        </div>
+        <div class="pm-summary-item">
+            <svg><use href="#icon-file-text"/></svg>
+            <span class="pm-summary-value">{{ summary.stories }}</span> User Stories
+        </div>
+        <div class="pm-summary-item">
+            <svg><use href="#icon-target"/></svg>
+            <span class="pm-summary-value">{{ summary.total_points }}</span> Story Points
+        </div>
+        <div class="pm-summary-item">
+            <svg><use href="#icon-check"/></svg>
+            <span class="pm-summary-value">{{ summary.done_pct }}%</span> {{ _("done") }}
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="pm-filters">
+        <a href="/product" class="pm-filter {% if not filter_project %}active{% endif %}">{{ _("tous") }}</a>
+        {% for p in projects %}
+        <a href="/product?project={{ p.id }}" class="pm-filter {% if filter_project == p.id %}active{% endif %}">{{ p.name }}</a>
+        {% endfor %}
+    </div>
+
+    <!-- Epics -->
+    <div>
+        <div class="section-title">
+            <svg class="icon icon-sm"><use href="#icon-rocket"/></svg> Backlog Produit
+        </div>
+
+        {% if not epics %}
+        <div class="pm-empty">
+            <svg><use href="#icon-layers"/></svg>
+            <div>{{ _('no_epic_create') }}</div>
+        </div>
+        {% endif %}
+
+        <div class="pm-epics">
+            {% for e in epics %}
+            <div class="pm-epic" id="epic-{{ e.id }}">
+                <div class="pm-epic-header" onclick="toggleEpic('{{ e.id }}')">
+                    <svg class="pm-epic-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    <div class="pm-epic-title">{{ e.name }}</div>
+                    <span class="pm-epic-project">{{ e.project_name }}</span>
+                    {% if e.wsjf_score > 0 %}
+                    <span class="pm-wsjf-badge" onclick="event.stopPropagation();openWSJF('{{ e.id }}',{{ e.business_value }},{{ e.time_criticality }},{{ e.risk_reduction }},{{ e.job_duration }})" title="WSJF Score">W:{{ e.wsjf_score }}</span>
+                    {% else %}
+                    <span class="pm-wsjf-badge" onclick="event.stopPropagation();openWSJF('{{ e.id }}',0,0,0,1)" title="Set WSJF" style="opacity:0.5">WSJF</span>
+                    {% endif %}
+                    <div class="pm-epic-stats">
+                        <span class="pm-epic-stat">
+                            <svg><use href="#icon-layers"/></svg>
+                            {{ e.features|length }}
+                        </span>
+                        <span class="pm-epic-stat">
+                            <svg><use href="#icon-target"/></svg>
+                            {{ e.total_points }} pts
+                        </span>
+                        {% if e.total_stories > 0 %}
+                        <div class="pm-epic-progress">
+                            <div class="pm-epic-progress-fill" style="width:{{ e.done_pct }}%"></div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <span class="pm-epic-status {{ e.status }}">{{ e.status }}</span>
+                </div>
+
+                <div class="pm-features" id="features-{{ e.id }}">
+                    {% for f in e.features %}
+                    <div class="pm-feat" data-feature-id="{{ f.id }}" data-priority="{{ loop.index }}">
+                        <span class="pm-feat-drag" title="Drag to reorder">⋮⋮</span>
+                        <span class="pm-feat-name">{{ f.name }}</span>
+                        <span class="pm-feat-points editable-sp" data-type="feature" data-id="{{ f.id }}" title="Click to edit">{{ f.story_points }} pts</span>
+                        {% if f.deps %}
+                        <span class="pm-dep-badge has-deps" onclick="event.stopPropagation();showDeps('{{ f.id }}')" title="Has {{ f.deps|length }} dependency(ies)">🔗{{ f.deps|length }}</span>
+                        {% elif f.depended_by %}
+                        <span class="pm-dep-badge depended" title="Required by {{ f.depended_by|length }} feature(s)">⬆{{ f.depended_by|length }}</span>
+                        {% endif %}
+                        <span class="pm-feat-status {{ f.status }}">{{ f.status }}</span>
+                        <span style="font-size:0.65rem;color:var(--text-secondary);cursor:pointer" onclick="event.stopPropagation();openDepModal('{{ f.id }}','{{ f.name }}')" title="Manage dependencies">🔗</span>
+                    </div>
+                    {% if f.stories %}
+                    <div class="pm-stories" data-feature-id="{{ f.id }}">
+                        {% for s in f.stories %}
+                        <div class="pm-story" data-story-id="{{ s.id }}">
+                            <span class="pm-story-dot {{ s.status }}"></span>
+                            <span class="pm-story-title">{{ s.title }}</span>
+                            {% if s.story_points %}<span class="pm-story-sp editable-sp" data-type="story" data-id="{{ s.id }}" title="Click to edit">{{ s.story_points }} pts</span>{% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <!-- Add Story button -->
+                    <button class="pm-add-btn pm-add-story-btn" onclick="toggleForm('story-form-{{ f.id }}')">
+                        <svg class="icon icon-xs"><use href="#icon-plus"/></svg> Story
+                    </button>
+                    <div class="pm-inline-form story-form" id="story-form-{{ f.id }}">
+                        <div>
+                            <input placeholder="User story title (As a... I want... so that...)" id="story-title-{{ f.id }}">
+                            <input placeholder="Story points" type="number" min="0" max="100" id="story-sp-{{ f.id }}" style="width:80px;margin-top:0.3rem">
+                        </div>
+                        <button class="btn btn-sm btn-primary" onclick="createStory('{{ f.id }}')">Add</button>
+                    </div>
+                    {% else %}
+                    <div class="pm-feat" style="justify-content:center;grid-template-columns:1fr">
+                        <span style="color:var(--text-secondary);font-size:0.78rem;font-style:italic">{{ _('no_feature') }}</span>
+                    </div>
+                    {% endfor %}
+
+                    <!-- Add Feature button -->
+                    <button class="pm-add-btn" onclick="toggleForm('feat-form-{{ e.id }}')">
+                        <svg class="icon icon-xs"><use href="#icon-plus"/></svg> Feature
+                    </button>
+                    <div class="pm-inline-form" id="feat-form-{{ e.id }}">
+                        <div>
+                            <input placeholder="Feature name" id="feat-name-{{ e.id }}">
+                            <input placeholder="Story points" type="number" min="0" max="100" id="feat-sp-{{ e.id }}" style="width:80px;margin-top:0.3rem">
+                        </div>
+                        <button class="btn btn-sm btn-primary" onclick="createFeature('{{ e.id }}')">Add</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- WSJF Modal -->
+<div class="pm-modal-overlay" id="wsjfModal">
+    <div class="pm-modal">
+        <h3>WSJF Calculator</h3>
+        <input type="hidden" id="wsjf-epic-id">
+        <label>Business Value</label>
+        <div class="pm-modal-row">
+            <input type="range" min="1" max="21" step="1" id="wsjf-bv" value="1" oninput="updateWSJF()">
+            <span class="pm-modal-val" id="wsjf-bv-val">1</span>
+        </div>
+        <label>Time Criticality</label>
+        <div class="pm-modal-row">
+            <input type="range" min="1" max="21" step="1" id="wsjf-tc" value="1" oninput="updateWSJF()">
+            <span class="pm-modal-val" id="wsjf-tc-val">1</span>
+        </div>
+        <label>Risk Reduction / Opportunity Enablement</label>
+        <div class="pm-modal-row">
+            <input type="range" min="1" max="21" step="1" id="wsjf-rr" value="1" oninput="updateWSJF()">
+            <span class="pm-modal-val" id="wsjf-rr-val">1</span>
+        </div>
+        <label>Job Duration (effort)</label>
+        <div class="pm-modal-row">
+            <input type="range" min="1" max="21" step="1" id="wsjf-jd" value="1" oninput="updateWSJF()">
+            <span class="pm-modal-val" id="wsjf-jd-val">1</span>
+        </div>
+        <div class="pm-wsjf-result">
+            <div style="font-size:0.72rem;color:var(--text-secondary)">Cost of Delay / Job Duration</div>
+            <div class="pm-wsjf-score" id="wsjf-score-display">0.0</div>
+        </div>
+        <div class="pm-modal-actions">
+            <button class="btn btn-sm btn-ghost" onclick="closeWSJF()">Cancel</button>
+            <button class="btn btn-sm btn-primary" onclick="saveWSJF()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Dependencies Modal -->
+<div class="pm-modal-overlay" id="depModal">
+    <div class="pm-modal">
+        <h3>Dependencies — <span id="dep-feat-name"></span></h3>
+        <input type="hidden" id="dep-feature-id">
+        <div class="pm-dep-list" id="dep-list"><!-- Loaded dynamically --></div>
+        <label>Add dependency (feature ID)</label>
+        <div style="display:flex;gap:0.5rem">
+            <input id="dep-add-input" placeholder="feat-xxxxxx" style="flex:1;background:var(--bg-primary);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);padding:0.35rem 0.5rem;font-size:0.78rem">
+            <button class="btn btn-sm btn-primary" onclick="addDep()">Add</button>
+        </div>
+        <div class="pm-modal-actions">
+            <button class="btn btn-sm btn-ghost" onclick="closeDep()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script>
+function toggleEpic(id) {
+    document.getElementById('epic-' + id).classList.toggle('open');
+}
+
+function toggleForm(id) {
+    document.getElementById(id).classList.toggle('open');
+}
+
+// ── Create Feature ──
+async function createFeature(epicId) {
+    const name = document.getElementById('feat-name-' + epicId).value.trim();
+    const sp = parseInt(document.getElementById('feat-sp-' + epicId).value) || 0;
+    if (!name) return;
+    try {
+        await fetch(`/api/epics/${epicId}/features`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name, story_points: sp}),
+        });
+        location.reload();
+    } catch(e) { console.error(e); }
+}
+
+// ── Create Story ──
+async function createStory(featureId) {
+    const title = document.getElementById('story-title-' + featureId).value.trim();
+    const sp = parseInt(document.getElementById('story-sp-' + featureId).value) || 0;
+    if (!title) return;
+    try {
+        await fetch(`/api/features/${featureId}/stories`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({title, story_points: sp}),
+        });
+        location.reload();
+    } catch(e) { console.error(e); }
+}
+
+// ── Inline story point editing ──
+document.querySelectorAll('.editable-sp').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', function() {
+        const current = parseInt(this.textContent) || 0;
+        const input = document.createElement('input');
+        input.type = 'number'; input.value = current; input.min = 0; input.max = 100;
+        input.style.cssText = 'width:50px;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--purple);border-radius:4px;padding:2px 4px;font-size:0.75rem;text-align:center';
+        const original = this.textContent;
+        this.textContent = '';
+        this.appendChild(input);
+        input.focus(); input.select();
+        const save = async () => {
+            const val = parseInt(input.value) || 0;
+            const type = el.dataset.type, id = el.dataset.id;
+            const url = type === 'feature' ? `/api/features/${id}` : `/api/stories/${id}`;
+            try {
+                await fetch(url, {method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({story_points:val})});
+                el.textContent = val + ' pts';
+            } catch(e) { el.textContent = original; }
+        };
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', e => { if(e.key==='Enter') input.blur(); if(e.key==='Escape') el.textContent = original; });
+    });
+});
+
+// ── Drag-drop reorder features ──
+document.querySelectorAll('.pm-features').forEach(container => {
+    const featItems = container.querySelectorAll('.pm-feat[data-feature-id]');
+    if (featItems.length < 2) return;
+    new Sortable(container, {
+        handle: '.pm-feat-drag',
+        animation: 150,
+        ghostClass: 'pm-sortable-ghost',
+        chosenClass: 'pm-sortable-chosen',
+        draggable: '.pm-feat[data-feature-id]',
+        onEnd: async function() {
+            const ids = [...container.querySelectorAll('.pm-feat[data-feature-id]')].map(el => el.dataset.featureId);
+            try {
+                await fetch('/api/backlog/reorder', {
+                    method: 'PATCH',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({type: 'feature', ids}),
+                });
+            } catch(e) { console.error(e); }
+        }
+    });
+});
+
+// ── WSJF Calculator ──
+function openWSJF(epicId, bv, tc, rr, jd) {
+    document.getElementById('wsjf-epic-id').value = epicId;
+    document.getElementById('wsjf-bv').value = bv || 1;
+    document.getElementById('wsjf-tc').value = tc || 1;
+    document.getElementById('wsjf-rr').value = rr || 1;
+    document.getElementById('wsjf-jd').value = jd || 1;
+    updateWSJF();
+    document.getElementById('wsjfModal').classList.add('open');
+}
+function closeWSJF() { document.getElementById('wsjfModal').classList.remove('open'); }
+function updateWSJF() {
+    const bv = parseInt(document.getElementById('wsjf-bv').value);
+    const tc = parseInt(document.getElementById('wsjf-tc').value);
+    const rr = parseInt(document.getElementById('wsjf-rr').value);
+    const jd = Math.max(parseInt(document.getElementById('wsjf-jd').value), 1);
+    document.getElementById('wsjf-bv-val').textContent = bv;
+    document.getElementById('wsjf-tc-val').textContent = tc;
+    document.getElementById('wsjf-rr-val').textContent = rr;
+    document.getElementById('wsjf-jd-val').textContent = jd;
+    const score = ((bv + tc + rr) / jd).toFixed(1);
+    document.getElementById('wsjf-score-display').textContent = score;
+}
+async function saveWSJF() {
+    const epicId = document.getElementById('wsjf-epic-id').value;
+    const body = {
+        business_value: parseInt(document.getElementById('wsjf-bv').value),
+        time_criticality: parseInt(document.getElementById('wsjf-tc').value),
+        risk_reduction: parseInt(document.getElementById('wsjf-rr').value),
+        job_duration: parseInt(document.getElementById('wsjf-jd').value),
+    };
+    try {
+        await fetch(`/api/missions/${epicId}/wsjf`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+        });
+        location.reload();
+    } catch(e) { console.error(e); }
+}
+
+// ── Dependencies ──
+function openDepModal(featureId, featureName) {
+    document.getElementById('dep-feature-id').value = featureId;
+    document.getElementById('dep-feat-name').textContent = featureName;
+    loadDeps(featureId);
+    document.getElementById('depModal').classList.add('open');
+}
+function closeDep() { document.getElementById('depModal').classList.remove('open'); }
+
+async function loadDeps(featureId) {
+    const list = document.getElementById('dep-list');
+    list.innerHTML = '<div style="font-size:0.75rem;color:var(--text-secondary)">Loading...</div>';
+    try {
+        const resp = await fetch(`/api/features/${featureId}/deps`);
+        const data = await resp.json();
+        if (!data.deps || data.deps.length === 0) {
+            list.innerHTML = '<div style="font-size:0.75rem;color:var(--text-secondary);font-style:italic">No dependencies</div>';
+            return;
+        }
+        list.innerHTML = data.deps.map(d =>
+            `<div class="pm-dep-item">
+                <span class="pm-feat-status ${d.status}">${d.status}</span>
+                <span style="flex:1">${d.name}</span>
+                <span class="pm-dep-rm" onclick="removeDep('${featureId}','${d.depends_on}')">✕</span>
+            </div>`
+        ).join('');
+    } catch(e) { list.innerHTML = '<div style="color:var(--red)">Error loading</div>'; }
+}
+
+async function addDep() {
+    const featureId = document.getElementById('dep-feature-id').value;
+    const dependsOn = document.getElementById('dep-add-input').value.trim();
+    if (!dependsOn) return;
+    try {
+        await fetch(`/api/features/${featureId}/deps`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({depends_on: dependsOn}),
+        });
+        document.getElementById('dep-add-input').value = '';
+        loadDeps(featureId);
+    } catch(e) { console.error(e); }
+}
+
+async function removeDep(featureId, dependsOn) {
+    try {
+        await fetch(`/api/features/${featureId}/deps/${dependsOn}`, {method: 'DELETE'});
+        loadDeps(featureId);
+    } catch(e) { console.error(e); }
+}
+
+async function showDeps(featureId) {
+    const el = document.querySelector(`[data-feature-id="${featureId}"] .pm-feat-name`);
+    openDepModal(featureId, el ? el.textContent : featureId);
+}
+</script>
+{% endblock %}

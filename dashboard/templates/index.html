@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Software Factory{% endblock %}
+
+{% block content %}
+<!-- Global Stats Cards -->
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <div class="text-sm text-gray-500 dark:text-gray-400">Total Tasks</div>
+        <div class="text-3xl font-bold">{{ "{:,}".format(stats.total) }}</div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <div class="text-sm text-gray-500 dark:text-gray-400">Deployed</div>
+        <div class="text-3xl font-bold text-green-600 dark:text-green-400">{{ "{:,}".format(stats.deployed) }}</div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <div class="text-sm text-gray-500 dark:text-gray-400">Pending</div>
+        <div class="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{{ "{:,}".format(stats.pending) }}</div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <div class="text-sm text-gray-500 dark:text-gray-400">In Progress</div>
+        <div class="text-3xl font-bold text-blue-600 dark:text-blue-400">{{ "{:,}".format(stats.in_progress) }}</div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <div class="text-sm text-gray-500 dark:text-gray-400">Failed</div>
+        <div class="text-3xl font-bold text-red-600 dark:text-red-400">{{ "{:,}".format(stats.failed) }}</div>
+    </div>
+</div>
+
+<!-- Global Progress Bar -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-8">
+    <div class="flex justify-between items-center mb-2">
+        <span class="text-sm font-medium">Overall Progress</span>
+        <span class="text-sm text-gray-500 dark:text-gray-400">{{ stats.success_pct }}% complete</span>
+    </div>
+    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
+        <div class="bg-green-600 h-4 rounded-full progress-bar" style="width: {{ stats.success_pct }}%"></div>
+    </div>
+</div>
+
+<!-- Projects Grid -->
+<h2 class="text-xl font-bold mb-4">Projects</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+    {% for project in projects %}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow">
+        <div class="p-4">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-2">
+                    {% if project.running %}
+                    <span class="w-3 h-3 bg-green-500 rounded-full animate-pulse-green"></span>
+                    {% else %}
+                    <span class="w-3 h-3 bg-gray-400 rounded-full"></span>
+                    {% endif %}
+                    <a href="/project/{{ project.id }}" class="font-semibold text-lg hover:text-blue-600 dark:hover:text-blue-400">
+                        {{ project.display_name }}
+                    </a>
+                </div>
+                {% if project.running %}
+                <span class="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
+                    {{ project.workers }} worker{% if project.workers != 1 %}s{% endif %}
+                </span>
+                {% endif %}
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-cols-4 gap-2 text-center text-sm mb-3">
+                <div>
+                    <div class="text-green-600 dark:text-green-400 font-bold">{{ project.stats.deployed }}</div>
+                    <div class="text-xs text-gray-500">deployed</div>
+                </div>
+                <div>
+                    <div class="text-yellow-600 dark:text-yellow-400 font-bold">{{ project.stats.pending }}</div>
+                    <div class="text-xs text-gray-500">pending</div>
+                </div>
+                <div>
+                    <div class="text-blue-600 dark:text-blue-400 font-bold">{{ project.stats.in_progress }}</div>
+                    <div class="text-xs text-gray-500">active</div>
+                </div>
+                <div>
+                    <div class="text-red-600 dark:text-red-400 font-bold">{{ project.stats.failed }}</div>
+                    <div class="text-xs text-gray-500">failed</div>
+                </div>
+            </div>
+
+            <!-- Progress bar -->
+            {% set pct = (project.stats.deployed / project.stats.total * 100) if project.stats.total > 0 else 0 %}
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-3">
+                <div class="bg-green-600 h-2 rounded-full" style="width: {{ pct|round(1) }}%"></div>
+            </div>
+
+            <!-- Domains -->
+            <div class="flex flex-wrap gap-1 mb-3">
+                {% for domain in project.domains[:5] %}
+                <span class="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded">
+                    {{ domain }}
+                </span>
+                {% endfor %}
+            </div>
+
+            <!-- Actions -->
+            <div class="flex justify-between items-center pt-3 border-t border-gray-200 dark:border-gray-700">
+                <a href="/project/{{ project.id }}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                    View details
+                </a>
+                <div class="flex space-x-2">
+                    {% if project.running %}
+                    <button
+                        hx-post="/api/daemons/{{ project.id }}/cycle/stop"
+                        hx-swap="none"
+                        hx-on::after-request="location.reload()"
+                        class="text-xs bg-red-100 hover:bg-red-200 dark:bg-red-900 dark:hover:bg-red-800 text-red-800 dark:text-red-200 px-2 py-1 rounded">
+                        Stop
+                    </button>
+                    {% else %}
+                    <button
+                        hx-post="/api/daemons/{{ project.id }}/cycle/start"
+                        hx-swap="none"
+                        hx-on::after-request="location.reload()"
+                        class="text-xs bg-green-100 hover:bg-green-200 dark:bg-green-900 dark:hover:bg-green-800 text-green-800 dark:text-green-200 px-2 py-1 rounded">
+                        Start
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Team of Rivals Metrics -->
+<h2 class="text-xl font-bold mb-4">Team of Rivals - Quality Metrics</h2>
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+        Cascaded critics based on arXiv:2601.14351 "If You Want Coherence, Orchestrate a Team of Rivals"
+    </p>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <!-- L0 Fast -->
+        <div>
+            <div class="flex justify-between items-center mb-1">
+                <span class="text-sm font-medium">L0: Fast Checks</span>
+                <span class="text-xs text-gray-500">target: 25%</span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                <div class="bg-purple-600 h-3 rounded-full" style="width: 0%"></div>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">Deterministic patterns</div>
+        </div>
+
+        <!-- L1a Code -->
+        <div>
+            <div class="flex justify-between items-center mb-1">
+                <span class="text-sm font-medium">L1a: Code Critic</span>
+                <span class="text-xs text-gray-500">target: 60%</span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                <div class="bg-blue-600 h-3 rounded-full" style="width: 28%"></div>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">MiniMax M2.1 - SLOP detection</div>
+        </div>
+
+        <!-- L1b Security -->
+        <div>
+            <div class="flex justify-between items-center mb-1">
+                <span class="text-sm font-medium">L1b: Security</span>
+                <span class="text-xs text-gray-500">target: 15%</span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                <div class="bg-orange-600 h-3 rounded-full" style="width: 0%"></div>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">GLM-4.7 - OWASP</div>
+        </div>
+
+        <!-- L2 Arch -->
+        <div>
+            <div class="flex justify-between items-center mb-1">
+                <span class="text-sm font-medium">L2: Architecture</span>
+                <span class="text-xs text-gray-500">target: 10%</span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                <div class="bg-red-600 h-3 rounded-full" style="width: 100%"></div>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">Opus 4.5 - Design review</div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<h2 class="text-xl font-bold mb-4">Quick Actions</h2>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <a href="/tasks?status=pending" class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 hover:shadow-lg transition-shadow text-center">
+        <div class="text-2xl mb-2">&#128203;</div>
+        <div class="font-medium">Pending Tasks</div>
+        <div class="text-sm text-gray-500">{{ "{:,}".format(stats.pending) }} tasks</div>
+    </a>
+    <a href="/tasks?status=build_failed" class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 hover:shadow-lg transition-shadow text-center">
+        <div class="text-2xl mb-2">&#128679;</div>
+        <div class="font-medium">Failed Builds</div>
+        <div class="text-sm text-gray-500">{{ "{:,}".format(stats.failed) }} tasks</div>
+    </a>
+    <a href="/tasks?status=deployed" class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 hover:shadow-lg transition-shadow text-center">
+        <div class="text-2xl mb-2">&#127881;</div>
+        <div class="font-medium">Deployed</div>
+        <div class="text-sm text-gray-500">{{ "{:,}".format(stats.deployed) }} tasks</div>
+    </a>
+    <a href="/tasks" class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 hover:shadow-lg transition-shadow text-center">
+        <div class="text-2xl mb-2">&#128269;</div>
+        <div class="font-medium">All Tasks</div>
+        <div class="text-sm text-gray-500">Browse & filter</div>
+    </a>
+</div>
+{% endblock %}
