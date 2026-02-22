@@ -948,6 +948,22 @@ async def api_mission_start(request: Request):
     except Exception as e:
         logger.warning("Could not create epic record: %s", e)
 
+    # Auto-provision TMA, Security, Debt missions for the project
+    try:
+        from ...projects.manager import get_project_store, Project
+        _ps = get_project_store()
+        if project_id and not _ps.get(project_id):
+            _ps.create(Project(
+                id=project_id,
+                name=brief[:60] or wf.name,
+                path=workspace_path,
+                description=brief[:200],
+            ))
+        if project_id:
+            _ps.auto_provision(project_id, brief[:60] or wf.name)
+    except Exception as _prov_err:
+        logger.warning("auto_provision failed for %s: %s", project_id, _prov_err)
+
     # Create a session for the orchestrator agent
     session_store = get_session_store()
     session_id = uuid.uuid4().hex[:8]
@@ -1600,11 +1616,12 @@ async def api_mission_run(request: Request, mission_id: str):
     async def _safe_run():
         try:
             async with _mission_semaphore:
-                logger.info("Mission %s acquired semaphore, starting execution", mission_id)
+                logger.warning("ORCH mission=%s acquired semaphore, starting", mission_id)
                 await orchestrator.run_phases()
+                logger.warning("ORCH mission=%s completed normally", mission_id)
         except Exception as exc:
             import traceback
-            logger.error("Mission %s _run_phases crashed: %s\n%s", mission_id, exc, traceback.format_exc())
+            logger.error("ORCH mission=%s CRASHED: %s\n%s", mission_id, exc, traceback.format_exc())
             try:
                 mission.status = MissionStatus.FAILED
                 run_store.update(mission)

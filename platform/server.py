@@ -128,6 +128,22 @@ async def lifespan(app: FastAPI):
     if _orphaned:
         logger.info("Marked %d orphaned active sessions as interrupted", _orphaned)
 
+    # Reset stale "running" mission_runs (orphaned after container restart)
+    from .missions.store import get_mission_run_store
+    _mrs = get_mission_run_store()
+    try:
+        from .db.migrations import get_db as _gdb
+        _rdb = _gdb()
+        _stale = _rdb.execute(
+            "UPDATE mission_runs SET status='interrupted' WHERE status='running'"
+        ).rowcount
+        _rdb.commit()
+        _rdb.close()
+        if _stale:
+            logger.warning("Reset %d stale running mission_runs to interrupted", _stale)
+    except Exception as e:
+        logger.warning("Failed to reset stale missions: %s", e)
+
     # Start unified MCP SF server (platform + LRM tools merged)
     _mcp_procs: dict[str, Any] = {}
 

@@ -83,6 +83,17 @@ class MissionOrchestrator:
         agent_store = self.agent_store
         session_id = self.session_id
 
+        logger.warning("ORCH START mission=%s phases=%d session=%s", mission.id, len(mission.phases), session_id)
+
+        # Stop any existing agent loops for this session to avoid conflicts
+        try:
+            from ..agents.loop import get_loop_manager
+            mgr = get_loop_manager()
+            await mgr.stop_session(session_id)
+            logger.warning("ORCH stopped existing agent loops for session %s", session_id)
+        except Exception as e:
+            logger.warning("ORCH stop loops: %s", e)
+
         workspace = mission.workspace_path or ""
         phases_done = 0
         phases_failed = 0
@@ -96,7 +107,7 @@ class MissionOrchestrator:
         wf_config = wf.config if hasattr(wf, 'config') and isinstance(wf.config, dict) else {}
         acceptance_criteria = get_criteria_for_workflow(wf.id, wf_config, workspace=workspace)
         if acceptance_criteria:
-            logger.info("Evidence gate: %d acceptance criteria for workflow %s", len(acceptance_criteria), wf.id)
+            logger.warning("ORCH evidence gate: %d criteria for %s", len(acceptance_criteria), wf.id)
 
         i = 0
         while i < len(mission.phases):
@@ -128,12 +139,12 @@ class MissionOrchestrator:
                             phase_agents.append(aid)
                 if phase_agents:
                     aids = phase_agents
-                    logger.info("Dynamic team for %s: %s (from graph)", wf_phase.id, aids)
+                    logger.warning("ORCH team for %s: %s (from graph)", wf_phase.id, aids)
                 else:
                     # Fallback: assign generic dev agents
                     fallback = ["lead_dev", "lead_backend", "lead_frontend"]
                     aids = [a for a in fallback if agent_store.get(a)][:3] or ["lead_dev"]
-                    logger.info("Dynamic team for %s: %s (fallback)", wf_phase.id, aids)
+                    logger.warning("ORCH team for %s: %s (fallback)", wf_phase.id, aids)
 
             # Dynamic lead/reviewer resolution
             if not aids and cfg.get("dynamic_lead"):
@@ -145,17 +156,17 @@ class MissionOrchestrator:
                             aids.append(aid)
                 if not aids:
                     aids = ["system-architect-art"]
-                logger.info("Dynamic lead for %s: %s", wf_phase.id, aids)
+                logger.warning("ORCH lead for %s: %s", wf_phase.id, aids)
 
             if not aids and cfg.get("dynamic_reviewers"):
                 aids = ["system-architect-art"]
-                logger.info("Dynamic reviewers for %s: %s", wf_phase.id, aids)
+                logger.warning("ORCH reviewers for %s: %s", wf_phase.id, aids)
 
             if not aids and cfg.get("dynamic_deployer"):
                 aids = ["ft-infra-lead"]
                 if not agent_store.get("ft-infra-lead"):
                     aids = ["devops"]
-                logger.info("Dynamic deployer for %s: %s", wf_phase.id, aids)
+                logger.warning("ORCH deployer for %s: %s", wf_phase.id, aids)
 
             # Build CDP context: workspace state + previous phase summaries
             cdp_context = ""
@@ -214,6 +225,7 @@ class MissionOrchestrator:
             phase.agent_count = len(aids)
             mission.current_phase = phase.phase_id
             run_store.update(mission)
+            logger.warning("ORCH phase=%s status=RUNNING agents=%s pattern=%s", phase.phase_id, aids, pattern_type)
 
             await self._push_sse(session_id, {
                 "type": "phase_started",
@@ -274,7 +286,7 @@ class MissionOrchestrator:
                         )
                         sprint = _ms.create_sprint(sprint)
                         current_sprint_id = sprint.id
-                        logger.info("SAFe Sprint created: %s (num=%d, mission=%s)", sprint.id, sprint_num, mission.id)
+                        logger.warning("ORCH Sprint created: %s (num=%d, mission=%s)", sprint.id, sprint_num, mission.id)
                     except Exception as e:
                         logger.warning("Sprint creation failed: %s", e)
 
@@ -545,6 +557,7 @@ class MissionOrchestrator:
                 phase.status = PhaseStatus.DONE if phase_success else PhaseStatus.FAILED
 
             phase_success = (phase.status == PhaseStatus.DONE)
+            logger.warning("ORCH phase=%s status=%s", phase.phase_id, phase.status.value)
 
             phase.completed_at = datetime.utcnow()
             if phase_success:
@@ -620,7 +633,7 @@ class MissionOrchestrator:
                     if phase.phase_id in ("dev-sprint",):
                         _fdb.execute("UPDATE features SET status='in_progress' WHERE epic_id=? AND status='backlog'", (mission.id,))
                         _fdb.commit()
-                    elif phase.phase_id in ("qa-campaign", "qa-execution", "deploy-prod"):
+                    elif phase.phase_id in ("qa-campaign", "qa-execution", "deploy-prod", "feature-deploy"):
                         _fdb.execute("UPDATE features SET status='done' WHERE epic_id=? AND status='in_progress'", (mission.id,))
                         _fdb.commit()
                     rows = _fdb.execute("SELECT name, status, priority, story_points FROM features WHERE epic_id=?", (mission.id,)).fetchall()
@@ -644,7 +657,7 @@ class MissionOrchestrator:
             })
 
             # Feedback loop: activate TMA after deploy phase
-            if phase_success and phase.phase_id in ("deploy-prod", "deploy", "deploy-feature", "tma-handoff"):
+            if phase_success and phase.phase_id in ("deploy-prod", "deploy", "deploy-feature", "feature-deploy", "tma-handoff"):
                 try:
                     from ..missions.feedback import on_deploy_completed
                     if mission.project_id:
@@ -653,7 +666,7 @@ class MissionOrchestrator:
                     logger.warning("Feedback on_deploy_completed failed: %s", _fb_err)
 
             # Feedback: create TMA incident on deploy failure
-            if not phase_success and phase.phase_id in ("deploy-prod", "deploy", "deploy-feature"):
+            if not phase_success and phase.phase_id in ("deploy-prod", "deploy", "deploy-feature", "feature-deploy"):
                 try:
                     from ..missions.feedback import on_deploy_failed
                     if mission.project_id:
