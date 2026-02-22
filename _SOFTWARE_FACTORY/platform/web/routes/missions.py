@@ -1616,11 +1616,12 @@ async def api_mission_run(request: Request, mission_id: str):
     async def _safe_run():
         try:
             async with _mission_semaphore:
-                logger.info("Mission %s acquired semaphore, starting execution", mission_id)
+                logger.warning("ORCH mission=%s acquired semaphore, starting", mission_id)
                 await orchestrator.run_phases()
+                logger.warning("ORCH mission=%s completed normally", mission_id)
         except Exception as exc:
             import traceback
-            logger.error("Mission %s _run_phases crashed: %s\n%s", mission_id, exc, traceback.format_exc())
+            logger.error("ORCH mission=%s CRASHED: %s\n%s", mission_id, exc, traceback.format_exc())
             try:
                 mission.status = MissionStatus.FAILED
                 run_store.update(mission)
