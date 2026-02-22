@@ -2,17 +2,19 @@
 
 ## STRUCTURE
 ```
-_FACTORY_CORE/         # Utils: subprocess, logging, LLM, daemon
-_SOFTWARE_FACTORY/     # SF — TDD automation + Agent Platform
-  cli/factory.py       # CLI: factory <project> <command>
+_SOFTWARE_FACTORY/     # Agent Platform + Dashboard
   cli/sf.py            # CLI: sf <command> (platform client, SSE streaming)
-  core/                # Brain, TDD workers, adversarial, FRACTAL
+  cli/_api.py          # httpx REST + SSE streaming client
+  cli/_db.py           # SQLite direct (offline mode)
+  cli/_output.py       # ANSI tables, colors, JSON output
+  cli/_stream.py       # SSE consumer, agent colorizer
+  dashboard/           # Lightweight monitoring dashboard (port 8080)
   platform/            # Agent Platform — FastAPI web app
     server.py          # Port 8090 (prod) / 8099 (dev)
     web/routes/        # 10 sub-modules (helpers.py: _parse_body dual JSON/form)
     a2a/               # Agent-to-Agent: bus, negotiation, veto
     agents/            # Loop, executor, store (156 agents)
-    patterns/          # 12 orchestration patterns
+    patterns/          # 15 orchestration patterns (12 DB + 3 engine-only)
     missions/          # SAFe lifecycle + ProductBacklog
     workflows/         # 36 builtin workflows
     llm/               # Multi-provider client + observability
@@ -21,9 +23,14 @@ _SOFTWARE_FACTORY/     # SF — TDD automation + Agent Platform
     services/          # Notification (Slack/Email/Webhook)
     mcps/              # MCP server manager (fetch, memory, playwright)
     deploy/            # Dockerfile + docker-compose (Azure VM)
-  data/                # SQLite DBs (factory.db, platform.db)
-_MIGRATION_FACTORY/    # Angular migration engine (ISO 100%)
+  mcp_lrm/             # MCP LRM server (port 9500)
+  skills/              # Agent YAML definitions
+  projects/            # Per-project configs
+  data/                # SQLite DBs (platform.db)
+  tests/               # pytest + Playwright E2E
+  deploy/              # Helm charts
 ```
+Legacy: `_SOFTWARE_FACTORY-old/` (core/, factory CLI, brain, TDD workers — archived)
 
 ## REPO + DEPLOY
 ```
@@ -35,16 +42,14 @@ Demo:   PLATFORM_LLM_PROVIDER=demo (mock, no key)
 
 ## RUN
 ```bash
-# Factory CLI
-cd _SOFTWARE_FACTORY && source setup_env.sh
-factory <p> brain run --mode vision|fix|security|refactor|missing
-factory <p> cycle start -w 5 -b 20 -t 30
-
 # Platform CLI
 sf status | sf ideation "prompt" | sf missions list | sf projects chat ID "msg"
 
 # Platform dev (NEVER --reload, ALWAYS --ws none)
 python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8099 --ws none --log-level warning
+
+# Dashboard (local monitoring)
+python3 -m dashboard.server  # → http://localhost:8080
 
 # Tests
 python3 -m pytest tests/ -v                    # 52 tests
@@ -133,9 +138,10 @@ Other:         tech-debt-reduction (5), review-cycle (2), sf-pipeline (3),
                migration-sharelook (8)
 ```
 
-### 12 PATTERNS (engine.py)
-solo, sequential, parallel, loop, hierarchical, network, router, aggregator,
-human-in-the-loop, adversarial-pair, adversarial-cascade, wave
+### 15 PATTERNS (12 in DB + 3 engine-only)
+DB: solo-chat, sequential, parallel, hierarchical, router, aggregator,
+    human-in-the-loop, adversarial-pair, adversarial-cascade, debate, sf-tdd, wave
+Engine-only: solo, loop, network
 
 ### ADVERSARIAL (Team of Rivals — arXiv:2601.14351)
 ```
@@ -145,6 +151,7 @@ L2: architecture (RBAC, validation, API design) → VETO + ESCALATION
 Multi-vendor: Brain=Opus, Worker=MiniMax, Security=GLM, Arch=Opus
 Rule: "Code writers cannot declare their own success"
 Retry: 5 attempts max → NodeStatus.FAILED
+CoVe (arXiv:2309.11495): 4-stage anti-hallucination (Draft→Verify→Answer→Final)
 ```
 
 ### MISSION CONTROL (11 phases)
@@ -202,37 +209,7 @@ LLM: per-call tracing (provider, model, tokens, cost). Live: `/monitoring` SSE.
 DSI/CTO `/dsi`, Métier `/metier` (SAFe value stream), Portfolio `/`, Board `/projects/{id}/board`
 Ideation `/ideation` → 5 agents network debate → "Créer Epic"
 
-## SF PIPELINE (core/)
-```
-Brain(Opus) → FRACTAL(3 concerns) → TDD Workers(//) → Adversarial → Build → Infra → Deploy → E2E → Promote/Rollback → XP
-```
-CoVe (arXiv:2309.11495): 4-stage anti-hallucination. Applied: Brain, Adversarial, Infra.
-AO Traceability: no feature without AO ref. Config: `ao_compliance.*` in projects/*.yaml.
-
-### CORE MODULES
-```
-brain.py:           Recursive analysis, 10 modes (vision/fix/security/perf/refactor/test/migrate/debt/missing)
-cycle_worker.py:    TDD→BUILD→DEPLOY batch, no FRACTAL. PREFERRED (20x less CPU than wiggum)
-fractal.py:         L1=3 concerns, L2=KISS atomic (impl→test→verify)
-adversarial.py:     100% LLM+CoVe, zero regex. Context-aware (CLI Exit≠skip)
-project_context.py: RAG 10 categories, FTS5, auto-refresh 1h, 12K chars
-meta_awareness.py:  Cross-project error detection (50+ reps → SYSTEMIC)
-tmc_runner.py:      k6 load tests. p95<500ms, errors<1%, >50rps
-chaos_runner.py:    kill/latency/cpu scenarios, 30s recovery, auto-rollback
-```
-
-### FACTORY CLI
-```bash
-factory <p> brain run --mode vision|fix|security|perf|refactor|test|migrate|debt|missing
-factory <p> cycle start -w 5 -b 20 -t 30    # PREFERRED
-factory <p> infra check|diagnose|fix
-factory queue start|stop|status
-factory meta status|analyze --create-tasks
-factory xp analyze --apply
-factory status --all
-```
-
-## KEY FILES
+## KEY FILES (all under platform/)
 ```
 server.py, models.py, config.py
 llm/client.py, llm/observability.py
@@ -248,6 +225,7 @@ tools/tool_runner.py, tools/code_tools.py, tools/mcp_bridge.py
 web/routes/{helpers,pages,missions,projects,agents,sessions,patterns,workflows,metrics,settings}.py
 ops/auto_heal.py, ops/chaos_endurance.py, ops/run_backup.py
 mcps/manager.py
+cli/sf.py, cli/_api.py, cli/_db.py, cli/_output.py, cli/_stream.py
 ```
 
 ## DB
@@ -257,7 +235,6 @@ mcps/manager.py
 ## CONVENTIONS
 - ⛔ ZERO SKIP: NEVER test.skip/@ts-ignore/#[ignore] — FIX > SKIP
 - Adversarial 100% LLM (never regex)
-- Cycle > Wiggum (batch build, 20x less CPU)
 - HTMX: readyState check (not DOMContentLoaded). Enum: `_s(val)` helper.
 - Process cleanup: start_new_session=True + os.killpg() on timeout
 
