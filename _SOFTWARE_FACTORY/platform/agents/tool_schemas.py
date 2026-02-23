@@ -1469,7 +1469,7 @@ def _get_tool_schemas() -> list[dict]:
         {
             "type": "function",
             "function": {
-                "name": "mcp_playwright_browser_screenshot",
+                "name": "mcp_playwright_browser_take_screenshot",
                 "description": "Take a PNG screenshot of the current browser page. Use after browser_navigate to capture visual state for QA evidence.",
                 "parameters": {
                     "type": "object",
@@ -1708,7 +1708,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "mcp_playwright_browser_navigate",
         "mcp_playwright_browser_snapshot",
         "mcp_playwright_browser_click",
-        "mcp_playwright_browser_screenshot",
+        "mcp_playwright_browser_take_screenshot",
         "mcp_playwright_browser_type",
         "mcp_memory_search_nodes",
     ],

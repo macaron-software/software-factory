@@ -699,9 +699,9 @@ async def _tool_browse(args: dict, ctx: ExecutionContext) -> str:
 
 
 async def _tool_take_screenshot(args: dict, ctx: ExecutionContext) -> str:
-    """Take a PNG screenshot. Alias for mcp_playwright_browser_screenshot."""
+    """Take a PNG screenshot. Alias for mcp_playwright_browser_take_screenshot."""
     return await _tool_mcp_dynamic(
-        "mcp_playwright_browser_screenshot",
+        "mcp_playwright_browser_take_screenshot",
         {
             "name": args.get("name", "screenshot"),
             "selector": args.get("selector", ""),
@@ -789,7 +789,7 @@ async def _tool_run_e2e_tests(args: dict, ctx: ExecutionContext) -> str:
 
         for name in ["homepage", "main-view"]:
             ss_result = await _tool_mcp_dynamic(
-                "mcp_playwright_browser_screenshot", {"name": name}, ctx
+                "mcp_playwright_browser_take_screenshot", {"name": name}, ctx
             )
             results.append(f"[screenshot:{name}] {ss_result[:200]}")
             screenshots_taken += 1
