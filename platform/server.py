@@ -564,6 +564,8 @@ def create_app() -> FastAPI:
 
     # ── SAFe perspective middleware ─────────────────────────────────────
     SAFE_PERSPECTIVES = {
+        "overview",
+        "dsi",
         "portfolio_manager",
         "rte",
         "product_owner",
