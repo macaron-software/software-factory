@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from .agents import router as agents_router
+from .analytics import router as analytics_router
 from .api import router as api_router
 from .cli import router as cli_router
 from .helpers import _active_mission_tasks, serve_workspace_file
@@ -30,6 +31,7 @@ router.include_router(api_router)
 router.include_router(cli_router)
 router.include_router(sf_router)
 router.include_router(tma_router)
+router.include_router(analytics_router)
 
 # Workspace file serving (needs to be on the main router)
 router.add_api_route("/workspace/{path:path}", serve_workspace_file, methods=["GET"])

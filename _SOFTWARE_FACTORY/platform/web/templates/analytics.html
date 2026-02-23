@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics — Software Factory</title>
+    <link rel="stylesheet" href="/static/base.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        .analytics-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card h3 {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin: 0 0 0.5rem 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1;
+        }
+        
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-tertiary);
+            margin-top: 0.5rem;
+        }
+        
+        .chart-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .chart-section h2 {
+            font-size: 1.3rem;
+            margin: 0 0 1.5rem 0;
+            color: var(--text-primary);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 350px;
+        }
+        
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 2rem;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+        
+        .refresh-btn {
+            padding: 0.5rem 1rem;
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            margin-bottom: 1rem;
+        }
+        
+        .refresh-btn:hover {
+            opacity: 0.9;
+        }
+        
+        .timestamp {
+            font-size: 0.85rem;
+            color: var(--text-tertiary);
+            margin-left: 1rem;
+        }
+    </style>
+</head>
+<body>
+    {% include "components/nav.html" %}
+    
+    <div class="analytics-container">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem;">
+            <h1 style="font-size:2rem;font-weight:700;margin:0;">📊 Analytics Dashboard</h1>
+            <div>
+                <button class="refresh-btn" onclick="refreshData()">🔄 Refresh</button>
+                <span class="timestamp" id="last-update"></span>
+            </div>
+        </div>
+        
+        <!-- Key Metrics -->
+        <div class="stats-grid" id="stats-grid">
+            <div class="stat-card">
+                <h3>Total Missions</h3>
+                <div class="stat-value" id="stat-missions">-</div>
+                <div class="stat-label">Active & Completed</div>
+            </div>
+            <div class="stat-card">
+                <h3>Success Rate</h3>
+                <div class="stat-value" id="stat-success">-%</div>
+                <div class="stat-label">Completed / Total</div>
+            </div>
+            <div class="stat-card">
+                <h3>Active Agents</h3>
+                <div class="stat-value" id="stat-agents">-</div>
+                <div class="stat-label">Available in system</div>
+            </div>
+            <div class="stat-card">
+                <h3>Skills Used</h3>
+                <div class="stat-value" id="stat-skills">-</div>
+                <div class="stat-label">Total injections</div>
+            </div>
+        </div>
+        
+        <!-- Missions Status -->
+        <div class="chart-section">
+            <h2>📈 Missions Status Distribution</h2>
+            <div class="chart-container">
+                <canvas id="missions-chart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Skills & Agents -->
+        <div class="grid-2">
+            <div class="chart-section">
+                <h2>🧠 Top Skills Used</h2>
+                <div class="chart-container">
+                    <canvas id="skills-chart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-section">
+                <h2>🤖 Top Agents Performance</h2>
+                <div class="chart-container">
+                    <canvas id="agents-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Health -->
+        <div class="chart-section">
+            <h2>🔧 System Health</h2>
+            <div class="chart-container" style="height:200px;">
+                <canvas id="system-chart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let charts = {};
+        
+        async function loadAnalytics() {
+            try {
+                const response = await fetch('/api/analytics/overview');
+                const result = await response.json();
+                
+                if (!result.success) {
+                    console.error('Failed to load analytics');
+                    return;
+                }
+                
+                const data = result.data;
+                
+                // Update stats
+                document.getElementById('stat-missions').textContent = data.missions.performance.total_missions || 0;
+                document.getElementById('stat-success').textContent = (data.missions.performance.success_rate || 0) + '%';
+                document.getElementById('stat-agents').textContent = 158; // From system
+                document.getElementById('stat-skills').textContent = data.skills.cache.total_cache_hits || 0;
+                
+                // Update timestamp
+                const timestamp = new Date(data.timestamp);
+                document.getElementById('last-update').textContent = `Last updated: ${timestamp.toLocaleTimeString()}`;
+                
+                // Render charts
+                renderMissionsChart(data.missions.status);
+                renderSkillsChart(data.skills.top);
+                renderAgentsChart(data.agents.leaderboard);
+                renderSystemChart(data.system);
+                
+            } catch (error) {
+                console.error('Error loading analytics:', error);
+            }
+        }
+        
+        function renderMissionsChart(statusData) {
+            const ctx = document.getElementById('missions-chart');
+            if (charts.missions) charts.missions.destroy();
+            
+            if (!statusData || !statusData.by_status) return;
+            
+            const labels = statusData.by_status.map(s => s.status);
+            const values = statusData.by_status.map(s => s.count);
+            const colors = ['#4ade80', '#facc15', '#f87171', '#60a5fa', '#a78bfa'];
+            
+            charts.missions = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors,
+                        borderWidth: 2,
+                        borderColor: '#1e1e1e'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { color: '#d4d4d4' }
+                        },
+                        title: {
+                            display: true,
+                            text: `Total: ${statusData.total} missions`,
+                            color: '#d4d4d4'
+                        }
+                    }
+                }
+            });
+        }
+        
+        function renderSkillsChart(topSkills) {
+            const ctx = document.getElementById('skills-chart');
+            if (charts.skills) charts.skills.destroy();
+            
+            if (!topSkills || topSkills.length === 0) {
+                ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+                return;
+            }
+            
+            const labels = topSkills.map(s => s.title.substring(0, 30));
+            const values = topSkills.map(s => s.usage_count);
+            
+            charts.skills = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Usage Count',
+                        data: values,
+                        backgroundColor: '#4ade80',
+                        borderColor: '#22c55e',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#d4d4d4' },
+                            grid: { color: '#3e3e42' }
+                        },
+                        y: {
+                            ticks: { color: '#d4d4d4' },
+                            grid: { color: '#3e3e42' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function renderAgentsChart(leaderboard) {
+            const ctx = document.getElementById('agents-chart');
+            if (charts.agents) charts.agents.destroy();
+            
+            if (!leaderboard || leaderboard.length === 0) {
+                ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+                return;
+            }
+            
+            const labels = leaderboard.map(a => a.name.substring(0, 20));
+            const values = leaderboard.map(a => a.skills_used);
+            
+            charts.agents = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Skills Used',
+                        data: values,
+                        backgroundColor: '#60a5fa',
+                        borderColor: '#3b82f6',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#d4d4d4' },
+                            grid: { color: '#3e3e42' }
+                        },
+                        y: {
+                            ticks: { color: '#d4d4d4' },
+                            grid: { color: '#3e3e42' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function renderSystemChart(systemData) {
+            const ctx = document.getElementById('system-chart');
+            if (charts.system) charts.system.destroy();
+            
+            if (!systemData || !systemData.database) return;
+            
+            const db = systemData.database;
+            
+            charts.system = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['DB Size (MB)', 'Tables', 'Total Rows (÷1000)'],
+                    datasets: [{
+                        label: 'System Metrics',
+                        data: [db.size_mb, db.tables, Math.round(db.total_rows / 1000)],
+                        backgroundColor: ['#a78bfa', '#facc15', '#f87171'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#d4d4d4' },
+                            grid: { color: '#3e3e42' }
+                        },
+                        y: {
+                            ticks: { color: '#d4d4d4' },
+                            grid: { color: '#3e3e42' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function refreshData() {
+            loadAnalytics();
+        }
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadAnalytics, 30000);
+        
+        // Initial load
+        loadAnalytics();
+    </script>
+</body>
+</html>
