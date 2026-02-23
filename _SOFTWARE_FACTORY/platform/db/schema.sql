@@ -481,3 +481,18 @@ CREATE TABLE IF NOT EXISTS mission_runs (
 
 CREATE INDEX IF NOT EXISTS idx_mission_runs_project ON mission_runs(project_id);
 CREATE INDEX IF NOT EXISTS idx_mission_runs_status ON mission_runs(status);
+
+-- Custom AI Providers: User-configurable LLM providers
+CREATE TABLE IF NOT EXISTS custom_ai_providers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    provider_type TEXT NOT NULL DEFAULT 'openai-compatible',
+    base_url TEXT NOT NULL,
+    api_key_encrypted TEXT NOT NULL,
+    default_model TEXT NOT NULL,
+    enabled INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_custom_ai_enabled ON custom_ai_providers(enabled);

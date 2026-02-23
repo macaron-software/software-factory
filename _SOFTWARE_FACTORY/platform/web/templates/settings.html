@@ -210,7 +210,7 @@
     <!-- ═══ LLM Providers ═══ -->
     <div class="settings-panel" id="panel-providers">
         <section class="settings-section">
-            <h3>{{ _("llm_providers") }}</h3>
+            <h3>Built-in LLM Providers</h3>
             {% for p in providers %}
             <div class="form-group" style="margin-bottom:12px;">
                 <label>{{ p.name }} <span class="badge {% if p.enabled %}badge-green{% else %}badge-red{% endif %}">{% if p.enabled %}active{% else %}no key{% endif %}</span></label>
@@ -219,10 +219,62 @@
                 </div>
             </div>
             {% endfor %}
+            <p class="settings-note">
+                Set environment variables like <code>ANTHROPIC_API_KEY</code>, <code>AZURE_OPENAI_API_KEY</code> to enable providers.
+            </p>
         </section>
-        <p class="settings-note">
-            Set environment variables like <code>ANTHROPIC_API_KEY</code>, <code>AZURE_OPENAI_API_KEY</code> to enable providers.
-        </p>
+
+        <section class="settings-section" style="margin-top:2rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <h3 style="margin:0">Custom AI Providers</h3>
+                <button class="btn btn-primary btn-sm" onclick="showAddProviderModal()">
+                    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Add Provider
+                </button>
+            </div>
+            <div id="custom-providers-list">
+                <p style="color:var(--text-secondary);font-size:0.85rem">Loading...</p>
+            </div>
+        </section>
+    </div>
+</div>
+
+<!-- Add Provider Modal -->
+<div id="add-provider-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;padding:2rem;overflow-y:auto">
+    <div style="max-width:520px;margin:auto;background:var(--bg-primary);border-radius:12px;border:1px solid var(--border);padding:1.5rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem">
+            <h3 style="margin:0">Add Custom AI Provider</h3>
+            <button onclick="document.getElementById('add-provider-modal').style.display='none'" style="background:none;border:none;color:var(--text-secondary);font-size:1.5rem;cursor:pointer">&times;</button>
+        </div>
+        <form id="add-provider-form" onsubmit="saveCustomProvider(event)">
+            <div class="form-group">
+                <label>Provider Name</label>
+                <input type="text" name="name" placeholder="My Custom LLM" required>
+            </div>
+            <div class="form-group">
+                <label>Provider Type</label>
+                <select name="provider_type">
+                    <option value="openai-compatible">OpenAI Compatible</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Base URL</label>
+                <input type="url" name="base_url" placeholder="https://api.example.com" required>
+            </div>
+            <div class="form-group">
+                <label>API Key</label>
+                <input type="password" name="api_key" placeholder="sk-..." required>
+            </div>
+            <div class="form-group">
+                <label>Default Model</label>
+                <input type="text" name="default_model" placeholder="gpt-4" required>
+            </div>
+            <div style="display:flex;gap:0.5rem;margin-top:1.5rem">
+                <button type="submit" class="btn btn-primary" style="flex:1">Save Provider</button>
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('add-provider-modal').style.display='none'">Cancel</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -233,6 +285,11 @@ function showSettingsTab(id) {
     document.getElementById('panel-'+id).classList.add('active');
     event.target.closest('.settings-tab').classList.add('active');
     try { localStorage.setItem('settings_tab', id); } catch(e){}
+    
+    // Load custom providers when switching to providers tab
+    if (id === 'providers') {
+        loadCustomProviders();
+    }
 }
 // Restore last tab
 try {
@@ -269,7 +326,7 @@ async function saveInteg(id) {
     const j = await r.json();
     if (j.ok) {
         const btn = event.target.closest('button');
-        btn.textContent = '✓ Saved'; setTimeout(() => btn.innerHTML = '<svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save', 1500);
+        btn.textContent = '[+] Saved'; setTimeout(() => btn.innerHTML = '<svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save', 1500);
     }
 }
 
@@ -283,6 +340,139 @@ async function testInteg(id) {
     dot.className = 'integ-status-dot ' + (j.ok ? 'connected' : 'error');
     if (label) label.textContent = j.ok ? 'connected' : 'error: ' + (j.error || 'failed');
     btn.disabled = false; btn.innerHTML = '<svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-zap"/></svg> Test';
+}
+
+// Custom AI Providers
+async function loadCustomProviders() {
+    try {
+        const r = await fetch('/api/ai-providers');
+        const j = await r.json();
+        const list = document.getElementById('custom-providers-list');
+        
+        if (!j.ok || !j.providers || j.providers.length === 0) {
+            list.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem">No custom providers configured</p>';
+            return;
+        }
+        
+        list.innerHTML = j.providers.map(p => `
+            <div class="integ-card ${p.enabled ? 'enabled' : ''}" style="margin-bottom:1rem">
+                <div class="integ-header">
+                    <div class="integ-icon" style="background:rgba(124,58,237,.15);color:#7c3aed">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6M23 12h-6m-6 0H5"/></svg>
+                    </div>
+                    <div class="integ-info">
+                        <div class="integ-name">${p.name}</div>
+                        <div class="integ-type">${p.provider_type}</div>
+                    </div>
+                    <label class="integ-toggle">
+                        <input type="checkbox" ${p.enabled ? 'checked' : ''} onchange="toggleCustomProvider('${p.id}', this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="integ-desc">
+                    Base URL: ${p.base_url}<br>
+                    Model: ${p.default_model}
+                </div>
+                <div class="integ-actions">
+                    <button class="btn btn-ghost btn-sm" onclick="testCustomProvider('${p.id}')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-zap"/></svg> Test
+                    </button>
+                    <button class="btn btn-ghost btn-sm" onclick="deleteCustomProvider('${p.id}')" style="font-size:0.72rem;color:var(--red)">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-trash"/></svg> Delete
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.error('Failed to load custom providers:', e);
+    }
+}
+
+function showAddProviderModal() {
+    document.getElementById('add-provider-modal').style.display = 'block';
+    document.getElementById('add-provider-form').reset();
+}
+
+async function saveCustomProvider(e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+        name: form.name.value,
+        provider_type: form.provider_type.value,
+        base_url: form.base_url.value,
+        api_key: form.api_key.value,
+        default_model: form.default_model.value
+    };
+    
+    try {
+        const r = await fetch('/api/ai-providers', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        const j = await r.json();
+        
+        if (j.ok) {
+            document.getElementById('add-provider-modal').style.display = 'none';
+            loadCustomProviders();
+        } else {
+            alert('Error: ' + (j.error || 'Failed to save provider'));
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function toggleCustomProvider(id, enabled) {
+    await fetch(`/api/ai-providers/${id}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({enabled})
+    });
+}
+
+async function testCustomProvider(id) {
+    const btn = event.target.closest('button');
+    btn.disabled = true;
+    btn.textContent = 'Testing...';
+    
+    try {
+        const r = await fetch(`/api/ai-providers/${id}/test`, {method: 'POST'});
+        const j = await r.json();
+        
+        if (j.ok) {
+            btn.textContent = '[+] Connected';
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-zap"/></svg> Test';
+            }, 2000);
+        } else {
+            alert('Connection failed: ' + (j.error || 'Unknown error'));
+            btn.disabled = false;
+            btn.innerHTML = '<svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-zap"/></svg> Test';
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-zap"/></svg> Test';
+    }
+}
+
+async function deleteCustomProvider(id) {
+    if (!confirm('Delete this provider?')) return;
+    
+    try {
+        const r = await fetch(`/api/ai-providers/${id}`, {method: 'DELETE'});
+        const j = await r.json();
+        
+        if (j.ok) {
+            loadCustomProviders();
+        } else {
+            alert('Error: ' + (j.error || 'Failed to delete'));
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
 }
 </script>
 {% endblock %}
