@@ -273,6 +273,12 @@ async def report_js_error(request: Request, report: JSErrorReport):
             "VALUES (?, '', ?, ?, 'medium', 'js-error', 'browser', 'open')",
             (tid, title, desc),
         )
+        # Bridge to platform_incidents so auto-heal picks it up
+        db.execute(
+            "INSERT OR IGNORE INTO platform_incidents (id, title, severity, status, source, error_type, error_detail, created_at) "
+            "VALUES (?, ?, 'P3', 'open', 'js-error', 'js-error', ?, datetime('now'))",
+            (f"js-{tid}", title, desc),
+        )
         db.commit()
         db.close()
         logger.info("JS error ticket created: %s — %s", tid, title)
