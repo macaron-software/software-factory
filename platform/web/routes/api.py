@@ -2649,6 +2649,8 @@ async def notification_test():
 # ── SAFe Perspective ───────────────────────────────────────────────────
 
 SAFE_PERSPECTIVES = {
+    "overview",
+    "dsi",
     "portfolio_manager",
     "rte",
     "product_owner",
@@ -2661,6 +2663,8 @@ SAFE_PERSPECTIVES = {
 }
 
 PERSPECTIVE_LABELS = {
+    "overview": "Overview",
+    "dsi": "DSI",
     "portfolio_manager": "Portfolio Manager",
     "rte": "RTE",
     "product_owner": "Product Owner",
@@ -2674,14 +2678,16 @@ PERSPECTIVE_LABELS = {
 
 # Which sidebar links each perspective can see
 PERSPECTIVE_SIDEBAR = {
-    "portfolio_manager": {"/", "/backlog", "/pi", "/metrics", "/settings"},
-    "rte": {"/", "/pi", "/ceremonies", "/sessions", "/art", "/monitoring", "/settings"},
+    "overview": {"/", "/backlog", "/pi", "/ceremonies", "/metrics", "/art", "/monitoring"},
+    "dsi": {"/", "/backlog", "/pi", "/ceremonies", "/metrics", "/art", "/monitoring", "/projects", "/settings"},
+    "portfolio_manager": {"/", "/backlog", "/pi", "/metrics", "/projects", "/settings"},
+    "rte": {"/", "/pi", "/ceremonies", "/sessions", "/art", "/monitoring", "/projects", "/settings"},
     "product_owner": {"/", "/backlog", "/pi", "/projects", "/sessions", "/settings"},
-    "scrum_master": {"/", "/pi", "/ceremonies", "/sessions", "/art", "/monitoring", "/settings"},
+    "scrum_master": {"/", "/pi", "/ceremonies", "/sessions", "/art", "/monitoring", "/projects", "/settings"},
     "developer": {"/", "/projects", "/sessions", "/toolbox", "/art", "/settings"},
     "architect": {"/", "/backlog", "/pi", "/projects", "/toolbox", "/monitoring", "/settings"},
     "qa_security": {"/", "/projects", "/ceremonies", "/sessions", "/monitoring", "/settings"},
-    "business_owner": {"/", "/backlog", "/pi", "/metrics", "/settings"},
+    "business_owner": {"/", "/backlog", "/pi", "/metrics", "/projects", "/settings"},
     "admin": {"/", "/backlog", "/pi", "/ceremonies", "/sessions", "/art", "/toolbox", "/mercato", "/metrics", "/monitoring", "/projects", "/settings"},
 }
 
@@ -2749,7 +2755,7 @@ async def dashboard_kpis(request: Request, perspective: str = "admin"):
 
     # KPIs vary by perspective
     cards = []
-    if perspective in ("portfolio_manager", "business_owner", "admin"):
+    if perspective in ("overview", "dsi", "portfolio_manager", "business_owner", "admin"):
         cards = [
             {"value": str(total_epics), "label": "Total Epics"},
             {"value": str(active_missions), "label": "Active Missions"},

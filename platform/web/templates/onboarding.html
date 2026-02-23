@@ -63,6 +63,16 @@
             <div class="step-title">What is your SAFe role?</div>
             <div class="step-subtitle">This will adapt your dashboard, navigation and quick actions.</div>
             <div class="role-grid">
+                <div class="role-card" data-role="overview" onclick="selectRole(this)">
+                    <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-home"/></svg></span>
+                    <h3>Overview</h3>
+                    <p>Full visibility across all projects and teams</p>
+                </div>
+                <div class="role-card" data-role="dsi" onclick="selectRole(this)">
+                    <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-monitor"/></svg></span>
+                    <h3>DSI</h3>
+                    <p>IT governance, strategic alignment, multi-project oversight</p>
+                </div>
                 <div class="role-card" data-role="portfolio_manager" onclick="selectRole(this)">
                     <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-briefcase"/></svg></span>
                     <h3>Portfolio Manager</h3>
@@ -110,13 +120,13 @@
             </div>
         </div>
 
-        <!-- Step 2: Choose Project/ART -->
+        <!-- Step 2: Choose Projects -->
         <div class="step" id="step-2">
-            <div class="step-title">Which project are you working on?</div>
-            <div class="step-subtitle">Optional — you can change this anytime.</div>
+            <div class="step-title">Which projects do you manage?</div>
+            <div class="step-subtitle">Select one or more — you can change this anytime.</div>
             <div class="project-grid">
                 {% for p in projects %}
-                <div class="project-card" data-project="{{ p.id }}" onclick="selectProject(this)">
+                <div class="project-card" data-project="{{ p.id }}" onclick="toggleProject(this)">
                     <h4>{{ p.name }}</h4>
                     <small>{{ p.factory_type or '' }}</small>
                 </div>
@@ -133,7 +143,7 @@
             <div class="step-title">You're all set!</div>
             <div class="summary-box">
                 <div class="summary-role" id="summary-role">—</div>
-                <div class="summary-project" id="summary-project">No project selected</div>
+                <div class="summary-project" id="summary-project">No projects selected</div>
             </div>
             <div class="onboarding-actions">
                 <button class="btn-secondary" onclick="goToStep(2)">Back</button>
@@ -144,8 +154,9 @@
 
     <script>
     let selectedRole = null;
-    let selectedProject = null;
+    let selectedProjects = [];
     const roleLabels = {
+        overview: 'Overview', dsi: 'DSI',
         portfolio_manager: 'Portfolio Manager', rte: 'RTE', product_owner: 'Product Owner',
         scrum_master: 'Scrum Master', developer: 'Developer', architect: 'Architect',
         qa_security: 'QA / Security', business_owner: 'Business Owner'
@@ -158,10 +169,14 @@
         document.getElementById('btn-next-1').disabled = false;
     }
 
-    function selectProject(el) {
-        document.querySelectorAll('.project-card').forEach(c => c.classList.remove('selected'));
-        el.classList.add('selected');
-        selectedProject = el.dataset.project;
+    function toggleProject(el) {
+        el.classList.toggle('selected');
+        const pid = el.dataset.project;
+        if (el.classList.contains('selected')) {
+            if (!selectedProjects.includes(pid)) selectedProjects.push(pid);
+        } else {
+            selectedProjects = selectedProjects.filter(p => p !== pid);
+        }
     }
 
     function goToStep(n) {
@@ -175,8 +190,11 @@
         }
         if (n === 3) {
             document.getElementById('summary-role').textContent = roleLabels[selectedRole] || selectedRole;
-            const projEl = selectedProject ? document.querySelector(`[data-project="${selectedProject}"] h4`) : null;
-            document.getElementById('summary-project').textContent = projEl ? projEl.textContent : 'No project selected';
+            const names = selectedProjects.map(pid => {
+                const el = document.querySelector(`[data-project="${pid}"] h4`);
+                return el ? el.textContent : pid;
+            });
+            document.getElementById('summary-project').textContent = names.length ? names.join(', ') : 'No project selected';
         }
     }
 
@@ -188,8 +206,8 @@
             body: JSON.stringify({perspective: selectedRole})
         });
         document.cookie = 'onboarding_done=1; path=/; max-age=31536000; samesite=lax';
-        if (selectedProject) {
-            document.cookie = 'default_project=' + selectedProject + '; path=/; max-age=31536000; samesite=lax';
+        if (selectedProjects.length) {
+            document.cookie = 'default_projects=' + selectedProjects.join(',') + '; path=/; max-age=31536000; samesite=lax';
         }
         location.href = '/';
     }

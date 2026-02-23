@@ -19,6 +19,8 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 
+**[Live Demo: sf.macaron-software.com](https://sf.macaron-software.com)** — click "Skip (Demo)" to explore
+
 [Features](#features) · [Quick Start](#quick-start) · [Screenshots](#screenshots) · [Architecture](#architecture) · [Contributing](#contributing)
 
 </div>
@@ -574,6 +576,6 @@ This project is licensed under the AGPL v3 License - see the [LICENSE](LICENSE) 
 
 ## Support
 
-- Documentation: https://docs.software-factory.dev
+- Live Demo: https://sf.macaron-software.com
 - Issues: https://github.com/macaron-software/software-factory/issues
 - Discussions: https://github.com/macaron-software/software-factory/discussions

@@ -162,10 +162,13 @@
                     <div class="perspective-wrapper" style="position:relative">
                         <button class="perspective-btn" id="perspectiveBtn" onclick="document.getElementById('perspectiveDropdown').classList.toggle('show')" title="SAFe Perspective">
                             <svg class="icon icon-sm"><use href="#icon-shield"/></svg>
-                            <span class="perspective-label">{% if p == 'portfolio_manager' %}PM{% elif p == 'rte' %}RTE{% elif p == 'product_owner' %}PO{% elif p == 'scrum_master' %}SM{% elif p == 'developer' %}Dev{% elif p == 'architect' %}Arch{% elif p == 'qa_security' %}QA{% elif p == 'business_owner' %}BO{% else %}All{% endif %}</span>
+                            <span class="perspective-label">{% if p == 'overview' %}OVW{% elif p == 'dsi' %}DSI{% elif p == 'portfolio_manager' %}PM{% elif p == 'rte' %}RTE{% elif p == 'product_owner' %}PO{% elif p == 'scrum_master' %}SM{% elif p == 'developer' %}Dev{% elif p == 'architect' %}Arch{% elif p == 'qa_security' %}QA{% elif p == 'business_owner' %}BO{% else %}All{% endif %}</span>
                         </button>
                         <div class="perspective-dropdown" id="perspectiveDropdown">
                             <div class="perspective-dropdown-title">SAFe Perspective</div>
+                            <a class="perspective-item {% if p == 'overview' %}active{% endif %}" onclick="setPerspective('overview')">Overview</a>
+                            <a class="perspective-item {% if p == 'dsi' %}active{% endif %}" onclick="setPerspective('dsi')">DSI</a>
+                            <hr style="border:0;border-top:1px solid var(--border);margin:4px 0">
                             <a class="perspective-item {% if p == 'portfolio_manager' %}active{% endif %}" onclick="setPerspective('portfolio_manager')">Portfolio Manager</a>
                             <a class="perspective-item {% if p == 'rte' %}active{% endif %}" onclick="setPerspective('rte')">RTE</a>
                             <a class="perspective-item {% if p == 'product_owner' %}active{% endif %}" onclick="setPerspective('product_owner')">Product Owner</a>

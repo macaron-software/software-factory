@@ -16,7 +16,7 @@
     <div class="dash-grid">
         <!-- Main Section -->
         <div class="dash-main">
-            {% if p in ('portfolio_manager', 'business_owner', 'admin') %}
+            {% if p in ('overview', 'dsi', 'portfolio_manager', 'business_owner', 'admin') %}
             <div class="dash-section">
                 <h3>Active Missions</h3>
                 <div id="dashMissions"
@@ -28,7 +28,7 @@
             </div>
             {% endif %}
 
-            {% if p in ('rte', 'scrum_master', 'admin') %}
+            {% if p in ('overview', 'dsi', 'rte', 'scrum_master', 'admin') %}
             <div class="dash-section">
                 <h3>Current Sprints</h3>
                 <div id="dashSprints"
@@ -40,7 +40,7 @@
             </div>
             {% endif %}
 
-            {% if p in ('product_owner', 'admin') %}
+            {% if p in ('overview', 'dsi', 'product_owner', 'admin') %}
             <div class="dash-section">
                 <h3>Backlog Overview</h3>
                 <div id="dashBacklog"
@@ -52,7 +52,7 @@
             </div>
             {% endif %}
 
-            {% if p in ('developer', 'architect', 'admin') %}
+            {% if p in ('overview', 'dsi', 'developer', 'architect', 'admin') %}
             <div class="dash-section">
                 <h3>Projects</h3>
                 <div id="dashProjects"
@@ -64,7 +64,7 @@
             </div>
             {% endif %}
 
-            {% if p in ('qa_security', 'admin') %}
+            {% if p in ('overview', 'dsi', 'qa_security', 'admin') %}
             <div class="dash-section">
                 <h3>Quality & Security</h3>
                 <div id="dashQuality"
@@ -83,18 +83,18 @@
             <div class="dash-section">
                 <h3>Quick Actions</h3>
                 <div class="dash-actions">
-                    {% if p in ('portfolio_manager', 'product_owner', 'business_owner', 'admin') %}
+                    {% if p in ('overview', 'dsi', 'portfolio_manager', 'product_owner', 'business_owner', 'admin') %}
                     <a href="/backlog" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-plus"/></svg> New Epic</a>
                     <a href="/backlog?tab=ideation" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-zap"/></svg> Ideation</a>
                     {% endif %}
-                    {% if p in ('rte', 'scrum_master', 'admin') %}
+                    {% if p in ('overview', 'dsi', 'rte', 'scrum_master', 'admin') %}
                     <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-workflow"/></svg> Launch Ceremony</a>
                     {% endif %}
-                    {% if p in ('developer', 'architect', 'admin') %}
+                    {% if p in ('overview', 'dsi', 'developer', 'architect', 'admin') %}
                     <a href="/sessions/new" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> New Session</a>
                     <a href="/projects" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-folder"/></svg> Open Project</a>
                     {% endif %}
-                    {% if p in ('qa_security', 'admin') %}
+                    {% if p in ('overview', 'dsi', 'qa_security', 'admin') %}
                     <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-shield"/></svg> Security Audit</a>
                     {% endif %}
                     {% if p == 'admin' %}
