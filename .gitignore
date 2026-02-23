@@ -20,6 +20,7 @@ logs/
 # Environment secrets
 .env
 .env.*
+!.env.example
 *.key
 
 # Deployment credentials (VPS, DNS, API keys)

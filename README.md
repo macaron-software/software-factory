@@ -94,60 +94,57 @@ The Docker image includes: **Node.js 20**, **Playwright + Chromium**, **bandit**
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
-cp .env.example .env       # Configure LLM API keys (see Step 3 below)
-docker-compose up -d
+make setup   # copies .env.example → .env (edit it to add your LLM API key)
+make run     # builds & starts the platform
 ```
 
-Open http://localhost:8090
+Open http://localhost:8090 — click **"Skip (Demo)"** to explore without an API key.
 
 ### Option 2: Local Installation
 
 ```bash
-# Clone repository
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
+pip install -r platform/requirements.txt
 
-# Install dependencies
-pip install -r requirements.txt
 # Start platform
-python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8099 --ws none
+python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
 ```
 
 Open http://localhost:8090
 
 ### Step 3: Configure an LLM Provider
 
-The platform requires at least **one LLM provider** for agents to generate real code, tests, and decisions.
-Without a key, it runs in **demo mode** (mock responses — useful for UI exploration).
+Without an API key, the platform runs in **demo mode** — agents respond with mock answers.
+This is useful to explore the UI, but agents won't generate real code or analysis.
+
+To enable real AI agents, edit `.env` and add **one** API key:
 
 ```bash
-# Copy the example environment file
-cp .env.example .env
+# Option A: MiniMax (free tier — recommended for getting started)
+PLATFORM_LLM_PROVIDER=minimax
+MINIMAX_API_KEY=sk-your-key-here
 
-# Edit .env and add your API key(s)
+# Option B: Azure OpenAI
+PLATFORM_LLM_PROVIDER=azure-openai
+AZURE_OPENAI_API_KEY=your-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+
+# Option C: NVIDIA NIM (free tier)
+PLATFORM_LLM_PROVIDER=nvidia
+NVIDIA_API_KEY=nvapi-your-key-here
 ```
+
+Then restart: `make run`
 
 | Provider | Env Variable | Models | Free Tier |
 |----------|-------------|--------|-----------|
-| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5, M2.1 | ✅ Yes |
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 | ✅ Yes |
 | **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini | ❌ |
 | **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 | ❌ |
 | **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 | ✅ Yes |
 
-Set `PLATFORM_LLM_PROVIDER` to your primary provider (`minimax`, `azure-openai`, `azure-ai`, `nvidia`).
 The platform auto-falls back to other configured providers if the primary fails.
-
-```bash
-# Example: use MiniMax as primary
-PLATFORM_LLM_PROVIDER=minimax
-MINIMAX_API_KEY=sk-your-key-here
-
-# Example: use Azure OpenAI
-PLATFORM_LLM_PROVIDER=azure-openai
-AZURE_OPENAI_API_KEY=your-key
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-```
-
 You can also configure providers from the **Settings** page in the dashboard (`/settings`).
 
 ## Features
@@ -428,56 +425,56 @@ helm install software-factory ./deploy/helm/
 
 ### Environment Variables
 
-```bash
-# Required
-ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
+See [`.env.example`](.env.example) for the full list. Key variables:
 
-# Optional
-PORT=8090
-DATABASE_URL=sqlite:///data/platform.db
-LOG_LEVEL=INFO
-ENABLE_AUTH=true
+```bash
+# LLM Provider (required for real agents)
+PLATFORM_LLM_PROVIDER=minimax        # minimax | azure-openai | azure-ai | nvidia | demo
+MINIMAX_API_KEY=sk-...               # MiniMax API key
+
+# Authentication (optional)
+GITHUB_CLIENT_ID=...                 # GitHub OAuth
+GITHUB_CLIENT_SECRET=...
+AZURE_AD_CLIENT_ID=...               # Azure AD OAuth
+AZURE_AD_CLIENT_SECRET=...
+AZURE_AD_TENANT_ID=...
+
+# Integrations (optional)
+JIRA_URL=https://your-jira.atlassian.net
+ATLASSIAN_TOKEN=your-token
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
-## What's New in v1.2.0 (Feb 21-22, 2026)
+## What's New in v2.0.1 (Feb 2026)
 
-### CLI 'sf' - Full Command-Line Interface
-- 40+ commands mirroring all web dashboard functionality
-- Dual mode: API (live server) or DB (offline)
-- SSE streaming with per-agent colored output
-- JSON output for scripting
-- 52 automated tests
+### Authentication & Security
+- **JWT-based auth** with login/register/refresh/logout
+- **RBAC** — admin, project_manager, developer, viewer roles
+- **OAuth** — GitHub and Azure AD SSO login
+- **Admin panel** — user management UI (`/admin/users`)
+- **Demo mode** — one-click "Skip" button for instant access
 
-### Product Management Enhancements
-- 11 new PM capabilities
-- WSJF prioritization algorithms
-- Value stream mapping
+### Agent Mercato
+- **Agent marketplace** with token-based economy
+- **Agent listings, transfers, bidding** between projects
+- **Wallet system** with transaction history
 
-### Security Hardening
-- AuthMiddleware enabled by default
-- CSP headers tightened
-- Secret scrubbing in logs and API responses
-- Rate limiting per user
+### 3D Agent World
+- **Immersive 3D visualization** of all agents (`/world`)
+- Post-processing (bloom, SMAA), HD agent models, environment details
+- Day/night cycle synchronized with theme
 
-### Testing & Quality
-- Endurance test suite
-- Chaos engineering tests
-- E2E Playwright tests for all pages
-- Debian 13 fresh install validation
+### LLM Providers
+- **Multi-provider** with automatic fallback chain
+- MiniMax M2.5, Azure OpenAI GPT-5-mini, Azure AI Foundry, NVIDIA NIM
+- **Demo mode** for UI exploration without API keys
 
-### DevOps & Monitoring
-- GitHub webhooks integration
-- Helm chart for Kubernetes
-- Prometheus metrics endpoint
-- Grafana dashboards
-- CD pipeline automation
-
-### UI Improvements
-- Real-time notifications
-- Chart.js analytics visualizations
-- Mobile responsive design
-- Improved SSE streaming stability
+### Platform Improvements
+- DORA metrics dashboard with LLM cost tracking
+- Jira bidirectional sync
+- Playwright E2E test suite (82 tests)
+- Internationalization (EN/FR)
+- Real-time notifications (Slack, Email, Webhook)
 
 ## Contributing
 
