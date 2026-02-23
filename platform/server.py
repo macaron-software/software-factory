@@ -153,17 +153,9 @@ async def lifespan(app: FastAPI):
 
     # Reset stale "running" mission_runs (orphaned after container restart)
     from .missions.store import get_mission_run_store
-<<<<<<< HEAD:platform/server.py
     _mrs = get_mission_run_store()
     try:
         from .db.migrations import get_db as _gdb
-=======
-
-    _mrs = get_mission_run_store()
-    try:
-        from .db.migrations import get_db as _gdb
-
->>>>>>> origin/master:_SOFTWARE_FACTORY/platform/server.py
         _rdb = _gdb()
         _stale = _rdb.execute(
             "UPDATE mission_runs SET status='paused' WHERE status='running'"
@@ -171,13 +163,7 @@ async def lifespan(app: FastAPI):
         _rdb.commit()
         _rdb.close()
         if _stale:
-<<<<<<< HEAD:platform/server.py
             logger.warning("Reset %d stale running mission_runs to paused (container restart)", _stale)
-=======
-            logger.warning(
-                "Reset %d stale running mission_runs to paused (container restart)", _stale
-            )
->>>>>>> origin/master:_SOFTWARE_FACTORY/platform/server.py
     except Exception as e:
         logger.warning("Failed to reset stale missions: %s", e)
 
@@ -266,16 +252,8 @@ async def lifespan(app: FastAPI):
         _all_runs = _mrs.list_runs(limit=50)
         _paused = [m for m in _all_runs if m.status.value == "paused"]
         if _paused:
-<<<<<<< HEAD:platform/server.py
             logger.warning("Found %d paused missions (restart manually if needed): %s",
                            len(_paused), [m.id for m in _paused])
-=======
-            logger.warning(
-                "Found %d paused missions (restart manually if needed): %s",
-                len(_paused),
-                [m.id for m in _paused],
-            )
->>>>>>> origin/master:_SOFTWARE_FACTORY/platform/server.py
     except Exception as exc:
         logger.warning("Mission check failed: %s", exc)
 

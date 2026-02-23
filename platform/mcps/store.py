@@ -148,20 +148,12 @@ BUILTIN_MCPS = [
         name="Playwright Browser",
         description="Browser automation via MCP: navigate, click, fill, screenshot, accessibility snapshot. For E2E testing and QA evidence.",
         command="npx",
-<<<<<<< HEAD:platform/mcps/store.py
         args=["@playwright/mcp@latest", "--headless"],
-=======
-        args=["@playwright/mcp@latest", "--headless", "--no-sandbox", "--executable-path", "/opt/pw-browsers/chromium-1208/chrome-linux/chrome"],
->>>>>>> origin/master:_SOFTWARE_FACTORY/platform/mcps/store.py
         env={"PLAYWRIGHT_BROWSERS_PATH": "/opt/pw-browsers"},
         tools=[
             {"name": "browser_navigate", "description": "Navigate to URL",
              "params": {"url": "string"}},
-<<<<<<< HEAD:platform/mcps/store.py
             {"name": "browser_screenshot", "description": "Take PNG screenshot of current page",
-=======
-            {"name": "browser_take_screenshot", "description": "Take PNG screenshot of current page",
->>>>>>> origin/master:_SOFTWARE_FACTORY/platform/mcps/store.py
              "params": {"name": "string", "selector": "string (optional)"}},
             {"name": "browser_click", "description": "Click element",
              "params": {"element": "string (description)", "ref": "string (element ref)"}},

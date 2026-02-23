@@ -1555,28 +1555,13 @@ def _get_tool_schemas() -> list[dict]:
         {
             "type": "function",
             "function": {
-<<<<<<< HEAD:platform/agents/tool_schemas.py
                 "name": "mcp_playwright_browser_screenshot",
-=======
-                "name": "mcp_playwright_browser_take_screenshot",
->>>>>>> origin/master:_SOFTWARE_FACTORY/platform/agents/tool_schemas.py
                 "description": "Take a PNG screenshot of the current browser page. Use after browser_navigate to capture visual state for QA evidence.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-<<<<<<< HEAD:platform/agents/tool_schemas.py
                         "name": {"type": "string", "description": "Screenshot name (e.g. 'homepage', 'login-form')"},
                         "selector": {"type": "string", "description": "Optional CSS selector to screenshot a specific element"},
-=======
-                        "name": {
-                            "type": "string",
-                            "description": "Screenshot name (e.g. 'homepage', 'login-form')",
-                        },
-                        "selector": {
-                            "type": "string",
-                            "description": "Optional CSS selector to screenshot a specific element",
-                        },
->>>>>>> origin/master:_SOFTWARE_FACTORY/platform/agents/tool_schemas.py
                     },
                     "required": ["name"],
                 },
@@ -1590,19 +1575,8 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-<<<<<<< HEAD:platform/agents/tool_schemas.py
                         "element": {"type": "string", "description": "Human-readable element description"},
                         "ref": {"type": "string", "description": "Exact target element reference from snapshot"},
-=======
-                        "element": {
-                            "type": "string",
-                            "description": "Human-readable element description",
-                        },
-                        "ref": {
-                            "type": "string",
-                            "description": "Exact target element reference from snapshot",
-                        },
->>>>>>> origin/master:_SOFTWARE_FACTORY/platform/agents/tool_schemas.py
                         "text": {"type": "string", "description": "Text to type"},
                     },
                     "required": ["element", "ref", "text"],
@@ -1741,7 +1715,6 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "solaris_component",
     ],
     "dev": [
-<<<<<<< HEAD:platform/agents/tool_schemas.py
         "code_read", "code_write", "code_edit", "code_search",
         "git_status", "git_log", "git_diff", "git_commit",
         "list_files", "deep_search", "fractal_code",
@@ -1769,80 +1742,6 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "mcp_fetch_fetch",
         "mcp_playwright_browser_navigate", "mcp_playwright_browser_snapshot",
         "mcp_playwright_browser_click", "mcp_playwright_browser_screenshot",
-=======
-        "code_read",
-        "code_write",
-        "code_edit",
-        "code_search",
-        "git_status",
-        "git_log",
-        "git_diff",
-        "git_commit",
-        "list_files",
-        "deep_search",
-        "fractal_code",
-        "memory_search",
-        "memory_store",
-        "get_project_context",
-        "build",
-        "test",
-        "docker_deploy",
-        "docker_status",
-        "screenshot",
-        "simulator_screenshot",
-        "create_ticket",
-        "lrm_locate",
-        "lrm_conventions",
-        "lrm_build",
-        "lrm_examples",
-        "github_prs",
-        "github_code_search",
-        "android_build",
-        "android_test",
-        "android_lint",
-        "mcp_fetch_fetch",
-        "mcp_memory_create_entities",
-        "mcp_memory_search_nodes",
-        "mcp_memory_create_relations",
-    ],
-    "qa": [
-        "code_read",
-        "code_write",
-        "code_search",
-        "list_files",
-        "deep_search",
-        "screenshot",
-        "simulator_screenshot",
-        "playwright_test",
-        "build",
-        "test",
-        "browser_screenshot",
-        "browse",
-        "take_screenshot",
-        "inspect_page",
-        "run_e2e_tests",
-        "memory_search",
-        "memory_store",
-        "get_project_context",
-        "git_diff",
-        "git_log",
-        "github_issues",
-        "github_prs",
-        "jira_search",
-        "jira_create",
-        "create_ticket",
-        "chaos_test",
-        "tmc_load_test",
-        "android_build",
-        "android_test",
-        "android_lint",
-        "android_emulator_test",
-        "mcp_fetch_fetch",
-        "mcp_playwright_browser_navigate",
-        "mcp_playwright_browser_snapshot",
-        "mcp_playwright_browser_click",
-        "mcp_playwright_browser_take_screenshot",
->>>>>>> origin/master:_SOFTWARE_FACTORY/platform/agents/tool_schemas.py
         "mcp_playwright_browser_type",
         "mcp_memory_search_nodes",
     ],
@@ -1866,19 +1765,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "memory_store",
         "get_project_context",
         "lrm_build",
-<<<<<<< HEAD:platform/agents/tool_schemas.py
         "github_actions", "github_prs",
         "infra_check", "chaos_test", "tmc_load_test",
         "local_ci", "create_ticket",
-=======
-        "github_actions",
-        "github_prs",
-        "infra_check",
-        "chaos_test",
-        "tmc_load_test",
-        "local_ci",
-        "create_ticket",
->>>>>>> origin/master:_SOFTWARE_FACTORY/platform/agents/tool_schemas.py
         "get_si_blueprint",
     ],
     "security": [
@@ -1948,13 +1837,7 @@ def _classify_agent_role(agent: AgentDef) -> str:
         return "architecture"
     if any(k in combined for k in ("ux", "ui", "design", "ergon")):
         return "ux"
-<<<<<<< HEAD:platform/agents/tool_schemas.py
     if any(k in combined for k in ("qa", "test", "qualit", "fixture", "perf", "tma", "maintenance")):
-=======
-    if any(
-        k in combined for k in ("qa", "test", "qualit", "fixture", "perf", "tma", "maintenance")
-    ):
->>>>>>> origin/master:_SOFTWARE_FACTORY/platform/agents/tool_schemas.py
         return "qa"
     if any(
         k in combined
