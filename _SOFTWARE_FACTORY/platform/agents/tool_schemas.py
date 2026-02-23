@@ -1208,6 +1208,45 @@ def _get_tool_schemas() -> list[dict]:
             },
         },
     ]
+    # ── Simple Playwright aliases (LLM-friendly short names) ──
+    schemas.extend([
+        {
+            "type": "function",
+            "function": {
+                "name": "browse",
+                "description": "Open a URL in the browser for visual testing. Call this BEFORE take_screenshot.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "URL to open (e.g. http://localhost:3000)"},
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "take_screenshot",
+                "description": "Take a PNG screenshot of the current browser page. Call browse(url) first.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "Screenshot name (e.g. homepage, login-page)"},
+                    },
+                    "required": ["name"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "inspect_page",
+                "description": "Get the accessibility tree of the current browser page for assertions.",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        },
+    ])
     _TOOL_SCHEMAS = schemas
     return schemas
 
@@ -1257,6 +1296,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "code_read", "code_write", "code_search", "list_files", "deep_search",
         "screenshot", "simulator_screenshot", "playwright_test",
         "build", "test", "browser_screenshot",
+        "browse", "take_screenshot", "inspect_page",
         "memory_search", "memory_store", "get_project_context",
         "git_diff", "git_log",
         "github_issues", "github_prs",

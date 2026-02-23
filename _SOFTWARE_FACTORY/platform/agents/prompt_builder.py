@@ -52,21 +52,26 @@ CRITICAL: When the user asks you to DO something (lancer, fixer, chercher), USE 
         role_cat = _classify_agent_role(agent)
         if role_cat == "qa":
             parts.append("""
-## QA Tools — E2E Testing with Playwright (IMPORTANT)
-You MUST use Playwright MCP tools to verify the application visually:
-1. First, start the dev server: build(command="npm run dev -- --port 4173 &")
-2. Navigate: mcp_playwright_browser_navigate(url="http://localhost:4173")
-3. Screenshot: mcp_playwright_browser_screenshot(name="homepage")
-4. Inspect: mcp_playwright_browser_snapshot() → get accessibility tree
-5. Interact: mcp_playwright_browser_click(element="Login button", ref="ref_from_snapshot")
-6. Fill forms: mcp_playwright_browser_type(element="Email input", ref="ref", text="test@example.com")
-7. Screenshot again: mcp_playwright_browser_screenshot(name="after-login")
+## QA Tools — Visual E2E Testing (MANDATORY)
+You have browser tools. You MUST use them:
+1. Start dev server: build(command="cd frontend && npm run dev -- --port 4173 &") or build(command="npm start &")
+2. Open the app: browse(url="http://localhost:4173")
+3. Take screenshot: take_screenshot(name="homepage")
+4. Get page elements: inspect_page()
+5. Take more screenshots of key pages: take_screenshot(name="dashboard")
 
-EVERY QA validation MUST include at least:
-- 1 screenshot of the main page
-- 1 screenshot of a key user flow
-- build(command="npm test") to run unit tests
-Use create_ticket(title="...", severity="P2", description="...") for any bug found.""")
+REQUIRED for every QA validation:
+- Call browse() then take_screenshot() at least 2 times
+- Call build(command="npm test") to run unit tests
+- Call create_ticket() for any bug found
+
+Example flow:
+  build(command="cd backend && npm start &")   → start backend
+  build(command="cd frontend && npm run dev -- --port 4173 &")  → start frontend
+  browse(url="http://localhost:4173")  → open app
+  take_screenshot(name="home")  → capture homepage
+  inspect_page()  → check accessibility tree
+  take_screenshot(name="login-flow")  → capture login page""")
         elif role_cat == "security":
             parts.append("""
 ## Security Tools (IMPORTANT)

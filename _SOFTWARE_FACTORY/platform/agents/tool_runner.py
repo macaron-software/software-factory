@@ -688,6 +688,26 @@ async def _tool_browser_screenshot(args: dict, ctx: ExecutionContext) -> str:
         return f"[browser_screenshot] ERROR: {e}"
 
 
+# ── Playwright shortcut aliases (simple names for LLM compatibility) ──
+
+async def _tool_browse(args: dict, ctx: ExecutionContext) -> str:
+    """Navigate browser to a URL. Alias for mcp_playwright_browser_navigate."""
+    return await _tool_mcp_dynamic("mcp_playwright_browser_navigate", {"url": args.get("url", "")}, ctx)
+
+
+async def _tool_take_screenshot(args: dict, ctx: ExecutionContext) -> str:
+    """Take a PNG screenshot. Alias for mcp_playwright_browser_screenshot."""
+    return await _tool_mcp_dynamic("mcp_playwright_browser_screenshot", {
+        "name": args.get("name", "screenshot"),
+        "selector": args.get("selector", ""),
+    }, ctx)
+
+
+async def _tool_inspect_page(args: dict, ctx: ExecutionContext) -> str:
+    """Get accessibility tree of current page. Alias for mcp_playwright_browser_snapshot."""
+    return await _tool_mcp_dynamic("mcp_playwright_browser_snapshot", {}, ctx)
+
+
 async def _tool_security_chaos(name: str, args: dict, ctx: ExecutionContext) -> str:
     """Dispatch security/chaos/TMC/infra tools to their BaseTool implementations."""
     from ..tools.chaos_tools import ChaosTestTool, InfraCheckTool, TmcLoadTestTool
@@ -1378,6 +1398,14 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
         return await _tool_build_test(name, args, ctx)
     if name == "browser_screenshot":
         return await _tool_browser_screenshot(args, ctx)
+
+    # ── Playwright shortcut aliases ──
+    if name == "browse":
+        return await _tool_browse(args, ctx)
+    if name == "take_screenshot":
+        return await _tool_take_screenshot(args, ctx)
+    if name == "inspect_page":
+        return await _tool_inspect_page(args, ctx)
 
     # ── Security & chaos tools ──
     if name in (
