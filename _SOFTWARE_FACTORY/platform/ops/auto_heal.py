@@ -318,6 +318,8 @@ async def resolve_completed_missions():
 # ── Active heal tracking ─────────────────────────────────────────────
 
 _active_heals: set[str] = set()  # mission_ids currently running
+_last_cycle_ok: float = 0.0  # timestamp of last successful cycle
+_last_cycle_error: str = ""  # last error message if any
 
 
 async def heal_cycle():
@@ -428,6 +430,7 @@ async def _recover_interrupted_heals():
 
 async def auto_heal_loop():
     """Background loop: scan incidents → create epics → launch TMA workflows."""
+    global _last_cycle_ok, _last_cycle_error
     logger.info("Auto-heal loop started (interval=%ds, severity≥%s, max_concurrent=%d)",
                SCAN_INTERVAL, SEVERITY_THRESHOLD, MAX_CONCURRENT_HEALS)
     while True:
@@ -436,7 +439,10 @@ async def auto_heal_loop():
             continue
         try:
             await heal_cycle()
+            _last_cycle_ok = datetime.now(timezone.utc).timestamp()
+            _last_cycle_error = ""
         except Exception as e:
+            _last_cycle_error = str(e)
             logger.error("Auto-heal cycle error: %s", e, exc_info=True)
 
 
@@ -467,6 +473,16 @@ def get_autoheal_stats() -> dict:
         resolved = db.execute(
             "SELECT COUNT(*) as n FROM platform_incidents WHERE status='resolved'"
         ).fetchone()["n"]
+        # Heartbeat: last cycle within 2× interval = alive
+        import time
+        now = time.time()
+        if _last_cycle_ok == 0:
+            heartbeat = "starting"
+        elif now - _last_cycle_ok < SCAN_INTERVAL * 2.5:
+            heartbeat = "alive"
+        else:
+            heartbeat = "stale"
+
         return {
             "enabled": ENABLED,
             "interval_s": SCAN_INTERVAL,
@@ -475,6 +491,9 @@ def get_autoheal_stats() -> dict:
             "missions": {"total": total, "active": active, "completed": completed, "failed": failed},
             "incidents": {"open": open_incidents, "investigating": investigating, "resolved": resolved},
             "active_heals": len(_active_heals),
+            "heartbeat": heartbeat,
+            "last_cycle_ts": _last_cycle_ok,
+            "last_error": _last_cycle_error,
         }
     finally:
         db.close()

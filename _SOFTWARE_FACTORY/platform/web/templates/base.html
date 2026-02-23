@@ -136,9 +136,7 @@
                 </ul>
             </div>
 
-            <div class="sidebar-footer">
-                <span class="status-dot active"></span>
-            </div>
+            <div class="sidebar-footer"></div>
         </nav>
 
         <!-- Main content -->
@@ -147,6 +145,11 @@
                 <h2>{{ page_title }}</h2>
                 <div class="topbar-right">
                     {% block topbar_actions %}{% endblock %}
+                    <div class="tma-heartbeat-wrapper" id="tmaHeartbeat"
+                         hx-get="/api/autoheal/heartbeat"
+                         hx-trigger="load, every 30s"
+                         hx-swap="innerHTML">
+                    </div>
                     <div class="notif-wrapper" id="notifWrapper">
                         <button class="topbar-bell" id="notifBell" aria-label="Notifications">
                             <svg class="icon icon-sm"><use href="#icon-bell"/></svg>
@@ -198,6 +201,15 @@
     .notif-footer a{color:var(--purple-light);font-size:11px;text-decoration:none}
     .notif-footer a:hover{text-decoration:underline}
     .notif-empty{padding:24px;text-align:center;color:var(--text-secondary);font-size:12px}
+    /* TMA heartbeat — animated ECG icon in topbar */
+    .tma-heartbeat-wrapper{position:relative;display:flex;align-items:center}
+    .tma-hb{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-full);cursor:help;transition:background .15s}
+    .tma-hb:hover{background:var(--bg-tertiary)}
+    .tma-hb svg{width:16px;height:16px;color:var(--tma-color)}
+    .tma-hb.alive svg{animation:hb-beat 1.2s ease-in-out infinite}
+    .tma-hb.healing svg{animation:hb-beat .6s ease-in-out infinite}
+    .tma-hb.stale svg{opacity:.4;animation:none}
+    @keyframes hb-beat{0%,100%{transform:scale(1);opacity:1}15%{transform:scale(1.25);opacity:1}30%{transform:scale(1);opacity:.7}45%{transform:scale(1.15);opacity:1}60%{transform:scale(1);opacity:1}}
     .sidebar-view-switch{display:flex;justify-content:center;gap:2px;padding:0.3rem 0.4rem;margin:0 0.3rem 0.3rem;background:var(--bg-tertiary);border-radius:8px}
     .view-switch-btn{background:none;border:none;color:var(--text-secondary);padding:0.3rem;border-radius:6px;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center}
     .view-switch-btn:hover{color:var(--text-primary);background:var(--bg-secondary)}

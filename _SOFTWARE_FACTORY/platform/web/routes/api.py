@@ -1444,6 +1444,45 @@ async def autoheal_stats():
     return JSONResponse(get_autoheal_stats())
 
 
+@router.get("/api/autoheal/heartbeat")
+async def autoheal_heartbeat():
+    """Return animated ECG heartbeat icon for TMA status."""
+    from ...ops.auto_heal import get_autoheal_stats
+    stats = get_autoheal_stats()
+    hb = stats.get("heartbeat", "starting")
+    open_inc = stats["incidents"]["open"]
+    active = stats["active_heals"]
+
+    if not stats["enabled"]:
+        css_class = "stale"
+        color = "var(--text-secondary)"
+        label = "TMA disabled"
+    elif hb == "alive" and open_inc == 0 and active == 0:
+        css_class = "alive"
+        color = "#22c55e"
+        label = "TMA OK — no open incidents"
+    elif hb == "alive" and (open_inc > 0 or active > 0):
+        css_class = "healing"
+        color = "#f59e0b"
+        label = f"TMA active — {open_inc} open, {active} healing"
+    elif hb == "starting":
+        css_class = "stale"
+        color = "var(--text-secondary)"
+        label = "TMA starting..."
+    else:
+        css_class = "stale"
+        color = "#ef4444"
+        label = f"TMA down — {stats.get('last_error', '?')[:50]}"
+
+    html = (
+        f'<span class="tma-hb {css_class}" data-tooltip="{label}" style="--tma-color:{color}">'
+        f'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        f'<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>'
+        f'</svg></span>'
+    )
+    return HTMLResponse(html)
+
+
 @router.post("/api/autoheal/trigger")
 async def autoheal_trigger():
     """Manually trigger one auto-heal cycle."""
