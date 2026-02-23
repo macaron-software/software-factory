@@ -281,6 +281,24 @@ def _migrate(conn):
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_integrations_type ON integrations(type)")
 
+    # ── Notifications (in-app) ──
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS notifications (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL DEFAULT 'info',
+            title TEXT NOT NULL,
+            message TEXT DEFAULT '',
+            url TEXT DEFAULT '',
+            severity TEXT DEFAULT 'info',
+            source TEXT DEFAULT '',
+            ref_id TEXT DEFAULT '',
+            is_read INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_notif_read ON notifications(is_read)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_notif_created ON notifications(created_at DESC)")
+
     # Seed default integrations if empty
     existing = conn.execute("SELECT COUNT(*) FROM integrations").fetchone()[0]
     if existing == 0:

@@ -281,6 +281,15 @@ async def report_js_error(request: Request, report: JSErrorReport):
         )
         db.commit()
         db.close()
+        # In-app notification
+        try:
+            from ...services.notifications import emit_notification
+            emit_notification(
+                title, type="tma", message=report.source or report.url,
+                severity="warning", source="js-error", ref_id=tid,
+            )
+        except Exception:
+            pass
         logger.info("JS error ticket created: %s — %s", tid, title)
         return {"status": "created", "ticket_id": tid}
     except Exception as e:

@@ -174,6 +174,16 @@ def create_heal_epic(group: IncidentGroup) -> str:
 
     logger.warning("Auto-heal: created TMA epic %s for %d incidents (%s)",
                   mission.id, group.count, group.error_type)
+    try:
+        from ..services.notifications import emit_notification
+        emit_notification(
+            f"Auto-heal: TMA epic created for {group.count} incidents",
+            type="autoheal", message=f"Error type: {group.error_type}. Mission {mission.id[:8]} launched.",
+            url=f"/missions/{mission.id}", severity="warning",
+            source="autoheal", ref_id=mission.id,
+        )
+    except Exception:
+        pass
     return mission.id
 
 
