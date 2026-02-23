@@ -208,7 +208,9 @@
     .tma-hb svg{width:16px;height:16px;color:var(--tma-color)}
     .tma-hb.alive svg{animation:hb-beat 1.2s ease-in-out infinite}
     .tma-hb.healing svg{animation:hb-beat .6s ease-in-out infinite}
+    .tma-hb.starting svg{opacity:.6;animation:hb-fade 2s ease-in-out infinite}
     .tma-hb.stale svg{opacity:.4;animation:none}
+    @keyframes hb-fade{0%,100%{opacity:.3}50%{opacity:.8}}
     @keyframes hb-beat{0%,100%{transform:scale(1);opacity:1}15%{transform:scale(1.25);opacity:1}30%{transform:scale(1);opacity:.7}45%{transform:scale(1.15);opacity:1}60%{transform:scale(1);opacity:1}}
     /* TMA hover popover */
     .tma-tip{display:none;position:absolute;top:calc(100% + 8px);right:0;width:220px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:999;padding:10px 12px;pointer-events:none}

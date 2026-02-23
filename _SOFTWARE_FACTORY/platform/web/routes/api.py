@@ -1462,7 +1462,7 @@ async def autoheal_heartbeat():
     elif hb == "alive":
         css_class, color, status_label = "healing", "#f59e0b", "Active"
     elif hb == "starting":
-        css_class, color, status_label = "stale", "var(--text-secondary)", "Starting..."
+        css_class, color, status_label = "starting", "#818cf8", "Starting..."
     else:
         css_class, color, status_label = "stale", "#ef4444", "Down"
 
