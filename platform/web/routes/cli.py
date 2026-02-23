@@ -166,8 +166,9 @@ async def execute_cli_command(cmd: CLICommand) -> CLIResponse:
     # Route sf commands to SF native commands
     if cmd.command == "sf":
         from .sf_commands import SFCommandRequest, execute_sf_command
-        sf_req = SFCommandRequest(command=' '.join(cmd.args), args=[])
+        sf_req = SFCommandRequest(command=" ".join(cmd.args), args=[])
         return await execute_sf_command(sf_req)
+
 
     # Validate command
     is_valid, error_msg = validate_command(cmd.command, cmd.args)
