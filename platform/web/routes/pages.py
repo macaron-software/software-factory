@@ -66,8 +66,8 @@ async def home_page(request: Request):
     from starlette.responses import RedirectResponse
 
     perspective = getattr(request.state, "perspective", "admin")
-    # Strategic perspectives land on the rich portfolio view
-    tab_map = {"dsi": "dsi", "business_owner": "metier", "overview": "overview", "portfolio_manager": "overview"}
+    # Only DSI, Business Owner, and Overview land on the portfolio tabs
+    tab_map = {"dsi": "dsi", "business_owner": "metier", "overview": "overview"}
     if perspective in tab_map:
         return RedirectResponse(url=f"/portfolio?tab={tab_map[perspective]}", status_code=302)
     return _templates(request).TemplateResponse(

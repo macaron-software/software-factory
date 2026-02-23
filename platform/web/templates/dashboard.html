@@ -1,80 +1,174 @@
 {% extends "base.html" %}
 {% block content %}
 {% set p = request.state.perspective|default('admin') %}
+{% set dash_titles = {
+    'portfolio_manager': 'Portfolio Manager',
+    'rte': 'Release Train Engineer',
+    'product_owner': 'Product Owner',
+    'scrum_master': 'Scrum Master',
+    'developer': 'Developer',
+    'architect': 'Architect',
+    'qa_security': 'QA / Security',
+    'admin': 'Admin'
+} %}
 <div class="dashboard">
+    <div class="dash-header">
+        <h2 class="dash-title">{{ dash_titles.get(p, 'Dashboard') }}</h2>
+        <span class="dash-subtitle">
+            {% if p == 'portfolio_manager' %}Strategic alignment, WSJF prioritization, portfolio kanban
+            {% elif p == 'rte' %}PI planning, ceremonies, train coordination
+            {% elif p == 'product_owner' %}Backlog management, features, stories
+            {% elif p == 'scrum_master' %}Sprints, velocity, retrospectives
+            {% elif p == 'developer' %}Code, tasks, agent sessions
+            {% elif p == 'architect' %}Technical vision, enablers, architecture
+            {% elif p == 'qa_security' %}Quality gates, security audits, testing
+            {% elif p == 'admin' %}Full platform overview
+            {% endif %}
+        </span>
+    </div>
+
     <!-- KPI Cards -->
     <div class="dash-kpis" id="dashKpis"
          hx-get="/api/dashboard/kpis?perspective={{ p }}"
          hx-trigger="load, every 30s"
          hx-swap="innerHTML">
-        <div class="kpi-card skeleton"><div class="kpi-value">—</div><div class="kpi-label">Loading...</div></div>
-        <div class="kpi-card skeleton"><div class="kpi-value">—</div><div class="kpi-label">Loading...</div></div>
-        <div class="kpi-card skeleton"><div class="kpi-value">—</div><div class="kpi-label">Loading...</div></div>
-        <div class="kpi-card skeleton"><div class="kpi-value">—</div><div class="kpi-label">Loading...</div></div>
+        <div class="kpi-card skeleton"><div class="kpi-value">--</div><div class="kpi-label">Loading...</div></div>
+        <div class="kpi-card skeleton"><div class="kpi-value">--</div><div class="kpi-label">Loading...</div></div>
+        <div class="kpi-card skeleton"><div class="kpi-value">--</div><div class="kpi-label">Loading...</div></div>
+        <div class="kpi-card skeleton"><div class="kpi-value">--</div><div class="kpi-label">Loading...</div></div>
     </div>
 
     <div class="dash-grid">
         <!-- Main Section -->
         <div class="dash-main">
-            {% if p in ('overview', 'dsi', 'portfolio_manager', 'business_owner', 'admin') %}
+
+            {# ── Portfolio Manager ── #}
+            {% if p == 'portfolio_manager' %}
             <div class="dash-section">
-                <h3>Active Missions</h3>
-                <div id="dashMissions"
-                     hx-get="/api/dashboard/missions"
-                     hx-trigger="load, every 30s"
-                     hx-swap="innerHTML">
+                <h3>Epic Pipeline</h3>
+                <div id="dashMissions" hx-get="/api/dashboard/missions" hx-trigger="load, every 30s" hx-swap="innerHTML">
                     <p class="text-muted">Loading...</p>
                 </div>
             </div>
-            {% endif %}
-
-            {% if p in ('overview', 'dsi', 'rte', 'scrum_master', 'admin') %}
-            <div class="dash-section">
-                <h3>Current Sprints</h3>
-                <div id="dashSprints"
-                     hx-get="/api/dashboard/sprints"
-                     hx-trigger="load, every 30s"
-                     hx-swap="innerHTML">
-                    <p class="text-muted">Loading...</p>
-                </div>
-            </div>
-            {% endif %}
-
-            {% if p in ('overview', 'dsi', 'product_owner', 'admin') %}
             <div class="dash-section">
                 <h3>Backlog Overview</h3>
-                <div id="dashBacklog"
-                     hx-get="/api/dashboard/backlog"
-                     hx-trigger="load"
-                     hx-swap="innerHTML">
+                <div id="dashBacklog" hx-get="/api/dashboard/backlog" hx-trigger="load" hx-swap="innerHTML">
                     <p class="text-muted">Loading...</p>
                 </div>
             </div>
-            {% endif %}
 
-            {% if p in ('overview', 'dsi', 'developer', 'architect', 'admin') %}
+            {# ── RTE ── #}
+            {% elif p == 'rte' %}
+            <div class="dash-section">
+                <h3>Active Sprints</h3>
+                <div id="dashSprints" hx-get="/api/dashboard/sprints" hx-trigger="load, every 30s" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="dash-section">
+                <h3>Running Missions</h3>
+                <div id="dashMissions" hx-get="/api/dashboard/missions" hx-trigger="load, every 30s" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+
+            {# ── Product Owner ── #}
+            {% elif p == 'product_owner' %}
+            <div class="dash-section">
+                <h3>Backlog</h3>
+                <div id="dashBacklog" hx-get="/api/dashboard/backlog" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="dash-section">
+                <h3>Active Missions</h3>
+                <div id="dashMissions" hx-get="/api/dashboard/missions" hx-trigger="load, every 30s" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+
+            {# ── Scrum Master ── #}
+            {% elif p == 'scrum_master' %}
+            <div class="dash-section">
+                <h3>Current Sprints</h3>
+                <div id="dashSprints" hx-get="/api/dashboard/sprints" hx-trigger="load, every 30s" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+
+            {# ── Developer ── #}
+            {% elif p == 'developer' %}
+            <div class="dash-section">
+                <h3>My Projects</h3>
+                <div id="dashProjects" hx-get="/api/dashboard/projects" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+
+            {# ── Architect ── #}
+            {% elif p == 'architect' %}
             <div class="dash-section">
                 <h3>Projects</h3>
-                <div id="dashProjects"
-                     hx-get="/api/dashboard/projects"
-                     hx-trigger="load"
-                     hx-swap="innerHTML">
+                <div id="dashProjects" hx-get="/api/dashboard/projects" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="dash-section">
+                <h3>Active Missions</h3>
+                <div id="dashMissions" hx-get="/api/dashboard/missions" hx-trigger="load, every 30s" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+
+            {# ── QA / Security ── #}
+            {% elif p == 'qa_security' %}
+            <div class="dash-section">
+                <h3>Quality & Security</h3>
+                <div id="dashQuality" hx-get="/api/dashboard/quality" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="dash-section">
+                <h3>Active Missions</h3>
+                <div id="dashMissions" hx-get="/api/dashboard/missions" hx-trigger="load, every 30s" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+
+            {# ── Admin (all) ── #}
+            {% else %}
+            <div class="dash-section">
+                <h3>Active Missions</h3>
+                <div id="dashMissions" hx-get="/api/dashboard/missions" hx-trigger="load, every 30s" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="dash-section">
+                <h3>Current Sprints</h3>
+                <div id="dashSprints" hx-get="/api/dashboard/sprints" hx-trigger="load, every 30s" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="dash-section">
+                <h3>Backlog Overview</h3>
+                <div id="dashBacklog" hx-get="/api/dashboard/backlog" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="dash-section">
+                <h3>Projects</h3>
+                <div id="dashProjects" hx-get="/api/dashboard/projects" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="dash-section">
+                <h3>Quality & Security</h3>
+                <div id="dashQuality" hx-get="/api/dashboard/quality" hx-trigger="load" hx-swap="innerHTML">
                     <p class="text-muted">Loading...</p>
                 </div>
             </div>
             {% endif %}
 
-            {% if p in ('overview', 'dsi', 'qa_security', 'admin') %}
-            <div class="dash-section">
-                <h3>Quality & Security</h3>
-                <div id="dashQuality"
-                     hx-get="/api/dashboard/quality"
-                     hx-trigger="load"
-                     hx-swap="innerHTML">
-                    <p class="text-muted">Loading...</p>
-                </div>
-            </div>
-            {% endif %}
         </div>
 
         <!-- Sidebar -->
@@ -83,21 +177,52 @@
             <div class="dash-section">
                 <h3>Quick Actions</h3>
                 <div class="dash-actions">
-                    {% if p in ('overview', 'dsi', 'portfolio_manager', 'product_owner', 'business_owner', 'admin') %}
+                    {% if p == 'portfolio_manager' %}
                     <a href="/backlog" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-plus"/></svg> New Epic</a>
                     <a href="/backlog?tab=ideation" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-zap"/></svg> Ideation</a>
-                    {% endif %}
-                    {% if p in ('overview', 'dsi', 'rte', 'scrum_master', 'admin') %}
+                    <a href="/pi" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-calendar"/></svg> PI Board</a>
+                    <a href="/metrics" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-chart"/></svg> Metrics</a>
+
+                    {% elif p == 'rte' %}
                     <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-workflow"/></svg> Launch Ceremony</a>
-                    {% endif %}
-                    {% if p in ('overview', 'dsi', 'developer', 'architect', 'admin') %}
+                    <a href="/pi" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-calendar"/></svg> PI Board</a>
+                    <a href="/art" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-users"/></svg> ART</a>
+                    <a href="/monitoring" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-activity"/></svg> Monitoring</a>
+
+                    {% elif p == 'product_owner' %}
+                    <a href="/backlog" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-plus"/></svg> New Epic</a>
+                    <a href="/backlog?tab=ideation" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-zap"/></svg> Ideation</a>
+                    <a href="/projects" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-folder"/></svg> Projects</a>
+                    <a href="/sessions/new" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> New Session</a>
+
+                    {% elif p == 'scrum_master' %}
+                    <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-workflow"/></svg> Launch Ceremony</a>
+                    <a href="/pi" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-calendar"/></svg> PI Board</a>
+                    <a href="/art" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-users"/></svg> ART</a>
+                    <a href="/monitoring" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-activity"/></svg> Monitoring</a>
+
+                    {% elif p == 'developer' %}
                     <a href="/sessions/new" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> New Session</a>
                     <a href="/projects" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-folder"/></svg> Open Project</a>
-                    {% endif %}
-                    {% if p in ('overview', 'dsi', 'qa_security', 'admin') %}
+                    <a href="/toolbox" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-tool"/></svg> Toolbox</a>
+
+                    {% elif p == 'architect' %}
+                    <a href="/sessions/new" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> New Session</a>
+                    <a href="/projects" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-folder"/></svg> Open Project</a>
+                    <a href="/toolbox" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-tool"/></svg> Toolbox</a>
+                    <a href="/backlog" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-layers"/></svg> Backlog</a>
+
+                    {% elif p == 'qa_security' %}
                     <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-shield"/></svg> Security Audit</a>
-                    {% endif %}
-                    {% if p == 'admin' %}
+                    <a href="/sessions/new" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> New Session</a>
+                    <a href="/monitoring" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-activity"/></svg> Monitoring</a>
+
+                    {% else %}
+                    <a href="/backlog" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-plus"/></svg> New Epic</a>
+                    <a href="/backlog?tab=ideation" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-zap"/></svg> Ideation</a>
+                    <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-workflow"/></svg> Launch Ceremony</a>
+                    <a href="/sessions/new" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> New Session</a>
+                    <a href="/projects" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-folder"/></svg> Open Project</a>
                     <a href="/world" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-globe"/></svg> World 3D</a>
                     <a href="/design-system" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-palette"/></svg> Design System</a>
                     {% endif %}
@@ -120,6 +245,9 @@
 
 <style>
 .dashboard{padding:0}
+.dash-header{margin-bottom:1.25rem}
+.dash-title{font-size:1.25rem;font-weight:700;color:var(--text-primary);margin:0}
+.dash-subtitle{font-size:0.78rem;color:var(--text-secondary)}
 .dash-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
 .kpi-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;text-align:center}
 .kpi-card.skeleton{opacity:.5}
