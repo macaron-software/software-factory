@@ -3,7 +3,7 @@ Analytics API — Real-time metrics and insights
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter
@@ -443,7 +443,7 @@ async def get_system_health() -> SystemHealthResponse:
                     "total_rows": total_rows,
                 },
                 "tables": sorted(table_stats, key=lambda x: x["rows"], reverse=True)[:10],
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
 
@@ -483,7 +483,7 @@ async def get_analytics_overview() -> dict[str, Any]:
                 },
                 "tma": tma_overview.data if tma_overview.success else {},
                 "system": system_health.data if system_health.success else {},
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         }
 
