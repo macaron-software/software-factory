@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block content %}
+{% set p = request.state.perspective|default('admin') %}
+<div class="dashboard">
+    <!-- KPI Cards -->
+    <div class="dash-kpis" id="dashKpis"
+         hx-get="/api/dashboard/kpis?perspective={{ p }}"
+         hx-trigger="load, every 30s"
+         hx-swap="innerHTML">
+        <div class="kpi-card skeleton"><div class="kpi-value">—</div><div class="kpi-label">Loading...</div></div>
+        <div class="kpi-card skeleton"><div class="kpi-value">—</div><div class="kpi-label">Loading...</div></div>
+        <div class="kpi-card skeleton"><div class="kpi-value">—</div><div class="kpi-label">Loading...</div></div>
+        <div class="kpi-card skeleton"><div class="kpi-value">—</div><div class="kpi-label">Loading...</div></div>
+    </div>
+
+    <div class="dash-grid">
+        <!-- Main Section -->
+        <div class="dash-main">
+            {% if p in ('portfolio_manager', 'business_owner', 'admin') %}
+            <div class="dash-section">
+                <h3>Active Missions</h3>
+                <div id="dashMissions"
+                     hx-get="/api/dashboard/missions"
+                     hx-trigger="load, every 30s"
+                     hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if p in ('rte', 'scrum_master', 'admin') %}
+            <div class="dash-section">
+                <h3>Current Sprints</h3>
+                <div id="dashSprints"
+                     hx-get="/api/dashboard/sprints"
+                     hx-trigger="load, every 30s"
+                     hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if p in ('product_owner', 'admin') %}
+            <div class="dash-section">
+                <h3>Backlog Overview</h3>
+                <div id="dashBacklog"
+                     hx-get="/api/dashboard/backlog"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if p in ('developer', 'architect', 'admin') %}
+            <div class="dash-section">
+                <h3>Projects</h3>
+                <div id="dashProjects"
+                     hx-get="/api/dashboard/projects"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if p in ('qa_security', 'admin') %}
+            <div class="dash-section">
+                <h3>Quality & Security</h3>
+                <div id="dashQuality"
+                     hx-get="/api/dashboard/quality"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="dash-side">
+            <!-- Quick Actions -->
+            <div class="dash-section">
+                <h3>Quick Actions</h3>
+                <div class="dash-actions">
+                    {% if p in ('portfolio_manager', 'product_owner', 'business_owner', 'admin') %}
+                    <a href="/backlog" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-plus"/></svg> New Epic</a>
+                    <a href="/backlog?tab=ideation" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-zap"/></svg> Ideation</a>
+                    {% endif %}
+                    {% if p in ('rte', 'scrum_master', 'admin') %}
+                    <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-workflow"/></svg> Launch Ceremony</a>
+                    {% endif %}
+                    {% if p in ('developer', 'architect', 'admin') %}
+                    <a href="/sessions/new" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> New Session</a>
+                    <a href="/projects" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-folder"/></svg> Open Project</a>
+                    {% endif %}
+                    {% if p in ('qa_security', 'admin') %}
+                    <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-shield"/></svg> Security Audit</a>
+                    {% endif %}
+                    {% if p == 'admin' %}
+                    <a href="/world" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-globe"/></svg> World 3D</a>
+                    <a href="/design-system" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-palette"/></svg> Design System</a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="dash-section">
+                <h3>Recent Activity</h3>
+                <div id="dashActivity"
+                     hx-get="/api/dashboard/activity"
+                     hx-trigger="load, every 15s"
+                     hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.dashboard{padding:0}
+.dash-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
+.kpi-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;text-align:center}
+.kpi-card.skeleton{opacity:.5}
+.kpi-value{font-size:1.75rem;font-weight:700;color:var(--purple-light,#c084fc);line-height:1}
+.kpi-label{font-size:0.75rem;color:var(--text-secondary);margin-top:0.5rem;text-transform:uppercase;letter-spacing:.05em}
+.kpi-trend{font-size:0.7rem;margin-top:0.25rem}
+.kpi-trend.up{color:#34d399}
+.kpi-trend.down{color:var(--accent)}
+.dash-grid{display:grid;grid-template-columns:1fr 280px;gap:1.5rem}
+.dash-main{display:flex;flex-direction:column;gap:1.5rem}
+.dash-side{display:flex;flex-direction:column;gap:1.5rem}
+.dash-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem}
+.dash-section h3{margin:0 0 1rem;font-size:0.875rem;color:var(--text-primary);font-weight:600}
+.dash-actions{display:flex;flex-direction:column;gap:0.5rem}
+.dash-action-btn{display:flex;align-items:center;gap:8px;padding:0.5rem 0.75rem;background:var(--bg-tertiary,#251a35);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);text-decoration:none;font-size:0.8125rem;transition:all .15s}
+.dash-action-btn:hover{border-color:var(--purple);background:rgba(168,85,247,.1)}
+.dash-mission{display:flex;align-items:center;gap:1rem;padding:0.75rem 0;border-bottom:1px solid var(--border-subtle,rgba(255,255,255,.05))}
+.dash-mission:last-child{border-bottom:none}
+.dash-mission-name{flex:1;font-size:0.8125rem;color:var(--text-primary)}
+.dash-mission-bar{width:100px;height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden}
+.dash-mission-fill{height:100%;background:var(--purple);border-radius:3px;transition:width .3s}
+.dash-mission-pct{font-size:0.75rem;color:var(--text-secondary);min-width:35px;text-align:right}
+.dash-activity-item{display:flex;gap:8px;padding:0.5rem 0;border-bottom:1px solid var(--border-subtle,rgba(255,255,255,.05));font-size:0.75rem}
+.dash-activity-item:last-child{border-bottom:none}
+.dash-activity-time{color:var(--text-secondary);min-width:40px;flex-shrink:0}
+.dash-activity-text{color:var(--text-primary);flex:1}
+.dash-stat{display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--border-subtle,rgba(255,255,255,.05));font-size:0.8125rem}
+.dash-stat:last-child{border-bottom:none}
+.dash-stat-label{color:var(--text-secondary)}
+.dash-stat-value{color:var(--text-primary);font-weight:600}
+.text-muted{color:var(--text-secondary);font-size:0.8125rem}
+@media(max-width:900px){
+    .dash-kpis{grid-template-columns:repeat(2,1fr)}
+    .dash-grid{grid-template-columns:1fr}
+}
+</style>
+{% endblock %}

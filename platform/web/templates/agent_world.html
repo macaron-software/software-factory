@@ -5,7 +5,7 @@
     <span class="badge badge-purple" id="world-agent-count">{{ agents|length }} agents</span>
     <span class="badge badge-green" id="world-active-count">0 actifs</span>
     <span class="badge badge-blue" id="world-mission-count">0 missions</span>
-    <button class="btn btn-sm" onclick="worldToggleDayNight()" title="{{ _("tt_day_night") }}" id="btn-daynight">🌙</button>
+    <button class="btn btn-sm" onclick="worldToggleDayNight()" title="{{ _("tt_day_night") }}" id="btn-daynight"><svg class="icon icon-sm"><use href="#icon-moon"/></svg></button>
     <button class="btn btn-sm" onclick="worldResetCamera()" title="Reset camera">
         <svg class="icon icon-sm"><use href="#icon-maximize"/></svg>
     </button>
@@ -129,6 +129,10 @@
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 
 // ═══════════════════════════════════════════════════════════════
 // MACARON WORLD — 3D Sims-like Agent Visualization
@@ -203,13 +207,18 @@ const STATUS_COLORS = {
 };
 
 // ── Globals ──
-let scene, camera, renderer, controls, clock;
+let scene, camera, renderer, controls, clock, composer;
 let agents = {};  // id → { mesh, data, target, status, walkPhase, ... }
 let raycaster, mouse;
 let selectedAgent = null;
 let particleSystems = [];
+let connectionLines = []; // lines between collaborating agents
+let codeSparks = []; // particle bursts when agents code
+let clouds = []; // day-mode clouds
+let birds = []; // day-mode birds
+let fountainParticles = null;
 // Day/Night scene references
-let sceneRefs = { ambient: null, dir: null, fill: null, hemi: null, floor: null, grid: null, zoneMeshes: [], trees: [], skyDome: null, fountain: null, stars: null };
+let sceneRefs = { ambient: null, dir: null, fill: null, hemi: null, floor: null, grid: null, zoneMeshes: [], trees: [], skyDome: null, fountain: null, stars: null, lamps: [] };
 
 // ── Loading ──
 const loadBar = document.getElementById('world-load-bar');
@@ -234,13 +243,26 @@ function init() {
     camera.lookAt(0, 0, 0);
 
     // Renderer
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
     renderer.setSize(canvas.clientWidth, canvas.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.4;
+
+    // Post-processing
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(canvas.clientWidth, canvas.clientHeight),
+        0.4,   // strength
+        0.6,   // radius
+        0.85   // threshold
+    );
+    composer.addPass(bloomPass);
+    const smaaPass = new SMAAPass(canvas.clientWidth, canvas.clientHeight);
+    composer.addPass(smaaPass);
 
     // Controls
     controls = new OrbitControls(camera, renderer.domElement);
@@ -272,15 +294,24 @@ function init() {
     buildNature();
     setLoadProgress(70);
     buildAgents();
+    setLoadProgress(75);
+    buildPaths();
+    buildLamps();
+    buildBushes();
+    buildCampusSign();
     setLoadProgress(80);
     buildAmbientParticles();
+    buildClouds();
+    buildBirds();
+    buildFountainParticles();
+    buildConnectionLines();
     setLoadProgress(90);
     buildZoneLabelsUI();
     setupInteraction();
     connectSSE();
     seedLiveData();
     if (isDayMode) applyDayNight(true, false);
-    document.getElementById('btn-daynight').textContent = isDayMode ? '☀️' : '🌙';
+    document.getElementById('btn-daynight').innerHTML = isDayMode ? '<svg class="icon icon-sm"><use href="#icon-sun"/></svg>' : '<svg class="icon icon-sm"><use href="#icon-moon"/></svg>';
 
     // Listen for site theme changes (topbar toggle)
     new MutationObserver(() => {
@@ -288,7 +319,7 @@ function init() {
         const shouldBeDay = siteTheme === 'light';
         if (shouldBeDay !== isDayMode) {
             isDayMode = shouldBeDay;
-            document.getElementById('btn-daynight').textContent = isDayMode ? '☀️' : '🌙';
+            document.getElementById('btn-daynight').innerHTML = isDayMode ? '<svg class="icon icon-sm"><use href="#icon-sun"/></svg>' : '<svg class="icon icon-sm"><use href="#icon-moon"/></svg>';
             applyDayNight(isDayMode, true);
         }
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
@@ -475,7 +506,7 @@ function buildMissionBuildings() {
             // Running indicator — pulsing sphere
             if (phase.status === 'running') {
                 const pulse = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8),
-                    new THREE.MeshStandardMaterial({ color: 0x3b82f6, emissive: 0x3b82f6, emissiveIntensity: 0.8, transparent: true }));
+                    new THREE.MeshStandardMaterial({ color: 0x3b82f6, emissive: 0x3b82f6, emissiveIntensity: 1.5, transparent: true }));
                 pulse.position.set(px, 0.8, mz.z);
                 pulse.userData.isPulse = true;
                 scene.add(pulse);
@@ -615,16 +646,24 @@ function buildNature() {
     for (const [tx, tz] of treePositions) {
         const h = 2.5 + Math.random() * 2;
         const trunkMat = new THREE.MeshStandardMaterial({ color: isDayMode ? 0x8B5A2B : 0x4a3020, roughness: 0.9 });
-        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, h * 0.5, 6), trunkMat);
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.16, h * 0.5, 6), trunkMat);
         trunk.position.set(tx, h * 0.25, tz);
         trunk.castShadow = true;
         scene.add(trunk);
+
+        // Multi-layered crown (2-3 spheres stacked) instead of a single cone
         const leafMat = new THREE.MeshStandardMaterial({ color: isDayMode ? 0x4CAF50 : 0x1a5c30, roughness: 0.8 });
-        const crown = new THREE.Mesh(new THREE.ConeGeometry(h * 0.4, h * 0.6, 6), leafMat);
-        crown.position.set(tx, h * 0.7, tz);
-        crown.castShadow = true;
-        scene.add(crown);
-        sceneRefs.trees.push({ trunk, crown });
+        const layers = 2 + Math.floor(Math.random() * 2);
+        const crowns = [];
+        for (let li = 0; li < layers; li++) {
+            const r = h * (0.35 - li * 0.07);
+            const crown = new THREE.Mesh(new THREE.SphereGeometry(r, 7, 5), leafMat);
+            crown.position.set(tx + (Math.random() - 0.5) * 0.15, h * (0.5 + li * 0.22), tz + (Math.random() - 0.5) * 0.15);
+            crown.castShadow = true;
+            scene.add(crown);
+            crowns.push(crown);
+        }
+        sceneRefs.trees.push({ trunk, crowns });
     }
 
     // Fountain in chill zone (dynamic position)
@@ -793,30 +832,21 @@ function createAgentMesh(agent) {
     const bodyColor = new THREE.Color(agent.color || '#7c3aed');
     const skinColor = new THREE.Color(0xe8beac);
 
-    // Body
-    const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.6 });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.6, 0.25), bodyMat);
-    body.position.y = 0.95;
-    body.castShadow = true;
-    group.add(body);
+    // Shadow disc under agent
+    const shadowGeo = new THREE.CircleGeometry(0.35, 12);
+    const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25, depthWrite: false });
+    const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = 0.02;
+    group.add(shadow);
 
-    // Head
-    const headMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.7 });
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.3), headMat);
-    head.position.y = 1.5;
-    head.castShadow = true;
-    group.add(head);
-
-    // Arms
-    const armMat = new THREE.MeshStandardMaterial({ color: bodyColor.clone().multiplyScalar(0.85), roughness: 0.6 });
-    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.45, 0.12), armMat);
-    leftArm.position.set(-0.32, 0.95, 0);
-    leftArm.userData.isArm = true;
-    group.add(leftArm);
-    const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.45, 0.12), armMat);
-    rightArm.position.set(0.32, 0.95, 0);
-    rightArm.userData.isArm = true;
-    group.add(rightArm);
+    // Shoes
+    const shoeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 });
+    for (const sx of [-0.12, 0.12]) {
+        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.2), shoeMat);
+        shoe.position.set(sx, 0.08, 0.02);
+        group.add(shoe);
+    }
 
     // Legs
     const legMat = new THREE.MeshStandardMaterial({ color: 0x2a2a3a, roughness: 0.7 });
@@ -829,12 +859,97 @@ function createAgentMesh(agent) {
     rightLeg.userData.isLeg = true;
     group.add(rightLeg);
 
-    // Plumbob (diamond)
+    // Body
+    const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.6 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.6, 0.25), bodyMat);
+    body.position.y = 0.95;
+    body.castShadow = true;
+    body.userData.isBody = true;
+    group.add(body);
+
+    // Arms
+    const armMat = new THREE.MeshStandardMaterial({ color: bodyColor.clone().multiplyScalar(0.85), roughness: 0.6 });
+    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.45, 0.12), armMat);
+    leftArm.position.set(-0.32, 0.95, 0);
+    leftArm.userData.isArm = true;
+    group.add(leftArm);
+    const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.45, 0.12), armMat);
+    rightArm.position.set(0.32, 0.95, 0);
+    rightArm.userData.isArm = true;
+    group.add(rightArm);
+
+    // Head — sphere instead of box
+    const headMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.7 });
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), headMat);
+    head.position.y = 1.47;
+    head.castShadow = true;
+    group.add(head);
+
+    // Eyes
+    const eyeWhiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const pupilMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    for (const ex of [-0.08, 0.08]) {
+        const eyeWhite = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), eyeWhiteMat);
+        eyeWhite.position.set(ex, 1.5, 0.18);
+        group.add(eyeWhite);
+        const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.022, 6, 6), pupilMat);
+        pupil.position.set(ex, 1.5, 0.21);
+        group.add(pupil);
+    }
+
+    // Role-based accessories
+    const role = agent.role || '';
+    const rank = agent.hierarchy_rank || 50;
+    const hasVeto = agent.permissions?.can_veto;
+
+    if (role === 'devops' || role.includes('devops')) {
+        // Hard hat
+        const hatMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.4 });
+        const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.25, 0.1, 8), hatMat);
+        hat.position.y = 1.68;
+        group.add(hat);
+        const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.02, 8), hatMat);
+        brim.position.y = 1.64;
+        group.add(brim);
+    } else if (role === 'critic' || role.includes('critic') || hasVeto) {
+        // Glasses
+        const glassMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.8, roughness: 0.2 });
+        for (const gx of [-0.08, 0.08]) {
+            const lens = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.008, 6, 8), glassMat);
+            lens.position.set(gx, 1.5, 0.22);
+            group.add(lens);
+        }
+        const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.008, 0.008), glassMat);
+        bridge.position.set(0, 1.5, 0.22);
+        group.add(bridge);
+    } else if (role === 'security' || role.includes('security') || role.includes('pentester')) {
+        // Shield badge on body
+        const shieldMat = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 0.3, roughness: 0.4 });
+        const shield = new THREE.Mesh(new THREE.CircleGeometry(0.06, 6), shieldMat);
+        shield.position.set(0.12, 1.1, 0.13);
+        group.add(shield);
+    } else if (rank <= 10) {
+        // Crown/star for leadership
+        const crownMat = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xffd700, emissiveIntensity: 0.3, roughness: 0.3, metalness: 0.6 });
+        const crown = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.12, 5), crownMat);
+        crown.position.y = 1.72;
+        group.add(crown);
+    }
+
+    // Hair — simple cap shape, color varies
+    const hairColors = [0x2a1a0a, 0x4a2a10, 0x1a1a1a, 0x8B4513, 0x654321, 0xD2691E, 0x3a2010];
+    const hairColor = hairColors[Math.abs(hashStr(agent.id)) % hairColors.length];
+    const hairMat = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.9 });
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.23, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.55), hairMat);
+    hair.position.y = 1.52;
+    group.add(hair);
+
+    // Plumbob (diamond) — with bloom-friendly emissive
     const plumbobGeo = new THREE.OctahedronGeometry(0.15, 0);
     const plumbobMat = new THREE.MeshStandardMaterial({
         color: STATUS_COLORS.idle,
         emissive: STATUS_COLORS.idle,
-        emissiveIntensity: 0.6,
+        emissiveIntensity: 1.2,
         transparent: true,
         opacity: 0.85,
     });
@@ -849,6 +964,12 @@ function createAgentMesh(agent) {
     group.add(nameSprite);
 
     return group;
+}
+
+function hashStr(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    return h;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1052,7 +1173,35 @@ function animate() {
         sceneRefs.fountain.rotation.y = elapsed * 0.3;
     }
 
-    renderer.render(scene, camera);
+    // Clouds drift (day mode)
+    for (const cl of clouds) {
+        cl.mesh.position.x += cl.speed * dt;
+        if (cl.mesh.position.x > cl.resetX) cl.mesh.position.x = cl.startX;
+    }
+
+    // Birds circle (day mode)
+    for (const b of birds) {
+        b.angle += b.speed * dt;
+        b.mesh.position.x = b.cx + Math.cos(b.angle) * b.radius;
+        b.mesh.position.z = b.cz + Math.sin(b.angle) * b.radius;
+        b.mesh.position.y = b.y + Math.sin(elapsed * 2 + b.angle) * 0.3;
+    }
+
+    // Fountain particles
+    if (fountainParticles) animateFountainParticles(dt, elapsed);
+
+    // Connection lines between collaborating agents
+    updateConnectionLines(elapsed);
+
+    // Code sparks from acting agents
+    updateCodeSparks(dt);
+
+    // Lamp flicker (subtle)
+    for (const lamp of sceneRefs.lamps) {
+        if (lamp.light) lamp.light.intensity = (isDayMode ? 0 : 0.8) + Math.sin(elapsed * 3 + lamp.phase) * 0.05;
+    }
+
+    composer.render();
 }
 
 function animateAgent(ag, dt, elapsed) {
@@ -1060,11 +1209,18 @@ function animateAgent(ag, dt, elapsed) {
     const plumbob = mesh.children.find(c => c.userData.isPlumbob);
     const arms = mesh.children.filter(c => c.userData.isArm);
     const legs = mesh.children.filter(c => c.userData.isLeg);
+    const body = mesh.children.find(c => c.userData.isBody);
 
     // Plumbob — always bob and rotate
     if (plumbob) {
         plumbob.rotation.y += dt * (ag.status === 'thinking' ? 3 : 0.5);
         plumbob.position.y = 2.1 + Math.sin(elapsed * 1.5 + ag.walkPhase) * 0.08;
+    }
+
+    // Breathing — subtle body scale oscillation
+    if (body) {
+        const breathe = 1 + Math.sin(elapsed * 1.2 + ag.walkPhase) * 0.012;
+        body.scale.set(1, breathe, 1);
     }
 
     // Movement toward target
@@ -1082,16 +1238,17 @@ function animateAgent(ag, dt, elapsed) {
         // Face direction
         mesh.rotation.y = Math.atan2(dx, dz);
 
-        // Walk cycle
+        // Walk cycle with vertical bob
         ag.walkPhase += dt * 8;
         const legSwing = Math.sin(ag.walkPhase) * 0.4;
+        mesh.position.y = Math.abs(Math.sin(ag.walkPhase)) * 0.04; // bounce
         if (legs[0]) legs[0].rotation.x = legSwing;
         if (legs[1]) legs[1].rotation.x = -legSwing;
         if (arms[0]) arms[0].rotation.x = -legSwing * 0.6;
         if (arms[1]) arms[1].rotation.x = legSwing * 0.6;
     } else {
-        // At destination — status-based animation
-        // Reset legs
+        // At destination
+        mesh.position.y *= 0.9; // settle back
         for (const l of legs) l.rotation.x *= 0.9;
 
         if (ag.status === 'acting') {
@@ -1099,19 +1256,22 @@ function animateAgent(ag, dt, elapsed) {
             const typingPhase = elapsed * 6 + ag.walkPhase;
             if (arms[0]) arms[0].rotation.x = Math.sin(typingPhase) * 0.25;
             if (arms[1]) arms[1].rotation.x = Math.sin(typingPhase + 1) * 0.25;
+            // Emit code sparks occasionally
+            ag._sparkTimer = (ag._sparkTimer || 0) - dt;
+            if (ag._sparkTimer <= 0) {
+                ag._sparkTimer = 0.8 + Math.random() * 1.5;
+                emitCodeSpark(mesh.position.x, mesh.position.z);
+            }
         } else if (ag.status === 'thinking') {
-            // Subtle sway
             if (arms[0]) arms[0].rotation.x = Math.sin(elapsed * 0.8) * 0.1;
         } else {
-            // Idle — arms rest
             for (const a of arms) a.rotation.x *= 0.95;
         }
 
-        // Idle behavior — occasional head turn
+        // Idle behavior
         ag.idleTimer -= dt;
         if (ag.idleTimer <= 0 && ag.status === 'idle') {
             ag.idleTimer = 5 + Math.random() * 10;
-            // Small random rotation
             mesh.rotation.y += (Math.random() - 0.5) * 0.5;
         }
     }
@@ -1157,7 +1317,7 @@ function updateAgentStatus(agentId, newStatus, task) {
         const color = STATUS_COLORS[newStatus] || STATUS_COLORS.idle;
         plumbob.material.color.setHex(color);
         plumbob.material.emissive.setHex(color);
-        plumbob.material.emissiveIntensity = newStatus === 'acting' ? 0.8 : 0.6;
+        plumbob.material.emissiveIntensity = newStatus === 'acting' ? 1.5 : 1.2;
     }
 
     // Glow nearby screens when acting
@@ -1183,7 +1343,7 @@ function glowNearbyScreen(pos, on) {
                     obj.material = new THREE.MeshStandardMaterial({
                         color: 0x1a1a2a,
                         emissive: 0x3b82f6,
-                        emissiveIntensity: 0.5,
+                        emissiveIntensity: 1.2,
                         roughness: 0.3,
                     });
                 } else {
@@ -1268,7 +1428,7 @@ function buildZoneLabelsUI() {
         el.className = 'wz-label';
         el.style.borderLeftColor = '#' + z.color.toString(16).padStart(6, '0');
         const m = z.mission;
-        el.textContent = `🏭 ${(z.name || '').slice(0, 20)} (${m.phases_done}/${m.phases_total})`;
+        el.textContent = `${(z.name || '').slice(0, 20)} (${m.phases_done}/${m.phases_total})`;
         el.onclick = () => flyToZone(z);
         container.appendChild(el);
     }
@@ -1277,7 +1437,7 @@ function buildZoneLabelsUI() {
         const el = document.createElement('div');
         el.className = 'wz-label';
         el.style.borderLeftColor = '#' + z.color.toString(16).padStart(6, '0');
-        el.textContent = z.id === 'board' ? '🏛️ Board Room' : '☕ Chill Zone';
+        el.textContent = z.id === 'board' ? 'Board Room' : 'Chill Zone';
         el.onclick = () => flyToZone(z);
         container.appendChild(el);
     }
@@ -1339,7 +1499,7 @@ function selectAgent(agentId) {
     statusEl.querySelector('span:last-child').textContent = statusLabel(ag.status);
 
     const taskEl = document.getElementById('wi-task');
-    const missionText = ag.missionName ? `🚀 ${ag.missionName}` : (ag.data.tagline || '');
+    const missionText = ag.missionName ? `${ag.missionName}` : (ag.data.tagline || '');
     taskEl.style.display = missionText ? 'block' : 'none';
     taskEl.textContent = missionText;
 
@@ -1529,7 +1689,7 @@ function toggleDayNight() {
     const theme = isDayMode ? 'light' : 'dark';
     localStorage.setItem('macaron_theme', theme);
     document.documentElement.setAttribute('data-theme', theme);
-    document.getElementById('btn-daynight').textContent = isDayMode ? '☀️' : '🌙';
+    document.getElementById('btn-daynight').innerHTML = isDayMode ? '<svg class="icon icon-sm"><use href="#icon-sun"/></svg>' : '<svg class="icon icon-sm"><use href="#icon-moon"/></svg>';
     applyDayNight(isDayMode, true);
 }
 
@@ -1564,11 +1724,365 @@ function applyDayNight(day, animate) {
     // Trees — greener in day
     for (const tr of sceneRefs.trees) {
         tr.trunk.material.color.setHex(day ? 0x8B5A2B : 0x4a3020);
-        tr.crown.material.color.setHex(day ? 0x4CAF50 : 0x1a5c30);
+        const leafColor = day ? 0x4CAF50 : 0x1a5c30;
+        if (tr.crowns) {
+            for (const c of tr.crowns) c.material.color.setHex(leafColor);
+        } else if (tr.crown) {
+            tr.crown.material.color.setHex(leafColor);
+        }
     }
+
+    // Lamps
+    for (const lamp of sceneRefs.lamps) {
+        if (lamp.light) lamp.light.intensity = day ? 0 : 0.8;
+        if (lamp.bulb) lamp.bulb.material.emissiveIntensity = day ? 0 : 1.0;
+    }
+
+    // Clouds
+    for (const cl of clouds) cl.mesh.visible = day;
+
+    // Birds
+    for (const b of birds) b.mesh.visible = day;
 
     // Exposure
     renderer.toneMappingExposure = t.exposure;
+}
+
+// ═══════════════════════════════════════════════════════
+// PATHS — walkways between zones
+// ═══════════════════════════════════════════════════════
+function buildPaths() {
+    const pathMat = new THREE.MeshStandardMaterial({
+        color: isDayMode ? 0xc8bfb0 : 0x252035,
+        roughness: 0.85, metalness: 0.05,
+    });
+    // Connect zones with paths (flat boxes)
+    const connections = [];
+    // From chill to board
+    const chillZ = ZONES.find(z => z.id === 'chill');
+    const boardZ = ZONES.find(z => z.id === 'board');
+    if (chillZ && boardZ) {
+        connections.push({ x1: chillZ.x, z1: chillZ.z - chillZ.h/2, x2: boardZ.x, z2: boardZ.z + boardZ.h/2 });
+    }
+    // From mission zones to main corridor (horizontal)
+    for (const mz of MISSION_ZONES) {
+        const targetX = (chillZ ? chillZ.x - chillZ.w/2 - 2 : 15);
+        connections.push({ x1: mz.x + mz.w/2, z1: mz.z, x2: targetX, z2: mz.z });
+    }
+    // Main corridor (vertical) connecting all missions to shared zones
+    if (MISSION_ZONES.length > 0 && chillZ) {
+        const cx = (chillZ ? chillZ.x - chillZ.w/2 - 2 : 15);
+        const allMZ = MISSION_ZONES.map(z => z.z);
+        const minZ = Math.min(...allMZ, chillZ.z);
+        const maxZ = Math.max(...allMZ, boardZ ? boardZ.z : 0);
+        const corridor = new THREE.Mesh(
+            new THREE.BoxGeometry(0.8, 0.02, maxZ - minZ + 4),
+            pathMat
+        );
+        corridor.position.set(cx, 0.015, (minZ + maxZ) / 2);
+        corridor.receiveShadow = true;
+        scene.add(corridor);
+    }
+    for (const c of connections) {
+        const dx = c.x2 - c.x1, dz = c.z2 - c.z1;
+        const len = Math.sqrt(dx*dx + dz*dz);
+        if (len < 0.5) continue;
+        const path = new THREE.Mesh(new THREE.BoxGeometry(len, 0.02, 0.6), pathMat);
+        path.position.set((c.x1+c.x2)/2, 0.015, (c.z1+c.z2)/2);
+        path.rotation.y = Math.atan2(dx, dz) + Math.PI/2;
+        path.receiveShadow = true;
+        scene.add(path);
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// LAMPADAIRES — street lamps with point lights
+// ═══════════════════════════════════════════════════════
+function buildLamps() {
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.7, roughness: 0.3 });
+    const bulbMat = new THREE.MeshStandardMaterial({ color: 0xffeedd, emissive: 0xffeedd, emissiveIntensity: isDayMode ? 0 : 1.0, roughness: 0.2 });
+
+    // Place lamps along paths and zone edges
+    const lampPositions = [];
+    const chillZ = ZONES.find(z => z.id === 'chill');
+    const boardZ = ZONES.find(z => z.id === 'board');
+    if (chillZ) {
+        lampPositions.push([chillZ.x - chillZ.w/2 - 1, chillZ.z - 2]);
+        lampPositions.push([chillZ.x + chillZ.w/2 + 1, chillZ.z + 2]);
+    }
+    if (boardZ) {
+        lampPositions.push([boardZ.x - boardZ.w/2 - 1, boardZ.z]);
+        lampPositions.push([boardZ.x + boardZ.w/2 + 1, boardZ.z]);
+    }
+    // Along mission zones
+    for (let i = 0; i < MISSION_ZONES.length; i += 2) {
+        const mz = MISSION_ZONES[i];
+        lampPositions.push([mz.x + mz.w/2 + 1.5, mz.z]);
+    }
+
+    for (const [lx, lz] of lampPositions) {
+        // Pole
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 3.5, 6), poleMat);
+        pole.position.set(lx, 1.75, lz);
+        pole.castShadow = true;
+        scene.add(pole);
+        // Arm
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.04, 0.04), poleMat);
+        arm.position.set(lx + 0.4, 3.4, lz);
+        scene.add(arm);
+        // Bulb
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), bulbMat.clone());
+        bulb.position.set(lx + 0.7, 3.3, lz);
+        scene.add(bulb);
+        // Point light
+        const light = new THREE.PointLight(0xffeedd, isDayMode ? 0 : 0.8, 12, 1.5);
+        light.position.set(lx + 0.7, 3.2, lz);
+        scene.add(light);
+        sceneRefs.lamps.push({ pole, bulb, light, phase: Math.random() * Math.PI * 2 });
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// BUSHES — small green spheres between zones
+// ═══════════════════════════════════════════════════════
+function buildBushes() {
+    const bushMat = new THREE.MeshStandardMaterial({ color: isDayMode ? 0x388E3C : 0x1a4a20, roughness: 0.85 });
+    const bushPositions = [];
+    // Scatter bushes between zones
+    for (const z of ZONES) {
+        const x1 = z.x - z.w/2, x2 = z.x + z.w/2;
+        const z1 = z.z - z.h/2, z2 = z.z + z.h/2;
+        bushPositions.push([x1 - 1.5, z1 + 1], [x2 + 1.5, z2 - 1]);
+    }
+    for (const [bx, bz] of bushPositions) {
+        const r = 0.3 + Math.random() * 0.3;
+        const bush = new THREE.Mesh(new THREE.SphereGeometry(r, 6, 5), bushMat);
+        bush.position.set(bx, r * 0.7, bz);
+        bush.castShadow = true;
+        scene.add(bush);
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// CAMPUS SIGN — "Macaron Software" at entrance
+// ═══════════════════════════════════════════════════════
+function buildCampusSign() {
+    // Position at front of layout
+    const allZ = ZONES.map(z => z.z + z.h/2);
+    const frontZ = Math.max(10, ...allZ) + 4;
+
+    // Sign posts
+    const postMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.6, roughness: 0.3 });
+    for (const px of [-3, 3]) {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.5, 6), postMat);
+        post.position.set(px, 1.25, frontZ);
+        scene.add(post);
+    }
+    // Sign board
+    const signMat = new THREE.MeshStandardMaterial({
+        color: isDayMode ? 0x2a2040 : 0x1a1030,
+        roughness: 0.4, metalness: 0.2,
+    });
+    const signBoard = new THREE.Mesh(new THREE.BoxGeometry(7, 1.2, 0.15), signMat);
+    signBoard.position.set(0, 2.2, frontZ);
+    scene.add(signBoard);
+
+    // Text
+    const signText = makeTextSprite('MACARON SOFTWARE', 0x7c3aed, 0.5);
+    signText.position.set(0, 2.3, frontZ + 0.1);
+    scene.add(signText);
+    const subText = makeTextSprite('Software Factory', 0xaaaaaa, 0.25);
+    subText.position.set(0, 1.85, frontZ + 0.1);
+    scene.add(subText);
+}
+
+// ═══════════════════════════════════════════════════════
+// CLOUDS — day mode drifting clouds
+// ═══════════════════════════════════════════════════════
+function buildClouds() {
+    const cloudMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff, transparent: true, opacity: 0.6,
+        roughness: 1.0,
+    });
+    for (let i = 0; i < 8; i++) {
+        const cloudGroup = new THREE.Group();
+        const numPuffs = 3 + Math.floor(Math.random() * 3);
+        for (let p = 0; p < numPuffs; p++) {
+            const r = 1.5 + Math.random() * 2;
+            const puff = new THREE.Mesh(new THREE.SphereGeometry(r, 7, 5), cloudMat);
+            puff.position.set(
+                (Math.random() - 0.5) * 3,
+                (Math.random() - 0.5) * 0.8,
+                (Math.random() - 0.5) * 2
+            );
+            puff.scale.y = 0.5;
+            cloudGroup.add(puff);
+        }
+        const x = (Math.random() - 0.5) * 120;
+        const y = 30 + Math.random() * 15;
+        const z = (Math.random() - 0.5) * 80;
+        cloudGroup.position.set(x, y, z);
+        cloudGroup.visible = isDayMode;
+        scene.add(cloudGroup);
+        clouds.push({ mesh: cloudGroup, speed: 0.3 + Math.random() * 0.5, startX: -70, resetX: 70 });
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// BIRDS — day mode circling points
+// ═══════════════════════════════════════════════════════
+function buildBirds() {
+    const birdMat = new THREE.MeshBasicMaterial({ color: 0x333333 });
+    for (let i = 0; i < 5; i++) {
+        const bird = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.2, 3), birdMat);
+        bird.rotation.x = Math.PI / 2;
+        const cx = (Math.random() - 0.5) * 40;
+        const cz = (Math.random() - 0.5) * 40;
+        const y = 15 + Math.random() * 10;
+        bird.position.set(cx, y, cz);
+        bird.visible = isDayMode;
+        scene.add(bird);
+        birds.push({
+            mesh: bird,
+            cx, cz, y,
+            radius: 5 + Math.random() * 10,
+            angle: Math.random() * Math.PI * 2,
+            speed: 0.3 + Math.random() * 0.4,
+        });
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// FOUNTAIN PARTICLES — water jet
+// ═══════════════════════════════════════════════════════
+function buildFountainParticles() {
+    const chillZ = ZONES.find(z => z.id === 'chill');
+    if (!chillZ) return;
+    const fx = chillZ.x, fz = chillZ.z + 2;
+    const count = 40;
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    const vel = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+        resetFountainParticle(pos, vel, i, fx, fz);
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const mat = new THREE.PointsMaterial({
+        color: isDayMode ? 0x4488cc : 0x4466ff,
+        size: 0.06, transparent: true, opacity: 0.7, depthWrite: false,
+    });
+    const points = new THREE.Points(geo, mat);
+    scene.add(points);
+    fountainParticles = { points, vel, fx, fz, count };
+}
+
+function resetFountainParticle(pos, vel, i, fx, fz) {
+    pos[i*3] = fx + (Math.random()-0.5)*0.3;
+    pos[i*3+1] = 0.5;
+    pos[i*3+2] = fz + (Math.random()-0.5)*0.3;
+    vel[i*3] = (Math.random()-0.5)*0.3;
+    vel[i*3+1] = 1.5 + Math.random()*1.5;
+    vel[i*3+2] = (Math.random()-0.5)*0.3;
+}
+
+function animateFountainParticles(dt, elapsed) {
+    const fp = fountainParticles;
+    const pos = fp.points.geometry.attributes.position;
+    for (let i = 0; i < fp.count; i++) {
+        pos.array[i*3] += fp.vel[i*3] * dt;
+        pos.array[i*3+1] += fp.vel[i*3+1] * dt;
+        pos.array[i*3+2] += fp.vel[i*3+2] * dt;
+        fp.vel[i*3+1] -= 3.0 * dt; // gravity
+        if (pos.array[i*3+1] < 0.3) {
+            resetFountainParticle(pos.array, fp.vel, i, fp.fx, fp.fz);
+        }
+    }
+    pos.needsUpdate = true;
+}
+
+// ═══════════════════════════════════════════════════════
+// CONNECTION LINES — between collaborating agents
+// ═══════════════════════════════════════════════════════
+function buildConnectionLines() {
+    // Build lines between agents in the same session
+    const agentSessions = LIVE_DATA.agent_sessions || {};
+    const sessionGroups = {};
+    for (const [aid, sid] of Object.entries(agentSessions)) {
+        if (!sessionGroups[sid]) sessionGroups[sid] = [];
+        sessionGroups[sid].push(aid);
+    }
+    for (const [sid, agentIds] of Object.entries(sessionGroups)) {
+        if (agentIds.length < 2) continue;
+        for (let i = 0; i < agentIds.length - 1; i++) {
+            const a1 = agents[agentIds[i]], a2 = agents[agentIds[i+1]];
+            if (!a1 || !a2) continue;
+            const geo = new THREE.BufferGeometry();
+            const positions = new Float32Array(6);
+            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const mat = new THREE.LineBasicMaterial({
+                color: 0x7c3aed, transparent: true, opacity: 0.25, depthWrite: false,
+            });
+            const line = new THREE.Line(geo, mat);
+            scene.add(line);
+            connectionLines.push({ line, a1Id: agentIds[i], a2Id: agentIds[i+1] });
+        }
+    }
+}
+
+function updateConnectionLines(elapsed) {
+    for (const cl of connectionLines) {
+        const a1 = agents[cl.a1Id], a2 = agents[cl.a2Id];
+        if (!a1 || !a2) continue;
+        const pos = cl.line.geometry.attributes.position;
+        pos.array[0] = a1.mesh.position.x;
+        pos.array[1] = 1.0;
+        pos.array[2] = a1.mesh.position.z;
+        pos.array[3] = a2.mesh.position.x;
+        pos.array[4] = 1.0;
+        pos.array[5] = a2.mesh.position.z;
+        pos.needsUpdate = true;
+        // Pulse opacity
+        cl.line.material.opacity = 0.15 + Math.sin(elapsed * 2) * 0.1;
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// CODE SPARKS — particles when agents are coding
+// ═══════════════════════════════════════════════════════
+function emitCodeSpark(x, z) {
+    const count = 6;
+    for (let i = 0; i < count; i++) {
+        const sparkMat = new THREE.MeshBasicMaterial({
+            color: [0x7c3aed, 0x3b82f6, 0x22c55e, 0xeab308][i % 4],
+            transparent: true, opacity: 1.0,
+        });
+        const spark = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.04), sparkMat);
+        spark.position.set(x + (Math.random()-0.5)*0.5, 1.2, z + (Math.random()-0.5)*0.3);
+        scene.add(spark);
+        codeSparks.push({
+            mesh: spark,
+            vy: 1.0 + Math.random() * 1.5,
+            vx: (Math.random()-0.5) * 0.5,
+            life: 0.8 + Math.random() * 0.5,
+        });
+    }
+}
+
+function updateCodeSparks(dt) {
+    for (let i = codeSparks.length - 1; i >= 0; i--) {
+        const s = codeSparks[i];
+        s.mesh.position.y += s.vy * dt;
+        s.mesh.position.x += s.vx * dt;
+        s.life -= dt;
+        s.mesh.material.opacity = Math.max(0, s.life);
+        s.mesh.rotation.y += dt * 5;
+        if (s.life <= 0) {
+            scene.remove(s.mesh);
+            s.mesh.geometry.dispose();
+            s.mesh.material.dispose();
+            codeSparks.splice(i, 1);
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1581,6 +2095,7 @@ function onResize() {
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
+    composer.setSize(w, h);
 }
 
 // ═══════════════════════════════════════════════════════

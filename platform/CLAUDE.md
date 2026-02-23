@@ -37,16 +37,19 @@ KILL:   lsof -ti:8099 | xargs kill -9
 
 ```bash
 SSH_KEY="$HOME/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa"
-# FULL rebuild:
-rsync -azP --delete --exclude='__pycache__' --exclude='data/' \
+# FULL deploy (rsync local → VM → rebuild):
+rsync -azP --delete --exclude='__pycache__' --exclude='*.pyc' --exclude='data/' --exclude='.git' --exclude='tests/' \
   platform/ -e "ssh -i $SSH_KEY" azureadmin@4.233.64.30:/opt/macaron/platform/
-ssh -i "$SSH_KEY" azureadmin@4.233.64.30 "cd /opt/macaron && sudo docker compose --env-file .env -f platform/deploy/docker-compose-vm.yml up -d --build"
+ssh -i "$SSH_KEY" azureadmin@4.233.64.30 "cd /opt/macaron && docker compose --env-file .env -f platform/deploy/docker-compose-vm.yml up -d --build --no-deps platform"
 # FAST hotpatch (no rebuild, preserves container state):
 tar cf /tmp/update.tar <files...>
 scp -i "$SSH_KEY" /tmp/update.tar azureadmin@4.233.64.30:/tmp/
 ssh -i "$SSH_KEY" azureadmin@4.233.64.30 "docker cp /tmp/update.tar deploy-platform-1:/tmp/ && docker exec deploy-platform-1 bash -c 'cd /app/macaron_platform && tar xf /tmp/update.tar' && docker restart deploy-platform-1"
+# ⚠️ Hotpatch is LOST on docker compose --build → always rsync BEFORE rebuild
 # Container code path: /app/macaron_platform/ (NOT /app/platform/)
-# Auth: macaron:macaron | Prod LLM: Azure OpenAI gpt-5-mini only (AZURE_DEPLOY=1)
+# Auth: admin@demo.local (Skip Demo button) | admin@macaron-software.com / macaron2026
+# Prod LLM: Azure OpenAI gpt-5-mini only (AZURE_DEPLOY=1, NO minimax fallback)
+# Custom domain: sf.macaron-software.com → 4.233.64.30:80 (nginx)
 # UID mismatch: /opt/macaron owned by 501 (macOS), azureadmin=1001 → use docker cp
 ```
 
@@ -54,7 +57,7 @@ ssh -i "$SSH_KEY" azureadmin@4.233.64.30 "docker cp /tmp/update.tar deploy-platf
 
 - FastAPI + Jinja2 + HTMX + SSE (no WS). Zero build step. Zero emoji (SVG Feather only)
 - SQLite WAL + FTS5 (~35 tables)
-- LLM local: MiniMax M2.5 → Azure OpenAI (fallback). Prod: Azure OpenAI gpt-5-mini only
+- LLM per environment (see LLM ENVIRONMENTS below)
 - Rate limit: 15 rpm (token-limited ~10-16 calls/min in practice, 100K tokens/60s)
 - **133+ agents** (95 YAML defs), 12 patterns, 19 workflows, 1271 skills
 
@@ -267,9 +270,30 @@ STRATEGY                     ENGINEERING
 ### LLM
 
 - `llm/client.py` (~500L) — multi-provider, rate limiter (15 rpm), cooldown on 429
-- Fallback: MiniMax M2.5 → Azure OpenAI. Prod: `AZURE_DEPLOY=1` → azure-openai only
 - httpx: connect=30s, read=300s. MiniMax strips `<think>` auto
 - Azure: `max_completion_tokens` (NOT `max_tokens`)
+
+## LLM ENVIRONMENTS
+
+```
+┌──────────────────────┬──────────────┬─────────────┬──────────────────────┐
+│ Environment          │ Provider     │ Model       │ Fallback             │
+├──────────────────────┼──────────────┼─────────────┼──────────────────────┤
+│ Azure VM (prod)      │ azure-openai │ gpt-5-mini  │ none (AZURE_DEPLOY=1)│
+│ 4.233.64.30          │              │             │                      │
+│ sf.macaron-software  │              │             │                      │
+├──────────────────────┼──────────────┼─────────────┼──────────────────────┤
+│ Local dev            │ minimax      │ MiniMax-M2.5│ → azure-openai       │
+├──────────────────────┼──────────────┼─────────────┼──────────────────────┤
+│ VPS Macaron (future) │ minimax      │ MiniMax-M2.5│ → azure-openai       │
+└──────────────────────┴──────────────┴─────────────┴──────────────────────┘
+
+Config: PLATFORM_LLM_PROVIDER + PLATFORM_LLM_MODEL env vars
+Azure: AZURE_DEPLOY=1 → _FALLBACK_CHAIN=["azure-openai"] only
+Local: _FALLBACK_CHAIN=[minimax, azure-openai, azure-ai]
+Keys: ~/.config/factory/*.key (local) | .factory-keys/ volume (docker)
+NEVER set *_API_KEY=dummy — breaks all LLM calls
+```
 
 ### Memory
 

@@ -2644,3 +2644,295 @@ async def notification_test():
             },
         }
     )
+
+
+# ── SAFe Perspective ───────────────────────────────────────────────────
+
+SAFE_PERSPECTIVES = {
+    "portfolio_manager",
+    "rte",
+    "product_owner",
+    "scrum_master",
+    "developer",
+    "architect",
+    "qa_security",
+    "business_owner",
+    "admin",
+}
+
+PERSPECTIVE_LABELS = {
+    "portfolio_manager": "Portfolio Manager",
+    "rte": "RTE",
+    "product_owner": "Product Owner",
+    "scrum_master": "Scrum Master",
+    "developer": "Developer",
+    "architect": "Architect",
+    "qa_security": "QA / Security",
+    "business_owner": "Business Owner",
+    "admin": "Admin",
+}
+
+# Which sidebar links each perspective can see
+PERSPECTIVE_SIDEBAR = {
+    "portfolio_manager": {"/", "/backlog", "/pi", "/metrics", "/settings"},
+    "rte": {"/", "/pi", "/ceremonies", "/sessions", "/art", "/monitoring", "/settings"},
+    "product_owner": {"/", "/backlog", "/pi", "/projects", "/sessions", "/settings"},
+    "scrum_master": {"/", "/pi", "/ceremonies", "/sessions", "/art", "/monitoring", "/settings"},
+    "developer": {"/", "/projects", "/sessions", "/toolbox", "/art", "/settings"},
+    "architect": {"/", "/backlog", "/pi", "/projects", "/toolbox", "/monitoring", "/settings"},
+    "qa_security": {"/", "/projects", "/ceremonies", "/sessions", "/monitoring", "/settings"},
+    "business_owner": {"/", "/backlog", "/pi", "/metrics", "/settings"},
+    "admin": {"/", "/backlog", "/pi", "/ceremonies", "/sessions", "/art", "/toolbox", "/mercato", "/metrics", "/monitoring", "/projects", "/settings"},
+}
+
+
+@router.post("/api/perspective")
+async def set_perspective(request: Request):
+    """Set SAFe perspective cookie."""
+    body = await request.json()
+    perspective = body.get("perspective", "admin")
+    if perspective not in SAFE_PERSPECTIVES:
+        perspective = "admin"
+    response = JSONResponse({"ok": True, "perspective": perspective})
+    response.set_cookie(
+        key="safe_perspective",
+        value=perspective,
+        max_age=31536000,
+        httponly=True,
+        samesite="lax",
+    )
+    return response
+
+
+@router.get("/api/perspective")
+async def get_perspective(request: Request):
+    """Get current perspective + sidebar config."""
+    p = getattr(request.state, "perspective", "admin")
+    return JSONResponse(
+        {
+            "perspective": p,
+            "label": PERSPECTIVE_LABELS.get(p, p),
+            "sidebar": list(PERSPECTIVE_SIDEBAR.get(p) or []),
+            "labels": PERSPECTIVE_LABELS,
+        }
+    )
+
+
+# ── Dashboard KPIs & Partials ────────────────────────────────────────
+
+
+@router.get("/api/dashboard/kpis")
+async def dashboard_kpis(request: Request, perspective: str = "admin"):
+    """KPI cards adapted to perspective."""
+    from ...agents.store import get_agent_store
+    from ...missions.store import get_mission_run_store, get_mission_store
+    from ...sessions.store import get_session_store
+
+    mission_store = get_mission_store()
+    run_store = get_mission_run_store()
+    agent_store = get_agent_store()
+    session_store = get_session_store()
+
+    missions = mission_store.list_missions(limit=500)
+    runs = run_store.list_runs(limit=500)
+    agents = agent_store.list_all()
+    sessions = session_store.list_all(limit=100)
+
+    active_missions = sum(1 for m in missions if m.status in ("active", "running"))
+    total_epics = len(missions)
+    active_agents = len(agents)
+    active_sessions = sum(1 for s in sessions if s.status in ("active", "running"))
+
+    # Compute completion rate
+    completed = sum(1 for m in missions if m.status in ("completed", "done"))
+    completion_rate = int(completed / total_epics * 100) if total_epics > 0 else 0
+
+    # KPIs vary by perspective
+    cards = []
+    if perspective in ("portfolio_manager", "business_owner", "admin"):
+        cards = [
+            {"value": str(total_epics), "label": "Total Epics"},
+            {"value": str(active_missions), "label": "Active Missions"},
+            {"value": f"{completion_rate}%", "label": "Completion Rate"},
+            {"value": str(active_agents), "label": "Agents"},
+        ]
+    elif perspective in ("rte", "scrum_master"):
+        sprints_active = sum(
+            1 for r in runs if r.status and str(getattr(r.status, 'value', r.status)) in ("running", "active")
+        )
+        cards = [
+            {"value": str(active_missions), "label": "Active Missions"},
+            {"value": str(sprints_active), "label": "Running Sprints"},
+            {"value": str(active_sessions), "label": "Live Sessions"},
+            {"value": str(active_agents), "label": "Agents"},
+        ]
+    elif perspective in ("product_owner",):
+        cards = [
+            {"value": str(total_epics), "label": "Epics"},
+            {"value": str(active_missions), "label": "In Progress"},
+            {"value": f"{completion_rate}%", "label": "Done Rate"},
+            {"value": str(active_sessions), "label": "Sessions"},
+        ]
+    elif perspective in ("developer", "architect"):
+        from ...projects.manager import get_project_store
+
+        projects = get_project_store().list_all()
+        cards = [
+            {"value": str(len(projects)), "label": "Projects"},
+            {"value": str(active_sessions), "label": "Active Sessions"},
+            {"value": str(active_missions), "label": "Missions"},
+            {"value": str(active_agents), "label": "Agents"},
+        ]
+    elif perspective == "qa_security":
+        cards = [
+            {"value": str(active_missions), "label": "Missions"},
+            {"value": str(active_sessions), "label": "Test Sessions"},
+            {"value": f"{completion_rate}%", "label": "Pass Rate"},
+            {"value": str(active_agents), "label": "Agents"},
+        ]
+    else:
+        cards = [
+            {"value": str(total_epics), "label": "Epics"},
+            {"value": str(active_missions), "label": "Active"},
+            {"value": str(active_sessions), "label": "Sessions"},
+            {"value": str(active_agents), "label": "Agents"},
+        ]
+
+    html = ""
+    for c in cards:
+        html += f'<div class="kpi-card"><div class="kpi-value">{c["value"]}</div><div class="kpi-label">{c["label"]}</div></div>'
+    return HTMLResponse(html)
+
+
+@router.get("/api/dashboard/missions")
+async def dashboard_missions(request: Request):
+    """Active missions with progress bars."""
+    from ...missions.store import get_mission_run_store, get_mission_store
+
+    mission_store = get_mission_store()
+    run_store = get_mission_run_store()
+    missions = mission_store.list_missions(limit=50)
+    runs = run_store.list_runs(limit=50)
+    runs_map = {r.parent_mission_id: r for r in runs if r.parent_mission_id}
+
+    html = ""
+    active = [m for m in missions if m.status in ("active", "running")][:8]
+    if not active:
+        html = '<p class="text-muted">No active missions</p>'
+    for m in active:
+        run = runs_map.get(m.id)
+        if run and run.phases:
+            done = sum(1 for ph in run.phases if ph.status.value in ("done", "done_with_issues"))
+            total = len(run.phases)
+            pct = int(done / total * 100) if total > 0 else 0
+        else:
+            pct = 0
+        name = html_mod.escape(m.name[:40])
+        html += f"""<div class="dash-mission">
+            <div class="dash-mission-name">{name}</div>
+            <div class="dash-mission-bar"><div class="dash-mission-fill" style="width:{pct}%"></div></div>
+            <div class="dash-mission-pct">{pct}%</div>
+        </div>"""
+    return HTMLResponse(html)
+
+
+@router.get("/api/dashboard/sprints")
+async def dashboard_sprints(request: Request):
+    """Active sprints summary."""
+    from ...missions.store import get_mission_store
+
+    store = get_mission_store()
+    try:
+        sprints = store.list_sprints(limit=10)
+    except Exception:
+        sprints = []
+
+    active = [s for s in sprints if getattr(s, "status", "") in ("active", "planning")][:5]
+    if not active:
+        return HTMLResponse('<p class="text-muted">No active sprints</p>')
+
+    html = ""
+    for s in active:
+        name = html_mod.escape(getattr(s, "name", "Sprint")[:30])
+        vel = getattr(s, "velocity", 0) or 0
+        planned = getattr(s, "planned_sp", 0) or 0
+        pct = int(vel / planned * 100) if planned > 0 else 0
+        html += f"""<div class="dash-stat">
+            <span class="dash-stat-label">{name}</span>
+            <span class="dash-stat-value">{vel}/{planned} SP ({pct}%)</span>
+        </div>"""
+    return HTMLResponse(html)
+
+
+@router.get("/api/dashboard/backlog")
+async def dashboard_backlog(request: Request):
+    """Backlog stats for PO."""
+    from ...missions.store import get_mission_store
+
+    store = get_mission_store()
+    try:
+        features = store.list_features(limit=100)
+    except Exception:
+        features = []
+
+    try:
+        stories = store.list_user_stories(limit=200)
+    except Exception:
+        stories = []
+
+    html = f"""<div class="dash-stat"><span class="dash-stat-label">Features</span><span class="dash-stat-value">{len(features)}</span></div>
+    <div class="dash-stat"><span class="dash-stat-label">User Stories</span><span class="dash-stat-value">{len(stories)}</span></div>"""
+    return HTMLResponse(html)
+
+
+@router.get("/api/dashboard/projects")
+async def dashboard_projects(request: Request):
+    """Projects list for dev."""
+    from ...projects.manager import get_project_store
+
+    projects = get_project_store().list_all()[:8]
+    if not projects:
+        return HTMLResponse('<p class="text-muted">No projects</p>')
+
+    html = ""
+    for p in projects:
+        name = html_mod.escape(p.name[:30])
+        ftype = html_mod.escape((p.factory_type or "")[:20])
+        html += f"""<div class="dash-stat">
+            <a href="/projects/{p.id}" class="dash-stat-label" style="color:var(--text-primary);text-decoration:none">{name}</a>
+            <span class="dash-stat-value" style="font-size:0.75rem;color:var(--text-secondary)">{ftype}</span>
+        </div>"""
+    return HTMLResponse(html)
+
+
+@router.get("/api/dashboard/quality")
+async def dashboard_quality(request: Request):
+    """Quality metrics for QA."""
+    return HTMLResponse("""<div class="dash-stat"><span class="dash-stat-label">Test Campaigns</span><span class="dash-stat-value">—</span></div>
+    <div class="dash-stat"><span class="dash-stat-label">Security Audits</span><span class="dash-stat-value">—</span></div>
+    <div class="dash-stat"><span class="dash-stat-label">Open Vulnerabilities</span><span class="dash-stat-value">0</span></div>""")
+
+
+@router.get("/api/dashboard/activity")
+async def dashboard_activity(request: Request):
+    """Recent activity feed."""
+    from ...sessions.store import get_session_store
+
+    store = get_session_store()
+    sessions = store.list_all(limit=10)
+    recent = sorted(sessions, key=lambda s: s.created_at or "", reverse=True)[:6]
+
+    if not recent:
+        return HTMLResponse('<p class="text-muted">No recent activity</p>')
+
+    html = ""
+    for s in recent:
+        ts = (s.created_at or "")[:16].replace("T", " ")[-5:]  # HH:MM
+        name = html_mod.escape((s.name or "Session")[:35])
+        status = getattr(s, "status", "")
+        badge = "var(--purple)" if status == "active" else "var(--text-secondary)"
+        html += f"""<div class="dash-activity-item">
+            <span class="dash-activity-time">{ts}</span>
+            <span class="dash-activity-text">{name}</span>
+        </div>"""
+    return HTMLResponse(html)

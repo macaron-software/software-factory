@@ -92,7 +92,7 @@ _is_azure = os.environ.get("AZURE_DEPLOY", "")
 if _primary == "demo":
     _FALLBACK_CHAIN = ["demo"]
 elif _is_azure:
-    # Azure prod: only azure-openai, no minimax/nvidia
+    # Azure prod: azure-openai only (no minimax)
     _FALLBACK_CHAIN = ["azure-openai"]
 else:
     _FALLBACK_CHAIN = [_primary] + [
@@ -675,12 +675,25 @@ class LLMClient:
                 except Exception as exc:
                     err_str = repr(exc)
                     is_rate_limit = "429" in err_str or "RateLimitReached" in err_str
-                    is_transient = "ReadError" in err_str or "ConnectError" in err_str or "RemoteProtocolError" in err_str or "ServerDisconnected" in err_str
+                    is_transient = (
+                        "ReadError" in err_str
+                        or "ConnectError" in err_str
+                        or "RemoteProtocolError" in err_str
+                        or "ServerDisconnected" in err_str
+                    )
                     if attempt < max_attempts - 1 and (is_rate_limit or is_transient):
                         import random
-                        delay = min((2 ** attempt) * 10 + random.uniform(0, 5), 90)
-                        logger.warning("LLM stream %s/%s %s (attempt %d/%d) — retrying in %ds",
-                                       prov, use_model, "rate-limited" if is_rate_limit else "transient error", attempt + 1, max_attempts, int(delay))
+
+                        delay = min((2**attempt) * 10 + random.uniform(0, 5), 90)
+                        logger.warning(
+                            "LLM stream %s/%s %s (attempt %d/%d) — retrying in %ds",
+                            prov,
+                            use_model,
+                            "rate-limited" if is_rate_limit else "transient error",
+                            attempt + 1,
+                            max_attempts,
+                            int(delay),
+                        )
                         await asyncio.sleep(delay)
                         continue
                     logger.warning(

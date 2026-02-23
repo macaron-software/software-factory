@@ -681,22 +681,22 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
-        # ── MCP: JIRA/Confluence (optional — needs ATLASSIAN_TOKEN) ──
+        # ── MCP: JIRA (needs JIRA_URL + JIRA_TOKEN or ~/.config/factory/jira.key) ──
         {
             "type": "function",
             "function": {
                 "name": "jira_search",
-                "description": "Search JIRA issues using JQL query.",
+                "description": "Search Jira issues using JQL query.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "jql": {
                             "type": "string",
-                            "description": "JQL query (e.g. 'project=PROJ AND status=Open')",
+                            "description": "JQL query (e.g. 'project=LPDATA AND status=\"En Cours\"')",
                         },
                         "max_results": {
                             "type": "integer",
-                            "description": "Max results (default 10)",
+                            "description": "Max results (default 20)",
                         },
                     },
                     "required": ["jql"],
@@ -707,16 +707,95 @@ def _get_tool_schemas() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "jira_create",
-                "description": "Create a JIRA issue (bug, story, task).",
+                "description": "Create a Jira issue.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "project": {"type": "string", "description": "Project key (e.g. 'PROJ')"},
+                        "project": {"type": "string", "description": "Project key (default: LPDATA)"},
                         "summary": {"type": "string", "description": "Issue title"},
-                        "type": {"type": "string", "description": "Issue type: Bug, Story, Task"},
+                        "type": {"type": "string", "description": "Issue type: User Story, Feature, Anomalie (AGILE), etc."},
                         "description": {"type": "string", "description": "Issue description"},
+                        "priority": {"type": "string", "description": "Priority name (optional)"},
+                        "labels": {"type": "array", "items": {"type": "string"}, "description": "Labels (optional)"},
                     },
-                    "required": ["project", "summary", "type"],
+                    "required": ["summary"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "jira_update",
+                "description": "Update fields on an existing Jira issue.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "issue_key": {"type": "string", "description": "Issue key (e.g. LPDATA-123)"},
+                        "fields": {
+                            "type": "object",
+                            "description": "Fields to update: summary, description, priority, labels, assignee",
+                        },
+                    },
+                    "required": ["issue_key", "fields"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "jira_transition",
+                "description": "Move a Jira issue to a new status (e.g. 'En Cours', 'Terminé').",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "issue_key": {"type": "string", "description": "Issue key (e.g. LPDATA-123)"},
+                        "transition": {"type": "string", "description": "Target transition name"},
+                    },
+                    "required": ["issue_key", "transition"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "jira_board_issues",
+                "description": "List all issues from a Jira Agile board (default: BAC A SABLE IA board 8680).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "board_id": {"type": "integer", "description": "Board ID (default 8680)"},
+                        "max_results": {"type": "integer", "description": "Max results (default 50)"},
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "jira_add_comment",
+                "description": "Add a comment to a Jira issue.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "issue_key": {"type": "string", "description": "Issue key (e.g. LPDATA-123)"},
+                        "comment": {"type": "string", "description": "Comment body text"},
+                    },
+                    "required": ["issue_key", "comment"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "jira_sync_from_platform",
+                "description": "Push platform mission tasks/stories to Jira as issues.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "mission_id": {"type": "string", "description": "Platform mission ID to sync"},
+                        "board_id": {"type": "integer", "description": "Target Jira board ID (default 8680)"},
+                    },
+                    "required": ["mission_id"],
                 },
             },
         },
@@ -923,41 +1002,6 @@ def _get_tool_schemas() -> list[dict]:
                             "type": "string",
                             "description": "Git commit message (if commit step included)",
                         },
-                    },
-                    "required": ["cwd"],
-                },
-            },
-        },
-        # ── Ticket/Incident management tools ──
-        {
-            "type": "function",
-            "function": {
-                "name": "create_ticket",
-                "description": "Create a support ticket or incident for TMA tracking. Persisted in platform DB.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "title": {"type": "string", "description": "Ticket title (concise)"},
-                        "description": {"type": "string", "description": "Detailed description of the issue"},
-                        "severity": {"type": "string", "enum": ["critical", "high", "medium", "low"], "description": "Severity level"},
-                        "category": {"type": "string", "enum": ["bug", "incident", "improvement", "security"], "description": "Ticket category"},
-                    },
-                    "required": ["title", "description", "severity"],
-                },
-            },
-        },
-        # ── Local CI pipeline (fallback when no GitHub Actions) ──
-        {
-            "type": "function",
-            "function": {
-                "name": "local_ci",
-                "description": "Run a local CI pipeline: install deps → build → lint → test → commit. Auto-detects stack (npm/pip/cargo). Use this when no remote CI is configured.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "cwd": {"type": "string", "description": "Project workspace root directory"},
-                        "steps": {"type": "array", "items": {"type": "string"}, "description": "Steps to run: install, build, lint, test, commit (default: all)"},
-                        "commit_message": {"type": "string", "description": "Git commit message (if commit step included)"},
                     },
                     "required": ["cwd"],
                 },
@@ -1555,13 +1599,19 @@ def _get_tool_schemas() -> list[dict]:
         {
             "type": "function",
             "function": {
-                "name": "mcp_playwright_browser_screenshot",
+                "name": "mcp_playwright_browser_take_screenshot",
                 "description": "Take a PNG screenshot of the current browser page. Use after browser_navigate to capture visual state for QA evidence.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "name": {"type": "string", "description": "Screenshot name (e.g. 'homepage', 'login-form')"},
-                        "selector": {"type": "string", "description": "Optional CSS selector to screenshot a specific element"},
+                        "name": {
+                            "type": "string",
+                            "description": "Screenshot name (e.g. 'homepage', 'login-form')",
+                        },
+                        "selector": {
+                            "type": "string",
+                            "description": "Optional CSS selector to screenshot a specific element",
+                        },
                     },
                     "required": ["name"],
                 },
@@ -1575,8 +1625,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "element": {"type": "string", "description": "Human-readable element description"},
-                        "ref": {"type": "string", "description": "Exact target element reference from snapshot"},
+                        "element": {
+                            "type": "string",
+                            "description": "Human-readable element description",
+                        },
+                        "ref": {
+                            "type": "string",
+                            "description": "Exact target element reference from snapshot",
+                        },
                         "text": {"type": "string", "description": "Text to type"},
                     },
                     "required": ["element", "ref", "text"],
@@ -1668,6 +1724,11 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "github_prs",
         "jira_search",
         "jira_create",
+        "jira_update",
+        "jira_transition",
+        "jira_board_issues",
+        "jira_add_comment",
+        "jira_sync_from_platform",
         "confluence_read",
         "mcp_fetch_fetch",
         "mcp_memory_create_entities",
@@ -1715,33 +1776,81 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "solaris_component",
     ],
     "dev": [
-        "code_read", "code_write", "code_edit", "code_search",
-        "git_status", "git_log", "git_diff", "git_commit",
-        "list_files", "deep_search", "fractal_code",
-        "memory_search", "memory_store", "get_project_context",
-        "build", "test",
-        "docker_deploy", "docker_status", "screenshot", "simulator_screenshot",
+        "code_read",
+        "code_write",
+        "code_edit",
+        "code_search",
+        "git_status",
+        "git_log",
+        "git_diff",
+        "git_commit",
+        "list_files",
+        "deep_search",
+        "fractal_code",
+        "memory_search",
+        "memory_store",
+        "get_project_context",
+        "build",
+        "test",
+        "docker_deploy",
+        "docker_status",
+        "screenshot",
+        "simulator_screenshot",
         "create_ticket",
-        "lrm_locate", "lrm_conventions", "lrm_build", "lrm_examples",
-        "github_prs", "github_code_search",
-        "android_build", "android_test", "android_lint",
-        "mcp_fetch_fetch", "mcp_memory_create_entities", "mcp_memory_search_nodes",
+        "lrm_locate",
+        "lrm_conventions",
+        "lrm_build",
+        "lrm_examples",
+        "github_prs",
+        "github_code_search",
+        "android_build",
+        "android_test",
+        "android_lint",
+        "mcp_fetch_fetch",
+        "mcp_memory_create_entities",
+        "mcp_memory_search_nodes",
         "mcp_memory_create_relations",
     ],
     "qa": [
-        "code_read", "code_write", "code_search", "list_files", "deep_search",
-        "screenshot", "simulator_screenshot", "playwright_test",
-        "build", "test", "browser_screenshot",
-        "memory_search", "memory_store", "get_project_context",
-        "git_diff", "git_log",
-        "github_issues", "github_prs",
-        "jira_search", "jira_create",
-        "create_ticket",
-        "chaos_test", "tmc_load_test",
-        "android_build", "android_test", "android_lint", "android_emulator_test",
+        "code_read",
+        "code_write",
+        "code_search",
+        "list_files",
+        "deep_search",
+        "screenshot",
+        "simulator_screenshot",
+        "playwright_test",
+        "build",
+        "test",
+        "browser_screenshot",
+        "browse",
+        "take_screenshot",
+        "inspect_page",
+        "run_e2e_tests",
+        "memory_search",
+        "memory_store",
+        "get_project_context",
+        "git_diff",
+        "git_log",
+        "github_issues",
+        "github_prs",
+        "jira_search",
+        "jira_create",
+        "jira_update",
+        "jira_transition",
+        "jira_board_issues",
+        "jira_add_comment",
+        "chaos_test",
+        "tmc_load_test",
+        "android_build",
+        "android_test",
+        "android_lint",
+        "android_emulator_test",
         "mcp_fetch_fetch",
-        "mcp_playwright_browser_navigate", "mcp_playwright_browser_snapshot",
-        "mcp_playwright_browser_click", "mcp_playwright_browser_screenshot",
+        "mcp_playwright_browser_navigate",
+        "mcp_playwright_browser_snapshot",
+        "mcp_playwright_browser_click",
+        "mcp_playwright_browser_take_screenshot",
         "mcp_playwright_browser_type",
         "mcp_memory_search_nodes",
     ],
@@ -1765,9 +1874,13 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "memory_store",
         "get_project_context",
         "lrm_build",
-        "github_actions", "github_prs",
-        "infra_check", "chaos_test", "tmc_load_test",
-        "local_ci", "create_ticket",
+        "github_actions",
+        "github_prs",
+        "infra_check",
+        "chaos_test",
+        "tmc_load_test",
+        "local_ci",
+        "create_ticket",
         "get_si_blueprint",
     ],
     "security": [
@@ -1806,6 +1919,11 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "github_issues",
         "github_prs",
         "jira_search",
+        "jira_create",
+        "jira_update",
+        "jira_transition",
+        "jira_board_issues",
+        "jira_sync_from_platform",
     ],
 }
 
@@ -1837,7 +1955,9 @@ def _classify_agent_role(agent: AgentDef) -> str:
         return "architecture"
     if any(k in combined for k in ("ux", "ui", "design", "ergon")):
         return "ux"
-    if any(k in combined for k in ("qa", "test", "qualit", "fixture", "perf", "tma", "maintenance")):
+    if any(
+        k in combined for k in ("qa", "test", "qualit", "fixture", "perf", "tma", "maintenance")
+    ):
         return "qa"
     if any(
         k in combined

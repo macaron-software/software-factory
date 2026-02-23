@@ -16,6 +16,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.responses import JSONResponse
 
 from .config import get_config
 from .db.migrations import init_db
@@ -153,9 +154,11 @@ async def lifespan(app: FastAPI):
 
     # Reset stale "running" mission_runs (orphaned after container restart)
     from .missions.store import get_mission_run_store
+
     _mrs = get_mission_run_store()
     try:
         from .db.migrations import get_db as _gdb
+
         _rdb = _gdb()
         _stale = _rdb.execute(
             "UPDATE mission_runs SET status='paused' WHERE status='running'"
@@ -163,7 +166,9 @@ async def lifespan(app: FastAPI):
         _rdb.commit()
         _rdb.close()
         if _stale:
-            logger.warning("Reset %d stale running mission_runs to paused (container restart)", _stale)
+            logger.warning(
+                "Reset %d stale running mission_runs to paused (container restart)", _stale
+            )
     except Exception as e:
         logger.warning("Failed to reset stale missions: %s", e)
 
@@ -176,10 +181,33 @@ async def lifespan(app: FastAPI):
         else "platform.mcp_platform.server"
     )
 
-    def _start_mcp(name: str, module: str, port: int):
-        """Start an MCP server subprocess, return Popen."""
+    def _kill_port(port: int) -> None:
+        """Kill any process holding the given TCP port (best-effort)."""
+        import signal as _sig
         import subprocess as _sp
 
+        try:
+            # lsof works on Linux/macOS; ss is Linux-only fallback
+            result = _sp.run(
+                ["lsof", "-t", "-i", f"TCP:{port}"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            for pid_str in result.stdout.strip().splitlines():
+                try:
+                    os.kill(int(pid_str), _sig.SIGTERM)
+                    logger.info("Killed PID %s holding port %d", pid_str, port)
+                except (ProcessLookupError, ValueError):
+                    pass
+        except Exception:
+            pass  # lsof unavailable — proceed anyway
+
+    def _start_mcp(name: str, module: str, port: int):
+        """Kill any leftover process on port, then start an MCP server subprocess."""
+        import subprocess as _sp
+
+        _kill_port(port)
         log_file = Path(__file__).parent.parent / "data" / "logs" / f"mcp-{name}.log"
         log_file.parent.mkdir(parents=True, exist_ok=True)
         fh = open(log_file, "a")
@@ -205,6 +233,7 @@ async def lifespan(app: FastAPI):
             proc = _mcp_procs.get("sf")
             if proc and proc.poll() is not None:
                 logger.warning("MCP SF died (exit=%s), restarting...", proc.returncode)
+                await asyncio.sleep(3)  # wait for port to be released
                 try:
                     _mcp_procs["sf"] = _start_mcp("sf", _mcp_sf_mod, 9501)
                 except Exception as e:
@@ -252,8 +281,11 @@ async def lifespan(app: FastAPI):
         _all_runs = _mrs.list_runs(limit=50)
         _paused = [m for m in _all_runs if m.status.value == "paused"]
         if _paused:
-            logger.warning("Found %d paused missions (restart manually if needed): %s",
-                           len(_paused), [m.id for m in _paused])
+            logger.warning(
+                "Found %d paused missions (restart manually if needed): %s",
+                len(_paused),
+                [m.id for m in _paused],
+            )
     except Exception as exc:
         logger.warning("Mission check failed: %s", exc)
 
@@ -402,35 +434,65 @@ def create_app() -> FastAPI:
         trace_id_var.reset(token)
         return response
 
-    # ── Auth: setup wizard redirect ────────────────────────────────────
+    # ── Auth: setup wizard redirect + enforcement ──────────────────────
     _setup_checked = False
 
     @app.middleware("http")
-    async def setup_redirect_middleware(request, call_next):
-        """Redirect to /setup if no users exist (first-time setup)."""
+    async def auth_middleware(request, call_next):
+        """Enforce authentication: setup redirect + login required on all routes."""
         nonlocal _setup_checked
         path = request.url.path
-        # Skip for static, API, setup page itself
-        if (
-            _setup_checked
-            or path.startswith("/static")
-            or path.startswith("/api/")
-            or path == "/setup"
-            or path == "/health"
-            or path == "/favicon.ico"
-        ):
-            return await call_next(request)
 
-        try:
-            from .auth.middleware import is_setup_needed
+        # ── Phase 1: Setup wizard redirect ──
+        if not _setup_checked:
+            skip_setup = (
+                path.startswith("/static")
+                or path.startswith("/api/auth")
+                or path in ("/setup", "/health", "/favicon.ico", "/api/health")
+            )
+            if not skip_setup:
+                try:
+                    from .auth.middleware import is_setup_needed
 
-            if is_setup_needed():
+                    if is_setup_needed():
+                        from starlette.responses import RedirectResponse
+
+                        return RedirectResponse(url="/setup", status_code=302)
+                    _setup_checked = True
+                except Exception:
+                    pass
+
+        # ── Phase 2: Auth enforcement ──
+        from .auth.middleware import is_public_path
+
+        if not is_public_path(path) and not path.startswith("/static"):
+            from .auth.middleware import get_current_user
+
+            user = await get_current_user(request)
+            if user is None:
+                if path.startswith("/api/"):
+                    return JSONResponse({"detail": "Authentication required"}, status_code=401)
                 from starlette.responses import RedirectResponse
 
-                return RedirectResponse(url="/setup", status_code=302)
-            _setup_checked = True  # Cache: no need to check again
-        except Exception:
-            pass
+                return RedirectResponse(url=f"/login?next={path}", status_code=302)
+            request.state.user = user
+
+        return await call_next(request)
+
+    # ── Onboarding redirect (first-time users) ──────────────────────────
+    @app.middleware("http")
+    async def onboarding_middleware(request, call_next):
+        """Redirect to /onboarding if user hasn't completed it."""
+        path = request.url.path
+        skip = (
+            path.startswith("/static")
+            or path.startswith("/api/")
+            or path in ("/login", "/setup", "/onboarding", "/health", "/favicon.ico")
+        )
+        if not skip and not request.cookies.get("onboarding_done"):
+            from starlette.responses import RedirectResponse
+
+            return RedirectResponse(url="/onboarding", status_code=302)
         return await call_next(request)
 
     # ── Locale detection middleware ─────────────────────────────────────
@@ -499,6 +561,28 @@ def create_app() -> FastAPI:
             )
 
         return response
+
+    # ── SAFe perspective middleware ─────────────────────────────────────
+    SAFE_PERSPECTIVES = {
+        "portfolio_manager",
+        "rte",
+        "product_owner",
+        "scrum_master",
+        "developer",
+        "architect",
+        "qa_security",
+        "business_owner",
+        "admin",
+    }
+
+    @app.middleware("http")
+    async def perspective_middleware(request, call_next):
+        """Read SAFe perspective from cookie and inject into request state."""
+        perspective = request.cookies.get("safe_perspective", "")
+        if perspective not in SAFE_PERSPECTIVES:
+            perspective = "admin"  # default: see everything
+        request.state.perspective = perspective
+        return await call_next(request)
 
     # Metrics + incident middleware
     @app.middleware("http")
@@ -611,9 +695,13 @@ def create_app() -> FastAPI:
     # Routes
     from .web.routes import router as web_router
     from .web.routes.auth import router as auth_router
+    from .web.routes.mercato import router as mercato_router
+    from .web.routes.oauth import router as oauth_router
     from .web.ws import router as sse_router
 
     app.include_router(auth_router)
+    app.include_router(oauth_router)
+    app.include_router(mercato_router)
     app.include_router(web_router)
     app.include_router(sse_router, prefix="/sse")
 

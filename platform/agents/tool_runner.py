@@ -37,6 +37,13 @@ def _get_tool_registry():
         register_mcp_tools(reg)
     except Exception:
         pass
+    # Solaris Design System tools
+    try:
+        from ..tools.mcp_bridge import register_solaris_tools
+
+        register_solaris_tools(reg)
+    except Exception:
+        pass
     # Memory tools
     try:
         from ..tools.memory_tools import register_memory_tools
@@ -887,10 +894,20 @@ async def _tool_security_chaos(name: str, args: dict, ctx: ExecutionContext) -> 
         return f"[{name}] ERROR: {e}"
 
 
+async def _tool_platform_backlog(name: str, args: dict, ctx: ExecutionContext) -> str:
+    """Delegate create_feature/create_story to platform_tools registry."""
+    from ..tools.platform_tools import PlatformCreateFeatureTool, PlatformCreateStoryTool
+
+    tool = PlatformCreateFeatureTool() if name == "create_feature" else PlatformCreateStoryTool()
+    return await tool.execute(args, ctx.agent)
+
+
 async def _tool_create_ticket(args: dict, ctx: ExecutionContext) -> str:
     """Create a support ticket in the platform DB."""
     import uuid
+
     from ..db import get_db
+
     title = args.get("title", "")
     desc = args.get("description", "")
     severity = args.get("severity", "medium")
@@ -916,7 +933,9 @@ async def _tool_create_ticket(args: dict, ctx: ExecutionContext) -> str:
 
 async def _tool_local_ci(args: dict, ctx: ExecutionContext) -> str:
     """Run local CI pipeline: install → build → lint → test → commit."""
-    import subprocess, os
+    import os
+    import subprocess
+
     cwd = args.get("cwd", ctx.project_path or ".")
     steps = args.get("steps", ["install", "build", "lint", "test", "commit"])
     commit_msg = args.get("commit_message", "ci: automated build pass")
@@ -929,11 +948,26 @@ async def _tool_local_ci(args: dict, ctx: ExecutionContext) -> str:
 
     cmds = {}
     if has_pkg:
-        cmds = {"install": "npm install", "build": "npm run build", "lint": "npm run lint", "test": "npm test"}
+        cmds = {
+            "install": "npm install",
+            "build": "npm run build",
+            "lint": "npm run lint",
+            "test": "npm test",
+        }
     elif has_req:
-        cmds = {"install": "pip install -r requirements.txt", "build": "python -m py_compile *.py", "lint": "python -m flake8 . --max-line-length=120 --count", "test": "python -m pytest -v"}
+        cmds = {
+            "install": "pip install -r requirements.txt",
+            "build": "python -m py_compile *.py",
+            "lint": "python -m flake8 . --max-line-length=120 --count",
+            "test": "python -m pytest -v",
+        }
     elif has_cargo:
-        cmds = {"install": "cargo fetch", "build": "cargo build", "lint": "cargo clippy -- -D warnings", "test": "cargo test"}
+        cmds = {
+            "install": "cargo fetch",
+            "build": "cargo build",
+            "lint": "cargo clippy -- -D warnings",
+            "test": "cargo test",
+        }
     else:
         return "Error: no package.json, requirements.txt, or Cargo.toml found — cannot detect stack"
 
@@ -941,8 +975,16 @@ async def _tool_local_ci(args: dict, ctx: ExecutionContext) -> str:
         if step == "commit":
             try:
                 subprocess.run(["git", "add", "-A"], cwd=cwd, timeout=10, capture_output=True)
-                r = subprocess.run(["git", "commit", "-m", commit_msg], cwd=cwd, timeout=30, capture_output=True, text=True)
-                results.append(f"[commit] {'OK' if r.returncode == 0 else 'SKIP (nothing to commit)'}")
+                r = subprocess.run(
+                    ["git", "commit", "-m", commit_msg],
+                    cwd=cwd,
+                    timeout=30,
+                    capture_output=True,
+                    text=True,
+                )
+                results.append(
+                    f"[commit] {'OK' if r.returncode == 0 else 'SKIP (nothing to commit)'}"
+                )
             except Exception as e:
                 results.append(f"[commit] ERROR: {e}")
             continue
@@ -952,9 +994,13 @@ async def _tool_local_ci(args: dict, ctx: ExecutionContext) -> str:
             results.append(f"[{step}] SKIP (unknown step)")
             continue
         try:
-            r = subprocess.run(cmd, shell=True, cwd=cwd, timeout=300, capture_output=True, text=True)
+            r = subprocess.run(
+                cmd, shell=True, cwd=cwd, timeout=300, capture_output=True, text=True
+            )
             status = "OK" if r.returncode == 0 else f"FAIL (exit {r.returncode})"
-            output = (r.stdout[-500:] if r.returncode == 0 else (r.stderr[-500:] or r.stdout[-500:])).strip()
+            output = (
+                r.stdout[-500:] if r.returncode == 0 else (r.stderr[-500:] or r.stdout[-500:])
+            ).strip()
             results.append(f"[{step}] {status}\n{output}" if output else f"[{step}] {status}")
             if r.returncode != 0 and step in ("build", "test"):
                 results.append(f"⛔ Pipeline stopped at '{step}'")
@@ -1425,7 +1471,20 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
     # ── Resolve paths: project_path is the default for all file/git tools ──
     if ctx.project_path:
         # Git/build/deploy/test tools: inject cwd
-        if name in ("git_status", "git_log", "git_diff", "git_commit", "build", "test", "lint", "docker_build", "docker_deploy", "screenshot", "playwright_test", "browser_screenshot"):
+        if name in (
+            "git_status",
+            "git_log",
+            "git_diff",
+            "git_commit",
+            "build",
+            "test",
+            "lint",
+            "docker_build",
+            "docker_deploy",
+            "screenshot",
+            "playwright_test",
+            "browser_screenshot",
+        ):
             cwd_val = args.get("cwd", "")
             if not cwd_val or cwd_val in (".", "./"):
                 args["cwd"] = ctx.project_path
@@ -1540,6 +1599,10 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
     if name == "create_ticket":
         return await _tool_create_ticket(args, ctx)
 
+    # ── Backlog tools (create_feature, create_story) — handled by platform_tools registry ──
+    if name in ("create_feature", "create_story"):
+        return await _tool_platform_backlog(name, args, ctx)
+
     # ── Local CI pipeline ──
     if name == "local_ci":
         return await _tool_local_ci(args, ctx)
@@ -1570,7 +1633,10 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
         return await _tool_mcp_solaris(name, args, ctx)
     if name.startswith("github_"):
         return await _tool_mcp_github(name, args, ctx)
-    if name.startswith("jira_") or name == "confluence_read":
+    if name.startswith("jira_"):
+        from ..tools.jira_tools import run_jira_tool
+        return await run_jira_tool(name, args)
+    if name == "confluence_read":
         return await _tool_mcp_jira(name, args, ctx)
 
     # ── Dynamic MCP tools (mcp_<server-id>_<tool>) ──

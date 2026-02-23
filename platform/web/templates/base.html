@@ -5,12 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ page_title }} — Software Factory</title>
-    <link rel="stylesheet" href="/static/css/main.css?v=20260222">
-    <link rel="stylesheet" href="/static/css/components.css?v=20260222">
-    <link rel="stylesheet" href="/static/css/agents.css?v=20260222">
-    <link rel="stylesheet" href="/static/css/projects.css?v=20260222">
+    <link rel="stylesheet" href="/static/css/main.css?v=20260223b">
+    <link rel="stylesheet" href="/static/css/components.css?v=20260223b">
+    <link rel="stylesheet" href="/static/css/agents.css?v=20260223b">
+    <link rel="stylesheet" href="/static/css/projects.css?v=20260223b">
     <script src="/static/js/htmx.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+    <script src="/static/js/sortable.min.js"></script>
     <script src="/static/js/sse.js" defer></script>
     <script>
     /* JS i18n — mirrors server-side _() */
@@ -67,44 +67,57 @@
                 <h1 class="logo"><svg class="icon icon-logo"><use href="#icon-macaron"/></svg></h1>
             </div>
 
+            {% set p = request.state.perspective|default('admin') %}
             <div class="sidebar-section">
                 <ul class="nav-links">
-                    <li><a href="/" data-tooltip="Portfolio" data-views="strategy,all" class="{% if page_title in ('Portfolio', 'Projects', 'DSI Board', 'Vue Métier') %}active{% endif %}">
+                    <li><a href="/" data-tooltip="Dashboard" class="{% if page_title in ('Dashboard', 'Portfolio', 'Projects', 'DSI Board', 'Vue Métier') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-home"/></svg>
                     </a></li>
-                    <li><a href="/backlog" data-tooltip="Backlog" data-views="strategy,all" class="{% if page_title in ('Backlog', 'Product', 'Idéation') %}active{% endif %}">
+                    {% if p in ('admin', 'portfolio_manager', 'product_owner', 'architect', 'business_owner') %}
+                    <li><a href="/backlog" data-tooltip="Backlog" class="{% if page_title in ('Backlog', 'Product', 'Idéation') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-layers"/></svg>
                     </a></li>
-                    <li><a href="/product-line" data-tooltip="Ligne de Produit" data-views="strategy,all" class="{% if page_title == 'Ligne de Produit' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-briefcase"/></svg>
-                    </a></li>
-                    <li><a href="/pi" data-tooltip="PI Board" data-views="strategy,all" class="{% if page_title in ('PI Board', 'Program Increment', 'Epics', 'Epic', 'Epic Control') %}active{% endif %}">
+                    {% endif %}
+                    {% if p in ('admin', 'portfolio_manager', 'rte', 'product_owner', 'scrum_master', 'architect', 'business_owner') %}
+                    <li><a href="/pi" data-tooltip="PI Board" class="{% if page_title in ('PI Board', 'Program Increment', 'Epics', 'Epic', 'Epic Control') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-rocket"/></svg>
                     </a></li>
-                    <li><a href="/ceremonies" data-tooltip="Ceremonies" data-views="engineering,all" class="{% if page_title in ('Ceremonies', 'Workflows', 'Patterns') %}active{% endif %}">
+                    {% endif %}
+                    {% if p in ('admin', 'rte', 'scrum_master', 'qa_security') %}
+                    <li><a href="/ceremonies" data-tooltip="Ceremonies" class="{% if page_title in ('Ceremonies', 'Workflows', 'Patterns') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-workflow"/></svg>
                     </a></li>
-                    <li><a href="/live" data-tooltip="Live" data-views="engineering,all" class="{% if page_title in ('Live', 'Sessions') %}active{% endif %}">
+                    {% endif %}
+                    {% if p in ('admin', 'product_owner', 'developer', 'architect', 'qa_security') %}
+                    <li><a href="/projects" data-tooltip="Projects" class="{% if page_title in ('Projects', 'Project') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-folder"/></svg>
+                    </a></li>
+                    {% endif %}
+                    {% if p in ('admin', 'rte', 'product_owner', 'scrum_master', 'developer', 'qa_security') %}
+                    <li><a href="/sessions" data-tooltip="Sessions" class="{% if page_title in ('Live', 'Sessions', 'Session') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-message-circle"/></svg>
                     </a></li>
-                    <li><a href="/art" data-tooltip="ART" data-views="engineering,all" class="{% if page_title in ('ART', 'Agents', 'Organisation SAFe', 'Team Generator') %}active{% endif %}">
+                    {% endif %}
+                    {% if p in ('admin', 'rte', 'scrum_master', 'developer') %}
+                    <li><a href="/art" data-tooltip="Teams" class="{% if page_title in ('ART', 'Agents', 'Organisation SAFe', 'Team Generator', 'Mercato') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-users"/></svg>
                     </a></li>
-                    <li><a href="/toolbox" data-tooltip="Toolbox" data-views="engineering" class="{% if page_title in ('Toolbox', 'Skills', 'Memory', 'MCPs') %}active{% endif %}">
+                    {% endif %}
+                    {% if p in ('admin', 'developer', 'architect') %}
+                    <li><a href="/toolbox" data-tooltip="Toolbox" class="{% if page_title in ('Toolbox', 'Skills', 'Memory', 'MCPs', 'Design System') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-plug"/></svg>
                     </a></li>
-                    <li><a href="/design-system" data-tooltip="Design System" data-views="engineering" class="{% if page_title == 'Design System' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-palette"/></svg>
-                    </a></li>
-                    <li><a href="/world" data-tooltip="World 3D" data-views="engineering,all" class="{% if page_title == 'World' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-globe"/></svg>
-                    </a></li>
-                    <li><a href="/metrics" data-tooltip="Metrics" data-views="strategy,all" class="{% if page_title == 'Metrics' %}active{% endif %}">
+                    {% endif %}
+                    {% if p in ('admin', 'portfolio_manager', 'business_owner') %}
+                    <li><a href="/metrics" data-tooltip="Metrics" class="{% if page_title == 'Metrics' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-chart"/></svg>
                     </a></li>
-                    <li><a href="/monitoring" data-tooltip="Monitoring" data-views="engineering,all" class="{% if page_title == 'Monitoring' %}active{% endif %}">
+                    {% endif %}
+                    {% if p in ('admin', 'rte', 'architect', 'qa_security', 'scrum_master') %}
+                    <li><a href="/monitoring" data-tooltip="Monitoring" class="{% if page_title == 'Monitoring' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-activity"/></svg>
                     </a></li>
+                    {% endif %}
                 </ul>
             </div>
 
@@ -145,6 +158,26 @@
                 <h2>{{ page_title }}</h2>
                 <div class="topbar-right">
                     {% block topbar_actions %}{% endblock %}
+                    <!-- SAFe Perspective Selector -->
+                    <div class="perspective-wrapper" style="position:relative">
+                        <button class="perspective-btn" id="perspectiveBtn" onclick="document.getElementById('perspectiveDropdown').classList.toggle('show')" title="SAFe Perspective">
+                            <svg class="icon icon-sm"><use href="#icon-shield"/></svg>
+                            <span class="perspective-label">{% if p == 'portfolio_manager' %}PM{% elif p == 'rte' %}RTE{% elif p == 'product_owner' %}PO{% elif p == 'scrum_master' %}SM{% elif p == 'developer' %}Dev{% elif p == 'architect' %}Arch{% elif p == 'qa_security' %}QA{% elif p == 'business_owner' %}BO{% else %}All{% endif %}</span>
+                        </button>
+                        <div class="perspective-dropdown" id="perspectiveDropdown">
+                            <div class="perspective-dropdown-title">SAFe Perspective</div>
+                            <a class="perspective-item {% if p == 'portfolio_manager' %}active{% endif %}" onclick="setPerspective('portfolio_manager')">Portfolio Manager</a>
+                            <a class="perspective-item {% if p == 'rte' %}active{% endif %}" onclick="setPerspective('rte')">RTE</a>
+                            <a class="perspective-item {% if p == 'product_owner' %}active{% endif %}" onclick="setPerspective('product_owner')">Product Owner</a>
+                            <a class="perspective-item {% if p == 'scrum_master' %}active{% endif %}" onclick="setPerspective('scrum_master')">Scrum Master</a>
+                            <a class="perspective-item {% if p == 'developer' %}active{% endif %}" onclick="setPerspective('developer')">Developer</a>
+                            <a class="perspective-item {% if p == 'architect' %}active{% endif %}" onclick="setPerspective('architect')">Architect</a>
+                            <a class="perspective-item {% if p == 'qa_security' %}active{% endif %}" onclick="setPerspective('qa_security')">QA / Security</a>
+                            <a class="perspective-item {% if p == 'business_owner' %}active{% endif %}" onclick="setPerspective('business_owner')">Business Owner</a>
+                            <hr style="border:0;border-top:1px solid var(--border);margin:4px 0">
+                            <a class="perspective-item {% if p == 'admin' %}active{% endif %}" onclick="setPerspective('admin')">Admin (all)</a>
+                        </div>
+                    </div>
                     <div class="tma-heartbeat-wrapper" id="tmaHeartbeat"
                          hx-get="/api/autoheal/heartbeat"
                          hx-trigger="load, every 30s"
@@ -176,7 +209,7 @@
                             </div>
                             <hr style="border:0;border-top:1px solid var(--border);margin:0">
                             {% if request.state.user.role == 'admin' %}
-                            <a href="/users" class="user-dropdown-item">Manage Users</a>
+                            <a href="/admin/users" class="user-dropdown-item">Manage Users</a>
                             {% endif %}
                             <a href="#" class="user-dropdown-item" onclick="doLogout()">Sign out</a>
                             {% else %}
@@ -193,6 +226,18 @@
     </div>
 
     <style>
+    /* SAFe Perspective selector */
+    .perspective-btn{display:flex;align-items:center;gap:4px;background:var(--bg-tertiary,#21262d);border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--text-primary);cursor:pointer;font-size:0.75rem;font-weight:600;white-space:nowrap}
+    .perspective-btn:hover{border-color:var(--purple)}
+    .perspective-label{color:var(--purple-light,#c084fc)}
+    .perspective-dropdown{display:none;position:absolute;top:calc(100% + 8px);right:0;width:200px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:999;overflow:hidden;padding:4px 0}
+    .perspective-dropdown.show{display:block}
+    .perspective-dropdown-title{padding:6px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-secondary);font-weight:600}
+    .perspective-item{display:block;padding:6px 12px;color:var(--text-primary);text-decoration:none;font-size:0.8125rem;cursor:pointer;border-radius:0}
+    .perspective-item:hover{background:var(--bg-tertiary,#21262d)}
+    .perspective-item.active{color:var(--purple-light);font-weight:600}
+    .perspective-item.active::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--purple);margin-right:6px}
+
     /* User dropdown menu */
     .topbar-avatar{cursor:pointer;border:none;background:var(--accent);color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.875rem}
     .user-dropdown{display:none;position:absolute;top:calc(100% + 8px);right:0;width:220px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:999;overflow:hidden}
@@ -391,10 +436,19 @@ document.addEventListener('click', function(e) {
     if (dd && btn && !btn.contains(e.target) && !dd.contains(e.target)) {
         dd.classList.remove('show');
     }
+    const pd = document.getElementById('perspectiveDropdown');
+    const pb = document.getElementById('perspectiveBtn');
+    if (pd && pb && !pb.contains(e.target) && !pd.contains(e.target)) {
+        pd.classList.remove('show');
+    }
 });
 async function doLogout() {
     await fetch('/api/auth/logout', {method:'POST'});
     location.href = '/login';
+}
+async function setPerspective(p) {
+    await fetch('/api/perspective', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({perspective:p})});
+    location.reload();
 }
 </script>
 </body>

@@ -613,7 +613,10 @@ async def available_stories_for_sprint(sprint_id: str):
         db.close()
 
 
-@router.post("/api/missions/{mission_id}/launch", responses={200: {"model": OkResponse}, 404: {"model": ErrorResponse}})
+@router.post(
+    "/api/missions/{mission_id}/launch",
+    responses={200: {"model": OkResponse}, 404: {"model": ErrorResponse}},
+)
 async def launch_mission_workflow(request: Request, mission_id: str):
     """Create a session from mission's workflow and redirect to live view."""
     from ...missions.store import get_mission_store
@@ -912,18 +915,33 @@ async def delete_mission(mission_id: str):
         conn.execute("DELETE FROM support_tickets WHERE mission_id = ?", (run_id,))
     conn.execute("DELETE FROM mission_runs WHERE parent_mission_id = ?", (mission_id,))
     # Delete features, stories, sprints, tasks linked to mission
-    conn.execute("DELETE FROM user_stories WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)", (mission_id,))
+    conn.execute(
+        "DELETE FROM user_stories WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)",
+        (mission_id,),
+    )
     try:
-        conn.execute("DELETE FROM feature_deps WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)", (mission_id,))
-        conn.execute("DELETE FROM feature_deps WHERE depends_on IN (SELECT id FROM features WHERE epic_id = ?)", (mission_id,))
+        conn.execute(
+            "DELETE FROM feature_deps WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)",
+            (mission_id,),
+        )
+        conn.execute(
+            "DELETE FROM feature_deps WHERE depends_on IN (SELECT id FROM features WHERE epic_id = ?)",
+            (mission_id,),
+        )
     except Exception:
         pass
     conn.execute("DELETE FROM features WHERE epic_id = ?", (mission_id,))
     conn.execute("DELETE FROM sprints WHERE mission_id = ?", (mission_id,))
     conn.execute("DELETE FROM tasks WHERE mission_id = ?", (mission_id,))
     try:
-        conn.execute("DELETE FROM ideation_findings WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mission_id,))
-        conn.execute("DELETE FROM ideation_messages WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mission_id,))
+        conn.execute(
+            "DELETE FROM ideation_findings WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)",
+            (mission_id,),
+        )
+        conn.execute(
+            "DELETE FROM ideation_messages WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)",
+            (mission_id,),
+        )
         conn.execute("DELETE FROM ideation_sessions WHERE mission_id = ?", (mission_id,))
     except Exception:
         pass
@@ -960,25 +978,48 @@ async def delete_project(project_id: str):
                 conn.execute("DELETE FROM tool_calls WHERE session_id = ?", (session_id,))
                 conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
                 conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
-            for tbl in ("sprints", "tasks", "confluence_pages", "llm_traces", "llm_usage", "platform_incidents", "support_tickets"):
+            for tbl in (
+                "sprints",
+                "tasks",
+                "confluence_pages",
+                "llm_traces",
+                "llm_usage",
+                "platform_incidents",
+                "support_tickets",
+            ):
                 try:
                     conn.execute(f"DELETE FROM {tbl} WHERE mission_id = ?", (run_id,))
                 except Exception:
                     pass  # Table may not exist
         conn.execute("DELETE FROM mission_runs WHERE parent_mission_id = ?", (mid,))
         # Delete features (epic_id = mission_id in SAFe terms)
-        conn.execute("DELETE FROM user_stories WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)", (mid,))
+        conn.execute(
+            "DELETE FROM user_stories WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)",
+            (mid,),
+        )
         try:
-            conn.execute("DELETE FROM feature_deps WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)", (mid,))
-            conn.execute("DELETE FROM feature_deps WHERE depends_on IN (SELECT id FROM features WHERE epic_id = ?)", (mid,))
+            conn.execute(
+                "DELETE FROM feature_deps WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)",
+                (mid,),
+            )
+            conn.execute(
+                "DELETE FROM feature_deps WHERE depends_on IN (SELECT id FROM features WHERE epic_id = ?)",
+                (mid,),
+            )
         except Exception:
             pass
         conn.execute("DELETE FROM features WHERE epic_id = ?", (mid,))
         conn.execute("DELETE FROM sprints WHERE mission_id = ?", (mid,))
         conn.execute("DELETE FROM tasks WHERE mission_id = ?", (mid,))
         try:
-            conn.execute("DELETE FROM ideation_findings WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mid,))
-            conn.execute("DELETE FROM ideation_messages WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)", (mid,))
+            conn.execute(
+                "DELETE FROM ideation_findings WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)",
+                (mid,),
+            )
+            conn.execute(
+                "DELETE FROM ideation_messages WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)",
+                (mid,),
+            )
             conn.execute("DELETE FROM ideation_sessions WHERE mission_id = ?", (mid,))
         except Exception:
             pass
@@ -1079,8 +1120,16 @@ async def api_mission_start(request: Request):
     workspace_root.mkdir(parents=True, exist_ok=True)
     # Init git repo + README with brief
     subprocess.run(["git", "init"], cwd=str(workspace_root), capture_output=True)
-    subprocess.run(["git", "config", "user.email", "agents@macaron.ai"], cwd=str(workspace_root), capture_output=True)
-    subprocess.run(["git", "config", "user.name", "Macaron Agents"], cwd=str(workspace_root), capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "agents@macaron.ai"],
+        cwd=str(workspace_root),
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Macaron Agents"],
+        cwd=str(workspace_root),
+        capture_output=True,
+    )
     readme = workspace_root / "README.md"
     readme.write_text(f"# {wf.name}\n\n{brief}\n\nMission ID: {mission_id}\n")
     # Add .gitignore to prevent node_modules/dist/build from being committed
@@ -1147,15 +1196,18 @@ async def api_mission_start(request: Request):
 
     # Auto-provision TMA, Security, Debt missions for the project
     try:
-        from ...projects.manager import get_project_store, Project
+        from ...projects.manager import Project, get_project_store
+
         _ps = get_project_store()
         if project_id and not _ps.get(project_id):
-            _ps.create(Project(
-                id=project_id,
-                name=brief[:60] or wf.name,
-                path=workspace_path,
-                description=brief[:200],
-            ))
+            _ps.create(
+                Project(
+                    id=project_id,
+                    name=brief[:60] or wf.name,
+                    path=workspace_path,
+                    description=brief[:200],
+                )
+            )
         if project_id:
             _ps.auto_provision(project_id, brief[:60] or wf.name)
     except Exception as _prov_err:
@@ -1975,6 +2027,7 @@ async def _launch_orchestrator(mission_id: str):
                 logger.warning("ORCH mission=%s completed normally", mission_id)
         except Exception as exc:
             import traceback
+
             logger.error("ORCH mission=%s CRASHED: %s\n%s", mission_id, exc, traceback.format_exc())
             try:
                 mission.status = MissionStatus.FAILED
@@ -2197,7 +2250,12 @@ async def _run_post_phase_hooks(
     # After dev sprint: auto screenshots for HTML files
     if "dev" in phase_key or "sprint" in phase_key:
         ws = Path(workspace)
-        html_files = list(ws.glob("*.html")) + list(ws.glob("public/*.html")) + list(ws.glob("src/*.html")) + list(ws.glob("client/*.html"))
+        html_files = (
+            list(ws.glob("*.html"))
+            + list(ws.glob("public/*.html"))
+            + list(ws.glob("src/*.html"))
+            + list(ws.glob("client/*.html"))
+        )
         if html_files:
             screenshots_dir = ws / "screenshots"
             screenshots_dir.mkdir(exist_ok=True)
@@ -2219,12 +2277,19 @@ asyncio.run(main())
                 try:
                     r = subprocess.run(
                         ["python3", "-c", shot_script],
-                        capture_output=True, text=True, cwd=workspace, timeout=30
+                        capture_output=True,
+                        text=True,
+                        cwd=workspace,
+                        timeout=30,
                     )
                     if r.returncode == 0 and (screenshots_dir / fname).exists():
                         shot_paths.append(f"screenshots/{fname}")
                     else:
-                        logger.warning("Sprint screenshot failed for %s: %s", hf.name, r.stderr[:200] if r.stderr else "unknown")
+                        logger.warning(
+                            "Sprint screenshot failed for %s: %s",
+                            hf.name,
+                            r.stderr[:200] if r.stderr else "unknown",
+                        )
                 except Exception as e:
                     logger.warning("Sprint screenshot error for %s: %s", hf.name, e)
 
@@ -2245,8 +2310,8 @@ asyncio.run(main())
                     },
                 )
 
-    # After CI/CD or TDD Sprint phase: run build if package.json or Dockerfile exists
-    if any(k in phase_key for k in ("cicd", "pipeline", "sprint", "dev")):
+    # After CI/CD or TDD Sprint phase: run build if package.json or Cargo.toml exists
+    if any(k in phase_key for k in ("cicd", "pipeline", "sprint", "dev", "tdd", "quality")):
         ws = Path(workspace)
 
         # Detect project roots (support subdirectories: frontend/, backend/, etc.)
@@ -2268,67 +2333,220 @@ asyncio.run(main())
                 cargo_check = subprocess.run(
                     ["cargo", "check"], cwd=cargo_cwd, capture_output=True, text=True, timeout=180
                 )
-                build_msg = "npm install réussi" if result.returncode == 0 else f"npm install échoué: {result.stderr[:200]}"
-                await push_sse(session_id, {
-                    "type": "message",
-                    "from_agent": "system",
-                    "from_name": "CI/CD",
-                    "from_role": "Pipeline",
-                    "content": build_msg,
-                    "phase_id": phase_id,
-                    "msg_type": "text",
-                })
+                cargo_msg = (
+                    "cargo check réussi"
+                    if cargo_check.returncode == 0
+                    else f"cargo check échoué: {cargo_check.stderr[-300:]}"
+                )
+                if cargo_check.returncode != 0:
+                    result["build_ok"] = False
+                await push_sse(
+                    session_id,
+                    {
+                        "type": "message",
+                        "from_agent": "system",
+                        "from_name": "CI/CD",
+                        "from_role": "Pipeline",
+                        "content": cargo_msg,
+                        "phase_id": phase_id,
+                        "msg_type": "text",
+                    },
+                )
+                # Run cargo test
+                if cargo_check.returncode == 0:
+                    cargo_test = subprocess.run(
+                        ["cargo", "test", "--no-fail-fast"],
+                        cwd=cargo_cwd,
+                        capture_output=True,
+                        text=True,
+                        timeout=180,
+                    )
+                    test_msg = (
+                        f"cargo test réussi: {cargo_test.stdout[-200:]}"
+                        if cargo_test.returncode == 0
+                        else f"cargo test échoué: {cargo_test.stdout[-300:]}"
+                    )
+                    if cargo_test.returncode != 0:
+                        result["test_ok"] = False
+                    await push_sse(
+                        session_id,
+                        {
+                            "type": "message",
+                            "from_agent": "system",
+                            "from_name": "CI/CD",
+                            "from_role": "Pipeline",
+                            "content": test_msg,
+                            "phase_id": phase_id,
+                            "msg_type": "text",
+                        },
+                    )
+
+            # Node.js project support
+            if npm_root and (npm_root / "package.json").exists():
+                npm_cwd = str(npm_root)
+                npm_r = subprocess.run(
+                    ["npm", "install"], cwd=npm_cwd, capture_output=True, text=True, timeout=120
+                )
+                build_msg = (
+                    "npm install réussi"
+                    if npm_r.returncode == 0
+                    else f"npm install échoué: {npm_r.stderr[:200]}"
+                )
+                if npm_r.returncode != 0:
+                    result["build_ok"] = False
+                await push_sse(
+                    session_id,
+                    {
+                        "type": "message",
+                        "from_agent": "system",
+                        "from_name": "CI/CD",
+                        "from_role": "Pipeline",
+                        "content": build_msg,
+                        "phase_id": phase_id,
+                        "msg_type": "text",
+                    },
+                )
                 # Run build script if exists
                 import json as _json
+
                 try:
-                    pkg = _json.loads((ws / "package.json").read_text())
+                    pkg = _json.loads((npm_root / "package.json").read_text())
                     if "build" in (pkg.get("scripts") or {}):
-                        build_result = subprocess.run(
-                            ["npm", "run", "build"], cwd=workspace, capture_output=True, text=True, timeout=120
+                        build_r = subprocess.run(
+                            ["npm", "run", "build"],
+                            cwd=npm_cwd,
+                            capture_output=True,
+                            text=True,
+                            timeout=120,
                         )
-                        build_status = "réussi" if build_result.returncode == 0 else f"échoué: {build_result.stderr[:200]}"
-                        await push_sse(session_id, {
-                            "type": "message",
-                            "from_agent": "system",
-                            "from_name": "CI/CD",
-                            "from_role": "Pipeline",
-                            "content": f"npm run build {build_status}",
-                            "phase_id": phase_id,
-                            "msg_type": "text",
-                        })
+                        build_status = (
+                            "réussi"
+                            if build_r.returncode == 0
+                            else f"échoué: {build_r.stderr[:200]}"
+                        )
+                        if build_r.returncode != 0:
+                            result["build_ok"] = False
+                        await push_sse(
+                            session_id,
+                            {
+                                "type": "message",
+                                "from_agent": "system",
+                                "from_name": "CI/CD",
+                                "from_role": "Pipeline",
+                                "content": f"npm run build {build_status}",
+                                "phase_id": phase_id,
+                                "msg_type": "text",
+                            },
+                        )
                     if "test" in (pkg.get("scripts") or {}):
-                        test_result = subprocess.run(
-                            ["npm", "test"], cwd=workspace, capture_output=True, text=True, timeout=120,
+                        test_r = subprocess.run(
+                            ["npm", "test"],
+                            cwd=npm_cwd,
+                            capture_output=True,
+                            text=True,
+                            timeout=120,
                             env={**dict(subprocess.os.environ), "CI": "true"},
                         )
-                        test_status = "réussi" if test_result.returncode == 0 else f"échoué: {test_result.stderr[:200]}"
-                        await push_sse(session_id, {
+                        test_status = (
+                            "réussi" if test_r.returncode == 0 else f"échoué: {test_r.stderr[:200]}"
+                        )
+                        if test_r.returncode != 0:
+                            result["test_ok"] = False
+                        await push_sse(
+                            session_id,
+                            {
+                                "type": "message",
+                                "from_agent": "system",
+                                "from_name": "CI/CD",
+                                "from_role": "Pipeline",
+                                "content": f"npm test {test_status}",
+                                "phase_id": phase_id,
+                                "msg_type": "text",
+                            },
+                        )
+                except Exception:
+                    pass
+            # Python project support: requirements.txt + pytest
+            elif (ws / "requirements.txt").exists():
+                result_pip = subprocess.run(
+                    ["pip", "install", "-r", "requirements.txt"],
+                    cwd=workspace,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+                pip_msg = (
+                    "pip install réussi"
+                    if result_pip.returncode == 0
+                    else f"pip install échoué: {result_pip.stderr[:200]}"
+                )
+                if result_pip.returncode != 0:
+                    result["build_ok"] = False
+                await push_sse(
+                    session_id,
+                    {
+                        "type": "message",
+                        "from_agent": "system",
+                        "from_name": "CI/CD",
+                        "from_role": "Pipeline",
+                        "content": pip_msg,
+                        "phase_id": phase_id,
+                        "msg_type": "text",
+                    },
+                )
+                # Run pytest if test files exist
+                test_files = list(ws.glob("test_*.py")) + list(ws.glob("tests/*.py"))
+                if test_files:
+                    pytest_result = subprocess.run(
+                        ["python3", "-m", "pytest", "-v", "--tb=short"],
+                        cwd=workspace,
+                        capture_output=True,
+                        text=True,
+                        timeout=120,
+                        env={**dict(subprocess.os.environ), "CI": "true"},
+                    )
+                    test_status = (
+                        "réussi"
+                        if pytest_result.returncode == 0
+                        else f"échoué: {pytest_result.stdout[-300:]}"
+                    )
+                    if pytest_result.returncode != 0:
+                        result["test_ok"] = False
+                    await push_sse(
+                        session_id,
+                        {
                             "type": "message",
                             "from_agent": "system",
                             "from_name": "CI/CD",
                             "from_role": "Pipeline",
-                            "content": f"npm test {test_status}",
+                            "content": f"pytest {test_status}",
                             "phase_id": phase_id,
                             "msg_type": "text",
-                        })
-                except Exception:
-                    pass
+                        },
+                    )
         except Exception as e:
             logger.error("Post-phase build failed: %s", e)
 
         # After sprint: start server, take screenshots, stop server
         ws = Path(workspace)
-        if (ws / "package.json").exists():
+        npm_root_srv = _find_project_file("package.json")
+        if npm_root_srv and (npm_root_srv / "package.json").exists():
             try:
                 import json as _json2
-                pkg2 = _json2.loads((ws / "package.json").read_text())
+
+                pkg2 = _json2.loads((npm_root_srv / "package.json").read_text())
                 scripts = pkg2.get("scripts") or {}
                 start_cmd = None
+                srv_cwd = str(npm_root_srv)
                 if "start" in scripts:
                     start_cmd = "npm start"
                 elif "dev" in scripts:
                     start_cmd = "npm run dev"
-                elif (ws / "src" / "server.ts").exists() or (ws / "src" / "server.js").exists() or (ws / "server.js").exists():
+                elif (
+                    (npm_root_srv / "src" / "server.ts").exists()
+                    or (npm_root_srv / "src" / "server.js").exists()
+                    or (npm_root_srv / "server.js").exists()
+                ):
                     main = pkg2.get("main", "")
                     if main:
                         start_cmd = f"node {main}"
@@ -2338,25 +2556,59 @@ asyncio.run(main())
                     screenshots_dir.mkdir(exist_ok=True)
                     # Start server in background
                     import signal
-                    server_env = {**dict(subprocess.os.environ), "PORT": "9050", "NODE_ENV": "production"}
+
+                    server_env = {
+                        **dict(subprocess.os.environ),
+                        "PORT": "9050",
+                        "NODE_ENV": "production",
+                    }
                     server_proc = subprocess.Popen(
-                        start_cmd, shell=True, cwd=workspace,
-                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                        env=server_env, preexec_fn=subprocess.os.setsid
+                        start_cmd,
+                        shell=True,
+                        cwd=srv_cwd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        env=server_env,
+                        preexec_fn=subprocess.os.setsid,
                     )
                     import time as _time
+
                     _time.sleep(4)  # Wait for server to start
                     # Check if server is up
                     health = subprocess.run(
-                        ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "http://127.0.0.1:9050/"],
-                        capture_output=True, text=True, timeout=5
+                        [
+                            "curl",
+                            "-s",
+                            "-o",
+                            "/dev/null",
+                            "-w",
+                            "%{http_code}",
+                            "http://127.0.0.1:9050/",
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
                     )
                     http_code = health.stdout.strip()
                     if http_code and http_code != "000":
-                        # Take multi-page screenshots
-                        pages_to_shot = [
-                            ("/", "homepage"),
-                        ]
+                        # Discover routes from HTML files in public/
+                        pages_to_shot = [("/", "homepage")]
+                        seen = {"/"}
+                        for html in sorted(ws.glob("public/*.html")):
+                            route = f"/{html.name}"
+                            if route not in seen and html.name != "index.html":
+                                pages_to_shot.append((route, html.stem))
+                                seen.add(route)
+                        # Common routes fallback
+                        for r, n in [
+                            ("/login", "login"),
+                            ("/stations", "stations"),
+                            ("/booking", "booking"),
+                            ("/dashboard", "dashboard"),
+                        ]:
+                            if r not in seen and (ws / "public" / f"{n}.html").exists():
+                                pages_to_shot.append((r, n))
+                                seen.add(r)
                         shot_paths_srv = []
                         for url_path, shot_name in pages_to_shot:
                             shot_script = f"""
@@ -2374,9 +2626,14 @@ asyncio.run(main())
                             try:
                                 r = subprocess.run(
                                     ["python3", "-c", shot_script],
-                                    capture_output=True, text=True, timeout=30
+                                    capture_output=True,
+                                    text=True,
+                                    timeout=30,
                                 )
-                                if r.returncode == 0 and (screenshots_dir / f"{shot_name}.png").exists():
+                                if (
+                                    r.returncode == 0
+                                    and (screenshots_dir / f"{shot_name}.png").exists()
+                                ):
                                     shot_paths_srv.append(f"screenshots/{shot_name}.png")
                             except Exception:
                                 pass
@@ -2385,25 +2642,31 @@ asyncio.run(main())
                             shot_msg = f"Screenshots du serveur (HTTP {http_code}) :\n" + "\n".join(
                                 f"[SCREENSHOT:{p}]" for p in shot_paths_srv
                             )
-                            await push_sse(session_id, {
-                                "type": "message",
-                                "from_agent": "system",
-                                "from_name": "CI/CD",
-                                "from_role": "Pipeline",
-                                "content": shot_msg,
-                                "phase_id": phase_id,
-                                "msg_type": "text",
-                            })
+                            await push_sse(
+                                session_id,
+                                {
+                                    "type": "message",
+                                    "from_agent": "system",
+                                    "from_name": "CI/CD",
+                                    "from_role": "Pipeline",
+                                    "content": shot_msg,
+                                    "phase_id": phase_id,
+                                    "msg_type": "text",
+                                },
+                            )
                         else:
-                            await push_sse(session_id, {
-                                "type": "message",
-                                "from_agent": "system",
-                                "from_name": "CI/CD",
-                                "from_role": "Pipeline",
-                                "content": f"Serveur démarré (HTTP {http_code}) mais screenshots échoués",
-                                "phase_id": phase_id,
-                                "msg_type": "text",
-                            })
+                            await push_sse(
+                                session_id,
+                                {
+                                    "type": "message",
+                                    "from_agent": "system",
+                                    "from_name": "CI/CD",
+                                    "from_role": "Pipeline",
+                                    "content": f"Serveur démarré (HTTP {http_code}) mais screenshots échoués",
+                                    "phase_id": phase_id,
+                                    "msg_type": "text",
+                                },
+                            )
                     # Kill server
                     try:
                         subprocess.os.killpg(subprocess.os.getpgid(server_proc.pid), signal.SIGTERM)
@@ -2414,7 +2677,7 @@ asyncio.run(main())
                             pass
             except Exception as e:
                 logger.warning("Post-sprint server screenshot failed: %s", e)
-    if "deploy" in phase_key:
+    if "deploy" in phase_key or "quality" in phase_key:
         ws = Path(workspace)
         # Docker build + run if Dockerfile exists
         if (ws / "Dockerfile").exists():
@@ -2423,108 +2686,178 @@ asyncio.run(main())
                 # Build Docker image
                 build_result = subprocess.run(
                     ["docker", "build", "-t", container_name, "."],
-                    cwd=workspace, capture_output=True, text=True, timeout=300
+                    cwd=workspace,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
                 )
                 if build_result.returncode == 0:
-                    await push_sse(session_id, {
-                        "type": "message",
-                        "from_agent": "system",
-                        "from_name": "CI/CD",
-                        "from_role": "Pipeline",
-                        "content": f"Docker image {container_name} construite avec succès",
-                        "phase_id": phase_id,
-                        "msg_type": "text",
-                    })
+                    await push_sse(
+                        session_id,
+                        {
+                            "type": "message",
+                            "from_agent": "system",
+                            "from_name": "CI/CD",
+                            "from_role": "Pipeline",
+                            "content": f"Docker image {container_name} construite avec succès",
+                            "phase_id": phase_id,
+                            "msg_type": "text",
+                        },
+                    )
                     # Stop existing container if any
                     subprocess.run(
-                        ["docker", "rm", "-f", container_name],
-                        capture_output=True, timeout=10
+                        ["docker", "rm", "-f", container_name], capture_output=True, timeout=10
                     )
                     # Find free port
                     import socket
+
                     port = 9100
                     for p in range(9100, 9200):
                         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                             if s.connect_ex(("127.0.0.1", p)) != 0:
                                 port = p
                                 break
+                    # Detect container port from Dockerfile EXPOSE or default 3000
+                    container_port = 3000
+                    try:
+                        df_text = (ws / "Dockerfile").read_text()
+                        import re as _re
+
+                        expose_match = _re.search(r"EXPOSE\s+(\d+)", df_text)
+                        if expose_match:
+                            container_port = int(expose_match.group(1))
+                    except Exception:
+                        pass
                     # Run container
                     run_result = subprocess.run(
-                        ["docker", "run", "-d", "--name", container_name,
-                         "-p", f"{port}:3000",
-                         "--restart", "unless-stopped",
-                         container_name],
-                        capture_output=True, text=True, timeout=30
+                        [
+                            "docker",
+                            "run",
+                            "-d",
+                            "--name",
+                            container_name,
+                            "-p",
+                            f"{port}:{container_port}",
+                            "--restart",
+                            "unless-stopped",
+                            container_name,
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
                     )
                     if run_result.returncode == 0:
                         import time
+
                         time.sleep(3)  # Wait for container to start
                         # Health check
                         health = subprocess.run(
-                            ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-                             f"http://127.0.0.1:{port}/"],
-                            capture_output=True, text=True, timeout=10
+                            [
+                                "curl",
+                                "-s",
+                                "-o",
+                                "/dev/null",
+                                "-w",
+                                "%{http_code}",
+                                f"http://127.0.0.1:{port}/",
+                            ],
+                            capture_output=True,
+                            text=True,
+                            timeout=10,
                         )
                         status_code = health.stdout.strip()
                         deploy_msg = f"Container {container_name} déployé sur port {port} — HTTP {status_code}"
-                        await push_sse(session_id, {
-                            "type": "message",
-                            "from_agent": "system",
-                            "from_name": "CI/CD",
-                            "from_role": "Pipeline",
-                            "content": deploy_msg,
-                            "phase_id": phase_id,
-                            "msg_type": "text",
-                        })
-                        # Take screenshot of deployed app
+                        await push_sse(
+                            session_id,
+                            {
+                                "type": "message",
+                                "from_agent": "system",
+                                "from_name": "CI/CD",
+                                "from_role": "Pipeline",
+                                "content": deploy_msg,
+                                "phase_id": phase_id,
+                                "msg_type": "text",
+                            },
+                        )
+                        # Take multi-page screenshots of deployed app
                         screenshots_dir = ws / "screenshots"
                         screenshots_dir.mkdir(exist_ok=True)
-                        shot_script = f"""
+                        deploy_pages = [("/", "deployed")]
+                        for html in sorted(ws.glob("public/*.html")):
+                            if html.name != "index.html":
+                                deploy_pages.append((f"/{html.name}", f"deployed-{html.stem}"))
+                        deploy_shots = []
+                        for url_path, shot_name in deploy_pages[:8]:
+                            shot_script = f"""
 import asyncio
 from playwright.async_api import async_playwright
 async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         page = await browser.new_page(viewport={{"width": 1280, "height": 720}})
-        await page.goto("http://127.0.0.1:{port}/", wait_until="networkidle", timeout=15000)
-        await page.screenshot(path="{screenshots_dir}/deployed.png", full_page=True)
+        await page.goto("http://127.0.0.1:{port}{url_path}", wait_until="networkidle", timeout=15000)
+        await page.screenshot(path="{screenshots_dir}/{shot_name}.png", full_page=True)
         await browser.close()
 asyncio.run(main())
 """
-                        shot_result = subprocess.run(
-                            ["python3", "-c", shot_script],
-                            capture_output=True, text=True, cwd=workspace, timeout=30
-                        )
-                        if shot_result.returncode == 0 and (screenshots_dir / "deployed.png").exists():
-                            await push_sse(session_id, {
+                            try:
+                                shot_result = subprocess.run(
+                                    ["python3", "-c", shot_script],
+                                    capture_output=True,
+                                    text=True,
+                                    cwd=workspace,
+                                    timeout=30,
+                                )
+                                if (
+                                    shot_result.returncode == 0
+                                    and (screenshots_dir / f"{shot_name}.png").exists()
+                                ):
+                                    deploy_shots.append(f"screenshots/{shot_name}.png")
+                            except Exception:
+                                pass
+                        if deploy_shots:
+                            shot_content = f"Screenshots Docker deploy (HTTP {status_code}) :\n"
+                            shot_content += "\n".join(f"[SCREENSHOT:{s}]" for s in deploy_shots)
+                            await push_sse(
+                                session_id,
+                                {
+                                    "type": "message",
+                                    "from_agent": "system",
+                                    "from_name": "CI/CD",
+                                    "from_role": "Pipeline",
+                                    "content": shot_content,
+                                    "phase_id": phase_id,
+                                    "msg_type": "text",
+                                },
+                            )
+                    else:
+                        result["deploy_ok"] = False
+                        await push_sse(
+                            session_id,
+                            {
                                 "type": "message",
                                 "from_agent": "system",
                                 "from_name": "CI/CD",
                                 "from_role": "Pipeline",
-                                "content": f"Screenshot du site déployé : [SCREENSHOT:screenshots/deployed.png]",
+                                "content": f"Docker run échoué: {run_result.stderr[:200]}",
                                 "phase_id": phase_id,
                                 "msg_type": "text",
-                            })
-                    else:
-                        await push_sse(session_id, {
+                            },
+                        )
+                else:
+                    result["deploy_ok"] = False
+                    await push_sse(
+                        session_id,
+                        {
                             "type": "message",
                             "from_agent": "system",
                             "from_name": "CI/CD",
                             "from_role": "Pipeline",
-                            "content": f"Docker run échoué: {run_result.stderr[:200]}",
+                            "content": f"Docker build échoué: {build_result.stderr[:200]}",
                             "phase_id": phase_id,
                             "msg_type": "text",
-                        })
-                else:
-                    await push_sse(session_id, {
-                        "type": "message",
-                        "from_agent": "system",
-                        "from_name": "CI/CD",
-                        "from_role": "Pipeline",
-                        "content": f"Docker build échoué: {build_result.stderr[:200]}",
-                        "phase_id": phase_id,
-                        "msg_type": "text",
-                    })
+                        },
+                    )
             except Exception as e:
                 logger.warning("Docker deploy failed for %s: %s", mission.id, e)
         ws = Path(workspace)
@@ -2618,6 +2951,7 @@ asyncio.run(main())
     except Exception as e:
         logger.warning("Confluence sync failed: %s", e)
 
+    return result
 
 
 async def _update_docs_post_phase(
@@ -3416,9 +3750,13 @@ async def _qa_screenshots_web(ws: Path, shots_dir: Path, platform_type: str) -> 
             # Generate Python Playwright journey script
             journey_script = _build_playwright_journey_py(port, routes, users, str(shots_dir))
 
-            r = subprocess.run(["python3", "-c", journey_script],
-                               capture_output=True, text=True, timeout=90,
-                               cwd=str(ws))
+            r = subprocess.run(
+                ["python3", "-c", journey_script],
+                capture_output=True,
+                text=True,
+                timeout=90,
+                cwd=str(ws),
+            )
 
             # Collect all generated screenshots
             if shots_dir.exists():
@@ -3751,8 +4089,8 @@ def _build_playwright_journey_py(port: int, routes: list, users: list, shots_dir
             for route in routes[:5]:
                 steps += f"""
         try:
-            await page.goto("{base}{route['path']}", wait_until="networkidle", timeout=10000)
-            await page.screenshot(path="{shots_dir}/{step_num:02d}_{role}_{route['label']}.png", full_page=True)
+            await page.goto("{base}{route["path"]}", wait_until="networkidle", timeout=10000)
+            await page.screenshot(path="{shots_dir}/{step_num:02d}_{role}_{route["label"]}.png", full_page=True)
         except Exception:
             pass
 """
@@ -3763,7 +4101,7 @@ def _build_playwright_journey_py(port: int, routes: list, users: list, shots_dir
             label = route["label"]
             steps += f"""
         try:
-            await page.goto("{base}{route['path']}", wait_until="networkidle", timeout=10000)
+            await page.goto("{base}{route["path"]}", wait_until="networkidle", timeout=10000)
             await page.screenshot(path="{shots_dir}/{step_num:02d}_{label}.png", full_page=True)
         except Exception:
             pass
@@ -3800,8 +4138,16 @@ async def main():
 asyncio.run(main())
 """
     return script
-def _write_status_png(path: "Path", title: str, body: str,
-                      bg_color: tuple = (26, 17, 40), width: int = 800, height: int = 400):
+
+
+def _write_status_png(
+    path: Path,
+    title: str,
+    body: str,
+    bg_color: tuple = (26, 17, 40),
+    width: int = 800,
+    height: int = 400,
+):
     """Generate a status PNG with readable text using Pillow."""
     try:
         from PIL import Image, ImageDraw, ImageFont
@@ -4346,11 +4692,14 @@ def _build_phase_prompt(
         "dev-sprint": (
             f"Sprint de développement TDD pour «{brief}».\n"
             + (f"PLATEFORME: {platform_label}\n" if platform_label else "")
-            + (f"⚠️ STACK OBLIGATOIRE: {platform_label}. NE PAS utiliser une autre technologie.\n"
-               f"{'Utilisez HTML/CSS/JS ou TypeScript/Node.js. NE PAS écrire de Swift.' if platform in ('web-node', 'web-docker', 'web-static') else ''}\n"
-               f"{'Utilisez Swift/SwiftUI. NE PAS écrire de TypeScript.' if platform in ('ios-native', 'macos-native') else ''}\n"
-               f"{'Utilisez Kotlin/Java. NE PAS écrire de Swift.' if platform == 'android-native' else ''}\n"
-               if platform_label else "")
+            + (
+                f"⚠️ STACK OBLIGATOIRE: {platform_label}. NE PAS utiliser une autre technologie.\n"
+                f"{'Utilisez HTML/CSS/JS ou TypeScript/Node.js. NE PAS écrire de Swift.' if platform in ('web-node', 'web-docker', 'web-static') else ''}\n"
+                f"{'Utilisez Swift/SwiftUI. NE PAS écrire de TypeScript.' if platform in ('ios-native', 'macos-native') else ''}\n"
+                f"{'Utilisez Kotlin/Java. NE PAS écrire de Swift.' if platform == 'android-native' else ''}\n"
+                if platform_label
+                else ""
+            )
             + "VOUS DEVEZ UTILISER VOS OUTILS pour écrire du VRAI code dans le workspace.\n\n"
             "WORKFLOW OBLIGATOIRE:\n"
             "1. LIRE LE WORKSPACE: list_files + code_read sur les fichiers existants\n"
@@ -4416,7 +4765,7 @@ def _build_phase_prompt(
         prompt = prompts[ordered_keys[idx]]
     else:
         prompt = (
-            f"Phase {idx+1}/{total} : {phase_name} (pattern: {pattern}) pour le projet «{brief}».\n"
+            f"Phase {idx + 1}/{total} : {phase_name} (pattern: {pattern}) pour le projet «{brief}».\n"
             "Chaque agent contribue selon son rôle. Produisez un livrable concret."
         )
 

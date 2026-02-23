@@ -4,12 +4,543 @@
     <button class="tab active" hx-get="/skills" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click, load" onclick="switchTab(this)">{{ _("skills") }}</button>
     <button class="tab" hx-get="/memory" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("memory") }}</button>
     <button class="tab" hx-get="/mcps" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("mcps") }}</button>
+    <button class="tab" onclick="switchTab(this); showAPITab()">API</button>
+    <button class="tab" onclick="switchTab(this); showCLITab()">CLI</button>
+    <button class="tab" hx-get="/design-system" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">Design System</button>
 </div>
 <div id="tab-content"></div>
 <script>
 function switchTab(btn){
     document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.remove('active'));
     btn.classList.add('active');
+}
+
+function showAPITab() {
+    document.getElementById('tab-content').innerHTML = `
+        <div class="main-area" style="padding:2rem">
+            <h1 style="font-size:1.8rem;font-weight:700;margin-bottom:0.5rem">
+                <svg style="width:28px;height:28px;vertical-align:-4px;margin-right:0.5rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M16 18l2-2-2-2M8 6l-2 2 2 2M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                </svg>
+                API Documentation
+            </h1>
+            <p style="color:var(--text-secondary);margin-bottom:2rem">
+                Documentation interactive Swagger de l'API REST. Testez les endpoints directement depuis l'interface.
+            </p>
+            
+            <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+                <div style="padding:1rem;background:var(--bg-tertiary);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+                    <div style="display:flex;align-items:center;gap:0.5rem">
+                        <svg style="width:20px;height:20px;color:var(--green)" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="12" cy="12" r="10"/>
+                        </svg>
+                        <span style="font-weight:600">Swagger UI</span>
+                    </div>
+                    <a href="/docs" target="_blank" style="padding:0.5rem 1rem;background:var(--purple);color:#fff;text-decoration:none;border-radius:6px;font-size:0.85rem;font-weight:600">
+                        Ouvrir dans nouvel onglet
+                        <svg style="width:14px;height:14px;vertical-align:-2px;margin-left:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                        </svg>
+                    </a>
+                </div>
+                <iframe src="/docs" style="width:100%;height:calc(100vh - 300px);border:none"></iframe>
+            </div>
+        </div>
+    `;
+}
+
+function showCLITab() {
+    document.getElementById('tab-content').innerHTML = `
+        <div class="main-area" style="padding:2rem">
+            <h1 style="font-size:1.8rem;font-weight:700;margin-bottom:0.5rem">
+                <svg style="width:28px;height:28px;vertical-align:-4px;margin-right:0.5rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="4 17 10 11 4 5"></polyline>
+                    <line x1="12" y1="19" x2="20" y2="19"></line>
+                </svg>
+                CLI - Command Line Interface
+            </h1>
+            <p style="color:var(--text-secondary);margin-bottom:1.5rem">
+                Terminal interactif pour exécuter les commandes de la Software Factory. Tapez <code style="background:var(--bg-tertiary);padding:0.2rem 0.4rem;border-radius:4px">help</code> pour voir les commandes disponibles.
+            </p>
+
+            <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.1)">
+                <div style="padding:0.8rem 1rem;background:#2d2d30;border-bottom:1px solid #3e3e42;display:flex;align-items:center;justify-content:space-between">
+                    <div style="display:flex;align-items:center;gap:0.5rem">
+                        <svg style="width:18px;height:18px;color:#4ec9b0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="4 17 10 11 4 5"></polyline>
+                            <line x1="12" y1="19" x2="20" y2="19"></line>
+                        </svg>
+                        <span style="font-weight:600;color:#cccccc;font-size:0.9rem">sf-cli@production</span>
+                    </div>
+                    <div style="display:flex;gap:1rem;align-items:center">
+                        <button onclick="clearTerminal()" style="padding:0.3rem 0.8rem;background:#3e3e42;color:#cccccc;border:none;border-radius:4px;cursor:pointer;font-size:0.75rem;font-weight:500" title="Clear terminal">Clear</button>
+                        <button onclick="showCLIHelp()" style="padding:0.3rem 0.8rem;background:#3e3e42;color:#cccccc;border:none;border-radius:4px;cursor:pointer;font-size:0.75rem;font-weight:500" title="Show help">Help</button>
+                    </div>
+                </div>
+                <div id="cli-terminal" style="padding:1.5rem;background:#1e1e1e;color:#d4d4d4;font-family:'SF Mono', 'Consolas', 'Monaco', monospace;font-size:13px;line-height:1.6;min-height:500px;max-height:70vh;overflow-y:auto;cursor:text" onclick="document.getElementById('cli-input').focus()">
+                    <div style="color:#608b4e;margin-bottom:0.5rem">┌─ Welcome to Software Factory CLI v1.0.0 ─────────────────────────┐</div>
+                    <div style="color:#608b4e;margin-bottom:0.3rem">│ Interactive terminal for SF platform and system commands         │</div>
+                    <div style="color:#608b4e;margin-bottom:1rem">└──────────────────────────────────────────────────────────────────┘</div>
+                    
+                    <div style="color:#569cd6;margin-bottom:0.3rem">Quick Start:</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.3rem">• Type <span style="color:#ce9178">help</span> to see all available commands</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.3rem">• Use <span style="color:#ce9178">↑</span> <span style="color:#ce9178">↓</span> arrows to navigate command history</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.8rem">• Press <span style="color:#ce9178">Tab</span> for autocomplete</div>
+                    
+                    <div style="color:#569cd6;margin-bottom:0.3rem">SF Platform Commands:</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">platform status</span> — Platform statistics</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">missions list</span> / <span style="color:#4ec9b0">show &lt;id&gt;</span> — Missions management</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">agents list</span> / <span style="color:#4ec9b0">show &lt;id&gt;</span> — Agents management</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">workflows list</span> / <span style="color:#4ec9b0">show &lt;id&gt;</span> — Workflows</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">patterns list</span> / <span style="color:#4ec9b0">show &lt;id&gt;</span> — Patterns</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">projects list</span> — Projects</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">memory search</span> / <span style="color:#4ec9b0">project</span> / <span style="color:#4ec9b0">global</span> — Memory</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">skills sync</span> / <span style="color:#4ec9b0">search &lt;query&gt;</span> — Skills library</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.8rem"><span style="color:#4ec9b0">db status</span> — Database status</div>
+                    
+                    <div style="color:#569cd6;margin-bottom:0.3rem">System Commands:</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.3rem"><span style="color:#4ec9b0">ls -la</span> — List files</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.3rem"><span style="color:#4ec9b0">git status</span> — Check Git status</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.3rem"><span style="color:#4ec9b0">make test</span> — Run tests</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:1.2rem"><span style="color:#4ec9b0">ruff check .</span> — Lint Python code</div>
+                    
+                    <div style="color:#6a9955;font-style:italic;margin-bottom:0.3rem">Interactive Commands:</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.3rem">• <span style="color:#4ec9b0">ideation "your prompt"</span> — Run multi-agent ideation with streaming</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:1rem">• Or use full interface: <a href="/ideation" style="color:#4fc3f7;text-decoration:underline">Launch Ideation UI</a></div>
+                </div>
+                <div style="padding:0.8rem 1rem;background:#252526;border-top:1px solid #3e3e42;display:flex;align-items:center;gap:0.5rem">
+                    <span style="color:#4ec9b0;font-family:monospace;font-size:13px">sf$</span>
+                    <input 
+                        type="text" 
+                        id="cli-input" 
+                        placeholder="Tapez une commande..." 
+                        style="flex:1;background:transparent;border:none;color:#d4d4d4;font-family:'SF Mono', 'Consolas', monospace;font-size:13px;outline:none"
+                        onkeydown="handleCLIInput(event)"
+                        autocomplete="off"
+                        spellcheck="false"
+                    >
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Auto-focus on input
+    setTimeout(() => document.getElementById('cli-input').focus(), 100);
+    
+    // Initialize terminal history
+    if (!window.cliHistory) {
+        window.cliHistory = [];
+        window.cliHistoryIndex = -1;
+    }
+}
+
+// CLI Terminal functions
+function handleCLIInput(event) {
+    const input = event.target;
+    const command = input.value.trim();
+    
+    // Enter key - execute command
+    if (event.key === 'Enter' && command) {
+        window.cliHistory.push(command);
+        window.cliHistoryIndex = window.cliHistory.length;
+        executeCLICommand(command);
+        input.value = '';
+    }
+    
+    // Up arrow - previous command
+    if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (window.cliHistoryIndex > 0) {
+            window.cliHistoryIndex--;
+            input.value = window.cliHistory[window.cliHistoryIndex];
+        }
+    }
+    
+    // Down arrow - next command
+    if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        if (window.cliHistoryIndex < window.cliHistory.length - 1) {
+            window.cliHistoryIndex++;
+            input.value = window.cliHistory[window.cliHistoryIndex];
+        } else {
+            window.cliHistoryIndex = window.cliHistory.length;
+            input.value = '';
+        }
+    }
+    
+    // Tab - autocomplete
+    if (event.key === 'Tab') {
+        event.preventDefault();
+        const sfCommands = [
+            'help', 'clear', 'ideation',
+            'platform status',
+            'missions list', 'missions show',
+            'agents list', 'agents show',
+            'workflows list', 'workflows show',
+            'patterns list', 'patterns show',
+            'memory search', 'memory project', 'memory global',
+            'skills sync', 'skills search',
+            'projects list',
+            'db status',
+            'make', 'git', 'python3', 'ruff', 'pytest', 'ls', 'pwd', 'whoami'
+        ];
+        const partial = input.value.toLowerCase();
+        const match = sfCommands.find(cmd => cmd.startsWith(partial));
+        if (match) {
+            input.value = match + (match.includes(' ') ? '' : ' ');
+        }
+    }
+}
+
+async function executeCLICommand(commandLine) {
+    const terminal = document.getElementById('cli-terminal');
+    
+    // Echo command
+    const cmdEcho = document.createElement('div');
+    cmdEcho.style.color = '#4ec9b0';
+    cmdEcho.style.marginTop = '0.8rem';
+    cmdEcho.textContent = `sf$ ${commandLine}`;
+    terminal.appendChild(cmdEcho);
+    
+    // Parse command and args
+    const parts = commandLine.split(/\s+/);
+    const command = parts[0];
+    const args = parts.slice(1);
+    
+    // Handle built-in commands
+    if (command === 'clear') {
+        clearTerminal();
+        return;
+    }
+    
+    if (command === 'help') {
+        showCLIHelp();
+        return;
+    }
+    
+    if (command === 'ideation') {
+        // Check if prompt provided
+        const prompt = args.join(' ').trim();
+        if (!prompt) {
+            const outputDiv = document.createElement('div');
+            outputDiv.style.marginLeft = '1rem';
+            outputDiv.style.marginTop = '0.5rem';
+            outputDiv.innerHTML = `
+                <div style="color:#f48771;margin-bottom:0.5rem">Error: Prompt required</div>
+                <div style="color:#d4d4d4;margin-bottom:0.5rem">Usage: <span style="color:#4ec9b0">ideation "your prompt"</span></div>
+                <div style="color:#858585;font-size:12px">Example: ideation "créer une app de suivi GPS vélo IoT"</div>
+            `;
+            terminal.appendChild(outputDiv);
+            return;
+        }
+        
+        // Show starting message
+        const startDiv = document.createElement('div');
+        startDiv.style.marginLeft = '1rem';
+        startDiv.style.marginTop = '0.5rem';
+        startDiv.style.color = '#dcdcaa';
+        startDiv.textContent = 'Starting ideation session...';
+        terminal.appendChild(startDiv);
+        terminal.scrollTop = terminal.scrollHeight;
+        
+        // Launch ideation with streaming
+        runIdeation(prompt);
+        return;
+    }
+    
+    // Detect SF native commands vs system commands
+    const sfCommands = ['platform', 'missions', 'agents', 'workflows', 'patterns', 'memory', 'skills', 'projects', 'db'];
+    const isSFCommand = sfCommands.includes(command);
+    
+    // Show loading
+    const loadingDiv = document.createElement('div');
+    loadingDiv.style.color = '#858585';
+    loadingDiv.style.marginLeft = '1rem';
+    loadingDiv.textContent = 'Executing...';
+    terminal.appendChild(loadingDiv);
+    terminal.scrollTop = terminal.scrollHeight;
+    
+    try {
+        let response, data;
+        
+        if (isSFCommand) {
+            // Use SF commands API
+            response = await fetch('/api/sf/execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    command: commandLine,
+                    args: []
+                })
+            });
+            data = await response.json();
+        } else {
+            // Use generic CLI API
+            response = await fetch('/api/cli/execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command, args })
+            });
+            data = await response.json();
+        }
+        
+        terminal.removeChild(loadingDiv);
+        
+        const outputDiv = document.createElement('div');
+        outputDiv.style.marginLeft = '1rem';
+        outputDiv.style.whiteSpace = 'pre-wrap';
+        outputDiv.style.wordBreak = 'break-word';
+        
+        if (data.success) {
+            outputDiv.style.color = '#d4d4d4';
+            outputDiv.textContent = data.output || 'Command executed successfully';
+        } else {
+            outputDiv.style.color = '#f48771';
+            outputDiv.innerHTML = `<strong>Error${data.exit_code ? ' (exit '+data.exit_code+')' : ''}:</strong>\n${data.error || 'Unknown error'}`;
+            
+            // Report CLI errors to TMA
+            try {
+                fetch('/api/tma/js-error', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        message: `CLI Error: ${command} ${args.join(' ')}`,
+                        source: 'web-cli',
+                        error: data.error || 'Unknown error',
+                        command: commandLine,
+                        url: location.href
+                    })
+                });
+            } catch(_) {}
+        }
+        
+        terminal.appendChild(outputDiv);
+    } catch (error) {
+        terminal.removeChild(loadingDiv);
+        const errorDiv = document.createElement('div');
+        errorDiv.style.marginLeft = '1rem';
+        errorDiv.style.color = '#f48771';
+        errorDiv.textContent = `Error: ${error.message}`;
+        terminal.appendChild(errorDiv);
+    }
+    
+    terminal.scrollTop = terminal.scrollHeight;
+}
+
+function clearTerminal() {
+    const terminal = document.getElementById('cli-terminal');
+    terminal.innerHTML = `
+        <div style="color:#608b4e;margin-bottom:0.5rem">Welcome to Software Factory CLI v1.0.0</div>
+        <div style="color:#608b4e;margin-bottom:1rem">Type 'help' for available commands.</div>
+    `;
+}
+
+function showCLIHelp() {
+    const terminal = document.getElementById('cli-terminal');
+    const helpDiv = document.createElement('div');
+    helpDiv.style.marginLeft = '1rem';
+    helpDiv.style.marginTop = '0.5rem';
+    helpDiv.innerHTML = `
+        <div style="color:#dcdcaa;font-weight:600;margin-bottom:0.8rem">Software Factory CLI Commands</div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Interactive:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">ideation "prompt"</span> <span style="color:#858585">- Run multi-agent ideation with real-time streaming</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Platform:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">platform status</span> <span style="color:#858585">- Platform status (agents, missions, projects, skills)</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Missions:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">missions list</span> <span style="color:#858585">- List all missions</span><br>
+          <span style="color:#569cd6">missions show &lt;id&gt;</span> <span style="color:#858585">- Show mission details</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Agents:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">agents list</span> <span style="color:#858585">- List all agents</span><br>
+          <span style="color:#569cd6">agents show &lt;id&gt;</span> <span style="color:#858585">- Show agent details</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Workflows:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">workflows list</span> <span style="color:#858585">- List all workflows</span><br>
+          <span style="color:#569cd6">workflows show &lt;id&gt;</span> <span style="color:#858585">- Show workflow details</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Patterns:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">patterns list</span> <span style="color:#858585">- List all patterns</span><br>
+          <span style="color:#569cd6">patterns show &lt;id&gt;</span> <span style="color:#858585">- Show pattern details</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Projects:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">projects list</span> <span style="color:#858585">- List all projects</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Memory:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">memory search &lt;query&gt;</span> <span style="color:#858585">- Search memory</span><br>
+          <span style="color:#569cd6">memory project &lt;id&gt;</span> <span style="color:#858585">- Project memory</span><br>
+          <span style="color:#569cd6">memory global</span> <span style="color:#858585">- Global memory</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Skills:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">skills sync</span> <span style="color:#858585">- Sync GitHub skills</span><br>
+          <span style="color:#569cd6">skills search &lt;query&gt;</span> <span style="color:#858585">- Search skills by keyword</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Database:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">db status</span> <span style="color:#858585">- Show tables and row counts</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Development:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">make</span> <span style="color:#858585">[install-hooks, test-skills, quality, test]</span><br>
+          <span style="color:#569cd6">git</span> <span style="color:#858585">[status, log, diff, branch]</span><br>
+          <span style="color:#569cd6">python3</span> <span style="color:#858585">[--version, -m module]</span><br>
+          <span style="color:#569cd6">ruff</span> <span style="color:#858585">[check .]</span><br>
+          <span style="color:#569cd6">pytest</span> <span style="color:#858585">[-v, --cov]</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">System:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">ls</span> <span style="color:#858585">[-la, -lh]</span><br>
+          <span style="color:#569cd6">pwd</span> <span style="color:#858585">- Print working directory</span><br>
+          <span style="color:#569cd6">whoami</span> <span style="color:#858585">- Current user</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Terminal:</div>
+        <div style="margin-left:1rem;color:#d4d4d4">
+          <span style="color:#569cd6">clear</span> <span style="color:#858585">- Clear terminal</span><br>
+          <span style="color:#569cd6">help</span> <span style="color:#858585">- Show this help</span>
+        </div>
+        
+        <div style="margin-top:1rem;padding:0.8rem;background:#2d2d30;border-left:3px solid #4ec9b0;color:#858585;font-size:12px">
+          <strong style="color:#dcdcaa">Tips:</strong> Use ↑/↓ for history, Tab for autocomplete, type command names for details
+        </div>
+    `;
+    terminal.appendChild(helpDiv);
+    terminal.scrollTop = terminal.scrollHeight;
+}
+
+// Run ideation with streaming
+async function runIdeation(prompt) {
+    const terminal = document.getElementById('cli-terminal');
+    
+    try {
+        // Start ideation
+        const response = await fetch('/api/ideation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            const errorDiv = document.createElement('div');
+            errorDiv.style.marginLeft = '1rem';
+            errorDiv.style.color = '#f48771';
+            errorDiv.textContent = `Error: ${error.error || 'Failed to start ideation'}`;
+            terminal.appendChild(errorDiv);
+            terminal.scrollTop = terminal.scrollHeight;
+            return;
+        }
+        
+        const data = await response.json();
+        const sessionId = data.session_id;
+        const sseUrl = data.sse_url;
+        
+        // Show session info
+        const infoDiv = document.createElement('div');
+        infoDiv.style.marginLeft = '1rem';
+        infoDiv.style.marginTop = '0.5rem';
+        infoDiv.style.color = '#4ec9b0';
+        infoDiv.textContent = `Session ${sessionId} started. Connecting to agents...`;
+        terminal.appendChild(infoDiv);
+        terminal.scrollTop = terminal.scrollHeight;
+        
+        // Container for streaming output
+        const outputDiv = document.createElement('div');
+        outputDiv.style.marginLeft = '1rem';
+        outputDiv.style.marginTop = '0.5rem';
+        outputDiv.style.color = '#d4d4d4';
+        outputDiv.style.fontFamily = 'monospace';
+        outputDiv.style.whiteSpace = 'pre-wrap';
+        outputDiv.style.lineHeight = '1.6';
+        terminal.appendChild(outputDiv);
+        
+        // Connect to SSE
+        const eventSource = new EventSource(sseUrl);
+        let currentAgent = null;
+        
+        eventSource.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                
+                // Agent started
+                if (msg.from_agent && msg.from_agent !== currentAgent) {
+                    currentAgent = msg.from_agent;
+                    const agentDiv = document.createElement('div');
+                    agentDiv.style.marginTop = '1rem';
+                    agentDiv.style.color = '#dcdcaa';
+                    agentDiv.style.fontWeight = '600';
+                    agentDiv.textContent = `[${currentAgent}]`;
+                    outputDiv.appendChild(agentDiv);
+                }
+                
+                // Message content
+                if (msg.content) {
+                    const contentDiv = document.createElement('div');
+                    contentDiv.style.marginLeft = '1rem';
+                    contentDiv.style.color = '#d4d4d4';
+                    contentDiv.textContent = msg.content;
+                    outputDiv.appendChild(contentDiv);
+                }
+                
+                // Session completed
+                if (msg.message_type === 'system' && msg.content?.includes('completed')) {
+                    eventSource.close();
+                    const doneDiv = document.createElement('div');
+                    doneDiv.style.marginTop = '1rem';
+                    doneDiv.style.color = '#4ec9b0';
+                    doneDiv.textContent = 'Ideation completed!';
+                    outputDiv.appendChild(doneDiv);
+                }
+                
+                terminal.scrollTop = terminal.scrollHeight;
+            } catch (e) {
+                console.error('SSE parse error:', e);
+            }
+        };
+        
+        eventSource.onerror = (error) => {
+            console.error('SSE error:', error);
+            eventSource.close();
+            const errorDiv = document.createElement('div');
+            errorDiv.style.marginTop = '0.5rem';
+            errorDiv.style.color = '#f48771';
+            errorDiv.textContent = 'Connection lost. Ideation may still be running in background.';
+            outputDiv.appendChild(errorDiv);
+            terminal.scrollTop = terminal.scrollHeight;
+        };
+        
+    } catch (error) {
+        const errorDiv = document.createElement('div');
+        errorDiv.style.marginLeft = '1rem';
+        errorDiv.style.color = '#f48771';
+        errorDiv.textContent = `Error: ${error.message}`;
+        terminal.appendChild(errorDiv);
+        terminal.scrollTop = terminal.scrollHeight;
+    }
 }
 </script>
 {% endblock %}

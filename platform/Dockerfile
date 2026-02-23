@@ -32,7 +32,8 @@ RUN mkdir -p /app/data /app/workspace
 
 # Create non-root user
 RUN groupadd -r macaron && useradd -r -g macaron -d /app macaron \
-    && chown -R macaron:macaron /app
+    && chown -R macaron:macaron /app \
+    && chown -R macaron:macaron $PLAYWRIGHT_BROWSERS_PATH
 USER macaron
 
 # Env

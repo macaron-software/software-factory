@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Software Factory — Onboarding</title>
+    <link rel="stylesheet" href="/static/css/main.css?v=20260223c">
+    <style>
+    body{margin:0;background:var(--bg-primary,#0f0a1a);color:var(--text-primary,#e6edf3);font-family:var(--font-mono,'JetBrains Mono',monospace);min-height:100vh;display:flex;align-items:center;justify-content:center}
+    .onboarding{max-width:640px;width:100%;padding:2rem}
+    .onboarding-header{text-align:center;margin-bottom:2rem}
+    .onboarding-header h1{font-size:1.5rem;color:var(--purple-light,#c084fc);margin:0 0 0.5rem}
+    .onboarding-header p{color:var(--text-secondary,#8b949e);font-size:0.875rem;margin:0}
+    .step{display:none}
+    .step.active{display:block}
+    .step-title{font-size:1.1rem;font-weight:600;margin-bottom:1.5rem;color:var(--text-primary)}
+    .step-subtitle{font-size:0.8rem;color:var(--text-secondary);margin-bottom:1rem}
+    .role-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:0.75rem}
+    .role-card{background:var(--bg-secondary,#1a1128);border:2px solid var(--border,#30363d);border-radius:var(--radius,10px);padding:1rem;cursor:pointer;transition:all .15s}
+    .role-card:hover{border-color:var(--purple,#a855f7);background:var(--bg-tertiary,#251a35)}
+    .role-card.selected{border-color:var(--purple,#a855f7);background:rgba(168,85,247,.1)}
+    .role-card h3{margin:0 0 0.25rem;font-size:0.875rem;color:var(--text-primary)}
+    .role-card p{margin:0;font-size:0.7rem;color:var(--text-secondary);line-height:1.4}
+    .role-card .role-icon{font-size:1.2rem;margin-bottom:0.5rem;display:block}
+    .project-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem}
+    .project-card{background:var(--bg-secondary);border:2px solid var(--border);border-radius:var(--radius);padding:0.75rem;cursor:pointer;transition:all .15s;text-align:center}
+    .project-card:hover{border-color:var(--purple)}
+    .project-card.selected{border-color:var(--purple);background:rgba(168,85,247,.1)}
+    .project-card h4{margin:0;font-size:0.8rem}
+    .project-card small{color:var(--text-secondary);font-size:0.7rem}
+    .onboarding-actions{display:flex;justify-content:space-between;margin-top:2rem}
+    .btn-primary{background:var(--purple,#a855f7);color:#fff;border:none;padding:0.6rem 1.5rem;border-radius:8px;font-size:0.875rem;cursor:pointer;font-weight:600;font-family:inherit}
+    .btn-primary:hover{background:var(--purple-light,#c084fc)}
+    .btn-secondary{background:transparent;color:var(--text-secondary);border:1px solid var(--border);padding:0.6rem 1.5rem;border-radius:8px;font-size:0.875rem;cursor:pointer;font-family:inherit}
+    .btn-secondary:hover{color:var(--text-primary);border-color:var(--text-secondary)}
+    .step-indicator{display:flex;gap:8px;justify-content:center;margin-bottom:2rem}
+    .step-dot{width:8px;height:8px;border-radius:50%;background:var(--border)}
+    .step-dot.active{background:var(--purple)}
+    .step-dot.done{background:var(--purple-light)}
+    .summary-box{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;text-align:center}
+    .summary-box .summary-role{font-size:1.1rem;color:var(--purple-light);font-weight:600;margin-bottom:0.5rem}
+    .summary-box .summary-project{font-size:0.875rem;color:var(--text-secondary)}
+    .logo-onboarding{width:48px;height:48px;margin:0 auto 1rem;display:block}
+    </style>
+</head>
+<body>
+    {% include "partials/svg_sprites.html" %}
+    <div class="onboarding">
+        <div class="onboarding-header">
+            <svg class="logo-onboarding" style="color:var(--purple-light)"><use href="#icon-macaron"/></svg>
+            <h1>Welcome to Software Factory</h1>
+            <p>Let's set up your workspace</p>
+        </div>
+
+        <div class="step-indicator">
+            <div class="step-dot active" id="dot-1"></div>
+            <div class="step-dot" id="dot-2"></div>
+            <div class="step-dot" id="dot-3"></div>
+        </div>
+
+        <!-- Step 1: Choose SAFe Role -->
+        <div class="step active" id="step-1">
+            <div class="step-title">What is your SAFe role?</div>
+            <div class="step-subtitle">This will adapt your dashboard, navigation and quick actions.</div>
+            <div class="role-grid">
+                <div class="role-card" data-role="portfolio_manager" onclick="selectRole(this)">
+                    <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-briefcase"/></svg></span>
+                    <h3>Portfolio Manager</h3>
+                    <p>Govern epics, WSJF prioritization, portfolio kanban</p>
+                </div>
+                <div class="role-card" data-role="rte" onclick="selectRole(this)">
+                    <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-workflow"/></svg></span>
+                    <h3>RTE</h3>
+                    <p>PI planning, ceremonies, train coordination</p>
+                </div>
+                <div class="role-card" data-role="product_owner" onclick="selectRole(this)">
+                    <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-layers"/></svg></span>
+                    <h3>Product Owner</h3>
+                    <p>Backlog, features, stories, acceptance</p>
+                </div>
+                <div class="role-card" data-role="scrum_master" onclick="selectRole(this)">
+                    <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-refresh-cw"/></svg></span>
+                    <h3>Scrum Master</h3>
+                    <p>Sprints, velocity, retrospectives, impediments</p>
+                </div>
+                <div class="role-card" data-role="developer" onclick="selectRole(this)">
+                    <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-code"/></svg></span>
+                    <h3>Developer</h3>
+                    <p>Code, chat agents, tasks, toolbox</p>
+                </div>
+                <div class="role-card" data-role="architect" onclick="selectRole(this)">
+                    <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-grid"/></svg></span>
+                    <h3>Architect</h3>
+                    <p>Technical vision, enablers, architecture decisions</p>
+                </div>
+                <div class="role-card" data-role="qa_security" onclick="selectRole(this)">
+                    <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-shield"/></svg></span>
+                    <h3>QA / Security</h3>
+                    <p>Test campaigns, security audits, quality gates</p>
+                </div>
+                <div class="role-card" data-role="business_owner" onclick="selectRole(this)">
+                    <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-chart"/></svg></span>
+                    <h3>Business Owner</h3>
+                    <p>GO/NOGO decisions, ROI, business value</p>
+                </div>
+            </div>
+            <div class="onboarding-actions">
+                <button class="btn-secondary" onclick="skipOnboarding()">Skip</button>
+                <button class="btn-primary" id="btn-next-1" onclick="goToStep(2)" disabled>Next</button>
+            </div>
+        </div>
+
+        <!-- Step 2: Choose Project/ART -->
+        <div class="step" id="step-2">
+            <div class="step-title">Which project are you working on?</div>
+            <div class="step-subtitle">Optional — you can change this anytime.</div>
+            <div class="project-grid">
+                {% for p in projects %}
+                <div class="project-card" data-project="{{ p.id }}" onclick="selectProject(this)">
+                    <h4>{{ p.name }}</h4>
+                    <small>{{ p.factory_type or '' }}</small>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="onboarding-actions">
+                <button class="btn-secondary" onclick="goToStep(1)">Back</button>
+                <button class="btn-primary" onclick="goToStep(3)">Next</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Confirmation -->
+        <div class="step" id="step-3">
+            <div class="step-title">You're all set!</div>
+            <div class="summary-box">
+                <div class="summary-role" id="summary-role">—</div>
+                <div class="summary-project" id="summary-project">No project selected</div>
+            </div>
+            <div class="onboarding-actions">
+                <button class="btn-secondary" onclick="goToStep(2)">Back</button>
+                <button class="btn-primary" onclick="finishOnboarding()">Start</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    let selectedRole = null;
+    let selectedProject = null;
+    const roleLabels = {
+        portfolio_manager: 'Portfolio Manager', rte: 'RTE', product_owner: 'Product Owner',
+        scrum_master: 'Scrum Master', developer: 'Developer', architect: 'Architect',
+        qa_security: 'QA / Security', business_owner: 'Business Owner'
+    };
+
+    function selectRole(el) {
+        document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+        el.classList.add('selected');
+        selectedRole = el.dataset.role;
+        document.getElementById('btn-next-1').disabled = false;
+    }
+
+    function selectProject(el) {
+        document.querySelectorAll('.project-card').forEach(c => c.classList.remove('selected'));
+        el.classList.add('selected');
+        selectedProject = el.dataset.project;
+    }
+
+    function goToStep(n) {
+        document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+        document.getElementById('step-' + n).classList.add('active');
+        for (let i = 1; i <= 3; i++) {
+            const dot = document.getElementById('dot-' + i);
+            dot.classList.remove('active', 'done');
+            if (i < n) dot.classList.add('done');
+            if (i === n) dot.classList.add('active');
+        }
+        if (n === 3) {
+            document.getElementById('summary-role').textContent = roleLabels[selectedRole] || selectedRole;
+            const projEl = selectedProject ? document.querySelector(`[data-project="${selectedProject}"] h4`) : null;
+            document.getElementById('summary-project').textContent = projEl ? projEl.textContent : 'No project selected';
+        }
+    }
+
+    async function finishOnboarding() {
+        if (!selectedRole) { goToStep(1); return; }
+        await fetch('/api/perspective', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({perspective: selectedRole})
+        });
+        document.cookie = 'onboarding_done=1; path=/; max-age=31536000; samesite=lax';
+        if (selectedProject) {
+            document.cookie = 'default_project=' + selectedProject + '; path=/; max-age=31536000; samesite=lax';
+        }
+        location.href = '/';
+    }
+
+    function skipOnboarding() {
+        document.cookie = 'onboarding_done=1; path=/; max-age=31536000; samesite=lax';
+        location.href = '/';
+    }
+    </script>
+</body>
+</html>

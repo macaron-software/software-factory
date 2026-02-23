@@ -122,7 +122,7 @@ document.getElementById('genForm').addEventListener('submit', async (e) => {
             document.getElementById('genResultTitle').textContent = `Équipe de ${data.team_size} agents générée`;
             const list = document.getElementById('genTeamList');
             list.innerHTML = data.agents.map(a =>
-                `<li><span class="gen-badge gen-badge--ok">✓</span> ${a}</li>`
+                `<li><span class="gen-badge gen-badge--ok">ok</span> ${a}</li>`
             ).join('');
             document.getElementById('genResultMsg').textContent = 'Redirection vers la session live...';
             result.classList.add('show');

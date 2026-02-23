@@ -3,7 +3,7 @@
 {% block topbar_actions %}
 {% include "partials/view_switcher.html" %}
 <a href="/missions?action=new" class="btn btn-primary">
-    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> New Epic
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> {{ _("new_mission") }}
 </a>
 {% endblock %}
 
@@ -18,7 +18,7 @@
 .mc-sprint-badge{position:absolute;bottom:-2px;right:-2px;font-size:0.6rem;background:var(--purple);color:#fff;border-radius:4px;padding:0 4px;font-weight:700}
 .mc-progress{display:flex;align-items:center;gap:0.5rem;margin-top:0.4rem}
 .mc-progress-bar{flex:1;height:4px;background:var(--bg-tertiary);border-radius:2px;overflow:hidden}
-.mc-progress-fill{height:100%;background:linear-gradient(90deg,var(--purple),var(--purple-light));border-radius:2px}
+.mc-progress-fill{height:100%;background:var(--purple);border-radius:2px}
 .mc-progress-text{font-size:0.7rem;color:var(--text-secondary);min-width:40px;text-align:right}
 .mc-wsjf{font-size:0.65rem;background:var(--bg-tertiary);color:var(--yellow);padding:0.1rem 0.4rem;border-radius:4px;font-weight:600}
 .mc-creator{font-size:0.72rem;color:var(--text-secondary);display:flex;align-items:center;gap:0.3rem}
@@ -97,7 +97,7 @@
 {% if show_new_form %}
 <div class="new-mission-overlay" onclick="if(event.target===this)location.href='/missions'">
     <form class="new-mission-form" id="newMissionForm">
-        <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> New Epic</h3>
+        <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> {{ _("new_mission") }}</h3>
         <div class="nmf-field">
             <label>{{ _("project") }}</label>
             <select name="project_id" required>

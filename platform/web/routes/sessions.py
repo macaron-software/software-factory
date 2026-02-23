@@ -149,7 +149,7 @@ async def session_live_page(request: Request, session_id: str):
 
     # 1) Try loading graph from workflow config (primary source)
     if wf_id:
-        from platform.workflows.store import WorkflowStore
+        from ...workflows.store import WorkflowStore
         wf_store = WorkflowStore()
         wf = wf_store.get(wf_id)
         if wf:
@@ -251,7 +251,7 @@ async def session_live_page(request: Request, session_id: str):
 
     # 2) Fallback: build from session pattern if no workflow
     if not wf_graph_loaded and session.pattern_id:
-        from platform.patterns.store import get_pattern_store
+        from ...patterns.store import get_pattern_store
         pat = get_pattern_store().get(session.pattern_id)
         if pat and pat.agents:
             nid_to_aid = {}
@@ -415,7 +415,7 @@ async def session_live_page(request: Request, session_id: str):
     lang = get_lang(request)
     suggestions = []
     if wf_id:
-        from platform.workflows.store import WorkflowStore as _WS2
+        from ...workflows.store import WorkflowStore as _WS2
         _wf2 = _WS2().get(wf_id)
         if _wf2:
             _WORKFLOW_SUGGESTIONS = {

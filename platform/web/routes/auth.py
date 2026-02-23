@@ -68,6 +68,9 @@ async def setup(request: Request):
     password = body.get("password", "")
     name = body.get("display_name", email.split("@")[0] if email else "Admin")
 
+    if not email or not password:
+        return JSONResponse({"error": "Email and password required"}, status_code=400)
+
     try:
         user = service.register(email, password, name, role="admin")
         tokens = service.login(email, password,
@@ -77,6 +80,33 @@ async def setup(request: Request):
         return _set_auth_cookies(resp, tokens)
     except service.AuthError as e:
         return JSONResponse({"error": str(e), "code": e.code}, status_code=400)
+    except Exception as e:
+        return JSONResponse({"error": f"Setup failed: {str(e)}"}, status_code=500)
+
+
+@router.post("/api/auth/demo")
+async def demo_login(request: Request):
+    """Skip login — create or reuse demo admin and auto-login."""
+    demo_email = "admin@demo.local"
+    demo_pass = "demo-admin-2026"
+    demo_name = "Demo Admin"
+
+    # Create demo user if doesn't exist
+    try:
+        service.register(demo_email, demo_pass, demo_name, role="admin")
+    except service.AuthError:
+        pass  # Already exists
+
+    try:
+        tokens = service.login(
+            demo_email, demo_pass,
+            ip=request.client.host if request.client else "",
+            ua=request.headers.get("user-agent", ""),
+        )
+        resp = JSONResponse({"ok": True, "user": tokens["user"], "demo": True})
+        return _set_auth_cookies(resp, tokens)
+    except service.AuthError:
+        return JSONResponse({"error": "Demo user conflict"}, status_code=400)
 
 
 @router.post("/api/auth/login")

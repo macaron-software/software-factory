@@ -69,7 +69,7 @@ class SystemHealthResponse(BaseModel):
 async def get_top_skills(limit: int = 10) -> SkillsTopResponse:
     """Get top N most used skills."""
     try:
-        from platform.db import get_db
+        from ...db.migrations import get_db
 
         db = get_db()
 
@@ -113,7 +113,7 @@ async def get_top_skills(limit: int = 10) -> SkillsTopResponse:
 async def get_skills_heatmap() -> SkillsHeatmapResponse:
     """Get heatmap of domain × role skills usage."""
     try:
-        from platform.db import get_db
+        from ...db.migrations import get_db
 
         db = get_db()
 
@@ -157,7 +157,7 @@ async def get_skills_heatmap() -> SkillsHeatmapResponse:
 async def get_skills_cache_stats() -> dict[str, Any]:
     """Get skills cache statistics."""
     try:
-        from platform.db import get_db
+        from ...db.migrations import get_db
 
         db = get_db()
 
@@ -201,7 +201,7 @@ async def get_skills_cache_stats() -> dict[str, Any]:
 async def get_missions_status() -> MissionsStatusResponse:
     """Get missions distribution by status."""
     try:
-        from platform.missions.store import get_mission_store
+        from ...missions.store import get_mission_store
 
         store = get_mission_store()
         missions = store.list_missions(limit=1000)
@@ -234,7 +234,7 @@ async def get_missions_status() -> MissionsStatusResponse:
 async def get_missions_performance() -> dict[str, Any]:
     """Get missions performance metrics."""
     try:
-        from platform.missions.store import get_mission_store
+        from ...missions.store import get_mission_store
 
         store = get_mission_store()
         missions = store.list_missions(limit=1000)
@@ -278,8 +278,8 @@ async def get_missions_performance() -> dict[str, Any]:
 async def get_agents_leaderboard(limit: int = 10) -> AgentsLeaderboardResponse:
     """Get top performing agents."""
     try:
-        from platform.agents.store import get_agent_store
-        from platform.db import get_db
+        from ...agents.store import get_agent_store
+        from ...db.migrations import get_db
 
         agent_store = get_agent_store()
         db = get_db()
@@ -323,7 +323,7 @@ async def get_agents_leaderboard(limit: int = 10) -> AgentsLeaderboardResponse:
 async def get_agents_utilization() -> dict[str, Any]:
     """Get agents utilization metrics."""
     try:
-        from platform.agents.store import get_agent_store
+        from ...agents.store import get_agent_store
 
         agent_store = get_agent_store()
         agents = agent_store.list_all()
@@ -356,7 +356,7 @@ async def get_agents_utilization() -> dict[str, Any]:
 async def get_tma_overview() -> TMAOverviewResponse:
     """Get TMA tickets overview."""
     try:
-        from platform.db import get_db
+        from ...db.migrations import get_db
 
         db = get_db()
 
@@ -411,7 +411,7 @@ async def get_system_health() -> SystemHealthResponse:
     """Get system health metrics."""
     try:
         import os
-        from platform.db import get_db
+        from ...db.migrations import get_db
 
         db = get_db()
 

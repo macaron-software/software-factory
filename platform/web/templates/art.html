@@ -111,6 +111,11 @@
 .fiche-loading{text-align:center;padding:2rem;color:var(--text-muted);font-size:0.75rem}
 </style>
 
+<div class="tabs" style="margin-bottom:1rem">
+    <button class="tab active" onclick="artSwitchTab(this, 'art-org')">Organisation</button>
+    <button class="tab" onclick="artSwitchTab(this, 'art-mercato')" hx-get="/mercato/roster-partial" hx-target="#art-mercato-content" hx-swap="innerHTML" hx-trigger="click once">Mercato</button>
+</div>
+<div id="art-org">
 <div class="art-dash">
     <!-- KPIs -->
     <div class="art-kpis">
@@ -217,6 +222,17 @@
         <button class="art-modal-close" onclick="closeFiche()"><svg><use href="#icon-x"/></svg></button>
     </div>
     <div id="fhContent"><div class="fiche-loading">{{ _('loading') }}</div></div>
+</div>
+</div><!-- /art-org -->
+
+<!-- Mercato tab panel (hidden by default) -->
+<div id="art-mercato" style="display:none">
+    <div id="art-mercato-content">
+        <p style="color:var(--text-secondary);padding:2rem;text-align:center">Loading Mercato...</p>
+    </div>
+    <div style="text-align:center;margin-top:1rem">
+        <a href="/mercato" style="color:var(--purple-light);font-size:0.8rem">Open full Mercato page</a>
+    </div>
 </div>
 
 {% endblock %}
@@ -386,5 +402,12 @@
 
   function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 })();
+
+function artSwitchTab(btn, panelId) {
+    document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('art-org').style.display = panelId === 'art-org' ? '' : 'none';
+    document.getElementById('art-mercato').style.display = panelId === 'art-mercato' ? '' : 'none';
+}
 </script>
 {% endblock %}

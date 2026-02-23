@@ -24,7 +24,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
     EXCLUDED_PREFIXES = (
         "/health", "/static", "/docs", "/redoc", "/openapi.json",
-        "/sse", "/favicon", "/api/health", "/api/i18n/",
+        "/sse", "/favicon", "/api/health", "/api/i18n/", "/api/auth",
     )
     PUBLIC_GET_PATHS = (
         "/api/projects", "/api/agents", "/api/missions",
@@ -45,6 +45,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         if not path.startswith("/api/"):
+            return await call_next(request)
+
+        # Skip API key check if JWT auth already authenticated user
+        if hasattr(request.state, "user") and request.state.user is not None:
+            request.state.authenticated = True
             return await call_next(request)
 
         if request.method == "GET" and any(path.startswith(p) for p in self.PUBLIC_GET_PATHS):

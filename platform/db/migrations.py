@@ -375,7 +375,6 @@ def _migrate(conn):
                 integ,
             )
 
-
     # Auth & RBAC tables
     conn.execute("""
         CREATE TABLE IF NOT EXISTS session_state (
@@ -424,6 +423,85 @@ def _migrate(conn):
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_usess_user ON user_sessions(user_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_usess_expires ON user_sessions(expires_at)")
+
+    # ── Mercato: Agent Transfer Market ──
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS project_wallets (
+            project_id TEXT PRIMARY KEY,
+            balance INTEGER DEFAULT 5000,
+            total_earned INTEGER DEFAULT 0,
+            total_spent INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_assignments (
+            agent_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            assignment_type TEXT DEFAULT 'owned',
+            loan_expires_at TIMESTAMP,
+            loan_from_project TEXT
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_aa_project ON agent_assignments(project_id)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mercato_listings (
+            id TEXT PRIMARY KEY,
+            agent_id TEXT NOT NULL,
+            seller_project TEXT NOT NULL,
+            listing_type TEXT DEFAULT 'transfer',
+            asking_price INTEGER NOT NULL,
+            loan_weeks INTEGER,
+            buyout_clause INTEGER,
+            status TEXT DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_ml_status ON mercato_listings(status)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mercato_transfers (
+            id TEXT PRIMARY KEY,
+            listing_id TEXT,
+            agent_id TEXT NOT NULL,
+            from_project TEXT NOT NULL,
+            to_project TEXT NOT NULL,
+            transfer_type TEXT NOT NULL,
+            price INTEGER NOT NULL,
+            completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_mt_agent ON mercato_transfers(agent_id)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS token_transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT NOT NULL,
+            amount INTEGER NOT NULL,
+            reason TEXT NOT NULL,
+            reference_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_tt_project ON token_transactions(project_id)")
+
+    # ── LLM Usage tracking ──
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS llm_usage (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider TEXT NOT NULL,
+            model TEXT NOT NULL,
+            tokens_in INTEGER DEFAULT 0,
+            tokens_out INTEGER DEFAULT 0,
+            cost_estimate REAL DEFAULT 0,
+            project_id TEXT,
+            agent_id TEXT,
+            session_id TEXT,
+            ts TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_llm_usage_ts ON llm_usage(ts)")
 
 
 def _migrate_pg(conn):

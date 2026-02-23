@@ -245,6 +245,8 @@ class DORAMetrics:
                 "total_tokens": total_tokens,
                 "by_model": by_model,
             }
+        except Exception:
+            return {"total_cost_usd": 0, "total_calls": 0, "total_tokens": 0, "by_model": []}
         finally:
             db.close()
 

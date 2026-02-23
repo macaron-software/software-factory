@@ -31,6 +31,19 @@ async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 
+@router.get("/onboarding", response_class=HTMLResponse)
+async def onboarding_page(request: Request):
+    """SAFe onboarding wizard — choose perspective + project."""
+    from ...projects.manager import get_project_store
+
+    projects = get_project_store().list_all()
+    templates = _templates(request)
+    return templates.TemplateResponse(
+        "onboarding.html",
+        {"request": request, "projects": projects, "page_title": "Onboarding"},
+    )
+
+
 @router.get("/setup", response_class=HTMLResponse)
 async def setup_page(request: Request):
     """First-time setup wizard."""
@@ -38,6 +51,7 @@ async def setup_page(request: Request):
 
     if not is_setup_needed():
         from starlette.responses import RedirectResponse
+
         return RedirectResponse(url="/login", status_code=302)
     templates = _templates(request)
     return templates.TemplateResponse("setup.html", {"request": request})
@@ -47,8 +61,18 @@ async def setup_page(request: Request):
 
 
 @router.get("/", response_class=HTMLResponse)
+async def home_page(request: Request):
+    """Adaptive dashboard — content varies by SAFe perspective."""
+    perspective = getattr(request.state, "perspective", "admin")
+    return _templates(request).TemplateResponse(
+        "dashboard.html",
+        {"request": request, "page_title": "Dashboard"},
+    )
+
+
+@router.get("/portfolio", response_class=HTMLResponse)
 async def portfolio_page(request: Request):
-    """Portfolio dashboard — tour de contrôle DSI."""
+    """Portfolio dashboard — tour de contrôle DSI (legacy view)."""
     from ...agents.store import get_agent_store
     from ...missions.store import get_mission_run_store, get_mission_store
     from ...projects.manager import get_project_store
@@ -656,6 +680,35 @@ async def settings_page(request: Request):
             "providers": list_providers(),
             "integrations": integrations,
         },
+    )
+
+
+# ── Admin Users ──────────────────────────────────────────────────
+
+
+@router.get("/admin/users", response_class=HTMLResponse)
+async def admin_users_page(request: Request):
+    """Admin page for user management (CRUD)."""
+    from ...auth import service as auth_svc
+
+    users = auth_svc.list_users()
+    user_list = [
+        {
+            "id": u.id,
+            "email": u.email,
+            "display_name": u.display_name,
+            "role": u.role,
+            "avatar": u.avatar,
+            "is_active": u.is_active,
+            "auth_provider": u.auth_provider,
+            "last_login": u.last_login,
+            "created_at": u.created_at,
+        }
+        for u in users
+    ]
+    return _templates(request).TemplateResponse(
+        "admin_users.html",
+        {"request": request, "page_title": "Users", "users": user_list},
     )
 
 

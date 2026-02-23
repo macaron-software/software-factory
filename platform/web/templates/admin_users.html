@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary" onclick="showCreateModal()">
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> New user
+</button>
+{% endblock %}
+
+{% block content %}
+<style>
+.users-table{width:100%;border-collapse:collapse;font-size:0.82rem}
+.users-table th{text-align:left;padding:0.6rem 0.8rem;color:var(--text-secondary);font-weight:600;font-size:0.72rem;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)}
+.users-table td{padding:0.7rem 0.8rem;border-bottom:1px solid var(--border);color:var(--text-primary);vertical-align:middle}
+.users-table tr:hover td{background:var(--bg-secondary)}
+.user-name{font-weight:600}
+.user-email{color:var(--text-secondary);font-size:0.78rem}
+.role-badge{display:inline-block;padding:0.15rem 0.5rem;border-radius:10px;font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.role-admin{background:rgba(239,68,68,.15);color:#ef4444}
+.role-project_manager{background:rgba(168,85,247,.15);color:#a855f7}
+.role-developer{background:rgba(59,130,246,.15);color:#3b82f6}
+.role-viewer{background:rgba(107,114,128,.15);color:#6b7280}
+.provider-badge{display:inline-flex;align-items:center;gap:0.3rem;padding:0.15rem 0.5rem;border-radius:10px;font-size:0.72rem;background:var(--bg-tertiary);color:var(--text-secondary)}
+.user-actions{display:flex;gap:0.3rem}
+.user-actions button{background:none;border:1px solid var(--border);border-radius:6px;padding:0.3rem 0.5rem;cursor:pointer;color:var(--text-secondary);font-size:0.75rem}
+.user-actions button:hover{border-color:var(--purple);color:var(--purple)}
+.user-actions button.danger:hover{border-color:#ef4444;color:#ef4444}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal-box{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:440px}
+.modal-box h3{margin:0 0 1rem;font-size:1rem;color:var(--text-primary)}
+.modal-field{margin-bottom:0.8rem}
+.modal-field label{display:block;font-size:0.75rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.25rem;text-transform:uppercase;letter-spacing:.3px}
+.modal-field input,.modal-field select{width:100%;padding:0.5rem 0.7rem;font-size:0.82rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:inherit;outline:none;box-sizing:border-box}
+.modal-field input:focus,.modal-field select:focus{border-color:var(--purple)}
+.modal-actions{display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1.2rem}
+.modal-actions button{padding:0.5rem 1rem;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer;border:none;font-family:inherit}
+.modal-actions .btn-cancel{background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)}
+.modal-actions .btn-save{background:var(--purple);color:#fff}
+.modal-actions .btn-delete{background:#ef4444;color:#fff}
+.empty-state{text-align:center;padding:3rem;color:var(--text-secondary)}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:0.3rem}
+.status-dot.active{background:#22c55e}
+.status-dot.inactive{background:#6b7280}
+.user-meta{font-size:0.72rem;color:var(--text-secondary)}
+</style>
+
+<table class="users-table">
+    <thead>
+        <tr>
+            <th>User</th>
+            <th>Role</th>
+            <th>Provider</th>
+            <th>Status</th>
+            <th>Last login</th>
+            <th style="width:120px">Actions</th>
+        </tr>
+    </thead>
+    <tbody id="usersBody">
+        {% for u in users %}
+        <tr data-uid="{{ u.id }}">
+            <td>
+                <div class="user-name">{{ u.display_name or u.email }}</div>
+                <div class="user-email">{{ u.email }}</div>
+            </td>
+            <td><span class="role-badge role-{{ u.role }}">{{ u.role }}</span></td>
+            <td><span class="provider-badge">{{ u.auth_provider or 'local' }}</span></td>
+            <td><span class="status-dot {{ 'active' if u.is_active else 'inactive' }}"></span>{{ 'Active' if u.is_active else 'Inactive' }}</td>
+            <td class="user-meta">{{ u.last_login[:16] if u.last_login else '—' }}</td>
+            <td>
+                <div class="user-actions">
+                    <button onclick="editUser('{{ u.id }}','{{ u.display_name }}','{{ u.email }}','{{ u.role }}')">Edit</button>
+                    <button class="danger" onclick="deleteUser('{{ u.id }}','{{ u.display_name }}')">Delete</button>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+        {% if not users %}
+        <tr><td colspan="6" class="empty-state">No users yet</td></tr>
+        {% endif %}
+    </tbody>
+</table>
+
+<!-- Create / Edit Modal -->
+<div class="modal-overlay" id="userModal">
+    <div class="modal-box">
+        <h3 id="modalTitle">New user</h3>
+        <input type="hidden" id="modalUserId">
+        <div class="modal-field">
+            <label for="modalName">Display name</label>
+            <input id="modalName" type="text" placeholder="Jane Doe">
+        </div>
+        <div class="modal-field">
+            <label for="modalEmail">Email</label>
+            <input id="modalEmail" type="email" placeholder="jane@example.com">
+        </div>
+        <div class="modal-field" id="passwordField">
+            <label for="modalPassword">Password</label>
+            <input id="modalPassword" type="password" placeholder="Min 8 characters">
+        </div>
+        <div class="modal-field">
+            <label for="modalRole">Role</label>
+            <select id="modalRole">
+                <option value="viewer">Viewer</option>
+                <option value="developer">Developer</option>
+                <option value="project_manager">Project Manager</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+            <button class="btn-save" onclick="saveUser()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal-box">
+        <h3>Delete user</h3>
+        <p style="color:var(--text-secondary);font-size:0.85rem">Are you sure you want to delete <strong id="deleteUserName"></strong>? This cannot be undone.</p>
+        <input type="hidden" id="deleteUserId">
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+            <button class="btn-delete" onclick="confirmDelete()">Delete</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function showCreateModal() {
+    document.getElementById('modalTitle').textContent = 'New user';
+    document.getElementById('modalUserId').value = '';
+    document.getElementById('modalName').value = '';
+    document.getElementById('modalEmail').value = '';
+    document.getElementById('modalPassword').value = '';
+    document.getElementById('modalRole').value = 'developer';
+    document.getElementById('passwordField').style.display = '';
+    document.getElementById('modalEmail').disabled = false;
+    document.getElementById('userModal').classList.add('show');
+}
+
+function editUser(id, name, email, role) {
+    document.getElementById('modalTitle').textContent = 'Edit user';
+    document.getElementById('modalUserId').value = id;
+    document.getElementById('modalName').value = name;
+    document.getElementById('modalEmail').value = email;
+    document.getElementById('modalEmail').disabled = true;
+    document.getElementById('modalRole').value = role;
+    document.getElementById('passwordField').style.display = 'none';
+    document.getElementById('userModal').classList.add('show');
+}
+
+function closeModal() { document.getElementById('userModal').classList.remove('show'); }
+
+async function saveUser() {
+    const id = document.getElementById('modalUserId').value;
+    const name = document.getElementById('modalName').value.trim();
+    const email = document.getElementById('modalEmail').value.trim();
+    const role = document.getElementById('modalRole').value;
+    const password = document.getElementById('modalPassword').value;
+
+    if (!name || !email) return alert('Name and email required');
+
+    try {
+        let resp;
+        if (id) {
+            resp = await fetch(`/api/users/${id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({display_name: name, role}),
+            });
+        } else {
+            if (!password || password.length < 8) return alert('Password must be at least 8 characters');
+            resp = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email, password, display_name: name, role}),
+            });
+        }
+        const data = await resp.json();
+        if (data.ok || data.user) {
+            location.reload();
+        } else {
+            alert(data.error || 'Failed');
+        }
+    } catch(e) { alert('Network error'); }
+}
+
+function deleteUser(id, name) {
+    document.getElementById('deleteUserId').value = id;
+    document.getElementById('deleteUserName').textContent = name;
+    document.getElementById('deleteModal').classList.add('show');
+}
+
+function closeDeleteModal() { document.getElementById('deleteModal').classList.remove('show'); }
+
+async function confirmDelete() {
+    const id = document.getElementById('deleteUserId').value;
+    try {
+        const resp = await fetch(`/api/users/${id}`, {method: 'DELETE'});
+        const data = await resp.json();
+        if (data.ok) { location.reload(); }
+        else { alert(data.error || 'Failed'); }
+    } catch(e) { alert('Network error'); }
+}
+
+// Close modals on overlay click
+document.getElementById('userModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+document.getElementById('deleteModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeDeleteModal(); });
+</script>
+{% endblock %}

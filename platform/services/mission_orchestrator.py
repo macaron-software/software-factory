@@ -88,11 +88,17 @@ class MissionOrchestrator:
         agent_store = self.agent_store
         session_id = self.session_id
 
-        logger.warning("ORCH START mission=%s phases=%d session=%s", mission.id, len(mission.phases), session_id)
+        logger.warning(
+            "ORCH START mission=%s phases=%d session=%s",
+            mission.id,
+            len(mission.phases),
+            session_id,
+        )
 
         # Stop any existing agent loops for this session to avoid conflicts
         try:
             from ..agents.loop import get_loop_manager
+
             mgr = get_loop_manager()
             await mgr.stop_session(session_id)
             logger.warning("ORCH stopped existing agent loops for session %s", session_id)
@@ -108,11 +114,18 @@ class MissionOrchestrator:
         reloop_errors = []
 
         # Evidence gate: acceptance criteria for dev phases
-        from ..services.evidence import get_criteria_for_workflow, run_evidence_checks, format_evidence_report
-        wf_config = wf.config if hasattr(wf, 'config') and isinstance(wf.config, dict) else {}
+        from ..services.evidence import (
+            format_evidence_report,
+            get_criteria_for_workflow,
+            run_evidence_checks,
+        )
+
+        wf_config = wf.config if hasattr(wf, "config") and isinstance(wf.config, dict) else {}
         acceptance_criteria = get_criteria_for_workflow(wf.id, wf_config, workspace=workspace)
         if acceptance_criteria:
-            logger.warning("ORCH evidence gate: %d criteria for %s", len(acceptance_criteria), wf.id)
+            logger.warning(
+                "ORCH evidence gate: %d criteria for %s", len(acceptance_criteria), wf.id
+            )
 
         i = 0
         while i < len(mission.phases):
@@ -247,7 +260,12 @@ class MissionOrchestrator:
             phase.agent_count = len(aids)
             mission.current_phase = phase.phase_id
             run_store.update(mission)
-            logger.warning("ORCH phase=%s status=RUNNING agents=%s pattern=%s", phase.phase_id, aids, pattern_type)
+            logger.warning(
+                "ORCH phase=%s status=RUNNING agents=%s pattern=%s",
+                phase.phase_id,
+                aids,
+                pattern_type,
+            )
 
             await self._push_sse(
                 session_id,
@@ -295,14 +313,36 @@ class MissionOrchestrator:
             phase_task += f"\nMISSION_ID: {mission.id}"
 
             # Sprint loop
-            phase_key_check = wf_phase.name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
-            is_dev_phase = "sprint" in phase_key_check or "dev" in phase_key_check or "features" in phase_key_check or "test" in phase_key_check
-            is_retryable = is_dev_phase or "cicd" in phase_key_check or "qa" in phase_key_check or "architecture" in phase_key_check or "setup" in phase_key_check
+            phase_key_check = (
+                wf_phase.name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
+            )
+            is_dev_phase = (
+                "sprint" in phase_key_check
+                or "dev" in phase_key_check
+                or "features" in phase_key_check
+                or "test" in phase_key_check
+            )
+            is_retryable = (
+                is_dev_phase
+                or "cicd" in phase_key_check
+                or "qa" in phase_key_check
+                or "architecture" in phase_key_check
+                or "setup" in phase_key_check
+            )
             # Evidence gate only for TDD sprints (not E2E/QA which can't run tests)
             is_evidence_gated = "sprint" in phase_key_check and "e2e" not in phase_key_check
-            max_sprints = wf_phase.config.get("max_iterations", 5 if is_evidence_gated else 2) if is_dev_phase else 1
+            max_sprints = (
+                wf_phase.config.get("max_iterations", 5 if is_evidence_gated else 2)
+                if is_dev_phase
+                else 1
+            )
             if is_dev_phase:
-                logger.warning("ORCH phase=%s max_sprints=%d (from config=%s)", phase.phase_id, max_sprints, wf_phase.config.get("max_iterations"))
+                logger.warning(
+                    "ORCH phase=%s max_sprints=%d (from config=%s)",
+                    phase.phase_id,
+                    max_sprints,
+                    wf_phase.config.get("max_iterations"),
+                )
 
             phase_success = False
             phase_error = ""
@@ -330,7 +370,12 @@ class MissionOrchestrator:
                         )
                         sprint = _ms.create_sprint(sprint)
                         current_sprint_id = sprint.id
-                        logger.warning("ORCH Sprint created: %s (num=%d, mission=%s)", sprint.id, sprint_num, mission.id)
+                        logger.warning(
+                            "ORCH Sprint created: %s (num=%d, mission=%s)",
+                            sprint.id,
+                            sprint_num,
+                            mission.id,
+                        )
                     except Exception as e:
                         logger.warning("Sprint creation failed: %s", e)
 
@@ -591,16 +636,17 @@ class MissionOrchestrator:
                         prev_context += f"\n- REJET itération {sprint_num}: {phase_error[:500]}"
                         phase_error = ""
                         continue
-                    else:
-                        # Max sprints exhausted — continue pipeline with issues (don't block)
-                        await self._sse_orch_msg(
-                            f"Max iterations atteint ({max_sprints}) — poursuite avec avertissement.",
-                            phase.phase_id,
-                        )
-                        logger.warning("Phase %s max sprints exhausted — continuing with issues", phase.phase_id)
-                        phase_success = True
-                        phase_error = f"Max sprints exhausted ({max_sprints}): {phase_error[:200]}"
-                        break
+                    # Max sprints exhausted — continue pipeline with issues (don't block)
+                    await self._sse_orch_msg(
+                        f"Max iterations atteint ({max_sprints}) — poursuite avec avertissement.",
+                        phase.phase_id,
+                    )
+                    logger.warning(
+                        "Phase %s max sprints exhausted — continuing with issues", phase.phase_id
+                    )
+                    phase_success = True
+                    phase_error = f"Max sprints exhausted ({max_sprints}): {phase_error[:200]}"
+                    break
 
                 # ── Evidence Gate: check acceptance criteria after dev sprints ──
                 if is_evidence_gated and acceptance_criteria and workspace:
@@ -648,25 +694,32 @@ class MissionOrchestrator:
                             total_count,
                         )
                         break  # All criteria met, exit sprint loop
-                    else:
-                        if sprint_num < max_sprints:
-                            await self._sse_orch_msg(
-                                f"Evidence Gate FAILED ({passed_count}/{total_count}) — critères manquants, relance sprint…",
-                                phase.phase_id,
-                            )
-                            logger.warning("Evidence gate FAILED for %s sprint %d (%d/%d), looping", phase.phase_id, sprint_num, passed_count, total_count)
-                            # Inject evidence feedback into next sprint prompt
-                            prev_context += f"\n\n{evidence_report}"
-                            continue  # Loop to next sprint
-                        else:
-                            await self._sse_orch_msg(
-                                f"Evidence Gate FAILED ({passed_count}/{total_count}) — max sprints atteint, poursuite avec avertissement.\n{evidence_report}",
-                                phase.phase_id,
-                            )
-                            logger.warning("Evidence gate FAILED for %s, max sprints exhausted — continuing with issues", phase.phase_id)
-                            phase_success = True  # Continue pipeline despite evidence gap
-                            phase_error = f"Evidence gate: {passed_count}/{total_count} criteria met"
-                            break
+                    if sprint_num < max_sprints:
+                        await self._sse_orch_msg(
+                            f"Evidence Gate FAILED ({passed_count}/{total_count}) — critères manquants, relance sprint…",
+                            phase.phase_id,
+                        )
+                        logger.warning(
+                            "Evidence gate FAILED for %s sprint %d (%d/%d), looping",
+                            phase.phase_id,
+                            sprint_num,
+                            passed_count,
+                            total_count,
+                        )
+                        # Inject evidence feedback into next sprint prompt
+                        prev_context += f"\n\n{evidence_report}"
+                        continue  # Loop to next sprint
+                    await self._sse_orch_msg(
+                        f"Evidence Gate FAILED ({passed_count}/{total_count}) — max sprints atteint, poursuite avec avertissement.\n{evidence_report}",
+                        phase.phase_id,
+                    )
+                    logger.warning(
+                        "Evidence gate FAILED for %s, max sprints exhausted — continuing with issues",
+                        phase.phase_id,
+                    )
+                    phase_success = True  # Continue pipeline despite evidence gap
+                    phase_error = f"Evidence gate: {passed_count}/{total_count} criteria met"
+                    break
 
                 if max_sprints > 1 and sprint_num < max_sprints:
                     await self._sse_orch_msg(
@@ -719,12 +772,16 @@ class MissionOrchestrator:
                     return
             else:
                 phase.status = PhaseStatus.DONE if phase_success else PhaseStatus.FAILED
-                if not phase_success and phase_error and ("Evidence gate" in phase_error or "Max sprints" in phase_error):
-                    phase.status = PhaseStatus.DONE_WITH_ISSUES
-                elif phase_success and phase_error:
+                if (
+                    not phase_success
+                    and phase_error
+                    and ("Evidence gate" in phase_error or "Max sprints" in phase_error)
+                    or phase_success
+                    and phase_error
+                ):
                     phase.status = PhaseStatus.DONE_WITH_ISSUES
 
-            phase_actually_done = (phase.status in (PhaseStatus.DONE, PhaseStatus.DONE_WITH_ISSUES))
+            phase_actually_done = phase.status in (PhaseStatus.DONE, PhaseStatus.DONE_WITH_ISSUES)
             phase_success = phase_actually_done
             logger.warning("ORCH phase=%s status=%s", phase.phase_id, phase.status.value)
 
@@ -829,8 +886,16 @@ class MissionOrchestrator:
                             (mission.id,),
                         )
                         _fdb.commit()
-                    elif phase.phase_id in ("qa-campaign", "qa-execution", "deploy-prod", "feature-deploy"):
-                        _fdb.execute("UPDATE features SET status='done' WHERE epic_id=? AND status='in_progress'", (mission.id,))
+                    elif phase.phase_id in (
+                        "qa-campaign",
+                        "qa-execution",
+                        "deploy-prod",
+                        "feature-deploy",
+                    ):
+                        _fdb.execute(
+                            "UPDATE features SET status='done' WHERE epic_id=? AND status='in_progress'",
+                            (mission.id,),
+                        )
                         _fdb.commit()
                     rows = _fdb.execute(
                         "SELECT name, status, priority, story_points FROM features WHERE epic_id=?",
@@ -872,7 +937,13 @@ class MissionOrchestrator:
             )
 
             # Feedback loop: activate TMA after deploy phase
-            if phase_success and phase.phase_id in ("deploy-prod", "deploy", "deploy-feature", "feature-deploy", "tma-handoff"):
+            if phase_success and phase.phase_id in (
+                "deploy-prod",
+                "deploy",
+                "deploy-feature",
+                "feature-deploy",
+                "tma-handoff",
+            ):
                 try:
                     from ..missions.feedback import on_deploy_completed
 
@@ -882,7 +953,12 @@ class MissionOrchestrator:
                     logger.warning("Feedback on_deploy_completed failed: %s", _fb_err)
 
             # Feedback: create TMA incident on deploy failure
-            if not phase_success and phase.phase_id in ("deploy-prod", "deploy", "deploy-feature", "feature-deploy"):
+            if not phase_success and phase.phase_id in (
+                "deploy-prod",
+                "deploy",
+                "deploy-feature",
+                "feature-deploy",
+            ):
                 try:
                     from ..missions.feedback import on_deploy_failed
 
@@ -1009,19 +1085,70 @@ class MissionOrchestrator:
                 async def _safe_hooks():
                     nonlocal hook_result
                     try:
-                        await asyncio.wait_for(
-                            _run_post_phase_hooks(
-                                phase.phase_id, wf_phase.name, mission, session_id, self._push_sse
-                            ), timeout=600
+                        hook_result = (
+                            await asyncio.wait_for(
+                                _run_post_phase_hooks(
+                                    phase.phase_id,
+                                    wf_phase.name,
+                                    mission,
+                                    session_id,
+                                    self._push_sse,
+                                ),
+                                timeout=600,
+                            )
+                            or hook_result
                         )
                     except Exception as hook_err:
-                        logger.warning("Post-phase hooks timeout/error for %s: %s", phase.phase_id, hook_err)
+                        logger.warning(
+                            "Post-phase hooks timeout/error for %s: %s", phase.phase_id, hook_err
+                        )
+
                 await _safe_hooks()  # AWAIT — don't fire-and-forget
+
+                # Create incidents for build/test/deploy failures in hooks
+                if (
+                    not hook_result.get("build_ok", True)
+                    or not hook_result.get("test_ok", True)
+                    or not hook_result.get("deploy_ok", True)
+                ):
+                    from ..missions.feedback import create_platform_incident
+
+                    failures = []
+                    if not hook_result.get("build_ok"):
+                        failures.append("build")
+                    if not hook_result.get("test_ok"):
+                        failures.append("tests")
+                    if not hook_result.get("deploy_ok"):
+                        failures.append("deploy")
+                    create_platform_incident(
+                        title=f"Pipeline {', '.join(failures)} failed — {wf_phase.name}",
+                        severity="P3",
+                        source="pipeline_hooks",
+                        error_type=f"{'_'.join(failures)}_failure",
+                        error_detail=f"Phase: {wf_phase.name}, Mission: {mission.id}",
+                        mission_id=mission.id,
+                    )
 
             # Error Reloop
             if not phase_success and reloop_count < MAX_RELOOPS:
                 phase_key_rl = phase.phase_id.lower() if phase.phase_id else ""
-                is_reloopable = any(k in phase_key_rl for k in ("qa", "deploy", "tma", "sprint", "dev", "cicd", "ci-cd", "pipeline", "adversarial", "review", "e2e", "test"))
+                is_reloopable = any(
+                    k in phase_key_rl
+                    for k in (
+                        "qa",
+                        "deploy",
+                        "tma",
+                        "sprint",
+                        "dev",
+                        "cicd",
+                        "ci-cd",
+                        "pipeline",
+                        "adversarial",
+                        "review",
+                        "e2e",
+                        "test",
+                    )
+                )
                 if is_reloopable:
                     reloop_count += 1
                     reloop_errors.append(
