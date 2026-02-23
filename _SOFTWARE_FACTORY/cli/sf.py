@@ -690,6 +690,48 @@ def cmd_runs_stop(args):
     stop_run(args.run_id)
 
 
+# ── Workflows ──
+
+
+def cmd_workflows_list(args):
+    b = get_backend(args)
+    workflows = b.workflows_list()
+    if getattr(args, "json_output", False):
+        out.out_json(workflows)
+    elif workflows:
+        cols = ["id", "name", "pattern_type"]
+        rows = [{c: w.get(c, "") for c in cols} for w in workflows]
+        print(out.table(rows, cols))
+    else:
+        print(out.dim("No workflows"))
+
+
+def cmd_workflows_show(args):
+    b = get_backend(args)
+    output(args, b.workflow_show(args.id))
+
+
+# ── Patterns ──
+
+
+def cmd_patterns_list(args):
+    b = get_backend(args)
+    patterns = b.patterns_list()
+    if getattr(args, "json_output", False):
+        out.out_json(patterns)
+    elif patterns:
+        cols = ["id", "name", "description"]
+        rows = [{c: p.get(c, "") for c in cols} for p in patterns]
+        print(out.table(rows, cols))
+    else:
+        print(out.dim("No patterns"))
+
+
+def cmd_patterns_show(args):
+    b = get_backend(args)
+    output(args, b.pattern_show(args.id))
+
+
 # ── Argument parser ──
 
 
@@ -1003,6 +1045,26 @@ def build_parser() -> argparse.ArgumentParser:
     mg.add_argument("--set-key")
     mg.add_argument("--set-value")
     mg.set_defaults(func=cmd_memory_global)
+
+    # ── workflows ──
+    wf = sub.add_parser("workflows", help="Workflow management")
+    wf_sub = wf.add_subparsers(dest="subcmd")
+
+    wf_sub.add_parser("list", help="List workflows").set_defaults(func=cmd_workflows_list)
+
+    wfs = wf_sub.add_parser("show", help="Show workflow")
+    wfs.add_argument("id")
+    wfs.set_defaults(func=cmd_workflows_show)
+
+    # ── patterns ──
+    pat = sub.add_parser("patterns", help="Pattern management")
+    pat_sub = pat.add_subparsers(dest="subcmd")
+
+    pat_sub.add_parser("list", help="List patterns").set_defaults(func=cmd_patterns_list)
+
+    pts = pat_sub.add_parser("show", help="Show pattern")
+    pts.add_argument("id")
+    pts.set_defaults(func=cmd_patterns_show)
 
     # ── chaos ──
     cha = sub.add_parser("chaos", help="Chaos testing")
