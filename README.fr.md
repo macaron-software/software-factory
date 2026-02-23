@@ -44,17 +44,43 @@ Imaginez une **usine logicielle virtuelle** où 158 agents IA collaborent à tra
 
 <table>
 <tr>
-<td width="33%">
-<strong>Dashboard — Streaming SSE Temps Réel</strong><br>
+<td width="50%">
+<strong>Dashboard — Perspective SAFe Adaptative</strong><br>
 <img src="docs/screenshots/fr/dashboard.png" alt="Dashboard" width="100%">
 </td>
-<td width="33%">
-<strong>API Swagger — 94 Endpoints REST</strong><br>
-<img src="docs/screenshots/fr/swagger.png" alt="API Swagger" width="100%">
+<td width="50%">
+<strong>Portfolio — Backlog Stratégique & WSJF</strong><br>
+<img src="docs/screenshots/fr/portfolio.png" alt="Portfolio" width="100%">
 </td>
-<td width="33%">
-<strong>CLI — 40+ Commandes</strong><br>
-<img src="docs/screenshots/fr/cli.png" alt="CLI" width="100%">
+</tr>
+<tr>
+<td width="50%">
+<strong>PI Board — Planification Program Increment</strong><br>
+<img src="docs/screenshots/fr/pi_board.png" alt="PI Board" width="100%">
+</td>
+<td width="50%">
+<strong>Idéation — Brainstorming Multi-Agents IA</strong><br>
+<img src="docs/screenshots/fr/ideation.png" alt="Idéation" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>ART — Agile Release Trains & Équipes Agents</strong><br>
+<img src="docs/screenshots/fr/agents.png" alt="Agents" width="100%">
+</td>
+<td width="50%">
+<strong>Cérémonies — Templates Workflows & Patterns</strong><br>
+<img src="docs/screenshots/fr/ceremonies.png" alt="Cérémonies" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Monitoring — Métriques DORA & Santé Système</strong><br>
+<img src="docs/screenshots/fr/monitoring.png" alt="Monitoring" width="100%">
+</td>
+<td width="50%">
+<strong>Onboarding — Wizard Sélection Rôle SAFe</strong><br>
+<img src="docs/screenshots/fr/onboarding.png" alt="Onboarding" width="100%">
 </td>
 </tr>
 </table>
@@ -193,6 +219,66 @@ L'image Docker inclut tout le nécessaire pour que les agents travaillent en aut
 | **Deploy** | `docker_deploy`, `github_actions` | Déploiement conteneur et statut CI/CD |
 | **Mémoire** | `memory_store`, `memory_search`, `deep_search` | Mémoire projet persistante entre sessions |
 
+### 🔄 Auto-Réparation & Self-Healing (TMA)
+
+Cycle autonome de détection, triage et réparation d'incidents :
+
+- **Heartbeat monitoring** — vérification continue de la santé des missions et services
+- **Détection auto d'incidents** — HTTP 5xx, timeout, crash agent → création automatique d'incident
+- **Triage & classification** — sévérité (P0-P3), analyse d'impact, hypothèse cause racine
+- **Auto-réparation** — les agents diagnostiquent et corrigent autonomement (patches, config, restarts)
+- **Création de tickets** — incidents non résolus → tickets trackés pour revue humaine
+- **Escalade** — P0/P1 déclenche notifications Slack/Email à l'équipe d'astreinte
+- **Boucle rétrospective** — apprentissages post-incident stockés en mémoire, injectés dans les sprints futurs
+
+### 🎭 Perspectives SAFe & Onboarding
+
+Interface adaptative par rôle SAFe :
+
+- **9 perspectives SAFe** — Portfolio Manager, RTE, Product Owner, Scrum Master, Developer, Architect, QA/Security, Business Owner, Admin
+- **Dashboard adaptatif** — KPIs, actions rapides et sidebar varient selon le rôle sélectionné
+- **Wizard d'onboarding** — parcours 3 étapes (choisir rôle → choisir projet → démarrer)
+- **Sélecteur de perspective** — changer de rôle SAFe depuis la topbar
+- **Sidebar dynamique** — navigation filtrée selon la perspective courante
+
+### 🧠 Mémoire 4 Couches & RLM Deep Search
+
+Connaissance persistante inter-sessions avec recherche intelligente :
+
+- **Mémoire session** — contexte conversationnel
+- **Mémoire pattern** — apprentissages des exécutions de patterns d'orchestration
+- **Mémoire projet** — connaissances par projet (décisions, conventions, architecture)
+- **Mémoire globale** — connaissances organisationnelles cross-projets (FTS5)
+- **Fichiers projet auto-chargés** — CLAUDE.md, SPECS.md, VISION.md injectés dans chaque prompt LLM (max 8K)
+- **RLM Deep Search** — boucle itérative WRITE-EXECUTE-OBSERVE-DECIDE (jusqu'à 10 itérations)
+
+### 🛒 Mercato Agents (Marché des Transferts)
+
+Place de marché à tokens pour la composition d'équipes :
+
+- **Listings agents** — mettre des agents en vente avec prix demandé
+- **Pool agents libres** — agents non assignés disponibles au draft
+- **Transferts & prêts** — acheter, vendre ou prêter des agents entre projets
+- **Valorisation marché** — valorisation automatique basée sur skills et performance
+- **Système de wallets** — portefeuilles tokens par projet avec historique
+
+### 🛡️ Garde Qualité Adversariale
+
+Porte de qualité double couche bloquant le code fake/placeholder :
+
+- **L0 Déterministe** — détection instantanée de slop, mocks, fake builds, hallucinations, erreurs de stack
+- **L1 Sémantique LLM** — revue qualité par LLM séparé sur les sorties d'exécution
+- **Rejet forcé** — hallucinations et erreurs de stack toujours bloquées
+
+### 📝 Auto-Documentation & Wiki
+
+Génération automatique de documentation tout au long du cycle :
+
+- **Rétrospectives sprint** — notes retro générées par LLM, stockées en mémoire et injectées dans les sprints suivants
+- **Résumés de phases** — documentation automatique des décisions et résultats de chaque phase mission
+- **Sync Confluence** — synchronisation bidirectionnelle avec les pages wiki Confluence
+- **Swagger auto-docs** — 94 endpoints REST auto-documentés sur `/docs`
+
 ## Quatre Interfaces
 
 ### 1. Dashboard Web (HTMX + SSE)
@@ -297,53 +383,57 @@ python3 -m platform.mcp_platform.server
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-## Nouveautés v1.2.0 (21-22 fév 2026)
+## Nouveautés v2.1.0 (fév 2026)
 
-### CLI 'sf' - Interface Ligne de Commande Complète
-- 40+ commandes miroir de toutes les fonctionnalités du dashboard web
-- Mode dual : API (serveur live) ou DB (offline)
-- Streaming SSE avec sortie colorée par agent
-- Sortie JSON pour scripting
-- 52 tests automatisés
+### Perspectives SAFe & Onboarding
+- **9 perspectives SAFe** — dashboard, sidebar et KPIs adaptatifs par rôle
+- **Wizard d'onboarding** — parcours 3 étapes première connexion
+- **Sélecteur de perspective** — changer de rôle SAFe depuis la topbar
 
-### Améliorations Product Management
-- 11 nouvelles capacités PM
-- Algorithmes de priorisation WSJF
-- Cartographie value stream
+### Auto-Réparation & Self-Healing
+- **Heartbeat TMA** — monitoring continu avec création auto d'incidents
+- **Agents auto-réparation** — diagnostic et correction autonomes
+- **Escalade tickets** — incidents non résolus créent des tickets avec notifications
 
-### Durcissement Sécurité
-- AuthMiddleware activé par défaut
-- Headers CSP renforcés
-- Masquage secrets dans logs et réponses API
-- Rate limiting par utilisateur
+### Mémoire 4 Couches & RLM
+- **Connaissance persistante** — mémoire session, pattern, projet et globale avec FTS5
+- **RLM deep search** — boucle d'exploration récursive (jusqu'à 10 itérations)
+- **Contexte projet auto-chargé** — CLAUDE.md, SPECS.md, VISION.md injectés dans chaque prompt agent
 
-### Tests & Qualité
-- Suite de tests d'endurance
-- Tests chaos engineering
-- Tests E2E Playwright sur toutes les pages
-- Validation installation Debian 13
+### Garde Qualité Adversariale
+- **L0 déterministe** — détection instantanée de slop, mocks, fake builds, hallucinations
+- **L1 sémantique** — revue qualité LLM sur les sorties d'exécution
+- **Rejet forcé** — hallucinations et erreurs de stack toujours bloquées
 
-#### Lancer les tests E2E (Playwright)
+### Mercato Agents
+- **Place de marché à tokens** avec listings, transferts, prêts et draft d'agents libres
+- **Valorisation marché** — pricing automatique basé sur skills et performance
+- **Système wallets** — économie tokens par projet avec historique
 
-```bash
-cd platform/tests/e2e
-npm install
-npx playwright install --with-deps chromium
-npm test
-```
+### Auth & Sécurité
+- **Auth JWT** avec login/register/refresh/logout
+- **RBAC** — admin, project_manager, developer, viewer
+- **OAuth** — GitHub et Azure AD SSO
+- **Mode démo** — bouton "Skip" pour accès instantané
 
-### DevOps & Monitoring
-- Intégration webhooks GitHub
-- Chart Helm pour Kubernetes
-- Endpoint métriques Prometheus
-- Dashboards Grafana
-- Automatisation pipeline CD
+### Auto-Documentation
+- **Rétrospectives sprint** — notes retro LLM avec boucle d'apprentissage
+- **Résumés de phases** — documentation auto des résultats de missions
+- **Sync Confluence** — intégration wiki bidirectionnelle
 
-### Améliorations UI
-- Notifications temps réel
-- Visualisations analytics Chart.js
-- Design responsive mobile
-- Stabilité streaming SSE améliorée
+### Fournisseurs LLM
+- **Multi-provider** avec fallback automatique
+- MiniMax M2.5, Azure OpenAI GPT-5-mini, Azure AI Foundry, NVIDIA NIM
+- **Mode démo** pour exploration UI sans clés API
+
+### Améliorations Plateforme
+- Dashboard métriques DORA avec suivi coûts LLM
+- Sync bidirectionnelle Jira
+- Suite E2E Playwright (82 tests)
+- Internationalisation (EN/FR)
+- Notifications temps réel (Slack, Email, Webhook)
+- Pipeline Design System dans les workflows
+- Visualisation 3D Agent World
 
 ## Contribuer
 

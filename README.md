@@ -45,18 +45,18 @@ Think of it as a **virtual software factory** where 158 AI agents collaborate th
 <table>
 <tr>
 <td width="50%">
-<strong>Portfolio — Strategic Committee & Governance</strong><br>
-<img src="docs/screenshots/en/portfolio.png" alt="Portfolio Dashboard" width="100%">
+<strong>Dashboard — Adaptive SAFe Perspective</strong><br>
+<img src="docs/screenshots/en/dashboard.png" alt="Dashboard" width="100%">
 </td>
 <td width="50%">
-<strong>PI Board — Program Increment Planning</strong><br>
-<img src="docs/screenshots/en/pi_board.png" alt="PI Board" width="100%">
+<strong>Portfolio — Strategic Backlog & WSJF</strong><br>
+<img src="docs/screenshots/en/portfolio.png" alt="Portfolio Dashboard" width="100%">
 </td>
 </tr>
 <tr>
 <td width="50%">
-<strong>Agents — 158 Specialized AI Agents</strong><br>
-<img src="docs/screenshots/en/agents.png" alt="Agent Teams" width="100%">
+<strong>PI Board — Program Increment Planning</strong><br>
+<img src="docs/screenshots/en/pi_board.png" alt="PI Board" width="100%">
 </td>
 <td width="50%">
 <strong>Ideation Workshop — AI-Powered Brainstorming</strong><br>
@@ -65,22 +65,22 @@ Think of it as a **virtual software factory** where 158 AI agents collaborate th
 </tr>
 <tr>
 <td width="50%">
-<strong>Mission Control — Real-Time Execution Monitoring</strong><br>
-<img src="docs/screenshots/en/mission_control.png" alt="Mission Control" width="100%">
+<strong>ART — Agile Release Trains & Agent Teams</strong><br>
+<img src="docs/screenshots/en/agents.png" alt="Agent Teams" width="100%">
 </td>
 <td width="50%">
-<strong>Monitoring — System Health & Metrics</strong><br>
-<img src="docs/screenshots/en/monitoring.png" alt="Monitoring" width="100%">
+<strong>Ceremonies — Workflow Templates & Patterns</strong><br>
+<img src="docs/screenshots/en/ceremonies.png" alt="Ceremonies" width="100%">
 </td>
 </tr>
 <tr>
 <td width="50%">
-<strong>Swagger API — 94 REST Endpoints</strong><br>
-<img src="docs/screenshots/en/swagger.png" alt="Swagger API" width="100%">
+<strong>Monitoring — DORA Metrics & System Health</strong><br>
+<img src="docs/screenshots/en/monitoring.png" alt="Monitoring" width="100%">
 </td>
 <td width="50%">
-<strong>CLI — 40+ Commands</strong><br>
-<img src="docs/screenshots/en/cli.png" alt="CLI" width="100%">
+<strong>Onboarding — SAFe Role Selection Wizard</strong><br>
+<img src="docs/screenshots/en/onboarding.png" alt="Onboarding" width="100%">
 </td>
 </tr>
 </table>
@@ -219,6 +219,70 @@ The Docker image includes everything agents need to work autonomously:
 | **Tickets** | `create_ticket`, `jira_search`, `jira_create` | Create incidents/tickets for TMA tracking |
 | **Deploy** | `docker_deploy`, `docker_status`, `github_actions` | Container deployment and CI/CD status |
 | **Memory** | `memory_store`, `memory_search`, `deep_search` | Persistent project memory across sessions |
+
+### 🔄 Auto-Heal & Self-Repair (TMA)
+
+Autonomous incident detection, triage, and self-repair cycle:
+
+- **Heartbeat monitoring** — continuous health checks on all running missions and services
+- **Incident auto-detection** — HTTP 5xx, timeout, agent crash → automatic incident creation
+- **Triage & classification** — severity (P0-P3), impact analysis, root cause hypothesis
+- **Self-repair** — agents autonomously diagnose and fix issues (code patches, config changes, restarts)
+- **Ticket creation** — unresolved incidents automatically create tracked tickets for human review
+- **Escalation** — P0/P1 incidents trigger Slack/Email notifications to on-call team
+- **Retrospective loop** — post-incident learnings stored in memory, injected into future sprints
+
+### 🎭 SAFe Perspectives & Onboarding
+
+Role-based adaptive UI that mirrors real SAFe organization:
+
+- **9 SAFe perspectives** — Portfolio Manager, RTE, Product Owner, Scrum Master, Developer, Architect, QA/Security, Business Owner, Admin
+- **Adaptive dashboard** — KPIs, quick actions, and sidebar links change per selected role
+- **Onboarding wizard** — 3-step first-time user flow (choose role → choose project → start)
+- **Perspective selector** — switch SAFe role anytime from the topbar dropdown
+- **Dynamic sidebar** — only shows navigation relevant to the current perspective
+
+### 🧠 4-Layer Memory & RLM Deep Search
+
+Persistent knowledge across sessions with intelligent retrieval:
+
+- **Session memory** — conversation context within a single session
+- **Pattern memory** — learnings from orchestration pattern execution
+- **Project memory** — per-project knowledge (decisions, conventions, architecture)
+- **Global memory** — cross-project organizational knowledge (FTS5 full-text search)
+- **Auto-loaded project files** — CLAUDE.md, SPECS.md, VISION.md, README.md injected into every LLM prompt (max 8K)
+- **RLM Deep Search** — Recursive Language Model (arXiv:2512.24601) — iterative WRITE-EXECUTE-OBSERVE-DECIDE loop with up to 10 exploration iterations
+
+### 🛒 Agent Mercato (Transfer Market)
+
+Token-based agent marketplace for team composition:
+
+- **Agent listings** — list agents for transfer with asking price
+- **Free agent pool** — unassigned agents available for drafting
+- **Transfers & loans** — buy, sell, or loan agents between projects
+- **Market valuation** — automatic agent valuation based on skills, experience, and performance
+- **Wallet system** — per-project token wallets with transaction history
+- **Draft system** — claim free agents for your project
+
+### 🛡️ Adversarial Quality Guard
+
+Two-layer quality gate that blocks fake/placeholder code from passing:
+
+- **L0 Deterministic** — instant detection of slop (lorem ipsum, TBD), mocks (NotImplementedError, TODO), fake builds, hallucinations, stack mismatches
+- **L1 LLM Semantic** — separate LLM reviews output quality for execution patterns
+- **Scoring** — score < 5 passes, 5-6 soft-pass with warning, 7+ rejected
+- **Force reject** — hallucination, slop, stack mismatch, fake builds always rejected regardless of score
+
+### 📝 Auto-Documentation & Wiki
+
+Automatic documentation generation throughout the lifecycle:
+
+- **Sprint retrospectives** — LLM-generated retro notes stored in DB and memory, injected into next sprint prompts (learning loop)
+- **Phase summaries** — each mission phase produces an LLM-generated summary of decisions and outcomes
+- **Architecture Decision Records** — architecture patterns automatically document design decisions in project memory
+- **Project context files** — auto-loaded instruction files (CLAUDE.md, SPECS.md, CONVENTIONS.md) serve as living documentation
+- **Confluence sync** — bidirectional sync with Confluence wiki pages for enterprise documentation
+- **Swagger auto-docs** — 94 REST endpoints auto-documented at `/docs` with OpenAPI schema
 
 ## Four Interfaces
 
@@ -445,7 +509,32 @@ ATLASSIAN_TOKEN=your-token
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
-## What's New in v2.0.1 (Feb 2026)
+## What's New in v2.1.0 (Feb 2026)
+
+### SAFe Perspectives & Onboarding
+- **9 SAFe role perspectives** — adaptive dashboard, sidebar, and KPIs per role
+- **Onboarding wizard** — 3-step first-time user flow with role and project selection
+- **Perspective selector** — switch SAFe role from topbar at any time
+
+### Auto-Heal & Self-Repair
+- **TMA heartbeat** — continuous health monitoring with auto-incident creation
+- **Self-repair agents** — autonomous diagnosis and fix for common failures
+- **Ticket escalation** — unresolved incidents create tracked tickets with notifications
+
+### 4-Layer Memory & RLM
+- **Persistent knowledge** — session, pattern, project, and global memory layers with FTS5
+- **RLM deep search** — recursive exploration loop (up to 10 iterations) for complex codebase analysis
+- **Auto-loaded project context** — CLAUDE.md, SPECS.md, VISION.md injected into every agent prompt
+
+### Adversarial Quality Guard
+- **L0 deterministic** — instant detection of slop, mocks, fake builds, hallucinations
+- **L1 semantic** — LLM-based quality review for execution outputs
+- **Force reject** — hallucination and stack mismatch always blocked
+
+### Agent Mercato
+- **Token-based marketplace** with agent listings, transfers, loans, and free agent draft
+- **Market valuation** — automatic agent pricing based on skills and performance
+- **Wallet system** — per-project token economy with transaction history
 
 ### Authentication & Security
 - **JWT-based auth** with login/register/refresh/logout
@@ -454,15 +543,10 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - **Admin panel** — user management UI (`/admin/users`)
 - **Demo mode** — one-click "Skip" button for instant access
 
-### Agent Mercato
-- **Agent marketplace** with token-based economy
-- **Agent listings, transfers, bidding** between projects
-- **Wallet system** with transaction history
-
-### 3D Agent World
-- **Immersive 3D visualization** of all agents (`/world`)
-- Post-processing (bloom, SMAA), HD agent models, environment details
-- Day/night cycle synchronized with theme
+### Auto-Documentation
+- **Sprint retrospectives** — LLM-generated retro notes with learning loop
+- **Phase summaries** — automatic documentation of mission phase outcomes
+- **Confluence sync** — bidirectional wiki integration
 
 ### LLM Providers
 - **Multi-provider** with automatic fallback chain
@@ -475,6 +559,8 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - Playwright E2E test suite (82 tests)
 - Internationalization (EN/FR)
 - Real-time notifications (Slack, Email, Webhook)
+- Design System pipeline in workflows (UX → dev → review)
+- 3D Agent World visualization
 
 ## Contributing
 
