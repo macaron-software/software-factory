@@ -1,4 +1,5 @@
 """CLI output formatting — tables, colors, JSON mode."""
+
 import json
 import os
 import sys
@@ -29,14 +30,36 @@ def c(text: str, code: str) -> str:
     return f"{code}{text}{_RESET}"
 
 
-def bold(t: str) -> str: return c(t, _BOLD)
-def dim(t: str) -> str: return c(t, _DIM)
-def red(t: str) -> str: return c(t, _RED)
-def green(t: str) -> str: return c(t, _GREEN)
-def yellow(t: str) -> str: return c(t, _YELLOW)
-def blue(t: str) -> str: return c(t, _BLUE)
-def magenta(t: str) -> str: return c(t, _MAGENTA)
-def cyan(t: str) -> str: return c(t, _CYAN)
+def bold(t: str) -> str:
+    return c(t, _BOLD)
+
+
+def dim(t: str) -> str:
+    return c(t, _DIM)
+
+
+def red(t: str) -> str:
+    return c(t, _RED)
+
+
+def green(t: str) -> str:
+    return c(t, _GREEN)
+
+
+def yellow(t: str) -> str:
+    return c(t, _YELLOW)
+
+
+def blue(t: str) -> str:
+    return c(t, _BLUE)
+
+
+def magenta(t: str) -> str:
+    return c(t, _MAGENTA)
+
+
+def cyan(t: str) -> str:
+    return c(t, _CYAN)
 
 
 def agent_color(agent_name: str) -> str:
@@ -104,7 +127,7 @@ def table(rows: list[dict], columns: list[str] | None = None, max_width: int = 0
             raw = _strip_ansi(val)
             pad = widths[col] - len(raw)
             if pad < 0:
-                val = raw[:widths[col]-1] + "…"
+                val = raw[: widths[col] - 1] + "…"
                 pad = 0
             parts.append(val + " " * pad)
         lines.append("  ".join(parts))
@@ -132,15 +155,15 @@ def out_json(data: Any) -> None:
 
 
 def info(msg: str) -> None:
-    print(f"{green('✓')} {msg}", file=sys.stderr)
+    print(f"{green('[+]')} {msg}", file=sys.stderr)
 
 
 def warn(msg: str) -> None:
-    print(f"{yellow('⚠')} {msg}", file=sys.stderr)
+    print(f"{yellow('[!]')} {msg}", file=sys.stderr)
 
 
 def error(msg: str) -> None:
-    print(f"{red('✗')} {msg}", file=sys.stderr)
+    print(f"{red('[x]')} {msg}", file=sys.stderr)
 
 
 def _term_width() -> int:
@@ -152,10 +175,12 @@ def _term_width() -> int:
 
 def _strip_ansi(s: str) -> str:
     import re
-    return re.sub(r'\033\[[0-9;]*m', '', s)
+
+    return re.sub(r"\033\[[0-9;]*m", "", s)
 
 
 # ── Markdown rendering for streamed content ──
+
 
 def render_md(text: str) -> str:
     """Render markdown text for terminal: tables, headers, bold, lists."""
@@ -180,11 +205,10 @@ def _render_md_table(lines: list[str]) -> str:
     """Render a markdown table with aligned columns and box drawing."""
     # Parse cells
     rows = []
-    sep_idx = -1
-    for idx, line in enumerate(lines):
+    for line in lines:
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         if cells and all(c.replace("-", "").replace(":", "") == "" for c in cells):
-            sep_idx = idx
+            # Skip separator line
             continue
         rows.append(cells)
     if not rows:
@@ -235,13 +259,13 @@ def _render_md_table(lines: list[str]) -> str:
 def _render_md_inline(text: str) -> str:
     """Render inline markdown: **bold**, `code`, *italic*."""
     import re
+
     # Bold **text**
-    text = re.sub(r'\*\*(.+?)\*\*', lambda m: bold(m.group(1)), text)
+    text = re.sub(r"\*\*(.+?)\*\*", lambda m: bold(m.group(1)), text)
     # Code `text`
-    text = re.sub(r'`([^`]+)`', lambda m: c(m.group(1), _CYAN), text)
+    text = re.sub(r"`([^`]+)`", lambda m: c(m.group(1), _CYAN), text)
     # Italic *text* (but not inside bold)
-    text = re.sub(r'(?<!\*)\*([^*]+)\*(?!\*)', lambda m: c(m.group(1), _DIM), text)
-    return text
+    return re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", lambda m: c(m.group(1), _DIM), text)
 
 
 def _render_md_line(line: str) -> str:
@@ -263,7 +287,8 @@ def _render_md_line(line: str) -> str:
         return "  • " + _render_md_inline(stripped[2:])
     # Numbered lists
     import re
-    m = re.match(r'^(\d+)\.\s+(.+)', stripped)
+
+    m = re.match(r"^(\d+)\.\s+(.+)", stripped)
     if m:
         return f"  {dim(m.group(1) + '.')} {_render_md_inline(m.group(2))}"
     return _render_md_inline(line)

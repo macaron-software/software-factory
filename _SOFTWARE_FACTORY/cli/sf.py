@@ -1083,6 +1083,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main():
+    # Handle help shortcut: sf help [command]
+    if len(sys.argv) >= 2 and sys.argv[1] == "help":
+        if len(sys.argv) == 2:
+            # sf help -> show full help
+            sys.argv[1] = "--help"
+        else:
+            # sf help <command> -> sf <command> --help
+            cmd = sys.argv[2]
+            sys.argv = [sys.argv[0], cmd, "--help"]
+
     # Handle ideation shortcut: sf [options] ideation "prompt..."
     # Find "ideation" anywhere in argv, then check next arg
     try:
