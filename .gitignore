@@ -1,3 +1,9 @@
+# Monorepo private directories (NEVER push these)
+_FACTORY_CORE/
+_FINARY/
+_MIGRATION_FACTORY/
+_SOFTWARE_FACTORY/
+
 # Python
 __pycache__/
 *.pyc
