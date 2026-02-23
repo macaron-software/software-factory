@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('macaron_theme') || 'dark')</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — Software Factory</title>
+    <link rel="stylesheet" href="/static/css/main.css?v=20260222">
+    <style>
+        body { display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: var(--bg-primary, #0d1117); }
+        .login-box { width: 100%; max-width: 400px; padding: 2rem; }
+        .login-logo { text-align: center; margin-bottom: 2rem; }
+        .login-logo h1 { font-size: 1.5rem; color: var(--text-primary, #e6edf3); margin: 0; }
+        .login-logo p { color: var(--text-secondary, #8b949e); font-size: 0.875rem; margin: 0.25rem 0 0; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: 0.875rem; color: var(--text-secondary, #8b949e); margin-bottom: 0.375rem; }
+        .form-group input { width: 100%; padding: 0.625rem 0.75rem; font-size: 0.875rem; background: var(--bg-secondary, #161b22); border: 1px solid var(--border-primary, #30363d); border-radius: 6px; color: var(--text-primary, #e6edf3); outline: none; box-sizing: border-box; }
+        .form-group input:focus { border-color: var(--accent, #58a6ff); box-shadow: 0 0 0 3px rgba(88,166,255,.15); }
+        .btn-login { width: 100%; padding: 0.75rem; font-size: 0.875rem; font-weight: 600; background: var(--accent, #238636); color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+        .btn-login:hover { opacity: 0.9; }
+        .btn-login:disabled { opacity: 0.5; cursor: wait; }
+        .error-msg { color: #f85149; font-size: 0.8125rem; margin-top: 1rem; text-align: center; display: none; }
+        .error-msg.show { display: block; }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <div class="login-logo">
+            <h1>Software Factory</h1>
+            <p>Sign in to your account</p>
+        </div>
+        <form id="loginForm" onsubmit="return handleLogin(event)">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required autofocus autocomplete="email">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn-login" id="loginBtn">Sign in</button>
+            <div class="error-msg" id="errorMsg"></div>
+        </form>
+    </div>
+    <script>
+    async function handleLogin(e) {
+        e.preventDefault();
+        const btn = document.getElementById('loginBtn');
+        const err = document.getElementById('errorMsg');
+        btn.disabled = true;
+        err.classList.remove('show');
+        try {
+            const resp = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    email: document.getElementById('email').value,
+                    password: document.getElementById('password').value,
+                }),
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                const next = new URLSearchParams(location.search).get('next') || '/';
+                location.href = next;
+            } else {
+                err.textContent = data.error || 'Login failed';
+                err.classList.add('show');
+            }
+        } catch (ex) {
+            err.textContent = 'Network error';
+            err.classList.add('show');
+        }
+        btn.disabled = false;
+        return false;
+    }
+    </script>
+</body>
+</html>

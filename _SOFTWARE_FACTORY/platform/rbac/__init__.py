@@ -49,7 +49,7 @@ class ProductArtifact(str, Enum):
 
 class HumanRole(str, Enum):
     ADMIN = "admin"
-    PRODUCT_OWNER = "product_owner"
+    PROJECT_MANAGER = "project_manager"
     DEVELOPER = "developer"
     VIEWER = "viewer"
 
@@ -236,7 +236,7 @@ _ALL_ACTIONS = {"create", "read", "update", "delete", "approve", "veto", "assign
 
 _HUMAN_PERMISSIONS: dict[str, dict[str, set[str]]] = {
     "admin": {art.value: _ALL_ACTIONS for art in ProductArtifact},
-    "product_owner": {
+    "project_manager": {
         "product_brief": {"create", "read", "update", "delete", "approve"},
         "prd":           {"create", "read", "update", "delete", "approve"},
         "epic":          {"create", "read", "update", "delete", "approve"},
@@ -316,3 +316,90 @@ def human_permissions_summary(role: str) -> dict[str, list[str]]:
     """All permissions for a human role as {artifact: [actions]}."""
     perms = _HUMAN_PERMISSIONS.get(role, {})
     return {art: sorted(actions) for art, actions in perms.items() if actions}
+
+
+# ── Platform Resource RBAC (Jira-like) ───────────────────────────
+# Controls what users can do on platform resources (projects, missions, etc.)
+# This is separate from product artifact RBAC above.
+
+class PlatformResource(str, Enum):
+    PROJECTS = "projects"
+    MISSIONS = "missions"
+    AGENTS = "agents"
+    SESSIONS = "sessions"
+    FEATURES = "features"
+    WORKFLOWS = "workflows"
+    SETTINGS = "settings"
+    USERS = "users"
+    TMA = "tma"
+
+
+class PlatformAction(str, Enum):
+    VIEW = "view"
+    CREATE = "create"
+    EDIT = "edit"
+    DELETE = "delete"
+    EXECUTE = "execute"
+    ADMIN = "admin"
+
+
+_ALL_PLATFORM_ACTIONS = {a.value for a in PlatformAction}
+
+# Permission matrix: role → resource → set of actions
+_PLATFORM_PERMISSIONS: dict[str, dict[str, set[str]]] = {
+    "admin": {r.value: _ALL_PLATFORM_ACTIONS for r in PlatformResource},
+    "project_manager": {
+        "projects":  {"view", "create", "edit"},
+        "missions":  {"view", "create", "edit", "delete", "execute"},
+        "agents":    {"view"},
+        "sessions":  {"view", "create", "edit", "delete"},
+        "features":  {"view", "create", "edit", "delete"},
+        "workflows": {"view", "execute"},
+        "settings":  {"view"},
+        "users":     {"view"},
+        "tma":       {"view", "create", "edit", "delete"},
+    },
+    "developer": {
+        "projects":  {"view"},
+        "missions":  {"view", "execute"},
+        "agents":    {"view"},
+        "sessions":  {"view", "create"},
+        "features":  {"view", "edit"},
+        "workflows": {"view"},
+        "settings":  set(),
+        "users":     set(),
+        "tma":       {"view", "edit"},
+    },
+    "viewer": {
+        "projects":  {"view"},
+        "missions":  {"view"},
+        "agents":    {"view"},
+        "sessions":  {"view"},
+        "features":  {"view"},
+        "workflows": {"view"},
+        "settings":  set(),
+        "users":     set(),
+        "tma":       {"view"},
+    },
+}
+
+
+def platform_can(role: str, resource: str, action: str) -> bool:
+    """Check if a human role can perform an action on a platform resource."""
+    perms = _PLATFORM_PERMISSIONS.get(role, _PLATFORM_PERMISSIONS.get("viewer", {}))
+    return action in perms.get(resource, set())
+
+
+def check_platform_permission(
+    role: str, resource: str, action: str
+) -> tuple[bool, str]:
+    """Check platform permission, return (allowed, reason)."""
+    if platform_can(role, resource, action):
+        return True, "ok"
+    return False, f"Role '{role}' cannot {action} '{resource}'"
+
+
+def platform_permissions_summary(role: str) -> dict[str, list[str]]:
+    """All platform permissions for a role as {resource: [actions]}."""
+    perms = _PLATFORM_PERMISSIONS.get(role, {})
+    return {res: sorted(actions) for res, actions in perms.items() if actions}

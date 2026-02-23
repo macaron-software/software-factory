@@ -376,6 +376,56 @@ def _migrate(conn):
             )
 
 
+    # Auth & RBAC tables
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS session_state (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL DEFAULT '',
+            display_name TEXT NOT NULL DEFAULT '',
+            role TEXT NOT NULL DEFAULT 'viewer',
+            avatar TEXT DEFAULT '',
+            is_active INTEGER DEFAULT 1,
+            auth_provider TEXT DEFAULT 'local',
+            provider_id TEXT DEFAULT '',
+            last_login TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_project_roles (
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            project_id TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'viewer',
+            granted_by TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, project_id)
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            refresh_token_hash TEXT NOT NULL,
+            user_agent TEXT DEFAULT '',
+            ip_address TEXT DEFAULT '',
+            expires_at TIMESTAMP NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_usess_user ON user_sessions(user_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_usess_expires ON user_sessions(expires_at)")
+
+
 def _migrate_pg(conn):
     """PostgreSQL incremental migrations (safe ALTER TABLE IF NOT EXISTS)."""
     # PG schema_pg.sql already includes all columns, but for future migrations:

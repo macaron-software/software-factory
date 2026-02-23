@@ -163,7 +163,27 @@
                              hx-trigger="notif-open"
                              hx-swap="innerHTML"></div>
                     </div>
-                    <div class="topbar-avatar">S</div>
+                    <div class="user-menu-wrapper" style="position:relative">
+                        <button class="topbar-avatar" id="userMenuBtn" onclick="document.getElementById('userDropdown').classList.toggle('show')" title="{{ request.state.user.display_name if request.state.user else 'User' }}">
+                            {{ (request.state.user.display_name[:1] if request.state.user else 'U') | upper }}
+                        </button>
+                        <div class="user-dropdown" id="userDropdown">
+                            {% if request.state.user %}
+                            <div class="user-dropdown-header">
+                                <strong>{{ request.state.user.display_name }}</strong>
+                                <small>{{ request.state.user.email }}</small>
+                                <span class="user-role-badge">{{ request.state.user.role }}</span>
+                            </div>
+                            <hr style="border:0;border-top:1px solid var(--border);margin:0">
+                            {% if request.state.user.role == 'admin' %}
+                            <a href="/users" class="user-dropdown-item">Manage Users</a>
+                            {% endif %}
+                            <a href="#" class="user-dropdown-item" onclick="doLogout()">Sign out</a>
+                            {% else %}
+                            <a href="/login" class="user-dropdown-item">Sign in</a>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </header>
             <div class="main-area">
@@ -173,6 +193,17 @@
     </div>
 
     <style>
+    /* User dropdown menu */
+    .topbar-avatar{cursor:pointer;border:none;background:var(--accent);color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.875rem}
+    .user-dropdown{display:none;position:absolute;top:calc(100% + 8px);right:0;width:220px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:999;overflow:hidden}
+    .user-dropdown.show{display:block}
+    .user-dropdown-header{padding:0.75rem 1rem}
+    .user-dropdown-header strong{display:block;color:var(--text-primary);font-size:0.875rem}
+    .user-dropdown-header small{color:var(--text-secondary);font-size:0.75rem}
+    .user-role-badge{display:inline-block;margin-top:0.25rem;padding:0.125rem 0.5rem;border-radius:9999px;background:var(--bg-tertiary,#21262d);color:var(--text-secondary);font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.05em}
+    .user-dropdown-item{display:block;padding:0.5rem 1rem;color:var(--text-primary);text-decoration:none;font-size:0.8125rem}
+    .user-dropdown-item:hover{background:var(--bg-tertiary,#21262d)}
+
     /* Notification bell + dropdown */
     .notif-wrapper{position:relative}
     .topbar-bell{position:relative}
@@ -353,6 +384,18 @@ async function executeDelete() {
 document.getElementById('deleteConfirmModal').addEventListener('click', function(e) {
     if (e.target === this) closeDeleteModal();
 });
+/* User menu — close on outside click + logout */
+document.addEventListener('click', function(e) {
+    const dd = document.getElementById('userDropdown');
+    const btn = document.getElementById('userMenuBtn');
+    if (dd && btn && !btn.contains(e.target) && !dd.contains(e.target)) {
+        dd.classList.remove('show');
+    }
+});
+async function doLogout() {
+    await fetch('/api/auth/logout', {method:'POST'});
+    location.href = '/login';
+}
 </script>
 </body>
 </html>
