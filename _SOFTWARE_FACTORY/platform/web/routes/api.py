@@ -1448,6 +1448,7 @@ async def autoheal_stats():
 async def autoheal_heartbeat():
     """Return animated ECG heartbeat icon for TMA status."""
     from ...ops.auto_heal import get_autoheal_stats
+
     stats = get_autoheal_stats()
     hb = stats.get("heartbeat", "starting")
     open_inc = stats["incidents"]["open"]
@@ -1478,7 +1479,7 @@ async def autoheal_heartbeat():
         f'<span class="tma-hb {css_class}" data-tooltip="{label}" style="--tma-color:{color}">'
         f'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
         f'<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>'
-        f'</svg></span>'
+        f"</svg></span>"
     )
     return HTMLResponse(html)
 
@@ -1575,7 +1576,7 @@ async def set_language(lang: str, request: Request):
         lang = "en"
     referer = request.headers.get("referer", "/")
     response = RedirectResponse(url=referer, status_code=303)
-    response.set_cookie("lang", lang, max_age=365 * 86400, httponly=False, samesite="lax")
+    response.set_cookie("sf_lang", lang, max_age=365 * 86400, httponly=True, samesite="lax")
     return response
 
 

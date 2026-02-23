@@ -126,7 +126,7 @@ _EXEC_PROTOCOL = """ROLE: Developer. You MUST call code_write. No code_write = F
 WORKFLOW:
 1. EXPLORE FIRST: list_files + code_read existing files → understand what exists already
 2. deep_search(query="architecture, patterns, existing code") → discover project structure
-3. memory_search(query="conventions, decisions") → learn past decisions
+3. memory_search(query="conventions, decisions, design-system") → learn past decisions + design tokens
 4. THEN code_write per file → REAL build → git_commit
 
 TOOL: code_write(path="src/module.ts", content="full source code here")
@@ -138,13 +138,26 @@ RULES:
 - FOLLOW THE STACK DECIDED IN ARCHITECTURE PHASE. Do NOT switch language.
 - Do NOT describe changes. DO them via code_write.
 - NEVER create fake build scripts (gradlew, Makefile) that do nothing.
-- AFTER writing code, verify with REAL build tools:
-  - Web/Node.js: build(command="npm install && npm run build")
-  - Python: build(command="python3 -m py_compile file.py")
-  - Android/Kotlin: android_build() — compiles via Gradle in real SDK container
-  - Android tests: android_test() — runs real unit tests
-  - Swift/iOS: build(command="swift build") — only for iOS/macOS projects
-  - Docker: build(command="docker build -t test .")
+
+UI/UX CONSTRAINTS (MANDATORY for frontend code):
+- IMPORT design tokens: @import './styles/tokens.css' or import '../styles/tokens.css'
+- ALL colors via CSS custom properties: var(--color-primary), var(--color-text), etc.
+- ALL font sizes via tokens: var(--font-size-sm), var(--font-size-md), etc.
+- ALL spacing via tokens: var(--spacing-sm), var(--spacing-md), etc.
+- NO hardcoded hex colors (#fff, #333), NO hardcoded px font-sizes, NO inline styles
+- WCAG AA accessibility: aria-label on icons, aria-describedby on forms, role attributes
+- Semantic HTML: <nav>, <main>, <article>, <section>, <header>, <footer>. NOT <div> soup.
+- Responsive: mobile-first, use CSS grid/flexbox, test 320px→1440px
+- Focus management: :focus-visible styles, skip-to-content link, keyboard navigation
+- Loading/error/empty states for EVERY data-dependent component
+
+BUILD VERIFICATION:
+- Web/Node.js: build(command="npm install && npm run build")
+- Python: build(command="python3 -m py_compile file.py")
+- Android/Kotlin: android_build() — compiles via Gradle in real SDK container
+- Android tests: android_test() — runs real unit tests
+- Swift/iOS: build(command="swift build") — only for iOS/macOS projects
+- Docker: build(command="docker build -t test .")
 - If build fails, FIX the code and retry. Do NOT commit broken code.
 - Do NOT use generic build() for Android — use android_build() instead."""
 
@@ -227,7 +240,7 @@ def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
     import uuid
 
     try:
-        from ..db import get_db
+        from ..db.migrations import get_db
     except Exception:
         return
 
@@ -268,6 +281,184 @@ def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
         logger.info("Auto-created %d TMA tickets from %s results", len(fail_lines[:5]), source)
     except Exception as e:
         logger.warning("Failed to auto-create tickets: %s", e)
+
+
+def _auto_persist_backlog(result: str, ctx, mission_id: str):
+    """Auto-parse PM output to persist features/stories in the product backlog.
+
+    MiniMax M2.5 won't call create_feature tool reliably, so we parse
+    structured tables from PM output (Epic/Story markdown tables).
+    """
+    import re
+    import uuid
+
+    try:
+        from ..db.migrations import get_db
+    except Exception:
+        return
+
+    # Extract epics — two formats:
+    # Format 1: | **E1** | Title | Priority |
+    # Format 2: | **E1** Title | Desc | Status |  (title in same cell as Exx)
+    epic_pattern = re.compile(
+        r"\|\s*\*\*(?:E\d+|Epic\s*\d*)\*\*\s*(?:\|?\s*)(.+?)\s*\|\s*(.+?)\s*\|",
+        re.IGNORECASE,
+    )
+    # Extract stories: | US-E1-01 : Title | Estimation | Dependency |
+    story_pattern = re.compile(
+        r"\|\s*(US-[\w-]+)\s*[:\s]+(.+?)\s*\|\s*(\d+)\s*\|",
+        re.IGNORECASE,
+    )
+
+    epics_found = epic_pattern.findall(result)
+    stories_found = story_pattern.findall(result)
+
+    if not epics_found and not stories_found:
+        return
+
+    try:
+        db = get_db()
+        feature_ids = {}
+
+        # Create features from epics
+        priority_map = {
+            "p0": 1,
+            "p1": 3,
+            "p2": 5,
+            "p3": 7,
+            "haute": 1,
+            "high": 1,
+            "moyen": 3,
+            "medium": 3,
+            "basse": 7,
+            "low": 7,
+        }
+        for i, (name, extra) in enumerate(epics_found):
+            fid = f"feat-{uuid.uuid4().hex[:6]}"
+            # Try to find priority in extra column
+            prio_match = re.search(
+                r"P\d+|haute?|high|moyen|medium|basse?|low", extra, re.IGNORECASE
+            )
+            prio_clean = prio_match.group(0).lower() if prio_match else "p2"
+            priority = priority_map.get(prio_clean, 5)
+            name_clean = name.strip().rstrip("|").strip()
+            if not name_clean or len(name_clean) < 3:
+                continue
+            db.execute(
+                "INSERT OR IGNORE INTO features (id, epic_id, name, description, priority, status, created_at) "
+                "VALUES (?, ?, ?, ?, ?, 'backlog', datetime('now'))",
+                (fid, mission_id, name_clean, "Auto-extracted from PM decomposition", priority),
+            )
+            feature_ids[f"E{i + 1}"] = fid
+
+        # Create user stories
+        for story_id, title, points in stories_found:
+            sid = f"us-{uuid.uuid4().hex[:6]}"
+            # Link to parent feature via story ID prefix (US-E1-xx → E1)
+            epic_ref = re.match(r"US-(E\d+)", story_id, re.IGNORECASE)
+            feat_id = feature_ids.get(epic_ref.group(1), "") if epic_ref else ""
+            db.execute(
+                "INSERT OR IGNORE INTO user_stories (id, feature_id, title, story_points, status, created_at) "
+                "VALUES (?, ?, ?, ?, 'backlog', datetime('now'))",
+                (sid, feat_id, f"{story_id}: {title.strip()}", int(points)),
+            )
+
+        db.commit()
+        db.close()
+        logger.info(
+            "Auto-persisted backlog: %d features, %d stories for mission %s",
+            len(epics_found),
+            len(stories_found),
+            mission_id,
+        )
+    except Exception as e:
+        logger.warning("Failed to auto-persist backlog: %s", e)
+
+
+def _auto_extract_requirements(description: str, mission_id: str):
+    """Extract requirements from mission description for AO traceability.
+
+    Decomposes both top-level numbered requirements AND their sub-items.
+    Input: '1. **Portail usager** : inscription, choix du VAE, paiement'
+    Output: REQ-xxxx-01 (parent) + REQ-xxxx-01.1, 01.2, 01.3 (sub-reqs)
+    """
+    import re
+
+    try:
+        from ..db.migrations import get_db
+    except Exception:
+        return
+
+    # Match numbered items: "1. **Title**: desc" OR "1. Title: desc"
+    req_pattern = re.compile(
+        r"(\d+)\.\s*\*{0,2}([^*:\n]+?)\*{0,2}\s*[:：]\s*(.+?)(?=\n\d+\.\s|\Z)",
+        re.DOTALL,
+    )
+    reqs = req_pattern.findall(description)
+    if not reqs:
+        return
+
+    try:
+        db = get_db()
+        db.execute("""CREATE TABLE IF NOT EXISTS requirements (
+            id TEXT PRIMARY KEY,
+            mission_id TEXT NOT NULL,
+            parent_id TEXT DEFAULT '',
+            req_number TEXT,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            status TEXT DEFAULT 'identified',
+            covered_by TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now'))
+        )""")
+
+        total = 0
+        prefix = mission_id[:4]
+        for num, title, desc in reqs:
+            parent_id = f"REQ-{prefix}-{num.zfill(2)}"
+            # Insert parent requirement
+            db.execute(
+                "INSERT OR IGNORE INTO requirements (id, mission_id, parent_id, req_number, title, description) "
+                "VALUES (?, ?, '', ?, ?, ?)",
+                (parent_id, mission_id, num, title.strip(), desc.strip()[:500]),
+            )
+            total += 1
+
+            # Decompose sub-items from description (comma/semicolon separated)
+            desc_clean = desc.strip()
+            # Remove parenthetical content for cleaner splitting
+            desc_no_parens = re.sub(r"\([^)]*\)", "", desc_clean)
+            sub_items = [
+                s.strip()
+                for s in re.split(r"[,;]", desc_no_parens)
+                if s.strip() and len(s.strip()) > 3
+            ]
+
+            for j, sub in enumerate(sub_items, 1):
+                sub_id = f"REQ-{prefix}-{num.zfill(2)}.{j}"
+                # Clean up sub-item: remove leading articles, trailing whitespace
+                sub_clean = re.sub(
+                    r"^(le |la |les |l\'|un |une |des |du )", "", sub.strip(), flags=re.IGNORECASE
+                ).strip()
+                if len(sub_clean) < 3:
+                    continue
+                db.execute(
+                    "INSERT OR IGNORE INTO requirements (id, mission_id, parent_id, req_number, title, description) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (sub_id, mission_id, parent_id, f"{num}.{j}", sub_clean, ""),
+                )
+                total += 1
+
+        db.commit()
+        db.close()
+        logger.info(
+            "Extracted %d AO requirements (%d top + sub) for mission %s",
+            total,
+            len(reqs),
+            mission_id,
+        )
+    except Exception as e:
+        logger.warning("Failed to extract requirements: %s", e)
 
 
 def _build_team_context(run: PatternRun, current_node: str, to_agent_id: str) -> str:
@@ -506,6 +697,32 @@ async def _execute_node(
                     _auto_create_tickets_from_results(e2e_result, ctx, "qa")
                 except Exception as e:
                     full_task += f"\n\n## E2E Tests: Error running auto-tests: {e}"
+        elif "ux" in role_lower or "design" in role_lower:
+            full_task += _EXEC_PROTOCOL
+            # Auto-create design system scaffold if it doesn't exist
+            if ctx.project_path:
+                try:
+                    import os
+
+                    styles_dir = os.path.join(ctx.project_path, "src", "styles")
+                    tokens_path = os.path.join(styles_dir, "tokens.css")
+                    if not os.path.exists(tokens_path):
+                        full_task += """
+
+## Design System Status: NOT YET CREATED
+The project has NO design system yet. You MUST create it NOW using code_write.
+Create these files:
+1. src/styles/tokens.css — CSS custom properties (colors, typography, spacing, radius, shadows)
+2. src/styles/base.css — CSS reset, responsive grid, accessibility defaults
+3. src/styles/components.css — Base component styles (btn, card, form, badge, alert, nav)
+
+This is BLOCKING: developers cannot start without your design tokens."""
+                    else:
+                        full_task += (
+                            "\n\n## Design System Status: EXISTS — review and improve if needed."
+                        )
+                except Exception:
+                    pass
         elif "lead" in role_lower or "architect" in role_lower:
             full_task += _REVIEW_PROTOCOL
             full_task += "\n\n" + _PR_PROTOCOL
@@ -626,6 +843,24 @@ async def _execute_node(
 
     state.result = result
     state.output = content
+
+    # Auto-persist backlog when PM produces epic/story decomposition
+    role_lower = (agent.role or agent.id or "").lower()
+    if ("product" in role_lower or "pm" in role_lower) and (
+        "Épic" in content or "Epic" in content or "US-" in content or "Story" in content
+    ):
+        mission_id = run.session_id  # fallback
+        if hasattr(ctx, "mission_run_id") and ctx.mission_run_id:
+            mission_id = ctx.mission_run_id
+        else:
+            # Try to get mission_id from session config
+            try:
+                sess = get_session_store().get(run.session_id)
+                if sess and sess.config:
+                    mission_id = sess.config.get("mission_id", mission_id)
+            except Exception:
+                pass
+        _auto_persist_backlog(content, ctx, mission_id)
 
     # Detect VETO/NOGO/APPROVE — must be explicit decisions, not mentions
     msg_type = "text"

@@ -1103,6 +1103,57 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {"type": "object", "properties": {}},
             },
         },
+        # ── Backlog tools (create features/stories for AO traceability) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "create_feature",
+                "description": "Create a feature in the product backlog linked to an epic. Each feature gets a REQ-ID for AO traceability.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "epic_id": {"type": "string", "description": "Parent epic/mission ID"},
+                        "name": {"type": "string", "description": "Feature name"},
+                        "description": {"type": "string", "description": "Feature description"},
+                        "acceptance_criteria": {
+                            "type": "string",
+                            "description": "Acceptance criteria",
+                        },
+                        "priority": {
+                            "type": "integer",
+                            "description": "Priority (1=highest, 10=lowest)",
+                        },
+                        "story_points": {"type": "integer", "description": "Story points estimate"},
+                    },
+                    "required": ["name"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "create_story",
+                "description": "Create a user story under a feature. Links to a feature for backlog traceability.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "feature_id": {"type": "string", "description": "Parent feature ID"},
+                        "title": {
+                            "type": "string",
+                            "description": "User story title (e.g. US-E1-01: Intégration FC)",
+                        },
+                        "description": {"type": "string", "description": "Story description"},
+                        "acceptance_criteria": {
+                            "type": "string",
+                            "description": "Acceptance criteria",
+                        },
+                        "story_points": {"type": "integer", "description": "Story points estimate"},
+                        "priority": {"type": "integer", "description": "Priority (1=highest)"},
+                    },
+                    "required": ["title"],
+                },
+            },
+        },
         # ── Composition tools (dynamic workflow/team/mission) ──
         {
             "type": "function",
@@ -1587,6 +1638,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "memory_search",
         "memory_store",
         "get_project_context",
+        "create_feature",
+        "create_story",
         "screenshot",
         "github_issues",
         "github_prs",
@@ -1625,12 +1678,14 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
     ],
     "ux": [
         "code_read",
+        "code_write",
         "code_search",
         "list_files",
         "screenshot",
         "memory_search",
         "memory_store",
         "get_project_context",
+        "create_feature",
         "figma_get_node",
         "figma_get_styles",
         "solaris_wcag",

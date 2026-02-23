@@ -665,6 +665,16 @@ async def launch_mission_workflow(request: Request, mission_id: str):
     from .workflows import _run_workflow_background
 
     task_desc = mission.goal or mission.description or mission.name
+
+    # Auto-extract AO requirements from mission description for traceability
+    if mission.description:
+        try:
+            from ...patterns.engine import _auto_extract_requirements
+
+            _auto_extract_requirements(mission.description, mission_id)
+        except Exception:
+            pass
+
     asyncio.create_task(
         _run_workflow_background(wf, session.id, task_desc, mission.project_id or "")
     )

@@ -1901,7 +1901,19 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         "leader": "architecte",
                     },
                 ),
-                # ── Phase 5: Sprints Dev (HIERARCHICAL — Lead distribue, devs codent, QA inner loop) ──
+                # ── Phase 5: Design System & Tokens (SEQUENTIAL — UX crée le socle UI avant les devs) ──
+                WorkflowPhase(
+                    id="design-system",
+                    pattern_id="sequential",
+                    name="Design System & Tokens UI",
+                    description="L'UX Designer crée le mini design system: tokens CSS (couleurs, typo, spacing, radius), base layout responsive, composants de base (header, footer, card, button, form). Le Lead Dev valide l'intégration technique. TOUT le code UI des sprints DOIT utiliser ces tokens.",
+                    gate="always",
+                    config={
+                        "agents": ["ux_designer", "lead_dev"],
+                        "leader": "ux_designer",
+                    },
+                ),
+                # ── Phase 6: Sprints Dev (HIERARCHICAL — Lead distribue, devs codent, QA inner loop) ──
                 WorkflowPhase(
                     id="dev-sprint",
                     pattern_id="hierarchical",
@@ -1927,6 +1939,19 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     },
                 ),
                 # ── Phase 7: QA (LOOP — Test Manager planifie, exécution, si KO → reboucle) ──
+                WorkflowPhase(
+                    id="ux-review",
+                    pattern_id="loop",
+                    name="Revue UX & Conformité Design",
+                    description="L'UX Designer vérifie que le code utilise les design tokens, respecte l'accessibilité WCAG AA (aria-*, contrast ≥ 4.5:1, keyboard nav), et la cohérence visuelle. Si VETO: boucle retour avec les corrections demandées aux devs. MANDATORY: run_e2e_tests() pour captures d'écran des parcours.",
+                    gate="no_veto",
+                    config={
+                        "agents": ["ux_designer", "dev_frontend"],
+                        "leader": "ux_designer",
+                        "max_iterations": 2,
+                    },
+                ),
+                # ── Phase 8: QA (LOOP — Test Manager planifie, exécution, si KO → reboucle) ──
                 WorkflowPhase(
                     id="qa-campaign",
                     pattern_id="loop",

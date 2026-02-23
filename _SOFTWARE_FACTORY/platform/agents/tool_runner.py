@@ -887,6 +887,14 @@ async def _tool_security_chaos(name: str, args: dict, ctx: ExecutionContext) -> 
         return f"[{name}] ERROR: {e}"
 
 
+async def _tool_platform_backlog(name: str, args: dict, ctx: ExecutionContext) -> str:
+    """Delegate create_feature/create_story to platform_tools registry."""
+    from ..tools.platform_tools import PlatformCreateFeatureTool, PlatformCreateStoryTool
+
+    tool = PlatformCreateFeatureTool() if name == "create_feature" else PlatformCreateStoryTool()
+    return await tool.execute(args, ctx.agent)
+
+
 async def _tool_create_ticket(args: dict, ctx: ExecutionContext) -> str:
     """Create a support ticket in the platform DB."""
     import uuid
@@ -1583,6 +1591,10 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
     # ── Ticket/Incident management ──
     if name == "create_ticket":
         return await _tool_create_ticket(args, ctx)
+
+    # ── Backlog tools (create_feature, create_story) — handled by platform_tools registry ──
+    if name in ("create_feature", "create_story"):
+        return await _tool_platform_backlog(name, args, ctx)
 
     # ── Local CI pipeline ──
     if name == "local_ci":
