@@ -104,7 +104,16 @@
     </style>
 </head>
 <body>
-    {% include "components/nav.html" %}
+    <!-- Navigation: Minimal for analytics -->
+    <nav style="position:fixed;top:0;left:0;height:100vh;width:240px;background:#1a1625;border-right:1px solid #2d2640;padding:1.5rem 0;z-index:100;overflow-y:auto;">
+        <div style="padding:0 1.5rem 2rem;border-bottom:1px solid #2d2640;">
+            <h2 style="font-size:1.25rem;font-weight:700;margin:0;">Macaron Platform</h2>
+        </div>
+        <ul style="list-style:none;padding:1rem 0;margin:0;">
+            <li><a href="/" style="display:block;padding:0.75rem 1.5rem;color:#c084fc;text-decoration:none;">← Back to Dashboard</a></li>
+            <li><a href="/analytics" style="display:block;padding:0.75rem 1.5rem;color:#fff;background:rgba(192,132,252,0.1);text-decoration:none;">📊 Analytics</a></li>
+        </ul>
+    </nav>
     
     <div class="analytics-container">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem;">
