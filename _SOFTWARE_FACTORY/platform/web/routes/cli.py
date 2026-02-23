@@ -150,7 +150,7 @@ def execute_help() -> str:
     return help_text
 
 
-@router.post("/cli/execute", response_model=CLIResponse)
+@router.post("/api/cli/execute", response_model=CLIResponse)
 async def execute_cli_command(cmd: CLICommand) -> CLIResponse:
     """
     Execute a whitelisted CLI command.
@@ -175,12 +175,21 @@ async def execute_cli_command(cmd: CLICommand) -> CLIResponse:
         logger.info(f"Executing CLI command: {' '.join(command_array)}")
 
         # Execute with timeout
+        import os
+
+        cwd = "/app" if os.path.exists("/app") else os.getcwd()
+
+        # Ensure proper PATH environment
+        env = os.environ.copy()
+        env["PATH"] = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:" + env.get("PATH", "")
+
         result = subprocess.run(
             command_array,
             capture_output=True,
             text=True,
             timeout=60,  # 60 seconds max
-            cwd="/app",  # Docker context, adjust if needed
+            cwd=cwd,
+            env=env,
         )
 
         return CLIResponse(
@@ -208,7 +217,7 @@ async def execute_cli_command(cmd: CLICommand) -> CLIResponse:
         )
 
 
-@router.get("/cli/commands")
+@router.get("/api/cli/commands")
 async def list_commands() -> dict[str, Any]:
     """List all available CLI commands."""
     return {

@@ -44,13 +44,13 @@ def format_table(headers: list[str], rows: list[list[str]]) -> str:
     lines = []
 
     # Header
-    header_line = "  ".join(h.ljust(w) for h, w in zip(headers, col_widths))
+    header_line = "  ".join(h.ljust(w) for h, w in zip(headers, col_widths, strict=True))
     lines.append(header_line)
     lines.append("-" * len(header_line))
 
     # Rows
     for row in rows:
-        lines.append("  ".join(str(cell).ljust(w) for cell, w in zip(row, col_widths)))
+        lines.append("  ".join(str(cell).ljust(w) for cell, w in zip(row, col_widths, strict=False)))
 
     return "\n".join(lines)
 
@@ -93,7 +93,7 @@ System:
   • Port:      8099 (dev) / 8090 (prod)
   • Status:    Operational
 
-Last check: {datetime.now(tz=None).strftime("%Y-%m-%d %H:%M:%S")}
+Last check: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 """
 
         return SFCommandResponse(
@@ -138,17 +138,17 @@ async def cmd_missions_list(args: list[str]) -> SFCommandResponse:
             return SFCommandResponse(success=True, output="No missions found", data={"count": 0})
 
         # Format as table
-        headers = ["ID", "Title", "Type", "Status", "Agent", "Created"]
+        headers = ["ID", "Name", "Type", "Status", "Agent", "Created"]
         rows = []
         for m in missions[:limit]:
             rows.append(
                 [
                     m.id[:8],
-                    m.title[:40],
-                    m.type or "generic",
-                    m.status or "pending",
-                    m.agent_id[:15] if m.agent_id else "none",
-                    m.created_at[:10] if m.created_at else "unknown",
+                    getattr(m, "name", getattr(m, "title", "untitled"))[:40],
+                    getattr(m, "type", "generic") or "generic",
+                    getattr(m, "status", "pending") or "pending",
+                    m.agent_id[:15] if hasattr(m, "agent_id") and m.agent_id else "none",
+                    m.created_at[:10] if hasattr(m, "created_at") and m.created_at else "unknown",
                 ]
             )
 
@@ -181,18 +181,18 @@ async def cmd_missions_show(mission_id: str) -> SFCommandResponse:
 ===============
 
 ID:          {mission.id}
-Title:       {mission.title}
-Type:        {mission.type or "generic"}
-Status:      {mission.status or "pending"}
-Agent:       {mission.agent_id or "none"}
-Created:     {mission.created_at or "unknown"}
-Updated:     {mission.updated_at or "unknown"}
+Name:        {getattr(mission, "name", getattr(mission, "title", "untitled"))}
+Type:        {getattr(mission, "type", "generic") or "generic"}
+Status:      {getattr(mission, "status", "pending") or "pending"}
+Agent:       {mission.agent_id if hasattr(mission, "agent_id") and mission.agent_id else "none"}
+Created:     {mission.created_at if hasattr(mission, "created_at") and mission.created_at else "unknown"}
+Updated:     {mission.updated_at if hasattr(mission, "updated_at") and mission.updated_at else "unknown"}
 
 Description:
 {mission.description or "No description"}
 
 Context:
-{mission.context or "No context"}
+{getattr(mission, "context", "No context") or "No context"}
 """
 
         return SFCommandResponse(success=True, output=output, data={"mission": mission.id})
