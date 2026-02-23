@@ -114,6 +114,20 @@ async def update_ticket(request: Request, ticket_id: str, payload: TMATicketUpda
         db.commit()
         logger.info(f"Updated TMA ticket {ticket_id}")
 
+        # Notify on status change
+        if payload.status:
+            try:
+                from ...services.notifications import emit_notification
+                emit_notification(
+                    f"TMA ticket {payload.status}: {ticket_id[:8]}",
+                    type="tma", message=payload.name or "",
+                    url=f"/tma/tickets/{ticket_id}",
+                    severity="warning" if payload.status in ("open", "in_progress") else "info",
+                    source="tma", ref_id=ticket_id,
+                )
+            except Exception:
+                pass
+
         # Return updated ticket
         return await get_ticket(request, ticket_id)
     except Exception as e:
