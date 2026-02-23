@@ -52,20 +52,31 @@ touch interfaces, and microcopy.
 </div>
 
 <style>
-.skeleton {
-  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-  border-radius: var(--radius-sm);
-}
+  .skeleton {
+    background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: var(--radius-sm);
+  }
 
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
 
-.skeleton--avatar { width: 48px; height: 48px; border-radius: 50%; }
-.skeleton--text { height: 16px; margin: 8px 0; }
+  .skeleton--avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+  }
+  .skeleton--text {
+    height: 16px;
+    margin: 8px 0;
+  }
 </style>
 ```
 
@@ -87,6 +98,7 @@ function LoadingButton({ isLoading, children, ...props }: LoadingButtonProps) {
 ```
 
 #### Loading Guidelines
+
 - Use **skeleton screens** for initial page/content loads
 - Use **spinners** for action feedback (save, submit)
 - Use **progress bars** for operations with known duration
@@ -209,6 +221,7 @@ function EmailField() {
 ```
 
 #### Form UX Rules
+
 - Validate on **blur** (not on every keystroke)
 - Clear errors **on change** (give immediate feedback)
 - Show errors **inline** next to the field (not at top of form)
@@ -220,7 +233,12 @@ function EmailField() {
 
 ```css
 /* Minimum 44×44px touch targets (WCAG 2.5.5) */
-.btn, .link, .checkbox, .radio, input[type="checkbox"], input[type="radio"] {
+.btn,
+.link,
+.checkbox,
+.radio,
+input[type="checkbox"],
+input[type="radio"] {
   min-width: 44px;
   min-height: 44px;
 }
@@ -272,19 +290,20 @@ function SettingsForm() {
 
 ### Microcopy Guidelines
 
-| Context | ❌ Bad | ✅ Good |
-|---------|--------|---------|
-| Button | Submit | Save Changes |
-| Button | Click here | Download Report |
-| Error | Error occurred | Unable to save — check your connection |
-| Empty | No data | No projects yet — create one to get started |
-| Confirm | Are you sure? | Delete "My Project"? This can't be undone. |
-| Loading | Loading... | Loading your dashboard... |
-| Success | Done | Changes saved successfully |
+| Context | ❌ Bad         | ✅ Good                                     |
+| ------- | -------------- | ------------------------------------------- |
+| Button  | Submit         | Save Changes                                |
+| Button  | Click here     | Download Report                             |
+| Error   | Error occurred | Unable to save — check your connection      |
+| Empty   | No data        | No projects yet — create one to get started |
+| Confirm | Are you sure?  | Delete "My Project"? This can't be undone.  |
+| Loading | Loading...     | Loading your dashboard...                   |
+| Success | Done           | Changes saved successfully                  |
 
 ## Output Format
 
 For each UX pattern implemented:
+
 ```
 ## Pattern: [Name]
 - State: [loading/error/empty/form/interaction]

@@ -7,15 +7,15 @@ Each agent runs as an independent asyncio.Task:
   4. Parse structured actions from LLM output
   5. Route actions through the MessageBus
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from ..models import A2AMessage, AgentInstance, AgentStatus, MessageType
 
@@ -25,34 +25,43 @@ logger = logging.getLogger(__name__)
 # Action dataclass
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AgentAction:
     """Parsed structured action from LLM output."""
-    type: str = ""       # respond, delegate, veto, approve, ask, escalate
-    target: str = ""     # agent_id for delegate/ask
+
+    type: str = ""  # respond, delegate, veto, approve, ask, escalate
+    target: str = ""  # agent_id for delegate/ask
     content: str = ""
     reason: str = ""
 
 
 # Regex patterns for action tags in LLM output
 _ACTION_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("delegate", re.compile(r"\[DELEGATE:([^\]]+)\]\s*(.*?)(?=\[DELEGATE:|\[VETO|\[APPROVE\]|\[ASK:|\[ESCALATE|\Z)",  re.MULTILINE | re.DOTALL)),
-    ("veto",     re.compile(r"\[VETO:([^\]]*)\]",           re.MULTILINE)),
-    ("approve",  re.compile(r"\[APPROVE\]",                  re.MULTILINE)),
-    ("ask",      re.compile(r"\[ASK:([^\]:]+):([^\]]*)\]",   re.MULTILINE)),
-    ("escalate", re.compile(r"\[ESCALATE:?([^\]]*)\]",       re.MULTILINE)),
+    (
+        "delegate",
+        re.compile(
+            r"\[DELEGATE:([^\]]+)\]\s*(.*?)(?=\[DELEGATE:|\[VETO|\[APPROVE\]|\[ASK:|\[ESCALATE|\Z)",
+            re.MULTILINE | re.DOTALL,
+        ),
+    ),
+    ("veto", re.compile(r"\[VETO:([^\]]*)\]", re.MULTILINE)),
+    ("approve", re.compile(r"\[APPROVE\]", re.MULTILINE)),
+    ("ask", re.compile(r"\[ASK:([^\]:]+):([^\]]*)\]", re.MULTILINE)),
+    ("escalate", re.compile(r"\[ESCALATE:?([^\]]*)\]", re.MULTILINE)),
 ]
 
 # ---------------------------------------------------------------------------
 # AgentLoop
 # ---------------------------------------------------------------------------
 
+
 class AgentLoop:
     """Autonomous agent that checks inbox, thinks via LLM, communicates via bus."""
 
     def __init__(
         self,
-        agent_def: "AgentDef",
+        agent_def: AgentDef,
         session_id: str,
         project_id: str = "",
         project_path: str = "",
@@ -82,8 +91,8 @@ class AgentLoop:
         self._pair_counts: dict[str, int] = {}  # track msg counts per conversation partner
 
         # Lazy — initialised in start()
-        self._executor: "AgentExecutor | None" = None  # type: ignore[name-defined]
-        self._bus: "MessageBus | None" = None           # type: ignore[name-defined]
+        self._executor: AgentExecutor | None = None  # type: ignore[name-defined]
+        self._bus: MessageBus | None = None  # type: ignore[name-defined]
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -91,8 +100,8 @@ class AgentLoop:
 
     async def start(self) -> None:
         """Register on the bus, replay pending messages, and launch the run-loop task."""
-        from .executor import get_executor
         from ..a2a.bus import get_bus
+        from .executor import get_executor
 
         self._executor = get_executor()
         self._bus = get_bus()
@@ -126,17 +135,25 @@ class AgentLoop:
             ).fetchall()
             for row in reversed(rows):  # oldest first
                 msg = A2AMessage(
-                    id=row[0], session_id=row[1], from_agent=row[2],
-                    to_agent=row[3], message_type=MessageType(row[4]),
-                    content=row[5], parent_id=row[7],
+                    id=row[0],
+                    session_id=row[1],
+                    from_agent=row[2],
+                    to_agent=row[3],
+                    message_type=MessageType(row[4]),
+                    content=row[5],
+                    parent_id=row[7],
                 )
                 try:
                     self._inbox.put_nowait(msg)
                 except asyncio.QueueFull:
                     break
             if rows:
-                logger.info("Replayed %d messages for agent=%s session=%s",
-                            len(rows), self.agent.id, self.session_id)
+                logger.info(
+                    "Replayed %d messages for agent=%s session=%s",
+                    len(rows),
+                    self.agent.id,
+                    self.session_id,
+                )
         except Exception as exc:
             logger.debug("Replay failed for agent=%s: %s", self.agent.id, exc)
 
@@ -178,8 +195,12 @@ class AgentLoop:
             # Round limit to prevent infinite loops
             self._rounds += 1
             if self._rounds > self.max_rounds:
-                logger.warning("Agent %s hit max rounds (%d), pausing  session=%s",
-                               self.agent.id, self.max_rounds, self.session_id)
+                logger.warning(
+                    "Agent %s hit max rounds (%d), pausing  session=%s",
+                    self.agent.id,
+                    self.max_rounds,
+                    self.session_id,
+                )
                 await self._set_status(AgentStatus.IDLE)
                 break
 
@@ -199,11 +220,12 @@ class AgentLoop:
 
                     async def _run_streaming():
                         nonlocal result, stream_started
-                        from .executor import ExecutionResult
                         from ..sessions.runner import _push_sse
 
                         in_think = False
-                        async for event_type, data in self._executor.run_streaming(ctx, msg.content):
+                        async for event_type, data in self._executor.run_streaming(
+                            ctx, msg.content
+                        ):
                             if event_type == "delta":
                                 # Filter out <think> blocks (MiniMax internal reasoning)
                                 if "<think>" in data:
@@ -216,23 +238,32 @@ class AgentLoop:
 
                                 if not stream_started:
                                     stream_started = True
-                                    await _push_sse(self.session_id, {
-                                        "type": "stream_start",
+                                    await _push_sse(
+                                        self.session_id,
+                                        {
+                                            "type": "stream_start",
+                                            "agent_id": self.agent.id,
+                                            "agent_name": self.agent.name,
+                                        },
+                                    )
+                                await _push_sse(
+                                    self.session_id,
+                                    {
+                                        "type": "stream_delta",
                                         "agent_id": self.agent.id,
-                                        "agent_name": self.agent.name,
-                                    })
-                                await _push_sse(self.session_id, {
-                                    "type": "stream_delta",
-                                    "agent_id": self.agent.id,
-                                    "delta": data,
-                                })
+                                        "delta": data,
+                                    },
+                                )
                             elif event_type == "result":
                                 if stream_started:
-                                    await _push_sse(self.session_id, {
-                                        "type": "stream_end",
-                                        "agent_id": self.agent.id,
-                                        "content": data.content,
-                                    })
+                                    await _push_sse(
+                                        self.session_id,
+                                        {
+                                            "type": "stream_end",
+                                            "agent_id": self.agent.id,
+                                            "content": data.content,
+                                        },
+                                    )
                                 result = data
 
                     await asyncio.wait_for(
@@ -243,11 +274,17 @@ class AgentLoop:
                         logger.error("Executor returned no result agent=%s", self.agent.id)
                         await self._set_status(AgentStatus.ERROR)
                         continue
-                    logger.warning("LOOP executor returned for agent=%s content_len=%d", self.agent.id, len(result.content or ""))
+                    logger.warning(
+                        "LOOP executor returned for agent=%s content_len=%d",
+                        self.agent.id,
+                        len(result.content or ""),
+                    )
                 except asyncio.TimeoutError:
                     logger.error(
                         "Executor timeout  agent=%s session=%s timeout=%.0fs",
-                        self.agent.id, self.session_id, self.think_timeout,
+                        self.agent.id,
+                        self.session_id,
+                        self.think_timeout,
                     )
                     await self._set_status(AgentStatus.ERROR)
                     continue
@@ -255,7 +292,9 @@ class AgentLoop:
                 if result.error:
                     logger.error(
                         "Executor error  agent=%s session=%s error=%s",
-                        self.agent.id, self.session_id, result.error,
+                        self.agent.id,
+                        self.session_id,
+                        result.error,
                     )
                     await self._set_status(AgentStatus.ERROR)
                     continue
@@ -271,7 +310,9 @@ class AgentLoop:
                 if actions:
                     await self._set_status(AgentStatus.ACTING)
                     for action in actions:
-                        await self._execute_action(action, parent_id=msg.id, full_context=result.content)
+                        await self._execute_action(
+                            action, parent_id=msg.id, full_context=result.content
+                        )
                 else:
                     # No structured actions — send plain response
                     await self.send_message(
@@ -284,13 +325,18 @@ class AgentLoop:
                 elapsed = int((time.monotonic() - t0) * 1000)
                 logger.info(
                     "AgentLoop cycle  agent=%s session=%s duration_ms=%d actions=%d",
-                    self.agent.id, self.session_id, elapsed, len(actions),
+                    self.agent.id,
+                    self.session_id,
+                    elapsed,
+                    len(actions),
                 )
 
             except asyncio.CancelledError:
                 raise
             except Exception:
-                logger.exception("AgentLoop error  agent=%s session=%s", self.agent.id, self.session_id)
+                logger.exception(
+                    "AgentLoop error  agent=%s session=%s", self.agent.id, self.session_id
+                )
                 self.instance.error_count += 1
                 await self._set_status(AgentStatus.ERROR)
                 continue
@@ -310,8 +356,12 @@ class AgentLoop:
         try:
             self._inbox.put_nowait(msg)
         except asyncio.QueueFull:
-            logger.warning("Inbox full  agent=%s session=%s, dropping message %s",
-                           self.agent.id, self.session_id, msg.id)
+            logger.warning(
+                "Inbox full  agent=%s session=%s, dropping message %s",
+                self.agent.id,
+                self.session_id,
+                msg.id,
+            )
 
     # ------------------------------------------------------------------
     # Message filtering
@@ -333,8 +383,12 @@ class AgentLoop:
         if partner:
             self._pair_counts[partner] = self._pair_counts.get(partner, 0) + 1
             if self._pair_counts[partner] > 3:
-                logger.info("Pair limit reached  agent=%s partner=%s count=%d, skipping",
-                           self.agent.id, partner, self._pair_counts[partner])
+                logger.info(
+                    "Pair limit reached  agent=%s partner=%s count=%d, skipping",
+                    self.agent.id,
+                    partner,
+                    self._pair_counts[partner],
+                )
                 return True
         return False
 
@@ -342,20 +396,19 @@ class AgentLoop:
     # Context builder
     # ------------------------------------------------------------------
 
-    async def _build_context(self) -> "ExecutionContext":
+    async def _build_context(self) -> ExecutionContext:
         """Assemble ExecutionContext with history, memory, skills."""
-        from .executor import ExecutionContext
+        from ..memory.manager import get_memory_manager
         from ..sessions.store import get_session_store
         from ..skills.library import get_skill_library
-        from ..memory.manager import get_memory_manager
+        from .executor import ExecutionContext
 
         history_dicts: list[dict] = []
         try:
             store = get_session_store()
             messages = store.get_messages(self.session_id, limit=50)
             history_dicts = [
-                {"from_agent": m.from_agent, "content": m.content,
-                 "message_type": m.message_type}
+                {"from_agent": m.from_agent, "content": m.content, "message_type": m.message_type}
                 for m in messages
             ]
         except Exception as exc:
@@ -369,8 +422,7 @@ class AgentLoop:
                 entries = mem.project_get(self.project_id, limit=10)
                 if entries:
                     project_context = "\n".join(
-                        f"[{e['category']}] {e['key']}: {e['value'][:200]}"
-                        for e in entries
+                        f"[{e['category']}] {e['key']}: {e['value'][:200]}" for e in entries
                     )
             except Exception as exc:
                 logger.debug("Failed to load project context: %s", exc)
@@ -380,30 +432,57 @@ class AgentLoop:
         if self.project_path:
             try:
                 from ..memory.project_files import get_project_memory
+
                 pmem = get_project_memory(self.project_id, self.project_path)
                 project_memory_str = pmem.combined
             except Exception as exc:
                 logger.debug("Failed to load project memory files: %s", exc)
 
-        # Skills
+        # Skills - Auto-inject relevant skills based on mission context
         skills_prompt = ""
-        if self.agent.skills:
-            try:
-                lib = get_skill_library()
-                parts = []
-                for sid in self.agent.skills[:5]:
-                    skill = lib.get(sid)
-                    if skill and skill.get("content"):
-                        parts.append(f"### {skill['name']}\n{skill['content'][:1500]}")
-                skills_prompt = "\n\n".join(parts)
-            except Exception:
-                pass
+
+        # Try automatic skills injection first
+        try:
+            from .skills_integration import enrich_agent_with_skills
+
+            # Get mission description for context
+            mission_desc = None
+            if history_dicts:
+                # Use first user message as mission context
+                for msg in history_dicts:
+                    if msg.get("from_agent") == "user":
+                        mission_desc = msg.get("content", "")[:500]
+                        break
+
+            skills_prompt = enrich_agent_with_skills(
+                agent_id=self.agent.id,
+                agent_role=self.agent.role,
+                mission_description=mission_desc,
+                project_id=self.project_id,
+                fallback_skills=self.agent.skills,  # Fallback to manual skills
+            )
+        except Exception as exc:
+            logger.debug(f"Auto skills injection failed: {exc}, using manual skills")
+
+            # Fallback to original manual skill loading
+            if self.agent.skills:
+                try:
+                    lib = get_skill_library()
+                    parts = []
+                    for sid in self.agent.skills[:5]:
+                        skill = lib.get(sid)
+                        if skill and skill.get("content"):
+                            parts.append(f"### {skill['name']}\n{skill['content'][:1500]}")
+                    skills_prompt = "\n\n".join(parts)
+                except Exception:
+                    pass
 
         # Vision
         vision = ""
         if self.project_id:
             try:
                 from ..projects.manager import get_project_store
+
                 proj = get_project_store().get(self.project_id)
                 if proj and proj.vision:
                     vision = proj.vision[:3000]
@@ -419,6 +498,7 @@ class AgentLoop:
         if self.agent.id == "chef_de_programme":
             try:
                 from ..missions.store import get_mission_run_store
+
                 runs = get_mission_run_store().list_runs(limit=10)
                 for mr in runs:
                     if mr.session_id == self.session_id:
@@ -453,29 +533,37 @@ class AgentLoop:
         for action_type, pattern in _ACTION_PATTERNS:
             for m in pattern.finditer(content):
                 if action_type == "delegate":
-                    actions.append(AgentAction(
-                        type="delegate",
-                        target=m.group(1).strip(),
-                        content=m.group(2).strip(),
-                    ))
+                    actions.append(
+                        AgentAction(
+                            type="delegate",
+                            target=m.group(1).strip(),
+                            content=m.group(2).strip(),
+                        )
+                    )
                 elif action_type == "veto":
-                    actions.append(AgentAction(
-                        type="veto",
-                        reason=m.group(1).strip(),
-                    ))
+                    actions.append(
+                        AgentAction(
+                            type="veto",
+                            reason=m.group(1).strip(),
+                        )
+                    )
                 elif action_type == "approve":
                     actions.append(AgentAction(type="approve"))
                 elif action_type == "ask":
-                    actions.append(AgentAction(
-                        type="ask",
-                        target=m.group(1).strip(),
-                        content=m.group(2).strip(),
-                    ))
+                    actions.append(
+                        AgentAction(
+                            type="ask",
+                            target=m.group(1).strip(),
+                            content=m.group(2).strip(),
+                        )
+                    )
                 elif action_type == "escalate":
-                    actions.append(AgentAction(
-                        type="escalate",
-                        reason=m.group(1).strip(),
-                    ))
+                    actions.append(
+                        AgentAction(
+                            type="escalate",
+                            reason=m.group(1).strip(),
+                        )
+                    )
 
         return actions
 
@@ -483,13 +571,15 @@ class AgentLoop:
     # Action execution
     # ------------------------------------------------------------------
 
-    async def _execute_action(self, action: AgentAction, parent_id: str = "", full_context: str = "") -> None:
+    async def _execute_action(
+        self, action: AgentAction, parent_id: str = "", full_context: str = ""
+    ) -> None:
         """Route a parsed action through the message bus."""
         type_map = {
             "delegate": MessageType.DELEGATE,
-            "veto":     MessageType.VETO,
-            "approve":  MessageType.APPROVE,
-            "ask":      MessageType.REQUEST,
+            "veto": MessageType.VETO,
+            "approve": MessageType.APPROVE,
+            "ask": MessageType.REQUEST,
             "escalate": MessageType.ESCALATE,
         }
         msg_type = type_map.get(action.type, MessageType.INFORM)
@@ -510,7 +600,10 @@ class AgentLoop:
         self.instance.messages_sent += 1
         logger.info(
             "Action executed  agent=%s type=%s target=%s session=%s",
-            self.agent.id, action.type, action.target, self.session_id,
+            self.agent.id,
+            action.type,
+            action.target,
+            self.session_id,
         )
 
     # ------------------------------------------------------------------
@@ -584,6 +677,7 @@ class AgentLoop:
 # ---------------------------------------------------------------------------
 # AgentLoopManager (singleton)
 # ---------------------------------------------------------------------------
+
 
 class AgentLoopManager:
     """Manages all running agent loops for a session."""

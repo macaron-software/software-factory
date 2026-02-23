@@ -80,33 +80,45 @@ Always verify these fundamentals first:
 
 ```html
 <!-- Required landmarks on every page -->
-<header role="banner">         <!-- One per page -->
-<nav role="navigation">         <!-- Label if multiple -->
-<main role="main">              <!-- One per page -->
-<footer role="contentinfo">     <!-- One per page -->
-<aside role="complementary">    <!-- Sidebar content -->
-<form role="search">            <!-- Search form -->
+<header role="banner">
+  <!-- One per page -->
+  <nav role="navigation">
+    <!-- Label if multiple -->
+    <main role="main">
+      <!-- One per page -->
+      <footer role="contentinfo">
+        <!-- One per page -->
+        <aside role="complementary">
+          <!-- Sidebar content -->
+          <form role="search">
+            <!-- Search form -->
 
-<!-- ARIA states for interactive elements -->
-<button aria-expanded="false" aria-controls="menu-panel">Menu</button>
-<div id="menu-panel" role="menu" aria-hidden="true">
-  <button role="menuitem">Option 1</button>
-  <button role="menuitem">Option 2</button>
-</div>
+            <!-- ARIA states for interactive elements -->
+            <button aria-expanded="false" aria-controls="menu-panel">Menu</button>
+            <div id="menu-panel" role="menu" aria-hidden="true">
+              <button role="menuitem">Option 1</button>
+              <button role="menuitem">Option 2</button>
+            </div>
 
-<!-- Live regions for dynamic content -->
-<div role="status" aria-live="polite">3 results found</div>
-<div role="alert" aria-live="assertive">Error: Invalid email</div>
+            <!-- Live regions for dynamic content -->
+            <div role="status" aria-live="polite">3 results found</div>
+            <div role="alert" aria-live="assertive">Error: Invalid email</div>
+          </form>
+        </aside>
+      </footer>
+    </main>
+  </nav>
+</header>
 ```
 
 ### Color Contrast Requirements
 
-| Element | Minimum Ratio | Level |
-|---------|--------------|-------|
-| Body text (< 18px) | 4.5:1 | AA |
-| Large text (≥ 18px or ≥ 14px bold) | 3:1 | AA |
-| UI components & graphics | 3:1 | AA |
-| Body text (enhanced) | 7:1 | AAA |
+| Element                            | Minimum Ratio | Level |
+| ---------------------------------- | ------------- | ----- |
+| Body text (< 18px)                 | 4.5:1         | AA    |
+| Large text (≥ 18px or ≥ 14px bold) | 3:1           | AA    |
+| UI components & graphics           | 3:1           | AA    |
+| Body text (enhanced)               | 7:1           | AAA   |
 
 ```typescript
 // Automated contrast check
@@ -124,6 +136,7 @@ function getContrastRatio(fg: string, bg: string): number {
 ### Keyboard Navigation
 
 Every interactive element must be:
+
 1. **Focusable** — reachable via Tab key
 2. **Operable** — activatable via Enter or Space
 3. **Visible** — has a visible focus indicator
@@ -143,22 +156,22 @@ Every interactive element must be:
 
 #### Keyboard Patterns by Component
 
-| Component | Tab | Enter/Space | Escape | Arrow Keys |
-|-----------|-----|-------------|--------|------------|
-| Button | Focus | Activate | - | - |
-| Link | Focus | Navigate | - | - |
-| Menu | Focus trigger | Open/Select | Close | Navigate items |
-| Dialog | Focus first element | - | Close | - |
-| Tabs | Focus active tab | Select tab | - | Switch tabs |
-| Accordion | Focus header | Toggle | - | Navigate headers |
-| Combobox | Focus input | Select | Close list | Navigate options |
+| Component | Tab                 | Enter/Space | Escape     | Arrow Keys       |
+| --------- | ------------------- | ----------- | ---------- | ---------------- |
+| Button    | Focus               | Activate    | -          | -                |
+| Link      | Focus               | Navigate    | -          | -                |
+| Menu      | Focus trigger       | Open/Select | Close      | Navigate items   |
+| Dialog    | Focus first element | -           | Close      | -                |
+| Tabs      | Focus active tab    | Select tab  | -          | Switch tabs      |
+| Accordion | Focus header        | Toggle      | -          | Navigate headers |
+| Combobox  | Focus input         | Select      | Close list | Navigate options |
 
 ### Focus Management
 
 ```typescript
 // After opening a modal
 dialog.showModal();
-dialog.querySelector('[autofocus]')?.focus();
+dialog.querySelector("[autofocus]")?.focus();
 
 // After closing a modal — return focus to trigger
 const trigger = document.activeElement;
@@ -175,7 +188,7 @@ nextItem?.focus();
 ```html
 <!-- Every input needs a label -->
 <label for="email">Email address</label>
-<input id="email" type="email" required aria-describedby="email-hint email-error">
+<input id="email" type="email" required aria-describedby="email-hint email-error" />
 <span id="email-hint" class="hint">We'll never share your email</span>
 <span id="email-error" class="error" role="alert" aria-live="polite"></span>
 
@@ -183,13 +196,13 @@ nextItem?.focus();
 <fieldset>
   <legend>Shipping Address</legend>
   <label for="street">Street</label>
-  <input id="street" type="text">
+  <input id="street" type="text" />
   <label for="city">City</label>
-  <input id="city" type="text">
+  <input id="city" type="text" />
 </fieldset>
 
 <!-- Error messages must be associated -->
-<input id="password" type="password" aria-invalid="true" aria-describedby="pw-error">
+<input id="password" type="password" aria-invalid="true" aria-describedby="pw-error" />
 <span id="pw-error" role="alert">Password must be at least 8 characters</span>
 ```
 
@@ -200,18 +213,18 @@ nextItem?.focus();
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
 <style>
-.skip-link {
-  position: absolute;
-  top: -100%;
-  left: 0;
-  padding: 0.5rem 1rem;
-  background: var(--color-primary-500);
-  color: white;
-  z-index: 9999;
-}
-.skip-link:focus {
-  top: 0;
-}
+  .skip-link {
+    position: absolute;
+    top: -100%;
+    left: 0;
+    padding: 0.5rem 1rem;
+    background: var(--color-primary-500);
+    color: white;
+    z-index: 9999;
+  }
+  .skip-link:focus {
+    top: 0;
+  }
 </style>
 ```
 

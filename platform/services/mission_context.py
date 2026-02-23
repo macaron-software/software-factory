@@ -2,6 +2,7 @@
 
 Extracted from web/routes/missions.py to keep route handlers thin.
 """
+
 from __future__ import annotations
 
 import logging
@@ -21,13 +22,13 @@ class MissionContextBuilder:
 
     async def build_context(self) -> dict | None:
         """Return a dict ready for template rendering, or None if mission not found."""
-        from ..missions.store import get_mission_run_store
         from ..agents.store import get_agent_store
-        from ..workflows.store import get_workflow_store
-        from ..sessions.store import get_session_store
         from ..memory.manager import get_memory_manager
+        from ..missions.store import get_mission_run_store
+        from ..sessions.store import get_session_store
         from ..web.routes.helpers import _agent_map_for_template
         from ..web.routes.missions import _detect_project_platform
+        from ..workflows.store import get_workflow_store
 
         mission_id = self.mission_id
         run_store = get_mission_run_store()
@@ -160,24 +161,31 @@ class MissionContextBuilder:
             for a in aids:
                 adef = agent_defs.get(a)
                 am = agent_map.get(a, {})
-                entries.append({
-                    "id": a,
-                    "name": am.get("name", a),
-                    "role": am.get("role", ""),
-                    "avatar_url": am.get("avatar_url", ""),
-                    "color": am.get("color", "#8b949e"),
-                    "tagline": getattr(adef, "tagline", "") or "" if adef else "",
-                    "persona": getattr(adef, "persona", "") or "" if adef else "",
-                    "motivation": getattr(adef, "motivation", "") or "" if adef else "",
-                    "skills": getattr(adef, "skills", []) or [] if adef else [],
-                    "tools": getattr(adef, "tools", []) or [] if adef else [],
-                    "model": getattr(adef, "model", "") or "" if adef else "",
-                    "provider": getattr(adef, "provider", "") or "" if adef else "",
-                })
+                entries.append(
+                    {
+                        "id": a,
+                        "name": am.get("name", a),
+                        "role": am.get("role", ""),
+                        "avatar_url": am.get("avatar_url", ""),
+                        "color": am.get("color", "#8b949e"),
+                        "tagline": getattr(adef, "tagline", "") or "" if adef else "",
+                        "persona": getattr(adef, "persona", "") or "" if adef else "",
+                        "motivation": getattr(adef, "motivation", "") or "" if adef else "",
+                        "skills": getattr(adef, "skills", []) or [] if adef else [],
+                        "tools": getattr(adef, "tools", []) or [] if adef else [],
+                        "model": getattr(adef, "model", "") or "" if adef else "",
+                        "provider": getattr(adef, "provider", "") or "" if adef else "",
+                    }
+                )
             phase_agents[wp.id] = entries
 
             agent_set = set(aids)
             p_nodes = [n for n in all_nodes if n.get("agent_id") in agent_set]
+
+            # If no graph config exists, generate nodes from phase agents
+            if not p_nodes and aids:
+                p_nodes = [{"id": f"n-{a}", "agent_id": a} for a in aids]
+
             p_node_ids = {n["id"] for n in p_nodes}
             p_edges = [e for e in all_edges if e["from"] in p_node_ids and e["to"] in p_node_ids]
 
@@ -189,13 +197,16 @@ class MissionContextBuilder:
             for n in p_nodes:
                 aid = n.get("agent_id", "")
                 am = agent_map.get(aid, {})
-                enriched_nodes.append({
-                    "id": n["id"], "agent_id": aid,
-                    "label": am.get("name", n.get("label", aid)),
-                    "role": am.get("role", ""),
-                    "avatar": am.get("avatar_url", ""),
-                    "hierarchy_rank": am.get("hierarchy_rank", 50),
-                })
+                enriched_nodes.append(
+                    {
+                        "id": n["id"],
+                        "agent_id": aid,
+                        "label": am.get("name", n.get("label", aid)),
+                        "role": am.get("role", ""),
+                        "avatar": am.get("avatar_url", ""),
+                        "hierarchy_rank": am.get("hierarchy_rank", 50),
+                    }
+                )
             phase_graphs[wp.id] = {"nodes": enriched_nodes, "edges": p_edges}
 
         return phase_agents, phase_graphs
@@ -203,17 +214,20 @@ class MissionContextBuilder:
     def _auto_generate_edges(self, p_nodes, p_edges, pattern_id, agent_map):
         """Auto-generate rich multi-pattern edges."""
         pids = [n["id"] for n in p_nodes]
-        ranked = sorted(p_nodes, key=lambda n: agent_map.get(n.get("agent_id",""), {}).get("hierarchy_rank", 50))
+        ranked = sorted(
+            p_nodes,
+            key=lambda n: agent_map.get(n.get("agent_id", ""), {}).get("hierarchy_rank", 50),
+        )
         leader_nid = ranked[0]["id"]
 
-        C_HIER   = "#f59e0b"
-        C_NET    = "#8b5cf6"
-        C_SEQ    = "#3b82f6"
-        C_LOOP   = "#ec4899"
-        C_PAR    = "#10b981"
-        C_GATE   = "#ef4444"
-        C_AGG    = "#06b6d4"
-        C_ROUTE  = "#f97316"
+        C_HIER = "#f59e0b"
+        C_NET = "#8b5cf6"
+        C_SEQ = "#3b82f6"
+        C_LOOP = "#ec4899"
+        C_PAR = "#10b981"
+        C_GATE = "#ef4444"
+        C_AGG = "#06b6d4"
+        C_ROUTE = "#f97316"
 
         def _add(f, t, **kw):
             if not any(e["from"] == f and e["to"] == t for e in p_edges):
@@ -221,7 +235,7 @@ class MissionContextBuilder:
 
         if pattern_id == "network":
             for i, a in enumerate(pids):
-                for b in pids[i+1:]:
+                for b in pids[i + 1 :]:
                     _add(a, b, color=C_NET, label="")
                     _add(b, a, color=C_NET, label="")
             others = [p for p in pids if p != leader_nid]
@@ -233,7 +247,7 @@ class MissionContextBuilder:
             for a in advisors:
                 _add(a, leader_nid, color=C_HIER, label="avis")
             for i, a in enumerate(advisors):
-                for b in advisors[i+1:]:
+                for b in advisors[i + 1 :]:
                     _add(a, b, color=C_NET, label="débat")
                     _add(b, a, color=C_NET, label="")
             if advisors:
@@ -241,7 +255,7 @@ class MissionContextBuilder:
 
         elif pattern_id == "sequential":
             for i in range(len(pids) - 1):
-                _add(pids[i], pids[i+1], color=C_SEQ, label="")
+                _add(pids[i], pids[i + 1], color=C_SEQ, label="")
             if len(pids) >= 3:
                 _add(pids[-1], pids[0], color=C_LOOP, label="feedback")
 
@@ -253,7 +267,7 @@ class MissionContextBuilder:
             for a in contributors:
                 _add(aggregator, a, color=C_LOOP, label="review")
             for i, a in enumerate(contributors):
-                for b in contributors[i+1:]:
+                for b in contributors[i + 1 :]:
                     _add(a, b, color=C_NET, label="")
 
         elif pattern_id == "hierarchical":
@@ -263,7 +277,7 @@ class MissionContextBuilder:
             for t in team:
                 _add(t, leader_nid, color=C_LOOP, label="review")
             for i, a in enumerate(team):
-                for b in team[i+1:]:
+                for b in team[i + 1 :]:
                     _add(a, b, color=C_NET, label="")
 
         elif pattern_id == "parallel":
@@ -273,12 +287,12 @@ class MissionContextBuilder:
             for w in workers:
                 _add(w, leader_nid, color=C_AGG, label="résultat")
             for i, a in enumerate(workers):
-                for b in workers[i+1:]:
+                for b in workers[i + 1 :]:
                     _add(a, b, color=C_NET, label="")
 
         elif pattern_id == "loop":
             for i in range(len(pids)):
-                f, t = pids[i], pids[(i+1) % len(pids)]
+                f, t = pids[i], pids[(i + 1) % len(pids)]
                 _add(f, t, color=C_LOOP, label="")
                 _add(t, f, color=C_LOOP, label="feedback")
 
@@ -289,12 +303,12 @@ class MissionContextBuilder:
             for s in specialists:
                 _add(s, leader_nid, color=C_AGG, label="résolu")
             for i, a in enumerate(specialists):
-                for b in specialists[i+1:]:
+                for b in specialists[i + 1 :]:
                     _add(a, b, color=C_NET, label="")
 
         else:
             for i in range(len(pids) - 1):
-                _add(pids[i], pids[i+1], color="#8b949e")
+                _add(pids[i], pids[i + 1], color="#8b949e")
 
     def _extract_messages(self, mission, wf, agent_map, get_session_store):
         messages = []
@@ -311,7 +325,7 @@ class MissionContextBuilder:
             msgs = session_store.get_messages(mission.session_id, limit=500)
             for m in msgs:
                 if m.from_agent == "system" and m.content:
-                    for wp in (wf.phases if wf else []):
+                    for wp in wf.phases if wf else []:
                         if wp.name and wp.name in m.content and "started" in m.content:
                             _current_phase_infer = wp.id
                             break
@@ -333,7 +347,11 @@ class MissionContextBuilder:
                     "metadata": meta,
                 }
                 messages.append(msg_dict)
-                pid = meta.get("phase_id", "") or _current_phase_infer or _agent_to_phase.get(m.from_agent, "")
+                pid = (
+                    meta.get("phase_id", "")
+                    or _current_phase_infer
+                    or _agent_to_phase.get(m.from_agent, "")
+                )
                 if pid:
                     phase_messages.setdefault(pid, []).append(msg_dict)
         return messages, phase_messages
@@ -343,7 +361,7 @@ class MissionContextBuilder:
         for pid, pmsgs in phase_messages.items():
             shots = []
             for m in pmsgs:
-                for match in re.finditer(r'\[SCREENSHOT:([^\]]+)\]', m.get("content", "")):
+                for match in re.finditer(r"\[SCREENSHOT:([^\]]+)\]", m.get("content", "")):
                     p = match.group(1).strip().lstrip("./")
                     shots.append(p)
             if shots:
@@ -353,8 +371,11 @@ class MissionContextBuilder:
             _ws_shots_dir = Path(mission.workspace_path) / "screenshots"
             if _ws_shots_dir.exists():
                 _ws_shots = sorted(
-                    [f"screenshots/{f.name}" for f in _ws_shots_dir.glob("*.png")
-                     if f.stat().st_size > 1000],
+                    [
+                        f"screenshots/{f.name}"
+                        for f in _ws_shots_dir.glob("*.png")
+                        if f.stat().st_size > 1000
+                    ],
                 )
                 if _ws_shots:
                     for pid in ("qa-campaign", "qa-execution", "test"):
@@ -365,9 +386,19 @@ class MissionContextBuilder:
 
     def _load_memories(self, mission, get_memory_manager):
         memories = []
-        _useful_cats = {"product", "architecture", "security", "development", "quality",
-                        "phase-summary", "vision", "convention", "team",
-                        "decisions", "infrastructure"}
+        _useful_cats = {
+            "product",
+            "architecture",
+            "security",
+            "development",
+            "quality",
+            "phase-summary",
+            "vision",
+            "convention",
+            "team",
+            "decisions",
+            "infrastructure",
+        }
         try:
             mem_mgr = get_memory_manager()
             proj_mems = mem_mgr.project_get(mission.id, limit=80) or []
@@ -399,17 +430,37 @@ class MissionContextBuilder:
             for m in all_msgs:
                 content = m.content or ""
                 if "git_commit" in content or "[TOOL_CALL]" in content:
-                    for match in re.finditer(r'(?:git_commit|git commit)[^\n]*?["\']([^"\']{5,80})["\']', content):
-                        tool_commits.append({"hash": f"{hash(match.group(1)) & 0xfffffff:07x}", "message": match.group(1)})
-                    for match in re.finditer(r'(?:feat|fix|chore|refactor|test|docs)\([^)]+\):\s*(.{10,80})', content):
+                    for match in re.finditer(
+                        r'(?:git_commit|git commit)[^\n]*?["\']([^"\']{5,80})["\']', content
+                    ):
+                        tool_commits.append(
+                            {
+                                "hash": f"{hash(match.group(1)) & 0xFFFFFFF:07x}",
+                                "message": match.group(1),
+                            }
+                        )
+                    for match in re.finditer(
+                        r"(?:feat|fix|chore|refactor|test|docs)\([^)]+\):\s*(.{10,80})", content
+                    ):
                         msg = match.group(0)
                         if msg not in [c["message"] for c in tool_commits]:
-                            tool_commits.append({"hash": f"{hash(msg) & 0xfffffff:07x}", "message": msg})
+                            tool_commits.append(
+                                {"hash": f"{hash(msg) & 0xFFFFFFF:07x}", "message": msg}
+                            )
                 if "create_pull_request" in content.lower() or "[PR]" in content:
-                    for match in re.finditer(r'\[PR\]\s*(.{5,80})', content):
-                        tool_prs.append({"number": len(tool_prs) + 1, "title": match.group(1).strip(), "status": "Open"})
-                if any(kw in content.lower() for kw in ("implement", "create ", "add ", "[pr]", "livrable")):
-                    for match in re.finditer(r'\[PR\]\s*(.{5,100})', content):
+                    for match in re.finditer(r"\[PR\]\s*(.{5,80})", content):
+                        tool_prs.append(
+                            {
+                                "number": len(tool_prs) + 1,
+                                "title": match.group(1).strip(),
+                                "status": "Open",
+                            }
+                        )
+                if any(
+                    kw in content.lower()
+                    for kw in ("implement", "create ", "add ", "[pr]", "livrable")
+                ):
+                    for match in re.finditer(r"\[PR\]\s*(.{5,100})", content):
                         feat = match.group(1).strip()
                         if feat not in tool_features:
                             tool_features.append(feat)
@@ -422,17 +473,28 @@ class MissionContextBuilder:
         workspace_commits = list(tool_commits)
         if mission.workspace_path:
             import subprocess
+
             try:
                 result = subprocess.run(
                     ["git", "branch", "-a", "--format=%(refname:short)"],
-                    cwd=mission.workspace_path, capture_output=True, text=True, timeout=5
+                    cwd=mission.workspace_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
-                branches = [b.strip() for b in result.stdout.strip().split("\n") if b.strip() and b.strip() not in ("master", "main")]
+                branches = [
+                    b.strip()
+                    for b in result.stdout.strip().split("\n")
+                    if b.strip() and b.strip() not in ("master", "main")
+                ]
                 for i, branch in enumerate(branches[:10]):
                     status = "Open"
                     merged = subprocess.run(
                         ["git", "branch", "--merged", "HEAD", "--format=%(refname:short)"],
-                        cwd=mission.workspace_path, capture_output=True, text=True, timeout=5
+                        cwd=mission.workspace_path,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
                     )
                     if branch in merged.stdout:
                         status = "Merged"
@@ -442,12 +504,17 @@ class MissionContextBuilder:
             try:
                 result = subprocess.run(
                     ["git", "log", "--oneline", "--no-decorate", "-15"],
-                    cwd=mission.workspace_path, capture_output=True, text=True, timeout=5
+                    cwd=mission.workspace_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
                 for line in result.stdout.strip().split("\n"):
                     if line.strip():
                         parts = line.strip().split(" ", 1)
-                        workspace_commits.append({"hash": parts[0], "message": parts[1] if len(parts) > 1 else ""})
+                        workspace_commits.append(
+                            {"hash": parts[0], "message": parts[1] if len(parts) > 1 else ""}
+                        )
             except Exception:
                 pass
         return pull_requests, workspace_commits
@@ -456,7 +523,13 @@ class MissionContextBuilder:
         si_blueprint = None
         try:
             import yaml as _yaml
-            bp_path = Path(__file__).resolve().parents[1] / "data" / "si_blueprints" / f"{mission.project_id}.yaml"
+
+            bp_path = (
+                Path(__file__).resolve().parents[1]
+                / "data"
+                / "si_blueprints"
+                / f"{mission.project_id}.yaml"
+            )
             if bp_path.exists():
                 with open(bp_path) as _f:
                     si_blueprint = _yaml.safe_load(_f)
@@ -479,8 +552,12 @@ class MissionContextBuilder:
 
     def _build_result_section(self, mission, _detect_project_platform):
         result = {
-            "screenshots": [], "build_cmd": "", "run_cmd": "",
-            "launch_cmd": "", "deploy_url": "", "project_type": "",
+            "screenshots": [],
+            "build_cmd": "",
+            "run_cmd": "",
+            "launch_cmd": "",
+            "deploy_url": "",
+            "project_type": "",
         }
         ws_path = mission.workspace_path or ""
         if not ws_path:
@@ -501,10 +578,29 @@ class MissionContextBuilder:
 
         detected = _detect_project_platform(ws_path)
         brief_lower = (mission.brief or "").lower()
-        brief_web_keywords = ("site web", "e-commerce", "webapp", "web app", "api rest",
-                              "saas", "dashboard", "portail", "backoffice", "back-office",
-                              "react", "vue", "angular", "svelte", "next.js", "django",
-                              "flask", "fastapi", "express", "node.js", "docker")
+        brief_web_keywords = (
+            "site web",
+            "e-commerce",
+            "webapp",
+            "web app",
+            "api rest",
+            "saas",
+            "dashboard",
+            "portail",
+            "backoffice",
+            "back-office",
+            "react",
+            "vue",
+            "angular",
+            "svelte",
+            "next.js",
+            "django",
+            "flask",
+            "fastapi",
+            "express",
+            "node.js",
+            "docker",
+        )
         if any(kw in brief_lower for kw in brief_web_keywords):
             if detected in ("macos-native", "ios-native", "unknown"):
                 detected = "web-docker" if "docker" in brief_lower else "web-node"
@@ -519,13 +615,18 @@ class MissionContextBuilder:
                 scheme = "App"
                 try:
                     import yaml as _y
+
                     proj = _y.safe_load((ws / "project.yml").read_text())
                     scheme = proj.get("name", "App")
                 except Exception:
                     pass
-                result["build_cmd"] = f"xcodegen generate && xcodebuild -scheme {scheme} -configuration Debug build"
+                result["build_cmd"] = (
+                    f"xcodegen generate && xcodebuild -scheme {scheme} -configuration Debug build"
+                )
                 result["run_cmd"] = f"open build/Debug/{scheme}.app"
-                result["launch_cmd"] = f"xcodegen generate && xcodebuild -scheme {scheme} -configuration Debug build && open build/Debug/{scheme}.app"
+                result["launch_cmd"] = (
+                    f"xcodegen generate && xcodebuild -scheme {scheme} -configuration Debug build && open build/Debug/{scheme}.app"
+                )
             else:
                 result["build_cmd"] = "swift build"
                 result["run_cmd"] = "swift run"
@@ -555,9 +656,19 @@ class MissionContextBuilder:
                 if env_file.exists():
                     try:
                         env_text = env_file.read_text()[:2000]
-                        urls = re.findall(r'https?://[^\s\)\"\']+', env_text)
+                        urls = re.findall(r"https?://[^\s\)\"\']+", env_text)
                         for u in urls:
-                            if any(d in u for d in ("azurewebsites", "azure", "herokuapp", "vercel", "netlify", "localhost")):
+                            if any(
+                                d in u
+                                for d in (
+                                    "azurewebsites",
+                                    "azure",
+                                    "herokuapp",
+                                    "vercel",
+                                    "netlify",
+                                    "localhost",
+                                )
+                            ):
                                 result["deploy_url"] = u
                                 break
                     except Exception:
@@ -581,8 +692,20 @@ class MissionContextBuilder:
             rel = os.path.relpath(root, ws)
             if rel == ".":
                 rel = ""
-            _ws_exclude = {"node_modules", ".git", ".next", "dist", "build", "vendor", "__pycache__", ".tox", "venv"}
-            dirs[:] = [d for d in sorted(dirs) if not d.startswith(".") and d not in _ws_exclude][:20]
+            _ws_exclude = {
+                "node_modules",
+                ".git",
+                ".next",
+                "dist",
+                "build",
+                "vendor",
+                "__pycache__",
+                ".tox",
+                "venv",
+            }
+            dirs[:] = [d for d in sorted(dirs) if not d.startswith(".") and d not in _ws_exclude][
+                :20
+            ]
             for f in sorted(files)[:30]:
                 if f.endswith(".bak"):
                     continue
@@ -594,10 +717,21 @@ class MissionContextBuilder:
         po_backlog, po_sprint, po_done = [], [], []
         try:
             from ..db.migrations import get_db
+
             db = get_db()
-            rows = db.execute("SELECT name, description, acceptance_criteria, priority, status, story_points, assigned_to FROM features WHERE epic_id=?", (self.mission_id,)).fetchall()
+            rows = db.execute(
+                "SELECT name, description, acceptance_criteria, priority, status, story_points, assigned_to FROM features WHERE epic_id=?",
+                (self.mission_id,),
+            ).fetchall()
             for r in rows:
-                feat = {"name": r[0], "description": r[1] or "", "acceptance_criteria": r[2] or "", "priority": r[3] or 5, "story_points": r[5] or 0, "assigned_to": r[6] or ""}
+                feat = {
+                    "name": r[0],
+                    "description": r[1] or "",
+                    "acceptance_criteria": r[2] or "",
+                    "priority": r[3] or 5,
+                    "story_points": r[5] or 0,
+                    "assigned_to": r[6] or "",
+                }
                 if r[4] == "done":
                     po_done.append(feat)
                 elif r[4] in ("in_progress", "sprint"):
@@ -608,16 +742,32 @@ class MissionContextBuilder:
             pass
         if not po_backlog and not po_sprint and not po_done and tool_features:
             for f in tool_features:
-                po_done.append({"name": f, "description": "", "acceptance_criteria": "", "priority": 5, "story_points": 0, "assigned_to": ""})
+                po_done.append(
+                    {
+                        "name": f,
+                        "description": "",
+                        "acceptance_criteria": "",
+                        "priority": 5,
+                        "story_points": 0,
+                        "assigned_to": "",
+                    }
+                )
         if not po_backlog and not po_sprint and not po_done and mission:
             from ..models import PhaseStatus
+
             done_phases = {"deploy-prod", "qa-execution", "qa-campaign", "tma-router", "tma-fix"}
             sprint_phases = {"dev-sprint", "cicd"}
             for ph in mission.phases:
                 if not getattr(ph, "summary", None):
                     continue
-                feat = {"name": ph.summary[:80], "description": "", "acceptance_criteria": "",
-                        "priority": 5, "story_points": 0, "assigned_to": ""}
+                feat = {
+                    "name": ph.summary[:80],
+                    "description": "",
+                    "acceptance_criteria": "",
+                    "priority": 5,
+                    "story_points": 0,
+                    "assigned_to": "",
+                }
                 if ph.phase_id in done_phases and ph.status in (PhaseStatus.DONE,):
                     po_done.append(feat)
                 elif ph.phase_id in sprint_phases:
@@ -633,32 +783,72 @@ class MissionContextBuilder:
         qa_total_iterations = 0
         try:
             from ..db.migrations import get_db as _gdb_qa
+
             db = _gdb_qa()
-            rows = db.execute("SELECT agent_id, accepted, rejected, iterations, quality_score FROM agent_scores WHERE epic_id=?", (self.mission_id,)).fetchall()
+            rows = db.execute(
+                "SELECT agent_id, accepted, rejected, iterations, quality_score FROM agent_scores WHERE epic_id=?",
+                (self.mission_id,),
+            ).fetchall()
             for r in rows:
-                agent_scores.append({"agent_id": r[0], "accepted": r[1], "rejected": r[2], "iterations": r[3], "quality_score": r[4]})
+                agent_scores.append(
+                    {
+                        "agent_id": r[0],
+                        "accepted": r[1],
+                        "rejected": r[2],
+                        "iterations": r[3],
+                        "quality_score": r[4],
+                    }
+                )
                 qa_total_accepted += r[1]
                 qa_total_rejected += r[2]
                 qa_total_iterations += r[3]
         except Exception:
             pass
-        qa_pass_rate = round(qa_total_accepted / qa_total_iterations * 100) if qa_total_iterations > 0 else 0
+        qa_pass_rate = (
+            round(qa_total_accepted / qa_total_iterations * 100) if qa_total_iterations > 0 else 0
+        )
 
         qa_test_files = []
-        _qa_exclude = {"node_modules", ".git", ".next", "dist", "build", "vendor", "__pycache__", ".tox", "venv"}
+        _qa_exclude = {
+            "node_modules",
+            ".git",
+            ".next",
+            "dist",
+            "build",
+            "vendor",
+            "__pycache__",
+            ".tox",
+            "venv",
+        }
         ws_path = mission.workspace_path or ""
         if ws_path and Path(ws_path).exists():
             ws = Path(ws_path)
-            test_globs = ["**/test_*.py", "**/*_test.py", "**/*.test.ts", "**/*.test.js",
-                          "**/*.spec.ts", "**/*.spec.js", "**/Tests/**/*.swift", "**/*Test.swift",
-                          "**/*Test.kt", "**/*Test.java", "tests/**/*", "test/**/*", "__tests__/**/*"]
+            test_globs = [
+                "**/test_*.py",
+                "**/*_test.py",
+                "**/*.test.ts",
+                "**/*.test.js",
+                "**/*.spec.ts",
+                "**/*.spec.js",
+                "**/Tests/**/*.swift",
+                "**/*Test.swift",
+                "**/*Test.kt",
+                "**/*Test.java",
+                "tests/**/*",
+                "test/**/*",
+                "__tests__/**/*",
+            ]
             seen = set()
             for pat in test_globs:
                 for tf in ws.glob(pat):
                     rel = str(tf.relative_to(ws))
                     if any(part in _qa_exclude for part in tf.relative_to(ws).parts):
                         continue
-                    if tf.is_file() and tf.suffix in (".py", ".ts", ".js", ".swift", ".kt", ".java") and str(tf) not in seen:
+                    if (
+                        tf.is_file()
+                        and tf.suffix in (".py", ".ts", ".js", ".swift", ".kt", ".java")
+                        and str(tf) not in seen
+                    ):
                         seen.add(str(tf))
                         rel = str(tf.relative_to(ws))
                         ttype = "unit"
@@ -667,12 +857,19 @@ class MissionContextBuilder:
                             ttype = "e2e"
                         elif "smoke" in lower:
                             ttype = "smoke"
-                        elif "ui" in lower or "ihm" in lower or "browser" in lower or "spec" in lower:
+                        elif (
+                            "ui" in lower or "ihm" in lower or "browser" in lower or "spec" in lower
+                        ):
                             ttype = "e2e-ihm"
                         qa_test_files.append({"path": rel, "type": ttype})
             qa_test_files = sorted(qa_test_files, key=lambda x: x["type"])[:30]
 
-        qa_coverage = {"test_count": len(qa_test_files), "code_count": 0, "ratio": 0, "coverage_pct": None}
+        qa_coverage = {
+            "test_count": len(qa_test_files),
+            "code_count": 0,
+            "ratio": 0,
+            "coverage_pct": None,
+        }
         if ws_path and Path(ws_path).exists():
             ws = Path(ws_path)
             code_exts = {".py", ".ts", ".js", ".swift", ".kt", ".java", ".rs"}
@@ -686,16 +883,25 @@ class MissionContextBuilder:
                         code_count += 1
             qa_coverage["code_count"] = code_count
             qa_coverage["ratio"] = round(len(qa_test_files) / max(code_count, 1) * 100)
-            for cov_file in ["coverage/coverage-summary.json", "htmlcov/status.json", ".coverage", "coverage.xml", "lcov.info"]:
+            for cov_file in [
+                "coverage/coverage-summary.json",
+                "htmlcov/status.json",
+                ".coverage",
+                "coverage.xml",
+                "lcov.info",
+            ]:
                 cp = ws / cov_file
                 if cp.exists():
                     try:
                         import json as _jcov
+
                         if cov_file.endswith(".json"):
                             with open(cp) as _cf:
                                 cov_data = _jcov.load(_cf)
                             if "total" in cov_data:
-                                qa_coverage["coverage_pct"] = cov_data["total"].get("lines", {}).get("pct")
+                                qa_coverage["coverage_pct"] = (
+                                    cov_data["total"].get("lines", {}).get("pct")
+                                )
                                 break
                     except Exception:
                         pass
@@ -710,17 +916,25 @@ class MissionContextBuilder:
                         content = m.get("content", "")
                         if not content:
                             continue
-                        passes = len(re.findall(r'(?:✅|PASS|passed|réussi|OK)', content, re.IGNORECASE))
-                        fails = len(re.findall(r'(?:❌|FAIL|failed|échoué|ERROR|KO)', content, re.IGNORECASE))
+                        passes = len(
+                            re.findall(r"(?:✅|PASS|passed|réussi|OK)", content, re.IGNORECASE)
+                        )
+                        fails = len(
+                            re.findall(
+                                r"(?:❌|FAIL|failed|échoué|ERROR|KO)", content, re.IGNORECASE
+                            )
+                        )
                         if passes or fails:
                             agent = m.get("from_agent", "unknown")
-                            qa_phase_results.append({
-                                "phase": wp.name,
-                                "agent": agent,
-                                "passes": passes,
-                                "fails": fails,
-                                "excerpt": content[:300],
-                            })
+                            qa_phase_results.append(
+                                {
+                                    "phase": wp.name,
+                                    "agent": agent,
+                                    "passes": passes,
+                                    "fails": fails,
+                                    "excerpt": content[:300],
+                                }
+                            )
 
         return {
             "agent_scores": agent_scores,
@@ -741,7 +955,12 @@ class MissionContextBuilder:
         ws_path = mission.workspace_path or ""
         if ws_path and Path(ws_path).exists():
             ws = Path(ws_path)
-            for archi_name in ("Architecture.md", "ARCHITECTURE.md", "architecture.md", "docs/architecture.md"):
+            for archi_name in (
+                "Architecture.md",
+                "ARCHITECTURE.md",
+                "architecture.md",
+                "docs/architecture.md",
+            ):
                 archi_file = ws / archi_name
                 if archi_file.exists():
                     try:
@@ -760,17 +979,41 @@ class MissionContextBuilder:
                     content = m.get("content", "")
                     if not content:
                         continue
-                    is_archi_agent = any(k in agent for k in ("architecte", "archi", "lead_dev", "sre"))
+                    is_archi_agent = any(
+                        k in agent for k in ("architecte", "archi", "lead_dev", "sre")
+                    )
                     if is_archi_agent and len(content) > 50:
-                        for tech in re.findall(r'(?:Swift(?:UI)?|Kotlin|React|Vue|Svelte|FastAPI|Django|Node\.js|PostgreSQL|Redis|Docker|Nginx|Playwright|TypeScript|Python|Rust|Go|GraphQL|gRPC|REST|WebSocket|SSE)', content):
+                        for tech in re.findall(
+                            r"(?:Swift(?:UI)?|Kotlin|React|Vue|Svelte|FastAPI|Django|Node\.js|PostgreSQL|Redis|Docker|Nginx|Playwright|TypeScript|Python|Rust|Go|GraphQL|gRPC|REST|WebSocket|SSE)",
+                            content,
+                        ):
                             if tech not in archi_stack:
                                 archi_stack.append(tech)
-                        if any(kw in content.lower() for kw in ("architecture", "pattern", "design", "stack", "layer", "module", "service", "composant", "structure", "choix")):
+                        if any(
+                            kw in content.lower()
+                            for kw in (
+                                "architecture",
+                                "pattern",
+                                "design",
+                                "stack",
+                                "layer",
+                                "module",
+                                "service",
+                                "composant",
+                                "structure",
+                                "choix",
+                            )
+                        ):
                             archi_decisions.append({"phase": wp.name, "text": content[:400]})
         archi_decisions = archi_decisions[:10]
         archi_stack = archi_stack[:15]
 
-        return {"content": archi_content, "updated": archi_updated, "decisions": archi_decisions, "stack": archi_stack}
+        return {
+            "content": archi_content,
+            "updated": archi_updated,
+            "decisions": archi_decisions,
+            "stack": archi_stack,
+        }
 
     def _load_wiki_data(self, mission, lessons, get_memory_manager):
         wiki_pages = []
@@ -779,9 +1022,12 @@ class MissionContextBuilder:
         if ws_path and Path(ws_path).exists():
             ws = Path(ws_path)
             doc_patterns = [
-                ("README.md", "README"), ("SPECS.md", "Specifications"),
-                ("DesignSystem.md", "Design System"), ("API.md", "API"),
-                ("CHANGELOG.md", "Changelog"), ("docs/README.md", "Documentation"),
+                ("README.md", "README"),
+                ("SPECS.md", "Specifications"),
+                ("DesignSystem.md", "Design System"),
+                ("API.md", "API"),
+                ("CHANGELOG.md", "Changelog"),
+                ("docs/README.md", "Documentation"),
             ]
             for fname, title in doc_patterns:
                 fpath = ws / fname
@@ -791,7 +1037,9 @@ class MissionContextBuilder:
                         if len(content.strip()) > 20:
                             mtime = fpath.stat().st_mtime
                             updated = datetime.fromtimestamp(mtime).strftime("%d/%m %H:%M")
-                            wiki_pages.append({"title": title, "content": content, "updated": updated})
+                            wiki_pages.append(
+                                {"title": title, "content": content, "updated": updated}
+                            )
                     except Exception:
                         pass
 
@@ -801,11 +1049,21 @@ class MissionContextBuilder:
                 entries = mem.project_search(mission.project_id, "", limit=20)
                 for e in entries:
                     if hasattr(e, "value") and e.value:
-                        wiki_memories.append({"category": getattr(e, "category", "") or "general", "value": e.value[:200]})
+                        wiki_memories.append(
+                            {
+                                "category": getattr(e, "category", "") or "general",
+                                "value": e.value[:200],
+                            }
+                        )
         except Exception:
             pass
         for lesson in lessons[:5]:
-            wiki_memories.append({"category": "lesson", "value": lesson[:200] if isinstance(lesson, str) else str(lesson)[:200]})
+            wiki_memories.append(
+                {
+                    "category": "lesson",
+                    "value": lesson[:200] if isinstance(lesson, str) else str(lesson)[:200],
+                }
+            )
         wiki_memories = wiki_memories[:20]
         return wiki_pages, wiki_memories
 
@@ -814,11 +1072,13 @@ class MissionContextBuilder:
         support_tickets = []
         try:
             from ..db.migrations import get_db
+
             _tdb = get_db()
             _ticket_rows = _tdb.execute(
                 "SELECT * FROM support_tickets WHERE mission_id=? ORDER BY "
                 "CASE severity WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END, created_at DESC",
-                (self.mission_id,)).fetchall()
+                (self.mission_id,),
+            ).fetchall()
             support_tickets = [dict(r) for r in _ticket_rows]
             _tdb.close()
         except Exception:
@@ -827,58 +1087,158 @@ class MissionContextBuilder:
         if wf_id == "security-hacking":
             tab_profile = [
                 {"id": "phases", "label": "Phases", "icon": "list"},
-                {"id": "vulns", "label": "Vulnerabilites", "icon": "alert-triangle",
-                 "agent_id": "threat-analyst", "fallback": "pentester-lead"},
-                {"id": "remediation", "label": "Remediation", "icon": "tool",
-                 "agent_id": "security-dev-lead", "fallback": "lead_dev"},
-                {"id": "compliance", "label": "Compliance", "icon": "clipboard",
-                 "agent_id": "compliance_officer", "fallback": "ciso"},
-                {"id": "ciso", "label": "CISO Dashboard", "icon": "shield",
-                 "agent_id": "ciso", "fallback": "pentester-lead"},
-                {"id": "wiki", "label": "Rapport", "icon": "book-open",
-                 "agent_id": "tech_writer", "fallback": "pentester-lead"},
+                {
+                    "id": "vulns",
+                    "label": "Vulnerabilites",
+                    "icon": "alert-triangle",
+                    "agent_id": "threat-analyst",
+                    "fallback": "pentester-lead",
+                },
+                {
+                    "id": "remediation",
+                    "label": "Remediation",
+                    "icon": "tool",
+                    "agent_id": "security-dev-lead",
+                    "fallback": "lead_dev",
+                },
+                {
+                    "id": "compliance",
+                    "label": "Compliance",
+                    "icon": "clipboard",
+                    "agent_id": "compliance_officer",
+                    "fallback": "ciso",
+                },
+                {
+                    "id": "ciso",
+                    "label": "CISO Dashboard",
+                    "icon": "shield",
+                    "agent_id": "ciso",
+                    "fallback": "pentester-lead",
+                },
+                {
+                    "id": "wiki",
+                    "label": "Rapport",
+                    "icon": "book-open",
+                    "agent_id": "tech_writer",
+                    "fallback": "pentester-lead",
+                },
             ]
         elif wf_id == "rse-compliance":
             tab_profile = [
                 {"id": "phases", "label": "Phases", "icon": "list"},
-                {"id": "rgpd", "label": "RGPD", "icon": "lock",
-                 "agent_id": "rse-dpo", "fallback": "rse-manager"},
-                {"id": "green-it", "label": "Green IT", "icon": "cpu",
-                 "agent_id": "rse-nr", "fallback": "rse-manager"},
-                {"id": "a11y", "label": "Accessibilite", "icon": "eye",
-                 "agent_id": "rse-a11y", "fallback": "rse-manager"},
-                {"id": "ethique", "label": "Ethique IA", "icon": "zap",
-                 "agent_id": "rse-ethique-ia", "fallback": "rse-manager"},
-                {"id": "wiki", "label": "Synthese", "icon": "book-open",
-                 "agent_id": "rse-manager", "fallback": "tech_writer"},
+                {
+                    "id": "rgpd",
+                    "label": "RGPD",
+                    "icon": "lock",
+                    "agent_id": "rse-dpo",
+                    "fallback": "rse-manager",
+                },
+                {
+                    "id": "green-it",
+                    "label": "Green IT",
+                    "icon": "cpu",
+                    "agent_id": "rse-nr",
+                    "fallback": "rse-manager",
+                },
+                {
+                    "id": "a11y",
+                    "label": "Accessibilite",
+                    "icon": "eye",
+                    "agent_id": "rse-a11y",
+                    "fallback": "rse-manager",
+                },
+                {
+                    "id": "ethique",
+                    "label": "Ethique IA",
+                    "icon": "zap",
+                    "agent_id": "rse-ethique-ia",
+                    "fallback": "rse-manager",
+                },
+                {
+                    "id": "wiki",
+                    "label": "Synthese",
+                    "icon": "book-open",
+                    "agent_id": "rse-manager",
+                    "fallback": "tech_writer",
+                },
             ]
         elif wf_id in ("tma-maintenance", "dsi-platform-tma"):
             tab_profile = [
                 {"id": "phases", "label": "Phases", "icon": "list"},
-                {"id": "tickets", "label": "Tickets", "icon": "inbox",
-                 "agent_id": "responsable_tma", "fallback": "plat-tma-lead"},
-                {"id": "diagnostic", "label": "Diagnostic", "icon": "search",
-                 "agent_id": "dev_tma", "fallback": "plat-tma-dev-back"},
-                {"id": "correctifs", "label": "Correctifs", "icon": "git-commit",
-                 "agent_id": "lead_dev", "fallback": "dev_tma"},
-                {"id": "sla", "label": "SLA", "icon": "clock",
-                 "agent_id": "chef_projet", "fallback": "responsable_tma"},
-                {"id": "historique", "label": "Historique", "icon": "archive",
-                 "agent_id": "responsable_tma", "fallback": "plat-tma-lead"},
+                {
+                    "id": "tickets",
+                    "label": "Tickets",
+                    "icon": "inbox",
+                    "agent_id": "responsable_tma",
+                    "fallback": "plat-tma-lead",
+                },
+                {
+                    "id": "diagnostic",
+                    "label": "Diagnostic",
+                    "icon": "search",
+                    "agent_id": "dev_tma",
+                    "fallback": "plat-tma-dev-back",
+                },
+                {
+                    "id": "correctifs",
+                    "label": "Correctifs",
+                    "icon": "git-commit",
+                    "agent_id": "lead_dev",
+                    "fallback": "dev_tma",
+                },
+                {
+                    "id": "sla",
+                    "label": "SLA",
+                    "icon": "clock",
+                    "agent_id": "chef_projet",
+                    "fallback": "responsable_tma",
+                },
+                {
+                    "id": "historique",
+                    "label": "Historique",
+                    "icon": "archive",
+                    "agent_id": "responsable_tma",
+                    "fallback": "plat-tma-lead",
+                },
             ]
         else:
             tab_profile = [
                 {"id": "phases", "label": "Phases", "icon": "list"},
-                {"id": "dev", "label": "Dev", "icon": "git-branch",
-                 "agent_id": "lead_dev", "fallback": "dev_backend"},
-                {"id": "po", "label": "PO", "icon": "clipboard",
-                 "agent_id": "product_owner", "fallback": "chef_projet"},
-                {"id": "qa", "label": "QA", "icon": "check",
-                 "agent_id": "qa_lead", "fallback": "test_manager"},
-                {"id": "archi", "label": "Archi", "icon": "layers",
-                 "agent_id": "architecte", "fallback": "lead_dev"},
-                {"id": "wiki", "label": "Wiki", "icon": "book-open",
-                 "agent_id": "tech_writer", "fallback": "lead_dev"},
+                {
+                    "id": "dev",
+                    "label": "Dev",
+                    "icon": "git-branch",
+                    "agent_id": "lead_dev",
+                    "fallback": "dev_backend",
+                },
+                {
+                    "id": "po",
+                    "label": "PO",
+                    "icon": "clipboard",
+                    "agent_id": "product_owner",
+                    "fallback": "chef_projet",
+                },
+                {
+                    "id": "qa",
+                    "label": "QA",
+                    "icon": "check",
+                    "agent_id": "qa_lead",
+                    "fallback": "test_manager",
+                },
+                {
+                    "id": "archi",
+                    "label": "Archi",
+                    "icon": "layers",
+                    "agent_id": "architecte",
+                    "fallback": "lead_dev",
+                },
+                {
+                    "id": "wiki",
+                    "label": "Wiki",
+                    "icon": "book-open",
+                    "agent_id": "tech_writer",
+                    "fallback": "lead_dev",
+                },
                 {"id": "projet", "label": "Projet", "icon": "code"},
             ]
 

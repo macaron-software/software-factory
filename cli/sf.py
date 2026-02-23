@@ -12,8 +12,8 @@ Usage:
     sf agents list
     sf llm stats
 """
+
 import argparse
-import json
 import os
 import sys
 
@@ -30,25 +30,30 @@ DEFAULT_URL = os.environ.get("MACARON_URL", "http://localhost:8090")
 
 # ── Backend selection ──
 
+
 def get_backend(args):
     """Auto-detect or force API vs DB backend."""
     if getattr(args, "db", False):
         from cli._db import DBBackend
+
         db_path = getattr(args, "db_path", None)
         return DBBackend(db_path)
 
     if getattr(args, "api", False):
         from cli._api import APIBackend
+
         return APIBackend(args.url, getattr(args, "token", None))
 
     # Auto-detect: try API first
     try:
         import httpx
+
         for ep in ("/api/health", "/api/agents"):
             try:
                 r = httpx.get(f"{args.url}{ep}", timeout=3)
                 if r.status_code in (200, 401):
                     from cli._api import APIBackend
+
                     return APIBackend(args.url, getattr(args, "token", None))
             except Exception:
                 continue
@@ -58,6 +63,7 @@ def get_backend(args):
     # Fallback to DB
     try:
         from cli._db import DBBackend
+
         db_path = getattr(args, "db_path", None) or os.environ.get("SF_DB_PATH")
         return DBBackend(db_path)
     except FileNotFoundError:
@@ -87,6 +93,7 @@ def output(args, data):
 
 # ── Command handlers ──
 
+
 def cmd_status(args):
     b = get_backend(args)
     health = b.health()
@@ -94,7 +101,9 @@ def cmd_status(args):
     health.update(mon)
     output(args, health)
 
+
 # ── Projects ──
+
 
 def cmd_projects_list(args):
     b = get_backend(args)
@@ -106,20 +115,28 @@ def cmd_projects_list(args):
     else:
         print(out.table(rows, cols))
 
+
 def cmd_projects_create(args):
     b = get_backend(args)
-    result = b.project_create(args.name, getattr(args, "desc", ""),
-                               getattr(args, "path", ""), getattr(args, "type", "web"))
+    result = b.project_create(
+        args.name,
+        getattr(args, "desc", ""),
+        getattr(args, "path", ""),
+        getattr(args, "type", "web"),
+    )
     output(args, result)
+
 
 def cmd_projects_show(args):
     b = get_backend(args)
     output(args, b.project_show(args.id))
 
+
 def cmd_projects_vision(args):
     b = get_backend(args)
     text = getattr(args, "set", None)
     output(args, b.project_vision(args.id, text))
+
 
 def cmd_projects_chat(args):
     b = get_backend(args)
@@ -129,9 +146,12 @@ def cmd_projects_chat(args):
         sys.exit(1)
     msg = " ".join(args.message)
     from cli._stream import print_stream
+
     print_stream(url, "POST", {"message": msg})
 
+
 # ── Missions ──
+
 
 def cmd_missions_list(args):
     b = get_backend(args)
@@ -143,22 +163,27 @@ def cmd_missions_list(args):
     else:
         print(out.table(rows, cols))
 
+
 def cmd_missions_show(args):
     b = get_backend(args)
     output(args, b.mission_show(args.id))
+
 
 def cmd_missions_create(args):
     b = get_backend(args)
     output(args, b.mission_create(args.name, args.project, getattr(args, "type", "epic")))
 
+
 def cmd_missions_start(args):
     b = get_backend(args)
     output(args, b.mission_start(args.id))
+
 
 def cmd_missions_run(args):
     b = get_backend(args)
     if getattr(args, "headless", False):
         from cli._stream import run_headless
+
         run_headless(sys.argv)
         return
     # Start the mission first
@@ -171,13 +196,16 @@ def cmd_missions_run(args):
     if url:
         out.info(f"Mission {args.id} started — streaming live...")
         from cli._stream import print_stream
+
         print_stream(url)
     else:
         output(args, result)
 
+
 def cmd_missions_wsjf(args):
     b = get_backend(args)
     output(args, b.mission_wsjf(args.id, args.bv, args.tc, args.rr, args.jd))
+
 
 def cmd_missions_chat(args):
     b = get_backend(args)
@@ -187,92 +215,156 @@ def cmd_missions_chat(args):
         sys.exit(1)
     msg = " ".join(args.message)
     from cli._stream import print_stream
+
     print_stream(url, "POST", {"message": msg})
+
 
 def cmd_missions_reset(args):
     b = get_backend(args)
     output(args, b.mission_reset(args.id))
 
+
 def cmd_missions_children(args):
     b = get_backend(args)
     output(args, b.mission_children(args.id))
 
+
+def cmd_missions_screenshots(args):
+    b = get_backend(args)
+    data = b.api_get(f"/api/missions/{args.id}/screenshots")
+    screenshots = data.get("screenshots", [])
+    if not screenshots:
+        out.info("No screenshots found for this mission.")
+        return
+    if getattr(args, "json_output", False):
+        out.out_json(data)
+    else:
+        out.info(f"Screenshots for mission {args.id} ({len(screenshots)}):")
+        for s in screenshots:
+            name = s.get("name", "")
+            size = s.get("size_kb", 0)
+            path = s.get("path", "")
+            print(f"  {out.CYAN}{name}{out.RESET}  ({size} KB)  {path}")
+
+
+def cmd_missions_metrics(args):
+    b = get_backend(args)
+    data = b.api_get(f"/api/metrics/pipeline/{args.id}")
+    if getattr(args, "json_output", False):
+        out.out_json(data)
+        return
+    tools = data.get("tools", {})
+    out.info(f"Pipeline Metrics — {args.id}")
+    print(f"  Tools: {tools.get('total', 0)} calls, {tools.get('rate', 0)}% success")
+    print(f"  Screenshots: {data.get('screenshots', 0)}")
+    tickets = data.get("tickets", {})
+    if tickets:
+        print(f"  Tickets: {tickets}")
+    print(f"  Phases: {len(data.get('phases', []))}")
+    print(f"  Agents: {len(data.get('agents', []))}")
+
+
 # ── Features ──
+
 
 def cmd_features_list(args):
     b = get_backend(args)
     output(args, b.features_list(args.epic_id))
 
+
 def cmd_features_create(args):
     b = get_backend(args)
     output(args, b.feature_create(args.epic_id, args.name, getattr(args, "sp", 3)))
 
+
 def cmd_features_update(args):
     b = get_backend(args)
     kwargs = {}
-    if getattr(args, "sp", None): kwargs["story_points"] = args.sp
-    if getattr(args, "feat_status", None): kwargs["status"] = args.feat_status
-    if getattr(args, "name", None): kwargs["name"] = args.name
+    if getattr(args, "sp", None):
+        kwargs["story_points"] = args.sp
+    if getattr(args, "feat_status", None):
+        kwargs["status"] = args.feat_status
+    if getattr(args, "name", None):
+        kwargs["name"] = args.name
     output(args, b.feature_update(args.id, **kwargs))
+
 
 def cmd_features_deps(args):
     b = get_backend(args)
     output(args, b.feature_deps(args.id))
 
+
 def cmd_features_add_dep(args):
     b = get_backend(args)
     output(args, b.feature_add_dep(args.id, args.dep_id))
+
 
 def cmd_features_rm_dep(args):
     b = get_backend(args)
     output(args, b.feature_rm_dep(args.id, args.dep_id))
 
+
 # ── Stories ──
+
 
 def cmd_stories_list(args):
     b = get_backend(args)
     fid = getattr(args, "feature_id", None)
     output(args, b.stories_list(fid))
 
+
 def cmd_stories_create(args):
     b = get_backend(args)
     output(args, b.story_create(args.feature_id, args.name, getattr(args, "sp", 2)))
 
+
 def cmd_stories_update(args):
     b = get_backend(args)
     kwargs = {}
-    if getattr(args, "sp", None): kwargs["story_points"] = args.sp
-    if getattr(args, "story_status", None): kwargs["status"] = args.story_status
-    if getattr(args, "sprint", None): kwargs["sprint_id"] = args.sprint
+    if getattr(args, "sp", None):
+        kwargs["story_points"] = args.sp
+    if getattr(args, "story_status", None):
+        kwargs["status"] = args.story_status
+    if getattr(args, "sprint", None):
+        kwargs["sprint_id"] = args.sprint
     output(args, b.story_update(args.id, **kwargs))
 
+
 # ── Sprints ──
+
 
 def cmd_sprints_create(args):
     b = get_backend(args)
     output(args, b.sprint_create(args.mission_id, args.name, getattr(args, "number", 1)))
+
 
 def cmd_sprints_assign(args):
     b = get_backend(args)
     story_ids = args.stories.split(",")
     output(args, b.sprint_assign(args.sprint_id, story_ids))
 
+
 def cmd_sprints_unassign(args):
     b = get_backend(args)
     output(args, b.sprint_unassign(args.sprint_id, args.story_id))
+
 
 def cmd_sprints_available(args):
     b = get_backend(args)
     output(args, b.sprint_available(args.sprint_id))
 
+
 # ── Backlog ──
+
 
 def cmd_backlog_reorder(args):
     b = get_backend(args)
     ids = args.ids.split(",")
     output(args, b.backlog_reorder(args.type, ids))
 
+
 # ── Agents ──
+
 
 def cmd_agents_list(args):
     b = get_backend(args)
@@ -284,15 +376,19 @@ def cmd_agents_list(args):
     else:
         print(out.table(rows, cols))
 
+
 def cmd_agents_show(args):
     b = get_backend(args)
     output(args, b.agent_show(args.id))
+
 
 def cmd_agents_delete(args):
     b = get_backend(args)
     output(args, b.agent_delete(args.id))
 
+
 # ── Sessions ──
+
 
 def cmd_sessions_list(args):
     b = get_backend(args)
@@ -304,15 +400,20 @@ def cmd_sessions_list(args):
     else:
         print(out.table(rows, cols))
 
+
 def cmd_sessions_show(args):
     b = get_backend(args)
     output(args, b.session_show(args.id))
 
+
 def cmd_sessions_create(args):
     b = get_backend(args)
     agents = args.agents.split(",") if getattr(args, "agents", None) else None
-    output(args, b.session_create(getattr(args, "project", None), agents,
-                                   getattr(args, "pattern", "solo")))
+    output(
+        args,
+        b.session_create(getattr(args, "project", None), agents, getattr(args, "pattern", "solo")),
+    )
+
 
 def cmd_sessions_chat(args):
     b = get_backend(args)
@@ -322,13 +423,17 @@ def cmd_sessions_chat(args):
         sys.exit(1)
     msg = " ".join(args.message)
     from cli._stream import print_stream
+
     print_stream(url, "POST", {"message": msg})
+
 
 def cmd_sessions_stop(args):
     b = get_backend(args)
     output(args, b.session_stop(args.id))
 
+
 # ── Ideation ──
+
 
 def cmd_ideation_start(args):
     b = get_backend(args)
@@ -337,6 +442,7 @@ def cmd_ideation_start(args):
 
     if getattr(args, "headless", False):
         from cli._stream import run_headless
+
         run_headless(sys.argv)
         return
 
@@ -362,61 +468,77 @@ def cmd_ideation_start(args):
     out.info(f"Session {session_id} — streaming agent conversation...")
     sse_url = b.ideation_session_url(session_id)
     from cli._stream import print_stream
+
     print_stream(sse_url)
 
     # After streaming completes
     print()
     out.info(f"Create epic: sf ideation create-epic {session_id}")
 
+
 def cmd_ideation_create_epic(args):
     b = get_backend(args)
     output(args, b.ideation_create_epic(args.session_id))
+
 
 def cmd_ideation_list(args):
     b = get_backend(args)
     output(args, b.ideation_list())
 
+
 # ── Metrics ──
+
 
 def cmd_metrics_dora(args):
     b = get_backend(args)
     output(args, b.metrics_dora(getattr(args, "project_id", None)))
 
+
 def cmd_metrics_velocity(args):
     b = get_backend(args)
     output(args, b.metrics_velocity())
+
 
 def cmd_metrics_burndown(args):
     b = get_backend(args)
     output(args, b.metrics_burndown(getattr(args, "epic_id", None)))
 
+
 def cmd_metrics_cycle_time(args):
     b = get_backend(args)
     output(args, b.metrics_cycle_time())
 
+
 # ── LLM ──
+
 
 def cmd_llm_stats(args):
     b = get_backend(args)
     output(args, b.llm_stats())
 
+
 def cmd_llm_usage(args):
     b = get_backend(args)
     output(args, b.llm_usage())
+
 
 def cmd_llm_traces(args):
     b = get_backend(args)
     output(args, b.llm_traces(getattr(args, "limit", 20)))
 
+
 # ── Memory ──
+
 
 def cmd_memory_search(args):
     b = get_backend(args)
     output(args, b.memory_search(" ".join(args.query)))
 
+
 def cmd_memory_project(args):
     b = get_backend(args)
     output(args, b.memory_project(args.project_id))
+
 
 def cmd_memory_global(args):
     b = get_backend(args)
@@ -427,43 +549,56 @@ def cmd_memory_global(args):
     else:
         output(args, b.memory_global())
 
+
 # ── Chaos ──
+
 
 def cmd_chaos_history(args):
     b = get_backend(args)
     output(args, b.chaos_history())
 
+
 def cmd_chaos_trigger(args):
     b = get_backend(args)
     output(args, b.chaos_trigger(getattr(args, "scenario", None)))
 
+
 # ── Watchdog ──
+
 
 def cmd_watchdog_metrics(args):
     b = get_backend(args)
     output(args, b.watchdog_metrics())
 
+
 # ── Incidents ──
+
 
 def cmd_incidents_list(args):
     b = get_backend(args)
     output(args, b.incidents_list())
 
+
 def cmd_incidents_create(args):
     b = get_backend(args)
     output(args, b.incident_create(args.title, getattr(args, "severity", "P2")))
 
+
 # ── Autoheal ──
+
 
 def cmd_autoheal_stats(args):
     b = get_backend(args)
     output(args, b.autoheal_stats())
 
+
 def cmd_autoheal_trigger(args):
     b = get_backend(args)
     output(args, b.autoheal_trigger())
 
+
 # ── Search ──
+
 
 def cmd_search(args):
     b = get_backend(args)
@@ -480,7 +615,9 @@ def cmd_search(args):
                 for i in items:
                     print(f"  {i}")
 
+
 # ── Export ──
+
 
 def cmd_export(args):
     b = get_backend(args)
@@ -494,26 +631,34 @@ def cmd_export(args):
     else:
         out.out_json(data)
 
+
 # ── Releases ──
+
 
 def cmd_releases(args):
     b = get_backend(args)
     output(args, b.releases(args.project_id))
 
+
 # ── Notifications ──
+
 
 def cmd_notifications_status(args):
     b = get_backend(args)
     output(args, b.notifications_status())
 
+
 def cmd_notifications_test(args):
     b = get_backend(args)
     output(args, b.notifications_test())
 
+
 # ── Runs (headless) ──
+
 
 def cmd_runs_list(args):
     from cli._stream import list_runs
+
     runs = list_runs()
     if getattr(args, "json_output", False):
         out.out_json(runs)
@@ -521,6 +666,7 @@ def cmd_runs_list(args):
         print(out.table(runs, ["id", "pid", "status", "cmd"]))
     else:
         print(out.dim("No background runs"))
+
 
 def cmd_runs_show(args):
     log_dir = os.path.expanduser("~/.sf/runs")
@@ -531,16 +677,63 @@ def cmd_runs_show(args):
     else:
         out.error(f"Run {args.run_id} not found")
 
+
 def cmd_runs_tail(args):
     from cli._stream import tail_run
+
     tail_run(args.run_id)
+
 
 def cmd_runs_stop(args):
     from cli._stream import stop_run
+
     stop_run(args.run_id)
 
 
+# ── Workflows ──
+
+
+def cmd_workflows_list(args):
+    b = get_backend(args)
+    workflows = b.workflows_list()
+    if getattr(args, "json_output", False):
+        out.out_json(workflows)
+    elif workflows:
+        cols = ["id", "name", "pattern_type"]
+        rows = [{c: w.get(c, "") for c in cols} for w in workflows]
+        print(out.table(rows, cols))
+    else:
+        print(out.dim("No workflows"))
+
+
+def cmd_workflows_show(args):
+    b = get_backend(args)
+    output(args, b.workflow_show(args.id))
+
+
+# ── Patterns ──
+
+
+def cmd_patterns_list(args):
+    b = get_backend(args)
+    patterns = b.patterns_list()
+    if getattr(args, "json_output", False):
+        out.out_json(patterns)
+    elif patterns:
+        cols = ["id", "name", "description"]
+        rows = [{c: p.get(c, "") for c in cols} for p in patterns]
+        print(out.table(rows, cols))
+    else:
+        print(out.dim("No patterns"))
+
+
+def cmd_patterns_show(args):
+    b = get_backend(args)
+    output(args, b.pattern_show(args.id))
+
+
 # ── Argument parser ──
+
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
@@ -555,7 +748,8 @@ def build_parser() -> argparse.ArgumentParser:
   sf projects chat myproj "ajoute un auth"     Chat with PM agent
   sf agents list                               List all agents
   sf llm stats                                 LLM usage statistics
-""")
+""",
+    )
 
     # Global flags
     p.add_argument("--url", default=DEFAULT_URL, help="Platform URL")
@@ -647,6 +841,14 @@ def build_parser() -> argparse.ArgumentParser:
     mchi = miss_sub.add_parser("children", help="List sub-missions")
     mchi.add_argument("id")
     mchi.set_defaults(func=cmd_missions_children)
+
+    mss = miss_sub.add_parser("screenshots", help="List mission screenshots")
+    mss.add_argument("id")
+    mss.set_defaults(func=cmd_missions_screenshots)
+
+    mme = miss_sub.add_parser("metrics", help="Pipeline metrics for mission")
+    mme.add_argument("id")
+    mme.set_defaults(func=cmd_missions_metrics)
 
     # ── features ──
     feat = sub.add_parser("features", help="Feature management")
@@ -844,6 +1046,26 @@ def build_parser() -> argparse.ArgumentParser:
     mg.add_argument("--set-value")
     mg.set_defaults(func=cmd_memory_global)
 
+    # ── workflows ──
+    wf = sub.add_parser("workflows", help="Workflow management")
+    wf_sub = wf.add_subparsers(dest="subcmd")
+
+    wf_sub.add_parser("list", help="List workflows").set_defaults(func=cmd_workflows_list)
+
+    wfs = wf_sub.add_parser("show", help="Show workflow")
+    wfs.add_argument("id")
+    wfs.set_defaults(func=cmd_workflows_show)
+
+    # ── patterns ──
+    pat = sub.add_parser("patterns", help="Pattern management")
+    pat_sub = pat.add_subparsers(dest="subcmd")
+
+    pat_sub.add_parser("list", help="List patterns").set_defaults(func=cmd_patterns_list)
+
+    pts = pat_sub.add_parser("show", help="Show pattern")
+    pts.add_argument("id")
+    pts.set_defaults(func=cmd_patterns_show)
+
     # ── chaos ──
     cha = sub.add_parser("chaos", help="Chaos testing")
     cha_sub = cha.add_subparsers(dest="subcmd")
@@ -895,8 +1117,12 @@ def build_parser() -> argparse.ArgumentParser:
     # ── notifications ──
     notif = sub.add_parser("notifications", help="Notification management")
     notif_sub = notif.add_subparsers(dest="subcmd")
-    notif_sub.add_parser("status", help="Notification status").set_defaults(func=cmd_notifications_status)
-    notif_sub.add_parser("test", help="Send test notification").set_defaults(func=cmd_notifications_test)
+    notif_sub.add_parser("status", help="Notification status").set_defaults(
+        func=cmd_notifications_status
+    )
+    notif_sub.add_parser("test", help="Send test notification").set_defaults(
+        func=cmd_notifications_test
+    )
 
     # ── runs (headless) ──
     runs = sub.add_parser("runs", help="Background runs")
@@ -919,11 +1145,27 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main():
+    # Handle help shortcut: sf help [command]
+    if len(sys.argv) >= 2 and sys.argv[1] == "help":
+        if len(sys.argv) == 2:
+            # sf help -> show full help
+            sys.argv[1] = "--help"
+        else:
+            # sf help <command> -> sf <command> --help
+            cmd = sys.argv[2]
+            sys.argv = [sys.argv[0], cmd, "--help"]
+
     # Handle ideation shortcut: sf [options] ideation "prompt..."
     # Find "ideation" anywhere in argv, then check next arg
     try:
         idx = sys.argv.index("ideation")
-        if idx + 1 < len(sys.argv) and sys.argv[idx + 1] not in ("start", "create-epic", "list", "--help", "-h"):
+        if idx + 1 < len(sys.argv) and sys.argv[idx + 1] not in (
+            "start",
+            "create-epic",
+            "list",
+            "--help",
+            "-h",
+        ):
             sys.argv.insert(idx + 1, "start")
     except ValueError:
         pass
@@ -946,6 +1188,7 @@ def main():
     except Exception as e:
         if getattr(args, "verbose", False):
             import traceback
+
             traceback.print_exc()
         else:
             out.error(str(e))

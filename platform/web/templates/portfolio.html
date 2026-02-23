@@ -2,7 +2,7 @@
 
 {% block topbar_actions %}
 <a href="/missions?action=new" class="btn btn-primary">
-    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> New Epic
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> {{ _("new_mission") }}
 </a>
 {% endblock %}
 
@@ -99,7 +99,7 @@
 .pmc-team-agent[title]:hover svg{color:var(--purple-light)}
 
 .pmc-progress-bar{height:4px;background:var(--bg-tertiary);border-radius:2px;margin-top:0.6rem;overflow:hidden}
-.pmc-progress-fill{height:100%;background:linear-gradient(90deg,var(--purple),var(--purple-light));border-radius:2px;transition:width .3s}
+.pmc-progress-fill{height:100%;background:var(--purple);border-radius:2px;transition:width .3s}
 
 .pmc-no-missions{font-size:0.78rem;color:var(--text-secondary);font-style:italic;padding:0.5rem 0}
 
@@ -322,7 +322,7 @@
                 {% endif %}
 
                 <div class="pmc-badges">
-                    {% if p.running_phases > 0 %}
+                    {% if (p.running_phases|default(0)) > 0 %}
                     <span class="pmc-badge running"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> {{ p.running_phases }} phase{{ 's' if p.running_phases > 1 }}</span>
                     {% endif %}
                     {% if p.tma_active > 0 %}

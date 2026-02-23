@@ -2,17 +2,16 @@
 
 Extracted from executor.py to keep the main file focused on the agent loop.
 """
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ..llm.client import LLMMessage
 
 # Re-export from tool_schemas for convenience
 from .tool_schemas import (
     _classify_agent_role,
-    _get_tools_for_agent,
-    _filter_schemas,
 )
 
 if TYPE_CHECKING:
@@ -48,8 +47,72 @@ CRITICAL: When the user asks you to DO something (lancer, fixer, chercher), USE 
    Example: memory_store(key="auth-strategy", value="JWT with refresh tokens, bcrypt for passwords, 15min access token TTL", category="architecture")
 3. What to store: decisions, technical choices, API contracts, blockers found, verdicts (GO/NOGO), risks identified.
 4. What NOT to store: greetings, process descriptions, "I will now examine...".""")
+
+        # Role-specific tool instructions
+        role_cat = _classify_agent_role(agent)
+        if role_cat == "qa":
+            parts.append("""
+## QA Testing (MANDATORY — read carefully)
+You have a tool called run_e2e_tests. You MUST call it.
+It automatically: installs deps, starts the server, takes screenshots, runs tests.
+
+STEP 1: Call run_e2e_tests() — this is REQUIRED, do it FIRST
+STEP 2: Read the results and report bugs with create_ticket()
+STEP 3: Call build(command="npm test") for additional unit tests if needed
+
+DO NOT skip run_e2e_tests(). Your validation is REJECTED without it.""")
+        elif role_cat == "security":
+            parts.append("""
+## Security Tools (IMPORTANT)
+Run SAST scans on the codebase:
+- build(command="bandit -r . -f json") for Python projects
+- build(command="semgrep --config auto .") for any project
+- build(command="npm audit") for Node.js projects
+Report findings with severity ratings.""")
+        elif role_cat == "product":
+            parts.append("""
+## Backlog Tools (IMPORTANT — AO Traceability)
+When decomposing an epic into features and stories, you MUST persist them:
+- create_feature(epic_id="<mission_id>", name="Feature name", priority=1, story_points=8)
+- create_story(feature_id="<id>", title="US-E1-01: Story title", story_points=5)
+
+EVERY requirement from the AO/epic description must have at least one feature.
+Items marked "hors MVP" or "P2" must STILL be created with status 'deferred'.
+Format stories as US-<Epic>-<Num> for traceability (e.g. US-E1-01, US-E2-03).""")
+        elif role_cat == "ux":
+            parts.append("""
+## Design System (MANDATORY — you MUST create these files)
+You are the UX Designer. You MUST use code_write to create a design system BEFORE any dev sprint.
+
+STEP 1: Create design tokens file:
+  code_write(path="src/styles/tokens.css", content="... CSS custom properties ...")
+  Include: --color-primary, --color-secondary, --color-background, --color-surface,
+  --color-text, --color-error, --color-success, --font-family, --font-size-sm/md/lg/xl,
+  --spacing-xs/sm/md/lg/xl, --radius-sm/md/lg, --shadow-sm/md/lg, --transition-fast/normal
+
+STEP 2: Create base layout with responsive breakpoints:
+  code_write(path="src/styles/base.css", content="... reset + responsive grid ...")
+  Include: CSS reset, responsive breakpoints (320px/768px/1024px/1440px), container,
+  skip-to-content link, focus-visible styles, reduced-motion media query
+
+STEP 3: Create component library (at minimum):
+  code_write(path="src/styles/components.css", content="... buttons, cards, forms ...")
+  Include: .btn (primary/secondary/ghost), .card, .form-group, .input, .badge, .alert
+  ALL using var(--token-*). NO hardcoded colors. NO hardcoded font sizes.
+
+STEP 4: Store design decisions in memory:
+  memory_store(key="design-system", value="Tokens: ..., Components: ..., A11y: WCAG AA")
+
+RULES:
+- Contrast ratio ≥ 4.5:1 (text) and ≥ 3:1 (large text, UI components)
+- All interactive elements must have :focus-visible styles
+- prefers-reduced-motion: reduce → disable animations
+- Mobile-first responsive (min-width breakpoints)
+- All colors via CSS custom properties (tokens), NEVER hardcoded hex/rgb""")
     else:
-        parts.append("\nYou do NOT have tools. Do NOT write [TOOL_CALL] or attempt to use tools. Focus on analysis, synthesis, and delegation to your team.")
+        parts.append(
+            "\nYou do NOT have tools. Do NOT write [TOOL_CALL] or attempt to use tools. Focus on analysis, synthesis, and delegation to your team."
+        )
 
     if ctx.skills_prompt:
         parts.append(f"\n## Skills\n{ctx.skills_prompt}")
@@ -93,10 +156,12 @@ def _build_messages(ctx: ExecutionContext, user_message: str) -> list[LLMMessage
     for h in ctx.history[-20:]:
         role = "assistant" if h.get("from_agent") != "user" else "user"
         name = h.get("from_agent")
-        messages.append(LLMMessage(
-            role=role,
-            content=h.get("content", ""),
-            name=name if name != "user" else None,
-        ))
+        messages.append(
+            LLMMessage(
+                role=role,
+                content=h.get("content", ""),
+                name=name if name != "user" else None,
+            )
+        )
     messages.append(LLMMessage(role="user", content=user_message))
     return messages

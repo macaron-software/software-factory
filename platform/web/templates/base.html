@@ -5,12 +5,58 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ page_title }} — Software Factory</title>
-    <link rel="stylesheet" href="/static/css/main.css?v=20260220b">
-    <link rel="stylesheet" href="/static/css/components.css?v=20260220">
-    <link rel="stylesheet" href="/static/css/agents.css?v=20260220">
-    <link rel="stylesheet" href="/static/css/projects.css?v=20260220">
+    <link rel="stylesheet" href="/static/css/main.css?v=20260222">
+    <link rel="stylesheet" href="/static/css/components.css?v=20260222">
+    <link rel="stylesheet" href="/static/css/agents.css?v=20260222">
+    <link rel="stylesheet" href="/static/css/projects.css?v=20260222">
     <script src="/static/js/htmx.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
     <script src="/static/js/sse.js" defer></script>
+    <script>
+    /* JS i18n — mirrors server-side _() */
+    window.__i18n = {{ i18n_catalog | tojson }};
+    function _(key) { return window.__i18n[key] || key; }
+
+    /* Global error handler → auto-create TMA ticket */
+    (function() {
+        const _reported = new Set();
+        const _throttle = 60000; /* 1 ticket per unique error per minute */
+        window.addEventListener('error', function(e) {
+            const sig = (e.message || '') + ':' + (e.filename || '') + ':' + (e.lineno || 0);
+            if (_reported.has(sig)) return;
+            _reported.add(sig);
+            setTimeout(() => _reported.delete(sig), _throttle);
+            try {
+                fetch('/api/tma/js-error', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        message: e.message || 'Unknown error',
+                        source: e.filename || location.pathname,
+                        line: e.lineno || 0,
+                        col: e.colno || 0,
+                        url: location.href,
+                        ua: navigator.userAgent.slice(0, 120)
+                    })
+                });
+            } catch(_) {}
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            const msg = (e.reason && e.reason.message) || String(e.reason || 'Unhandled promise rejection');
+            const sig = 'promise:' + msg;
+            if (_reported.has(sig)) return;
+            _reported.add(sig);
+            setTimeout(() => _reported.delete(sig), _throttle);
+            try {
+                fetch('/api/tma/js-error', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ message: msg, source: 'promise', url: location.href })
+                });
+            } catch(_) {}
+        });
+    })();
+    </script>
 </head>
 <body>
     {% include "partials/svg_sprites.html" %}
@@ -83,18 +129,6 @@
                         <svg class="icon icon-xs theme-icon-moon"><use href="#icon-moon"/></svg>
                     </button>
                 </div>
-                <!-- View mode switcher -->
-                <div class="sidebar-view-switch">
-                    <button class="view-switch-btn" data-mode="all" title="{{ _("tt_all") }}">
-                        <svg class="icon icon-xs"><use href="#icon-grid"/></svg>
-                    </button>
-                    <button class="view-switch-btn" data-mode="strategy" title="{{ _("tt_strategy") }}">
-                        <svg class="icon icon-xs"><use href="#icon-layers"/></svg>
-                    </button>
-                    <button class="view-switch-btn" data-mode="engineering" title="{{ _("tt_engineering") }}">
-                        <svg class="icon icon-xs"><use href="#icon-settings"/></svg>
-                    </button>
-                </div>
                 <ul class="nav-links">
                     <li><a href="/settings" data-tooltip="Settings" class="{% if page_title == 'Settings' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-settings"/></svg>
@@ -102,9 +136,7 @@
                 </ul>
             </div>
 
-            <div class="sidebar-footer">
-                <span class="status-dot active"></span>
-            </div>
+            <div class="sidebar-footer"></div>
         </nav>
 
         <!-- Main content -->
@@ -113,9 +145,24 @@
                 <h2>{{ page_title }}</h2>
                 <div class="topbar-right">
                     {% block topbar_actions %}{% endblock %}
-                    <button class="topbar-bell">
-                        <svg class="icon icon-sm"><use href="#icon-activity"/></svg>
-                    </button>
+                    <div class="tma-heartbeat-wrapper" id="tmaHeartbeat"
+                         hx-get="/api/autoheal/heartbeat"
+                         hx-trigger="load, every 30s"
+                         hx-swap="innerHTML">
+                    </div>
+                    <div class="notif-wrapper" id="notifWrapper">
+                        <button class="topbar-bell" id="notifBell" aria-label="Notifications">
+                            <svg class="icon icon-sm"><use href="#icon-bell"/></svg>
+                            <span id="notifBadge"
+                                  hx-get="/api/notifications/badge"
+                                  hx-trigger="load, every 30s"
+                                  hx-swap="innerHTML"></span>
+                        </button>
+                        <div class="notif-dropdown" id="notifDropdown"
+                             hx-get="/api/notifications/dropdown"
+                             hx-trigger="notif-open"
+                             hx-swap="innerHTML"></div>
+                    </div>
                     <div class="topbar-avatar">S</div>
                 </div>
             </header>
@@ -126,6 +173,54 @@
     </div>
 
     <style>
+    /* Notification bell + dropdown */
+    .notif-wrapper{position:relative}
+    .topbar-bell{position:relative}
+    #notifBadge .notif-badge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--accent);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;pointer-events:none}
+    .notif-dropdown{display:none;position:absolute;top:calc(100% + 8px);right:0;width:360px;max-height:480px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:999;overflow:hidden}
+    .notif-dropdown.open{display:flex;flex-direction:column}
+    .notif-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)}
+    .notif-header h4{margin:0;font-size:var(--text-sm);color:var(--text-primary)}
+    .notif-mark-all{background:none;border:none;color:var(--purple-light);font-size:11px;cursor:pointer;padding:2px 6px;border-radius:4px}
+    .notif-mark-all:hover{background:var(--bg-tertiary)}
+    .notif-list{overflow-y:auto;flex:1;max-height:380px}
+    .notif-item{display:flex;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border-subtle, rgba(255,255,255,.05));cursor:pointer;transition:background .1s}
+    .notif-item:hover{background:var(--bg-tertiary)}
+    .notif-item.unread{background:rgba(168,85,247,.06)}
+    .notif-item.unread .notif-dot{display:block}
+    .notif-dot{display:none;width:8px;height:8px;border-radius:50%;background:var(--purple);flex-shrink:0;margin-top:5px}
+    .notif-body{flex:1;min-width:0}
+    .notif-title{font-size:12px;color:var(--text-primary);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .notif-msg{font-size:11px;color:var(--text-secondary);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .notif-time{font-size:10px;color:var(--text-muted, var(--text-secondary));margin-top:3px}
+    .notif-sev{width:3px;border-radius:2px;flex-shrink:0}
+    .notif-sev.info{background:var(--blue, #3b82f6)}
+    .notif-sev.warning{background:#f59e0b}
+    .notif-sev.critical{background:#ef4444}
+    .notif-footer{padding:8px 16px;border-top:1px solid var(--border);text-align:center}
+    .notif-footer a{color:var(--purple-light);font-size:11px;text-decoration:none}
+    .notif-footer a:hover{text-decoration:underline}
+    .notif-empty{padding:24px;text-align:center;color:var(--text-secondary);font-size:12px}
+    /* TMA heartbeat — animated ECG icon in topbar */
+    .tma-heartbeat-wrapper{position:relative;display:flex;align-items:center}
+    .tma-hb{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-full);cursor:help;transition:background .15s}
+    .tma-hb:hover{background:var(--bg-tertiary)}
+    .tma-hb svg{width:16px;height:16px;color:var(--tma-color)}
+    .tma-hb.alive svg{animation:hb-beat 1.2s ease-in-out infinite}
+    .tma-hb.healing svg{animation:hb-beat .6s ease-in-out infinite}
+    .tma-hb.starting svg{opacity:.6;animation:hb-fade 2s ease-in-out infinite}
+    .tma-hb.stale svg{opacity:.4;animation:none}
+    @keyframes hb-fade{0%,100%{opacity:.3}50%{opacity:.8}}
+    @keyframes hb-beat{0%,100%{transform:scale(1);opacity:1}15%{transform:scale(1.25);opacity:1}30%{transform:scale(1);opacity:.7}45%{transform:scale(1.15);opacity:1}60%{transform:scale(1);opacity:1}}
+    /* TMA hover popover */
+    .tma-tip{display:none;position:absolute;top:calc(100% + 8px);right:0;width:220px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:999;padding:10px 12px;pointer-events:none}
+    .tma-hb:hover .tma-tip{display:block}
+    .tma-tip-title{font-size:11px;font-weight:700;margin-bottom:8px;letter-spacing:.3px}
+    .tma-tip-grid{display:flex;flex-direction:column;gap:3px}
+    .tma-tip-row{display:flex;justify-content:space-between;font-size:11px;color:var(--text-secondary)}
+    .tma-tip-row span:last-child{font-weight:600;color:var(--text-primary);font-variant-numeric:tabular-nums}
+    .tma-tip-sep{height:1px;background:var(--border);margin:4px 0}
+    .tma-tip-footer{font-size:9px;color:var(--text-secondary);margin-top:8px;opacity:.7}
     .sidebar-view-switch{display:flex;justify-content:center;gap:2px;padding:0.3rem 0.4rem;margin:0 0.3rem 0.3rem;background:var(--bg-tertiary);border-radius:8px}
     .view-switch-btn{background:none;border:none;color:var(--text-secondary);padding:0.3rem;border-radius:6px;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center}
     .view-switch-btn:hover{color:var(--text-primary);background:var(--bg-secondary)}
@@ -154,6 +249,25 @@
     })();
     </script>
     <script>
+    /* Notification bell toggle */
+    (function(){
+      const bell = document.getElementById('notifBell');
+      const dd = document.getElementById('notifDropdown');
+      if (!bell || !dd) return;
+      bell.addEventListener('click', function(e){
+        e.stopPropagation();
+        const isOpen = dd.classList.toggle('open');
+        if (isOpen) htmx.trigger(dd, 'notif-open');
+      });
+      document.addEventListener('click', function(e){
+        if (!dd.contains(e.target) && !bell.contains(e.target)) dd.classList.remove('open');
+      });
+      document.addEventListener('keydown', function(e){
+        if (e.key === 'Escape') dd.classList.remove('open');
+      });
+    })();
+    </script>
+    <script>
     /* Language selector */
     document.getElementById('langSelect')?.addEventListener('change', function(){
       fetch('/api/set-lang/' + this.value).then(function(){ location.reload(); });
@@ -161,43 +275,18 @@
     </script>
     <script>
     (function(){
-      // Auto-detect view from current page
-      const PAGE_VIEW_MAP = {
-        'Portfolio': 'strategy',
-        'Backlog': 'strategy',
-        'PI Board': 'strategy',
-        'Metrics': 'strategy',
-        'Ceremonies': 'engineering',
-        'Live': 'engineering',
-        'ART': 'engineering',
-        'Toolbox': 'engineering',
-      };
-      const pageTitle = document.querySelector('.topbar h2')?.textContent?.trim() || '';
-      const autoView = PAGE_VIEW_MAP[pageTitle] || null;
-      const savedView = localStorage.getItem('sidebar_view') || 'all';
-      const currentView = autoView || savedView;
+      // Force "all" view mode permanently
+      const currentView = 'all';
 
       function applyView(mode){
-        localStorage.setItem('sidebar_view', mode);
-        // Toggle nav items
+        // Always show all nav items
         document.querySelectorAll('.nav-links a[data-views]').forEach(a=>{
-          const views = a.dataset.views.split(',');
-          const show = mode === 'all' || views.includes(mode) || views.includes('all');
-          a.closest('li').classList.toggle('view-hidden', !show);
-        });
-        // Toggle active button
-        document.querySelectorAll('.view-switch-btn').forEach(b=>{
-          b.classList.toggle('active', b.dataset.mode === mode);
+          a.closest('li').classList.remove('view-hidden');
         });
       }
 
       // Init
       applyView(currentView);
-
-      // Click handlers
-      document.querySelectorAll('.view-switch-btn').forEach(btn=>{
-        btn.addEventListener('click', ()=> applyView(btn.dataset.mode));
-      });
     })();
     </script>
 

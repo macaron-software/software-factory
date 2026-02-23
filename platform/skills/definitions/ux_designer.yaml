@@ -35,7 +35,9 @@ skills:
 
 tools:
   - code_read
+  - code_write
   - code_search
+  - list_files
 
 llm:
   model: MiniMax-M2.5

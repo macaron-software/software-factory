@@ -23,8 +23,8 @@ system conventions — BEM naming, CSS custom properties, atomic design, and PHP
 ## Use this skill when
 
 - Building new PPZ components
-- Modifying existing .ppz-* styled components
-- Working with --ppz-* CSS tokens
+- Modifying existing .ppz-\* styled components
+- Working with --ppz-\* CSS tokens
 - Implementing PHP templates for PPZ components
 - Auditing PPZ code for convention compliance
 
@@ -42,20 +42,30 @@ PPZ follows strict BEM with `.ppz-` prefix:
 
 ```css
 /* Block */
-.ppz-card { }
+.ppz-card {
+}
 
 /* Element (double underscore) */
-.ppz-card__header { }
-.ppz-card__body { }
-.ppz-card__footer { }
-.ppz-card__title { }
-.ppz-card__action { }
+.ppz-card__header {
+}
+.ppz-card__body {
+}
+.ppz-card__footer {
+}
+.ppz-card__title {
+}
+.ppz-card__action {
+}
 
 /* Modifier (double hyphen) */
-.ppz-card--elevated { }
-.ppz-card--compact { }
-.ppz-card--featured { }
-.ppz-card__title--large { }
+.ppz-card--elevated {
+}
+.ppz-card--compact {
+}
+.ppz-card--featured {
+}
+.ppz-card__title--large {
+}
 ```
 
 #### Naming Rules
@@ -102,20 +112,20 @@ PPZ follows strict BEM with `.ppz-` prefix:
   --ppz-color-border-strong: #cbd5e1;
 
   /* Spacing (4px base grid) */
-  --ppz-space-1: 0.25rem;    /* 4px */
-  --ppz-space-2: 0.5rem;     /* 8px */
-  --ppz-space-3: 0.75rem;    /* 12px */
-  --ppz-space-4: 1rem;       /* 16px */
-  --ppz-space-5: 1.25rem;    /* 20px */
-  --ppz-space-6: 1.5rem;     /* 24px */
-  --ppz-space-8: 2rem;       /* 32px */
-  --ppz-space-10: 2.5rem;    /* 40px */
-  --ppz-space-12: 3rem;      /* 48px */
-  --ppz-space-16: 4rem;      /* 64px */
+  --ppz-space-1: 0.25rem; /* 4px */
+  --ppz-space-2: 0.5rem; /* 8px */
+  --ppz-space-3: 0.75rem; /* 12px */
+  --ppz-space-4: 1rem; /* 16px */
+  --ppz-space-5: 1.25rem; /* 20px */
+  --ppz-space-6: 1.5rem; /* 24px */
+  --ppz-space-8: 2rem; /* 32px */
+  --ppz-space-10: 2.5rem; /* 40px */
+  --ppz-space-12: 3rem; /* 48px */
+  --ppz-space-16: 4rem; /* 64px */
 
   /* Typography */
-  --ppz-font-family: 'Inter', -apple-system, sans-serif;
-  --ppz-font-mono: 'JetBrains Mono', monospace;
+  --ppz-font-family: "Inter", -apple-system, sans-serif;
+  --ppz-font-mono: "JetBrains Mono", monospace;
 
   --ppz-text-xs: 0.75rem;
   --ppz-text-sm: 0.875rem;

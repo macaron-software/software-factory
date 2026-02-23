@@ -3,6 +3,7 @@
 Serves the HTMX-based UI with SSE real-time updates.
 Runs on port 8090 (separate from Factory dashboard on 8080).
 """
+
 from __future__ import annotations
 
 import logging
@@ -30,15 +31,17 @@ STATIC_DIR = WEB_DIR / "static"
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
     from .log_config import setup_logging
+
     setup_logging(level=os.environ.get("LOG_LEVEL", "WARNING"))
 
     # OpenTelemetry tracing (opt-in via OTEL_ENABLED=1)
     if os.environ.get("OTEL_ENABLED"):
         try:
             from opentelemetry import trace
-            from opentelemetry.sdk.trace import TracerProvider
-            from opentelemetry.sdk.trace.export import SimpleSpanProcessor, ConsoleSpanExporter
             from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+            from opentelemetry.sdk.trace import TracerProvider
+            from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+
             provider = TracerProvider()
             provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
             trace.set_tracer_provider(provider)
@@ -53,35 +56,44 @@ async def lifespan(app: FastAPI):
 
     # Seed built-in agents
     from .agents.store import get_agent_store
+
     get_agent_store().seed_builtins()
 
     # Seed built-in patterns
     from .patterns.store import get_pattern_store
+
     get_pattern_store().seed_builtins()
 
     # Seed built-in workflows
     from .workflows.store import get_workflow_store
+
     get_workflow_store().seed_builtins()
 
     # Seed skills library into DB
     from .skills.library import get_skill_library
+
     n = get_skill_library().seed_db()
     if n:
         logger.info("Seeded %d skills into DB", n)
 
     # Seed projects from SF/MF registry into DB
     from .projects.manager import get_project_store
+
     ps = get_project_store()
     ps.seed_from_registry()
 
     # Auto-provision TMA/Security/Debt missions for projects missing them
-    from .missions.store import get_mission_store, MissionDef
+    from .missions.store import MissionDef, get_mission_store
+
     ms = get_mission_store()
     all_missions = ms.list_missions(limit=500)
     _prov_count = 0
     for proj in ps.list_all():
         proj_missions = [m for m in all_missions if m.project_id == proj.id]
-        has_tma = any(m.type == 'program' or m.name.startswith('TMA') or '[TMA' in m.name for m in proj_missions)
+        has_tma = any(
+            m.type == "program" or m.name.startswith("TMA") or "[TMA" in m.name
+            for m in proj_missions
+        )
         if not has_tma:
             try:
                 ps.auto_provision(proj.id, proj.name)
@@ -90,16 +102,23 @@ async def lifespan(app: FastAPI):
                 logger.warning("auto_provision failed for %s: %s", proj.id, e)
         else:
             # Ensure security mission exists even if TMA already present
-            has_secu = any(m.type == 'security' or m.name.startswith('Sécu') for m in proj_missions)
+            has_secu = any(m.type == "security" or m.name.startswith("Sécu") for m in proj_missions)
             if not has_secu:
                 try:
-                    ms.create_mission(MissionDef(
-                        name=f"Sécurité — {proj.name}", type="security", status="active",
-                        project_id=proj.id, workflow_id="review-cycle", wsjf_score=12,
-                        created_by="devsecops", config={"auto_provisioned": True, "schedule": "weekly"},
-                        description=f"Audit sécurité périodique pour {proj.name}.",
-                        goal="Score sécurité ≥ 80%, zéro CVE critique.",
-                    ))
+                    ms.create_mission(
+                        MissionDef(
+                            name=f"Sécurité — {proj.name}",
+                            type="security",
+                            status="active",
+                            project_id=proj.id,
+                            workflow_id="review-cycle",
+                            wsjf_score=12,
+                            created_by="devsecops",
+                            config={"auto_provisioned": True, "schedule": "weekly"},
+                            description=f"Audit sécurité périodique pour {proj.name}.",
+                            goal="Score sécurité ≥ 80%, zéro CVE critique.",
+                        )
+                    )
                     _prov_count += 1
                 except Exception as e:
                     logger.warning("security provision failed for %s: %s", proj.id, e)
@@ -108,21 +127,25 @@ async def lifespan(app: FastAPI):
 
     # Seed memory (global knowledge + project files)
     from .memory.seeder import seed_all as seed_memories
+
     n_mem = seed_memories()
     if n_mem:
         logger.info("Seeded %d memories", n_mem)
 
     # Seed org tree (Portfolio → ART → Team)
     from .agents.org import get_org_store
+
     get_org_store().seed_default()
     get_org_store().seed_additional_teams()
 
     # Demo mode: seed sample data when no LLM keys configured
     from .demo import seed_demo_data
+
     seed_demo_data()
 
     # Mark orphaned "active" sessions as interrupted (no running task after restart)
     from .sessions.store import get_session_store
+
     _ss = get_session_store()
     _orphaned = _ss.mark_orphaned_sessions()
     if _orphaned:
@@ -130,9 +153,17 @@ async def lifespan(app: FastAPI):
 
     # Reset stale "running" mission_runs (orphaned after container restart)
     from .missions.store import get_mission_run_store
+<<<<<<< HEAD:platform/server.py
     _mrs = get_mission_run_store()
     try:
         from .db.migrations import get_db as _gdb
+=======
+
+    _mrs = get_mission_run_store()
+    try:
+        from .db.migrations import get_db as _gdb
+
+>>>>>>> origin/master:_SOFTWARE_FACTORY/platform/server.py
         _rdb = _gdb()
         _stale = _rdb.execute(
             "UPDATE mission_runs SET status='paused' WHERE status='running'"
@@ -140,18 +171,29 @@ async def lifespan(app: FastAPI):
         _rdb.commit()
         _rdb.close()
         if _stale:
+<<<<<<< HEAD:platform/server.py
             logger.warning("Reset %d stale running mission_runs to paused (container restart)", _stale)
+=======
+            logger.warning(
+                "Reset %d stale running mission_runs to paused (container restart)", _stale
+            )
+>>>>>>> origin/master:_SOFTWARE_FACTORY/platform/server.py
     except Exception as e:
         logger.warning("Failed to reset stale missions: %s", e)
 
     # Start unified MCP SF server (platform + LRM tools merged)
     _mcp_procs: dict[str, Any] = {}
 
-    _mcp_sf_mod = "macaron_platform.mcp_platform.server" if Path("/app/macaron_platform").exists() else "platform.mcp_platform.server"
+    _mcp_sf_mod = (
+        "macaron_platform.mcp_platform.server"
+        if Path("/app/macaron_platform").exists()
+        else "platform.mcp_platform.server"
+    )
 
     def _start_mcp(name: str, module: str, port: int):
         """Start an MCP server subprocess, return Popen."""
         import subprocess as _sp
+
         log_file = Path(__file__).parent.parent / "data" / "logs" / f"mcp-{name}.log"
         log_file.parent.mkdir(parents=True, exist_ok=True)
         fh = open(log_file, "a")
@@ -159,7 +201,8 @@ async def lifespan(app: FastAPI):
             [sys.executable, "-m", module],
             cwd=str(Path(__file__).parent.parent),
             start_new_session=True,
-            stdout=fh, stderr=_sp.STDOUT,
+            stdout=fh,
+            stderr=_sp.STDOUT,
         )
         logger.info("MCP %s started (PID %d, port %d)", name, proc.pid, port)
         return proc
@@ -182,11 +225,14 @@ async def lifespan(app: FastAPI):
                     logger.error("MCP SF restart failed: %s", e)
 
     import asyncio
+
     asyncio.create_task(_mcp_watchdog())
 
     # Periodic WAL checkpoint to prevent data loss on crash
     async def _wal_checkpoint_loop():
-        import asyncio, sqlite3
+        import asyncio
+        import sqlite3
+
         db_path = str(Path(__file__).parent.parent / "data" / "platform.db")
         while True:
             await asyncio.sleep(30)
@@ -198,11 +244,14 @@ async def lifespan(app: FastAPI):
                 pass
 
     import asyncio
+
     asyncio.create_task(_wal_checkpoint_loop())
 
     # Auto-heal loop: scan incidents → create epics → launch TMA workflows
     try:
-        from .ops.auto_heal import auto_heal_loop, ENABLED as _ah_enabled
+        from .ops.auto_heal import ENABLED as _ah_enabled
+        from .ops.auto_heal import auto_heal_loop
+
         if _ah_enabled:
             asyncio.create_task(auto_heal_loop())
             logger.info("Auto-heal loop enabled")
@@ -212,12 +261,21 @@ async def lifespan(app: FastAPI):
     # Log paused missions (no auto-resume — paused missions stay paused until manually restarted)
     try:
         from .missions.store import get_mission_run_store
+
         _mrs = get_mission_run_store()
         _all_runs = _mrs.list_runs(limit=50)
         _paused = [m for m in _all_runs if m.status.value == "paused"]
         if _paused:
+<<<<<<< HEAD:platform/server.py
             logger.warning("Found %d paused missions (restart manually if needed): %s",
                            len(_paused), [m.id for m in _paused])
+=======
+            logger.warning(
+                "Found %d paused missions (restart manually if needed): %s",
+                len(_paused),
+                [m.id for m in _paused],
+            )
+>>>>>>> origin/master:_SOFTWARE_FACTORY/platform/server.py
     except Exception as exc:
         logger.warning("Mission check failed: %s", exc)
 
@@ -225,6 +283,7 @@ async def lifespan(app: FastAPI):
 
     # Stop MCP servers
     import os as _os
+
     for name, proc in _mcp_procs.items():
         if proc and proc.poll() is None:
             try:
@@ -236,6 +295,7 @@ async def lifespan(app: FastAPI):
     # Cleanup LLM client
     try:
         from .llm.client import get_llm_client
+
         await get_llm_client().close()
     except Exception:
         pass
@@ -247,6 +307,7 @@ def _record_incident(path: str, status_code: int, detail: str = ""):
     """Record a platform incident with deduplication (5-minute window)."""
     import sqlite3
     import uuid
+
     from .config import DB_PATH
 
     error_type = str(status_code)
@@ -289,11 +350,15 @@ def create_app() -> FastAPI:
 
     # ── Security: Auth middleware (API key) ────────────────────────────────
     from .security import AuthMiddleware
+
     app.add_middleware(AuthMiddleware)
 
     # ── Security: CORS ──────────────────────────────────────────────────────
     from starlette.middleware.cors import CORSMiddleware
-    _cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:8090,http://4.233.64.30").split(",")
+
+    _cors_origins = os.environ.get(
+        "CORS_ORIGINS", "http://localhost:8090,http://4.233.64.30"
+    ).split(",")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[o.strip() for o in _cors_origins],
@@ -326,6 +391,7 @@ def create_app() -> FastAPI:
     # ── Rate limiting (API endpoints, 60 req/min per IP) ───────────────
     import time as _rl_time
     from collections import defaultdict as _dd
+
     _rate_buckets: dict[str, list[float]] = _dd(list)
     _RATE_LIMIT = int(os.environ.get("API_RATE_LIMIT", "120"))  # per minute
     _RATE_WINDOW = 60.0
@@ -339,6 +405,7 @@ def create_app() -> FastAPI:
             bucket[:] = [t for t in bucket if now - t < _RATE_WINDOW]
             if len(bucket) >= _RATE_LIMIT:
                 from starlette.responses import JSONResponse as _JR
+
                 return _JR({"error": "rate_limit_exceeded", "retry_after": 60}, status_code=429)
             bucket.append(now)
         return await call_next(request)
@@ -347,7 +414,9 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def trace_id_middleware(request, call_next):
         import uuid as _uuid
+
         from .log_config import trace_id_var
+
         tid = request.headers.get("X-Trace-ID", str(_uuid.uuid4())[:8])
         token = trace_id_var.set(tid)
         response = await call_next(request)
@@ -355,10 +424,69 @@ def create_app() -> FastAPI:
         trace_id_var.reset(token)
         return response
 
+    # ── Locale detection middleware ─────────────────────────────────────
+    SUPPORTED_LOCALES = {"en", "fr", "es", "it", "de", "pt", "ja", "zh"}
+
+    @app.middleware("http")
+    async def locale_middleware(request, call_next):
+        """Detect and set user locale from Accept-Language header or cookie."""
+        import re as _locale_re
+
+        # Priority: 1) Cookie 2) Accept-Language header 3) Default to 'en'
+        locale = None
+
+        # Check cookie first
+        cookie_lang = request.cookies.get("sf_lang")
+        if cookie_lang and cookie_lang in SUPPORTED_LOCALES:
+            locale = cookie_lang
+
+        # Parse Accept-Language header if no cookie
+        if not locale:
+            accept_lang = request.headers.get("Accept-Language", "")
+            # Parse: "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7"
+            langs = []
+            for part in accept_lang.split(","):
+                match = _locale_re.match(r"([a-z]{2})(?:-[A-Z]{2})?(?:;q=([\d.]+))?", part.strip())
+                if match:
+                    lang_code = match.group(1)
+                    quality = float(match.group(2) or "1.0")
+                    langs.append((quality, lang_code))
+
+            # Sort by quality score (descending)
+            langs.sort(reverse=True)
+
+            # Find first supported locale
+            for _, lang_code in langs:
+                if lang_code in SUPPORTED_LOCALES:
+                    locale = lang_code
+                    break
+
+        # Fallback to English
+        if not locale:
+            locale = "en"
+
+        # Set in request state for templates
+        request.state.lang = locale
+
+        response = await call_next(request)
+
+        # Set cookie if not present or different
+        if not cookie_lang or cookie_lang != locale:
+            response.set_cookie(
+                key="sf_lang",
+                value=locale,
+                max_age=31536000,  # 1 year
+                httponly=True,
+                samesite="lax",
+            )
+
+        return response
+
     # Metrics + incident middleware
     @app.middleware("http")
     async def metrics_middleware(request, call_next):
         import time as _t
+
         _start = _t.time()
         try:
             response = await call_next(request)
@@ -366,9 +494,12 @@ def create_app() -> FastAPI:
             # Track request metrics
             try:
                 from .metrics.collector import get_collector
+
                 get_collector().track_request(
-                    request.method, request.url.path,
-                    response.status_code, _dur,
+                    request.method,
+                    request.url.path,
+                    response.status_code,
+                    _dur,
                 )
             except Exception:
                 pass
@@ -387,19 +518,22 @@ def create_app() -> FastAPI:
     # Templates
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     # Add markdown filter for chat rendering (with LLM artifact stripping)
-    import markdown as _md_lib
     import re as _re
+
+    import markdown as _md_lib
+
     def _clean_llm(text: str) -> str:
         t = str(text or "")
-        t = _re.sub(r'<think>[\s\S]*?</think>', '', t)
-        t = _re.sub(r'<think>[\s\S]*$', '', t)
-        t = _re.sub(r'\[TOOL_CALL\][\s\S]*?\[/TOOL_CALL\]', '', t)
-        t = _re.sub(r'\[TOOL_CALL\][\s\S]*$', '', t)
-        t = _re.sub(r'\[(DELEGATE|VETO|APPROVE|ASK|ESCALATE)[^\]]*\]', '', t)
+        t = _re.sub(r"<think>[\s\S]*?</think>", "", t)
+        t = _re.sub(r"<think>[\s\S]*$", "", t)
+        t = _re.sub(r"\[TOOL_CALL\][\s\S]*?\[/TOOL_CALL\]", "", t)
+        t = _re.sub(r"\[TOOL_CALL\][\s\S]*$", "", t)
+        t = _re.sub(r"\[(DELEGATE|VETO|APPROVE|ASK|ESCALATE)[^\]]*\]", "", t)
         return t.strip()
 
     def _render_screenshots(html: str) -> str:
         """Convert [SCREENSHOT:path] markers to inline <img> tags."""
+
         def _shot_repl(m):
             p = m.group(1).strip().lstrip("./")
             src = f"/workspace/{p}"
@@ -409,27 +543,34 @@ def create_app() -> FastAPI:
                 f'style="max-width:100%;border-radius:var(--radius-lg);margin:0.5rem 0;border:1px solid var(--border-subtle);cursor:pointer" '
                 f'onclick="window.open(this.src)">'
                 f'<div style="font-size:0.65rem;color:var(--text-tertiary);margin-top:2px">{p}</div>'
-                f'</div>'
+                f"</div>"
             )
-        return _re.sub(r'\[SCREENSHOT:([^\]]+)\]', _shot_repl, html)
+
+        return _re.sub(r"\[SCREENSHOT:([^\]]+)\]", _shot_repl, html)
 
     def _markdown_filter(text):
-        html = _md_lib.markdown(
-            _clean_llm(text), extensions=["fenced_code", "tables", "nl2br"]
-        )
+        html = _md_lib.markdown(_clean_llm(text), extensions=["fenced_code", "tables", "nl2br"])
         return _render_screenshots(html)
 
     templates.env.filters["markdown"] = _markdown_filter
 
     # i18n — make _() available in all templates
-    from .i18n import t as _translate, get_lang as _get_lang, SUPPORTED_LANGS
+    from .i18n import SUPPORTED_LANGS, _catalog
+    from .i18n import get_lang as _get_lang
+    from .i18n import t as _translate
 
     def _i18n_global(key: str, **kwargs):
         """Template global: {{ _('key', name='val') }}"""
         return _translate(key, lang=_i18n_global._current_lang, **kwargs)
+
     _i18n_global._current_lang = "en"
 
+    def _i18n_catalog_global():
+        """Return current lang's i18n catalog for JS injection."""
+        return _catalog.get(_i18n_global._current_lang, _catalog.get("en", {}))
+
     templates.env.globals["_"] = _i18n_global
+    templates.env.globals["i18n_catalog"] = _i18n_catalog_global()
     templates.env.globals["SUPPORTED_LANGS"] = SUPPORTED_LANGS
 
     # Middleware to set current language per-request
@@ -439,6 +580,8 @@ def create_app() -> FastAPI:
         async def dispatch(self, request, call_next):
             lang = _get_lang(request)
             _i18n_global._current_lang = lang
+            # Update JS catalog for current lang
+            templates.env.globals["i18n_catalog"] = _catalog.get(lang, _catalog.get("en", {}))
             request.state.lang = lang
             response = await call_next(request)
             return response

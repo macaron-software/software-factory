@@ -8,7 +8,6 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 from ..models import AgentInstance
 from .registry import BaseTool
@@ -25,6 +24,17 @@ class CodeReadTool(BaseTool):
             return f"Error: File not found: {path}"
         # Resolve symlinks to prevent path traversal
         path = os.path.realpath(path)
+        # If path is a directory, fallback to listing its contents
+        if os.path.isdir(path):
+            try:
+                entries = sorted(os.listdir(path))[:100]
+                listing = "\n".join(
+                    f"{'  ' if not os.path.isdir(os.path.join(path, e)) else ''}{e}{'/' if os.path.isdir(os.path.join(path, e)) else ''}"
+                    for e in entries
+                )
+                return f"Note: '{path}' is a directory. Contents:\n{listing}"
+            except Exception as e:
+                return f"Error listing directory {path}: {e}"
         try:
             max_lines = int(params.get("max_lines", 500))
             with open(path) as f:

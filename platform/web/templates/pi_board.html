@@ -142,10 +142,10 @@
 .pi-section-body.view-list .epic-desc,.pi-section-body.view-list .epic-features{display:none}
 .pi-section-body.view-list .epic-stats{margin:0;gap:0.8rem}
 .pi-section-body.view-list .epic-progress{max-width:160px}
-.pi-section-body.view-list .tma-board{display:flex;flex-direction:column;gap:0}
-.pi-section-body.view-list .tma-col-header{display:none}
-.pi-section-body.view-list .tma-col{display:contents}
-.pi-section-body.view-list .tma-col-body{display:contents}
+.pi-section-body.view-list .tma-board{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;gap:1rem}
+.pi-section-body.view-list .tma-col-header{display:flex!important;align-items:center;gap:0.4rem}
+.pi-section-body.view-list .tma-col{display:flex!important;flex-direction:column}
+.pi-section-body.view-list .tma-col-body{display:flex!important;flex-direction:column;gap:0.5rem}
 .pi-section-body.view-list .tma-card{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:0.6rem;padding:0.5rem 0.8rem;border-radius:6px;width:100%;margin-bottom:0.35rem}
 .pi-section-body.view-list .tma-card-desc{display:none}
 .pi-section-body.view-list .tma-card-header{margin-bottom:0}
@@ -161,10 +161,10 @@
 .pi-section-body.view-compact .epic-title{font-size:0.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pi-section-body.view-compact .epic-desc,.pi-section-body.view-compact .epic-features,.pi-section-body.view-compact .epic-toggle,.pi-section-body.view-compact .epic-stats{display:none}
 .pi-section-body.view-compact .epic-header>div:last-child{flex-shrink:0}
-.pi-section-body.view-compact .tma-board{display:flex;flex-direction:column;gap:0}
-.pi-section-body.view-compact .tma-col-header{display:none}
-.pi-section-body.view-compact .tma-col{display:contents}
-.pi-section-body.view-compact .tma-col-body{display:contents;gap:0}
+.pi-section-body.view-compact .tma-board{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;gap:1rem}
+.pi-section-body.view-compact .tma-col-header{display:flex!important;align-items:center;gap:0.4rem;font-size:0.75rem}
+.pi-section-body.view-compact .tma-col{display:flex!important;flex-direction:column}
+.pi-section-body.view-compact .tma-col-body{display:flex!important;flex-direction:column;gap:0.35rem}
 .pi-section-body.view-compact .tma-card{display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0.8rem;border-radius:0;border:none;border-bottom:1px solid var(--border);background:transparent}
 .pi-section-body.view-compact .tma-card:hover{background:var(--bg-secondary)}
 .pi-section-body.view-compact .tma-card-desc,.pi-section-body.view-compact .tma-card-footer{display:none}
@@ -260,7 +260,7 @@
             </div>
             <div class="tma-col-body">
             {% for t in tma_active %}
-            <div class="tma-card">
+            <div class="tma-card" style="cursor:pointer" onclick="openTMAModal('{{ t.id }}')" data-name="{{ t.name }}" data-type="{{ t.type }}" data-status="{{ t.status }}" data-project="{{ t.project_name }}" data-desc="{{ t.description }}" data-goal="{{ t.goal }}">
                 <div class="tma-card-header">
                     <span class="tma-status-dot s-active" title="Active"></span>
                     <div class="tma-type-icon {{ t.type }}">
@@ -290,7 +290,7 @@
             </div>
             <div class="tma-col-body">
             {% for t in tma_wip %}
-            <div class="tma-card">
+            <div class="tma-card" style="cursor:pointer" onclick="openTMAModal('{{ t.id }}')" data-name="{{ t.name }}" data-type="{{ t.type }}" data-status="{{ t.status }}" data-project="{{ t.project_name }}" data-desc="{{ t.description }}" data-goal="{{ t.goal }}">
                 <div class="tma-card-header">
                     <span class="tma-status-dot s-wip" title="En cours"></span>
                     <div class="tma-type-icon {{ t.type }}">
@@ -320,7 +320,7 @@
             </div>
             <div class="tma-col-body">
             {% for t in tma_resolved %}
-            <div class="tma-card">
+            <div class="tma-card" style="cursor:pointer" onclick="openTMAModal('{{ t.id }}')" data-name="{{ t.name }}" data-type="{{ t.type }}" data-status="{{ t.status }}" data-project="{{ t.project_name }}" data-desc="{{ t.description }}" data-goal="{{ t.goal }}">
                 <div class="tma-card-header">
                     <span class="tma-status-dot s-resolved" title="Resolved"></span>
                     <div class="tma-type-icon {{ t.type }}">
@@ -619,4 +619,177 @@ function debounceSearch(q) {
     } catch(e) { console.error('Release notes error:', e); }
 })();
 </script>
+
+<script>
+// TMA Ticket Modal Functions - EDITABLE VERSION
+let currentEditingTicket = null;
+
+async function openTMAModal(ticketId) {
+    const card = event.currentTarget;
+    const name = card.dataset.name || 'Ticket';
+    const type = card.dataset.type || 'unknown';
+    const status = card.dataset.status || 'active';
+    const project = card.dataset.project || '';
+    const desc = card.dataset.desc || '';
+    const goal = card.dataset.goal || '';
+    
+    currentEditingTicket = { id: ticketId, name, type, status, project, desc, goal };
+    
+    const modal = document.createElement('div');
+    modal.id = 'tmaModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10000;padding:1rem';
+    
+    const typeColors = {'bug':'#ef4444','security':'#f59e0b','debt':'#8b5cf6','performance':'#06b6d4'};
+    const typeColor = typeColors[type] || '#6b7280';
+    
+    modal.innerHTML = `
+    <div style="background:var(--bg-primary);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.5);width:100%;max-width:700px;max-height:90vh;overflow-y:auto">
+        <div style="padding:1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <h3 style="margin:0;display:flex;align-items:center;gap:0.8rem">
+                <span style="width:12px;height:12px;border-radius:50%;background:${typeColor}"></span>
+                <span style="font-size:1.1rem;font-weight:600">${name}</span>
+            </h3>
+            <button onclick="closeTMAModal()" style="background:none;border:none;font-size:2rem;color:var(--text-secondary);cursor:pointer;padding:0;width:32px;height:32px">&times;</button>
+        </div>
+        <form id="tmaEditForm" style="padding:1.5rem">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+                <div>
+                    <label style="font-size:0.7rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:0.3rem;display:block">Type</label>
+                    <select name="type" style="width:100%;padding:0.5rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:0.85rem">
+                        <option value="bug" ${type === 'bug' ? 'selected' : ''}>Bug</option>
+                        <option value="security" ${type === 'security' ? 'selected' : ''}>Security</option>
+                        <option value="debt" ${type === 'debt' ? 'selected' : ''}>Debt</option>
+                        <option value="performance" ${type === 'performance' ? 'selected' : ''}>Performance</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:0.7rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:0.3rem;display:block">Statut</label>
+                    <select name="status" style="width:100%;padding:0.5rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:0.85rem">
+                        <option value="open" ${status === 'open' ? 'selected' : ''}>Active</option>
+                        <option value="in_progress" ${status === 'in_progress' ? 'selected' : ''}>En cours</option>
+                        <option value="resolved" ${status === 'resolved' ? 'selected' : ''}>Résolu</option>
+                        <option value="closed" ${status === 'closed' ? 'selected' : ''}>Closed</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div style="margin-bottom:1.5rem">
+                <label style="font-size:0.7rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:0.3rem;display:block">Nom du ticket</label>
+                <input type="text" name="name" value="${name || ''}" style="width:100%;padding:0.8rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:0.85rem" required>
+            </div>
+            
+            ${project ? `<div style="margin-bottom:1.5rem">
+                <label style="font-size:0.7rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:0.3rem;display:block">Projet</label>
+                <div style="padding:0.5rem;background:var(--bg-secondary);border-radius:6px;font-size:0.85rem;color:var(--text-secondary)">${project}</div>
+            </div>` : ''}
+            
+            <div style="margin-bottom:1.5rem">
+                <label style="font-size:0.7rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:0.3rem;display:block">Description</label>
+                <textarea name="description" rows="4" style="width:100%;padding:0.8rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:0.85rem;resize:vertical">${desc || ''}</textarea>
+            </div>
+            
+            <div style="margin-bottom:1.5rem">
+                <label style="font-size:0.7rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:0.3rem;display:block">Objectif</label>
+                <textarea name="goal" rows="3" style="width:100%;padding:0.8rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;border-left:3px solid var(--purple);color:var(--text-primary);font-size:0.85rem;resize:vertical">${goal || ''}</textarea>
+            </div>
+            
+            <div style="background:var(--bg-tertiary);padding:1rem;border-radius:8px;font-size:0.75rem;color:var(--text-secondary)">
+                <strong>ID:</strong> ${ticketId}
+            </div>
+        </form>
+        
+        <div style="padding:1rem 1.5rem;border-top:1px solid var(--border);background:var(--bg-secondary);display:flex;gap:0.5rem;justify-content:space-between">
+            <button onclick="deleteTicket('${ticketId}')" style="background:#ef4444;color:white;border:none;padding:0.6rem 1.2rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600;transition:all 0.2s" onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">🗑️ Supprimer</button>
+            <div style="display:flex;gap:0.5rem">
+                <button onclick="closeTMAModal()" style="background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);padding:0.6rem 1.2rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600">Annuler</button>
+                <button onclick="saveTicket()" style="background:var(--purple);color:white;border:none;padding:0.6rem 1.5rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600;transition:all 0.2s" onmouseover="this.style.background='#7c3aed'" onmouseout="this.style.background='var(--purple)'">💾 Enregistrer</button>
+            </div>
+        </div>
+    </div>`;
+    
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeTMAModal(); });
+}
+
+async function saveTicket() {
+    const form = document.getElementById('tmaEditForm');
+    const formData = new FormData(form);
+    
+    const payload = {
+        name: formData.get('name'),
+        description: formData.get('description'),
+        goal: formData.get('goal'),
+        status: formData.get('status'),
+        type: formData.get('type')
+    };
+    
+    try {
+        const response = await fetch(`/api/tma/tickets/${currentEditingTicket.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        if (response.ok) {
+            showToast('Ticket mis à jour avec succès', 'success');
+            closeTMAModal();
+            setTimeout(() => window.location.reload(), 800);
+        } else {
+            const error = await response.json();
+            showToast('Erreur: ' + (error.detail || 'Update failed'), 'error');
+        }
+    } catch (error) {
+        showToast('Erreur réseau: ' + error.message, 'error');
+    }
+}
+
+async function deleteTicket(ticketId) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce ticket ?')) return;
+    
+    try {
+        const response = await fetch(`/api/tma/tickets/${ticketId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showToast('Ticket supprimé', 'success');
+            closeTMAModal();
+            setTimeout(() => window.location.reload(), 800);
+        } else {
+            const error = await response.json();
+            showToast('Erreur: ' + (error.detail || 'Delete failed'), 'error');
+        }
+    } catch (error) {
+        showToast('Erreur réseau: ' + error.message, 'error');
+    }
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.style.cssText = `position:fixed;top:20px;right:20px;padding:1rem 1.5rem;background:${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#6b7280'};color:white;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,0.3);z-index:10001;font-size:0.9rem;font-weight:600;animation:slideIn 0.3s ease`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+function closeTMAModal() { 
+    const modal = document.getElementById('tmaModal'); 
+    if (modal) modal.remove();
+    currentEditingTicket = null;
+}
+</script>
+
+<style>
+@keyframes slideIn {
+    from { transform: translateX(400px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slideOut {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(400px); opacity: 0; }
+}
+</style>
 {% endblock %}

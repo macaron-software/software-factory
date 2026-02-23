@@ -4,12 +4,11 @@ Supports dual backend: SQLite (local) / PostgreSQL (production).
 Backend selected via DATABASE_URL env var.
 """
 
-import os
 import sqlite3
 from pathlib import Path
 
-from ..config import DB_PATH, DATA_DIR
-from .adapter import is_postgresql, get_connection
+from ..config import DATA_DIR, DB_PATH
+from .adapter import get_connection, is_postgresql
 
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 SCHEMA_PG_PATH = Path(__file__).parent / "schema_pg.sql"
@@ -20,9 +19,8 @@ _USE_PG = is_postgresql()
 def _pg_column_exists(conn, table: str, column: str) -> bool:
     """Check if a column exists in a PostgreSQL table."""
     row = conn.execute(
-        "SELECT 1 FROM information_schema.columns "
-        "WHERE table_name=? AND column_name=?",
-        (table, column)
+        "SELECT 1 FROM information_schema.columns WHERE table_name=? AND column_name=?",
+        (table, column),
     ).fetchone()
     return row is not None
 
@@ -30,8 +28,7 @@ def _pg_column_exists(conn, table: str, column: str) -> bool:
 def _pg_table_exists(conn, table: str) -> bool:
     """Check if a table exists in PostgreSQL."""
     row = conn.execute(
-        "SELECT 1 FROM information_schema.tables WHERE table_name=?",
-        (table,)
+        "SELECT 1 FROM information_schema.tables WHERE table_name=?", (table,)
     ).fetchone()
     return row is not None
 
@@ -90,8 +87,12 @@ def _migrate(conn):
 
     try:
         m_cols = {r[1] for r in conn.execute("PRAGMA table_info(missions)").fetchall()}
-        for col, default in [("business_value", "0"), ("time_criticality", "0"),
-                             ("risk_reduction", "0"), ("job_duration", "1")]:
+        for col, default in [
+            ("business_value", "0"),
+            ("time_criticality", "0"),
+            ("risk_reduction", "0"),
+            ("job_duration", "1"),
+        ]:
             if col not in m_cols:
                 conn.execute(f"ALTER TABLE missions ADD COLUMN {col} REAL DEFAULT {default}")
     except Exception:
@@ -244,7 +245,9 @@ def _migrate(conn):
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_incidents_status ON platform_incidents(status)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_incidents_severity ON platform_incidents(severity)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_incidents_severity ON platform_incidents(severity)"
+    )
 
     # ── Performance indexes ──
     conn.execute("CREATE INDEX IF NOT EXISTS idx_missions_wsjf ON missions(wsjf_score DESC)")
@@ -252,17 +255,23 @@ def _migrate(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_missions_type ON missions(type)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_missions_workflow ON missions(workflow_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_created ON sessions(created_at)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_session_from ON messages(session_id, from_agent)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_session_from ON messages(session_id, from_agent)"
+    )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_toolcalls_session ON tool_calls(session_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_sprints_status ON sprints(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_features_status ON features(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_ideation_project ON ideation_sessions(project_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_ideation_status ON ideation_sessions(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_artifacts_type ON artifacts(type)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_mission_runs_parent ON mission_runs(parent_mission_id)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mission_runs_parent ON mission_runs(parent_mission_id)"
+    )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_mission_runs_session ON mission_runs(session_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_to)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_incidents_created ON platform_incidents(created_at)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_incidents_created ON platform_incidents(created_at)"
+    )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_scores_agent ON agent_scores(agent_id)")
 
     # ── Integrations (plugin connectors) ──
@@ -281,20 +290,69 @@ def _migrate(conn):
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_integrations_type ON integrations(type)")
 
+    # ── Custom AI Providers ──
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS custom_ai_providers (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            provider_type TEXT NOT NULL DEFAULT 'openai-compatible',
+            base_url TEXT NOT NULL,
+            api_key_encrypted TEXT NOT NULL,
+            default_model TEXT NOT NULL,
+            enabled INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_custom_ai_enabled ON custom_ai_providers(enabled)")
+
+    # ── Notifications (in-app) ──
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS notifications (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL DEFAULT 'info',
+            title TEXT NOT NULL,
+            message TEXT DEFAULT '',
+            url TEXT DEFAULT '',
+            severity TEXT DEFAULT 'info',
+            source TEXT DEFAULT '',
+            ref_id TEXT DEFAULT '',
+            is_read INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_notif_read ON notifications(is_read)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_notif_created ON notifications(created_at DESC)")
+
     # Seed default integrations if empty
     existing = conn.execute("SELECT COUNT(*) FROM integrations").fetchone()[0]
     if existing == 0:
         for integ in [
             ("jira", "Jira", "project_management", '{"url":"","project_key":"","mode":"import"}'),
-            ("confluence", "Confluence", "documentation", '{"url":"","space_key":"","auto_publish":["adr","retro"]}'),
+            (
+                "confluence",
+                "Confluence",
+                "documentation",
+                '{"url":"","space_key":"","auto_publish":["adr","retro"]}',
+            ),
             ("xray", "Xray", "test_management", '{"url":"","test_plan_sync":true}'),
-            ("sonarqube", "SonarQube", "quality", '{"url":"","project_key":"","quality_gate":true}'),
+            (
+                "sonarqube",
+                "SonarQube",
+                "quality",
+                '{"url":"","project_key":"","quality_gate":true}',
+            ),
             ("gitlab", "GitLab", "devops", '{"url":"","project_id":"","ci_sync":true}'),
-            ("azure-devops", "Azure DevOps", "devops", '{"org":"","project":"","boards_sync":true}'),
+            (
+                "azure-devops",
+                "Azure DevOps",
+                "devops",
+                '{"org":"","project":"","boards_sync":true}',
+            ),
         ]:
             conn.execute(
                 "INSERT OR IGNORE INTO integrations (id, name, type, config_json) VALUES (?,?,?,?)",
-                integ
+                integ,
             )
 
 

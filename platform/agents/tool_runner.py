@@ -2,6 +2,7 @@
 
 Extracted from executor.py to keep the main file focused on the agent loop.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -10,10 +11,10 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..llm.client import LLMClient, LLMToolCall
+    from ..llm.client import LLMToolCall
     from .executor import ExecutionContext
 
 logger = logging.getLogger(__name__)
@@ -21,64 +22,74 @@ logger = logging.getLogger(__name__)
 
 def _get_tool_registry():
     """Lazy import to avoid circular imports."""
-    from ..tools.registry import ToolRegistry
+    from ..tools.build_tools import register_build_tools
     from ..tools.code_tools import register_code_tools
     from ..tools.git_tools import register_git_tools
-    from ..tools.build_tools import register_build_tools
+    from ..tools.registry import ToolRegistry
+
     reg = ToolRegistry()
     register_code_tools(reg)
     register_git_tools(reg)
     register_build_tools(reg)
     try:
         from ..tools.mcp_bridge import register_mcp_tools
+
         register_mcp_tools(reg)
     except Exception:
         pass
     # Memory tools
     try:
         from ..tools.memory_tools import register_memory_tools
+
         register_memory_tools(reg)
     except Exception:
         pass
     # Web research tools
     try:
         from ..tools.web_tools import register_web_tools
+
         register_web_tools(reg)
     except Exception:
         pass
     # Deploy tools (docker build + Azure VM)
     try:
         from ..tools.deploy_tools import register_deploy_tools
+
         register_deploy_tools(reg)
     except Exception:
         pass
     # Phase orchestration tools (mission control)
     try:
         from ..tools.phase_tools import register_phase_tools
+
         register_phase_tools(reg)
     except Exception:
         pass
     # Playwright test/screenshot tools
     try:
         from ..tools.test_tools import register_test_tools
+
         register_test_tools(reg)
     except Exception:
         pass
     # Platform introspection tools (agents, missions, memory, metrics)
     try:
         from ..tools.platform_tools import register_platform_tools
+
         register_platform_tools(reg)
     except Exception:
         pass
     # Composition tools (dynamic workflow/team/mission creation)
     try:
         from ..tools.compose_tools import register_compose_tools
+
         register_compose_tools(reg)
     except Exception:
         pass
     # Android build tools (gradle, emulator, lint)
     try:
         from ..tools.android_tools import register_android_tools
+
         register_android_tools(reg)
     except Exception:
         pass
@@ -87,38 +98,38 @@ def _get_tool_registry():
 
 # ── Helpers ──────────────────────────────────────────────────────
 
+
 def _parse_xml_tool_calls(content: str) -> list:
     """Parse tool calls from LLM content (multiple formats)."""
-    from ..llm.client import LLMToolCall as _TC
     import uuid as _uuid
+
+    from ..llm.client import LLMToolCall as _TC
 
     calls = []
 
     # Format 1: <invoke name="tool_name"><parameter name="key">value</parameter>...</invoke>
-    invoke_re = re.compile(
-        r'<invoke\s+name="([^"]+)">(.*?)</invoke>', re.DOTALL
-    )
-    param_re = re.compile(
-        r'<parameter\s+name="([^"]+)">(.*?)</parameter>', re.DOTALL
-    )
+    invoke_re = re.compile(r'<invoke\s+name="([^"]+)">(.*?)</invoke>', re.DOTALL)
+    param_re = re.compile(r'<parameter\s+name="([^"]+)">(.*?)</parameter>', re.DOTALL)
     for m in invoke_re.finditer(content):
         fn_name = m.group(1)
         body = m.group(2)
         args = {}
         for pm in param_re.finditer(body):
             args[pm.group(1)] = pm.group(2).strip()
-        calls.append(_TC(
-            id=f"call_{_uuid.uuid4().hex[:12]}",
-            function_name=fn_name,
-            arguments=args,
-        ))
+        calls.append(
+            _TC(
+                id=f"call_{_uuid.uuid4().hex[:12]}",
+                function_name=fn_name,
+                arguments=args,
+            )
+        )
     if calls:
         return calls
 
     # Format 2: [TOOL_CALL]{ tool => 'name', args => { --KEY "value" }}[/TOOL_CALL]
     tc_re = re.compile(
         r'\[TOOL_CALL\]\s*\{[^}]*tool\s*=>\s*[\'"]([^\'"]+)[\'"].*?args\s*=>\s*\{(.*?)\}\s*\}?\s*\[/TOOL_CALL\]',
-        re.DOTALL
+        re.DOTALL,
     )
     arg_re = re.compile(r'--(\w+)\s+"([^"]*)"')
     for m in tc_re.finditer(content):
@@ -137,27 +148,31 @@ def _parse_xml_tool_calls(content: str) -> list:
             elif key == "context":
                 key = "brief"
             args[key] = am.group(2)
-        calls.append(_TC(
-            id=f"call_{_uuid.uuid4().hex[:12]}",
-            function_name=fn_name,
-            arguments=args,
-        ))
+        calls.append(
+            _TC(
+                id=f"call_{_uuid.uuid4().hex[:12]}",
+                function_name=fn_name,
+                arguments=args,
+            )
+        )
     if calls:
         return calls
 
     # Format 3: <tool_call>{"name":"tool","arguments":{...}}</tool_call> (JSON inside XML)
-    tc_json_re = re.compile(r'<tool_call>\s*(\{.*?\})\s*</tool_call>', re.DOTALL)
+    tc_json_re = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL)
     for m in tc_json_re.finditer(content):
         try:
             data = json.loads(m.group(1))
             fn_name = data.get("name", "")
             args = data.get("arguments", {})
             if fn_name:
-                calls.append(_TC(
-                    id=f"call_{_uuid.uuid4().hex[:12]}",
-                    function_name=fn_name,
-                    arguments=args if isinstance(args, dict) else {},
-                ))
+                calls.append(
+                    _TC(
+                        id=f"call_{_uuid.uuid4().hex[:12]}",
+                        function_name=fn_name,
+                        arguments=args if isinstance(args, dict) else {},
+                    )
+                )
         except json.JSONDecodeError:
             pass
 
@@ -167,16 +182,29 @@ def _parse_xml_tool_calls(content: str) -> list:
 def _record_artifact(ctx: ExecutionContext, tc: LLMToolCall, result: str):
     """Record a code_write/code_edit as an artifact in the DB."""
     import uuid
+
     from ..db.migrations import get_db
+
     path = tc.arguments.get("path", "unknown")
     art_type = "edit" if tc.function_name == "code_edit" else "create"
-    content = tc.arguments.get("content", "") or f"Edit: {tc.arguments.get('old_str', '')[:100]} → {tc.arguments.get('new_str', '')[:100]}"
+    content = (
+        tc.arguments.get("content", "")
+        or f"Edit: {tc.arguments.get('old_str', '')[:100]} → {tc.arguments.get('new_str', '')[:100]}"
+    )
     lang = os.path.splitext(path)[1].lstrip(".")
     db = get_db()
     try:
         db.execute(
             "INSERT INTO artifacts (id, session_id, type, name, content, language, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (str(uuid.uuid4())[:8], ctx.session_id, art_type, f"[{art_type.upper()}] {path}", content[:2000], lang, ctx.agent.id),
+            (
+                str(uuid.uuid4())[:8],
+                ctx.session_id,
+                art_type,
+                f"[{art_type.upper()}] {path}",
+                content[:2000],
+                lang,
+                ctx.agent.id,
+            ),
         )
         db.commit()
     except Exception as e:
@@ -206,7 +234,7 @@ def _build_phase_edges(pattern_type: str, agents: list[dict]) -> list[dict]:
             edges.append({"from": ids[1], "to": ids[0], "type": "feedback"})
     elif pattern_type in ("network",):
         for i, a in enumerate(ids):
-            for b in ids[i + 1:]:
+            for b in ids[i + 1 :]:
                 edges.append({"from": a, "to": b, "type": "discuss"})
     elif pattern_type in ("router",):
         for specialist in ids[1:]:
@@ -220,18 +248,32 @@ def _build_phase_edges(pattern_type: str, agents: list[dict]) -> list[dict]:
 async def _push_mission_sse(session_id: str, event: dict):
     """Push SSE event for mission control updates."""
     from ..sessions.runner import _push_sse
+
     await _push_sse(session_id, event)
 
 
 # ── Individual tool handlers (standalone functions) ──────────────
 
+
 async def _tool_list_files(args: dict) -> str:
     """List directory contents."""
     import os
+
     path = args.get("path", ".")
     depth = int(args.get("depth", 2))
+    # Fix path doubling: if path doesn't exist, try stripping duplicate basename
     if not os.path.isdir(path):
-        return f"Error: not a directory: {path}"
+        parent = os.path.dirname(path)
+        base = os.path.basename(path)
+        # e.g. /app/workspace/devpulse/devpulse → /app/workspace/devpulse
+        if os.path.basename(parent) == base and os.path.isdir(parent):
+            path = parent
+        elif not os.path.exists(path):
+            return f"Error: not a directory: {path}"
+        elif os.path.isfile(path):
+            return f"Note: '{path}' is a file, not a directory. Use code_read to view it."
+        else:
+            return f"Error: not a directory: {path}"
     lines = []
     for root, dirs, files in os.walk(path):
         level = root.replace(path, "").count(os.sep)
@@ -250,6 +292,7 @@ async def _tool_list_files(args: dict) -> str:
 async def _tool_memory_search(args: dict, ctx: ExecutionContext) -> str:
     """Search project + session memory (scoped to project_id — agents cannot cross-project)."""
     from ..memory.manager import get_memory_manager
+
     mem = get_memory_manager()
     query = args.get("query", "")
     try:
@@ -270,10 +313,19 @@ async def _tool_memory_search(args: dict, ctx: ExecutionContext) -> str:
                 pattern_results = mem.pattern_get(ctx.session_id, limit=5)
             for r in pattern_results:
                 if r.get("author_agent") != ctx.agent.id:  # skip self
-                    results.append({"key": r.get("key", ""), "value": r.get("value", ""), "category": f"session:{r.get('type','')}"})
+                    results.append(
+                        {
+                            "key": r.get("key", ""),
+                            "value": r.get("value", ""),
+                            "category": f"session:{r.get('type', '')}",
+                        }
+                    )
         if not results:
             return "No memory entries found for this project yet."
-        return "\n".join(f"[{r.get('category', r.get('key',''))}] {r.get('key','')}: {r.get('value','')[:300]}" for r in results[:12])
+        return "\n".join(
+            f"[{r.get('category', r.get('key', ''))}] {r.get('key', '')}: {r.get('value', '')[:300]}"
+            for r in results[:12]
+        )
     except Exception as e:
         return f"Memory search error: {e}"
 
@@ -281,6 +333,7 @@ async def _tool_memory_search(args: dict, ctx: ExecutionContext) -> str:
 async def _tool_memory_store(args: dict, ctx: ExecutionContext) -> str:
     """Store a fact in project memory (scoped to project_id, tagged with agent_id)."""
     from ..memory.manager import get_memory_manager
+
     mem = get_memory_manager()
     key = args.get("key", "")
     value = args.get("value", "")
@@ -300,6 +353,7 @@ async def _tool_memory_store(args: dict, ctx: ExecutionContext) -> str:
 async def _tool_deep_search(args: dict, ctx: ExecutionContext) -> str:
     """RLM: Deep recursive search (MIT CSAIL arXiv:2512.24601)."""
     from .rlm import get_project_rlm
+
     query = args.get("query", "")
     if not query:
         return "Error: query is required"
@@ -328,21 +382,26 @@ async def _tool_deep_search(args: dict, ctx: ExecutionContext) -> str:
         on_progress=rlm_progress,
     )
 
-    print(f"[EXECUTOR] deep_search done: {result.iterations} iters, {result.total_queries} queries, {len(result.answer)} chars", flush=True)
+    print(
+        f"[EXECUTOR] deep_search done: {result.iterations} iters, {result.total_queries} queries, {len(result.answer)} chars",
+        flush=True,
+    )
     header = f"RLM Deep Search ({result.iterations} iterations, {result.total_queries} queries)\n\n"
     return header + result.answer
 
 
 # ── Phase orchestration tools (Mission Control) ──
 
+
 async def _tool_run_phase(args: dict, ctx: ExecutionContext) -> str:
     """Run a mission phase via pattern engine."""
-    from ..missions.store import get_mission_run_store
-    from ..workflows.store import get_workflow_store
-    from ..patterns.store import get_pattern_store
-    from ..patterns.engine import run_pattern
-    from ..models import PhaseStatus
     from datetime import datetime
+
+    from ..missions.store import get_mission_run_store
+    from ..models import PhaseStatus
+    from ..patterns.engine import run_pattern
+    from ..patterns.store import get_pattern_store
+    from ..workflows.store import get_workflow_store
 
     phase_id = args.get("phase_id", "")
     brief = args.get("brief", "")
@@ -393,6 +452,7 @@ async def _tool_run_phase(args: dict, ctx: ExecutionContext) -> str:
     edges = _build_phase_edges(base_pattern.type, agents)
 
     from ..patterns.store import PatternDef
+
     phase_pattern = PatternDef(
         id=f"mission-{mission.id}-{phase_id}",
         name=f"{wf_phase.name}",
@@ -412,17 +472,23 @@ async def _tool_run_phase(args: dict, ctx: ExecutionContext) -> str:
     run_store.update(mission)
 
     # Push SSE event
-    await _push_mission_sse(ctx.session_id, {
-        "type": "phase_started",
-        "mission_id": mission.id,
-        "phase_id": phase_id,
-        "phase_name": wf_phase.name,
-        "pattern": base_pattern.type,
-        "agents": agent_ids,
-    })
+    await _push_mission_sse(
+        ctx.session_id,
+        {
+            "type": "phase_started",
+            "mission_id": mission.id,
+            "phase_id": phase_id,
+            "phase_name": wf_phase.name,
+            "pattern": base_pattern.type,
+            "agents": agent_ids,
+        },
+    )
 
     try:
-        print(f"[MISSION] Running phase '{phase_id}' ({base_pattern.type}) with {len(agent_ids)} agents", flush=True)
+        print(
+            f"[MISSION] Running phase '{phase_id}' ({base_pattern.type}) with {len(agent_ids)} agents",
+            flush=True,
+        )
         pattern_run = await run_pattern(
             phase_pattern,
             session_id=ctx.session_id,
@@ -444,12 +510,15 @@ async def _tool_run_phase(args: dict, ctx: ExecutionContext) -> str:
             phase_run.error = "Phase ended with vetoes or failures"
         run_store.update(mission)
 
-        await _push_mission_sse(ctx.session_id, {
-            "type": "phase_completed" if pattern_run.success else "phase_failed",
-            "mission_id": mission.id,
-            "phase_id": phase_id,
-            "success": pattern_run.success,
-        })
+        await _push_mission_sse(
+            ctx.session_id,
+            {
+                "type": "phase_completed" if pattern_run.success else "phase_failed",
+                "mission_id": mission.id,
+                "phase_id": phase_id,
+                "success": pattern_run.success,
+            },
+        )
 
         status = "DONE" if pattern_run.success else "FAILED"
         return f"Phase '{wf_phase.name}' {status}\n\n{phase_run.summary[:2000]}"
@@ -499,8 +568,12 @@ async def _tool_list_phases(args: dict, ctx: ExecutionContext) -> str:
 
     lines = [f"Mission: {mission.workflow_name} ({mission.status.value})\n"]
     status_icons = {
-        "pending": "·", "running": "~", "done": "✓",
-        "failed": "✗", "skipped": "-", "waiting_validation": "?",
+        "pending": "·",
+        "running": "~",
+        "done": "✓",
+        "failed": "✗",
+        "skipped": "-",
+        "waiting_validation": "?",
     }
     for i, p in enumerate(mission.phases, 1):
         icon = status_icons.get(p.status.value, "•")
@@ -512,8 +585,8 @@ async def _tool_list_phases(args: dict, ctx: ExecutionContext) -> str:
 async def _tool_request_validation(args: dict, ctx: ExecutionContext) -> str:
     """Request human validation — emit SSE checkpoint event."""
     from ..missions.store import get_mission_run_store
-    from ..sessions.store import get_session_store, MessageDef
     from ..models import PhaseStatus
+    from ..sessions.store import MessageDef, get_session_store
 
     question = args.get("question", "Proceed?")
     options = args.get("options", "GO,NOGO,PIVOT")
@@ -530,23 +603,28 @@ async def _tool_request_validation(args: dict, ctx: ExecutionContext) -> str:
 
     # Store as system message
     store = get_session_store()
-    store.add_message(MessageDef(
-        session_id=ctx.session_id,
-        from_agent=ctx.agent.id,
-        to_agent="human",
-        message_type="system",
-        content=f"**CHECKPOINT** — {question}\n\nOptions: {options}",
-    ))
+    store.add_message(
+        MessageDef(
+            session_id=ctx.session_id,
+            from_agent=ctx.agent.id,
+            to_agent="human",
+            message_type="system",
+            content=f"**CHECKPOINT** — {question}\n\nOptions: {options}",
+        )
+    )
 
     # SSE event for Mission Control UI
-    await _push_mission_sse(ctx.session_id, {
-        "type": "checkpoint",
-        "mission_id": mission.id if mission else "",
-        "phase_id": mission.current_phase if mission else "",
-        "question": question,
-        "options": options.split(","),
-        "requires_input": True,
-    })
+    await _push_mission_sse(
+        ctx.session_id,
+        {
+            "type": "checkpoint",
+            "mission_id": mission.id if mission else "",
+            "phase_id": mission.current_phase if mission else "",
+            "question": question,
+            "options": options.split(","),
+            "requires_input": True,
+        },
+    )
 
     return f"CHECKPOINT: Waiting for human validation.\nQuestion: {question}\nOptions: {options}\n\n(The user will respond via Mission Control UI)"
 
@@ -573,7 +651,8 @@ async def _tool_build_test(tool_name: str, args: dict, ctx: ExecutionContext) ->
     workspace = ctx.project_path
     if not workspace:
         return "Error: no workspace available"
-    import subprocess, os
+    import os
+    import subprocess
 
     # Intercept Android builds — redirect to android_build tool
     if any(kw in command for kw in ["gradlew", "gradle ", "assembleDebug", "assembleRelease"]):
@@ -588,8 +667,12 @@ async def _tool_build_test(tool_name: str, args: dict, ctx: ExecutionContext) ->
         command = "/usr/bin/" + command.strip()
     try:
         proc = subprocess.run(
-            command, shell=True, cwd=workspace,
-            capture_output=True, text=True, timeout=120,
+            command,
+            shell=True,
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         out = (proc.stdout or "") + (proc.stderr or "")
         status = "SUCCESS" if proc.returncode == 0 else f"FAILED (exit {proc.returncode})"
@@ -603,8 +686,12 @@ async def _tool_build_test(tool_name: str, args: dict, ctx: ExecutionContext) ->
 async def _tool_browser_screenshot(args: dict, ctx: ExecutionContext) -> str:
     """Take a real browser screenshot using Playwright."""
     from ..tools.build_tools import BrowserScreenshotTool
+
     if "cwd" not in args and ctx.project_path:
-        args["cwd"] = ctx.project_path
+        import os
+
+        if os.path.isdir(ctx.project_path):
+            args["cwd"] = ctx.project_path
     try:
         tool = BrowserScreenshotTool()
         return await tool.execute(args)
@@ -612,10 +699,169 @@ async def _tool_browser_screenshot(args: dict, ctx: ExecutionContext) -> str:
         return f"[browser_screenshot] ERROR: {e}"
 
 
+# ── Playwright shortcut aliases (simple names for LLM compatibility) ──
+
+
+async def _tool_browse(args: dict, ctx: ExecutionContext) -> str:
+    """Navigate browser to a URL. Alias for mcp_playwright_browser_navigate."""
+    return await _tool_mcp_dynamic(
+        "mcp_playwright_browser_navigate", {"url": args.get("url", "")}, ctx
+    )
+
+
+async def _tool_take_screenshot(args: dict, ctx: ExecutionContext) -> str:
+    """Take a PNG screenshot. Alias for mcp_playwright_browser_take_screenshot."""
+    return await _tool_mcp_dynamic(
+        "mcp_playwright_browser_take_screenshot",
+        {
+            "name": args.get("name", "screenshot"),
+            "selector": args.get("selector", ""),
+        },
+        ctx,
+    )
+
+
+async def _tool_inspect_page(args: dict, ctx: ExecutionContext) -> str:
+    """Get accessibility tree of current page. Alias for mcp_playwright_browser_snapshot."""
+    return await _tool_mcp_dynamic("mcp_playwright_browser_snapshot", {}, ctx)
+
+
+async def _tool_run_e2e_tests(args: dict, ctx: ExecutionContext) -> str:
+    """Run full E2E test suite: start server, take screenshots, run tests."""
+    import glob as glob_mod
+    import os
+    import subprocess
+    import time
+
+    workspace = ctx.project_path
+    if not workspace:
+        return "Error: no workspace"
+
+    results = []
+
+    # 1. Find app entry point
+    pkg_files = glob_mod.glob(os.path.join(workspace, "**/package.json"), recursive=True)
+    pkg_files = [p for p in pkg_files if "node_modules" not in p]
+
+    # 2. Install + build
+    for pkg in pkg_files[:2]:
+        pkg_dir = os.path.dirname(pkg)
+        label = os.path.basename(pkg_dir) or "root"
+        try:
+            proc = subprocess.run(
+                "npm install --legacy-peer-deps 2>&1 | tail -3",
+                shell=True,
+                cwd=pkg_dir,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            results.append(f"[{label}] npm install: {'OK' if proc.returncode == 0 else 'FAIL'}")
+        except Exception as e:
+            results.append(f"[{label}] npm install: {e}")
+
+    # 3. Try starting dev server
+    server_proc = None
+    port = args.get("port", 3000)
+    for pkg in pkg_files[:2]:
+        pkg_dir = os.path.dirname(pkg)
+        try:
+            import json as json_mod
+
+            with open(pkg) as f:
+                pj = json_mod.load(f)
+            scripts = pj.get("scripts", {})
+            start_cmd = None
+            if "dev" in scripts:
+                start_cmd = f"npm run dev -- --port {port}"
+            elif "start" in scripts:
+                start_cmd = f"PORT={port} npm start"
+            if start_cmd:
+                server_proc = subprocess.Popen(
+                    start_cmd,
+                    shell=True,
+                    cwd=pkg_dir,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                results.append(f"[server] Started: {start_cmd} (pid={server_proc.pid})")
+                # Wait for server to be ready (up to 15s)
+                import urllib.request
+
+                ready = False
+                for attempt in range(15):
+                    time.sleep(1)
+                    try:
+                        urllib.request.urlopen(f"http://localhost:{port}", timeout=1)
+                        ready = True
+                        break
+                    except Exception:
+                        pass
+                results.append(
+                    f"[server] {'Ready' if ready else 'Not responding (continuing anyway)'} after {attempt + 1}s"
+                )
+                break
+        except Exception:
+            pass
+
+    # 4. Take screenshots via MCP Playwright
+    screenshots_taken = 0
+    try:
+        nav_result = await _tool_mcp_dynamic(
+            "mcp_playwright_browser_navigate", {"url": f"http://localhost:{port}"}, ctx
+        )
+        results.append(f"[browse] {nav_result[:200]}")
+
+        for name in ["homepage", "main-view"]:
+            ss_result = await _tool_mcp_dynamic(
+                "mcp_playwright_browser_take_screenshot", {"name": name}, ctx
+            )
+            results.append(f"[screenshot:{name}] {ss_result[:200]}")
+            screenshots_taken += 1
+
+        snap_result = await _tool_mcp_dynamic("mcp_playwright_browser_snapshot", {}, ctx)
+        results.append(f"[inspect] {snap_result[:500]}")
+    except Exception as e:
+        results.append(f"[playwright] Error: {e}")
+
+    # 5. Run unit tests
+    for pkg in pkg_files[:2]:
+        pkg_dir = os.path.dirname(pkg)
+        label = os.path.basename(pkg_dir) or "root"
+        try:
+            proc = subprocess.run(
+                "npm test -- --watchAll=false 2>&1 | tail -20",
+                shell=True,
+                cwd=pkg_dir,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            status = "PASS" if proc.returncode == 0 else "FAIL"
+            results.append(f"[test:{label}] {status}\n{proc.stdout[-500:]}")
+        except subprocess.TimeoutExpired:
+            results.append(f"[test:{label}] TIMEOUT")
+        except Exception as e:
+            results.append(f"[test:{label}] Error: {e}")
+
+    # 6. Cleanup server
+    if server_proc:
+        try:
+            server_proc.terminate()
+            server_proc.wait(timeout=5)
+        except Exception:
+            pass
+
+    results.append(
+        f"\n📊 Summary: {screenshots_taken} screenshots taken, {len(pkg_files)} packages found"
+    )
+    return "\n".join(results)
+
+
 async def _tool_security_chaos(name: str, args: dict, ctx: ExecutionContext) -> str:
     """Dispatch security/chaos/TMC/infra tools to their BaseTool implementations."""
-    from ..tools.security_tools import SastScanTool, DependencyAuditTool, SecretsScanTool
-    from ..tools.chaos_tools import ChaosTestTool, TmcLoadTestTool, InfraCheckTool
+    from ..tools.chaos_tools import ChaosTestTool, InfraCheckTool, TmcLoadTestTool
+    from ..tools.security_tools import DependencyAuditTool, SastScanTool, SecretsScanTool
 
     _MAP = {
         "sast_scan": SastScanTool,
@@ -628,9 +874,12 @@ async def _tool_security_chaos(name: str, args: dict, ctx: ExecutionContext) -> 
     cls = _MAP.get(name)
     if not cls:
         return f"Error: unknown security tool '{name}'"
-    # Inject workspace cwd from context if not provided
+    # Inject workspace cwd from context if not provided — validate path exists
     if "cwd" not in args and ctx.workspace_path:
-        args["cwd"] = ctx.workspace_path
+        import os
+
+        if os.path.isdir(ctx.workspace_path):
+            args["cwd"] = ctx.workspace_path
     try:
         tool = cls()
         return await tool.execute(args)
@@ -638,10 +887,27 @@ async def _tool_security_chaos(name: str, args: dict, ctx: ExecutionContext) -> 
         return f"[{name}] ERROR: {e}"
 
 
+<<<<<<< HEAD:platform/agents/tool_runner.py
 async def _tool_create_ticket(args: dict, ctx: ExecutionContext) -> str:
     """Create a support ticket in the platform DB."""
     import uuid
     from ..db import get_db
+=======
+async def _tool_platform_backlog(name: str, args: dict, ctx: ExecutionContext) -> str:
+    """Delegate create_feature/create_story to platform_tools registry."""
+    from ..tools.platform_tools import PlatformCreateFeatureTool, PlatformCreateStoryTool
+
+    tool = PlatformCreateFeatureTool() if name == "create_feature" else PlatformCreateStoryTool()
+    return await tool.execute(args, ctx.agent)
+
+
+async def _tool_create_ticket(args: dict, ctx: ExecutionContext) -> str:
+    """Create a support ticket in the platform DB."""
+    import uuid
+
+    from ..db import get_db
+
+>>>>>>> origin/master:_SOFTWARE_FACTORY/platform/agents/tool_runner.py
     title = args.get("title", "")
     desc = args.get("description", "")
     severity = args.get("severity", "medium")
@@ -667,7 +933,13 @@ async def _tool_create_ticket(args: dict, ctx: ExecutionContext) -> str:
 
 async def _tool_local_ci(args: dict, ctx: ExecutionContext) -> str:
     """Run local CI pipeline: install → build → lint → test → commit."""
+<<<<<<< HEAD:platform/agents/tool_runner.py
     import subprocess, os
+=======
+    import os
+    import subprocess
+
+>>>>>>> origin/master:_SOFTWARE_FACTORY/platform/agents/tool_runner.py
     cwd = args.get("cwd", ctx.project_path or ".")
     steps = args.get("steps", ["install", "build", "lint", "test", "commit"])
     commit_msg = args.get("commit_message", "ci: automated build pass")
@@ -680,11 +952,34 @@ async def _tool_local_ci(args: dict, ctx: ExecutionContext) -> str:
 
     cmds = {}
     if has_pkg:
+<<<<<<< HEAD:platform/agents/tool_runner.py
         cmds = {"install": "npm install", "build": "npm run build", "lint": "npm run lint", "test": "npm test"}
     elif has_req:
         cmds = {"install": "pip install -r requirements.txt", "build": "python -m py_compile *.py", "lint": "python -m flake8 . --max-line-length=120 --count", "test": "python -m pytest -v"}
     elif has_cargo:
         cmds = {"install": "cargo fetch", "build": "cargo build", "lint": "cargo clippy -- -D warnings", "test": "cargo test"}
+=======
+        cmds = {
+            "install": "npm install",
+            "build": "npm run build",
+            "lint": "npm run lint",
+            "test": "npm test",
+        }
+    elif has_req:
+        cmds = {
+            "install": "pip install -r requirements.txt",
+            "build": "python -m py_compile *.py",
+            "lint": "python -m flake8 . --max-line-length=120 --count",
+            "test": "python -m pytest -v",
+        }
+    elif has_cargo:
+        cmds = {
+            "install": "cargo fetch",
+            "build": "cargo build",
+            "lint": "cargo clippy -- -D warnings",
+            "test": "cargo test",
+        }
+>>>>>>> origin/master:_SOFTWARE_FACTORY/platform/agents/tool_runner.py
     else:
         return "Error: no package.json, requirements.txt, or Cargo.toml found — cannot detect stack"
 
@@ -692,8 +987,21 @@ async def _tool_local_ci(args: dict, ctx: ExecutionContext) -> str:
         if step == "commit":
             try:
                 subprocess.run(["git", "add", "-A"], cwd=cwd, timeout=10, capture_output=True)
+<<<<<<< HEAD:platform/agents/tool_runner.py
                 r = subprocess.run(["git", "commit", "-m", commit_msg], cwd=cwd, timeout=30, capture_output=True, text=True)
                 results.append(f"[commit] {'OK' if r.returncode == 0 else 'SKIP (nothing to commit)'}")
+=======
+                r = subprocess.run(
+                    ["git", "commit", "-m", commit_msg],
+                    cwd=cwd,
+                    timeout=30,
+                    capture_output=True,
+                    text=True,
+                )
+                results.append(
+                    f"[commit] {'OK' if r.returncode == 0 else 'SKIP (nothing to commit)'}"
+                )
+>>>>>>> origin/master:_SOFTWARE_FACTORY/platform/agents/tool_runner.py
             except Exception as e:
                 results.append(f"[commit] ERROR: {e}")
             continue
@@ -703,9 +1011,19 @@ async def _tool_local_ci(args: dict, ctx: ExecutionContext) -> str:
             results.append(f"[{step}] SKIP (unknown step)")
             continue
         try:
+<<<<<<< HEAD:platform/agents/tool_runner.py
             r = subprocess.run(cmd, shell=True, cwd=cwd, timeout=300, capture_output=True, text=True)
             status = "OK" if r.returncode == 0 else f"FAIL (exit {r.returncode})"
             output = (r.stdout[-500:] if r.returncode == 0 else (r.stderr[-500:] or r.stdout[-500:])).strip()
+=======
+            r = subprocess.run(
+                cmd, shell=True, cwd=cwd, timeout=300, capture_output=True, text=True
+            )
+            status = "OK" if r.returncode == 0 else f"FAIL (exit {r.returncode})"
+            output = (
+                r.stdout[-500:] if r.returncode == 0 else (r.stderr[-500:] or r.stdout[-500:])
+            ).strip()
+>>>>>>> origin/master:_SOFTWARE_FACTORY/platform/agents/tool_runner.py
             results.append(f"[{step}] {status}\n{output}" if output else f"[{step}] {status}")
             if r.returncode != 0 and step in ("build", "test"):
                 results.append(f"⛔ Pipeline stopped at '{step}'")
@@ -722,17 +1040,18 @@ async def _tool_local_ci(args: dict, ctx: ExecutionContext) -> str:
 async def _tool_si_blueprint(args: dict, ctx: ExecutionContext) -> str:
     """Read the SI blueprint for a project."""
     import yaml
+
     project_id = args.get("project_id", "")
     if not project_id and ctx.project_id:
         project_id = ctx.project_id
 
     bp_path = Path(__file__).resolve().parents[2] / "data" / "si_blueprints" / f"{project_id}.yaml"
     if not bp_path.exists():
-            return (
-                f"No SI blueprint found for project '{project_id}'. "
-                f"Create one at {bp_path} with: cloud, compute, cicd, databases, "
-                f"monitoring, existing_services, conventions."
-            )
+        return (
+            f"No SI blueprint found for project '{project_id}'. "
+            f"Create one at {bp_path} with: cloud, compute, cicd, databases, "
+            f"monitoring, existing_services, conventions."
+        )
     try:
         with open(bp_path) as f:
             bp = yaml.safe_load(f)
@@ -744,11 +1063,16 @@ async def _tool_si_blueprint(args: dict, ctx: ExecutionContext) -> str:
 async def _tool_compose(name: str, args: dict, ctx: ExecutionContext) -> str:
     """Execute composition tools via the registry."""
     from ..models import AgentInstance
+
     registry = _get_tool_registry()
     tool = registry.get(name)
     if not tool:
         return f"Error: composition tool '{name}' not found"
-    agent_inst = AgentInstance(id=ctx.agent.id, name=ctx.agent.name, role=ctx.agent.role) if ctx.agent else None
+    agent_inst = (
+        AgentInstance(id=ctx.agent.id, name=ctx.agent.name, role=ctx.agent.role)
+        if ctx.agent
+        else None
+    )
     return await tool.execute(args, agent_inst)
 
 
@@ -766,12 +1090,12 @@ async def _tool_android(name: str, args: dict, ctx: ExecutionContext) -> str:
 
 async def _tool_fractal_code(args: dict, ctx: ExecutionContext, registry, llm) -> str:
     """Spawn a focused sub-agent LLM to complete an atomic coding task.
-    
+
     The sub-agent runs autonomously with code tools for up to 8 rounds.
     Like wiggum TDD from the Software Factory: write code → write tests → run → fix.
     """
     from ..llm.client import LLMMessage, LLMResponse
-    from .tool_schemas import _get_tool_schemas, _filter_schemas
+    from .tool_schemas import _filter_schemas, _get_tool_schemas
 
     task = args.get("task", "")
     extra_context = args.get("context", "")
@@ -797,11 +1121,21 @@ RULES:
 {f"CONTEXT: {extra_context}" if extra_context else ""}"""
 
     # Sub-agent tools: file ops + git + build/test
-    sub_tools = _filter_schemas(_get_tool_schemas(), [
-        "code_read", "code_write", "code_edit", "code_search",
-        "list_files", "git_status", "git_diff", "git_commit",
-        "build", "test",
-    ])
+    sub_tools = _filter_schemas(
+        _get_tool_schemas(),
+        [
+            "code_read",
+            "code_write",
+            "code_edit",
+            "code_search",
+            "list_files",
+            "git_status",
+            "git_diff",
+            "git_commit",
+            "build",
+            "test",
+        ],
+    )
 
     messages = [LLMMessage(role="user", content=task)]
     files_changed = []
@@ -827,9 +1161,13 @@ RULES:
             xml_tcs = _parse_xml_tool_calls(llm_resp.content)
             if xml_tcs:
                 llm_resp = LLMResponse(
-                    content="", model=llm_resp.model, provider=llm_resp.provider,
-                    tokens_in=llm_resp.tokens_in, tokens_out=llm_resp.tokens_out,
-                    duration_ms=llm_resp.duration_ms, finish_reason="tool_calls",
+                    content="",
+                    model=llm_resp.model,
+                    provider=llm_resp.provider,
+                    tokens_in=llm_resp.tokens_in,
+                    tokens_out=llm_resp.tokens_out,
+                    duration_ms=llm_resp.duration_ms,
+                    finish_reason="tool_calls",
                     tool_calls=xml_tcs,
                 )
 
@@ -838,37 +1176,54 @@ RULES:
             break
 
         # Execute tool calls
-        tc_msg_data = [{
-            "id": tc.id, "type": "function",
-            "function": {"name": tc.function_name, "arguments": json.dumps(tc.arguments)},
-        } for tc in llm_resp.tool_calls]
-        messages.append(LLMMessage(role="assistant", content=llm_resp.content or "", tool_calls=tc_msg_data))
+        tc_msg_data = [
+            {
+                "id": tc.id,
+                "type": "function",
+                "function": {"name": tc.function_name, "arguments": json.dumps(tc.arguments)},
+            }
+            for tc in llm_resp.tool_calls
+        ]
+        messages.append(
+            LLMMessage(role="assistant", content=llm_resp.content or "", tool_calls=tc_msg_data)
+        )
 
         for tc in llm_resp.tool_calls:
             result = await _execute_tool(tc, ctx, registry, llm)
-            messages.append(LLMMessage(role="tool", content=result[:4000], tool_call_id=tc.id, name=tc.function_name))
+            messages.append(
+                LLMMessage(
+                    role="tool", content=result[:4000], tool_call_id=tc.id, name=tc.function_name
+                )
+            )
             # Track file changes
             if tc.function_name in ("code_write", "code_edit"):
                 path = tc.arguments.get("path", "?")
                 if ctx.project_path and path.startswith(ctx.project_path):
-                    path = path[len(ctx.project_path):].lstrip("/")
+                    path = path[len(ctx.project_path) :].lstrip("/")
                 files_changed.append(f"{tc.function_name}: {path}")
             elif tc.function_name == "git_commit":
                 files_changed.append(f"committed: {tc.arguments.get('message', '?')[:60]}")
 
-            logger.warning("FRACTAL sub-agent round=%d tool=%s path=%s",
-                           rnd, tc.function_name, tc.arguments.get("path", "?")[:60])
+            logger.warning(
+                "FRACTAL sub-agent round=%d tool=%s path=%s",
+                rnd,
+                tc.function_name,
+                tc.arguments.get("path", "?")[:60],
+            )
 
         # Emit progress SSE
         if ctx.on_tool_call:
             try:
-                await ctx.on_tool_call("fractal_code", {"round": rnd, "tools": len(llm_resp.tool_calls)},
-                                       f"Sub-agent round {rnd+1}: {len(llm_resp.tool_calls)} tool calls")
+                await ctx.on_tool_call(
+                    "fractal_code",
+                    {"round": rnd, "tools": len(llm_resp.tool_calls)},
+                    f"Sub-agent round {rnd + 1}: {len(llm_resp.tool_calls)} tool calls",
+                )
             except Exception:
                 pass
 
     # Build summary
-    summary_parts = [f"## Fractal Sub-Agent Result", f"**Task:** {task[:200]}"]
+    summary_parts = ["## Fractal Sub-Agent Result", f"**Task:** {task[:200]}"]
     if files_changed:
         summary_parts.append(f"**Changes ({len(files_changed)}):**")
         for fc in files_changed[:20]:
@@ -882,6 +1237,7 @@ RULES:
     return "\n".join(summary_parts)
     """Push a mission control SSE event via the A2A bus SSE listeners."""
     from ..a2a.bus import get_bus
+
     data["session_id"] = session_id
     bus = get_bus()
     dead = []
@@ -896,23 +1252,27 @@ RULES:
 
 # ── MCP Tool Handlers ─────────────────────────────────────────
 
+
 async def _tool_mcp_lrm(name: str, args: dict, ctx: ExecutionContext) -> str:
     """Proxy to unified MCP SF server (localhost:9501, merged LRM+Platform)."""
     import aiohttp
+
     tool_name = name.replace("lrm_", "")
     if ctx.project_id:
         args.setdefault("project", ctx.project_id)
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
                 "http://localhost:9501/tool",
                 json={"name": tool_name, "arguments": args},
                 timeout=aiohttp.ClientTimeout(total=60),
-            ) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    return str(data.get("result", data))[:8000]
-                return f"LRM error {resp.status}"
+            ) as resp,
+        ):
+            if resp.status == 200:
+                data = await resp.json()
+                return str(data.get("result", data))[:8000]
+            return f"LRM error {resp.status}"
     except Exception as e:
         return f"LRM server unavailable: {e}"
 
@@ -920,18 +1280,23 @@ async def _tool_mcp_lrm(name: str, args: dict, ctx: ExecutionContext) -> str:
 async def _tool_mcp_figma(name: str, args: dict, ctx: ExecutionContext) -> str:
     """Proxy to Figma MCP (desktop or remote)."""
     import aiohttp
+
     endpoints = ["http://127.0.0.1:3845/mcp", "https://mcp.figma.com/mcp"]
     tool_name = name.replace("figma_", "")
     payload = {"method": tool_name, "params": args}
     for endpoint in endpoints:
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    endpoint, json=payload, timeout=aiohttp.ClientTimeout(total=30),
-                ) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        return str(data.get("result", data))[:8000]
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    endpoint,
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=30),
+                ) as resp,
+            ):
+                if resp.status == 200:
+                    data = await resp.json()
+                    return str(data.get("result", data))[:8000]
         except Exception:
             continue
     return "Figma MCP unavailable (desktop + remote)"
@@ -943,9 +1308,11 @@ async def _tool_mcp_solaris(name: str, args: dict, ctx: ExecutionContext) -> str
     try:
         if tool_name == "wcag":
             from solaris_solaris_wcag import solaris_wcag  # type: ignore
+
             return str(solaris_wcag(args.get("pattern", "")))[:8000]
         if tool_name == "component":
             from solaris_solaris_component import solaris_component  # type: ignore
+
             return str(solaris_component(args.get("component", "")))[:8000]
     except ImportError:
         pass
@@ -956,6 +1323,7 @@ async def _tool_mcp_solaris(name: str, args: dict, ctx: ExecutionContext) -> str
 async def _tool_mcp_github(name: str, args: dict, ctx: ExecutionContext) -> str:
     """Execute GitHub operations via gh CLI."""
     import asyncio as _aio
+
     owner = args.get("owner", "")
     repo = args.get("repo", "")
     try:
@@ -966,21 +1334,24 @@ async def _tool_mcp_github(name: str, args: dict, ctx: ExecutionContext) -> str:
             if query:
                 cmd += f" --search '{query}'"
             proc = await _aio.create_subprocess_shell(
-                cmd, stdout=_aio.subprocess.PIPE, stderr=_aio.subprocess.PIPE)
+                cmd, stdout=_aio.subprocess.PIPE, stderr=_aio.subprocess.PIPE
+            )
             out, err = await proc.communicate()
             return (out or err).decode()[:6000]
         if name == "github_prs":
             state = args.get("state", "open")
             cmd = f"gh pr list --repo {owner}/{repo} --state {state} --limit 20"
             proc = await _aio.create_subprocess_shell(
-                cmd, stdout=_aio.subprocess.PIPE, stderr=_aio.subprocess.PIPE)
+                cmd, stdout=_aio.subprocess.PIPE, stderr=_aio.subprocess.PIPE
+            )
             out, err = await proc.communicate()
             return (out or err).decode()[:6000]
         if name == "github_code_search":
             query = args.get("query", "")
             cmd = f"gh search code '{query}' --limit 20"
             proc = await _aio.create_subprocess_shell(
-                cmd, stdout=_aio.subprocess.PIPE, stderr=_aio.subprocess.PIPE)
+                cmd, stdout=_aio.subprocess.PIPE, stderr=_aio.subprocess.PIPE
+            )
             out, err = await proc.communicate()
             return (out or err).decode()[:6000]
         if name == "github_actions":
@@ -989,7 +1360,8 @@ async def _tool_mcp_github(name: str, args: dict, ctx: ExecutionContext) -> str:
             if status:
                 cmd += f" --status {status}"
             proc = await _aio.create_subprocess_shell(
-                cmd, stdout=_aio.subprocess.PIPE, stderr=_aio.subprocess.PIPE)
+                cmd, stdout=_aio.subprocess.PIPE, stderr=_aio.subprocess.PIPE
+            )
             out, err = await proc.communicate()
             return (out or err).decode()[:6000]
     except Exception as e:
@@ -1000,11 +1372,13 @@ async def _tool_mcp_github(name: str, args: dict, ctx: ExecutionContext) -> str:
 async def _tool_mcp_jira(name: str, args: dict, ctx: ExecutionContext) -> str:
     """JIRA/Confluence integration (needs ATLASSIAN_TOKEN env var)."""
     import os
+
     token = os.environ.get("ATLASSIAN_TOKEN")
     base_url = os.environ.get("ATLASSIAN_URL", "")
     if not token or not base_url:
         return "JIRA/Confluence not configured. Set ATLASSIAN_TOKEN and ATLASSIAN_URL env vars."
     import aiohttp
+
     headers = {"Authorization": f"Basic {token}", "Content-Type": "application/json"}
     try:
         async with aiohttp.ClientSession(headers=headers) as session:
@@ -1017,22 +1391,37 @@ async def _tool_mcp_jira(name: str, args: dict, ctx: ExecutionContext) -> str:
                 ) as resp:
                     data = await resp.json()
                     issues = data.get("issues", [])
-                    return "\n".join(
-                        f"[{i['key']}] {i['fields'].get('summary','')} ({i['fields'].get('status',{}).get('name','')})"
-                        for i in issues
-                    ) or "No issues found."
+                    return (
+                        "\n".join(
+                            f"[{i['key']}] {i['fields'].get('summary', '')} ({i['fields'].get('status', {}).get('name', '')})"
+                            for i in issues
+                        )
+                        or "No issues found."
+                    )
             if name == "jira_create":
-                payload = {"fields": {
-                    "project": {"key": args["project"]},
-                    "summary": args["summary"],
-                    "issuetype": {"name": args["type"]},
-                    "description": {"type": "doc", "version": 1, "content": [
-                        {"type": "paragraph", "content": [{"type": "text", "text": args.get("description", "")}]}
-                    ]},
-                }}
+                payload = {
+                    "fields": {
+                        "project": {"key": args["project"]},
+                        "summary": args["summary"],
+                        "issuetype": {"name": args["type"]},
+                        "description": {
+                            "type": "doc",
+                            "version": 1,
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [
+                                        {"type": "text", "text": args.get("description", "")}
+                                    ],
+                                }
+                            ],
+                        },
+                    }
+                }
                 async with session.post(
                     f"{base_url}/rest/api/3/issue",
-                    json=payload, timeout=aiohttp.ClientTimeout(total=30),
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=30),
                 ) as resp:
                     data = await resp.json()
                     return f"Created: {data.get('key', 'unknown')} — {data.get('self', '')}"
@@ -1052,7 +1441,9 @@ async def _tool_mcp_jira(name: str, args: dict, ctx: ExecutionContext) -> str:
                         pages = [data]
                     parts = []
                     for p in pages[:3]:
-                        parts.append(f"# {p.get('title','')}\n{p.get('body',{}).get('storage',{}).get('value','')[:3000]}")
+                        parts.append(
+                            f"# {p.get('title', '')}\n{p.get('body', {}).get('storage', {}).get('value', '')[:3000]}"
+                        )
                     return "\n\n".join(parts) or "No page found."
     except Exception as e:
         return f"JIRA/Confluence error: {e}"
@@ -1062,6 +1453,7 @@ async def _tool_mcp_jira(name: str, args: dict, ctx: ExecutionContext) -> str:
 async def _tool_mcp_dynamic(name: str, args: dict, ctx: ExecutionContext) -> str:
     """Route tool calls to running MCP servers. Format: mcp_<server>_<tool>."""
     from ..mcps.manager import get_mcp_manager
+
     manager = get_mcp_manager()
 
     # Parse: mcp_fetch_fetch, mcp_memory_search_nodes, mcp_playwright_browser_navigate
@@ -1093,6 +1485,7 @@ async def _tool_mcp_dynamic(name: str, args: dict, ctx: ExecutionContext) -> str
 
 # ── Main tool dispatcher ─────────────────────────────────────────
 
+
 async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=None) -> str:
     """Execute a single tool call and return string result."""
     name = tc.function_name
@@ -1101,7 +1494,24 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
     # ── Resolve paths: project_path is the default for all file/git tools ──
     if ctx.project_path:
         # Git/build/deploy/test tools: inject cwd
+<<<<<<< HEAD:platform/agents/tool_runner.py
         if name in ("git_status", "git_log", "git_diff", "git_commit", "build", "test", "lint", "docker_build", "docker_deploy", "screenshot", "playwright_test", "browser_screenshot"):
+=======
+        if name in (
+            "git_status",
+            "git_log",
+            "git_diff",
+            "git_commit",
+            "build",
+            "test",
+            "lint",
+            "docker_build",
+            "docker_deploy",
+            "screenshot",
+            "playwright_test",
+            "browser_screenshot",
+        ):
+>>>>>>> origin/master:_SOFTWARE_FACTORY/platform/agents/tool_runner.py
             cwd_val = args.get("cwd", "")
             if not cwd_val or cwd_val in (".", "./"):
                 args["cwd"] = ctx.project_path
@@ -1117,24 +1527,39 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
             path = args.get("path", "")
             if not path or path == ".":
                 args["path"] = ctx.project_path
+            elif os.path.isabs(path) and ctx.project_path:
+                # Agent used absolute path — normalize to workspace-relative
+                # e.g. /app/data/workspaces/abc123/src/main.ts → src/main.ts
+                if path.startswith(ctx.project_path + "/"):
+                    path = path[len(ctx.project_path) + 1 :]
+                    args["path"] = os.path.join(ctx.project_path, path)
+                elif path.startswith(ctx.project_path):
+                    args["path"] = ctx.project_path
+                else:
+                    args["path"] = path  # truly external absolute path
             elif not os.path.isabs(path):
                 # Strip workspace ID prefix if LLM included it (avoids path doubling)
                 if ctx.project_path:
                     ws_id = os.path.basename(ctx.project_path)
                     if path.startswith(ws_id + "/"):
-                        path = path[len(ws_id) + 1:]
+                        path = path[len(ws_id) + 1 :]
                     # Strip project_path prefix if LLM used it as relative
                     elif path.startswith("." + ctx.project_path):
                         path = path[1:]  # remove leading dot, keep absolute
-                args["path"] = os.path.join(ctx.project_path, path) if not os.path.isabs(path) else path
+                args["path"] = (
+                    os.path.join(ctx.project_path, path) if not os.path.isabs(path) else path
+                )
 
     # ── Permission enforcement ──
     try:
         from .permissions import get_permission_guard
+
         perms_dict = None
         if hasattr(ctx.agent, "permissions"):
             p = ctx.agent.permissions
-            perms_dict = p if isinstance(p, dict) else (p.model_dump() if hasattr(p, "model_dump") else {})
+            perms_dict = (
+                p if isinstance(p, dict) else (p.model_dump() if hasattr(p, "model_dump") else {})
+            )
         denied = get_permission_guard().check(
             agent_id=ctx.agent.id,
             tool_name=name,
@@ -1176,15 +1601,38 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
     if name == "browser_screenshot":
         return await _tool_browser_screenshot(args, ctx)
 
+    # ── Playwright shortcut aliases ──
+    if name == "browse":
+        return await _tool_browse(args, ctx)
+    if name == "take_screenshot":
+        return await _tool_take_screenshot(args, ctx)
+    if name == "inspect_page":
+        return await _tool_inspect_page(args, ctx)
+    if name == "run_e2e_tests":
+        return await _tool_run_e2e_tests(args, ctx)
+
     # ── Security & chaos tools ──
-    if name in ("sast_scan", "dependency_audit", "secrets_scan",
-                 "chaos_test", "tmc_load_test", "infra_check"):
+    if name in (
+        "sast_scan",
+        "dependency_audit",
+        "secrets_scan",
+        "chaos_test",
+        "tmc_load_test",
+        "infra_check",
+    ):
         return await _tool_security_chaos(name, args, ctx)
 
     # ── Ticket/Incident management ──
     if name == "create_ticket":
         return await _tool_create_ticket(args, ctx)
 
+<<<<<<< HEAD:platform/agents/tool_runner.py
+=======
+    # ── Backlog tools (create_feature, create_story) — handled by platform_tools registry ──
+    if name in ("create_feature", "create_story"):
+        return await _tool_platform_backlog(name, args, ctx)
+
+>>>>>>> origin/master:_SOFTWARE_FACTORY/platform/agents/tool_runner.py
     # ── Local CI pipeline ──
     if name == "local_ci":
         return await _tool_local_ci(args, ctx)
@@ -1193,8 +1641,13 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
         return await _tool_si_blueprint(args, ctx)
 
     # ── Composition tools (dynamic workflow/team/mission) ──
-    if name in ("compose_workflow", "create_team", "create_sub_mission",
-                 "list_sub_missions", "set_constraints"):
+    if name in (
+        "compose_workflow",
+        "create_team",
+        "create_sub_mission",
+        "list_sub_missions",
+        "set_constraints",
+    ):
         return await _tool_compose(name, args, ctx)
 
     # ── Android build tools (docker exec android-builder) ──

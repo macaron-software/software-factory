@@ -41,36 +41,37 @@ python -m uvicorn platform.server:app --port 8090 --reload
 
 ## Orchestration Patterns
 
-| Pattern | Description | Use Case |
-|---------|-------------|----------|
-| **Parallel** | N agents travaillent simultanément | Brainstorming, reviews parallèles |
-| **Sequential** | Pipeline agent → agent | Code → Review → Test → Deploy |
-| **Loop** | Itération jusqu'à convergence | Dev → Test → Fix → retest |
-| **Router** | 1 agent dispatche vers le spécialiste | Classification de demandes |
-| **Aggregator** | Plusieurs proposent, 1 synthétise | Architecture decisions |
-| **Hierarchical** | Manager décompose, workers exécutent | Sprint planning, features |
-| **Network** | Mesh complet, agents communiquent librement | Débats techniques |
-| **Human-in-the-loop** | Agent + humain valide | Déploiements production |
+| Pattern               | Description                                 | Use Case                          |
+| --------------------- | ------------------------------------------- | --------------------------------- |
+| **Parallel**          | N agents travaillent simultanément          | Brainstorming, reviews parallèles |
+| **Sequential**        | Pipeline agent → agent                      | Code → Review → Test → Deploy     |
+| **Loop**              | Itération jusqu'à convergence               | Dev → Test → Fix → retest         |
+| **Router**            | 1 agent dispatche vers le spécialiste       | Classification de demandes        |
+| **Aggregator**        | Plusieurs proposent, 1 synthétise           | Architecture decisions            |
+| **Hierarchical**      | Manager décompose, workers exécutent        | Sprint planning, features         |
+| **Network**           | Mesh complet, agents communiquent librement | Débats techniques                 |
+| **Human-in-the-loop** | Agent + humain valide                       | Déploiements production           |
 
 ## A2A Protocol
 
 Messages typés entre agents :
 
-| Type | Description |
-|------|-------------|
-| `REQUEST` | Demande d'action |
-| `RESPONSE` | Réponse |
-| `DELEGATE` | Délégation de tâche |
-| `VETO` | Blocage avec justification |
-| `APPROVE` | Validation |
-| `INFORM` | Information broadcast |
-| `NEGOTIATE` | Proposition de compromis |
-| `ESCALATE` | Escalade au niveau supérieur |
-| `HUMAN_REQUEST` | Demande d'input humain |
+| Type            | Description                  |
+| --------------- | ---------------------------- |
+| `REQUEST`       | Demande d'action             |
+| `RESPONSE`      | Réponse                      |
+| `DELEGATE`      | Délégation de tâche          |
+| `VETO`          | Blocage avec justification   |
+| `APPROVE`       | Validation                   |
+| `INFORM`        | Information broadcast        |
+| `NEGOTIATE`     | Proposition de compromis     |
+| `ESCALATE`      | Escalade au niveau supérieur |
+| `HUMAN_REQUEST` | Demande d'input humain       |
 
 ### Veto System
 
 Hiérarchie de veto (comme Team of Rivals) :
+
 - 🔒 **Sécurité** : VETO ABSOLU (vulnérabilités critiques)
 - 🏛️ **Architecte** : VETO STRONG (violations patterns)
 - 🏗️ **Lead Dev** : VETO STRONG (qualité code)
@@ -118,6 +119,7 @@ sudo systemctl enable --now macaron-platform
 ## Integration with Factory
 
 The platform reuses existing Factory core:
+
 - **Brain** → deep recursive analysis (Opus 4.5)
 - **Adversarial** → Team of Rivals review cascade
 - **FRACTAL** → task decomposition (3 concerns)

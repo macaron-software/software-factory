@@ -1,0 +1,48 @@
+#!/bin/bash
+# Commit-msg hook - Validate conventional commits format
+# Blocks commit if message doesn't follow: <type>(<scope>): <description>
+
+COMMIT_MSG_FILE=$1
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Skip merge commits and revert commits
+if echo "$COMMIT_MSG" | grep -qE "^Merge|^Revert"; then
+  exit 0
+fi
+
+# Conventional commit pattern
+# Types: feat, fix, docs, chore, refactor, test, ci, perf, build, style
+# Scope: optional (e.g., auth, api, ui)
+# Description: at least 10 chars
+PATTERN="^(feat|fix|docs|chore|refactor|test|ci|perf|build|style)(\(.+\))?: .{10,}"
+
+if ! echo "$COMMIT_MSG" | grep -Eq "$PATTERN"; then
+  echo ""
+  echo "❌ Invalid commit message format!"
+  echo ""
+  echo "Expected: <type>(<scope>): <description>"
+  echo ""
+  echo "Types:"
+  echo "  feat:     New feature"
+  echo "  fix:      Bug fix"
+  echo "  docs:     Documentation changes"
+  echo "  chore:    Maintenance tasks"
+  echo "  refactor: Code refactoring"
+  echo "  test:     Test changes"
+  echo "  ci:       CI/CD changes"
+  echo "  perf:     Performance improvements"
+  echo "  build:    Build system changes"
+  echo "  style:    Code style changes"
+  echo ""
+  echo "Examples:"
+  echo "  feat(auth): add OAuth2 login"
+  echo "  fix(api): handle null pointer in user endpoint"
+  echo "  docs: update README with installation steps"
+  echo ""
+  echo "Your message: $COMMIT_MSG"
+  echo ""
+  exit 1
+fi
+
+echo "✅ Commit message valid"
+exit 0

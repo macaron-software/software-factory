@@ -19,17 +19,18 @@
 
 ## RTO / RPO Targets
 
-| Resource | RPO (max data loss) | RTO (recovery time) |
-|----------|--------------------|--------------------|
-| PostgreSQL | 24h (daily dump) + 7d PITR | 15 min |
-| SQLite (local) | 24h (daily backup) | 5 min |
-| VM | 7d (weekly snapshot) | 30 min |
-| Secrets | 24h | 5 min |
-| Source code | 0 (git) | 0 |
+| Resource       | RPO (max data loss)        | RTO (recovery time) |
+| -------------- | -------------------------- | ------------------- |
+| PostgreSQL     | 24h (daily dump) + 7d PITR | 15 min              |
+| SQLite (local) | 24h (daily backup)         | 5 min               |
+| VM             | 7d (weekly snapshot)       | 30 min              |
+| Secrets        | 24h                        | 5 min               |
+| Source code    | 0 (git)                    | 0                   |
 
 ## Daily Backup (Automated)
 
 ### What runs
+
 ```bash
 # Cron on local Mac (3AM UTC daily)
 0 3 * * * /path/to/_SOFTWARE_FACTORY/platform/ops/run_backup.sh >> /var/log/macaron-backup.log 2>&1
@@ -39,14 +40,16 @@
 ```
 
 ### What gets backed up
-| Data | Size | Destination | Retention |
-|------|------|-------------|-----------|
-| 7 SQLite DBs | ~25MB gz | `db-backups/daily/YYYYMMDD/` | 90 days |
-| PG dump (33 tables) | ~0.7MB gz | `pg-dumps/daily/YYYYMMDD/` | 90 days |
-| Secrets (API keys) | ~1KB | `secrets/daily/YYYYMMDD/` | 90 days |
-| VM snapshot | 30GB disk | Azure Managed Disk | 4 snapshots |
+
+| Data                | Size      | Destination                  | Retention   |
+| ------------------- | --------- | ---------------------------- | ----------- |
+| 7 SQLite DBs        | ~25MB gz  | `db-backups/daily/YYYYMMDD/` | 90 days     |
+| PG dump (33 tables) | ~0.7MB gz | `pg-dumps/daily/YYYYMMDD/`   | 90 days     |
+| Secrets (API keys)  | ~1KB      | `secrets/daily/YYYYMMDD/`    | 90 days     |
+| VM snapshot         | 30GB disk | Azure Managed Disk           | 4 snapshots |
 
 ### Verification
+
 ```bash
 # Check backup health
 python3 platform/ops/run_health.py
@@ -167,14 +170,15 @@ python3 platform/ops/run_health.py
 
 ## Azure Resources
 
-| Resource | Name | SKU | Location |
-|----------|------|-----|----------|
-| VM | vm-macaron | D4as_v5 (4c/16GB) | francecentral |
-| PostgreSQL | macaron-platform-pg | B1ms | francecentral |
-| Blob Storage | macaronbackups | Standard_GRS | francecentral→francesouth |
-| Snapshots | vm-macaron-snap-* | Incremental | francecentral |
+| Resource     | Name                | SKU               | Location                  |
+| ------------ | ------------------- | ----------------- | ------------------------- |
+| VM           | vm-macaron          | D4as_v5 (4c/16GB) | francecentral             |
+| PostgreSQL   | macaron-platform-pg | B1ms              | francecentral             |
+| Blob Storage | macaronbackups      | Standard_GRS      | francecentral→francesouth |
+| Snapshots    | vm-macaron-snap-\*  | Incremental       | francecentral             |
 
 ### Credentials
+
 - Stored in `~/.config/factory/.env` (chmod 600) — NEVER hardcode in source
 - VM SSH: `azureadmin@4.233.64.30` / `$VM_PASS`
 - PG: `$DATABASE_URL`

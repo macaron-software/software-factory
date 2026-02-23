@@ -47,26 +47,26 @@ annotated findings.
 ### Screenshot Capture with Playwright
 
 ```typescript
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
 const VIEWPORTS = [
-  { name: 'mobile', width: 375, height: 812 },
-  { name: 'tablet', width: 768, height: 1024 },
-  { name: 'desktop', width: 1440, height: 900 },
+  { name: "mobile", width: 375, height: 812 },
+  { name: "tablet", width: 768, height: 1024 },
+  { name: "desktop", width: 1440, height: 900 },
 ];
 
 for (const viewport of VIEWPORTS) {
   test(`Capture ${viewport.name} screenshot`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await page.goto('/target-page');
+    await page.goto("/target-page");
 
     // Wait for all images and fonts to load
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState("networkidle");
 
     // Hide dynamic content that varies between runs
     await page.evaluate(() => {
-      document.querySelectorAll('[data-dynamic]').forEach(el => {
-        (el as HTMLElement).style.visibility = 'hidden';
+      document.querySelectorAll("[data-dynamic]").forEach((el) => {
+        (el as HTMLElement).style.visibility = "hidden";
       });
     });
 
@@ -81,20 +81,20 @@ for (const viewport of VIEWPORTS) {
 ### Component-Level Screenshots
 
 ```typescript
-test('Capture component screenshots', async ({ page }) => {
-  await page.goto('/components/button');
+test("Capture component screenshots", async ({ page }) => {
+  await page.goto("/components/button");
 
   // Screenshot specific component
-  const button = page.getByTestId('primary-button');
-  await button.screenshot({ path: 'screenshots/button-default.png' });
+  const button = page.getByTestId("primary-button");
+  await button.screenshot({ path: "screenshots/button-default.png" });
 
   // Hover state
   await button.hover();
-  await button.screenshot({ path: 'screenshots/button-hover.png' });
+  await button.screenshot({ path: "screenshots/button-hover.png" });
 
   // Focus state
   await button.focus();
-  await button.screenshot({ path: 'screenshots/button-focus.png' });
+  await button.screenshot({ path: "screenshots/button-focus.png" });
 });
 ```
 
@@ -105,19 +105,19 @@ test('Capture component screenshots', async ({ page }) => {
 export default defineConfig({
   expect: {
     toHaveScreenshot: {
-      maxDiffPixelRatio: 0.01,  // 1% tolerance
-      threshold: 0.2,            // Per-pixel color threshold
+      maxDiffPixelRatio: 0.01, // 1% tolerance
+      threshold: 0.2, // Per-pixel color threshold
     },
   },
-  snapshotDir: './visual-baselines',
+  snapshotDir: "./visual-baselines",
 });
 
 // Visual regression test
-test('Button matches baseline', async ({ page }) => {
-  await page.goto('/components/button');
-  const button = page.getByTestId('primary-button');
+test("Button matches baseline", async ({ page }) => {
+  await page.goto("/components/button");
+  const button = page.getByTestId("primary-button");
 
-  await expect(button).toHaveScreenshot('button-primary.png');
+  await expect(button).toHaveScreenshot("button-primary.png");
 });
 ```
 
@@ -132,15 +132,15 @@ When automated pixel diff isn't available:
 
 ### Annotation Categories
 
-| Category | Symbol | Description |
-|----------|--------|-------------|
-| Spacing | 📏 | Padding, margin, gap differences |
-| Color | 🎨 | Wrong color values |
-| Typography | 🔤 | Font size, weight, line-height issues |
-| Layout | 📐 | Alignment, positioning, grid issues |
-| Missing | ❌ | Element missing from implementation |
-| Extra | ➕ | Element not in design but in implementation |
-| State | 🔄 | Interactive state mismatch |
+| Category   | Symbol | Description                                 |
+| ---------- | ------ | ------------------------------------------- |
+| Spacing    | 📏     | Padding, margin, gap differences            |
+| Color      | 🎨     | Wrong color values                          |
+| Typography | 🔤     | Font size, weight, line-height issues       |
+| Layout     | 📐     | Alignment, positioning, grid issues         |
+| Missing    | ❌     | Element missing from implementation         |
+| Extra      | ➕     | Element not in design but in implementation |
+| State      | 🔄     | Interactive state mismatch                  |
 
 ### Severity Scale
 

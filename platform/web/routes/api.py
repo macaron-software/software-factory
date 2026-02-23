@@ -1,7 +1,7 @@
 """Web routes — Pure API endpoints (memory, LLM, RBAC, DORA, retrospectives)."""
+
 from __future__ import annotations
 
-import asyncio
 import html as html_mod
 import json
 import logging
@@ -9,13 +9,27 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, FileResponse, PlainTextResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 
-from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, serve_workspace_file
 from ..schemas import (
-    HealthResponse, MemoryStats, LlmStatsResponse, DoraMetrics,
-    FeatureOut, IncidentOut, IncidentCreate, IncidentStats,
-    AutoHealStats, OkResponse, ErrorResponse,
+    AutoHealStats,
+    DoraMetrics,
+    FeatureOut,
+    HealthResponse,
+    IncidentOut,
+    IncidentStats,
+    LlmStatsResponse,
+    MemoryStats,
+    OkResponse,
+)
+from .helpers import (
+    _templates,
 )
 
 router = APIRouter()
@@ -23,7 +37,10 @@ logger = logging.getLogger(__name__)
 
 # Prime psutil cpu_percent so interval=0 returns meaningful values
 try:
-    import psutil as _ps, os as _os
+    import os as _os
+
+    import psutil as _ps
+
     _ps.Process(_os.getpid()).cpu_percent()
     _ps.cpu_percent()
 except Exception:
@@ -31,10 +48,12 @@ except Exception:
 
 # ── Health ────────────────────────────────────────────────────────
 
+
 @router.get("/api/health", responses={200: {"model": HealthResponse}})
 async def health_check():
     """Liveness/readiness probe for Docker healthcheck."""
     from ...db.migrations import get_db
+
     try:
         db = get_db()
         db.execute("SELECT 1")
@@ -42,21 +61,26 @@ async def health_check():
     except Exception as e:
         return JSONResponse({"status": "error", "detail": str(e)}, status_code=503)
 
+
 # ── Memory API ───────────────────────────────────────────────────
+
 
 @router.get("/api/memory/stats", responses={200: {"model": MemoryStats}})
 async def memory_stats():
     """Memory layer statistics."""
     from ...memory.manager import get_memory_manager
+
     return JSONResponse(get_memory_manager().stats())
 
 
 # ── LLM Observability ──────────────────────────────────────────
 
+
 @router.get("/api/llm/stats", responses={200: {"model": LlmStatsResponse}})
 async def llm_stats(hours: int = 24, session_id: str = ""):
     """LLM usage statistics: calls, tokens, cost, by provider/agent."""
     from ...llm.observability import get_tracer
+
     return JSONResponse(get_tracer().stats(session_id=session_id, hours=hours))
 
 
@@ -64,6 +88,7 @@ async def llm_stats(hours: int = 24, session_id: str = ""):
 async def llm_traces(limit: int = 50, session_id: str = ""):
     """Recent LLM call traces."""
     from ...llm.observability import get_tracer
+
     return JSONResponse(get_tracer().recent(limit=limit, session_id=session_id))
 
 
@@ -71,6 +96,7 @@ async def llm_traces(limit: int = 50, session_id: str = ""):
 async def vector_search(scope_id: str, q: str, limit: int = 10):
     """Semantic vector search in memory."""
     from ...memory.manager import get_memory_manager
+
     mem = get_memory_manager()
     results = await mem.semantic_search(scope_id, q, limit=limit)
     return JSONResponse(results)
@@ -80,28 +106,34 @@ async def vector_search(scope_id: str, q: str, limit: int = 10):
 async def vector_stats(scope_id: str = ""):
     """Vector store statistics."""
     from ...memory.vectors import get_vector_store
+
     return JSONResponse(get_vector_store().count(scope_id))
 
 
 @router.get("/api/sandbox/status")
 async def sandbox_status():
     """Docker sandbox status."""
-    from ...tools.sandbox import SANDBOX_ENABLED, SANDBOX_IMAGE, SANDBOX_NETWORK, SANDBOX_MEMORY
     import shutil
+
+    from ...tools.sandbox import SANDBOX_ENABLED, SANDBOX_IMAGE, SANDBOX_MEMORY, SANDBOX_NETWORK
+
     docker_available = shutil.which("docker") is not None
-    return JSONResponse({
-        "enabled": SANDBOX_ENABLED,
-        "docker_available": docker_available,
-        "default_image": SANDBOX_IMAGE,
-        "network": SANDBOX_NETWORK,
-        "memory_limit": SANDBOX_MEMORY,
-    })
+    return JSONResponse(
+        {
+            "enabled": SANDBOX_ENABLED,
+            "docker_available": docker_available,
+            "default_image": SANDBOX_IMAGE,
+            "network": SANDBOX_NETWORK,
+            "memory_limit": SANDBOX_MEMORY,
+        }
+    )
 
 
 @router.get("/api/permissions/denials")
 async def permission_denials(limit: int = 50, agent_id: str = ""):
     """Recent permission denials (audit log)."""
     from ...agents.permissions import get_permission_guard
+
     return JSONResponse(get_permission_guard().recent_denials(limit=limit, agent_id=agent_id))
 
 
@@ -109,6 +141,7 @@ async def permission_denials(limit: int = 50, agent_id: str = ""):
 async def permission_stats():
     """Permission denial statistics."""
     from ...agents.permissions import get_permission_guard
+
     return JSONResponse(get_permission_guard().denial_stats())
 
 
@@ -116,6 +149,7 @@ async def permission_stats():
 async def project_memory(project_id: str, q: str = "", category: str = ""):
     """Get or search project memory."""
     from ...memory.manager import get_memory_manager
+
     mem = get_memory_manager()
     if q:
         entries = mem.project_search(project_id, q)
@@ -128,6 +162,7 @@ async def project_memory(project_id: str, q: str = "", category: str = ""):
 async def global_memory(category: str = ""):
     """Get global memory entries."""
     from ...memory.manager import get_memory_manager
+
     entries = get_memory_manager().global_get(category=category or None)
     return JSONResponse(entries)
 
@@ -136,13 +171,16 @@ async def global_memory(category: str = ""):
 async def global_memory_store(request: Request):
     """Store a global memory entry."""
     from ...memory.manager import get_memory_manager
+
     data = await request.json()
     cat = data.get("category", "general")
     key = data.get("key", "")
     val = data.get("value", "")
     if not key or not val:
         return JSONResponse({"error": "key and value required"}, status_code=400)
-    get_memory_manager().global_store(key, val, category=cat, confidence=data.get("confidence", 0.8))
+    get_memory_manager().global_store(
+        key, val, category=cat, confidence=data.get("confidence", 0.8)
+    )
     return JSONResponse({"ok": True})
 
 
@@ -150,30 +188,37 @@ async def global_memory_store(request: Request):
 async def memory_search(q: str = ""):
     """Search across all memory layers."""
     from ...memory.manager import get_memory_manager
+
     if not q:
-        return HTMLResponse('<div style="color:var(--text-muted);font-size:0.75rem;padding:0.5rem">Tapez une requête…</div>')
+        return HTMLResponse(
+            '<div style="color:var(--text-muted);font-size:0.75rem;padding:0.5rem">Tapez une requête…</div>'
+        )
     mem = get_memory_manager()
     results = mem.global_search(q, limit=20)
     if not results:
-        return HTMLResponse(f'<div style="color:var(--text-muted);font-size:0.75rem;padding:0.5rem">No results for "{html_mod.escape(q)}"</div>')
+        return HTMLResponse(
+            f'<div style="color:var(--text-muted);font-size:0.75rem;padding:0.5rem">No results for "{html_mod.escape(q)}"</div>'
+        )
     html = ""
     for r in results:
         cat = r.get("category", "")
         conf = r.get("confidence", 0)
-        html += f'''<div class="mem-entry">
-            <div><span class="mem-badge {cat}">{cat}</span> <span class="mem-key">{r.get("key","")}</span></div>
-            <div class="mem-val">{str(r.get("value",""))[:300]}</div>
-            <div class="mem-meta"><span>{int(conf*100)}% confidence</span></div>
-        </div>'''
+        html += f"""<div class="mem-entry">
+            <div><span class="mem-badge {cat}">{cat}</span> <span class="mem-key">{r.get("key", "")}</span></div>
+            <div class="mem-val">{str(r.get("value", ""))[:300]}</div>
+            <div class="mem-meta"><span>{int(conf * 100)}% confidence</span></div>
+        </div>"""
     return HTMLResponse(html)
 
 
 # ── Retrospectives & Self-Improvement ────────────────────────────
 
+
 @router.get("/api/retrospectives")
 async def list_retrospectives(scope: str = "", limit: int = 20):
     """List retrospectives, optionally filtered by scope."""
     from ...db.migrations import get_db
+
     db = get_db()
     try:
         if scope:
@@ -186,15 +231,22 @@ async def list_retrospectives(scope: str = "", limit: int = 20):
                 "SELECT * FROM retrospectives ORDER BY created_at DESC LIMIT ?",
                 (limit,),
             ).fetchall()
-        return JSONResponse([{
-            "id": r["id"], "scope": r["scope"], "scope_id": r["scope_id"],
-            "successes": json.loads(r["successes"] or "[]"),
-            "failures": json.loads(r["failures"] or "[]"),
-            "lessons": json.loads(r["lessons"] or "[]"),
-            "improvements": json.loads(r["improvements"] or "[]"),
-            "metrics": json.loads(r["metrics_json"] or "{}"),
-            "created_at": r["created_at"] or "",
-        } for r in rows])
+        return JSONResponse(
+            [
+                {
+                    "id": r["id"],
+                    "scope": r["scope"],
+                    "scope_id": r["scope_id"],
+                    "successes": json.loads(r["successes"] or "[]"),
+                    "failures": json.loads(r["failures"] or "[]"),
+                    "lessons": json.loads(r["lessons"] or "[]"),
+                    "improvements": json.loads(r["improvements"] or "[]"),
+                    "metrics": json.loads(r["metrics_json"] or "{}"),
+                    "created_at": r["created_at"] or "",
+                }
+                for r in rows
+            ]
+        )
     except Exception:
         return JSONResponse([])
     finally:
@@ -204,10 +256,11 @@ async def list_retrospectives(scope: str = "", limit: int = 20):
 @router.post("/api/retrospectives/generate")
 async def generate_retrospective(request: Request):
     """Auto-generate a retrospective from session/ideation data using LLM."""
-    from ...db.migrations import get_db
-    from ...llm.client import get_llm_client, LLMMessage
-    from ...memory.manager import get_memory_manager
     import uuid
+
+    from ...db.migrations import get_db
+    from ...llm.client import LLMMessage, get_llm_client
+    from ...memory.manager import get_memory_manager
 
     data = await request.json()
     scope = data.get("scope", "session")
@@ -242,7 +295,9 @@ async def generate_retrospective(request: Request):
             ).fetchall()
             for t in tool_rows:
                 status = "OK" if t["success"] else "FAIL"
-                context_parts.append(f"  Tool {t['tool_name']}: {status} {(t['result'] or '')[:100]}")
+                context_parts.append(
+                    f"  Tool {t['tool_name']}: {status} {(t['result'] or '')[:100]}"
+                )
 
         elif scope == "global":
             # Aggregate all recent tool calls + sessions
@@ -259,7 +314,9 @@ async def generate_retrospective(request: Request):
         db.close()
 
     if not context_parts:
-        context_parts = ["No detailed data available — generate a general retrospective about the platform usage."]
+        context_parts = [
+            "No detailed data available — generate a general retrospective about the platform usage."
+        ]
 
     context = "\n".join(context_parts)
 
@@ -285,7 +342,8 @@ Réponds UNIQUEMENT avec le JSON."""
         resp = await client.chat(
             messages=[LLMMessage(role="user", content=retro_prompt)],
             system_prompt="Tu es un coach Agile expert en rétrospectives SAFe.",
-            temperature=0.5, max_tokens=2048,
+            temperature=0.5,
+            max_tokens=2048,
         )
         raw = resp.content.strip()
         if "```json" in raw:
@@ -307,11 +365,15 @@ Réponds UNIQUEMENT avec le JSON."""
     try:
         db.execute(
             "INSERT INTO retrospectives (id, scope, scope_id, successes, failures, lessons, improvements) VALUES (?,?,?,?,?,?,?)",
-            (retro_id, scope, scope_id,
-             json.dumps(retro_data.get("successes", []), ensure_ascii=False),
-             json.dumps(retro_data.get("failures", []), ensure_ascii=False),
-             json.dumps(retro_data.get("lessons", []), ensure_ascii=False),
-             json.dumps(retro_data.get("improvements", []), ensure_ascii=False)),
+            (
+                retro_id,
+                scope,
+                scope_id,
+                json.dumps(retro_data.get("successes", []), ensure_ascii=False),
+                json.dumps(retro_data.get("failures", []), ensure_ascii=False),
+                json.dumps(retro_data.get("lessons", []), ensure_ascii=False),
+                json.dumps(retro_data.get("improvements", []), ensure_ascii=False),
+            ),
         )
         db.commit()
 
@@ -343,9 +405,12 @@ Réponds UNIQUEMENT avec le JSON."""
 async def api_get_si_blueprint(project_id: str):
     """Read SI blueprint for a project."""
     import yaml
+
     bp_path = Path(__file__).resolve().parents[3] / "data" / "si_blueprints" / f"{project_id}.yaml"
     if not bp_path.exists():
-        return JSONResponse({"error": "No SI blueprint found", "project_id": project_id}, status_code=404)
+        return JSONResponse(
+            {"error": "No SI blueprint found", "project_id": project_id}, status_code=404
+        )
     with open(bp_path) as f:
         return JSONResponse(yaml.safe_load(f))
 
@@ -354,6 +419,7 @@ async def api_get_si_blueprint(project_id: str):
 async def api_put_si_blueprint(request: Request, project_id: str):
     """Write SI blueprint for a project."""
     import yaml
+
     bp_dir = Path(__file__).resolve().parents[3] / "data" / "si_blueprints"
     bp_dir.mkdir(parents=True, exist_ok=True)
     data = await request.json()
@@ -365,31 +431,45 @@ async def api_put_si_blueprint(request: Request, project_id: str):
 
 async def api_project_git(request: Request, project_id: str):
     """Git panel partial (HTMX)."""
-    from ...projects.manager import get_project_store
     from ...projects import git_service
+    from ...projects.manager import get_project_store
+
     project = get_project_store().get(project_id)
     if not project:
         return HTMLResponse("")
     git = git_service.get_status(project.path) if project.has_git else None
     commits = git_service.get_log(project.path, 10) if project.has_git else []
     changes = git_service.get_changes(project.path) if project.has_git else []
-    return _templates(request).TemplateResponse("partials/git_panel.html", {
-        "request": request, "git": git, "commits": commits, "changes": changes,
-    })
+    return _templates(request).TemplateResponse(
+        "partials/git_panel.html",
+        {
+            "request": request,
+            "git": git,
+            "commits": commits,
+            "changes": changes,
+        },
+    )
 
 
 @router.get("/api/projects/{project_id}/tasks", response_class=HTMLResponse)
 async def api_project_tasks(request: Request, project_id: str):
     """Task panel partial (HTMX)."""
     from ...projects import factory_tasks
+
     tasks = factory_tasks.get_task_summary(project_id)
     recent = factory_tasks.get_recent_tasks(project_id, 15)
-    return _templates(request).TemplateResponse("partials/task_panel.html", {
-        "request": request, "tasks": tasks, "recent_tasks": recent,
-    })
+    return _templates(request).TemplateResponse(
+        "partials/task_panel.html",
+        {
+            "request": request,
+            "tasks": tasks,
+            "recent_tasks": recent,
+        },
+    )
 
 
 # ── DORA Metrics ─────────────────────────────────────────────────
+
 
 @router.get("/metrics", response_class=HTMLResponse)
 async def dora_dashboard_page(request: Request):
@@ -405,22 +485,29 @@ async def dora_dashboard_page(request: Request):
     summary = dora.summary(project_id, period)
     trend = dora.trend(project_id, weeks=12)
 
-    return _templates(request).TemplateResponse("dora_dashboard.html", {
-        "request": request,
-        "page_title": "DORA Metrics",
-        "projects": projects,
-        "selected_project": project_id,
-        "period": period,
-        "dora": summary,
-        "trend": trend,
-    })
+    return _templates(request).TemplateResponse(
+        "dora_dashboard.html",
+        {
+            "request": request,
+            "page_title": "DORA Metrics",
+            "projects": projects,
+            "selected_project": project_id,
+            "period": period,
+            "dora": summary,
+            "trend": trend,
+        },
+    )
 
 
 @router.get("/api/metrics/prometheus", response_class=PlainTextResponse)
 async def prometheus_metrics():
     """Prometheus-compatible metrics endpoint."""
-    import os, time as _t, psutil
+    import os
+
+    import psutil
+
     from ...metrics.collector import get_collector
+
     c = get_collector()
     snap = c.snapshot()
     proc = psutil.Process(os.getpid())
@@ -455,6 +542,7 @@ async def prometheus_metrics():
 async def dora_api(request: Request, project_id: str):
     """DORA metrics JSON API."""
     from ...metrics.dora import get_dora_metrics
+
     period = int(request.query_params.get("period", "30"))
     pid = "" if project_id == "all" else project_id
     return JSONResponse(get_dora_metrics().summary(pid, period))
@@ -464,13 +552,17 @@ async def dora_api(request: Request, project_id: str):
 async def epic_features(epic_id: str):
     """List features for an epic."""
     from ...db.migrations import get_db
+
     db = get_db()
-    rows = db.execute("""
+    rows = db.execute(
+        """
         SELECT id, name, description, status, story_points, assigned_to, created_at
         FROM features WHERE epic_id = ? ORDER BY
         CASE status WHEN 'in_progress' THEN 0 WHEN 'backlog' THEN 1 WHEN 'done' THEN 2 ELSE 3 END,
         priority ASC, name ASC
-    """, (epic_id,)).fetchall()
+    """,
+        (epic_id,),
+    ).fetchall()
     return JSONResponse([dict(r) for r in rows])
 
 
@@ -479,8 +571,9 @@ async def monitoring_live(request: Request, hours: int = 24):
     """Live monitoring data: system, LLM, agents, missions, memory.
     Cached for 5 seconds to avoid hammering DB on rapid polling."""
     import os
-    import psutil
     import time as _time
+
+    import psutil
 
     hours = max(1, min(hours, 8760))
 
@@ -496,7 +589,7 @@ async def monitoring_live(request: Request, hours: int = 24):
     cpu_percent = process.cpu_percent(interval=0)
     sys_cpu = psutil.cpu_percent(interval=0)
     sys_mem = psutil.virtual_memory()
-    disk = psutil.disk_usage('/')
+    disk = psutil.disk_usage("/")
 
     system = {
         "cpu_percent": round(cpu_percent, 1),
@@ -511,9 +604,11 @@ async def monitoring_live(request: Request, hours: int = 24):
     # LLM stats
     try:
         from ...llm.observability import get_tracer
+
         llm = get_tracer().stats(hours=hours)
         # Hourly breakdown for chart
         from ...db.migrations import get_db
+
         db = get_db()
         # Use day grouping for periods > 48h, else hourly
         if hours > 48:
@@ -539,43 +634,75 @@ async def monitoring_live(request: Request, hours: int = 24):
         llm["hourly"] = [dict(r) for r in hourly]
         db.close()
     except Exception:
-        llm = {"total_calls": 0, "total_tokens_in": 0, "total_tokens_out": 0,
-               "total_cost_usd": 0, "avg_duration_ms": 0, "error_count": 0,
-               "by_provider": [], "by_agent": [], "hourly": []}
+        llm = {
+            "total_calls": 0,
+            "total_tokens_in": 0,
+            "total_tokens_out": 0,
+            "total_cost_usd": 0,
+            "avg_duration_ms": 0,
+            "error_count": 0,
+            "by_provider": [],
+            "by_agent": [],
+            "hourly": [],
+        }
 
     # Active agents (runtime from AgentLoopManager + historical from DB — single connection)
     agents_runtime = {"active": 0, "loops": 0}
     agents_historical = {"total_registered": 0, "participated": 0, "sessions_with_agents": 0}
-    missions = []; sessions = []; sprints = []; features = []
-    msg_count = {"cnt": 0}; msg_total = {"cnt": 0}
+    missions = []
+    sessions = []
+    sprints = []
+    features = []
+    msg_count = {"cnt": 0}
+    msg_total = {"cnt": 0}
     try:
         from ...agents.loop import get_loop_manager
+
         mgr = get_loop_manager()
-        active_loops = {k: {"status": v.status, "agent_id": v.agent_id}
-                        for k, v in mgr._loops.items() if v.status in ("thinking", "acting")}
+        active_loops = {
+            k: {"status": v.status, "agent_id": v.agent_id}
+            for k, v in mgr._loops.items()
+            if v.status in ("thinking", "acting")
+        }
         agents_runtime = {"active": len(active_loops), "loops": len(mgr._loops)}
     except Exception:
         active_loops = {}
     try:
         from ...db.migrations import get_db
+
         adb = get_db()
         agents_historical["total_registered"] = adb.execute(
-            "SELECT COUNT(*) FROM agents").fetchone()[0]
+            "SELECT COUNT(*) FROM agents"
+        ).fetchone()[0]
         agents_historical["participated"] = adb.execute(
-            "SELECT COUNT(DISTINCT from_agent) FROM messages WHERE from_agent IS NOT NULL AND from_agent != 'system'").fetchone()[0]
+            "SELECT COUNT(DISTINCT from_agent) FROM messages WHERE from_agent IS NOT NULL AND from_agent != 'system'"
+        ).fetchone()[0]
         agents_historical["sessions_with_agents"] = adb.execute(
-            "SELECT COUNT(DISTINCT session_id) FROM messages WHERE from_agent IS NOT NULL AND from_agent != 'system'").fetchone()[0]
+            "SELECT COUNT(DISTINCT session_id) FROM messages WHERE from_agent IS NOT NULL AND from_agent != 'system'"
+        ).fetchone()[0]
         agents_historical["total_messages"] = adb.execute(
-            "SELECT COUNT(*) FROM messages WHERE from_agent IS NOT NULL AND from_agent != 'system'").fetchone()[0]
+            "SELECT COUNT(*) FROM messages WHERE from_agent IS NOT NULL AND from_agent != 'system'"
+        ).fetchone()[0]
         top = adb.execute(
-            "SELECT from_agent, COUNT(*) as cnt FROM messages WHERE from_agent IS NOT NULL AND from_agent != 'system' GROUP BY from_agent ORDER BY cnt DESC LIMIT 5").fetchall()
+            "SELECT from_agent, COUNT(*) as cnt FROM messages WHERE from_agent IS NOT NULL AND from_agent != 'system' GROUP BY from_agent ORDER BY cnt DESC LIMIT 5"
+        ).fetchall()
         agents_historical["top_agents"] = [{"agent": r[0], "messages": r[1]} for r in top]
         # Reuse same connection for missions/sessions/sprints/features/messages
-        missions = adb.execute("SELECT status, COUNT(*) as cnt FROM missions GROUP BY status").fetchall()
-        sessions = adb.execute("SELECT status, COUNT(*) as cnt FROM sessions GROUP BY status").fetchall()
-        sprints = adb.execute("SELECT status, COUNT(*) as cnt FROM sprints GROUP BY status").fetchall()
-        features = adb.execute("SELECT status, COUNT(*) as cnt FROM features GROUP BY status").fetchall()
-        msg_count = adb.execute("SELECT COUNT(*) as cnt FROM messages WHERE timestamp > datetime('now', '-24 hours')").fetchone()
+        missions = adb.execute(
+            "SELECT status, COUNT(*) as cnt FROM missions GROUP BY status"
+        ).fetchall()
+        sessions = adb.execute(
+            "SELECT status, COUNT(*) as cnt FROM sessions GROUP BY status"
+        ).fetchall()
+        sprints = adb.execute(
+            "SELECT status, COUNT(*) as cnt FROM sprints GROUP BY status"
+        ).fetchall()
+        features = adb.execute(
+            "SELECT status, COUNT(*) as cnt FROM features GROUP BY status"
+        ).fetchall()
+        msg_count = adb.execute(
+            "SELECT COUNT(*) as cnt FROM messages WHERE timestamp > datetime('now', '-24 hours')"
+        ).fetchone()
         msg_total = adb.execute("SELECT COUNT(*) as cnt FROM messages").fetchone()
         adb.close()
     except Exception:
@@ -584,6 +711,7 @@ async def monitoring_live(request: Request, hours: int = 24):
     # Memory stats
     try:
         from ...memory.manager import get_memory_manager
+
         mem_stats = get_memory_manager().stats()
     except Exception:
         mem_stats = {}
@@ -591,6 +719,7 @@ async def monitoring_live(request: Request, hours: int = 24):
     # Projects count
     try:
         from ...projects.manager import get_project_store
+
         projects = get_project_store().list_all()
         project_count = len(projects)
     except Exception:
@@ -600,8 +729,9 @@ async def monitoring_live(request: Request, hours: int = 24):
     # SSE connections (from bus)
     try:
         from ...a2a.bus import get_bus
+
         bus = get_bus()
-        sse_connections = len(getattr(bus, '_sse_listeners', []))
+        sse_connections = len(getattr(bus, "_sse_listeners", []))
     except Exception:
         sse_connections = 0
 
@@ -609,10 +739,14 @@ async def monitoring_live(request: Request, hours: int = 24):
     db_stats = {}
     try:
         from ...db.migrations import get_db
+
         db = get_db()
-        tables = [r[0] for r in db.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
-        ).fetchall()]
+        tables = [
+            r[0]
+            for r in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            ).fetchall()
+        ]
         # Single query for all table counts via UNION ALL
         if tables:
             union = " UNION ALL ".join(
@@ -625,15 +759,20 @@ async def monitoring_live(request: Request, hours: int = 24):
             table_counts = {}
             total_rows = 0
         # DB file size
-        db_path = str(db.execute("PRAGMA database_list").fetchone()[2]) if db.execute("PRAGMA database_list").fetchone() else ""
+        db_path = (
+            str(db.execute("PRAGMA database_list").fetchone()[2])
+            if db.execute("PRAGMA database_list").fetchone()
+            else ""
+        )
         db_size_mb = 0
         if db_path:
             import pathlib
+
             p = pathlib.Path(db_path)
             if p.exists():
                 db_size_mb = round(p.stat().st_size / 1024 / 1024, 2)
                 # Include WAL
-                wal = p.with_suffix('.db-wal')
+                wal = p.with_suffix(".db-wal")
                 if wal.exists():
                     db_size_mb += round(wal.stat().st_size / 1024 / 1024, 2)
         # Page stats
@@ -659,6 +798,7 @@ async def monitoring_live(request: Request, hours: int = 24):
     vector_stats = {}
     try:
         from ...db.migrations import get_db
+
         db = get_db()
         vr = db.execute("""
             SELECT COUNT(*) as total,
@@ -681,6 +821,7 @@ async def monitoring_live(request: Request, hours: int = 24):
     mcp_status = {}
     try:
         import urllib.request
+
         try:
             r = urllib.request.urlopen("http://127.0.0.1:9501/health", timeout=2)
             mcp_sf = json.loads(r.read().decode())
@@ -690,11 +831,13 @@ async def monitoring_live(request: Request, hours: int = 24):
 
         # RLM Cache DB
         import pathlib
+
         rlm_cache = pathlib.Path(os.environ.get("DATA_DIR", "data")) / "rlm_cache.db"
         if not rlm_cache.exists():
             rlm_cache = pathlib.Path(__file__).resolve().parents[3] / "data" / "rlm_cache.db"
         if rlm_cache.exists():
             import sqlite3
+
             cdb = sqlite3.connect(str(rlm_cache))
             cdb.row_factory = sqlite3.Row
             try:
@@ -725,6 +868,7 @@ async def monitoring_live(request: Request, hours: int = 24):
     incidents = {}
     try:
         from ...db.migrations import get_db
+
         db = get_db()
         inc_rows = db.execute("""
             SELECT severity, status, COUNT(*) as cnt
@@ -733,7 +877,11 @@ async def monitoring_live(request: Request, hours: int = 24):
         """).fetchall()
         open_count = sum(r["cnt"] for r in inc_rows if r["status"] == "open")
         total_count = sum(r["cnt"] for r in inc_rows)
-        incidents = {"open": open_count, "total": total_count, "by_severity_status": [dict(r) for r in inc_rows]}
+        incidents = {
+            "open": open_count,
+            "total": total_count,
+            "by_severity_status": [dict(r) for r in inc_rows],
+        }
         db.close()
     except Exception:
         incidents = {"open": 0, "total": 0}
@@ -742,6 +890,7 @@ async def monitoring_live(request: Request, hours: int = 24):
     metrics_snapshot = {}
     try:
         from ...metrics.collector import get_collector
+
         metrics_snapshot = get_collector().snapshot()
     except Exception:
         pass
@@ -751,15 +900,19 @@ async def monitoring_live(request: Request, hours: int = 24):
     docker_system = {}
     try:
         import pathlib
+
         sock_path = "/var/run/docker.sock"
         if pathlib.Path(sock_path).exists():
-            import http.client, urllib.parse
+            import http.client
+            import urllib.parse
 
             class DockerSocket(http.client.HTTPConnection):
                 def __init__(self):
                     super().__init__("localhost")
+
                 def connect(self):
                     import socket as _sock
+
                     self.sock = _sock.socket(_sock.AF_UNIX, _sock.SOCK_STREAM)
                     self.sock.connect(sock_path)
                     self.sock.settimeout(5)
@@ -775,16 +928,23 @@ async def monitoring_live(request: Request, hours: int = 24):
 
             for c in containers_raw:
                 cid = c.get("Id", "")[:12]
-                name = (c.get("Names", ["/?"]) or ["/?"]) [0].lstrip("/")
+                name = (c.get("Names", ["/?"]) or ["/?"])[0].lstrip("/")
                 state = c.get("State", "?")
                 status = c.get("Status", "?")
                 image = (c.get("Image", "?") or "?")[:40]
                 ports_raw = c.get("Ports", [])
-                ports_str = ", ".join(
-                    f"{p.get('PublicPort', '')}→{p.get('PrivatePort', '')}"
-                    for p in ports_raw if p.get("PublicPort")
-                ) if ports_raw else ""
-                restarts = c.get("RestartCount", 0) if c.get("HostConfig", {}).get("RestartPolicy") else 0
+                ports_str = (
+                    ", ".join(
+                        f"{p.get('PublicPort', '')}→{p.get('PrivatePort', '')}"
+                        for p in ports_raw
+                        if p.get("PublicPort")
+                    )
+                    if ports_raw
+                    else ""
+                )
+                restarts = (
+                    c.get("RestartCount", 0) if c.get("HostConfig", {}).get("RestartPolicy") else 0
+                )
                 created = c.get("Created", 0)
 
                 # Per-container stats (stream=false = single snapshot)
@@ -802,10 +962,14 @@ async def monitoring_live(request: Request, hours: int = 24):
                         if sr.status == 200:
                             st = json.loads(sr.read().decode())
                             # CPU %
-                            cpu_delta = st.get("cpu_stats", {}).get("cpu_usage", {}).get("total_usage", 0) - \
-                                        st.get("precpu_stats", {}).get("cpu_usage", {}).get("total_usage", 0)
-                            sys_delta = st.get("cpu_stats", {}).get("system_cpu_usage", 0) - \
-                                        st.get("precpu_stats", {}).get("system_cpu_usage", 0)
+                            cpu_delta = st.get("cpu_stats", {}).get("cpu_usage", {}).get(
+                                "total_usage", 0
+                            ) - st.get("precpu_stats", {}).get("cpu_usage", {}).get(
+                                "total_usage", 0
+                            )
+                            sys_delta = st.get("cpu_stats", {}).get("system_cpu_usage", 0) - st.get(
+                                "precpu_stats", {}
+                            ).get("system_cpu_usage", 0)
                             ncpus = st.get("cpu_stats", {}).get("online_cpus", 1) or 1
                             if sys_delta > 0 and cpu_delta > 0:
                                 cpu_pct = round((cpu_delta / sys_delta) * ncpus * 100, 1)
@@ -813,7 +977,9 @@ async def monitoring_live(request: Request, hours: int = 24):
                             mem_usage = st.get("memory_stats", {}).get("usage", 0)
                             mem_cache = st.get("memory_stats", {}).get("stats", {}).get("cache", 0)
                             mem_mb = round((mem_usage - mem_cache) / 1048576, 1)
-                            mem_limit_mb = round(st.get("memory_stats", {}).get("limit", 0) / 1048576, 0)
+                            mem_limit_mb = round(
+                                st.get("memory_stats", {}).get("limit", 0) / 1048576, 0
+                            )
                             # Network I/O
                             nets = st.get("networks", {})
                             for iface in nets.values():
@@ -826,13 +992,24 @@ async def monitoring_live(request: Request, hours: int = 24):
                     except Exception:
                         pass
 
-                docker_info.append({
-                    "name": name, "id": cid, "status": status, "state": state,
-                    "image": image, "ports": ports_str, "restarts": restarts,
-                    "cpu_pct": cpu_pct, "mem_mb": mem_mb, "mem_limit_mb": mem_limit_mb,
-                    "net_rx_mb": net_rx_mb, "net_tx_mb": net_tx_mb, "pids": pids,
-                    "created": created,
-                })
+                docker_info.append(
+                    {
+                        "name": name,
+                        "id": cid,
+                        "status": status,
+                        "state": state,
+                        "image": image,
+                        "ports": ports_str,
+                        "restarts": restarts,
+                        "cpu_pct": cpu_pct,
+                        "mem_mb": mem_mb,
+                        "mem_limit_mb": mem_limit_mb,
+                        "net_rx_mb": net_rx_mb,
+                        "net_tx_mb": net_tx_mb,
+                        "pids": pids,
+                        "created": created,
+                    }
+                )
 
             # --- Docker system info (images, disk) ---
             try:
@@ -890,28 +1067,47 @@ async def monitoring_live(request: Request, hours: int = 24):
     # ── Git info ──
     git_info = {}
     try:
-        import subprocess, pathlib
+        import pathlib
+        import subprocess
+
         for git_dir in ["/app", "/opt/macaron", os.environ.get("GIT_DIR", "")]:
             if not git_dir or not pathlib.Path(git_dir).exists():
                 continue
-            r = subprocess.run(["git", "log", "--oneline", "-5", "--no-decorate"],
-                               capture_output=True, text=True, timeout=5, cwd=git_dir)
+            r = subprocess.run(
+                ["git", "log", "--oneline", "-5", "--no-decorate"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                cwd=git_dir,
+            )
             if r.returncode == 0 and r.stdout.strip():
                 git_info["recent_commits"] = [
                     {"hash": line[:7], "message": line[8:]}
-                    for line in r.stdout.strip().split("\n") if line
+                    for line in r.stdout.strip().split("\n")
+                    if line
                 ]
-                r2 = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                                    capture_output=True, text=True, timeout=5, cwd=git_dir)
+                r2 = subprocess.run(
+                    ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    cwd=git_dir,
+                )
                 if r2.returncode == 0:
                     git_info["branch"] = r2.stdout.strip()
-                r3 = subprocess.run(["git", "log", "-1", "--format=%ci"],
-                                    capture_output=True, text=True, timeout=5, cwd=git_dir)
+                r3 = subprocess.run(
+                    ["git", "log", "-1", "--format=%ci"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    cwd=git_dir,
+                )
                 if r3.returncode == 0:
                     git_info["last_commit_time"] = r3.stdout.strip()
                 break
         if not git_info:
             import pathlib as _pl
+
             ver = _pl.Path("/app/VERSION")
             if ver.exists():
                 git_info["branch"] = ver.read_text().strip()
@@ -922,6 +1118,7 @@ async def monitoring_live(request: Request, hours: int = 24):
     phase_stats = []
     try:
         from ...db.migrations import get_db
+
         db = get_db()
         runs = db.execute("""
             SELECT phases_json, status, current_phase
@@ -938,8 +1135,9 @@ async def monitoring_live(request: Request, hours: int = 24):
                     phase_counts[k] = phase_counts.get(k, 0) + 1
             except Exception:
                 pass
-        phase_stats = [{"phase_name": k[0], "status": k[1], "cnt": v}
-                       for k, v in sorted(phase_counts.items())]
+        phase_stats = [
+            {"phase_name": k[0], "status": k[1], "cnt": v} for k, v in sorted(phase_counts.items())
+        ]
         db.close()
     except Exception:
         pass
@@ -966,15 +1164,23 @@ async def monitoring_live(request: Request, hours: int = 24):
         }
         # Servers running on VM (probe ports)
         import socket
+
         def _port_up(port, host="127.0.0.1"):
             try:
                 with socket.create_connection((host, port), timeout=1):
                     return "up"
             except Exception:
                 return "down"
+
         azure_infra["servers"] = [
             {"name": "Platform (uvicorn)", "port": 8090, "status": "up"},
-            {"name": "MCP SF (unified)", "port": 9501, "status": "up" if mcp_status.get("mcp_sf", {}).get("status") in ("up", "ok") else "down"},
+            {
+                "name": "MCP SF (unified)",
+                "port": 9501,
+                "status": "up"
+                if mcp_status.get("mcp_sf", {}).get("status") in ("up", "ok")
+                else "down",
+            },
             {"name": "PostgreSQL", "port": 5432, "status": _port_up(5432)},
             {"name": "Nginx (reverse proxy)", "port": 80, "status": _port_up(80)},
         ]
@@ -993,17 +1199,19 @@ async def monitoring_live(request: Request, hours: int = 24):
             "other_llm_usd": round(other_cost, 4),
             "total_llm_usd": round(azure_cost + other_cost, 4),
             # Azure infra monthly estimates (Standard_B2ms + PG B1ms + storage)
-            "vm_monthly_usd": 60.74,        # Standard_B2ms francecentral
-            "disk_monthly_usd": 9.50,        # P6 Premium SSD 64GB
-            "pg_monthly_usd": 12.34,         # PG B1ms 1vCPU/2GB
-            "storage_monthly_usd": 2.50,     # Blob GRS ~50GB
+            "vm_monthly_usd": 60.74,  # Standard_B2ms francecentral
+            "disk_monthly_usd": 9.50,  # P6 Premium SSD 64GB
+            "pg_monthly_usd": 12.34,  # PG B1ms 1vCPU/2GB
+            "storage_monthly_usd": 2.50,  # Blob GRS ~50GB
             "total_infra_monthly_usd": 85.08,
         }
     except Exception:
         pass
 
     # Redact sensitive infrastructure details for unauthenticated requests
-    is_authed = getattr(request.state, "authenticated", False) if hasattr(request, "state") else False
+    is_authed = (
+        getattr(request.state, "authenticated", False) if hasattr(request, "state") else False
+    )
     if not is_authed and os.getenv("MACARON_API_KEY"):
         # Strip container IDs, kernel, server version, git branch, Azure details
         for d in docker_info:
@@ -1063,26 +1271,32 @@ async def monitoring_live(request: Request, hours: int = 24):
 def import_time():
     """Get current time as epoch."""
     import time
+
     return time.time()
 
 
 # ── RBAC ─────────────────────────────────────────────────────────
 
+
 @router.get("/api/rbac/agent/{agent_id}")
 async def rbac_agent_permissions(agent_id: str):
     """Get RBAC permissions for an agent."""
     from ...rbac import agent_permissions_summary, get_agent_category
-    return JSONResponse({
-        "agent_id": agent_id,
-        "category": get_agent_category(agent_id),
-        "permissions": agent_permissions_summary(agent_id),
-    })
+
+    return JSONResponse(
+        {
+            "agent_id": agent_id,
+            "category": get_agent_category(agent_id),
+            "permissions": agent_permissions_summary(agent_id),
+        }
+    )
 
 
 @router.get("/api/rbac/check")
 async def rbac_check(request: Request):
     """Check a specific permission. Query: ?actor=agent_id&type=agent&artifact=code&action=create"""
     from ...rbac import check_agent_permission, check_human_permission
+
     actor = request.query_params.get("actor", "")
     actor_type = request.query_params.get("type", "agent")
     artifact = request.query_params.get("artifact", "")
@@ -1098,10 +1312,12 @@ async def rbac_check(request: Request):
 
 # ── Incidents ────────────────────────────────────────────────────
 
+
 @router.get("/api/incidents/stats", responses={200: {"model": IncidentStats}})
 async def incidents_stats():
     """Incident counts by severity and status."""
     from ...db.migrations import get_db
+
     db = get_db()
     try:
         by_severity = db.execute(
@@ -1114,11 +1330,13 @@ async def incidents_stats():
             "SELECT id, title, severity, status, source, error_type, created_at "
             "FROM platform_incidents ORDER BY created_at DESC LIMIT 5"
         ).fetchall()
-        return JSONResponse({
-            "by_severity": {r["severity"]: r["cnt"] for r in by_severity},
-            "by_status": {r["status"]: r["cnt"] for r in by_status},
-            "recent": [dict(r) for r in recent],
-        })
+        return JSONResponse(
+            {
+                "by_severity": {r["severity"]: r["cnt"] for r in by_severity},
+                "by_status": {r["status"]: r["cnt"] for r in by_status},
+                "recent": [dict(r) for r in recent],
+            }
+        )
     except Exception:
         return JSONResponse({"by_severity": {}, "by_status": {}, "recent": []})
     finally:
@@ -1129,6 +1347,7 @@ async def incidents_stats():
 async def list_incidents(request: Request):
     """List incidents, optionally filtered by status/severity."""
     from ...db.migrations import get_db
+
     status = request.query_params.get("status", "")
     severity = request.query_params.get("severity", "")
     limit = int(request.query_params.get("limit", "50"))
@@ -1156,7 +1375,9 @@ async def list_incidents(request: Request):
 async def create_incident(request: Request):
     """Create a manual incident."""
     import uuid
+
     from ...db.migrations import get_db
+
     data = await request.json()
     title = data.get("title", "")
     if not title:
@@ -1167,9 +1388,16 @@ async def create_incident(request: Request):
         db.execute(
             "INSERT INTO platform_incidents (id, title, severity, status, source, error_type, error_detail, mission_id, agent_id) "
             "VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?)",
-            (inc_id, title, data.get("severity", "P3"), data.get("source", "manual"),
-             data.get("error_type", ""), data.get("error_detail", ""),
-             data.get("mission_id", ""), data.get("agent_id", "")),
+            (
+                inc_id,
+                title,
+                data.get("severity", "P3"),
+                data.get("source", "manual"),
+                data.get("error_type", ""),
+                data.get("error_detail", ""),
+                data.get("mission_id", ""),
+                data.get("agent_id", ""),
+            ),
         )
         db.commit()
         return JSONResponse({"id": inc_id, "title": title})
@@ -1181,6 +1409,7 @@ async def create_incident(request: Request):
 async def update_incident(request: Request, incident_id: str):
     """Update incident status (resolve, close)."""
     from ...db.migrations import get_db
+
     data = await request.json()
     db = get_db()
     try:
@@ -1206,20 +1435,72 @@ async def update_incident(request: Request, incident_id: str):
 
 # ── Auto-Heal API ────────────────────────────────────────────────────
 
+
 @router.get("/api/autoheal/stats", responses={200: {"model": AutoHealStats}})
 async def autoheal_stats():
     """Auto-heal engine statistics."""
     from ...ops.auto_heal import get_autoheal_stats
+
     return JSONResponse(get_autoheal_stats())
+
+
+@router.get("/api/autoheal/heartbeat")
+async def autoheal_heartbeat():
+    """Return animated ECG heartbeat icon with hover detail popover."""
+    from ...ops.auto_heal import get_autoheal_stats
+
+    stats = get_autoheal_stats()
+    hb = stats.get("heartbeat", "starting")
+    inc = stats["incidents"]
+    mis = stats["missions"]
+    active = stats["active_heals"]
+
+    if not stats["enabled"]:
+        css_class, color, status_label = "stale", "var(--text-secondary)", "Disabled"
+    elif hb == "alive" and inc["open"] == 0 and active == 0:
+        css_class, color, status_label = "alive", "#22c55e", "OK"
+    elif hb == "alive":
+        css_class, color, status_label = "healing", "#f59e0b", "Active"
+    elif hb == "starting":
+        css_class, color, status_label = "starting", "#818cf8", "Starting..."
+    else:
+        css_class, color, status_label = "stale", "#ef4444", "Down"
+
+    last_err = stats.get("last_error", "")
+    err_line = f'<div class="tma-tip-row" style="color:#ef4444">Err: {last_err[:60]}</div>' if last_err else ""
+
+    html = (
+        f'<span class="tma-hb {css_class}" style="--tma-color:{color}">'
+        f'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        f'<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>'
+        f'<div class="tma-tip">'
+        f'<div class="tma-tip-title" style="color:{color}">TMA Auto-Heal — {status_label}</div>'
+        f'<div class="tma-tip-grid">'
+        f'<div class="tma-tip-row"><span>Open</span><span style="color:#f59e0b">{inc["open"]}</span></div>'
+        f'<div class="tma-tip-row"><span>Investigating</span><span>{inc["investigating"]}</span></div>'
+        f'<div class="tma-tip-row"><span>Resolved</span><span style="color:#22c55e">{inc["resolved"]}</span></div>'
+        f'<div class="tma-tip-sep"></div>'
+        f'<div class="tma-tip-row"><span>Missions</span><span>{mis["total"]}</span></div>'
+        f'<div class="tma-tip-row"><span>Healing</span><span style="color:#f59e0b">{active}</span></div>'
+        f'<div class="tma-tip-row"><span>Completed</span><span style="color:#22c55e">{mis["completed"]}</span></div>'
+        f'<div class="tma-tip-row"><span>Failed</span><span style="color:#ef4444">{mis["failed"]}</span></div>'
+        f'{err_line}'
+        f'</div>'
+        f'<div class="tma-tip-footer">Scan every {stats["interval_s"]}s — Max {stats["max_concurrent"]} concurrent</div>'
+        f'</div></span>'
+    )
+    return HTMLResponse(html)
 
 
 @router.post("/api/autoheal/trigger")
 async def autoheal_trigger():
     """Manually trigger one auto-heal cycle."""
     from ...ops.auto_heal import heal_cycle
+
     try:
         await heal_cycle()
         from ...ops.auto_heal import get_autoheal_stats
+
         return JSONResponse({"ok": True, **get_autoheal_stats()})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
@@ -1227,10 +1508,12 @@ async def autoheal_trigger():
 
 # ── Chaos Endurance ──────────────────────────────────────────────────
 
+
 @router.get("/api/chaos/history")
 async def chaos_history():
     """Get chaos run history."""
-    from ...ops.chaos_endurance import get_chaos_history, _ensure_table
+    from ...ops.chaos_endurance import _ensure_table, get_chaos_history
+
     try:
         _ensure_table()
     except Exception:
@@ -1242,6 +1525,7 @@ async def chaos_history():
 async def chaos_trigger(request: Request):
     """Manually trigger a chaos scenario."""
     from ...ops.chaos_endurance import trigger_chaos
+
     body = {}
     try:
         body = await request.json()
@@ -1250,22 +1534,26 @@ async def chaos_trigger(request: Request):
     scenario = body.get("scenario")
     try:
         result = await trigger_chaos(scenario)
-        return JSONResponse({
-            "ok": result.success,
-            "scenario": result.scenario,
-            "mttr_ms": result.mttr_ms,
-            "detail": result.detail,
-        })
+        return JSONResponse(
+            {
+                "ok": result.success,
+                "scenario": result.scenario,
+                "mttr_ms": result.mttr_ms,
+                "detail": result.detail,
+            }
+        )
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
 # ── Endurance Watchdog ───────────────────────────────────────────────
 
+
 @router.get("/api/watchdog/metrics")
 async def watchdog_metrics():
     """Get endurance watchdog metrics."""
-    from ...ops.endurance_watchdog import get_metrics, _ensure_table
+    from ...ops.endurance_watchdog import _ensure_table, get_metrics
+
     try:
         _ensure_table()
     except Exception:
@@ -1278,6 +1566,7 @@ async def llm_usage_stats():
     """Get LLM usage aggregate (cost by day/phase/agent)."""
     try:
         from ...llm.client import get_llm_client
+
         client = get_llm_client()
         data = await client.aggregate_usage(days=7)
         return JSONResponse(data)
@@ -1285,18 +1574,17 @@ async def llm_usage_stats():
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-
-
 # ── i18n ─────────────────────────────────────────────────────────────
 @router.get("/api/set-lang/{lang}")
 async def set_language(lang: str, request: Request):
     """Switch UI language. Sets cookie and redirects back."""
     from ...i18n import SUPPORTED_LANGS
+
     if lang not in SUPPORTED_LANGS:
         lang = "en"
     referer = request.headers.get("referer", "/")
     response = RedirectResponse(url=referer, status_code=303)
-    response.set_cookie("lang", lang, max_age=365 * 86400, httponly=False, samesite="lax")
+    response.set_cookie("sf_lang", lang, max_age=365 * 86400, httponly=True, samesite="lax")
     return response
 
 
@@ -1304,6 +1592,7 @@ async def set_language(lang: str, request: Request):
 async def i18n_catalog(lang: str):
     """Serve translation catalog for client-side JS."""
     from ...i18n import SUPPORTED_LANGS, _catalog, _load_catalog
+
     if not _catalog:
         _load_catalog()
     if lang not in SUPPORTED_LANGS:
@@ -1313,14 +1602,18 @@ async def i18n_catalog(lang: str):
 
 # ── Reactions Engine ─────────────────────────────────────────────
 
+
 @router.get("/api/reactions/stats")
 async def reactions_stats():
     """Get reaction engine statistics."""
     from ...reactions import get_reaction_engine
+
     engine = get_reaction_engine()
     stats = engine.get_stats()
-    rules = {e.value: {"action": r.action.value, "auto": r.auto, "retries": r.retries}
-             for e, r in engine.rules.items()}
+    rules = {
+        e.value: {"action": r.action.value, "auto": r.auto, "retries": r.retries}
+        for e, r in engine.rules.items()
+    }
     return JSONResponse({"stats": stats, "rules": rules})
 
 
@@ -1328,6 +1621,7 @@ async def reactions_stats():
 async def reactions_history(request: Request):
     """Get reaction history."""
     from ...reactions import get_reaction_engine
+
     project_id = request.query_params.get("project", "")
     limit = int(request.query_params.get("limit", "50"))
     return JSONResponse(get_reaction_engine().get_history(project_id, limit))
@@ -1337,25 +1631,33 @@ async def reactions_history(request: Request):
 async def list_workspaces():
     """List active agent workspaces."""
     from ...workspaces import get_workspace_manager
+
     mgr = get_workspace_manager()
     active = await mgr.list_active()
-    return JSONResponse([{
-        "session_id": w.session_id[:8],
-        "project_id": w.project_id,
-        "branch": w.branch,
-        "path": w.path,
-        "type": w.workspace_type.value,
-        "status": w.status.value,
-        "created_at": w.created_at,
-    } for w in active])
+    return JSONResponse(
+        [
+            {
+                "session_id": w.session_id[:8],
+                "project_id": w.project_id,
+                "branch": w.branch,
+                "path": w.path,
+                "type": w.workspace_type.value,
+                "status": w.status.value,
+                "created_at": w.created_at,
+            }
+            for w in active
+        ]
+    )
 
 
 # ── Integrations CRUD ────────────────────────────────────────────
+
 
 @router.get("/api/integrations")
 async def list_integrations():
     """List all integrations."""
     from ...db.migrations import get_db
+
     db = get_db()
     try:
         rows = db.execute("SELECT * FROM integrations ORDER BY name").fetchall()
@@ -1368,20 +1670,28 @@ async def list_integrations():
 async def update_integration(integ_id: str, request: Request):
     """Toggle or update integration config."""
     from ...db.migrations import get_db
+
     data = await request.json()
     db = get_db()
     try:
         if "enabled" in data:
-            db.execute("UPDATE integrations SET enabled=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                       (1 if data["enabled"] else 0, integ_id))
+            db.execute(
+                "UPDATE integrations SET enabled=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (1 if data["enabled"] else 0, integ_id),
+            )
         if "config" in data:
-            existing = db.execute("SELECT config_json FROM integrations WHERE id=?", (integ_id,)).fetchone()
+            existing = db.execute(
+                "SELECT config_json FROM integrations WHERE id=?", (integ_id,)
+            ).fetchone()
             if existing:
                 import json as _json
+
                 cfg = _json.loads(existing["config_json"] or "{}")
                 cfg.update(data["config"])
-                db.execute("UPDATE integrations SET config_json=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                           (_json.dumps(cfg), integ_id))
+                db.execute(
+                    "UPDATE integrations SET config_json=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                    (_json.dumps(cfg), integ_id),
+                )
         db.commit()
         return JSONResponse({"ok": True})
     finally:
@@ -1392,32 +1702,44 @@ async def update_integration(integ_id: str, request: Request):
 async def test_integration(integ_id: str):
     """Test integration connectivity."""
     from ...db.migrations import get_db
+
     db = get_db()
     try:
         row = db.execute("SELECT * FROM integrations WHERE id=?", (integ_id,)).fetchone()
         if not row:
             return JSONResponse({"ok": False, "error": "not found"}, 404)
         import json as _json
+
         cfg = _json.loads(row["config_json"] or "{}")
         url = cfg.get("url", "")
         if not url:
-            db.execute("UPDATE integrations SET status='error', updated_at=CURRENT_TIMESTAMP WHERE id=?", (integ_id,))
+            db.execute(
+                "UPDATE integrations SET status='error', updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (integ_id,),
+            )
             db.commit()
             return JSONResponse({"ok": False, "error": "no URL configured"})
         # Basic connectivity test
         try:
             import urllib.request
+
             req = urllib.request.Request(url, method="HEAD")
             req.add_header("User-Agent", "Macaron-Platform/1.0")
             token = cfg.get("api_token", "")
             if token:
                 req.add_header("Authorization", f"Bearer {token}")
             urllib.request.urlopen(req, timeout=10)
-            db.execute("UPDATE integrations SET status='connected', last_sync=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE id=?", (integ_id,))
+            db.execute(
+                "UPDATE integrations SET status='connected', last_sync=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (integ_id,),
+            )
             db.commit()
             return JSONResponse({"ok": True})
         except Exception as e:
-            db.execute("UPDATE integrations SET status='error', updated_at=CURRENT_TIMESTAMP WHERE id=?", (integ_id,))
+            db.execute(
+                "UPDATE integrations SET status='error', updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (integ_id,),
+            )
             db.commit()
             return JSONResponse({"ok": False, "error": str(e)[:200]})
     finally:
@@ -1426,10 +1748,12 @@ async def test_integration(integ_id: str):
 
 # ── Search (JQL-like) ────────────────────────────────────────────
 
+
 @router.get("/api/search")
 async def search_all(request: Request):
     """Search epics, features, missions, tickets across all projects."""
     from ...db.migrations import get_db
+
     q = request.query_params.get("q", "").strip()
     if not q:
         return JSONResponse({"results": [], "total": 0})
@@ -1442,35 +1766,65 @@ async def search_all(request: Request):
         # Search missions (epics)
         for r in db.execute(
             "SELECT id, name, status, project_id, type, workflow_id FROM missions WHERE name LIKE ? OR description LIKE ? LIMIT 20",
-            (like, like)
+            (like, like),
         ).fetchall():
-            results.append({"type": "epic", "id": r["id"], "name": r["name"],
-                           "status": r["status"], "project": r["project_id"], "subtype": r["type"]})
+            results.append(
+                {
+                    "type": "epic",
+                    "id": r["id"],
+                    "name": r["name"],
+                    "status": r["status"],
+                    "project": r["project_id"],
+                    "subtype": r["type"],
+                }
+            )
 
         # Search features
         for r in db.execute(
             "SELECT f.id, f.name, f.status, f.epic_id, f.story_points FROM features f WHERE f.name LIKE ? OR f.description LIKE ? LIMIT 20",
-            (like, like)
+            (like, like),
         ).fetchall():
-            results.append({"type": "feature", "id": r["id"], "name": r["name"],
-                           "status": r["status"], "epic_id": r["epic_id"], "sp": r["story_points"]})
+            results.append(
+                {
+                    "type": "feature",
+                    "id": r["id"],
+                    "name": r["name"],
+                    "status": r["status"],
+                    "epic_id": r["epic_id"],
+                    "sp": r["story_points"],
+                }
+            )
 
         # Search tickets
         for r in db.execute(
             "SELECT id, title, status, severity, mission_id FROM support_tickets WHERE title LIKE ? OR description LIKE ? LIMIT 10",
-            (like, like)
+            (like, like),
         ).fetchall():
-            results.append({"type": "ticket", "id": r["id"], "name": r["title"],
-                           "status": r["status"], "severity": r["severity"]})
+            results.append(
+                {
+                    "type": "ticket",
+                    "id": r["id"],
+                    "name": r["title"],
+                    "status": r["status"],
+                    "severity": r["severity"],
+                }
+            )
 
         # Search memory
         try:
             for r in db.execute(
                 "SELECT key, category, content FROM memory WHERE key LIKE ? OR content LIKE ? LIMIT 10",
-                (like, like)
+                (like, like),
             ).fetchall():
-                results.append({"type": "memory", "id": r["key"], "name": r["key"],
-                               "category": r["category"], "preview": r["content"][:100]})
+                results.append(
+                    {
+                        "type": "memory",
+                        "id": r["key"],
+                        "name": r["key"],
+                        "category": r["category"],
+                        "preview": r["content"][:100],
+                    }
+                )
         except Exception:
             pass
 
@@ -1481,12 +1835,14 @@ async def search_all(request: Request):
 
 # ── Export (CSV) ─────────────────────────────────────────────────
 
+
 @router.get("/api/export/epics")
 async def export_epics_csv(request: Request):
     """Export all epics as CSV."""
-    from ...db.migrations import get_db
     import csv
     import io
+
+    from ...db.migrations import get_db
 
     db = get_db()
     try:
@@ -1499,15 +1855,40 @@ async def export_epics_csv(request: Request):
 
         out = io.StringIO()
         writer = csv.writer(out)
-        writer.writerow(["ID", "Name", "Status", "Project", "Type", "Workflow", "WSJF", "Created", "Features", "Story Points"])
+        writer.writerow(
+            [
+                "ID",
+                "Name",
+                "Status",
+                "Project",
+                "Type",
+                "Workflow",
+                "WSJF",
+                "Created",
+                "Features",
+                "Story Points",
+            ]
+        )
         for r in rows:
-            writer.writerow([r["id"], r["name"], r["status"], r["project_id"], r["type"],
-                           r["workflow_id"], r["wsjf_score"], r["created_at"], r["feature_count"], r["total_sp"]])
+            writer.writerow(
+                [
+                    r["id"],
+                    r["name"],
+                    r["status"],
+                    r["project_id"],
+                    r["type"],
+                    r["workflow_id"],
+                    r["wsjf_score"],
+                    r["created_at"],
+                    r["feature_count"],
+                    r["total_sp"],
+                ]
+            )
 
         return StreamingResponse(
             iter([out.getvalue()]),
             media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=epics_export.csv"}
+            headers={"Content-Disposition": "attachment; filename=epics_export.csv"},
         )
     finally:
         db.close()
@@ -1516,29 +1897,55 @@ async def export_epics_csv(request: Request):
 @router.get("/api/export/features")
 async def export_features_csv(request: Request):
     """Export features as CSV, optionally filtered by epic."""
-    from ...db.migrations import get_db
     import csv
     import io
+
+    from ...db.migrations import get_db
 
     epic_id = request.query_params.get("epic_id", "")
     db = get_db()
     try:
         if epic_id:
-            rows = db.execute("SELECT * FROM features WHERE epic_id=? ORDER BY priority", (epic_id,)).fetchall()
+            rows = db.execute(
+                "SELECT * FROM features WHERE epic_id=? ORDER BY priority", (epic_id,)
+            ).fetchall()
         else:
             rows = db.execute("SELECT * FROM features ORDER BY epic_id, priority").fetchall()
 
         out = io.StringIO()
         writer = csv.writer(out)
-        writer.writerow(["ID", "Epic ID", "Name", "Status", "Priority", "Story Points", "Assigned To", "Created"])
+        writer.writerow(
+            [
+                "ID",
+                "Epic ID",
+                "Name",
+                "Status",
+                "Priority",
+                "Story Points",
+                "Assigned To",
+                "Created",
+            ]
+        )
         for r in rows:
-            writer.writerow([r["id"], r["epic_id"], r["name"], r["status"], r["priority"],
-                           r["story_points"], r["assigned_to"], r["created_at"]])
+            writer.writerow(
+                [
+                    r["id"],
+                    r["epic_id"],
+                    r["name"],
+                    r["status"],
+                    r["priority"],
+                    r["story_points"],
+                    r["assigned_to"],
+                    r["created_at"],
+                ]
+            )
 
         return StreamingResponse(
             iter([out.getvalue()]),
             media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename=features_export{'_'+epic_id if epic_id else ''}.csv"}
+            headers={
+                "Content-Disposition": f"attachment; filename=features_export{'_' + epic_id if epic_id else ''}.csv"
+            },
         )
     finally:
         db.close()
@@ -1546,31 +1953,40 @@ async def export_features_csv(request: Request):
 
 # ── Burndown / Velocity ─────────────────────────────────────────
 
+
 @router.get("/api/metrics/burndown/{epic_id}")
 async def burndown_data(epic_id: str):
     """Get burndown data for an epic — features completed over time."""
     from ...db.migrations import get_db
+
     db = get_db()
     try:
-        total_sp = db.execute("SELECT COALESCE(SUM(story_points),0) FROM features WHERE epic_id=?", (epic_id,)).fetchone()[0]
+        total_sp = db.execute(
+            "SELECT COALESCE(SUM(story_points),0) FROM features WHERE epic_id=?", (epic_id,)
+        ).fetchone()[0]
         done_features = db.execute(
             "SELECT name, story_points, completed_at FROM features WHERE epic_id=? AND status='done' AND completed_at IS NOT NULL ORDER BY completed_at",
-            (epic_id,)
+            (epic_id,),
         ).fetchall()
 
-        points = [{"date": r["completed_at"][:10], "sp": r["story_points"], "name": r["name"]} for r in done_features]
+        points = [
+            {"date": r["completed_at"][:10], "sp": r["story_points"], "name": r["name"]}
+            for r in done_features
+        ]
         remaining = total_sp
         burndown = []
         for p in points:
             remaining -= p["sp"]
             burndown.append({"date": p["date"], "remaining": remaining, "done_name": p["name"]})
 
-        return JSONResponse({
-            "total_sp": total_sp,
-            "remaining_sp": remaining,
-            "completed_count": len(done_features),
-            "burndown": burndown,
-        })
+        return JSONResponse(
+            {
+                "total_sp": total_sp,
+                "remaining_sp": remaining,
+                "completed_count": len(done_features),
+                "burndown": burndown,
+            }
+        )
     finally:
         db.close()
 
@@ -1579,15 +1995,24 @@ async def burndown_data(epic_id: str):
 async def velocity_data():
     """Get velocity across sprints."""
     from ...db.migrations import get_db
+
     db = get_db()
     try:
         sprints = db.execute(
             "SELECT id, name, status, velocity, planned_sp FROM sprints ORDER BY created_at DESC LIMIT 20"
         ).fetchall()
-        return JSONResponse([{
-            "id": s["id"], "name": s["name"], "status": s["status"],
-            "velocity": s["velocity"], "planned_sp": s["planned_sp"],
-        } for s in sprints])
+        return JSONResponse(
+            [
+                {
+                    "id": s["id"],
+                    "name": s["name"],
+                    "status": s["status"],
+                    "velocity": s["velocity"],
+                    "planned_sp": s["planned_sp"],
+                }
+                for s in sprints
+            ]
+        )
     except Exception:
         return JSONResponse([])
     finally:
@@ -1598,51 +2023,67 @@ async def velocity_data():
 async def releases_data(project_id: str):
     """Get release notes — completed features grouped by epic, with dates."""
     from ...db.migrations import get_db
+
     db = get_db()
     try:
         epics = db.execute(
             "SELECT id, name, status, completed_at FROM missions WHERE project_id=? AND type='epic' AND status='completed' ORDER BY completed_at DESC",
-            (project_id,)
+            (project_id,),
         ).fetchall()
 
         releases = []
         for epic in epics:
             features = db.execute(
                 "SELECT name, status, story_points, completed_at, acceptance_criteria FROM features WHERE epic_id=? AND status='done' ORDER BY completed_at",
-                (epic["id"],)
+                (epic["id"],),
             ).fetchall()
             total_sp = sum(f["story_points"] or 0 for f in features)
-            releases.append({
-                "epic_id": epic["id"],
-                "epic_name": epic["name"],
-                "completed_at": epic["completed_at"],
-                "feature_count": len(features),
-                "total_sp": total_sp,
-                "features": [{"name": f["name"], "sp": f["story_points"], "date": f["completed_at"]} for f in features],
-            })
+            releases.append(
+                {
+                    "epic_id": epic["id"],
+                    "epic_name": epic["name"],
+                    "completed_at": epic["completed_at"],
+                    "feature_count": len(features),
+                    "total_sp": total_sp,
+                    "features": [
+                        {"name": f["name"], "sp": f["story_points"], "date": f["completed_at"]}
+                        for f in features
+                    ],
+                }
+            )
 
         # Also include active epics with partial completion
         active = db.execute(
             "SELECT id, name, status FROM missions WHERE project_id=? AND type='epic' AND status IN ('active','planning') ORDER BY created_at DESC",
-            (project_id,)
+            (project_id,),
         ).fetchall()
         for epic in active:
             features = db.execute(
                 "SELECT name, status, story_points, completed_at FROM features WHERE epic_id=? ORDER BY status, completed_at",
-                (epic["id"],)
+                (epic["id"],),
             ).fetchall()
             done = [f for f in features if f["status"] == "done"]
             total = len(features)
-            releases.append({
-                "epic_id": epic["id"],
-                "epic_name": epic["name"] + " (in progress)",
-                "completed_at": None,
-                "feature_count": total,
-                "done_count": len(done),
-                "progress_pct": round(len(done) / total * 100) if total else 0,
-                "total_sp": sum(f["story_points"] or 0 for f in features),
-                "features": [{"name": f["name"], "sp": f["story_points"], "status": f["status"], "date": f["completed_at"]} for f in features],
-            })
+            releases.append(
+                {
+                    "epic_id": epic["id"],
+                    "epic_name": epic["name"] + " (in progress)",
+                    "completed_at": None,
+                    "feature_count": total,
+                    "done_count": len(done),
+                    "progress_pct": round(len(done) / total * 100) if total else 0,
+                    "total_sp": sum(f["story_points"] or 0 for f in features),
+                    "features": [
+                        {
+                            "name": f["name"],
+                            "sp": f["story_points"],
+                            "status": f["status"],
+                            "date": f["completed_at"],
+                        }
+                        for f in features
+                    ],
+                }
+            )
 
         return JSONResponse({"project_id": project_id, "releases": releases})
     finally:
@@ -1653,27 +2094,36 @@ async def releases_data(project_id: str):
 async def cycle_time_data(project_id: str = ""):
     """Cycle time distribution — time from created to completed for features and stories."""
     from ...db.migrations import get_db
+
     db = get_db()
     try:
-        where = "AND f.epic_id IN (SELECT id FROM missions WHERE project_id=?)" if project_id else ""
+        where = (
+            "AND f.epic_id IN (SELECT id FROM missions WHERE project_id=?)" if project_id else ""
+        )
         params = (project_id,) if project_id else ()
 
-        features = db.execute(f"""
+        features = db.execute(
+            f"""
             SELECT f.name,
                    julianday(f.completed_at) - julianday(f.created_at) as days
             FROM features f
             WHERE f.status='done' AND f.completed_at IS NOT NULL AND f.created_at IS NOT NULL {where}
             ORDER BY days
-        """, params).fetchall()
+        """,
+            params,
+        ).fetchall()
 
-        stories = db.execute(f"""
+        stories = db.execute(
+            f"""
             SELECT s.title,
                    julianday(s.completed_at) - julianday(s.created_at) as days
             FROM user_stories s
             JOIN features f ON s.feature_id = f.id
             WHERE s.status='done' AND s.completed_at IS NOT NULL AND s.created_at IS NOT NULL {where}
             ORDER BY days
-        """, params).fetchall()
+        """,
+            params,
+        ).fetchall()
 
         feat_days = [round(r["days"], 1) for r in features if r["days"] and r["days"] > 0]
         story_days = [round(r["days"], 1) for r in stories if r["days"] and r["days"] > 0]
@@ -1689,32 +2139,126 @@ async def cycle_time_data(project_id: str = ""):
             for i in range(bins):
                 lo = mn + step * i
                 hi = lo + step
-                cnt = sum(1 for v in values if lo <= v < hi) if i < bins - 1 else sum(1 for v in values if lo <= v <= hi)
+                cnt = (
+                    sum(1 for v in values if lo <= v < hi)
+                    if i < bins - 1
+                    else sum(1 for v in values if lo <= v <= hi)
+                )
                 result.append({"range": f"{lo:.0f}-{hi:.0f}", "count": cnt})
             return result
 
-        return JSONResponse({
-            "features": {
-                "count": len(feat_days),
-                "avg_days": round(sum(feat_days) / len(feat_days), 1) if feat_days else 0,
-                "median_days": round(sorted(feat_days)[len(feat_days)//2], 1) if feat_days else 0,
-                "p90_days": round(sorted(feat_days)[int(len(feat_days)*0.9)] , 1) if feat_days else 0,
-                "histogram": histogram(feat_days),
-            },
-            "stories": {
-                "count": len(story_days),
-                "avg_days": round(sum(story_days) / len(story_days), 1) if story_days else 0,
-                "median_days": round(sorted(story_days)[len(story_days)//2], 1) if story_days else 0,
-                "histogram": histogram(story_days),
-            },
-        })
+        return JSONResponse(
+            {
+                "features": {
+                    "count": len(feat_days),
+                    "avg_days": round(sum(feat_days) / len(feat_days), 1) if feat_days else 0,
+                    "median_days": round(sorted(feat_days)[len(feat_days) // 2], 1)
+                    if feat_days
+                    else 0,
+                    "p90_days": round(sorted(feat_days)[int(len(feat_days) * 0.9)], 1)
+                    if feat_days
+                    else 0,
+                    "histogram": histogram(feat_days),
+                },
+                "stories": {
+                    "count": len(story_days),
+                    "avg_days": round(sum(story_days) / len(story_days), 1) if story_days else 0,
+                    "median_days": round(sorted(story_days)[len(story_days) // 2], 1)
+                    if story_days
+                    else 0,
+                    "histogram": histogram(story_days),
+                },
+            }
+        )
     except Exception:
-        return JSONResponse({"features": {"count": 0, "histogram": []}, "stories": {"count": 0, "histogram": []}})
+        return JSONResponse(
+            {"features": {"count": 0, "histogram": []}, "stories": {"count": 0, "histogram": []}}
+        )
     finally:
         db.close()
 
 
-# ── GitHub Webhook Integration ────────────────────────────────────────────────
+@router.get("/api/metrics/pipeline/{mission_id}")
+async def pipeline_metrics(mission_id: str):
+    """Pipeline metrics for a specific mission run: duration, tool stats, agent performance."""
+    from ...db.migrations import get_db
+
+    db = get_db()
+    try:
+        # Tool call stats
+        tool_stats = db.execute(
+            "SELECT tool_name, COUNT(*) as total, SUM(CASE WHEN success=1 THEN 1 ELSE 0 END) as ok "
+            "FROM tool_calls WHERE session_id IN "
+            "(SELECT id FROM sessions WHERE mission_run_id=?) "
+            "GROUP BY tool_name ORDER BY total DESC",
+            (mission_id,),
+        ).fetchall()
+
+        # Agent performance
+        agent_stats = db.execute(
+            "SELECT agent_id, COUNT(*) as messages, "
+            "SUM(CASE WHEN role='assistant' THEN 1 ELSE 0 END) as responses "
+            "FROM messages WHERE session_id IN "
+            "(SELECT id FROM sessions WHERE mission_run_id=?) "
+            "GROUP BY agent_id ORDER BY messages DESC",
+            (mission_id,),
+        ).fetchall()
+
+        # Phase timing
+        phases = db.execute(
+            "SELECT phase_id, status, started_at, completed_at FROM sessions "
+            "WHERE mission_run_id=? ORDER BY created_at",
+            (mission_id,),
+        ).fetchall()
+
+        # Screenshots count
+        from ...missions.store import get_mission_run_store
+
+        store = get_mission_run_store()
+        mission = store.get(mission_id)
+        screenshot_count = 0
+        if mission and mission.workspace_path:
+            ws = Path(mission.workspace_path)
+            ss_dir = ws / "screenshots"
+            if ss_dir.exists():
+                screenshot_count = len(list(ss_dir.glob("*.png")))
+
+        # Tickets count
+        tickets = db.execute(
+            "SELECT status, COUNT(*) as cnt FROM support_tickets "
+            "WHERE mission_id=? GROUP BY status",
+            (mission_id,),
+        ).fetchall()
+
+        total_tools = sum(r["total"] for r in tool_stats)
+        ok_tools = sum(r["ok"] for r in tool_stats)
+
+        return JSONResponse(
+            {
+                "mission_id": mission_id,
+                "tools": {
+                    "total": total_tools,
+                    "success": ok_tools,
+                    "rate": round(ok_tools / total_tools * 100, 1) if total_tools else 0,
+                    "by_tool": [
+                        {"name": r["tool_name"], "total": r["total"], "ok": r["ok"]}
+                        for r in tool_stats
+                    ],
+                },
+                "agents": [
+                    {"id": r["agent_id"], "messages": r["messages"], "responses": r["responses"]}
+                    for r in agent_stats
+                ],
+                "phases": [{"id": r["phase_id"], "status": r["status"]} for r in phases],
+                "screenshots": screenshot_count,
+                "tickets": {r["status"]: r["cnt"] for r in tickets},
+            }
+        )
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        db.close()
+
 
 import hashlib
 import hmac
@@ -1753,6 +2297,7 @@ async def github_webhook(request: Request):
         return JSONResponse({"ok": True, "event": "ping"})
 
     from ...db.connection import get_db
+
     db = get_db()
     now = datetime.utcnow().isoformat()
 
@@ -1764,12 +2309,18 @@ async def github_webhook(request: Request):
             mid = str(uuid.uuid4())[:8]
             db.execute(
                 "INSERT INTO missions (id, name, project_id, type, status, description, created_at) VALUES (?, ?, ?, 'feature', 'planning', ?, ?)",
-                (mid, f"Build: {repo}@{branch}", repo, f"{len(commits)} commit(s) pushed to {branch}", now),
+                (
+                    mid,
+                    f"Build: {repo}@{branch}",
+                    repo,
+                    f"{len(commits)} commit(s) pushed to {branch}",
+                    now,
+                ),
             )
             db.commit()
             return JSONResponse({"ok": True, "event": "push", "mission_id": mid})
 
-        elif event == "pull_request":
+        if event == "pull_request":
             action = payload.get("action", "")
             pr = payload.get("pull_request", {})
             repo = payload.get("repository", {}).get("full_name", "unknown")
@@ -1777,10 +2328,18 @@ async def github_webhook(request: Request):
                 mid = str(uuid.uuid4())[:8]
                 db.execute(
                     "INSERT INTO missions (id, name, project_id, type, status, description, created_at) VALUES (?, ?, ?, 'feature', 'in_review', ?, ?)",
-                    (mid, f"Review: PR #{pr.get('number')} {pr.get('title', '')}", repo, pr.get("body", "")[:500], now),
+                    (
+                        mid,
+                        f"Review: PR #{pr.get('number')} {pr.get('title', '')}",
+                        repo,
+                        pr.get("body", "")[:500],
+                        now,
+                    ),
                 )
                 db.commit()
-                return JSONResponse({"ok": True, "event": "pull_request", "action": action, "mission_id": mid})
+                return JSONResponse(
+                    {"ok": True, "event": "pull_request", "action": action, "mission_id": mid}
+                )
 
         elif event == "issues":
             action = payload.get("action", "")
@@ -1788,13 +2347,204 @@ async def github_webhook(request: Request):
             repo = payload.get("repository", {}).get("full_name", "unknown")
             if action == "opened":
                 mid = str(uuid.uuid4())[:8]
-                mtype = "bug" if any(l.get("name") == "bug" for l in issue.get("labels", [])) else "feature"
+                mtype = (
+                    "bug"
+                    if any(l.get("name") == "bug" for l in issue.get("labels", []))
+                    else "feature"
+                )
                 db.execute(
                     "INSERT INTO missions (id, name, project_id, type, status, description, created_at) VALUES (?, ?, ?, ?, 'planning', ?, ?)",
-                    (mid, f"Issue #{issue.get('number')}: {issue.get('title', '')}", repo, mtype, issue.get("body", "")[:500], now),
+                    (
+                        mid,
+                        f"Issue #{issue.get('number')}: {issue.get('title', '')}",
+                        repo,
+                        mtype,
+                        issue.get("body", "")[:500],
+                        now,
+                    ),
                 )
                 db.commit()
                 return JSONResponse({"ok": True, "event": "issues", "mission_id": mid})
+    finally:
+        db.close()
+
+
+# ── Custom AI Providers ──────────────────────────────────────────────────────
+@router.get("/api/ai-providers")
+async def list_ai_providers():
+    """List all custom AI providers."""
+    from ...db.migrations import get_db
+    
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, name, provider_type, base_url, default_model, enabled, created_at "
+            "FROM custom_ai_providers ORDER BY name"
+        ).fetchall()
+        providers = [dict(r) for r in rows]
+        return JSONResponse({"ok": True, "providers": providers})
+    finally:
+        db.close()
+
+
+@router.post("/api/ai-providers")
+async def create_ai_provider(request: Request):
+    """Create a new custom AI provider."""
+    import uuid
+    from cryptography.fernet import Fernet
+    from ...db.migrations import get_db
+    
+    body = await request.json()
+    name = body.get("name", "").strip()
+    provider_type = body.get("provider_type", "openai-compatible")
+    base_url = body.get("base_url", "").strip()
+    api_key = body.get("api_key", "").strip()
+    default_model = body.get("default_model", "").strip()
+    
+    if not all([name, base_url, api_key, default_model]):
+        return JSONResponse({"ok": False, "error": "Missing required fields"}, status_code=400)
+    
+    # Encrypt API key
+    encryption_key = os.environ.get("SF_ENCRYPTION_KEY")
+    if not encryption_key:
+        # Generate a key if not set (for development)
+        encryption_key = Fernet.generate_key().decode()
+        logger.warning("SF_ENCRYPTION_KEY not set, using temporary key (not secure for production)")
+    
+    fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
+    encrypted_key = fernet.encrypt(api_key.encode()).decode()
+    
+    provider_id = str(uuid.uuid4())[:12]
+    db = get_db()
+    try:
+        db.execute(
+            "INSERT INTO custom_ai_providers (id, name, provider_type, base_url, api_key_encrypted, default_model, enabled) "
+            "VALUES (?, ?, ?, ?, ?, ?, 1)",
+            (provider_id, name, provider_type, base_url, encrypted_key, default_model)
+        )
+        db.commit()
+        return JSONResponse({"ok": True, "id": provider_id})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    finally:
+        db.close()
+
+
+@router.patch("/api/ai-providers/{provider_id}")
+async def update_ai_provider(provider_id: str, request: Request):
+    """Update a custom AI provider."""
+    from cryptography.fernet import Fernet
+    from ...db.migrations import get_db
+    
+    body = await request.json()
+    db = get_db()
+    
+    try:
+        updates = []
+        params = []
+        
+        if "enabled" in body:
+            updates.append("enabled = ?")
+            params.append(1 if body["enabled"] else 0)
+        
+        if "name" in body:
+            updates.append("name = ?")
+            params.append(body["name"])
+        
+        if "base_url" in body:
+            updates.append("base_url = ?")
+            params.append(body["base_url"])
+        
+        if "default_model" in body:
+            updates.append("default_model = ?")
+            params.append(body["default_model"])
+        
+        if "api_key" in body and body["api_key"]:
+            encryption_key = os.environ.get("SF_ENCRYPTION_KEY")
+            if not encryption_key:
+                encryption_key = Fernet.generate_key().decode()
+            fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
+            encrypted_key = fernet.encrypt(body["api_key"].encode()).decode()
+            updates.append("api_key_encrypted = ?")
+            params.append(encrypted_key)
+        
+        if updates:
+            updates.append("updated_at = datetime('now')")
+            params.append(provider_id)
+            db.execute(
+                f"UPDATE custom_ai_providers SET {', '.join(updates)} WHERE id = ?",
+                params
+            )
+            db.commit()
+        
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    finally:
+        db.close()
+
+
+@router.delete("/api/ai-providers/{provider_id}")
+async def delete_ai_provider(provider_id: str):
+    """Delete a custom AI provider."""
+    from ...db.migrations import get_db
+    
+    db = get_db()
+    try:
+        db.execute("DELETE FROM custom_ai_providers WHERE id = ?", (provider_id,))
+        db.commit()
+        return JSONResponse({"ok": True})
+    finally:
+        db.close()
+
+
+@router.post("/api/ai-providers/{provider_id}/test")
+async def test_ai_provider(provider_id: str):
+    """Test connection to a custom AI provider."""
+    from cryptography.fernet import Fernet
+    import httpx
+    from ...db.migrations import get_db
+    
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT base_url, api_key_encrypted, default_model FROM custom_ai_providers WHERE id = ?",
+            (provider_id,)
+        ).fetchone()
+        
+        if not row:
+            return JSONResponse({"ok": False, "error": "Provider not found"}, status_code=404)
+        
+        base_url = row[0]
+        encrypted_key = row[1]
+        model = row[2]
+        
+        # Decrypt API key
+        encryption_key = os.environ.get("SF_ENCRYPTION_KEY")
+        if not encryption_key:
+            encryption_key = Fernet.generate_key().decode()
+        fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
+        api_key = fernet.decrypt(encrypted_key.encode()).decode()
+        
+        # Test API call
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                f"{base_url}/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": "test"}],
+                    "max_tokens": 5
+                }
+            )
+        
+        if response.status_code == 200:
+            return JSONResponse({"ok": True, "status": "connected"})
+        else:
+            return JSONResponse({"ok": False, "error": f"HTTP {response.status_code}"}, status_code=500)
+    
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
     finally:
         db.close()
 
@@ -1803,25 +2553,30 @@ async def github_webhook(request: Request):
 
 # ── Notification Configuration ────────────────────────────────────────────────
 
+
 @router.get("/api/notifications/status")
 async def notification_status():
     """Check notification configuration status."""
     from ...services.notification_service import get_notification_service
+
     svc = get_notification_service()
-    return JSONResponse({
-        "configured": svc.is_configured,
-        "channels": {
-            "slack": svc.has_slack,
-            "email": svc.has_email,
-            "webhook": svc.has_webhook,
-        },
-    })
+    return JSONResponse(
+        {
+            "configured": svc.is_configured,
+            "channels": {
+                "slack": svc.has_slack,
+                "email": svc.has_email,
+                "webhook": svc.has_webhook,
+            },
+        }
+    )
 
 
 @router.post("/api/notifications/test")
 async def notification_test():
     """Send a test notification to all configured channels."""
-    from ...services.notification_service import get_notification_service, NotificationPayload
+    from ...services.notification_service import NotificationPayload, get_notification_service
+
     svc = get_notification_service()
     if not svc.is_configured:
         return JSONResponse({"error": "No notification channels configured"}, status_code=400)
@@ -1832,6 +2587,13 @@ async def notification_test():
         severity="info",
     )
     await svc.notify(payload)
-    return JSONResponse({"ok": True, "channels": {
-        "slack": svc.has_slack, "email": svc.has_email, "webhook": svc.has_webhook,
-    }})
+    return JSONResponse(
+        {
+            "ok": True,
+            "channels": {
+                "slack": svc.has_slack,
+                "email": svc.has_email,
+                "webhook": svc.has_webhook,
+            },
+        }
+    )

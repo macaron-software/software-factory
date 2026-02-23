@@ -68,16 +68,14 @@ git clone https://github.com/org/project.git
 cd project
 npm install
 cp .env.example .env  # Edit with your values
-npm run dev
-` ``
+npm run dev ` ``
 
 ### Running Tests
 
 ` ``bash
 npm test           # Unit tests
 npm run test:e2e   # E2E tests
-npm run test:ci    # Full CI suite
-` ``
+npm run test:ci    # Full CI suite ` ``
 
 ## Architecture
 
@@ -88,8 +86,7 @@ src/
 ├── domain/        # Business logic
 ├── application/   # Use cases
 ├── infrastructure/# External integrations
-└── presentation/  # API layer
-` ``
+└── presentation/  # API layer ` ``
 
 ## API Documentation
 
@@ -98,12 +95,12 @@ See [API Reference](./docs/api.md) for details.
 
 ## Configuration
 
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `DATABASE_URL` | PostgreSQL connection string | - | Yes |
-| `REDIS_URL` | Redis connection string | `redis://localhost:6379` | No |
-| `PORT` | Server port | `3000` | No |
-| `LOG_LEVEL` | Logging level | `info` | No |
+| Variable       | Description                  | Default                  | Required |
+| -------------- | ---------------------------- | ------------------------ | -------- |
+| `DATABASE_URL` | PostgreSQL connection string | -                        | Yes      |
+| `REDIS_URL`    | Redis connection string      | `redis://localhost:6379` | No       |
+| `PORT`         | Server port                  | `3000`                   | No       |
+| `LOG_LEVEL`    | Logging level                | `info`                   | No       |
 
 ## Contributing
 
@@ -150,19 +147,19 @@ paths:
                   type: string
                   example: John Doe
       responses:
-        '201':
+        "201":
           description: User created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
-        '400':
+                $ref: "#/components/schemas/User"
+        "400":
           description: Validation error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '409':
+                $ref: "#/components/schemas/Error"
+        "409":
           description: Email already exists
 
 components:
@@ -210,24 +207,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - User registration with email verification (#123)
 
 ### Changed
+
 - Updated dashboard layout for better mobile experience (#456)
 
 ### Fixed
+
 - Fixed race condition in concurrent order processing (#789)
 
 ## [1.2.0] - 2024-01-15
 
 ### Added
+
 - Dark mode support
 - Export to CSV feature
 
 ### Deprecated
+
 - Legacy API v1 endpoints (will be removed in v2.0.0)
 
 ### Security
+
 - Updated dependencies to patch CVE-2024-XXXXX
 ```
 
@@ -237,42 +240,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # ADR-001: Use PostgreSQL as Primary Database
 
 ## Status
+
 Accepted (2024-01-15)
 
 ## Context
+
 We need a primary database for our application that handles:
+
 - Complex relational queries
 - ACID transactions
 - Full-text search
 - JSON document storage for flexible schemas
 
 ## Decision
+
 We will use PostgreSQL 16 as our primary database.
 
 ## Consequences
 
 ### Positive
+
 - Excellent support for complex queries and joins
 - JSONB support for semi-structured data
 - Strong community and ecosystem
 - Free and open source
 
 ### Negative
+
 - Horizontal scaling is more complex than NoSQL alternatives
 - Requires more operational expertise than managed NoSQL services
 
 ### Risks
+
 - If we need extreme write throughput, may need to add a message queue
   Mitigation: Design with eventual consistency where possible
 
 ## Alternatives Considered
 
 ### MongoDB
+
 - Pros: Flexible schema, easy horizontal scaling
 - Cons: Weaker consistency guarantees, less suitable for relational data
 - Rejected: Our data model is primarily relational
 
 ### DynamoDB
+
 - Pros: Fully managed, auto-scaling
 - Cons: Vendor lock-in, limited query flexibility
 - Rejected: Too restrictive for our query patterns
@@ -282,7 +294,7 @@ We will use PostgreSQL 16 as our primary database.
 
 #### TypeScript/JSDoc
 
-```typescript
+````typescript
 /**
  * Calculates the discount amount for an order based on the pricing tier.
  *
@@ -298,10 +310,10 @@ We will use PostgreSQL 16 as our primary database.
  * ```
  */
 export function calculateDiscount(amount: number, tier: DiscountTier): number {
-  if (amount < 0) throw new Error('Amount must be positive');
+  if (amount < 0) throw new Error("Amount must be positive");
   // ...
 }
-```
+````
 
 #### Python Docstrings
 

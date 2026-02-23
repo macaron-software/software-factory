@@ -132,6 +132,17 @@
             <span class="dora-card-level level-{% if dora.velocity.predictability_pct >= 80 %}elite{% elif dora.velocity.predictability_pct >= 60 %}high{% elif dora.velocity.predictability_pct >= 40 %}medium{% else %}low{% endif %}">{{ dora.velocity.predictability_pct }}% predictable</span>
         </div>
         {% endif %}
+
+        <!-- LLM Cost -->
+        {% if dora.llm_cost %}
+        <div class="dora-card">
+            <div class="dora-card-icon"><svg class="icon" style="color:var(--cyan)"><use href="#icon-cpu"/></svg></div>
+            <div class="dora-card-title">LLM Cost</div>
+            <div class="dora-card-value">${{ dora.llm_cost.total_cost_usd }}</div>
+            <div class="dora-card-detail">{{ dora.llm_cost.total_calls }} calls &middot; {{ (dora.llm_cost.total_tokens / 1000) | round(0) | int }}K tokens</div>
+            <span class="dora-card-level level-{% if dora.llm_cost.total_cost_usd < 5 %}elite{% elif dora.llm_cost.total_cost_usd < 20 %}high{% elif dora.llm_cost.total_cost_usd < 50 %}medium{% else %}low{% endif %}">{{ dora.llm_cost.by_model | length }} models</span>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Sparkline Trends -->
@@ -139,16 +150,20 @@
         <h4><svg class="icon icon-sm" style="vertical-align:-2px"><use href="#icon-trending-up"/></svg> Tendance — 12 dernières semaines</h4>
 
         <div class="dora-trend-row">
-            <span class="dora-trend-label">{{ _("ceremonies") }}</span>
+            <span class="dora-trend-label">Deploys</span>
             <div class="dora-sparkline" id="sparkDeploy"></div>
         </div>
         <div class="dora-trend-row">
-            <span class="dora-trend-label">{{ _("activity") }}</span>
+            <span class="dora-trend-label">Lead Time (h)</span>
             <div class="dora-sparkline" id="sparkLeadTime"></div>
         </div>
         <div class="dora-trend-row">
-            <span class="dora-trend-label">{{ _("failure") }}</span>
+            <span class="dora-trend-label">Incidents</span>
             <div class="dora-sparkline" id="sparkFailure"></div>
+        </div>
+        <div class="dora-trend-row">
+            <span class="dora-trend-label">MTTR (h)</span>
+            <div class="dora-sparkline" id="sparkMTTR"></div>
         </div>
     </div>
 
@@ -214,6 +229,7 @@ function renderSparkline(containerId, data, color) {
 renderSparkline('sparkDeploy', trend.deploy, '#16a34a');
 renderSparkline('sparkLeadTime', trend.lead_time, '#3b82f6');
 renderSparkline('sparkFailure', trend.failure, '#dc2626');
+renderSparkline('sparkMTTR', trend.mttr, '#d29922');
 
 // Deployment + Lead Time dual-axis chart
 if (trend.deploy && trend.deploy.length > 0) {

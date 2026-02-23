@@ -39,10 +39,10 @@
             <div class="mc-result-header">
                 <span style="font-size:0.7rem;color:var(--green);font-weight:700">{{ _("resultat") }}</span>
                 {% if result_project_type %}
-                <span style="font-size:0.65rem;background:var(--bg-tertiary);color:var(--purple-light);padding:2px 8px;border-radius:10px;border:1px solid var(--border)">{{ {'macos-native':'🖥️ macOS','ios-native':'📱 iOS','android-native':'🤖 Android','web-docker':'🐳 Docker','web-node':'⬢ Node.js','web-static':'🌐 Static'}.get(result_project_type, result_project_type) }}</span>
+                <span style="font-size:0.65rem;background:var(--bg-tertiary);color:var(--purple-light);padding:2px 8px;border-radius:10px;border:1px solid var(--border)">{{ {'macos-native':'🖥️ macOS','ios-native':'📱 iOS','android-native':'🤖 Android','web-docker':'🐳 Docker','web-node':'⬢ Node.js','web-static':'Static'}.get(result_project_type, result_project_type) }}</span>
                 {% endif %}
                 {% if result_deploy_url %}
-                <a href="{{ result_deploy_url }}" target="_blank" class="mc-result-link">🌐 {{ result_deploy_url }}</a>
+                <a href="{{ result_deploy_url }}" target="_blank" class="mc-result-link">{{ result_deploy_url }}</a>
                 {% endif %}
                 {% if result_launch_cmd %}
                 <code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_launch_cmd }}" title="▶ Cliquer pour exécuter" style="color:var(--green);border-color:var(--green);cursor:pointer">🚀 {{ result_launch_cmd }}</code>

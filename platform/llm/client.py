@@ -8,6 +8,7 @@ All providers use OpenAI-compatible chat/completions API:
 
 Streaming supported via SSE (text/event-stream).
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -17,10 +18,10 @@ import os
 import sqlite3
 import time
 import uuid
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import AsyncIterator, Optional
 
 import httpx
 
@@ -39,7 +40,9 @@ _PROVIDERS = {
     },
     "azure-ai": {
         "name": "Azure AI Foundry (GPT-5.2)",
-        "base_url": os.environ.get("AZURE_AI_ENDPOINT", "https://swedencentral.api.cognitive.microsoft.com").rstrip("/"),
+        "base_url": os.environ.get(
+            "AZURE_AI_ENDPOINT", "https://swedencentral.api.cognitive.microsoft.com"
+        ).rstrip("/"),
         "key_env": "AZURE_AI_API_KEY",
         "models": ["gpt-5.2"],
         "default": "gpt-5.2",
@@ -51,7 +54,9 @@ _PROVIDERS = {
     },
     "azure-openai": {
         "name": "Azure OpenAI (GPT-5-mini)",
-        "base_url": os.environ.get("AZURE_OPENAI_ENDPOINT", "https://ascii-ui-openai.openai.azure.com").rstrip("/"),
+        "base_url": os.environ.get(
+            "AZURE_OPENAI_ENDPOINT", "https://ascii-ui-openai.openai.azure.com"
+        ).rstrip("/"),
         "key_env": "AZURE_OPENAI_API_KEY",
         "models": ["gpt-5-mini"],
         "default": "gpt-5-mini",
@@ -90,7 +95,9 @@ elif _is_azure:
     # Azure prod: only azure-openai, no minimax/nvidia
     _FALLBACK_CHAIN = ["azure-openai"]
 else:
-    _FALLBACK_CHAIN = [_primary] + [p for p in ["minimax", "azure-openai", "azure-ai"] if p != _primary]
+    _FALLBACK_CHAIN = [_primary] + [
+        p for p in ["minimax", "azure-openai", "azure-ai"] if p != _primary
+    ]
 
 
 class _RateLimiter:
@@ -121,7 +128,9 @@ class _RateLimiter:
                 # Calculate wait time until oldest request exits the window
                 wait = self._timestamps[0] - cutoff
             if time.monotonic() + wait > deadline:
-                raise TimeoutError(f"Rate limiter: waited {timeout}s, still at capacity ({self._max} req/{self._window}s)")
+                raise TimeoutError(
+                    f"Rate limiter: waited {timeout}s, still at capacity ({self._max} req/{self._window}s)"
+                )
             await asyncio.sleep(min(wait + 0.1, 5.0))
 
     @property
@@ -143,9 +152,9 @@ _rate_limiter = _RateLimiter(
 class LLMMessage:
     role: str  # system | user | assistant | tool
     content: str
-    name: Optional[str] = None
-    tool_call_id: Optional[str] = None  # for role=tool responses
-    tool_calls: Optional[list[dict]] = None  # for assistant tool_calls
+    name: str | None = None
+    tool_call_id: str | None = None  # for role=tool responses
+    tool_calls: list[dict] | None = None  # for assistant tool_calls
 
 
 @dataclass
@@ -177,12 +186,12 @@ class LLMStreamChunk:
 
 # Cost estimation: $/1M tokens (input, output) per model
 _MODEL_PRICING: dict[str, tuple[float, float]] = {
-    "gpt-5.2":       (2.50, 10.00),
-    "gpt-5-mini":    (0.40,  1.60),
-    "kimi-k2":       (0.60,  2.40),
-    "m1":            (0.50,  2.00),
-    "m2.5":          (0.50,  2.00),
-    "demo":          (0.00,  0.00),
+    "gpt-5.2": (2.50, 10.00),
+    "gpt-5-mini": (0.40, 1.60),
+    "kimi-k2": (0.60, 2.40),
+    "m1": (0.50, 2.00),
+    "m2.5": (0.50, 2.00),
+    "demo": (0.00, 0.00),
 }
 _DEFAULT_PRICING = (1.00, 4.00)  # fallback for unknown models
 
@@ -198,7 +207,7 @@ class LLMClient:
     CB_OPEN_DURATION = 120  # seconds — how long circuit stays open
 
     def __init__(self):
-        self._http: Optional[httpx.AsyncClient] = None
+        self._http: httpx.AsyncClient | None = None
         self._stats = {"calls": 0, "tokens_in": 0, "tokens_out": 0, "errors": 0}
         self._usage_table_ready = False
         # Cooldown: provider → timestamp when it becomes available again
@@ -220,8 +229,13 @@ class LLMClient:
         if len(self._cb_failures[provider]) >= self.CB_FAIL_THRESHOLD:
             self._cb_open_until[provider] = now + self.CB_OPEN_DURATION
             self._cb_failures[provider] = []
-            logger.error("Circuit breaker OPEN for %s (%d failures in %ds) — blocked for %ds",
-                        provider, self.CB_FAIL_THRESHOLD, self.CB_WINDOW, self.CB_OPEN_DURATION)
+            logger.error(
+                "Circuit breaker OPEN for %s (%d failures in %ds) — blocked for %ds",
+                provider,
+                self.CB_FAIL_THRESHOLD,
+                self.CB_WINDOW,
+                self.CB_OPEN_DURATION,
+            )
 
     def _cb_record_success(self, provider: str):
         """Reset failures on success (half-open → closed)."""
@@ -285,11 +299,15 @@ class LLMClient:
         elif any(k in lower for k in ["security", "cve", "vulnerab"]):
             content = "Security audit complete. Found 2 medium-severity issues: 1) Missing rate limiting on auth endpoint, 2) SQL injection risk in search query. Both have been patched."
         else:
-            content = f"Task acknowledged. I've analyzed the request and prepared an implementation plan. The work is broken down into 3 phases: analysis, implementation, and validation. Proceeding with phase 1."
+            content = "Task acknowledged. I've analyzed the request and prepared an implementation plan. The work is broken down into 3 phases: analysis, implementation, and validation. Proceeding with phase 1."
         return LLMResponse(
-            content=content, model="demo", provider="demo",
-            tokens_in=len(last) // 4, tokens_out=len(content) // 4,
-            duration_ms=50, finish_reason="stop",
+            content=content,
+            model="demo",
+            provider="demo",
+            tokens_in=len(last) // 4,
+            tokens_out=len(content) // 4,
+            duration_ms=50,
+            finish_reason="stop",
         )
 
     def _build_url(self, pcfg: dict, model: str) -> str:
@@ -316,7 +334,7 @@ class LLMClient:
         temperature: float = 0.7,
         max_tokens: int = 4096,
         system_prompt: str = "",
-        tools: Optional[list[dict]] = None,
+        tools: list[dict] | None = None,
     ) -> LLMResponse:
         """Send a chat completion request. Falls back to next provider on failure."""
         if _is_azure:
@@ -334,7 +352,9 @@ class LLMClient:
             cooldown_until = self._provider_cooldown.get(prov, 0)
             if cooldown_until > now:
                 remaining = int(cooldown_until - now)
-                logger.warning("LLM %s in cooldown (%ds left), skipping → fallback", prov, remaining)
+                logger.warning(
+                    "LLM %s in cooldown (%ds left), skipping → fallback", prov, remaining
+                )
                 continue
 
             # Skip providers with open circuit breaker
@@ -353,25 +373,46 @@ class LLMClient:
             if prov == "demo":
                 return self._demo_response(messages)
 
-            use_model = model if (prov == provider and model and model in pcfg.get("models", [])) else pcfg["default"]
+            use_model = (
+                model
+                if (prov == provider and model and model in pcfg.get("models", []))
+                else pcfg["default"]
+            )
 
             # Rate limiter: queue until a slot is available
             try:
                 await _rate_limiter.acquire(timeout=180.0)
             except TimeoutError:
-                logger.error("LLM rate limiter timeout (180s) — queue full (%s)", _rate_limiter.usage)
+                logger.error(
+                    "LLM rate limiter timeout (180s) — queue full (%s)", _rate_limiter.usage
+                )
                 continue
 
             logger.warning("LLM trying %s/%s ... [rate: %s]", prov, use_model, _rate_limiter.usage)
             last_exc = None
-            max_attempts = 5  # More retries for rate limits (with backoff)
+            max_attempts = 3  # Retry within provider, then fall back to next
             for attempt in range(max_attempts):
                 try:
-                    result = await self._do_chat(pcfg, prov, use_model, messages, temperature, max_tokens, system_prompt, tools)
+                    result = await self._do_chat(
+                        pcfg,
+                        prov,
+                        use_model,
+                        messages,
+                        temperature,
+                        max_tokens,
+                        system_prompt,
+                        tools,
+                    )
                     self._stats["calls"] += 1
                     self._stats["tokens_in"] += result.tokens_in
                     self._stats["tokens_out"] += result.tokens_out
-                    logger.warning("LLM %s/%s OK (%d in, %d out tokens)", prov, use_model, result.tokens_in, result.tokens_out)
+                    logger.warning(
+                        "LLM %s/%s OK (%d in, %d out tokens)",
+                        prov,
+                        use_model,
+                        result.tokens_in,
+                        result.tokens_out,
+                    )
                     self._cb_record_success(prov)
                     # Trace for observability
                     self._trace(result, messages)
@@ -381,33 +422,60 @@ class LLMClient:
                     last_exc = exc
                     err_str = repr(exc)
                     is_rate_limit = "429" in err_str or "RateLimitReached" in err_str
-                    is_transient = "ReadError" in err_str or "ConnectError" in err_str or "RemoteProtocolError" in err_str
+                    is_transient = (
+                        "ReadError" in err_str
+                        or "ConnectError" in err_str
+                        or "RemoteProtocolError" in err_str
+                    )
                     if attempt < max_attempts - 1 and (is_transient or is_rate_limit):
                         import random
+
                         # Exponential backoff with jitter: 10s, 20s, 40s, 80s
-                        base = (2 ** attempt) * (10 if is_rate_limit else 3)
+                        base = (2**attempt) * (10 if is_rate_limit else 3)
                         jitter = random.uniform(0, base * 0.3)
                         delay = min(base + jitter, 90)
-                        logger.warning("LLM %s/%s %s (attempt %d/%d): %s — retrying in %ds",
-                                       prov, use_model, "rate-limited" if is_rate_limit else "transient",
-                                       attempt + 1, max_attempts, err_str[:120], int(delay))
+                        logger.warning(
+                            "LLM %s/%s %s (attempt %d/%d): %s — retrying in %ds",
+                            prov,
+                            use_model,
+                            "rate-limited" if is_rate_limit else "transient",
+                            attempt + 1,
+                            max_attempts,
+                            err_str[:120],
+                            int(delay),
+                        )
                         await asyncio.sleep(delay)
                         continue
-                    logger.warning("LLM %s/%s failed after %d attempts: %s", prov, use_model, attempt + 1, err_str[:200])
+                    logger.warning(
+                        "LLM %s/%s failed after %d attempts: %s",
+                        prov,
+                        use_model,
+                        attempt + 1,
+                        err_str[:200],
+                    )
                     self._stats["errors"] += 1
                     self._cb_record_failure(prov)
                     await self._persist_usage(prov, use_model, 0, 0, error=True)
                     if is_rate_limit:
-                        self._provider_cooldown[prov] = time.monotonic() + 30
-                        logger.warning("LLM %s → cooldown 30s (rate limited)", prov)
+                        self._provider_cooldown[prov] = time.monotonic() + 90
+                        logger.warning(
+                            "LLM %s → cooldown 90s (rate limited), falling back to next provider",
+                            prov,
+                        )
                 continue
 
         raise RuntimeError(f"All LLM providers failed for {provider}/{model}")
 
     async def _do_chat(
-        self, pcfg: dict, provider: str, model: str,
-        messages: list[LLMMessage], temperature: float, max_tokens: int,
-        system_prompt: str, tools: Optional[list[dict]] = None,
+        self,
+        pcfg: dict,
+        provider: str,
+        model: str,
+        messages: list[LLMMessage],
+        temperature: float,
+        max_tokens: int,
+        system_prompt: str,
+        tools: list[dict] | None = None,
     ) -> LLMResponse:
         http = await self._get_http()
         url = self._build_url(pcfg, model)
@@ -470,15 +538,22 @@ class LLMClient:
 
         # Retry loop for 429 rate limits (3 attempts with exponential backoff)
         import random
+
         for attempt in range(3):
             resp = await http.post(url, json=body, headers=headers)
             if resp.status_code != 429:
                 break
-            retry_after = int(resp.headers.get("Retry-After", (2 ** attempt) * 10))
+            retry_after = int(resp.headers.get("Retry-After", (2**attempt) * 10))
             retry_after = max(retry_after, 10)
             retry_after = min(retry_after + random.randint(0, 5), 90)
-            logger.warning("LLM %s/%s rate-limited (429), retry in %ds (attempt %d/3) [rate: %s]",
-                           provider, model, retry_after, attempt + 1, _rate_limiter.usage)
+            logger.warning(
+                "LLM %s/%s rate-limited (429), retry in %ds (attempt %d/3) [rate: %s]",
+                provider,
+                model,
+                retry_after,
+                attempt + 1,
+                _rate_limiter.usage,
+            )
             await asyncio.sleep(retry_after)
 
         elapsed = int((time.monotonic() - t0) * 1000)
@@ -517,11 +592,13 @@ class LLMClient:
                 args = json.loads(fn.get("arguments", "{}"))
             except (json.JSONDecodeError, TypeError):
                 args = {}
-            parsed_tool_calls.append(LLMToolCall(
-                id=tc.get("id", ""),
-                function_name=fn.get("name", ""),
-                arguments=args,
-            ))
+            parsed_tool_calls.append(
+                LLMToolCall(
+                    id=tc.get("id", ""),
+                    function_name=fn.get("name", ""),
+                    arguments=args,
+                )
+            )
 
         usage = data.get("usage", {})
         return LLMResponse(
@@ -573,7 +650,11 @@ class LLMClient:
                     await asyncio.sleep(0.02)
                 yield LLMStreamChunk(delta="", done=True, model="demo", finish_reason="stop")
                 return
-            use_model = model if (prov == provider and model and model in pcfg.get("models", [])) else pcfg["default"]
+            use_model = (
+                model
+                if (prov == provider and model and model in pcfg.get("models", []))
+                else pcfg["default"]
+            )
 
             # Rate limiter: queue until a slot is available
             try:
@@ -585,22 +666,48 @@ class LLMClient:
             max_attempts = 4
             for attempt in range(max_attempts):
                 try:
-                    async for chunk in self._do_stream(pcfg, prov, use_model, messages, temperature, max_tokens, system_prompt):
+                    async for chunk in self._do_stream(
+                        pcfg, prov, use_model, messages, temperature, max_tokens, system_prompt
+                    ):
                         yield chunk
                     self._cb_record_success(prov)
                     return
                 except Exception as exc:
                     err_str = repr(exc)
                     is_rate_limit = "429" in err_str or "RateLimitReached" in err_str
+<<<<<<< HEAD:platform/llm/client.py
                     is_transient = "ReadError" in err_str or "ConnectError" in err_str or "RemoteProtocolError" in err_str or "ServerDisconnected" in err_str
                     if attempt < max_attempts - 1 and (is_rate_limit or is_transient):
                         import random
                         delay = min((2 ** attempt) * 10 + random.uniform(0, 5), 90)
                         logger.warning("LLM stream %s/%s %s (attempt %d/%d) — retrying in %ds",
                                        prov, use_model, "rate-limited" if is_rate_limit else "transient error", attempt + 1, max_attempts, int(delay))
+=======
+                    is_transient = (
+                        "ReadError" in err_str
+                        or "ConnectError" in err_str
+                        or "RemoteProtocolError" in err_str
+                        or "ServerDisconnected" in err_str
+                    )
+                    if attempt < max_attempts - 1 and (is_rate_limit or is_transient):
+                        import random
+
+                        delay = min((2**attempt) * 10 + random.uniform(0, 5), 90)
+                        logger.warning(
+                            "LLM stream %s/%s %s (attempt %d/%d) — retrying in %ds",
+                            prov,
+                            use_model,
+                            "rate-limited" if is_rate_limit else "transient error",
+                            attempt + 1,
+                            max_attempts,
+                            int(delay),
+                        )
+>>>>>>> origin/master:_SOFTWARE_FACTORY/platform/llm/client.py
                         await asyncio.sleep(delay)
                         continue
-                    logger.warning("LLM stream %s/%s failed: %s — trying next", prov, use_model, err_str[:200])
+                    logger.warning(
+                        "LLM stream %s/%s failed: %s — trying next", prov, use_model, err_str[:200]
+                    )
                     self._cb_record_failure(prov)
                     if is_rate_limit:
                         self._provider_cooldown[prov] = time.monotonic() + 30
@@ -610,9 +717,12 @@ class LLMClient:
 
     async def _do_stream(
         self,
-        pcfg: dict, provider: str, model: str,
+        pcfg: dict,
+        provider: str,
+        model: str,
         messages: list[LLMMessage],
-        temperature: float, max_tokens: int,
+        temperature: float,
+        max_tokens: int,
         system_prompt: str,
     ) -> AsyncIterator[LLMStreamChunk]:
         """Single-provider streaming attempt."""
@@ -631,7 +741,11 @@ class LLMClient:
                 # MiniMax rejects system role in streaming
                 if d["role"] == "system":
                     if not msgs:
-                        sys_content = (sys_content + "\n\n" + d["content"]).strip() if sys_content else d["content"]
+                        sys_content = (
+                            (sys_content + "\n\n" + d["content"]).strip()
+                            if sys_content
+                            else d["content"]
+                        )
                     else:
                         d["role"] = "user"
                         d["content"] = f"[System instruction]: {d['content']}"
@@ -654,7 +768,9 @@ class LLMClient:
             if provider == "minimax":
                 for i, m in enumerate(msgs):
                     if m["role"] == "user":
-                        msgs[i]["content"] = f"[System instructions]:\n{sys_content}\n\n[User message]:\n{m['content']}"
+                        msgs[i]["content"] = (
+                            f"[System instructions]:\n{sys_content}\n\n[User message]:\n{m['content']}"
+                        )
                         break
                 else:
                     msgs.insert(0, {"role": "user", "content": sys_content})
@@ -679,7 +795,9 @@ class LLMClient:
             body["temperature"] = temperature
 
         # Use a separate client for streaming to avoid blocking the shared client
-        stream_http = httpx.AsyncClient(timeout=httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0))
+        stream_http = httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0)
+        )
         try:
             async with stream_http.stream("POST", url, json=body, headers=headers) as resp:
                 if resp.status_code != 200:
@@ -704,7 +822,9 @@ class LLMClient:
                         if content:
                             yield LLMStreamChunk(delta=content, model=model)
                         if finish:
-                            yield LLMStreamChunk(delta="", done=True, model=model, finish_reason=finish)
+                            yield LLMStreamChunk(
+                                delta="", done=True, model=model, finish_reason=finish
+                            )
                             return  # MiniMax doesn't send [DONE], exit on finish_reason
                     except json.JSONDecodeError:
                         continue
@@ -713,17 +833,24 @@ class LLMClient:
 
     def set_trace_context(self, agent_id: str = "", session_id: str = "", mission_id: str = ""):
         """Set context for observability tracing on subsequent calls."""
-        self._trace_context = {"agent_id": agent_id, "session_id": session_id, "mission_id": mission_id}
+        self._trace_context = {
+            "agent_id": agent_id,
+            "session_id": session_id,
+            "mission_id": mission_id,
+        }
 
     def _trace(self, result: LLMResponse, messages: list[LLMMessage]):
         """Record LLM call in observability store."""
         try:
             from .observability import get_tracer
+
             ctx = self._trace_context
             input_preview = ""
             if messages:
                 last = messages[-1]
-                input_preview = (last.content if isinstance(last, LLMMessage) else last.get("content", ""))[:200]
+                input_preview = (
+                    last.content if isinstance(last, LLMMessage) else last.get("content", "")
+                )[:200]
             get_tracer().trace_call(
                 provider=result.provider,
                 model=result.model,
@@ -745,14 +872,16 @@ class LLMClient:
         for pid, pcfg in _PROVIDERS.items():
             key = self._get_api_key(pcfg)
             has_key = bool(key and key != "no-key") or not pcfg.get("key_env")
-            result.append({
-                "id": pid,
-                "name": pcfg["name"],
-                "models": pcfg["models"],
-                "default": pcfg["default"],
-                "enabled": has_key,
-                "has_key": has_key,
-            })
+            result.append(
+                {
+                    "id": pid,
+                    "name": pcfg["name"],
+                    "models": pcfg["models"],
+                    "default": pcfg["default"],
+                    "enabled": has_key,
+                    "has_key": has_key,
+                }
+            )
         return result
 
     # ── LLM usage persistence ──────────────────────────────────────
@@ -788,7 +917,12 @@ class LLMClient:
         return (tokens_in * price_in + tokens_out * price_out) / 1_000_000
 
     async def _persist_usage(
-        self, provider: str, model: str, tokens_in: int, tokens_out: int, error: bool = False,
+        self,
+        provider: str,
+        model: str,
+        tokens_in: int,
+        tokens_out: int,
+        error: bool = False,
     ):
         """Insert a usage row into the llm_usage SQLite table (non-blocking)."""
         try:
@@ -826,6 +960,7 @@ class LLMClient:
 
     async def aggregate_usage(self, days: int = 7) -> dict:
         """Return cost/day, cost/phase, cost/agent breakdowns for the last N days."""
+
         def _query():
             self._ensure_usage_table()
             conn = sqlite3.connect(str(_USAGE_DB_PATH))
@@ -850,19 +985,33 @@ class LLMClient:
                 return {
                     "days": days,
                     "total": {
-                        "cost": totals[0] or 0, "tokens_in": totals[1] or 0,
-                        "tokens_out": totals[2] or 0, "calls": totals[3] or 0, "errors": totals[4] or 0,
+                        "cost": totals[0] or 0,
+                        "tokens_in": totals[1] or 0,
+                        "tokens_out": totals[2] or 0,
+                        "calls": totals[3] or 0,
+                        "errors": totals[4] or 0,
                     },
                     "by_day": [
-                        {"day": r[0], "cost": r[1], "tokens_in": r[2], "tokens_out": r[3], "calls": r[4]}
+                        {
+                            "day": r[0],
+                            "cost": r[1],
+                            "tokens_in": r[2],
+                            "tokens_out": r[3],
+                            "calls": r[4],
+                        }
                         for r in by_day
                     ],
                     "by_phase": [
-                        {"phase": r[0] or "(none)", "cost": r[1], "calls": r[2]}
-                        for r in by_phase
+                        {"phase": r[0] or "(none)", "cost": r[1], "calls": r[2]} for r in by_phase
                     ],
                     "by_agent": [
-                        {"agent_id": r[0] or "(none)", "cost": r[1], "tokens_in": r[2], "tokens_out": r[3], "calls": r[4]}
+                        {
+                            "agent_id": r[0] or "(none)",
+                            "cost": r[1],
+                            "tokens_in": r[2],
+                            "tokens_out": r[3],
+                            "calls": r[4],
+                        }
                         for r in by_agent
                     ],
                 }
@@ -879,7 +1028,7 @@ class LLMClient:
 
 
 # Singleton
-_client: Optional[LLMClient] = None
+_client: LLMClient | None = None
 
 
 def get_llm_client() -> LLMClient:

@@ -673,7 +673,7 @@ async function refresh() {
         if (d.docker && d.docker.length > 0) {
             dockerEl.innerHTML = d.docker.map(c => {
                 const up = c.state === 'running';
-                const dot = up ? '🟢' : (c.state === 'exited' ? '🔴' : '🟡');
+                const dot = up ? '<span style="color:#22c55e">●</span>' : (c.state === 'exited' ? '<span style="color:#ef4444">●</span>' : '<span style="color:#eab308">●</span>');
                 const memPct = (c.mem_limit_mb > 0) ? Math.round(c.mem_mb / c.mem_limit_mb * 100) : 0;
                 const memBar = c.mem_limit_mb > 0 ? `<div style="background:var(--bg-tertiary,#1a1730);border-radius:3px;height:4px;width:60px;margin-top:2px"><div style="background:${memPct>80?'var(--red,#ef4444)':memPct>50?'var(--yellow,#eab308)':'var(--green,#22c55e)'};height:4px;border-radius:3px;width:${Math.min(memPct,100)}%"></div></div>` : '';
                 const cpuColor = c.cpu_pct > 80 ? 'var(--red,#ef4444)' : c.cpu_pct > 40 ? 'var(--yellow,#eab308)' : 'var(--green,#22c55e)';

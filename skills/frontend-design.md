@@ -50,20 +50,20 @@ creates emotion, space creates rhythm, and motion creates delight.
 ```css
 /* Define a type scale — don't use arbitrary sizes */
 :root {
-  --font-display: 'Cal Sans', 'Inter', system-ui, sans-serif;
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-display: "Cal Sans", "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
 
   /* Modular scale (ratio: 1.25) */
-  --text-xs: 0.75rem;    /* 12px */
-  --text-sm: 0.875rem;   /* 14px */
-  --text-base: 1rem;     /* 16px */
-  --text-lg: 1.25rem;    /* 20px */
-  --text-xl: 1.563rem;   /* 25px */
-  --text-2xl: 1.953rem;  /* 31px */
-  --text-3xl: 2.441rem;  /* 39px */
-  --text-4xl: 3.052rem;  /* 49px */
-  --text-5xl: 3.815rem;  /* 61px */
+  --text-xs: 0.75rem; /* 12px */
+  --text-sm: 0.875rem; /* 14px */
+  --text-base: 1rem; /* 16px */
+  --text-lg: 1.25rem; /* 20px */
+  --text-xl: 1.563rem; /* 25px */
+  --text-2xl: 1.953rem; /* 31px */
+  --text-3xl: 2.441rem; /* 39px */
+  --text-4xl: 3.052rem; /* 49px */
+  --text-5xl: 3.815rem; /* 61px */
 
   /* Line heights */
   --leading-tight: 1.15;
@@ -118,16 +118,16 @@ h1 {
 ```css
 :root {
   /* 4px base unit — all spacing derives from this */
-  --space-1: 0.25rem;  /* 4px */
-  --space-2: 0.5rem;   /* 8px */
-  --space-3: 0.75rem;  /* 12px */
-  --space-4: 1rem;     /* 16px */
-  --space-6: 1.5rem;   /* 24px */
-  --space-8: 2rem;     /* 32px */
-  --space-12: 3rem;    /* 48px */
-  --space-16: 4rem;    /* 64px */
-  --space-24: 6rem;    /* 96px */
-  --space-32: 8rem;    /* 128px */
+  --space-1: 0.25rem; /* 4px */
+  --space-2: 0.5rem; /* 8px */
+  --space-3: 0.75rem; /* 12px */
+  --space-4: 1rem; /* 16px */
+  --space-6: 1.5rem; /* 24px */
+  --space-8: 2rem; /* 32px */
+  --space-12: 3rem; /* 48px */
+  --space-16: 4rem; /* 64px */
+  --space-24: 6rem; /* 96px */
+  --space-32: 8rem; /* 128px */
 }
 
 /* Use generous spacing for premium feel */
@@ -174,14 +174,21 @@ h1 {
 }
 
 /* Stagger children */
-.card:nth-child(1) { animation-delay: 0ms; }
-.card:nth-child(2) { animation-delay: 100ms; }
-.card:nth-child(3) { animation-delay: 200ms; }
+.card:nth-child(1) {
+  animation-delay: 0ms;
+}
+.card:nth-child(2) {
+  animation-delay: 100ms;
+}
+.card:nth-child(3) {
+  animation-delay: 200ms;
+}
 
 /* Hover micro-interactions */
 .card {
-  transition: transform var(--duration-normal) var(--ease-out),
-              box-shadow var(--duration-normal) var(--ease-out);
+  transition:
+    transform var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out);
 }
 
 .card:hover {
@@ -202,12 +209,12 @@ h1 {
   <div class="hero-content">
     <span class="hero-badge">✨ Now in Beta</span>
     <h1 class="hero-title">
-      Build something<br>
+      Build something<br />
       <span class="gradient-text">extraordinary</span>
     </h1>
     <p class="hero-subtitle">
-      The developer platform that makes shipping delightful.
-      Focus on what matters — we handle the rest.
+      The developer platform that makes shipping delightful. Focus on what matters — we handle the
+      rest.
     </p>
     <div class="hero-actions">
       <button class="btn btn-primary btn-lg">Get Started Free</button>
@@ -217,18 +224,19 @@ h1 {
 </section>
 
 <style>
-.gradient-text {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
+  .gradient-text {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
 </style>
 ```
 
 ### Design Checklist
 
 Before shipping any design:
+
 - [ ] Typography scale is consistent (no arbitrary sizes)
 - [ ] Color palette has max 3-4 hues (not a rainbow)
 - [ ] Spacing follows the scale (no magic numbers)
@@ -240,6 +248,7 @@ Before shipping any design:
 ## Output Format
 
 When creating a design, provide:
+
 1. Visual concept (one sentence describing the aesthetic direction)
 2. Token definitions (colors, typography, spacing)
 3. HTML structure

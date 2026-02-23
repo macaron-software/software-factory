@@ -61,14 +61,14 @@ solaris_validation(component: "button")
 
 For each component, verify:
 
-| Property | Figma Spec | Code Value | Token | Match? |
-|----------|-----------|------------|-------|--------|
-| padding-x | 16px | var(--space-4) | ✅ | ✅ |
-| padding-y | 8px | 10px | ❌ hardcoded | ❌ |
-| border-radius | 8px | var(--radius-md) | ✅ | ✅ |
-| font-size | 14px | var(--text-sm) | ✅ | ✅ |
-| color | #3B82F6 | var(--color-primary) | ✅ | ✅ |
-| shadow | 0 4px 6px | none | ❌ missing | ❌ |
+| Property      | Figma Spec | Code Value           | Token        | Match? |
+| ------------- | ---------- | -------------------- | ------------ | ------ |
+| padding-x     | 16px       | var(--space-4)       | ✅           | ✅     |
+| padding-y     | 8px        | 10px                 | ❌ hardcoded | ❌     |
+| border-radius | 8px        | var(--radius-md)     | ✅           | ✅     |
+| font-size     | 14px       | var(--text-sm)       | ✅           | ✅     |
+| color         | #3B82F6    | var(--color-primary) | ✅           | ✅     |
+| shadow        | 0 4px 6px  | none                 | ❌ missing   | ❌     |
 
 ### Responsive Fidelity Check
 
@@ -76,9 +76,9 @@ Verify at each breakpoint:
 
 ```typescript
 const BREAKPOINTS = [
-  { name: 'mobile', width: 375, figmaFrame: 'Mobile' },
-  { name: 'tablet', width: 768, figmaFrame: 'Tablet' },
-  { name: 'desktop', width: 1440, figmaFrame: 'Desktop' },
+  { name: "mobile", width: 375, figmaFrame: "Mobile" },
+  { name: "tablet", width: 768, figmaFrame: "Tablet" },
+  { name: "desktop", width: 1440, figmaFrame: "Desktop" },
 ];
 
 for (const bp of BREAKPOINTS) {
@@ -92,6 +92,7 @@ for (const bp of BREAKPOINTS) {
 ### Component Audit Checklist
 
 For each component:
+
 - [ ] Spacing matches Figma (padding, margin, gap)
 - [ ] Colors use correct tokens
 - [ ] Typography (font, size, weight, line-height) matches

@@ -201,7 +201,7 @@ export function Header({ user, onSearch }: HeaderProps) {
 }
 
 /* Dark theme */
-[data-theme='dark'] {
+[data-theme="dark"] {
   --color-bg: #0f172a;
   --color-text: #f1f5f9;
   --color-surface: #1e293b;
@@ -233,6 +233,7 @@ data-testid="modal-close-btn"
 ### Component States
 
 Every component must handle these states:
+
 - **Default** — normal appearance
 - **Hover** — cursor over (desktop)
 - **Focus** — keyboard focus (with visible indicator)

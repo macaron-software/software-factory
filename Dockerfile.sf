@@ -1,0 +1,25 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# System deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl sqlite3 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy SOFTWARE_FACTORY platform code
+COPY _SOFTWARE_FACTORY/platform /app/platform
+
+# Copy requirements
+COPY platform/requirements.txt /tmp/requirements.txt
+
+# Python deps  
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Env
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+
+EXPOSE 8090
+
+CMD ["uvicorn", "platform.server:app", "--host", "0.0.0.0", "--port", "8090"]

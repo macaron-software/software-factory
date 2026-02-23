@@ -43,15 +43,15 @@ OWASP Top 10 vulnerabilities, secret detection, auth review, and input validatio
 
 ```typescript
 // ❌ VULNERABLE: No authorization check
-app.get('/api/users/:id', async (req, res) => {
+app.get("/api/users/:id", async (req, res) => {
   const user = await db.getUser(req.params.id);
   res.json(user); // Any authenticated user can access any user's data
 });
 
 // ✅ SECURE: Check authorization
-app.get('/api/users/:id', authenticate, async (req, res) => {
-  if (req.user.id !== req.params.id && req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Forbidden' });
+app.get("/api/users/:id", authenticate, async (req, res) => {
+  if (req.user.id !== req.params.id && req.user.role !== "admin") {
+    return res.status(403).json({ error: "Forbidden" });
   }
   const user = await db.getUser(req.params.id);
   res.json(user);
@@ -59,6 +59,7 @@ app.get('/api/users/:id', authenticate, async (req, res) => {
 ```
 
 Check for:
+
 - [ ] Every endpoint has authentication
 - [ ] Authorization checks prevent horizontal privilege escalation
 - [ ] Admin functions verify admin role
@@ -73,13 +74,14 @@ const hash = md5(password); // MD5 is broken
 const token = Math.random().toString(36); // Not cryptographically secure
 
 // ✅ SECURE
-import bcrypt from 'bcrypt';
-import crypto from 'crypto';
+import bcrypt from "bcrypt";
+import crypto from "crypto";
 const hash = await bcrypt.hash(password, 12);
-const token = crypto.randomBytes(32).toString('hex');
+const token = crypto.randomBytes(32).toString("hex");
 ```
 
 Check for:
+
 - [ ] Passwords hashed with bcrypt/argon2 (not MD5/SHA1)
 - [ ] Sensitive data encrypted at rest
 - [ ] HTTPS enforced (no mixed content)
@@ -93,19 +95,20 @@ Check for:
 const query = `SELECT * FROM users WHERE email = '${email}'`;
 
 // ✅ SECURE: Parameterized query
-const query = 'SELECT * FROM users WHERE email = $1';
+const query = "SELECT * FROM users WHERE email = $1";
 const result = await db.query(query, [email]);
 
 // ❌ VULNERABLE: Command Injection
 exec(`convert ${filename} output.png`);
 
 // ✅ SECURE: Use library, validate input
-import { execFile } from 'child_process';
-if (!/^[a-zA-Z0-9._-]+$/.test(filename)) throw new Error('Invalid filename');
-execFile('convert', [filename, 'output.png']);
+import { execFile } from "child_process";
+if (!/^[a-zA-Z0-9._-]+$/.test(filename)) throw new Error("Invalid filename");
+execFile("convert", [filename, "output.png"]);
 ```
 
 Check for:
+
 - [ ] All SQL uses parameterized queries or ORM
 - [ ] No string concatenation in queries
 - [ ] OS commands use execFile with validated args
@@ -130,11 +133,12 @@ app.use((err, req, res, next) => {
 // ✅ SECURE: Generic errors in production
 app.use((err, req, res, next) => {
   console.error(err); // Log internally
-  res.status(500).json({ error: 'Internal server error' });
+  res.status(500).json({ error: "Internal server error" });
 });
 ```
 
 Check for:
+
 - [ ] Debug mode disabled in production
 - [ ] Default credentials changed
 - [ ] Error messages don't leak internals
@@ -151,6 +155,7 @@ cargo audit
 ```
 
 Check for:
+
 - [ ] Dependencies scanned for CVEs
 - [ ] No unmaintained packages
 - [ ] Lock files committed (package-lock.json, Pipfile.lock)
@@ -159,24 +164,29 @@ Check for:
 
 ```typescript
 // ❌ VULNERABLE: Weak session management
-app.use(session({
-  secret: 'mysecret', // Hardcoded, weak secret
-  cookie: { secure: false }, // Not HTTPS-only
-}));
+app.use(
+  session({
+    secret: "mysecret", // Hardcoded, weak secret
+    cookie: { secure: false }, // Not HTTPS-only
+  })
+);
 
 // ✅ SECURE
-app.use(session({
-  secret: process.env.SESSION_SECRET, // From environment
-  cookie: {
-    secure: true,       // HTTPS only
-    httpOnly: true,      // No JavaScript access
-    sameSite: 'strict',  // CSRF protection
-    maxAge: 3600000,     // 1 hour expiry
-  },
-}));
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET, // From environment
+    cookie: {
+      secure: true, // HTTPS only
+      httpOnly: true, // No JavaScript access
+      sameSite: "strict", // CSRF protection
+      maxAge: 3600000, // 1 hour expiry
+    },
+  })
+);
 ```
 
 Check for:
+
 - [ ] Passwords have minimum complexity requirements
 - [ ] Sessions expire after inactivity
 - [ ] JWT tokens have reasonable expiration
@@ -204,9 +214,9 @@ const response = await fetch(req.body.url); // Attacker can access internal serv
 
 // ✅ SECURE: Validate and restrict
 const url = new URL(req.body.url);
-const allowedHosts = ['api.example.com', 'cdn.example.com'];
+const allowedHosts = ["api.example.com", "cdn.example.com"];
 if (!allowedHosts.includes(url.hostname)) {
-  throw new Error('URL not allowed');
+  throw new Error("URL not allowed");
 }
 ```
 
@@ -234,7 +244,7 @@ res.send(`<div>${userInput}</div>`);
 
 // ✅ SECURE: Escape output
 element.textContent = userInput;
-import { escape } from 'html-escaper';
+import { escape } from "html-escaper";
 res.send(`<div>${escape(userInput)}</div>`);
 ```
 
@@ -242,7 +252,7 @@ res.send(`<div>${escape(userInput)}</div>`);
 
 ```typescript
 // ✅ Implement CSRF tokens
-import csrf from 'csurf';
+import csrf from "csurf";
 app.use(csrf({ cookie: true }));
 
 // In forms:

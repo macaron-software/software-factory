@@ -43,35 +43,35 @@ pagination, and error formats.
 Each API test follows this pattern:
 
 ```typescript
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 
-const BASE_URL = process.env.API_URL || 'http://localhost:3000/api';
+const BASE_URL = process.env.API_URL || "http://localhost:3000/api";
 
-describe('POST /api/users', () => {
+describe("POST /api/users", () => {
   let authToken: string;
 
   beforeAll(async () => {
     // Setup: get auth token
     const res = await fetch(`${BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@test.com', password: 'test123' }),
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "admin@test.com", password: "test123" }),
     });
     const data = await res.json();
     authToken = data.token;
   });
 
-  it('should create a user and return 201', async () => {
+  it("should create a user and return 201", async () => {
     const res = await fetch(`${BASE_URL}/users`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
       },
       body: JSON.stringify({
-        email: 'new@test.com',
-        name: 'Test User',
-        role: 'member',
+        email: "new@test.com",
+        name: "Test User",
+        role: "member",
       }),
     });
 
@@ -79,52 +79,52 @@ describe('POST /api/users', () => {
     const body = await res.json();
     expect(body).toMatchObject({
       id: expect.any(String),
-      email: 'new@test.com',
-      name: 'Test User',
-      role: 'member',
+      email: "new@test.com",
+      name: "Test User",
+      role: "member",
       createdAt: expect.any(String),
     });
   });
 
-  it('should return 400 for missing required fields', async () => {
+  it("should return 400 for missing required fields", async () => {
     const res = await fetch(`${BASE_URL}/users`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
       },
-      body: JSON.stringify({ name: 'No Email' }),
+      body: JSON.stringify({ name: "No Email" }),
     });
 
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBeDefined();
-    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(body.error.code).toBe("VALIDATION_ERROR");
   });
 
-  it('should return 401 without auth token', async () => {
+  it("should return 401 without auth token", async () => {
     const res = await fetch(`${BASE_URL}/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'test@test.com', name: 'Test' }),
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "test@test.com", name: "Test" }),
     });
 
     expect(res.status).toBe(401);
   });
 
-  it('should return 409 for duplicate email', async () => {
+  it("should return 409 for duplicate email", async () => {
     const res = await fetch(`${BASE_URL}/users`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
       },
-      body: JSON.stringify({ email: 'admin@test.com', name: 'Duplicate' }),
+      body: JSON.stringify({ email: "admin@test.com", name: "Duplicate" }),
     });
 
     expect(res.status).toBe(409);
     const body = await res.json();
-    expect(body.error.code).toBe('DUPLICATE_ENTRY');
+    expect(body.error.code).toBe("DUPLICATE_ENTRY");
   });
 });
 ```
@@ -133,50 +133,50 @@ describe('POST /api/users', () => {
 
 Always test these status codes for each endpoint:
 
-| Code | Meaning | When to test |
-|------|---------|--------------|
-| 200 | OK | Successful GET, PUT, PATCH |
-| 201 | Created | Successful POST that creates a resource |
-| 204 | No Content | Successful DELETE |
-| 400 | Bad Request | Invalid body, missing fields, wrong types |
-| 401 | Unauthorized | Missing or invalid auth token |
-| 403 | Forbidden | Valid token but insufficient permissions |
-| 404 | Not Found | Resource doesn't exist |
-| 409 | Conflict | Duplicate entry, version conflict |
-| 422 | Unprocessable | Valid JSON but business rule violation |
-| 429 | Too Many Requests | Rate limit exceeded |
-| 500 | Server Error | Should never happen — test for absence |
+| Code | Meaning           | When to test                              |
+| ---- | ----------------- | ----------------------------------------- |
+| 200  | OK                | Successful GET, PUT, PATCH                |
+| 201  | Created           | Successful POST that creates a resource   |
+| 204  | No Content        | Successful DELETE                         |
+| 400  | Bad Request       | Invalid body, missing fields, wrong types |
+| 401  | Unauthorized      | Missing or invalid auth token             |
+| 403  | Forbidden         | Valid token but insufficient permissions  |
+| 404  | Not Found         | Resource doesn't exist                    |
+| 409  | Conflict          | Duplicate entry, version conflict         |
+| 422  | Unprocessable     | Valid JSON but business rule violation    |
+| 429  | Too Many Requests | Rate limit exceeded                       |
+| 500  | Server Error      | Should never happen — test for absence    |
 
 ### Auth Guard Testing Pattern
 
 ```typescript
-describe('Authorization guards', () => {
-  it('rejects unauthenticated requests', async () => {
+describe("Authorization guards", () => {
+  it("rejects unauthenticated requests", async () => {
     const res = await fetch(`${BASE_URL}/admin/users`);
     expect(res.status).toBe(401);
   });
 
-  it('rejects non-admin users', async () => {
+  it("rejects non-admin users", async () => {
     const res = await fetch(`${BASE_URL}/admin/users`, {
-      headers: { 'Authorization': `Bearer ${memberToken}` },
+      headers: { Authorization: `Bearer ${memberToken}` },
     });
     expect(res.status).toBe(403);
   });
 
-  it('accepts admin users', async () => {
+  it("accepts admin users", async () => {
     const res = await fetch(`${BASE_URL}/admin/users`, {
-      headers: { 'Authorization': `Bearer ${adminToken}` },
+      headers: { Authorization: `Bearer ${adminToken}` },
     });
     expect(res.status).toBe(200);
   });
 
-  it('rejects expired tokens', async () => {
+  it("rejects expired tokens", async () => {
     const res = await fetch(`${BASE_URL}/admin/users`, {
-      headers: { 'Authorization': `Bearer ${expiredToken}` },
+      headers: { Authorization: `Bearer ${expiredToken}` },
     });
     expect(res.status).toBe(401);
     const body = await res.json();
-    expect(body.error.code).toBe('TOKEN_EXPIRED');
+    expect(body.error.code).toBe("TOKEN_EXPIRED");
   });
 });
 ```
@@ -184,8 +184,8 @@ describe('Authorization guards', () => {
 ### Pagination Testing
 
 ```typescript
-describe('GET /api/items (pagination)', () => {
-  it('returns paginated results with metadata', async () => {
+describe("GET /api/items (pagination)", () => {
+  it("returns paginated results with metadata", async () => {
     const res = await fetch(`${BASE_URL}/items?page=1&limit=10`);
     const body = await res.json();
 
@@ -198,7 +198,7 @@ describe('GET /api/items (pagination)', () => {
     });
   });
 
-  it('returns empty array for page beyond results', async () => {
+  it("returns empty array for page beyond results", async () => {
     const res = await fetch(`${BASE_URL}/items?page=9999&limit=10`);
     const body = await res.json();
 
@@ -206,7 +206,7 @@ describe('GET /api/items (pagination)', () => {
     expect(res.status).toBe(200);
   });
 
-  it('defaults to page 1 and limit 20', async () => {
+  it("defaults to page 1 and limit 20", async () => {
     const res = await fetch(`${BASE_URL}/items`);
     const body = await res.json();
 
@@ -223,9 +223,10 @@ All API errors should follow a consistent format. Validate it:
 ```typescript
 interface ApiError {
   error: {
-    code: string;      // Machine-readable: 'VALIDATION_ERROR', 'NOT_FOUND'
-    message: string;   // Human-readable description
-    details?: Array<{  // Field-level errors for validation
+    code: string; // Machine-readable: 'VALIDATION_ERROR', 'NOT_FOUND'
+    message: string; // Human-readable description
+    details?: Array<{
+      // Field-level errors for validation
       field: string;
       message: string;
     }>;

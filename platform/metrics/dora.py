@@ -1,23 +1,25 @@
 """DORA Metrics — Deployment Frequency, Lead Time, Change Failure Rate, MTTR."""
+
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
+
 from ..db.migrations import get_db
 
 logger = logging.getLogger(__name__)
 
 _LEVELS = {
     "deploy_freq": [
-        (1.0, "elite"),     # ≥1/day
-        (0.25, "high"),     # ≥1/week
+        (1.0, "elite"),  # ≥1/day
+        (0.25, "high"),  # ≥1/week
         (0.033, "medium"),  # ≥1/month
         (0.0, "low"),
     ],
     "lead_time_h": [
-        (1, "elite"),       # <1h
-        (24, "high"),       # <1 day
-        (168, "medium"),    # <1 week
+        (1, "elite"),  # <1h
+        (24, "high"),  # <1 day
+        (168, "medium"),  # <1 week
         (999999, "low"),
     ],
     "change_failure_pct": [
@@ -48,7 +50,7 @@ def _classify(metric: str, value: float) -> str:
 
 def _overall_level(levels: list[str]) -> str:
     rank = {"elite": 0, "high": 1, "medium": 2, "low": 3}
-    avg = sum(rank.get(l, 3) for l in levels) / max(len(levels), 1)
+    avg = sum(rank.get(lv, 3) for lv in levels) / max(len(levels), 1)
     if avg <= 0.5:
         return "elite"
     if avg <= 1.5:
@@ -64,6 +66,7 @@ class DORAMetrics:
     def _phase_data(self, project_id: str = "") -> tuple[int, int, int, list]:
         """Get phase counts from mission_runs. Returns (total, done, failed, runs)."""
         import json
+
         db = get_db()
         try:
             if project_id:
@@ -88,9 +91,16 @@ class DORAMetrics:
                 total += t
                 done += d
                 failed += f
-                runs.append({"total": t, "done": d, "failed": f,
-                             "created_at": r["created_at"], "updated_at": r["updated_at"],
-                             "project_id": r["project_id"]})
+                runs.append(
+                    {
+                        "total": t,
+                        "done": d,
+                        "failed": f,
+                        "created_at": r["created_at"],
+                        "updated_at": r["updated_at"],
+                        "project_id": r["project_id"],
+                    }
+                )
             return total, done, failed, runs
         finally:
             db.close()
@@ -100,7 +110,12 @@ class DORAMetrics:
         total, done, failed, runs = self._phase_data(project_id)
         per_day = done / max(period_days, 1)
         level = _classify("deploy_freq", per_day)
-        return {"count": done, "per_day": round(per_day, 2), "period_days": period_days, "level": level}
+        return {
+            "count": done,
+            "per_day": round(per_day, 2),
+            "period_days": period_days,
+            "level": level,
+        }
 
     def lead_time_for_changes(self, project_id: str = "", period_days: int = 30) -> dict:
         """Average time from mission start to current progress (hours)."""
@@ -112,8 +127,16 @@ class DORAMetrics:
         for r in runs:
             if r["created_at"] and r["done"] > 0:
                 try:
-                    created = datetime.fromisoformat(r["created_at"].replace("Z", "+00:00").replace("+00:00", ""))
-                    updated = datetime.fromisoformat(r["updated_at"].replace("Z", "+00:00").replace("+00:00", "")) if r["updated_at"] else now
+                    created = datetime.fromisoformat(
+                        r["created_at"].replace("Z", "+00:00").replace("+00:00", "")
+                    )
+                    updated = (
+                        datetime.fromisoformat(
+                            r["updated_at"].replace("Z", "+00:00").replace("+00:00", "")
+                        )
+                        if r["updated_at"]
+                        else now
+                    )
                     h = (updated - created).total_seconds() / 3600
                     if h >= 0:
                         hours.append(h)
@@ -125,7 +148,12 @@ class DORAMetrics:
         median = hours[len(hours) // 2]
         p90 = hours[int(len(hours) * 0.9)]
         level = _classify("lead_time_h", median)
-        return {"median_hours": round(median, 1), "p90_hours": round(p90, 1), "count": len(hours), "level": level}
+        return {
+            "median_hours": round(median, 1),
+            "p90_hours": round(p90, 1),
+            "count": len(hours),
+            "level": level,
+        }
 
     def change_failure_rate(self, project_id: str = "", period_days: int = 30) -> dict:
         """Percentage of phases that failed vs total attempted."""
@@ -148,7 +176,12 @@ class DORAMetrics:
                 (cutoff,),
             ).fetchall()
             if not rows:
-                return {"median_hours": 0, "count": 0, "level": "high", "note": "no resolved incidents"}
+                return {
+                    "median_hours": 0,
+                    "count": 0,
+                    "level": "high",
+                    "note": "no resolved incidents",
+                }
             hours = [r["hours"] for r in rows if r["hours"] is not None and r["hours"] >= 0]
             if not hours:
                 return {"median_hours": 0, "count": 0, "level": "high"}
@@ -165,21 +198,64 @@ class DORAMetrics:
         avg_throughput = done / max(len(active_runs), 1)
         predictability = round(done / max(total, 1) * 100, 1)
         return {
-            "sprints": [{"sprint": i+1, "velocity": r["done"], "planned": r["total"],
-                        "status": "active", "mission": r["project_id"]} for i, r in enumerate(active_runs)],
+            "sprints": [
+                {
+                    "sprint": i + 1,
+                    "velocity": r["done"],
+                    "planned": r["total"],
+                    "status": "active",
+                    "mission": r["project_id"],
+                }
+                for i, r in enumerate(active_runs)
+            ],
             "total_velocity": done,
             "avg_velocity": round(avg_throughput, 1),
             "predictability_pct": predictability,
             "sprint_count": len(active_runs),
         }
 
+    def llm_cost(self, project_id: str = "", period_days: int = 30) -> dict:
+        """LLM usage cost from llm_usage table."""
+        db = get_db()
+        try:
+            cutoff = (datetime.utcnow() - timedelta(days=period_days)).isoformat()
+            rows = db.execute(
+                "SELECT provider, model, SUM(tokens_in) as tin, SUM(tokens_out) as tout, "
+                "SUM(cost_estimate) as cost, COUNT(*) as calls FROM llm_usage "
+                "WHERE ts >= ? GROUP BY provider, model ORDER BY cost DESC",
+                (cutoff,),
+            ).fetchall()
+            total_cost = sum(r["cost"] or 0 for r in rows)
+            total_calls = sum(r["calls"] or 0 for r in rows)
+            total_tokens = sum((r["tin"] or 0) + (r["tout"] or 0) for r in rows)
+            by_model = [
+                {
+                    "provider": r["provider"],
+                    "model": r["model"],
+                    "calls": r["calls"],
+                    "cost": round(r["cost"] or 0, 4),
+                    "tokens_in": r["tin"] or 0,
+                    "tokens_out": r["tout"] or 0,
+                }
+                for r in rows
+            ]
+            return {
+                "total_cost_usd": round(total_cost, 2),
+                "total_calls": total_calls,
+                "total_tokens": total_tokens,
+                "by_model": by_model,
+            }
+        finally:
+            db.close()
+
     def summary(self, project_id: str = "", period_days: int = 30) -> dict:
-        """All 4 DORA metrics + velocity + overall level."""
+        """All 4 DORA metrics + velocity + LLM cost + overall level."""
         df = self.deployment_frequency(project_id, period_days)
         lt = self.lead_time_for_changes(project_id, period_days)
         cfr = self.change_failure_rate(project_id, period_days)
         mt = self.mttr(project_id, period_days)
         vel = self.velocity_metrics(project_id)
+        llm = self.llm_cost(project_id, period_days)
         overall = _overall_level([df["level"], lt["level"], cfr["level"], mt["level"]])
         return {
             "overall_level": overall,
@@ -190,47 +266,70 @@ class DORAMetrics:
             "change_failure_rate": cfr,
             "mttr": mt,
             "velocity": vel,
+            "llm_cost": llm,
         }
 
     def trend(self, project_id: str = "", weeks: int = 12) -> dict:
-        """Weekly sparkline data — phases completed per week."""
-        import json
+        """Weekly sparkline data from real platform data."""
         data = {"deploy": [], "lead_time": [], "failure": [], "mttr": []}
         db = get_db()
         try:
-            if project_id:
-                rows = db.execute(
-                    "SELECT phases_json, created_at, updated_at FROM mission_runs WHERE project_id=?",
-                    (project_id,),
-                ).fetchall()
-            else:
-                rows = db.execute("SELECT phases_json, created_at, updated_at FROM mission_runs").fetchall()
-
-            # Count sessions completed per week for trend
             for w in range(weeks - 1, -1, -1):
                 end = datetime.utcnow() - timedelta(weeks=w)
                 start = end - timedelta(weeks=1)
                 start_iso = start.isoformat()
                 end_iso = end.isoformat()
+                proj_filter = " AND project_id=?" if project_id else ""
+                proj_params = (
+                    [start_iso, end_iso, project_id] if project_id else [start_iso, end_iso]
+                )
 
-                # Sessions created in this week
-                s_rows = db.execute(
-                    "SELECT COUNT(*) as cnt FROM sessions WHERE created_at >= ? AND created_at < ?" + (
-                        " AND project_id=?" if project_id else ""),
-                    ([start_iso, end_iso, project_id] if project_id else [start_iso, end_iso]),
+                # Deploy: completed sprints in this week
+                s_row = db.execute(
+                    "SELECT COUNT(*) as cnt FROM sprints WHERE status='completed' AND completed_at >= ? AND completed_at < ?"
+                    + (
+                        " AND mission_id IN (SELECT id FROM missions WHERE project_id=?)"
+                        if project_id
+                        else ""
+                    ),
+                    proj_params,
                 ).fetchone()
-                data["deploy"].append(s_rows["cnt"] if s_rows else 0)
+                data["deploy"].append(s_row["cnt"] if s_row else 0)
 
-                # Messages (agent activity) in this week
-                m_rows = db.execute(
-                    "SELECT COUNT(*) as cnt FROM messages WHERE timestamp >= ? AND timestamp < ?",
+                # Lead time: average mission_run duration (hours) for runs completed this week
+                lt_rows = db.execute(
+                    "SELECT (julianday(updated_at) - julianday(created_at)) * 24 as hours FROM mission_runs "
+                    "WHERE status='completed' AND updated_at >= ? AND updated_at < ?" + proj_filter,
+                    proj_params,
+                ).fetchall()
+                avg_lt = (
+                    round(sum(r["hours"] for r in lt_rows if r["hours"]) / max(len(lt_rows), 1), 1)
+                    if lt_rows
+                    else 0
+                )
+                data["lead_time"].append(avg_lt)
+
+                # Failure: incidents created this week
+                f_row = db.execute(
+                    "SELECT COUNT(*) as cnt FROM platform_incidents WHERE created_at >= ? AND created_at < ?",
                     (start_iso, end_iso),
                 ).fetchone()
-                activity = m_rows["cnt"] if m_rows else 0
-                data["lead_time"].append(min(activity, 100))  # cap for sparkline
+                data["failure"].append(f_row["cnt"] if f_row else 0)
 
-                data["failure"].append(0)
-                data["mttr"].append(0)
+                # MTTR: average resolution time (hours) for incidents resolved this week
+                mttr_rows = db.execute(
+                    "SELECT (julianday(resolved_at) - julianday(created_at)) * 24 as hours "
+                    "FROM platform_incidents WHERE status='resolved' AND resolved_at >= ? AND resolved_at < ?",
+                    (start_iso, end_iso),
+                ).fetchall()
+                avg_mttr = (
+                    round(
+                        sum(r["hours"] for r in mttr_rows if r["hours"]) / max(len(mttr_rows), 1), 1
+                    )
+                    if mttr_rows
+                    else 0
+                )
+                data["mttr"].append(avg_mttr)
         finally:
             db.close()
         return data

@@ -204,6 +204,16 @@ class MissionStore:
             row = db.execute("SELECT name, project_id, type FROM missions WHERE id = ?", (mission_id,)).fetchone()
             if not row:
                 return
+            # In-app notification
+            from ..services.notifications import emit_notification
+            severity = "critical" if status == "failed" else "info"
+            emit_notification(
+                f"Mission {status}: {row['name']}",
+                type="mission", message=f"Mission '{row['name']}' ({row['type']}) has {status}.",
+                url=f"/missions/{mission_id}", severity=severity,
+                source="mission", ref_id=mission_id,
+            )
+            # External notification (Slack/Email/Webhook)
             from ..services.notification_service import get_notification_service, NotificationPayload
             svc = get_notification_service()
             if not svc.is_configured:

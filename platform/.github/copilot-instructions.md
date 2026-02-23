@@ -15,6 +15,7 @@ python -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
 ```
 
 Required env vars:
+
 ```bash
 AZURE_OPENAI_API_KEY      # Azure OpenAI (primary LLM)
 AZURE_OPENAI_ENDPOINT     # e.g. https://castudioiatestopenai.openai.azure.com/
@@ -43,6 +44,7 @@ DB (migrations.py, schema.sql)     ← SQLite + FTS5, WAL mode
 ### Agent Execution Flow
 
 The tool-calling engine in `agents/executor.py` runs a loop (max 10 rounds):
+
 1. Build system prompt (agent persona + skills + project memory + context)
 2. Call LLM with OpenAI-compatible tool schemas
 3. If LLM returns `tool_calls` → execute tools → feed results back → repeat
@@ -53,6 +55,7 @@ Tools: `code_read`, `code_search`, `code_write`, `code_edit`, `git_status`, `git
 ### RLM (Recursive Language Model)
 
 `agents/rlm.py` implements arXiv:2512.24601 — iterative WRITE-EXECUTE-OBSERVE-DECIDE loop:
+
 - **Orchestrator LLM** generates 1-3 exploration queries per iteration
 - **Sub-agents** execute queries in parallel (grep, file read, structure) — deterministic, no LLM
 - Findings accumulated (max 8K chars, recent prioritized), up to 10 iterations
@@ -65,6 +68,7 @@ Tools: `code_read`, `code_search`, `code_write`, `code_edit`, `git_status`, `git
 Key method: `LLMClient.chat(messages, provider, model, temperature, max_tokens, system_prompt, tools) → LLMResponse`
 
 Provider-specific quirks:
+
 - Azure OpenAI uses `max_completion_tokens` (not `max_tokens`)
 - MiniMax returns `<think>` blocks that get stripped automatically
 - The client is a singleton: `get_llm_client()`
@@ -93,10 +97,12 @@ Stores use raw `sqlite3` via `get_db()` from `db.migrations`. Row-to-dataclass c
 ### Templates: Jinja2 + HTMX
 
 All templates extend `base.html` which provides two blocks:
+
 - `{% block topbar_actions %}` — right side of the top bar
 - `{% block content %}` — main area
 
 HTMX patterns used throughout:
+
 - `hx-get`/`hx-post` for async loads
 - `hx-target` + `hx-swap="innerHTML"` or `"beforeend"` for partial updates
 - `hx-trigger="load, every 30s"` for polling sections (git status, tasks)
@@ -107,6 +113,7 @@ Markdown rendering: the Jinja2 environment has a `markdown` filter (`{{ content 
 ### CSS: Dark purple theme with CSS variables
 
 All colors/spacing defined as CSS variables in `:root` in `main.css`:
+
 - `--bg-primary: #0f0a1a`, `--bg-secondary: #1a1128`, `--bg-tertiary: #251a35`
 - `--purple: #a855f7`, `--purple-light: #c084fc`, `--accent: #f78166`
 - `--sidebar-width: 56px`, `--radius: 10px`
@@ -119,6 +126,7 @@ All list pages use a unified `.item-grid[data-view-grid]` + `.item-card` structu
 ### Import style
 
 Always use relative imports within the package:
+
 ```python
 from ..db.migrations import get_db
 from ..agents.store import get_agent_store
@@ -130,6 +138,7 @@ Use `from __future__ import annotations` at the top of files that use forward re
 ### Module naming
 
 The package is called `platform` which shadows Python's stdlib `platform` module. This means:
+
 - **Never** `import platform` at the top level in any file within this package
 - **Never** use `--reload` with uvicorn (it re-imports and hits the naming conflict)
 - Always run from the parent directory: `python -m uvicorn platform.server:app`

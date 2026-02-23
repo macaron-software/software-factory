@@ -44,7 +44,7 @@
                 <h4>Fichiers ({{ workspace_files|length if workspace_files else 0 }})</h4>
                 <div class="mc-dev-file-tree">
                     {% for f in workspace_files or [] %}
-                    <div class="mc-dev-file"><span class="mc-dev-file-icon">{{ '📁' if f.is_dir else '📄' }}</span>{{ f.path }}</div>
+                    <div class="mc-dev-file"><span class="mc-dev-file-icon">{% if f.is_dir %}<svg class="icon icon-xs"><use href="#icon-folder"/></svg>{% else %}<svg class="icon icon-xs"><use href="#icon-file-text"/></svg>{% endif %}</span>{{ f.path }}</div>
                     {% endfor %}
                 </div>
             </div>
@@ -346,20 +346,20 @@
                 {% endif %}
                 {% if result_deploy_url %}
                 <div class="mc-projet-url">
-                    <h4>🌐 Application déployée</h4>
+                    <h4>Application déployée</h4>
                     <a href="{{ result_deploy_url }}" target="_blank">{{ result_deploy_url }}</a>
                 </div>
                 {% endif %}
                 {% if result_build_cmd %}
                 <div class="mc-projet-build">
-                    <h4>🔧 Build & Run</h4>
-                    <code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_build_cmd }}" style="cursor:pointer" title="▶ Cliquer pour exécuter">🔧 {{ result_build_cmd }}</code>
+                    <h4>Build & Run</h4>
+                    <code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_build_cmd }}" style="cursor:pointer" title="▶ Cliquer pour exécuter">{{ result_build_cmd }}</code>
                     {% if result_run_cmd %}<code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_run_cmd }}" style="cursor:pointer" title="▶ Cliquer pour exécuter">▶ {{ result_run_cmd }}</code>{% endif %}
                 </div>
                 {% endif %}
                 {% if result_screenshots %}
                 <div class="mc-projet-gallery">
-                    <h4>📸 Screenshots ({{ result_screenshots|length }})</h4>
+                    <h4>Screenshots ({{ result_screenshots|length }})</h4>
                     <div class="mc-projet-imgs">
                         {% for s in result_screenshots %}
                         <div style="text-align:center">
@@ -371,10 +371,10 @@
                 </div>
                 {% endif %}
                 <div class="mc-projet-files">
-                    <h4>📁 Workspace</h4>
+                    <h4>Workspace</h4>
                     <div class="mc-projet-file-tree">
                         {% for f in workspace_files or [] %}
-                        <div class="mc-dev-file"><span class="mc-dev-file-icon">{{ '📁' if f.is_dir else '📄' }}</span>{{ f.path }}</div>
+                        <div class="mc-dev-file"><span class="mc-dev-file-icon">{% if f.is_dir %}<svg class="icon icon-xs"><use href="#icon-folder"/></svg>{% else %}<svg class="icon icon-xs"><use href="#icon-file-text"/></svg>{% endif %}</span>{{ f.path }}</div>
                         {% endfor %}
                     </div>
                     {% if mission.workspace_path %}

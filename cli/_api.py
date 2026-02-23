@@ -1,5 +1,5 @@
 """API backend — httpx client wrapping all REST endpoints."""
-import json
+
 from typing import Any
 
 try:
@@ -19,7 +19,9 @@ class APIBackend:
         if token:
             headers["Authorization"] = f"Bearer {token}"
         self._client = httpx.Client(
-            base_url=self.base_url, timeout=30, headers=headers,
+            base_url=self.base_url,
+            timeout=30,
+            headers=headers,
             follow_redirects=True,
         )
 
@@ -81,11 +83,18 @@ class APIBackend:
     def projects_list(self) -> list:
         return self._get("/api/projects")
 
-    def project_create(self, name: str, desc: str = "", path: str = "",
-                       proj_type: str = "web") -> dict:
-        return self._post("/api/projects", {
-            "name": name, "description": desc, "path": path, "type": proj_type,
-        })
+    def project_create(
+        self, name: str, desc: str = "", path: str = "", proj_type: str = "web"
+    ) -> dict:
+        return self._post(
+            "/api/projects",
+            {
+                "name": name,
+                "description": desc,
+                "path": path,
+                "type": proj_type,
+            },
+        )
 
     def project_show(self, pid: str) -> dict:
         projs = self.projects_list()
@@ -120,8 +129,9 @@ class APIBackend:
     def mission_show(self, mid: str) -> dict:
         return self._get(f"/api/missions/{mid}")
 
-    def mission_create(self, name: str, project_id: str, mission_type: str = "epic",
-                       **kwargs) -> dict:
+    def mission_create(
+        self, name: str, project_id: str, mission_type: str = "epic", **kwargs
+    ) -> dict:
         body = {"name": name, "project_id": project_id, "type": mission_type, **kwargs}
         return self._post("/api/missions", body)
 
@@ -134,12 +144,16 @@ class APIBackend:
     def mission_reset(self, mid: str) -> dict:
         return self._post(f"/api/missions/{mid}/reset")
 
-    def mission_wsjf(self, mid: str, bv: int = 5, tc: int = 5,
-                     rr: int = 5, jd: int = 5) -> dict:
-        return self._post(f"/api/missions/{mid}/wsjf", {
-            "business_value": bv, "time_criticality": tc,
-            "risk_reduction": rr, "job_duration": jd,
-        })
+    def mission_wsjf(self, mid: str, bv: int = 5, tc: int = 5, rr: int = 5, jd: int = 5) -> dict:
+        return self._post(
+            f"/api/missions/{mid}/wsjf",
+            {
+                "business_value": bv,
+                "time_criticality": tc,
+                "risk_reduction": rr,
+                "job_duration": jd,
+            },
+        )
 
     def mission_children(self, mid: str) -> list:
         return self._get(f"/api/missions/{mid}/children")
@@ -156,9 +170,13 @@ class APIBackend:
         return self._get(f"/api/epics/{epic_id}/features")
 
     def feature_create(self, epic_id: str, name: str, sp: int = 3) -> dict:
-        return self._post(f"/api/epics/{epic_id}/features", {
-            "name": name, "story_points": sp,
-        })
+        return self._post(
+            f"/api/epics/{epic_id}/features",
+            {
+                "name": name,
+                "story_points": sp,
+            },
+        )
 
     def feature_update(self, fid: str, **kwargs) -> dict:
         return self._patch(f"/api/features/{fid}", kwargs)
@@ -167,9 +185,13 @@ class APIBackend:
         return self._get(f"/api/features/{fid}/deps")
 
     def feature_add_dep(self, fid: str, dep_id: str, dep_type: str = "blocked_by") -> dict:
-        return self._post(f"/api/features/{fid}/deps", {
-            "depends_on": dep_id, "dep_type": dep_type,
-        })
+        return self._post(
+            f"/api/features/{fid}/deps",
+            {
+                "depends_on": dep_id,
+                "dep_type": dep_type,
+            },
+        )
 
     def feature_rm_dep(self, fid: str, dep_id: str) -> dict:
         return self._delete(f"/api/features/{fid}/deps/{dep_id}")
@@ -182,9 +204,13 @@ class APIBackend:
         return self._get("/api/stories")
 
     def story_create(self, feature_id: str, title: str, sp: int = 2) -> dict:
-        return self._post(f"/api/features/{feature_id}/stories", {
-            "title": title, "story_points": sp,
-        })
+        return self._post(
+            f"/api/features/{feature_id}/stories",
+            {
+                "title": title,
+                "story_points": sp,
+            },
+        )
 
     def story_update(self, sid: str, **kwargs) -> dict:
         return self._patch(f"/api/stories/{sid}", kwargs)
@@ -192,14 +218,21 @@ class APIBackend:
     # ── Sprints ──
 
     def sprint_create(self, mission_id: str, name: str, number: int = 1) -> dict:
-        return self._post(f"/api/missions/{mission_id}/sprints", {
-            "name": name, "number": number,
-        })
+        return self._post(
+            f"/api/missions/{mission_id}/sprints",
+            {
+                "name": name,
+                "number": number,
+            },
+        )
 
     def sprint_assign(self, sprint_id: str, story_ids: list[str]) -> dict:
-        return self._post(f"/api/sprints/{sprint_id}/assign-stories", {
-            "story_ids": story_ids,
-        })
+        return self._post(
+            f"/api/sprints/{sprint_id}/assign-stories",
+            {
+                "story_ids": story_ids,
+            },
+        )
 
     def sprint_unassign(self, sprint_id: str, story_id: str) -> dict:
         return self._delete(f"/api/sprints/{sprint_id}/stories/{story_id}")
@@ -210,9 +243,13 @@ class APIBackend:
     # ── Backlog ──
 
     def backlog_reorder(self, item_type: str, ids: list[str]) -> dict:
-        return self._patch("/api/backlog/reorder", {
-            "type": item_type, "ordered_ids": ids,
-        })
+        return self._patch(
+            "/api/backlog/reorder",
+            {
+                "type": item_type,
+                "ordered_ids": ids,
+            },
+        )
 
     # ── Agents ──
 
@@ -244,9 +281,9 @@ class APIBackend:
     def session_show(self, sid: str) -> dict:
         return self._get(f"/api/sessions/{sid}")
 
-    def session_create(self, project: str | None = None,
-                       agents: list[str] | None = None,
-                       pattern: str = "solo") -> dict:
+    def session_create(
+        self, project: str | None = None, agents: list[str] | None = None, pattern: str = "solo"
+    ) -> dict:
         body = {"pattern": pattern}
         if project:
             body["project_id"] = project
@@ -321,6 +358,28 @@ class APIBackend:
     def memory_global_set(self, key: str, value: str) -> dict:
         return self._post("/api/memory/global", {"key": key, "value": value})
 
+    # ── Workflows ──
+
+    def workflows_list(self) -> list:
+        """List all workflows."""
+        wfs = self._get("/api/workflows")
+        return wfs if isinstance(wfs, list) else []
+
+    def workflow_show(self, wf_id: str) -> dict:
+        """Show workflow details."""
+        return self._get(f"/api/workflows/{wf_id}")
+
+    # ── Patterns ──
+
+    def patterns_list(self) -> list:
+        """List all patterns."""
+        patterns = self._get("/api/patterns")
+        return patterns if isinstance(patterns, list) else []
+
+    def pattern_show(self, pattern_id: str) -> dict:
+        """Show pattern details."""
+        return self._get(f"/api/patterns/{pattern_id}")
+
     # ── Chaos ──
 
     def chaos_history(self) -> list:
@@ -342,11 +401,15 @@ class APIBackend:
     def incidents_list(self) -> list:
         return self._get("/api/incidents")
 
-    def incident_create(self, title: str, severity: str = "P2",
-                        source: str = "cli") -> dict:
-        return self._post("/api/incidents", {
-            "title": title, "severity": severity, "source": source,
-        })
+    def incident_create(self, title: str, severity: str = "P2", source: str = "cli") -> dict:
+        return self._post(
+            "/api/incidents",
+            {
+                "title": title,
+                "severity": severity,
+                "source": source,
+            },
+        )
 
     # ── Autoheal ──
 

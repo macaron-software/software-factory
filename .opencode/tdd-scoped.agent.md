@@ -15,6 +15,7 @@ tools:
   read: true
   edit: true
 ---
+
 You are a STRICT single-file editor. You MUST only edit ONE file.
 
 ## CRITICAL RULES - VIOLATION = REJECTION

@@ -13,25 +13,24 @@ to keep the context window fresh for each agent (inspired by GSD).
 Wave Dependencies: nodes are grouped into waves based on dependency edges.
 Agents within a wave run in parallel, waves run sequentially.
 """
+
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 # Prevent RecursionError in deep async pattern chains
 sys.setrecursionlimit(max(sys.getrecursionlimit(), 5000))
 
-from ..agents.store import get_agent_store, AgentDef
-from ..agents.executor import get_executor, ExecutionContext, ExecutionResult
-from ..sessions.store import get_session_store, SessionDef, MessageDef
-from ..projects.manager import get_project_store
+from ..agents.executor import ExecutionContext, ExecutionResult, get_executor
+from ..agents.store import AgentDef, get_agent_store
 from ..memory.manager import get_memory_manager
+from ..projects.manager import get_project_store
+from ..sessions.store import MessageDef, get_session_store
 from ..skills.library import get_skill_library
 from .store import PatternDef
 
@@ -55,15 +54,16 @@ class NodeStatus(str, Enum):
 class NodeState:
     node_id: str
     agent_id: str
-    agent: Optional[AgentDef] = None
+    agent: AgentDef | None = None
     status: NodeStatus = NodeStatus.PENDING
-    result: Optional[ExecutionResult] = None
+    result: ExecutionResult | None = None
     output: str = ""
 
 
 @dataclass
 class PatternRun:
     """Runtime state of a pattern execution."""
+
     pattern: PatternDef
     session_id: str
     project_id: str = ""
@@ -87,6 +87,7 @@ async def _sse(run: PatternRun, event: dict):
     if run.phase_id and "phase_id" not in event:
         event["phase_id"] = run.phase_id
     await _push_sse(run.session_id, event)
+
 
 # Protocol that makes agents produce trackable PRs/deliverables
 _PR_PROTOCOL = """[IMPORTANT — Team Protocol]
@@ -125,7 +126,7 @@ _EXEC_PROTOCOL = """ROLE: Developer. You MUST call code_write. No code_write = F
 WORKFLOW:
 1. EXPLORE FIRST: list_files + code_read existing files → understand what exists already
 2. deep_search(query="architecture, patterns, existing code") → discover project structure
-3. memory_search(query="conventions, decisions") → learn past decisions
+3. memory_search(query="conventions, decisions, design-system") → learn past decisions + design tokens
 4. THEN code_write per file → REAL build → git_commit
 
 TOOL: code_write(path="src/module.ts", content="full source code here")
@@ -137,13 +138,26 @@ RULES:
 - FOLLOW THE STACK DECIDED IN ARCHITECTURE PHASE. Do NOT switch language.
 - Do NOT describe changes. DO them via code_write.
 - NEVER create fake build scripts (gradlew, Makefile) that do nothing.
-- AFTER writing code, verify with REAL build tools:
-  - Web/Node.js: build(command="npm install && npm run build")
-  - Python: build(command="python3 -m py_compile file.py")
-  - Android/Kotlin: android_build() — compiles via Gradle in real SDK container
-  - Android tests: android_test() — runs real unit tests
-  - Swift/iOS: build(command="swift build") — only for iOS/macOS projects
-  - Docker: build(command="docker build -t test .")
+
+UI/UX CONSTRAINTS (MANDATORY for frontend code):
+- IMPORT design tokens: @import './styles/tokens.css' or import '../styles/tokens.css'
+- ALL colors via CSS custom properties: var(--color-primary), var(--color-text), etc.
+- ALL font sizes via tokens: var(--font-size-sm), var(--font-size-md), etc.
+- ALL spacing via tokens: var(--spacing-sm), var(--spacing-md), etc.
+- NO hardcoded hex colors (#fff, #333), NO hardcoded px font-sizes, NO inline styles
+- WCAG AA accessibility: aria-label on icons, aria-describedby on forms, role attributes
+- Semantic HTML: <nav>, <main>, <article>, <section>, <header>, <footer>. NOT <div> soup.
+- Responsive: mobile-first, use CSS grid/flexbox, test 320px→1440px
+- Focus management: :focus-visible styles, skip-to-content link, keyboard navigation
+- Loading/error/empty states for EVERY data-dependent component
+
+BUILD VERIFICATION:
+- Web/Node.js: build(command="npm install && npm run build")
+- Python: build(command="python3 -m py_compile file.py")
+- Android/Kotlin: android_build() — compiles via Gradle in real SDK container
+- Android tests: android_test() — runs real unit tests
+- Swift/iOS: build(command="swift build") — only for iOS/macOS projects
+- Docker: build(command="docker build -t test .")
 - If build fails, FIX the code and retry. Do NOT commit broken code.
 - Do NOT use generic build() for Android — use android_build() instead."""
 
@@ -221,6 +235,232 @@ CRITICAL RULES:
 - End with a clear actionable conclusion"""
 
 
+def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
+    """Auto-create TMA tickets from E2E/build results that contain failures."""
+    import uuid
+
+    try:
+        from ..db.migrations import get_db
+    except Exception:
+        return
+
+    # Detect failures in results
+    fail_lines = []
+    for line in results.split("\n"):
+        line_lower = line.lower()
+        if any(kw in line_lower for kw in ("fail", "error:", "timeout", "not responding")):
+            if "npm install: OK" not in line and "0 failures" not in line_lower:
+                fail_lines.append(line.strip())
+
+    if not fail_lines:
+        return
+
+    mission_id = getattr(ctx, "mission_run_id", "") or ""
+    agent_id = ctx.agent.id if ctx.agent else source
+    try:
+        db = get_db()
+        for i, fail in enumerate(fail_lines[:5]):  # max 5 tickets per run
+            tid = str(uuid.uuid4())[:8]
+            title = fail[:120] if len(fail) > 10 else f"Auto-detected {source} failure #{i + 1}"
+            severity = "high" if "error" in fail.lower() else "medium"
+            db.execute(
+                "INSERT INTO support_tickets (id, mission_id, title, description, severity, category, reporter, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, 'open')",
+                (
+                    tid,
+                    mission_id,
+                    title,
+                    f"Auto-created from {source} results:\n{fail}",
+                    severity,
+                    "auto-qa",
+                    agent_id,
+                ),
+            )
+        db.commit()
+        db.close()
+        logger.info("Auto-created %d TMA tickets from %s results", len(fail_lines[:5]), source)
+    except Exception as e:
+        logger.warning("Failed to auto-create tickets: %s", e)
+
+
+def _auto_persist_backlog(result: str, ctx, mission_id: str):
+    """Auto-parse PM output to persist features/stories in the product backlog.
+
+    MiniMax M2.5 won't call create_feature tool reliably, so we parse
+    structured tables from PM output (Epic/Story markdown tables).
+    """
+    import re
+    import uuid
+
+    try:
+        from ..db.migrations import get_db
+    except Exception:
+        return
+
+    # Extract epics — two formats:
+    # Format 1: | **E1** | Title | Priority |
+    # Format 2: | **E1** Title | Desc | Status |  (title in same cell as Exx)
+    epic_pattern = re.compile(
+        r"\|\s*\*\*(?:E\d+|Epic\s*\d*)\*\*\s*(?:\|?\s*)(.+?)\s*\|\s*(.+?)\s*\|",
+        re.IGNORECASE,
+    )
+    # Extract stories: | US-E1-01 : Title | Estimation | Dependency |
+    story_pattern = re.compile(
+        r"\|\s*(US-[\w-]+)\s*[:\s]+(.+?)\s*\|\s*(\d+)\s*\|",
+        re.IGNORECASE,
+    )
+
+    epics_found = epic_pattern.findall(result)
+    stories_found = story_pattern.findall(result)
+
+    if not epics_found and not stories_found:
+        return
+
+    try:
+        db = get_db()
+        feature_ids = {}
+
+        # Create features from epics
+        priority_map = {
+            "p0": 1,
+            "p1": 3,
+            "p2": 5,
+            "p3": 7,
+            "haute": 1,
+            "high": 1,
+            "moyen": 3,
+            "medium": 3,
+            "basse": 7,
+            "low": 7,
+        }
+        for i, (name, extra) in enumerate(epics_found):
+            fid = f"feat-{uuid.uuid4().hex[:6]}"
+            # Try to find priority in extra column
+            prio_match = re.search(
+                r"P\d+|haute?|high|moyen|medium|basse?|low", extra, re.IGNORECASE
+            )
+            prio_clean = prio_match.group(0).lower() if prio_match else "p2"
+            priority = priority_map.get(prio_clean, 5)
+            name_clean = name.strip().rstrip("|").strip()
+            if not name_clean or len(name_clean) < 3:
+                continue
+            db.execute(
+                "INSERT OR IGNORE INTO features (id, epic_id, name, description, priority, status, created_at) "
+                "VALUES (?, ?, ?, ?, ?, 'backlog', datetime('now'))",
+                (fid, mission_id, name_clean, "Auto-extracted from PM decomposition", priority),
+            )
+            feature_ids[f"E{i + 1}"] = fid
+
+        # Create user stories
+        for story_id, title, points in stories_found:
+            sid = f"us-{uuid.uuid4().hex[:6]}"
+            # Link to parent feature via story ID prefix (US-E1-xx → E1)
+            epic_ref = re.match(r"US-(E\d+)", story_id, re.IGNORECASE)
+            feat_id = feature_ids.get(epic_ref.group(1), "") if epic_ref else ""
+            db.execute(
+                "INSERT OR IGNORE INTO user_stories (id, feature_id, title, story_points, status, created_at) "
+                "VALUES (?, ?, ?, ?, 'backlog', datetime('now'))",
+                (sid, feat_id, f"{story_id}: {title.strip()}", int(points)),
+            )
+
+        db.commit()
+        db.close()
+        logger.info(
+            "Auto-persisted backlog: %d features, %d stories for mission %s",
+            len(epics_found),
+            len(stories_found),
+            mission_id,
+        )
+    except Exception as e:
+        logger.warning("Failed to auto-persist backlog: %s", e)
+
+
+def _auto_extract_requirements(description: str, mission_id: str):
+    """Extract requirements from mission description for AO traceability.
+
+    Decomposes both top-level numbered requirements AND their sub-items.
+    Input: '1. **Portail usager** : inscription, choix du VAE, paiement'
+    Output: REQ-xxxx-01 (parent) + REQ-xxxx-01.1, 01.2, 01.3 (sub-reqs)
+    """
+    import re
+
+    try:
+        from ..db.migrations import get_db
+    except Exception:
+        return
+
+    # Match numbered items: "1. **Title**: desc" OR "1. Title: desc"
+    req_pattern = re.compile(
+        r"(\d+)\.\s*\*{0,2}([^*:\n]+?)\*{0,2}\s*[:：]\s*(.+?)(?=\n\d+\.\s|\Z)",
+        re.DOTALL,
+    )
+    reqs = req_pattern.findall(description)
+    if not reqs:
+        return
+
+    try:
+        db = get_db()
+        db.execute("""CREATE TABLE IF NOT EXISTS requirements (
+            id TEXT PRIMARY KEY,
+            mission_id TEXT NOT NULL,
+            parent_id TEXT DEFAULT '',
+            req_number TEXT,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            status TEXT DEFAULT 'identified',
+            covered_by TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now'))
+        )""")
+
+        total = 0
+        prefix = mission_id[:4]
+        for num, title, desc in reqs:
+            parent_id = f"REQ-{prefix}-{num.zfill(2)}"
+            # Insert parent requirement
+            db.execute(
+                "INSERT OR IGNORE INTO requirements (id, mission_id, parent_id, req_number, title, description) "
+                "VALUES (?, ?, '', ?, ?, ?)",
+                (parent_id, mission_id, num, title.strip(), desc.strip()[:500]),
+            )
+            total += 1
+
+            # Decompose sub-items from description (comma/semicolon separated)
+            desc_clean = desc.strip()
+            # Remove parenthetical content for cleaner splitting
+            desc_no_parens = re.sub(r"\([^)]*\)", "", desc_clean)
+            sub_items = [
+                s.strip()
+                for s in re.split(r"[,;]", desc_no_parens)
+                if s.strip() and len(s.strip()) > 3
+            ]
+
+            for j, sub in enumerate(sub_items, 1):
+                sub_id = f"REQ-{prefix}-{num.zfill(2)}.{j}"
+                # Clean up sub-item: remove leading articles, trailing whitespace
+                sub_clean = re.sub(
+                    r"^(le |la |les |l\'|un |une |des |du )", "", sub.strip(), flags=re.IGNORECASE
+                ).strip()
+                if len(sub_clean) < 3:
+                    continue
+                db.execute(
+                    "INSERT OR IGNORE INTO requirements (id, mission_id, parent_id, req_number, title, description) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (sub_id, mission_id, parent_id, f"{num}.{j}", sub_clean, ""),
+                )
+                total += 1
+
+        db.commit()
+        db.close()
+        logger.info(
+            "Extracted %d AO requirements (%d top + sub) for mission %s",
+            total,
+            len(reqs),
+            mission_id,
+        )
+    except Exception as e:
+        logger.warning("Failed to extract requirements: %s", e)
+
+
 def _build_team_context(run: PatternRun, current_node: str, to_agent_id: str) -> str:
     """Build team awareness: who's on the team, what's the communication flow."""
     parts = []
@@ -237,7 +477,7 @@ def _build_team_context(run: PatternRun, current_node: str, to_agent_id: str) ->
                 status = " (has already contributed)"
             team.append(f"  - {ns.agent.name} ({ns.agent.role}){status}")
     if team:
-        parts.append(f"[Your team]:\n" + "\n".join(team))
+        parts.append("[Your team]:\n" + "\n".join(team))
 
     # Who are you addressing?
     if to_agent_id and to_agent_id not in ("all", "session"):
@@ -284,21 +524,27 @@ async def run_pattern(
 
     # Log pattern start — target the leader, not broadcast
     store = get_session_store()
-    store.add_message(MessageDef(
-        session_id=session_id,
-        from_agent="system",
-        to_agent=pattern_leader or "all",
-        message_type="system",
-        content=f"Pattern **{pattern.name}** started ({pattern.type})",
-    ))
-    await _sse(run, {
-        "type": "pattern_start",
-        "pattern_id": pattern.id,
-        "pattern_name": pattern.name,
-    })
+    store.add_message(
+        MessageDef(
+            session_id=session_id,
+            from_agent="system",
+            to_agent=pattern_leader or "all",
+            message_type="system",
+            content=f"Pattern **{pattern.name}** started ({pattern.type})",
+        )
+    )
+    await _sse(
+        run,
+        {
+            "type": "pattern_start",
+            "pattern_id": pattern.id,
+            "pattern_name": pattern.name,
+        },
+    )
 
     try:
         import sys
+
         # Prevent recursion errors from deep async/httpx stacks during concurrent LLM calls
         if sys.getrecursionlimit() < 3000:
             sys.setrecursionlimit(3000)
@@ -330,8 +576,7 @@ async def run_pattern(
         run.finished = True
         has_vetoes = any(n.status == NodeStatus.VETOED for n in run.nodes.values())
         all_ok = all(
-            n.status in (NodeStatus.COMPLETED, NodeStatus.PENDING)
-            for n in run.nodes.values()
+            n.status in (NodeStatus.COMPLETED, NodeStatus.PENDING) for n in run.nodes.values()
         )
         run.success = all_ok and not has_vetoes
     except Exception as e:
@@ -347,25 +592,33 @@ async def run_pattern(
         status = "NOGO — vetoes non résolus"
     else:
         status = f"FAILED: {run.error}"
-    store.add_message(MessageDef(
-        session_id=session_id,
-        from_agent="system",
-        to_agent=pattern_leader or "all",
-        message_type="system",
-        content=f"Pattern **{pattern.name}** {status}",
-    ))
-    await _sse(run, {
-        "type": "pattern_end",
-        "success": run.success,
-        "error": run.error,
-    })
+    store.add_message(
+        MessageDef(
+            session_id=session_id,
+            from_agent="system",
+            to_agent=pattern_leader or "all",
+            message_type="system",
+            content=f"Pattern **{pattern.name}** {status}",
+        )
+    )
+    await _sse(
+        run,
+        {
+            "type": "pattern_end",
+            "success": run.success,
+            "error": run.error,
+        },
+    )
 
     return run
 
 
 async def _execute_node(
-    run: PatternRun, node_id: str, task: str,
-    context_from: str = "", to_agent_id: str = "",
+    run: PatternRun,
+    node_id: str,
+    task: str,
+    context_from: str = "",
+    to_agent_id: str = "",
     protocol_override: str = "",
 ) -> str:
     """Execute a single node: call its agent with the task, store messages."""
@@ -378,12 +631,15 @@ async def _execute_node(
     store = get_session_store()
 
     # Push thinking status
-    await _sse(run, {
-        "type": "agent_status",
-        "agent_id": agent.id,
-        "node_id": node_id,
-        "status": "thinking",
-    })
+    await _sse(
+        run,
+        {
+            "type": "agent_status",
+            "agent_id": agent.id,
+            "node_id": node_id,
+            "status": "thinking",
+        },
+    )
 
     # Build context
     ctx = await _build_node_context(agent, run)
@@ -397,6 +653,7 @@ async def _execute_node(
         # Sanitize agent output to prevent cross-agent prompt injection
         try:
             from ..security.sanitize import sanitize_agent_output
+
             context_from = sanitize_agent_output(context_from, agent_id=to_agent_id)
         except ImportError:
             pass
@@ -418,12 +675,54 @@ async def _execute_node(
         elif "devops" in role_lower or "sre" in role_lower or "pipeline" in role_lower:
             full_task += _CICD_PROTOCOL
             full_task += "\n\n" + _PR_PROTOCOL
-        elif "dev" in role_lower or "fullstack" in role_lower or "backend" in role_lower or "frontend" in role_lower:
+        elif (
+            "dev" in role_lower
+            or "fullstack" in role_lower
+            or "backend" in role_lower
+            or "frontend" in role_lower
+        ):
             full_task += _EXEC_PROTOCOL
             full_task += "\n\n" + _PR_PROTOCOL
         elif "qa" in role_lower or "test" in role_lower:
             full_task += _QA_PROTOCOL
             full_task += "\n\n" + _PR_PROTOCOL
+            # Auto-run E2E tests for QA agents (LLM can't call tools reliably)
+            if ctx.project_path:
+                try:
+                    from ..agents.tool_runner import _tool_run_e2e_tests
+
+                    e2e_result = await _tool_run_e2e_tests({}, ctx)
+                    full_task += f"\n\n## E2E Test Results (auto-executed)\n{e2e_result}"
+                    # Auto-create TMA tickets for failures found
+                    _auto_create_tickets_from_results(e2e_result, ctx, "qa")
+                except Exception as e:
+                    full_task += f"\n\n## E2E Tests: Error running auto-tests: {e}"
+        elif "ux" in role_lower or "design" in role_lower:
+            full_task += _EXEC_PROTOCOL
+            # Auto-create design system scaffold if it doesn't exist
+            if ctx.project_path:
+                try:
+                    import os
+
+                    styles_dir = os.path.join(ctx.project_path, "src", "styles")
+                    tokens_path = os.path.join(styles_dir, "tokens.css")
+                    if not os.path.exists(tokens_path):
+                        full_task += """
+
+## Design System Status: NOT YET CREATED
+The project has NO design system yet. You MUST create it NOW using code_write.
+Create these files:
+1. src/styles/tokens.css — CSS custom properties (colors, typography, spacing, radius, shadows)
+2. src/styles/base.css — CSS reset, responsive grid, accessibility defaults
+3. src/styles/components.css — Base component styles (btn, card, form, badge, alert, nav)
+
+This is BLOCKING: developers cannot start without your design tokens."""
+                    else:
+                        full_task += (
+                            "\n\n## Design System Status: EXISTS — review and improve if needed."
+                        )
+                except Exception:
+                    pass
         elif "lead" in role_lower or "architect" in role_lower:
             full_task += _REVIEW_PROTOCOL
             full_task += "\n\n" + _PR_PROTOCOL
@@ -434,18 +733,22 @@ async def _execute_node(
     executor = get_executor()
     result = None
 
-    await _sse(run, {
-        "type": "stream_start",
-        "agent_id": agent.id,
-        "agent_name": agent.name,
-        "node_id": node_id,
-        "pattern_type": run.pattern.type,
-        "to_agent": to_agent_id or "all",
-        "iteration": run.iteration,
-        "flow_step": run.flow_step,
-    })
+    await _sse(
+        run,
+        {
+            "type": "stream_start",
+            "agent_id": agent.id,
+            "agent_name": agent.name,
+            "node_id": node_id,
+            "pattern_type": run.pattern.type,
+            "to_agent": to_agent_id or "all",
+            "iteration": run.iteration,
+            "flow_step": run.flow_step,
+        },
+    )
 
     import re as _re
+
     in_think = False
     in_tool_call = False
     think_chunks = 0
@@ -470,28 +773,44 @@ async def _execute_node(
                 if in_think:
                     think_chunks += 1
                     if think_chunks % 20 == 0:
-                        await _sse(run, {
-                            "type": "stream_thinking",
-                            "agent_id": agent.id,
-                        })
+                        await _sse(
+                            run,
+                            {
+                                "type": "stream_thinking",
+                                "agent_id": agent.id,
+                            },
+                        )
                 elif not in_tool_call:
                     if delta_count <= 3:
-                        logger.warning("STREAM_DELTA agent=%s count=%d len=%d", agent.id, delta_count, len(delta))
-                    await _sse(run, {
-                        "type": "stream_delta",
-                        "agent_id": agent.id,
-                        "delta": delta,
-                    })
+                        logger.warning(
+                            "STREAM_DELTA agent=%s count=%d len=%d",
+                            agent.id,
+                            delta_count,
+                            len(delta),
+                        )
+                    await _sse(
+                        run,
+                        {
+                            "type": "stream_delta",
+                            "agent_id": agent.id,
+                            "delta": delta,
+                        },
+                    )
             elif kind == "tool":
                 # Agent is calling a tool — send activity SSE so UI shows progress
-                await _sse(run, {
-                    "type": "stream_thinking",
-                    "agent_id": agent.id,
-                    "tool_name": value,
-                })
+                await _sse(
+                    run,
+                    {
+                        "type": "stream_thinking",
+                        "agent_id": agent.id,
+                        "tool_name": value,
+                    },
+                )
             elif kind == "result":
                 result = value
-        logger.warning("STREAM_DONE agent=%s deltas=%d think=%d", agent.id, delta_count, think_chunks)
+        logger.warning(
+            "STREAM_DONE agent=%s deltas=%d think=%d", agent.id, delta_count, think_chunks
+        )
     except Exception as exc:
         logger.error("Streaming failed for %s, falling back: %s", agent.id, exc)
         result = await executor.run(ctx, full_task)
@@ -504,19 +823,44 @@ async def _execute_node(
     if "<think>" in content:
         content = _re.sub(r"<think>.*?</think>\s*", "", content, flags=_re.DOTALL).strip()
     if "<minimax:tool_call>" in content or "<tool_call>" in content:
-        content = _re.sub(r"<minimax:tool_call>.*?</minimax:tool_call>\s*", "", content, flags=_re.DOTALL).strip()
+        content = _re.sub(
+            r"<minimax:tool_call>.*?</minimax:tool_call>\s*", "", content, flags=_re.DOTALL
+        ).strip()
         content = _re.sub(r"<tool_call>.*?</tool_call>\s*", "", content, flags=_re.DOTALL).strip()
     if content != (result.content or ""):
         result = ExecutionResult(
-            content=content, agent_id=result.agent_id, model=result.model,
-            provider=result.provider, tokens_in=result.tokens_in,
-            tokens_out=result.tokens_out, duration_ms=result.duration_ms,
-            tool_calls=result.tool_calls, delegations=result.delegations,
+            content=content,
+            agent_id=result.agent_id,
+            model=result.model,
+            provider=result.provider,
+            tokens_in=result.tokens_in,
+            tokens_out=result.tokens_out,
+            duration_ms=result.duration_ms,
+            tool_calls=result.tool_calls,
+            delegations=result.delegations,
             error=result.error,
         )
 
     state.result = result
     state.output = content
+
+    # Auto-persist backlog when PM produces epic/story decomposition
+    role_lower = (agent.role or agent.id or "").lower()
+    if ("product" in role_lower or "pm" in role_lower) and (
+        "Épic" in content or "Epic" in content or "US-" in content or "Story" in content
+    ):
+        mission_id = run.session_id  # fallback
+        if hasattr(ctx, "mission_run_id") and ctx.mission_run_id:
+            mission_id = ctx.mission_run_id
+        else:
+            # Try to get mission_id from session config
+            try:
+                sess = get_session_store().get(run.session_id)
+                if sess and sess.config:
+                    mission_id = sess.config.get("mission_id", mission_id)
+            except Exception:
+                pass
+        _auto_persist_backlog(content, ctx, mission_id)
 
     # Detect VETO/NOGO/APPROVE — must be explicit decisions, not mentions
     msg_type = "text"
@@ -571,6 +915,7 @@ async def _execute_node(
         for _adv_attempt in range(MAX_ADVERSARIAL_RETRIES + 1):
             try:
                 from ..agents.adversarial import run_guard
+
                 guard_result = await run_guard(
                     content=content,
                     task=task,
@@ -588,7 +933,8 @@ async def _execute_node(
                 if guard_result.issues:
                     logger.info(
                         "ADVERSARIAL WARN [%s] score=%d: %s",
-                        agent.name, guard_result.score,
+                        agent.name,
+                        guard_result.score,
                         "; ".join(guard_result.issues[:3]),
                     )
                 break  # approved
@@ -602,29 +948,40 @@ async def _execute_node(
             if guard_result.score <= 6 and not has_critical_flags:
                 logger.info(
                     "ADVERSARIAL SOFT-PASS [%s] score=%d (≤6 = warning): %s",
-                    agent.name, guard_result.score,
+                    agent.name,
+                    guard_result.score,
                     "; ".join(guard_result.issues[:3]),
                 )
-                content = f"[ADVERSARIAL WARNING — score {guard_result.score}/10]\n" + "\n".join(f"- {i}" for i in guard_result.issues[:3]) + "\n\n" + content
+                content = (
+                    f"[ADVERSARIAL WARNING — score {guard_result.score}/10]\n"
+                    + "\n".join(f"- {i}" for i in guard_result.issues[:3])
+                    + "\n\n"
+                    + content
+                )
                 break  # pass with warning appended
 
             # Rejected — retry with feedback if attempts remain
             logger.warning(
                 "ADVERSARIAL REJECT [%s] attempt=%d score=%d: %s",
-                agent.name, _adv_attempt + 1, guard_result.score,
+                agent.name,
+                _adv_attempt + 1,
+                guard_result.score,
                 "; ".join(guard_result.issues[:3]),
             )
-            await _sse(run, {
-                "type": "adversarial",
-                "agent_id": agent.id,
-                "agent_name": agent.name,
-                "passed": False,
-                "score": guard_result.score,
-                "level": guard_result.level,
-                "issues": guard_result.issues[:5],
-                "node_id": node_id,
-                "retry": _adv_attempt + 1,
-            })
+            await _sse(
+                run,
+                {
+                    "type": "adversarial",
+                    "agent_id": agent.id,
+                    "agent_name": agent.name,
+                    "passed": False,
+                    "score": guard_result.score,
+                    "level": guard_result.level,
+                    "issues": guard_result.issues[:5],
+                    "node_id": node_id,
+                    "retry": _adv_attempt + 1,
+                },
+            )
 
             if _adv_attempt < MAX_ADVERSARIAL_RETRIES:
                 # Re-run agent with rejection feedback
@@ -637,22 +994,34 @@ async def _execute_node(
                 if protocol_override:
                     retry_task += "\n\n" + protocol_override
 
-                await _sse(run, {
-                    "type": "agent_status",
-                    "agent_id": agent.id,
-                    "node_id": node_id,
-                    "status": "thinking",
-                })
+                await _sse(
+                    run,
+                    {
+                        "type": "agent_status",
+                        "agent_id": agent.id,
+                        "node_id": node_id,
+                        "status": "thinking",
+                    },
+                )
 
                 try:
                     retry_result = await executor.run(ctx, retry_task)
                     retry_content = retry_result.content or ""
                     # Strip think/tool artifacts
                     if "<think>" in retry_content:
-                        retry_content = _re.sub(r"<think>.*?</think>\s*", "", retry_content, flags=_re.DOTALL).strip()
+                        retry_content = _re.sub(
+                            r"<think>.*?</think>\s*", "", retry_content, flags=_re.DOTALL
+                        ).strip()
                     if "<minimax:tool_call>" in retry_content or "<tool_call>" in retry_content:
-                        retry_content = _re.sub(r"<minimax:tool_call>.*?</minimax:tool_call>\s*", "", retry_content, flags=_re.DOTALL).strip()
-                        retry_content = _re.sub(r"<tool_call>.*?</tool_call>\s*", "", retry_content, flags=_re.DOTALL).strip()
+                        retry_content = _re.sub(
+                            r"<minimax:tool_call>.*?</minimax:tool_call>\s*",
+                            "",
+                            retry_content,
+                            flags=_re.DOTALL,
+                        ).strip()
+                        retry_content = _re.sub(
+                            r"<tool_call>.*?</tool_call>\s*", "", retry_content, flags=_re.DOTALL
+                        ).strip()
                     # Use retry output
                     result = retry_result
                     content = retry_content
@@ -660,7 +1029,11 @@ async def _execute_node(
                     state.output = content
                     # Accumulate tool_calls from retry
                     cumulative_tool_calls.extend(retry_result.tool_calls or [])
-                    logger.info("ADVERSARIAL RETRY [%s] attempt=%d — re-running agent", agent.name, _adv_attempt + 2)
+                    logger.info(
+                        "ADVERSARIAL RETRY [%s] attempt=%d — re-running agent",
+                        agent.name,
+                        _adv_attempt + 2,
+                    )
                 except Exception as retry_err:
                     logger.error("Adversarial retry failed for %s: %s", agent.id, retry_err)
                     break
@@ -678,99 +1051,144 @@ async def _execute_node(
                 # Track rejection in agent scores
                 try:
                     from ..db.migrations import get_db
+
                     db = get_db()
                     db.execute(
                         """INSERT INTO agent_scores (agent_id, epic_id, rejected, iterations)
                            VALUES (?, ?, 1, ?)
                            ON CONFLICT(agent_id, epic_id)
                            DO UPDATE SET rejected = rejected + 1, iterations = iterations + ?""",
-                        (agent.id, run.project_id or "", MAX_ADVERSARIAL_RETRIES + 1, MAX_ADVERSARIAL_RETRIES + 1),
+                        (
+                            agent.id,
+                            run.project_id or "",
+                            MAX_ADVERSARIAL_RETRIES + 1,
+                            MAX_ADVERSARIAL_RETRIES + 1,
+                        ),
                     )
                     db.commit()
                     db.close()
                 except Exception:
                     pass
+                # Create platform_incident for adversarial rejections (DORA tracking)
+                try:
+                    from ..missions.feedback import create_platform_incident
+
+                    create_platform_incident(
+                        title=f"Adversarial rejection: {agent.name}",
+                        severity="P3",
+                        source="adversarial_guard",
+                        error_type="quality_rejection",
+                        error_detail=f"Agent {agent.name} output rejected (score {guard_result.score}/10, {guard_result.level}). "
+                        f"Issues: {'; '.join(guard_result.issues[:5])}",
+                        mission_id=run.project_id or "",
+                        agent_id=agent.id,
+                    )
+                except Exception:
+                    pass
 
     # Push final guard result to frontend
     if guard_result and guard_result.passed:
-        await _sse(run, {
-            "type": "adversarial",
-            "agent_id": agent.id,
-            "agent_name": agent.name,
-            "passed": True,
-            "score": guard_result.score,
-            "level": guard_result.level,
-            "issues": guard_result.issues[:5],
-            "node_id": node_id,
-        })
+        await _sse(
+            run,
+            {
+                "type": "adversarial",
+                "agent_id": agent.id,
+                "agent_name": agent.name,
+                "passed": True,
+                "score": guard_result.score,
+                "level": guard_result.level,
+                "issues": guard_result.issues[:5],
+                "node_id": node_id,
+            },
+        )
 
-    store.add_message(MessageDef(
-        session_id=run.session_id,
-        from_agent=agent.id,
-        to_agent=to_agent_id or "all",
-        message_type=msg_type,
-        content=content,
-        metadata={
-            "model": result.model,
-            "provider": result.provider,
-            "tokens_in": result.tokens_in,
-            "tokens_out": result.tokens_out,
-            "duration_ms": result.duration_ms,
-            "node_id": node_id,
-            "pattern_id": run.pattern.id,
-            "pattern_type": run.pattern.type,
-            "phase_id": run.phase_id,
-            "tool_calls": result.tool_calls if result.tool_calls else None,
-        },
-    ))
+    store.add_message(
+        MessageDef(
+            session_id=run.session_id,
+            from_agent=agent.id,
+            to_agent=to_agent_id or "all",
+            message_type=msg_type,
+            content=content,
+            metadata={
+                "model": result.model,
+                "provider": result.provider,
+                "tokens_in": result.tokens_in,
+                "tokens_out": result.tokens_out,
+                "duration_ms": result.duration_ms,
+                "node_id": node_id,
+                "pattern_id": run.pattern.id,
+                "pattern_type": run.pattern.type,
+                "phase_id": run.phase_id,
+                "tool_calls": result.tool_calls if result.tool_calls else None,
+            },
+        )
+    )
 
     # Compute activity counts for UI badges
     tcs = result.tool_calls or []
     edit_count = sum(1 for tc in tcs if tc.get("name") in ("code_edit", "code_write"))
-    read_count = sum(1 for tc in tcs if tc.get("name") in ("code_read", "code_search", "list_files"))
+    read_count = sum(
+        1 for tc in tcs if tc.get("name") in ("code_read", "code_search", "list_files")
+    )
 
-    await _sse(run, {
-        "type": "stream_end",
-        "agent_id": agent.id,
-        "content": content,
-        "message_type": msg_type,
-        "to_agent": to_agent_id or "all",
-        "flow_step": run.flow_step,
-    })
+    await _sse(
+        run,
+        {
+            "type": "stream_end",
+            "agent_id": agent.id,
+            "content": content,
+            "message_type": msg_type,
+            "to_agent": to_agent_id or "all",
+            "flow_step": run.flow_step,
+        },
+    )
 
-    await _sse(run, {
-        "type": "message",
-        "from_agent": agent.id,
-        "to_agent": to_agent_id or "all",
-        "content": content,
-        "message_type": msg_type,
-        "pattern_type": run.pattern.type,
-        "node_id": node_id,
-        "edits": edit_count,
-        "reads": read_count,
-        "tool_count": len(tcs),
-    })
+    await _sse(
+        run,
+        {
+            "type": "message",
+            "from_agent": agent.id,
+            "to_agent": to_agent_id or "all",
+            "content": content,
+            "message_type": msg_type,
+            "pattern_type": run.pattern.type,
+            "node_id": node_id,
+            "edits": edit_count,
+            "reads": read_count,
+            "tool_count": len(tcs),
+        },
+    )
 
-    await _sse(run, {
-        "type": "agent_status",
-        "agent_id": agent.id,
-        "status": "idle",
-    })
+    await _sse(
+        run,
+        {
+            "type": "agent_status",
+            "agent_id": agent.id,
+            "status": "idle",
+        },
+    )
 
     # Store key insights in project memory + notify frontend
     if run.project_id and content and not result.error:
         try:
             mem = get_memory_manager()
             import re as _re2
+
             # Strip tool call artifacts, JSON blobs, and filler
-            clean = _re2.sub(r'\{["\'](?:path|name|command|args)["\'].*?\}', '', content)
-            clean = _re2.sub(r'\[TOOL_CALL\].*?\[/TOOL_CALL\]', '', clean, flags=_re2.DOTALL)
-            clean = _re2.sub(r'(?:Now |)(?:Calling|Searching|Looking|Reading|Inspecting)\s+\w+.*?(?:\n|\.\.\.)', '', clean)
-            clean = _re2.sub(r"(?:J'examine|Je vais|Let me|I'll inspect|I'll check|I will now).*?\n", '', clean)
+            clean = _re2.sub(r'\{["\'](?:path|name|command|args)["\'].*?\}', "", content)
+            clean = _re2.sub(r"\[TOOL_CALL\].*?\[/TOOL_CALL\]", "", clean, flags=_re2.DOTALL)
+            clean = _re2.sub(
+                r"(?:Now |)(?:Calling|Searching|Looking|Reading|Inspecting)\s+\w+.*?(?:\n|\.\.\.)",
+                "",
+                clean,
+            )
+            clean = _re2.sub(
+                r"(?:J'examine|Je vais|Let me|I'll inspect|I'll check|I will now).*?\n", "", clean
+            )
             clean = clean.strip()
 
             # Skip adversarial warnings/rejections — these aren't decisions
-            if clean.startswith('[ADVERSARIAL') or 'ADVERSARIAL WARNING' in clean[:100]:
+            if clean.startswith("[ADVERSARIAL") or "ADVERSARIAL WARNING" in clean[:100]:
                 raise ValueError("adversarial output, not a decision")
 
             if len(clean) < 20:
@@ -778,25 +1196,41 @@ async def _execute_node(
 
             # Extract structured facts from agent output
             _FACT_KEYWORDS = (
-                'decision:', 'choix:', 'stack:', 'architecture:',
-                'action:', 'conclusion:', 'recommandation:', 'verdict:',
-                'risque:', 'blocage:', 'résultat:', 'created:', 'wrote:',
-                'approve', 'veto', 'go ', 'nogo', 'request_changes',
+                "decision:",
+                "choix:",
+                "stack:",
+                "architecture:",
+                "action:",
+                "conclusion:",
+                "recommandation:",
+                "verdict:",
+                "risque:",
+                "blocage:",
+                "résultat:",
+                "created:",
+                "wrote:",
+                "approve",
+                "veto",
+                "go ",
+                "nogo",
+                "request_changes",
             )
             facts = []
-            for line in clean.split('\n'):
+            for line in clean.split("\n"):
                 line_s = line.strip()
                 if not line_s or len(line_s) < 15:
                     continue
-                if line_s.startswith('[PR]') or line_s.startswith('- ['):
-                    facts.append(line_s)
-                elif any(kw in line_s.lower() for kw in _FACT_KEYWORDS):
+                if (
+                    line_s.startswith("[PR]")
+                    or line_s.startswith("- [")
+                    or any(kw in line_s.lower() for kw in _FACT_KEYWORDS)
+                ):
                     facts.append(line_s)
             # Compact summary: facts first, then truncated clean text
             if facts:
                 summary = "\n".join(facts[:8])
             else:
-                paragraphs = [p.strip() for p in clean.split('\n\n') if len(p.strip()) > 40]
+                paragraphs = [p.strip() for p in clean.split("\n\n") if len(p.strip()) > 40]
                 summary = paragraphs[0][:300] if paragraphs else clean[:300]
 
             # Use semantic category based on agent role
@@ -834,23 +1268,32 @@ async def _execute_node(
                 author=agent.id,
             )
 
-            await _sse(run, {
-                "type": "memory_stored",
-                "category": cat,
-                "key": f"{agent.name}: {run.flow_step or 'contribution'}",
-                "value": summary[:200],
-                "agent_id": agent.id,
-            })
+            await _sse(
+                run,
+                {
+                    "type": "memory_stored",
+                    "category": cat,
+                    "key": f"{agent.name}: {run.flow_step or 'contribution'}",
+                    "value": summary[:200],
+                    "agent_id": agent.id,
+                },
+            )
             # Record as tool_call for monitoring (auto-store counts as memory_store)
             try:
                 from ..db.migrations import get_db as _get_db2
+
                 _db2 = _get_db2()
                 _db2.execute(
                     "INSERT INTO tool_calls (agent_id, session_id, tool_name, parameters_json, result_json, success, timestamp) "
                     "VALUES (?, ?, 'memory_store', ?, ?, 1, datetime('now'))",
-                    (agent.id, run.session_id,
-                     json.dumps({"key": f"{agent.name}:{cat}", "category": cat, "auto": True})[:1000],
-                     f"Auto-stored: {summary[:200]}"),
+                    (
+                        agent.id,
+                        run.session_id,
+                        json.dumps({"key": f"{agent.name}:{cat}", "category": cat, "auto": True})[
+                            :1000
+                        ],
+                        f"Auto-stored: {summary[:200]}",
+                    ),
                 )
                 _db2.commit()
             except Exception:
@@ -861,6 +1304,7 @@ async def _execute_node(
     # Track agent performance score
     try:
         from ..db.migrations import get_db
+
         db = get_db()
         # Count this as an accepted contribution (iterations tracked separately)
         db.execute(
@@ -882,8 +1326,10 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
     """Build execution context for a node's agent."""
     store = get_session_store()
     history = store.get_messages(run.session_id, limit=30)
-    history_dicts = [{"from_agent": m.from_agent, "content": m.content,
-                      "message_type": m.message_type} for m in history]
+    history_dicts = [
+        {"from_agent": m.from_agent, "content": m.content, "message_type": m.message_type}
+        for m in history
+    ]
 
     project_context = ""
     vision = ""
@@ -933,8 +1379,7 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
                         seen_ids.add(eid)
                 if entries:
                     project_context = "\n".join(
-                        f"[{e['category']}] {e['key']}: {e['value'][:200]}"
-                        for e in entries[:15]
+                        f"[{e['category']}] {e['key']}: {e['value'][:200]}" for e in entries[:15]
                     )
         except Exception:
             pass
@@ -948,15 +1393,17 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
             other_entries = [e for e in pattern_entries if e.get("author_agent") != agent.id]
             if other_entries:
                 session_mem = "\n".join(
-                    f"[{e.get('type','ctx')}] {e['key']}: {e['value'][:200]}"
+                    f"[{e.get('type', 'ctx')}] {e['key']}: {e['value'][:200]}"
                     for e in other_entries[:10]
                 )
-                project_context += f"\n\n## Decisions from this session (other agents)\n{session_mem}"
+                project_context += (
+                    f"\n\n## Decisions from this session (other agents)\n{session_mem}"
+                )
     except Exception:
         pass
 
-    # Fallback: use workspace_path from mission if project_path not found from registry
-    if not project_path and run.project_path:
+    # For missions: prefer workspace_path (actual code) over project registry path
+    if run.project_path:
         project_path = run.project_path
 
     skills_prompt = ""
@@ -987,8 +1434,7 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
             if lesson_lines:
                 lessons_prompt = (
                     "\n## Lessons from past epics\n"
-                    "Apply these learnings from previous projects:\n"
-                    + "\n".join(lesson_lines[:10])
+                    "Apply these learnings from previous projects:\n" + "\n".join(lesson_lines[:10])
                 )
     except Exception:
         pass
@@ -1000,6 +1446,7 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
     if any(r in role_lower for r in si_roles) and run.project_id:
         try:
             import yaml as _yaml
+
             bp_path = Path(__file__).resolve().parents[2] / "data" / "si_blueprints"
             # Try project_id first, then check if there's a parent project
             for bp_name in (run.project_id,):
@@ -1014,7 +1461,9 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
                         f"CI/CD: {bp.get('cicd', {}).get('provider', '?')}\n"
                     )
                     if bp.get("databases"):
-                        si_prompt += f"Databases: {', '.join(d.get('type','') for d in bp['databases'])}\n"
+                        si_prompt += (
+                            f"Databases: {', '.join(d.get('type', '') for d in bp['databases'])}\n"
+                        )
                     if bp.get("conventions"):
                         si_prompt += f"Deploy: {bp['conventions'].get('deploy', '?')}, Secrets: {bp['conventions'].get('secrets', '?')}\n"
                     if bp.get("constraints"):
@@ -1022,7 +1471,7 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
                     if bp.get("existing_services"):
                         si_prompt += "Existing services:\n"
                         for svc in bp["existing_services"][:5]:
-                            si_prompt += f"  - {svc.get('name','')}: {svc.get('url','')} ({svc.get('proto','')})\n"
+                            si_prompt += f"  - {svc.get('name', '')}: {svc.get('url', '')} ({svc.get('proto', '')})\n"
                     break
         except Exception:
             pass
@@ -1034,6 +1483,7 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
 
     # Role-based tool filtering — each agent only sees tools relevant to their role
     from ..agents.executor import _get_tools_for_agent
+
     allowed_tools = _get_tools_for_agent(agent) if tools_for_agent else None
 
     # Enrich project_context with lessons and SI blueprint
@@ -1059,16 +1509,16 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
 # ── Pattern Runners ─────────────────────────────────────────────
 
 # Imports from extracted pattern implementations
-from .impls.solo import run_solo as _impl_solo
-from .impls.sequential import run_sequential as _impl_sequential
-from .impls.parallel import run_parallel as _impl_parallel
-from .impls.loop import run_loop as _impl_loop
-from .impls.hierarchical import run_hierarchical as _impl_hierarchical
-from .impls.network import run_network as _impl_network
-from .impls.router import run_router as _impl_router
 from .impls.aggregator import run_aggregator as _impl_aggregator
-from .impls.wave import run_wave as _impl_wave
+from .impls.hierarchical import run_hierarchical as _impl_hierarchical
 from .impls.human_in_the_loop import run_human_in_the_loop as _impl_human_in_the_loop
+from .impls.loop import run_loop as _impl_loop
+from .impls.network import run_network as _impl_network
+from .impls.parallel import run_parallel as _impl_parallel
+from .impls.router import run_router as _impl_router
+from .impls.sequential import run_sequential as _impl_sequential
+from .impls.solo import run_solo as _impl_solo
+from .impls.wave import run_wave as _impl_wave
 
 
 class _EngineProxy:
@@ -1077,10 +1527,19 @@ class _EngineProxy:
     Passed as 'engine' to extracted pattern implementations so they can call
     engine._execute_node(), engine._ordered_nodes(), etc.
     """
+
     @staticmethod
-    async def _execute_node(run, node_id, task, context_from="", to_agent_id="", protocol_override=""):
-        return await _execute_node(run, node_id, task, context_from=context_from,
-                                   to_agent_id=to_agent_id, protocol_override=protocol_override)
+    async def _execute_node(
+        run, node_id, task, context_from="", to_agent_id="", protocol_override=""
+    ):
+        return await _execute_node(
+            run,
+            node_id,
+            task,
+            context_from=context_from,
+            to_agent_id=to_agent_id,
+            protocol_override=protocol_override,
+        )
 
     @staticmethod
     def _ordered_nodes(pattern):
@@ -1139,7 +1598,7 @@ def _compress_output(text: str, max_chars: int = COMPRESSED_OUTPUT_SIZE) -> str:
     """
     if len(text) <= max_chars:
         return text
-    lines = text.split('\n')
+    lines = text.split("\n")
     kept = []
     char_count = 0
     # Always keep first non-empty paragraph
@@ -1150,23 +1609,39 @@ def _compress_output(text: str, max_chars: int = COMPRESSED_OUTPUT_SIZE) -> str:
             break
     # Then scan for high-signal lines
     signal_markers = (
-        'decision', 'choix', 'stack', 'conclusion', 'recommand',
-        'action', 'verdict', 'valide', 'approve', 'reject', 'veto',
-        '[pr]', 'architecture', 'technologie', 'priorit',
-        '- ', '* ', '1.', '2.', '3.',
+        "decision",
+        "choix",
+        "stack",
+        "conclusion",
+        "recommand",
+        "action",
+        "verdict",
+        "valide",
+        "approve",
+        "reject",
+        "veto",
+        "[pr]",
+        "architecture",
+        "technologie",
+        "priorit",
+        "- ",
+        "* ",
+        "1.",
+        "2.",
+        "3.",
     )
     for line in lines[1:]:
         stripped = line.strip().lower()
         if not stripped:
             continue
-        if any(m in stripped for m in signal_markers) or stripped.startswith('#'):
+        if any(m in stripped for m in signal_markers) or stripped.startswith("#"):
             kept.append(line)
             char_count += len(line)
             if char_count >= max_chars:
                 break
-    result = '\n'.join(kept)
+    result = "\n".join(kept)
     if len(result) > max_chars:
-        result = result[:max_chars] + '...'
+        result = result[:max_chars] + "..."
     return result
 
 
@@ -1195,10 +1670,10 @@ def _build_compressed_context(accumulated: list[str], budget: int = CONTEXT_BUDG
     compressed = []
     for entry in older:
         # Entry format: "[AgentName]:\n{output}"
-        header_end = entry.find('\n')
+        header_end = entry.find("\n")
         if header_end > 0:
             header = entry[:header_end]
-            body = _compress_output(entry[header_end + 1:], per_agent)
+            body = _compress_output(entry[header_end + 1 :], per_agent)
             compressed.append(f"{header}\n{body}")
         else:
             compressed.append(_compress_output(entry, per_agent))
@@ -1242,6 +1717,3 @@ def _compute_waves(pattern: PatternDef) -> list[list[str]]:
         remaining -= set(wave)
 
     return waves
-
-
-
