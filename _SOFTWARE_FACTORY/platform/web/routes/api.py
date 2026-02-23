@@ -1506,6 +1506,33 @@ async def autoheal_trigger():
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
+# ── Jira Integration ────────────────────────────────────────────────
+
+
+@router.get("/api/jira/board")
+async def jira_board(board_id: int = 8680):
+    """Get issues from a Jira board."""
+    from ...tools.jira_tools import jira_board_issues
+    result = await jira_board_issues(board_id)
+    return PlainTextResponse(result)
+
+
+@router.get("/api/jira/search")
+async def jira_search_api(jql: str = "project=LPDATA"):
+    """Search Jira issues."""
+    from ...tools.jira_tools import jira_search
+    result = await jira_search(jql)
+    return PlainTextResponse(result)
+
+
+@router.post("/api/jira/sync/{mission_id}")
+async def jira_sync_mission(mission_id: str, board_id: int = 8680):
+    """Sync a mission's tasks/stories to Jira."""
+    from ...tools.jira_tools import jira_sync_from_platform
+    result = await jira_sync_from_platform(mission_id, board_id)
+    return PlainTextResponse(result)
+
+
 # ── Chaos Endurance ──────────────────────────────────────────────────
 
 

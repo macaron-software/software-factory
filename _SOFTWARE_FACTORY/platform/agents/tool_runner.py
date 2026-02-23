@@ -1626,7 +1626,10 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
         return await _tool_mcp_solaris(name, args, ctx)
     if name.startswith("github_"):
         return await _tool_mcp_github(name, args, ctx)
-    if name.startswith("jira_") or name == "confluence_read":
+    if name.startswith("jira_"):
+        from ..tools.jira_tools import run_jira_tool
+        return await run_jira_tool(name, args)
+    if name == "confluence_read":
         return await _tool_mcp_jira(name, args, ctx)
 
     # ── Dynamic MCP tools (mcp_<server-id>_<tool>) ──
