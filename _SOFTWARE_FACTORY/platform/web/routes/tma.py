@@ -229,3 +229,54 @@ async def list_tickets(
         ],
         "count": len(tickets),
     }
+
+
+class JSErrorReport(BaseModel):
+    """Browser JS error report."""
+    message: str = ""
+    source: str = ""
+    line: int = 0
+    col: int = 0
+    url: str = ""
+    ua: str = ""
+
+
+@router.post("/js-error")
+async def report_js_error(request: Request, report: JSErrorReport):
+    """Receive JS errors from browser and create TMA support tickets."""
+    import uuid
+    from ...db.migrations import get_db
+
+    # Skip noise
+    if not report.message or "Script error" in report.message:
+        return {"status": "ignored"}
+
+    tid = str(uuid.uuid4())[:8]
+    title = f"[JS] {report.message[:120]}"
+    desc = (
+        f"Source: {report.source}:{report.line}:{report.col}\n"
+        f"Page: {report.url}\n"
+        f"UA: {report.ua}"
+    )
+    try:
+        db = get_db()
+        # Deduplicate: skip if same title exists and is still open
+        existing = db.execute(
+            "SELECT id FROM support_tickets WHERE title=? AND status='open' LIMIT 1",
+            (title,),
+        ).fetchone()
+        if existing:
+            db.close()
+            return {"status": "duplicate", "ticket_id": existing[0]}
+        db.execute(
+            "INSERT INTO support_tickets (id, mission_id, title, description, severity, category, reporter, status) "
+            "VALUES (?, '', ?, ?, 'medium', 'js-error', 'browser', 'open')",
+            (tid, title, desc),
+        )
+        db.commit()
+        db.close()
+        logger.info("JS error ticket created: %s — %s", tid, title)
+        return {"status": "created", "ticket_id": tid}
+    except Exception as e:
+        logger.warning("Failed to create JS error ticket: %s", e)
+        return {"status": "error", "detail": str(e)}

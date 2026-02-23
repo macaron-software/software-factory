@@ -10,7 +10,53 @@
     <link rel="stylesheet" href="/static/css/agents.css?v=20260222">
     <link rel="stylesheet" href="/static/css/projects.css?v=20260222">
     <script src="/static/js/htmx.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
     <script src="/static/js/sse.js" defer></script>
+    <script>
+    /* JS i18n — mirrors server-side _() */
+    window.__i18n = {{ i18n_catalog | tojson }};
+    function _(key) { return window.__i18n[key] || key; }
+
+    /* Global error handler → auto-create TMA ticket */
+    (function() {
+        const _reported = new Set();
+        const _throttle = 60000; /* 1 ticket per unique error per minute */
+        window.addEventListener('error', function(e) {
+            const sig = (e.message || '') + ':' + (e.filename || '') + ':' + (e.lineno || 0);
+            if (_reported.has(sig)) return;
+            _reported.add(sig);
+            setTimeout(() => _reported.delete(sig), _throttle);
+            try {
+                fetch('/api/tma/js-error', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        message: e.message || 'Unknown error',
+                        source: e.filename || location.pathname,
+                        line: e.lineno || 0,
+                        col: e.colno || 0,
+                        url: location.href,
+                        ua: navigator.userAgent.slice(0, 120)
+                    })
+                });
+            } catch(_) {}
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            const msg = (e.reason && e.reason.message) || String(e.reason || 'Unhandled promise rejection');
+            const sig = 'promise:' + msg;
+            if (_reported.has(sig)) return;
+            _reported.add(sig);
+            setTimeout(() => _reported.delete(sig), _throttle);
+            try {
+                fetch('/api/tma/js-error', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ message: msg, source: 'promise', url: location.href })
+                });
+            } catch(_) {}
+        });
+    })();
+    </script>
 </head>
 <body>
     {% include "partials/svg_sprites.html" %}
