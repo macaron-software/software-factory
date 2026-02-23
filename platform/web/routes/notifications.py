@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from ...services.notifications import get_notification_store
+from ...services.notification_service import get_notification_store
 from .helpers import _templates
 
 router = APIRouter()
