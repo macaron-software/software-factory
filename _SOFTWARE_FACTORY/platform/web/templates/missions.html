@@ -3,7 +3,7 @@
 {% block topbar_actions %}
 {% include "partials/view_switcher.html" %}
 <a href="/missions?action=new" class="btn btn-primary">
-    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> New Epic
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> {{ _("new_mission") }}
 </a>
 {% endblock %}
 
@@ -97,7 +97,7 @@
 {% if show_new_form %}
 <div class="new-mission-overlay" onclick="if(event.target===this)location.href='/missions'">
     <form class="new-mission-form" id="newMissionForm">
-        <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> New Epic</h3>
+        <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> {{ _("new_mission") }}</h3>
         <div class="nmf-field">
             <label>{{ _("project") }}</label>
             <select name="project_id" required>

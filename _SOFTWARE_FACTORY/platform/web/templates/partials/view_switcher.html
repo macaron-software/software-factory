@@ -17,13 +17,16 @@
 <script>
 (function(){
   function initSwitcher(sw) {
-    if (sw._vsInit) return;
-    sw._vsInit = true;
     const page = sw.dataset.page;
     const key = 'macaron_view_' + page;
     const saved = localStorage.getItem(key) || 'card';
-    const grid = sw.parentElement ? sw.parentElement.parentElement.querySelector('[data-view-grid]') || document.querySelector('[data-view-grid]') : null;
+    // Find closest grid: walk up then search, or fallback to document-level
+    const grid = sw.closest('.main-area, .tab-toolbar, #tab-content')?.querySelector('[data-view-grid]')
+      || document.querySelector('[data-view-grid]');
     if (!grid) return;
+
+    // Unbind previous handler if re-initializing
+    if (sw._vsClick) sw.removeEventListener('click', sw._vsClick);
 
     function setMode(mode) {
       grid.setAttribute('data-view', mode);
@@ -31,19 +34,27 @@
       localStorage.setItem(key, mode);
     }
 
-    sw.addEventListener('click', e => {
+    sw._vsClick = e => {
       const btn = e.target.closest('.vs-btn');
       if (btn) setMode(btn.dataset.mode);
-    });
+    };
+    sw.addEventListener('click', sw._vsClick);
 
     setMode(saved);
   }
 
-  // Init immediately (works for HTMX-loaded content)
-  document.querySelectorAll('.view-switcher:not([data-vs-init])').forEach(sw => { sw.dataset.vsInit='1'; initSwitcher(sw); });
-  // Also on DOMContentLoaded for full-page loads
-  document.addEventListener('DOMContentLoaded', () => {
+  function initAll() {
     document.querySelectorAll('.view-switcher').forEach(initSwitcher);
-  });
+  }
+
+  // Wait for DOM to be ready (grid must exist)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAll);
+  } else {
+    // DOM already loaded (HTMX swap, late script)
+    initAll();
+  }
+  // Re-init after HTMX swaps (for tab-loaded content)
+  document.body.addEventListener('htmx:afterSwap', initAll);
 })();
 </script>
