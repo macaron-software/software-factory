@@ -409,6 +409,37 @@ def create_app() -> FastAPI:
         trace_id_var.reset(token)
         return response
 
+    # ── Auth: setup wizard redirect ────────────────────────────────────
+    _setup_checked = False
+
+    @app.middleware("http")
+    async def setup_redirect_middleware(request, call_next):
+        """Redirect to /setup if no users exist (first-time setup)."""
+        nonlocal _setup_checked
+        path = request.url.path
+        # Skip for static, API, setup page itself
+        if (
+            _setup_checked
+            or path.startswith("/static")
+            or path.startswith("/api/")
+            or path == "/setup"
+            or path == "/health"
+            or path == "/favicon.ico"
+        ):
+            return await call_next(request)
+
+        try:
+            from .auth.middleware import is_setup_needed
+
+            if is_setup_needed():
+                from starlette.responses import RedirectResponse
+
+                return RedirectResponse(url="/setup", status_code=302)
+            _setup_checked = True  # Cache: no need to check again
+        except Exception:
+            pass
+        return await call_next(request)
+
     # ── Locale detection middleware ─────────────────────────────────────
     SUPPORTED_LOCALES = {"en", "fr", "es", "it", "de", "pt", "ja", "zh"}
 
@@ -452,6 +483,15 @@ def create_app() -> FastAPI:
 
         # Set in request state for templates
         request.state.lang = locale
+
+        # Inject current user into request state for templates
+        if not hasattr(request.state, "user"):
+            try:
+                from .auth.middleware import get_current_user as _get_user
+
+                request.state.user = await _get_user(request)
+            except Exception:
+                request.state.user = None
 
         response = await call_next(request)
 
@@ -577,8 +617,10 @@ def create_app() -> FastAPI:
 
     # Routes
     from .web.routes import router as web_router
+    from .web.routes.auth import router as auth_router
     from .web.ws import router as sse_router
 
+    app.include_router(auth_router)
     app.include_router(web_router)
     app.include_router(sse_router, prefix="/sse")
 

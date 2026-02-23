@@ -349,10 +349,12 @@ async def jira_sync_to_platform(board_id: int = 8680) -> str:
 
 # Platform kanban_status → Jira transition name
 _PLATFORM_TO_JIRA = {
-    "funnel": "Ré-ouvrir",  # → Créée
-    "analyzing": "En Cours",  # → En Cours
-    "backlog": "Non Prêt",  # → Prête
-    "implementing": "En Cours",  # → En Cours
+    "funnel": None,              # Créée (initial state, no transition needed)
+    "analyzing": "Prêt",         # → Prête
+    "backlog": "Prêt",           # → Prête
+    "implementing": "Prêt",      # → Prête (Feature type has no "En Cours")
+    "done": "Fermer",            # → Fermée
+}
     "done": "Réaliser",  # → Réalisée
 }
 
@@ -465,7 +467,7 @@ async def jira_kanban_sync(direction: str = "both") -> str:
                     db.commit()
                     # Set the right Jira status
                     target = _PLATFORM_TO_JIRA.get(m["kanban_status"] or "funnel")
-                    if target and target != "Ré-ouvrir":
+                    if target:
                         await jira_transition(jira_key, target)
                     results.append(
                         f"+ Created {jira_key} for '{m['name'][:30]}' ({m['kanban_status'] or 'funnel'})"
