@@ -50,7 +50,9 @@ def format_table(headers: list[str], rows: list[list[str]]) -> str:
 
     # Rows
     for row in rows:
-        lines.append("  ".join(str(cell).ljust(w) for cell, w in zip(row, col_widths, strict=False)))
+        lines.append(
+            "  ".join(str(cell).ljust(w) for cell, w in zip(row, col_widths, strict=False))
+        )
 
     return "\n".join(lines)
 
@@ -400,7 +402,7 @@ async def cmd_projects_list() -> SFCommandResponse:
 
 async def cmd_db_status() -> SFCommandResponse:
     """Show database status."""
-    from platform.db import get_db
+    from platform.db.migrations import get_db
 
     try:
         db = get_db()

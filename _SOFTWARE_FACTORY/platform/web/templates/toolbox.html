@@ -298,6 +298,21 @@ async function executeCLICommand(commandLine) {
         } else {
             outputDiv.style.color = '#f48771';
             outputDiv.innerHTML = `<strong>Error${data.exit_code ? ' (exit '+data.exit_code+')' : ''}:</strong>\n${data.error || 'Unknown error'}`;
+            
+            // Report CLI errors to TMA
+            try {
+                fetch('/api/tma/js-error', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        message: `CLI Error: ${command} ${args.join(' ')}`,
+                        source: 'web-cli',
+                        error: data.error || 'Unknown error',
+                        command: commandLine,
+                        url: location.href
+                    })
+                });
+            } catch(_) {}
         }
         
         terminal.appendChild(outputDiv);
