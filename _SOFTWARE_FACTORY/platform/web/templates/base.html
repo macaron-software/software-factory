@@ -210,6 +210,15 @@
     .tma-hb.healing svg{animation:hb-beat .6s ease-in-out infinite}
     .tma-hb.stale svg{opacity:.4;animation:none}
     @keyframes hb-beat{0%,100%{transform:scale(1);opacity:1}15%{transform:scale(1.25);opacity:1}30%{transform:scale(1);opacity:.7}45%{transform:scale(1.15);opacity:1}60%{transform:scale(1);opacity:1}}
+    /* TMA hover popover */
+    .tma-tip{display:none;position:absolute;top:calc(100% + 8px);right:0;width:220px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:999;padding:10px 12px;pointer-events:none}
+    .tma-hb:hover .tma-tip{display:block}
+    .tma-tip-title{font-size:11px;font-weight:700;margin-bottom:8px;letter-spacing:.3px}
+    .tma-tip-grid{display:flex;flex-direction:column;gap:3px}
+    .tma-tip-row{display:flex;justify-content:space-between;font-size:11px;color:var(--text-secondary)}
+    .tma-tip-row span:last-child{font-weight:600;color:var(--text-primary);font-variant-numeric:tabular-nums}
+    .tma-tip-sep{height:1px;background:var(--border);margin:4px 0}
+    .tma-tip-footer{font-size:9px;color:var(--text-secondary);margin-top:8px;opacity:.7}
     .sidebar-view-switch{display:flex;justify-content:center;gap:2px;padding:0.3rem 0.4rem;margin:0 0.3rem 0.3rem;background:var(--bg-tertiary);border-radius:8px}
     .view-switch-btn{background:none;border:none;color:var(--text-secondary);padding:0.3rem;border-radius:6px;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center}
     .view-switch-btn:hover{color:var(--text-primary);background:var(--bg-secondary)}

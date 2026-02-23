@@ -1446,40 +1446,48 @@ async def autoheal_stats():
 
 @router.get("/api/autoheal/heartbeat")
 async def autoheal_heartbeat():
-    """Return animated ECG heartbeat icon for TMA status."""
+    """Return animated ECG heartbeat icon with hover detail popover."""
     from ...ops.auto_heal import get_autoheal_stats
 
     stats = get_autoheal_stats()
     hb = stats.get("heartbeat", "starting")
-    open_inc = stats["incidents"]["open"]
+    inc = stats["incidents"]
+    mis = stats["missions"]
     active = stats["active_heals"]
 
     if not stats["enabled"]:
-        css_class = "stale"
-        color = "var(--text-secondary)"
-        label = "TMA disabled"
-    elif hb == "alive" and open_inc == 0 and active == 0:
-        css_class = "alive"
-        color = "#22c55e"
-        label = "TMA OK — no open incidents"
-    elif hb == "alive" and (open_inc > 0 or active > 0):
-        css_class = "healing"
-        color = "#f59e0b"
-        label = f"TMA active — {open_inc} open, {active} healing"
+        css_class, color, status_label = "stale", "var(--text-secondary)", "Disabled"
+    elif hb == "alive" and inc["open"] == 0 and active == 0:
+        css_class, color, status_label = "alive", "#22c55e", "OK"
+    elif hb == "alive":
+        css_class, color, status_label = "healing", "#f59e0b", "Active"
     elif hb == "starting":
-        css_class = "stale"
-        color = "var(--text-secondary)"
-        label = "TMA starting..."
+        css_class, color, status_label = "stale", "var(--text-secondary)", "Starting..."
     else:
-        css_class = "stale"
-        color = "#ef4444"
-        label = f"TMA down — {stats.get('last_error', '?')[:50]}"
+        css_class, color, status_label = "stale", "#ef4444", "Down"
+
+    last_err = stats.get("last_error", "")
+    err_line = f'<div class="tma-tip-row" style="color:#ef4444">Err: {last_err[:60]}</div>' if last_err else ""
 
     html = (
-        f'<span class="tma-hb {css_class}" data-tooltip="{label}" style="--tma-color:{color}">'
+        f'<span class="tma-hb {css_class}" style="--tma-color:{color}">'
         f'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-        f'<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>'
-        f"</svg></span>"
+        f'<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>'
+        f'<div class="tma-tip">'
+        f'<div class="tma-tip-title" style="color:{color}">TMA Auto-Heal — {status_label}</div>'
+        f'<div class="tma-tip-grid">'
+        f'<div class="tma-tip-row"><span>Open</span><span style="color:#f59e0b">{inc["open"]}</span></div>'
+        f'<div class="tma-tip-row"><span>Investigating</span><span>{inc["investigating"]}</span></div>'
+        f'<div class="tma-tip-row"><span>Resolved</span><span style="color:#22c55e">{inc["resolved"]}</span></div>'
+        f'<div class="tma-tip-sep"></div>'
+        f'<div class="tma-tip-row"><span>Missions</span><span>{mis["total"]}</span></div>'
+        f'<div class="tma-tip-row"><span>Healing</span><span style="color:#f59e0b">{active}</span></div>'
+        f'<div class="tma-tip-row"><span>Completed</span><span style="color:#22c55e">{mis["completed"]}</span></div>'
+        f'<div class="tma-tip-row"><span>Failed</span><span style="color:#ef4444">{mis["failed"]}</span></div>'
+        f'{err_line}'
+        f'</div>'
+        f'<div class="tma-tip-footer">Scan every {stats["interval_s"]}s — Max {stats["max_concurrent"]} concurrent</div>'
+        f'</div></span>'
     )
     return HTMLResponse(html)
 
@@ -2357,6 +2365,186 @@ async def github_webhook(request: Request):
                 )
                 db.commit()
                 return JSONResponse({"ok": True, "event": "issues", "mission_id": mid})
+    finally:
+        db.close()
+
+
+# ── Custom AI Providers ──────────────────────────────────────────────────────
+@router.get("/api/ai-providers")
+async def list_ai_providers():
+    """List all custom AI providers."""
+    from ...db.migrations import get_db
+    
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, name, provider_type, base_url, default_model, enabled, created_at "
+            "FROM custom_ai_providers ORDER BY name"
+        ).fetchall()
+        providers = [dict(r) for r in rows]
+        return JSONResponse({"ok": True, "providers": providers})
+    finally:
+        db.close()
+
+
+@router.post("/api/ai-providers")
+async def create_ai_provider(request: Request):
+    """Create a new custom AI provider."""
+    import uuid
+    from cryptography.fernet import Fernet
+    from ...db.migrations import get_db
+    
+    body = await request.json()
+    name = body.get("name", "").strip()
+    provider_type = body.get("provider_type", "openai-compatible")
+    base_url = body.get("base_url", "").strip()
+    api_key = body.get("api_key", "").strip()
+    default_model = body.get("default_model", "").strip()
+    
+    if not all([name, base_url, api_key, default_model]):
+        return JSONResponse({"ok": False, "error": "Missing required fields"}, status_code=400)
+    
+    # Encrypt API key
+    encryption_key = os.environ.get("SF_ENCRYPTION_KEY")
+    if not encryption_key:
+        # Generate a key if not set (for development)
+        encryption_key = Fernet.generate_key().decode()
+        logger.warning("SF_ENCRYPTION_KEY not set, using temporary key (not secure for production)")
+    
+    fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
+    encrypted_key = fernet.encrypt(api_key.encode()).decode()
+    
+    provider_id = str(uuid.uuid4())[:12]
+    db = get_db()
+    try:
+        db.execute(
+            "INSERT INTO custom_ai_providers (id, name, provider_type, base_url, api_key_encrypted, default_model, enabled) "
+            "VALUES (?, ?, ?, ?, ?, ?, 1)",
+            (provider_id, name, provider_type, base_url, encrypted_key, default_model)
+        )
+        db.commit()
+        return JSONResponse({"ok": True, "id": provider_id})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    finally:
+        db.close()
+
+
+@router.patch("/api/ai-providers/{provider_id}")
+async def update_ai_provider(provider_id: str, request: Request):
+    """Update a custom AI provider."""
+    from cryptography.fernet import Fernet
+    from ...db.migrations import get_db
+    
+    body = await request.json()
+    db = get_db()
+    
+    try:
+        updates = []
+        params = []
+        
+        if "enabled" in body:
+            updates.append("enabled = ?")
+            params.append(1 if body["enabled"] else 0)
+        
+        if "name" in body:
+            updates.append("name = ?")
+            params.append(body["name"])
+        
+        if "base_url" in body:
+            updates.append("base_url = ?")
+            params.append(body["base_url"])
+        
+        if "default_model" in body:
+            updates.append("default_model = ?")
+            params.append(body["default_model"])
+        
+        if "api_key" in body and body["api_key"]:
+            encryption_key = os.environ.get("SF_ENCRYPTION_KEY")
+            if not encryption_key:
+                encryption_key = Fernet.generate_key().decode()
+            fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
+            encrypted_key = fernet.encrypt(body["api_key"].encode()).decode()
+            updates.append("api_key_encrypted = ?")
+            params.append(encrypted_key)
+        
+        if updates:
+            updates.append("updated_at = datetime('now')")
+            params.append(provider_id)
+            db.execute(
+                f"UPDATE custom_ai_providers SET {', '.join(updates)} WHERE id = ?",
+                params
+            )
+            db.commit()
+        
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    finally:
+        db.close()
+
+
+@router.delete("/api/ai-providers/{provider_id}")
+async def delete_ai_provider(provider_id: str):
+    """Delete a custom AI provider."""
+    from ...db.migrations import get_db
+    
+    db = get_db()
+    try:
+        db.execute("DELETE FROM custom_ai_providers WHERE id = ?", (provider_id,))
+        db.commit()
+        return JSONResponse({"ok": True})
+    finally:
+        db.close()
+
+
+@router.post("/api/ai-providers/{provider_id}/test")
+async def test_ai_provider(provider_id: str):
+    """Test connection to a custom AI provider."""
+    from cryptography.fernet import Fernet
+    import httpx
+    from ...db.migrations import get_db
+    
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT base_url, api_key_encrypted, default_model FROM custom_ai_providers WHERE id = ?",
+            (provider_id,)
+        ).fetchone()
+        
+        if not row:
+            return JSONResponse({"ok": False, "error": "Provider not found"}, status_code=404)
+        
+        base_url = row[0]
+        encrypted_key = row[1]
+        model = row[2]
+        
+        # Decrypt API key
+        encryption_key = os.environ.get("SF_ENCRYPTION_KEY")
+        if not encryption_key:
+            encryption_key = Fernet.generate_key().decode()
+        fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
+        api_key = fernet.decrypt(encrypted_key.encode()).decode()
+        
+        # Test API call
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                f"{base_url}/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": "test"}],
+                    "max_tokens": 5
+                }
+            )
+        
+        if response.status_code == 200:
+            return JSONResponse({"ok": True, "status": "connected"})
+        else:
+            return JSONResponse({"ok": False, "error": f"HTTP {response.status_code}"}, status_code=500)
+    
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
     finally:
         db.close()
 
