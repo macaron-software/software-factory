@@ -299,6 +299,10 @@ def check_l0(
             score += 3
 
     threshold = 5  # reject if score >= threshold
+    # QA/test agents get a higher threshold — their auto-injected reports
+    # trigger false positives for "hallucination" (claiming actions without tool calls)
+    if any(k in role_lower for k in ("qa", "test", "validation", "e2e")):
+        threshold = 8
     return GuardResult(
         passed=score < threshold,
         score=score,

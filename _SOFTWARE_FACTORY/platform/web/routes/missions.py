@@ -1833,6 +1833,37 @@ async def api_confluence_status(mission_id: str):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+# ── Screenshots API ──
+
+
+@router.get("/api/missions/{mission_id}/screenshots")
+async def api_mission_screenshots(mission_id: str):
+    """List screenshots from mission workspace."""
+    from ...missions.store import get_mission_run_store
+
+    store = get_mission_run_store()
+    mission = store.get(mission_id)
+    if not mission or not mission.workspace_path:
+        return JSONResponse({"screenshots": [], "workspace": ""})
+    ws = Path(mission.workspace_path)
+    screenshots = []
+    for img_dir in [ws / "screenshots", ws]:
+        if img_dir.exists():
+            for ext in ("*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp"):
+                for img in sorted(img_dir.glob(ext)):
+                    if img.stat().st_size > 1000:
+                        rel = img.relative_to(ws)
+                        screenshots.append(
+                            {
+                                "name": img.name,
+                                "path": str(rel),
+                                "size_kb": round(img.stat().st_size / 1024, 1),
+                                "url": f"/workspace/{mission_id}/{rel}",
+                            }
+                        )
+    return JSONResponse({"screenshots": screenshots[:20], "workspace": str(ws)})
+
+
 # ── Support Tickets API (TMA) ──
 
 

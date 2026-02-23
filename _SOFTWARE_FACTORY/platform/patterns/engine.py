@@ -222,6 +222,54 @@ CRITICAL RULES:
 - End with a clear actionable conclusion"""
 
 
+def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
+    """Auto-create TMA tickets from E2E/build results that contain failures."""
+    import uuid
+
+    try:
+        from ..db import get_db
+    except Exception:
+        return
+
+    # Detect failures in results
+    fail_lines = []
+    for line in results.split("\n"):
+        line_lower = line.lower()
+        if any(kw in line_lower for kw in ("fail", "error:", "timeout", "not responding")):
+            if "npm install: OK" not in line and "0 failures" not in line_lower:
+                fail_lines.append(line.strip())
+
+    if not fail_lines:
+        return
+
+    mission_id = getattr(ctx, "mission_run_id", "") or ""
+    agent_id = ctx.agent.id if ctx.agent else source
+    try:
+        db = get_db()
+        for i, fail in enumerate(fail_lines[:5]):  # max 5 tickets per run
+            tid = str(uuid.uuid4())[:8]
+            title = fail[:120] if len(fail) > 10 else f"Auto-detected {source} failure #{i + 1}"
+            severity = "high" if "error" in fail.lower() else "medium"
+            db.execute(
+                "INSERT INTO support_tickets (id, mission_id, title, description, severity, category, reporter, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, 'open')",
+                (
+                    tid,
+                    mission_id,
+                    title,
+                    f"Auto-created from {source} results:\n{fail}",
+                    severity,
+                    "auto-qa",
+                    agent_id,
+                ),
+            )
+        db.commit()
+        db.close()
+        logger.info("Auto-created %d TMA tickets from %s results", len(fail_lines[:5]), source)
+    except Exception as e:
+        logger.warning("Failed to auto-create tickets: %s", e)
+
+
 def _build_team_context(run: PatternRun, current_node: str, to_agent_id: str) -> str:
     """Build team awareness: who's on the team, what's the communication flow."""
     parts = []
@@ -454,6 +502,8 @@ async def _execute_node(
 
                     e2e_result = await _tool_run_e2e_tests({}, ctx)
                     full_task += f"\n\n## E2E Test Results (auto-executed)\n{e2e_result}"
+                    # Auto-create TMA tickets for failures found
+                    _auto_create_tickets_from_results(e2e_result, ctx, "qa")
                 except Exception as e:
                     full_task += f"\n\n## E2E Tests: Error running auto-tests: {e}"
         elif "lead" in role_lower or "architect" in role_lower:

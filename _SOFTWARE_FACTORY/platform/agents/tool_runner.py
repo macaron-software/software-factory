@@ -261,8 +261,19 @@ async def _tool_list_files(args: dict) -> str:
 
     path = args.get("path", ".")
     depth = int(args.get("depth", 2))
+    # Fix path doubling: if path doesn't exist, try stripping duplicate basename
     if not os.path.isdir(path):
-        return f"Error: not a directory: {path}"
+        parent = os.path.dirname(path)
+        base = os.path.basename(path)
+        # e.g. /app/workspace/devpulse/devpulse → /app/workspace/devpulse
+        if os.path.basename(parent) == base and os.path.isdir(parent):
+            path = parent
+        elif not os.path.exists(path):
+            return f"Error: not a directory: {path}"
+        elif os.path.isfile(path):
+            return f"Note: '{path}' is a file, not a directory. Use code_read to view it."
+        else:
+            return f"Error: not a directory: {path}"
     lines = []
     for root, dirs, files in os.walk(path):
         level = root.replace(path, "").count(os.sep)
@@ -774,7 +785,21 @@ async def _tool_run_e2e_tests(args: dict, ctx: ExecutionContext) -> str:
                     stderr=subprocess.DEVNULL,
                 )
                 results.append(f"[server] Started: {start_cmd} (pid={server_proc.pid})")
-                time.sleep(5)
+                # Wait for server to be ready (up to 15s)
+                import urllib.request
+
+                ready = False
+                for attempt in range(15):
+                    time.sleep(1)
+                    try:
+                        urllib.request.urlopen(f"http://localhost:{port}", timeout=1)
+                        ready = True
+                        break
+                    except Exception:
+                        pass
+                results.append(
+                    f"[server] {'Ready' if ready else 'Not responding (continuing anyway)'} after {attempt + 1}s"
+                )
                 break
         except Exception:
             pass
@@ -1460,6 +1485,16 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
             path = args.get("path", "")
             if not path or path == ".":
                 args["path"] = ctx.project_path
+            elif os.path.isabs(path) and ctx.project_path:
+                # Agent used absolute path — normalize to workspace-relative
+                # e.g. /app/data/workspaces/abc123/src/main.ts → src/main.ts
+                if path.startswith(ctx.project_path + "/"):
+                    path = path[len(ctx.project_path) + 1 :]
+                    args["path"] = os.path.join(ctx.project_path, path)
+                elif path.startswith(ctx.project_path):
+                    args["path"] = ctx.project_path
+                else:
+                    args["path"] = path  # truly external absolute path
             elif not os.path.isabs(path):
                 # Strip workspace ID prefix if LLM included it (avoids path doubling)
                 if ctx.project_path:
