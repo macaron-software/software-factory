@@ -3,12 +3,11 @@
 Contains OpenAI-compatible function-calling tool definitions and
 role-based access control mappings. Extracted from executor.py.
 """
-from __future__ import annotations
-from typing import Optional
 
+from __future__ import annotations
 
 # Tool JSON schemas for OpenAI function-calling API
-_TOOL_SCHEMAS: Optional[list[dict]] = None
+_TOOL_SCHEMAS: list[dict] | None = None
 
 
 def _get_tool_schemas() -> list[dict]:
@@ -27,7 +26,10 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "path": {"type": "string", "description": "Absolute or relative file path"},
-                        "max_lines": {"type": "integer", "description": "Max lines to read (default 500)"},
+                        "max_lines": {
+                            "type": "integer",
+                            "description": "Max lines to read (default 500)",
+                        },
                     },
                     "required": ["path"],
                 },
@@ -42,7 +44,10 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "pattern": {"type": "string", "description": "Regex pattern to search for"},
-                        "path": {"type": "string", "description": "Directory to search in (default: project root)"},
+                        "path": {
+                            "type": "string",
+                            "description": "Directory to search in (default: project root)",
+                        },
                         "glob": {"type": "string", "description": "File glob filter, e.g. '*.py'"},
                     },
                     "required": ["pattern"],
@@ -73,7 +78,10 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "path": {"type": "string", "description": "File path"},
-                        "old_str": {"type": "string", "description": "Exact string to find and replace"},
+                        "old_str": {
+                            "type": "string",
+                            "description": "Exact string to find and replace",
+                        },
                         "new_str": {"type": "string", "description": "Replacement string"},
                     },
                     "required": ["path", "old_str", "new_str"],
@@ -88,7 +96,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "cwd": {"type": "string", "description": "Working directory (default: project root)"},
+                        "cwd": {
+                            "type": "string",
+                            "description": "Working directory (default: project root)",
+                        },
                     },
                 },
             },
@@ -102,7 +113,10 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "cwd": {"type": "string", "description": "Working directory"},
-                        "limit": {"type": "integer", "description": "Number of commits (default 10)"},
+                        "limit": {
+                            "type": "integer",
+                            "description": "Number of commits (default 10)",
+                        },
                     },
                 },
             },
@@ -130,7 +144,11 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "query": {"type": "string", "description": "Search query"},
-                        "scope": {"type": "string", "description": "Memory scope: project | global", "enum": ["project", "global"]},
+                        "scope": {
+                            "type": "string",
+                            "description": "Memory scope: project | global",
+                            "enum": ["project", "global"],
+                        },
                     },
                     "required": ["query"],
                 },
@@ -146,7 +164,10 @@ def _get_tool_schemas() -> list[dict]:
                     "properties": {
                         "key": {"type": "string", "description": "Short key/title for the memory"},
                         "value": {"type": "string", "description": "Content to store"},
-                        "category": {"type": "string", "description": "Category: decision | fact | learning | context"},
+                        "category": {
+                            "type": "string",
+                            "description": "Category: decision | fact | learning | context",
+                        },
                     },
                     "required": ["key", "value"],
                 },
@@ -175,8 +196,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "The question or exploration goal — e.g. 'how is authentication implemented', 'find all REST endpoints', 'explain the data model'"},
-                        "max_iterations": {"type": "integer", "description": "Max RLM iterations (default 3, max 3). Higher = deeper but slower."},
+                        "query": {
+                            "type": "string",
+                            "description": "The question or exploration goal — e.g. 'how is authentication implemented', 'find all REST endpoints', 'explain the data model'",
+                        },
+                        "max_iterations": {
+                            "type": "integer",
+                            "description": "Max RLM iterations (default 3, max 3). Higher = deeper but slower.",
+                        },
                     },
                     "required": ["query"],
                 },
@@ -190,8 +217,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "cwd": {"type": "string", "description": "Project workspace directory containing the code to deploy"},
-                        "mission_id": {"type": "string", "description": "Mission ID (used for container naming and tracking)"},
+                        "cwd": {
+                            "type": "string",
+                            "description": "Project workspace directory containing the code to deploy",
+                        },
+                        "mission_id": {
+                            "type": "string",
+                            "description": "Mission ID (used for container naming and tracking)",
+                        },
                     },
                     "required": ["cwd"],
                 },
@@ -205,8 +238,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "mission_id": {"type": "string", "description": "Mission ID of the container to stop"},
-                        "container": {"type": "string", "description": "Container name (alternative to mission_id)"},
+                        "mission_id": {
+                            "type": "string",
+                            "description": "Mission ID of the container to stop",
+                        },
+                        "container": {
+                            "type": "string",
+                            "description": "Container name (alternative to mission_id)",
+                        },
                     },
                 },
             },
@@ -220,7 +259,10 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "mission_id": {"type": "string", "description": "Mission ID to check"},
-                        "container": {"type": "string", "description": "Container name (alternative to mission_id)"},
+                        "container": {
+                            "type": "string",
+                            "description": "Container name (alternative to mission_id)",
+                        },
                     },
                 },
             },
@@ -249,8 +291,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "phase_id": {"type": "string", "description": "Phase ID (e.g. 'ideation', 'dev-sprint', 'qa-campaign')"},
-                        "brief": {"type": "string", "description": "Context/brief to pass to the phase agents"},
+                        "phase_id": {
+                            "type": "string",
+                            "description": "Phase ID (e.g. 'ideation', 'dev-sprint', 'qa-campaign')",
+                        },
+                        "brief": {
+                            "type": "string",
+                            "description": "Context/brief to pass to the phase agents",
+                        },
                     },
                     "required": ["phase_id", "brief"],
                 },
@@ -289,8 +337,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "question": {"type": "string", "description": "Question to ask the human decision-maker"},
-                        "options": {"type": "string", "description": "Available options, comma-separated (default: GO,NOGO,PIVOT)"},
+                        "question": {
+                            "type": "string",
+                            "description": "Question to ask the human decision-maker",
+                        },
+                        "options": {
+                            "type": "string",
+                            "description": "Available options, comma-separated (default: GO,NOGO,PIVOT)",
+                        },
                     },
                     "required": ["question"],
                 },
@@ -316,8 +370,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "url": {"type": "string", "description": "URL to screenshot (e.g. http://localhost:3000)"},
-                        "filename": {"type": "string", "description": "Output filename (default: auto-generated timestamp)"},
+                        "url": {
+                            "type": "string",
+                            "description": "URL to screenshot (e.g. http://localhost:3000)",
+                        },
+                        "filename": {
+                            "type": "string",
+                            "description": "Output filename (default: auto-generated timestamp)",
+                        },
                     },
                     "required": ["url"],
                 },
@@ -331,9 +391,18 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "device": {"type": "string", "description": "Device name or UUID (default: 'booted' = currently running)"},
-                        "app_bundle": {"type": "string", "description": "Optional: app bundle ID to launch before capturing (e.g. com.example.MyApp)"},
-                        "filename": {"type": "string", "description": "Output filename (default: auto-generated)"},
+                        "device": {
+                            "type": "string",
+                            "description": "Device name or UUID (default: 'booted' = currently running)",
+                        },
+                        "app_bundle": {
+                            "type": "string",
+                            "description": "Optional: app bundle ID to launch before capturing (e.g. com.example.MyApp)",
+                        },
+                        "filename": {
+                            "type": "string",
+                            "description": "Output filename (default: auto-generated)",
+                        },
                     },
                 },
             },
@@ -346,7 +415,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "spec": {"type": "string", "description": "Test spec file path (e.g. tests/e2e/smoke.spec.ts)"},
+                        "spec": {
+                            "type": "string",
+                            "description": "Test spec file path (e.g. tests/e2e/smoke.spec.ts)",
+                        },
                     },
                     "required": ["spec"],
                 },
@@ -361,8 +433,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "Pattern or description (e.g. 'auth middleware', '*.test.ts')"},
-                        "scope": {"type": "string", "description": "Limit search scope (e.g. 'src/', 'tests/')"},
+                        "query": {
+                            "type": "string",
+                            "description": "Pattern or description (e.g. 'auth middleware', '*.test.ts')",
+                        },
+                        "scope": {
+                            "type": "string",
+                            "description": "Limit search scope (e.g. 'src/', 'tests/')",
+                        },
                     },
                     "required": ["query"],
                 },
@@ -376,8 +454,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string", "description": "File or directory path to summarize"},
-                        "focus": {"type": "string", "description": "What to focus on (e.g. 'API endpoints', 'data model')"},
+                        "path": {
+                            "type": "string",
+                            "description": "File or directory path to summarize",
+                        },
+                        "focus": {
+                            "type": "string",
+                            "description": "What to focus on (e.g. 'API endpoints', 'data model')",
+                        },
                     },
                     "required": ["path"],
                 },
@@ -391,7 +475,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "domain": {"type": "string", "description": "Domain: rust, typescript, svelte, python, kotlin, swift"},
+                        "domain": {
+                            "type": "string",
+                            "description": "Domain: rust, typescript, svelte, python, kotlin, swift",
+                        },
                     },
                     "required": ["domain"],
                 },
@@ -405,8 +492,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "type": {"type": "string", "description": "Example type: test, implementation, api, model"},
-                        "domain": {"type": "string", "description": "Domain filter (e.g. 'auth', 'api')"},
+                        "type": {
+                            "type": "string",
+                            "description": "Example type: test, implementation, api, model",
+                        },
+                        "domain": {
+                            "type": "string",
+                            "description": "Domain filter (e.g. 'auth', 'api')",
+                        },
                     },
                     "required": ["type"],
                 },
@@ -420,8 +513,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "command": {"type": "string", "description": "Command type: build, test, lint, check"},
-                        "domain": {"type": "string", "description": "Target domain (e.g. 'backend', 'frontend')"},
+                        "command": {
+                            "type": "string",
+                            "description": "Command type: build, test, lint, check",
+                        },
+                        "domain": {
+                            "type": "string",
+                            "description": "Target domain (e.g. 'backend', 'frontend')",
+                        },
                     },
                     "required": ["command"],
                 },
@@ -435,7 +534,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "category": {"type": "string", "description": "Context category: vision, architecture, data_model, api_surface, conventions, all"},
+                        "category": {
+                            "type": "string",
+                            "description": "Context category: vision, architecture, data_model, api_surface, conventions, all",
+                        },
                     },
                     "required": ["category"],
                 },
@@ -480,7 +582,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "pattern": {"type": "string", "description": "WCAG pattern: accordion, button, tabs, checkbox, dialog, radio-group, switch, link"},
+                        "pattern": {
+                            "type": "string",
+                            "description": "WCAG pattern: accordion, button, tabs, checkbox, dialog, radio-group, switch, link",
+                        },
                     },
                     "required": ["pattern"],
                 },
@@ -494,7 +599,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "component": {"type": "string", "description": "Component name (e.g. 'button', 'badge', 'accordion')"},
+                        "component": {
+                            "type": "string",
+                            "description": "Component name (e.g. 'button', 'badge', 'accordion')",
+                        },
                     },
                     "required": ["component"],
                 },
@@ -512,7 +620,10 @@ def _get_tool_schemas() -> list[dict]:
                         "owner": {"type": "string", "description": "Repository owner"},
                         "repo": {"type": "string", "description": "Repository name"},
                         "state": {"type": "string", "description": "Filter: open, closed, all"},
-                        "query": {"type": "string", "description": "Search query for issue titles/body"},
+                        "query": {
+                            "type": "string",
+                            "description": "Search query for issue titles/body",
+                        },
                     },
                     "required": ["owner", "repo"],
                 },
@@ -542,7 +653,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "Code search query (e.g. 'function handleAuth language:typescript')"},
+                        "query": {
+                            "type": "string",
+                            "description": "Code search query (e.g. 'function handleAuth language:typescript')",
+                        },
                     },
                     "required": ["query"],
                 },
@@ -558,7 +672,10 @@ def _get_tool_schemas() -> list[dict]:
                     "properties": {
                         "owner": {"type": "string", "description": "Repository owner"},
                         "repo": {"type": "string", "description": "Repository name"},
-                        "status": {"type": "string", "description": "Filter: completed, in_progress, queued"},
+                        "status": {
+                            "type": "string",
+                            "description": "Filter: completed, in_progress, queued",
+                        },
                     },
                     "required": ["owner", "repo"],
                 },
@@ -573,8 +690,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "jql": {"type": "string", "description": "JQL query (e.g. 'project=PROJ AND status=Open')"},
-                        "max_results": {"type": "integer", "description": "Max results (default 10)"},
+                        "jql": {
+                            "type": "string",
+                            "description": "JQL query (e.g. 'project=PROJ AND status=Open')",
+                        },
+                        "max_results": {
+                            "type": "integer",
+                            "description": "Max results (default 10)",
+                        },
                     },
                     "required": ["jql"],
                 },
@@ -607,7 +730,10 @@ def _get_tool_schemas() -> list[dict]:
                     "properties": {
                         "space": {"type": "string", "description": "Confluence space key"},
                         "title": {"type": "string", "description": "Page title to search"},
-                        "page_id": {"type": "string", "description": "Page ID (alternative to title)"},
+                        "page_id": {
+                            "type": "string",
+                            "description": "Page ID (alternative to title)",
+                        },
                     },
                 },
             },
@@ -621,7 +747,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "command": {"type": "string", "description": "Build command to run. Examples: 'pip install -r requirements.txt', 'npm install && npm run build', 'cargo build', 'make'"},
+                        "command": {
+                            "type": "string",
+                            "description": "Build command to run. Examples: 'pip install -r requirements.txt', 'npm install && npm run build', 'cargo build', 'make'",
+                        },
                     },
                     "required": ["command"],
                 },
@@ -635,7 +764,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "command": {"type": "string", "description": "Test command to run. Examples: 'pytest -v', 'npm test', 'cargo test', 'python -m pytest tests/'"},
+                        "command": {
+                            "type": "string",
+                            "description": "Test command to run. Examples: 'pytest -v', 'npm test', 'cargo test', 'python -m pytest tests/'",
+                        },
                     },
                     "required": ["command"],
                 },
@@ -649,9 +781,18 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "url": {"type": "string", "description": "URL to screenshot. Leave empty to auto-serve local index.html"},
-                        "filename": {"type": "string", "description": "Screenshot filename (default: screenshot.png)"},
-                        "wait_ms": {"type": "integer", "description": "Wait time in ms after page load (default: 2000)"},
+                        "url": {
+                            "type": "string",
+                            "description": "URL to screenshot. Leave empty to auto-serve local index.html",
+                        },
+                        "filename": {
+                            "type": "string",
+                            "description": "Screenshot filename (default: screenshot.png)",
+                        },
+                        "wait_ms": {
+                            "type": "integer",
+                            "description": "Wait time in ms after page load (default: 2000)",
+                        },
                     },
                 },
             },
@@ -665,8 +806,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "task": {"type": "string", "description": "Detailed coding task. Be specific about: what files to create, what functions/classes, what tests. Example: 'Create src/auth.py with login(username, password) function and tests/test_auth.py with pytest tests for valid/invalid credentials'"},
-                        "context": {"type": "string", "description": "Additional context: existing files, architecture decisions, tech stack, conventions"},
+                        "task": {
+                            "type": "string",
+                            "description": "Detailed coding task. Be specific about: what files to create, what functions/classes, what tests. Example: 'Create src/auth.py with login(username, password) function and tests/test_auth.py with pytest tests for valid/invalid credentials'",
+                        },
+                        "context": {
+                            "type": "string",
+                            "description": "Additional context: existing files, architecture decisions, tech stack, conventions",
+                        },
                     },
                     "required": ["task"],
                 },
@@ -682,7 +829,10 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "cwd": {"type": "string", "description": "Workspace root directory"},
-                        "path": {"type": "string", "description": "Subdirectory or file to scan (default: whole workspace)"},
+                        "path": {
+                            "type": "string",
+                            "description": "Subdirectory or file to scan (default: whole workspace)",
+                        },
                     },
                     "required": ["cwd"],
                 },
@@ -696,7 +846,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "cwd": {"type": "string", "description": "Project root directory with dependency files"},
+                        "cwd": {
+                            "type": "string",
+                            "description": "Project root directory with dependency files",
+                        },
                     },
                     "required": ["cwd"],
                 },
@@ -710,7 +863,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "cwd": {"type": "string", "description": "Workspace root directory to scan"},
+                        "cwd": {
+                            "type": "string",
+                            "description": "Workspace root directory to scan",
+                        },
                     },
                     "required": ["cwd"],
                 },
@@ -726,9 +882,20 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "title": {"type": "string", "description": "Ticket title (concise)"},
-                        "description": {"type": "string", "description": "Detailed description of the issue"},
-                        "severity": {"type": "string", "enum": ["critical", "high", "medium", "low"], "description": "Severity level"},
-                        "category": {"type": "string", "enum": ["bug", "incident", "improvement", "security"], "description": "Ticket category"},
+                        "description": {
+                            "type": "string",
+                            "description": "Detailed description of the issue",
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": ["critical", "high", "medium", "low"],
+                            "description": "Severity level",
+                        },
+                        "category": {
+                            "type": "string",
+                            "enum": ["bug", "incident", "improvement", "security"],
+                            "description": "Ticket category",
+                        },
                     },
                     "required": ["title", "description", "severity"],
                 },
@@ -743,9 +910,19 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "cwd": {"type": "string", "description": "Project workspace root directory"},
-                        "steps": {"type": "array", "items": {"type": "string"}, "description": "Steps to run: install, build, lint, test, commit (default: all)"},
-                        "commit_message": {"type": "string", "description": "Git commit message (if commit step included)"},
+                        "cwd": {
+                            "type": "string",
+                            "description": "Project workspace root directory",
+                        },
+                        "steps": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Steps to run: install, build, lint, test, commit (default: all)",
+                        },
+                        "commit_message": {
+                            "type": "string",
+                            "description": "Git commit message (if commit step included)",
+                        },
                     },
                     "required": ["cwd"],
                 },
@@ -761,8 +938,20 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "url": {"type": "string", "description": "Staging URL to test"},
-                        "scenario": {"type": "string", "enum": ["kill_process", "network_latency", "memory_pressure", "cpu_stress"], "description": "Chaos scenario to run"},
-                        "timeout": {"type": "integer", "description": "Max recovery time in seconds (default: 30)"},
+                        "scenario": {
+                            "type": "string",
+                            "enum": [
+                                "kill_process",
+                                "network_latency",
+                                "memory_pressure",
+                                "cpu_stress",
+                            ],
+                            "description": "Chaos scenario to run",
+                        },
+                        "timeout": {
+                            "type": "integer",
+                            "description": "Max recovery time in seconds (default: 30)",
+                        },
                     },
                     "required": ["url", "scenario"],
                 },
@@ -777,8 +966,15 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "url": {"type": "string", "description": "URL to load test"},
-                        "scenario": {"type": "string", "enum": ["baseline", "ramp_10x", "spike", "soak"], "description": "Load scenario"},
-                        "duration": {"type": "integer", "description": "Test duration in seconds (default: 30)"},
+                        "scenario": {
+                            "type": "string",
+                            "enum": ["baseline", "ramp_10x", "spike", "soak"],
+                            "description": "Load scenario",
+                        },
+                        "duration": {
+                            "type": "integer",
+                            "description": "Test duration in seconds (default: 30)",
+                        },
                     },
                     "required": ["url"],
                 },
@@ -793,8 +989,15 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "url": {"type": "string", "description": "URL to check (for site check)"},
-                        "checks": {"type": "array", "items": {"type": "string"}, "description": "Checks to run: site, docker, ports"},
-                        "port": {"type": "integer", "description": "Port to check (for ports check)"},
+                        "checks": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Checks to run: site, docker, ports",
+                        },
+                        "port": {
+                            "type": "integer",
+                            "description": "Port to check (for ports check)",
+                        },
                     },
                 },
             },
@@ -822,7 +1025,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "agent_id": {"type": "string", "description": "Agent ID to get details. Omit to list all."},
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Agent ID to get details. Omit to list all.",
+                        },
                     },
                 },
             },
@@ -835,7 +1041,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "mission_id": {"type": "string", "description": "Mission ID. Omit to list all."},
+                        "mission_id": {
+                            "type": "string",
+                            "description": "Mission ID. Omit to list all.",
+                        },
                     },
                 },
             },
@@ -849,8 +1058,14 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "query": {"type": "string", "description": "Search query"},
-                        "project_id": {"type": "string", "description": "Project/mission ID for project-specific memory"},
-                        "category": {"type": "string", "description": "Filter: architecture, vision, team, process, backlog"},
+                        "project_id": {
+                            "type": "string",
+                            "description": "Project/mission ID for project-specific memory",
+                        },
+                        "category": {
+                            "type": "string",
+                            "description": "Filter: architecture, vision, team, process, backlog",
+                        },
                     },
                 },
             },
@@ -871,7 +1086,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "session_id": {"type": "string", "description": "Session ID to get messages. Omit to list recent sessions."},
+                        "session_id": {
+                            "type": "string",
+                            "description": "Session ID to get messages. Omit to list recent sessions.",
+                        },
                         "limit": {"type": "integer", "description": "Max messages (default 30)"},
                     },
                 },
@@ -894,7 +1112,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "id": {"type": "string", "description": "Workflow ID (auto-generated if omitted)"},
+                        "id": {
+                            "type": "string",
+                            "description": "Workflow ID (auto-generated if omitted)",
+                        },
                         "name": {"type": "string", "description": "Workflow name"},
                         "description": {"type": "string", "description": "What this workflow does"},
                         "phases": {
@@ -905,10 +1126,26 @@ def _get_tool_schemas() -> list[dict]:
                                 "properties": {
                                     "id": {"type": "string"},
                                     "name": {"type": "string"},
-                                    "pattern": {"type": "string", "enum": ["solo", "sequential", "parallel", "loop", "hierarchical", "network", "router", "aggregator", "human-in-the-loop"]},
+                                    "pattern": {
+                                        "type": "string",
+                                        "enum": [
+                                            "solo",
+                                            "sequential",
+                                            "parallel",
+                                            "loop",
+                                            "hierarchical",
+                                            "network",
+                                            "router",
+                                            "aggregator",
+                                            "human-in-the-loop",
+                                        ],
+                                    },
                                     "agents": {"type": "array", "items": {"type": "string"}},
                                     "config": {"type": "object"},
-                                    "gate": {"type": "string", "enum": ["all_approved", "no_veto", "always"]},
+                                    "gate": {
+                                        "type": "string",
+                                        "enum": ["all_approved", "no_veto", "always"],
+                                    },
                                 },
                             },
                         },
@@ -925,9 +1162,18 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "team_name": {"type": "string", "description": "Team name (e.g. 'Auth Team', 'Booking Team')"},
-                        "domain": {"type": "string", "description": "Domain: auth, booking, payment, admin, infra, qa, proto"},
-                        "stack": {"type": "string", "description": "Tech stack: 'Rust axum/sqlx', 'SvelteKit', 'Python FastAPI'"},
+                        "team_name": {
+                            "type": "string",
+                            "description": "Team name (e.g. 'Auth Team', 'Booking Team')",
+                        },
+                        "domain": {
+                            "type": "string",
+                            "description": "Domain: auth, booking, payment, admin, infra, qa, proto",
+                        },
+                        "stack": {
+                            "type": "string",
+                            "description": "Tech stack: 'Rust axum/sqlx', 'SvelteKit', 'Python FastAPI'",
+                        },
                         "roles": {
                             "type": "array",
                             "description": "Team members: [{id, name, role, skills: [], prompt}]",
@@ -955,15 +1201,28 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "parent_mission_id": {"type": "string", "description": "Parent mission/epic ID"},
+                        "parent_mission_id": {
+                            "type": "string",
+                            "description": "Parent mission/epic ID",
+                        },
                         "name": {"type": "string", "description": "Feature name"},
                         "description": {"type": "string", "description": "Feature description"},
                         "goal": {"type": "string", "description": "Acceptance criteria"},
                         "project_id": {"type": "string", "description": "Project identifier"},
-                        "type": {"type": "string", "description": "Mission type: feature|story", "enum": ["feature", "story"]},
-                        "workflow_id": {"type": "string", "description": "Workflow to execute for this feature"},
+                        "type": {
+                            "type": "string",
+                            "description": "Mission type: feature|story",
+                            "enum": ["feature", "story"],
+                        },
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow to execute for this feature",
+                        },
                         "wsjf_score": {"type": "number", "description": "WSJF priority score"},
-                        "config": {"type": "object", "description": "Extra config: team_ids, stack, ao_refs"},
+                        "config": {
+                            "type": "object",
+                            "description": "Extra config: team_ids, stack, ao_refs",
+                        },
                     },
                     "required": ["parent_mission_id", "name"],
                 },
@@ -994,8 +1253,15 @@ def _get_tool_schemas() -> list[dict]:
                         "mission_id": {"type": "string", "description": "Mission ID to update"},
                         "wip_limit": {"type": "integer", "description": "Max concurrent workers"},
                         "stack": {"type": "string", "description": "Required tech stack"},
-                        "ao_refs": {"type": "array", "items": {"type": "string"}, "description": "AO reference IDs"},
-                        "sprint_duration": {"type": "string", "description": "Sprint duration (e.g. '4h', '1d')"},
+                        "ao_refs": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "AO reference IDs",
+                        },
+                        "sprint_duration": {
+                            "type": "string",
+                            "description": "Sprint duration (e.g. '4h', '1d')",
+                        },
                         "max_workers": {"type": "integer", "description": "Max parallel workers"},
                     },
                     "required": ["mission_id"],
@@ -1011,7 +1277,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "workspace_path": {"type": "string", "description": "Path to Android project inside container (default: /workspace)"},
+                        "workspace_path": {
+                            "type": "string",
+                            "description": "Path to Android project inside container (default: /workspace)",
+                        },
                     },
                 },
             },
@@ -1024,7 +1293,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "workspace_path": {"type": "string", "description": "Path to Android project"},
+                        "workspace_path": {
+                            "type": "string",
+                            "description": "Path to Android project",
+                        },
                     },
                 },
             },
@@ -1037,7 +1309,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "workspace_path": {"type": "string", "description": "Path to Android project"},
+                        "workspace_path": {
+                            "type": "string",
+                            "description": "Path to Android project",
+                        },
                     },
                 },
             },
@@ -1050,7 +1325,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "workspace_path": {"type": "string", "description": "Path to Android project"},
+                        "workspace_path": {
+                            "type": "string",
+                            "description": "Path to Android project",
+                        },
                     },
                 },
             },
@@ -1065,8 +1343,14 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "url": {"type": "string", "description": "URL to fetch"},
-                        "max_length": {"type": "integer", "description": "Max response chars (default 5000)"},
-                        "raw": {"type": "boolean", "description": "Return raw HTML instead of markdown"},
+                        "max_length": {
+                            "type": "integer",
+                            "description": "Max response chars (default 5000)",
+                        },
+                        "raw": {
+                            "type": "boolean",
+                            "description": "Return raw HTML instead of markdown",
+                        },
                     },
                     "required": ["url"],
                 },
@@ -1169,8 +1453,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "element": {"type": "string", "description": "Human-readable element description from snapshot"},
-                        "ref": {"type": "string", "description": "Exact target element reference from snapshot"},
+                        "element": {
+                            "type": "string",
+                            "description": "Human-readable element description from snapshot",
+                        },
+                        "ref": {
+                            "type": "string",
+                            "description": "Exact target element reference from snapshot",
+                        },
                     },
                     "required": ["element", "ref"],
                 },
@@ -1184,8 +1474,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "name": {"type": "string", "description": "Screenshot name (e.g. 'homepage', 'login-form')"},
-                        "selector": {"type": "string", "description": "Optional CSS selector to screenshot a specific element"},
+                        "name": {
+                            "type": "string",
+                            "description": "Screenshot name (e.g. 'homepage', 'login-form')",
+                        },
+                        "selector": {
+                            "type": "string",
+                            "description": "Optional CSS selector to screenshot a specific element",
+                        },
                     },
                     "required": ["name"],
                 },
@@ -1199,8 +1495,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "element": {"type": "string", "description": "Human-readable element description"},
-                        "ref": {"type": "string", "description": "Exact target element reference from snapshot"},
+                        "element": {
+                            "type": "string",
+                            "description": "Human-readable element description",
+                        },
+                        "ref": {
+                            "type": "string",
+                            "description": "Exact target element reference from snapshot",
+                        },
                         "text": {"type": "string", "description": "Text to type"},
                     },
                     "required": ["element", "ref", "text"],
@@ -1209,163 +1511,327 @@ def _get_tool_schemas() -> list[dict]:
         },
     ]
     # ── Simple Playwright aliases (LLM-friendly short names) ──
-    schemas.extend([
-        {
-            "type": "function",
-            "function": {
-                "name": "browse",
-                "description": "Open a URL in the browser for visual testing. Call this BEFORE take_screenshot.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "url": {"type": "string", "description": "URL to open (e.g. http://localhost:3000)"},
+    schemas.extend(
+        [
+            {
+                "type": "function",
+                "function": {
+                    "name": "browse",
+                    "description": "Open a URL in the browser for visual testing. Call this BEFORE take_screenshot.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "url": {
+                                "type": "string",
+                                "description": "URL to open (e.g. http://localhost:3000)",
+                            },
+                        },
+                        "required": ["url"],
                     },
-                    "required": ["url"],
                 },
             },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "take_screenshot",
-                "description": "Take a PNG screenshot of the current browser page. Call browse(url) first.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "name": {"type": "string", "description": "Screenshot name (e.g. homepage, login-page)"},
+            {
+                "type": "function",
+                "function": {
+                    "name": "take_screenshot",
+                    "description": "Take a PNG screenshot of the current browser page. Call browse(url) first.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "Screenshot name (e.g. homepage, login-page)",
+                            },
+                        },
+                        "required": ["name"],
                     },
-                    "required": ["name"],
                 },
             },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "inspect_page",
-                "description": "Get the accessibility tree of the current browser page for assertions.",
-                "parameters": {"type": "object", "properties": {}},
+            {
+                "type": "function",
+                "function": {
+                    "name": "inspect_page",
+                    "description": "Get the accessibility tree of the current browser page for assertions.",
+                    "parameters": {"type": "object", "properties": {}},
+                },
             },
-        },
-    ])
+            {
+                "type": "function",
+                "function": {
+                    "name": "run_e2e_tests",
+                    "description": "Run full E2E test suite automatically: installs dependencies, starts dev server, takes browser screenshots, runs unit tests, returns full report. Call this for complete QA validation.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "port": {
+                                "type": "integer",
+                                "description": "Port for dev server (default 3000)",
+                            },
+                        },
+                    },
+                },
+            },
+        ]
+    )
     _TOOL_SCHEMAS = schemas
     return schemas
+
 
 # Tools available to each agent role category
 ROLE_TOOL_MAP: dict[str, list[str]] = {
     "product": [
-        "code_read", "code_search", "list_files", "deep_search",
-        "memory_search", "memory_store",
-        "get_project_context", "screenshot",
-        "github_issues", "github_prs",
-        "jira_search", "jira_create", "confluence_read",
-        "mcp_fetch_fetch", "mcp_memory_create_entities", "mcp_memory_search_nodes",
+        "code_read",
+        "code_search",
+        "list_files",
+        "deep_search",
+        "memory_search",
+        "memory_store",
+        "get_project_context",
+        "screenshot",
+        "github_issues",
+        "github_prs",
+        "jira_search",
+        "jira_create",
+        "confluence_read",
+        "mcp_fetch_fetch",
+        "mcp_memory_create_entities",
+        "mcp_memory_search_nodes",
         "mcp_memory_create_relations",
     ],
     "architecture": [
-        "code_read", "code_search", "list_files", "deep_search",
-        "memory_search", "memory_store", "get_project_context",
-        "git_log", "git_diff",
-        "lrm_conventions", "lrm_context", "lrm_summarize",
+        "code_read",
+        "code_search",
+        "list_files",
+        "deep_search",
+        "memory_search",
+        "memory_store",
+        "get_project_context",
+        "git_log",
+        "git_diff",
+        "lrm_conventions",
+        "lrm_context",
+        "lrm_summarize",
         "github_code_search",
         "get_si_blueprint",
-        "compose_workflow", "create_team", "create_sub_mission", "list_sub_missions", "set_constraints",
-        "mcp_fetch_fetch", "mcp_memory_create_entities", "mcp_memory_search_nodes",
+        "compose_workflow",
+        "create_team",
+        "create_sub_mission",
+        "list_sub_missions",
+        "set_constraints",
+        "mcp_fetch_fetch",
+        "mcp_memory_create_entities",
+        "mcp_memory_search_nodes",
         "mcp_memory_create_relations",
     ],
     "ux": [
-        "code_read", "code_search", "list_files", "screenshot",
-        "memory_search", "memory_store", "get_project_context",
-        "figma_get_node", "figma_get_styles",
-        "solaris_wcag", "solaris_component",
+        "code_read",
+        "code_search",
+        "list_files",
+        "screenshot",
+        "memory_search",
+        "memory_store",
+        "get_project_context",
+        "figma_get_node",
+        "figma_get_styles",
+        "solaris_wcag",
+        "solaris_component",
     ],
     "dev": [
-        "code_read", "code_write", "code_edit", "code_search",
-        "git_status", "git_log", "git_diff", "git_commit",
-        "list_files", "deep_search", "fractal_code",
-        "memory_search", "memory_store", "get_project_context",
-        "build", "test",
-        "docker_deploy", "docker_status", "screenshot", "simulator_screenshot",
+        "code_read",
+        "code_write",
+        "code_edit",
+        "code_search",
+        "git_status",
+        "git_log",
+        "git_diff",
+        "git_commit",
+        "list_files",
+        "deep_search",
+        "fractal_code",
+        "memory_search",
+        "memory_store",
+        "get_project_context",
+        "build",
+        "test",
+        "docker_deploy",
+        "docker_status",
+        "screenshot",
+        "simulator_screenshot",
         "create_ticket",
-        "lrm_locate", "lrm_conventions", "lrm_build", "lrm_examples",
-        "github_prs", "github_code_search",
-        "android_build", "android_test", "android_lint",
-        "mcp_fetch_fetch", "mcp_memory_create_entities", "mcp_memory_search_nodes",
+        "lrm_locate",
+        "lrm_conventions",
+        "lrm_build",
+        "lrm_examples",
+        "github_prs",
+        "github_code_search",
+        "android_build",
+        "android_test",
+        "android_lint",
+        "mcp_fetch_fetch",
+        "mcp_memory_create_entities",
+        "mcp_memory_search_nodes",
         "mcp_memory_create_relations",
     ],
     "qa": [
-        "code_read", "code_write", "code_search", "list_files", "deep_search",
-        "screenshot", "simulator_screenshot", "playwright_test",
-        "build", "test", "browser_screenshot",
-        "browse", "take_screenshot", "inspect_page",
-        "memory_search", "memory_store", "get_project_context",
-        "git_diff", "git_log",
-        "github_issues", "github_prs",
-        "jira_search", "jira_create",
+        "code_read",
+        "code_write",
+        "code_search",
+        "list_files",
+        "deep_search",
+        "screenshot",
+        "simulator_screenshot",
+        "playwright_test",
+        "build",
+        "test",
+        "browser_screenshot",
+        "browse",
+        "take_screenshot",
+        "inspect_page",
+        "run_e2e_tests",
+        "memory_search",
+        "memory_store",
+        "get_project_context",
+        "git_diff",
+        "git_log",
+        "github_issues",
+        "github_prs",
+        "jira_search",
+        "jira_create",
         "create_ticket",
-        "chaos_test", "tmc_load_test",
-        "android_build", "android_test", "android_lint", "android_emulator_test",
+        "chaos_test",
+        "tmc_load_test",
+        "android_build",
+        "android_test",
+        "android_lint",
+        "android_emulator_test",
         "mcp_fetch_fetch",
-        "mcp_playwright_browser_navigate", "mcp_playwright_browser_snapshot",
-        "mcp_playwright_browser_click", "mcp_playwright_browser_screenshot",
+        "mcp_playwright_browser_navigate",
+        "mcp_playwright_browser_snapshot",
+        "mcp_playwright_browser_click",
+        "mcp_playwright_browser_screenshot",
         "mcp_playwright_browser_type",
         "mcp_memory_search_nodes",
     ],
     "devops": [
-        "code_read", "code_write", "code_edit", "code_search",
-        "git_status", "git_log", "git_diff", "git_commit",
-        "list_files", "docker_deploy", "docker_stop", "docker_status",
-        "build", "test", "browser_screenshot",
-        "memory_search", "memory_store", "get_project_context",
+        "code_read",
+        "code_write",
+        "code_edit",
+        "code_search",
+        "git_status",
+        "git_log",
+        "git_diff",
+        "git_commit",
+        "list_files",
+        "docker_deploy",
+        "docker_stop",
+        "docker_status",
+        "build",
+        "test",
+        "browser_screenshot",
+        "memory_search",
+        "memory_store",
+        "get_project_context",
         "lrm_build",
-        "github_actions", "github_prs",
-        "infra_check", "chaos_test", "tmc_load_test",
-        "local_ci", "create_ticket",
+        "github_actions",
+        "github_prs",
+        "infra_check",
+        "chaos_test",
+        "tmc_load_test",
+        "local_ci",
+        "create_ticket",
         "get_si_blueprint",
     ],
     "security": [
-        "code_read", "code_search", "list_files", "deep_search",
-        "memory_search", "memory_store", "get_project_context",
-        "git_log", "git_diff",
-        "github_code_search", "github_issues",
-        "sast_scan", "dependency_audit", "secrets_scan",
+        "code_read",
+        "code_search",
+        "list_files",
+        "deep_search",
+        "memory_search",
+        "memory_store",
+        "get_project_context",
+        "git_log",
+        "git_diff",
+        "github_code_search",
+        "github_issues",
+        "sast_scan",
+        "dependency_audit",
+        "secrets_scan",
         "get_si_blueprint",
     ],
     "cdp": [
-        "memory_search", "memory_store", "get_project_context",
-        "list_files", "deep_search", "code_read",
-        "run_phase", "get_phase_status", "list_phases", "request_validation",
-        "compose_workflow", "create_team", "create_sub_mission", "list_sub_missions", "set_constraints",
-        "github_issues", "github_prs",
+        "memory_search",
+        "memory_store",
+        "get_project_context",
+        "list_files",
+        "deep_search",
+        "code_read",
+        "run_phase",
+        "get_phase_status",
+        "list_phases",
+        "request_validation",
+        "compose_workflow",
+        "create_team",
+        "create_sub_mission",
+        "list_sub_missions",
+        "set_constraints",
+        "github_issues",
+        "github_prs",
         "jira_search",
     ],
 }
 
 # Platform introspection tools — available to ALL agent roles
 _PLATFORM_TOOLS = [
-    "platform_agents", "platform_missions", "platform_memory_search",
-    "platform_metrics", "platform_sessions", "platform_workflows",
+    "platform_agents",
+    "platform_missions",
+    "platform_memory_search",
+    "platform_metrics",
+    "platform_sessions",
+    "platform_workflows",
 ]
 for _role_key in ROLE_TOOL_MAP:
     ROLE_TOOL_MAP[_role_key].extend(_PLATFORM_TOOLS)
 
 
-def _classify_agent_role(agent: "AgentDef") -> str:
+def _classify_agent_role(agent: AgentDef) -> str:
     """Classify an agent into a tool-mapping role category."""
     role = (agent.role or "").lower()
     name = (agent.name or "").lower()
     combined = f"{role} {name}"
 
-    if any(k in combined for k in ("product", "business", "analyste", "ba ", "fonctionnel", "product-manager")):
+    if any(
+        k in combined
+        for k in ("product", "business", "analyste", "ba ", "fonctionnel", "product-manager")
+    ):
         return "product"
     if any(k in combined for k in ("archi", "architect")):
         return "architecture"
     if any(k in combined for k in ("ux", "ui", "design", "ergon")):
         return "ux"
-    if any(k in combined for k in ("qa", "test", "qualit", "fixture", "perf", "tma", "maintenance")):
+    if any(
+        k in combined for k in ("qa", "test", "qualit", "fixture", "perf", "tma", "maintenance")
+    ):
         return "qa"
-    if any(k in combined for k in ("devops", "sre", "pipeline", "infra", "deploy", "backup", "recovery", "monitoring", "observ", "canary")):
+    if any(
+        k in combined
+        for k in (
+            "devops",
+            "sre",
+            "pipeline",
+            "infra",
+            "deploy",
+            "backup",
+            "recovery",
+            "monitoring",
+            "observ",
+            "canary",
+        )
+    ):
         return "devops"
-    if any(k in combined for k in ("secur", "secu", "cyber", "license", "compliance officer", "scanner")):
+    if any(
+        k in combined
+        for k in ("secur", "secu", "cyber", "license", "compliance officer", "scanner")
+    ):
         return "security"
     if any(k in combined for k in ("contractual", "conformit", " ao ", "cctp", "recette")):
         return "product"
@@ -1378,13 +1844,13 @@ def _classify_agent_role(agent: "AgentDef") -> str:
     return "dev"  # default to dev (most permissive set)
 
 
-def _get_tools_for_agent(agent: "AgentDef") -> Optional[list[str]]:
+def _get_tools_for_agent(agent: AgentDef) -> list[str] | None:
     """Return the list of allowed tool names for this agent, or None for all."""
     role_cat = _classify_agent_role(agent)
     return ROLE_TOOL_MAP.get(role_cat)
 
 
-def _filter_schemas(schemas: list[dict], allowed: Optional[list[str]]) -> list[dict]:
+def _filter_schemas(schemas: list[dict], allowed: list[str] | None) -> list[dict]:
     """Filter tool schemas to only include allowed tool names."""
     if allowed is None:
         return schemas

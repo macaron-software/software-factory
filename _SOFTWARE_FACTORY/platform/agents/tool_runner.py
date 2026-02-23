@@ -690,22 +690,147 @@ async def _tool_browser_screenshot(args: dict, ctx: ExecutionContext) -> str:
 
 # ── Playwright shortcut aliases (simple names for LLM compatibility) ──
 
+
 async def _tool_browse(args: dict, ctx: ExecutionContext) -> str:
     """Navigate browser to a URL. Alias for mcp_playwright_browser_navigate."""
-    return await _tool_mcp_dynamic("mcp_playwright_browser_navigate", {"url": args.get("url", "")}, ctx)
+    return await _tool_mcp_dynamic(
+        "mcp_playwright_browser_navigate", {"url": args.get("url", "")}, ctx
+    )
 
 
 async def _tool_take_screenshot(args: dict, ctx: ExecutionContext) -> str:
     """Take a PNG screenshot. Alias for mcp_playwright_browser_screenshot."""
-    return await _tool_mcp_dynamic("mcp_playwright_browser_screenshot", {
-        "name": args.get("name", "screenshot"),
-        "selector": args.get("selector", ""),
-    }, ctx)
+    return await _tool_mcp_dynamic(
+        "mcp_playwright_browser_screenshot",
+        {
+            "name": args.get("name", "screenshot"),
+            "selector": args.get("selector", ""),
+        },
+        ctx,
+    )
 
 
 async def _tool_inspect_page(args: dict, ctx: ExecutionContext) -> str:
     """Get accessibility tree of current page. Alias for mcp_playwright_browser_snapshot."""
     return await _tool_mcp_dynamic("mcp_playwright_browser_snapshot", {}, ctx)
+
+
+async def _tool_run_e2e_tests(args: dict, ctx: ExecutionContext) -> str:
+    """Run full E2E test suite: start server, take screenshots, run tests."""
+    import glob as glob_mod
+    import os
+    import subprocess
+    import time
+
+    workspace = ctx.project_path
+    if not workspace:
+        return "Error: no workspace"
+
+    results = []
+
+    # 1. Find app entry point
+    pkg_files = glob_mod.glob(os.path.join(workspace, "**/package.json"), recursive=True)
+    pkg_files = [p for p in pkg_files if "node_modules" not in p]
+
+    # 2. Install + build
+    for pkg in pkg_files[:2]:
+        pkg_dir = os.path.dirname(pkg)
+        label = os.path.basename(pkg_dir) or "root"
+        try:
+            proc = subprocess.run(
+                "npm install --legacy-peer-deps 2>&1 | tail -3",
+                shell=True,
+                cwd=pkg_dir,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            results.append(f"[{label}] npm install: {'OK' if proc.returncode == 0 else 'FAIL'}")
+        except Exception as e:
+            results.append(f"[{label}] npm install: {e}")
+
+    # 3. Try starting dev server
+    server_proc = None
+    port = args.get("port", 3000)
+    for pkg in pkg_files[:2]:
+        pkg_dir = os.path.dirname(pkg)
+        try:
+            import json as json_mod
+
+            with open(pkg) as f:
+                pj = json_mod.load(f)
+            scripts = pj.get("scripts", {})
+            start_cmd = None
+            if "dev" in scripts:
+                start_cmd = f"npm run dev -- --port {port}"
+            elif "start" in scripts:
+                start_cmd = f"PORT={port} npm start"
+            if start_cmd:
+                server_proc = subprocess.Popen(
+                    start_cmd,
+                    shell=True,
+                    cwd=pkg_dir,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                results.append(f"[server] Started: {start_cmd} (pid={server_proc.pid})")
+                time.sleep(5)
+                break
+        except Exception:
+            pass
+
+    # 4. Take screenshots via MCP Playwright
+    screenshots_taken = 0
+    try:
+        nav_result = await _tool_mcp_dynamic(
+            "mcp_playwright_browser_navigate", {"url": f"http://localhost:{port}"}, ctx
+        )
+        results.append(f"[browse] {nav_result[:200]}")
+
+        for name in ["homepage", "main-view"]:
+            ss_result = await _tool_mcp_dynamic(
+                "mcp_playwright_browser_screenshot", {"name": name}, ctx
+            )
+            results.append(f"[screenshot:{name}] {ss_result[:200]}")
+            screenshots_taken += 1
+
+        snap_result = await _tool_mcp_dynamic("mcp_playwright_browser_snapshot", {}, ctx)
+        results.append(f"[inspect] {snap_result[:500]}")
+    except Exception as e:
+        results.append(f"[playwright] Error: {e}")
+
+    # 5. Run unit tests
+    for pkg in pkg_files[:2]:
+        pkg_dir = os.path.dirname(pkg)
+        label = os.path.basename(pkg_dir) or "root"
+        try:
+            proc = subprocess.run(
+                "npm test -- --watchAll=false 2>&1 | tail -20",
+                shell=True,
+                cwd=pkg_dir,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            status = "PASS" if proc.returncode == 0 else "FAIL"
+            results.append(f"[test:{label}] {status}\n{proc.stdout[-500:]}")
+        except subprocess.TimeoutExpired:
+            results.append(f"[test:{label}] TIMEOUT")
+        except Exception as e:
+            results.append(f"[test:{label}] Error: {e}")
+
+    # 6. Cleanup server
+    if server_proc:
+        try:
+            server_proc.terminate()
+            server_proc.wait(timeout=5)
+        except Exception:
+            pass
+
+    results.append(
+        f"\n📊 Summary: {screenshots_taken} screenshots taken, {len(pkg_files)} packages found"
+    )
+    return "\n".join(results)
 
 
 async def _tool_security_chaos(name: str, args: dict, ctx: ExecutionContext) -> str:
@@ -1406,6 +1531,8 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
         return await _tool_take_screenshot(args, ctx)
     if name == "inspect_page":
         return await _tool_inspect_page(args, ctx)
+    if name == "run_e2e_tests":
+        return await _tool_run_e2e_tests(args, ctx)
 
     # ── Security & chaos tools ──
     if name in (

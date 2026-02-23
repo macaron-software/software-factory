@@ -15,7 +15,6 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +22,11 @@ logger = logging.getLogger(__name__)
 @dataclass
 class GuardResult:
     """Result of adversarial guard check."""
+
     passed: bool
-    score: int = 0           # 0 = clean, higher = worse
-    issues: list[str] = None # list of detected issues
-    level: str = ""          # "L0" or "L1"
+    score: int = 0  # 0 = clean, higher = worse
+    issues: list[str] = None  # list of detected issues
+    level: str = ""  # "L0" or "L1"
 
     def __post_init__(self):
         if self.issues is None:
@@ -43,23 +43,23 @@ class GuardResult:
 
 # Slop patterns — generic filler that adds no value
 _SLOP_PATTERNS = [
-    (r'\blorem ipsum\b', "Lorem ipsum placeholder text"),
-    (r'\bfoo\s*bar\s*baz\b', "Placeholder foo/bar/baz"),
-    (r'(?:https?://)?example\.com', "example.com placeholder URL"),
-    (r'\bplaceholder\b.*\btext\b', "Placeholder text"),
-    (r'\bTBD\b', "TBD marker — incomplete work"),
-    (r'\bXXX\b', "XXX marker — needs attention"),
+    (r"\blorem ipsum\b", "Lorem ipsum placeholder text"),
+    (r"\bfoo\s*bar\s*baz\b", "Placeholder foo/bar/baz"),
+    (r"(?:https?://)?example\.com", "example.com placeholder URL"),
+    (r"\bplaceholder\b.*\btext\b", "Placeholder text"),
+    (r"\bTBD\b", "TBD marker — incomplete work"),
+    (r"\bXXX\b", "XXX marker — needs attention"),
 ]
 
 # Mock/stub patterns — fake implementations
 _MOCK_PATTERNS = [
-    (r'#\s*TODO\s*:?\s*implement', "TODO implement marker"),
-    (r'//\s*TODO\s*:?\s*implement', "TODO implement marker"),
-    (r'raise\s+NotImplementedError\b(?!\s*#\s*pragma)', "NotImplementedError without pragma"),
-    (r'pass\s*#\s*(?:todo|fixme|implement)', "pass with TODO comment"),
-    (r'return\s+(?:None|null|undefined)\s*#\s*(?:todo|stub|mock)', "Stub return with TODO"),
-    (r'(?:fake|mock|dummy|hardcoded)\s+(?:data|response|result|value)', "Fake/mock data"),
-    (r'def\s+\w+\([^)]*\)\s*:\s*\n\s+pass\s*$', "Empty function body (pass)"),
+    (r"#\s*TODO\s*:?\s*implement", "TODO implement marker"),
+    (r"//\s*TODO\s*:?\s*implement", "TODO implement marker"),
+    (r"raise\s+NotImplementedError\b(?!\s*#\s*pragma)", "NotImplementedError without pragma"),
+    (r"pass\s*#\s*(?:todo|fixme|implement)", "pass with TODO comment"),
+    (r"return\s+(?:None|null|undefined)\s*#\s*(?:todo|stub|mock)", "Stub return with TODO"),
+    (r"(?:fake|mock|dummy|hardcoded)\s+(?:data|response|result|value)", "Fake/mock data"),
+    (r"def\s+\w+\([^)]*\)\s*:\s*\n\s+pass\s*$", "Empty function body (pass)"),
     (r'console\.log\s*\(\s*["\']test', "console.log('test') — debug leftover"),
 ]
 
@@ -69,22 +69,34 @@ _FAKE_BUILD_PATTERNS = [
     (r'echo\s+["\'].*stub', "Fake build script — stub echo"),
     (r'echo\s+["\']BUILD\s+SUCCESS', "Fake build script — hardcoded SUCCESS"),
     (r'echo\s+["\']Tests?\s+passed', "Fake build script — hardcoded test pass"),
-    (r'exit\s+0\s*#?\s*(?:stub|fake|placeholder|todo)', "Fake script — exit 0 placeholder"),
-    (r'#!/bin/sh\s*\n\s*(?:echo|true|:)\s', "Empty shell script — does nothing"),
+    (r"exit\s+0\s*#?\s*(?:stub|fake|placeholder|todo)", "Fake script — exit 0 placeholder"),
+    (r"#!/bin/sh\s*\n\s*(?:echo|true|:)\s", "Empty shell script — does nothing"),
 ]
 
 # Hallucination patterns — claiming actions without evidence
 _HALLUCINATION_PATTERNS = [
-    (r"j'ai\s+(?:deploye|déployé|lancé|exécuté|testé|vérifié|créé le fichier|commit)", "Claims action without tool evidence"),
-    (r"i(?:'ve| have)\s+(?:deployed|tested|created|committed|executed|verified)", "Claims action without tool evidence"),
-    (r"le\s+(?:build|test|deploy)\s+(?:a|est)\s+(?:réussi|passé|ok)", "Claims success without evidence"),
+    (
+        r"j'ai\s+(?:deploye|déployé|lancé|exécuté|testé|vérifié|créé le fichier|commit)",
+        "Claims action without tool evidence",
+    ),
+    (
+        r"i(?:'ve| have)\s+(?:deployed|tested|created|committed|executed|verified)",
+        "Claims action without tool evidence",
+    ),
+    (
+        r"le\s+(?:build|test|deploy)\s+(?:a|est)\s+(?:réussi|passé|ok)",
+        "Claims success without evidence",
+    ),
     (r"voici\s+(?:le|les)\s+résultat", "Claims to show results"),
 ]
 
 # Lie patterns — inventing file paths, URLs, or data
 _LIE_PATTERNS = [
-    (r'(?:fichier|file)\s+(?:créé|created|saved)\s*:\s*\S+', "Claims file creation — verify with tool_calls"),
-    (r'(?:http|https)://(?:staging|prod|api)\.\S+(?:\.local|\.internal)', "Invented internal URL"),
+    (
+        r"(?:fichier|file)\s+(?:créé|created|saved)\s*:\s*\S+",
+        "Claims file creation — verify with tool_calls",
+    ),
+    (r"(?:http|https)://(?:staging|prod|api)\.\S+(?:\.local|\.internal)", "Invented internal URL"),
 ]
 
 # Stack mismatch detection — backend code in wrong language
@@ -131,7 +143,9 @@ def _check_stack_mismatch(tool_calls: list, task: str) -> list[str]:
         for tc in tool_calls:
             if tc.get("name") not in ("code_write", "code_edit"):
                 continue
-            file_path = str(tc.get("args", {}).get("file_path", "") or tc.get("args", {}).get("path", ""))
+            file_path = str(
+                tc.get("args", {}).get("file_path", "") or tc.get("args", {}).get("path", "")
+            )
             if not file_path:
                 continue
             has_wrong_ext = any(file_path.endswith(ext) for ext in rule["wrong_extensions"])
@@ -152,7 +166,9 @@ _MIN_CONTENT_LENGTH = {
 }
 
 
-def check_l0(content: str, agent_role: str = "", tool_calls: list = None, task: str = "") -> GuardResult:
+def check_l0(
+    content: str, agent_role: str = "", tool_calls: list = None, task: str = ""
+) -> GuardResult:
     """L0: Fast deterministic checks. Returns immediately."""
     if not content or not content.strip():
         return GuardResult(passed=False, score=10, issues=["Empty output"], level="L0")
@@ -164,8 +180,21 @@ def check_l0(content: str, agent_role: str = "", tool_calls: list = None, task: 
 
     # Tool call names for evidence checking
     tool_names = {tc.get("name", "") for tc in tool_calls}
-    has_write_tool = bool(tool_names & {"code_write", "code_edit", "git_commit", "deploy_azure", "docker_build"})
-    has_test_tool = bool(tool_names & {"test", "build", "playwright_test", "android_build", "android_test", "android_lint", "android_emulator_test"})
+    has_write_tool = bool(
+        tool_names & {"code_write", "code_edit", "git_commit", "deploy_azure", "docker_build"}
+    )
+    has_test_tool = bool(
+        tool_names
+        & {
+            "test",
+            "build",
+            "playwright_test",
+            "android_build",
+            "android_test",
+            "android_lint",
+            "android_emulator_test",
+        }
+    )
 
     # Check stack mismatch — wrong language for declared project stack
     stack_issues = _check_stack_mismatch(tool_calls, task)
@@ -190,11 +219,16 @@ def check_l0(content: str, agent_role: str = "", tool_calls: list = None, task: 
         if tc.get("name") not in ("code_write", "code_edit"):
             continue
         file_content = str(tc.get("args", {}).get("content", ""))
-        file_path = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
+        file_path = str(
+            tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", "")
+        )
         if not file_content:
             continue
         # Check for fake build scripts (gradlew, Makefile, build.sh)
-        is_build_script = any(kw in file_path.lower() for kw in ["gradlew", "makefile", "build.sh", "build.bat", "compile.sh"])
+        is_build_script = any(
+            kw in file_path.lower()
+            for kw in ["gradlew", "makefile", "build.sh", "build.bat", "compile.sh"]
+        )
         for pattern, desc in _FAKE_BUILD_PATTERNS:
             if re.search(pattern, file_content, re.IGNORECASE | re.MULTILINE):
                 issues.append(f"FAKE_BUILD: {desc} in {file_path}")
@@ -202,7 +236,9 @@ def check_l0(content: str, agent_role: str = "", tool_calls: list = None, task: 
                 break
         # Check for tiny/empty build scripts
         if is_build_script and len(file_content.strip()) < 50:
-            issues.append(f"FAKE_BUILD: Suspiciously small build script ({len(file_content)} chars) in {file_path}")
+            issues.append(
+                f"FAKE_BUILD: Suspiciously small build script ({len(file_content)} chars) in {file_path}"
+            )
             score += 7
         # Check mock/stub patterns in written files
         for pattern, desc in _MOCK_PATTERNS:
@@ -235,22 +271,24 @@ def check_l0(content: str, agent_role: str = "", tool_calls: list = None, task: 
             break
     min_len = _MIN_CONTENT_LENGTH[role_key]
     # Only check length for non-approve/non-veto responses AND when no code was written via tools
-    if not has_write_tool and not any(marker in content_lower for marker in ("[approve]", "[veto]", "go/nogo")):
+    if not has_write_tool and not any(
+        marker in content_lower for marker in ("[approve]", "[veto]", "go/nogo")
+    ):
         if len(content.strip()) < min_len:
             issues.append(f"TOO_SHORT: {len(content.strip())} chars (min {min_len} for {role_key})")
             score += 2
 
     # Check for copy-paste of task (agent echoing the prompt)
     # Heuristic: if >70% of content is a quote block, it's probably echo
-    quote_lines = sum(1 for l in content.split('\n') if l.strip().startswith('>'))
-    total_lines = max(len(content.split('\n')), 1)
+    quote_lines = sum(1 for l in content.split("\n") if l.strip().startswith(">"))
+    total_lines = max(len(content.split("\n")), 1)
     if quote_lines / total_lines > 0.7 and total_lines > 5:
         issues.append("ECHO: Agent mostly quoted the task back")
         score += 4
 
     # Check for suspicious repeated blocks (copy-paste slop)
     # Use higher threshold for structured content (tables, org charts)
-    lines = [l.strip() for l in content.split('\n') if len(l.strip()) > 20]
+    lines = [l.strip() for l in content.split("\n") if len(l.strip()) > 20]
     if len(lines) > 10:
         seen = {}
         for l in lines:
@@ -286,7 +324,7 @@ async def check_l1(
     - Honesty (claims match tool evidence)
     """
     try:
-        from ..llm.client import get_llm_client, LLMMessage
+        from ..llm.client import LLMMessage, get_llm_client
 
         # Build evidence summary from tool calls
         evidence = "No tools used."
@@ -309,8 +347,11 @@ async def check_l1(
             pattern_context = (
                 f"\n- HIERARCHICAL PATTERN: This agent ({agent_role}) may be a manager/coordinator OR a worker."
                 " Managers DECOMPOSE work into subtasks — they do NOT write code themselves."
-                " Workers execute subtasks. A manager referencing files in the workspace is VALID (other agents wrote them)."
+                " Workers execute subtasks using code_write. Workers MAY write additional files beyond their subtask."
+                " If a worker used code_write to create files, this is VALID work — do NOT flag as hallucination."
+                " A manager referencing files in the workspace is VALID (other agents wrote them)."
                 " Do NOT reject managers for 'hallucination' about existing files."
+                " Do NOT reject workers who wrote extra useful files (e.g., Cargo.toml alongside main.rs)."
             )
         elif pattern_type == "sequential":
             pattern_context = (
@@ -356,6 +397,7 @@ Respond ONLY with JSON:
         )
 
         import json
+
         raw = resp.content.strip()
         if "```json" in raw:
             raw = raw.split("```json", 1)[1].split("```", 1)[0].strip()
@@ -367,12 +409,16 @@ Respond ONLY with JSON:
         l1_issues = data.get("issues", [])
         verdict = data.get("verdict", "APPROVE")
 
-        # HALLUCINATION/SLOP/STACK_MISMATCH in issues = always reject, regardless of score
+        # HALLUCINATION/SLOP/STACK_MISMATCH in issues = reject UNLESS agent used code_write/code_edit
         has_critical = any(
             "HALLUCINATION" in i.upper() or "SLOP" in i.upper() or "STACK_MISMATCH" in i.upper()
             for i in l1_issues
         )
-        if has_critical:
+        # If agent actually wrote code, don't auto-reject for hallucination claims
+        used_write_tools = tool_calls and any(
+            tc.get("name", "") in ("code_write", "code_edit", "git_commit") for tc in tool_calls
+        )
+        if has_critical and not used_write_tools:
             l1_score = max(l1_score, 7)  # floor at 7 = force retry
             verdict = "REJECT"
 
@@ -414,7 +460,18 @@ async def run_guard(
     # Discussion patterns (network, human-in-the-loop) are debating, not producing code
     # Strategic/business/management roles produce analysis, not code — skip L1
     execution_patterns = {"sequential", "hierarchical", "parallel", "loop", "aggregator"}
-    _non_dev_roles = {"strat", "dirprog", "product", "metier", "business", "portfolio", "lean", "scrum", "rh", "programme"}
+    _non_dev_roles = {
+        "strat",
+        "dirprog",
+        "product",
+        "metier",
+        "business",
+        "portfolio",
+        "lean",
+        "scrum",
+        "rh",
+        "programme",
+    }
     role_lower = (agent_role or "").lower()
     is_dev_role = not any(nr in role_lower for nr in _non_dev_roles)
     if enable_l1 and pattern_type in execution_patterns and is_dev_role:

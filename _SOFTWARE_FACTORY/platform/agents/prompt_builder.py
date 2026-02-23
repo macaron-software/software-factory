@@ -52,26 +52,15 @@ CRITICAL: When the user asks you to DO something (lancer, fixer, chercher), USE 
         role_cat = _classify_agent_role(agent)
         if role_cat == "qa":
             parts.append("""
-## QA Tools — Visual E2E Testing (MANDATORY)
-You have browser tools. You MUST use them:
-1. Start dev server: build(command="cd frontend && npm run dev -- --port 4173 &") or build(command="npm start &")
-2. Open the app: browse(url="http://localhost:4173")
-3. Take screenshot: take_screenshot(name="homepage")
-4. Get page elements: inspect_page()
-5. Take more screenshots of key pages: take_screenshot(name="dashboard")
+## QA Testing (MANDATORY — read carefully)
+You have a tool called run_e2e_tests. You MUST call it.
+It automatically: installs deps, starts the server, takes screenshots, runs tests.
 
-REQUIRED for every QA validation:
-- Call browse() then take_screenshot() at least 2 times
-- Call build(command="npm test") to run unit tests
-- Call create_ticket() for any bug found
+STEP 1: Call run_e2e_tests() — this is REQUIRED, do it FIRST
+STEP 2: Read the results and report bugs with create_ticket()
+STEP 3: Call build(command="npm test") for additional unit tests if needed
 
-Example flow:
-  build(command="cd backend && npm start &")   → start backend
-  build(command="cd frontend && npm run dev -- --port 4173 &")  → start frontend
-  browse(url="http://localhost:4173")  → open app
-  take_screenshot(name="home")  → capture homepage
-  inspect_page()  → check accessibility tree
-  take_screenshot(name="login-flow")  → capture login page""")
+DO NOT skip run_e2e_tests(). Your validation is REJECTED without it.""")
         elif role_cat == "security":
             parts.append("""
 ## Security Tools (IMPORTANT)

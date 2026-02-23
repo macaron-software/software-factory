@@ -2237,13 +2237,82 @@ asyncio.run(main())
                     },
                 )
 
-    # After CI/CD or TDD Sprint phase: run build if package.json or Dockerfile exists
-    if any(k in phase_key for k in ("cicd", "pipeline", "sprint", "dev")):
+    # After CI/CD or TDD Sprint phase: run build if package.json or Cargo.toml exists
+    if any(k in phase_key for k in ("cicd", "pipeline", "sprint", "dev", "tdd", "quality")):
         ws = Path(workspace)
+
+        # Detect project roots (support subdirectories: frontend/, backend/, etc.)
+        def _find_project_file(name: str) -> Path | None:
+            if (ws / name).exists():
+                return ws
+            for sub in ("frontend", "client", "web", "app", "backend", "server", "api"):
+                if (ws / sub / name).exists():
+                    return ws / sub
+            return None
+
+        npm_root = _find_project_file("package.json")
+        cargo_root = _find_project_file("Cargo.toml")
+
         try:
-            if (ws / "package.json").exists():
+            # Rust/Cargo project support
+            if cargo_root:
+                cargo_cwd = str(cargo_root)
+                cargo_check = subprocess.run(
+                    ["cargo", "check"], cwd=cargo_cwd, capture_output=True, text=True, timeout=180
+                )
+                cargo_msg = (
+                    "cargo check réussi"
+                    if cargo_check.returncode == 0
+                    else f"cargo check échoué: {cargo_check.stderr[-300:]}"
+                )
+                if cargo_check.returncode != 0:
+                    result["build_ok"] = False
+                await push_sse(
+                    session_id,
+                    {
+                        "type": "message",
+                        "from_agent": "system",
+                        "from_name": "CI/CD",
+                        "from_role": "Pipeline",
+                        "content": cargo_msg,
+                        "phase_id": phase_id,
+                        "msg_type": "text",
+                    },
+                )
+                # Run cargo test
+                if cargo_check.returncode == 0:
+                    cargo_test = subprocess.run(
+                        ["cargo", "test", "--no-fail-fast"],
+                        cwd=cargo_cwd,
+                        capture_output=True,
+                        text=True,
+                        timeout=180,
+                    )
+                    test_msg = (
+                        f"cargo test réussi: {cargo_test.stdout[-200:]}"
+                        if cargo_test.returncode == 0
+                        else f"cargo test échoué: {cargo_test.stdout[-300:]}"
+                    )
+                    if cargo_test.returncode != 0:
+                        result["test_ok"] = False
+                    await push_sse(
+                        session_id,
+                        {
+                            "type": "message",
+                            "from_agent": "system",
+                            "from_name": "CI/CD",
+                            "from_role": "Pipeline",
+                            "content": test_msg,
+                            "phase_id": phase_id,
+                            "msg_type": "text",
+                        },
+                    )
+
+            # Node.js project support
+            if npm_root and (npm_root / "package.json").exists():
+                npm_cwd = str(npm_root)
                 npm_r = subprocess.run(
-                    ["npm", "install"], cwd=workspace, capture_output=True, text=True, timeout=120
+                    ["npm", "install"], cwd=npm_cwd, capture_output=True, text=True, timeout=120
                 )
                 build_msg = (
                     "npm install réussi"
@@ -2268,11 +2337,11 @@ asyncio.run(main())
                 import json as _json
 
                 try:
-                    pkg = _json.loads((ws / "package.json").read_text())
+                    pkg = _json.loads((npm_root / "package.json").read_text())
                     if "build" in (pkg.get("scripts") or {}):
                         build_r = subprocess.run(
                             ["npm", "run", "build"],
-                            cwd=workspace,
+                            cwd=npm_cwd,
                             capture_output=True,
                             text=True,
                             timeout=120,
@@ -2299,7 +2368,7 @@ asyncio.run(main())
                     if "test" in (pkg.get("scripts") or {}):
                         test_r = subprocess.run(
                             ["npm", "test"],
-                            cwd=workspace,
+                            cwd=npm_cwd,
                             capture_output=True,
                             text=True,
                             timeout=120,
@@ -2387,21 +2456,23 @@ asyncio.run(main())
 
         # After sprint: start server, take screenshots, stop server
         ws = Path(workspace)
-        if (ws / "package.json").exists():
+        npm_root_srv = _find_project_file("package.json")
+        if npm_root_srv and (npm_root_srv / "package.json").exists():
             try:
                 import json as _json2
 
-                pkg2 = _json2.loads((ws / "package.json").read_text())
+                pkg2 = _json2.loads((npm_root_srv / "package.json").read_text())
                 scripts = pkg2.get("scripts") or {}
                 start_cmd = None
+                srv_cwd = str(npm_root_srv)
                 if "start" in scripts:
                     start_cmd = "npm start"
                 elif "dev" in scripts:
                     start_cmd = "npm run dev"
                 elif (
-                    (ws / "src" / "server.ts").exists()
-                    or (ws / "src" / "server.js").exists()
-                    or (ws / "server.js").exists()
+                    (npm_root_srv / "src" / "server.ts").exists()
+                    or (npm_root_srv / "src" / "server.js").exists()
+                    or (npm_root_srv / "server.js").exists()
                 ):
                     main = pkg2.get("main", "")
                     if main:
@@ -2421,7 +2492,7 @@ asyncio.run(main())
                     server_proc = subprocess.Popen(
                         start_cmd,
                         shell=True,
-                        cwd=workspace,
+                        cwd=srv_cwd,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         env=server_env,
@@ -2519,7 +2590,7 @@ asyncio.run(main())
                             pass
             except Exception as e:
                 logger.warning("Post-sprint server screenshot failed: %s", e)
-    if "deploy" in phase_key:
+    if "deploy" in phase_key or "quality" in phase_key:
         ws = Path(workspace)
         # Docker build + run if Dockerfile exists
         if (ws / "Dockerfile").exists():

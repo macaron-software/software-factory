@@ -39,6 +39,14 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     gate="no_veto",
                     config={"agents": ["qa_lead", "securite", "arch-critic", "devops"]},
                 ),
+                WorkflowPhase(
+                    id="p4",
+                    pattern_id="sequential",
+                    name="Deploy & Verify",
+                    description="Docker build, deploy, health check, screenshots of user journeys",
+                    gate="always",
+                    config={"agents": ["devops", "testeur", "qa_lead"]},
+                ),
             ],
         ),
         WorkflowDef(
