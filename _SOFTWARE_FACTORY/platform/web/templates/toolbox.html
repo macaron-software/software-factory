@@ -92,8 +92,11 @@ function showCLITab() {
                     <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">platform status</span> — Platform statistics</div>
                     <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">missions list</span> / <span style="color:#4ec9b0">show &lt;id&gt;</span> — Missions management</div>
                     <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">agents list</span> / <span style="color:#4ec9b0">show &lt;id&gt;</span> — Agents management</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">workflows list</span> / <span style="color:#4ec9b0">show &lt;id&gt;</span> — Workflows</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">patterns list</span> / <span style="color:#4ec9b0">show &lt;id&gt;</span> — Patterns</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">projects list</span> — Projects</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">memory search</span> / <span style="color:#4ec9b0">project</span> / <span style="color:#4ec9b0">global</span> — Memory</div>
                     <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">skills sync</span> / <span style="color:#4ec9b0">search &lt;query&gt;</span> — Skills library</div>
-                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.2rem"><span style="color:#4ec9b0">projects list</span> — List projects</div>
                     <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.8rem"><span style="color:#4ec9b0">db status</span> — Database status</div>
                     
                     <div style="color:#569cd6;margin-bottom:0.3rem">System Commands:</div>
@@ -102,7 +105,7 @@ function showCLITab() {
                     <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.3rem"><span style="color:#4ec9b0">make test</span> — Run tests</div>
                     <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:1.2rem"><span style="color:#4ec9b0">ruff check .</span> — Lint Python code</div>
                     
-                    <div style="color:#6a9955;font-style:italic;margin-bottom:0.3rem">Note: For ideation and interactive sessions, use:</div>
+                    <div style="color:#6a9955;font-style:italic;margin-bottom:0.3rem">Note: For ideation and interactive operations, use:</div>
                     <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.3rem">• Web interface: <span style="color:#ce9178">/ideation</span> page</div>
                     <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:1rem">• Terminal CLI: <span style="color:#ce9178">sf ideation "your prompt"</span></div>
                 </div>
@@ -174,6 +177,9 @@ function handleCLIInput(event) {
             'platform status',
             'missions list', 'missions show',
             'agents list', 'agents show',
+            'workflows list', 'workflows show',
+            'patterns list', 'patterns show',
+            'memory search', 'memory project', 'memory global',
             'skills sync', 'skills search',
             'projects list',
             'db status',
@@ -214,14 +220,14 @@ async function executeCLICommand(commandLine) {
     }
     
     // Detect SF native commands vs system commands
-    const sfCommands = ['platform', 'missions', 'agents', 'skills', 'projects', 'db'];
+    const sfCommands = ['platform', 'missions', 'agents', 'workflows', 'patterns', 'memory', 'skills', 'projects', 'db'];
     const isSFCommand = sfCommands.includes(command);
     
     // Show loading
     const loadingDiv = document.createElement('div');
     loadingDiv.style.color = '#858585';
     loadingDiv.style.marginLeft = '1rem';
-    loadingDiv.textContent = '⏳ Executing...';
+    loadingDiv.textContent = 'Executing...';
     terminal.appendChild(loadingDiv);
     terminal.scrollTop = terminal.scrollHeight;
     
@@ -258,7 +264,7 @@ async function executeCLICommand(commandLine) {
         
         if (data.success) {
             outputDiv.style.color = '#d4d4d4';
-            outputDiv.textContent = data.output || '✓ Command executed successfully';
+            outputDiv.textContent = data.output || 'Command executed successfully';
         } else {
             outputDiv.style.color = '#f48771';
             outputDiv.innerHTML = `<strong>Error${data.exit_code ? ' (exit '+data.exit_code+')' : ''}:</strong>\n${data.error || 'Unknown error'}`;
@@ -293,42 +299,59 @@ function showCLIHelp() {
     helpDiv.innerHTML = `
         <div style="color:#dcdcaa;font-weight:600;margin-bottom:0.8rem">Software Factory CLI Commands</div>
         
-        <div style="color:#4ec9b0;margin-bottom:0.3rem">🏢 Platform:</div>
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Platform:</div>
         <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
           <span style="color:#569cd6">platform status</span> <span style="color:#858585">- Platform status (agents, missions, projects, skills)</span>
         </div>
         
-        <div style="color:#4ec9b0;margin-bottom:0.3rem">🎯 Missions:</div>
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Missions:</div>
         <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
           <span style="color:#569cd6">missions list</span> <span style="color:#858585">- List all missions</span><br>
-          <span style="color:#569cd6">missions list --status=running</span> <span style="color:#858585">- Filter by status</span><br>
           <span style="color:#569cd6">missions show &lt;id&gt;</span> <span style="color:#858585">- Show mission details</span>
         </div>
         
-        <div style="color:#4ec9b0;margin-bottom:0.3rem">🤖 Agents:</div>
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Agents:</div>
         <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
           <span style="color:#569cd6">agents list</span> <span style="color:#858585">- List all agents</span><br>
-          <span style="color:#569cd6">agents list --role=backend</span> <span style="color:#858585">- Filter by role</span><br>
           <span style="color:#569cd6">agents show &lt;id&gt;</span> <span style="color:#858585">- Show agent details</span>
         </div>
         
-        <div style="color:#4ec9b0;margin-bottom:0.3rem">💎 Skills:</div>
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Workflows:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">workflows list</span> <span style="color:#858585">- List all workflows</span><br>
+          <span style="color:#569cd6">workflows show &lt;id&gt;</span> <span style="color:#858585">- Show workflow details</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Patterns:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">patterns list</span> <span style="color:#858585">- List all patterns</span><br>
+          <span style="color:#569cd6">patterns show &lt;id&gt;</span> <span style="color:#858585">- Show pattern details</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Projects:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">projects list</span> <span style="color:#858585">- List all projects</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Memory:</div>
+        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
+          <span style="color:#569cd6">memory search &lt;query&gt;</span> <span style="color:#858585">- Search memory</span><br>
+          <span style="color:#569cd6">memory project &lt;id&gt;</span> <span style="color:#858585">- Project memory</span><br>
+          <span style="color:#569cd6">memory global</span> <span style="color:#858585">- Global memory</span>
+        </div>
+        
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Skills:</div>
         <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
           <span style="color:#569cd6">skills sync</span> <span style="color:#858585">- Sync GitHub skills</span><br>
           <span style="color:#569cd6">skills search &lt;query&gt;</span> <span style="color:#858585">- Search skills by keyword</span>
         </div>
         
-        <div style="color:#4ec9b0;margin-bottom:0.3rem">📦 Projects:</div>
-        <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
-          <span style="color:#569cd6">projects list</span> <span style="color:#858585">- List all projects</span>
-        </div>
-        
-        <div style="color:#4ec9b0;margin-bottom:0.3rem">🗄️ Database:</div>
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Database:</div>
         <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
           <span style="color:#569cd6">db status</span> <span style="color:#858585">- Show tables and row counts</span>
         </div>
         
-        <div style="color:#4ec9b0;margin-bottom:0.3rem">🛠️ Development:</div>
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Development:</div>
         <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
           <span style="color:#569cd6">make</span> <span style="color:#858585">[install-hooks, test-skills, quality, test]</span><br>
           <span style="color:#569cd6">git</span> <span style="color:#858585">[status, log, diff, branch]</span><br>
@@ -337,14 +360,14 @@ function showCLIHelp() {
           <span style="color:#569cd6">pytest</span> <span style="color:#858585">[-v, --cov]</span>
         </div>
         
-        <div style="color:#4ec9b0;margin-bottom:0.3rem">📁 System:</div>
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">System:</div>
         <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
           <span style="color:#569cd6">ls</span> <span style="color:#858585">[-la, -lh]</span><br>
           <span style="color:#569cd6">pwd</span> <span style="color:#858585">- Print working directory</span><br>
           <span style="color:#569cd6">whoami</span> <span style="color:#858585">- Current user</span>
         </div>
         
-        <div style="color:#4ec9b0;margin-bottom:0.3rem">🖥️ Terminal:</div>
+        <div style="color:#4ec9b0;margin-bottom:0.3rem">Terminal:</div>
         <div style="margin-left:1rem;color:#d4d4d4">
           <span style="color:#569cd6">clear</span> <span style="color:#858585">- Clear terminal</span><br>
           <span style="color:#569cd6">help</span> <span style="color:#858585">- Show this help</span>
