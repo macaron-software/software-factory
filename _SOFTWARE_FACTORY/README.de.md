@@ -34,9 +34,13 @@ Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 158 KI-Agenten ü
 - **145 spezialisierte Agenten** — Architekten, Entwickler, Tester, SRE, Sicherheitsanalysten, Product Owner
 - **12 Orchestrierungsmuster** — Solo, parallel, hierarchisch, Netzwerk, adversarial-pair, human-in-the-loop
 - **SAFe-ausgerichteter Lebenszyklus** — Portfolio → Epic → Feature → Story mit PI-Kadenz
-- **Selbstheilung** — autonome Vorfallserkennung, Triage und Selbstreparatur
+- **Selbstheilung** — autonome Vorfallserkennung, Triage und Selbstreparatur mit Echtzeit-Benachrichtigungen
 - **Sicherheit zuerst** — Prompt-Injection-Guard, RBAC, Secret-Scrubbing
 - **DORA-Metriken** — Bereitstellungshäufigkeit, Lead Time, MTTR, Change Failure Rate
+- **Mehrsprachig** — automatische Erkennung der Browser-Sprache (8 Sprachen: en, fr, es, it, de, pt, ja, zh)
+- **Benutzerdefinierte KI-Anbieter** — GUI zur Konfiguration jedes OpenAI-kompatiblen LLM mit verschlüsselten API-Schlüsseln
+- **Echtzeit-Analytik** — Live-Performance-Dashboards mit Chart.js-Visualisierungen
+- **In-App-Benachrichtigungen** — Glockensymbol mit Dropdown für TMA-Tickets, Vorfälle und Systemwarnungen
 
 ## Screenshots
 

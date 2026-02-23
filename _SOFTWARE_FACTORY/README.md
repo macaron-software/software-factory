@@ -36,9 +36,13 @@ Think of it as a **virtual software factory** where 158 AI agents collaborate th
 - **158 specialized agents** — architects, developers, testers, SREs, security analysts, product owners
 - **12 orchestration patterns** — solo, parallel, hierarchical, network, adversarial-pair, human-in-the-loop
 - **SAFe-aligned lifecycle** — Portfolio → Epic → Feature → Story with PI cadence
-- **Auto-heal** — autonomous incident detection, triage, and self-repair
+- **Auto-heal** — autonomous incident detection, triage, and self-repair with real-time notifications
 - **Security-first** — prompt injection guard, RBAC, secret scrubbing, connection pooling
 - **DORA metrics** — deployment frequency, lead time, MTTR, change failure rate
+- **Multilingual** — auto-detects browser language (8 locales: en, fr, es, it, de, pt, ja, zh)
+- **Custom AI providers** — GUI to configure any OpenAI-compatible LLM with encrypted API keys
+- **Real-time analytics** — live performance dashboards with Chart.js visualizations
+- **In-app notifications** — bell icon with dropdown for TMA tickets, incidents, and system alerts
 
 ## Screenshots
 
@@ -156,7 +160,13 @@ AZURE_OPENAI_API_KEY=your-key
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
 ```
 
-You can also configure providers from the **Settings** page in the dashboard (`/settings`).
+You can also configure **custom AI providers** from the **Settings** page in the dashboard (`/settings`):
+
+- Click **LLM Providers** tab → **Add Provider**
+- Enter provider details (name, base URL, API key, default model)
+- API keys are encrypted at rest using Fernet symmetric encryption
+- Test connection before enabling
+- Works with any OpenAI-compatible API
 
 ## Features
 
@@ -203,8 +213,9 @@ Full Portfolio → Epic → Feature → Story hierarchy with:
 - **Authentication** — JWT-based auth with RBAC
 - **Prompt injection guard** — detect and block malicious prompts
 - **Secret scrubbing** — automatic redaction of sensitive data
+- **Encrypted storage** — API keys encrypted with Fernet (custom AI providers)
 - **CSP (Content Security Policy)** — hardened headers
-- **Rate limiting** — per-user API quotas
+- **Rate limiting** — per-user API quotas (120 req/min per IP)
 - **Audit logging** — comprehensive activity logs
 
 ### 📈 DORA Metrics & Monitoring
@@ -213,8 +224,10 @@ Full Portfolio → Epic → Feature → Story hierarchy with:
 - **Lead time** — commit to deploy duration
 - **MTTR** — mean time to recovery from incidents
 - **Change failure rate** — percentage of failed deployments
-- **Real-time dashboards** — Chart.js visualizations
-- **Prometheus metrics** — /metrics endpoint
+- **Real-time analytics** — `/analytics` dashboard with Chart.js visualizations
+- **TMA heartbeat** — animated ECG indicator showing auto-heal status
+- **In-app notifications** — bell icon with dropdown for tickets and incidents
+- **Prometheus metrics** — /metrics endpoint for external monitoring
 
 ### 🔧 Built-in Agent Tools
 
@@ -241,7 +254,10 @@ Main UI at http://localhost:8090:
 - **PI Board** — program increment planning
 - **Mission Control** — execution monitoring
 - **Agent Management** — view, configure, monitor agents
-- **Incident Dashboard** — auto-heal triage
+- **Incident Dashboard** — auto-heal triage with TMA heartbeat indicator
+- **Real-time Analytics** — deployment frequency, lead time, MTTR dashboards
+- **In-app Notifications** — bell icon with live updates for tickets and incidents
+- **Multilingual** — auto-detects browser language (en, fr, es, it, de, pt, ja, zh)
 - **Mobile responsive** — works on tablets and phones
 
 ### 2. CLI (`sf`)

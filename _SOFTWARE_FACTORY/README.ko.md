@@ -32,8 +32,12 @@ Software Factory is an autonomous multi-agent platform that orchestrates the ent
 - **145 specialized agents** — architects, developers, testers, SRE, security analysts
 - **12 orchestration patterns** — solo, parallel, hierarchical, network, adversarial-pair
 - **SAFe-aligned lifecycle** — Portfolio → Epic → Feature → Story
-- **Auto-heal** — autonomous incident detection and self-repair
+- **Auto-heal** — autonomous incident detection and self-repair with real-time notifications
 - **DORA metrics** — deployment frequency, lead time, MTTR, change failure rate
+- **Multilingual** — auto-detects browser language (8 locales: en, fr, es, it, de, pt, ja, zh)
+- **Custom AI providers** — GUI to configure any OpenAI-compatible LLM with encrypted API keys
+- **Real-time analytics** — live performance dashboards with Chart.js visualizations
+- **In-app notifications** — bell icon with dropdown for TMA tickets, incidents, and system alerts
 
 ## Screenshots
 

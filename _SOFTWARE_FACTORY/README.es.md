@@ -34,9 +34,13 @@ Piensa en ello como una **fábrica de software virtual** donde 158 agentes IA co
 - **158 agentes especializados** — arquitectos, desarrolladores, testers, SRE, analistas de seguridad, product owners
 - **12 patrones de orquestación** — solo, paralelo, jerárquico, red, adversarial-pair, human-in-the-loop
 - **Ciclo de vida SAFe** — Portfolio → Epic → Feature → Story con cadencia PI
-- **Auto-reparación** — detección autónoma de incidentes, triage y auto-reparación
+- **Auto-reparación** — detección autónoma de incidentes, triage y auto-reparación con notificaciones en tiempo real
 - **Seguridad prioritaria** — guardia inyección de prompt, RBAC, enmascaramiento secretos
 - **Métricas DORA** — frecuencia despliegue, lead time, MTTR, tasa fallo cambios
+- **Multilingüe** — detección automática del idioma del navegador (8 idiomas: en, fr, es, it, de, pt, ja, zh)
+- **Proveedores de IA personalizados** — interfaz para configurar cualquier LLM compatible con OpenAI con cifrado de claves API
+- **Analítica en tiempo real** — paneles de rendimiento en vivo con visualizaciones Chart.js
+- **Notificaciones integradas** — icono de campana con menú desplegable para tickets TMA, incidentes y alertas del sistema
 
 ## Capturas de pantalla
 

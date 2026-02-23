@@ -36,9 +36,13 @@ Imaginez une **usine logicielle virtuelle** où 158 agents IA collaborent à tra
 - **158 agents spécialisés** — architectes, développeurs, testeurs, SRE, analystes sécurité, product owners
 - **12 patterns d'orchestration** — solo, parallèle, hiérarchique, réseau, adversarial-pair, human-in-the-loop
 - **Cycle de vie SAFe** — Portfolio → Epic → Feature → Story avec cadence PI
-- **Auto-réparation** — détection autonome d'incidents, triage et auto-réparation
+- **Auto-réparation** — détection autonome d'incidents, triage et auto-réparation avec notifications temps réel
 - **Sécurité prioritaire** — garde injection de prompt, RBAC, masquage secrets, connection pooling
 - **Métriques DORA** — fréquence déploiement, lead time, MTTR, taux échec changements
+- **Multilingue** — détection automatique de la langue du navigateur (8 langues : en, fr, es, it, de, pt, ja, zh)
+- **Fournisseurs IA personnalisés** — interface pour configurer n'importe quel LLM compatible OpenAI avec chiffrement des clés API
+- **Analytics temps réel** — tableaux de bord de performance en direct avec visualisations Chart.js
+- **Notifications intégrées** — icône cloche avec dropdown pour tickets TMA, incidents et alertes système
 
 ## Captures d'écran
 
