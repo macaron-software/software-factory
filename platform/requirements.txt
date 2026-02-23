@@ -14,3 +14,5 @@ psycopg[binary]>=3.1
 psycopg-pool>=3.1
 psutil>=5.9
 numpy>=1.26
+bcrypt>=4.0
+PyJWT>=2.8

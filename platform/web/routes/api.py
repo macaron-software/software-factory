@@ -1467,7 +1467,11 @@ async def autoheal_heartbeat():
         css_class, color, status_label = "stale", "#ef4444", "Down"
 
     last_err = stats.get("last_error", "")
-    err_line = f'<div class="tma-tip-row" style="color:#ef4444">Err: {last_err[:60]}</div>' if last_err else ""
+    err_line = (
+        f'<div class="tma-tip-row" style="color:#ef4444">Err: {last_err[:60]}</div>'
+        if last_err
+        else ""
+    )
 
     html = (
         f'<span class="tma-hb {css_class}" style="--tma-color:{color}">'
@@ -1484,10 +1488,10 @@ async def autoheal_heartbeat():
         f'<div class="tma-tip-row"><span>Healing</span><span style="color:#f59e0b">{active}</span></div>'
         f'<div class="tma-tip-row"><span>Completed</span><span style="color:#22c55e">{mis["completed"]}</span></div>'
         f'<div class="tma-tip-row"><span>Failed</span><span style="color:#ef4444">{mis["failed"]}</span></div>'
-        f'{err_line}'
-        f'</div>'
+        f"{err_line}"
+        f"</div>"
         f'<div class="tma-tip-footer">Scan every {stats["interval_s"]}s — Max {stats["max_concurrent"]} concurrent</div>'
-        f'</div></span>'
+        f"</div></span>"
     )
     return HTMLResponse(html)
 
@@ -1504,6 +1508,45 @@ async def autoheal_trigger():
         return JSONResponse({"ok": True, **get_autoheal_stats()})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+# ── Jira Integration ────────────────────────────────────────────────
+
+
+@router.get("/api/jira/board")
+async def jira_board(board_id: int = 8680):
+    """Get issues from a Jira board."""
+    from ...tools.jira_tools import jira_board_issues
+
+    result = await jira_board_issues(board_id)
+    return PlainTextResponse(result)
+
+
+@router.get("/api/jira/search")
+async def jira_search_api(jql: str = "project=LPDATA"):
+    """Search Jira issues."""
+    from ...tools.jira_tools import jira_search
+
+    result = await jira_search(jql)
+    return PlainTextResponse(result)
+
+
+@router.post("/api/jira/sync/{mission_id}")
+async def jira_sync_mission(mission_id: str, board_id: int = 8680):
+    """Sync a mission's tasks/stories to Jira."""
+    from ...tools.jira_tools import jira_sync_from_platform
+
+    result = await jira_sync_from_platform(mission_id, board_id)
+    return PlainTextResponse(result)
+
+
+@router.post("/api/jira/kanban-sync")
+async def jira_kanban_sync_api(direction: str = "both"):
+    """Bidirectional kanban sync between Platform and Jira board."""
+    from ...tools.jira_tools import jira_kanban_sync
+
+    result = await jira_kanban_sync(direction)
+    return PlainTextResponse(result)
 
 
 # ── Chaos Endurance ──────────────────────────────────────────────────
@@ -2374,7 +2417,7 @@ async def github_webhook(request: Request):
 async def list_ai_providers():
     """List all custom AI providers."""
     from ...db.migrations import get_db
-    
+
     db = get_db()
     try:
         rows = db.execute(
@@ -2391,36 +2434,38 @@ async def list_ai_providers():
 async def create_ai_provider(request: Request):
     """Create a new custom AI provider."""
     import uuid
+
     from cryptography.fernet import Fernet
+
     from ...db.migrations import get_db
-    
+
     body = await request.json()
     name = body.get("name", "").strip()
     provider_type = body.get("provider_type", "openai-compatible")
     base_url = body.get("base_url", "").strip()
     api_key = body.get("api_key", "").strip()
     default_model = body.get("default_model", "").strip()
-    
+
     if not all([name, base_url, api_key, default_model]):
         return JSONResponse({"ok": False, "error": "Missing required fields"}, status_code=400)
-    
+
     # Encrypt API key
     encryption_key = os.environ.get("SF_ENCRYPTION_KEY")
     if not encryption_key:
         # Generate a key if not set (for development)
         encryption_key = Fernet.generate_key().decode()
         logger.warning("SF_ENCRYPTION_KEY not set, using temporary key (not secure for production)")
-    
+
     fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
     encrypted_key = fernet.encrypt(api_key.encode()).decode()
-    
+
     provider_id = str(uuid.uuid4())[:12]
     db = get_db()
     try:
         db.execute(
             "INSERT INTO custom_ai_providers (id, name, provider_type, base_url, api_key_encrypted, default_model, enabled) "
             "VALUES (?, ?, ?, ?, ?, ?, 1)",
-            (provider_id, name, provider_type, base_url, encrypted_key, default_model)
+            (provider_id, name, provider_type, base_url, encrypted_key, default_model),
         )
         db.commit()
         return JSONResponse({"ok": True, "id": provider_id})
@@ -2434,49 +2479,49 @@ async def create_ai_provider(request: Request):
 async def update_ai_provider(provider_id: str, request: Request):
     """Update a custom AI provider."""
     from cryptography.fernet import Fernet
+
     from ...db.migrations import get_db
-    
+
     body = await request.json()
     db = get_db()
-    
+
     try:
         updates = []
         params = []
-        
+
         if "enabled" in body:
             updates.append("enabled = ?")
             params.append(1 if body["enabled"] else 0)
-        
+
         if "name" in body:
             updates.append("name = ?")
             params.append(body["name"])
-        
+
         if "base_url" in body:
             updates.append("base_url = ?")
             params.append(body["base_url"])
-        
+
         if "default_model" in body:
             updates.append("default_model = ?")
             params.append(body["default_model"])
-        
+
         if "api_key" in body and body["api_key"]:
             encryption_key = os.environ.get("SF_ENCRYPTION_KEY")
             if not encryption_key:
                 encryption_key = Fernet.generate_key().decode()
-            fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
+            fernet = Fernet(
+                encryption_key.encode() if isinstance(encryption_key, str) else encryption_key
+            )
             encrypted_key = fernet.encrypt(body["api_key"].encode()).decode()
             updates.append("api_key_encrypted = ?")
             params.append(encrypted_key)
-        
+
         if updates:
             updates.append("updated_at = datetime('now')")
             params.append(provider_id)
-            db.execute(
-                f"UPDATE custom_ai_providers SET {', '.join(updates)} WHERE id = ?",
-                params
-            )
+            db.execute(f"UPDATE custom_ai_providers SET {', '.join(updates)} WHERE id = ?", params)
             db.commit()
-        
+
         return JSONResponse({"ok": True})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
@@ -2488,7 +2533,7 @@ async def update_ai_provider(provider_id: str, request: Request):
 async def delete_ai_provider(provider_id: str):
     """Delete a custom AI provider."""
     from ...db.migrations import get_db
-    
+
     db = get_db()
     try:
         db.execute("DELETE FROM custom_ai_providers WHERE id = ?", (provider_id,))
@@ -2501,31 +2546,34 @@ async def delete_ai_provider(provider_id: str):
 @router.post("/api/ai-providers/{provider_id}/test")
 async def test_ai_provider(provider_id: str):
     """Test connection to a custom AI provider."""
-    from cryptography.fernet import Fernet
     import httpx
+    from cryptography.fernet import Fernet
+
     from ...db.migrations import get_db
-    
+
     db = get_db()
     try:
         row = db.execute(
             "SELECT base_url, api_key_encrypted, default_model FROM custom_ai_providers WHERE id = ?",
-            (provider_id,)
+            (provider_id,),
         ).fetchone()
-        
+
         if not row:
             return JSONResponse({"ok": False, "error": "Provider not found"}, status_code=404)
-        
+
         base_url = row[0]
         encrypted_key = row[1]
         model = row[2]
-        
+
         # Decrypt API key
         encryption_key = os.environ.get("SF_ENCRYPTION_KEY")
         if not encryption_key:
             encryption_key = Fernet.generate_key().decode()
-        fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
+        fernet = Fernet(
+            encryption_key.encode() if isinstance(encryption_key, str) else encryption_key
+        )
         api_key = fernet.decrypt(encrypted_key.encode()).decode()
-        
+
         # Test API call
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
@@ -2534,15 +2582,14 @@ async def test_ai_provider(provider_id: str):
                 json={
                     "model": model,
                     "messages": [{"role": "user", "content": "test"}],
-                    "max_tokens": 5
-                }
+                    "max_tokens": 5,
+                },
             )
-        
+
         if response.status_code == 200:
             return JSONResponse({"ok": True, "status": "connected"})
-        else:
-            return JSONResponse({"ok": False, "error": f"HTTP {response.status_code}"}, status_code=500)
-    
+        return JSONResponse({"ok": False, "error": f"HTTP {response.status_code}"}, status_code=500)
+
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
     finally:

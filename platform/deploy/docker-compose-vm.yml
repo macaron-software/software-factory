@@ -20,6 +20,10 @@ services:
       - MF_ROOT=/app/mf_projects
       - ANDROID_BUILDER_CONTAINER=android-builder
       - AZURE_DEPLOY=1
+      - JIRA_URL=${JIRA_URL:-}
+      - JIRA_PROJECT=${JIRA_PROJECT:-}
+      - JIRA_BOARD_ID=${JIRA_BOARD_ID:-}
+      - JIRA_TOKEN=${JIRA_TOKEN:-}
     volumes:
       - platform-data:/app/data
       - /opt/macaron/.factory-keys:/app/.config/factory:ro

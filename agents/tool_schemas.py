@@ -681,22 +681,22 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
-        # ── MCP: JIRA/Confluence (optional — needs ATLASSIAN_TOKEN) ──
+        # ── MCP: JIRA (needs JIRA_URL + JIRA_TOKEN or ~/.config/factory/jira.key) ──
         {
             "type": "function",
             "function": {
                 "name": "jira_search",
-                "description": "Search JIRA issues using JQL query.",
+                "description": "Search Jira issues using JQL query.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "jql": {
                             "type": "string",
-                            "description": "JQL query (e.g. 'project=PROJ AND status=Open')",
+                            "description": "JQL query (e.g. 'project=LPDATA AND status=\"En Cours\"')",
                         },
                         "max_results": {
                             "type": "integer",
-                            "description": "Max results (default 10)",
+                            "description": "Max results (default 20)",
                         },
                     },
                     "required": ["jql"],
@@ -707,16 +707,95 @@ def _get_tool_schemas() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "jira_create",
-                "description": "Create a JIRA issue (bug, story, task).",
+                "description": "Create a Jira issue.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "project": {"type": "string", "description": "Project key (e.g. 'PROJ')"},
+                        "project": {"type": "string", "description": "Project key (default: LPDATA)"},
                         "summary": {"type": "string", "description": "Issue title"},
-                        "type": {"type": "string", "description": "Issue type: Bug, Story, Task"},
+                        "type": {"type": "string", "description": "Issue type: User Story, Feature, Anomalie (AGILE), etc."},
                         "description": {"type": "string", "description": "Issue description"},
+                        "priority": {"type": "string", "description": "Priority name (optional)"},
+                        "labels": {"type": "array", "items": {"type": "string"}, "description": "Labels (optional)"},
                     },
-                    "required": ["project", "summary", "type"],
+                    "required": ["summary"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "jira_update",
+                "description": "Update fields on an existing Jira issue.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "issue_key": {"type": "string", "description": "Issue key (e.g. LPDATA-123)"},
+                        "fields": {
+                            "type": "object",
+                            "description": "Fields to update: summary, description, priority, labels, assignee",
+                        },
+                    },
+                    "required": ["issue_key", "fields"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "jira_transition",
+                "description": "Move a Jira issue to a new status (e.g. 'En Cours', 'Terminé').",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "issue_key": {"type": "string", "description": "Issue key (e.g. LPDATA-123)"},
+                        "transition": {"type": "string", "description": "Target transition name"},
+                    },
+                    "required": ["issue_key", "transition"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "jira_board_issues",
+                "description": "List all issues from a Jira Agile board (default: BAC A SABLE IA board 8680).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "board_id": {"type": "integer", "description": "Board ID (default 8680)"},
+                        "max_results": {"type": "integer", "description": "Max results (default 50)"},
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "jira_add_comment",
+                "description": "Add a comment to a Jira issue.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "issue_key": {"type": "string", "description": "Issue key (e.g. LPDATA-123)"},
+                        "comment": {"type": "string", "description": "Comment body text"},
+                    },
+                    "required": ["issue_key", "comment"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "jira_sync_from_platform",
+                "description": "Push platform mission tasks/stories to Jira as issues.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "mission_id": {"type": "string", "description": "Platform mission ID to sync"},
+                        "board_id": {"type": "integer", "description": "Target Jira board ID (default 8680)"},
+                    },
+                    "required": ["mission_id"],
                 },
             },
         },
@@ -1592,6 +1671,11 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "github_prs",
         "jira_search",
         "jira_create",
+        "jira_update",
+        "jira_transition",
+        "jira_board_issues",
+        "jira_add_comment",
+        "jira_sync_from_platform",
         "confluence_read",
         "mcp_fetch_fetch",
         "mcp_memory_create_entities",
@@ -1697,7 +1781,10 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "github_prs",
         "jira_search",
         "jira_create",
-        "create_ticket",
+        "jira_update",
+        "jira_transition",
+        "jira_board_issues",
+        "jira_add_comment",
         "chaos_test",
         "tmc_load_test",
         "android_build",
@@ -1777,6 +1864,11 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "github_issues",
         "github_prs",
         "jira_search",
+        "jira_create",
+        "jira_update",
+        "jira_transition",
+        "jira_board_issues",
+        "jira_sync_from_platform",
     ],
 }
 

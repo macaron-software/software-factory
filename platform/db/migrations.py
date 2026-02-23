@@ -164,6 +164,8 @@ def _migrate(conn):
         m_cols2 = {r[1] for r in conn.execute("PRAGMA table_info(missions)").fetchall()}
         if m_cols2 and "kanban_status" not in m_cols2:
             conn.execute("ALTER TABLE missions ADD COLUMN kanban_status TEXT DEFAULT 'funnel'")
+        if m_cols2 and "jira_key" not in m_cols2:
+            conn.execute("ALTER TABLE missions ADD COLUMN jira_key TEXT")
     except Exception:
         pass
 
@@ -171,6 +173,24 @@ def _migrate(conn):
         f_cols = {r[1] for r in conn.execute("PRAGMA table_info(features)").fetchall()}
         if f_cols and "completed_at" not in f_cols:
             conn.execute("ALTER TABLE features ADD COLUMN completed_at TEXT")
+        if f_cols and "jira_key" not in f_cols:
+            conn.execute("ALTER TABLE features ADD COLUMN jira_key TEXT")
+    except Exception:
+        pass
+
+    # jira_key on user_stories
+    try:
+        us_cols = {r[1] for r in conn.execute("PRAGMA table_info(user_stories)").fetchall()}
+        if us_cols and "jira_key" not in us_cols:
+            conn.execute("ALTER TABLE user_stories ADD COLUMN jira_key TEXT")
+    except Exception:
+        pass
+
+    # jira_key on tasks
+    try:
+        t_cols = {r[1] for r in conn.execute("PRAGMA table_info(tasks)").fetchall()}
+        if t_cols and "jira_key" not in t_cols:
+            conn.execute("ALTER TABLE tasks ADD COLUMN jira_key TEXT")
     except Exception:
         pass
 
@@ -354,6 +374,56 @@ def _migrate(conn):
                 "INSERT OR IGNORE INTO integrations (id, name, type, config_json) VALUES (?,?,?,?)",
                 integ,
             )
+
+
+    # Auth & RBAC tables
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS session_state (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL DEFAULT '',
+            display_name TEXT NOT NULL DEFAULT '',
+            role TEXT NOT NULL DEFAULT 'viewer',
+            avatar TEXT DEFAULT '',
+            is_active INTEGER DEFAULT 1,
+            auth_provider TEXT DEFAULT 'local',
+            provider_id TEXT DEFAULT '',
+            last_login TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_project_roles (
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            project_id TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'viewer',
+            granted_by TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, project_id)
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            refresh_token_hash TEXT NOT NULL,
+            user_agent TEXT DEFAULT '',
+            ip_address TEXT DEFAULT '',
+            expires_at TIMESTAMP NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_usess_user ON user_sessions(user_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_usess_expires ON user_sessions(expires_at)")
 
 
 def _migrate_pg(conn):

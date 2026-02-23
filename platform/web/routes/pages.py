@@ -21,6 +21,28 @@ from .helpers import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+# ── Auth pages ───────────────────────────────────────────────────
+
+
+@router.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    """Login page."""
+    templates = _templates(request)
+    return templates.TemplateResponse("login.html", {"request": request})
+
+
+@router.get("/setup", response_class=HTMLResponse)
+async def setup_page(request: Request):
+    """First-time setup wizard."""
+    from ...auth.middleware import is_setup_needed
+
+    if not is_setup_needed():
+        from starlette.responses import RedirectResponse
+        return RedirectResponse(url="/login", status_code=302)
+    templates = _templates(request)
+    return templates.TemplateResponse("setup.html", {"request": request})
+
+
 # ── Pages ────────────────────────────────────────────────────────
 
 
