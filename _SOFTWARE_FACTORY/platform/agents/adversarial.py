@@ -330,9 +330,9 @@ async def check_l1(
         evidence = "No tools used."
         if tool_calls:
             evidence_lines = []
-            for tc in tool_calls[:10]:
+            for tc in tool_calls[:15]:
                 name = tc.get("name", "?")
-                result_preview = str(tc.get("result", ""))[:200]
+                result_preview = str(tc.get("result", ""))[:400]
                 evidence_lines.append(f"- {name}: {result_preview}")
             evidence = "\n".join(evidence_lines)
 
@@ -345,13 +345,17 @@ async def check_l1(
             )
         elif pattern_type == "hierarchical":
             pattern_context = (
-                f"\n- HIERARCHICAL PATTERN: This agent ({agent_role}) may be a manager/coordinator OR a worker."
-                " Managers DECOMPOSE work into subtasks — they do NOT write code themselves."
-                " Workers execute subtasks using code_write. Workers MAY write additional files beyond their subtask."
-                " If a worker used code_write to create files, this is VALID work — do NOT flag as hallucination."
-                " A manager referencing files in the workspace is VALID (other agents wrote them)."
-                " Do NOT reject managers for 'hallucination' about existing files."
-                " Do NOT reject workers who wrote extra useful files (e.g., Cargo.toml alongside main.rs)."
+                f"\n- HIERARCHICAL PATTERN: This agent ({agent_role}) may be a LEAD/COORDINATOR or a WORKER."
+                "\n  LEADS/COORDINATORS: They REVIEW/SUMMARIZE work done by other agents. They KNOW about files"
+                " that exist in the workspace because OTHER agents created them. A lead saying 'server.js has endpoints'"
+                " is NOT hallucination — other workers created that file."
+                "\n  WORKERS: They CREATE code via code_write. Workers MAY write extra files."
+                "\n  TESTERS/QA: They VERIFY work from workers. They may reference files without code_read"
+                " if they inspected them visually in the workspace."
+                "\n  CRITICAL: In hierarchical patterns, files exist from OTHER agents' work."
+                " Do NOT flag 'hallucination' for mentioning files that are NOT in THIS agent's tool evidence."
+                " The agent can see the workspace and knows what other agents wrote."
+                "\n  If list_files output is truncated (shows '...'), do NOT assume missing files are absent."
             )
         elif pattern_type == "sequential":
             pattern_context = (
@@ -409,7 +413,9 @@ Respond ONLY with JSON:
         l1_issues = data.get("issues", [])
         verdict = data.get("verdict", "APPROVE")
 
-        # HALLUCINATION/SLOP/STACK_MISMATCH in issues = reject UNLESS agent used code_write/code_edit
+        # HALLUCINATION/SLOP/STACK_MISMATCH in issues = reject UNLESS:
+        # - agent used code_write/code_edit (wrote real code)
+        # - agent is in hierarchical pattern and is a lead/tester (references others' work)
         has_critical = any(
             "HALLUCINATION" in i.upper() or "SLOP" in i.upper() or "STACK_MISMATCH" in i.upper()
             for i in l1_issues
@@ -418,7 +424,12 @@ Respond ONLY with JSON:
         used_write_tools = tool_calls and any(
             tc.get("name", "") in ("code_write", "code_edit", "git_commit") for tc in tool_calls
         )
-        if has_critical and not used_write_tools:
+        # In hierarchical patterns, leads/testers reference files from workers — not hallucination
+        is_hierarchical_reviewer = pattern_type == "hierarchical" and any(
+            r in (agent_role or "").lower()
+            for r in ("lead", "test", "qa", "review", "architect", "senior", "principal")
+        )
+        if has_critical and not used_write_tools and not is_hierarchical_reviewer:
             l1_score = max(l1_score, 7)  # floor at 7 = force retry
             verdict = "REJECT"
 
