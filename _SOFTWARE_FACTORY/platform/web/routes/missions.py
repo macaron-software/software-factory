@@ -1224,6 +1224,13 @@ async def api_mission_start(request: Request):
     except Exception as e:
         logger.error("Failed to start CDP agent: %s", e)
 
+    # Auto-trigger orchestrator pipeline (no second API call needed)
+    try:
+        await _launch_orchestrator(mission_id)
+        logger.warning("ORCH auto-launched for mission=%s", mission_id)
+    except Exception as e:
+        logger.error("Failed to auto-launch orchestrator: %s", e)
+
     return JSONResponse(
         {
             "mission_id": mission_id,
@@ -1914,13 +1921,8 @@ async def api_update_ticket(request: Request, mission_id: str, ticket_id: str):
     return JSONResponse(dict(row))
 
 
-@router.post("/api/missions/{mission_id}/run")
-async def api_mission_run(request: Request, mission_id: str):
-    """Drive mission execution: CDP orchestrates phases sequentially.
-
-    Uses the REAL pattern engine (run_pattern) for each phase — agents
-    think with LLM, stream their responses, and interact per pattern type.
-    """
+async def _launch_orchestrator(mission_id: str):
+    """Shared helper: launch the MissionOrchestrator as an asyncio task."""
     import asyncio
 
     from ...agents.store import get_agent_store
@@ -1933,18 +1935,15 @@ async def api_mission_run(request: Request, mission_id: str):
     run_store = get_mission_run_store()
     mission = run_store.get(mission_id)
     if not mission:
-        return JSONResponse({"error": "Not found"}, status_code=404)
+        raise ValueError(f"Mission {mission_id} not found")
 
-    # Prevent double-launch: check if an asyncio task is already running
     existing_task = _active_mission_tasks.get(mission_id)
     if existing_task and not existing_task.done():
-        return JSONResponse(
-            {"status": "running", "mission_id": mission_id, "info": "already running"}
-        )
+        return  # Already running
 
     wf = get_workflow_store().get(mission.workflow_id)
     if not wf:
-        return JSONResponse({"error": "Workflow not found"}, status_code=404)
+        raise ValueError(f"Workflow {mission.workflow_id} not found")
 
     session_id = mission.session_id or ""
     agent_store = get_agent_store()
@@ -1998,11 +1997,32 @@ async def api_mission_run(request: Request, mission_id: str):
     mission.status = MissionStatus.RUNNING
     run_store.update(mission)
 
-    # Track the task so we can detect stuck missions after restart
     task = asyncio.create_task(_safe_run())
     _active_mission_tasks[mission_id] = task
     task.add_done_callback(lambda t: _active_mission_tasks.pop(mission_id, None))
 
+
+@router.post("/api/missions/{mission_id}/run")
+async def api_mission_run(request: Request, mission_id: str):
+    """Drive mission execution: CDP orchestrates phases sequentially.
+
+    Uses the REAL pattern engine (run_pattern) for each phase — agents
+    think with LLM, stream their responses, and interact per pattern type.
+    """
+    from ...missions.store import get_mission_run_store
+
+    run_store = get_mission_run_store()
+    mission = run_store.get(mission_id)
+    if not mission:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    existing_task = _active_mission_tasks.get(mission_id)
+    if existing_task and not existing_task.done():
+        return JSONResponse(
+            {"status": "running", "mission_id": mission_id, "info": "already running"}
+        )
+
+    await _launch_orchestrator(mission_id)
     return JSONResponse({"status": "running", "mission_id": mission_id})
 
 
@@ -2518,10 +2538,24 @@ asyncio.run(main())
                     )
                     http_code = health.stdout.strip()
                     if http_code and http_code != "000":
-                        # Take multi-page screenshots
-                        pages_to_shot = [
-                            ("/", "homepage"),
-                        ]
+                        # Discover routes from HTML files in public/
+                        pages_to_shot = [("/", "homepage")]
+                        seen = {"/"}
+                        for html in sorted(ws.glob("public/*.html")):
+                            route = f"/{html.name}"
+                            if route not in seen and html.name != "index.html":
+                                pages_to_shot.append((route, html.stem))
+                                seen.add(route)
+                        # Common routes fallback
+                        for r, n in [
+                            ("/login", "login"),
+                            ("/stations", "stations"),
+                            ("/booking", "booking"),
+                            ("/dashboard", "dashboard"),
+                        ]:
+                            if r not in seen and (ws / "public" / f"{n}.html").exists():
+                                pages_to_shot.append((r, n))
+                                seen.add(r)
                         shot_paths_srv = []
                         for url_path, shot_name in pages_to_shot:
                             shot_script = f"""
@@ -2630,6 +2664,17 @@ asyncio.run(main())
                             if s.connect_ex(("127.0.0.1", p)) != 0:
                                 port = p
                                 break
+                    # Detect container port from Dockerfile EXPOSE or default 3000
+                    container_port = 3000
+                    try:
+                        df_text = (ws / "Dockerfile").read_text()
+                        import re as _re
+
+                        expose_match = _re.search(r"EXPOSE\s+(\d+)", df_text)
+                        if expose_match:
+                            container_port = int(expose_match.group(1))
+                    except Exception:
+                        pass
                     # Run container
                     run_result = subprocess.run(
                         [
@@ -2639,7 +2684,7 @@ asyncio.run(main())
                             "--name",
                             container_name,
                             "-p",
-                            f"{port}:3000",
+                            f"{port}:{container_port}",
                             "--restart",
                             "unless-stopped",
                             container_name,
@@ -2681,32 +2726,45 @@ asyncio.run(main())
                                 "msg_type": "text",
                             },
                         )
-                        # Take screenshot of deployed app
+                        # Take multi-page screenshots of deployed app
                         screenshots_dir = ws / "screenshots"
                         screenshots_dir.mkdir(exist_ok=True)
-                        shot_script = f"""
+                        deploy_pages = [("/", "deployed")]
+                        for html in sorted(ws.glob("public/*.html")):
+                            if html.name != "index.html":
+                                deploy_pages.append((f"/{html.name}", f"deployed-{html.stem}"))
+                        deploy_shots = []
+                        for url_path, shot_name in deploy_pages[:8]:
+                            shot_script = f"""
 import asyncio
 from playwright.async_api import async_playwright
 async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         page = await browser.new_page(viewport={{"width": 1280, "height": 720}})
-        await page.goto("http://127.0.0.1:{port}/", wait_until="networkidle", timeout=15000)
-        await page.screenshot(path="{screenshots_dir}/deployed.png", full_page=True)
+        await page.goto("http://127.0.0.1:{port}{url_path}", wait_until="networkidle", timeout=15000)
+        await page.screenshot(path="{screenshots_dir}/{shot_name}.png", full_page=True)
         await browser.close()
 asyncio.run(main())
 """
-                        shot_result = subprocess.run(
-                            ["python3", "-c", shot_script],
-                            capture_output=True,
-                            text=True,
-                            cwd=workspace,
-                            timeout=30,
-                        )
-                        if (
-                            shot_result.returncode == 0
-                            and (screenshots_dir / "deployed.png").exists()
-                        ):
+                            try:
+                                shot_result = subprocess.run(
+                                    ["python3", "-c", shot_script],
+                                    capture_output=True,
+                                    text=True,
+                                    cwd=workspace,
+                                    timeout=30,
+                                )
+                                if (
+                                    shot_result.returncode == 0
+                                    and (screenshots_dir / f"{shot_name}.png").exists()
+                                ):
+                                    deploy_shots.append(f"screenshots/{shot_name}.png")
+                            except Exception:
+                                pass
+                        if deploy_shots:
+                            shot_content = f"Screenshots Docker deploy (HTTP {status_code}) :\n"
+                            shot_content += "\n".join(f"[SCREENSHOT:{s}]" for s in deploy_shots)
                             await push_sse(
                                 session_id,
                                 {
@@ -2714,7 +2772,7 @@ asyncio.run(main())
                                     "from_agent": "system",
                                     "from_name": "CI/CD",
                                     "from_role": "Pipeline",
-                                    "content": "Screenshot du site déployé : [SCREENSHOT:screenshots/deployed.png]",
+                                    "content": shot_content,
                                     "phase_id": phase_id,
                                     "msg_type": "text",
                                 },
