@@ -144,7 +144,8 @@ class ProjectStore:
         # Auto-create workspace directory if path not provided
         if not p.path:
             import os
-            workspace = os.path.join(os.environ.get("WORKSPACE_ROOT", "/app/workspace"), p.id)
+            _default_ws = "/app/workspace" if os.path.isdir("/app") else os.path.join(os.getcwd(), "workspace")
+            workspace = os.path.join(os.environ.get("WORKSPACE_ROOT", _default_ws), p.id)
             os.makedirs(workspace, exist_ok=True)
             p.path = workspace
         conn = get_db()

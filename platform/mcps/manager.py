@@ -126,7 +126,8 @@ class MCPProcess:
                         b64 = item.get("data", "")
                         if b64:
                             img_name = arguments.get("name", f"mcp_screenshot_{tool_name}")
-                            ws = os.environ.get("WORKSPACE_ROOT", "/app/workspace")
+                            _default_ws = "/app/workspace" if os.path.isdir("/app") else os.path.join(os.getcwd(), "workspace")
+                            ws = os.environ.get("WORKSPACE_ROOT", _default_ws)
                             ss_dir = Path(ws) / "screenshots"
                             ss_dir.mkdir(parents=True, exist_ok=True)
                             ext = "png" if "png" in item.get("mimeType", "png") else "jpg"

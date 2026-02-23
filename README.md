@@ -105,10 +105,12 @@ Open http://localhost:8090 — click **"Skip (Demo)"** to explore without an API
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r platform/requirements.txt
 
 # Start platform
-python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
+make dev
+# or manually: PYTHONPATH=$(pwd) python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
 ```
 
 Open http://localhost:8090
@@ -139,17 +141,17 @@ Then restart: `make run`
 
 | Provider | Env Variable | Models | Free Tier |
 |----------|-------------|--------|-----------|
-| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 | ✅ Yes |
-| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini | ❌ |
-| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 | ❌ |
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 | ✅ Yes |
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 | Yes |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini | No |
+| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 | No |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 | Yes |
 
 The platform auto-falls back to other configured providers if the primary fails.
 You can also configure providers from the **Settings** page in the dashboard (`/settings`).
 
 ## Features
 
-### 🤖 158 Specialized AI Agents
+### 158 Specialized AI Agents
 
 Agents are organized in teams mirroring real software organizations:
 
@@ -163,7 +165,7 @@ Agents are organized in teams mirroring real software organizations:
 | **DevOps** | DevOps Engineer, SRE, Platform Engineer | CI/CD, monitoring, infrastructure |
 | **Management** | Scrum Master, RTE, Agile Coach | Ceremonies, facilitation, impediment removal |
 
-### 🎯 12 Orchestration Patterns
+### 12 Orchestration Patterns
 
 - **Solo** — single agent for simple tasks
 - **Sequential** — pipeline of agents executing in order
@@ -178,7 +180,7 @@ Agents are organized in teams mirroring real software organizations:
 - **Saga** — distributed transaction with compensations
 - **Event-driven** — agents react to events asynchronously
 
-### 📊 SAFe-Aligned Lifecycle
+### SAFe-Aligned Lifecycle
 
 Full Portfolio → Epic → Feature → Story hierarchy with:
 
@@ -187,7 +189,7 @@ Full Portfolio → Epic → Feature → Story hierarchy with:
 - **Team Backlog** — user stories, tasks, acceptance criteria
 - **Sprint Execution** — daily standups, sprint reviews, retrospectives
 
-### 🛡️ Security & Compliance
+### Security & Compliance
 
 - **Authentication** — JWT-based auth with RBAC
 - **Prompt injection guard** — detect and block malicious prompts
@@ -196,7 +198,7 @@ Full Portfolio → Epic → Feature → Story hierarchy with:
 - **Rate limiting** — per-user API quotas
 - **Audit logging** — comprehensive activity logs
 
-### 📈 DORA Metrics & Monitoring
+### DORA Metrics & Monitoring
 
 - **Deployment frequency** — how often code reaches production
 - **Lead time** — commit to deploy duration
@@ -205,7 +207,7 @@ Full Portfolio → Epic → Feature → Story hierarchy with:
 - **Real-time dashboards** — Chart.js visualizations
 - **Prometheus metrics** — /metrics endpoint
 
-### 🔧 Built-in Agent Tools
+### Built-in Agent Tools
 
 The Docker image includes everything agents need to work autonomously:
 
@@ -220,7 +222,7 @@ The Docker image includes everything agents need to work autonomously:
 | **Deploy** | `docker_deploy`, `docker_status`, `github_actions` | Container deployment and CI/CD status |
 | **Memory** | `memory_store`, `memory_search`, `deep_search` | Persistent project memory across sessions |
 
-### 🔄 Auto-Heal & Self-Repair (TMA)
+### Auto-Heal & Self-Repair (TMA)
 
 Autonomous incident detection, triage, and self-repair cycle:
 
@@ -232,7 +234,7 @@ Autonomous incident detection, triage, and self-repair cycle:
 - **Escalation** — P0/P1 incidents trigger Slack/Email notifications to on-call team
 - **Retrospective loop** — post-incident learnings stored in memory, injected into future sprints
 
-### 🎭 SAFe Perspectives & Onboarding
+### SAFe Perspectives & Onboarding
 
 Role-based adaptive UI that mirrors real SAFe organization:
 
@@ -242,7 +244,7 @@ Role-based adaptive UI that mirrors real SAFe organization:
 - **Perspective selector** — switch SAFe role anytime from the topbar dropdown
 - **Dynamic sidebar** — only shows navigation relevant to the current perspective
 
-### 🧠 4-Layer Memory & RLM Deep Search
+### 4-Layer Memory & RLM Deep Search
 
 Persistent knowledge across sessions with intelligent retrieval:
 
@@ -253,7 +255,7 @@ Persistent knowledge across sessions with intelligent retrieval:
 - **Auto-loaded project files** — CLAUDE.md, SPECS.md, VISION.md, README.md injected into every LLM prompt (max 8K)
 - **RLM Deep Search** — Recursive Language Model (arXiv:2512.24601) — iterative WRITE-EXECUTE-OBSERVE-DECIDE loop with up to 10 exploration iterations
 
-### 🛒 Agent Mercato (Transfer Market)
+### Agent Mercato (Transfer Market)
 
 Token-based agent marketplace for team composition:
 
@@ -264,7 +266,7 @@ Token-based agent marketplace for team composition:
 - **Wallet system** — per-project token wallets with transaction history
 - **Draft system** — claim free agents for your project
 
-### 🛡️ Adversarial Quality Guard
+### Adversarial Quality Guard
 
 Two-layer quality gate that blocks fake/placeholder code from passing:
 
@@ -273,7 +275,7 @@ Two-layer quality gate that blocks fake/placeholder code from passing:
 - **Scoring** — score < 5 passes, 5-6 soft-pass with warning, 7+ rejected
 - **Force reject** — hallucination, slop, stack mismatch, fake builds always rejected regardless of score
 
-### 📝 Auto-Documentation & Wiki
+### Auto-Documentation & Wiki
 
 Automatic documentation generation throughout the lifecycle:
 
@@ -360,7 +362,7 @@ python3 -m platform.mcp_platform.server
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  🎯 Strategic Portfolio (Portfolio Canvas, Value Streams)       │
+│  Strategic Portfolio (Portfolio Canvas, Value Streams)       │
 │  Vision, Themes, Epics → WSJF Prioritization                    │
 └────────────────────────┬─────────────────────────────────────────┘
                          │
@@ -383,7 +385,7 @@ python3 -m platform.mcp_platform.server
           └──────────────┬──────────────┘
                          ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│  🔴 Quality Gates + Auto-Heal                                    │
+│  Quality Gates + Auto-Heal                                    │
 │  Tests, Security, Performance → Incident Detection → Self-Repair │
 └──────────────────────────────────────────────────────────────────┘
 ```
