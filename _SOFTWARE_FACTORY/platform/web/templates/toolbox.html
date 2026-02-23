@@ -105,9 +105,9 @@ function showCLITab() {
                     <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.3rem"><span style="color:#4ec9b0">make test</span> — Run tests</div>
                     <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:1.2rem"><span style="color:#4ec9b0">ruff check .</span> — Lint Python code</div>
                     
-                    <div style="color:#6a9955;font-style:italic;margin-bottom:0.3rem">Note: For ideation and interactive operations:</div>
-                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.3rem">• Type <span style="color:#4ec9b0">ideation</span> or click → <a href="/ideation" style="color:#4fc3f7;text-decoration:underline">Launch Ideation</a></div>
-                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:1rem">• Terminal: <span style="color:#ce9178">sf ideation "your prompt"</span></div>
+                    <div style="color:#6a9955;font-style:italic;margin-bottom:0.3rem">Interactive Commands:</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:0.3rem">• <span style="color:#4ec9b0">ideation "your prompt"</span> — Run multi-agent ideation with streaming</div>
+                    <div style="color:#d4d4d4;margin-left:1.5rem;margin-bottom:1rem">• Or use full interface: <a href="/ideation" style="color:#4fc3f7;text-decoration:underline">Launch Ideation UI</a></div>
                 </div>
                 <div style="padding:0.8rem 1rem;background:#252526;border-top:1px solid #3e3e42;display:flex;align-items:center;gap:0.5rem">
                     <span style="color:#4ec9b0;font-family:monospace;font-size:13px">sf$</span>
@@ -220,19 +220,32 @@ async function executeCLICommand(commandLine) {
     }
     
     if (command === 'ideation') {
-        const outputDiv = document.createElement('div');
-        outputDiv.style.marginLeft = '1rem';
-        outputDiv.style.marginTop = '0.5rem';
-        outputDiv.innerHTML = `
-            <div style="color:#dcdcaa;margin-bottom:0.5rem">🚀 Launching Ideation Interface...</div>
-            <div style="color:#d4d4d4;margin-bottom:0.5rem">The CLI web is read-only. For interactive ideation with streaming:</div>
-            <div style="margin-left:1rem;margin-bottom:0.5rem">
-                <a href="/ideation" style="color:#4fc3f7;font-weight:600;text-decoration:underline">→ Click here to open Ideation</a>
-            </div>
-            <div style="color:#858585;font-size:12px">Or use terminal: <span style="color:#ce9178">sf ideation "your prompt"</span></div>
-        `;
-        terminal.appendChild(outputDiv);
-        setTimeout(() => window.location.href = '/ideation', 1000);
+        // Check if prompt provided
+        const prompt = args.join(' ').trim();
+        if (!prompt) {
+            const outputDiv = document.createElement('div');
+            outputDiv.style.marginLeft = '1rem';
+            outputDiv.style.marginTop = '0.5rem';
+            outputDiv.innerHTML = `
+                <div style="color:#f48771;margin-bottom:0.5rem">Error: Prompt required</div>
+                <div style="color:#d4d4d4;margin-bottom:0.5rem">Usage: <span style="color:#4ec9b0">ideation "your prompt"</span></div>
+                <div style="color:#858585;font-size:12px">Example: ideation "créer une app de suivi GPS vélo IoT"</div>
+            `;
+            terminal.appendChild(outputDiv);
+            return;
+        }
+        
+        // Show starting message
+        const startDiv = document.createElement('div');
+        startDiv.style.marginLeft = '1rem';
+        startDiv.style.marginTop = '0.5rem';
+        startDiv.style.color = '#dcdcaa';
+        startDiv.textContent = 'Starting ideation session...';
+        terminal.appendChild(startDiv);
+        terminal.scrollTop = terminal.scrollHeight;
+        
+        // Launch ideation with streaming
+        runIdeation(prompt);
         return;
     }
     
@@ -318,7 +331,7 @@ function showCLIHelp() {
         
         <div style="color:#4ec9b0;margin-bottom:0.3rem">Interactive:</div>
         <div style="margin-left:1rem;margin-bottom:0.8rem;color:#d4d4d4">
-          <span style="color:#569cd6">ideation</span> <span style="color:#858585">- Launch ideation interface (redirects to /ideation)</span>
+          <span style="color:#569cd6">ideation "prompt"</span> <span style="color:#858585">- Run multi-agent ideation with real-time streaming</span>
         </div>
         
         <div style="color:#4ec9b0;margin-bottom:0.3rem">Platform:</div>
@@ -401,6 +414,117 @@ function showCLIHelp() {
     `;
     terminal.appendChild(helpDiv);
     terminal.scrollTop = terminal.scrollHeight;
+}
+
+// Run ideation with streaming
+async function runIdeation(prompt) {
+    const terminal = document.getElementById('cli-terminal');
+    
+    try {
+        // Start ideation
+        const response = await fetch('/api/ideation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            const errorDiv = document.createElement('div');
+            errorDiv.style.marginLeft = '1rem';
+            errorDiv.style.color = '#f48771';
+            errorDiv.textContent = `Error: ${error.error || 'Failed to start ideation'}`;
+            terminal.appendChild(errorDiv);
+            terminal.scrollTop = terminal.scrollHeight;
+            return;
+        }
+        
+        const data = await response.json();
+        const sessionId = data.session_id;
+        const sseUrl = data.sse_url;
+        
+        // Show session info
+        const infoDiv = document.createElement('div');
+        infoDiv.style.marginLeft = '1rem';
+        infoDiv.style.marginTop = '0.5rem';
+        infoDiv.style.color = '#4ec9b0';
+        infoDiv.textContent = `Session ${sessionId} started. Connecting to agents...`;
+        terminal.appendChild(infoDiv);
+        terminal.scrollTop = terminal.scrollHeight;
+        
+        // Container for streaming output
+        const outputDiv = document.createElement('div');
+        outputDiv.style.marginLeft = '1rem';
+        outputDiv.style.marginTop = '0.5rem';
+        outputDiv.style.color = '#d4d4d4';
+        outputDiv.style.fontFamily = 'monospace';
+        outputDiv.style.whiteSpace = 'pre-wrap';
+        outputDiv.style.lineHeight = '1.6';
+        terminal.appendChild(outputDiv);
+        
+        // Connect to SSE
+        const eventSource = new EventSource(sseUrl);
+        let currentAgent = null;
+        
+        eventSource.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                
+                // Agent started
+                if (msg.from_agent && msg.from_agent !== currentAgent) {
+                    currentAgent = msg.from_agent;
+                    const agentDiv = document.createElement('div');
+                    agentDiv.style.marginTop = '1rem';
+                    agentDiv.style.color = '#dcdcaa';
+                    agentDiv.style.fontWeight = '600';
+                    agentDiv.textContent = `[${currentAgent}]`;
+                    outputDiv.appendChild(agentDiv);
+                }
+                
+                // Message content
+                if (msg.content) {
+                    const contentDiv = document.createElement('div');
+                    contentDiv.style.marginLeft = '1rem';
+                    contentDiv.style.color = '#d4d4d4';
+                    contentDiv.textContent = msg.content;
+                    outputDiv.appendChild(contentDiv);
+                }
+                
+                // Session completed
+                if (msg.message_type === 'system' && msg.content?.includes('completed')) {
+                    eventSource.close();
+                    const doneDiv = document.createElement('div');
+                    doneDiv.style.marginTop = '1rem';
+                    doneDiv.style.color = '#4ec9b0';
+                    doneDiv.textContent = 'Ideation completed!';
+                    outputDiv.appendChild(doneDiv);
+                }
+                
+                terminal.scrollTop = terminal.scrollHeight;
+            } catch (e) {
+                console.error('SSE parse error:', e);
+            }
+        };
+        
+        eventSource.onerror = (error) => {
+            console.error('SSE error:', error);
+            eventSource.close();
+            const errorDiv = document.createElement('div');
+            errorDiv.style.marginTop = '0.5rem';
+            errorDiv.style.color = '#f48771';
+            errorDiv.textContent = 'Connection lost. Ideation may still be running in background.';
+            outputDiv.appendChild(errorDiv);
+            terminal.scrollTop = terminal.scrollHeight;
+        };
+        
+    } catch (error) {
+        const errorDiv = document.createElement('div');
+        errorDiv.style.marginLeft = '1rem';
+        errorDiv.style.color = '#f48771';
+        errorDiv.textContent = `Error: ${error.message}`;
+        terminal.appendChild(errorDiv);
+        terminal.scrollTop = terminal.scrollHeight;
+    }
 }
 </script>
 {% endblock %}
