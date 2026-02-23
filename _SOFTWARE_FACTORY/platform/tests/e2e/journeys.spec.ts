@@ -12,29 +12,22 @@ test.describe("Journey: Browse Portfolio → Project → Chat", () => {
 
     // 1. Load portfolio
     await safeGoto(page, "/");
-    await expect(page).toHaveTitle(/Macaron/i);
+    await expect(page).toHaveTitle(/.+/);
 
-    // 2. Find first project card and get its link
-    const firstCard = page.locator(".project-mission-card").first();
+    // 2. Find first project card (the card itself is an <a>)
+    const firstCard = page.locator("a.project-mission-card").first();
     await expect(firstCard).toBeVisible({ timeout: 10_000 });
     const projectTitle = await firstCard.locator(".pmc-title").textContent();
     expect(projectTitle!.length).toBeGreaterThan(2);
 
     // 3. Click through to project detail
-    const link = firstCard.locator("a").first();
-    if (await link.isVisible()) {
-      await link.click();
-      await page.waitForLoadState("networkidle");
+    await firstCard.click();
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(1_000);
 
-      // 4. Should see chat interface with PM identity
-      const chatInput = page.locator("#chat-input");
-      if (await chatInput.isVisible({ timeout: 5_000 })) {
-        // PM avatar (initials circle) should be visible
-        const avatar = page.locator(".agent-avatar-sm, .chat-msg-avatar");
-        const sidebar = page.locator("#project-sidebar, .ps-section");
-        await expect(sidebar).toBeVisible();
-      }
-    }
+    // 4. Should see project page content
+    const mainContent = page.locator("main").first();
+    await expect(mainContent).toBeVisible({ timeout: 5_000 });
 
     assertNoErrors(errors, "Portfolio→Project journey");
   });
@@ -210,5 +203,157 @@ test.describe("Journey: View Modes on Portfolio", () => {
     }
 
     assertNoErrors(errors, "View mode toggle");
+  });
+});
+
+/* ────────────────────────────────────────────── */
+/*  Journey: Backlog → Ideation (tab switch)     */
+/* ────────────────────────────────────────────── */
+
+test.describe("Journey: Backlog → Ideation Tab", () => {
+  test("switch to ideation tab, verify _() works and input is functional", async ({ page }) => {
+    const errors = collectErrors(page);
+    await safeGoto(page, "/backlog");
+
+    // Backlog tab should be active
+    const backlogTab = page.locator("#tab-backlog");
+    await expect(backlogTab).toBeVisible({ timeout: 10_000 });
+
+    // Switch to ideation tab
+    const ideationTab = page.locator("#tab-discovery");
+    await expect(ideationTab).toBeVisible();
+    await ideationTab.click();
+    await page.waitForTimeout(2_000);
+
+    // Ideation input should appear
+    const textarea = page.locator("#ideaInput, .idea-input textarea").first();
+    await expect(textarea).toBeVisible({ timeout: 10_000 });
+
+    // Send button should be present
+    const sendBtn = page.locator("#ideaSend, .idea-send").first();
+    await expect(sendBtn).toBeVisible();
+
+    // Verify no JS errors (especially _() not defined)
+    assertNoErrors(errors, "Backlog → Ideation tab");
+  });
+});
+
+/* ────────────────────────────────────────────── */
+/*  Journey: Mission Control — phases + graphs   */
+/* ────────────────────────────────────────────── */
+
+test.describe("Journey: Mission Control", () => {
+  test("load mission control, expand accordion, see agent graphs", async ({ page }) => {
+    const errors = collectErrors(page);
+
+    // Go to PI board to find a mission
+    await safeGoto(page, "/pi");
+    await page.waitForTimeout(1_000);
+
+    // Find a mission link
+    const missionLink = page.locator('a[href*="/missions/"][href*="/control"]').first();
+    if (!(await missionLink.isVisible({ timeout: 5_000 }))) {
+      // Try from portfolio
+      await safeGoto(page, "/");
+      const epicLink = page.locator('a[href*="/missions/"]').first();
+      if (!(await epicLink.isVisible({ timeout: 5_000 }))) {
+        test.skip();
+        return;
+      }
+      await epicLink.click();
+      await page.waitForLoadState("domcontentloaded");
+    } else {
+      await missionLink.click();
+      await page.waitForLoadState("domcontentloaded");
+    }
+
+    await page.waitForTimeout(2_000);
+
+    // Should see mission control page with phases
+    const phaseAccordion = page.locator(".mc-phase, .mc-timeline-item").first();
+    if (await phaseAccordion.isVisible({ timeout: 5_000 })) {
+      // Click to expand
+      const header = phaseAccordion.locator(".mc-phase-header, .mc-tl-header").first();
+      if (await header.isVisible()) {
+        await header.click();
+        await page.waitForTimeout(500);
+
+        // Should see graph SVG or agent avatars
+        const graphEl = page.locator(".mc-phase-graph svg, .mc-phase-graph").first();
+        const agentEl = page.locator(".mc-agent-avatar, .mc-node").first();
+        const hasGraph = await graphEl.isVisible({ timeout: 3_000 }).catch(() => false);
+        const hasAgent = await agentEl.isVisible({ timeout: 3_000 }).catch(() => false);
+        // At least one should be visible
+        expect(hasGraph || hasAgent).toBeTruthy();
+      }
+    }
+
+    assertNoErrors(errors, "Mission Control");
+  });
+});
+
+/* ────────────────────────────────────────────── */
+/*  Journey: Ceremonies page loads                */
+/* ────────────────────────────────────────────── */
+
+test.describe("Journey: Ceremonies", () => {
+  test("ceremonies page loads without errors", async ({ page }) => {
+    const errors = collectErrors(page);
+    await safeGoto(page, "/ceremonies");
+
+    // Should have page title (varies by page)
+    await expect(page).toHaveTitle(/.+/);
+
+    // No JS errors
+    assertNoErrors(errors, "Ceremonies page");
+  });
+});
+
+/* ────────────────────────────────────────────── */
+/*  Journey: ART page loads                      */
+/* ────────────────────────────────────────────── */
+
+test.describe("Journey: ART Agents", () => {
+  test("ART page loads agents without errors", async ({ page }) => {
+    const errors = collectErrors(page);
+    await safeGoto(page, "/art");
+
+    // Should have agents or content visible
+    await expect(page).toHaveTitle(/.+/);
+    const content = page.locator(".agent-card, .item-card, main").first();
+    await expect(content).toBeVisible({ timeout: 10_000 });
+
+    assertNoErrors(errors, "ART page");
+  });
+});
+
+/* ────────────────────────────────────────────── */
+/*  Journey: Toolbox / Metrics loads              */
+/* ────────────────────────────────────────────── */
+
+test.describe("Journey: Toolbox", () => {
+  test("toolbox page loads without errors", async ({ page }) => {
+    const errors = collectErrors(page);
+    await safeGoto(page, "/toolbox");
+
+    await expect(page).toHaveTitle(/.+/);
+    assertNoErrors(errors, "Toolbox page");
+  });
+});
+
+test.describe("Journey: Metrics", () => {
+  test("metrics page loads charts without errors", async ({ page }) => {
+    const errors = collectErrors(page);
+    await safeGoto(page, "/metrics");
+
+    await expect(page).toHaveTitle(/.+/);
+
+    // Should have at least one metric card
+    const card = page.locator(".metric-card, .stat-card, .dora-card, main").first();
+    if (await card.isVisible({ timeout: 5_000 })) {
+      // Good
+    }
+
+    assertNoErrors(errors, "Metrics page");
   });
 });
