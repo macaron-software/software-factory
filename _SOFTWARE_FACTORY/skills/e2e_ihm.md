@@ -43,33 +43,33 @@ and accessibility checks.
 Always use `test.step()` to break tests into readable phases:
 
 ```typescript
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
-test('user can create and publish an article', async ({ page }) => {
-  await test.step('Login as editor', async () => {
-    await page.goto('/login');
-    await page.getByLabel('Email').fill('editor@test.com');
-    await page.getByLabel('Password').fill('password123');
-    await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page.getByText('Dashboard')).toBeVisible();
+test("user can create and publish an article", async ({ page }) => {
+  await test.step("Login as editor", async () => {
+    await page.goto("/login");
+    await page.getByLabel("Email").fill("editor@test.com");
+    await page.getByLabel("Password").fill("password123");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByText("Dashboard")).toBeVisible();
   });
 
-  await test.step('Create a new article', async () => {
-    await page.getByRole('link', { name: 'New Article' }).click();
-    await page.getByLabel('Title').fill('My Test Article');
-    await page.getByLabel('Content').fill('This is the article body.');
-    await page.getByRole('button', { name: 'Save Draft' }).click();
-    await expect(page.getByText('Draft saved')).toBeVisible();
+  await test.step("Create a new article", async () => {
+    await page.getByRole("link", { name: "New Article" }).click();
+    await page.getByLabel("Title").fill("My Test Article");
+    await page.getByLabel("Content").fill("This is the article body.");
+    await page.getByRole("button", { name: "Save Draft" }).click();
+    await expect(page.getByText("Draft saved")).toBeVisible();
   });
 
-  await test.step('Publish the article', async () => {
-    await page.getByRole('button', { name: 'Publish' }).click();
-    await expect(page.getByText('Published')).toBeVisible();
+  await test.step("Publish the article", async () => {
+    await page.getByRole("button", { name: "Publish" }).click();
+    await expect(page.getByText("Published")).toBeVisible();
   });
 
-  await test.step('Verify article is visible on homepage', async () => {
-    await page.goto('/');
-    await expect(page.getByText('My Test Article')).toBeVisible();
+  await test.step("Verify article is visible on homepage", async () => {
+    await page.goto("/");
+    await expect(page.getByText("My Test Article")).toBeVisible();
   });
 });
 ```
@@ -89,39 +89,39 @@ Never use fragile selectors like `div > span:nth-child(3)`.
 
 ```typescript
 // pages/login.page.ts
-import { Page, expect } from '@playwright/test';
+import { Page, expect } from "@playwright/test";
 
 export class LoginPage {
   constructor(private page: Page) {}
 
   async goto() {
-    await this.page.goto('/login');
+    await this.page.goto("/login");
   }
 
   async login(email: string, password: string) {
-    await this.page.getByLabel('Email').fill(email);
-    await this.page.getByLabel('Password').fill(password);
-    await this.page.getByRole('button', { name: 'Sign in' }).click();
+    await this.page.getByLabel("Email").fill(email);
+    await this.page.getByLabel("Password").fill(password);
+    await this.page.getByRole("button", { name: "Sign in" }).click();
   }
 
   async expectError(message: string) {
-    await expect(this.page.getByRole('alert')).toContainText(message);
+    await expect(this.page.getByRole("alert")).toContainText(message);
   }
 
   async expectLoggedIn() {
-    await expect(this.page.getByText('Dashboard')).toBeVisible();
+    await expect(this.page.getByText("Dashboard")).toBeVisible();
   }
 }
 
 // tests/login.spec.ts
-import { test } from '@playwright/test';
-import { LoginPage } from '../pages/login.page';
+import { test } from "@playwright/test";
+import { LoginPage } from "../pages/login.page";
 
-test('shows error for invalid credentials', async ({ page }) => {
+test("shows error for invalid credentials", async ({ page }) => {
   const loginPage = new LoginPage(page);
   await loginPage.goto();
-  await loginPage.login('bad@email.com', 'wrongpassword');
-  await loginPage.expectError('Invalid credentials');
+  await loginPage.login("bad@email.com", "wrongpassword");
+  await loginPage.expectError("Invalid credentials");
 });
 ```
 
@@ -129,18 +129,16 @@ test('shows error for invalid credentials', async ({ page }) => {
 
 ```typescript
 // ✅ GOOD: Wait for specific element
-await expect(page.getByText('Data loaded')).toBeVisible({ timeout: 10000 });
+await expect(page.getByText("Data loaded")).toBeVisible({ timeout: 10000 });
 
 // ✅ GOOD: Wait for network idle after action
-await page.getByRole('button', { name: 'Load More' }).click();
-await page.waitForResponse(resp =>
-  resp.url().includes('/api/items') && resp.status() === 200
-);
+await page.getByRole("button", { name: "Load More" }).click();
+await page.waitForResponse((resp) => resp.url().includes("/api/items") && resp.status() === 200);
 
 // ✅ GOOD: Wait for navigation
 await Promise.all([
-  page.waitForURL('/dashboard'),
-  page.getByRole('link', { name: 'Dashboard' }).click(),
+  page.waitForURL("/dashboard"),
+  page.getByRole("link", { name: "Dashboard" }).click(),
 ]);
 
 // ❌ BAD: Never use fixed waits
@@ -150,22 +148,22 @@ await page.waitForTimeout(3000); // NEVER DO THIS
 ### Multi-User Scenarios
 
 ```typescript
-import { test, expect, Browser } from '@playwright/test';
+import { test, expect, Browser } from "@playwright/test";
 
-test('admin creates item, user sees it', async ({ browser }) => {
+test("admin creates item, user sees it", async ({ browser }) => {
   const adminContext = await browser.newContext();
   const userContext = await browser.newContext();
   const adminPage = await adminContext.newPage();
   const userPage = await userContext.newPage();
 
-  await test.step('Admin creates item', async () => {
-    await adminPage.goto('/login');
+  await test.step("Admin creates item", async () => {
+    await adminPage.goto("/login");
     // ... login as admin, create item
   });
 
-  await test.step('User sees the item', async () => {
-    await userPage.goto('/items');
-    await expect(userPage.getByText('New Item')).toBeVisible();
+  await test.step("User sees the item", async () => {
+    await userPage.goto("/items");
+    await expect(userPage.getByText("New Item")).toBeVisible();
   });
 
   await adminContext.close();
@@ -179,9 +177,9 @@ test('admin creates item, user sees it', async ({ browser }) => {
 // playwright.config.ts
 export default defineConfig({
   use: {
-    screenshot: 'only-on-failure',
-    trace: 'retain-on-failure',
-    video: 'retain-on-failure',
+    screenshot: "only-on-failure",
+    trace: "retain-on-failure",
+    video: "retain-on-failure",
   },
 });
 ```
@@ -189,14 +187,12 @@ export default defineConfig({
 ### Accessibility Checks During E2E
 
 ```typescript
-import AxeBuilder from '@axe-core/playwright';
+import AxeBuilder from "@axe-core/playwright";
 
-test('page meets accessibility standards', async ({ page }) => {
-  await page.goto('/dashboard');
+test("page meets accessibility standards", async ({ page }) => {
+  await page.goto("/dashboard");
 
-  const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa'])
-    .analyze();
+  const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
 
   expect(results.violations).toEqual([]);
 });

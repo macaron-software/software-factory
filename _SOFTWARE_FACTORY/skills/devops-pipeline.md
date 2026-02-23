@@ -62,7 +62,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: "npm"
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -76,7 +76,7 @@ jobs:
         env:
           POSTGRES_DB: test
           POSTGRES_PASSWORD: test
-        ports: ['5432:5432']
+        ports: ["5432:5432"]
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -85,7 +85,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: 'npm' }
+        with: { node-version: 20, cache: "npm" }
       - run: npm ci
       - run: npm run test:ci
         env:
@@ -187,12 +187,12 @@ CMD ["node", "dist/server.js"]
 ### Docker Compose
 
 ```yaml
-version: '3.8'
+version: "3.8"
 services:
   app:
     build: .
     ports:
-      - '3000:3000'
+      - "3000:3000"
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgres://app:${DB_PASSWORD}@db:5432/app
@@ -204,7 +204,7 @@ services:
       resources:
         limits:
           memory: 512M
-          cpus: '0.5'
+          cpus: "0.5"
 
   db:
     image: postgres:16-alpine
@@ -214,7 +214,7 @@ services:
       POSTGRES_DB: app
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -223,8 +223,8 @@ services:
   nginx:
     image: nginx:alpine
     ports:
-      - '80:80'
-      - '443:443'
+      - "80:80"
+      - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./certs:/etc/nginx/certs:ro
@@ -304,34 +304,34 @@ server {
 
 ```typescript
 // health.ts
-app.get('/health', async (req, res) => {
+app.get("/health", async (req, res) => {
   const checks = {
-    status: 'ok',
+    status: "ok",
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     checks: {
-      database: 'unknown',
-      redis: 'unknown',
+      database: "unknown",
+      redis: "unknown",
     },
   };
 
   try {
-    await db.query('SELECT 1');
-    checks.checks.database = 'ok';
+    await db.query("SELECT 1");
+    checks.checks.database = "ok";
   } catch (e) {
-    checks.checks.database = 'error';
-    checks.status = 'degraded';
+    checks.checks.database = "error";
+    checks.status = "degraded";
   }
 
   try {
     await redis.ping();
-    checks.checks.redis = 'ok';
+    checks.checks.redis = "ok";
   } catch (e) {
-    checks.checks.redis = 'error';
-    checks.status = 'degraded';
+    checks.checks.redis = "error";
+    checks.status = "degraded";
   }
 
-  const statusCode = checks.status === 'ok' ? 200 : 503;
+  const statusCode = checks.status === "ok" ? 200 : 503;
   res.status(statusCode).json(checks);
 });
 ```
@@ -346,12 +346,12 @@ async function gracefulShutdown(signal: string) {
 
   // Stop accepting new connections
   server.close(() => {
-    console.log('HTTP server closed');
+    console.log("HTTP server closed");
   });
 
   // Wait for in-flight requests (max 30s)
   const timeout = setTimeout(() => {
-    console.error('Forced shutdown after timeout');
+    console.error("Forced shutdown after timeout");
     process.exit(1);
   }, 30000);
 
@@ -359,16 +359,16 @@ async function gracefulShutdown(signal: string) {
     await db.disconnect();
     await redis.quit();
     clearTimeout(timeout);
-    console.log('Graceful shutdown complete');
+    console.log("Graceful shutdown complete");
     process.exit(0);
   } catch (err) {
-    console.error('Error during shutdown:', err);
+    console.error("Error during shutdown:", err);
     process.exit(1);
   }
 }
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 ```
 
 ### Rollback Strategy

@@ -67,11 +67,11 @@ cp .env.example .env
 # 编辑 .env 并添加 API 密钥
 ```
 
-| 提供商 | 环境变量 | 免费 |
-|--------|----------|------|
-| **MiniMax** | `MINIMAX_API_KEY` | ✅ |
-| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌ |
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | ✅ |
+| 提供商           | 环境变量                                         | 免费 |
+| ---------------- | ------------------------------------------------ | ---- |
+| **MiniMax**      | `MINIMAX_API_KEY`                                | ✅   |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌   |
+| **NVIDIA NIM**   | `NVIDIA_API_KEY`                                 | ✅   |
 
 设置 `PLATFORM_LLM_PROVIDER` 为主提供商（`minimax`、`azure-openai`、`nvidia`）。
 也可以在仪表板的 **Settings** 页面（`/settings`）配置。
@@ -84,7 +84,6 @@ cp .env.example .env
 - **REST API** — 94 documented endpoints
 - **MCP Server** — 23 tools
 - **License AGPL v3**
-
 
 ## 测试
 

@@ -1,6 +1,7 @@
 # Software Factory — Context
 
 ## STRUCTURE
+
 ```
 _SOFTWARE_FACTORY/     # Agent Platform + Dashboard
   cli/sf.py            # CLI: sf <command> (platform client, SSE streaming)
@@ -30,9 +31,11 @@ _SOFTWARE_FACTORY/     # Agent Platform + Dashboard
   tests/               # pytest + Playwright E2E
   deploy/              # Helm charts
 ```
+
 Legacy: `_SOFTWARE_FACTORY-old/` (core/, factory CLI, brain, TDD workers — archived)
 
 ## REPO + DEPLOY
+
 ```
 GitHub: macaron-software/software-factory (AGPL-3.0) — v1.0.0→v1.2.0
 Clone:  /tmp/gh_push_ops/software-factory (auth: leglands via gh)
@@ -41,6 +44,7 @@ Demo:   PLATFORM_LLM_PROVIDER=demo (mock, no key)
 ```
 
 ## RUN
+
 ```bash
 # Platform CLI
 sf status | sf ideation "prompt" | sf missions list | sf projects chat ID "msg"
@@ -57,15 +61,18 @@ cd platform/tests/e2e && npx playwright test   # 82 tests (9 specs)
 ```
 
 ## LLM
+
 ```
 Default: PLATFORM_LLM_PROVIDER=minimax  PLATFORM_LLM_MODEL=MiniMax-M2.5
 Azure:   PLATFORM_LLM_PROVIDER=azure-openai  PLATFORM_LLM_MODEL=gpt-5-mini
 ```
+
 Fallback: minimax → azure-openai → azure-ai. Cooldown 90s on 429.
 Keys: `~/.config/factory/*.key` — NEVER `*_API_KEY=dummy`
 MiniMax: <think> consume tokens (min 16K). GPT-5-mini: NO temperature, max_completion_tokens≥8K.
 
 ## AZURE
+
 ```
 VM:  4.233.64.30 (D4as_v5 4CPU/16GB, francecentral) — SSH azureadmin, nginx basic auth macaron/macaron
      Container: deploy-platform-1, path /app/macaron_platform/, volume deploy_platform-data at /app/data
@@ -80,6 +87,7 @@ DR:  L3 full 14/14 — blob GRS (macaronbackups), snapshots, PG PITR 7d
 ```
 
 ## DEPLOY WORKFLOW
+
 ```
 rsync /tmp → sudo cp (perms). Ou: docker exec -i CID tee /app/macaron_platform/PATH
 After: clear __pycache__ → docker restart → wait 15s → health check
@@ -88,6 +96,7 @@ Auto-resume: lifespan restarts running missions on container restart.
 ```
 
 ## SECURITY
+
 ```
 Auth: AuthMiddleware bearer (MACARON_API_KEY), GET public, mutations require token
 Headers: HSTS, X-Frame DENY, CSP, X-XSS, Referrer strict
@@ -100,6 +109,7 @@ Rate limit: PG-backed per-IP+token, survives restart
 ```
 
 ## PLATFORM ARCHITECTURE
+
 ```
 FastAPI + HTMX + Jinja2 + SSE | Dark purple | SQLite/PostgreSQL dual
 AgentLoop ←→ MessageBus (per-agent queues) → SSE → Frontend
@@ -107,7 +117,8 @@ AgentExecutor → LLM → tool calls → route via bus
 Dual SSE: _push_sse() → _sse_queues (runner) + bus._sse_listeners (broadcast)
 ```
 
-### 156 AGENTS (store.py + skills/definitions/*.yaml)
+### 156 AGENTS (store.py + skills/definitions/\*.yaml)
+
 ```
 Dev (35+):     brain, lead_dev, dev_backend/frontend, workers, mobile_ios/android
 QA (18+):      testeur, test_automation, perf-tester, fixture-gen, mobile_qa
@@ -121,6 +132,7 @@ SAFe (6):      rte, epic_owner, lean_portfolio_manager, solution_train_engineer
 ```
 
 ### 36 WORKFLOWS (builtins.py)
+
 ```
 Lifecycle:     product-lifecycle (11 phases), feature-sprint (5), feature-request (6)
 DSI:           dsi-platform-features (9), dsi-platform-tma (6)
@@ -139,11 +151,13 @@ Other:         tech-debt-reduction (5), review-cycle (2), sf-pipeline (3),
 ```
 
 ### 15 PATTERNS (12 in DB + 3 engine-only)
+
 DB: solo-chat, sequential, parallel, hierarchical, router, aggregator,
-    human-in-the-loop, adversarial-pair, adversarial-cascade, debate, sf-tdd, wave
+human-in-the-loop, adversarial-pair, adversarial-cascade, debate, sf-tdd, wave
 Engine-only: solo, loop, network
 
 ### ADVERSARIAL (Team of Rivals — arXiv:2601.14351)
+
 ```
 L0: deterministic (test.skip, @ts-ignore, empty catch) → VETO ABSOLU
 L1: LLM semantic (SLOP, hallucination, logic) → VETO ABSOLU
@@ -155,6 +169,7 @@ CoVe (arXiv:2309.11495): 4-stage anti-hallucination (Draft→Verify→Answer→F
 ```
 
 ### MISSION CONTROL (11 phases)
+
 ```
 1.Idéation(network) 2.Comité(HITL) 3.Constitution(seq) 4.Archi(aggregator)
 5.Sprints(hierarchical) 6.CI/CD(seq) 7.QA(loop) 8.Tests(parallel)
@@ -163,10 +178,12 @@ Semaphore: 2 concurrent missions. Phase timeout: 600s. Reloop max 2x.
 ```
 
 ### SAFe (~7/10)
+
 WSJF real calc, sprint auto-creation, feature pull PO, velocity tracking.
 Gates GO/NOGO/PIVOT. Learning loop + I&A retrospective. Error reloop max 2x.
 
 ### PRODUCT MANAGEMENT
+
 ```
 Hierarchy: Epic(mission) → Feature → UserStory
 WSJF: 4 components → CoD/JD auto-compute. Slider UI.
@@ -175,7 +192,8 @@ Dependencies: feature_deps table + visual 🔗 badges.
 Charts: Chart.js velocity, burndown, cycle time histogram, Gantt.
 ```
 
-### REST API (dual JSON + form via _parse_body)
+### REST API (dual JSON + form via \_parse_body)
+
 ```
 POST /api/projects, /api/missions, /api/missions/{id}/start, /api/missions/{id}/run
 POST /api/missions/{id}/wsjf, /api/missions/{id}/sprints, /api/missions/{id}/validate
@@ -189,6 +207,7 @@ Swagger: /docs (FastAPI auto-generated)
 ```
 
 ### MCP
+
 ```
 MCP LRM (port 9500): lrm_locate/read/conventions/task_*/build, confluence, jira
 MCP Platform (port 9501): agents/missions/phases/messages/memory/git/code/metrics
@@ -198,18 +217,22 @@ Dispatch: tool_runner.py _tool_mcp_dynamic() → parse mcp_<server>_<tool> → J
 ```
 
 ### MEMORY
+
 4-layer: session → pattern → project → global (FTS5/tsvector)
 Wiki `/memory`, confidence bars. Retrospectives → LLM → lessons → global.
 
 ### MONITORING
+
 DORA: deploy freq, lead time, CFR, MTTR + velocity + sparklines.
 LLM: per-call tracing (provider, model, tokens, cost). Live: `/monitoring` SSE.
 
 ### DASHBOARDS
+
 DSI/CTO `/dsi`, Métier `/metier` (SAFe value stream), Portfolio `/`, Board `/projects/{id}/board`
 Ideation `/ideation` → 5 agents network debate → "Créer Epic"
 
 ## KEY FILES (all under platform/)
+
 ```
 server.py, models.py, config.py
 llm/client.py, llm/observability.py
@@ -229,16 +252,19 @@ cli/sf.py, cli/_api.py, cli/_db.py, cli/_output.py, cli/_stream.py
 ```
 
 ## DB
-`data/platform.db` (racine _SOFTWARE_FACTORY). Dual: `DATABASE_URL` → PG, absent → SQLite.
+
+`data/platform.db` (racine \_SOFTWARE_FACTORY). Dual: `DATABASE_URL` → PG, absent → SQLite.
 ⚠️ NEVER `rm -f data/platform.db`. ⚠️ NEVER `*_API_KEY=dummy`.
 
 ## CONVENTIONS
+
 - ⛔ ZERO SKIP: NEVER test.skip/@ts-ignore/#[ignore] — FIX > SKIP
 - Adversarial 100% LLM (never regex)
 - HTMX: readyState check (not DOMContentLoaded). Enum: `_s(val)` helper.
 - Process cleanup: start_new_session=True + os.killpg() on timeout
 
 ## AUDIT COVERAGE (46/46 = 100%)
+
 ```
 Stabilité:        chaos-scheduled, tma-autoheal, monitoring-setup, canary-deployment ✓
 Maintenabilité:   tech-debt-reduction, review-cycle, adversarial cascade ✓

@@ -13,6 +13,7 @@
 ## Fix Patterns by Vulnerability Type
 
 ### SQL Injection → Parameterized Queries
+
 ```python
 # ❌ VULNERABLE
 cursor.execute(f"SELECT * FROM users WHERE id = '{user_id}'")
@@ -22,6 +23,7 @@ cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
 ```
 
 ### XSS → Output Encoding + CSP
+
 ```python
 # ❌ VULNERABLE (Jinja2)
 {{ user_input }}
@@ -32,6 +34,7 @@ cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
 ```
 
 ### SSRF → URL Allowlist
+
 ```python
 # ❌ VULNERABLE
 response = requests.get(user_url)
@@ -53,6 +56,7 @@ response = requests.get(user_url)
 ```
 
 ### Auth Bypass → Centralized Middleware
+
 ```python
 # ❌ VULNERABLE (auth check in each route)
 @app.get("/api/admin/users")
@@ -71,6 +75,7 @@ async def auth_middleware(request, call_next):
 ```
 
 ### IDOR → Authorization Before Data Access
+
 ```python
 # ❌ VULNERABLE
 @app.get("/api/orders/{order_id}")
@@ -87,6 +92,7 @@ async def get_order(order_id: int, user = Depends(get_current_user)):
 ```
 
 ### CSRF → SameSite + Token
+
 ```python
 # ✅ Cookie config
 response.set_cookie("session", value, samesite="strict", secure=True, httponly=True)
@@ -96,6 +102,7 @@ response.set_cookie("session", value, samesite="strict", secure=True, httponly=T
 ```
 
 ### Command Injection → Subprocess with List
+
 ```python
 # ❌ VULNERABLE
 os.system(f"git log {user_input}")
@@ -105,6 +112,7 @@ subprocess.run(["git", "log", user_input], check=True, capture_output=True)
 ```
 
 ### Path Traversal → Canonicalize + Validate
+
 ```python
 # ❌ VULNERABLE
 with open(os.path.join(upload_dir, filename)) as f: ...
@@ -122,30 +130,36 @@ if not str(safe_path.resolve()).startswith(str(pathlib.Path(upload_dir).resolve(
 ## Security Fix: [Finding ID] — [Title]
 
 ### Vulnerability
+
 - Type: [SQLi/XSS/SSRF/...]
 - CVSS: X.X
 - File: [path]
 - Line: [number]
 
 ### Root Cause
+
 [Brief explanation of WHY the code was vulnerable]
 
 ### Fix
+
 [Description of the fix approach]
 
 ### Test
+
 - [x] Test reproduces exploit (fails without fix)
 - [x] Test passes with fix
 - [x] Full test suite passes (no regressions)
 - [x] SAST scan clean
 
 ### Checklist
+
 - [ ] Atomic change (security fix only, no features)
 - [ ] Documented in security changelog
 - [ ] Reviewed by Security Dev Lead
 ```
 
 ## Anti-Patterns (REJECT)
+
 - Fix that disables the feature instead of securing it
 - Regex-only input validation (use proper parsing)
 - Client-side validation without server-side

@@ -96,6 +96,7 @@ docker-compose up -d --build
 Get API credentials from: https://porkbun.com/account/api
 
 Then add them to `deploy/setup-dns.sh`:
+
 ```bash
 API_KEY="pk1_YOUR_KEY"
 SECRET="sk1_YOUR_SECRET"

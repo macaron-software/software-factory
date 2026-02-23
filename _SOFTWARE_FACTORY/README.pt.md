@@ -67,11 +67,11 @@ cp .env.example .env
 # Editar .env e adicionar chaves API
 ```
 
-| Provedor | Variável de ambiente | Gratuito |
-|----------|---------------------|----------|
-| **MiniMax** | `MINIMAX_API_KEY` | ✅ |
-| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌ |
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | ✅ |
+| Provedor         | Variável de ambiente                             | Gratuito |
+| ---------------- | ------------------------------------------------ | -------- |
+| **MiniMax**      | `MINIMAX_API_KEY`                                | ✅       |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌       |
+| **NVIDIA NIM**   | `NVIDIA_API_KEY`                                 | ✅       |
 
 Definir `PLATFORM_LLM_PROVIDER` como provedor principal. Configuração também em **Settings** (`/settings`).
 
@@ -83,7 +83,6 @@ Definir `PLATFORM_LLM_PROVIDER` como provedor principal. Configuração também 
 - **REST API** — 94 documented endpoints
 - **MCP Server** — 23 tools
 - **License AGPL v3**
-
 
 ## Testes
 

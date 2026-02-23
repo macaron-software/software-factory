@@ -62,6 +62,7 @@ solaris_validation(component: "button")
 Extract these properties from BOTH Figma and code:
 
 #### Box Model
+
 - `padding-top`, `padding-right`, `padding-bottom`, `padding-left`
 - `margin-top`, `margin-right`, `margin-bottom`, `margin-left`
 - `width`, `height` (or `min-width`, `min-height`)
@@ -69,6 +70,7 @@ Extract these properties from BOTH Figma and code:
 - `border-radius` (all corners)
 
 #### Typography
+
 - `font-family`
 - `font-size`
 - `font-weight`
@@ -78,6 +80,7 @@ Extract these properties from BOTH Figma and code:
 - `text-decoration`
 
 #### Visual
+
 - `background-color`
 - `color` (text)
 - `box-shadow`
@@ -85,24 +88,25 @@ Extract these properties from BOTH Figma and code:
 
 ### Step 3: State Comparison Matrix
 
-| State | Figma Exists? | Code Exists? | Properties Match? |
-|-------|--------------|--------------|-------------------|
-| Default | ✅ | ✅ | Check below |
-| Hover | ✅ | ? | Check below |
-| Focus | ✅ | ? | Check below |
-| Active/Pressed | ✅ | ? | Check below |
-| Disabled | ✅ | ? | Check below |
-| Error | ✅ | ? | Check below |
-| Loading | ✅ | ? | Check below |
+| State          | Figma Exists? | Code Exists? | Properties Match? |
+| -------------- | ------------- | ------------ | ----------------- |
+| Default        | ✅            | ✅           | Check below       |
+| Hover          | ✅            | ?            | Check below       |
+| Focus          | ✅            | ?            | Check below       |
+| Active/Pressed | ✅            | ?            | Check below       |
+| Disabled       | ✅            | ?            | Check below       |
+| Error          | ✅            | ?            | Check below       |
+| Loading        | ✅            | ?            | Check below       |
 
 For each state, verify:
+
 ```css
 /* Example: Button hover state */
 .btn:hover {
   /* Figma spec: background #2563EB, translateY -1px, shadow 0 4px 6px */
   background-color: var(--color-primary-600); /* ✅ matches */
   transform: translateY(-1px); /* ✅ matches */
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1); /* ✅ matches */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* ✅ matches */
 }
 ```
 
@@ -111,9 +115,9 @@ For each state, verify:
 ```typescript
 // Check component at each breakpoint
 const variants = [
-  { breakpoint: 'mobile', properties: { Size: 'Small' } },
-  { breakpoint: 'tablet', properties: { Size: 'Medium' } },
-  { breakpoint: 'desktop', properties: { Size: 'Large' } },
+  { breakpoint: "mobile", properties: { Size: "Small" } },
+  { breakpoint: "tablet", properties: { Size: "Medium" } },
+  { breakpoint: "desktop", properties: { Size: "Large" } },
 ];
 
 for (const variant of variants) {
@@ -124,6 +128,7 @@ for (const variant of variants) {
 ### Step 5: Code Quality Check
 
 Beyond visual properties, also verify:
+
 - Component uses design tokens (not hardcoded values)
 - Component has `data-testid` attribute
 - Component handles `aria-*` attributes properly
@@ -132,14 +137,14 @@ Beyond visual properties, also verify:
 
 ### Tolerance Rules
 
-| Property | Tolerance | Notes |
-|----------|----------|-------|
-| Spacing | 0px | Must be exact token match |
-| Colors | Exact | Must match token or hex exactly |
-| Font size | 0px | Must be exact |
-| Border radius | 0px | Must be exact token |
-| Shadows | ±1px, ±5% opacity | Small rendering differences OK |
-| Line height | ±0.05 | Minor rendering differences OK |
+| Property      | Tolerance         | Notes                           |
+| ------------- | ----------------- | ------------------------------- |
+| Spacing       | 0px               | Must be exact token match       |
+| Colors        | Exact             | Must match token or hex exactly |
+| Font size     | 0px               | Must be exact                   |
+| Border radius | 0px               | Must be exact token             |
+| Shadows       | ±1px, ±5% opacity | Small rendering differences OK  |
+| Line height   | ±0.05             | Minor rendering differences OK  |
 
 ## Output Format
 

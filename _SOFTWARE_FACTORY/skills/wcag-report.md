@@ -50,21 +50,21 @@ A WCAG compliance report follows this structure:
 #### axe-core Integration
 
 ```typescript
-import AxeBuilder from '@axe-core/playwright';
-import { test, expect } from '@playwright/test';
+import AxeBuilder from "@axe-core/playwright";
+import { test, expect } from "@playwright/test";
 
-test('WCAG 2.1 AA compliance scan', async ({ page }) => {
-  await page.goto('/target-page');
+test("WCAG 2.1 AA compliance scan", async ({ page }) => {
+  await page.goto("/target-page");
 
   const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
 
   // Group by impact
-  const critical = results.violations.filter(v => v.impact === 'critical');
-  const serious = results.violations.filter(v => v.impact === 'serious');
-  const moderate = results.violations.filter(v => v.impact === 'moderate');
-  const minor = results.violations.filter(v => v.impact === 'minor');
+  const critical = results.violations.filter((v) => v.impact === "critical");
+  const serious = results.violations.filter((v) => v.impact === "serious");
+  const moderate = results.violations.filter((v) => v.impact === "moderate");
+  const minor = results.violations.filter((v) => v.impact === "minor");
 
   console.log(`Critical: ${critical.length}, Serious: ${serious.length}`);
   console.log(`Moderate: ${moderate.length}, Minor: ${minor.length}`);
@@ -72,10 +72,10 @@ test('WCAG 2.1 AA compliance scan', async ({ page }) => {
   // Report all violations with details
   for (const violation of results.violations) {
     console.log(`[${violation.impact}] ${violation.id}: ${violation.description}`);
-    console.log(`  WCAG: ${violation.tags.filter(t => t.startsWith('wcag')).join(', ')}`);
+    console.log(`  WCAG: ${violation.tags.filter((t) => t.startsWith("wcag")).join(", ")}`);
     console.log(`  Nodes: ${violation.nodes.length}`);
     for (const node of violation.nodes) {
-      console.log(`    - ${node.target.join(' > ')}`);
+      console.log(`    - ${node.target.join(" > ")}`);
       console.log(`      Fix: ${node.failureSummary}`);
     }
   }
@@ -142,12 +142,12 @@ npx lighthouse http://localhost:3000 \
 
 ### Severity Classification
 
-| Severity | Description | SLA |
-|----------|-------------|-----|
-| 🔴 Critical | Prevents task completion for disabled users | Fix within 1 sprint |
-| 🟠 Serious | Significant barrier, workaround exists | Fix within 2 sprints |
-| 🟡 Moderate | Inconvenient but task is completable | Fix within 1 quarter |
-| 🔵 Minor | Annoyance, minimal impact | Fix in backlog |
+| Severity    | Description                                 | SLA                  |
+| ----------- | ------------------------------------------- | -------------------- |
+| 🔴 Critical | Prevents task completion for disabled users | Fix within 1 sprint  |
+| 🟠 Serious  | Significant barrier, workaround exists      | Fix within 2 sprints |
+| 🟡 Moderate | Inconvenient but task is completable        | Fix within 1 quarter |
+| 🔵 Minor    | Annoyance, minimal impact                   | Fix in backlog       |
 
 ### Screen Reader Testing Protocol
 

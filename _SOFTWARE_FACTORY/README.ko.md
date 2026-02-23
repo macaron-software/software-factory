@@ -67,11 +67,11 @@ cp .env.example .env
 # .env를 편집하고 API 키 추가
 ```
 
-| 제공업체 | 환경 변수 | 무료 |
-|---------|----------|------|
-| **MiniMax** | `MINIMAX_API_KEY` | ✅ |
-| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌ |
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | ✅ |
+| 제공업체         | 환경 변수                                        | 무료 |
+| ---------------- | ------------------------------------------------ | ---- |
+| **MiniMax**      | `MINIMAX_API_KEY`                                | ✅   |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌   |
+| **NVIDIA NIM**   | `NVIDIA_API_KEY`                                 | ✅   |
 
 `PLATFORM_LLM_PROVIDER`를 기본 제공업체로 설정. 대시보드 **Settings**(`/settings`)에서도 설정 가능.
 
@@ -83,7 +83,6 @@ cp .env.example .env
 - **REST API** — 94 documented endpoints
 - **MCP Server** — 23 tools
 - **License AGPL v3**
-
 
 ## 테스트
 

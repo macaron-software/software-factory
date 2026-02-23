@@ -102,12 +102,12 @@ cp .env.example .env
 # Éditer .env et ajouter vos clés API
 ```
 
-| Fournisseur | Variable d'env | Modèles | Gratuit |
-|-------------|---------------|---------|---------|
-| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5, M2.1 | ✅ Oui |
-| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini | ❌ |
-| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 | ❌ |
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 | ✅ Oui |
+| Fournisseur          | Variable d'env                                   | Modèles            | Gratuit |
+| -------------------- | ------------------------------------------------ | ------------------ | ------- |
+| **MiniMax**          | `MINIMAX_API_KEY`                                | MiniMax-M2.5, M2.1 | ✅ Oui  |
+| **Azure OpenAI**     | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini         | ❌      |
+| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT`         | GPT-5.2            | ❌      |
+| **NVIDIA NIM**       | `NVIDIA_API_KEY`                                 | Kimi K2            | ✅ Oui  |
 
 Définir `PLATFORM_LLM_PROVIDER` sur votre fournisseur principal (`minimax`, `azure-openai`, `azure-ai`, `nvidia`).
 La plateforme bascule automatiquement sur les autres fournisseurs configurés en cas d'échec.
@@ -126,15 +126,15 @@ Vous pouvez aussi configurer les fournisseurs depuis la page **Settings** du das
 
 Les agents sont organisés en équipes reflétant de vraies organisations logicielles :
 
-| Équipe | Agents | Rôle |
-|--------|--------|------|
-| **Product** | Product Manager, Business Analyst, PO | Planification SAFe, priorisation WSJF |
-| **Architecture** | Solution Architect, Tech Lead, System Architect | Décisions architecture, design patterns |
-| **Développement** | Backend/Frontend/Mobile/Data Engineers | Implémentation TDD par stack |
-| **Qualité** | QA Engineers, Security Analysts, Test Automation | Tests, audits sécurité, tests pénétration |
-| **Design** | UX Designer, UI Designer | Expérience utilisateur, design visuel |
-| **DevOps** | DevOps Engineer, SRE, Platform Engineer | CI/CD, monitoring, infrastructure |
-| **Management** | Scrum Master, RTE, Agile Coach | Cérémonies, facilitation, levée obstacles |
+| Équipe            | Agents                                           | Rôle                                      |
+| ----------------- | ------------------------------------------------ | ----------------------------------------- |
+| **Product**       | Product Manager, Business Analyst, PO            | Planification SAFe, priorisation WSJF     |
+| **Architecture**  | Solution Architect, Tech Lead, System Architect  | Décisions architecture, design patterns   |
+| **Développement** | Backend/Frontend/Mobile/Data Engineers           | Implémentation TDD par stack              |
+| **Qualité**       | QA Engineers, Security Analysts, Test Automation | Tests, audits sécurité, tests pénétration |
+| **Design**        | UX Designer, UI Designer                         | Expérience utilisateur, design visuel     |
+| **DevOps**        | DevOps Engineer, SRE, Platform Engineer          | CI/CD, monitoring, infrastructure         |
+| **Management**    | Scrum Master, RTE, Agile Coach                   | Cérémonies, facilitation, levée obstacles |
 
 ### 🎯 12 Patterns d'Orchestration
 
@@ -182,16 +182,16 @@ Hiérarchie complète Portfolio → Epic → Feature → Story avec :
 
 L'image Docker inclut tout le nécessaire pour que les agents travaillent en autonomie :
 
-| Catégorie | Outils | Description |
-|-----------|--------|-------------|
-| **Code** | `code_read`, `code_write`, `code_edit`, `code_search` | Lecture, écriture et recherche de fichiers |
-| **Build** | `build`, `test`, `local_ci` | Builds, tests, pipeline CI local (npm/pip/cargo auto-détecté) |
-| **Git** | `git_commit`, `git_diff`, `git_log` | Contrôle de version avec isolation par branche agent |
-| **Sécurité** | `sast_scan`, `dependency_audit`, `secrets_scan` | SAST via bandit/semgrep, audit CVE, détection de secrets |
-| **QA** | `playwright_test`, `browser_screenshot` | Tests E2E Playwright et captures d'écran (Chromium inclus) |
-| **Tickets** | `create_ticket`, `jira_search`, `jira_create` | Création d'incidents/tickets pour le suivi TMA |
-| **Deploy** | `docker_deploy`, `github_actions` | Déploiement conteneur et statut CI/CD |
-| **Mémoire** | `memory_store`, `memory_search`, `deep_search` | Mémoire projet persistante entre sessions |
+| Catégorie    | Outils                                                | Description                                                   |
+| ------------ | ----------------------------------------------------- | ------------------------------------------------------------- |
+| **Code**     | `code_read`, `code_write`, `code_edit`, `code_search` | Lecture, écriture et recherche de fichiers                    |
+| **Build**    | `build`, `test`, `local_ci`                           | Builds, tests, pipeline CI local (npm/pip/cargo auto-détecté) |
+| **Git**      | `git_commit`, `git_diff`, `git_log`                   | Contrôle de version avec isolation par branche agent          |
+| **Sécurité** | `sast_scan`, `dependency_audit`, `secrets_scan`       | SAST via bandit/semgrep, audit CVE, détection de secrets      |
+| **QA**       | `playwright_test`, `browser_screenshot`               | Tests E2E Playwright et captures d'écran (Chromium inclus)    |
+| **Tickets**  | `create_ticket`, `jira_search`, `jira_create`         | Création d'incidents/tickets pour le suivi TMA                |
+| **Deploy**   | `docker_deploy`, `github_actions`                     | Déploiement conteneur et statut CI/CD                         |
+| **Mémoire**  | `memory_store`, `memory_search`, `deep_search`        | Mémoire projet persistante entre sessions                     |
 
 ## Quatre Interfaces
 
@@ -300,6 +300,7 @@ python3 -m platform.mcp_platform.server
 ## Nouveautés v1.2.0 (21-22 fév 2026)
 
 ### CLI 'sf' - Interface Ligne de Commande Complète
+
 - 40+ commandes miroir de toutes les fonctionnalités du dashboard web
 - Mode dual : API (serveur live) ou DB (offline)
 - Streaming SSE avec sortie colorée par agent
@@ -307,17 +308,20 @@ python3 -m platform.mcp_platform.server
 - 52 tests automatisés
 
 ### Améliorations Product Management
+
 - 11 nouvelles capacités PM
 - Algorithmes de priorisation WSJF
 - Cartographie value stream
 
 ### Durcissement Sécurité
+
 - AuthMiddleware activé par défaut
 - Headers CSP renforcés
 - Masquage secrets dans logs et réponses API
 - Rate limiting par utilisateur
 
 ### Tests & Qualité
+
 - Suite de tests d'endurance
 - Tests chaos engineering
 - Tests E2E Playwright sur toutes les pages
@@ -333,6 +337,7 @@ npm test
 ```
 
 ### DevOps & Monitoring
+
 - Intégration webhooks GitHub
 - Chart Helm pour Kubernetes
 - Endpoint métriques Prometheus
@@ -340,6 +345,7 @@ npm test
 - Automatisation pipeline CD
 
 ### Améliorations UI
+
 - Notifications temps réel
 - Visualisations analytics Chart.js
 - Design responsive mobile

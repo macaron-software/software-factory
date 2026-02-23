@@ -43,20 +43,21 @@ Every feature follows three strict phases:
 #### 1. RED — Write a Failing Test
 
 Write the test BEFORE any implementation. The test must:
+
 - Describe the expected behavior clearly in the test name
 - Follow Arrange-Act-Assert (AAA) pattern
 - Fail for the RIGHT reason (not a syntax error)
 
 ```typescript
 // TypeScript + Vitest example
-import { describe, it, expect } from 'vitest';
-import { calculateDiscount } from './pricing';
+import { describe, it, expect } from "vitest";
+import { calculateDiscount } from "./pricing";
 
-describe('calculateDiscount', () => {
-  it('should apply 10% discount for orders over $100', () => {
+describe("calculateDiscount", () => {
+  it("should apply 10% discount for orders over $100", () => {
     // Arrange
     const orderTotal = 150;
-    const discountTier = 'standard';
+    const discountTier = "standard";
 
     // Act
     const result = calculateDiscount(orderTotal, discountTier);
@@ -65,13 +66,13 @@ describe('calculateDiscount', () => {
     expect(result).toBe(135);
   });
 
-  it('should return original price for orders under $100', () => {
-    const result = calculateDiscount(50, 'standard');
+  it("should return original price for orders under $100", () => {
+    const result = calculateDiscount(50, "standard");
     expect(result).toBe(50);
   });
 
-  it('should throw for negative amounts', () => {
-    expect(() => calculateDiscount(-10, 'standard')).toThrow('Amount must be positive');
+  it("should throw for negative amounts", () => {
+    expect(() => calculateDiscount(-10, "standard")).toThrow("Amount must be positive");
   });
 });
 ```
@@ -119,8 +120,8 @@ Implement ONLY what's needed to make the failing test pass. No extra features, n
 
 ```typescript
 export function calculateDiscount(amount: number, tier: string): number {
-  if (amount < 0) throw new Error('Amount must be positive');
-  if (amount > 100 && tier === 'standard') {
+  if (amount < 0) throw new Error("Amount must be positive");
+  if (amount > 100 && tier === "standard") {
     return amount * 0.9;
   }
   return amount;
@@ -130,6 +131,7 @@ export function calculateDiscount(amount: number, tier: string): number {
 #### 3. REFACTOR — Improve Without Changing Behavior
 
 With green tests as safety net, improve:
+
 - Extract constants/enums
 - Remove duplication
 - Improve naming
@@ -140,18 +142,19 @@ Run tests after EVERY refactor step. If any test fails, revert immediately.
 ### Mocking Strategies
 
 Use mocks ONLY when:
+
 - External services (APIs, databases)
 - Non-deterministic behavior (dates, random)
 - Slow dependencies (file system, network)
 
 ```typescript
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { UserService } from './user-service';
-import { EmailClient } from './email-client';
+import { vi, describe, it, expect, beforeEach } from "vitest";
+import { UserService } from "./user-service";
+import { EmailClient } from "./email-client";
 
-vi.mock('./email-client');
+vi.mock("./email-client");
 
-describe('UserService', () => {
+describe("UserService", () => {
   let service: UserService;
   let mockEmailClient: EmailClient;
 
@@ -162,12 +165,12 @@ describe('UserService', () => {
     service = new UserService(mockEmailClient);
   });
 
-  it('should send welcome email on registration', async () => {
-    await service.register('user@example.com', 'password123');
+  it("should send welcome email on registration", async () => {
+    await service.register("user@example.com", "password123");
 
     expect(mockEmailClient.send).toHaveBeenCalledWith({
-      to: 'user@example.com',
-      template: 'welcome',
+      to: "user@example.com",
+      template: "welcome",
     });
   });
 });
@@ -183,6 +186,7 @@ describe('UserService', () => {
 ### Test Naming Convention
 
 Use descriptive names that read like specifications:
+
 - `it('should reject passwords shorter than 8 characters')`
 - `it('returns empty array when no results match filter')`
 - `test_raises_permission_error_for_non_admin_users`

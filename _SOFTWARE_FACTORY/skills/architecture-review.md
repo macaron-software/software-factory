@@ -62,7 +62,7 @@ Evaluate layer separation:
 ```typescript
 // ❌ WRONG: Domain depends on infrastructure
 // domain/user.ts
-import { PrismaClient } from '@prisma/client'; // Infrastructure leak!
+import { PrismaClient } from "@prisma/client"; // Infrastructure leak!
 
 // ✅ CORRECT: Domain defines interface, infrastructure implements
 // domain/user-repository.ts
@@ -72,8 +72,8 @@ export interface UserRepository {
 }
 
 // infrastructure/prisma-user-repository.ts
-import { PrismaClient } from '@prisma/client';
-import { UserRepository } from '../domain/user-repository';
+import { PrismaClient } from "@prisma/client";
+import { UserRepository } from "../domain/user-repository";
 
 export class PrismaUserRepository implements UserRepository {
   constructor(private prisma: PrismaClient) {}
@@ -95,17 +95,25 @@ export class PrismaUserRepository implements UserRepository {
 ```typescript
 // ❌ VIOLATION: Class does too many things
 class UserService {
-  createUser() { }
-  sendWelcomeEmail() { }
-  generateReport() { }
-  validateCreditCard() { }
+  createUser() {}
+  sendWelcomeEmail() {}
+  generateReport() {}
+  validateCreditCard() {}
 }
 
 // ✅ CORRECT: Each class has one reason to change
-class UserService { createUser() { } }
-class EmailService { sendWelcomeEmail() { } }
-class ReportService { generateReport() { } }
-class PaymentService { validateCreditCard() { } }
+class UserService {
+  createUser() {}
+}
+class EmailService {
+  sendWelcomeEmail() {}
+}
+class ReportService {
+  generateReport() {}
+}
+class PaymentService {
+  validateCreditCard() {}
+}
 ```
 
 #### O — Open/Closed
@@ -116,8 +124,8 @@ interface PaymentProcessor {
   process(amount: number): Promise<PaymentResult>;
 }
 
-class StripeProcessor implements PaymentProcessor { }
-class PayPalProcessor implements PaymentProcessor { }
+class StripeProcessor implements PaymentProcessor {}
+class PayPalProcessor implements PaymentProcessor {}
 // Adding new processor doesn't modify existing code
 ```
 
@@ -125,9 +133,15 @@ class PayPalProcessor implements PaymentProcessor { }
 
 ```typescript
 // ❌ VIOLATION: Square breaks Rectangle contract
-class Rectangle { setWidth(w) { } setHeight(h) { } }
+class Rectangle {
+  setWidth(w) {}
+  setHeight(h) {}
+}
 class Square extends Rectangle {
-  setWidth(w) { this.width = w; this.height = w; } // Breaks expectations
+  setWidth(w) {
+    this.width = w;
+    this.height = w;
+  } // Breaks expectations
 }
 ```
 
@@ -142,8 +156,12 @@ interface Worker {
 }
 
 // ✅ CORRECT: Segregated interfaces
-interface Workable { work(): void; }
-interface Feedable { eat(): void; }
+interface Workable {
+  work(): void;
+}
+interface Feedable {
+  eat(): void;
+}
 ```
 
 #### D — Dependency Inversion
@@ -185,8 +203,8 @@ class Order {
 
   addItem(product: Product, quantity: number): void {
     // Enforce business rules at the aggregate boundary
-    if (this.status !== 'draft') throw new Error('Cannot modify submitted order');
-    const existing = this.items.find(i => i.productId === product.id);
+    if (this.status !== "draft") throw new Error("Cannot modify submitted order");
+    const existing = this.items.find((i) => i.productId === product.id);
     if (existing) {
       existing.increaseQuantity(quantity);
     } else {
@@ -206,28 +224,37 @@ class Order {
 # ADR-001: [Title]
 
 ## Status
+
 [Proposed | Accepted | Deprecated | Superseded by ADR-XXX]
 
 ## Context
+
 [What is the issue that we're seeing that is motivating this decision?]
 
 ## Decision
+
 [What is the change that we're proposing and/or doing?]
 
 ## Consequences
+
 ### Positive
+
 - [Benefit 1]
 - [Benefit 2]
 
 ### Negative
+
 - [Trade-off 1]
 - [Trade-off 2]
 
 ### Risks
+
 - [Risk 1 and mitigation strategy]
 
 ## Alternatives Considered
+
 ### Alternative A: [Name]
+
 - Pros: [...]
 - Cons: [...]
 - Rejected because: [...]
@@ -235,13 +262,13 @@ class Order {
 
 ### Scalability Assessment
 
-| Dimension | Question | Pattern |
-|-----------|----------|---------|
-| Read scale | Can reads be cached? | Cache-aside, CDN, read replicas |
-| Write scale | Can writes be queued? | Message queue, event sourcing |
-| Compute | Can processing be parallelized? | Worker pools, serverless |
-| Storage | Does data grow unboundedly? | Archival, partitioning, TTL |
-| Network | Are there chatty services? | Batch APIs, BFF pattern |
+| Dimension   | Question                        | Pattern                         |
+| ----------- | ------------------------------- | ------------------------------- |
+| Read scale  | Can reads be cached?            | Cache-aside, CDN, read replicas |
+| Write scale | Can writes be queued?           | Message queue, event sourcing   |
+| Compute     | Can processing be parallelized? | Worker pools, serverless        |
+| Storage     | Does data grow unboundedly?     | Archival, partitioning, TTL     |
+| Network     | Are there chatty services?      | Batch APIs, BFF pattern         |
 
 ### Code Organization Review
 

@@ -67,11 +67,11 @@ cp .env.example .env
 # .envを編集してAPIキーを追加
 ```
 
-| プロバイダー | 環境変数 | 無料 |
-|-------------|----------|------|
-| **MiniMax** | `MINIMAX_API_KEY` | ✅ |
-| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌ |
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | ✅ |
+| プロバイダー     | 環境変数                                         | 無料 |
+| ---------------- | ------------------------------------------------ | ---- |
+| **MiniMax**      | `MINIMAX_API_KEY`                                | ✅   |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌   |
+| **NVIDIA NIM**   | `NVIDIA_API_KEY`                                 | ✅   |
 
 `PLATFORM_LLM_PROVIDER` をプライマリプロバイダーに設定。ダッシュボードの **Settings**（`/settings`）からも設定可能。
 
@@ -83,7 +83,6 @@ cp .env.example .env
 - **REST API** — 94 documented endpoints
 - **MCP Server** — 23 tools
 - **License AGPL v3**
-
 
 ## テスト
 

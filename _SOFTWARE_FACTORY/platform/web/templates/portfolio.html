@@ -322,7 +322,7 @@
                 {% endif %}
 
                 <div class="pmc-badges">
-                    {% if p.running_phases > 0 %}
+                    {% if (p.running_phases|default(0)) > 0 %}
                     <span class="pmc-badge running"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> {{ p.running_phases }} phase{{ 's' if p.running_phases > 1 }}</span>
                     {% endif %}
                     {% if p.tma_active > 0 %}

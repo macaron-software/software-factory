@@ -62,31 +62,31 @@ Test pure logic, calculations, transformations, validation:
 // - State reducers
 // - Business rules
 
-import { describe, it, expect } from 'vitest';
-import { formatCurrency, validateEmail, calculateTax } from './utils';
+import { describe, it, expect } from "vitest";
+import { formatCurrency, validateEmail, calculateTax } from "./utils";
 
-describe('formatCurrency', () => {
-  it('formats USD with 2 decimals', () => {
-    expect(formatCurrency(1234.5, 'USD')).toBe('$1,234.50');
+describe("formatCurrency", () => {
+  it("formats USD with 2 decimals", () => {
+    expect(formatCurrency(1234.5, "USD")).toBe("$1,234.50");
   });
 
-  it('handles zero', () => {
-    expect(formatCurrency(0, 'USD')).toBe('$0.00');
+  it("handles zero", () => {
+    expect(formatCurrency(0, "USD")).toBe("$0.00");
   });
 
-  it('handles negative amounts', () => {
-    expect(formatCurrency(-50, 'USD')).toBe('-$50.00');
+  it("handles negative amounts", () => {
+    expect(formatCurrency(-50, "USD")).toBe("-$50.00");
   });
 });
 
-describe('validateEmail', () => {
+describe("validateEmail", () => {
   it.each([
-    ['user@example.com', true],
-    ['user@.com', false],
-    ['@example.com', false],
-    ['user@example', false],
-    ['', false],
-  ])('validates %s as %s', (email, expected) => {
+    ["user@example.com", true],
+    ["user@.com", false],
+    ["@example.com", false],
+    ["user@example", false],
+    ["", false],
+  ])("validates %s as %s", (email, expected) => {
     expect(validateEmail(email)).toBe(expected);
   });
 });
@@ -97,10 +97,10 @@ describe('validateEmail', () => {
 Test API endpoints with real HTTP calls against a test server:
 
 ```typescript
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createTestServer } from './test-helpers';
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { createTestServer } from "./test-helpers";
 
-describe('Users API', () => {
+describe("Users API", () => {
   let server: TestServer;
 
   beforeAll(async () => {
@@ -111,25 +111,25 @@ describe('Users API', () => {
     await server.close();
   });
 
-  it('POST /api/users creates a user', async () => {
-    const res = await server.fetch('/api/users', {
-      method: 'POST',
-      body: { email: 'test@example.com', name: 'Test' },
+  it("POST /api/users creates a user", async () => {
+    const res = await server.fetch("/api/users", {
+      method: "POST",
+      body: { email: "test@example.com", name: "Test" },
     });
 
     expect(res.status).toBe(201);
     expect(res.body.id).toBeDefined();
   });
 
-  it('GET /api/users/:id returns the created user', async () => {
-    const created = await server.fetch('/api/users', {
-      method: 'POST',
-      body: { email: 'get@example.com', name: 'Get Test' },
+  it("GET /api/users/:id returns the created user", async () => {
+    const created = await server.fetch("/api/users", {
+      method: "POST",
+      body: { email: "get@example.com", name: "Get Test" },
     });
 
     const res = await server.fetch(`/api/users/${created.body.id}`);
     expect(res.status).toBe(200);
-    expect(res.body.email).toBe('get@example.com');
+    expect(res.body.email).toBe("get@example.com");
   });
 });
 ```
@@ -139,28 +139,28 @@ describe('Users API', () => {
 Test critical user journeys only:
 
 ```typescript
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
-test('complete purchase flow', async ({ page }) => {
-  await test.step('Browse products', async () => {
-    await page.goto('/products');
-    await page.getByRole('link', { name: 'Premium Plan' }).click();
+test("complete purchase flow", async ({ page }) => {
+  await test.step("Browse products", async () => {
+    await page.goto("/products");
+    await page.getByRole("link", { name: "Premium Plan" }).click();
   });
 
-  await test.step('Add to cart', async () => {
-    await page.getByRole('button', { name: 'Add to Cart' }).click();
-    await expect(page.getByText('Added to cart')).toBeVisible();
+  await test.step("Add to cart", async () => {
+    await page.getByRole("button", { name: "Add to Cart" }).click();
+    await expect(page.getByText("Added to cart")).toBeVisible();
   });
 
-  await test.step('Checkout', async () => {
-    await page.goto('/cart');
-    await page.getByRole('button', { name: 'Checkout' }).click();
-    await page.getByLabel('Card number').fill('4242424242424242');
-    await page.getByRole('button', { name: 'Pay' }).click();
+  await test.step("Checkout", async () => {
+    await page.goto("/cart");
+    await page.getByRole("button", { name: "Checkout" }).click();
+    await page.getByLabel("Card number").fill("4242424242424242");
+    await page.getByRole("button", { name: "Pay" }).click();
   });
 
-  await test.step('Confirm', async () => {
-    await expect(page.getByText('Payment successful')).toBeVisible();
+  await test.step("Confirm", async () => {
+    await expect(page.getByText("Payment successful")).toBeVisible();
   });
 });
 ```
@@ -169,21 +169,21 @@ test('complete purchase flow', async ({ page }) => {
 
 ```typescript
 // factories/user.factory.ts
-import { faker } from '@faker-js/faker';
+import { faker } from "@faker-js/faker";
 
 export function createUserFixture(overrides?: Partial<User>): User {
   return {
     id: faker.string.uuid(),
     email: faker.internet.email(),
     name: faker.person.fullName(),
-    role: 'member',
+    role: "member",
     createdAt: new Date().toISOString(),
     ...overrides,
   };
 }
 
 // Usage in tests
-const admin = createUserFixture({ role: 'admin' });
+const admin = createUserFixture({ role: "admin" });
 const users = Array.from({ length: 10 }, () => createUserFixture());
 ```
 
@@ -191,21 +191,21 @@ const users = Array.from({ length: 10 }, () => createUserFixture());
 
 ```typescript
 // Mock external services, NOT your own code
-vi.mock('./email-service', () => ({
+vi.mock("./email-service", () => ({
   sendEmail: vi.fn().mockResolvedValue({ success: true }),
 }));
 
 // Use MSW for API mocking in component tests
-import { setupServer } from 'msw/node';
-import { http, HttpResponse } from 'msw';
+import { setupServer } from "msw/node";
+import { http, HttpResponse } from "msw";
 
 const server = setupServer(
-  http.get('/api/users', () => {
+  http.get("/api/users", () => {
     return HttpResponse.json([
-      { id: '1', name: 'Alice' },
-      { id: '2', name: 'Bob' },
+      { id: "1", name: "Alice" },
+      { id: "2", name: "Bob" },
     ]);
-  }),
+  })
 );
 
 beforeAll(() => server.listen());
@@ -256,6 +256,7 @@ jobs:
    - Isolate test data (no shared state)
    - Use `test.describe.serial()` only when truly needed
 4. **Retry as last resort**:
+
 ```typescript
 // playwright.config.ts
 export default defineConfig({

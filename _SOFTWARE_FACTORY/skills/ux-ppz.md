@@ -83,11 +83,22 @@ function ppz_popin(array $props): string {
   overflow: hidden;
 }
 
-.ppz-popin--sm { width: min(400px, 90vw); }
-.ppz-popin--md { width: min(560px, 90vw); }
-.ppz-popin--lg { width: min(720px, 90vw); }
-.ppz-popin--xl { width: min(960px, 90vw); }
-.ppz-popin--full { width: 90vw; height: 90vh; }
+.ppz-popin--sm {
+  width: min(400px, 90vw);
+}
+.ppz-popin--md {
+  width: min(560px, 90vw);
+}
+.ppz-popin--lg {
+  width: min(720px, 90vw);
+}
+.ppz-popin--xl {
+  width: min(960px, 90vw);
+}
+.ppz-popin--full {
+  width: 90vw;
+  height: 90vh;
+}
 
 .ppz-popin__header {
   display: flex;
@@ -126,17 +137,17 @@ class PpzPopin {
     this.previousFocus = null;
 
     // Close on backdrop click
-    this.dialog.addEventListener('click', (e) => {
+    this.dialog.addEventListener("click", (e) => {
       if (e.target === this.dialog) this.close();
     });
 
     // Close on Escape
-    this.dialog.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') this.close();
+    this.dialog.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") this.close();
     });
 
     // Close button
-    this.dialog.querySelector('[data-ppz-close]')?.addEventListener('click', () => {
+    this.dialog.querySelector("[data-ppz-close]")?.addEventListener("click", () => {
       this.close();
     });
   }
@@ -247,15 +258,15 @@ function ppz_wizard(array $props): string {
 
 ### PPZ Interaction Patterns
 
-| Pattern | PPZ Implementation | Trigger |
-|---------|-------------------|---------|
-| Create item | Open popin with form | Click "+" or "New" button |
-| Edit item | Open popin with pre-filled form | Click edit icon or row |
-| Delete item | Confirm popin → toast on success | Click delete → confirm |
-| View details | Open popin or navigate to detail page | Click item row/card |
-| Bulk actions | Select via checkboxes → action bar appears | Check items |
-| Search | Instant filter (debounced) or search popin | Type in search bar |
-| Notify | Toast (auto-dismiss) for info, persistent for errors | After action |
+| Pattern      | PPZ Implementation                                   | Trigger                   |
+| ------------ | ---------------------------------------------------- | ------------------------- |
+| Create item  | Open popin with form                                 | Click "+" or "New" button |
+| Edit item    | Open popin with pre-filled form                      | Click edit icon or row    |
+| Delete item  | Confirm popin → toast on success                     | Click delete → confirm    |
+| View details | Open popin or navigate to detail page                | Click item row/card       |
+| Bulk actions | Select via checkboxes → action bar appears           | Check items               |
+| Search       | Instant filter (debounced) or search popin           | Type in search bar        |
+| Notify       | Toast (auto-dismiss) for info, persistent for errors | After action              |
 
 ### PPZ Loading Patterns
 

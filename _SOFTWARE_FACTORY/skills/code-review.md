@@ -46,17 +46,18 @@ real issues while maintaining a positive, collaborative tone.
 
 ### Severity Classification
 
-| Level | Label | Meaning | Action Required |
-|-------|-------|---------|-----------------|
-| 🔴 | **Blocking** | Bug, security issue, data loss risk | Must fix before merge |
-| 🟠 | **Important** | Performance issue, missing test, poor pattern | Should fix before merge |
-| 🟡 | **Suggestion** | Better approach exists, minor improvement | Consider for this or next PR |
-| 🔵 | **Nit** | Style, naming, minor readability | Optional, low priority |
-| 💬 | **Question** | Clarification needed | Answer before merge |
+| Level | Label          | Meaning                                       | Action Required              |
+| ----- | -------------- | --------------------------------------------- | ---------------------------- |
+| 🔴    | **Blocking**   | Bug, security issue, data loss risk           | Must fix before merge        |
+| 🟠    | **Important**  | Performance issue, missing test, poor pattern | Should fix before merge      |
+| 🟡    | **Suggestion** | Better approach exists, minor improvement     | Consider for this or next PR |
+| 🔵    | **Nit**        | Style, naming, minor readability              | Optional, low priority       |
+| 💬    | **Question**   | Clarification needed                          | Answer before merge          |
 
 ### Review Checklist
 
 #### Correctness
+
 ```
 - [ ] Logic handles all expected inputs correctly
 - [ ] Edge cases covered (null, empty, boundary values)
@@ -67,6 +68,7 @@ real issues while maintaining a positive, collaborative tone.
 ```
 
 #### Security
+
 ```
 - [ ] No hardcoded secrets, API keys, or passwords
 - [ ] User input is validated and sanitized
@@ -78,6 +80,7 @@ real issues while maintaining a positive, collaborative tone.
 ```
 
 #### Performance
+
 ```
 - [ ] No N+1 query patterns
 - [ ] Large lists are paginated
@@ -88,6 +91,7 @@ real issues while maintaining a positive, collaborative tone.
 ```
 
 #### Testing
+
 ```
 - [ ] New code has corresponding tests
 - [ ] Edge cases are tested
@@ -135,6 +139,7 @@ to add new payment providers without modifying existing code.
 ### Common Issues to Watch For
 
 #### JavaScript/TypeScript
+
 ```typescript
 // 🔴 Missing await
 async function saveUser(user: User) {
@@ -155,6 +160,7 @@ function UserList({ users }: Props) {
 ```
 
 #### Python
+
 ```python
 # 🔴 Mutable default argument
 def add_item(item, items=[]):  # BAD: shared mutable default
@@ -182,6 +188,7 @@ except (ValueError, KeyError) as e:
 ```
 
 #### SQL
+
 ```sql
 -- 🔴 No LIMIT on potentially large result set
 SELECT * FROM logs WHERE created_at > '2024-01-01';

@@ -70,11 +70,11 @@ cp .env.example .env
 # Editar .env y añadir claves API
 ```
 
-| Proveedor | Variable de entorno | Gratuito |
-|-----------|--------------------|-----------|
-| **MiniMax** | `MINIMAX_API_KEY` | ✅ |
-| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌ |
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | ✅ |
+| Proveedor        | Variable de entorno                              | Gratuito |
+| ---------------- | ------------------------------------------------ | -------- |
+| **MiniMax**      | `MINIMAX_API_KEY`                                | ✅       |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌       |
+| **NVIDIA NIM**   | `NVIDIA_API_KEY`                                 | ✅       |
 
 Establecer `PLATFORM_LLM_PROVIDER` como proveedor principal. Configuración también disponible en **Settings** (`/settings`).
 
@@ -86,7 +86,6 @@ Establecer `PLATFORM_LLM_PROVIDER` como proveedor principal. Configuración tamb
 - **API REST** — 94 endpoints documentados
 - **Servidor MCP** — 23 herramientas
 - **Licencia AGPL v3**
-
 
 ## Pruebas
 

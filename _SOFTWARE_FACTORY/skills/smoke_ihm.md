@@ -39,13 +39,13 @@ have no console or network errors.
 ### Basic Page Health Check
 
 ```typescript
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from "@playwright/test";
 
 const PAGES = [
-  { path: '/', title: 'Home', expectedText: 'Welcome' },
-  { path: '/login', title: 'Login', expectedText: 'Sign in' },
-  { path: '/dashboard', title: 'Dashboard', expectedText: 'Overview' },
-  { path: '/settings', title: 'Settings', expectedText: 'Preferences' },
+  { path: "/", title: "Home", expectedText: "Welcome" },
+  { path: "/login", title: "Login", expectedText: "Sign in" },
+  { path: "/dashboard", title: "Dashboard", expectedText: "Overview" },
+  { path: "/settings", title: "Settings", expectedText: "Preferences" },
 ];
 
 for (const { path, title, expectedText } of PAGES) {
@@ -54,14 +54,14 @@ for (const { path, title, expectedText } of PAGES) {
     const networkFailures: string[] = [];
 
     // Capture console errors
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
+    page.on("console", (msg) => {
+      if (msg.type() === "error") {
         errors.push(msg.text());
       }
     });
 
     // Capture network failures
-    page.on('requestfailed', request => {
+    page.on("requestfailed", (request) => {
       networkFailures.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText}`);
     });
 
@@ -85,18 +85,18 @@ for (const { path, title, expectedText } of PAGES) {
 
 ```typescript
 const VIEWPORTS = [
-  { name: 'mobile', width: 375, height: 667 },
-  { name: 'tablet', width: 768, height: 1024 },
-  { name: 'desktop', width: 1440, height: 900 },
+  { name: "mobile", width: 375, height: 667 },
+  { name: "tablet", width: 768, height: 1024 },
+  { name: "desktop", width: 1440, height: 900 },
 ];
 
 for (const viewport of VIEWPORTS) {
   test(`Smoke: Home page renders on ${viewport.name}`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    const response = await page.goto('/');
+    const response = await page.goto("/");
 
     expect(response?.status()).toBe(200);
-    await expect(page.locator('body')).toBeVisible();
+    await expect(page.locator("body")).toBeVisible();
 
     // Check no horizontal overflow
     const bodyWidth = await page.evaluate(() => document.body.scrollWidth);
@@ -108,8 +108,8 @@ for (const viewport of VIEWPORTS) {
 ### Quick Auth Smoke Check
 
 ```typescript
-test('Smoke: Protected pages redirect to login', async ({ page }) => {
-  const protectedPages = ['/dashboard', '/settings', '/profile'];
+test("Smoke: Protected pages redirect to login", async ({ page }) => {
+  const protectedPages = ["/dashboard", "/settings", "/profile"];
 
   for (const path of protectedPages) {
     await page.goto(path);
@@ -117,21 +117,21 @@ test('Smoke: Protected pages redirect to login', async ({ page }) => {
   }
 });
 
-test('Smoke: Login works with valid credentials', async ({ page }) => {
-  await page.goto('/login');
-  await page.getByLabel('Email').fill('smoke@test.com');
-  await page.getByLabel('Password').fill('smoketest123');
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL('/dashboard');
+test("Smoke: Login works with valid credentials", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill("smoke@test.com");
+  await page.getByLabel("Password").fill("smoketest123");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL("/dashboard");
 });
 ```
 
 ### Performance Smoke Check
 
 ```typescript
-test('Smoke: Pages load within acceptable time', async ({ page }) => {
+test("Smoke: Pages load within acceptable time", async ({ page }) => {
   const start = Date.now();
-  await page.goto('/');
+  await page.goto("/");
   const loadTime = Date.now() - start;
 
   expect(loadTime).toBeLessThan(3000); // 3 second max
@@ -146,8 +146,11 @@ test('Smoke: Pages load within acceptable time', async ({ page }) => {
 ```
 
 Tag smoke tests with:
+
 ```typescript
-test('@smoke Home page loads', async ({ page }) => { /* ... */ });
+test("@smoke Home page loads", async ({ page }) => {
+  /* ... */
+});
 ```
 
 ## Output Format

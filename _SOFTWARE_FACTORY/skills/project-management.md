@@ -81,17 +81,18 @@ Dependencies: [List any blockers or dependencies]
 
 **Weighted Shortest Job First** = (Business Value + Time Criticality + Risk Reduction) / Job Size
 
-| Story | Business Value (1-10) | Time Criticality (1-10) | Risk Reduction (1-10) | Job Size (1-10) | WSJF |
-|-------|--------------------|----------------------|---------------------|----------------|------|
-| Login redesign | 8 | 3 | 5 | 5 | 3.2 |
-| API rate limiting | 6 | 9 | 8 | 3 | 7.7 |
-| Dashboard charts | 4 | 2 | 1 | 8 | 0.9 |
+| Story             | Business Value (1-10) | Time Criticality (1-10) | Risk Reduction (1-10) | Job Size (1-10) | WSJF |
+| ----------------- | --------------------- | ----------------------- | --------------------- | --------------- | ---- |
+| Login redesign    | 8                     | 3                       | 5                     | 5               | 3.2  |
+| API rate limiting | 6                     | 9                       | 8                     | 3               | 7.7  |
+| Dashboard charts  | 4                     | 2                       | 1                     | 8               | 0.9  |
 
 **Highest WSJF = do first** (API rate limiting in this example).
 
 ### Task Decomposition
 
 Break features into tasks that are:
+
 - **Independent** — can be worked on without waiting for others
 - **Small** — completable in 1-2 days maximum
 - **Testable** — has clear verification criteria
@@ -143,15 +144,16 @@ Dependencies: Task 4 depends on Task 5; Task 3 depends on Tasks 1 + 2
 
 #### Risk Register Template
 
-| ID | Risk | Probability | Impact | Score | Mitigation | Owner | Status |
-|----|------|------------|--------|-------|------------|-------|--------|
-| R1 | API provider outage | Medium | High | 6 | Implement fallback provider | @backend | Open |
-| R2 | Scope creep on dashboard | High | Medium | 6 | Freeze scope after sprint planning | @pm | Monitoring |
-| R3 | Key developer on vacation | High | High | 9 | Cross-train + document | @lead | In progress |
+| ID  | Risk                      | Probability | Impact | Score | Mitigation                         | Owner    | Status      |
+| --- | ------------------------- | ----------- | ------ | ----- | ---------------------------------- | -------- | ----------- |
+| R1  | API provider outage       | Medium      | High   | 6     | Implement fallback provider        | @backend | Open        |
+| R2  | Scope creep on dashboard  | High        | Medium | 6     | Freeze scope after sprint planning | @pm      | Monitoring  |
+| R3  | Key developer on vacation | High        | High   | 9     | Cross-train + document             | @lead    | In progress |
 
 **Score** = Probability (1-3) × Impact (1-3)
 
 #### Risk Categories
+
 - **Technical**: Technology uncertainty, integration challenges, performance
 - **Resource**: Team availability, skill gaps, tooling
 - **Schedule**: Dependencies, external teams, scope changes
@@ -163,29 +165,37 @@ Dependencies: Task 4 depends on Task 5; Task 3 depends on Tasks 1 + 2
 # Weekly Status Report — [Date]
 
 ## Summary
+
 [One paragraph: what was accomplished, what's at risk, what needs attention]
 
 ## Progress
+
 ### Completed This Week
+
 - ✅ [Task/Story] — [brief description]
 - ✅ [Task/Story] — [brief description]
 
 ### In Progress
+
 - 🔄 [Task/Story] — [status, % complete, expected completion]
 - 🔄 [Task/Story] — [status, blockers if any]
 
 ### Blocked
+
 - 🚫 [Task/Story] — [blocker description, who can unblock]
 
 ## Metrics
+
 - Sprint burndown: [X of Y points completed]
 - Velocity: [current sprint velocity vs average]
 - Blockers resolved: [X of Y]
 
 ## Risks & Issues
+
 - [New or changed risks]
 
 ## Next Week Focus
+
 - [Top priorities for next week]
 ```
 
@@ -197,22 +207,26 @@ Dependencies: Task 4 depends on Task 5; Task 3 depends on Tasks 1 + 2
 # Sprint [X] Retrospective
 
 ## What went well? (Continue)
+
 - [Team contribution 1]
 - [Process that worked]
 
 ## What didn't go well? (Stop)
+
 - [Problem 1]
 - [Problem 2]
 
 ## What should we try? (Start)
+
 - [Improvement idea 1]
 - [Improvement idea 2]
 
 ## Action Items
-| Action | Owner | Due Date |
-|--------|-------|----------|
-| [Specific action] | @person | [Date] |
-| [Specific action] | @person | [Date] |
+
+| Action            | Owner   | Due Date |
+| ----------------- | ------- | -------- |
+| [Specific action] | @person | [Date]   |
+| [Specific action] | @person | [Date]   |
 ```
 
 ### Dependency Management

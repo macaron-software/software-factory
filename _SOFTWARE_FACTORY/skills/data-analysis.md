@@ -128,17 +128,17 @@ FROM funnel;
 
 ### KPI Definition Framework
 
-| Category | KPI | Formula | Good Target |
-|----------|-----|---------|-------------|
-| Growth | DAU | Distinct users/day | Trending up |
-| Growth | MAU | Distinct users/month | Trending up |
-| Growth | DAU/MAU | DAU ÷ MAU | > 20% (stickiness) |
-| Revenue | MRR | Sum of monthly recurring | Trending up |
-| Revenue | ARPU | Revenue ÷ Active Users | Trending up |
-| Retention | D1/D7/D30 | Users returning after N days | D1>40%, D7>20%, D30>10% |
-| Engagement | Session length | Avg time per session | Depends on product |
-| Quality | Error rate | Errors ÷ Total requests | < 0.1% |
-| Quality | P95 latency | 95th percentile response time | < 500ms |
+| Category   | KPI            | Formula                       | Good Target             |
+| ---------- | -------------- | ----------------------------- | ----------------------- |
+| Growth     | DAU            | Distinct users/day            | Trending up             |
+| Growth     | MAU            | Distinct users/month          | Trending up             |
+| Growth     | DAU/MAU        | DAU ÷ MAU                     | > 20% (stickiness)      |
+| Revenue    | MRR            | Sum of monthly recurring      | Trending up             |
+| Revenue    | ARPU           | Revenue ÷ Active Users        | Trending up             |
+| Retention  | D1/D7/D30      | Users returning after N days  | D1>40%, D7>20%, D30>10% |
+| Engagement | Session length | Avg time per session          | Depends on product      |
+| Quality    | Error rate     | Errors ÷ Total requests       | < 0.1%                  |
+| Quality    | P95 latency    | 95th percentile response time | < 500ms                 |
 
 ### Dashboard Design Principles
 
@@ -165,14 +165,14 @@ Dashboard Layout:
 
 ### Data Visualization Best Practices
 
-| Data Type | Best Chart | Avoid |
-|-----------|-----------|-------|
-| Trend over time | Line chart | Pie chart |
-| Part of whole | Stacked bar, treemap | Pie chart (>5 slices) |
-| Comparison | Bar chart (horizontal) | 3D bars |
-| Distribution | Histogram, box plot | Pie chart |
-| Correlation | Scatter plot | Line chart |
-| Geographic | Choropleth map | Bar chart |
+| Data Type       | Best Chart             | Avoid                 |
+| --------------- | ---------------------- | --------------------- |
+| Trend over time | Line chart             | Pie chart             |
+| Part of whole   | Stacked bar, treemap   | Pie chart (>5 slices) |
+| Comparison      | Bar chart (horizontal) | 3D bars               |
+| Distribution    | Histogram, box plot    | Pie chart             |
+| Correlation     | Scatter plot           | Line chart            |
+| Geographic      | Choropleth map         | Bar chart             |
 
 ### ETL Patterns
 
@@ -258,7 +258,7 @@ significant = p_value < 0.05  # 95% confidence
 
 ## Anti-patterns
 
-- **NEVER** use SELECT * in production queries — specify columns
+- **NEVER** use SELECT \* in production queries — specify columns
 - **NEVER** skip LIMIT on exploratory queries — protect the database
 - **NEVER** join without indexes — check query plans
 - **NEVER** use pie charts for more than 5 categories

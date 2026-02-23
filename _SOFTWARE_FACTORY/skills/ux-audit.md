@@ -41,6 +41,7 @@ heuristic frameworks, task flow analysis, and systematic usability evaluation.
 Evaluate each heuristic on a scale: ✅ Good | ⚠️ Issues | ❌ Failing
 
 #### 1. Visibility of System Status
+
 - Does the system always inform users about what is going on?
 - Loading indicators for async operations?
 - Progress bars for multi-step processes?
@@ -53,6 +54,7 @@ Check: In multi-step forms, is there a progress indicator?
 ```
 
 #### 2. Match Between System and Real World
+
 - Does the language match the user's vocabulary?
 - Are icons intuitive and recognizable?
 - Do metaphors make sense?
@@ -64,6 +66,7 @@ Check: Does the information architecture follow user mental models?
 ```
 
 #### 3. User Control and Freedom
+
 - Can users undo actions easily?
 - Is there always a way to go back?
 - Can users cancel in-progress operations?
@@ -75,6 +78,7 @@ Check: Can users navigate back from any page?
 ```
 
 #### 4. Consistency and Standards
+
 - Are similar elements styled consistently?
 - Do icons mean the same thing everywhere?
 - Is terminology consistent?
@@ -86,6 +90,7 @@ Check: Do breadcrumbs follow the same pattern everywhere?
 ```
 
 #### 5. Error Prevention
+
 - Are dangerous actions guarded by confirmation?
 - Is input validated before submission?
 - Are defaults safe?
@@ -97,6 +102,7 @@ Check: Are dangerous defaults avoided?
 ```
 
 #### 6. Recognition Rather Than Recall
+
 - Are recently used items visible?
 - Are options visible rather than hidden?
 - Is help contextual?
@@ -108,6 +114,7 @@ Check: Are recent searches/items shown?
 ```
 
 #### 7. Flexibility and Efficiency of Use
+
 - Are there keyboard shortcuts for power users?
 - Can experienced users skip steps?
 - Are there bulk actions?
@@ -119,6 +126,7 @@ Check: Can users customize their workflow?
 ```
 
 #### 8. Aesthetic and Minimalist Design
+
 - Is visual noise minimized?
 - Is content prioritized by importance?
 - Are decorative elements purposeful?
@@ -130,6 +138,7 @@ Check: Are there unnecessary visual elements?
 ```
 
 #### 9. Help Users Recognize, Diagnose, and Recover from Errors
+
 - Are error messages in plain language?
 - Do they indicate the cause?
 - Do they suggest a solution?
@@ -141,6 +150,7 @@ Check: Do API errors show user-friendly messages (not stack traces)?
 ```
 
 #### 10. Help and Documentation
+
 - Is contextual help available?
 - Are tooltips provided for complex features?
 - Is documentation searchable?
@@ -167,21 +177,21 @@ Task: [e.g., "Create a new project"]
 
 ### Consistency Checklist
 
-| Element | Page A | Page B | Page C | Consistent? |
-|---------|--------|--------|--------|-------------|
-| Primary button style | Blue/filled | Blue/filled | Green/filled | ❌ |
-| Heading hierarchy | h1→h2→h3 | h1→h3 | h1→h2→h3 | ❌ |
-| Error message style | Red inline | Red toast | Red modal | ❌ |
-| Loading pattern | Skeleton | Spinner | Nothing | ❌ |
+| Element              | Page A      | Page B      | Page C       | Consistent? |
+| -------------------- | ----------- | ----------- | ------------ | ----------- |
+| Primary button style | Blue/filled | Blue/filled | Green/filled | ❌          |
+| Heading hierarchy    | h1→h2→h3    | h1→h3       | h1→h2→h3     | ❌          |
+| Error message style  | Red inline  | Red toast   | Red modal    | ❌          |
+| Loading pattern      | Skeleton    | Spinner     | Nothing      | ❌          |
 
 ### Severity Rating
 
-| Level | Description | Example |
-|-------|-------------|---------|
-| 🔴 Critical | Users cannot complete task | Broken form submission |
-| 🟠 Major | Users struggle significantly | No error messages on form |
-| 🟡 Minor | Users are annoyed but can proceed | Inconsistent button styles |
-| 🔵 Cosmetic | Polish issue, no impact | Slight spacing inconsistency |
+| Level       | Description                       | Example                      |
+| ----------- | --------------------------------- | ---------------------------- |
+| 🔴 Critical | Users cannot complete task        | Broken form submission       |
+| 🟠 Major    | Users struggle significantly      | No error messages on form    |
+| 🟡 Minor    | Users are annoyed but can proceed | Inconsistent button styles   |
+| 🔵 Cosmetic | Polish issue, no impact           | Slight spacing inconsistency |
 
 ## Output Format
 

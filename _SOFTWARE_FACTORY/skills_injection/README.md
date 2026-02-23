@@ -28,6 +28,7 @@ python skills_loader.py
 ```
 
 This will:
+
 - Fetch 1310 skills from GitHub repos
 - Generate embeddings (takes ~10 min, costs ~$0.50)
 - Store in platform.db

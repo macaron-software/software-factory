@@ -135,12 +135,12 @@ cp .env.example .env
 # Edit .env and add your API key(s)
 ```
 
-| Provider | Env Variable | Models | Free Tier |
-|----------|-------------|--------|-----------|
-| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5, M2.1 | ✅ Yes |
-| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini | ❌ |
-| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 | ❌ |
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 | ✅ Yes |
+| Provider             | Env Variable                                     | Models             | Free Tier |
+| -------------------- | ------------------------------------------------ | ------------------ | --------- |
+| **MiniMax**          | `MINIMAX_API_KEY`                                | MiniMax-M2.5, M2.1 | ✅ Yes    |
+| **Azure OpenAI**     | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini         | ❌        |
+| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT`         | GPT-5.2            | ❌        |
+| **NVIDIA NIM**       | `NVIDIA_API_KEY`                                 | Kimi K2            | ✅ Yes    |
 
 Set `PLATFORM_LLM_PROVIDER` to your primary provider (`minimax`, `azure-openai`, `azure-ai`, `nvidia`).
 The platform auto-falls back to other configured providers if the primary fails.
@@ -164,15 +164,15 @@ You can also configure providers from the **Settings** page in the dashboard (`/
 
 Agents are organized in teams mirroring real software organizations:
 
-| Team | Agents | Role |
-|------|--------|------|
-| **Product** | Product Manager, Business Analyst, PO | SAFe planning, WSJF prioritization |
-| **Architecture** | Solution Architect, Tech Lead, System Architect | Architecture decisions, design patterns |
-| **Development** | Backend/Frontend/Mobile/Data Engineers | TDD implementation per stack |
-| **Quality** | QA Engineers, Security Analysts, Test Automation | Testing, security audits, penetration testing |
-| **Design** | UX Designer, UI Designer | User experience, visual design |
-| **DevOps** | DevOps Engineer, SRE, Platform Engineer | CI/CD, monitoring, infrastructure |
-| **Management** | Scrum Master, RTE, Agile Coach | Ceremonies, facilitation, impediment removal |
+| Team             | Agents                                           | Role                                          |
+| ---------------- | ------------------------------------------------ | --------------------------------------------- |
+| **Product**      | Product Manager, Business Analyst, PO            | SAFe planning, WSJF prioritization            |
+| **Architecture** | Solution Architect, Tech Lead, System Architect  | Architecture decisions, design patterns       |
+| **Development**  | Backend/Frontend/Mobile/Data Engineers           | TDD implementation per stack                  |
+| **Quality**      | QA Engineers, Security Analysts, Test Automation | Testing, security audits, penetration testing |
+| **Design**       | UX Designer, UI Designer                         | User experience, visual design                |
+| **DevOps**       | DevOps Engineer, SRE, Platform Engineer          | CI/CD, monitoring, infrastructure             |
+| **Management**   | Scrum Master, RTE, Agile Coach                   | Ceremonies, facilitation, impediment removal  |
 
 ### 🎯 12 Orchestration Patterns
 
@@ -220,16 +220,16 @@ Full Portfolio → Epic → Feature → Story hierarchy with:
 
 The Docker image includes everything agents need to work autonomously:
 
-| Category | Tools | Description |
-|----------|-------|-------------|
-| **Code** | `code_read`, `code_write`, `code_edit`, `code_search`, `list_files` | Read, write, and search project files |
-| **Build** | `build`, `test`, `local_ci` | Run builds, tests, and local CI pipelines (npm/pip/cargo auto-detected) |
-| **Git** | `git_commit`, `git_diff`, `git_log`, `git_status` | Version control with agent branch isolation |
-| **Security** | `sast_scan`, `dependency_audit`, `secrets_scan` | SAST via bandit/semgrep, CVE audit, secret detection |
-| **QA** | `playwright_test`, `browser_screenshot`, `screenshot` | Playwright E2E tests and screenshots (Chromium included) |
-| **Tickets** | `create_ticket`, `jira_search`, `jira_create` | Create incidents/tickets for TMA tracking |
-| **Deploy** | `docker_deploy`, `docker_status`, `github_actions` | Container deployment and CI/CD status |
-| **Memory** | `memory_store`, `memory_search`, `deep_search` | Persistent project memory across sessions |
+| Category     | Tools                                                               | Description                                                             |
+| ------------ | ------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| **Code**     | `code_read`, `code_write`, `code_edit`, `code_search`, `list_files` | Read, write, and search project files                                   |
+| **Build**    | `build`, `test`, `local_ci`                                         | Run builds, tests, and local CI pipelines (npm/pip/cargo auto-detected) |
+| **Git**      | `git_commit`, `git_diff`, `git_log`, `git_status`                   | Version control with agent branch isolation                             |
+| **Security** | `sast_scan`, `dependency_audit`, `secrets_scan`                     | SAST via bandit/semgrep, CVE audit, secret detection                    |
+| **QA**       | `playwright_test`, `browser_screenshot`, `screenshot`               | Playwright E2E tests and screenshots (Chromium included)                |
+| **Tickets**  | `create_ticket`, `jira_search`, `jira_create`                       | Create incidents/tickets for TMA tracking                               |
+| **Deploy**   | `docker_deploy`, `docker_status`, `github_actions`                  | Container deployment and CI/CD status                                   |
+| **Memory**   | `memory_store`, `memory_search`, `deep_search`                      | Persistent project memory across sessions                               |
 
 ## Four Interfaces
 
@@ -451,6 +451,7 @@ ENABLE_AUTH=true
 ## What's New in v1.2.0 (Feb 21-22, 2026)
 
 ### CLI 'sf' - Full Command-Line Interface
+
 - 40+ commands mirroring all web dashboard functionality
 - Dual mode: API (live server) or DB (offline)
 - SSE streaming with per-agent colored output
@@ -458,23 +459,27 @@ ENABLE_AUTH=true
 - 52 automated tests
 
 ### Product Management Enhancements
+
 - 11 new PM capabilities
 - WSJF prioritization algorithms
 - Value stream mapping
 
 ### Security Hardening
+
 - AuthMiddleware enabled by default
 - CSP headers tightened
 - Secret scrubbing in logs and API responses
 - Rate limiting per user
 
 ### Testing & Quality
+
 - Endurance test suite
 - Chaos engineering tests
 - E2E Playwright tests for all pages
 - Debian 13 fresh install validation
 
 ### DevOps & Monitoring
+
 - GitHub webhooks integration
 - Helm chart for Kubernetes
 - Prometheus metrics endpoint
@@ -482,6 +487,7 @@ ENABLE_AUTH=true
 - CD pipeline automation
 
 ### UI Improvements
+
 - Real-time notifications
 - Chart.js analytics visualizations
 - Mobile responsive design
@@ -503,6 +509,7 @@ This project uses automated quality gates on every push/PR:
 [![Code Quality](https://github.com/macaron-software/software-factory/actions/workflows/quality.yml/badge.svg)](https://github.com/macaron-software/software-factory/actions/workflows/quality.yml)
 
 **Local development setup:**
+
 ```bash
 # Install all quality tools and git hooks
 make install-hooks

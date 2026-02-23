@@ -20,6 +20,7 @@ make install-hooks
 ```
 
 This will:
+
 - Install Python linters (ruff, bandit, safety, pytest)
 - Install JavaScript linters (eslint, prettier, jest) if `package.json` exists
 - Setup Git hooks: `pre-commit`, `commit-msg`, `pre-push`
