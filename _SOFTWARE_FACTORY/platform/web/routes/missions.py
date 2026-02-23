@@ -808,7 +808,7 @@ async def portfolio_kanban(request: Request):
     db = get_db()
     try:
         rows = db.execute(
-            "SELECT id, name, project_id, wsjf_score, kanban_status, status FROM missions ORDER BY wsjf_score DESC"
+            "SELECT id, name, project_id, wsjf_score, kanban_status, status, jira_key FROM missions ORDER BY wsjf_score DESC"
         ).fetchall()
     finally:
         db.close()
@@ -820,7 +820,13 @@ async def portfolio_kanban(request: Request):
     # WIP limit: max 3 in implementing
     wip_limit = 3
     wip_over = len(columns["implementing"]) > wip_limit
-    html = '<div style="display:flex;gap:12px;overflow-x:auto;padding:16px;">'
+    # Jira sync button
+    html = '<div style="display:flex;justify-content:flex-end;padding:0 16px 8px">'
+    html += '<button class="btn btn-sm btn-secondary" hx-post="/api/jira/kanban-sync" hx-target="#jira-sync-result" hx-swap="innerHTML">'
+    html += '<svg class="icon icon-xs"><use href="#icon-refresh-cw"/></svg> Sync Jira</button>'
+    html += ' <span id="jira-sync-result" style="font-size:0.75rem;color:var(--text-secondary);margin-left:8px;align-self:center"></span>'
+    html += "</div>"
+    html += '<div style="display:flex;gap:12px;overflow-x:auto;padding:0 16px 16px;">'
     for col_name, label in [
         ("funnel", "Funnel"),
         ("analyzing", "Analyzing"),
@@ -841,7 +847,13 @@ async def portfolio_kanban(request: Request):
             wsjf = item.get("wsjf_score", 0) or 0
             html += '<div style="background:var(--bg-tertiary);border-radius:6px;padding:8px;margin-bottom:6px;font-size:0.8rem;">'
             html += f'<a href="/missions/{item["id"]}" style="color:var(--purple-light);text-decoration:none">{item["name"][:40]}</a>'
-            html += f'<div style="color:var(--text-muted);font-size:0.7rem;">WSJF: {wsjf:.0f} | {item.get("project_id", "")}</div>'
+            jira_key = item.get("jira_key", "")
+            jira_badge = (
+                f' <span style="font-size:0.6rem;background:var(--bg-primary);color:var(--purple-light);padding:1px 4px;border-radius:3px">{jira_key}</span>'
+                if jira_key
+                else ""
+            )
+            html += f'<div style="color:var(--text-muted);font-size:0.7rem;">WSJF: {wsjf:.0f} | {item.get("project_id", "")}{jira_badge}</div>'
             html += "</div>"
         html += "</div>"
     html += "</div>"

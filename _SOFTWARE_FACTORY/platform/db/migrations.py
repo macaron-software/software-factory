@@ -164,6 +164,8 @@ def _migrate(conn):
         m_cols2 = {r[1] for r in conn.execute("PRAGMA table_info(missions)").fetchall()}
         if m_cols2 and "kanban_status" not in m_cols2:
             conn.execute("ALTER TABLE missions ADD COLUMN kanban_status TEXT DEFAULT 'funnel'")
+        if m_cols2 and "jira_key" not in m_cols2:
+            conn.execute("ALTER TABLE missions ADD COLUMN jira_key TEXT")
     except Exception:
         pass
 
