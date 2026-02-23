@@ -151,6 +151,57 @@ Then restart: `make run`
 The platform auto-falls back to other configured providers if the primary fails.
 You can also configure providers from the **Settings** page in the dashboard (`/settings`).
 
+## Getting Started — Your First Project
+
+After installation, here's how to go from idea to working project:
+
+### Path A: Start from an Idea (Ideation Workshop)
+
+1. **Open the Ideation page** — go to `/ideation` (or click "Ideation" in the sidebar)
+2. **Describe your idea** — e.g. *"Enterprise carpooling app with real-time matching"*
+3. **Watch agents discuss** — 5 specialized agents (Product Manager, Business Analyst, Architect, UX Designer, Security) analyze your idea in real-time via SSE streaming
+4. **Create a project from the result** — click **"Create an Epic from this idea"**. The platform will:
+   - Create a new **project** with generated `VISION.md` and CI/CD scaffolding
+   - Create an **epic** with features and user stories broken down by the PO agent
+   - Auto-provision **TMA** (maintenance), **Security**, and **Tech Debt** missions
+
+You now have a full SAFe backlog ready to execute.
+
+### Path B: Create a Project Manually
+
+1. Go to `/projects` and click **"New Project"**
+2. Fill in: name, description, tech stack, repository path
+3. The platform auto-creates:
+   - A **Product Manager agent** assigned to the project
+   - A **TMA mission** (continuous maintenance — monitors health, creates incidents)
+   - A **Security mission** (weekly security audits — SAST, dependency checks)
+   - A **Tech Debt mission** (monthly debt reduction — planned)
+
+### Then: Create Epics & Features
+
+- From the **Portfolio** page (`/portfolio`), create epics with WSJF prioritization
+- From an epic, add **features** and break them into **user stories**
+- Use the **PI Board** (`/pi-board`) to plan program increments and assign features to sprints
+
+### Running Missions
+
+- Click **"Start"** on any mission to launch agent execution
+- Choose an **orchestration pattern** (hierarchical, network, parallel...)
+- Watch agents work in real-time from **Mission Control**
+- Agents use their tools (code_read, git, build, test, security scan) autonomously
+
+### TMA & Security — Always On
+
+These are **automatically enabled** for every project — no configuration needed:
+
+| Mission | Type | Schedule | What it does |
+|---------|------|----------|-------------|
+| **TMA** | Program | Continuous | Health monitoring, incident detection, auto-repair, ticket creation |
+| **Security** | Review | Weekly | SAST scans (bandit/semgrep), dependency audit, secret detection |
+| **Tech Debt** | Reduction | Monthly | Code quality analysis, refactoring recommendations |
+
+All three are created with the project. TMA and Security start as **active**, Tech Debt starts as **planning** (activate when ready).
+
 ## Features
 
 ### 158 Specialized AI Agents
