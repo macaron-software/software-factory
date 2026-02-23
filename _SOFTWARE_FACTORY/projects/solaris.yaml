@@ -8,6 +8,18 @@ project:
   root_path: /Users/sylvain/_LAPOSTE/_SD3
   vision_doc: CLAUDE.md
 
+# Specialized Solaris agents (auto-activated for this project)
+agents:
+  design_team:
+    - solaris_ux_designer      # UX with Figma MCP
+    - solaris_ui_developer     # Angular + Solaris implementation
+    - solaris_design_qa        # Design system validation
+  required:
+    - solaris_ux_designer      # Mandatory for design system work
+  optional:
+    - architecte               # For system architecture
+    - lead_frontend            # For code review
+
 # Project CLI commands
 # Uses `solaris` CLI for all operations
 cli:
