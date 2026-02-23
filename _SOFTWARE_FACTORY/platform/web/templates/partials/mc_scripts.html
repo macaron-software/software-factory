@@ -113,20 +113,20 @@ document.querySelectorAll('.mc-exec-btn').forEach(btn => {
                 const output = (data.stdout || '') + (data.stderr ? '\n' + data.stderr : '');
                 termOut.textContent = output || '(no output)';
                 if (data.returncode === 0) {
-                    termStatus.textContent = '✅ Success (exit 0)';
+                    termStatus.textContent = 'Success (exit 0)';
                     termStatus.style.color = 'var(--green)';
                 } else {
-                    termStatus.textContent = `❌ Failed (exit ${data.returncode})`;
+                    termStatus.textContent = `Failed (exit ${data.returncode})`;
                     termStatus.style.color = '#f85149';
                 }
             } else {
                 termOut.textContent = data.error || 'Error';
-                termStatus.textContent = '❌ Error';
+                termStatus.textContent = 'Error';
                 termStatus.style.color = '#f85149';
             }
         } catch (e) {
             termOut.textContent = e.message;
-            termStatus.textContent = '❌ Network error';
+            termStatus.textContent = 'Network error';
             termStatus.style.color = '#f85149';
         }
         document.querySelectorAll('.mc-exec-btn').forEach(b => b.style.opacity = '1');

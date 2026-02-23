@@ -5,7 +5,7 @@
     <span class="badge badge-purple" id="world-agent-count">{{ agents|length }} agents</span>
     <span class="badge badge-green" id="world-active-count">0 actifs</span>
     <span class="badge badge-blue" id="world-mission-count">0 missions</span>
-    <button class="btn btn-sm" onclick="worldToggleDayNight()" title="{{ _("tt_day_night") }}" id="btn-daynight">🌙</button>
+    <button class="btn btn-sm" onclick="worldToggleDayNight()" title="{{ _("tt_day_night") }}" id="btn-daynight"><svg class="icon icon-sm"><use href="#icon-moon"/></svg></button>
     <button class="btn btn-sm" onclick="worldResetCamera()" title="Reset camera">
         <svg class="icon icon-sm"><use href="#icon-maximize"/></svg>
     </button>
@@ -280,7 +280,7 @@ function init() {
     connectSSE();
     seedLiveData();
     if (isDayMode) applyDayNight(true, false);
-    document.getElementById('btn-daynight').textContent = isDayMode ? '☀️' : '🌙';
+    document.getElementById('btn-daynight').innerHTML = isDayMode ? '<svg class="icon icon-sm"><use href="#icon-sun"/></svg>' : '<svg class="icon icon-sm"><use href="#icon-moon"/></svg>';
 
     // Listen for site theme changes (topbar toggle)
     new MutationObserver(() => {
@@ -288,7 +288,7 @@ function init() {
         const shouldBeDay = siteTheme === 'light';
         if (shouldBeDay !== isDayMode) {
             isDayMode = shouldBeDay;
-            document.getElementById('btn-daynight').textContent = isDayMode ? '☀️' : '🌙';
+            document.getElementById('btn-daynight').innerHTML = isDayMode ? '<svg class="icon icon-sm"><use href="#icon-sun"/></svg>' : '<svg class="icon icon-sm"><use href="#icon-moon"/></svg>';
             applyDayNight(isDayMode, true);
         }
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
@@ -1268,7 +1268,7 @@ function buildZoneLabelsUI() {
         el.className = 'wz-label';
         el.style.borderLeftColor = '#' + z.color.toString(16).padStart(6, '0');
         const m = z.mission;
-        el.textContent = `🏭 ${(z.name || '').slice(0, 20)} (${m.phases_done}/${m.phases_total})`;
+        el.textContent = `${(z.name || '').slice(0, 20)} (${m.phases_done}/${m.phases_total})`;
         el.onclick = () => flyToZone(z);
         container.appendChild(el);
     }
@@ -1277,7 +1277,7 @@ function buildZoneLabelsUI() {
         const el = document.createElement('div');
         el.className = 'wz-label';
         el.style.borderLeftColor = '#' + z.color.toString(16).padStart(6, '0');
-        el.textContent = z.id === 'board' ? '🏛️ Board Room' : '☕ Chill Zone';
+        el.textContent = z.id === 'board' ? 'Board Room' : 'Chill Zone';
         el.onclick = () => flyToZone(z);
         container.appendChild(el);
     }
@@ -1339,7 +1339,7 @@ function selectAgent(agentId) {
     statusEl.querySelector('span:last-child').textContent = statusLabel(ag.status);
 
     const taskEl = document.getElementById('wi-task');
-    const missionText = ag.missionName ? `🚀 ${ag.missionName}` : (ag.data.tagline || '');
+    const missionText = ag.missionName ? `${ag.missionName}` : (ag.data.tagline || '');
     taskEl.style.display = missionText ? 'block' : 'none';
     taskEl.textContent = missionText;
 
@@ -1529,7 +1529,7 @@ function toggleDayNight() {
     const theme = isDayMode ? 'light' : 'dark';
     localStorage.setItem('macaron_theme', theme);
     document.documentElement.setAttribute('data-theme', theme);
-    document.getElementById('btn-daynight').textContent = isDayMode ? '☀️' : '🌙';
+    document.getElementById('btn-daynight').innerHTML = isDayMode ? '<svg class="icon icon-sm"><use href="#icon-sun"/></svg>' : '<svg class="icon icon-sm"><use href="#icon-moon"/></svg>';
     applyDayNight(isDayMode, true);
 }
 

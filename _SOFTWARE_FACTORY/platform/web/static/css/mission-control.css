@@ -908,7 +908,7 @@
 }
 .mc-cdp-banner {
   height: 56px;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.3), rgba(59, 130, 246, 0.18));
+  background: rgba(124, 58, 237, 0.15);
   position: relative;
 }
 .mc-cdp-avatar-wrap {

@@ -157,7 +157,7 @@
 }
 .progress__fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--purple), var(--purple-light));
+  background: var(--purple);
   border-radius: var(--radius-xs);
   transition: width 0.3s;
 }

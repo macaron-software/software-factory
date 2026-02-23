@@ -290,7 +290,7 @@ body {
   width: 32px;
   height: 32px;
   border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--purple), var(--blue));
+  background: var(--purple);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1080,7 +1080,7 @@ body {
   position: absolute;
   inset: 0;
   border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, rgba(167, 139, 250, 0.04), transparent);
+  background: rgba(167, 139, 250, 0.04);
   opacity: 0;
   transition: opacity 0.25s;
   pointer-events: none;
