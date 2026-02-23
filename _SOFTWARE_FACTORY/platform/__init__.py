@@ -1,8 +1,8 @@
 # Workaround: this package shadows stdlib 'platform'. Re-export critical attrs
 # so that libraries like httpx/zstandard that call platform.python_implementation() work.
 import importlib.util as _ilu
-import sys as _sys
 import os as _os
+import sys as _sys
 import sysconfig as _sc
 
 # Find the stdlib platform.py directly
@@ -17,5 +17,6 @@ machine = _stdlib_platform.machine
 python_version = _stdlib_platform.python_version
 release = _stdlib_platform.release
 version = _stdlib_platform.version
+uname = _stdlib_platform.uname  # Needed by watchfiles
 
 del _ilu, _os, _sc, _spec, _stdlib_path, _stdlib_platform
