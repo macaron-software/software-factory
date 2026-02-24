@@ -217,6 +217,24 @@
         </div>
     </div>
 
+        <!-- Session Metrics Panel -->
+        {% if session %}
+        <div class="wf-panel" style="margin-top:1.2rem">
+            <div class="wf-panel-header">
+                <div class="wf-panel-title"><svg><use href="#icon-activity"/></svg> Metrics</div>
+            </div>
+            <div class="wf-panel-body" id="phaseMetrics"
+                 hx-get="/api/dashboard/phase-metrics?session_id={{ session.id }}"
+                 hx-trigger="load, every 30s"
+                 hx-swap="innerHTML">
+                <div style="text-align:center;color:var(--text-muted);padding:0.8rem;font-size:0.72rem">
+                    <svg class="icon icon-sm" style="animation:spin 1s linear infinite;color:var(--purple)"><use href="#icon-loader"/></svg>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
     <!-- Right: Messages Feed -->
     <div class="wf-panel">
         <div class="wf-panel-header">

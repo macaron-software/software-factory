@@ -221,6 +221,20 @@
     </div>
 </div>
 
+<!-- Quality Heatmap -->
+<div class="dsi-panel" style="margin-bottom:1.2rem">
+    <div class="dsi-panel-header">
+        <div class="dsi-panel-title"><svg><use href="#icon-shield"/></svg> Quality Scorecard</div>
+        <a href="/quality" style="font-size:0.65rem;color:var(--purple);text-decoration:none">Détails →</a>
+    </div>
+    <div class="dsi-panel-body" id="dsiQualityHeatmap"
+         hx-get="/api/dashboard/overview-quality"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        <p class="text-muted" style="font-size:0.75rem">Loading quality data...</p>
+    </div>
+</div>
+
 <script>
 // Render incidents stats from JSON into the panel
 document.addEventListener('htmx:afterRequest', function(evt) {

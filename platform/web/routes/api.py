@@ -3211,6 +3211,14 @@ async def dashboard_quality(request: Request):
     return HTMLResponse(html)
 
 
+@router.get("/api/quality")
+async def api_quality_all(request: Request):
+    """Get quality scores for all projects."""
+    from ...metrics.quality import QualityScanner
+
+    return {"projects": QualityScanner.get_all_projects_scores()}
+
+
 @router.get("/api/quality/{project_id}")
 async def api_quality_project(request: Request, project_id: str):
     """Get quality scorecard for a project."""
@@ -3219,14 +3227,6 @@ async def api_quality_project(request: Request, project_id: str):
     snapshot = QualityScanner.get_latest_snapshot(project_id)
     trend = QualityScanner.get_trend(project_id, limit=20)
     return {"snapshot": snapshot, "trend": trend}
-
-
-@router.get("/api/quality")
-async def api_quality_all(request: Request):
-    """Get quality scores for all projects."""
-    from ...metrics.quality import QualityScanner
-
-    return {"projects": QualityScanner.get_all_projects_scores()}
 
 
 @router.get("/api/dashboard/quality-mission")
@@ -3470,4 +3470,199 @@ async def dashboard_activity(request: Request):
             <span class="dash-activity-time">{ts}</span>
             <span class="dash-activity-text">{name}</span>
         </div>"""
+    return HTMLResponse(html)
+
+
+@router.get("/api/dashboard/phase-metrics")
+async def dashboard_phase_metrics(request: Request):
+    """Per-phase metrics: duration, tokens, cost, tool calls — HTMX fragment."""
+    from ...db.migrations import get_db as _get_db
+
+    session_id = request.query_params.get("session_id", "")
+    if not session_id:
+        return HTMLResponse("")
+
+    db = _get_db()
+    try:
+        # Get mission run phases for this session
+        run = db.execute(
+            "SELECT phases_json FROM mission_runs WHERE session_id = ? ORDER BY updated_at DESC LIMIT 1",
+            (session_id,),
+        ).fetchone()
+
+        # Get LLM usage per phase
+        usage = db.execute(
+            "SELECT phase, SUM(tokens_in) as tin, SUM(tokens_out) as tout, "
+            "SUM(cost_estimate) as cost, COUNT(*) as calls "
+            "FROM llm_usage WHERE mission_id = ? OR mission_id IN "
+            "(SELECT id FROM missions WHERE id IN "
+            "(SELECT json_extract(config_json, '$.mission_id') FROM sessions WHERE id = ?)) "
+            "GROUP BY phase",
+            (session_id, session_id),
+        ).fetchall()
+
+        # Get tool calls count
+        tool_count = db.execute(
+            "SELECT COUNT(*) FROM tool_calls WHERE session_id = ?", (session_id,)
+        ).fetchone()[0]
+
+        # Get total messages
+        msg_stats = db.execute(
+            "SELECT COUNT(*), MIN(timestamp), MAX(timestamp) FROM messages WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()
+    except Exception:
+        return HTMLResponse("")
+    finally:
+        db.close()
+
+    msg_count = msg_stats[0] if msg_stats else 0
+    first_ts = msg_stats[1] if msg_stats else None
+    last_ts = msg_stats[2] if msg_stats else None
+
+    # Compute duration
+    duration_str = "—"
+    if first_ts and last_ts:
+        from datetime import datetime as _dt
+        try:
+            t1 = _dt.fromisoformat(first_ts.replace("Z", "+00:00").split("+")[0])
+            t2 = _dt.fromisoformat(last_ts.replace("Z", "+00:00").split("+")[0])
+            dur = (t2 - t1).total_seconds()
+            if dur > 3600:
+                duration_str = f"{dur/3600:.1f}h"
+            elif dur > 60:
+                duration_str = f"{dur/60:.0f}min"
+            else:
+                duration_str = f"{dur:.0f}s"
+        except Exception:
+            pass
+
+    # Total tokens
+    total_in = sum(u[1] or 0 for u in usage)
+    total_out = sum(u[2] or 0 for u in usage)
+    total_cost = sum(u[3] or 0 for u in usage)
+    llm_calls = sum(u[4] or 0 for u in usage)
+
+    def _fmt_tokens(n: int) -> str:
+        if n > 1_000_000:
+            return f"{n/1_000_000:.1f}M"
+        if n > 1_000:
+            return f"{n/1_000:.1f}K"
+        return str(n)
+
+    # Build phase metrics from mission_runs if available
+    phase_html = ""
+    if run and run[0]:
+        import json as _json
+        phases = _json.loads(run[0])
+        for ph in phases:
+            ph_name = ph.get("phase_name", ph.get("phase_id", "?"))
+            ph_status = ph.get("status", "pending")
+            started = ph.get("started_at", "")
+            completed = ph.get("completed_at", "")
+            ph_dur = "—"
+            if started and completed:
+                try:
+                    t1 = _dt.fromisoformat(started)
+                    t2 = _dt.fromisoformat(completed)
+                    d = (t2 - t1).total_seconds()
+                    ph_dur = f"{d/60:.0f}min" if d > 60 else f"{d:.0f}s"
+                except Exception:
+                    pass
+            icon = "✓" if ph_status == "done" else ("⏳" if ph_status in ("running", "active") else "○")
+            color = "var(--green)" if ph_status == "done" else ("var(--yellow)" if ph_status in ("running", "active") else "var(--text-muted)")
+            phase_html += (
+                f'<div style="display:flex;justify-content:space-between;align-items:center;'
+                f'padding:0.25rem 0;border-bottom:1px solid var(--border);font-size:0.75rem">'
+                f'<span style="color:{color}">{icon} {ph_name}</span>'
+                f'<span style="color:var(--text-secondary)">{ph_dur}</span></div>'
+            )
+
+    html = f"""<div style="padding:0.75rem">
+<div style="font-size:0.75rem;font-weight:600;margin-bottom:0.5rem;color:var(--text-secondary)">
+    ⚡ Session Metrics
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.75rem">
+    <div style="background:var(--bg-secondary);border-radius:8px;padding:0.5rem;text-align:center">
+        <div style="font-size:1.1rem;font-weight:700;color:var(--purple)">{duration_str}</div>
+        <div style="font-size:0.65rem;color:var(--text-muted)">Duration</div>
+    </div>
+    <div style="background:var(--bg-secondary);border-radius:8px;padding:0.5rem;text-align:center">
+        <div style="font-size:1.1rem;font-weight:700;color:var(--blue)">{msg_count}</div>
+        <div style="font-size:0.65rem;color:var(--text-muted)">Messages</div>
+    </div>
+    <div style="background:var(--bg-secondary);border-radius:8px;padding:0.5rem;text-align:center">
+        <div style="font-size:1.1rem;font-weight:700;color:var(--green)">{_fmt_tokens(total_in + total_out)}</div>
+        <div style="font-size:0.65rem;color:var(--text-muted)">Tokens</div>
+    </div>
+    <div style="background:var(--bg-secondary);border-radius:8px;padding:0.5rem;text-align:center">
+        <div style="font-size:1.1rem;font-weight:700;color:var(--yellow)">{tool_count}</div>
+        <div style="font-size:0.65rem;color:var(--text-muted)">Tool Calls</div>
+    </div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.75rem">
+    <div style="background:var(--bg-secondary);border-radius:8px;padding:0.5rem;text-align:center">
+        <div style="font-size:1.1rem;font-weight:700;color:var(--text-primary)">{llm_calls}</div>
+        <div style="font-size:0.65rem;color:var(--text-muted)">LLM Calls</div>
+    </div>
+    <div style="background:var(--bg-secondary);border-radius:8px;padding:0.5rem;text-align:center">
+        <div style="font-size:1.1rem;font-weight:700;color:var(--orange)">${total_cost:.3f}</div>
+        <div style="font-size:0.65rem;color:var(--text-muted)">Cost</div>
+    </div>
+</div>
+{('<div style="font-size:0.7rem;font-weight:600;margin-bottom:0.4rem;color:var(--text-secondary)">Phase Durations</div>' + phase_html) if phase_html else ''}
+</div>"""
+    return HTMLResponse(html)
+
+
+@router.get("/api/dashboard/overview-quality")
+async def dashboard_overview_quality(request: Request):
+    """Quality heatmap for the Overview tab — shows all projects with color-coded scores."""
+    from ...db.migrations import get_db as _get_db
+
+    db = _get_db()
+    try:
+        rows = db.execute("""
+            SELECT qs.project_id, qs.global_score, p.name
+            FROM quality_snapshots qs
+            INNER JOIN (
+                SELECT project_id, MAX(created_at) as max_ts
+                FROM quality_snapshots GROUP BY project_id
+            ) latest ON qs.project_id = latest.project_id AND qs.created_at = latest.max_ts
+            LEFT JOIN projects p ON p.id = qs.project_id
+            ORDER BY qs.global_score DESC
+        """).fetchall()
+    except Exception:
+        rows = []
+    finally:
+        db.close()
+
+    if not rows:
+        return HTMLResponse('<div style="font-size:0.8rem;color:var(--text-muted);padding:1rem">No quality scans yet</div>')
+
+    # Build heatmap grid
+    cells = ""
+    for pid, score, pname in rows:
+        color = "#16a34a" if score >= 80 else "#3b82f6" if score >= 60 else "#ea580c" if score >= 40 else "#dc2626"
+        bg = f"rgba({int(color[1:3],16)},{int(color[3:5],16)},{int(color[5:7],16)},0.12)"
+        name = (pname or pid)[:20]
+        cells += (
+            f'<a href="/quality?project={pid}" style="text-decoration:none">'
+            f'<div style="background:{bg};color:{color};padding:0.5rem;border-radius:8px;'
+            f'text-align:center;font-size:0.75rem;font-weight:600;min-width:80px">'
+            f'{name}<br><span style="font-size:1.1rem">{score:.0f}</span></div></a>'
+        )
+
+    avg = sum(r[1] for r in rows) / len(rows) if rows else 0
+    avg_color = "#16a34a" if avg >= 80 else "#3b82f6" if avg >= 60 else "#ea580c" if avg >= 40 else "#dc2626"
+
+    html = f"""<div style="padding:0.75rem">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+    <span style="font-size:0.8rem;font-weight:600;color:var(--text-secondary)">Quality Overview</span>
+    <span style="font-size:1.2rem;font-weight:700;color:{avg_color}">{avg:.0f}/100</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:0.4rem">
+    {cells}
+</div>
+</div>"""
     return HTMLResponse(html)
