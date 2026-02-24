@@ -252,7 +252,7 @@
 <!-- Agent Popover -->
 <div class="mc-popover-overlay" id="mcPopoverOverlay" onclick="closeMcPopover()"></div>
 <div class="mc-popover" id="mcPopover">
-    <button class="mc-popover-close" onclick="closeMcPopover()">✕</button>
+    <button class="mc-popover-close" onclick="closeMcPopover()"><svg class="icon icon-sm"><use href="#icon-x"/></svg></button>
     <div class="mc-popover-header" id="mcPopHeader"></div>
     <div class="mc-popover-body" id="mcPopBody"></div>
 </div>
@@ -267,7 +267,7 @@
                 <h3 id="mcChatName">{{ cdp['name'] if cdp else 'Orchestrateur' }}</h3>
                 <small id="mcChatRole">{{ cdp['role'] if cdp else 'Orchestrateur' }} &mdash; {{ mission.brief[:60] }}{% if mission.brief|length > 60 %}...{% endif %}</small>
             </div>
-            <button class="mc-chat-close" onclick="closeCdpChat()">✕</button>
+            <button class="mc-chat-close" onclick="closeCdpChat()"><svg class="icon icon-sm"><use href="#icon-x"/></svg></button>
         </div>
         <div class="mc-chat-msgs" id="mcChatMsgs">
             <div class="mc-chat-msg system">

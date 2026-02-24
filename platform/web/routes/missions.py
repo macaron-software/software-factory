@@ -1631,7 +1631,7 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
                         "platform_sessions": "Cérémonies",
                         "platform_workflows": "Templates workflow",
                     }
-                    label = tool_labels.get(data_s, f"🔧 {data_s}")
+                    label = tool_labels.get(data_s, f'<svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-wrench"/></svg> {data_s}')
                     yield sse("tool", {"name": data_s, "label": label})
                 elif evt == "result":
                     if hasattr(data_s, "error") and data_s.error:
@@ -3099,7 +3099,7 @@ asyncio.run(main())
             )
             screenshots = await _auto_qa_screenshots(ws, platform_type)
             if screenshots:
-                shot_content = f"📸 QA Screenshots ({platform_type}) — {len(screenshots)} captures :\n"
+                shot_content = f"QA Screenshots ({platform_type}) — {len(screenshots)} captures :\n"
                 shot_content += "\n".join(f"[SCREENSHOT:{s}]" for s in screenshots)
                 await push_sse(
                     session_id,
@@ -3606,7 +3606,7 @@ async def _qa_screenshots_macos(ws: Path, shots_dir: Path) -> list[str]:
     if build_result.returncode != 0:
         _write_status_png(
             shots_dir / "01_build_failed.png",
-            "BUILD FAILED ❌",
+            "BUILD FAILED [X]",
             build_log[-1200:],
             bg_color=(40, 10, 10),
         )
@@ -3615,7 +3615,7 @@ async def _qa_screenshots_macos(ws: Path, shots_dir: Path) -> list[str]:
 
     _write_status_png(
         shots_dir / "01_build_success.png",
-        "BUILD SUCCESS ✅",
+        "BUILD SUCCESS [OK]",
         build_log[-400:],
         bg_color=(10, 40, 10),
     )
@@ -3879,7 +3879,7 @@ async def _qa_screenshots_ios(ws: Path, shots_dir: Path) -> list[str]:
     if build_result.returncode != 0:
         _write_status_png(
             shots_dir / "01_ios_build_failed.png",
-            "iOS BUILD FAILED ❌",
+            "iOS BUILD FAILED [X]",
             build_log[-1000:],
             bg_color=(40, 10, 10),
         )
@@ -3888,7 +3888,7 @@ async def _qa_screenshots_ios(ws: Path, shots_dir: Path) -> list[str]:
 
     _write_status_png(
         shots_dir / "01_ios_build_success.png",
-        "iOS BUILD ✅",
+        "iOS BUILD [OK]",
         build_log[-400:],
         bg_color=(10, 40, 10),
     )
@@ -3961,7 +3961,7 @@ async def _qa_screenshots_web(
                 build_log = (r.stdout + "\n" + r.stderr)[-1200:]
                 _write_status_png(
                     shots_dir / "01_docker_build_failed.png",
-                    "DOCKER BUILD FAILED ❌",
+                    "DOCKER BUILD FAILED [X]",
                     build_log,
                     bg_color=(40, 10, 10),
                 )
@@ -4462,7 +4462,7 @@ def _write_status_png(
                 color = (255, 100, 100)
             elif "warning" in line.lower():
                 color = (255, 200, 80)
-            elif "success" in line.lower() or "✅" in line:
+            elif "success" in line.lower() or "[OK]" in line:
                 color = (100, 255, 100)
             draw.text((pad, y), line, fill=color, font=font)
             y += line_h
@@ -4982,7 +4982,7 @@ def _build_phase_prompt(
             f"Sprint de développement TDD pour «{brief}».\n"
             + (f"PLATEFORME: {platform_label}\n" if platform_label else "")
             + (
-                f"⚠️ STACK OBLIGATOIRE: {platform_label}. NE PAS utiliser une autre technologie.\n"
+                f"/!\\ STACK OBLIGATOIRE: {platform_label}. NE PAS utiliser une autre technologie.\n"
                 f"{'Utilisez HTML/CSS/JS ou TypeScript/Node.js. NE PAS écrire de Swift.' if platform in ('web-node', 'web-docker', 'web-static') else ''}\n"
                 f"{'Utilisez Swift/SwiftUI. NE PAS écrire de TypeScript.' if platform in ('ios-native', 'macos-native') else ''}\n"
                 f"{'Utilisez Kotlin/Java. NE PAS écrire de Swift.' if platform == 'android-native' else ''}\n"

@@ -166,7 +166,7 @@ async function generateRetro() {
         for (const f of data.failures || []) html += `<div class="retro-item failure"><span class="retro-icon">−</span> ${f}</div>`;
         for (const l of data.lessons || []) html += `<div class="retro-item lesson"><span class="retro-icon">·</span> ${l}</div>`;
         for (const i of data.improvements || []) html += `<div class="retro-item improvement"><span class="retro-icon">·</span> ${i}</div>`;
-        html += `<div style="margin-top:0.5rem;font-size:0.6rem;color:var(--text-muted);text-align:right">Leçons → mémoire globale ✓</div>`;
+        html += `<div style="margin-top:0.5rem;font-size:0.6rem;color:var(--text-muted);text-align:right">Leçons → mémoire globale <svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-check-circle"/></svg></div>`;
         panel.innerHTML = html;
     } catch(e) {
         panel.innerHTML = `<div class="retro-item failure"><span class="retro-icon">−</span> ${_("error")}: ${e.message}</div>`;

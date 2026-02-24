@@ -596,7 +596,7 @@ function handleSSE(d) {
     }
     else if (d.type === 'phase_completed') {
         updatePhaseStatus(d.phase_id, d.success ? 'done' : 'failed');
-        addActivity(`${d.success ? '✓' : '✗'} Phase terminée`, 'tool');
+        addActivity(`${d.success ? '<svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-check"/></svg>' : '<svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-x"/></svg>'} Phase terminée`, 'tool');
         updateStats();
         generatePhaseSummary(d.phase_id);
     }
@@ -770,7 +770,7 @@ function handleSSE(d) {
         }
     }
     else if (d.type === 'adversarial') {
-        const icon = d.passed ? '✓' : '✗';
+        const icon = d.passed ? '<svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-check"/></svg>' : '<svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-x"/></svg>';
         const cls = d.passed ? 'pass' : 'fail';
         const label = d.passed ? 'APPROVED' : `REJECTED (${d.score}/10)`;
         const name = d.agent_name || d.agent_id;
@@ -851,7 +851,7 @@ function handleSSE(d) {
         addActivity(`Pattern «${d.pattern_name}» lancé`, 'tool');
     }
     else if (d.type === 'pattern_end') {
-        addActivity(`${d.success ? '✓' : '✗'} Pattern terminé${d.error ? ': '+d.error : ''}`, d.success ? 'tool' : 'system');
+        addActivity(`${d.success ? '<svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-check"/></svg>' : '<svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-x"/></svg>'} Pattern terminé${d.error ? ': '+d.error : ''}`, d.success ? 'tool' : 'system');
     }
     if (d.type === 'commit') addCommit(d);
     if (d.type === 'memory_stored') addMemory(d);

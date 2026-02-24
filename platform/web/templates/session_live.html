@@ -961,7 +961,7 @@ function renderLiveEdges(W, H){
     badge.setAttribute('x', mx);
     badge.setAttribute('y', my);
     badge.style.fill = edgeColor;
-    const typeIcons = (e.types||[]).map(t=> t==='veto'?'✗':t==='approve'?'✓':'').filter(Boolean).join('');
+    const typeIcons = (e.types||[]).map(t=> t==='veto'?'[X]':t==='approve'?'[OK]':'').filter(Boolean).join('');
     const label = e.label || '';
     badge.textContent = e.count > 0
       ? `${label?label+' ':''}×${e.count}${typeIcons?' '+typeIcons:''}`

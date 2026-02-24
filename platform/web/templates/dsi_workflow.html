@@ -73,7 +73,7 @@
 .wf-deliverable{display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0;font-size:0.76rem}
 .wf-deliverable-check{width:16px;height:16px;border-radius:4px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .wf-deliverable-check.done{background:var(--green);border-color:var(--green);color:#fff}
-.wf-deliverable-check.done::after{content:'✓';font-size:0.65rem}
+.wf-deliverable-check.done::after{content:'';width:8px;height:8px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E") center/contain no-repeat}
 
 /* ── Messages Feed — uses unified .mu--compact from components.css ── */
 
@@ -121,7 +121,7 @@
          onclick="selectPhase({{ loop.index0 }})" data-idx="{{ loop.index0 }}">
         <div class="wf-phase-bar">
             <div class="wf-phase-num">
-                {% if p.status == 'done' %}✓{% else %}{{ loop.index }}{% endif %}
+                {% if p.status == 'done' %}<svg class="icon icon-sm"><use href="#icon-check"/></svg>{% else %}{{ loop.index }}{% endif %}
             </div>
             <div class="wf-phase-info">
                 <div class="wf-phase-name">{{ p.name }}</div>
@@ -130,7 +130,7 @@
             {% if p.gate and p.gate != 'always' %}
             <span class="wf-gate-badge {{ 'pass' if p.status == 'done' else ('pending' if p.status == 'active' else 'skip') }}"
                   title="Gate: {{ p.gate }}">
-                {% if p.status == 'done' %}✓{% elif p.status == 'active' %}⏳{% else %}○{% endif %}
+                {% if p.status == 'done' %}<svg class="icon icon-sm"><use href="#icon-check"/></svg>{% elif p.status == 'active' %}<svg class="icon icon-sm"><use href="#icon-clock"/></svg>{% else %}○{% endif %}
                 {{ p.gate | replace('_', ' ') | truncate(12, True, '…') }}
             </span>
             {% endif %}

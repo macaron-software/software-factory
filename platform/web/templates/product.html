@@ -200,12 +200,12 @@
                         <span class="pm-feat-name">{{ f.name }}</span>
                         <span class="pm-feat-points editable-sp" data-type="feature" data-id="{{ f.id }}" title="Click to edit">{{ f.story_points }} pts</span>
                         {% if f.deps %}
-                        <span class="pm-dep-badge has-deps" onclick="event.stopPropagation();showDeps('{{ f.id }}')" title="Has {{ f.deps|length }} dependency(ies)">🔗{{ f.deps|length }}</span>
+                        <span class="pm-dep-badge has-deps" onclick="event.stopPropagation();showDeps('{{ f.id }}')" title="Has {{ f.deps|length }} dependency(ies)"><svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-git-merge"/></svg>{{ f.deps|length }}</span>
                         {% elif f.depended_by %}
-                        <span class="pm-dep-badge depended" title="Required by {{ f.depended_by|length }} feature(s)">⬆{{ f.depended_by|length }}</span>
+                        <span class="pm-dep-badge depended" title="Required by {{ f.depended_by|length }} feature(s)"><svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-arrow-right"/></svg>{{ f.depended_by|length }}</span>
                         {% endif %}
                         <span class="pm-feat-status {{ f.status }}">{{ f.status }}</span>
-                        <span style="font-size:0.65rem;color:var(--text-secondary);cursor:pointer" onclick="event.stopPropagation();openDepModal('{{ f.id }}','{{ f.name }}')" title="Manage dependencies">🔗</span>
+                        <span style="font-size:0.65rem;color:var(--text-secondary);cursor:pointer" onclick="event.stopPropagation();openDepModal('{{ f.id }}','{{ f.name }}')" title="Manage dependencies"><svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-git-merge"/></svg></span>
                     </div>
                     {% if f.stories %}
                     <div class="pm-stories" data-feature-id="{{ f.id }}">
@@ -456,7 +456,7 @@ async function loadDeps(featureId) {
             `<div class="pm-dep-item">
                 <span class="pm-feat-status ${d.status}">${d.status}</span>
                 <span style="flex:1">${d.name}</span>
-                <span class="pm-dep-rm" onclick="removeDep('${featureId}','${d.depends_on}')">✕</span>
+                <span class="pm-dep-rm" onclick="removeDep('${featureId}','${d.depends_on}')"><svg class="icon icon-sm"><use href="#icon-x"/></svg></span>
             </div>`
         ).join('');
     } catch(e) { list.innerHTML = '<div style="color:var(--red)">Error loading</div>'; }

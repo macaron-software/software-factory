@@ -33,7 +33,7 @@
 <body>
     <div class="setup-box">
         <div class="setup-logo">
-            <h1>🏭 Software Factory</h1>
+            <h1><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12" y2="18"/><line x1="9" y1="10" x2="9" y2="14"/><line x1="15" y1="8" x2="15" y2="14"/><line x1="12" y1="6" x2="12" y2="14"/></svg>Software Factory</h1>
             <p>Welcome! Create your administrator account to get started.</p>
         </div>
         <div class="step-indicator">Step 1 of 1 — Admin Account</div>
@@ -59,7 +59,7 @@
             <div class="error-msg" id="errorMsg"></div>
         </form>
         <div class="separator"><span>or</span></div>
-        <button class="btn-demo" id="demoBtn" onclick="handleDemo()">⚡ Skip — Enter Demo Mode</button>
+        <button class="btn-demo" id="demoBtn" onclick="handleDemo()"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Skip — Enter Demo Mode</button>
     </div>
     <script>
     async function handleSetup(e) {
@@ -129,7 +129,7 @@
             err.classList.add('show');
         }
         btn.disabled = false;
-        btn.textContent = '⚡ Skip — Enter Demo Mode';
+        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Skip — Enter Demo Mode';
     }
     </script>
 </body>

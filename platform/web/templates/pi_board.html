@@ -699,10 +699,10 @@ async function openTMAModal(ticketId) {
         </form>
         
         <div style="padding:1rem 1.5rem;border-top:1px solid var(--border);background:var(--bg-secondary);display:flex;gap:0.5rem;justify-content:space-between">
-            <button onclick="deleteTicket('${ticketId}')" style="background:#ef4444;color:white;border:none;padding:0.6rem 1.2rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600;transition:all 0.2s" onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">🗑️ Supprimer</button>
+            <button onclick="deleteTicket('${ticketId}')" style="background:#ef4444;color:white;border:none;padding:0.6rem 1.2rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600;transition:all 0.2s" onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'"><svg class="icon icon-sm" style="vertical-align:middle;margin-right:4px"><use href="#icon-trash"/></svg>Supprimer</button>
             <div style="display:flex;gap:0.5rem">
                 <button onclick="closeTMAModal()" style="background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);padding:0.6rem 1.2rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600">Annuler</button>
-                <button onclick="saveTicket()" style="background:var(--purple);color:white;border:none;padding:0.6rem 1.5rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600;transition:all 0.2s" onmouseover="this.style.background='#7c3aed'" onmouseout="this.style.background='var(--purple)'">💾 Enregistrer</button>
+                <button onclick="saveTicket()" style="background:var(--purple);color:white;border:none;padding:0.6rem 1.5rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600;transition:all 0.2s" onmouseover="this.style.background='#7c3aed'" onmouseout="this.style.background='var(--purple)'"><svg class="icon icon-sm" style="vertical-align:middle;margin-right:4px"><use href="#icon-save"/></svg>Enregistrer</button>
             </div>
         </div>
     </div>`;

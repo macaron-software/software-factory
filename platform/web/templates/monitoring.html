@@ -606,7 +606,7 @@ async function refresh() {
                 `<span class="mon-badge ${sevColors[r.severity]||'purple'}">${r.severity} ${r.status}: ${r.cnt}</span>`
             ).join('');
         } else {
-            incEl.innerHTML = '<span class="mon-empty">No incidents ✓</span>';
+            incEl.innerHTML = '<span class="mon-empty">No incidents <svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-check-circle"/></svg></span>';
         }
 
         // Azure Infrastructure
