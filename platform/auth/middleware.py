@@ -52,11 +52,16 @@ def _check_api_key(request: Request) -> bool:
     if not _API_KEY:
         return False
     auth = request.headers.get("authorization", "")
-    token = auth[7:] if auth.startswith("Bearer ") else request.query_params.get("token", "")
+    token = (
+        auth[7:]
+        if auth.startswith("Bearer ")
+        else request.query_params.get("token", "")
+    )
     if not token:
         return False
     return (
-        hashlib.sha256(token.encode()).hexdigest() == hashlib.sha256(_API_KEY.encode()).hexdigest()
+        hashlib.sha256(token.encode()).hexdigest()
+        == hashlib.sha256(_API_KEY.encode()).hexdigest()
     )
 
 
@@ -96,7 +101,9 @@ def require_auth(min_role: str = "viewer"):
 
                 raise HTTPException(status_code=401, detail="Authentication required")
             # Redirect to login page for HTML requests
-            return RedirectResponse(url=f"/login?next={request.url.path}", status_code=302)
+            return RedirectResponse(
+                url=f"/login?next={request.url.path}", status_code=302
+            )
 
         min_level = ROLE_HIERARCHY.get(min_role, 0)
         user_level = ROLE_HIERARCHY.get(user.role, 0)
@@ -133,7 +140,9 @@ def require_project_role(project_id_param: str, min_role: str = "viewer"):
                 from starlette.exceptions import HTTPException
 
                 raise HTTPException(status_code=401, detail="Authentication required")
-            return RedirectResponse(url=f"/login?next={request.url.path}", status_code=302)
+            return RedirectResponse(
+                url=f"/login?next={request.url.path}", status_code=302
+            )
 
         # Admin bypasses project-level checks
         if user.role == "admin":
@@ -197,6 +206,7 @@ PUBLIC_PATHS = {
     "/docs",
     "/openapi.json",
     "/js-error",
+    "/api/analytics",
 }
 
 
