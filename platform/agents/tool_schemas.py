@@ -1903,6 +1903,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
     ],
     "architecture": [
         "code_read",
+        "code_write",
+        "code_edit",
         "code_search",
         "list_files",
         "deep_search",
@@ -1911,6 +1913,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "get_project_context",
         "git_log",
         "git_diff",
+        "git_status",
+        "git_commit",
         "lrm_conventions",
         "lrm_context",
         "lrm_summarize",
@@ -1980,6 +1984,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
     "qa": [
         "code_read",
         "code_write",
+        "code_edit",
         "code_search",
         "list_files",
         "deep_search",
@@ -1998,6 +2003,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "get_project_context",
         "git_diff",
         "git_log",
+        "git_status",
+        "git_commit",
         "github_issues",
         "github_prs",
         "jira_search",
@@ -2141,7 +2148,7 @@ def _classify_agent_role(agent: AgentDef) -> str:
         return "ux"
     if any(
         k in combined
-        for k in ("qa", "test", "qualit", "fixture", "perf", "tma", "maintenance")
+        for k in ("qa", "test", "qualit", "fixture", "perf")
     ):
         return "qa"
     if any(

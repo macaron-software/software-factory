@@ -1508,7 +1508,7 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
     tools_for_agent = has_project and bool(project_path)
 
     # Role-based tool filtering — each agent only sees tools relevant to their role
-    from ..agents.executor import _get_tools_for_agent
+    from ..agents.tool_schemas import _get_tools_for_agent
 
     allowed_tools = _get_tools_for_agent(agent) if tools_for_agent else None
 
