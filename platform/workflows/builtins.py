@@ -87,7 +87,9 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Debate",
                     description="Agents argue for/against different approaches",
                     gate="always",
-                    config={"agents": ["architecte", "lead_dev", "dev_backend", "securite"]},
+                    config={
+                        "agents": ["architecte", "lead_dev", "dev_backend", "securite"]
+                    },
                 ),
                 WorkflowPhase(
                     id="p2",
@@ -113,7 +115,9 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="PI Planning",
                     description="CP présente vision migration. Lead+QA+Sécu définissent scope, risques, acceptance criteria.",
                     gate="always",
-                    config={"agents": ["chef_projet", "lead_dev", "qa_lead", "securite"]},
+                    config={
+                        "agents": ["chef_projet", "lead_dev", "qa_lead", "securite"]
+                    },
                 ),
                 # ── Sprint Planning: Lead décompose en stories pour les devs ──
                 WorkflowPhase(
@@ -131,7 +135,14 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Dev Sprint",
                     description="Devs exécutent migration en //. Lead vérifie complétude. Inner loop jusqu'à COMPLETE.",
                     gate="always",
-                    config={"agents": ["lead_dev", "dev_frontend", "dev_fullstack", "qa_lead"]},
+                    config={
+                        "agents": [
+                            "lead_dev",
+                            "dev_frontend",
+                            "dev_fullstack",
+                            "qa_lead",
+                        ]
+                    },
                 ),
                 # ── Sprint Review: QA valide, Sécu audite, CP GO/NOGO ──
                 WorkflowPhase(
@@ -140,7 +151,9 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Sprint Review",
                     description="Lead présente travail. QA valide ISO 100% (golden files). Sécu audit CVE. CP décide GO/NOGO.",
                     gate="no_veto",
-                    config={"agents": ["lead_dev", "qa_lead", "securite", "chef_projet"]},
+                    config={
+                        "agents": ["lead_dev", "qa_lead", "securite", "chef_projet"]
+                    },
                 ),
                 # ── Retrospective: Tous débattent améliorations ──
                 WorkflowPhase(
@@ -215,7 +228,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 340,
                             "label": "Dev Fullstack",
                         },
-                        {"id": "n7", "agent_id": "devops", "x": 550, "y": 340, "label": "DevOps"},
+                        {
+                            "id": "n7",
+                            "agent_id": "devops",
+                            "x": 550,
+                            "y": 340,
+                            "label": "DevOps",
+                        },
                     ],
                     "edges": [
                         # PI Planning: CP briefs everyone
@@ -296,11 +315,19 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     ],
                 },
                 "project_ref": "sharelook",
-                "migration": {"framework": "angular", "from": "16.2.12", "to": "17.3.0"},
+                "migration": {
+                    "framework": "angular",
+                    "from": "16.2.12",
+                    "to": "17.3.0",
+                },
                 "agents_permissions": {
                     "qa_lead": {"can_veto": True, "veto_level": "ABSOLUTE"},
                     "securite": {"can_veto": True, "veto_level": "ABSOLUTE"},
-                    "lead_dev": {"can_veto": True, "veto_level": "STRONG", "can_delegate": True},
+                    "lead_dev": {
+                        "can_veto": True,
+                        "veto_level": "STRONG",
+                        "can_delegate": True,
+                    },
                     "chef_projet": {"can_delegate": True},
                 },
             },
@@ -320,7 +347,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     description="Le metier presente son besoin. Le comite strategique (DSI, CPO, CTO, Business Owner) debat de la valeur, la faisabilite, l'alignement strategique. Chaque membre donne son avis argumente. Le DSI rend la decision GO/NOGO.",
                     gate="all_approved",
                     config={
-                        "agents": ["metier", "business_owner", "strat-cpo", "strat-cto", "dsi"]
+                        "agents": [
+                            "metier",
+                            "business_owner",
+                            "strat-cpo",
+                            "strat-cto",
+                            "dsi",
+                        ]
                     },
                 ),
                 WorkflowPhase(
@@ -361,7 +394,14 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Product Design",
                     description="Le Product Manager pilote: decompose la vision en features avec criteres d'acceptation. L'UX Designer cree les maquettes et parcours utilisateur. Le metier valide la conformite au besoin initial. Le Lead Dev evalue la faisabilite technique de chaque feature.",
                     gate="always",
-                    config={"agents": ["product_manager", "ux_designer", "metier", "lead_dev"]},
+                    config={
+                        "agents": [
+                            "product_manager",
+                            "ux_designer",
+                            "metier",
+                            "lead_dev",
+                        ]
+                    },
                 ),
                 WorkflowPhase(
                     id="dev-sprint",
@@ -369,7 +409,9 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Sprint de Developpement",
                     description="Le Lead Dev distribue les stories aux devs. Les devs codent en TDD. Le QA valide en continu. Le Lead fait la code review. Adversarial review avant chaque merge.",
                     gate="always",
-                    config={"agents": ["lead_dev", "dev_frontend", "dev_backend", "qa_lead"]},
+                    config={
+                        "agents": ["lead_dev", "dev_frontend", "dev_backend", "qa_lead"]
+                    },
                 ),
                 WorkflowPhase(
                     id="qa-validation",
@@ -378,7 +420,12 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     description="Le Test Manager definit la campagne. Le QA Lead execute les tests fonctionnels et E2E avec Playwright (navigation, screenshots, assertions). L'API Tester valide les endpoints. Si KO, retour au dev. Max 3 iterations.",
                     gate="qa_approved",
                     config={
-                        "agents": ["test_manager", "qa_lead", "test_auto", "api_tester"],
+                        "agents": [
+                            "test_manager",
+                            "qa_lead",
+                            "test_auto",
+                            "api_tester",
+                        ],
                         "max_iterations": 3,
                     },
                 ),
@@ -405,7 +452,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                 "graph": {
                     "pattern": "hierarchical",
                     "nodes": [
-                        {"id": "n1", "agent_id": "dsi", "x": 400, "y": 10, "label": "DSI"},
+                        {
+                            "id": "n1",
+                            "agent_id": "dsi",
+                            "x": 400,
+                            "y": 10,
+                            "label": "DSI",
+                        },
                         {
                             "id": "n2",
                             "agent_id": "strat-cpo",
@@ -532,8 +585,20 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 480,
                             "label": "QA Lead",
                         },
-                        {"id": "n20", "agent_id": "devops", "x": 300, "y": 580, "label": "DevOps"},
-                        {"id": "n21", "agent_id": "sre", "x": 500, "y": 580, "label": "SRE"},
+                        {
+                            "id": "n20",
+                            "agent_id": "devops",
+                            "x": 300,
+                            "y": 580,
+                            "label": "DevOps",
+                        },
+                        {
+                            "id": "n21",
+                            "agent_id": "sre",
+                            "x": 500,
+                            "y": 580,
+                            "label": "SRE",
+                        },
                         {
                             "id": "n22",
                             "agent_id": "performance_engineer",
@@ -551,47 +616,210 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     ],
                     "edges": [
                         # Intake: metier → comite strategique (debate)
-                        {"from": "n4", "to": "n2", "label": "besoin", "color": "#3b82f6"},
-                        {"from": "n4", "to": "n3", "label": "besoin", "color": "#3b82f6"},
-                        {"from": "n4", "to": "n1", "label": "besoin", "color": "#3b82f6"},
-                        {"from": "n2", "to": "n1", "label": "avis CPO", "color": "#d946ef"},
-                        {"from": "n3", "to": "n1", "label": "avis CTO", "color": "#d946ef"},
-                        {"from": "n5", "to": "n1", "label": "avis BO", "color": "#d946ef"},
+                        {
+                            "from": "n4",
+                            "to": "n2",
+                            "label": "besoin",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n3",
+                            "label": "besoin",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n1",
+                            "label": "besoin",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n1",
+                            "label": "avis CPO",
+                            "color": "#d946ef",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n1",
+                            "label": "avis CTO",
+                            "color": "#d946ef",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n1",
+                            "label": "avis BO",
+                            "color": "#d946ef",
+                        },
                         # Impact: DSI commande l'analyse
-                        {"from": "n1", "to": "n6", "label": "analyser", "color": "#f59e0b"},
-                        {"from": "n1", "to": "n7", "label": "analyser", "color": "#f59e0b"},
-                        {"from": "n1", "to": "n8", "label": "analyser", "color": "#f59e0b"},
-                        {"from": "n1", "to": "n9", "label": "analyser", "color": "#f59e0b"},
-                        {"from": "n1", "to": "n23", "label": "analyser", "color": "#f59e0b"},
-                        {"from": "n6", "to": "n2", "label": "impact SI", "color": "#10b981"},
-                        {"from": "n7", "to": "n2", "label": "impact secu", "color": "#10b981"},
-                        {"from": "n8", "to": "n2", "label": "impact regl.", "color": "#10b981"},
-                        {"from": "n9", "to": "n2", "label": "impact cloud", "color": "#10b981"},
-                        {"from": "n23", "to": "n2", "label": "impact integ.", "color": "#10b981"},
-                        {"from": "n10", "to": "n2", "label": "capacite", "color": "#10b981"},
+                        {
+                            "from": "n1",
+                            "to": "n6",
+                            "label": "analyser",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n7",
+                            "label": "analyser",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n8",
+                            "label": "analyser",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n9",
+                            "label": "analyser",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n23",
+                            "label": "analyser",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n6",
+                            "to": "n2",
+                            "label": "impact SI",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n7",
+                            "to": "n2",
+                            "label": "impact secu",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n8",
+                            "to": "n2",
+                            "label": "impact regl.",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n9",
+                            "to": "n2",
+                            "label": "impact cloud",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n23",
+                            "to": "n2",
+                            "label": "impact integ.",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n10",
+                            "to": "n2",
+                            "label": "capacite",
+                            "color": "#10b981",
+                        },
                         # Constitution: DirProg → PM → CP → SM
-                        {"from": "n11", "to": "n12", "label": "staffing", "color": "#8b5cf6"},
-                        {"from": "n12", "to": "n13", "label": "backlog", "color": "#8b5cf6"},
-                        {"from": "n13", "to": "n14", "label": "planning", "color": "#8b5cf6"},
+                        {
+                            "from": "n11",
+                            "to": "n12",
+                            "label": "staffing",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n12",
+                            "to": "n13",
+                            "label": "backlog",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n13",
+                            "to": "n14",
+                            "label": "planning",
+                            "color": "#8b5cf6",
+                        },
                         # Product Design: PM → UX + Lead
-                        {"from": "n12", "to": "n15", "label": "maquettes", "color": "#d946ef"},
-                        {"from": "n12", "to": "n16", "label": "features", "color": "#d946ef"},
-                        {"from": "n15", "to": "n4", "label": "valider UX", "color": "#06b6d4"},
+                        {
+                            "from": "n12",
+                            "to": "n15",
+                            "label": "maquettes",
+                            "color": "#d946ef",
+                        },
+                        {
+                            "from": "n12",
+                            "to": "n16",
+                            "label": "features",
+                            "color": "#d946ef",
+                        },
+                        {
+                            "from": "n15",
+                            "to": "n4",
+                            "label": "valider UX",
+                            "color": "#06b6d4",
+                        },
                         # Sprint: Lead → Devs → QA
-                        {"from": "n16", "to": "n17", "label": "stories", "color": "#f59e0b"},
-                        {"from": "n16", "to": "n18", "label": "stories", "color": "#f59e0b"},
-                        {"from": "n17", "to": "n19", "label": "review", "color": "#10b981"},
-                        {"from": "n18", "to": "n19", "label": "review", "color": "#10b981"},
+                        {
+                            "from": "n16",
+                            "to": "n17",
+                            "label": "stories",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n16",
+                            "to": "n18",
+                            "label": "stories",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n17",
+                            "to": "n19",
+                            "label": "review",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n18",
+                            "to": "n19",
+                            "label": "review",
+                            "color": "#10b981",
+                        },
                         # Release: QA + Secu → CP → DevOps → SRE
-                        {"from": "n19", "to": "n13", "label": "GO/NOGO", "color": "#ef4444"},
-                        {"from": "n13", "to": "n20", "label": "deploy", "color": "#8b5cf6"},
-                        {"from": "n20", "to": "n21", "label": "monitoring", "color": "#8b5cf6"},
-                        {"from": "n22", "to": "n13", "label": "perf OK", "color": "#10b981"},
+                        {
+                            "from": "n19",
+                            "to": "n13",
+                            "label": "GO/NOGO",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n13",
+                            "to": "n20",
+                            "label": "deploy",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n20",
+                            "to": "n21",
+                            "label": "monitoring",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n22",
+                            "to": "n13",
+                            "label": "perf OK",
+                            "color": "#10b981",
+                        },
                     ],
                 },
                 "agents_permissions": {
-                    "dsi": {"can_veto": True, "veto_level": "ABSOLUTE", "can_delegate": True},
-                    "strat-cpo": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                    "dsi": {
+                        "can_veto": True,
+                        "veto_level": "ABSOLUTE",
+                        "can_delegate": True,
+                    },
+                    "strat-cpo": {
+                        "can_veto": True,
+                        "veto_level": "STRONG",
+                        "can_approve": True,
+                    },
                     "strat-cto": {"can_veto": True, "veto_level": "STRONG"},
                     "qa_lead": {"can_veto": True, "veto_level": "ABSOLUTE"},
                     "securite": {"can_veto": True, "veto_level": "ABSOLUTE"},
@@ -659,7 +887,9 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Sprint de Correction",
                     description="Le Lead Dev distribue les refactors. Les devs corrigent en TDD. Le QA Lead valide la non-regression (coverage ne doit pas baisser, pas de breaking change). Adversarial review renforcee: VETO si regression perf, VETO si API breaking sans deprecation.",
                     gate="all_approved",
-                    config={"agents": ["lead_dev", "dev_frontend", "dev_backend", "qa_lead"]},
+                    config={
+                        "agents": ["lead_dev", "dev_frontend", "dev_backend", "qa_lead"]
+                    },
                 ),
                 WorkflowPhase(
                     id="validation",
@@ -667,7 +897,14 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Validation (Proof of Reduction)",
                     description="QA presente le rapport de non-regression. Perf Engineer compare les benchmarks avant/apres. Lead Dev montre la reduction de complexite. Le CTO valide que la dette a reellement diminue. Metriques: complexity delta, coverage delta, build time delta, incident rate delta.",
                     gate="all_approved",
-                    config={"agents": ["qa_lead", "performance_engineer", "lead_dev", "strat-cto"]},
+                    config={
+                        "agents": [
+                            "qa_lead",
+                            "performance_engineer",
+                            "lead_dev",
+                            "strat-cto",
+                        ]
+                    },
                 ),
             ],
             config={
@@ -716,7 +953,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 140,
                             "label": "Securite",
                         },
-                        {"id": "n7", "agent_id": "sre", "x": 650, "y": 140, "label": "SRE"},
+                        {
+                            "id": "n7",
+                            "agent_id": "sre",
+                            "x": 650,
+                            "y": 140,
+                            "label": "SRE",
+                        },
                         {
                             "id": "n8",
                             "agent_id": "performance_engineer",
@@ -776,37 +1019,146 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     ],
                     "edges": [
                         # Scan: CTO commande l'audit en parallele
-                        {"from": "n1", "to": "n4", "label": "audit archi", "color": "#f59e0b"},
-                        {"from": "n1", "to": "n5", "label": "audit code", "color": "#f59e0b"},
-                        {"from": "n1", "to": "n6", "label": "audit secu", "color": "#f59e0b"},
-                        {"from": "n1", "to": "n7", "label": "audit ops", "color": "#f59e0b"},
-                        {"from": "n1", "to": "n8", "label": "audit perf", "color": "#f59e0b"},
+                        {
+                            "from": "n1",
+                            "to": "n4",
+                            "label": "audit archi",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n5",
+                            "label": "audit code",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n6",
+                            "label": "audit secu",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n7",
+                            "label": "audit ops",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n8",
+                            "label": "audit perf",
+                            "color": "#f59e0b",
+                        },
                         # Reports remontent au CTO
-                        {"from": "n4", "to": "n1", "label": "rapport", "color": "#10b981"},
-                        {"from": "n5", "to": "n1", "label": "rapport", "color": "#10b981"},
-                        {"from": "n6", "to": "n1", "label": "rapport", "color": "#10b981"},
-                        {"from": "n7", "to": "n1", "label": "rapport", "color": "#10b981"},
-                        {"from": "n8", "to": "n1", "label": "rapport", "color": "#10b981"},
+                        {
+                            "from": "n4",
+                            "to": "n1",
+                            "label": "rapport",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n1",
+                            "label": "rapport",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n6",
+                            "to": "n1",
+                            "label": "rapport",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n7",
+                            "to": "n1",
+                            "label": "rapport",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n8",
+                            "to": "n1",
+                            "label": "rapport",
+                            "color": "#10b981",
+                        },
                         # Priorisation: debat entre strategiques
-                        {"from": "n1", "to": "n2", "label": "dette vs feature", "color": "#d946ef"},
-                        {"from": "n2", "to": "n10", "label": "arbitrage", "color": "#d946ef"},
-                        {"from": "n3", "to": "n9", "label": "capacite", "color": "#d946ef"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "dette vs feature",
+                            "color": "#d946ef",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n10",
+                            "label": "arbitrage",
+                            "color": "#d946ef",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n9",
+                            "label": "capacite",
+                            "color": "#d946ef",
+                        },
                         {"from": "n9", "to": "n1", "label": "WSJF", "color": "#d946ef"},
                         # Planning: SM → Lead → CP
-                        {"from": "n11", "to": "n5", "label": "sprint scope", "color": "#8b5cf6"},
-                        {"from": "n5", "to": "n12", "label": "tasks", "color": "#8b5cf6"},
+                        {
+                            "from": "n11",
+                            "to": "n5",
+                            "label": "sprint scope",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n12",
+                            "label": "tasks",
+                            "color": "#8b5cf6",
+                        },
                         # Sprint: Lead → Devs → QA
-                        {"from": "n5", "to": "n13", "label": "refactors", "color": "#f59e0b"},
-                        {"from": "n5", "to": "n14", "label": "refactors", "color": "#f59e0b"},
-                        {"from": "n13", "to": "n15", "label": "review", "color": "#10b981"},
-                        {"from": "n14", "to": "n15", "label": "review", "color": "#10b981"},
+                        {
+                            "from": "n5",
+                            "to": "n13",
+                            "label": "refactors",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n14",
+                            "label": "refactors",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n13",
+                            "to": "n15",
+                            "label": "review",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n14",
+                            "to": "n15",
+                            "label": "review",
+                            "color": "#10b981",
+                        },
                         # Validation: QA + Perf → CTO
-                        {"from": "n15", "to": "n1", "label": "non-regression", "color": "#ef4444"},
-                        {"from": "n8", "to": "n1", "label": "benchmark", "color": "#ef4444"},
+                        {
+                            "from": "n15",
+                            "to": "n1",
+                            "label": "non-regression",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n8",
+                            "to": "n1",
+                            "label": "benchmark",
+                            "color": "#ef4444",
+                        },
                     ],
                 },
                 "agents_permissions": {
-                    "strat-cto": {"can_veto": True, "veto_level": "ABSOLUTE", "can_delegate": True},
+                    "strat-cto": {
+                        "can_veto": True,
+                        "veto_level": "ABSOLUTE",
+                        "can_delegate": True,
+                    },
                     "strat-cpo": {"can_veto": True, "veto_level": "STRONG"},
                     "qa_lead": {"can_veto": True, "veto_level": "ABSOLUTE"},
                     "securite": {"can_veto": True, "veto_level": "STRONG"},
@@ -866,7 +1218,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
             config={
                 "graph": {
                     "nodes": [
-                        {"id": "n1", "agent_id": "dsi", "x": 400, "y": 20, "label": "DSI"},
+                        {
+                            "id": "n1",
+                            "agent_id": "dsi",
+                            "x": 400,
+                            "y": 20,
+                            "label": "DSI",
+                        },
                         {
                             "id": "n2",
                             "agent_id": "strat-cpo",
@@ -905,28 +1263,108 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     ],
                     "edges": [
                         # DSI ↔ CPO/CTO: strategic arbitration
-                        {"from": "n1", "to": "n2", "label": "product vision", "color": "#a855f7"},
-                        {"from": "n1", "to": "n3", "label": "tech vision", "color": "#a855f7"},
-                        {"from": "n2", "to": "n1", "label": "proposal", "color": "#8b5cf6"},
-                        {"from": "n3", "to": "n1", "label": "feasibility", "color": "#8b5cf6"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "product vision",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n3",
+                            "label": "tech vision",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n1",
+                            "label": "proposal",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n1",
+                            "label": "feasibility",
+                            "color": "#8b5cf6",
+                        },
                         # CPO ↔ CTO: product vs tech
-                        {"from": "n2", "to": "n3", "label": "feature vs debt", "color": "#f59e0b"},
-                        {"from": "n3", "to": "n2", "label": "arch constraints", "color": "#f59e0b"},
+                        {
+                            "from": "n2",
+                            "to": "n3",
+                            "label": "feature vs debt",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n2",
+                            "label": "arch constraints",
+                            "color": "#f59e0b",
+                        },
                         # Portfolio ↔ CPO: WSJF prioritization
-                        {"from": "n4", "to": "n2", "label": "WSJF scoring", "color": "#10b981"},
-                        {"from": "n2", "to": "n4", "label": "business value", "color": "#10b981"},
+                        {
+                            "from": "n4",
+                            "to": "n2",
+                            "label": "WSJF scoring",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n4",
+                            "label": "business value",
+                            "color": "#10b981",
+                        },
                         # Portfolio ↔ Lean: budget & capacity
-                        {"from": "n4", "to": "n6", "label": "flow metrics", "color": "#06b6d4"},
-                        {"from": "n6", "to": "n4", "label": "lean budget", "color": "#06b6d4"},
+                        {
+                            "from": "n4",
+                            "to": "n6",
+                            "label": "flow metrics",
+                            "color": "#06b6d4",
+                        },
+                        {
+                            "from": "n6",
+                            "to": "n4",
+                            "label": "lean budget",
+                            "color": "#06b6d4",
+                        },
                         # CTO ↔ Dir Programme: charge & planning
-                        {"from": "n3", "to": "n5", "label": "complexity", "color": "#ef4444"},
-                        {"from": "n5", "to": "n3", "label": "team capacity", "color": "#ef4444"},
+                        {
+                            "from": "n3",
+                            "to": "n5",
+                            "label": "complexity",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n3",
+                            "label": "team capacity",
+                            "color": "#ef4444",
+                        },
                         # Dir Programme ↔ Lean: staffing
-                        {"from": "n5", "to": "n6", "label": "staffing plan", "color": "#d946ef"},
-                        {"from": "n6", "to": "n5", "label": "guardrails", "color": "#d946ef"},
+                        {
+                            "from": "n5",
+                            "to": "n6",
+                            "label": "staffing plan",
+                            "color": "#d946ef",
+                        },
+                        {
+                            "from": "n6",
+                            "to": "n5",
+                            "label": "guardrails",
+                            "color": "#d946ef",
+                        },
                         # DSI ↔ Lean: strategic alignment
-                        {"from": "n1", "to": "n6", "label": "strat themes", "color": "#64748b"},
-                        {"from": "n6", "to": "n1", "label": "portfolio health", "color": "#64748b"},
+                        {
+                            "from": "n1",
+                            "to": "n6",
+                            "label": "strat themes",
+                            "color": "#64748b",
+                        },
+                        {
+                            "from": "n6",
+                            "to": "n1",
+                            "label": "portfolio health",
+                            "color": "#64748b",
+                        },
                     ],
                 },
                 "agents_permissions": {
@@ -990,7 +1428,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Structuration PO",
                     description="Le Product Owner structure: projet, epic, features avec critères d'acceptation, user stories, estimation story points.",
                     gate="always",
-                    config={"agents": ["product_manager", "business_analyst", "scrum_master"]},
+                    config={
+                        "agents": [
+                            "product_manager",
+                            "business_analyst",
+                            "scrum_master",
+                        ]
+                    },
                 ),
                 WorkflowPhase(
                     id="comite-strat",
@@ -1014,7 +1458,14 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Constitution Projet",
                     description="Setup automatique: git repo, CI/CD pipeline, VISION.md, agents assignés. Auto-provision TMA + centre sécurité + suivi dette technique.",
                     gate="always",
-                    config={"agents": ["scrum_master", "devops", "lead_dev", "product_manager"]},
+                    config={
+                        "agents": [
+                            "scrum_master",
+                            "devops",
+                            "lead_dev",
+                            "product_manager",
+                        ]
+                    },
                 ),
                 WorkflowPhase(
                     id="architecture",
@@ -1038,7 +1489,9 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Sprint Dev",
                     description="Le Lead Dev distribue les tâches aux développeurs. Chaque dev implémente en TDD (Red→Green→Refactor). Adversarial review sur chaque commit.",
                     gate="always",
-                    config={"agents": ["lead_dev", "dev_backend", "dev_frontend", "testeur"]},
+                    config={
+                        "agents": ["lead_dev", "dev_backend", "dev_frontend", "testeur"]
+                    },
                 ),
                 WorkflowPhase(
                     id="cicd-pipeline",
@@ -1054,7 +1507,9 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Campagne QA",
                     description="Tests fonctionnels, tests de non-régression, tests de charge. Boucle jusqu'à zéro défaut bloquant.",
                     gate="no_veto",
-                    config={"agents": ["qa_lead", "test_automation", "performance_engineer"]},
+                    config={
+                        "agents": ["qa_lead", "test_automation", "performance_engineer"]
+                    },
                 ),
                 WorkflowPhase(
                     id="deploy-prod",
@@ -1063,7 +1518,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     description="Revue pré-production: QA sign-off, sécu sign-off, DevOps plan de déploiement. Décision GO/NOGO.",
                     gate="checkpoint",
                     config={
-                        "agents": ["devops", "qa_lead", "securite", "sre", "release_train_engineer"]
+                        "agents": [
+                            "devops",
+                            "qa_lead",
+                            "securite",
+                            "sre",
+                            "release_train_engineer",
+                        ]
                     },
                 ),
                 WorkflowPhase(
@@ -1072,7 +1533,9 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Handoff TMA",
                     description="Documentation opérationnelle, formation équipe TMA, activation monitoring, runbook incident. Le projet passe en maintenance.",
                     gate="always",
-                    config={"agents": ["responsable_tma", "dev_tma", "sre", "tech_writer"]},
+                    config={
+                        "agents": ["responsable_tma", "dev_tma", "sre", "tech_writer"]
+                    },
                 ),
             ],
             config={
@@ -1176,29 +1639,77 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n3", "label": "brief", "color": "#7c3aed"},
-                        {"from": "n2", "to": "n3", "label": "feasibility", "color": "#58a6ff"},
+                        {
+                            "from": "n1",
+                            "to": "n3",
+                            "label": "brief",
+                            "color": "#7c3aed",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n3",
+                            "label": "feasibility",
+                            "color": "#58a6ff",
+                        },
                         {"from": "n3", "to": "n4", "label": "epic", "color": "#d29922"},
-                        {"from": "n3", "to": "n5", "label": "tech spec", "color": "#d29922"},
+                        {
+                            "from": "n3",
+                            "to": "n5",
+                            "label": "tech spec",
+                            "color": "#d29922",
+                        },
                         {"from": "n4", "to": "n6", "label": "GO", "color": "#3fb950"},
                         {"from": "n5", "to": "n6", "label": "GO", "color": "#3fb950"},
-                        {"from": "n6", "to": "n7", "label": "project", "color": "#58a6ff"},
-                        {"from": "n7", "to": "n8", "label": "design", "color": "#7c3aed"},
+                        {
+                            "from": "n6",
+                            "to": "n7",
+                            "label": "project",
+                            "color": "#58a6ff",
+                        },
+                        {
+                            "from": "n7",
+                            "to": "n8",
+                            "label": "design",
+                            "color": "#7c3aed",
+                        },
                         {"from": "n8", "to": "n9", "label": "code", "color": "#3fb950"},
-                        {"from": "n9", "to": "n10", "label": "build ok", "color": "#3fb950"},
-                        {"from": "n10", "to": "n11", "label": "qa ok", "color": "#3fb950"},
-                        {"from": "n11", "to": "n12", "label": "deployed", "color": "#f97316"},
+                        {
+                            "from": "n9",
+                            "to": "n10",
+                            "label": "build ok",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n10",
+                            "to": "n11",
+                            "label": "qa ok",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n11",
+                            "to": "n12",
+                            "label": "deployed",
+                            "color": "#f97316",
+                        },
                     ],
                 },
                 "agents_permissions": {
                     "strat-cpo": {"can_veto": True, "veto_level": "ABSOLUTE"},
                     "strat-cto": {"can_veto": True, "veto_level": "STRONG"},
                     "enterprise_architect": {"can_veto": True, "veto_level": "STRONG"},
-                    "lead_dev": {"can_delegate": True, "can_veto": True, "veto_level": "STRONG"},
+                    "lead_dev": {
+                        "can_delegate": True,
+                        "can_veto": True,
+                        "veto_level": "STRONG",
+                    },
                     "qa_lead": {"can_veto": True, "veto_level": "ABSOLUTE"},
                     "securite": {"can_veto": True, "veto_level": "STRONG"},
                     "devops": {"can_approve": True},
-                    "sre": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                    "sre": {
+                        "can_veto": True,
+                        "veto_level": "STRONG",
+                        "can_approve": True,
+                    },
                 },
             },
         ),
@@ -1241,7 +1752,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     description="L'architecte, le lead dev, la sécu et le DevOps conçoivent la solution. Débat technique sur les choix.",
                     gate="no_veto",
                     config={
-                        "agents": ["architecte", "lead_dev", "securite", "devops", "strat-cto"],
+                        "agents": [
+                            "architecte",
+                            "lead_dev",
+                            "securite",
+                            "devops",
+                            "strat-cto",
+                        ],
                         "leader": "architecte",
                         "deliverables": [
                             "Architecture validée",
@@ -1420,41 +1937,186 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "vision produit", "color": "#a855f7"},
-                        {"from": "n1", "to": "n3", "label": "vision tech", "color": "#a855f7"},
-                        {"from": "n2", "to": "n1", "label": "proposition", "color": "#8b5cf6"},
-                        {"from": "n3", "to": "n1", "label": "faisabilité", "color": "#8b5cf6"},
-                        {"from": "n1", "to": "n4", "label": "analyse archi", "color": "#a855f7"},
-                        {"from": "n4", "to": "n1", "label": "recommandation", "color": "#8b5cf6"},
-                        {"from": "n5", "to": "n1", "label": "budget/portfolio", "color": "#f59e0b"},
-                        {"from": "n1", "to": "n6", "label": "GO projet", "color": "#34d399"},
-                        {"from": "n3", "to": "n4", "label": "contraintes tech", "color": "#f59e0b"},
-                        {"from": "n4", "to": "n6", "label": "design archi", "color": "#3b82f6"},
-                        {"from": "n4", "to": "n7", "label": "review sécu", "color": "#3b82f6"},
-                        {"from": "n4", "to": "n8", "label": "infra cible", "color": "#3b82f6"},
-                        {"from": "n6", "to": "n4", "label": "feedback dev", "color": "#8b5cf6"},
-                        {"from": "n7", "to": "n4", "label": "exigences sécu", "color": "#ef4444"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "vision produit",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n3",
+                            "label": "vision tech",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n1",
+                            "label": "proposition",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n1",
+                            "label": "faisabilité",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n4",
+                            "label": "analyse archi",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n1",
+                            "label": "recommandation",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n1",
+                            "label": "budget/portfolio",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n6",
+                            "label": "GO projet",
+                            "color": "#34d399",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n4",
+                            "label": "contraintes tech",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n6",
+                            "label": "design archi",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n7",
+                            "label": "review sécu",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n8",
+                            "label": "infra cible",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n6",
+                            "to": "n4",
+                            "label": "feedback dev",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n7",
+                            "to": "n4",
+                            "label": "exigences sécu",
+                            "color": "#ef4444",
+                        },
                         {
                             "from": "n8",
                             "to": "n4",
                             "label": "contraintes infra",
                             "color": "#f59e0b",
                         },
-                        {"from": "n6", "to": "n9", "label": "specs tech", "color": "#34d399"},
-                        {"from": "n4", "to": "n9", "label": "architecture doc", "color": "#34d399"},
-                        {"from": "n9", "to": "n10", "label": "backlog", "color": "#a855f7"},
-                        {"from": "n10", "to": "n6", "label": "sprint plan", "color": "#3b82f6"},
-                        {"from": "n9", "to": "n13", "label": "critères QA", "color": "#3b82f6"},
-                        {"from": "n10", "to": "n11", "label": "sprint tasks", "color": "#34d399"},
-                        {"from": "n10", "to": "n12", "label": "sprint tasks", "color": "#34d399"},
-                        {"from": "n6", "to": "n11", "label": "code review", "color": "#3b82f6"},
-                        {"from": "n6", "to": "n12", "label": "code review", "color": "#3b82f6"},
-                        {"from": "n11", "to": "n13", "label": "PR ready", "color": "#34d399"},
-                        {"from": "n12", "to": "n13", "label": "PR ready", "color": "#34d399"},
-                        {"from": "n13", "to": "n14", "label": "test plan", "color": "#3b82f6"},
-                        {"from": "n14", "to": "n13", "label": "test results", "color": "#34d399"},
-                        {"from": "n13", "to": "n8", "label": "deploy OK", "color": "#34d399"},
-                        {"from": "n8", "to": "n1", "label": "prod status", "color": "#34d399"},
+                        {
+                            "from": "n6",
+                            "to": "n9",
+                            "label": "specs tech",
+                            "color": "#34d399",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n9",
+                            "label": "architecture doc",
+                            "color": "#34d399",
+                        },
+                        {
+                            "from": "n9",
+                            "to": "n10",
+                            "label": "backlog",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n10",
+                            "to": "n6",
+                            "label": "sprint plan",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n9",
+                            "to": "n13",
+                            "label": "critères QA",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n10",
+                            "to": "n11",
+                            "label": "sprint tasks",
+                            "color": "#34d399",
+                        },
+                        {
+                            "from": "n10",
+                            "to": "n12",
+                            "label": "sprint tasks",
+                            "color": "#34d399",
+                        },
+                        {
+                            "from": "n6",
+                            "to": "n11",
+                            "label": "code review",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n6",
+                            "to": "n12",
+                            "label": "code review",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n11",
+                            "to": "n13",
+                            "label": "PR ready",
+                            "color": "#34d399",
+                        },
+                        {
+                            "from": "n12",
+                            "to": "n13",
+                            "label": "PR ready",
+                            "color": "#34d399",
+                        },
+                        {
+                            "from": "n13",
+                            "to": "n14",
+                            "label": "test plan",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n14",
+                            "to": "n13",
+                            "label": "test results",
+                            "color": "#34d399",
+                        },
+                        {
+                            "from": "n13",
+                            "to": "n8",
+                            "label": "deploy OK",
+                            "color": "#34d399",
+                        },
+                        {
+                            "from": "n8",
+                            "to": "n1",
+                            "label": "prod status",
+                            "color": "#34d399",
+                        },
                     ],
                 },
             },
@@ -1521,7 +2183,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 20,
                             "label": "Resp. TMA",
                         },
-                        {"id": "n2", "agent_id": "qa_lead", "x": 250, "y": 120, "label": "QA Lead"},
+                        {
+                            "id": "n2",
+                            "agent_id": "qa_lead",
+                            "x": 250,
+                            "y": 120,
+                            "label": "QA Lead",
+                        },
                         {
                             "id": "n3",
                             "agent_id": "chef_projet",
@@ -1529,7 +2197,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 120,
                             "label": "Chef de Projet",
                         },
-                        {"id": "n4", "agent_id": "dev_tma", "x": 200, "y": 240, "label": "Dev TMA"},
+                        {
+                            "id": "n4",
+                            "agent_id": "dev_tma",
+                            "x": 200,
+                            "y": 240,
+                            "label": "Dev TMA",
+                        },
                         {
                             "id": "n5",
                             "agent_id": "lead_dev",
@@ -1537,7 +2211,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 240,
                             "label": "Lead Dev",
                         },
-                        {"id": "n6", "agent_id": "dba", "x": 600, "y": 240, "label": "DBA"},
+                        {
+                            "id": "n6",
+                            "agent_id": "dba",
+                            "x": 600,
+                            "y": 240,
+                            "label": "DBA",
+                        },
                         {
                             "id": "n7",
                             "agent_id": "test_automation",
@@ -1559,20 +2239,76 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 360,
                             "label": "Pipeline Eng.",
                         },
-                        {"id": "n10", "agent_id": "devops", "x": 400, "y": 460, "label": "DevOps"},
+                        {
+                            "id": "n10",
+                            "agent_id": "devops",
+                            "x": 400,
+                            "y": 460,
+                            "label": "DevOps",
+                        },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "triage", "color": "#ef4444"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "triage",
+                            "color": "#ef4444",
+                        },
                         {"from": "n1", "to": "n3", "label": "SLA", "color": "#ef4444"},
-                        {"from": "n1", "to": "n4", "label": "assigner", "color": "#f59e0b"},
-                        {"from": "n4", "to": "n5", "label": "impact?", "color": "#3b82f6"},
-                        {"from": "n4", "to": "n6", "label": "query?", "color": "#3b82f6"},
-                        {"from": "n5", "to": "n4", "label": "review", "color": "#10b981"},
-                        {"from": "n4", "to": "n7", "label": "test E2E", "color": "#8b5cf6"},
-                        {"from": "n7", "to": "n8", "label": "résultats", "color": "#10b981"},
-                        {"from": "n8", "to": "n9", "label": "GO CI", "color": "#10b981"},
-                        {"from": "n9", "to": "n10", "label": "deploy", "color": "#8b5cf6"},
-                        {"from": "n10", "to": "n1", "label": "confirmé", "color": "#10b981"},
+                        {
+                            "from": "n1",
+                            "to": "n4",
+                            "label": "assigner",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n5",
+                            "label": "impact?",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n6",
+                            "label": "query?",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n4",
+                            "label": "review",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n7",
+                            "label": "test E2E",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n7",
+                            "to": "n8",
+                            "label": "résultats",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n8",
+                            "to": "n9",
+                            "label": "GO CI",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n9",
+                            "to": "n10",
+                            "label": "deploy",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n10",
+                            "to": "n1",
+                            "label": "confirmé",
+                            "color": "#10b981",
+                        },
                     ],
                 },
                 "agents_permissions": {
@@ -1582,7 +2318,11 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         "can_delegate": True,
                     },
                     "qa_lead": {"can_veto": True, "veto_level": "ABSOLUTE"},
-                    "test_manager": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                    "test_manager": {
+                        "can_veto": True,
+                        "veto_level": "STRONG",
+                        "can_approve": True,
+                    },
                     "lead_dev": {"can_veto": True, "veto_level": "STRONG"},
                 },
             },
@@ -1619,7 +2359,9 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Exécution",
                     description="Exécution en parallèle: tests E2E IHM (Playwright), tests API (fetch), tests smoke, tests de performance. Collecte des résultats.",
                     gate="always",
-                    config={"agents": ["test_automation", "testeur", "performance_engineer"]},
+                    config={
+                        "agents": ["test_automation", "testeur", "performance_engineer"]
+                    },
                 ),
                 WorkflowPhase(
                     id="report",
@@ -1641,8 +2383,20 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 20,
                             "label": "Test Manager",
                         },
-                        {"id": "n2", "agent_id": "qa_lead", "x": 250, "y": 130, "label": "QA Lead"},
-                        {"id": "n3", "agent_id": "metier", "x": 550, "y": 130, "label": "Métier"},
+                        {
+                            "id": "n2",
+                            "agent_id": "qa_lead",
+                            "x": 250,
+                            "y": 130,
+                            "label": "QA Lead",
+                        },
+                        {
+                            "id": "n3",
+                            "agent_id": "metier",
+                            "x": 550,
+                            "y": 130,
+                            "label": "Métier",
+                        },
                         {
                             "id": "n4",
                             "agent_id": "test_automation",
@@ -1650,7 +2404,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 260,
                             "label": "Test Automation",
                         },
-                        {"id": "n5", "agent_id": "testeur", "x": 400, "y": 260, "label": "Testeur"},
+                        {
+                            "id": "n5",
+                            "agent_id": "testeur",
+                            "x": 400,
+                            "y": 260,
+                            "label": "Testeur",
+                        },
                         {
                             "id": "n6",
                             "agent_id": "lead_dev",
@@ -1674,15 +2434,60 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "matrice", "color": "#a855f7"},
-                        {"from": "n1", "to": "n3", "label": "scénarios", "color": "#a855f7"},
-                        {"from": "n2", "to": "n4", "label": "E2E specs", "color": "#3b82f6"},
-                        {"from": "n2", "to": "n5", "label": "API specs", "color": "#3b82f6"},
-                        {"from": "n6", "to": "n4", "label": "fixtures", "color": "#f59e0b"},
-                        {"from": "n4", "to": "n1", "label": "résultats E2E", "color": "#10b981"},
-                        {"from": "n5", "to": "n1", "label": "résultats API", "color": "#10b981"},
-                        {"from": "n7", "to": "n1", "label": "résultats perf", "color": "#10b981"},
-                        {"from": "n1", "to": "n8", "label": "GO/NOGO", "color": "#ef4444"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "matrice",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n3",
+                            "label": "scénarios",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n4",
+                            "label": "E2E specs",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n5",
+                            "label": "API specs",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n6",
+                            "to": "n4",
+                            "label": "fixtures",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n1",
+                            "label": "résultats E2E",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n1",
+                            "label": "résultats API",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n7",
+                            "to": "n1",
+                            "label": "résultats perf",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n8",
+                            "label": "GO/NOGO",
+                            "color": "#ef4444",
+                        },
                     ],
                 },
                 "agents_permissions": {
@@ -1692,7 +2497,11 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         "can_delegate": True,
                         "can_approve": True,
                     },
-                    "qa_lead": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                    "qa_lead": {
+                        "can_veto": True,
+                        "veto_level": "STRONG",
+                        "can_approve": True,
+                    },
                     "chef_projet": {"can_approve": True},
                 },
             },
@@ -1721,7 +2530,9 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Build & Tests",
                     description="Le Pipeline Engineer configure les jobs: lint → build → unit tests → integration tests. Le Test Automation intègre les tests E2E. Le Lead Dev valide les configurations.",
                     gate="always",
-                    config={"agents": ["pipeline_engineer", "test_automation", "lead_dev"]},
+                    config={
+                        "agents": ["pipeline_engineer", "test_automation", "lead_dev"]
+                    },
                 ),
                 WorkflowPhase(
                     id="quality-gates",
@@ -1744,7 +2555,9 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Deploy Canary → Prod",
                     description="Le DevOps déploie en canary (1%→10%→50%→100%). Le SRE monitore les métriques. Rollback automatique si error_rate > baseline+5%. Le Chef de Projet valide le GO prod.",
                     gate="all_approved",
-                    config={"agents": ["devops", "sre", "pipeline_engineer", "chef_projet"]},
+                    config={
+                        "agents": ["devops", "sre", "pipeline_engineer", "chef_projet"]
+                    },
                 ),
             ],
             config={
@@ -1758,7 +2571,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 20,
                             "label": "Pipeline Engineer",
                         },
-                        {"id": "n2", "agent_id": "devops", "x": 250, "y": 130, "label": "DevOps"},
+                        {
+                            "id": "n2",
+                            "agent_id": "devops",
+                            "x": 250,
+                            "y": 130,
+                            "label": "DevOps",
+                        },
                         {
                             "id": "n3",
                             "agent_id": "devsecops",
@@ -1780,7 +2599,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 260,
                             "label": "Lead Dev",
                         },
-                        {"id": "n6", "agent_id": "qa_lead", "x": 150, "y": 370, "label": "QA Lead"},
+                        {
+                            "id": "n6",
+                            "agent_id": "qa_lead",
+                            "x": 150,
+                            "y": 370,
+                            "label": "QA Lead",
+                        },
                         {
                             "id": "n7",
                             "agent_id": "securite",
@@ -1795,7 +2620,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 370,
                             "label": "Perf Engineer",
                         },
-                        {"id": "n9", "agent_id": "sre", "x": 300, "y": 480, "label": "SRE"},
+                        {
+                            "id": "n9",
+                            "agent_id": "sre",
+                            "x": 300,
+                            "y": 480,
+                            "label": "SRE",
+                        },
                         {
                             "id": "n10",
                             "agent_id": "chef_projet",
@@ -1805,18 +2636,78 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "environments", "color": "#a855f7"},
-                        {"from": "n1", "to": "n3", "label": "scans sécu", "color": "#a855f7"},
-                        {"from": "n1", "to": "n4", "label": "tests E2E", "color": "#3b82f6"},
-                        {"from": "n1", "to": "n5", "label": "config", "color": "#3b82f6"},
-                        {"from": "n4", "to": "n6", "label": "couverture", "color": "#10b981"},
-                        {"from": "n3", "to": "n7", "label": "SAST/DAST", "color": "#ef4444"},
-                        {"from": "n5", "to": "n8", "label": "benchmarks", "color": "#f59e0b"},
-                        {"from": "n6", "to": "n1", "label": "GO QA", "color": "#10b981"},
-                        {"from": "n7", "to": "n1", "label": "GO sécu", "color": "#10b981"},
-                        {"from": "n8", "to": "n1", "label": "GO perf", "color": "#10b981"},
-                        {"from": "n2", "to": "n9", "label": "canary", "color": "#8b5cf6"},
-                        {"from": "n9", "to": "n10", "label": "GO prod", "color": "#ef4444"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "environments",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n3",
+                            "label": "scans sécu",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n4",
+                            "label": "tests E2E",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n5",
+                            "label": "config",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n6",
+                            "label": "couverture",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n7",
+                            "label": "SAST/DAST",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n8",
+                            "label": "benchmarks",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n6",
+                            "to": "n1",
+                            "label": "GO QA",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n7",
+                            "to": "n1",
+                            "label": "GO sécu",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n8",
+                            "to": "n1",
+                            "label": "GO perf",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n9",
+                            "label": "canary",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n9",
+                            "to": "n10",
+                            "label": "GO prod",
+                            "color": "#ef4444",
+                        },
                     ],
                 },
                 "agents_permissions": {
@@ -1825,10 +2716,18 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         "veto_level": "STRONG",
                         "can_delegate": True,
                     },
-                    "devops": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                    "devops": {
+                        "can_veto": True,
+                        "veto_level": "STRONG",
+                        "can_approve": True,
+                    },
                     "qa_lead": {"can_veto": True, "veto_level": "ABSOLUTE"},
                     "securite": {"can_veto": True, "veto_level": "ABSOLUTE"},
-                    "sre": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                    "sre": {
+                        "can_veto": True,
+                        "veto_level": "STRONG",
+                        "can_approve": True,
+                    },
                 },
             },
         ),
@@ -1850,7 +2749,12 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     description="Le Product Manager cadre le sujet et briefe l'équipe. Le métier exprime le besoin. L'UX Designer explore les parcours utilisateur. L'Architecte évalue la faisabilité technique. Débat structuré puis synthèse par le PO.",
                     gate="always",
                     config={
-                        "agents": ["metier", "ux_designer", "architecte", "product_manager"],
+                        "agents": [
+                            "metier",
+                            "ux_designer",
+                            "architecte",
+                            "product_manager",
+                        ],
                         "leader": "product_manager",
                     },
                 ),
@@ -1897,7 +2801,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     description="En parallèle: le Lead Dev analyse la faisabilité, l'UX crée les maquettes, la Sécurité définit les exigences, le DevOps planifie l'infra. L'Architecte agrège toutes les analyses en un document d'architecture consolidé.",
                     gate="no_veto",
                     config={
-                        "agents": ["lead_dev", "ux_designer", "securite", "devops", "architecte"],
+                        "agents": [
+                            "lead_dev",
+                            "ux_designer",
+                            "securite",
+                            "devops",
+                            "architecte",
+                        ],
                         "leader": "architecte",
                     },
                 ),
@@ -1921,7 +2831,12 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     description="Le Lead Dev distribue les stories. Les devs frontend et backend codent en TDD. Le Test Automation écrit les tests E2E en parallèle. Le Lead fait la code review. Boucle interne: si incomplet, le Lead re-distribue.",
                     gate="always",
                     config={
-                        "agents": ["lead_dev", "dev_frontend", "dev_backend", "test_automation"],
+                        "agents": [
+                            "lead_dev",
+                            "dev_frontend",
+                            "dev_backend",
+                            "test_automation",
+                        ],
                         "leader": "lead_dev",
                         "max_iterations": 3,
                     },
@@ -1986,7 +2901,12 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     description="Le QA Lead dispatche. En parallèle: le Test Automation lance Playwright, le Testeur fait les tests API, le Perf Engineer lance k6. Le QA Lead agrège les résultats.",
                     gate="all_approved",
                     config={
-                        "agents": ["qa_lead", "test_automation", "testeur", "performance_engineer"],
+                        "agents": [
+                            "qa_lead",
+                            "test_automation",
+                            "testeur",
+                            "performance_engineer",
+                        ],
                         "leader": "qa_lead",
                     },
                 ),
@@ -2010,7 +2930,12 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     description="Le Responsable TMA reçoit les incidents. Il analyse la nature (bug code, perf, infra, sécu) et route vers le spécialiste approprié: Dev TMA pour les bugs, SRE pour l'infra, Test Automation pour les régressions.",
                     gate="always",
                     config={
-                        "agents": ["responsable_tma", "dev_tma", "sre", "test_automation"],
+                        "agents": [
+                            "responsable_tma",
+                            "dev_tma",
+                            "sre",
+                            "test_automation",
+                        ],
                         "leader": "responsable_tma",
                     },
                 ),
@@ -2058,9 +2983,27 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "label": "Architecte",
                         },
                         # Row 2: Comité stratégique
-                        {"id": "n5", "agent_id": "dsi", "x": 370, "y": 120, "label": "DSI"},
-                        {"id": "n6", "agent_id": "strat-cpo", "x": 200, "y": 120, "label": "CPO"},
-                        {"id": "n7", "agent_id": "strat-cto", "x": 540, "y": 120, "label": "CTO"},
+                        {
+                            "id": "n5",
+                            "agent_id": "dsi",
+                            "x": 370,
+                            "y": 120,
+                            "label": "DSI",
+                        },
+                        {
+                            "id": "n6",
+                            "agent_id": "strat-cpo",
+                            "x": 200,
+                            "y": 120,
+                            "label": "CPO",
+                        },
+                        {
+                            "id": "n7",
+                            "agent_id": "strat-cto",
+                            "x": 540,
+                            "y": 120,
+                            "label": "CTO",
+                        },
                         {
                             "id": "n8",
                             "agent_id": "strat-portfolio",
@@ -2105,7 +3048,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 320,
                             "label": "Sécurité",
                         },
-                        {"id": "n14", "agent_id": "devops", "x": 600, "y": 320, "label": "DevOps"},
+                        {
+                            "id": "n14",
+                            "agent_id": "devops",
+                            "x": 600,
+                            "y": 320,
+                            "label": "DevOps",
+                        },
                         # Row 5: Devs + Test Automation
                         {
                             "id": "n15",
@@ -2173,7 +3122,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "label": "Perf Eng.",
                         },
                         # Row 8: Deploy + SRE
-                        {"id": "n24", "agent_id": "sre", "x": 500, "y": 720, "label": "SRE"},
+                        {
+                            "id": "n24",
+                            "agent_id": "sre",
+                            "x": 500,
+                            "y": 720,
+                            "label": "SRE",
+                        },
                         # Row 9: TMA
                         {
                             "id": "n25",
@@ -2199,53 +3154,203 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     ],
                     "edges": [
                         # Idéation → Comité Strat
-                        {"from": "n1", "to": "n3", "label": "besoin", "color": "#3b82f6"},
+                        {
+                            "from": "n1",
+                            "to": "n3",
+                            "label": "besoin",
+                            "color": "#3b82f6",
+                        },
                         {"from": "n2", "to": "n3", "label": "UX", "color": "#3b82f6"},
-                        {"from": "n4", "to": "n3", "label": "faisabilité", "color": "#3b82f6"},
-                        {"from": "n3", "to": "n5", "label": "dossier", "color": "#a855f7"},
+                        {
+                            "from": "n4",
+                            "to": "n3",
+                            "label": "faisabilité",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n5",
+                            "label": "dossier",
+                            "color": "#a855f7",
+                        },
                         # Comité Strat interne
-                        {"from": "n6", "to": "n5", "label": "avis CPO", "color": "#d946ef"},
-                        {"from": "n7", "to": "n5", "label": "avis CTO", "color": "#d946ef"},
+                        {
+                            "from": "n6",
+                            "to": "n5",
+                            "label": "avis CPO",
+                            "color": "#d946ef",
+                        },
+                        {
+                            "from": "n7",
+                            "to": "n5",
+                            "label": "avis CTO",
+                            "color": "#d946ef",
+                        },
                         {"from": "n8", "to": "n5", "label": "WSJF", "color": "#10b981"},
-                        {"from": "n27", "to": "n8", "label": "lean", "color": "#06b6d4"},
+                        {
+                            "from": "n27",
+                            "to": "n8",
+                            "label": "lean",
+                            "color": "#06b6d4",
+                        },
                         # GO → Constitution
                         {"from": "n5", "to": "n9", "label": "GO", "color": "#10b981"},
-                        {"from": "n9", "to": "n10", "label": "staffing", "color": "#8b5cf6"},
-                        {"from": "n10", "to": "n11", "label": "planning", "color": "#8b5cf6"},
+                        {
+                            "from": "n9",
+                            "to": "n10",
+                            "label": "staffing",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n10",
+                            "to": "n11",
+                            "label": "planning",
+                            "color": "#8b5cf6",
+                        },
                         # Architecture
-                        {"from": "n10", "to": "n12", "label": "specs", "color": "#f59e0b"},
-                        {"from": "n4", "to": "n12", "label": "archi", "color": "#a855f7"},
-                        {"from": "n12", "to": "n13", "label": "review sécu", "color": "#ef4444"},
-                        {"from": "n12", "to": "n14", "label": "infra", "color": "#8b5cf6"},
+                        {
+                            "from": "n10",
+                            "to": "n12",
+                            "label": "specs",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n12",
+                            "label": "archi",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n12",
+                            "to": "n13",
+                            "label": "review sécu",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n12",
+                            "to": "n14",
+                            "label": "infra",
+                            "color": "#8b5cf6",
+                        },
                         # Dev Sprint
-                        {"from": "n12", "to": "n15", "label": "stories", "color": "#f59e0b"},
-                        {"from": "n12", "to": "n16", "label": "stories", "color": "#f59e0b"},
-                        {"from": "n12", "to": "n17", "label": "tests E2E", "color": "#3b82f6"},
+                        {
+                            "from": "n12",
+                            "to": "n15",
+                            "label": "stories",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n12",
+                            "to": "n16",
+                            "label": "stories",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n12",
+                            "to": "n17",
+                            "label": "tests E2E",
+                            "color": "#3b82f6",
+                        },
                         # CICD
-                        {"from": "n14", "to": "n18", "label": "pipeline", "color": "#8b5cf6"},
-                        {"from": "n18", "to": "n19", "label": "scans sécu", "color": "#ef4444"},
-                        {"from": "n17", "to": "n18", "label": "tests CI", "color": "#3b82f6"},
+                        {
+                            "from": "n14",
+                            "to": "n18",
+                            "label": "pipeline",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n18",
+                            "to": "n19",
+                            "label": "scans sécu",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n17",
+                            "to": "n18",
+                            "label": "tests CI",
+                            "color": "#3b82f6",
+                        },
                         # QA Campaign
-                        {"from": "n18", "to": "n20", "label": "build OK", "color": "#10b981"},
-                        {"from": "n20", "to": "n21", "label": "plan test", "color": "#a855f7"},
-                        {"from": "n21", "to": "n22", "label": "API tests", "color": "#3b82f6"},
-                        {"from": "n21", "to": "n17", "label": "E2E tests", "color": "#3b82f6"},
-                        {"from": "n23", "to": "n20", "label": "perf OK", "color": "#10b981"},
-                        {"from": "n22", "to": "n20", "label": "résultats", "color": "#10b981"},
+                        {
+                            "from": "n18",
+                            "to": "n20",
+                            "label": "build OK",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n20",
+                            "to": "n21",
+                            "label": "plan test",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n21",
+                            "to": "n22",
+                            "label": "API tests",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n21",
+                            "to": "n17",
+                            "label": "E2E tests",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n23",
+                            "to": "n20",
+                            "label": "perf OK",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n22",
+                            "to": "n20",
+                            "label": "résultats",
+                            "color": "#10b981",
+                        },
                         # Deploy
-                        {"from": "n20", "to": "n10", "label": "GO/NOGO", "color": "#ef4444"},
-                        {"from": "n14", "to": "n24", "label": "canary", "color": "#8b5cf6"},
-                        {"from": "n24", "to": "n10", "label": "prod OK", "color": "#10b981"},
+                        {
+                            "from": "n20",
+                            "to": "n10",
+                            "label": "GO/NOGO",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n14",
+                            "to": "n24",
+                            "label": "canary",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n24",
+                            "to": "n10",
+                            "label": "prod OK",
+                            "color": "#10b981",
+                        },
                         # TMA Handover
-                        {"from": "n12", "to": "n25", "label": "transfert", "color": "#d946ef"},
-                        {"from": "n25", "to": "n26", "label": "assigner", "color": "#f59e0b"},
+                        {
+                            "from": "n12",
+                            "to": "n25",
+                            "label": "transfert",
+                            "color": "#d946ef",
+                        },
+                        {
+                            "from": "n25",
+                            "to": "n26",
+                            "label": "assigner",
+                            "color": "#f59e0b",
+                        },
                         {
                             "from": "n20",
                             "to": "n25",
                             "label": "tests régression",
                             "color": "#3b82f6",
                         },
-                        {"from": "n26", "to": "n24", "label": "hotfix", "color": "#ef4444"},
+                        {
+                            "from": "n26",
+                            "to": "n24",
+                            "label": "hotfix",
+                            "color": "#ef4444",
+                        },
                     ],
                 },
                 "agents_permissions": {
@@ -2255,20 +3360,40 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         "can_delegate": True,
                         "can_approve": True,
                     },
-                    "strat-cpo": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                    "strat-cpo": {
+                        "can_veto": True,
+                        "veto_level": "STRONG",
+                        "can_approve": True,
+                    },
                     "strat-cto": {"can_veto": True, "veto_level": "STRONG"},
                     "qa_lead": {"can_veto": True, "veto_level": "ABSOLUTE"},
                     "securite": {"can_veto": True, "veto_level": "ABSOLUTE"},
-                    "test_manager": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                    "test_manager": {
+                        "can_veto": True,
+                        "veto_level": "STRONG",
+                        "can_approve": True,
+                    },
                     "responsable_tma": {
                         "can_veto": True,
                         "veto_level": "STRONG",
                         "can_delegate": True,
                     },
-                    "lead_dev": {"can_delegate": True, "can_veto": True, "veto_level": "STRONG"},
+                    "lead_dev": {
+                        "can_delegate": True,
+                        "can_veto": True,
+                        "veto_level": "STRONG",
+                    },
                     "chef_projet": {"can_delegate": True, "can_approve": True},
-                    "devops": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
-                    "sre": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                    "devops": {
+                        "can_veto": True,
+                        "veto_level": "STRONG",
+                        "can_approve": True,
+                    },
+                    "sre": {
+                        "can_veto": True,
+                        "veto_level": "STRONG",
+                        "can_approve": True,
+                    },
                     "pipeline_engineer": {"can_veto": True, "veto_level": "STRONG"},
                 },
             },
@@ -2344,7 +3469,9 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     description="Le PO Plateforme écrit les user stories. Le Scrum Master organise le sprint. "
                     "Le Lead Dev estime et découpe en tâches techniques.",
                     gate="always",
-                    config={"agents": ["plat-product", "scrum_master", "plat-lead-dev"]},
+                    config={
+                        "agents": ["plat-product", "scrum_master", "plat-lead-dev"]
+                    },
                 ),
                 WorkflowPhase(
                     id="dev-sprint",
@@ -2383,7 +3510,12 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     "Sécurité (OWASP), Performance (charge). Tous doivent valider.",
                     gate="no_veto",
                     config={
-                        "agents": ["qa_lead", "test_automation", "securite", "performance_engineer"]
+                        "agents": [
+                            "qa_lead",
+                            "test_automation",
+                            "securite",
+                            "performance_engineer",
+                        ]
                     },
                 ),
                 WorkflowPhase(
@@ -2403,7 +3535,14 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     "ce qui a bien marché, ce qui a échoué, les améliorations à apporter. "
                     "Les leçons sont stockées en mémoire globale.",
                     gate="always",
-                    config={"agents": ["plat-lead-dev", "plat-product", "scrum_master", "qa_lead"]},
+                    config={
+                        "agents": [
+                            "plat-lead-dev",
+                            "plat-product",
+                            "scrum_master",
+                            "qa_lead",
+                        ]
+                    },
                 ),
             ],
             config={
@@ -2411,9 +3550,27 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                 "graph": {
                     "pattern": "hierarchical",
                     "nodes": [
-                        {"id": "n1", "agent_id": "dsi", "x": 400, "y": 20, "label": "DSI"},
-                        {"id": "n2", "agent_id": "strat-cpo", "x": 250, "y": 20, "label": "CPO"},
-                        {"id": "n3", "agent_id": "strat-cto", "x": 550, "y": 20, "label": "CTO"},
+                        {
+                            "id": "n1",
+                            "agent_id": "dsi",
+                            "x": 400,
+                            "y": 20,
+                            "label": "DSI",
+                        },
+                        {
+                            "id": "n2",
+                            "agent_id": "strat-cpo",
+                            "x": 250,
+                            "y": 20,
+                            "label": "CPO",
+                        },
+                        {
+                            "id": "n3",
+                            "agent_id": "strat-cto",
+                            "x": 550,
+                            "y": 20,
+                            "label": "CTO",
+                        },
                         {
                             "id": "n4",
                             "agent_id": "strat-portfolio",
@@ -2519,8 +3676,20 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 480,
                             "label": "Perf Engineer",
                         },
-                        {"id": "n19", "agent_id": "devops", "x": 300, "y": 580, "label": "DevOps"},
-                        {"id": "n20", "agent_id": "sre", "x": 500, "y": 580, "label": "SRE"},
+                        {
+                            "id": "n19",
+                            "agent_id": "devops",
+                            "x": 300,
+                            "y": 580,
+                            "label": "DevOps",
+                        },
+                        {
+                            "id": "n20",
+                            "agent_id": "sre",
+                            "x": 500,
+                            "y": 580,
+                            "label": "SRE",
+                        },
                         {
                             "id": "n21",
                             "agent_id": "pipeline_engineer",
@@ -2537,27 +3706,132 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n6", "label": "vision", "color": "#a855f7"},
-                        {"from": "n2", "to": "n5", "label": "priorités", "color": "#a855f7"},
-                        {"from": "n3", "to": "n6", "label": "tech stack", "color": "#3b82f6"},
-                        {"from": "n5", "to": "n8", "label": "stories", "color": "#f59e0b"},
-                        {"from": "n5", "to": "n9", "label": "sprint", "color": "#f59e0b"},
-                        {"from": "n6", "to": "n9", "label": "design", "color": "#3b82f6"},
-                        {"from": "n9", "to": "n10", "label": "routes/DB", "color": "#10b981"},
-                        {"from": "n9", "to": "n11", "label": "templates", "color": "#10b981"},
-                        {"from": "n9", "to": "n12", "label": "executor", "color": "#10b981"},
-                        {"from": "n9", "to": "n13", "label": "engine", "color": "#10b981"},
-                        {"from": "n9", "to": "n14", "label": "infra", "color": "#10b981"},
-                        {"from": "n10", "to": "n16", "label": "tests", "color": "#8b5cf6"},
-                        {"from": "n11", "to": "n16", "label": "tests", "color": "#8b5cf6"},
-                        {"from": "n12", "to": "n17", "label": "tests", "color": "#8b5cf6"},
-                        {"from": "n15", "to": "n9", "label": "audit", "color": "#ef4444"},
-                        {"from": "n16", "to": "n19", "label": "GO deploy", "color": "#10b981"},
-                        {"from": "n17", "to": "n19", "label": "E2E OK", "color": "#10b981"},
-                        {"from": "n19", "to": "n20", "label": "staging", "color": "#f59e0b"},
-                        {"from": "n20", "to": "n9", "label": "prod GO", "color": "#10b981"},
-                        {"from": "n21", "to": "n19", "label": "pipeline", "color": "#3b82f6"},
-                        {"from": "n22", "to": "n19", "label": "scan", "color": "#ef4444"},
+                        {
+                            "from": "n1",
+                            "to": "n6",
+                            "label": "vision",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n5",
+                            "label": "priorités",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n6",
+                            "label": "tech stack",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n8",
+                            "label": "stories",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n9",
+                            "label": "sprint",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n6",
+                            "to": "n9",
+                            "label": "design",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n9",
+                            "to": "n10",
+                            "label": "routes/DB",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n9",
+                            "to": "n11",
+                            "label": "templates",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n9",
+                            "to": "n12",
+                            "label": "executor",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n9",
+                            "to": "n13",
+                            "label": "engine",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n9",
+                            "to": "n14",
+                            "label": "infra",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n10",
+                            "to": "n16",
+                            "label": "tests",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n11",
+                            "to": "n16",
+                            "label": "tests",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n12",
+                            "to": "n17",
+                            "label": "tests",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n15",
+                            "to": "n9",
+                            "label": "audit",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n16",
+                            "to": "n19",
+                            "label": "GO deploy",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n17",
+                            "to": "n19",
+                            "label": "E2E OK",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n19",
+                            "to": "n20",
+                            "label": "staging",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n20",
+                            "to": "n9",
+                            "label": "prod GO",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n21",
+                            "to": "n19",
+                            "label": "pipeline",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n22",
+                            "to": "n19",
+                            "label": "scan",
+                            "color": "#ef4444",
+                        },
                     ],
                 },
                 "agents_permissions": {
@@ -2567,15 +3841,27 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         "can_delegate": True,
                         "can_approve": True,
                     },
-                    "strat-cpo": {"can_veto": True, "veto_level": "ABSOLUTE", "can_approve": True},
-                    "strat-cto": {"can_veto": True, "veto_level": "ABSOLUTE", "can_approve": True},
+                    "strat-cpo": {
+                        "can_veto": True,
+                        "veto_level": "ABSOLUTE",
+                        "can_approve": True,
+                    },
+                    "strat-cto": {
+                        "can_veto": True,
+                        "veto_level": "ABSOLUTE",
+                        "can_approve": True,
+                    },
                     "plat-lead-dev": {
                         "can_veto": True,
                         "veto_level": "STRONG",
                         "can_delegate": True,
                         "can_approve": True,
                     },
-                    "architecte": {"can_veto": True, "veto_level": "STRONG", "can_approve": True},
+                    "architecte": {
+                        "can_veto": True,
+                        "veto_level": "STRONG",
+                        "can_approve": True,
+                    },
                     "qa_lead": {"can_veto": True, "veto_level": "ABSOLUTE"},
                     "securite": {"can_veto": True, "veto_level": "STRONG"},
                 },
@@ -2685,7 +3971,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 20,
                             "label": "TMA Lead",
                         },
-                        {"id": "n2", "agent_id": "sre", "x": 600, "y": 20, "label": "SRE"},
+                        {
+                            "id": "n2",
+                            "agent_id": "sre",
+                            "x": 600,
+                            "y": 20,
+                            "label": "SRE",
+                        },
                         {
                             "id": "n3",
                             "agent_id": "architecte",
@@ -2721,7 +4013,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 240,
                             "label": "TMA Agents",
                         },
-                        {"id": "n8", "agent_id": "dba", "x": 750, "y": 240, "label": "DBA"},
+                        {
+                            "id": "n8",
+                            "agent_id": "dba",
+                            "x": 750,
+                            "y": 240,
+                            "label": "DBA",
+                        },
                         {
                             "id": "n9",
                             "agent_id": "plat-tma-qa",
@@ -2743,27 +4041,94 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "y": 360,
                             "label": "Perf Eng.",
                         },
-                        {"id": "n12", "agent_id": "qa_lead", "x": 200, "y": 20, "label": "QA Lead"},
-                        {"id": "n13", "agent_id": "devops", "x": 400, "y": 460, "label": "DevOps"},
+                        {
+                            "id": "n12",
+                            "agent_id": "qa_lead",
+                            "x": 200,
+                            "y": 20,
+                            "label": "QA Lead",
+                        },
+                        {
+                            "id": "n13",
+                            "agent_id": "devops",
+                            "x": 400,
+                            "y": 460,
+                            "label": "DevOps",
+                        },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n3", "label": "triage", "color": "#ef4444"},
-                        {"from": "n1", "to": "n4", "label": "sécu?", "color": "#ef4444"},
-                        {"from": "n1", "to": "n5", "label": "fix back", "color": "#f59e0b"},
-                        {"from": "n1", "to": "n6", "label": "fix front", "color": "#f59e0b"},
-                        {"from": "n1", "to": "n7", "label": "fix agents", "color": "#f59e0b"},
-                        {"from": "n3", "to": "n1", "label": "impact", "color": "#3b82f6"},
+                        {
+                            "from": "n1",
+                            "to": "n3",
+                            "label": "triage",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n4",
+                            "label": "sécu?",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n5",
+                            "label": "fix back",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n6",
+                            "label": "fix front",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n7",
+                            "label": "fix agents",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n1",
+                            "label": "impact",
+                            "color": "#3b82f6",
+                        },
                         {"from": "n5", "to": "n9", "label": "test", "color": "#10b981"},
                         {"from": "n6", "to": "n9", "label": "test", "color": "#10b981"},
                         {"from": "n7", "to": "n9", "label": "test", "color": "#10b981"},
                         {"from": "n8", "to": "n5", "label": "data", "color": "#3b82f6"},
-                        {"from": "n9", "to": "n1", "label": "validé", "color": "#10b981"},
+                        {
+                            "from": "n9",
+                            "to": "n1",
+                            "label": "validé",
+                            "color": "#10b981",
+                        },
                         {"from": "n9", "to": "n10", "label": "E2E", "color": "#8b5cf6"},
                         {"from": "n10", "to": "n13", "label": "GO", "color": "#10b981"},
-                        {"from": "n11", "to": "n13", "label": "perf OK", "color": "#10b981"},
-                        {"from": "n12", "to": "n1", "label": "incidents", "color": "#ef4444"},
-                        {"from": "n2", "to": "n1", "label": "métriques", "color": "#3b82f6"},
-                        {"from": "n13", "to": "n1", "label": "déployé", "color": "#10b981"},
+                        {
+                            "from": "n11",
+                            "to": "n13",
+                            "label": "perf OK",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n12",
+                            "to": "n1",
+                            "label": "incidents",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n1",
+                            "label": "métriques",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n13",
+                            "to": "n1",
+                            "label": "déployé",
+                            "color": "#10b981",
+                        },
                     ],
                 },
                 "agents_permissions": {
@@ -2803,7 +4168,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     "La Security Researcher cartographie la surface d'attaque (OSINT, ports, services, APIs). "
                     "L'Exploit Dev identifie les points d'entrée potentiels. Scan passif puis actif.",
                     gate="always",
-                    config={"agents": ["pentester-lead", "security-researcher", "exploit-dev"]},
+                    config={
+                        "agents": [
+                            "pentester-lead",
+                            "security-researcher",
+                            "exploit-dev",
+                        ]
+                    },
                 ),
                 WorkflowPhase(
                     id="threat-model",
@@ -2834,7 +4205,11 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     "Itération: tester → analyser → adapter → re-tester. Max 5 itérations.",
                     gate="always",
                     config={
-                        "agents": ["pentester-lead", "exploit-dev", "security-researcher"],
+                        "agents": [
+                            "pentester-lead",
+                            "exploit-dev",
+                            "security-researcher",
+                        ],
                         "max_iterations": 5,
                     },
                 ),
@@ -2849,7 +4224,11 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     "Livrable: rapport CVSS avec PoC, impact, et remediation pour chaque vuln.",
                     gate="always",
                     config={
-                        "agents": ["pentester-lead", "security-researcher", "threat-analyst"],
+                        "agents": [
+                            "pentester-lead",
+                            "security-researcher",
+                            "threat-analyst",
+                        ],
                         "leader": "threat-analyst",
                     },
                 ),
@@ -2863,7 +4242,9 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     "Checkpoint: GO (corriger immédiatement), NOGO (bloquer la release), "
                     "PIVOT (accepter le risque avec plan de mitigation).",
                     gate="checkpoint",
-                    config={"agents": ["ciso", "compliance_officer", "security-architect"]},
+                    config={
+                        "agents": ["ciso", "compliance_officer", "security-architect"]
+                    },
                 ),
                 WorkflowPhase(
                     id="remediation",
@@ -2916,7 +4297,14 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     "Le CISO donne le GO final pour la prod. "
                     "Pipeline: staging → E2E sécu → canary 1% → monitoring → prod 100%.",
                     gate="all_approved",
-                    config={"agents": ["secops-engineer", "qa-security", "pentester-lead", "ciso"]},
+                    config={
+                        "agents": [
+                            "secops-engineer",
+                            "qa-security",
+                            "pentester-lead",
+                            "ciso",
+                        ]
+                    },
                 ),
             ],
             config={
@@ -3027,37 +4415,157 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     ],
                     "edges": [
                         # Phase 1: Recon
-                        {"from": "n1", "to": "n2", "label": "recon OSINT", "color": "#ef4444"},
-                        {"from": "n1", "to": "n3", "label": "recon exploit", "color": "#ef4444"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "recon OSINT",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n3",
+                            "label": "recon exploit",
+                            "color": "#ef4444",
+                        },
                         # Phase 2: Threat Model (network/debate)
-                        {"from": "n2", "to": "n4", "label": "surface", "color": "#f97316"},
-                        {"from": "n2", "to": "n5", "label": "findings", "color": "#f97316"},
-                        {"from": "n1", "to": "n5", "label": "vecteurs", "color": "#f97316"},
-                        {"from": "n4", "to": "n5", "label": "défenses", "color": "#3b82f6"},
-                        {"from": "n5", "to": "n1", "label": "priorités", "color": "#8b5cf6"},
+                        {
+                            "from": "n2",
+                            "to": "n4",
+                            "label": "surface",
+                            "color": "#f97316",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n5",
+                            "label": "findings",
+                            "color": "#f97316",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n5",
+                            "label": "vecteurs",
+                            "color": "#f97316",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n5",
+                            "label": "défenses",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n1",
+                            "label": "priorités",
+                            "color": "#8b5cf6",
+                        },
                         # Phase 3: Exploitation
-                        {"from": "n1", "to": "n3", "label": "exploit", "color": "#dc2626"},
+                        {
+                            "from": "n1",
+                            "to": "n3",
+                            "label": "exploit",
+                            "color": "#dc2626",
+                        },
                         {"from": "n3", "to": "n5", "label": "CVSS", "color": "#dc2626"},
                         # Phase 4: Report → Phase 5: Review
-                        {"from": "n5", "to": "n7", "label": "rapport", "color": "#fbbf24"},
-                        {"from": "n5", "to": "n8", "label": "compliance?", "color": "#fbbf24"},
-                        {"from": "n4", "to": "n7", "label": "recommandations", "color": "#3b82f6"},
+                        {
+                            "from": "n5",
+                            "to": "n7",
+                            "label": "rapport",
+                            "color": "#fbbf24",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n8",
+                            "label": "compliance?",
+                            "color": "#fbbf24",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n7",
+                            "label": "recommandations",
+                            "color": "#3b82f6",
+                        },
                         # Phase 6: Remediation
-                        {"from": "n7", "to": "n9", "label": "GO fix", "color": "#22c55e"},
-                        {"from": "n9", "to": "n10", "label": "fix backend", "color": "#22c55e"},
-                        {"from": "n9", "to": "n11", "label": "fix frontend", "color": "#22c55e"},
-                        {"from": "n9", "to": "n12", "label": "validate PR", "color": "#22c55e"},
+                        {
+                            "from": "n7",
+                            "to": "n9",
+                            "label": "GO fix",
+                            "color": "#22c55e",
+                        },
+                        {
+                            "from": "n9",
+                            "to": "n10",
+                            "label": "fix backend",
+                            "color": "#22c55e",
+                        },
+                        {
+                            "from": "n9",
+                            "to": "n11",
+                            "label": "fix frontend",
+                            "color": "#22c55e",
+                        },
+                        {
+                            "from": "n9",
+                            "to": "n12",
+                            "label": "validate PR",
+                            "color": "#22c55e",
+                        },
                         # Phase 7: Verification
-                        {"from": "n10", "to": "n12", "label": "PR ready", "color": "#10b981"},
-                        {"from": "n11", "to": "n12", "label": "PR ready", "color": "#10b981"},
-                        {"from": "n12", "to": "n3", "label": "re-exploit?", "color": "#a78bfa"},
-                        {"from": "n3", "to": "n12", "label": "exploit fails", "color": "#10b981"},
-                        {"from": "n12", "to": "n8", "label": "compliance OK?", "color": "#64748b"},
+                        {
+                            "from": "n10",
+                            "to": "n12",
+                            "label": "PR ready",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n11",
+                            "to": "n12",
+                            "label": "PR ready",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n12",
+                            "to": "n3",
+                            "label": "re-exploit?",
+                            "color": "#a78bfa",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n12",
+                            "label": "exploit fails",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n12",
+                            "to": "n8",
+                            "label": "compliance OK?",
+                            "color": "#64748b",
+                        },
                         # Phase 8: Deploy
-                        {"from": "n8", "to": "n6", "label": "approved", "color": "#06b6d4"},
-                        {"from": "n12", "to": "n6", "label": "QA GO", "color": "#10b981"},
-                        {"from": "n6", "to": "n7", "label": "deployed", "color": "#10b981"},
-                        {"from": "n6", "to": "n1", "label": "monitoring", "color": "#06b6d4"},
+                        {
+                            "from": "n8",
+                            "to": "n6",
+                            "label": "approved",
+                            "color": "#06b6d4",
+                        },
+                        {
+                            "from": "n12",
+                            "to": "n6",
+                            "label": "QA GO",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n6",
+                            "to": "n7",
+                            "label": "deployed",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n6",
+                            "to": "n1",
+                            "label": "monitoring",
+                            "color": "#06b6d4",
+                        },
                     ],
                 },
                 "agents_permissions": {
@@ -3066,7 +4574,11 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         "veto_level": "STRONG",
                         "can_delegate": True,
                     },
-                    "ciso": {"can_veto": True, "veto_level": "ABSOLUTE", "can_approve": True},
+                    "ciso": {
+                        "can_veto": True,
+                        "veto_level": "ABSOLUTE",
+                        "can_approve": True,
+                    },
                     "compliance_officer": {
                         "can_veto": True,
                         "veto_level": "STRONG",
@@ -3177,7 +4689,14 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     "Checkpoint: GO (conforme), NOGO (non-conformités critiques), "
                     "PIVOT (plan de remediation avec jalons).",
                     gate="checkpoint",
-                    config={"agents": ["rse-manager", "rse-dpo", "rse-juriste", "rse-ethique-ia"]},
+                    config={
+                        "agents": [
+                            "rse-manager",
+                            "rse-dpo",
+                            "rse-juriste",
+                            "rse-ethique-ia",
+                        ]
+                    },
                 ),
             ],
             config={
@@ -3267,24 +4786,84 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "r1", "to": "r2", "label": "privacy → legal", "color": "#8b5cf6"},
+                        {
+                            "from": "r1",
+                            "to": "r2",
+                            "label": "privacy → legal",
+                            "color": "#8b5cf6",
+                        },
                         {
                             "from": "r2",
                             "to": "r3",
                             "label": "compliant → green",
                             "color": "#22c55e",
                         },
-                        {"from": "r3", "to": "r4", "label": "NR ↔ éco", "color": "#22c55e"},
-                        {"from": "r4", "to": "r5", "label": "green → a11y", "color": "#06b6d4"},
-                        {"from": "r5", "to": "r6", "label": "lead ↔ expert", "color": "#06b6d4"},
-                        {"from": "r6", "to": "r7", "label": "a11y → éthique", "color": "#f59e0b"},
-                        {"from": "r7", "to": "r8", "label": "éthique ↔ ML", "color": "#f59e0b"},
-                        {"from": "r8", "to": "r9", "label": "IA → social", "color": "#ec4899"},
-                        {"from": "r9", "to": "r10", "label": "all → synthèse", "color": "#8b5cf6"},
-                        {"from": "r1", "to": "r10", "label": "RGPD report", "color": "#8b5cf6"},
-                        {"from": "r3", "to": "r10", "label": "Green report", "color": "#22c55e"},
-                        {"from": "r5", "to": "r10", "label": "A11Y report", "color": "#06b6d4"},
-                        {"from": "r7", "to": "r10", "label": "Ethics report", "color": "#f59e0b"},
+                        {
+                            "from": "r3",
+                            "to": "r4",
+                            "label": "NR ↔ éco",
+                            "color": "#22c55e",
+                        },
+                        {
+                            "from": "r4",
+                            "to": "r5",
+                            "label": "green → a11y",
+                            "color": "#06b6d4",
+                        },
+                        {
+                            "from": "r5",
+                            "to": "r6",
+                            "label": "lead ↔ expert",
+                            "color": "#06b6d4",
+                        },
+                        {
+                            "from": "r6",
+                            "to": "r7",
+                            "label": "a11y → éthique",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "r7",
+                            "to": "r8",
+                            "label": "éthique ↔ ML",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "r8",
+                            "to": "r9",
+                            "label": "IA → social",
+                            "color": "#ec4899",
+                        },
+                        {
+                            "from": "r9",
+                            "to": "r10",
+                            "label": "all → synthèse",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "r1",
+                            "to": "r10",
+                            "label": "RGPD report",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "r3",
+                            "to": "r10",
+                            "label": "Green report",
+                            "color": "#22c55e",
+                        },
+                        {
+                            "from": "r5",
+                            "to": "r10",
+                            "label": "A11Y report",
+                            "color": "#06b6d4",
+                        },
+                        {
+                            "from": "r7",
+                            "to": "r10",
+                            "label": "Ethics report",
+                            "color": "#f59e0b",
+                        },
                     ],
                 },
                 "agents_permissions": {
@@ -3323,7 +4902,11 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     description="RTE + PM + Archi débattent la décomposition en Features. Input: AO + VISION.md + codebase.",
                     gate="always",
                     config={
-                        "agents": ["rte", "product-manager-art", "system-architect-art"],
+                        "agents": [
+                            "rte",
+                            "product-manager-art",
+                            "system-architect-art",
+                        ],
                         "max_iterations": 3,
                     },
                 ),
@@ -3523,31 +5106,120 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n2", "to": "n1", "label": "vision", "color": "#bc8cff"},
+                        {
+                            "from": "n2",
+                            "to": "n1",
+                            "label": "vision",
+                            "color": "#bc8cff",
+                        },
                         {"from": "n3", "to": "n1", "label": "arch", "color": "#58a6ff"},
-                        {"from": "n1", "to": "n2", "label": "feedback", "color": "#d29922"},
-                        {"from": "n1", "to": "n3", "label": "feedback", "color": "#d29922"},
-                        {"from": "n1", "to": "n4", "label": "delegate", "color": "#f97316"},
-                        {"from": "n1", "to": "n5", "label": "delegate", "color": "#22c55e"},
-                        {"from": "n1", "to": "n6", "label": "delegate", "color": "#eab308"},
-                        {"from": "n1", "to": "n7", "label": "delegate", "color": "#a855f7"},
-                        {"from": "n1", "to": "n8", "label": "delegate", "color": "#06b6d4"},
-                        {"from": "n4", "to": "n9", "label": "infra", "color": "#ef4444"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "feedback",
+                            "color": "#d29922",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n3",
+                            "label": "feedback",
+                            "color": "#d29922",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n4",
+                            "label": "delegate",
+                            "color": "#f97316",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n5",
+                            "label": "delegate",
+                            "color": "#22c55e",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n6",
+                            "label": "delegate",
+                            "color": "#eab308",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n7",
+                            "label": "delegate",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n8",
+                            "label": "delegate",
+                            "color": "#06b6d4",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n9",
+                            "label": "infra",
+                            "color": "#ef4444",
+                        },
                         {"from": "n5", "to": "n10", "label": "e2e", "color": "#ec4899"},
-                        {"from": "n6", "to": "n11", "label": "proto", "color": "#64748b"},
+                        {
+                            "from": "n6",
+                            "to": "n11",
+                            "label": "proto",
+                            "color": "#64748b",
+                        },
                         {"from": "n7", "to": "n10", "label": "e2e", "color": "#ec4899"},
                         {"from": "n8", "to": "n10", "label": "e2e", "color": "#ec4899"},
-                        {"from": "n9", "to": "n12", "label": "merge", "color": "#58a6ff"},
-                        {"from": "n10", "to": "n12", "label": "tests", "color": "#ec4899"},
-                        {"from": "n11", "to": "n12", "label": "schemas", "color": "#64748b"},
-                        {"from": "n4", "to": "n12", "label": "merge", "color": "#f97316"},
-                        {"from": "n5", "to": "n12", "label": "merge", "color": "#22c55e"},
-                        {"from": "n6", "to": "n12", "label": "merge", "color": "#eab308"},
-                        {"from": "n12", "to": "n13", "label": "release", "color": "#d29922"},
+                        {
+                            "from": "n9",
+                            "to": "n12",
+                            "label": "merge",
+                            "color": "#58a6ff",
+                        },
+                        {
+                            "from": "n10",
+                            "to": "n12",
+                            "label": "tests",
+                            "color": "#ec4899",
+                        },
+                        {
+                            "from": "n11",
+                            "to": "n12",
+                            "label": "schemas",
+                            "color": "#64748b",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n12",
+                            "label": "merge",
+                            "color": "#f97316",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n12",
+                            "label": "merge",
+                            "color": "#22c55e",
+                        },
+                        {
+                            "from": "n6",
+                            "to": "n12",
+                            "label": "merge",
+                            "color": "#eab308",
+                        },
+                        {
+                            "from": "n12",
+                            "to": "n13",
+                            "label": "release",
+                            "color": "#d29922",
+                        },
                     ],
                 },
                 "agents_permissions": {
-                    "rte": {"can_delegate": True, "can_veto": True, "veto_level": "strong"},
+                    "rte": {
+                        "can_delegate": True,
+                        "can_veto": True,
+                        "veto_level": "strong",
+                    },
                     "product-manager-art": {"can_veto": True, "veto_level": "advisory"},
                     "system-architect-art": {"can_veto": True, "veto_level": "strong"},
                     "ft-e2e-lead": {"can_veto": True, "veto_level": "absolute"},
@@ -3695,14 +5367,39 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "stories", "color": "#58a6ff"},
-                        {"from": "n1", "to": "n3", "label": "stories", "color": "#58a6ff"},
-                        {"from": "n1", "to": "n4", "label": "stories", "color": "#58a6ff"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "stories",
+                            "color": "#58a6ff",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n3",
+                            "label": "stories",
+                            "color": "#58a6ff",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n4",
+                            "label": "stories",
+                            "color": "#58a6ff",
+                        },
                         {"from": "n2", "to": "n5", "label": "code", "color": "#3fb950"},
                         {"from": "n3", "to": "n5", "label": "code", "color": "#3fb950"},
                         {"from": "n4", "to": "n5", "label": "code", "color": "#3fb950"},
-                        {"from": "n5", "to": "n6", "label": "approved", "color": "#ec4899"},
-                        {"from": "n5", "to": "n7", "label": "approved", "color": "#ec4899"},
+                        {
+                            "from": "n5",
+                            "to": "n6",
+                            "label": "approved",
+                            "color": "#ec4899",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n7",
+                            "label": "approved",
+                            "color": "#ec4899",
+                        },
                         {"from": "n6", "to": "n8", "label": "pass", "color": "#d29922"},
                         {"from": "n7", "to": "n8", "label": "pass", "color": "#d29922"},
                     ],
@@ -3735,7 +5432,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Networking Layer",
                     description="Lead iOS delegates: APIClient, SSEClient, DTOs, AuthManager to network dev",
                     gate="always",
-                    config={"agents": ["mobile_ios_lead", "mobile_ios_dev_net", "mobile_ios_qa"]},
+                    config={
+                        "agents": [
+                            "mobile_ios_lead",
+                            "mobile_ios_dev_net",
+                            "mobile_ios_qa",
+                        ]
+                    },
                 ),
                 WorkflowPhase(
                     id="ios-features",
@@ -3744,7 +5447,11 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     description="Lead delegates UI screens to dev: Dashboard, Missions, Agents, Chat, Ideation",
                     gate="always",
                     config={
-                        "agents": ["mobile_ios_lead", "mobile_ios_dev_ui", "mobile_ios_dev_net"]
+                        "agents": [
+                            "mobile_ios_lead",
+                            "mobile_ios_dev_ui",
+                            "mobile_ios_dev_net",
+                        ]
                     },
                 ),
                 WorkflowPhase(
@@ -3753,7 +5460,10 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Testing & QA",
                     description="QA writes XCTest + Swift Testing, validates coverage > 80%, accessibility audit",
                     gate="always",
-                    config={"agents": ["mobile_ios_qa", "mobile_ios_lead"], "max_iterations": 3},
+                    config={
+                        "agents": ["mobile_ios_qa", "mobile_ios_lead"],
+                        "max_iterations": 3,
+                    },
                 ),
                 WorkflowPhase(
                     id="ios-integration",
@@ -3761,7 +5471,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Integration & Polish",
                     description="Final integration: navigation flows, dark mode, error states, app shell",
                     gate="always",
-                    config={"agents": ["mobile_ios_lead", "mobile_ios_dev_ui", "mobile_ios_qa"]},
+                    config={
+                        "agents": [
+                            "mobile_ios_lead",
+                            "mobile_ios_dev_ui",
+                            "mobile_ios_qa",
+                        ]
+                    },
                 ),
             ],
             config={
@@ -3819,10 +5535,30 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n3", "label": "architecture", "color": "#58a6ff"},
-                        {"from": "n2", "to": "n3", "label": "ux specs", "color": "#ec4899"},
-                        {"from": "n3", "to": "n4", "label": "networking", "color": "#3fb950"},
-                        {"from": "n3", "to": "n5", "label": "features", "color": "#3fb950"},
+                        {
+                            "from": "n1",
+                            "to": "n3",
+                            "label": "architecture",
+                            "color": "#58a6ff",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n3",
+                            "label": "ux specs",
+                            "color": "#ec4899",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n4",
+                            "label": "networking",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n5",
+                            "label": "features",
+                            "color": "#3fb950",
+                        },
                         {"from": "n4", "to": "n6", "label": "test", "color": "#d29922"},
                         {"from": "n5", "to": "n6", "label": "test", "color": "#d29922"},
                     ],
@@ -3845,7 +5581,9 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Architecture & UX",
                     description="Mobile architect + UX define app structure, navigation, API contract",
                     gate="always",
-                    config={"agents": ["mobile_archi", "mobile_ux", "mobile_android_lead"]},
+                    config={
+                        "agents": ["mobile_archi", "mobile_ux", "mobile_android_lead"]
+                    },
                 ),
                 WorkflowPhase(
                     id="android-network",
@@ -3956,10 +5694,30 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n3", "label": "architecture", "color": "#58a6ff"},
-                        {"from": "n2", "to": "n3", "label": "ux specs", "color": "#ec4899"},
-                        {"from": "n3", "to": "n4", "label": "networking", "color": "#3fb950"},
-                        {"from": "n3", "to": "n5", "label": "features", "color": "#3fb950"},
+                        {
+                            "from": "n1",
+                            "to": "n3",
+                            "label": "architecture",
+                            "color": "#58a6ff",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n3",
+                            "label": "ux specs",
+                            "color": "#ec4899",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n4",
+                            "label": "networking",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n5",
+                            "label": "features",
+                            "color": "#3fb950",
+                        },
                         {"from": "n4", "to": "n6", "label": "test", "color": "#d29922"},
                         {"from": "n5", "to": "n6", "label": "test", "color": "#d29922"},
                     ],
@@ -4058,11 +5816,31 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "root cause", "color": "#ef4444"},
-                        {"from": "n1", "to": "n3", "label": "test spec", "color": "#f97316"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "root cause",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n3",
+                            "label": "test spec",
+                            "color": "#f97316",
+                        },
                         {"from": "n2", "to": "n4", "label": "fix", "color": "#3fb950"},
-                        {"from": "n3", "to": "n4", "label": "test results", "color": "#3fb950"},
-                        {"from": "n4", "to": "n5", "label": "verified", "color": "#58a6ff"},
+                        {
+                            "from": "n3",
+                            "to": "n4",
+                            "label": "test results",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n5",
+                            "label": "verified",
+                            "color": "#58a6ff",
+                        },
                     ],
                 },
             },
@@ -4099,7 +5877,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     description="Les équipes estiment en parallèle les features et identifient les dépendances inter-équipes. Chaque lead évalue la complexité et les risques.",
                     gate="always",
                     config={
-                        "agents": ["lead_dev", "plat-lead-dev", "qa_lead", "devops", "securite"]
+                        "agents": [
+                            "lead_dev",
+                            "plat-lead-dev",
+                            "qa_lead",
+                            "devops",
+                            "securite",
+                        ]
                     },
                 ),
                 WorkflowPhase(
@@ -4139,7 +5923,13 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Publication Plan PI",
                     description="Le plan PI est publié: features engagées, sprints planifiés, jalons identifiés, risques ROAM documentés.",
                     gate="always",
-                    config={"agents": ["release_train_engineer", "scrum_master", "tech_writer"]},
+                    config={
+                        "agents": [
+                            "release_train_engineer",
+                            "scrum_master",
+                            "tech_writer",
+                        ]
+                    },
                 ),
             ],
             config={
@@ -4235,16 +6025,66 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n4", "label": "backlog", "color": "#7c3aed"},
-                        {"from": "n2", "to": "n4", "label": "runway", "color": "#58a6ff"},
-                        {"from": "n3", "to": "n7", "label": "capacity", "color": "#f97316"},
-                        {"from": "n4", "to": "n7", "label": "estimates", "color": "#3fb950"},
-                        {"from": "n5", "to": "n7", "label": "qa effort", "color": "#3fb950"},
-                        {"from": "n6", "to": "n7", "label": "infra needs", "color": "#3fb950"},
-                        {"from": "n7", "to": "n9", "label": "plan draft", "color": "#7c3aed"},
-                        {"from": "n8", "to": "n9", "label": "alignment", "color": "#d29922"},
-                        {"from": "n9", "to": "n11", "label": "approved", "color": "#3fb950"},
-                        {"from": "n10", "to": "n11", "label": "tech ok", "color": "#3fb950"},
+                        {
+                            "from": "n1",
+                            "to": "n4",
+                            "label": "backlog",
+                            "color": "#7c3aed",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n4",
+                            "label": "runway",
+                            "color": "#58a6ff",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n7",
+                            "label": "capacity",
+                            "color": "#f97316",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n7",
+                            "label": "estimates",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n7",
+                            "label": "qa effort",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n6",
+                            "to": "n7",
+                            "label": "infra needs",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n7",
+                            "to": "n9",
+                            "label": "plan draft",
+                            "color": "#7c3aed",
+                        },
+                        {
+                            "from": "n8",
+                            "to": "n9",
+                            "label": "alignment",
+                            "color": "#d29922",
+                        },
+                        {
+                            "from": "n9",
+                            "to": "n11",
+                            "label": "approved",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n10",
+                            "to": "n11",
+                            "label": "tech ok",
+                            "color": "#3fb950",
+                        },
                     ],
                 },
             },
@@ -4366,11 +6206,36 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n6", "label": "review", "color": "#06b6d4"},
-                        {"from": "n2", "to": "n6", "label": "review", "color": "#8b5cf6"},
-                        {"from": "n3", "to": "n6", "label": "review", "color": "#f59e0b"},
-                        {"from": "n4", "to": "n6", "label": "review", "color": "#06b6d4"},
-                        {"from": "n5", "to": "n6", "label": "review", "color": "#06b6d4"},
+                        {
+                            "from": "n1",
+                            "to": "n6",
+                            "label": "review",
+                            "color": "#06b6d4",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n6",
+                            "label": "review",
+                            "color": "#8b5cf6",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n6",
+                            "label": "review",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n6",
+                            "label": "review",
+                            "color": "#06b6d4",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n6",
+                            "label": "review",
+                            "color": "#06b6d4",
+                        },
                     ],
                 },
             },
@@ -4458,9 +6323,24 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "strategy defined", "color": "#ef4444"},
-                        {"from": "n2", "to": "n3", "label": "scripts ready", "color": "#f59e0b"},
-                        {"from": "n3", "to": "n4", "label": "restore ok", "color": "#3fb950"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "strategy defined",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n3",
+                            "label": "scripts ready",
+                            "color": "#f59e0b",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n4",
+                            "label": "restore ok",
+                            "color": "#3fb950",
+                        },
                     ],
                 },
             },
@@ -4498,7 +6378,9 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     name="Bottleneck Analysis",
                     description="Analyze results: slow queries (N+1), memory leaks, bundle size, Core Web Vitals",
                     gate="Bottlenecks identified and prioritized",
-                    config={"agents": ["perf-tester", "lead_dev", "performance_engineer"]},
+                    config={
+                        "agents": ["perf-tester", "lead_dev", "performance_engineer"]
+                    },
                 ),
                 WorkflowPhase(
                     id="perf-fix",
@@ -4562,9 +6444,24 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "scenarios ready", "color": "#f97316"},
-                        {"from": "n2", "to": "n3", "label": "results", "color": "#f97316"},
-                        {"from": "n3", "to": "n4", "label": "bottlenecks", "color": "#ef4444"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "scenarios ready",
+                            "color": "#f97316",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n3",
+                            "label": "results",
+                            "color": "#f97316",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n4",
+                            "label": "bottlenecks",
+                            "color": "#ef4444",
+                        },
                         {
                             "from": "n4",
                             "to": "n2",
@@ -4572,7 +6469,12 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "color": "#d29922",
                             "style": "dashed",
                         },
-                        {"from": "n4", "to": "n5", "label": "SLOs met", "color": "#3fb950"},
+                        {
+                            "from": "n4",
+                            "to": "n5",
+                            "label": "SLOs met",
+                            "color": "#3fb950",
+                        },
                     ],
                 },
             },
@@ -4659,10 +6561,30 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "deps found", "color": "#10b981"},
-                        {"from": "n1", "to": "n3", "label": "inventory", "color": "#10b981"},
-                        {"from": "n2", "to": "n4", "label": "licenses ok", "color": "#3fb950"},
-                        {"from": "n3", "to": "n4", "label": "sbom ready", "color": "#3fb950"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "deps found",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n3",
+                            "label": "inventory",
+                            "color": "#10b981",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n4",
+                            "label": "licenses ok",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n4",
+                            "label": "sbom ready",
+                            "color": "#3fb950",
+                        },
                     ],
                 },
             },
@@ -4766,10 +6688,30 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "scenarios", "color": "#ef4444"},
-                        {"from": "n2", "to": "n3", "label": "baseline ok", "color": "#3fb950"},
-                        {"from": "n3", "to": "n4", "label": "fault active", "color": "#ef4444"},
-                        {"from": "n4", "to": "n5", "label": "observed", "color": "#d29922"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "scenarios",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n3",
+                            "label": "baseline ok",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n4",
+                            "label": "fault active",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n5",
+                            "label": "observed",
+                            "color": "#d29922",
+                        },
                     ],
                 },
             },
@@ -4873,9 +6815,24 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     "edges": [
                         {"from": "n1", "to": "n2", "label": "SLOs", "color": "#ec4899"},
                         {"from": "n1", "to": "n3", "label": "SLOs", "color": "#ec4899"},
-                        {"from": "n2", "to": "n4", "label": "endpoints", "color": "#3fb950"},
-                        {"from": "n3", "to": "n4", "label": "logs ready", "color": "#3fb950"},
-                        {"from": "n4", "to": "n5", "label": "alerts defined", "color": "#d29922"},
+                        {
+                            "from": "n2",
+                            "to": "n4",
+                            "label": "endpoints",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n4",
+                            "label": "logs ready",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n5",
+                            "label": "alerts defined",
+                            "color": "#d29922",
+                        },
                     ],
                 },
             },
@@ -4983,10 +6940,30 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "checks ok", "color": "#3fb950"},
-                        {"from": "n2", "to": "n3", "label": "1% stable", "color": "#3fb950"},
-                        {"from": "n3", "to": "n4", "label": "10% stable", "color": "#3fb950"},
-                        {"from": "n4", "to": "n5", "label": "approved", "color": "#3fb950"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "checks ok",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n3",
+                            "label": "1% stable",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n4",
+                            "label": "10% stable",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n5",
+                            "label": "approved",
+                            "color": "#3fb950",
+                        },
                         {
                             "from": "n2",
                             "to": "n1",
@@ -5086,9 +7063,24 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "models", "color": "#a855f7"},
-                        {"from": "n2", "to": "n3", "label": "factories", "color": "#a855f7"},
-                        {"from": "n2", "to": "n4", "label": "factories", "color": "#a855f7"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "models",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n3",
+                            "label": "factories",
+                            "color": "#a855f7",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n4",
+                            "label": "factories",
+                            "color": "#a855f7",
+                        },
                     ],
                 },
             },
@@ -5174,10 +7166,30 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "strings found", "color": "#3b82f6"},
-                        {"from": "n1", "to": "n3", "label": "strings found", "color": "#3b82f6"},
-                        {"from": "n2", "to": "n4", "label": "coverage", "color": "#3fb950"},
-                        {"from": "n3", "to": "n4", "label": "formats ok", "color": "#3fb950"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "strings found",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n1",
+                            "to": "n3",
+                            "label": "strings found",
+                            "color": "#3b82f6",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n4",
+                            "label": "coverage",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n4",
+                            "label": "formats ok",
+                            "color": "#3fb950",
+                        },
                     ],
                 },
             },
@@ -5264,8 +7276,18 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "findings", "color": "#ef4444"},
-                        {"from": "n2", "to": "n3", "label": "critical/high", "color": "#ef4444"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "findings",
+                            "color": "#ef4444",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n3",
+                            "label": "critical/high",
+                            "color": "#ef4444",
+                        },
                         {
                             "from": "n3",
                             "to": "n1",
@@ -5273,7 +7295,12 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "color": "#d29922",
                             "style": "dashed",
                         },
-                        {"from": "n3", "to": "n4", "label": "all fixed", "color": "#3fb950"},
+                        {
+                            "from": "n3",
+                            "to": "n4",
+                            "label": "all fixed",
+                            "color": "#3fb950",
+                        },
                     ],
                 },
             },
@@ -5376,11 +7403,31 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "requirements", "color": "#6366f1"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "requirements",
+                            "color": "#6366f1",
+                        },
                         {"from": "n1", "to": "n3", "label": "SLAs", "color": "#6366f1"},
-                        {"from": "n2", "to": "n4", "label": "matrix", "color": "#3fb950"},
-                        {"from": "n3", "to": "n4", "label": "SLA report", "color": "#3fb950"},
-                        {"from": "n4", "to": "n5", "label": "PV ready", "color": "#d29922"},
+                        {
+                            "from": "n2",
+                            "to": "n4",
+                            "label": "matrix",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n4",
+                            "label": "SLA report",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n5",
+                            "label": "PV ready",
+                            "color": "#d29922",
+                        },
                     ],
                 },
             },
@@ -5482,11 +7529,36 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "architecture", "color": "#0ea5e9"},
-                        {"from": "n2", "to": "n3", "label": "modules ready", "color": "#0ea5e9"},
-                        {"from": "n2", "to": "n4", "label": "modules ready", "color": "#0ea5e9"},
-                        {"from": "n3", "to": "n5", "label": "envs ok", "color": "#3fb950"},
-                        {"from": "n4", "to": "n5", "label": "drift ok", "color": "#3fb950"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "architecture",
+                            "color": "#0ea5e9",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n3",
+                            "label": "modules ready",
+                            "color": "#0ea5e9",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n4",
+                            "label": "modules ready",
+                            "color": "#0ea5e9",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n5",
+                            "label": "envs ok",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n5",
+                            "label": "drift ok",
+                            "color": "#3fb950",
+                        },
                     ],
                 },
             },
@@ -5622,12 +7694,42 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         },
                     ],
                     "edges": [
-                        {"from": "n1", "to": "n2", "label": "plan ok", "color": "#d946ef"},
-                        {"from": "n2", "to": "n3", "label": "backup ok", "color": "#3fb950"},
-                        {"from": "n3", "to": "n4", "label": "scripts ready", "color": "#d946ef"},
-                        {"from": "n4", "to": "n5", "label": "staging ok", "color": "#3fb950"},
-                        {"from": "n5", "to": "n6", "label": "approved", "color": "#3fb950"},
-                        {"from": "n6", "to": "n7", "label": "migrated", "color": "#d946ef"},
+                        {
+                            "from": "n1",
+                            "to": "n2",
+                            "label": "plan ok",
+                            "color": "#d946ef",
+                        },
+                        {
+                            "from": "n2",
+                            "to": "n3",
+                            "label": "backup ok",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n3",
+                            "to": "n4",
+                            "label": "scripts ready",
+                            "color": "#d946ef",
+                        },
+                        {
+                            "from": "n4",
+                            "to": "n5",
+                            "label": "staging ok",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n5",
+                            "to": "n6",
+                            "label": "approved",
+                            "color": "#3fb950",
+                        },
+                        {
+                            "from": "n6",
+                            "to": "n7",
+                            "label": "migrated",
+                            "color": "#d946ef",
+                        },
                         {
                             "from": "n6",
                             "to": "n2",
@@ -5638,6 +7740,180 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     ],
                 },
             },
+        ),
+    )
+
+    # ── Quality & Continuous Improvement Workflows (v2.1) ──
+
+    builtins.append(
+        WorkflowDef(
+            id="quality-improvement",
+            name="Quality Improvement Cycle",
+            description="Automated quality improvement: scan code quality with deterministic tools, identify worst dimensions, plan and execute improvements, rescan and learn.",
+            icon="",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="quality-scan",
+                    pattern_id="solo",
+                    name="Quality Scan",
+                    description="Run full deterministic quality scan: complexity (radon/lizard), coverage (coverage.py/nyc), security (bandit/semgrep), documentation (interrogate), architecture (madge/jscpd/mypy), maintainability (radon MI). Store scorecard in DB.",
+                    gate="Quality scorecard computed and stored",
+                    config={"agents": ["qa"]},
+                ),
+                WorkflowPhase(
+                    id="quality-analysis",
+                    pattern_id="network",
+                    name="Root Cause Analysis",
+                    description="Analyze quality scorecard. Identify TOP 3 worst dimensions. For each: find specific files/functions causing low scores. Cross-reference with adversarial rejection history and past incidents.",
+                    gate="Root causes identified for each low-scoring dimension",
+                    config={"agents": ["qa", "architecte", "lead-dev"]},
+                ),
+                WorkflowPhase(
+                    id="rex-digest",
+                    pattern_id="solo",
+                    name="REX & Memory Digest",
+                    description="Search memory_project and memory_global for: past ROTI, retrospective notes, recurring issues, lessons learned. Extract patterns: what keeps failing, what improved, what was tried before.",
+                    gate="REX digest compiled with actionable patterns",
+                    config={"agents": ["product-owner"]},
+                ),
+                WorkflowPhase(
+                    id="improvement-plan",
+                    pattern_id="network",
+                    name="Improvement Plan",
+                    description="Generate concrete improvement plan based on quality scan + REX digest. For each worst dimension: specific actions (refactor files, add tests, fix deps, improve docs). Prioritize by impact/effort.",
+                    gate="Improvement plan with prioritized actions",
+                    config={"agents": ["lead-dev", "architecte", "product-owner"]},
+                ),
+                WorkflowPhase(
+                    id="improvement-exec",
+                    pattern_id="hierarchical",
+                    name="Execute Improvements",
+                    description="Execute improvement actions: refactor high-complexity functions, add missing tests, fix dependency vulnerabilities, improve documentation, resolve circular dependencies. MUST use quality tools to verify each fix.",
+                    gate="All planned improvements implemented",
+                    config={"agents": ["lead-dev", "dev-1", "dev-2", "qa"]},
+                ),
+                WorkflowPhase(
+                    id="quality-rescan",
+                    pattern_id="solo",
+                    name="Quality Rescan",
+                    description="Re-run full quality scan. Compare before/after scores per dimension. Verify improvements are real (not just moving code around). Store new snapshot for trend.",
+                    gate="Scores improved or stable (no regression)",
+                    config={"agents": ["qa"]},
+                ),
+                WorkflowPhase(
+                    id="quality-learning",
+                    pattern_id="solo",
+                    name="Learning & Memory",
+                    description="Store what worked and what didn't in memory_global. Update project conventions if patterns emerged. Generate quality trend summary for sprint retro.",
+                    gate="always",
+                    config={"agents": ["product-owner"]},
+                ),
+            ],
+        ),
+    )
+
+    builtins.append(
+        WorkflowDef(
+            id="retrospective-quality",
+            name="Quality Retrospective",
+            description="End-of-sprint/PI quality retrospective: collect ROTI, REX, incidents, quality metrics. Analyze patterns. Generate and implement improvement actions for the SF itself.",
+            icon="",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="retro-collect",
+                    pattern_id="solo",
+                    name="Collect Feedback",
+                    description="Collect all sprint data: quality snapshots, adversarial rejections, platform incidents, session outcomes (success/fail/interrupted), LLM usage, ROTI feedback, retrospective notes from memory.",
+                    gate="Sprint data collected and structured",
+                    config={"agents": ["rte"]},
+                ),
+                WorkflowPhase(
+                    id="retro-analyze",
+                    pattern_id="network",
+                    name="Pattern Analysis",
+                    description="Analyze collected data for patterns: recurring failures, common adversarial rejections, quality regressions, successful improvements. Identify systemic vs one-off issues. Compute improvement velocity.",
+                    gate="Patterns identified with evidence",
+                    config={"agents": ["rte", "architecte", "product-owner"]},
+                ),
+                WorkflowPhase(
+                    id="retro-actions",
+                    pattern_id="network",
+                    name="Generate Actions",
+                    description="Generate concrete improvement actions for the SF itself: update agent skills (YAML), modify protocols (_EXEC_PROTOCOL, _DECOMPOSE_PROTOCOL), add new adversarial checks, tune workflow phases, improve tool schemas.",
+                    gate="Actionable improvement items with owner and target",
+                    config={"agents": ["lead-dev", "architecte", "product-owner"]},
+                ),
+                WorkflowPhase(
+                    id="retro-implement",
+                    pattern_id="hierarchical",
+                    name="Implement SF Improvements",
+                    description="Implement the improvement actions: modify YAML skill definitions, update protocol strings in engine.py, add adversarial checks, tune workflow configurations. Use code_write to make changes.",
+                    gate="SF improvements implemented and verified",
+                    config={"agents": ["lead-dev", "dev-1"]},
+                ),
+                WorkflowPhase(
+                    id="retro-validate",
+                    pattern_id="solo",
+                    name="Validate Changes",
+                    description="Run quality scan on the SF platform code itself. Verify no regressions. Store improvement results in memory_global for next iteration.",
+                    gate="always",
+                    config={"agents": ["qa"]},
+                ),
+            ],
+        ),
+    )
+
+    builtins.append(
+        WorkflowDef(
+            id="skill-evolution",
+            name="Agent Skill Evolution",
+            description="Meta-improvement: analyze agent performance across missions, extract best practices from top performers, update skills and prompts for underperformers. A/B test improvements.",
+            icon="",
+            is_builtin=True,
+            phases=[
+                WorkflowPhase(
+                    id="skill-audit",
+                    pattern_id="solo",
+                    name="Agent Performance Audit",
+                    description="Analyze all agents: quality scores per agent, adversarial rejection rates, code_write success rates, tool usage patterns. Rank agents by effectiveness. Identify top 5 and bottom 5 performers.",
+                    gate="Agent performance report generated",
+                    config={"agents": ["rte"]},
+                ),
+                WorkflowPhase(
+                    id="skill-best-practices",
+                    pattern_id="network",
+                    name="Extract Best Practices",
+                    description="Study top-performing agents: what tools do they use, what patterns in their prompts work, how do they structure code, what makes them pass adversarial checks. Extract reusable patterns.",
+                    gate="Best practices documented",
+                    config={"agents": ["architecte", "lead-dev"]},
+                ),
+                WorkflowPhase(
+                    id="skill-update",
+                    pattern_id="hierarchical",
+                    name="Update Agent Skills",
+                    description="Modify YAML skill definitions for underperforming agents. Update system prompts with best practices. Add new skills if gaps found. Remove redundant/confusing skills.",
+                    gate="Skill YAML files updated",
+                    config={"agents": ["lead-dev", "dev-1"]},
+                ),
+                WorkflowPhase(
+                    id="prompt-update",
+                    pattern_id="solo",
+                    name="Update Protocols",
+                    description="Refine _EXEC_PROTOCOL, _DECOMPOSE_PROTOCOL, _QA_PROTOCOL, _RESEARCH_PROTOCOL based on analysis. Add or clarify instructions that top agents follow. Remove instructions that cause confusion.",
+                    gate="Protocol strings updated in engine.py",
+                    config={"agents": ["lead-dev"]},
+                ),
+                WorkflowPhase(
+                    id="skill-validate",
+                    pattern_id="parallel",
+                    name="Validate Improvements",
+                    description="Run a sample mission with updated skills/protocols. Compare output quality with previous runs. Verify adversarial pass rate improved. Store comparison in memory_global.",
+                    gate="always",
+                    config={"agents": ["qa", "lead-dev"]},
+                ),
+            ],
         ),
     )
 

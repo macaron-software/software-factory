@@ -77,11 +77,18 @@ def _migrate(conn):
         conn.execute("ALTER TABLE agents ADD COLUMN motivation TEXT DEFAULT ''")
 
     try:
-        im_cols = {r[1] for r in conn.execute("PRAGMA table_info(ideation_messages)").fetchall()}
+        im_cols = {
+            r[1]
+            for r in conn.execute("PRAGMA table_info(ideation_messages)").fetchall()
+        }
         if im_cols and "role" not in im_cols:
-            conn.execute("ALTER TABLE ideation_messages ADD COLUMN role TEXT DEFAULT ''")
+            conn.execute(
+                "ALTER TABLE ideation_messages ADD COLUMN role TEXT DEFAULT ''"
+            )
         if im_cols and "target" not in im_cols:
-            conn.execute("ALTER TABLE ideation_messages ADD COLUMN target TEXT DEFAULT ''")
+            conn.execute(
+                "ALTER TABLE ideation_messages ADD COLUMN target TEXT DEFAULT ''"
+            )
     except Exception:
         pass
 
@@ -94,16 +101,24 @@ def _migrate(conn):
             ("job_duration", "1"),
         ]:
             if col not in m_cols:
-                conn.execute(f"ALTER TABLE missions ADD COLUMN {col} REAL DEFAULT {default}")
+                conn.execute(
+                    f"ALTER TABLE missions ADD COLUMN {col} REAL DEFAULT {default}"
+                )
     except Exception:
         pass
 
     try:
-        mr_cols = {r[1] for r in conn.execute("PRAGMA table_info(mission_runs)").fetchall()}
+        mr_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(mission_runs)").fetchall()
+        }
         if mr_cols and "workspace_path" not in mr_cols:
-            conn.execute("ALTER TABLE mission_runs ADD COLUMN workspace_path TEXT DEFAULT ''")
+            conn.execute(
+                "ALTER TABLE mission_runs ADD COLUMN workspace_path TEXT DEFAULT ''"
+            )
         if mr_cols and "parent_mission_id" not in mr_cols:
-            conn.execute("ALTER TABLE mission_runs ADD COLUMN parent_mission_id TEXT DEFAULT ''")
+            conn.execute(
+                "ALTER TABLE mission_runs ADD COLUMN parent_mission_id TEXT DEFAULT ''"
+            )
     except Exception:
         pass
 
@@ -154,16 +169,22 @@ def _migrate(conn):
         sp_cols = {r[1] for r in conn.execute("PRAGMA table_info(sprints)").fetchall()}
         if sp_cols:
             if "velocity" not in sp_cols:
-                conn.execute("ALTER TABLE sprints ADD COLUMN velocity INTEGER DEFAULT 0")
+                conn.execute(
+                    "ALTER TABLE sprints ADD COLUMN velocity INTEGER DEFAULT 0"
+                )
             if "planned_sp" not in sp_cols:
-                conn.execute("ALTER TABLE sprints ADD COLUMN planned_sp INTEGER DEFAULT 0")
+                conn.execute(
+                    "ALTER TABLE sprints ADD COLUMN planned_sp INTEGER DEFAULT 0"
+                )
     except Exception:
         pass
 
     try:
         m_cols2 = {r[1] for r in conn.execute("PRAGMA table_info(missions)").fetchall()}
         if m_cols2 and "kanban_status" not in m_cols2:
-            conn.execute("ALTER TABLE missions ADD COLUMN kanban_status TEXT DEFAULT 'funnel'")
+            conn.execute(
+                "ALTER TABLE missions ADD COLUMN kanban_status TEXT DEFAULT 'funnel'"
+            )
         if m_cols2 and "jira_key" not in m_cols2:
             conn.execute("ALTER TABLE missions ADD COLUMN jira_key TEXT")
     except Exception:
@@ -180,7 +201,9 @@ def _migrate(conn):
 
     # jira_key on user_stories
     try:
-        us_cols = {r[1] for r in conn.execute("PRAGMA table_info(user_stories)").fetchall()}
+        us_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(user_stories)").fetchall()
+        }
         if us_cols and "jira_key" not in us_cols:
             conn.execute("ALTER TABLE user_stories ADD COLUMN jira_key TEXT")
     except Exception:
@@ -246,7 +269,9 @@ def _migrate(conn):
             resolved_at TIMESTAMP
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_tickets_mission ON support_tickets(mission_id)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tickets_mission ON support_tickets(mission_id)"
+    )
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS platform_incidents (
@@ -264,35 +289,55 @@ def _migrate(conn):
             resolution TEXT
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_incidents_status ON platform_incidents(status)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_incidents_status ON platform_incidents(status)"
+    )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_incidents_severity ON platform_incidents(severity)"
     )
 
     # ── Performance indexes ──
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_missions_wsjf ON missions(wsjf_score DESC)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_missions_created ON missions(created_at)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_missions_wsjf ON missions(wsjf_score DESC)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_missions_created ON missions(created_at)"
+    )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_missions_type ON missions(type)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_missions_workflow ON missions(workflow_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_created ON sessions(created_at)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_missions_workflow ON missions(workflow_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_sessions_created ON sessions(created_at)"
+    )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_messages_session_from ON messages(session_id, from_agent)"
     )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_toolcalls_session ON tool_calls(session_id)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_toolcalls_session ON tool_calls(session_id)"
+    )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_sprints_status ON sprints(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_features_status ON features(status)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_ideation_project ON ideation_sessions(project_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_ideation_status ON ideation_sessions(status)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ideation_project ON ideation_sessions(project_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ideation_status ON ideation_sessions(status)"
+    )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_artifacts_type ON artifacts(type)")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_mission_runs_parent ON mission_runs(parent_mission_id)"
     )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_mission_runs_session ON mission_runs(session_id)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mission_runs_session ON mission_runs(session_id)"
+    )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_to)")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_incidents_created ON platform_incidents(created_at)"
     )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_scores_agent ON agent_scores(agent_id)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_agent_scores_agent ON agent_scores(agent_id)"
+    )
 
     # ── Integrations (plugin connectors) ──
     conn.execute("""
@@ -308,7 +353,9 @@ def _migrate(conn):
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_integrations_type ON integrations(type)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_integrations_type ON integrations(type)"
+    )
 
     # ── Custom AI Providers ──
     conn.execute("""
@@ -324,7 +371,9 @@ def _migrate(conn):
             updated_at TEXT DEFAULT (datetime('now'))
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_custom_ai_enabled ON custom_ai_providers(enabled)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_custom_ai_enabled ON custom_ai_providers(enabled)"
+    )
 
     # ── Notifications (in-app) ──
     conn.execute("""
@@ -342,13 +391,20 @@ def _migrate(conn):
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_notif_read ON notifications(is_read)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_notif_created ON notifications(created_at DESC)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_notif_created ON notifications(created_at DESC)"
+    )
 
     # Seed default integrations if empty
     existing = conn.execute("SELECT COUNT(*) FROM integrations").fetchone()[0]
     if existing == 0:
         for integ in [
-            ("jira", "Jira", "project_management", '{"url":"","project_key":"","mode":"import"}'),
+            (
+                "jira",
+                "Jira",
+                "project_management",
+                '{"url":"","project_key":"","mode":"import"}',
+            ),
             (
                 "confluence",
                 "Confluence",
@@ -422,7 +478,9 @@ def _migrate(conn):
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_usess_user ON user_sessions(user_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_usess_expires ON user_sessions(expires_at)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_usess_expires ON user_sessions(expires_at)"
+    )
 
     # ── Mercato: Agent Transfer Market ──
     conn.execute("""
@@ -445,7 +503,9 @@ def _migrate(conn):
             loan_from_project TEXT
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_aa_project ON agent_assignments(project_id)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_aa_project ON agent_assignments(project_id)"
+    )
     conn.execute("""
         CREATE TABLE IF NOT EXISTS mercato_listings (
             id TEXT PRIMARY KEY,
@@ -473,7 +533,9 @@ def _migrate(conn):
             completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_mt_agent ON mercato_transfers(agent_id)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mt_agent ON mercato_transfers(agent_id)"
+    )
     conn.execute("""
         CREATE TABLE IF NOT EXISTS token_transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -484,7 +546,9 @@ def _migrate(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_tt_project ON token_transactions(project_id)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tt_project ON token_transactions(project_id)"
+    )
 
     # ── LLM Usage tracking ──
     conn.execute("""
@@ -502,6 +566,46 @@ def _migrate(conn):
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_llm_usage_ts ON llm_usage(ts)")
+
+    # ── Quality Metrics (v2.1) ──
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS quality_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT NOT NULL,
+            mission_id TEXT,
+            session_id TEXT,
+            phase_name TEXT,
+            dimension TEXT NOT NULL,
+            score REAL NOT NULL,
+            details_json TEXT,
+            tool_used TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_qr_project ON quality_reports(project_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_qr_mission ON quality_reports(mission_id)"
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_qr_ts ON quality_reports(created_at)")
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS quality_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT NOT NULL,
+            mission_id TEXT,
+            global_score REAL NOT NULL,
+            breakdown_json TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_qs_project ON quality_snapshots(project_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_qs_ts ON quality_snapshots(created_at)"
+    )
 
 
 def _migrate_pg(conn):

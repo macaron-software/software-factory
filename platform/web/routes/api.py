@@ -115,7 +115,12 @@ async def sandbox_status():
     """Docker sandbox status."""
     import shutil
 
-    from ...tools.sandbox import SANDBOX_ENABLED, SANDBOX_IMAGE, SANDBOX_MEMORY, SANDBOX_NETWORK
+    from ...tools.sandbox import (
+        SANDBOX_ENABLED,
+        SANDBOX_IMAGE,
+        SANDBOX_MEMORY,
+        SANDBOX_NETWORK,
+    )
 
     docker_available = shutil.which("docker") is not None
     return JSONResponse(
@@ -134,7 +139,9 @@ async def permission_denials(limit: int = 50, agent_id: str = ""):
     """Recent permission denials (audit log)."""
     from ...agents.permissions import get_permission_guard
 
-    return JSONResponse(get_permission_guard().recent_denials(limit=limit, agent_id=agent_id))
+    return JSONResponse(
+        get_permission_guard().recent_denials(limit=limit, agent_id=agent_id)
+    )
 
 
 @router.get("/api/permissions/stats")
@@ -282,7 +289,9 @@ async def generate_retrospective(request: Request):
             context_parts.append(f"Ideation session {scope_id}:")
             for m in msgs:
                 role_str = f" ({m['role']})" if "role" in m.keys() and m["role"] else ""
-                context_parts.append(f"  {m['agent_name']}{role_str}: {m['content'][:200]}")
+                context_parts.append(
+                    f"  {m['agent_name']}{role_str}: {m['content'][:200]}"
+                )
             for f in findings:
                 context_parts.append(f"  Finding [{f['type']}]: {f['text']}")
 
@@ -406,10 +415,16 @@ async def api_get_si_blueprint(project_id: str):
     """Read SI blueprint for a project."""
     import yaml
 
-    bp_path = Path(__file__).resolve().parents[3] / "data" / "si_blueprints" / f"{project_id}.yaml"
+    bp_path = (
+        Path(__file__).resolve().parents[3]
+        / "data"
+        / "si_blueprints"
+        / f"{project_id}.yaml"
+    )
     if not bp_path.exists():
         return JSONResponse(
-            {"error": "No SI blueprint found", "project_id": project_id}, status_code=404
+            {"error": "No SI blueprint found", "project_id": project_id},
+            status_code=404,
         )
     with open(bp_path) as f:
         return JSONResponse(yaml.safe_load(f))
@@ -499,6 +514,33 @@ async def dora_dashboard_page(request: Request):
     )
 
 
+@router.get("/quality", response_class=HTMLResponse)
+async def quality_dashboard_page(request: Request):
+    """Quality Scorecard dashboard page."""
+    from ...metrics.quality import QualityScanner
+    from ...projects.manager import get_project_store
+
+    projects = get_project_store().list_all()
+    project_id = request.query_params.get("project_id", "")
+
+    snapshot = QualityScanner.get_latest_snapshot(project_id) if project_id else None
+    trend = QualityScanner.get_trend(project_id) if project_id else []
+    all_scores = QualityScanner.get_all_projects_scores()
+
+    return _templates(request).TemplateResponse(
+        "quality.html",
+        {
+            "request": request,
+            "page_title": "Quality Scorecard",
+            "projects": projects,
+            "selected_project": project_id,
+            "snapshot": snapshot,
+            "trend": trend,
+            "all_scores": all_scores,
+        },
+    )
+
+
 @router.get("/api/metrics/prometheus", response_class=PlainTextResponse)
 async def prometheus_metrics():
     """Prometheus-compatible metrics endpoint."""
@@ -521,19 +563,31 @@ async def prometheus_metrics():
         lines.append(f"{name}{lbl} {value}")
 
     _m("macaron_uptime_seconds", snap["uptime_seconds"], "Platform uptime")
-    _m("macaron_http_requests_total", snap["http"]["total_requests"], "Total HTTP requests")
+    _m(
+        "macaron_http_requests_total",
+        snap["http"]["total_requests"],
+        "Total HTTP requests",
+    )
     _m("macaron_http_errors_total", snap["http"]["total_errors"], "Total HTTP errors")
     _m("macaron_http_avg_ms", snap["http"]["avg_ms"], "Average HTTP latency ms")
     for code, cnt in snap["http"].get("by_status", {}).items():
         _m("macaron_http_status", cnt, labels=f'code="{code}"')
     _m("macaron_mcp_calls_total", snap["mcp"]["total_calls"], "Total MCP tool calls")
-    _m("macaron_process_cpu_percent", round(proc.cpu_percent(interval=0), 1), "Process CPU")
+    _m(
+        "macaron_process_cpu_percent",
+        round(proc.cpu_percent(interval=0), 1),
+        "Process CPU",
+    )
     mem = proc.memory_info()
     _m("macaron_process_rss_bytes", mem.rss, "Process RSS bytes")
     _m("macaron_process_threads", proc.num_threads(), "Process threads")
     for provider, stats in snap.get("llm", {}).get("by_provider", {}).items():
         _m("macaron_llm_calls", stats.get("calls", 0), labels=f'provider="{provider}"')
-        _m("macaron_llm_cost_usd", stats.get("cost_usd", 0), labels=f'provider="{provider}"')
+        _m(
+            "macaron_llm_cost_usd",
+            stats.get("cost_usd", 0),
+            labels=f'provider="{provider}"',
+        )
 
     return "\n".join(lines) + "\n"
 
@@ -548,7 +602,9 @@ async def dora_api(request: Request, project_id: str):
     return JSONResponse(get_dora_metrics().summary(pid, period))
 
 
-@router.get("/api/epics/{epic_id}/features", responses={200: {"model": list[FeatureOut]}})
+@router.get(
+    "/api/epics/{epic_id}/features", responses={200: {"model": list[FeatureOut]}}
+)
 async def epic_features(epic_id: str):
     """List features for an epic."""
     from ...db.migrations import get_db
@@ -648,7 +704,11 @@ async def monitoring_live(request: Request, hours: int = 24):
 
     # Active agents (runtime from AgentLoopManager + historical from DB — single connection)
     agents_runtime = {"active": 0, "loops": 0}
-    agents_historical = {"total_registered": 0, "participated": 0, "sessions_with_agents": 0}
+    agents_historical = {
+        "total_registered": 0,
+        "participated": 0,
+        "sessions_with_agents": 0,
+    }
     missions = []
     sessions = []
     sprints = []
@@ -686,7 +746,9 @@ async def monitoring_live(request: Request, hours: int = 24):
         top = adb.execute(
             "SELECT from_agent, COUNT(*) as cnt FROM messages WHERE from_agent IS NOT NULL AND from_agent != 'system' GROUP BY from_agent ORDER BY cnt DESC LIMIT 5"
         ).fetchall()
-        agents_historical["top_agents"] = [{"agent": r[0], "messages": r[1]} for r in top]
+        agents_historical["top_agents"] = [
+            {"agent": r[0], "messages": r[1]} for r in top
+        ]
         # Reuse same connection for missions/sessions/sprints/features/messages
         missions = adb.execute(
             "SELECT status, COUNT(*) as cnt FROM missions GROUP BY status"
@@ -834,7 +896,9 @@ async def monitoring_live(request: Request, hours: int = 24):
 
         rlm_cache = pathlib.Path(os.environ.get("DATA_DIR", "data")) / "rlm_cache.db"
         if not rlm_cache.exists():
-            rlm_cache = pathlib.Path(__file__).resolve().parents[3] / "data" / "rlm_cache.db"
+            rlm_cache = (
+                pathlib.Path(__file__).resolve().parents[3] / "data" / "rlm_cache.db"
+            )
         if rlm_cache.exists():
             import sqlite3
 
@@ -943,7 +1007,9 @@ async def monitoring_live(request: Request, hours: int = 24):
                     else ""
                 )
                 restarts = (
-                    c.get("RestartCount", 0) if c.get("HostConfig", {}).get("RestartPolicy") else 0
+                    c.get("RestartCount", 0)
+                    if c.get("HostConfig", {}).get("RestartPolicy")
+                    else 0
                 )
                 created = c.get("Created", 0)
 
@@ -962,20 +1028,26 @@ async def monitoring_live(request: Request, hours: int = 24):
                         if sr.status == 200:
                             st = json.loads(sr.read().decode())
                             # CPU %
-                            cpu_delta = st.get("cpu_stats", {}).get("cpu_usage", {}).get(
-                                "total_usage", 0
-                            ) - st.get("precpu_stats", {}).get("cpu_usage", {}).get(
-                                "total_usage", 0
-                            )
-                            sys_delta = st.get("cpu_stats", {}).get("system_cpu_usage", 0) - st.get(
-                                "precpu_stats", {}
-                            ).get("system_cpu_usage", 0)
+                            cpu_delta = st.get("cpu_stats", {}).get(
+                                "cpu_usage", {}
+                            ).get("total_usage", 0) - st.get("precpu_stats", {}).get(
+                                "cpu_usage", {}
+                            ).get("total_usage", 0)
+                            sys_delta = st.get("cpu_stats", {}).get(
+                                "system_cpu_usage", 0
+                            ) - st.get("precpu_stats", {}).get("system_cpu_usage", 0)
                             ncpus = st.get("cpu_stats", {}).get("online_cpus", 1) or 1
                             if sys_delta > 0 and cpu_delta > 0:
-                                cpu_pct = round((cpu_delta / sys_delta) * ncpus * 100, 1)
+                                cpu_pct = round(
+                                    (cpu_delta / sys_delta) * ncpus * 100, 1
+                                )
                             # Memory
                             mem_usage = st.get("memory_stats", {}).get("usage", 0)
-                            mem_cache = st.get("memory_stats", {}).get("stats", {}).get("cache", 0)
+                            mem_cache = (
+                                st.get("memory_stats", {})
+                                .get("stats", {})
+                                .get("cache", 0)
+                            )
                             mem_mb = round((mem_usage - mem_cache) / 1048576, 1)
                             mem_limit_mb = round(
                                 st.get("memory_stats", {}).get("limit", 0) / 1048576, 0
@@ -1019,14 +1091,20 @@ async def monitoring_live(request: Request, hours: int = 24):
                 if resp2.status == 200:
                     info = json.loads(resp2.read().decode())
                     docker_system["containers_total"] = info.get("Containers", 0)
-                    docker_system["containers_running"] = info.get("ContainersRunning", 0)
-                    docker_system["containers_stopped"] = info.get("ContainersStopped", 0)
+                    docker_system["containers_running"] = info.get(
+                        "ContainersRunning", 0
+                    )
+                    docker_system["containers_stopped"] = info.get(
+                        "ContainersStopped", 0
+                    )
                     docker_system["images"] = info.get("Images", 0)
                     docker_system["server_version"] = info.get("ServerVersion", "?")
                     docker_system["os"] = info.get("OperatingSystem", "?")
                     docker_system["kernel"] = info.get("KernelVersion", "?")
                     docker_system["cpus"] = info.get("NCPU", 0)
-                    docker_system["mem_total_gb"] = round(info.get("MemTotal", 0) / 1073741824, 1)
+                    docker_system["mem_total_gb"] = round(
+                        info.get("MemTotal", 0) / 1073741824, 1
+                    )
                 conn2.close()
             except Exception:
                 pass
@@ -1040,9 +1118,13 @@ async def monitoring_live(request: Request, hours: int = 24):
                     df = json.loads(resp3.read().decode())
                     # Images disk
                     img_size = sum(i.get("Size", 0) for i in df.get("Images", []))
-                    img_shared = sum(i.get("SharedSize", 0) for i in df.get("Images", []))
+                    img_shared = sum(
+                        i.get("SharedSize", 0) for i in df.get("Images", [])
+                    )
                     docker_system["images_size_gb"] = round(img_size / 1073741824, 2)
-                    docker_system["images_shared_gb"] = round(img_shared / 1073741824, 2)
+                    docker_system["images_shared_gb"] = round(
+                        img_shared / 1073741824, 2
+                    )
                     # Containers disk
                     ct_size = sum(c.get("SizeRw", 0) for c in df.get("Containers", []))
                     docker_system["containers_disk_mb"] = round(ct_size / 1048576, 1)
@@ -1136,7 +1218,8 @@ async def monitoring_live(request: Request, hours: int = 24):
             except Exception:
                 pass
         phase_stats = [
-            {"phase_name": k[0], "status": k[1], "cnt": v} for k, v in sorted(phase_counts.items())
+            {"phase_name": k[0], "status": k[1], "cnt": v}
+            for k, v in sorted(phase_counts.items())
         ]
         db.close()
     except Exception:
@@ -1210,7 +1293,9 @@ async def monitoring_live(request: Request, hours: int = 24):
 
     # Redact sensitive infrastructure details for unauthenticated requests
     is_authed = (
-        getattr(request.state, "authenticated", False) if hasattr(request, "state") else False
+        getattr(request.state, "authenticated", False)
+        if hasattr(request, "state")
+        else False
     )
     if not is_authed and os.getenv("MACARON_API_KEY"):
         # Strip container IDs, kernel, server version, git branch, Azure details
@@ -1426,7 +1511,9 @@ async def update_incident(request: Request, incident_id: str):
         if not updates:
             return JSONResponse({"error": "nothing to update"}, status_code=400)
         params.append(incident_id)
-        db.execute(f"UPDATE platform_incidents SET {', '.join(updates)} WHERE id=?", params)
+        db.execute(
+            f"UPDATE platform_incidents SET {', '.join(updates)} WHERE id=?", params
+        )
         db.commit()
         return JSONResponse({"ok": True, "id": incident_id})
     finally:
@@ -1627,7 +1714,9 @@ async def set_language(lang: str, request: Request):
         lang = "en"
     referer = request.headers.get("referer", "/")
     response = RedirectResponse(url=referer, status_code=303)
-    response.set_cookie("sf_lang", lang, max_age=365 * 86400, httponly=True, samesite="lax")
+    response.set_cookie(
+        "sf_lang", lang, max_age=365 * 86400, httponly=True, samesite="lax"
+    )
     return response
 
 
@@ -1748,7 +1837,9 @@ async def test_integration(integ_id: str):
 
     db = get_db()
     try:
-        row = db.execute("SELECT * FROM integrations WHERE id=?", (integ_id,)).fetchone()
+        row = db.execute(
+            "SELECT * FROM integrations WHERE id=?", (integ_id,)
+        ).fetchone()
         if not row:
             return JSONResponse({"ok": False, "error": "not found"}, 404)
         import json as _json
@@ -1953,7 +2044,9 @@ async def export_features_csv(request: Request):
                 "SELECT * FROM features WHERE epic_id=? ORDER BY priority", (epic_id,)
             ).fetchall()
         else:
-            rows = db.execute("SELECT * FROM features ORDER BY epic_id, priority").fetchall()
+            rows = db.execute(
+                "SELECT * FROM features ORDER BY epic_id, priority"
+            ).fetchall()
 
         out = io.StringIO()
         writer = csv.writer(out)
@@ -2005,7 +2098,8 @@ async def burndown_data(epic_id: str):
     db = get_db()
     try:
         total_sp = db.execute(
-            "SELECT COALESCE(SUM(story_points),0) FROM features WHERE epic_id=?", (epic_id,)
+            "SELECT COALESCE(SUM(story_points),0) FROM features WHERE epic_id=?",
+            (epic_id,),
         ).fetchone()[0]
         done_features = db.execute(
             "SELECT name, story_points, completed_at FROM features WHERE epic_id=? AND status='done' AND completed_at IS NOT NULL ORDER BY completed_at",
@@ -2020,7 +2114,9 @@ async def burndown_data(epic_id: str):
         burndown = []
         for p in points:
             remaining -= p["sp"]
-            burndown.append({"date": p["date"], "remaining": remaining, "done_name": p["name"]})
+            burndown.append(
+                {"date": p["date"], "remaining": remaining, "done_name": p["name"]}
+            )
 
         return JSONResponse(
             {
@@ -2089,7 +2185,11 @@ async def releases_data(project_id: str):
                     "feature_count": len(features),
                     "total_sp": total_sp,
                     "features": [
-                        {"name": f["name"], "sp": f["story_points"], "date": f["completed_at"]}
+                        {
+                            "name": f["name"],
+                            "sp": f["story_points"],
+                            "date": f["completed_at"],
+                        }
                         for f in features
                     ],
                 }
@@ -2141,7 +2241,9 @@ async def cycle_time_data(project_id: str = ""):
     db = get_db()
     try:
         where = (
-            "AND f.epic_id IN (SELECT id FROM missions WHERE project_id=?)" if project_id else ""
+            "AND f.epic_id IN (SELECT id FROM missions WHERE project_id=?)"
+            if project_id
+            else ""
         )
         params = (project_id,) if project_id else ()
 
@@ -2168,8 +2270,12 @@ async def cycle_time_data(project_id: str = ""):
             params,
         ).fetchall()
 
-        feat_days = [round(r["days"], 1) for r in features if r["days"] and r["days"] > 0]
-        story_days = [round(r["days"], 1) for r in stories if r["days"] and r["days"] > 0]
+        feat_days = [
+            round(r["days"], 1) for r in features if r["days"] and r["days"] > 0
+        ]
+        story_days = [
+            round(r["days"], 1) for r in stories if r["days"] and r["days"] > 0
+        ]
 
         def histogram(values, bins=10):
             if not values:
@@ -2194,7 +2300,9 @@ async def cycle_time_data(project_id: str = ""):
             {
                 "features": {
                     "count": len(feat_days),
-                    "avg_days": round(sum(feat_days) / len(feat_days), 1) if feat_days else 0,
+                    "avg_days": round(sum(feat_days) / len(feat_days), 1)
+                    if feat_days
+                    else 0,
                     "median_days": round(sorted(feat_days)[len(feat_days) // 2], 1)
                     if feat_days
                     else 0,
@@ -2205,7 +2313,9 @@ async def cycle_time_data(project_id: str = ""):
                 },
                 "stories": {
                     "count": len(story_days),
-                    "avg_days": round(sum(story_days) / len(story_days), 1) if story_days else 0,
+                    "avg_days": round(sum(story_days) / len(story_days), 1)
+                    if story_days
+                    else 0,
                     "median_days": round(sorted(story_days)[len(story_days) // 2], 1)
                     if story_days
                     else 0,
@@ -2215,7 +2325,10 @@ async def cycle_time_data(project_id: str = ""):
         )
     except Exception:
         return JSONResponse(
-            {"features": {"count": 0, "histogram": []}, "stories": {"count": 0, "histogram": []}}
+            {
+                "features": {"count": 0, "histogram": []},
+                "stories": {"count": 0, "histogram": []},
+            }
         )
     finally:
         db.close()
@@ -2282,17 +2395,25 @@ async def pipeline_metrics(mission_id: str):
                 "tools": {
                     "total": total_tools,
                     "success": ok_tools,
-                    "rate": round(ok_tools / total_tools * 100, 1) if total_tools else 0,
+                    "rate": round(ok_tools / total_tools * 100, 1)
+                    if total_tools
+                    else 0,
                     "by_tool": [
                         {"name": r["tool_name"], "total": r["total"], "ok": r["ok"]}
                         for r in tool_stats
                     ],
                 },
                 "agents": [
-                    {"id": r["agent_id"], "messages": r["messages"], "responses": r["responses"]}
+                    {
+                        "id": r["agent_id"],
+                        "messages": r["messages"],
+                        "responses": r["responses"],
+                    }
                     for r in agent_stats
                 ],
-                "phases": [{"id": r["phase_id"], "status": r["status"]} for r in phases],
+                "phases": [
+                    {"id": r["phase_id"], "status": r["status"]} for r in phases
+                ],
                 "screenshots": screenshot_count,
                 "tickets": {r["status"]: r["cnt"] for r in tickets},
             }
@@ -2325,7 +2446,9 @@ async def github_webhook(request: Request):
     # HMAC signature verification
     if secret:
         sig_header = request.headers.get("X-Hub-Signature-256", "")
-        expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+        expected = (
+            "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+        )
         if not hmac.compare_digest(sig_header, expected):
             return JSONResponse({"error": "Invalid signature"}, status_code=401)
 
@@ -2381,7 +2504,12 @@ async def github_webhook(request: Request):
                 )
                 db.commit()
                 return JSONResponse(
-                    {"ok": True, "event": "pull_request", "action": action, "mission_id": mid}
+                    {
+                        "ok": True,
+                        "event": "pull_request",
+                        "action": action,
+                        "mission_id": mid,
+                    }
                 )
 
         elif event == "issues":
@@ -2447,16 +2575,22 @@ async def create_ai_provider(request: Request):
     default_model = body.get("default_model", "").strip()
 
     if not all([name, base_url, api_key, default_model]):
-        return JSONResponse({"ok": False, "error": "Missing required fields"}, status_code=400)
+        return JSONResponse(
+            {"ok": False, "error": "Missing required fields"}, status_code=400
+        )
 
     # Encrypt API key
     encryption_key = os.environ.get("SF_ENCRYPTION_KEY")
     if not encryption_key:
         # Generate a key if not set (for development)
         encryption_key = Fernet.generate_key().decode()
-        logger.warning("SF_ENCRYPTION_KEY not set, using temporary key (not secure for production)")
+        logger.warning(
+            "SF_ENCRYPTION_KEY not set, using temporary key (not secure for production)"
+        )
 
-    fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
+    fernet = Fernet(
+        encryption_key.encode() if isinstance(encryption_key, str) else encryption_key
+    )
     encrypted_key = fernet.encrypt(api_key.encode()).decode()
 
     provider_id = str(uuid.uuid4())[:12]
@@ -2510,7 +2644,9 @@ async def update_ai_provider(provider_id: str, request: Request):
             if not encryption_key:
                 encryption_key = Fernet.generate_key().decode()
             fernet = Fernet(
-                encryption_key.encode() if isinstance(encryption_key, str) else encryption_key
+                encryption_key.encode()
+                if isinstance(encryption_key, str)
+                else encryption_key
             )
             encrypted_key = fernet.encrypt(body["api_key"].encode()).decode()
             updates.append("api_key_encrypted = ?")
@@ -2519,7 +2655,10 @@ async def update_ai_provider(provider_id: str, request: Request):
         if updates:
             updates.append("updated_at = datetime('now')")
             params.append(provider_id)
-            db.execute(f"UPDATE custom_ai_providers SET {', '.join(updates)} WHERE id = ?", params)
+            db.execute(
+                f"UPDATE custom_ai_providers SET {', '.join(updates)} WHERE id = ?",
+                params,
+            )
             db.commit()
 
         return JSONResponse({"ok": True})
@@ -2559,7 +2698,9 @@ async def test_ai_provider(provider_id: str):
         ).fetchone()
 
         if not row:
-            return JSONResponse({"ok": False, "error": "Provider not found"}, status_code=404)
+            return JSONResponse(
+                {"ok": False, "error": "Provider not found"}, status_code=404
+            )
 
         base_url = row[0]
         encrypted_key = row[1]
@@ -2570,7 +2711,9 @@ async def test_ai_provider(provider_id: str):
         if not encryption_key:
             encryption_key = Fernet.generate_key().decode()
         fernet = Fernet(
-            encryption_key.encode() if isinstance(encryption_key, str) else encryption_key
+            encryption_key.encode()
+            if isinstance(encryption_key, str)
+            else encryption_key
         )
         api_key = fernet.decrypt(encrypted_key.encode()).decode()
 
@@ -2588,7 +2731,9 @@ async def test_ai_provider(provider_id: str):
 
         if response.status_code == 200:
             return JSONResponse({"ok": True, "status": "connected"})
-        return JSONResponse({"ok": False, "error": f"HTTP {response.status_code}"}, status_code=500)
+        return JSONResponse(
+            {"ok": False, "error": f"HTTP {response.status_code}"}, status_code=500
+        )
 
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
@@ -2622,11 +2767,16 @@ async def notification_status():
 @router.post("/api/notifications/test")
 async def notification_test():
     """Send a test notification to all configured channels."""
-    from ...services.notification_service import NotificationPayload, get_notification_service
+    from ...services.notification_service import (
+        NotificationPayload,
+        get_notification_service,
+    )
 
     svc = get_notification_service()
     if not svc.is_configured:
-        return JSONResponse({"error": "No notification channels configured"}, status_code=400)
+        return JSONResponse(
+            {"error": "No notification channels configured"}, status_code=400
+        )
     payload = NotificationPayload(
         event="test",
         title="Test Notification",
@@ -2678,17 +2828,120 @@ PERSPECTIVE_LABELS = {
 
 # Which sidebar links each perspective can see
 PERSPECTIVE_SIDEBAR = {
-    "overview": {"/", "/backlog", "/pi", "/ceremonies", "/metrics", "/art", "/monitoring"},
-    "dsi": {"/", "/backlog", "/pi", "/ceremonies", "/metrics", "/art", "/monitoring", "/projects", "/settings"},
-    "portfolio_manager": {"/", "/backlog", "/pi", "/metrics", "/projects", "/settings"},
-    "rte": {"/", "/pi", "/ceremonies", "/sessions", "/art", "/monitoring", "/projects", "/settings"},
-    "product_owner": {"/", "/backlog", "/pi", "/projects", "/sessions", "/settings"},
-    "scrum_master": {"/", "/pi", "/ceremonies", "/sessions", "/art", "/monitoring", "/projects", "/settings"},
-    "developer": {"/", "/projects", "/sessions", "/toolbox", "/art", "/settings"},
-    "architect": {"/", "/backlog", "/pi", "/projects", "/toolbox", "/monitoring", "/settings"},
-    "qa_security": {"/", "/projects", "/ceremonies", "/sessions", "/monitoring", "/settings"},
-    "business_owner": {"/", "/backlog", "/pi", "/metrics", "/projects", "/settings"},
-    "admin": {"/", "/backlog", "/pi", "/ceremonies", "/sessions", "/art", "/toolbox", "/mercato", "/metrics", "/monitoring", "/projects", "/settings"},
+    "overview": {
+        "/",
+        "/backlog",
+        "/pi",
+        "/ceremonies",
+        "/metrics",
+        "/quality",
+        "/art",
+        "/monitoring",
+    },
+    "dsi": {
+        "/",
+        "/backlog",
+        "/pi",
+        "/ceremonies",
+        "/metrics",
+        "/quality",
+        "/art",
+        "/monitoring",
+        "/projects",
+        "/settings",
+    },
+    "portfolio_manager": {
+        "/",
+        "/backlog",
+        "/pi",
+        "/metrics",
+        "/quality",
+        "/projects",
+        "/settings",
+    },
+    "rte": {
+        "/",
+        "/pi",
+        "/ceremonies",
+        "/sessions",
+        "/art",
+        "/monitoring",
+        "/quality",
+        "/projects",
+        "/settings",
+    },
+    "product_owner": {
+        "/",
+        "/backlog",
+        "/pi",
+        "/projects",
+        "/sessions",
+        "/quality",
+        "/settings",
+    },
+    "scrum_master": {
+        "/",
+        "/pi",
+        "/ceremonies",
+        "/sessions",
+        "/art",
+        "/monitoring",
+        "/quality",
+        "/projects",
+        "/settings",
+    },
+    "developer": {
+        "/",
+        "/projects",
+        "/sessions",
+        "/toolbox",
+        "/art",
+        "/quality",
+        "/settings",
+    },
+    "architect": {
+        "/",
+        "/backlog",
+        "/pi",
+        "/projects",
+        "/toolbox",
+        "/monitoring",
+        "/quality",
+        "/settings",
+    },
+    "qa_security": {
+        "/",
+        "/projects",
+        "/ceremonies",
+        "/sessions",
+        "/monitoring",
+        "/quality",
+        "/settings",
+    },
+    "business_owner": {
+        "/",
+        "/backlog",
+        "/pi",
+        "/metrics",
+        "/quality",
+        "/projects",
+        "/settings",
+    },
+    "admin": {
+        "/",
+        "/backlog",
+        "/pi",
+        "/ceremonies",
+        "/sessions",
+        "/art",
+        "/toolbox",
+        "/mercato",
+        "/metrics",
+        "/quality",
+        "/monitoring",
+        "/projects",
+        "/settings",
+    },
 }
 
 
@@ -2755,7 +3008,13 @@ async def dashboard_kpis(request: Request, perspective: str = "admin"):
 
     # KPIs vary by perspective
     cards = []
-    if perspective in ("overview", "dsi", "portfolio_manager", "business_owner", "admin"):
+    if perspective in (
+        "overview",
+        "dsi",
+        "portfolio_manager",
+        "business_owner",
+        "admin",
+    ):
         cards = [
             {"value": str(total_epics), "label": "Total Epics"},
             {"value": str(active_missions), "label": "Active Missions"},
@@ -2764,7 +3023,10 @@ async def dashboard_kpis(request: Request, perspective: str = "admin"):
         ]
     elif perspective in ("rte", "scrum_master"):
         sprints_active = sum(
-            1 for r in runs if r.status and str(getattr(r.status, 'value', r.status)) in ("running", "active")
+            1
+            for r in runs
+            if r.status
+            and str(getattr(r.status, "value", r.status)) in ("running", "active")
         )
         cards = [
             {"value": str(active_missions), "label": "Active Missions"},
@@ -2828,7 +3090,11 @@ async def dashboard_missions(request: Request):
     for m in active:
         run = runs_map.get(m.id)
         if run and run.phases:
-            done = sum(1 for ph in run.phases if ph.status.value in ("done", "done_with_issues"))
+            done = sum(
+                1
+                for ph in run.phases
+                if ph.status.value in ("done", "done_with_issues")
+            )
             total = len(run.phases)
             pct = int(done / total * 100) if total > 0 else 0
         else:
@@ -2853,7 +3119,9 @@ async def dashboard_sprints(request: Request):
     except Exception:
         sprints = []
 
-    active = [s for s in sprints if getattr(s, "status", "") in ("active", "planning")][:5]
+    active = [s for s in sprints if getattr(s, "status", "") in ("active", "planning")][
+        :5
+    ]
     if not active:
         return HTMLResponse('<p class="text-muted">No active sprints</p>')
 
@@ -2913,10 +3181,52 @@ async def dashboard_projects(request: Request):
 
 @router.get("/api/dashboard/quality")
 async def dashboard_quality(request: Request):
-    """Quality metrics for QA."""
-    return HTMLResponse("""<div class="dash-stat"><span class="dash-stat-label">Test Campaigns</span><span class="dash-stat-value">—</span></div>
-    <div class="dash-stat"><span class="dash-stat-label">Security Audits</span><span class="dash-stat-value">—</span></div>
-    <div class="dash-stat"><span class="dash-stat-label">Open Vulnerabilities</span><span class="dash-stat-value">0</span></div>""")
+    """Quality metrics summary for dashboard."""
+    from ...metrics.quality import QualityScanner
+
+    scores = QualityScanner.get_all_projects_scores()
+    if not scores:
+        return HTMLResponse("""<div class="dash-stat"><span class="dash-stat-label">Quality Score</span><span class="dash-stat-value">--</span></div>
+        <div class="dash-stat"><span class="dash-stat-label">Projects Scanned</span><span class="dash-stat-value">0</span></div>
+        <div class="dash-stat"><span class="dash-stat-label">Run quality_scan to start</span><span class="dash-stat-value"></span></div>""")
+
+    avg_score = sum(s["global_score"] for s in scores) / len(scores) if scores else 0
+    low_count = sum(1 for s in scores if s["global_score"] < 60)
+    color = (
+        "#16a34a" if avg_score >= 80 else "#ea580c" if avg_score >= 60 else "#dc2626"
+    )
+
+    html = f"""<div class="dash-stat">
+        <span class="dash-stat-label">Avg Quality</span>
+        <span class="dash-stat-value" style="color:{color}">{avg_score:.0f}/100</span>
+    </div>
+    <div class="dash-stat">
+        <span class="dash-stat-label">Projects Scanned</span>
+        <span class="dash-stat-value">{len(scores)}</span>
+    </div>
+    <div class="dash-stat">
+        <span class="dash-stat-label">Below Threshold</span>
+        <span class="dash-stat-value" style="color:{"#dc2626" if low_count else "var(--text-secondary)"}">{low_count}</span>
+    </div>"""
+    return HTMLResponse(html)
+
+
+@router.get("/api/quality/{project_id}")
+async def api_quality_project(request: Request, project_id: str):
+    """Get quality scorecard for a project."""
+    from ...metrics.quality import QualityScanner
+
+    snapshot = QualityScanner.get_latest_snapshot(project_id)
+    trend = QualityScanner.get_trend(project_id, limit=20)
+    return {"snapshot": snapshot, "trend": trend}
+
+
+@router.get("/api/quality")
+async def api_quality_all(request: Request):
+    """Get quality scores for all projects."""
+    from ...metrics.quality import QualityScanner
+
+    return {"projects": QualityScanner.get_all_projects_scores()}
 
 
 @router.get("/api/dashboard/activity")

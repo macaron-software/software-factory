@@ -25,7 +25,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string", "description": "Absolute or relative file path"},
+                        "path": {
+                            "type": "string",
+                            "description": "Absolute or relative file path",
+                        },
                         "max_lines": {
                             "type": "integer",
                             "description": "Max lines to read (default 500)",
@@ -43,12 +46,18 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "pattern": {"type": "string", "description": "Regex pattern to search for"},
+                        "pattern": {
+                            "type": "string",
+                            "description": "Regex pattern to search for",
+                        },
                         "path": {
                             "type": "string",
                             "description": "Directory to search in (default: project root)",
                         },
-                        "glob": {"type": "string", "description": "File glob filter, e.g. '*.py'"},
+                        "glob": {
+                            "type": "string",
+                            "description": "File glob filter, e.g. '*.py'",
+                        },
                     },
                     "required": ["pattern"],
                 },
@@ -63,7 +72,10 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "path": {"type": "string", "description": "File path to write"},
-                        "content": {"type": "string", "description": "Content to write"},
+                        "content": {
+                            "type": "string",
+                            "description": "Content to write",
+                        },
                     },
                     "required": ["path", "content"],
                 },
@@ -82,7 +94,10 @@ def _get_tool_schemas() -> list[dict]:
                             "type": "string",
                             "description": "Exact string to find and replace",
                         },
-                        "new_str": {"type": "string", "description": "Replacement string"},
+                        "new_str": {
+                            "type": "string",
+                            "description": "Replacement string",
+                        },
                     },
                     "required": ["path", "old_str", "new_str"],
                 },
@@ -130,7 +145,10 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "cwd": {"type": "string", "description": "Working directory"},
-                        "path": {"type": "string", "description": "Specific file to diff"},
+                        "path": {
+                            "type": "string",
+                            "description": "Specific file to diff",
+                        },
                     },
                 },
             },
@@ -162,7 +180,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "key": {"type": "string", "description": "Short key/title for the memory"},
+                        "key": {
+                            "type": "string",
+                            "description": "Short key/title for the memory",
+                        },
                         "value": {"type": "string", "description": "Content to store"},
                         "category": {
                             "type": "string",
@@ -181,8 +202,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string", "description": "Directory path to list"},
-                        "depth": {"type": "integer", "description": "Max depth (default 2)"},
+                        "path": {
+                            "type": "string",
+                            "description": "Directory path to list",
+                        },
+                        "depth": {
+                            "type": "integer",
+                            "description": "Max depth (default 2)",
+                        },
                     },
                     "required": ["path"],
                 },
@@ -258,7 +285,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "mission_id": {"type": "string", "description": "Mission ID to check"},
+                        "mission_id": {
+                            "type": "string",
+                            "description": "Mission ID to check",
+                        },
                         "container": {
                             "type": "string",
                             "description": "Container name (alternative to mission_id)",
@@ -312,7 +342,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "phase_id": {"type": "string", "description": "Phase ID to check"},
+                        "phase_id": {
+                            "type": "string",
+                            "description": "Phase ID to check",
+                        },
                     },
                     "required": ["phase_id"],
                 },
@@ -553,7 +586,10 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "file_key": {"type": "string", "description": "Figma file key"},
-                        "node_id": {"type": "string", "description": "Node ID (e.g. '37:1201')"},
+                        "node_id": {
+                            "type": "string",
+                            "description": "Node ID (e.g. '37:1201')",
+                        },
                     },
                     "required": ["file_key", "node_id"],
                 },
@@ -619,7 +655,10 @@ def _get_tool_schemas() -> list[dict]:
                     "properties": {
                         "owner": {"type": "string", "description": "Repository owner"},
                         "repo": {"type": "string", "description": "Repository name"},
-                        "state": {"type": "string", "description": "Filter: open, closed, all"},
+                        "state": {
+                            "type": "string",
+                            "description": "Filter: open, closed, all",
+                        },
                         "query": {
                             "type": "string",
                             "description": "Search query for issue titles/body",
@@ -639,7 +678,10 @@ def _get_tool_schemas() -> list[dict]:
                     "properties": {
                         "owner": {"type": "string", "description": "Repository owner"},
                         "repo": {"type": "string", "description": "Repository name"},
-                        "state": {"type": "string", "description": "Filter: open, closed, all"},
+                        "state": {
+                            "type": "string",
+                            "description": "Filter: open, closed, all",
+                        },
                     },
                     "required": ["owner", "repo"],
                 },
@@ -711,12 +753,28 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "project": {"type": "string", "description": "Project key (default: LPDATA)"},
+                        "project": {
+                            "type": "string",
+                            "description": "Project key (default: LPDATA)",
+                        },
                         "summary": {"type": "string", "description": "Issue title"},
-                        "type": {"type": "string", "description": "Issue type: User Story, Feature, Anomalie (AGILE), etc."},
-                        "description": {"type": "string", "description": "Issue description"},
-                        "priority": {"type": "string", "description": "Priority name (optional)"},
-                        "labels": {"type": "array", "items": {"type": "string"}, "description": "Labels (optional)"},
+                        "type": {
+                            "type": "string",
+                            "description": "Issue type: User Story, Feature, Anomalie (AGILE), etc.",
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Issue description",
+                        },
+                        "priority": {
+                            "type": "string",
+                            "description": "Priority name (optional)",
+                        },
+                        "labels": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Labels (optional)",
+                        },
                     },
                     "required": ["summary"],
                 },
@@ -730,7 +788,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "issue_key": {"type": "string", "description": "Issue key (e.g. LPDATA-123)"},
+                        "issue_key": {
+                            "type": "string",
+                            "description": "Issue key (e.g. LPDATA-123)",
+                        },
                         "fields": {
                             "type": "object",
                             "description": "Fields to update: summary, description, priority, labels, assignee",
@@ -748,8 +809,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "issue_key": {"type": "string", "description": "Issue key (e.g. LPDATA-123)"},
-                        "transition": {"type": "string", "description": "Target transition name"},
+                        "issue_key": {
+                            "type": "string",
+                            "description": "Issue key (e.g. LPDATA-123)",
+                        },
+                        "transition": {
+                            "type": "string",
+                            "description": "Target transition name",
+                        },
                     },
                     "required": ["issue_key", "transition"],
                 },
@@ -763,8 +830,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "board_id": {"type": "integer", "description": "Board ID (default 8680)"},
-                        "max_results": {"type": "integer", "description": "Max results (default 50)"},
+                        "board_id": {
+                            "type": "integer",
+                            "description": "Board ID (default 8680)",
+                        },
+                        "max_results": {
+                            "type": "integer",
+                            "description": "Max results (default 50)",
+                        },
                     },
                 },
             },
@@ -777,8 +850,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "issue_key": {"type": "string", "description": "Issue key (e.g. LPDATA-123)"},
-                        "comment": {"type": "string", "description": "Comment body text"},
+                        "issue_key": {
+                            "type": "string",
+                            "description": "Issue key (e.g. LPDATA-123)",
+                        },
+                        "comment": {
+                            "type": "string",
+                            "description": "Comment body text",
+                        },
                     },
                     "required": ["issue_key", "comment"],
                 },
@@ -792,8 +871,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "mission_id": {"type": "string", "description": "Platform mission ID to sync"},
-                        "board_id": {"type": "integer", "description": "Target Jira board ID (default 8680)"},
+                        "mission_id": {
+                            "type": "string",
+                            "description": "Platform mission ID to sync",
+                        },
+                        "board_id": {
+                            "type": "integer",
+                            "description": "Target Jira board ID (default 8680)",
+                        },
                     },
                     "required": ["mission_id"],
                 },
@@ -807,8 +892,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "space": {"type": "string", "description": "Confluence space key"},
-                        "title": {"type": "string", "description": "Page title to search"},
+                        "space": {
+                            "type": "string",
+                            "description": "Confluence space key",
+                        },
+                        "title": {
+                            "type": "string",
+                            "description": "Page title to search",
+                        },
                         "page_id": {
                             "type": "string",
                             "description": "Page ID (alternative to title)",
@@ -907,7 +998,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "cwd": {"type": "string", "description": "Workspace root directory"},
+                        "cwd": {
+                            "type": "string",
+                            "description": "Workspace root directory",
+                        },
                         "path": {
                             "type": "string",
                             "description": "Subdirectory or file to scan (default: whole workspace)",
@@ -960,7 +1054,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "title": {"type": "string", "description": "Ticket title (concise)"},
+                        "title": {
+                            "type": "string",
+                            "description": "Ticket title (concise)",
+                        },
                         "description": {
                             "type": "string",
                             "description": "Detailed description of the issue",
@@ -1067,7 +1164,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "url": {"type": "string", "description": "URL to check (for site check)"},
+                        "url": {
+                            "type": "string",
+                            "description": "URL to check (for site check)",
+                        },
                         "checks": {
                             "type": "array",
                             "items": {"type": "string"},
@@ -1090,7 +1190,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "project_id": {"type": "string", "description": "Project identifier"},
+                        "project_id": {
+                            "type": "string",
+                            "description": "Project identifier",
+                        },
                     },
                 },
             },
@@ -1169,7 +1272,10 @@ def _get_tool_schemas() -> list[dict]:
                             "type": "string",
                             "description": "Session ID to get messages. Omit to list recent sessions.",
                         },
-                        "limit": {"type": "integer", "description": "Max messages (default 30)"},
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max messages (default 30)",
+                        },
                     },
                 },
             },
@@ -1191,9 +1297,15 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "epic_id": {"type": "string", "description": "Parent epic/mission ID"},
+                        "epic_id": {
+                            "type": "string",
+                            "description": "Parent epic/mission ID",
+                        },
                         "name": {"type": "string", "description": "Feature name"},
-                        "description": {"type": "string", "description": "Feature description"},
+                        "description": {
+                            "type": "string",
+                            "description": "Feature description",
+                        },
                         "acceptance_criteria": {
                             "type": "string",
                             "description": "Acceptance criteria",
@@ -1202,7 +1314,10 @@ def _get_tool_schemas() -> list[dict]:
                             "type": "integer",
                             "description": "Priority (1=highest, 10=lowest)",
                         },
-                        "story_points": {"type": "integer", "description": "Story points estimate"},
+                        "story_points": {
+                            "type": "integer",
+                            "description": "Story points estimate",
+                        },
                     },
                     "required": ["name"],
                 },
@@ -1216,18 +1331,30 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "feature_id": {"type": "string", "description": "Parent feature ID"},
+                        "feature_id": {
+                            "type": "string",
+                            "description": "Parent feature ID",
+                        },
                         "title": {
                             "type": "string",
                             "description": "User story title (e.g. US-E1-01: Intégration FC)",
                         },
-                        "description": {"type": "string", "description": "Story description"},
+                        "description": {
+                            "type": "string",
+                            "description": "Story description",
+                        },
                         "acceptance_criteria": {
                             "type": "string",
                             "description": "Acceptance criteria",
                         },
-                        "story_points": {"type": "integer", "description": "Story points estimate"},
-                        "priority": {"type": "integer", "description": "Priority (1=highest)"},
+                        "story_points": {
+                            "type": "integer",
+                            "description": "Story points estimate",
+                        },
+                        "priority": {
+                            "type": "integer",
+                            "description": "Priority (1=highest)",
+                        },
                     },
                     "required": ["title"],
                 },
@@ -1247,7 +1374,10 @@ def _get_tool_schemas() -> list[dict]:
                             "description": "Workflow ID (auto-generated if omitted)",
                         },
                         "name": {"type": "string", "description": "Workflow name"},
-                        "description": {"type": "string", "description": "What this workflow does"},
+                        "description": {
+                            "type": "string",
+                            "description": "What this workflow does",
+                        },
                         "phases": {
                             "type": "array",
                             "description": "List of phases: [{id, name, pattern, agents: [agent_ids], config, gate}]",
@@ -1270,7 +1400,10 @@ def _get_tool_schemas() -> list[dict]:
                                             "human-in-the-loop",
                                         ],
                                     },
-                                    "agents": {"type": "array", "items": {"type": "string"}},
+                                    "agents": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                    },
                                     "config": {"type": "object"},
                                     "gate": {
                                         "type": "string",
@@ -1313,7 +1446,10 @@ def _get_tool_schemas() -> list[dict]:
                                     "id": {"type": "string"},
                                     "name": {"type": "string"},
                                     "role": {"type": "string"},
-                                    "skills": {"type": "array", "items": {"type": "string"}},
+                                    "skills": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                    },
                                     "prompt": {"type": "string"},
                                 },
                             },
@@ -1336,9 +1472,18 @@ def _get_tool_schemas() -> list[dict]:
                             "description": "Parent mission/epic ID",
                         },
                         "name": {"type": "string", "description": "Feature name"},
-                        "description": {"type": "string", "description": "Feature description"},
-                        "goal": {"type": "string", "description": "Acceptance criteria"},
-                        "project_id": {"type": "string", "description": "Project identifier"},
+                        "description": {
+                            "type": "string",
+                            "description": "Feature description",
+                        },
+                        "goal": {
+                            "type": "string",
+                            "description": "Acceptance criteria",
+                        },
+                        "project_id": {
+                            "type": "string",
+                            "description": "Project identifier",
+                        },
                         "type": {
                             "type": "string",
                             "description": "Mission type: feature|story",
@@ -1348,7 +1493,10 @@ def _get_tool_schemas() -> list[dict]:
                             "type": "string",
                             "description": "Workflow to execute for this feature",
                         },
-                        "wsjf_score": {"type": "number", "description": "WSJF priority score"},
+                        "wsjf_score": {
+                            "type": "number",
+                            "description": "WSJF priority score",
+                        },
                         "config": {
                             "type": "object",
                             "description": "Extra config: team_ids, stack, ao_refs",
@@ -1366,7 +1514,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "parent_mission_id": {"type": "string", "description": "Parent mission ID"},
+                        "parent_mission_id": {
+                            "type": "string",
+                            "description": "Parent mission ID",
+                        },
                     },
                     "required": ["parent_mission_id"],
                 },
@@ -1380,9 +1531,18 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "mission_id": {"type": "string", "description": "Mission ID to update"},
-                        "wip_limit": {"type": "integer", "description": "Max concurrent workers"},
-                        "stack": {"type": "string", "description": "Required tech stack"},
+                        "mission_id": {
+                            "type": "string",
+                            "description": "Mission ID to update",
+                        },
+                        "wip_limit": {
+                            "type": "integer",
+                            "description": "Max concurrent workers",
+                        },
+                        "stack": {
+                            "type": "string",
+                            "description": "Required tech stack",
+                        },
                         "ao_refs": {
                             "type": "array",
                             "items": {"type": "string"},
@@ -1392,7 +1552,10 @@ def _get_tool_schemas() -> list[dict]:
                             "type": "string",
                             "description": "Sprint duration (e.g. '4h', '1d')",
                         },
-                        "max_workers": {"type": "integer", "description": "Max parallel workers"},
+                        "max_workers": {
+                            "type": "integer",
+                            "description": "Max parallel workers",
+                        },
                     },
                     "required": ["mission_id"],
                 },
@@ -1501,7 +1664,10 @@ def _get_tool_schemas() -> list[dict]:
                                 "properties": {
                                     "name": {"type": "string"},
                                     "entityType": {"type": "string"},
-                                    "observations": {"type": "array", "items": {"type": "string"}},
+                                    "observations": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                    },
                                 },
                             },
                             "description": "Entities to create [{name, entityType, observations}]",
@@ -1927,6 +2093,17 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
     ],
 }
 
+# Quality tools — available to qa, devops, architecture, cdp roles
+_QUALITY_TOOLS = [
+    "quality_scan",
+    "complexity_check",
+    "coverage_check",
+    "doc_coverage_check",
+]
+for _qrole in ("qa", "devops", "architecture", "cdp"):
+    if _qrole in ROLE_TOOL_MAP:
+        ROLE_TOOL_MAP[_qrole].extend(_QUALITY_TOOLS)
+
 # Platform introspection tools — available to ALL agent roles
 _PLATFORM_TOOLS = [
     "platform_agents",
@@ -1948,7 +2125,14 @@ def _classify_agent_role(agent: AgentDef) -> str:
 
     if any(
         k in combined
-        for k in ("product", "business", "analyste", "ba ", "fonctionnel", "product-manager")
+        for k in (
+            "product",
+            "business",
+            "analyste",
+            "ba ",
+            "fonctionnel",
+            "product-manager",
+        )
     ):
         return "product"
     if any(k in combined for k in ("archi", "architect")):
@@ -1956,7 +2140,8 @@ def _classify_agent_role(agent: AgentDef) -> str:
     if any(k in combined for k in ("ux", "ui", "design", "ergon")):
         return "ux"
     if any(
-        k in combined for k in ("qa", "test", "qualit", "fixture", "perf", "tma", "maintenance")
+        k in combined
+        for k in ("qa", "test", "qualit", "fixture", "perf", "tma", "maintenance")
     ):
         return "qa"
     if any(
@@ -1980,13 +2165,20 @@ def _classify_agent_role(agent: AgentDef) -> str:
         for k in ("secur", "secu", "cyber", "license", "compliance officer", "scanner")
     ):
         return "security"
-    if any(k in combined for k in ("contractual", "conformit", " ao ", "cctp", "recette")):
+    if any(
+        k in combined for k in ("contractual", "conformit", " ao ", "cctp", "recette")
+    ):
         return "product"
     if any(k in combined for k in ("migration", "etl", "migrat")):
         return "devops"
-    if any(k in combined for k in ("programme", "projet", "cdp", "scrum", "coach", "pm ")):
+    if any(
+        k in combined for k in ("programme", "projet", "cdp", "scrum", "coach", "pm ")
+    ):
         return "cdp"
-    if any(k in combined for k in ("dev", "lead", "engineer", "backend", "frontend", "fullstack")):
+    if any(
+        k in combined
+        for k in ("dev", "lead", "engineer", "backend", "frontend", "fullstack")
+    ):
         return "dev"
     return "dev"  # default to dev (most permissive set)
 

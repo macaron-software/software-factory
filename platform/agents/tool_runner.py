@@ -100,6 +100,13 @@ def _get_tool_registry():
         register_android_tools(reg)
     except Exception:
         pass
+    # Quality scanning tools (complexity, coverage, security metrics)
+    try:
+        from ..tools.quality_tools import register_quality_tools
+
+        register_quality_tools(reg)
+    except Exception:
+        pass
     return reg
 
 
@@ -278,7 +285,9 @@ async def _tool_list_files(args: dict) -> str:
         elif not os.path.exists(path):
             return f"Error: not a directory: {path}"
         elif os.path.isfile(path):
-            return f"Note: '{path}' is a file, not a directory. Use code_read to view it."
+            return (
+                f"Note: '{path}' is a file, not a directory. Use code_read to view it."
+            )
         else:
             return f"Error: not a directory: {path}"
     lines = []
@@ -350,8 +359,12 @@ async def _tool_memory_store(args: dict, ctx: ExecutionContext) -> str:
     try:
         # ISOLATION: must have project_id, store with agent_id traceability
         if not ctx.project_id:
-            return "Error: no project context — cannot store memory without project scope"
-        mem.project_store(ctx.project_id, key, value, category=category, source=ctx.agent.id)
+            return (
+                "Error: no project context — cannot store memory without project scope"
+            )
+        mem.project_store(
+            ctx.project_id, key, value, category=category, source=ctx.agent.id
+        )
         return f"Stored in project memory: [{key}] (by {ctx.agent.id})"
     except Exception as e:
         return f"Memory store error: {e}"
@@ -368,7 +381,9 @@ async def _tool_deep_search(args: dict, ctx: ExecutionContext) -> str:
         return "Error: no project context for RLM"
 
     print(f"[EXECUTOR] deep_search called: {query[:80]}", flush=True)
-    rlm = get_project_rlm(ctx.project_id or "workspace", workspace_path=ctx.project_path)
+    rlm = get_project_rlm(
+        ctx.project_id or "workspace", workspace_path=ctx.project_path
+    )
     if not rlm:
         return f"Error: could not initialize RLM for project {ctx.project_id} (no path found)"
 
@@ -454,7 +469,10 @@ async def _tool_run_phase(args: dict, ctx: ExecutionContext) -> str:
 
     # Build agents list from phase config
     agent_ids = wf_phase.config.get("agents", [])
-    agents = [{"id": f"ph-{i}", "agent_id": aid, "label": aid} for i, aid in enumerate(agent_ids)]
+    agents = [
+        {"id": f"ph-{i}", "agent_id": aid, "label": aid}
+        for i, aid in enumerate(agent_ids)
+    ]
     # Build edges based on pattern type
     edges = _build_phase_edges(base_pattern.type, agents)
 
@@ -510,7 +528,9 @@ async def _tool_run_phase(args: dict, ctx: ExecutionContext) -> str:
                 agent_label = node.agent.name if node.agent else nid
                 summaries.append(f"**{agent_label}**: {node.output[:500]}")
 
-        phase_run.status = PhaseStatus.DONE if pattern_run.success else PhaseStatus.FAILED
+        phase_run.status = (
+            PhaseStatus.DONE if pattern_run.success else PhaseStatus.FAILED
+        )
         phase_run.completed_at = datetime.utcnow()
         phase_run.summary = "\n\n".join(summaries)[:3000]
         if not pattern_run.success:
@@ -585,7 +605,9 @@ async def _tool_list_phases(args: dict, ctx: ExecutionContext) -> str:
     for i, p in enumerate(mission.phases, 1):
         icon = status_icons.get(p.status.value, "•")
         current = " ← CURRENT" if p.phase_id == mission.current_phase else ""
-        lines.append(f"{i}. {icon} {p.phase_name} [{p.pattern_id}] — {p.status.value}{current}")
+        lines.append(
+            f"{i}. {icon} {p.phase_name} [{p.pattern_id}] — {p.status.value}{current}"
+        )
     return "\n".join(lines)
 
 
@@ -646,7 +668,9 @@ async def _tool_get_project_context(args: dict, ctx: ExecutionContext) -> str:
     if ctx.project_memory:
         parts.append(f"## Project Memory\n{ctx.project_memory[:1000]}")
     if not parts:
-        return "No project context available. This mission is running without a project."
+        return (
+            "No project context available. This mission is running without a project."
+        )
     return "\n\n".join(parts)
 
 
@@ -662,7 +686,10 @@ async def _tool_build_test(tool_name: str, args: dict, ctx: ExecutionContext) ->
     import subprocess
 
     # Intercept Android builds — redirect to android_build tool
-    if any(kw in command for kw in ["gradlew", "gradle ", "assembleDebug", "assembleRelease"]):
+    if any(
+        kw in command
+        for kw in ["gradlew", "gradle ", "assembleDebug", "assembleRelease"]
+    ):
         return (
             "⚠️ WRONG TOOL: Do NOT use build() for Android/Gradle projects.\n"
             "Use android_build() instead — it runs in the android-builder container with real SDK.\n"
@@ -682,7 +709,9 @@ async def _tool_build_test(tool_name: str, args: dict, ctx: ExecutionContext) ->
             timeout=120,
         )
         out = (proc.stdout or "") + (proc.stderr or "")
-        status = "SUCCESS" if proc.returncode == 0 else f"FAILED (exit {proc.returncode})"
+        status = (
+            "SUCCESS" if proc.returncode == 0 else f"FAILED (exit {proc.returncode})"
+        )
         return f"[{tool_name.upper()}] {status}\n$ {command}\n{out[-3000:]}"
     except subprocess.TimeoutExpired:
         return f"[{tool_name.upper()}] TIMEOUT after 120s: {command}"
@@ -747,7 +776,9 @@ async def _tool_run_e2e_tests(args: dict, ctx: ExecutionContext) -> str:
     results = []
 
     # 1. Find app entry point
-    pkg_files = glob_mod.glob(os.path.join(workspace, "**/package.json"), recursive=True)
+    pkg_files = glob_mod.glob(
+        os.path.join(workspace, "**/package.json"), recursive=True
+    )
     pkg_files = [p for p in pkg_files if "node_modules" not in p]
 
     # 2. Install + build
@@ -763,7 +794,9 @@ async def _tool_run_e2e_tests(args: dict, ctx: ExecutionContext) -> str:
                 text=True,
                 timeout=60,
             )
-            results.append(f"[{label}] npm install: {'OK' if proc.returncode == 0 else 'FAIL'}")
+            results.append(
+                f"[{label}] npm install: {'OK' if proc.returncode == 0 else 'FAIL'}"
+            )
         except Exception as e:
             results.append(f"[{label}] npm install: {e}")
 
@@ -826,7 +859,9 @@ async def _tool_run_e2e_tests(args: dict, ctx: ExecutionContext) -> str:
             results.append(f"[screenshot:{name}] {ss_result[:200]}")
             screenshots_taken += 1
 
-        snap_result = await _tool_mcp_dynamic("mcp_playwright_browser_snapshot", {}, ctx)
+        snap_result = await _tool_mcp_dynamic(
+            "mcp_playwright_browser_snapshot", {}, ctx
+        )
         results.append(f"[inspect] {snap_result[:500]}")
     except Exception as e:
         results.append(f"[playwright] Error: {e}")
@@ -868,7 +903,11 @@ async def _tool_run_e2e_tests(args: dict, ctx: ExecutionContext) -> str:
 async def _tool_security_chaos(name: str, args: dict, ctx: ExecutionContext) -> str:
     """Dispatch security/chaos/TMC/infra tools to their BaseTool implementations."""
     from ..tools.chaos_tools import ChaosTestTool, InfraCheckTool, TmcLoadTestTool
-    from ..tools.security_tools import DependencyAuditTool, SastScanTool, SecretsScanTool
+    from ..tools.security_tools import (
+        DependencyAuditTool,
+        SastScanTool,
+        SecretsScanTool,
+    )
 
     _MAP = {
         "sast_scan": SastScanTool,
@@ -896,9 +935,16 @@ async def _tool_security_chaos(name: str, args: dict, ctx: ExecutionContext) -> 
 
 async def _tool_platform_backlog(name: str, args: dict, ctx: ExecutionContext) -> str:
     """Delegate create_feature/create_story to platform_tools registry."""
-    from ..tools.platform_tools import PlatformCreateFeatureTool, PlatformCreateStoryTool
+    from ..tools.platform_tools import (
+        PlatformCreateFeatureTool,
+        PlatformCreateStoryTool,
+    )
 
-    tool = PlatformCreateFeatureTool() if name == "create_feature" else PlatformCreateStoryTool()
+    tool = (
+        PlatformCreateFeatureTool()
+        if name == "create_feature"
+        else PlatformCreateStoryTool()
+    )
     return await tool.execute(args, ctx.agent)
 
 
@@ -974,7 +1020,9 @@ async def _tool_local_ci(args: dict, ctx: ExecutionContext) -> str:
     for step in steps:
         if step == "commit":
             try:
-                subprocess.run(["git", "add", "-A"], cwd=cwd, timeout=10, capture_output=True)
+                subprocess.run(
+                    ["git", "add", "-A"], cwd=cwd, timeout=10, capture_output=True
+                )
                 r = subprocess.run(
                     ["git", "commit", "-m", commit_msg],
                     cwd=cwd,
@@ -999,9 +1047,13 @@ async def _tool_local_ci(args: dict, ctx: ExecutionContext) -> str:
             )
             status = "OK" if r.returncode == 0 else f"FAIL (exit {r.returncode})"
             output = (
-                r.stdout[-500:] if r.returncode == 0 else (r.stderr[-500:] or r.stdout[-500:])
+                r.stdout[-500:]
+                if r.returncode == 0
+                else (r.stderr[-500:] or r.stdout[-500:])
             ).strip()
-            results.append(f"[{step}] {status}\n{output}" if output else f"[{step}] {status}")
+            results.append(
+                f"[{step}] {status}\n{output}" if output else f"[{step}] {status}"
+            )
             if r.returncode != 0 and step in ("build", "test"):
                 results.append(f"⛔ Pipeline stopped at '{step}'")
                 break
@@ -1022,7 +1074,12 @@ async def _tool_si_blueprint(args: dict, ctx: ExecutionContext) -> str:
     if not project_id and ctx.project_id:
         project_id = ctx.project_id
 
-    bp_path = Path(__file__).resolve().parents[2] / "data" / "si_blueprints" / f"{project_id}.yaml"
+    bp_path = (
+        Path(__file__).resolve().parents[2]
+        / "data"
+        / "si_blueprints"
+        / f"{project_id}.yaml"
+    )
     if not bp_path.exists():
         return (
             f"No SI blueprint found for project '{project_id}'. "
@@ -1061,7 +1118,9 @@ async def _tool_android(name: str, args: dict, ctx: ExecutionContext) -> str:
         return f"Error: android tool '{name}' not found"
     # Set workspace path from mission context if not provided
     if not args.get("workspace_path") and ctx.project_path:
-        args["workspace_path"] = f"/workspace/workspaces/{ctx.project_path.split('/')[-1]}"
+        args["workspace_path"] = (
+            f"/workspace/workspaces/{ctx.project_path.split('/')[-1]}"
+        )
     return await tool.execute(args)
 
 
@@ -1157,19 +1216,27 @@ RULES:
             {
                 "id": tc.id,
                 "type": "function",
-                "function": {"name": tc.function_name, "arguments": json.dumps(tc.arguments)},
+                "function": {
+                    "name": tc.function_name,
+                    "arguments": json.dumps(tc.arguments),
+                },
             }
             for tc in llm_resp.tool_calls
         ]
         messages.append(
-            LLMMessage(role="assistant", content=llm_resp.content or "", tool_calls=tc_msg_data)
+            LLMMessage(
+                role="assistant", content=llm_resp.content or "", tool_calls=tc_msg_data
+            )
         )
 
         for tc in llm_resp.tool_calls:
             result = await _execute_tool(tc, ctx, registry, llm)
             messages.append(
                 LLMMessage(
-                    role="tool", content=result[:4000], tool_call_id=tc.id, name=tc.function_name
+                    role="tool",
+                    content=result[:4000],
+                    tool_call_id=tc.id,
+                    name=tc.function_name,
                 )
             )
             # Track file changes
@@ -1179,7 +1246,9 @@ RULES:
                     path = path[len(ctx.project_path) :].lstrip("/")
                 files_changed.append(f"{tc.function_name}: {path}")
             elif tc.function_name == "git_commit":
-                files_changed.append(f"committed: {tc.arguments.get('message', '?')[:60]}")
+                files_changed.append(
+                    f"committed: {tc.arguments.get('message', '?')[:60]}"
+                )
 
             logger.warning(
                 "FRACTAL sub-agent round=%d tool=%s path=%s",
@@ -1388,7 +1457,10 @@ async def _tool_mcp_jira(name: str, args: dict, ctx: ExecutionContext) -> str:
                                 {
                                     "type": "paragraph",
                                     "content": [
-                                        {"type": "text", "text": args.get("description", "")}
+                                        {
+                                            "type": "text",
+                                            "text": args.get("description", ""),
+                                        }
                                     ],
                                 }
                             ],
@@ -1410,7 +1482,9 @@ async def _tool_mcp_jira(name: str, args: dict, ctx: ExecutionContext) -> str:
                     url = f"{base_url}/wiki/rest/api/content/{page_id}?expand=body.storage"
                 else:
                     url = f"{base_url}/wiki/rest/api/content?title={title}&spaceKey={space}&expand=body.storage"
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                async with session.get(
+                    url, timeout=aiohttp.ClientTimeout(total=30)
+                ) as resp:
                     data = await resp.json()
                     if "results" in data:
                         pages = data["results"]
@@ -1463,7 +1537,9 @@ async def _tool_mcp_dynamic(name: str, args: dict, ctx: ExecutionContext) -> str
 # ── Main tool dispatcher ─────────────────────────────────────────
 
 
-async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=None) -> str:
+async def _execute_tool(
+    tc: LLMToolCall, ctx: ExecutionContext, registry, llm=None
+) -> str:
     """Execute a single tool call and return string result."""
     name = tc.function_name
     args = dict(tc.arguments)
@@ -1496,7 +1572,13 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
                 else:
                     args["cwd"] = os.path.join(ctx.project_path, cwd_val)
         # File tools: resolve relative paths to project root
-        if name in ("code_read", "code_search", "code_write", "code_edit", "list_files"):
+        if name in (
+            "code_read",
+            "code_search",
+            "code_write",
+            "code_edit",
+            "list_files",
+        ):
             path = args.get("path", "")
             if not path or path == ".":
                 args["path"] = ctx.project_path
@@ -1520,7 +1602,9 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
                     elif path.startswith("." + ctx.project_path):
                         path = path[1:]  # remove leading dot, keep absolute
                 args["path"] = (
-                    os.path.join(ctx.project_path, path) if not os.path.isabs(path) else path
+                    os.path.join(ctx.project_path, path)
+                    if not os.path.isabs(path)
+                    else path
                 )
 
     # ── Permission enforcement ──
@@ -1531,7 +1615,9 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
         if hasattr(ctx.agent, "permissions"):
             p = ctx.agent.permissions
             perms_dict = (
-                p if isinstance(p, dict) else (p.model_dump() if hasattr(p, "model_dump") else {})
+                p
+                if isinstance(p, dict)
+                else (p.model_dump() if hasattr(p, "model_dump") else {})
             )
         denied = get_permission_guard().check(
             agent_id=ctx.agent.id,
@@ -1635,6 +1721,7 @@ async def _execute_tool(tc: LLMToolCall, ctx: ExecutionContext, registry, llm=No
         return await _tool_mcp_github(name, args, ctx)
     if name.startswith("jira_"):
         from ..tools.jira_tools import run_jira_tool
+
         return await run_jira_tool(name, args)
     if name == "confluence_read":
         return await _tool_mcp_jira(name, args, ctx)

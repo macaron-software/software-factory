@@ -14,6 +14,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY platform/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Quality metrics tools (v2.1 — deterministic code analysis)
+RUN pip install --no-cache-dir radon lizard interrogate bandit pip-audit && \
+    npm install -g jscpd madge
+
 # Playwright for browser screenshots (agent evidence)
 ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright-browsers
 RUN pip install --no-cache-dir playwright && \
