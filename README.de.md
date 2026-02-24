@@ -27,7 +27,7 @@
 
 Software Factory ist eine **autonome Multi-Agenten-Plattform**, die den gesamten Software-Entwicklungszyklus orchestriert — von der Ideenfindung bis zur Bereitstellung — mithilfe spezialisierter KI-Agenten, die zusammenarbeiten.
 
-Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 158 KI-Agenten über strukturierte Workflows zusammenarbeiten, der SAFe-Methodik folgen, TDD-Praktiken anwenden und automatisierte Qualitätstorwerden nutzen.
+Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 161 KI-Agenten über strukturierte Workflows zusammenarbeiten, der SAFe-Methodik folgen, TDD-Praktiken anwenden und automatisierte Qualitätstorwerden nutzen.
 
 ### Hauptmerkmale
 
@@ -109,7 +109,7 @@ Konfiguration auch über **Settings** (`/settings`).
 
 ## Funktionen
 
-- **158 KI-Agenten** in Teams organisiert
+- **161 KI-Agenten** in Teams organisiert
 - **Integrierte Tools**: `code_write`, `build`, `local_ci`, `sast_scan`, `playwright_test`, `create_ticket`, `git_commit`
 - **Vollständiges CLI** — 40+ Befehle
 - **REST API** — 94 dokumentierte Endpunkte

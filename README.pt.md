@@ -106,7 +106,7 @@ Configuração também em **Settings** (`/settings`).
 
 ## Features
 
-- **158 AI agents** organized in teams
+- **161 AI agents** organized in teams
 - **Ferramentas integradas**: `code_write`, `build`, `local_ci`, `sast_scan`, `playwright_test`, `create_ticket`, `git_commit`
 - **Complete CLI** — 40+ commands
 - **REST API** — 94 documented endpoints

@@ -31,14 +31,15 @@
 
 Software Factory is an **autonomous multi-agent platform** that orchestrates the entire software development lifecycle — from ideation to deployment — using specialized AI agents working together.
 
-Think of it as a **virtual software factory** where 158 AI agents collaborate through structured workflows, following SAFe methodology, TDD practices, and automated quality gates.
+Think of it as a **virtual software factory** where 161 AI agents collaborate through structured workflows, following SAFe methodology, TDD practices, and automated quality gates.
 
 ### Key Highlights
 
-- **158 specialized agents** — architects, developers, testers, SREs, security analysts, product owners
+- **161 specialized agents** — architects, developers, testers, SREs, security analysts, product owners
 - **12 orchestration patterns** — solo, parallel, hierarchical, network, adversarial-pair, human-in-the-loop
 - **SAFe-aligned lifecycle** — Portfolio → Epic → Feature → Story with PI cadence
 - **Auto-heal** — autonomous incident detection, triage, and self-repair
+- **LLM resilience** — multi-provider fallback, jittered retry, rate-limit aware, env-driven model config
 - **Security-first** — prompt injection guard, RBAC, secret scrubbing, connection pooling
 - **DORA metrics** — deployment frequency, lead time, MTTR, change failure rate
 
@@ -207,7 +208,7 @@ All four are created with the project. TMA, Security, and Self-Healing start as 
 
 ## Features
 
-### 158 Specialized AI Agents
+### 161 Specialized AI Agents
 
 Agents are organized in teams mirroring real software organizations:
 

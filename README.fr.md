@@ -31,11 +31,11 @@
 
 Software Factory est une **plateforme multi-agents autonome** qui orchestre l'intégralité du cycle de développement logiciel — de l'idéation au déploiement — en utilisant des agents IA spécialisés travaillant ensemble.
 
-Imaginez une **usine logicielle virtuelle** où 158 agents IA collaborent à travers des workflows structurés, suivant la méthodologie SAFe, les pratiques TDD et des portes de qualité automatisées.
+Imaginez une **usine logicielle virtuelle** où 161 agents IA collaborent à travers des workflows structurés, suivant la méthodologie SAFe, les pratiques TDD et des portes de qualité automatisées.
 
 ### Points clés
 
-- **158 agents spécialisés** — architectes, développeurs, testeurs, SRE, analystes sécurité, product owners
+- **161 agents spécialisés** — architectes, développeurs, testeurs, SRE, analystes sécurité, product owners
 - **12 patterns d'orchestration** — solo, parallèle, hiérarchique, réseau, adversarial-pair, human-in-the-loop
 - **Cycle de vie SAFe** — Portfolio → Epic → Feature → Story avec cadence PI
 - **Auto-réparation** — détection autonome d'incidents, triage et auto-réparation
@@ -365,7 +365,7 @@ ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
 sf status                              # Santé plateforme
 sf projects list                       # Tous les projets
 sf missions list                       # Missions avec scores WSJF
-sf agents list                         # 158 agents
+sf agents list                         # 161 agents
 sf features list <epic_id>             # Features d'un epic
 sf stories list --feature <id>         # User stories
 

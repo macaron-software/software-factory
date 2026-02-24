@@ -106,7 +106,7 @@ NVIDIA_API_KEY=nvapi-your-key-here
 
 ## Features
 
-- **158 AI agents** organized in teams
+- **161 AI agents** organized in teams
 - **Built-in tools**: `code_write`, `build`, `local_ci`, `sast_scan`, `playwright_test`, `create_ticket`, `git_commit`
 - **Complete CLI** — 40+ commands
 - **REST API** — 94 documented endpoints
