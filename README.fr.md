@@ -213,6 +213,58 @@ Hiérarchie complète Portfolio → Epic → Feature → Story avec :
 - **Dashboards temps réel** — visualisations Chart.js
 - **Métriques Prometheus** — endpoint /metrics
 
+### 📊 Métriques Qualité — Monitoring Industriel
+
+Scan qualité déterministe (sans LLM) avec 10 dimensions, comme une chaîne de production :
+
+| Dimension | Outils | Ce qui est mesuré |
+|-----------|--------|------------------|
+| **Complexité** | radon, lizard | Complexité cyclomatique, complexité cognitive |
+| **Couverture UT** | coverage.py, nyc | Pourcentage de couverture lignes/branches |
+| **Couverture E2E** | Playwright | Nombre de fichiers test, couverture specs |
+| **Sécurité** | bandit, semgrep | Findings SAST par sévérité (critique/haute/moyenne/basse) |
+| **Accessibilité** | pa11y | Violations WCAG 2.1 AA |
+| **Performance** | Lighthouse | Scores Core Web Vitals |
+| **Documentation** | interrogate | README, changelog, API docs, couverture docstrings |
+| **Architecture** | madge, jscpd, mypy | Dépendances circulaires, duplication, erreurs type |
+| **Maintenabilité** | custom | Distribution taille fichiers, ratio gros fichiers |
+| **Adversarial** | intégré | Taux incidents, taux rejets adversarial |
+
+**Portes qualité sur les phases de workflow** — chaque phase affiche un badge qualité (PASS/FAIL/PENDING) basé sur des seuils configurables :
+
+| Type de porte | Seuil | Utilisé dans |
+|---------------|-------|-------------|
+| `always` | 0% | Phases analyse, planning |
+| `no_veto` | 50% | Phases implémentation, sprint |
+| `all_approved` | 70% | Phases revue, release |
+| `quality_gate` | 80% | Phases deploy, production |
+
+**Dashboard qualité** sur `/quality` — scorecard global, scores par projet, snapshots tendances.
+Badges qualité visibles sur les missions, projets, workflows et le dashboard principal.
+
+### 🔄 4 Missions Auto-Provisionnées par Projet
+
+Chaque projet reçoit automatiquement 4 missions opérationnelles :
+
+| Mission | Type | Fréquence | Description |
+|---------|------|-----------|-------------|
+| **MCO/TMA** | Programme | Continue | Monitoring santé, triage incidents (P0-P4), correctif TDD, validation non-régression |
+| **Sécurité** | Revue | Hebdomadaire | Scans SAST (bandit/semgrep), audit dépendances, veille CVE |
+| **Dette Technique** | Réduction | Mensuelle | Audit complexité, priorisation WSJF, sprints refactoring |
+| **Self-Healing** | Programme | Continue | Pipeline autonome : détection 5xx → mission TMA → diagnostic agent → correctif code → validation |
+
+### 🔃 Amélioration Continue
+
+Trois workflows intégrés pour l'auto-amélioration :
+
+| Workflow | Objectif | Agents |
+|----------|---------|--------|
+| **quality-improvement** | Scan → identifier pires dimensions → planifier et exécuter améliorations | QA Lead, Dev, Architecte |
+| **retrospective-quality** | Rétro sprint : ROTI, incidents, métriques qualité → actions | Scrum Master, QA, Dev |
+| **skill-evolution** | Analyser performance agents → mettre à jour prompts → évoluer skills | Brain, Lead Dev, QA |
+
+Ces workflows créent une **boucle de feedback** : métriques → analyse → amélioration → re-scan → suivi progrès.
+
 ### 🔧 Outils Intégrés des Agents
 
 L'image Docker inclut tout le nécessaire pour que les agents travaillent en autonomie :
@@ -393,6 +445,26 @@ python3 -m platform.mcp_platform.server
 ```
 
 ## Nouveautés v2.1.0 (fév 2026)
+
+### Métriques Qualité — Monitoring Industriel
+- **10 dimensions déterministes** — complexité, couverture (UT/E2E), sécurité, accessibilité, performance, documentation, architecture, maintenabilité, adversarial
+- **Portes qualité sur les phases** — badges PASS/FAIL par phase avec seuils configurables (always/no_veto/all_approved/quality_gate)
+- **Dashboard qualité** sur `/quality` — scorecard global, scores par projet, snapshots tendances
+- **Badges qualité partout** — missions, projets, workflows, dashboard principal
+- **Sans LLM** — toutes les métriques calculées de manière déterministe (radon, bandit, semgrep, coverage.py, pa11y, madge)
+
+### 4 Missions Auto-Provisionnées par Projet
+Chaque projet reçoit automatiquement 4 missions opérationnelles :
+- **MCO/TMA** — maintenance continue : monitoring santé, triage incidents (P0-P4), correctif TDD, validation non-régression
+- **Sécurité** — scans SAST hebdomadaires, audit dépendances, veille CVE
+- **Dette Technique** — réduction mensuelle : audit complexité, priorisation WSJF, sprints refactoring
+- **Self-Healing** — pipeline autonome : détection 5xx → mission TMA → diagnostic agent → correctif code → validation
+
+### Amélioration Continue
+- **Workflow quality-improvement** — scan → identifier pires dimensions → planifier et exécuter améliorations
+- **Workflow retrospective-quality** — rétro sprint avec ROTI, incidents, métriques qualité → actions
+- **Workflow skill-evolution** — analyser performance agents → mettre à jour prompts → évoluer skills
+- **Boucle de feedback** — métriques → analyse → amélioration → re-scan → suivi progrès
 
 ### Perspectives SAFe & Onboarding
 - **9 perspectives SAFe** — dashboard, sidebar et KPIs adaptatifs par rôle

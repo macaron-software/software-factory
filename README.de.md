@@ -116,6 +116,27 @@ Konfiguration auch über **Settings** (`/settings`).
 - **MCP Server** — 23 Tools
 - **Lizenz AGPL v3**
 
+## Qualitätsmetriken — Industrielles Monitoring
+
+Deterministische Qualitätsscans (ohne LLM) mit 10 Dimensionen — wie eine Produktionslinie:
+
+**Komplexität** · **Unit-Test-Abdeckung** · **E2E-Test-Abdeckung** · **Sicherheit** · **Barrierefreiheit** · **Performance** · **Dokumentation** · **Architektur** · **Wartbarkeit** · **Adversarial**
+
+Qualitäts-Gates auf Workflow-Phasen (PASS/FAIL-Badges) · Dashboard unter `/quality` · Badges auf Missionen, Projekten und Workflows.
+
+### 4 Auto-Provisionierte Missionen pro Projekt
+
+| Mission | Frequenz | Beschreibung |
+|---------|----------|-------------|
+| **MCO/TMA** | Kontinuierlich | Gesundheitsmonitoring, Vorfall-Triage (P0-P4), TDD-Fix |
+| **Sicherheit** | Wöchentlich | SAST-Scans, Abhängigkeitsaudit, CVE-Überwachung |
+| **Technische Schuld** | Monatlich | Komplexitätsaudit, WSJF-Priorisierung, Refactoring-Sprints |
+| **Self-Healing** | Kontinuierlich | 5xx-Erkennung → TMA-Mission → Agent-Diagnose → Code-Fix → Validierung |
+
+### Kontinuierliche Verbesserung
+
+3 integrierte Workflows: **quality-improvement** (Scan → Verbesserungsplan), **retrospective-quality** (Sprint-Retro mit Metriken), **skill-evolution** (Agent-Prompt-Optimierung).
+
 
 ## Tests
 

@@ -201,8 +201,9 @@ These are **automatically enabled** for every project — no configuration neede
 | **TMA** | Program | Continuous | Health monitoring, incident detection, auto-repair, ticket creation |
 | **Security** | Review | Weekly | SAST scans (bandit/semgrep), dependency audit, secret detection |
 | **Tech Debt** | Reduction | Monthly | Code quality analysis, refactoring recommendations |
+| **Self-Healing** | Program | Continuous | Auto-detection of 5xx/crashes → TMA mission → agent diagnosis → code fix → validation |
 
-All three are created with the project. TMA and Security start as **active**, Tech Debt starts as **planning** (activate when ready).
+All four are created with the project. TMA, Security, and Self-Healing start as **active**, Tech Debt starts as **planning** (activate when ready).
 
 ## Features
 
@@ -261,6 +262,47 @@ Full Portfolio → Epic → Feature → Story hierarchy with:
 - **Change failure rate** — percentage of failed deployments
 - **Real-time dashboards** — Chart.js visualizations
 - **Prometheus metrics** — /metrics endpoint
+
+### Quality Metrics — Industrial Monitoring
+
+Deterministic quality scanning (no LLM) with 10 dimensions, like a production line:
+
+| Dimension | Tools | What it measures |
+|-----------|-------|-----------------|
+| **Complexity** | radon, lizard | Cyclomatic complexity, cognitive complexity |
+| **Unit Test Coverage** | coverage.py, nyc | Line/branch coverage percentage |
+| **E2E Test Coverage** | Playwright | Test file count, spec coverage |
+| **Security** | bandit, semgrep | SAST findings by severity (critical/high/medium/low) |
+| **Accessibility** | pa11y | WCAG 2.1 AA violations |
+| **Performance** | Lighthouse | Core Web Vitals scores |
+| **Documentation** | interrogate | README, changelog, API docs, docstring coverage |
+| **Architecture** | madge, jscpd, mypy | Circular deps, code duplication, type errors |
+| **Maintainability** | custom | File size distribution, large file ratio |
+| **Adversarial** | built-in | Incident rate, adversarial rejection rate |
+
+**Quality gates on workflow phases** — each workflow phase shows a quality badge (PASS/FAIL/PENDING) based on dimension thresholds configured per gate type:
+
+| Gate Type | Threshold | Used in |
+|-----------|-----------|---------|
+| `always` | 0% | Analysis, planning phases |
+| `no_veto` | 50% | Implementation, sprint phases |
+| `all_approved` | 70% | Review, release phases |
+| `quality_gate` | 80% | Deploy, production phases |
+
+**Quality dashboard** at `/quality` — global scorecard, per-project scores, trend snapshots.
+Quality badges visible on mission detail, project board, workflow phases, and the main dashboard.
+
+### Continuous Improvement Workflows
+
+Three built-in workflows for self-improvement:
+
+| Workflow | Purpose | Agents |
+|----------|---------|--------|
+| **quality-improvement** | Scan metrics → identify worst dimensions → plan & execute improvements | QA Lead, Dev, Architect |
+| **retrospective-quality** | End-of-sprint retro: collect ROTI, incidents, quality data → action items | Scrum Master, QA, Dev |
+| **skill-evolution** | Analyze agent performance → update system prompts → evolve skills | Brain, Lead Dev, QA |
+
+These workflows create a **feedback loop**: metrics → analysis → improvement → re-scan → track progress.
 
 ### Built-in Agent Tools
 
@@ -567,6 +609,26 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
 ## What's New in v2.1.0 (Feb 2026)
+
+### Quality Metrics — Industrial Monitoring
+- **10 deterministic dimensions** — complexity, coverage (UT/E2E), security, accessibility, performance, documentation, architecture, maintainability, adversarial
+- **Quality gates on workflow phases** — PASS/FAIL badges per phase with configurable thresholds (always/no_veto/all_approved/quality_gate)
+- **Quality dashboard** at `/quality` — global scorecard, per-project scores, trend snapshots
+- **Quality badges everywhere** — mission detail, project board, workflow phases, main dashboard
+- **No LLM required** — all metrics computed deterministically using open-source tools (radon, bandit, semgrep, coverage.py, pa11y, madge)
+
+### 4 Auto-Provisioned Missions per Project
+Every project automatically gets 4 operational missions:
+- **MCO/TMA** — continuous maintenance: health monitoring, incident triage (P0-P4), TDD fix, non-regression validation
+- **Security** — weekly SAST scans, dependency audit, CVE watch, code review
+- **Tech Debt** — monthly debt reduction: complexity audit, WSJF prioritization, refactoring sprints
+- **Self-Healing** — autonomous incident pipeline: 5xx detection → TMA mission creation → agent diagnosis → code fix → validation
+
+### Continuous Improvement
+- **quality-improvement workflow** — scan → identify worst dimensions → plan & execute improvements
+- **retrospective-quality workflow** — sprint retro with ROTI, incidents, quality metrics → action items
+- **skill-evolution workflow** — analyze agent performance → update prompts → evolve skills
+- **Feedback loop** — metrics → analysis → improvement → re-scan → track progress
 
 ### SAFe Perspectives & Onboarding
 - **9 SAFe role perspectives** — adaptive dashboard, sidebar, and KPIs per role
