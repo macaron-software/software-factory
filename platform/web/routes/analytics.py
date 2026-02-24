@@ -3,9 +3,11 @@ Analytics API — Real-time metrics and insights
 """
 
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Any
 
+import httpx
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -163,7 +165,9 @@ async def get_skills_cache_stats() -> dict[str, Any]:
 
         # Cache statistics
         total_cache = db.execute("SELECT COUNT(*) FROM skills_cache").fetchone()[0]
-        total_hits = db.execute("SELECT SUM(hit_count) FROM skills_cache").fetchone()[0] or 0
+        total_hits = (
+            db.execute("SELECT SUM(hit_count) FROM skills_cache").fetchone()[0] or 0
+        )
 
         # Avg skills per cache entry
         avg_skills = (
@@ -183,7 +187,9 @@ async def get_skills_cache_stats() -> dict[str, Any]:
                 "total_cached_contexts": total_cache,
                 "total_cache_hits": total_hits,
                 "avg_skills_per_context": round(avg_skills, 2),
-                "hit_rate": (round(total_hits / total_cache * 100, 2) if total_cache > 0 else 0),
+                "hit_rate": (
+                    round(total_hits / total_cache * 100, 2) if total_cache > 0 else 0
+                ),
             },
         }
 
@@ -220,10 +226,14 @@ async def get_missions_status() -> MissionsStatusResponse:
                 "count": count,
                 "percentage": round(count / total * 100, 1) if total > 0 else 0,
             }
-            for status, count in sorted(status_counts.items(), key=lambda x: x[1], reverse=True)
+            for status, count in sorted(
+                status_counts.items(), key=lambda x: x[1], reverse=True
+            )
         ]
 
-        return MissionsStatusResponse(success=True, data={"total": total, "by_status": status_data})
+        return MissionsStatusResponse(
+            success=True, data={"total": total, "by_status": status_data}
+        )
 
     except Exception:
         logger.exception("Error getting missions status")
@@ -243,7 +253,9 @@ async def get_missions_performance() -> dict[str, Any]:
         completed = [m for m in missions if getattr(m, "status", "") == "completed"]
         failed = [m for m in missions if getattr(m, "status", "") == "failed"]
         active = [
-            m for m in missions if getattr(m, "status", "") in ["running", "in_progress", "active"]
+            m
+            for m in missions
+            if getattr(m, "status", "") in ["running", "in_progress", "active"]
         ]
 
         success_rate = (
@@ -260,7 +272,9 @@ async def get_missions_performance() -> dict[str, Any]:
                 "failed": len(failed),
                 "active": len(active),
                 "success_rate": success_rate,
-                "backlog_size": len([m for m in missions if getattr(m, "status", "") == "pending"]),
+                "backlog_size": len(
+                    [m for m in missions if getattr(m, "status", "") == "pending"]
+                ),
             },
         }
 
@@ -274,7 +288,9 @@ async def get_missions_performance() -> dict[str, Any]:
 # =============================================================================
 
 
-@router.get("/api/analytics/agents/leaderboard", response_model=AgentsLeaderboardResponse)
+@router.get(
+    "/api/analytics/agents/leaderboard", response_model=AgentsLeaderboardResponse
+)
 async def get_agents_leaderboard(limit: int = 10) -> AgentsLeaderboardResponse:
     """Get top performing agents."""
     try:
@@ -337,7 +353,9 @@ async def get_agents_utilization() -> dict[str, Any]:
                 "total_agents": total_agents,
                 "agents_with_skills": agents_with_skills,
                 "utilization_rate": (
-                    round(agents_with_skills / total_agents * 100, 1) if total_agents > 0 else 0
+                    round(agents_with_skills / total_agents * 100, 1)
+                    if total_agents > 0
+                    else 0
                 ),
             },
         }
@@ -417,7 +435,9 @@ async def get_system_health() -> SystemHealthResponse:
 
         # Database size
         db_path = "platform.db"
-        db_size_mb = os.path.getsize(db_path) / (1024 * 1024) if os.path.exists(db_path) else 0
+        db_size_mb = (
+            os.path.getsize(db_path) / (1024 * 1024) if os.path.exists(db_path) else 0
+        )
 
         # Table counts
         tables = db.execute(
@@ -442,7 +462,9 @@ async def get_system_health() -> SystemHealthResponse:
                     "tables": len(tables),
                     "total_rows": total_rows,
                 },
-                "tables": sorted(table_stats, key=lambda x: x["rows"], reverse=True)[:10],
+                "tables": sorted(table_stats, key=lambda x: x["rows"], reverse=True)[
+                    :10
+                ],
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
@@ -474,11 +496,15 @@ async def get_analytics_overview() -> dict[str, Any]:
                 },
                 "missions": {
                     "status": missions_status.data if missions_status.success else {},
-                    "performance": (missions_perf.get("data", {}) if missions_perf else {}),
+                    "performance": (
+                        missions_perf.get("data", {}) if missions_perf else {}
+                    ),
                 },
                 "agents": {
                     "leaderboard": (
-                        agents_leaderboard.data[:5] if agents_leaderboard.success else []
+                        agents_leaderboard.data[:5]
+                        if agents_leaderboard.success
+                        else []
                     ),
                 },
                 "tma": tma_overview.data if tma_overview.success else {},
@@ -490,3 +516,141 @@ async def get_analytics_overview() -> dict[str, Any]:
     except Exception as e:
         logger.exception("Error getting analytics overview")
         return {"success": False, "data": {}, "error": str(e)}
+
+
+# =============================================================================
+# OpenTelemetry / Tracing API
+# =============================================================================
+
+
+@router.get("/api/analytics/tracing/services")
+async def get_tracing_services() -> dict[str, Any]:
+    """List services reporting traces to Jaeger."""
+    endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+    jaeger_ui = endpoint.replace(":4317", ":16686").replace(":4318", ":16686")
+    if not jaeger_ui:
+        return {"success": False, "error": "OTEL not configured", "data": []}
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(f"{jaeger_ui}/api/services")
+            data = resp.json()
+            return {
+                "success": True,
+                "data": data.get("data", []),
+                "jaeger_ui": jaeger_ui,
+            }
+    except Exception as e:
+        return {"success": False, "error": str(e), "data": []}
+
+
+@router.get("/api/analytics/tracing/traces")
+async def get_tracing_traces(
+    service: str = "macaron-prod",
+    limit: int = 20,
+    lookback: str = "1h",
+) -> dict[str, Any]:
+    """Get recent traces from Jaeger for a service."""
+    endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+    jaeger_ui = endpoint.replace(":4317", ":16686").replace(":4318", ":16686")
+    if not jaeger_ui:
+        return {"success": False, "error": "OTEL not configured", "data": []}
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                f"{jaeger_ui}/api/traces",
+                params={"service": service, "limit": limit, "lookback": lookback},
+            )
+            raw = resp.json()
+            traces = []
+            for t in raw.get("data", []):
+                spans = t.get("spans", [])
+                if not spans:
+                    continue
+                root = spans[0]
+                duration_us = root.get("duration", 0)
+                traces.append(
+                    {
+                        "traceID": t.get("traceID", ""),
+                        "operation": root.get("operationName", "?"),
+                        "duration_ms": round(duration_us / 1000, 1),
+                        "spans_count": len(spans),
+                        "start": root.get("startTime", 0),
+                        "tags": {
+                            tag["key"]: tag["value"]
+                            for tag in root.get("tags", [])
+                            if tag["key"]
+                            in ("http.method", "http.status_code", "http.url")
+                        },
+                    }
+                )
+            return {"success": True, "data": traces, "total": len(traces)}
+    except Exception as e:
+        return {"success": False, "error": str(e), "data": []}
+
+
+@router.get("/api/analytics/tracing/stats")
+async def get_tracing_stats(
+    service: str = "macaron-prod", lookback: str = "1h"
+) -> dict[str, Any]:
+    """Compute latency stats (p50/p95/p99, throughput, errors) from Jaeger traces."""
+    endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+    jaeger_ui = endpoint.replace(":4317", ":16686").replace(":4318", ":16686")
+    if not jaeger_ui:
+        return {"success": False, "error": "OTEL not configured"}
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                f"{jaeger_ui}/api/traces",
+                params={"service": service, "limit": 200, "lookback": lookback},
+            )
+            raw = resp.json()
+
+        durations = []
+        errors = 0
+        ops: dict[str, list[float]] = {}
+        for t in raw.get("data", []):
+            spans = t.get("spans", [])
+            if not spans:
+                continue
+            root = spans[0]
+            d_ms = root.get("duration", 0) / 1000
+            durations.append(d_ms)
+            op = root.get("operationName", "?")
+            ops.setdefault(op, []).append(d_ms)
+            for tag in root.get("tags", []):
+                if tag["key"] == "http.status_code" and int(tag.get("value", 0)) >= 400:
+                    errors += 1
+
+        if not durations:
+            return {"success": True, "data": {"traces": 0}}
+
+        durations.sort()
+        n = len(durations)
+        return {
+            "success": True,
+            "data": {
+                "traces": n,
+                "errors": errors,
+                "error_rate": round(errors * 100 / n, 1),
+                "latency": {
+                    "p50": round(durations[n // 2], 1),
+                    "p95": round(durations[int(n * 0.95)], 1),
+                    "p99": round(durations[int(n * 0.99)], 1),
+                    "avg": round(sum(durations) / n, 1),
+                    "max": round(max(durations), 1),
+                },
+                "top_operations": [
+                    {
+                        "operation": op,
+                        "count": len(ds),
+                        "avg_ms": round(sum(ds) / len(ds), 1),
+                        "p95_ms": round(sorted(ds)[int(len(ds) * 0.95)], 1)
+                        if len(ds) > 1
+                        else round(ds[0], 1),
+                    }
+                    for op, ds in sorted(ops.items(), key=lambda x: -len(x[1]))[:10]
+                ],
+            },
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}

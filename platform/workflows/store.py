@@ -30,8 +30,11 @@ class WorkflowPhase:
     pattern_id: str = ""
     name: str = ""
     description: str = ""
-    gate: str = ""  # condition to proceed: "all_approved", "no_veto", "always"
+    gate: str = ""  # "all_approved", "no_veto", "always", "best_effort"
     config: dict = field(default_factory=dict)
+    retry_count: int = 1  # max retries on failure (0 = no retry)
+    skip_on_failure: bool = False  # skip phase after all retries exhausted
+    timeout: int = 0  # per-phase timeout override (0 = use global default)
 
 
 @dataclass
@@ -310,6 +313,14 @@ def _save_checkpoint(store, session_id: str, completed_phase: int):
         logger.debug("Checkpoint save failed for %s: %s", session_id, e)
 
 
+def _is_transient_error(error_str: str) -> bool:
+    """Check if an error is transient (rate limit, timeout, connection)."""
+    return any(
+        k in error_str.lower()
+        for k in ("429", "rate", "timeout", "connection", "temporarily", "overloaded")
+    )
+
+
 def _reset_stuck_phases(store, session_id: str):
     """Reset phases stuck at 'running' → 'pending' for resumed workflows."""
     try:
@@ -485,10 +496,13 @@ async def run_workflow(
             phase_task += "\n"
         phase_task += f"## Original goal:\n{initial_task}"
 
+        # Phase timeout: per-phase override or global default
+        phase_timeout = phase.timeout if phase.timeout > 0 else PHASE_TIMEOUT_SECONDS
+
         try:
             result = await asyncio.wait_for(
                 run_pattern(pattern, session_id, phase_task, project_id),
-                timeout=PHASE_TIMEOUT_SECONDS,
+                timeout=phase_timeout,
             )
             run.phase_results.append(
                 {
@@ -500,17 +514,25 @@ async def run_workflow(
 
             # RTE reacts to gate results
             if phase.gate == "all_approved" and not result.success:
-                run.status = "gated"
-                await _rte_facilitate(
-                    session_id,
-                    f"La phase **{phase.name}** n'a pas obtenu l'approbation de tous. "
-                    f"Des vetos non résolus subsistent après les boucles de correction. "
-                    f"Le workflow est bloqué. Synthétise la situation et propose les prochaines étapes.",
-                    to_agent=leader,
-                    project_id=project_id,
-                )
-                break
-            elif phase.gate == "no_veto" and not result.success:
+                if phase.skip_on_failure:
+                    await _rte_facilitate(
+                        session_id,
+                        f"La phase **{phase.name}** n'a pas obtenu l'approbation mais skip_on_failure=True. On continue.",
+                        to_agent=leader,
+                        project_id=project_id,
+                    )
+                else:
+                    run.status = "gated"
+                    await _rte_facilitate(
+                        session_id,
+                        f"La phase **{phase.name}** n'a pas obtenu l'approbation de tous. "
+                        f"Des vetos non résolus subsistent après les boucles de correction. "
+                        f"Le workflow est bloqué. Synthétise la situation et propose les prochaines étapes.",
+                        to_agent=leader,
+                        project_id=project_id,
+                    )
+                    break
+            elif phase.gate in ("no_veto", "best_effort") and not result.success:
                 await _rte_facilitate(
                     session_id,
                     f"La phase **{phase.name}** a eu des retours mais on continue. "
@@ -536,10 +558,9 @@ async def run_workflow(
             logger.error(
                 "Workflow phase %s timed out after %ds",
                 phase.name,
-                PHASE_TIMEOUT_SECONDS,
+                phase_timeout,
             )
-            error_str = f"Phase timed out after {PHASE_TIMEOUT_SECONDS}s"
-            # Capture last agent message as context for the timeout
+            error_str = f"Phase timed out after {phase_timeout}s"
             _last_summary = _capture_last_agent_summary(store, session_id, phase.name)
             run.phase_results.append(
                 {
@@ -549,12 +570,15 @@ async def run_workflow(
                     "timeout": True,
                 }
             )
-            # Timeouts are transient — continue if gate allows
-            if phase.gate in ("always", "no_veto"):
+            # Timeouts: continue if gate allows or skip_on_failure
+            if (
+                phase.gate in ("always", "no_veto", "best_effort")
+                or phase.skip_on_failure
+            ):
                 await _rte_facilitate(
                     session_id,
-                    f"La phase **{phase.name}** a dépassé le timeout ({PHASE_TIMEOUT_SECONDS}s). "
-                    f"Gate='{phase.gate}', on continue.\n{_last_summary}",
+                    f"La phase **{phase.name}** a dépassé le timeout ({phase_timeout}s). "
+                    f"{'skip_on_failure' if phase.skip_on_failure else f'gate={phase.gate}'}, on continue.\n{_last_summary}",
                     to_agent=leader,
                     project_id=project_id,
                 )
@@ -565,7 +589,7 @@ async def run_workflow(
             run.error = error_str
             await _rte_facilitate(
                 session_id,
-                f"La phase **{phase.name}** a dépassé le timeout ({PHASE_TIMEOUT_SECONDS}s). "
+                f"La phase **{phase.name}** a dépassé le timeout ({phase_timeout}s). "
                 f"Le workflow est arrêté.\n{_last_summary}",
                 to_agent=leader,
                 project_id=project_id,
@@ -576,35 +600,39 @@ async def run_workflow(
             logger.error("Workflow phase %s failed: %s", phase.name, e)
             error_str = str(e)
             _last_summary = _capture_last_agent_summary(store, session_id, phase.name)
-            # Retry up to 3 times on transient errors with exponential backoff
-            is_transient = any(
-                k in error_str.lower()
-                for k in (
-                    "429",
-                    "rate",
-                    "timeout",
-                    "connection",
-                    "temporarily",
-                    "overloaded",
-                )
+
+            # Retry logic: use phase.retry_count (default 1), with error context injection
+            max_retries = max(
+                phase.retry_count,
+                3 if _is_transient_error(error_str) else phase.retry_count,
             )
-            if is_transient:
+            retry_ok = False
+            if max_retries > 0:
                 import random
 
-                retry_ok = False
-                for attempt in range(1, 4):
+                for attempt in range(1, max_retries + 1):
                     delay = min(15 * (2 ** (attempt - 1)) + random.uniform(0, 10), 120)
-                    logger.info(
-                        "Retrying phase %s (attempt %d/3) after %.0fs",
+                    logger.warning(
+                        "Retrying phase %s (attempt %d/%d) after %.0fs — %s",
                         phase.name,
                         attempt,
+                        max_retries,
                         delay,
+                        error_str[:100],
                     )
                     await asyncio.sleep(delay)
+                    # Inject error context into retry prompt
+                    retry_task = (
+                        f"{phase_task}\n\n"
+                        f"## RETRY (attempt {attempt}/{max_retries})\n"
+                        f"Previous attempt failed: {error_str[:500]}\n"
+                        f"{_last_summary}\n"
+                        f"Fix the issues and try again."
+                    )
                     try:
                         result = await asyncio.wait_for(
-                            run_pattern(pattern, session_id, phase_task, project_id),
-                            timeout=PHASE_TIMEOUT_SECONDS,
+                            run_pattern(pattern, session_id, retry_task, project_id),
+                            timeout=phase_timeout,
                         )
                         run.phase_results.append(
                             {
@@ -628,40 +656,44 @@ async def run_workflow(
                         break
                     except Exception as e2:
                         error_str = str(e2)
+                        _last_summary = _capture_last_agent_summary(
+                            store, session_id, phase.name
+                        )
                         logger.error(
                             "Retry %d failed for phase %s: %s", attempt, phase.name, e2
                         )
-                if retry_ok:
-                    continue
+            if retry_ok:
+                continue
 
-            # Non-critical phases (gate=always) — log error but continue
-            if phase.gate == "always":
+            # All retries exhausted — decide: skip or stop
+            if phase.skip_on_failure or phase.gate in ("always", "best_effort"):
                 run.phase_results.append(
                     {
                         "phase": phase.name,
                         "success": False,
                         "error": error_str,
                         "context": _last_summary,
+                        "skipped_after_failure": True,
                     }
                 )
                 await _rte_facilitate(
                     session_id,
-                    f"Erreur technique sur la phase **{phase.name}**: {error_str}\n"
+                    f"La phase **{phase.name}** a échoué après {max_retries} tentatives: {error_str[:200]}\n"
                     f"{_last_summary}\n"
-                    f"La phase a gate='always', on continue avec la suite.",
+                    f"Phase non-bloquante — on continue avec la suite.",
                     to_agent=leader,
                     project_id=project_id,
                 )
                 _save_checkpoint(store, session_id, i + 1)
-                continue  # don't break — keep going
+                continue
 
-            # Critical phases — stop workflow
+            # Critical phase — stop workflow
             run.status = "failed"
             run.error = f"{error_str} | {_last_summary}" if _last_summary else error_str
             await _rte_facilitate(
                 session_id,
-                f"Technical error on phase **{phase.name}**: {error_str}\n"
-                f"Annonce l'erreur a l'equipe et propose un plan de recovery.",
+                f"Erreur sur la phase **{phase.name}** après {max_retries} tentatives: {error_str[:200]}\n"
+                f"Annonce l'erreur à l'équipe et propose un plan de recovery.",
                 to_agent=leader,
                 project_id=project_id,
             )

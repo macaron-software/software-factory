@@ -178,6 +178,56 @@
             </div>
         </div>
     </div>
+
+    <!-- Tracing / OTEL Section -->
+    <h2 style="margin: 2.5rem 0 1rem; font-size: 1.3rem; font-weight: 700;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 6px;"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        OpenTelemetry Tracing
+    </h2>
+    <div class="stats-grid" id="tracing-stats">
+        <div class="stat-card">
+            <h3>Traces (1h)</h3>
+            <p class="stat-value" id="trace-count">—</p>
+            <p class="stat-label">requests traced</p>
+        </div>
+        <div class="stat-card">
+            <h3>Latency P95</h3>
+            <p class="stat-value" id="trace-p95">—</p>
+            <p class="stat-label">milliseconds</p>
+        </div>
+        <div class="stat-card">
+            <h3>Error Rate</h3>
+            <p class="stat-value" id="trace-errors">—</p>
+            <p class="stat-label">% of requests</p>
+        </div>
+        <div class="stat-card">
+            <h3>Avg Latency</h3>
+            <p class="stat-value" id="trace-avg">—</p>
+            <p class="stat-label">milliseconds</p>
+        </div>
+    </div>
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h2>Top Operations (latency)</h2>
+            <div class="chart-container">
+                <canvas id="chart-tracing-ops"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h2>Recent Traces</h2>
+            <div style="max-height: 300px; overflow-y: auto;">
+                <table style="width: 100%; font-size: 0.85rem;" id="traces-table">
+                    <thead><tr>
+                        <th style="text-align: left; padding: 4px 8px;">Operation</th>
+                        <th style="text-align: right; padding: 4px 8px;">Duration</th>
+                        <th style="text-align: right; padding: 4px 8px;">Spans</th>
+                        <th style="text-align: right; padding: 4px 8px;">Status</th>
+                    </tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -312,10 +362,80 @@ function renderCharts(data) {
 
 function refreshData() {
     loadAnalytics();
+    loadTracing();
+}
+
+// Tracing data loader
+async function loadTracing() {
+    try {
+        const [statsRes, tracesRes] = await Promise.all([
+            fetch('/api/analytics/tracing/stats?lookback=1h'),
+            fetch('/api/analytics/tracing/traces?limit=20&lookback=1h'),
+        ]);
+        const stats = await statsRes.json();
+        const traces = await tracesRes.json();
+
+        if (stats.success && stats.data.traces > 0) {
+            const d = stats.data;
+            document.getElementById('trace-count').textContent = d.traces;
+            document.getElementById('trace-p95').textContent = d.latency.p95 + 'ms';
+            document.getElementById('trace-errors').textContent = d.error_rate + '%';
+            document.getElementById('trace-avg').textContent = d.latency.avg + 'ms';
+
+            // Top operations chart
+            if (d.top_operations && d.top_operations.length > 0) {
+                const ctx = document.getElementById('chart-tracing-ops');
+                if (charts.tracingOps) charts.tracingOps.destroy();
+                charts.tracingOps = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: d.top_operations.map(o => o.operation.substring(0, 30)),
+                        datasets: [
+                            {
+                                label: 'Avg (ms)',
+                                data: d.top_operations.map(o => o.avg_ms),
+                                backgroundColor: '#8b5cf6',
+                            },
+                            {
+                                label: 'P95 (ms)',
+                                data: d.top_operations.map(o => o.p95_ms),
+                                backgroundColor: '#f59e0b',
+                            },
+                        ],
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                    },
+                });
+            }
+        } else {
+            document.getElementById('trace-count').textContent = '0';
+            document.getElementById('trace-p95').textContent = '—';
+            document.getElementById('trace-errors').textContent = '—';
+            document.getElementById('trace-avg').textContent = stats.error || 'No traces';
+        }
+
+        // Traces table
+        if (traces.success && traces.data.length > 0) {
+            const tbody = document.querySelector('#traces-table tbody');
+            tbody.innerHTML = traces.data.map(t => `<tr>
+                <td style="padding: 4px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">${t.operation}</td>
+                <td style="padding: 4px 8px; text-align: right; font-family: monospace;">${t.duration_ms}ms</td>
+                <td style="padding: 4px 8px; text-align: right;">${t.spans_count}</td>
+                <td style="padding: 4px 8px; text-align: right;">${t.tags?.['http.status_code'] || '—'}</td>
+            </tr>`).join('');
+        }
+    } catch (e) {
+        console.warn('Tracing load failed:', e);
+        document.getElementById('trace-count').textContent = 'N/A';
+    }
 }
 
 // Initial load
 loadAnalytics();
+loadTracing();
 
 // Auto-refresh every 30s
 setInterval(loadAnalytics, 30000);
