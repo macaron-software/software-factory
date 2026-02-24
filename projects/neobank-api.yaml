@@ -1,0 +1,8 @@
+project:
+  project_id: neobank-api
+  display_name: "NeoBank API Platform"
+  description: "Core banking API — accounts, payments, KYC/AML compliance, and real-time fraud detection engine"
+
+domains:
+  rust: {}
+  typescript: {}

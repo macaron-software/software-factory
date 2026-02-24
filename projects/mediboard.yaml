@@ -1,0 +1,8 @@
+project:
+  project_id: mediboard
+  display_name: "MediBoard — Hospital Dashboard"
+  description: "Clinical dashboard for hospital staff — patient flow, bed occupancy, lab results, and alert management"
+
+domains:
+  java: {}
+  angular: {}

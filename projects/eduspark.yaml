@@ -1,0 +1,8 @@
+project:
+  project_id: eduspark
+  display_name: "EduSpark — E-Learning Platform"
+  description: "Adaptive learning platform with AI-powered content recommendations, progress analytics, and live classrooms"
+
+domains:
+  python: {}
+  svelte: {}

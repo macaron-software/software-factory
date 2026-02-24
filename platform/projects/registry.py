@@ -42,7 +42,8 @@ class ProjectInfo:
 
 _PERSONAL_IDS = {"fervenza", "finary", "popinz", "psy", "yolonow", "sharelook-2"}
 
-_MANUAL_PROJECTS: list[dict] = [
+# Local-only projects — only loaded when SF_LOCAL=1 (dev machine)
+_LOCAL_PROJECTS: list[dict] = [
     {"id": "factory", "name": "Software Factory (Self)", "path": "", "factory_type": "sf",
      "domains": ["python"], "description": "Self-improving software factory"},
     {"id": "fervenza", "name": "Fervenza IoT Platform", "path": "", "factory_type": "sf",
@@ -68,6 +69,27 @@ _MANUAL_PROJECTS: list[dict] = [
     {"id": "yolonow", "name": "YoloNow - Event Discovery Platform", "path": "", "factory_type": "sf",
      "domains": ["rust", "svelte", "swift", "kotlin"], "description": "Event discovery app"},
 ]
+
+# Demo projects — realistic fictional projects for fresh/public installs
+_DEMO_PROJECTS: list[dict] = [
+    {"id": "greenfleet", "name": "GreenFleet — EV Fleet Management", "path": "", "factory_type": "sf",
+     "domains": ["python", "typescript", "react"],
+     "description": "Real-time EV fleet tracking, route optimization, and charging station management for logistics companies"},
+    {"id": "mediboard", "name": "MediBoard — Hospital Dashboard", "path": "", "factory_type": "sf",
+     "domains": ["java", "angular"],
+     "description": "Clinical dashboard for hospital staff — patient flow, bed occupancy, lab results, and alert management"},
+    {"id": "neobank-api", "name": "NeoBank API Platform", "path": "", "factory_type": "sf",
+     "domains": ["rust", "typescript"],
+     "description": "Core banking API — accounts, payments, KYC/AML compliance, and real-time fraud detection engine"},
+    {"id": "eduspark", "name": "EduSpark — E-Learning Platform", "path": "", "factory_type": "sf",
+     "domains": ["python", "svelte"],
+     "description": "Adaptive learning platform with AI-powered content recommendations, progress analytics, and live classrooms"},
+]
+
+
+def _is_local_dev() -> bool:
+    """Detect if running on developer's local machine (not a public/demo install)."""
+    return bool(os.environ.get("SF_LOCAL", ""))
 
 
 class ProjectRegistry:
@@ -111,9 +133,10 @@ class ProjectRegistry:
                 except Exception:
                     pass
 
-        # Manual additions (skip personal projects on Azure)
+        # Manual additions: local projects on dev machine, demo projects on public installs
+        projects_to_add = _LOCAL_PROJECTS if _is_local_dev() else _DEMO_PROJECTS
         is_azure = os.environ.get("AZURE_DEPLOY", "")
-        for m in _MANUAL_PROJECTS:
+        for m in projects_to_add:
             pid = m["id"]
             if is_azure and pid in _PERSONAL_IDS:
                 continue

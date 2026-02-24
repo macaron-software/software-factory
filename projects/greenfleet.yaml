@@ -1,0 +1,9 @@
+project:
+  project_id: greenfleet
+  display_name: "GreenFleet — EV Fleet Management"
+  description: "Real-time EV fleet tracking, route optimization, and charging station management for logistics companies"
+
+domains:
+  python: {}
+  typescript: {}
+  react: {}
