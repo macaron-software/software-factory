@@ -84,17 +84,12 @@
     </div>
 
     {% if snapshot %}
-    <!-- Global Score + Radar -->
-    <div class="quality-global" style="display:flex;align-items:center;justify-content:center;gap:2rem;flex-wrap:wrap">
-        <div style="text-align:center">
-            {% set gs = snapshot.global_score %}
-            {% set gc = 'elite' if gs >= 80 else 'high' if gs >= 60 else 'medium' if gs >= 40 else 'low' %}
-            <div class="quality-score-circle color-{{ gc }}">{{ gs|round|int }}</div>
-            <div class="quality-label">Global Quality Score — {{ gc|upper }}</div>
-        </div>
-        <div style="width:280px;height:280px">
-            <canvas id="qualityRadar"></canvas>
-        </div>
+    <!-- Global Score -->
+    <div class="quality-global">
+        {% set gs = snapshot.global_score %}
+        {% set gc = 'elite' if gs >= 80 else 'high' if gs >= 60 else 'medium' if gs >= 40 else 'low' %}
+        <div class="quality-score-circle color-{{ gc }}">{{ gs|round|int }}</div>
+        <div class="quality-label">Global Quality Score — {{ gc|upper }}</div>
     </div>
 
     <!-- Dimension Bars -->
@@ -158,50 +153,10 @@
     {% endif %}
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 function loadQuality() {
     const pid = document.getElementById('qualityProject').value;
     window.location.href = '/quality' + (pid ? '?project_id=' + pid : '');
-}
-
-// Radar chart
-const radarCanvas = document.getElementById('qualityRadar');
-if (radarCanvas && typeof Chart !== 'undefined') {
-    {% set dims = snapshot.breakdown.dimensions if snapshot and snapshot.breakdown else {} %}
-    {% set score_list = [] %}
-    {% for k in dims %}{% if score_list.append(dims[k].score) %}{% endif %}{% endfor %}
-    const labels = {{ dims.keys()|list|tojson }};
-    const scores = {{ score_list|tojson }};
-    new Chart(radarCanvas, {
-        type: 'radar',
-        data: {
-            labels: labels.map(l => l.replace('_', ' ')),
-            datasets: [{
-                data: scores,
-                borderColor: '#7c3aed',
-                backgroundColor: 'rgba(124,58,237,0.15)',
-                pointBackgroundColor: scores.map(s => s >= 80 ? '#16a34a' : s >= 60 ? '#3b82f6' : s >= 40 ? '#ea580c' : '#dc2626'),
-                pointRadius: 4,
-                borderWidth: 2,
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: { legend: { display: false } },
-            scales: {
-                r: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: { stepSize: 20, color: 'rgba(255,255,255,0.4)', font: { size: 9 }, backdropColor: 'transparent' },
-                    grid: { color: 'rgba(255,255,255,0.08)' },
-                    angleLines: { color: 'rgba(255,255,255,0.08)' },
-                    pointLabels: { color: 'rgba(255,255,255,0.7)', font: { size: 10 } },
-                }
-            }
-        }
-    });
 }
 </script>
 {% endblock %}
