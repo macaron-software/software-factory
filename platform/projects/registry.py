@@ -142,8 +142,10 @@ class ProjectRegistry:
                 except Exception:
                     pass
 
-        # Manual additions: local projects on dev machine, demo projects on public installs
-        projects_to_add = _LOCAL_PROJECTS if _is_local_dev() else _DEMO_PROJECTS
+        # Manual additions: local projects on dev machine, demo projects on all installs
+        projects_to_add = list(_DEMO_PROJECTS)  # Always include demo projects
+        if _is_local_dev():
+            projects_to_add.extend(_LOCAL_PROJECTS)
         is_azure = os.environ.get("AZURE_DEPLOY", "")
         for m in projects_to_add:
             pid = m["id"]
