@@ -541,15 +541,6 @@ def create_app() -> FastAPI:
 
     app.add_middleware(AuthMiddleware)
 
-    # ── OpenTelemetry ASGI middleware ────────────────────────────────────────
-    if _otel_provider is not None:
-        try:
-            from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
-
-            app.add_middleware(OpenTelemetryMiddleware, tracer_provider=_otel_provider)
-        except ImportError:
-            pass
-
     # ── Security: CORS ──────────────────────────────────────────────────────
     from starlette.middleware.cors import CORSMiddleware
 
@@ -895,6 +886,15 @@ def create_app() -> FastAPI:
             return response
 
     app.add_middleware(I18nMiddleware)
+
+    # ── OpenTelemetry ASGI middleware (last = runs first) ────────────────────
+    if _otel_provider is not None:
+        try:
+            from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
+
+            app.add_middleware(OpenTelemetryMiddleware, tracer_provider=_otel_provider)
+        except ImportError:
+            pass
 
     app.state.templates = templates
 

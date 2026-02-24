@@ -225,11 +225,16 @@ Wiki `/memory`, confidence bars. Retrospectives → LLM → lessons → global.
 
 DORA: deploy freq, lead time, CFR, MTTR + velocity + sparklines.
 LLM: per-call tracing (provider, model, tokens, cost). Live: `/monitoring` SSE.
+OpenTelemetry: opt-in via `OTEL_ENABLED=1`. Exports to Jaeger/OTEL collector via OTLP/HTTP.
+  Env vars: `OTEL_ENABLED=1`, `OTEL_SERVICE_NAME=macaron-prod`, `OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317`
+  Jaeger UI: http://localhost:16686 (traces, spans, latency).
+  Requires: `pip install opentelemetry-api opentelemetry-sdk opentelemetry-instrumentation-fastapi opentelemetry-exporter-otlp-proto-http`
 
 ### DASHBOARDS
 
 DSI/CTO `/dsi`, Métier `/metier` (SAFe value stream), Portfolio `/`, Board `/projects/{id}/board`
 Ideation `/ideation` → 5 agents network debate → "Créer Epic"
+Analytics `/analytics` — Chart.js: skills, missions, agents leaderboard, system health
 
 ## KEY FILES (all under platform/)
 
