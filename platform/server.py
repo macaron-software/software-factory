@@ -652,6 +652,9 @@ def create_app() -> FastAPI:
         # ── Phase 2: Auth enforcement ──
         from .auth.middleware import is_public_path
 
+        if path.startswith("/api/analytics") or path.startswith("/api/health"):
+            return await call_next(request)
+
         if not is_public_path(path) and not path.startswith("/static"):
             from .auth.middleware import get_current_user
 
