@@ -340,6 +340,22 @@ class AgentExecutor:
             )
 
         except Exception as exc:
+            err_str = str(exc)
+            is_llm_error = (
+                "All LLM providers failed" in err_str or "rate" in err_str.lower()
+            )
+            # Retry once with backoff for transient LLM errors
+            if is_llm_error and not getattr(ctx, "_retried", False):
+                ctx._retried = True  # type: ignore[attr-defined]
+                wait = 30 + (time.monotonic() % 30)  # 30-60s jittered backoff
+                logger.warning(
+                    "Agent %s LLM error, retrying in %ds: %s",
+                    agent.id,
+                    int(wait),
+                    err_str[:100],
+                )
+                await asyncio.sleep(wait)
+                return await self.run(ctx, user_message)
             elapsed = int((time.monotonic() - t0) * 1000)
             logger.error("Agent %s execution failed: %s", agent.id, exc, exc_info=True)
             return ExecutionResult(
@@ -684,6 +700,24 @@ class AgentExecutor:
             )
 
         except Exception as exc:
+            err_str = str(exc)
+            is_llm_error = (
+                "All LLM providers failed" in err_str or "rate" in err_str.lower()
+            )
+            # Retry once with backoff for transient LLM errors
+            if is_llm_error and not getattr(ctx, "_stream_retried", False):
+                ctx._stream_retried = True  # type: ignore[attr-defined]
+                wait = 30 + (time.monotonic() % 30)
+                logger.warning(
+                    "Agent %s streaming LLM error, retrying in %ds: %s",
+                    agent.id,
+                    int(wait),
+                    err_str[:100],
+                )
+                await asyncio.sleep(wait)
+                async for item in self.run_streaming(ctx, user_message):
+                    yield item
+                return
             elapsed = int((time.monotonic() - t0) * 1000)
             logger.error("Agent %s streaming failed: %s", agent.id, exc, exc_info=True)
             yield (
