@@ -9,6 +9,9 @@ DEMO_PROJECTS = [
     {"id": "demo-ecommerce", "name": "E-Commerce Platform", "description": "Full-stack e-commerce with payments, inventory, and analytics", "stack": "python,fastapi,react,postgresql"},
     {"id": "demo-mobile", "name": "Mobile Banking App", "description": "iOS/Android banking app with biometric auth and real-time transactions", "stack": "kotlin,swift,grpc,redis"},
     {"id": "demo-saas", "name": "SaaS Dashboard", "description": "Multi-tenant SaaS analytics dashboard with real-time streaming", "stack": "typescript,nextjs,prisma,kafka"},
+    {"id": "demo-payflow", "name": "PayFlow — Payment Orchestration", "description": "Multi-PSP routing, 3DS2 auth, reconciliation, real-time fraud scoring", "stack": "go,typescript,react,postgresql"},
+    {"id": "demo-dataforge", "name": "DataForge — Data Pipeline", "description": "Enterprise data pipeline with ingestion, transformation, quality checks, lineage tracking", "stack": "python,rust,typescript,kafka"},
+    {"id": "demo-urbanpulse", "name": "UrbanPulse — Smart City", "description": "Real-time traffic flow, public transport optimization, fleet management, air quality", "stack": "rust,svelte,python,timescaledb"},
 ]
 
 DEMO_MISSIONS = [
@@ -20,6 +23,21 @@ DEMO_MISSIONS = [
     {"name": "Tenant Isolation Security Audit", "project_id": "demo-saas", "type": "security", "status": "active", "priority": "critical"},
     {"name": "TMA - Production Monitoring", "project_id": "demo-ecommerce", "type": "program", "status": "active", "priority": "medium"},
     {"name": "Technical Debt Reduction Q1", "project_id": "demo-saas", "type": "debt", "status": "planning", "priority": "low"},
+    # PayFlow missions
+    {"name": "TMA — PayFlow", "project_id": "demo-payflow", "type": "program", "status": "active", "priority": "high"},
+    {"name": "Sécurité — PayFlow", "project_id": "demo-payflow", "type": "security", "status": "active", "priority": "critical"},
+    {"name": "Dette Technique — PayFlow", "project_id": "demo-payflow", "type": "debt", "status": "planning", "priority": "medium"},
+    {"name": "Self-Healing — PayFlow", "project_id": "demo-payflow", "type": "program", "status": "active", "priority": "high"},
+    # DataForge missions
+    {"name": "TMA — DataForge", "project_id": "demo-dataforge", "type": "program", "status": "active", "priority": "high"},
+    {"name": "Sécurité — DataForge", "project_id": "demo-dataforge", "type": "security", "status": "active", "priority": "critical"},
+    {"name": "Dette Technique — DataForge", "project_id": "demo-dataforge", "type": "debt", "status": "planning", "priority": "medium"},
+    {"name": "Self-Healing — DataForge", "project_id": "demo-dataforge", "type": "program", "status": "active", "priority": "high"},
+    # UrbanPulse missions
+    {"name": "TMA — UrbanPulse", "project_id": "demo-urbanpulse", "type": "program", "status": "active", "priority": "high"},
+    {"name": "Sécurité — UrbanPulse", "project_id": "demo-urbanpulse", "type": "security", "status": "active", "priority": "critical"},
+    {"name": "Dette Technique — UrbanPulse", "project_id": "demo-urbanpulse", "type": "debt", "status": "planning", "priority": "medium"},
+    {"name": "Self-Healing — UrbanPulse", "project_id": "demo-urbanpulse", "type": "program", "status": "active", "priority": "high"},
 ]
 
 

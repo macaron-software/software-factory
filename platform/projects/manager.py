@@ -194,6 +194,15 @@ class ProjectStore:
                 wsjf_score=5, created_by="enterprise_architect",
                 config={"auto_provisioned": True, "schedule": "monthly"},
             ),
+            MissionDef(
+                name=f"Self-Healing — {project_name}",
+                description=f"Auto-détection et auto-correction des incidents pour {project_name}. Monitoring → incident → diagnostic → fix → validation automatique.",
+                goal="MTTR < 15 min. Résolution automatique des incidents P3/P4. Escalade P1/P2 avec diagnostic pré-rempli.",
+                status="active", type="program",
+                project_id=project_id, workflow_id="tma-autoheal",
+                wsjf_score=10, created_by="sre",
+                config={"auto_provisioned": True, "permanent": True, "auto_heal": True},
+            ),
         ]
         created = []
         for m in provisions:
@@ -488,6 +497,14 @@ _PROJECT_PM: dict[str, dict] = {
     "psy": {"name": "Camille Roux", "avatar": "user", "tagline": "Product Manager — PSY Platform"},
     "yolonow": {"name": "Léa Fournier", "avatar": "user", "tagline": "Product Manager — YoloNow"},
     "sharelook-2": {"name": "Claire Dubois", "avatar": "user", "tagline": "Product Manager — Sharelook 2.0"},
+    # Demo projects
+    "neobank-api": {"name": "Alexandre Morin", "avatar": "user", "tagline": "Product Manager — NeoBank API Platform"},
+    "mediboard": {"name": "Isabelle Faure", "avatar": "user", "tagline": "Product Manager — MediBoard Hospital"},
+    "greenfleet": {"name": "Mathieu Garnier", "avatar": "user", "tagline": "Product Manager — GreenFleet EV"},
+    "eduspark": {"name": "Sarah Lemaire", "avatar": "user", "tagline": "Product Manager — EduSpark E-Learning"},
+    "payflow": {"name": "Vincent Carpentier", "avatar": "user", "tagline": "Product Manager — PayFlow Payments"},
+    "dataforge": {"name": "Nadia Bensalem", "avatar": "user", "tagline": "Product Manager — DataForge Pipeline"},
+    "urbanpulse": {"name": "Raphaël Nguyen", "avatar": "user", "tagline": "Product Manager — UrbanPulse Mobility"},
 }
 
 
@@ -499,6 +516,9 @@ def _project_color(project_id: str) -> str:
         "solaris": "#d29922", "sharelook": "#79c0ff", "finary": "#56d364",
         "lpd": "#db6d28", "logs-facteur": "#8b949e",
         "software-factory": "#c084fc",
+        "neobank-api": "#f778ba", "mediboard": "#2ea043", "greenfleet": "#1f883d",
+        "eduspark": "#bf8700", "payflow": "#da3633", "dataforge": "#388bfd",
+        "urbanpulse": "#a5d6ff",
     }
     return colors.get(project_id, "#8b949e")
 

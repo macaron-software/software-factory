@@ -84,6 +84,15 @@ _DEMO_PROJECTS: list[dict] = [
     {"id": "eduspark", "name": "EduSpark — E-Learning Platform", "path": "", "factory_type": "sf",
      "domains": ["python", "svelte"],
      "description": "Adaptive learning platform with AI-powered content recommendations, progress analytics, and live classrooms"},
+    {"id": "payflow", "name": "PayFlow — Payment Orchestration", "path": "", "factory_type": "sf",
+     "domains": ["go", "typescript", "react"],
+     "description": "Payment orchestration platform — multi-PSP routing, 3DS2 authentication, reconciliation engine, and real-time fraud scoring"},
+    {"id": "dataforge", "name": "DataForge — Real-time Data Pipeline", "path": "", "factory_type": "sf",
+     "domains": ["python", "rust", "typescript"],
+     "description": "Enterprise data pipeline — ingestion, transformation, quality checks, and lineage tracking with sub-second latency"},
+    {"id": "urbanpulse", "name": "UrbanPulse — Smart City Mobility", "path": "", "factory_type": "sf",
+     "domains": ["rust", "svelte", "python"],
+     "description": "Smart city mobility platform — real-time traffic flow, public transport optimization, bike/scooter fleet management, and air quality monitoring"},
 ]
 
 
