@@ -67,7 +67,9 @@ async def missions_page(request: Request):
     for m in filtered:
         stats = mission_store.mission_stats(m.id)
         sprints = mission_store.list_sprints(m.id)
-        current = next((s.number for s in sprints if s.status == "active"), len(sprints))
+        current = next(
+            (s.number for s in sprints if s.status == "active"), len(sprints)
+        )
         total_t = stats.get("total", 0)
         done_t = stats.get("done", 0)
         mission_cards.append(
@@ -133,7 +135,9 @@ async def mission_detail_page(request: Request, mission_id: str):
         tasks = mission_store.list_tasks(sprint_id=selected_sprint.id)
         for t in tasks:
             col = (
-                t.status if t.status in ("pending", "in_progress", "review", "done") else "pending"
+                t.status
+                if t.status in ("pending", "in_progress", "review", "done")
+                else "pending"
             )
             tasks_by_status.setdefault(col, []).append(t)
 
@@ -141,11 +145,15 @@ async def mission_detail_page(request: Request, mission_id: str):
     velocity_history = mission_store.get_velocity_history(mission_id)
     total_velocity = sum(v["velocity"] for v in velocity_history)
     total_planned = sum(v["planned_sp"] for v in velocity_history)
-    avg_velocity = round(total_velocity / len(velocity_history), 1) if velocity_history else 0
+    avg_velocity = (
+        round(total_velocity / len(velocity_history), 1) if velocity_history else 0
+    )
 
     # Team agents
     agent_store = get_agent_store()
-    prefix = mission.project_id[:4] if len(mission.project_id) >= 4 else mission.project_id
+    prefix = (
+        mission.project_id[:4] if len(mission.project_id) >= 4 else mission.project_id
+    )
     all_agents = agent_store.list_all()
     team_agents = [
         a
@@ -181,7 +189,9 @@ async def create_mission(request: Request):
     data = await _parse_body(request)
     m = MissionDef(
         project_id=data.get("project_id", ""),
-        name=data.get("name", t("mission_default_name", lang=getattr(request.state, "lang", "en"))),
+        name=data.get(
+            "name", t("mission_default_name", lang=getattr(request.state, "lang", "en"))
+        ),
         description=data.get("description", ""),
         goal=data.get("goal", ""),
         type=data.get("type", "feature"),
@@ -215,7 +225,11 @@ async def list_missions_api(request: Request):
         run = runs_by_parent.get(m.id)
         phases_total = len(run.phases) if run and run.phases else 0
         phases_done = (
-            sum(1 for p in (run.phases or []) if p.status.value in ("done", "done_with_issues"))
+            sum(
+                1
+                for p in (run.phases or [])
+                if p.status.value in ("done", "done_with_issues")
+            )
             if run
             else 0
         )
@@ -244,7 +258,9 @@ async def start_mission(mission_id: str):
     return JSONResponse({"ok": True})
 
 
-@router.post("/api/missions/{mission_id}/sprints", responses={200: {"model": OkResponse}})
+@router.post(
+    "/api/missions/{mission_id}/sprints", responses={200: {"model": OkResponse}}
+)
 async def create_sprint(mission_id: str):
     """Add a sprint to a mission."""
     from ...missions.store import SprintDef, get_mission_store
@@ -295,7 +311,9 @@ async def update_task_status(request: Request, task_id: str):
     new_status = data.get("status", "").strip()
     valid = {"pending", "assigned", "in_progress", "review", "done", "failed"}
     if new_status not in valid:
-        return JSONResponse({"error": f"Invalid status. Must be one of: {valid}"}, status_code=400)
+        return JSONResponse(
+            {"error": f"Invalid status. Must be one of: {valid}"}, status_code=400
+        )
     store = get_mission_store()
     ok = store.update_task_status(task_id, new_status)
     if not ok:
@@ -412,7 +430,9 @@ async def list_stories_api(feature_id: str = ""):
     return JSONResponse([dict(r) for r in rows])
 
 
-@router.get("/api/features/{feature_id}/stories", responses={200: {"model": list[StoryOut]}})
+@router.get(
+    "/api/features/{feature_id}/stories", responses={200: {"model": list[StoryOut]}}
+)
 async def list_feature_stories_api(feature_id: str):
     """List user stories for a specific feature."""
     from ...db.migrations import get_db
@@ -425,7 +445,9 @@ async def list_feature_stories_api(feature_id: str):
     return JSONResponse([dict(r) for r in rows])
 
 
-@router.post("/api/features/{feature_id}/stories", responses={200: {"model": OkResponse}})
+@router.post(
+    "/api/features/{feature_id}/stories", responses={200: {"model": OkResponse}}
+)
 async def create_story_api(request: Request, feature_id: str):
     """Create a new user story under a feature."""
     from ...missions.product import UserStoryDef, get_product_backlog
@@ -465,7 +487,9 @@ async def reorder_backlog(request: Request):
     db = get_db()
     try:
         for priority, item_id in enumerate(ids, 1):
-            db.execute(f"UPDATE {table} SET priority = ? WHERE id = ?", (priority, item_id))
+            db.execute(
+                f"UPDATE {table} SET priority = ? WHERE id = ?", (priority, item_id)
+            )
         db.commit()
     finally:
         db.close()
@@ -497,7 +521,8 @@ async def add_feature_dep(request: Request, feature_id: str):
 
 
 @router.delete(
-    "/api/features/{feature_id}/deps/{depends_on}", responses={200: {"model": OkResponse}}
+    "/api/features/{feature_id}/deps/{depends_on}",
+    responses={200: {"model": OkResponse}},
 )
 async def remove_feature_dep(feature_id: str, depends_on: str):
     """Remove a feature dependency."""
@@ -548,7 +573,9 @@ async def list_feature_deps(feature_id: str):
 # ── Sprint planning: assign stories to sprint ────────────────────
 
 
-@router.post("/api/sprints/{sprint_id}/assign-stories", responses={200: {"model": OkResponse}})
+@router.post(
+    "/api/sprints/{sprint_id}/assign-stories", responses={200: {"model": OkResponse}}
+)
 async def assign_stories_to_sprint(request: Request, sprint_id: str):
     """Assign multiple stories to a sprint. Body: {story_ids: [...]}"""
     from ...db.migrations import get_db
@@ -560,7 +587,9 @@ async def assign_stories_to_sprint(request: Request, sprint_id: str):
     db = get_db()
     try:
         for sid in story_ids:
-            db.execute("UPDATE user_stories SET sprint_id = ? WHERE id = ?", (sprint_id, sid))
+            db.execute(
+                "UPDATE user_stories SET sprint_id = ? WHERE id = ?", (sprint_id, sid)
+            )
         db.commit()
     finally:
         db.close()
@@ -568,7 +597,8 @@ async def assign_stories_to_sprint(request: Request, sprint_id: str):
 
 
 @router.delete(
-    "/api/sprints/{sprint_id}/stories/{story_id}", responses={200: {"model": OkResponse}}
+    "/api/sprints/{sprint_id}/stories/{story_id}",
+    responses={200: {"model": OkResponse}},
 )
 async def unassign_story_from_sprint(sprint_id: str, story_id: str):
     """Remove a story from a sprint."""
@@ -587,7 +617,8 @@ async def unassign_story_from_sprint(sprint_id: str, story_id: str):
 
 
 @router.get(
-    "/api/sprints/{sprint_id}/available-stories", responses={200: {"model": list[StoryOut]}}
+    "/api/sprints/{sprint_id}/available-stories",
+    responses={200: {"model": list[StoryOut]}},
 )
 async def available_stories_for_sprint(sprint_id: str):
     """List unassigned stories (backlog) available for sprint planning."""
@@ -596,7 +627,9 @@ async def available_stories_for_sprint(sprint_id: str):
     db = get_db()
     try:
         # Get the mission for this sprint
-        sprint = db.execute("SELECT mission_id FROM sprints WHERE id = ?", (sprint_id,)).fetchone()
+        sprint = db.execute(
+            "SELECT mission_id FROM sprints WHERE id = ?", (sprint_id,)
+        ).fetchone()
         if not sprint:
             return JSONResponse({"error": "Sprint not found"}, status_code=404)
         mission_id = sprint["mission_id"]
@@ -619,7 +652,8 @@ async def available_stories_for_sprint(sprint_id: str):
 )
 async def launch_mission_workflow(request: Request, mission_id: str):
     """Create a session from mission's workflow and redirect to live view."""
-    from ...missions.store import get_mission_store
+    from ...missions.store import get_mission_run_store, get_mission_store
+    from ...models import MissionRun, MissionStatus, PhaseRun, PhaseStatus
     from ...sessions.store import MessageDef, SessionDef, get_session_store
     from ...workflows.store import get_workflow_store
 
@@ -675,6 +709,32 @@ async def launch_mission_workflow(request: Request, mission_id: str):
         except Exception:
             pass
 
+    # Create MissionRun with phases from workflow (for pipeline UI)
+    phases = [
+        PhaseRun(
+            phase_id=wp.id,
+            phase_name=wp.name,
+            pattern_id=wp.pattern_id,
+            status=PhaseStatus.PENDING,
+        )
+        for wp in wf.phases
+    ]
+    run = MissionRun(
+        id=session.id,
+        workflow_id=wf_id,
+        workflow_name=wf.name,
+        brief=task_desc,
+        status=MissionStatus.RUNNING,
+        phases=phases,
+        project_id=mission.project_id or mission_id,
+        session_id=session.id,
+        parent_mission_id=mission_id,
+    )
+    try:
+        get_mission_run_store().create(run)
+    except Exception:
+        pass
+
     asyncio.create_task(
         _run_workflow_background(wf, session.id, task_desc, mission.project_id or "")
     )
@@ -704,7 +764,9 @@ async def compute_wsjf(mission_id: str, request: Request):
         db.commit()
     finally:
         db.close()
-    return JSONResponse({"wsjf": wsjf, "cost_of_delay": cost_of_delay, "job_duration": jd})
+    return JSONResponse(
+        {"wsjf": wsjf, "cost_of_delay": cost_of_delay, "job_duration": jd}
+    )
 
 
 @router.get("/api/missions/{mission_id}/board", response_class=HTMLResponse)
@@ -719,7 +781,11 @@ async def mission_board_partial(request: Request, mission_id: str):
     tasks = store.list_tasks(sprint_id=sprint_id)
     tasks_by_status = {}
     for t in tasks:
-        col = t.status if t.status in ("pending", "in_progress", "review", "done") else "pending"
+        col = (
+            t.status
+            if t.status in ("pending", "in_progress", "review", "done")
+            else "pending"
+        )
         tasks_by_status.setdefault(col, []).append(t)
 
     cols = [
@@ -812,7 +878,13 @@ async def portfolio_kanban(request: Request):
         ).fetchall()
     finally:
         db.close()
-    columns = {"funnel": [], "analyzing": [], "backlog": [], "implementing": [], "done": []}
+    columns = {
+        "funnel": [],
+        "analyzing": [],
+        "backlog": [],
+        "implementing": [],
+        "done": [],
+    }
     for r in rows:
         ks = r["kanban_status"] if r["kanban_status"] else "funnel"
         if ks in columns:
@@ -835,7 +907,9 @@ async def portfolio_kanban(request: Request):
         ("done", "Done"),
     ]:
         items = columns[col_name]
-        border_color = "var(--red)" if col_name == "implementing" and wip_over else "var(--border)"
+        border_color = (
+            "var(--red)" if col_name == "implementing" and wip_over else "var(--border)"
+        )
         html += f'<div style="flex:1;min-width:180px;background:var(--bg-secondary);border:1px solid {border_color};border-radius:var(--radius);padding:10px;">'
         wip_tag = (
             f' <span style="color:var(--red);font-size:0.7rem;">WIP {len(items)}/{wip_limit}</span>'
@@ -894,12 +968,15 @@ async def delete_mission(mission_id: str):
     from ...db.migrations import get_db
 
     conn = get_db()
-    mission = conn.execute("SELECT id, name FROM missions WHERE id = ?", (mission_id,)).fetchone()
+    mission = conn.execute(
+        "SELECT id, name FROM missions WHERE id = ?", (mission_id,)
+    ).fetchone()
     if not mission:
         return JSONResponse({"error": "Not found"}, status_code=404)
     # Delete all runs for this mission
     runs = conn.execute(
-        "SELECT id, session_id FROM mission_runs WHERE parent_mission_id = ?", (mission_id,)
+        "SELECT id, session_id FROM mission_runs WHERE parent_mission_id = ?",
+        (mission_id,),
     ).fetchall()
     for run_id, session_id in runs:
         if session_id:
@@ -942,7 +1019,9 @@ async def delete_mission(mission_id: str):
             "DELETE FROM ideation_messages WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)",
             (mission_id,),
         )
-        conn.execute("DELETE FROM ideation_sessions WHERE mission_id = ?", (mission_id,))
+        conn.execute(
+            "DELETE FROM ideation_sessions WHERE mission_id = ?", (mission_id,)
+        )
     except Exception:
         pass
     conn.execute("DELETE FROM missions WHERE id = ?", (mission_id,))
@@ -957,7 +1036,9 @@ async def delete_project(project_id: str):
 
     conn = get_db()
     conn.execute("PRAGMA busy_timeout = 10000")  # 10s wait for lock
-    project = conn.execute("SELECT id, name FROM projects WHERE id = ?", (project_id,)).fetchone()
+    project = conn.execute(
+        "SELECT id, name FROM projects WHERE id = ?", (project_id,)
+    ).fetchone()
     if not project:
         return JSONResponse({"error": "Not found"}, status_code=404)
     try:
@@ -971,11 +1052,14 @@ async def delete_project(project_id: str):
     for (mid,) in missions:
         # Delete runs
         runs = conn.execute(
-            "SELECT id, session_id FROM mission_runs WHERE parent_mission_id = ?", (mid,)
+            "SELECT id, session_id FROM mission_runs WHERE parent_mission_id = ?",
+            (mid,),
         ).fetchall()
         for run_id, session_id in runs:
             if session_id:
-                conn.execute("DELETE FROM tool_calls WHERE session_id = ?", (session_id,))
+                conn.execute(
+                    "DELETE FROM tool_calls WHERE session_id = ?", (session_id,)
+                )
                 conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
                 conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
             for tbl in (
@@ -1115,7 +1199,10 @@ async def api_mission_start(request: Request):
     from pathlib import Path
 
     workspace_root = (
-        Path(__file__).resolve().parent.parent.parent.parent / "data" / "workspaces" / mission_id
+        Path(__file__).resolve().parent.parent.parent.parent
+        / "data"
+        / "workspaces"
+        / mission_id
     )
     workspace_root.mkdir(parents=True, exist_ok=True)
     # Init git repo + README with brief
@@ -1134,7 +1221,9 @@ async def api_mission_start(request: Request):
     readme.write_text(f"# {wf.name}\n\n{brief}\n\nMission ID: {mission_id}\n")
     # Add .gitignore to prevent node_modules/dist/build from being committed
     gitignore = workspace_root / ".gitignore"
-    gitignore.write_text("node_modules/\ndist/\nbuild/\n.env\n*.bak\n__pycache__/\n.DS_Store\n")
+    gitignore.write_text(
+        "node_modules/\ndist/\nbuild/\n.env\n*.bak\n__pycache__/\n.DS_Store\n"
+    )
     subprocess.run(["git", "add", "."], cwd=str(workspace_root), capture_output=True)
     subprocess.run(
         ["git", "commit", "-m", "Initial commit — mission workspace"],
@@ -1242,7 +1331,9 @@ async def api_mission_start(request: Request):
     # Start the orchestrator agent loop with workspace path
     mgr = get_loop_manager()
     try:
-        await mgr.start_agent(orchestrator_id, session_id, mission.project_id, workspace_path)
+        await mgr.start_agent(
+            orchestrator_id, session_id, mission.project_id, workspace_path
+        )
     except Exception as e:
         logger.error("Failed to start CDP agent: %s", e)
 
@@ -1337,7 +1428,9 @@ async def mission_chat_stream(request: Request, mission_id: str):
     for m in recent:
         if m.from_agent not in ("user", "system") and m.content:
             agent_msgs.append(f"[{m.from_agent}] {m.content[:300]}")
-    agent_conv = "\n".join(agent_msgs[-10:]) if agent_msgs else "No agent conversations yet"
+    agent_conv = (
+        "\n".join(agent_msgs[-10:]) if agent_msgs else "No agent conversations yet"
+    )
 
     mission_context = f"""MISSION BRIEF: {mission.brief or "N/A"}
 MISSION STATUS: {mission.status.value if hasattr(mission.status, "value") else mission.status}
@@ -1468,7 +1561,10 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
 
                     clean = _re.sub(r"<think>[\s\S]*?</think>\s*", "", raw_accumulated)
                     # If still inside an unclosed <think>, don't send yet
-                    if "<think>" in clean and "</think>" not in clean.split("<think>")[-1]:
+                    if (
+                        "<think>" in clean
+                        and "</think>" not in clean.split("<think>")[-1]
+                    ):
                         clean = clean[: clean.rfind("<think>")]
                     clean = clean.strip()
                     # Send only newly revealed characters
@@ -1480,7 +1576,8 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
                     # Tool being called — show in UI
                     tool_labels = {
                         "memory_search": t(
-                            "tool_memory_search", lang=getattr(request.state, "lang", "en")
+                            "tool_memory_search",
+                            lang=getattr(request.state, "lang", "en"),
                         ),
                         "memory_store": "Sauvegarde mémoire",
                         "get_phase_status": "Statut des phases",
@@ -1491,7 +1588,8 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
                         "code_write": "Écriture de code",
                         "code_edit": "Modification de code",
                         "code_search": t(
-                            "tool_code_search", lang=getattr(request.state, "lang", "en")
+                            "tool_code_search",
+                            lang=getattr(request.state, "lang", "en"),
                         ),
                         "list_files": "Liste des fichiers",
                         "git_log": "Historique Git",
@@ -1511,12 +1609,18 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
                 elif evt == "result":
                     if hasattr(data_s, "error") and data_s.error:
                         llm_error = data_s.error
-                    elif hasattr(data_s, "content") and data_s.content and not raw_accumulated:
+                    elif (
+                        hasattr(data_s, "content")
+                        and data_s.content
+                        and not raw_accumulated
+                    ):
                         raw_accumulated = data_s.content
 
             import re as _re
 
-            accumulated = _re.sub(r"<think>[\s\S]*?</think>\s*", "", raw_accumulated).strip()
+            accumulated = _re.sub(
+                r"<think>[\s\S]*?</think>\s*", "", raw_accumulated
+            ).strip()
 
             # If LLM failed and no real content, send error
             if llm_error and not accumulated:
@@ -1536,7 +1640,9 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
                 )
 
             rendered = (
-                md_lib.markdown(accumulated, extensions=["fenced_code", "tables", "nl2br"])
+                md_lib.markdown(
+                    accumulated, extensions=["fenced_code", "tables", "nl2br"]
+                )
                 if accumulated
                 else ""
             )
@@ -1670,7 +1776,9 @@ async def api_mission_exec(request: Request, mission_id: str):
             }
         )
     except _sp.TimeoutExpired:
-        return JSONResponse({"error": f"Timeout ({timeout}s)", "command": cmd}, status_code=408)
+        return JSONResponse(
+            {"error": f"Timeout ({timeout}s)", "command": cmd}, status_code=408
+        )
     except Exception as e:
         return JSONResponse({"error": str(e), "command": cmd}, status_code=500)
 
@@ -1965,9 +2073,13 @@ async def api_update_ticket(request: Request, mission_id: str, ticket_id: str):
     if body.get("status") in ("resolved", "closed"):
         sets.append("resolved_at=CURRENT_TIMESTAMP")
     vals.extend([ticket_id, mission_id])
-    db.execute(f"UPDATE support_tickets SET {','.join(sets)} WHERE id=? AND mission_id=?", vals)
+    db.execute(
+        f"UPDATE support_tickets SET {','.join(sets)} WHERE id=? AND mission_id=?", vals
+    )
     db.commit()
-    row = db.execute("SELECT * FROM support_tickets WHERE id=?", (ticket_id,)).fetchone()
+    row = db.execute(
+        "SELECT * FROM support_tickets WHERE id=?", (ticket_id,)
+    ).fetchone()
     db.close()
     if not row:
         return JSONResponse({"error": "Not found"}, status_code=404)
@@ -2022,13 +2134,20 @@ async def _launch_orchestrator(mission_id: str):
     async def _safe_run():
         try:
             async with _mission_semaphore:
-                logger.warning("ORCH mission=%s acquired semaphore, starting", mission_id)
+                logger.warning(
+                    "ORCH mission=%s acquired semaphore, starting", mission_id
+                )
                 await orchestrator.run_phases()
                 logger.warning("ORCH mission=%s completed normally", mission_id)
         except Exception as exc:
             import traceback
 
-            logger.error("ORCH mission=%s CRASHED: %s\n%s", mission_id, exc, traceback.format_exc())
+            logger.error(
+                "ORCH mission=%s CRASHED: %s\n%s",
+                mission_id,
+                exc,
+                traceback.format_exc(),
+            )
             try:
                 mission.status = MissionStatus.FAILED
                 run_store.update(mission)
@@ -2079,7 +2198,9 @@ async def api_mission_run(request: Request, mission_id: str):
     return JSONResponse({"status": "running", "mission_id": mission_id})
 
 
-async def _auto_retrospective(mission, session_id: str, phase_summaries: list, push_sse):
+async def _auto_retrospective(
+    mission, session_id: str, phase_summaries: list, push_sse
+):
     """Auto-generate retrospective when epic completes, store lessons in global memory."""
     import json as _json
 
@@ -2093,8 +2214,14 @@ async def _auto_retrospective(mission, session_id: str, phase_summaries: list, p
     for ps in phase_summaries[-8:]:
         ctx_parts.append(ps[:300] if isinstance(ps, str) else str(ps)[:300])
     for m in msgs[-30:]:
-        agent = m.get("from_agent", "") if isinstance(m, dict) else getattr(m, "from_agent", "")
-        content = m.get("content", "") if isinstance(m, dict) else getattr(m, "content", "")
+        agent = (
+            m.get("from_agent", "")
+            if isinstance(m, dict)
+            else getattr(m, "from_agent", "")
+        )
+        content = (
+            m.get("content", "") if isinstance(m, dict) else getattr(m, "content", "")
+        )
         if content:
             ctx_parts.append(f"{agent}: {content[:150]}")
 
@@ -2159,11 +2286,19 @@ Sois CONCRET, TECHNIQUE et ACTIONNABLE. Réponds UNIQUEMENT avec le JSON."""
     # Push retrospective as SSE message
     retro_text = "## Rétrospective automatique\n\n"
     if retro.get("successes"):
-        retro_text += "**Réussites:**\n" + "\n".join(f"- {s}" for s in retro["successes"]) + "\n\n"
+        retro_text += (
+            "**Réussites:**\n"
+            + "\n".join(f"- {s}" for s in retro["successes"])
+            + "\n\n"
+        )
     if retro.get("lessons"):
-        retro_text += "**Leçons:**\n" + "\n".join(f"- {l}" for l in retro["lessons"]) + "\n\n"
+        retro_text += (
+            "**Leçons:**\n" + "\n".join(f"- {l}" for l in retro["lessons"]) + "\n\n"
+        )
     if retro.get("improvements"):
-        retro_text += "**Améliorations:**\n" + "\n".join(f"- {i}" for i in retro["improvements"])
+        retro_text += "**Améliorations:**\n" + "\n".join(
+            f"- {i}" for i in retro["improvements"]
+        )
 
     await push_sse(
         session_id,
@@ -2196,7 +2331,11 @@ async def _run_post_phase_hooks(
     # Auto-commit after EVERY phase — agents never call git_commit reliably
     try:
         git_add = subprocess.run(
-            ["git", "add", "-A"], cwd=workspace, capture_output=True, text=True, timeout=10
+            ["git", "add", "-A"],
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         status = subprocess.run(
             ["git", "status", "--porcelain"],
@@ -2234,7 +2373,9 @@ async def _run_post_phase_hooks(
     await _update_docs_post_phase(phase_id, phase_name, mission, session_id, push_sse)
 
     # After ideation/architecture/dev: extract features for PO kanban
-    if any(k in phase_key for k in ("ideation", "architecture", "sprint", "dev", "setup")):
+    if any(
+        k in phase_key for k in ("ideation", "architecture", "sprint", "dev", "setup")
+    ):
         try:
             await _extract_features_from_phase(
                 mission_id=mission.id,
@@ -2311,7 +2452,9 @@ asyncio.run(main())
                 )
 
     # After CI/CD or TDD Sprint phase: run build if package.json or Cargo.toml exists
-    if any(k in phase_key for k in ("cicd", "pipeline", "sprint", "dev", "tdd", "quality")):
+    if any(
+        k in phase_key for k in ("cicd", "pipeline", "sprint", "dev", "tdd", "quality")
+    ):
         ws = Path(workspace)
 
         # Detect project roots (support subdirectories: frontend/, backend/, etc.)
@@ -2331,7 +2474,11 @@ asyncio.run(main())
             if cargo_root:
                 cargo_cwd = str(cargo_root)
                 cargo_check = subprocess.run(
-                    ["cargo", "check"], cwd=cargo_cwd, capture_output=True, text=True, timeout=180
+                    ["cargo", "check"],
+                    cwd=cargo_cwd,
+                    capture_output=True,
+                    text=True,
+                    timeout=180,
                 )
                 cargo_msg = (
                     "cargo check réussi"
@@ -2385,7 +2532,11 @@ asyncio.run(main())
             if npm_root and (npm_root / "package.json").exists():
                 npm_cwd = str(npm_root)
                 npm_r = subprocess.run(
-                    ["npm", "install"], cwd=npm_cwd, capture_output=True, text=True, timeout=120
+                    ["npm", "install"],
+                    cwd=npm_cwd,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
                 )
                 build_msg = (
                     "npm install réussi"
@@ -2448,7 +2599,9 @@ asyncio.run(main())
                             env={**dict(subprocess.os.environ), "CI": "true"},
                         )
                         test_status = (
-                            "réussi" if test_r.returncode == 0 else f"échoué: {test_r.stderr[:200]}"
+                            "réussi"
+                            if test_r.returncode == 0
+                            else f"échoué: {test_r.stderr[:200]}"
                         )
                         if test_r.returncode != 0:
                             result["test_ok"] = False
@@ -2634,13 +2787,16 @@ asyncio.run(main())
                                     r.returncode == 0
                                     and (screenshots_dir / f"{shot_name}.png").exists()
                                 ):
-                                    shot_paths_srv.append(f"screenshots/{shot_name}.png")
+                                    shot_paths_srv.append(
+                                        f"screenshots/{shot_name}.png"
+                                    )
                             except Exception:
                                 pass
 
                         if shot_paths_srv:
-                            shot_msg = f"Screenshots du serveur (HTTP {http_code}) :\n" + "\n".join(
-                                f"[SCREENSHOT:{p}]" for p in shot_paths_srv
+                            shot_msg = (
+                                f"Screenshots du serveur (HTTP {http_code}) :\n"
+                                + "\n".join(f"[SCREENSHOT:{p}]" for p in shot_paths_srv)
                             )
                             await push_sse(
                                 session_id,
@@ -2669,7 +2825,9 @@ asyncio.run(main())
                             )
                     # Kill server
                     try:
-                        subprocess.os.killpg(subprocess.os.getpgid(server_proc.pid), signal.SIGTERM)
+                        subprocess.os.killpg(
+                            subprocess.os.getpgid(server_proc.pid), signal.SIGTERM
+                        )
                     except Exception:
                         try:
                             server_proc.kill()
@@ -2706,7 +2864,9 @@ asyncio.run(main())
                     )
                     # Stop existing container if any
                     subprocess.run(
-                        ["docker", "rm", "-f", container_name], capture_output=True, timeout=10
+                        ["docker", "rm", "-f", container_name],
+                        capture_output=True,
+                        timeout=10,
                     )
                     # Find free port
                     import socket
@@ -2785,7 +2945,9 @@ asyncio.run(main())
                         deploy_pages = [("/", "deployed")]
                         for html in sorted(ws.glob("public/*.html")):
                             if html.name != "index.html":
-                                deploy_pages.append((f"/{html.name}", f"deployed-{html.stem}"))
+                                deploy_pages.append(
+                                    (f"/{html.name}", f"deployed-{html.stem}")
+                                )
                         deploy_shots = []
                         for url_path, shot_name in deploy_pages[:8]:
                             shot_script = f"""
@@ -2816,8 +2978,12 @@ asyncio.run(main())
                             except Exception:
                                 pass
                         if deploy_shots:
-                            shot_content = f"Screenshots Docker deploy (HTTP {status_code}) :\n"
-                            shot_content += "\n".join(f"[SCREENSHOT:{s}]" for s in deploy_shots)
+                            shot_content = (
+                                f"Screenshots Docker deploy (HTTP {status_code}) :\n"
+                            )
+                            shot_content += "\n".join(
+                                f"[SCREENSHOT:{s}]" for s in deploy_shots
+                            )
                             await push_sse(
                                 session_id,
                                 {
@@ -2863,7 +3029,9 @@ asyncio.run(main())
         ws = Path(workspace)
         try:
             files = list(ws.rglob("*"))
-            real_files = [f.relative_to(ws) for f in files if f.is_file() and ".git" not in str(f)]
+            real_files = [
+                f.relative_to(ws) for f in files if f.is_file() and ".git" not in str(f)
+            ]
             git_log = subprocess.run(
                 ["git", "log", "--oneline", "-10"],
                 cwd=workspace,
@@ -2873,7 +3041,11 @@ asyncio.run(main())
             )
             summary = f"Workspace: {len(real_files)} fichiers\n"
             if real_files:
-                summary += "```\n" + "\n".join(str(f) for f in sorted(real_files)[:20]) + "\n```\n"
+                summary += (
+                    "```\n"
+                    + "\n".join(str(f) for f in sorted(real_files)[:20])
+                    + "\n```\n"
+                )
             if git_log.stdout:
                 summary += f"\nGit log:\n```\n{git_log.stdout.strip()}\n```"
             await push_sse(
@@ -2900,9 +3072,7 @@ asyncio.run(main())
             )
             screenshots = await _auto_qa_screenshots(ws, platform_type)
             if screenshots:
-                shot_content = (
-                    f"📸 QA Screenshots ({platform_type}) — {len(screenshots)} captures :\n"
-                )
+                shot_content = f"📸 QA Screenshots ({platform_type}) — {len(screenshots)} captures :\n"
                 shot_content += "\n".join(f"[SCREENSHOT:{s}]" for s in screenshots)
                 await push_sse(
                     session_id,
@@ -2921,7 +3091,9 @@ asyncio.run(main())
 
         # Run real Playwright E2E test files if any exist
         try:
-            e2e_results = await _run_real_e2e_tests(ws, session_id, phase_id, push_sse, mission)
+            e2e_results = await _run_real_e2e_tests(
+                ws, session_id, phase_id, push_sse, mission
+            )
         except Exception as e:
             logger.error("Post-phase E2E tests failed: %s", e)
 
@@ -2931,7 +3103,9 @@ asyncio.run(main())
 
         engine = get_sync_engine()
         if engine.client.health_check():
-            results = engine.sync_mission(mission.id if hasattr(mission, "id") else str(mission))
+            results = engine.sync_mission(
+                mission.id if hasattr(mission, "id") else str(mission)
+            )
             synced = [t for t, r in results.items() if r.get("status") == "ok"]
             if synced:
                 await push_sse(
@@ -2970,7 +3144,18 @@ async def _update_docs_post_phase(
     # Gather context: list of files + phase summary from messages
     try:
         file_list = subprocess.run(
-            ["find", ".", "-type", "f", "-not", "-path", "./.git/*", "-not", "-name", "*.bak"],
+            [
+                "find",
+                ".",
+                "-type",
+                "f",
+                "-not",
+                "-path",
+                "./.git/*",
+                "-not",
+                "-name",
+                "*.bak",
+            ],
             cwd=workspace,
             capture_output=True,
             text=True,
@@ -3053,7 +3238,9 @@ Reponds UNIQUEMENT avec le contenu Markdown du fichier."""
         archi_text = resp.content.strip()
         # Strip markdown fences if present
         if archi_text.startswith("```"):
-            archi_text = archi_text.split("\n", 1)[1] if "\n" in archi_text else archi_text
+            archi_text = (
+                archi_text.split("\n", 1)[1] if "\n" in archi_text else archi_text
+            )
         if archi_text.endswith("```"):
             archi_text = archi_text.rsplit("```", 1)[0]
 
@@ -3105,7 +3292,9 @@ Reponds UNIQUEMENT avec le contenu Markdown du fichier."""
         )
         readme_text = resp.content.strip()
         if readme_text.startswith("```"):
-            readme_text = readme_text.split("\n", 1)[1] if "\n" in readme_text else readme_text
+            readme_text = (
+                readme_text.split("\n", 1)[1] if "\n" in readme_text else readme_text
+            )
         if readme_text.endswith("```"):
             readme_text = readme_text.rsplit("```", 1)[0]
 
@@ -3159,7 +3348,9 @@ Reponds UNIQUEMENT avec le contenu Markdown du fichier."""
         pass
 
 
-async def _run_real_e2e_tests(ws: Path, session_id: str, phase_id: str, push_sse, mission) -> dict:
+async def _run_real_e2e_tests(
+    ws: Path, session_id: str, phase_id: str, push_sse, mission
+) -> dict:
     """Run real Playwright/Jest/Vitest E2E test files if they exist in workspace. No LLM."""
     import subprocess
 
@@ -3205,7 +3396,9 @@ async def _run_real_e2e_tests(ws: Path, session_id: str, phase_id: str, push_sse
     has_playwright_config = (ws / "playwright.config.ts").exists() or (
         ws / "playwright.config.js"
     ).exists()
-    has_vitest = (ws / "vitest.config.ts").exists() or (ws / "vitest.config.js").exists()
+    has_vitest = (ws / "vitest.config.ts").exists() or (
+        ws / "vitest.config.js"
+    ).exists()
     has_jest = (ws / "jest.config.ts").exists() or (ws / "jest.config.js").exists()
     has_pytest = any(f.suffix == ".py" for f in test_files)
 
@@ -3367,7 +3560,9 @@ async def _qa_screenshots_macos(ws: Path, shots_dir: Path) -> list[str]:
             f")\n"
         )
         logger.info(
-            "Auto-generated Package.swift for %s (excluding %d files)", app_name, len(excludes)
+            "Auto-generated Package.swift for %s (excluding %d files)",
+            app_name,
+            len(excludes),
         )
 
     # 2. Build
@@ -3468,7 +3663,10 @@ async def _qa_screenshots_macos(ws: Path, shots_dir: Path) -> list[str]:
 
     except Exception as e:
         _write_status_png(
-            shots_dir / "02_launch_error.png", "LAUNCH FAILED", str(e)[:500], bg_color=(40, 10, 10)
+            shots_dir / "02_launch_error.png",
+            "LAUNCH FAILED",
+            str(e)[:500],
+            bg_color=(40, 10, 10),
         )
         results.append("screenshots/02_launch_error.png")
     finally:
@@ -3514,7 +3712,12 @@ def _discover_macos_views(ws: Path) -> list[dict]:
             if ks:
                 shortcut = ks.group(1)
             views.append(
-                {"id": name.lower(), "name": name, "type": view_type, "shortcut": shortcut}
+                {
+                    "id": name.lower(),
+                    "name": name,
+                    "type": view_type,
+                    "shortcut": shortcut,
+                }
             )
             seen.add(name)
     return views
@@ -3533,7 +3736,9 @@ def _capture_app_screenshot(app_name: str, output_path: Path):
             "  return wID\n"
             "end tell"
         )
-        r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=10)
+        r = subprocess.run(
+            ["osascript", "-e", script], capture_output=True, text=True, timeout=10
+        )
         if r.returncode == 0 and r.stdout.strip():
             subprocess.run(
                 ["screencapture", "-l", r.stdout.strip(), str(output_path)],
@@ -3543,12 +3748,16 @@ def _capture_app_screenshot(app_name: str, output_path: Path):
         else:
             # Fallback: full screen
             subprocess.run(
-                ["screencapture", "-x", str(output_path)], timeout=10, capture_output=True
+                ["screencapture", "-x", str(output_path)],
+                timeout=10,
+                capture_output=True,
             )
     except Exception:
         import subprocess as _sp
 
-        _sp.run(["screencapture", "-x", str(output_path)], timeout=10, capture_output=True)
+        _sp.run(
+            ["screencapture", "-x", str(output_path)], timeout=10, capture_output=True
+        )
 
 
 def _applescript_navigate(app_name: str, view: dict):
@@ -3660,10 +3869,19 @@ async def _qa_screenshots_ios(ws: Path, shots_dir: Path) -> list[str]:
 
     # Boot simulator + screenshot
     try:
-        subprocess.run(["xcrun", "simctl", "boot", "iPhone 16"], capture_output=True, timeout=30)
+        subprocess.run(
+            ["xcrun", "simctl", "boot", "iPhone 16"], capture_output=True, timeout=30
+        )
         await _aio.sleep(3)
         subprocess.run(
-            ["xcrun", "simctl", "io", "booted", "screenshot", str(shots_dir / "02_simulator.png")],
+            [
+                "xcrun",
+                "simctl",
+                "io",
+                "booted",
+                "screenshot",
+                str(shots_dir / "02_simulator.png"),
+            ],
             capture_output=True,
             timeout=15,
         )
@@ -3674,7 +3892,9 @@ async def _qa_screenshots_ios(ws: Path, shots_dir: Path) -> list[str]:
     return results
 
 
-async def _qa_screenshots_web(ws: Path, shots_dir: Path, platform_type: str) -> list[str]:
+async def _qa_screenshots_web(
+    ws: Path, shots_dir: Path, platform_type: str
+) -> list[str]:
     """Start web server → Playwright multi-step journey screenshots (routes + interactions + RBAC)."""
     import asyncio as _aio
     import subprocess
@@ -3721,7 +3941,9 @@ async def _qa_screenshots_web(ws: Path, shots_dir: Path, platform_type: str) -> 
                 results.append("screenshots/01_docker_build_failed.png")
                 return results
         elif platform_type == "web-node":
-            subprocess.run(["npm", "install"], cwd=str(ws), capture_output=True, timeout=60)
+            subprocess.run(
+                ["npm", "install"], cwd=str(ws), capture_output=True, timeout=60
+            )
             proc = subprocess.Popen(
                 ["npm", "start"],
                 cwd=str(ws),
@@ -3748,7 +3970,9 @@ async def _qa_screenshots_web(ws: Path, shots_dir: Path, platform_type: str) -> 
             users = _discover_web_users(ws)
 
             # Generate Python Playwright journey script
-            journey_script = _build_playwright_journey_py(port, routes, users, str(shots_dir))
+            journey_script = _build_playwright_journey_py(
+                port, routes, users, str(shots_dir)
+            )
 
             r = subprocess.run(
                 ["python3", "-c", journey_script],
@@ -3797,7 +4021,9 @@ async def _qa_screenshots_web(ws: Path, shots_dir: Path, platform_type: str) -> 
                     pass
             if platform_type == "web-docker":
                 subprocess.run(
-                    ["docker", "rm", "-f", "qa-screenshot-app"], capture_output=True, timeout=10
+                    ["docker", "rm", "-f", "qa-screenshot-app"],
+                    capture_output=True,
+                    timeout=10,
                 )
     return results
 
@@ -3816,10 +4042,15 @@ def _discover_web_routes(ws: Path) -> list[dict]:
                 rel = str(f.parent.relative_to(routes_dir)).replace("\\", "/")
                 if rel == ".":
                     continue
-                route = "/" + rel.replace("(", "").replace(")", "").replace("[", ":").replace(
-                    "]", ""
-                )
-                if route not in seen and "+page" in f.name or "index" in f.name or "page" in f.name:
+                route = "/" + rel.replace("(", "").replace(")", "").replace(
+                    "[", ":"
+                ).replace("]", "")
+                if (
+                    route not in seen
+                    and "+page" in f.name
+                    or "index" in f.name
+                    or "page" in f.name
+                ):
                     label = rel.strip("/").replace("/", "_").replace("-", "_")
                     routes.append({"path": route, "label": label, "actions": []})
                     seen.add(route)
@@ -3846,7 +4077,9 @@ def _discover_web_routes(ws: Path) -> list[dict]:
                     )
                     seen.add(path)
             # Express: app.get('/path', ...)
-            for m in re.finditer(r"(?:app|router)\.(?:get|post|use)\(['\"](/[^'\"]*)['\"]", code):
+            for m in re.finditer(
+                r"(?:app|router)\.(?:get|post|use)\(['\"](/[^'\"]*)['\"]", code
+            ):
                 path = m.group(1)
                 if path not in seen and not re.search(r":\w+", path):
                     routes.append(
@@ -3866,7 +4099,11 @@ def _discover_web_routes(ws: Path) -> list[dict]:
         path = f"/{rel}"
         if path not in seen:
             routes.append(
-                {"path": path, "label": rel.replace("/", "_").replace(".html", ""), "actions": []}
+                {
+                    "path": path,
+                    "label": rel.replace("/", "_").replace(".html", ""),
+                    "actions": [],
+                }
             )
             seen.add(path)
 
@@ -3903,9 +4140,13 @@ def _enrich_route_actions(ws: Path, route: dict):
             for m in re.finditer(r"<button[^>]*>([^<]+)</button>", code):
                 btn_text = m.group(1).strip()
                 if len(btn_text) < 30:
-                    actions.append({"type": "click", "selector": f"button:has-text('{btn_text}')"})
+                    actions.append(
+                        {"type": "click", "selector": f"button:has-text('{btn_text}')"}
+                    )
             # Navigation links
-            for m in re.finditer(r'<a[^>]+href=["\']([^"\']+)["\'][^>]*>([^<]+)</a>', code):
+            for m in re.finditer(
+                r'<a[^>]+href=["\']([^"\']+)["\'][^>]*>([^<]+)</a>', code
+            ):
                 href, text = m.group(1), m.group(2).strip()
                 if href.startswith("/") and len(text) < 30:
                     actions.append({"type": "navigate", "href": href, "text": text})
@@ -3941,7 +4182,9 @@ def _discover_web_users(ws: Path) -> list[dict]:
                         role = "admin"
                     elif "manager" in email.lower() or "lead" in email.lower():
                         role = "manager"
-                    users.append({"email": email, "password": pw_match.group(1), "role": role})
+                    users.append(
+                        {"email": email, "password": pw_match.group(1), "role": role}
+                    )
     # Deduplicate
     seen = set()
     unique = []
@@ -3952,7 +4195,9 @@ def _discover_web_users(ws: Path) -> list[dict]:
     return unique[:4]
 
 
-def _build_playwright_journey(port: int, routes: list, users: list, shots_dir: str) -> str:
+def _build_playwright_journey(
+    port: int, routes: list, users: list, shots_dir: str
+) -> str:
     """Generate a Playwright script that screenshots each route + interactions + RBAC."""
     base = f"http://localhost:{port}"
 
@@ -4070,7 +4315,9 @@ const {{ chromium }} = require('playwright');
     return script
 
 
-def _build_playwright_journey_py(port: int, routes: list, users: list, shots_dir: str) -> str:
+def _build_playwright_journey_py(
+    port: int, routes: list, users: list, shots_dir: str
+) -> str:
     """Generate a Python Playwright script that screenshots each route."""
     base = f"http://localhost:{port}"
 
@@ -4209,7 +4456,11 @@ def _write_status_png(
 
         def _ch(ct, d):
             c = ct + d
-            return struct.pack(">I", len(d)) + c + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
+            return (
+                struct.pack(">I", len(d))
+                + c
+                + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
+            )
 
         ihdr = struct.pack(">IIBBBBB", img_w, img_h, 8, 2, 0, 0, 0)
         with open(str(path), "wb") as f:
@@ -4264,7 +4515,16 @@ def _detect_project_platform(workspace_path: str, brief: str = "") -> str:
         )
         if any(kw in bl for kw in web_kw):
             return "web-node"
-        ios_kw = ("ios", "iphone", "ipad", "swiftui", "uikit", "swift app", "apple", "xcode")
+        ios_kw = (
+            "ios",
+            "iphone",
+            "ipad",
+            "swiftui",
+            "uikit",
+            "swift app",
+            "apple",
+            "xcode",
+        )
         if any(kw in bl for kw in ios_kw):
             return "ios-native"
         macos_kw = ("macos", "mac app", "appkit", "cocoa")
@@ -4338,7 +4598,9 @@ def _detect_project_platform(workspace_path: str, brief: str = "") -> str:
                     pass
         if not is_ios:
             for src in (
-                list((ws / "Sources").rglob("*.swift"))[:20] if (ws / "Sources").exists() else []
+                list((ws / "Sources").rglob("*.swift"))[:20]
+                if (ws / "Sources").exists()
+                else []
             ):
                 try:
                     txt = src.read_text()[:500].lower()
@@ -4830,8 +5092,13 @@ async def api_project_provision(request: Request, project_id: str):
     store = get_project_store()
     project = store.get(project_id)
     if not project:
-        return JSONResponse({"ok": False, "reason": "Project not found"}, status_code=404)
+        return JSONResponse(
+            {"ok": False, "reason": "Project not found"}, status_code=404
+        )
     created = store.auto_provision(project_id, project.name)
     return JSONResponse(
-        {"ok": True, "created": [{"id": m.id, "type": m.type, "name": m.name} for m in created]}
+        {
+            "ok": True,
+            "created": [{"id": m.id, "type": m.type, "name": m.name} for m in created],
+        }
     )
