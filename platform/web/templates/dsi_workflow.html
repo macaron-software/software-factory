@@ -31,6 +31,21 @@
 .wf-phase.active .wf-phase-arrow{color:var(--purple)}
 .wf-phase.done .wf-phase-arrow{color:var(--green)}
 
+/* ── Quality Gate Badge on Phase Bar ── */
+.wf-gate-badge{display:inline-flex;align-items:center;gap:3px;padding:0.12rem 0.4rem;border-radius:10px;font-size:0.58rem;font-weight:700;letter-spacing:.3px;white-space:nowrap;margin-left:auto;flex-shrink:0}
+.wf-gate-badge.pass{background:rgba(52,211,153,.15);color:var(--green)}
+.wf-gate-badge.fail{background:rgba(239,68,68,.15);color:var(--red)}
+.wf-gate-badge.pending{background:rgba(245,158,11,.12);color:var(--yellow)}
+.wf-gate-badge.skip{background:var(--bg-tertiary);color:var(--text-muted)}
+
+/* ── Quality Gate Panel ── */
+.wf-qgate{margin-bottom:1.2rem}
+.wf-qgate-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.4rem}
+.wf-qgate-dim{display:flex;align-items:center;gap:0.4rem;padding:0.3rem 0.5rem;background:var(--bg-tertiary);border-radius:6px;font-size:0.72rem}
+.wf-qgate-dim-bar{flex:1;height:4px;border-radius:2px;background:var(--border);overflow:hidden}
+.wf-qgate-dim-fill{height:100%;border-radius:2px;transition:width .3s}
+.wf-qgate-score{font-weight:700;font-size:0.68rem;min-width:28px;text-align:right}
+
 /* ── Phase Detail Panel ── */
 .wf-detail{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.2rem}
 @media(max-width:1000px){.wf-detail{grid-template-columns:1fr}}
@@ -112,6 +127,13 @@
                 <div class="wf-phase-name">{{ p.name }}</div>
                 <div class="wf-phase-pattern">{{ p.pattern_id }} · {{ p.agents|length }} agents</div>
             </div>
+            {% if p.gate and p.gate != 'always' %}
+            <span class="wf-gate-badge {{ 'pass' if p.status == 'done' else ('pending' if p.status == 'active' else 'skip') }}"
+                  title="Gate: {{ p.gate }}">
+                {% if p.status == 'done' %}✓{% elif p.status == 'active' %}⏳{% else %}○{% endif %}
+                {{ p.gate | replace('_', ' ') | truncate(12, True, '…') }}
+            </span>
+            {% endif %}
         </div>
         {% if not loop.last %}
         <div class="wf-phase-arrow">›</div>
@@ -172,6 +194,25 @@
                     Lancez le workflow pour voir les livrables
                 </div>
                 {% endif %}
+            </div>
+        </div>
+
+        <!-- Quality Gate -->
+        <div class="wf-panel wf-qgate">
+            <div class="wf-panel-header">
+                <div class="wf-panel-title">
+                    <svg><use href="#icon-shield"/></svg> Quality Gate
+                </div>
+                {% if current_phase %}
+                <span style="font-size:0.62rem;color:var(--text-secondary)">{{ current_phase.gate | default('always') | replace('_', ' ') | upper }}</span>
+                {% endif %}
+            </div>
+            <div class="wf-panel-body" id="phaseQualityGate"
+                 hx-get="/api/dashboard/quality-phase?workflow_id={{ workflow.id }}&phase_idx={{ current_phase_idx }}"
+                 hx-trigger="load" hx-swap="innerHTML">
+                <div style="text-align:center;color:var(--text-muted);padding:0.8rem;font-size:0.72rem">
+                    <svg class="icon icon-sm" style="animation:spin 1s linear infinite;color:var(--purple)"><use href="#icon-loader"/></svg>
+                </div>
             </div>
         </div>
     </div>

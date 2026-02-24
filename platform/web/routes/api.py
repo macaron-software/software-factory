@@ -3322,6 +3322,132 @@ async def dashboard_quality_badge(request: Request):
     return HTMLResponse(html)
 
 
+@router.get("/api/dashboard/quality-phase")
+async def dashboard_quality_phase(request: Request):
+    """Quality gate panel for a workflow phase — shows per-phase quality dimensions."""
+    from ...metrics.quality import QualityScanner
+
+    workflow_id = request.query_params.get("workflow_id", "")
+    phase_idx = request.query_params.get("phase_idx", "0")
+    try:
+        phase_idx = int(phase_idx)
+    except ValueError:
+        phase_idx = 0
+
+    # Get workflow to find associated project
+    project_id = ""
+    phase_name = ""
+    phase_gate = "always"
+    try:
+        from ...workflows.store import get_workflow_store
+        wf = get_workflow_store().get(workflow_id)
+        if wf:
+            # Workflow may have project_id in config
+            project_id = (wf.config or {}).get("project_id", "")
+            if not project_id:
+                # Try to extract from workflow_id pattern (e.g. "proj-xyz-workflow")
+                from ...projects import get_project_store
+                for p in get_project_store().list_all():
+                    if p.id in workflow_id or workflow_id in (p.config or {}).get("workflow_ids", []):
+                        project_id = p.id
+                        break
+            if wf.phases and phase_idx < len(wf.phases):
+                phase_name = wf.phases[phase_idx].name
+                phase_gate = wf.phases[phase_idx].gate or "always"
+    except Exception:
+        pass
+
+    # Phase-to-dimensions mapping: which quality dims matter per phase type
+    phase_dims = {
+        "cadrage": ["documentation"],
+        "architecture": ["architecture", "complexity", "documentation"],
+        "sprint": ["complexity", "coverage_ut", "maintainability", "security"],
+        "implementation": ["complexity", "coverage_ut", "maintainability", "security"],
+        "code": ["complexity", "coverage_ut", "coverage_e2e", "maintainability"],
+        "test": ["coverage_ut", "coverage_e2e", "security"],
+        "review": ["complexity", "maintainability", "architecture", "documentation"],
+        "quality": ["coverage_ut", "coverage_e2e", "security", "complexity", "maintainability"],
+        "deploy": ["security", "coverage_ut", "coverage_e2e"],
+        "delivery": ["security", "coverage_ut", "coverage_e2e", "documentation"],
+    }
+
+    # Match phase name to relevant dims
+    relevant_dims = None
+    pname_lower = (phase_name or "").lower()
+    for key, dims in phase_dims.items():
+        if key in pname_lower:
+            relevant_dims = dims
+            break
+    if not relevant_dims:
+        relevant_dims = ["complexity", "coverage_ut", "security", "maintainability"]
+
+    # Thresholds per gate type
+    gate_thresholds = {
+        "always": 0,
+        "no_veto": 50,
+        "all_approved": 70,
+        "quality_gate": 80,
+    }
+    threshold = gate_thresholds.get(phase_gate, 50)
+
+    # Get latest quality snapshot
+    snapshot = QualityScanner.get_latest_snapshot(project_id) if project_id else None
+
+    if not snapshot:
+        html = (
+            '<div style="text-align:center;padding:0.8rem;color:var(--text-muted);font-size:0.72rem">'
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom:0.3rem">'
+            '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+            '<div>No quality scan yet</div>'
+            '<div style="font-size:0.65rem;margin-top:0.2rem">Run <code>quality_scan</code> to see phase quality gates</div>'
+            "</div>"
+        )
+        return HTMLResponse(html)
+
+    dims = snapshot.get("dimensions", {})
+    gs = snapshot.get("global_score", 0)
+
+    # Build dimension bars for relevant dims
+    html = '<div class="wf-qgate-grid">'
+    gate_pass = True
+    for dim_key in relevant_dims:
+        dim = dims.get(dim_key)
+        if not dim:
+            continue
+        score = dim.get("score", 0)
+        label = dim_key.replace("_", " ").title()
+        color = "#16a34a" if score >= 80 else "#3b82f6" if score >= 60 else "#ea580c" if score >= 40 else "#dc2626"
+        if score < threshold:
+            gate_pass = False
+        html += (
+            f'<div class="wf-qgate-dim">'
+            f'<span style="font-size:0.65rem;color:var(--text-secondary);min-width:65px">{label}</span>'
+            f'<div class="wf-qgate-dim-bar"><div class="wf-qgate-dim-fill" style="width:{score:.0f}%;background:{color}"></div></div>'
+            f'<span class="wf-qgate-score" style="color:{color}">{score:.0f}</span>'
+            f"</div>"
+        )
+    html += "</div>"
+
+    # Gate verdict
+    if threshold > 0:
+        verdict_color = "var(--green)" if gate_pass else "var(--red)"
+        verdict_icon = "✓ PASS" if gate_pass else "✗ FAIL"
+        html += (
+            f'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.6rem;'
+            f'padding:0.4rem 0.6rem;border-radius:6px;background:{verdict_color}11;border:1px solid {verdict_color}33">'
+            f'<span style="font-size:0.72rem;font-weight:700;color:{verdict_color}">{verdict_icon}</span>'
+            f'<span style="font-size:0.62rem;color:var(--text-secondary)">Threshold: {threshold}/100 · Score: {gs:.0f}/100</span>'
+            f"</div>"
+        )
+    else:
+        html += (
+            '<div style="margin-top:0.4rem;font-size:0.62rem;color:var(--text-muted);text-align:center">'
+            f"Gate: always — no threshold · Score: {gs:.0f}/100</div>"
+        )
+
+    return HTMLResponse(html)
+
+
 @router.get("/api/dashboard/activity")
 async def dashboard_activity(request: Request):
     """Recent activity feed."""
