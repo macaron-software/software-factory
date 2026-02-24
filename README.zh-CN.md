@@ -47,33 +47,61 @@ Software Factory is an autonomous multi-agent platform that orchestrates the ent
 
 ## Quick Start
 
+### 方式一：Docker（推荐）
+
 Docker 镜像包含：**Node.js 20**、**Playwright + Chromium**、**bandit**、**semgrep**、**ripgrep**。
 
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
-cp .env.example .env       # 配置 LLM 密钥（见下方）
-docker-compose up -d
+make setup   # 复制 .env.example → .env（编辑添加 LLM 密钥）
+make run     # 构建并启动平台
 ```
 
-Open http://localhost:8090
+### 方式二：本地安装
+
+```bash
+git clone https://github.com/macaron-software/software-factory.git
+cd software-factory
+cp .env.example .env                # 创建配置文件（添加 LLM 密钥 — 见下方）
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r platform/requirements.txt
+make dev
+```
+
+打开 http://localhost:8090 — 首次启动时会显示**引导向导**。
+选择您的 SAFe 角色或点击 **"Skip (Demo)"**。
 
 ### 配置 LLM 提供商
 
-平台需要至少 **一个 LLM 提供商** 才能让 AI 代理生成真实代码。没有 API 密钥时，以 **demo 模式** 运行。
+没有 API 密钥时，以 **demo 模式** 运行（模拟响应 — 方便探索界面）。
+
+编辑 `.env` 并添加 **一个** API 密钥：
 
 ```bash
-cp .env.example .env
-# 编辑 .env 并添加 API 密钥
+# 选项 A：MiniMax（免费 — 推荐入门）
+PLATFORM_LLM_PROVIDER=minimax
+MINIMAX_API_KEY=sk-your-key-here
+
+# 选项 B：Azure OpenAI
+PLATFORM_LLM_PROVIDER=azure-openai
+AZURE_OPENAI_API_KEY=your-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+
+# 选项 C：NVIDIA NIM（免费）
+PLATFORM_LLM_PROVIDER=nvidia
+NVIDIA_API_KEY=nvapi-your-key-here
 ```
 
-| 提供商 | 环境变量 | 免费 |
-|--------|----------|------|
-| **MiniMax** | `MINIMAX_API_KEY` | ✅ |
-| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌ |
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | ✅ |
+重启：`make run`（Docker）或 `make dev`（本地）
 
-设置 `PLATFORM_LLM_PROVIDER` 为主提供商（`minimax`、`azure-openai`、`nvidia`）。
+| 提供商 | 环境变量 | 模型 | 免费 |
+|--------|----------|------|------|
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 | ✅ |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini | ❌ |
+| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 | ❌ |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 | ✅ |
+
 也可以在仪表板的 **Settings** 页面（`/settings`）配置。
 
 ## Features

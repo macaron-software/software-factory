@@ -47,33 +47,62 @@ Software Factory is an autonomous multi-agent platform that orchestrates the ent
 
 ## Quick Start
 
+### オプション 1: Docker（推奨）
+
 Docker イメージ内蔵: **Node.js 20**, **Playwright + Chromium**, **bandit**, **semgrep**, **ripgrep**。
 
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
-cp .env.example .env       # LLMキーを設定（下記参照）
-docker-compose up -d
+make setup   # .env.example → .env をコピー（LLMキーを編集）
+make run     # ビルド＆起動
 ```
 
-Open http://localhost:8090
+### オプション 2: ローカルインストール
+
+```bash
+git clone https://github.com/macaron-software/software-factory.git
+cd software-factory
+cp .env.example .env                # 設定ファイル作成（LLMキーを追加 — 下記参照）
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r platform/requirements.txt
+make dev
+```
+
+http://localhost:8090 を開く — 初回起動時に**オンボーディングウィザード**が表示されます。
+SAFeロールを選択するか、**「Skip (Demo)」**をクリック。
 
 ### LLMプロバイダーの設定
 
-プラットフォームには少なくとも **1つのLLMプロバイダー** が必要です。APIキーなしでは **デモモード** で動作します。
+APIキーなしでは **デモモード** で動作します（模擬応答 — UIの探索に便利）。
+
+`.env` を編集して **1つの** APIキーを追加:
 
 ```bash
-cp .env.example .env
-# .envを編集してAPIキーを追加
+# オプション A: MiniMax（無料 — 推奨）
+PLATFORM_LLM_PROVIDER=minimax
+MINIMAX_API_KEY=sk-your-key-here
+
+# オプション B: Azure OpenAI
+PLATFORM_LLM_PROVIDER=azure-openai
+AZURE_OPENAI_API_KEY=your-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+
+# オプション C: NVIDIA NIM（無料）
+PLATFORM_LLM_PROVIDER=nvidia
+NVIDIA_API_KEY=nvapi-your-key-here
 ```
 
-| プロバイダー | 環境変数 | 無料 |
-|-------------|----------|------|
-| **MiniMax** | `MINIMAX_API_KEY` | ✅ |
-| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌ |
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | ✅ |
+再起動: `make run`（Docker）または `make dev`（ローカル）
 
-`PLATFORM_LLM_PROVIDER` をプライマリプロバイダーに設定。ダッシュボードの **Settings**（`/settings`）からも設定可能。
+| プロバイダー | 環境変数 | モデル | 無料 |
+|-------------|----------|--------|------|
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 | ✅ |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini | ❌ |
+| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 | ❌ |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 | ✅ |
+
+ダッシュボードの **Settings**（`/settings`）からも設定可能。
 
 ## Features
 

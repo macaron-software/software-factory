@@ -47,33 +47,62 @@ Software Factory is an autonomous multi-agent platform that orchestrates the ent
 
 ## Quick Start
 
+### Opção 1: Docker (Recomendado)
+
 A imagem Docker inclui: **Node.js 20**, **Playwright + Chromium**, **bandit**, **semgrep**, **ripgrep**.
 
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
-cp .env.example .env       # Configurar chaves LLM (ver abaixo)
-docker-compose up -d
+make setup   # copia .env.example → .env (edite com sua chave LLM)
+make run     # constrói e inicia a plataforma
 ```
 
-Open http://localhost:8090
+### Opção 2: Instalação local
+
+```bash
+git clone https://github.com/macaron-software/software-factory.git
+cd software-factory
+cp .env.example .env                # criar config (adicionar chave LLM — ver abaixo)
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r platform/requirements.txt
+make dev
+```
+
+Abrir http://localhost:8090 — no primeiro acesso, o **assistente de onboarding** aparece.
+Escolha seu papel SAFe ou clique em **"Skip (Demo)"**.
 
 ### Configurar provedor LLM
 
-A plataforma requer pelo menos **um provedor LLM** para gerar código real. Sem chave API, funciona em **modo demo**.
+Sem chave API, a plataforma funciona em **modo demo** (respostas simuladas — útil para explorar a interface).
+
+Edite `.env` e adicione **uma** chave API:
 
 ```bash
-cp .env.example .env
-# Editar .env e adicionar chaves API
+# Opção A: MiniMax (gratuito — recomendado para começar)
+PLATFORM_LLM_PROVIDER=minimax
+MINIMAX_API_KEY=sk-sua-chave-aqui
+
+# Opção B: Azure OpenAI
+PLATFORM_LLM_PROVIDER=azure-openai
+AZURE_OPENAI_API_KEY=sua-chave
+AZURE_OPENAI_ENDPOINT=https://seu-recurso.openai.azure.com
+
+# Opção C: NVIDIA NIM (gratuito)
+PLATFORM_LLM_PROVIDER=nvidia
+NVIDIA_API_KEY=nvapi-sua-chave-aqui
 ```
 
-| Provedor | Variável de ambiente | Gratuito |
-|----------|---------------------|----------|
-| **MiniMax** | `MINIMAX_API_KEY` | ✅ |
-| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌ |
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | ✅ |
+Reiniciar: `make run` (Docker) ou `make dev` (local)
 
-Definir `PLATFORM_LLM_PROVIDER` como provedor principal. Configuração também em **Settings** (`/settings`).
+| Provedor | Variável de ambiente | Modelos | Gratuito |
+|----------|---------------------|---------|----------|
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 | ✅ |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini | ❌ |
+| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 | ❌ |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 | ✅ |
+
+Configuração também em **Settings** (`/settings`).
 
 ## Features
 

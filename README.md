@@ -107,6 +107,7 @@ Open http://localhost:8090 — click **"Skip (Demo)"** to explore without an API
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
+cp .env.example .env                # create your config (edit to add LLM key — see Step 3)
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r platform/requirements.txt
 
@@ -115,7 +116,8 @@ make dev
 # or manually: PYTHONPATH=$(pwd) python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
 ```
 
-Open http://localhost:8090
+Open http://localhost:8090 — on first launch you'll see the **onboarding wizard**.
+Choose your SAFe role or click **"Skip (Demo)"** to explore immediately.
 
 ### Step 3: Configure an LLM Provider
 
@@ -139,7 +141,7 @@ PLATFORM_LLM_PROVIDER=nvidia
 NVIDIA_API_KEY=nvapi-your-key-here
 ```
 
-Then restart: `make run`
+Then restart: `make run` (Docker) or `make dev` (local)
 
 | Provider | Env Variable | Models | Free Tier |
 |----------|-------------|--------|-----------|

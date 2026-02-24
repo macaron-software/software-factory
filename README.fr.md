@@ -96,55 +96,62 @@ L'image inclut : **Node.js 20**, **Playwright + Chromium**, **bandit**, **semgre
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
-cp .env.example .env       # Configurer les clés LLM (voir Étape 3)
-docker-compose up -d
+make setup   # copie .env.example → .env (éditez pour ajouter votre clé LLM)
+make run     # construit et lance la plateforme
 ```
 
-Ouvrir http://localhost:8090
+Ouvrir http://localhost:8090 — au premier lancement, l'**assistant d'onboarding** apparaît.
+Choisissez votre rôle SAFe ou cliquez sur **« Skip (Demo) »** pour explorer directement.
 
 ### Option 2 : Installation locale
 
 ```bash
-# Cloner le dépôt
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
-
-# Installer les dépendances
-pip install -r requirements.txt
+cp .env.example .env                # créer votre config (éditer pour ajouter la clé LLM — voir Étape 3)
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r platform/requirements.txt
 
 # Démarrer la plateforme
-python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
+make dev
+# ou manuellement : PYTHONPATH=$(pwd) python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
 ```
 
-Ouvrir http://localhost:8090
+Ouvrir http://localhost:8090 — au premier lancement, l'**assistant d'onboarding** apparaît.
+Choisissez votre rôle SAFe ou cliquez sur **« Skip (Demo) »** pour explorer directement.
 
 ### Étape 3 : Configurer un fournisseur LLM
 
-La plateforme nécessite au moins **un fournisseur LLM** pour que les agents génèrent du vrai code, des tests et des décisions.
-Sans clé API, elle tourne en **mode demo** (réponses simulées — utile pour explorer l'interface).
+Sans clé API, la plateforme tourne en **mode demo** — les agents répondent avec des réponses simulées.
+C'est utile pour explorer l'interface, mais les agents ne génèreront pas de vrai code ou d'analyse.
+
+Pour activer les vrais agents IA, éditez `.env` et ajoutez **une** clé API :
 
 ```bash
-# Copier le fichier d'environnement exemple
-cp .env.example .env
+# Option A : MiniMax (gratuit — recommandé pour démarrer)
+PLATFORM_LLM_PROVIDER=minimax
+MINIMAX_API_KEY=sk-votre-clé-ici
 
-# Éditer .env et ajouter vos clés API
+# Option B : Azure OpenAI
+PLATFORM_LLM_PROVIDER=azure-openai
+AZURE_OPENAI_API_KEY=votre-clé
+AZURE_OPENAI_ENDPOINT=https://votre-resource.openai.azure.com
+
+# Option C : NVIDIA NIM (gratuit)
+PLATFORM_LLM_PROVIDER=nvidia
+NVIDIA_API_KEY=nvapi-votre-clé-ici
 ```
+
+Puis relancez : `make run` (Docker) ou `make dev` (local)
 
 | Fournisseur | Variable d'env | Modèles | Gratuit |
 |-------------|---------------|---------|---------|
-| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5, M2.1 | ✅ Oui |
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 | ✅ Oui |
 | **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini | ❌ |
 | **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 | ❌ |
 | **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 | ✅ Oui |
 
-Définir `PLATFORM_LLM_PROVIDER` sur votre fournisseur principal (`minimax`, `azure-openai`, `azure-ai`, `nvidia`).
 La plateforme bascule automatiquement sur les autres fournisseurs configurés en cas d'échec.
-
-```bash
-# Exemple : MiniMax comme fournisseur principal
-PLATFORM_LLM_PROVIDER=minimax
-MINIMAX_API_KEY=sk-votre-clé-ici
-```
 
 Vous pouvez aussi configurer les fournisseurs depuis la page **Settings** du dashboard (`/settings`).
 

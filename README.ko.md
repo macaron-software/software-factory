@@ -47,33 +47,62 @@ Software Factory is an autonomous multi-agent platform that orchestrates the ent
 
 ## Quick Start
 
+### 옵션 1: Docker (권장)
+
 Docker 이미지 포함: **Node.js 20**, **Playwright + Chromium**, **bandit**, **semgrep**, **ripgrep**.
 
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
-cp .env.example .env       # LLM 키 설정 (아래 참조)
-docker-compose up -d
+make setup   # .env.example → .env 복사 (LLM 키 편집)
+make run     # 빌드 및 시작
 ```
 
-Open http://localhost:8090
+### 옵션 2: 로컬 설치
+
+```bash
+git clone https://github.com/macaron-software/software-factory.git
+cd software-factory
+cp .env.example .env                # 설정 파일 생성 (LLM 키 추가 — 아래 참조)
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r platform/requirements.txt
+make dev
+```
+
+http://localhost:8090 열기 — 첫 실행 시 **온보딩 마법사**가 나타납니다.
+SAFe 역할을 선택하거나 **"Skip (Demo)"**를 클릭하세요.
 
 ### LLM 제공업체 설정
 
-플랫폼은 최소 **하나의 LLM 제공업체**가 필요합니다. API 키 없이는 **데모 모드**로 작동합니다.
+API 키 없이는 **데모 모드**로 작동합니다 (시뮬레이션 응답 — UI 탐색에 유용).
+
+`.env`를 편집하고 **하나의** API 키를 추가:
 
 ```bash
-cp .env.example .env
-# .env를 편집하고 API 키 추가
+# 옵션 A: MiniMax (무료 — 시작에 권장)
+PLATFORM_LLM_PROVIDER=minimax
+MINIMAX_API_KEY=sk-your-key-here
+
+# 옵션 B: Azure OpenAI
+PLATFORM_LLM_PROVIDER=azure-openai
+AZURE_OPENAI_API_KEY=your-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+
+# 옵션 C: NVIDIA NIM (무료)
+PLATFORM_LLM_PROVIDER=nvidia
+NVIDIA_API_KEY=nvapi-your-key-here
 ```
 
-| 제공업체 | 환경 변수 | 무료 |
-|---------|----------|------|
-| **MiniMax** | `MINIMAX_API_KEY` | ✅ |
-| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | ❌ |
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | ✅ |
+재시작: `make run` (Docker) 또는 `make dev` (로컬)
 
-`PLATFORM_LLM_PROVIDER`를 기본 제공업체로 설정. 대시보드 **Settings**(`/settings`)에서도 설정 가능.
+| 제공업체 | 환경 변수 | 모델 | 무료 |
+|---------|----------|------|------|
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 | ✅ |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini | ❌ |
+| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 | ❌ |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 | ✅ |
+
+대시보드 **Settings**(`/settings`)에서도 설정 가능.
 
 ## Features
 
