@@ -33,6 +33,7 @@
             </div>
         </div>
         <div class="item-meta">
+            <span hx-get="/api/dashboard/quality-badge?project_id={{ p.info.id }}" hx-trigger="load" hx-swap="innerHTML"></span>
             {% if p.info.has_git %}
             <span class="item-badge" hx-get="/api/projects/{{ p.info.id }}/git-status" hx-trigger="load" hx-swap="innerHTML">…</span>
             {% endif %}

@@ -3229,6 +3229,99 @@ async def api_quality_all(request: Request):
     return {"projects": QualityScanner.get_all_projects_scores()}
 
 
+@router.get("/api/dashboard/quality-mission")
+async def dashboard_quality_mission(request: Request):
+    """Quality badge + dimension bars for a single project (used in mission sidebar)."""
+    from ...metrics.quality import QualityScanner
+
+    project_id = request.query_params.get("project_id", "")
+    if not project_id:
+        return HTMLResponse(
+            '<div style="font-size:0.75rem;color:var(--text-muted)">No project</div>'
+        )
+    snapshot = QualityScanner.get_latest_snapshot(project_id)
+    if not snapshot:
+        return HTMLResponse(
+            '<div style="font-size:0.75rem;color:var(--text-muted)">'
+            "No scan yet — run <code>quality_scan</code>"
+            "</div>"
+        )
+    gs = snapshot["global_score"]
+    gc = (
+        "#16a34a"
+        if gs >= 80
+        else "#3b82f6"
+        if gs >= 60
+        else "#ea580c"
+        if gs >= 40
+        else "#dc2626"
+    )
+    dims = snapshot.get("breakdown", {}).get("dimensions", {})
+    bars = ""
+    for dim, info in sorted(dims.items(), key=lambda x: x[1].get("score", 0)):
+        s = info.get("score", 0)
+        c = (
+            "#16a34a"
+            if s >= 80
+            else "#3b82f6"
+            if s >= 60
+            else "#ea580c"
+            if s >= 40
+            else "#dc2626"
+        )
+        bars += (
+            f'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
+            f'<span style="font-size:0.7rem;width:70px;color:var(--text-secondary)">{dim.replace("_", " ").title()[:12]}</span>'
+            f'<div style="flex:1;height:4px;background:var(--bg-primary);border-radius:2px;overflow:hidden">'
+            f'<div style="width:{s}%;height:100%;background:{c};border-radius:2px"></div></div>'
+            f'<span style="font-size:0.68rem;color:{c};width:24px;text-align:right">{s:.0f}</span>'
+            f"</div>"
+        )
+    html = (
+        f'<div style="text-align:center;margin-bottom:8px">'
+        f'<span style="font-size:1.5rem;font-weight:700;color:{gc}">{gs:.0f}</span>'
+        f'<span style="font-size:0.75rem;color:var(--text-secondary)">/100</span>'
+        f"</div>{bars}"
+        f'<a href="/quality?project_id={project_id}" '
+        f'style="font-size:0.72rem;color:var(--purple);text-decoration:none;display:block;text-align:center;margin-top:6px">'
+        f"View details →</a>"
+    )
+    return HTMLResponse(html)
+
+
+@router.get("/api/dashboard/quality-badge")
+async def dashboard_quality_badge(request: Request):
+    """Inline quality badge for project topbar / cards."""
+    from ...metrics.quality import QualityScanner
+
+    project_id = request.query_params.get("project_id", "")
+    if not project_id:
+        return HTMLResponse("")
+    snapshot = QualityScanner.get_latest_snapshot(project_id)
+    if not snapshot:
+        return HTMLResponse("")
+    gs = snapshot["global_score"]
+    gc = (
+        "#16a34a"
+        if gs >= 80
+        else "#3b82f6"
+        if gs >= 60
+        else "#ea580c"
+        if gs >= 40
+        else "#dc2626"
+    )
+    html = (
+        f'<a href="/quality?project_id={project_id}" style="'
+        f"display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;"
+        f'font-size:0.75rem;font-weight:600;background:{gc}22;color:{gc};text-decoration:none" '
+        f'title="Quality Score: {gs:.0f}/100">'
+        f'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
+        f'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+        f"{gs:.0f}/100</a>"
+    )
+    return HTMLResponse(html)
+
+
 @router.get("/api/dashboard/activity")
 async def dashboard_activity(request: Request):
     """Recent activity feed."""

@@ -4,6 +4,10 @@
 <div class="project-topbar-info">
     <span class="project-type-dot {{ project.factory_type }} dot-lg"></span>
     <span style="font-size:0.8rem;color:var(--text-secondary)">{{ project.path }}</span>
+    <span id="projectQualityBadge"
+          hx-get="/api/dashboard/quality-badge?project_id={{ project.id }}"
+          hx-trigger="load"
+          hx-swap="innerHTML"></span>
     <a href="/projects/{{ project.id }}/board" class="btn btn-sm btn-ghost" title="Kanban Board">
         <svg class="icon icon-sm"><use href="#icon-columns"/></svg> Board
     </a>

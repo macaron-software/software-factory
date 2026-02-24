@@ -322,6 +322,17 @@
         </div>
         {% endif %}
 
+        {# ── Quality Scorecard ── #}
+        <div class="ms-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-check"/></svg> Quality</h4>
+            <div id="missionQuality"
+                 hx-get="/api/dashboard/quality-mission?project_id={{ mission.project_id }}"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+                <p style="font-size:0.75rem;color:var(--text-muted)">Loading...</p>
+            </div>
+        </div>
+
         {% if mission.workflow_id %}
         <div class="ms-section">
             <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-zap"/></svg> Workflow</h4>

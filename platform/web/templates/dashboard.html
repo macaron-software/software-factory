@@ -51,6 +51,12 @@
                 </div>
             </div>
             <div class="dash-section">
+                <h3>Portfolio Quality</h3>
+                <div id="dashQuality" hx-get="/api/dashboard/quality" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="dash-section">
                 <h3>Backlog Overview</h3>
                 <div id="dashBacklog" hx-get="/api/dashboard/backlog" hx-trigger="load" hx-swap="innerHTML">
                     <p class="text-muted">Loading...</p>
@@ -104,12 +110,24 @@
                     <p class="text-muted">Loading...</p>
                 </div>
             </div>
+            <div class="dash-section">
+                <h3>Code Quality</h3>
+                <div id="dashQuality" hx-get="/api/dashboard/quality" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
 
             {# ── Architect ── #}
             {% elif p == 'architect' %}
             <div class="dash-section">
                 <h3>Projects</h3>
                 <div id="dashProjects" hx-get="/api/dashboard/projects" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="dash-section">
+                <h3>Code Quality</h3>
+                <div id="dashQuality" hx-get="/api/dashboard/quality" hx-trigger="load" hx-swap="innerHTML">
                     <p class="text-muted">Loading...</p>
                 </div>
             </div>
