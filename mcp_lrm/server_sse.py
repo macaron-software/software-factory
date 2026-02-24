@@ -35,7 +35,7 @@ import sys
 import signal
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Set
 from datetime import datetime
 
 # Add parent to path for imports
@@ -47,11 +47,14 @@ try:
 except ImportError:
     print("Installing required packages...")
     import subprocess
-    subprocess.run([sys.executable, "-m", "pip", "install", "aiohttp", "aiohttp-sse"], check=True)
+
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "aiohttp", "aiohttp-sse"], check=True
+    )
     from aiohttp import web
     from aiohttp_sse import sse_response
 
-from mcp_lrm.exclusions import should_exclude_path, filter_paths, get_included_extensions
+from mcp_lrm.exclusions import should_exclude_path
 
 
 # ============================================================================
@@ -73,7 +76,7 @@ def log(msg: str, level: str = "INFO"):
         LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(LOG_FILE, "a") as f:
             f.write(line + "\n")
-    except:
+    except Exception:
         pass
 
 
@@ -87,15 +90,15 @@ def _constrain_vitest(cmd: str) -> str:
         return cmd  # already constrained
     # Insert after 'vitest run' or 'vitest' keyword
     cmd = re.sub(
-        r'(vitest\s+run)\b',
-        rf'\1 {constraint}',
+        r"(vitest\s+run)\b",
+        rf"\1 {constraint}",
         cmd,
     )
     if constraint not in cmd:
         # Fallback: insert after 'vitest'
         cmd = re.sub(
-            r'(vitest)\b',
-            rf'\1 {constraint}',
+            r"(vitest)\b",
+            rf"\1 {constraint}",
             cmd,
             count=1,
         )
@@ -106,6 +109,7 @@ def _constrain_vitest(cmd: str) -> str:
 # ============================================================================
 # MCP LRM SERVER (Shared Instance)
 # ============================================================================
+
 
 class MCPLRMServer:
     """
@@ -131,12 +135,13 @@ class MCPLRMServer:
         self.active_connections: Set[str] = set()
 
         self._load_task_store()
-        log(f"MCP LRM Server initialized")
+        log("MCP LRM Server initialized")
 
     def _load_task_store(self):
         """Load shared task store"""
         try:
             from core.task_store import TaskStore
+
             self.task_store = TaskStore()
             log("TaskStore connected")
         except Exception as e:
@@ -147,6 +152,7 @@ class MCPLRMServer:
         if project_name not in self.projects:
             try:
                 from core.project_registry import get_project
+
                 self.projects[project_name] = get_project(project_name)
                 log(f"Loaded project: {project_name}")
             except Exception as e:
@@ -163,10 +169,21 @@ class MCPLRMServer:
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "Search query (glob pattern or text)"},
+                        "query": {
+                            "type": "string",
+                            "description": "Search query (glob pattern or text)",
+                        },
                         "project": {"type": "string", "description": "Project name"},
-                        "scope": {"type": "string", "description": "Scope: 'all', domain, or path prefix", "default": "all"},
-                        "limit": {"type": "integer", "description": "Max results", "default": 20},
+                        "scope": {
+                            "type": "string",
+                            "description": "Scope: 'all', domain, or path prefix",
+                            "default": "all",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results",
+                            "default": 20,
+                        },
                     },
                     "required": ["query", "project"],
                 },
@@ -177,9 +194,16 @@ class MCPLRMServer:
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string", "description": "File path (relative to project root)"},
+                        "path": {
+                            "type": "string",
+                            "description": "File path (relative to project root)",
+                        },
                         "project": {"type": "string", "description": "Project name"},
-                        "lines": {"type": "integer", "description": "Max lines to read", "default": 500},
+                        "lines": {
+                            "type": "integer",
+                            "description": "Max lines to read",
+                            "default": 500,
+                        },
                     },
                     "required": ["path", "project"],
                 },
@@ -190,7 +214,10 @@ class MCPLRMServer:
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "domain": {"type": "string", "description": "Domain: rust, typescript, python, etc."},
+                        "domain": {
+                            "type": "string",
+                            "description": "Domain: rust, typescript, python, etc.",
+                        },
                         "project": {"type": "string", "description": "Project name"},
                     },
                     "required": ["domain", "project"],
@@ -225,9 +252,16 @@ class MCPLRMServer:
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "domain": {"type": "string", "description": "Domain: rust, typescript, etc."},
+                        "domain": {
+                            "type": "string",
+                            "description": "Domain: rust, typescript, etc.",
+                        },
                         "project": {"type": "string", "description": "Project name"},
-                        "command": {"type": "string", "description": "Command: build, test, lint", "default": "build"},
+                        "command": {
+                            "type": "string",
+                            "description": "Command: build, test, lint",
+                            "default": "build",
+                        },
                     },
                     "required": ["domain", "project"],
                 },
@@ -238,10 +272,25 @@ class MCPLRMServer:
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "Search query (keywords)"},
-                        "space": {"type": "string", "description": "Confluence space key", "default": "IAN"},
-                        "limit": {"type": "integer", "description": "Max results", "default": 10},
-                        "refresh": {"type": "boolean", "description": "Force refresh from Confluence API", "default": False},
+                        "query": {
+                            "type": "string",
+                            "description": "Search query (keywords)",
+                        },
+                        "space": {
+                            "type": "string",
+                            "description": "Confluence space key",
+                            "default": "IAN",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results",
+                            "default": 10,
+                        },
+                        "refresh": {
+                            "type": "boolean",
+                            "description": "Force refresh from Confluence API",
+                            "default": False,
+                        },
                     },
                     "required": ["query"],
                 },
@@ -252,10 +301,24 @@ class MCPLRMServer:
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "page_id": {"type": "string", "description": "Confluence page ID"},
-                        "title": {"type": "string", "description": "Page title (alternative to page_id)"},
-                        "space": {"type": "string", "description": "Space key", "default": "IAN"},
-                        "max_chars": {"type": "integer", "description": "Max chars to return", "default": 8000},
+                        "page_id": {
+                            "type": "string",
+                            "description": "Confluence page ID",
+                        },
+                        "title": {
+                            "type": "string",
+                            "description": "Page title (alternative to page_id)",
+                        },
+                        "space": {
+                            "type": "string",
+                            "description": "Space key",
+                            "default": "IAN",
+                        },
+                        "max_chars": {
+                            "type": "integer",
+                            "description": "Max chars to return",
+                            "default": 8000,
+                        },
                     },
                 },
             },
@@ -265,10 +328,24 @@ class MCPLRMServer:
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "JQL query or plain text keywords"},
-                        "project": {"type": "string", "description": "Jira project key (optional filter)"},
-                        "limit": {"type": "integer", "description": "Max results", "default": 20},
-                        "refresh": {"type": "boolean", "description": "Force refresh from Jira API", "default": False},
+                        "query": {
+                            "type": "string",
+                            "description": "JQL query or plain text keywords",
+                        },
+                        "project": {
+                            "type": "string",
+                            "description": "Jira project key (optional filter)",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results",
+                            "default": 20,
+                        },
+                        "refresh": {
+                            "type": "boolean",
+                            "description": "Force refresh from Jira API",
+                            "default": False,
+                        },
                     },
                     "required": ["query"],
                 },
@@ -311,7 +388,6 @@ class MCPLRMServer:
             return {"error": "Project not found"}
 
         query = args.get("query", "")
-        scope = args.get("scope", "all")
         limit = args.get("limit", 20)
 
         import glob
@@ -332,7 +408,9 @@ class MCPLRMServer:
             try:
                 proc = subprocess.run(
                     ["rg", "-l", "--max-count=1", query, str(root)],
-                    capture_output=True, text=True, timeout=10
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
                 )
                 for line in proc.stdout.strip().split("\n")[:limit]:
                     if line:
@@ -397,7 +475,7 @@ class MCPLRMServer:
         result = default_conventions.get(domain, {})
 
         # Merge project-specific conventions from YAML
-        if project and hasattr(project, 'config') and project.config:
+        if project and hasattr(project, "config") and project.config:
             domains_config = project.config.get("domains", {})
             domain_config = domains_config.get(domain, {})
 
@@ -465,16 +543,25 @@ class MCPLRMServer:
         cmd = _constrain_vitest(cmd)
 
         import subprocess
+
         try:
             proc = subprocess.run(
-                cmd, shell=True, cwd=str(project.root_path),
-                capture_output=True, text=True, timeout=300
+                cmd,
+                shell=True,
+                cwd=str(project.root_path),
+                capture_output=True,
+                text=True,
+                timeout=300,
             )
             return {
                 "success": proc.returncode == 0,
                 "returncode": proc.returncode,
-                "stdout": proc.stdout[-2000:] if len(proc.stdout) > 2000 else proc.stdout,
-                "stderr": proc.stderr[-2000:] if len(proc.stderr) > 2000 else proc.stderr,
+                "stdout": proc.stdout[-2000:]
+                if len(proc.stdout) > 2000
+                else proc.stdout,
+                "stderr": proc.stderr[-2000:]
+                if len(proc.stderr) > 2000
+                else proc.stderr,
             }
         except subprocess.TimeoutExpired:
             return {"error": "Command timed out (300s)"}
@@ -485,12 +572,16 @@ class MCPLRMServer:
 
     def _get_confluence_client(self):
         """Lazy-load Confluence client."""
-        if not hasattr(self, '_confluence_client'):
+        if not hasattr(self, "_confluence_client"):
             self._confluence_client = None
             try:
                 import sys
-                sys.path.insert(0, str(Path(__file__).resolve().parents[0].parent / "platform"))
+
+                sys.path.insert(
+                    0, str(Path(__file__).resolve().parents[0].parent / "platform")
+                )
                 from confluence.client import ConfluenceClient
+
                 self._confluence_client = ConfluenceClient()
                 log("Confluence client loaded")
             except Exception as e:
@@ -499,15 +590,17 @@ class MCPLRMServer:
 
     def _get_anonymizer(self):
         """Lazy-load anonymizer."""
-        if not hasattr(self, '_anonymizer'):
+        if not hasattr(self, "_anonymizer"):
             from .anonymizer import get_anonymizer
+
             self._anonymizer = get_anonymizer()
         return self._anonymizer
 
     def _get_cache(self):
         """Lazy-load RLM cache."""
-        if not hasattr(self, '_rlm_cache'):
+        if not hasattr(self, "_rlm_cache"):
             from .rlm_cache import get_rlm_cache
+
             self._rlm_cache = get_rlm_cache()
         return self._rlm_cache
 
@@ -525,42 +618,60 @@ class MCPLRMServer:
         if not refresh:
             results = cache.search_confluence(query, limit)
             if results:
-                return {"results": [anon.anonymize_dict(r) for r in results], "source": "cache"}
+                return {
+                    "results": [anon.anonymize_dict(r) for r in results],
+                    "source": "cache",
+                }
 
         # Fetch from Confluence API
         client = self._get_confluence_client()
         if not client:
             # Fallback to cache even if stale
             results = cache.search_confluence(query, limit)
-            return {"results": [anon.anonymize_dict(r) for r in results], "source": "cache", "note": "Confluence API unavailable"}
+            return {
+                "results": [anon.anonymize_dict(r) for r in results],
+                "source": "cache",
+                "note": "Confluence API unavailable",
+            }
 
         try:
             import re as _re
+
             # Use CQL search
             cql = f'space="{space}" AND (title~"{query}" OR text~"{query}")'
-            resp = client._request("GET", f"/rest/api/content/search", params={
-                "cql": cql, "limit": limit,
-                "expand": "body.storage,ancestors"
-            })
-            pages = resp.get("results", [])
+            pages = client.search_cql(cql, limit=limit, expand="body.storage,ancestors")
             for p in pages:
                 body_html = p.get("body", {}).get("storage", {}).get("value", "")
                 # Strip HTML tags for plain text
-                body_text = _re.sub(r'<[^>]+>', ' ', body_html)
-                body_text = _re.sub(r'\s+', ' ', body_text).strip()
-                ancestors = " > ".join(a.get("title", "") for a in p.get("ancestors", []))
+                body_text = _re.sub(r"<[^>]+>", " ", body_html)
+                body_text = _re.sub(r"\s+", " ", body_text).strip()
+                ancestors = " > ".join(
+                    a.get("title", "") for a in p.get("ancestors", [])
+                )
                 url = client.base_url + p.get("_links", {}).get("webui", "")
                 cache.upsert_confluence_page(
-                    page_id=str(p["id"]), space_key=space, title=p["title"],
-                    body=body_text, url=url, ancestors=ancestors
+                    page_id=str(p["id"]),
+                    space_key=space,
+                    title=p["title"],
+                    body=body_text,
+                    url=url,
+                    ancestors=ancestors,
                 )
 
             results = cache.search_confluence(query, limit)
-            return {"results": [anon.anonymize_dict(r) for r in results], "source": "api", "fetched": len(pages)}
+            return {
+                "results": [anon.anonymize_dict(r) for r in results],
+                "source": "api",
+                "fetched": len(pages),
+            }
         except Exception as e:
             log(f"Confluence search error: {e}", "ERROR")
             results = cache.search_confluence(query, limit)
-            return {"results": [anon.anonymize_dict(r) for r in results], "source": "cache", "error": str(e)}
+            return {
+                "results": [anon.anonymize_dict(r) for r in results],
+                "source": "cache",
+                "error": str(e),
+            }
 
     async def _tool_confluence_read(self, args: Dict) -> Dict:
         """Read a Confluence page by ID or title."""
@@ -591,6 +702,7 @@ class MCPLRMServer:
 
         try:
             import re as _re
+
             if title and not page_id:
                 # Find by title
                 found = client.find_page(title, space)
@@ -604,19 +716,29 @@ class MCPLRMServer:
                 return {"error": f"Page {page_id} not found"}
 
             body_html = page.get("body", {}).get("storage", {}).get("value", "")
-            body_text = _re.sub(r'<[^>]+>', ' ', body_html)
-            body_text = _re.sub(r'\s+', ' ', body_text).strip()
-            ancestors = " > ".join(a.get("title", "") for a in page.get("ancestors", []))
+            body_text = _re.sub(r"<[^>]+>", " ", body_html)
+            body_text = _re.sub(r"\s+", " ", body_text).strip()
+            ancestors = " > ".join(
+                a.get("title", "") for a in page.get("ancestors", [])
+            )
             url = client.base_url + page.get("_links", {}).get("webui", "")
 
             cache.upsert_confluence_page(
-                page_id=page_id, space_key=space, title=page["title"],
-                body=body_text, url=url, ancestors=ancestors
+                page_id=page_id,
+                space_key=space,
+                title=page["title"],
+                body=body_text,
+                url=url,
+                ancestors=ancestors,
             )
 
             result = {
-                "page_id": page_id, "title": page["title"], "space_key": space,
-                "body": body_text[:max_chars], "url": url, "ancestors": ancestors,
+                "page_id": page_id,
+                "title": page["title"],
+                "space_key": space,
+                "body": body_text[:max_chars],
+                "url": url,
+                "ancestors": ancestors,
             }
             return anon.anonymize_dict(result)
         except Exception as e:
@@ -627,7 +749,7 @@ class MCPLRMServer:
 
     def _get_jira_config(self):
         """Load Jira configuration from tokens."""
-        if not hasattr(self, '_jira_config'):
+        if not hasattr(self, "_jira_config"):
             self._jira_config = None
             # Try ~/.config/factory/jira.key
             key_file = Path.home() / ".config" / "factory" / "jira.key"
@@ -639,9 +761,13 @@ class MCPLRMServer:
             url = os.environ.get("ATLASSIAN_URL", "") or os.environ.get("JIRA_URL", "")
             if not url:
                 # Try to infer from Confluence URL
-                confluence_url = os.environ.get("CONFLUENCE_URL", "https://wiki.net.extra.laposte.fr/confluence")
+                confluence_url = os.environ.get(
+                    "CONFLUENCE_URL", "https://wiki.net.extra.laposte.fr/confluence"
+                )
                 # Jira is typically on same domain as Confluence
-                url = confluence_url.replace("/confluence", "").replace("wiki.", "jira.")
+                url = confluence_url.replace("/confluence", "/jira").replace(
+                    "wiki.", "jira."
+                )
 
             if token and url:
                 self._jira_config = {"url": url, "token": token}
@@ -664,20 +790,31 @@ class MCPLRMServer:
         if not refresh:
             results = cache.search_jira(query, limit)
             if results:
-                return {"results": [anon.anonymize_dict(r) for r in results], "source": "cache"}
+                return {
+                    "results": [anon.anonymize_dict(r) for r in results],
+                    "source": "cache",
+                }
 
         # Fetch from Jira API
         jira = self._get_jira_config()
         if not jira:
             results = cache.search_jira(query, limit)
-            return {"results": [anon.anonymize_dict(r) for r in results], "source": "cache", "note": "Jira not configured"}
+            return {
+                "results": [anon.anonymize_dict(r) for r in results],
+                "source": "cache",
+                "note": "Jira not configured",
+            }
 
         try:
             import urllib.request
             import json
 
             # Build JQL
-            if query.upper().startswith("PROJECT") or "=" in query or " AND " in query.upper():
+            if (
+                query.upper().startswith("PROJECT")
+                or "=" in query
+                or " AND " in query.upper()
+            ):
                 jql = query  # Already JQL
             else:
                 jql = f'text ~ "{query}"'
@@ -686,9 +823,22 @@ class MCPLRMServer:
             jql += " ORDER BY updated DESC"
 
             url = f"{jira['url']}/rest/api/2/search"
-            data = json.dumps({"jql": jql, "maxResults": limit, "fields": [
-                "summary", "description", "status", "assignee", "priority", "issuetype", "labels", "created"
-            ]}).encode()
+            data = json.dumps(
+                {
+                    "jql": jql,
+                    "maxResults": limit,
+                    "fields": [
+                        "summary",
+                        "description",
+                        "status",
+                        "assignee",
+                        "priority",
+                        "issuetype",
+                        "labels",
+                        "created",
+                    ],
+                }
+            ).encode()
 
             req = urllib.request.Request(url, data=data, method="POST")
             req.add_header("Authorization", f"Bearer {jira['token']}")
@@ -714,11 +864,19 @@ class MCPLRMServer:
                 )
 
             results = cache.search_jira(query, limit)
-            return {"results": [anon.anonymize_dict(r) for r in results], "source": "api", "fetched": len(issues)}
+            return {
+                "results": [anon.anonymize_dict(r) for r in results],
+                "source": "api",
+                "fetched": len(issues),
+            }
         except Exception as e:
             log(f"Jira search error: {e}", "ERROR")
             results = cache.search_jira(query, limit)
-            return {"results": [anon.anonymize_dict(r) for r in results], "source": "cache", "error": str(e)}
+            return {
+                "results": [anon.anonymize_dict(r) for r in results],
+                "source": "cache",
+                "error": str(e),
+            }
 
 
 # ============================================================================
@@ -730,11 +888,13 @@ mcp_server = MCPLRMServer()
 
 async def handle_health(request):
     """Health check endpoint"""
-    return web.json_response({
-        "status": "ok",
-        "connections": len(mcp_server.active_connections),
-        "projects_cached": len(mcp_server.projects),
-    })
+    return web.json_response(
+        {
+            "status": "ok",
+            "connections": len(mcp_server.active_connections),
+            "projects_cached": len(mcp_server.projects),
+        }
+    )
 
 
 async def handle_tools(request):
@@ -750,38 +910,54 @@ async def handle_sse(request):
     """
     session_id = str(uuid.uuid4())[:8]
     mcp_server.active_connections.add(session_id)
-    log(f"SSE connection opened: {session_id} (total: {len(mcp_server.active_connections)})")
+    log(
+        f"SSE connection opened: {session_id} (total: {len(mcp_server.active_connections)})"
+    )
 
     try:
         async with sse_response(request) as resp:
             # Send initial connection message
-            await resp.send(json.dumps({
-                "jsonrpc": "2.0",
-                "method": "connection/ready",
-                "params": {"session_id": session_id}
-            }))
+            await resp.send(
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "method": "connection/ready",
+                        "params": {"session_id": session_id},
+                    }
+                )
+            )
 
             # Send tools list
-            await resp.send(json.dumps({
-                "jsonrpc": "2.0",
-                "method": "tools/list",
-                "params": {"tools": mcp_server.get_tools()}
-            }))
+            await resp.send(
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "method": "tools/list",
+                        "params": {"tools": mcp_server.get_tools()},
+                    }
+                )
+            )
 
             # Keep connection alive and handle incoming messages
             while True:
                 await asyncio.sleep(30)  # Heartbeat
-                await resp.send(json.dumps({
-                    "jsonrpc": "2.0",
-                    "method": "heartbeat",
-                    "params": {"session_id": session_id}
-                }))
+                await resp.send(
+                    json.dumps(
+                        {
+                            "jsonrpc": "2.0",
+                            "method": "heartbeat",
+                            "params": {"session_id": session_id},
+                        }
+                    )
+                )
 
     except asyncio.CancelledError:
         pass
     finally:
         mcp_server.active_connections.discard(session_id)
-        log(f"SSE connection closed: {session_id} (remaining: {len(mcp_server.active_connections)})")
+        log(
+            f"SSE connection closed: {session_id} (remaining: {len(mcp_server.active_connections)})"
+        )
 
     return resp
 
@@ -806,6 +982,7 @@ async def handle_tool_call(request):
 # ============================================================================
 # SERVER LIFECYCLE
 # ============================================================================
+
 
 async def on_startup(app):
     """Server startup hook"""
@@ -846,6 +1023,7 @@ def run_server(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT):
 # DAEMON MODE
 # ============================================================================
 
+
 def daemonize():
     """Double-fork to become a daemon"""
     # First fork
@@ -861,9 +1039,9 @@ def daemonize():
         sys.exit(0)
 
     # Redirect stdio
-    sys.stdin = open(os.devnull, 'r')
-    sys.stdout = open(LOG_FILE, 'a')
-    sys.stderr = open(LOG_FILE, 'a')
+    sys.stdin = open(os.devnull, "r")
+    sys.stdout = open(LOG_FILE, "a")
+    sys.stderr = open(LOG_FILE, "a")
 
 
 def start_daemon():
@@ -912,12 +1090,15 @@ def status_daemon():
 
         # Try to get health
         import urllib.request
+
         try:
-            with urllib.request.urlopen(f"http://{DEFAULT_HOST}:{DEFAULT_PORT}/health", timeout=2) as resp:
+            with urllib.request.urlopen(
+                f"http://{DEFAULT_HOST}:{DEFAULT_PORT}/health", timeout=2
+            ) as resp:
                 data = json.loads(resp.read())
                 print(f"  Connections: {data.get('connections', 0)}")
                 print(f"  Projects cached: {data.get('projects_cached', 0)}")
-        except:
+        except Exception:
             print("  (health check failed)")
 
     except OSError:
@@ -933,9 +1114,13 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="MCP LRM Server (SSE/HTTP)")
-    parser.add_argument("command", nargs="?", default="run",
-                        choices=["run", "start", "stop", "status"],
-                        help="Command: run (foreground), start (daemon), stop, status")
+    parser.add_argument(
+        "command",
+        nargs="?",
+        default="run",
+        choices=["run", "start", "stop", "status"],
+        help="Command: run (foreground), start (daemon), stop, status",
+    )
     parser.add_argument("--host", default=DEFAULT_HOST, help="Host to bind")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="Port to bind")
 

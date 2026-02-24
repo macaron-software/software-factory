@@ -2,6 +2,7 @@
 Confluence REST API client for Server/Data Center.
 PAT auth, CRUD pages, attachment upload.
 """
+
 from __future__ import annotations
 
 import logging
@@ -59,7 +60,9 @@ class ConfluenceClient:
 
     # ── Page CRUD ──────────────────────────────────────────────
 
-    def get_page(self, page_id: str, expand: str = "body.storage,version") -> Optional[dict]:
+    def get_page(
+        self, page_id: str, expand: str = "body.storage,version"
+    ) -> Optional[dict]:
         """Get page by ID."""
         try:
             r = httpx.get(
@@ -92,8 +95,9 @@ class ConfluenceClient:
         results = r.json().get("results", [])
         return results[0] if results else None
 
-    def create_page(self, title: str, body_xhtml: str, parent_id: str = None,
-                    space_key: str = None) -> dict:
+    def create_page(
+        self, title: str, body_xhtml: str, parent_id: str = None, space_key: str = None
+    ) -> dict:
         """Create a new page."""
         sk = space_key or self.space_key
         payload = {
@@ -121,8 +125,9 @@ class ConfluenceClient:
         log.info("Created page %s: %s", page["id"], title)
         return page
 
-    def update_page(self, page_id: str, title: str, body_xhtml: str,
-                    version: int = None) -> dict:
+    def update_page(
+        self, page_id: str, title: str, body_xhtml: str, version: int = None
+    ) -> dict:
         """Update existing page. Increments version automatically."""
         if version is None:
             existing = self.get_page(page_id, expand="version")
@@ -151,13 +156,15 @@ class ConfluenceClient:
         log.info("Updated page %s v%d: %s", page_id, version + 1, title)
         return r.json()
 
-    def create_or_update(self, title: str, body_xhtml: str,
-                         parent_id: str = None) -> dict:
+    def create_or_update(
+        self, title: str, body_xhtml: str, parent_id: str = None
+    ) -> dict:
         """Idempotent: update if exists, create if not."""
         existing = self.find_page(title)
         if existing:
-            return self.update_page(existing["id"], title, body_xhtml,
-                                    existing["version"]["number"])
+            return self.update_page(
+                existing["id"], title, body_xhtml, existing["version"]["number"]
+            )
         return self.create_page(title, body_xhtml, parent_id)
 
     def get_children(self, page_id: str) -> list[dict]:
@@ -173,8 +180,13 @@ class ConfluenceClient:
 
     # ── Attachments ────────────────────────────────────────────
 
-    def upload_attachment(self, page_id: str, filename: str,
-                         data: bytes, content_type: str = "image/svg+xml") -> dict:
+    def upload_attachment(
+        self,
+        page_id: str,
+        filename: str,
+        data: bytes,
+        content_type: str = "image/svg+xml",
+    ) -> dict:
         """Upload or update attachment on a page."""
         headers = {
             "Authorization": f"Bearer {_load_pat()}",
@@ -207,6 +219,23 @@ class ConfluenceClient:
                 parent_id = page["id"]
         return parent_id
 
+    def search_cql(
+        self, cql: str, limit: int = 10, expand: str = "body.storage,ancestors"
+    ) -> list[dict]:
+        """Search using CQL query."""
+        try:
+            r = httpx.get(
+                self._api("/content/search"),
+                params={"cql": cql, "limit": limit, "expand": expand},
+                headers=self._headers(),
+                timeout=self.timeout,
+            )
+            r.raise_for_status()
+            return r.json().get("results", [])
+        except Exception as e:
+            log.warning("CQL search failed: %s", e)
+            return []
+
     def health_check(self) -> bool:
         """Check API connectivity."""
         try:
@@ -222,6 +251,7 @@ class ConfluenceClient:
 
 # Singleton
 _client: Optional[ConfluenceClient] = None
+
 
 def get_confluence_client() -> ConfluenceClient:
     global _client

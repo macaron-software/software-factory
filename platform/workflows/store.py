@@ -4,6 +4,7 @@ A Workflow is a sequence of phases. Each phase runs a pattern.
 Phases can have gates (conditions to proceed) and shared context.
 The RTE (Release Train Engineer) agent facilitates transitions via LLM.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -14,9 +15,9 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from ..db.migrations import get_db
-from ..patterns.store import get_pattern_store, PatternDef
+from ..patterns.store import get_pattern_store
 from ..patterns.engine import run_pattern, _push_sse
-from ..sessions.store import get_session_store, SessionDef, MessageDef
+from ..sessions.store import get_session_store, MessageDef
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class WorkflowPhase:
     """A single phase in a workflow."""
+
     id: str = ""
     pattern_id: str = ""
     name: str = ""
@@ -35,6 +37,7 @@ class WorkflowPhase:
 @dataclass
 class WorkflowDef:
     """A workflow definition — ordered list of phases."""
+
     id: str = ""
     name: str = ""
     description: str = ""
@@ -48,6 +51,7 @@ class WorkflowDef:
 @dataclass
 class WorkflowRun:
     """Runtime state of a workflow execution."""
+
     workflow: WorkflowDef
     session_id: str
     project_id: str = ""
@@ -79,6 +83,7 @@ class WorkflowStore:
 
     def list_all(self) -> list[WorkflowDef]:
         from ..cache import get as cache_get, put as cache_put
+
         cached = cache_get("workflows:all")
         if cached is not None:
             return cached
@@ -104,11 +109,27 @@ class WorkflowStore:
         conn = get_db()
         conn.execute(
             "INSERT OR REPLACE INTO workflows (id, name, description, phases_json, config_json, icon, is_builtin) VALUES (?,?,?,?,?,?,?)",
-            (wf.id, wf.name, wf.description,
-             json.dumps([{"id": p.id, "pattern_id": p.pattern_id, "name": p.name,
-                          "description": p.description, "gate": p.gate, "config": p.config}
-                         for p in wf.phases]),
-             json.dumps(wf.config), wf.icon, int(wf.is_builtin)),
+            (
+                wf.id,
+                wf.name,
+                wf.description,
+                json.dumps(
+                    [
+                        {
+                            "id": p.id,
+                            "pattern_id": p.pattern_id,
+                            "name": p.name,
+                            "description": p.description,
+                            "gate": p.gate,
+                            "config": p.config,
+                        }
+                        for p in wf.phases
+                    ]
+                ),
+                json.dumps(wf.config),
+                wf.icon,
+                int(wf.is_builtin),
+            ),
         )
         conn.commit()
         conn.close()
@@ -164,6 +185,7 @@ def get_workflow_store() -> WorkflowStore:
 
 _RTE_AGENT_ID = "release_train_engineer"
 
+
 async def _rte_facilitate(
     session_id: str,
     prompt: str,
@@ -180,19 +202,26 @@ async def _rte_facilitate(
     rte = agent_store.get(_RTE_AGENT_ID)
     if not rte:
         # Fallback to system message if RTE agent not found
-        store.add_message(MessageDef(
-            session_id=session_id,
-            from_agent="system", to_agent=to_agent or "all",
-            message_type="system", content=prompt,
-        ))
+        store.add_message(
+            MessageDef(
+                session_id=session_id,
+                from_agent="system",
+                to_agent=to_agent or "all",
+                message_type="system",
+                content=prompt,
+            )
+        )
         return prompt
 
     # Push thinking status
-    await _push_sse(session_id, {
-        "type": "agent_status",
-        "agent_id": rte.id,
-        "status": "thinking",
-    })
+    await _push_sse(
+        session_id,
+        {
+            "type": "agent_status",
+            "agent_id": rte.id,
+            "status": "thinking",
+        },
+    )
 
     ctx = ExecutionContext(
         agent=rte,
@@ -202,16 +231,19 @@ async def _rte_facilitate(
     )
 
     # Stream the RTE response via SSE
-    await _push_sse(session_id, {
-        "type": "stream_start",
-        "agent_id": rte.id,
-        "agent_name": rte.name,
-        "node_id": rte.id,
-        "pattern_type": "workflow",
-        "to_agent": to_agent or "all",
-        "flow_step": "Facilitation",
-        "iteration": 0,
-    })
+    await _push_sse(
+        session_id,
+        {
+            "type": "stream_start",
+            "agent_id": rte.id,
+            "agent_name": rte.name,
+            "node_id": rte.id,
+            "pattern_type": "workflow",
+            "to_agent": to_agent or "all",
+            "flow_step": "Facilitation",
+            "iteration": 0,
+        },
+    )
 
     executor = get_executor()
     accumulated = ""
@@ -219,11 +251,14 @@ async def _rte_facilitate(
         async for kind, value in executor.run_streaming(ctx, prompt):
             if kind == "delta" and value:
                 accumulated += value
-                await _push_sse(session_id, {
-                    "type": "stream_delta",
-                    "agent_id": rte.id,
-                    "delta": value,
-                })
+                await _push_sse(
+                    session_id,
+                    {
+                        "type": "stream_delta",
+                        "agent_id": rte.id,
+                        "delta": value,
+                    },
+                )
             elif kind == "result":
                 accumulated = value.content or accumulated
     except Exception as e:
@@ -232,13 +267,16 @@ async def _rte_facilitate(
         result = await executor.run(ctx, prompt)
         accumulated = result.content
 
-    await _push_sse(session_id, {
-        "type": "stream_end",
-        "agent_id": rte.id,
-        "content": accumulated,
-        "message_type": "text",
-        "to_agent": to_agent or "all",
-    })
+    await _push_sse(
+        session_id,
+        {
+            "type": "stream_end",
+            "agent_id": rte.id,
+            "content": accumulated,
+            "message_type": "text",
+            "to_agent": to_agent or "all",
+        },
+    )
 
     msg = MessageDef(
         session_id=session_id,
@@ -248,24 +286,45 @@ async def _rte_facilitate(
         content=accumulated,
     )
     store.add_message(msg)
-    await _push_sse(session_id, {
-        "type": "agent_status",
-        "agent_id": rte.id,
-        "status": "idle",
-    })
+    await _push_sse(
+        session_id,
+        {
+            "type": "agent_status",
+            "agent_id": rte.id,
+            "status": "idle",
+        },
+    )
 
     return accumulated
 
 
+def _save_checkpoint(store, session_id: str, completed_phase: int):
+    """Save workflow progress to session config for resume."""
+    try:
+        sess = store.get(session_id)
+        if sess:
+            config = sess.config or {}
+            config["workflow_checkpoint"] = completed_phase
+            store.update_config(session_id, config)
+    except Exception as e:
+        logger.debug("Checkpoint save failed for %s: %s", session_id, e)
+
+
 # ── Workflow Engine ──────────────────────────────────────────────
+
 
 async def run_workflow(
     workflow: WorkflowDef,
     session_id: str,
     initial_task: str,
     project_id: str = "",
+    resume_from: int = 0,
 ) -> WorkflowRun:
-    """Execute a workflow — RTE facilitates each phase transition."""
+    """Execute a workflow — RTE facilitates each phase transition.
+
+    Args:
+        resume_from: phase index to resume from (skip completed phases).
+    """
     run = WorkflowRun(
         workflow=workflow,
         session_id=session_id,
@@ -290,18 +349,32 @@ async def run_workflow(
 
     # RTE kicks off the sprint
     ceremony_names = [p.name for p in workflow.phases]
-    await _rte_facilitate(
-        session_id,
-        f"Tu lances le sprint **{workflow.name}** — {len(workflow.phases)} cérémonies: {', '.join(ceremony_names)}.\n"
-        f"Objectif du sprint: {initial_task}\n\n"
-        f"Annonce le démarrage à l'équipe. Le Scrum Master facilite, le CP priorise, l'équipe s'organise.",
-        to_agent=leader,
-        project_id=project_id,
-    )
+    if resume_from > 0:
+        await _rte_facilitate(
+            session_id,
+            f"Reprise du sprint **{workflow.name}** à la phase {resume_from + 1}/{len(workflow.phases)} "
+            f"({workflow.phases[resume_from].name}). Les {resume_from} premières phases sont déjà complétées.",
+            to_agent=leader,
+            project_id=project_id,
+        )
+    else:
+        await _rte_facilitate(
+            session_id,
+            f"Tu lances le sprint **{workflow.name}** — {len(workflow.phases)} cérémonies: {', '.join(ceremony_names)}.\n"
+            f"Objectif du sprint: {initial_task}\n\n"
+            f"Annonce le démarrage à l'équipe. Le Scrum Master facilite, le CP priorise, l'équipe s'organise.",
+            to_agent=leader,
+            project_id=project_id,
+        )
 
-    task = initial_task
     accumulated_context = []
     for i, phase in enumerate(workflow.phases):
+        # Skip already-completed phases on resume
+        if i < resume_from:
+            run.phase_results.append(
+                {"phase": phase.name, "success": True, "skipped": True}
+            )
+            continue
         run.current_phase = i
 
         phase_agents = phase.config.get("agents", [])
@@ -335,12 +408,16 @@ async def run_workflow(
         # Override pattern agents with the phase's workflow agents
         if phase_agents:
             from ..patterns.store import PatternDef as PD
+
             pattern = PD(
                 id=f"{workflow.id}-{phase.id}",
                 name=f"{phase.name}",
                 description=phase.description,
                 type=pattern.type,
-                agents=[{"id": f"n{j}", "agent_id": aid} for j, aid in enumerate(phase_agents)],
+                agents=[
+                    {"id": f"n{j}", "agent_id": aid}
+                    for j, aid in enumerate(phase_agents)
+                ],
                 edges=[],
                 config=pattern.config,
                 icon=pattern.icon,
@@ -357,11 +434,13 @@ async def run_workflow(
 
         try:
             result = await run_pattern(pattern, session_id, phase_task, project_id)
-            run.phase_results.append({
-                "phase": phase.name,
-                "success": result.success,
-                "error": result.error,
-            })
+            run.phase_results.append(
+                {
+                    "phase": phase.name,
+                    "success": result.success,
+                    "error": result.error,
+                }
+            )
 
             # RTE reacts to gate results
             if phase.gate == "all_approved" and not result.success:
@@ -389,45 +468,83 @@ async def run_workflow(
             for m in reversed(last_msgs):
                 if m.from_agent not in ("system", "user", _RTE_AGENT_ID):
                     summary = (m.content or "")[:300].replace("\n", " ")
-                    accumulated_context.append(f"[{phase.name}] {m.from_agent}: {summary}")
+                    accumulated_context.append(
+                        f"[{phase.name}] {m.from_agent}: {summary}"
+                    )
                     break
+
+            # Checkpoint: save completed phase index for resume
+            _save_checkpoint(store, session_id, i + 1)
 
         except Exception as e:
             logger.error("Workflow phase %s failed: %s", phase.name, e)
             error_str = str(e)
-            # Retry once on transient errors (rate limits, timeouts, connection errors)
-            is_transient = any(k in error_str.lower() for k in ("429", "rate", "timeout", "connection", "temporarily"))
+            # Retry up to 3 times on transient errors with exponential backoff
+            is_transient = any(
+                k in error_str.lower()
+                for k in (
+                    "429",
+                    "rate",
+                    "timeout",
+                    "connection",
+                    "temporarily",
+                    "overloaded",
+                )
+            )
             if is_transient:
-                logger.info("Retrying phase %s after transient error", phase.name)
-                import asyncio
-                await asyncio.sleep(15)
-                try:
-                    result = await run_pattern(pattern, session_id, phase_task, project_id)
-                    run.phase_results.append({
-                        "phase": phase.name,
-                        "success": result.success,
-                        "error": result.error,
-                        "retried": True,
-                    })
-                    # Accumulate context on retry success
-                    last_msgs = store.get_messages(session_id, limit=5)
-                    for m in reversed(last_msgs):
-                        if m.from_agent not in ("system", "user", _RTE_AGENT_ID):
-                            summary = (m.content or "")[:300].replace("\n", " ")
-                            accumulated_context.append(f"[{phase.name}] {m.from_agent}: {summary}")
-                            break
-                    continue  # phase succeeded on retry, move to next
-                except Exception as e2:
-                    error_str = str(e2)
-                    logger.error("Retry also failed for phase %s: %s", phase.name, e2)
+                import random
+
+                retry_ok = False
+                for attempt in range(1, 4):
+                    delay = min(15 * (2 ** (attempt - 1)) + random.uniform(0, 10), 120)
+                    logger.info(
+                        "Retrying phase %s (attempt %d/3) after %.0fs",
+                        phase.name,
+                        attempt,
+                        delay,
+                    )
+                    await asyncio.sleep(delay)
+                    try:
+                        result = await run_pattern(
+                            pattern, session_id, phase_task, project_id
+                        )
+                        run.phase_results.append(
+                            {
+                                "phase": phase.name,
+                                "success": result.success,
+                                "error": result.error,
+                                "retried": True,
+                                "retry_attempt": attempt,
+                            }
+                        )
+                        last_msgs = store.get_messages(session_id, limit=5)
+                        for m in reversed(last_msgs):
+                            if m.from_agent not in ("system", "user", _RTE_AGENT_ID):
+                                summary = (m.content or "")[:300].replace("\n", " ")
+                                accumulated_context.append(
+                                    f"[{phase.name}] {m.from_agent}: {summary}"
+                                )
+                                break
+                        _save_checkpoint(store, session_id, i + 1)
+                        retry_ok = True
+                        break
+                    except Exception as e2:
+                        error_str = str(e2)
+                        logger.error(
+                            "Retry %d failed for phase %s: %s", attempt, phase.name, e2
+                        )
+                if retry_ok:
+                    continue
 
             # Non-critical phases (gate=always) — log error but continue
             if phase.gate == "always":
-                run.phase_results.append({
-                    "phase": phase.name,
-                    "success": False,
-                    "error": error_str,
-                })
+                run.phase_results.append(
+                    {
+                        "phase": phase.name,
+                        "success": False,
+                        "error": error_str,
+                    }
+                )
                 await _rte_facilitate(
                     session_id,
                     f"Erreur technique sur la phase **{phase.name}**: {error_str}\n"
@@ -453,16 +570,23 @@ async def run_workflow(
         run.status = "completed"
 
     # Update session status to match workflow outcome
-    session_status = {"completed": "completed", "failed": "failed", "gated": "interrupted"}.get(run.status, "completed")
+    session_status = {
+        "completed": "completed",
+        "failed": "failed",
+        "gated": "interrupted",
+    }.get(run.status, "completed")
     try:
         store.update_status(session_id, session_status)
     except Exception:
         pass
 
     # RTE closes the workflow
-    status_emoji = {"completed": "[OK]", "failed": "[FAIL]", "gated": "[BLOCKED]"}.get(run.status, "[DONE]")
+    status_emoji = {"completed": "[OK]", "failed": "[FAIL]", "gated": "[BLOCKED]"}.get(
+        run.status, "[DONE]"
+    )
     phase_summary = "\n".join(
-        f"- {r['phase']}: {'[OK]' if r['success'] else '[FAIL]'}" for r in run.phase_results
+        f"- {r['phase']}: {'[OK]' if r['success'] else '[FAIL]'}"
+        for r in run.phase_results
     )
     await _rte_facilitate(
         session_id,
