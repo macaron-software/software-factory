@@ -12,9 +12,28 @@ from typing import Optional
 
 from ..db.migrations import get_db
 
-# Environment-driven defaults: Azure uses GPT-5-mini, local uses MiniMax M2.5
+# Environment-driven defaults: derive model from provider setting
 DEFAULT_PROVIDER = os.environ.get("PLATFORM_LLM_PROVIDER", "minimax")
-DEFAULT_MODEL = os.environ.get("PLATFORM_LLM_MODEL", "MiniMax-M2.5")
+
+
+def _resolve_default_model() -> str:
+    """Resolve default model from env var, or infer from provider."""
+    explicit = os.environ.get("PLATFORM_LLM_MODEL", "")
+    if explicit:
+        return explicit
+    # Infer from provider
+    _provider_models = {
+        "minimax": "MiniMax-M1-80k",
+        "azure-openai": "gpt-5-mini",
+        "azure-ai": "gpt-5-mini",
+        "anthropic": "claude-sonnet-4-20250514",
+        "glm": "glm-4-flash",
+        "demo": "demo-model",
+    }
+    return _provider_models.get(DEFAULT_PROVIDER, "gpt-5-mini")
+
+
+DEFAULT_MODEL = _resolve_default_model()
 
 
 @dataclass

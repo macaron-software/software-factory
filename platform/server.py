@@ -151,6 +151,33 @@ async def lifespan(app: FastAPI):
 
     seed_demo_data()
 
+    # Sync agent models: ensure DB agents match the current DEFAULT_MODEL
+    from .agents.store import DEFAULT_MODEL as _current_model
+
+    try:
+        from .db.migrations import get_db as _gdb_sync
+
+        _sdb = _gdb_sync()
+        # Only update agents that have a stale/wrong model (not matching env)
+        _stale_models = _sdb.execute(
+            "SELECT COUNT(*) FROM agents WHERE model != ? AND model NOT IN ('', 'demo-model')",
+            (_current_model,),
+        ).fetchone()[0]
+        if _stale_models:
+            _sdb.execute(
+                "UPDATE agents SET model = ? WHERE model != ? AND model NOT IN ('', 'demo-model')",
+                (_current_model, _current_model),
+            )
+            _sdb.commit()
+            logger.warning(
+                "Synced %d agents to DEFAULT_MODEL=%s (from env/provider settings)",
+                _stale_models,
+                _current_model,
+            )
+        _sdb.close()
+    except Exception as e:
+        logger.warning("Failed to sync agent models: %s", e)
+
     # Mark orphaned "active" sessions as interrupted (no running task after restart)
     from .sessions.store import get_session_store
 
