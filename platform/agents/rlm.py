@@ -9,6 +9,7 @@ WRITE-EXECUTE-OBSERVE-DECIDE cycle:
 3. OBSERVE: Results accumulated as findings
 4. DECIDE: Main LLM explores more or emits FINAL_ANSWER
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -32,6 +33,7 @@ MAX_FINDINGS_CHARS = 4000
 @dataclass
 class RLMResult:
     """Result of an RLM deep search."""
+
     answer: str
     findings: list[str] = field(default_factory=list)
     iterations: int = 0
@@ -45,19 +47,29 @@ class ProjectRLM:
     Tier 1 (sub-agents): lightweight tool execution (grep, read, structure)
     """
 
-    def __init__(self, project_id: str, project_path: str, project_name: str,
-                 provider: str = "minimax", model: str = "MiniMax-M2.5"):
+    def __init__(
+        self,
+        project_id: str,
+        project_path: str,
+        project_name: str,
+        provider: str = "",
+        model: str = "",
+    ):
         self.project_id = project_id
         self.project_path = project_path
         self.project_name = project_name
-        # RLM always uses MiniMax (fast, no rate limit) for its orchestrator
-        self.provider = "minimax"
-        self.model = "MiniMax-M2.5"
+        # RLM uses env-configured provider (falls back to minimax for local dev)
+        self.provider = os.environ.get("PLATFORM_LLM_PROVIDER", "minimax")
+        self.model = os.environ.get("PLATFORM_LLM_MODEL", "MiniMax-M2.5")
         self._llm = get_llm_client()
 
-    async def search(self, query: str, context: str = "",
-                     max_iterations: int = MAX_ITERATIONS,
-                     on_progress: Optional[object] = None) -> RLMResult:
+    async def search(
+        self,
+        query: str,
+        context: str = "",
+        max_iterations: int = MAX_ITERATIONS,
+        on_progress: Optional[object] = None,
+    ) -> RLMResult:
         """Deep recursive search on the project.
 
         The main LLM orchestrates the loop, sub-agents execute tool queries.
@@ -65,7 +77,9 @@ class ProjectRLM:
         """
         findings: list[str] = []
         total_queries = 0
-        print(f"[RLM] Starting search on '{self.project_name}': {query[:80]}", flush=True)
+        print(
+            f"[RLM] Starting search on '{self.project_name}': {query[:80]}", flush=True
+        )
 
         async def _notify(label: str):
             if on_progress:
@@ -76,11 +90,17 @@ class ProjectRLM:
 
         for i in range(max_iterations):
             await _notify(f"Deep search — iteration {i + 1}/{max_iterations}…")
-            print(f"[RLM:{self.project_name}] Iteration {i + 1}/{max_iterations}", flush=True)
+            print(
+                f"[RLM:{self.project_name}] Iteration {i + 1}/{max_iterations}",
+                flush=True,
+            )
 
             # Last iteration → force synthesis, don't ask LLM to decide
             if i == max_iterations - 1 and findings:
-                print(f"[RLM:{self.project_name}] Last iteration, forcing synthesis", flush=True)
+                print(
+                    f"[RLM:{self.project_name}] Last iteration, forcing synthesis",
+                    flush=True,
+                )
                 break
 
             # WRITE: Main LLM decides what to explore
@@ -108,11 +128,17 @@ class ProjectRLM:
 
             # PARSE: Extract decision
             decision = self._parse_response(resp.content)
-            print(f"[RLM:{self.project_name}] Decision: {decision.get('action')}", flush=True)
+            print(
+                f"[RLM:{self.project_name}] Decision: {decision.get('action')}",
+                flush=True,
+            )
 
             # FINAL_ANSWER → done
             if decision["action"] == "final":
-                print(f"[RLM:{self.project_name}] FINAL_ANSWER at iteration {i + 1}", flush=True)
+                print(
+                    f"[RLM:{self.project_name}] FINAL_ANSWER at iteration {i + 1}",
+                    flush=True,
+                )
                 return RLMResult(
                     answer=decision.get("answer", ""),
                     findings=findings,
@@ -128,10 +154,13 @@ class ProjectRLM:
 
             total_queries += len(queries)
             await _notify(f"Exploring codebase ({len(queries)} queries)…")
-            print(f"[RLM:{self.project_name}] Running {len(queries)} sub-agents...", flush=True)
-            results = await asyncio.gather(*[
-                self._execute_subagent(q) for q in queries
-            ])
+            print(
+                f"[RLM:{self.project_name}] Running {len(queries)} sub-agents...",
+                flush=True,
+            )
+            results = await asyncio.gather(
+                *[self._execute_subagent(q) for q in queries]
+            )
 
             # OBSERVE: Accumulate findings
             for q, result in zip(queries, results):
@@ -139,9 +168,12 @@ class ProjectRLM:
                 if result:
                     findings.append(f"[iter {i + 1}] Q: {q_text}\nA: {result[:2000]}")
 
-            logger.info("[RLM:%s] %d findings (%d chars)",
-                        self.project_name, len(findings),
-                        sum(len(f) for f in findings))
+            logger.info(
+                "[RLM:%s] %d findings (%d chars)",
+                self.project_name,
+                len(findings),
+                sum(len(f) for f in findings),
+            )
 
         # Max iterations: force synthesis from findings
         await _notify(f"Synthesizing {len(findings)} findings…")
@@ -211,9 +243,11 @@ class ProjectRLM:
 
     def _read_file(self, path: str, max_lines: int = 200) -> Optional[str]:
         """Read a file from the project."""
-        full = os.path.join(self.project_path, path) if not os.path.isabs(path) else path
+        full = (
+            os.path.join(self.project_path, path) if not os.path.isabs(path) else path
+        )
         try:
-            with open(full, 'r', errors='replace') as f:
+            with open(full, "r", errors="replace") as f:
                 lines = f.readlines()
             if len(lines) > max_lines:
                 content = "".join(lines[:max_lines])
@@ -223,13 +257,34 @@ class ProjectRLM:
         except Exception:
             return None
 
-    def _grep(self, pattern: str, glob_filter: str = "", max_results: int = 30) -> Optional[str]:
+    def _grep(
+        self, pattern: str, glob_filter: str = "", max_results: int = 30
+    ) -> Optional[str]:
         """Ripgrep search across the project."""
-        cmd = ["rg", "--no-heading", "-n", "-i", "--max-count", "3",
-               "--max-filesize", "500K",
-               "-g", "!.git", "-g", "!node_modules", "-g", "!target",
-               "-g", "!__pycache__", "-g", "!*.min.js", "-g", "!*.lock",
-               "-g", "!*.map"]
+        cmd = [
+            "rg",
+            "--no-heading",
+            "-n",
+            "-i",
+            "--max-count",
+            "3",
+            "--max-filesize",
+            "500K",
+            "-g",
+            "!.git",
+            "-g",
+            "!node_modules",
+            "-g",
+            "!target",
+            "-g",
+            "!__pycache__",
+            "-g",
+            "!*.min.js",
+            "-g",
+            "!*.lock",
+            "-g",
+            "!*.map",
+        ]
         if glob_filter:
             cmd.extend(["-g", glob_filter])
         cmd.extend([pattern, self.project_path])
@@ -242,7 +297,7 @@ class ProjectRLM:
             rel_lines = []
             for line in lines[:max_results]:
                 if line.startswith(self.project_path):
-                    line = line[len(self.project_path):].lstrip("/")
+                    line = line[len(self.project_path) :].lstrip("/")
                 rel_lines.append(line)
             return f"grep '{pattern}' ({len(lines)} matches):\n" + "\n".join(rel_lines)
         except FileNotFoundError:
@@ -252,7 +307,9 @@ class ProjectRLM:
                 proc = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
                 lines = proc.stdout.strip().split("\n") if proc.stdout.strip() else []
                 if lines:
-                    return f"grep '{pattern}' ({len(lines)} matches):\n" + "\n".join(lines[:max_results])
+                    return f"grep '{pattern}' ({len(lines)} matches):\n" + "\n".join(
+                        lines[:max_results]
+                    )
             except Exception:
                 pass
             return None
@@ -261,7 +318,9 @@ class ProjectRLM:
 
     def _get_structure(self, subpath: str = "", depth: int = 3) -> Optional[str]:
         """Get directory tree structure."""
-        root = os.path.join(self.project_path, subpath) if subpath else self.project_path
+        root = (
+            os.path.join(self.project_path, subpath) if subpath else self.project_path
+        )
         if not os.path.isdir(root):
             return None
         lines = []
@@ -271,17 +330,33 @@ class ProjectRLM:
                 dirs.clear()
                 continue
             # Skip noise
-            dirs[:] = [d for d in sorted(dirs)
-                       if d not in ('.git', 'node_modules', '__pycache__', 'target', '.build', '.next')]
+            dirs[:] = [
+                d
+                for d in sorted(dirs)
+                if d
+                not in (
+                    ".git",
+                    "node_modules",
+                    "__pycache__",
+                    "target",
+                    ".build",
+                    ".next",
+                )
+            ]
             indent = "  " * level
             lines.append(f"{indent}{os.path.basename(dirpath)}/")
             for f in sorted(files)[:30]:
                 lines.append(f"{'  ' * (level + 1)}{f}")
         return f"Structure ({subpath or '/'}):\n" + "\n".join(lines[:150])
 
-    def _build_iteration_prompt(self, query: str, iteration: int,
-                                max_iterations: int, findings: list[str],
-                                context: str) -> str:
+    def _build_iteration_prompt(
+        self,
+        query: str,
+        iteration: int,
+        max_iterations: int,
+        findings: list[str],
+        context: str,
+    ) -> str:
         """Build the prompt for the orchestrator LLM at each iteration."""
         # Truncate findings: keep recent verbatim, summarize older
         findings_text = "(none yet — first iteration)"
@@ -290,8 +365,12 @@ class ProjectRLM:
             if len(all_text) > MAX_FINDINGS_CHARS:
                 recent = "\n\n".join(findings[-4:])
                 older = [f.split("\n")[0] for f in findings[:-4]]
-                findings_text = ("OLDER (summary):\n" + "\n".join(older)
-                                 + "\n\nRECENT (full):\n" + recent)
+                findings_text = (
+                    "OLDER (summary):\n"
+                    + "\n".join(older)
+                    + "\n\nRECENT (full):\n"
+                    + recent
+                )
                 findings_text = findings_text[-MAX_FINDINGS_CHARS:]
             else:
                 findings_text = all_text
@@ -329,8 +408,8 @@ OR:
     def _parse_response(self, response: str) -> dict:
         """Parse orchestrator response into {action, queries/answer}."""
         cleaned = response.strip()
-        cleaned = re.sub(r'^```(?:json)?\s*', '', cleaned)
-        cleaned = re.sub(r'\s*```$', '', cleaned)
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
         try:
             data = json.loads(cleaned)
             if isinstance(data, dict) and "action" in data:
@@ -344,22 +423,28 @@ OR:
                     start = match.start()
                     depth = 0
                     for idx in range(start, len(cleaned)):
-                        if cleaned[idx] == '{':
+                        if cleaned[idx] == "{":
                             depth += 1
-                        elif cleaned[idx] == '}':
+                        elif cleaned[idx] == "}":
                             depth -= 1
                             if depth == 0:
-                                return json.loads(cleaned[start:idx + 1])
+                                return json.loads(cleaned[start : idx + 1])
                 except Exception:
                     pass
 
         # Fallback: treat as explore with generic query
         logger.warning("[RLM] Failed to parse response, using fallback query")
-        return {"action": "explore", "queries": [{"query": response[:200], "tool": "auto"}]}
+        return {
+            "action": "explore",
+            "queries": [{"query": response[:200], "tool": "auto"}],
+        }
 
     async def _force_final(self, query: str, findings: list[str]) -> str:
         """Force a final answer from accumulated findings (no extra LLM call)."""
-        print(f"[RLM:{self.project_name}] Force final from {len(findings)} findings", flush=True)
+        print(
+            f"[RLM:{self.project_name}] Force final from {len(findings)} findings",
+            flush=True,
+        )
         if not findings:
             return "No findings were collected during the search."
         # Return findings directly — the chat agent LLM will synthesize
