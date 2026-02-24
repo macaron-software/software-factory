@@ -11,10 +11,11 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
-import subprocess
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -76,7 +77,9 @@ class QualityScorecard:
 
 
 def _run_cmd(cmd: list[str], cwd: str, timeout: int = _TIMEOUT) -> tuple[str, str, int]:
-    """Run a subprocess, return (stdout, stderr, returncode)."""
+    """Run a subprocess, return (stdout, stderr, returncode). Sync fallback."""
+    import subprocess
+
     try:
         r = subprocess.run(
             cmd,
@@ -92,6 +95,56 @@ def _run_cmd(cmd: list[str], cwd: str, timeout: int = _TIMEOUT) -> tuple[str, st
         return "", f"Timeout after {timeout}s", -2
     except Exception as e:
         return "", str(e), -3
+
+
+async def _arun_cmd(
+    cmd: list[str], cwd: str, timeout: int = _TIMEOUT
+) -> tuple[str, str, int]:
+    """Run a subprocess asynchronously (non-blocking)."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=cwd,
+        )
+        stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        return (
+            stdout_b.decode(errors="replace"),
+            stderr_b.decode(errors="replace"),
+            proc.returncode or 0,
+        )
+    except FileNotFoundError:
+        return "", f"Command not found: {cmd[0]}", -1
+    except asyncio.TimeoutError:
+        proc.kill()  # type: ignore[possibly-undefined]
+        return "", f"Timeout after {timeout}s", -2
+    except Exception as e:
+        return "", str(e), -3
+
+
+def _validate_workspace(workspace: str) -> str:
+    """Validate workspace path to prevent directory traversal."""
+    p = Path(workspace).resolve()
+    # Must be an existing directory
+    if not p.is_dir():
+        raise ValueError(f"Workspace not found: {workspace}")
+    # Block system-critical paths
+    blocked = (
+        "/etc",
+        "/var",
+        "/usr",
+        "/bin",
+        "/sbin",
+        "/boot",
+        "/root",
+        "/proc",
+        "/sys",
+    )
+    for b in blocked:
+        if str(p) == b or str(p).startswith(b + "/"):
+            raise ValueError(f"Workspace in blocked path: {p}")
+    return str(p)
 
 
 def _detect_stack(workspace: str) -> dict:
@@ -125,6 +178,7 @@ class QualityScanner:
         url: str = "",
     ) -> QualityScorecard:
         """Run all dimension scans and compute global score."""
+        workspace = _validate_workspace(workspace)
         stack = _detect_stack(workspace)
         scorecard = QualityScorecard(project_id=project_id, workspace=workspace)
 
@@ -148,23 +202,25 @@ class QualityScanner:
         for dim_name, scanner_fn in scanners:
             try:
                 result = await scanner_fn(workspace, stack=stack)
-            except TypeError:
-                # Some scanners don't take stack kwarg
-                try:
-                    result = await scanner_fn(workspace)
-                except Exception as e:
-                    result = DimensionResult(dimension=dim_name, score=0, error=str(e))
             except Exception as e:
                 result = DimensionResult(dimension=dim_name, score=0, error=str(e))
             result.dimension = dim_name
             scorecard.dimensions[dim_name] = result
 
-        # Compute weighted global score
+        # Compute weighted global score — exclude skipped dimensions
         total = 0.0
+        active_weight = 0.0
         for dim, weight in WEIGHTS.items():
             if dim in scorecard.dimensions:
-                total += scorecard.dimensions[dim].score * weight
-        scorecard.global_score = round(total, 1)
+                r = scorecard.dimensions[dim]
+                if r.details.get("skipped"):
+                    continue  # don't inflate score with skipped=100
+                total += r.score * weight
+                active_weight += weight
+        # Weighted score normalized to active dimensions only
+        scorecard.global_score = (
+            round(total / active_weight, 1) if active_weight > 0 else 0.0
+        )
 
         # Persist
         if project_id:
@@ -192,7 +248,7 @@ class QualityScanner:
         score = 100.0
 
         if stack.get("python"):
-            stdout, stderr, rc = _run_cmd(
+            stdout, stderr, rc = await _arun_cmd(
                 ["python3", "-m", "radon", "cc", "-j", "-a", "."],
                 cwd=workspace,
             )
@@ -238,7 +294,7 @@ class QualityScanner:
             )
 
         # Fallback: lizard (multi-language)
-        stdout, stderr, rc = _run_cmd(
+        stdout, stderr, rc = await _arun_cmd(
             ["lizard", "--csv", "."],
             cwd=workspace,
         )
@@ -286,99 +342,107 @@ class QualityScanner:
         """Unit test coverage via coverage.py (Python) or nyc (JS)."""
         stack = kw.get("stack") or _detect_stack(workspace)
         details: dict = {}
+        tmpdir = tempfile.mkdtemp(prefix="macaron_cov_")
 
-        if stack.get("python"):
-            # Run pytest with coverage
-            _run_cmd(
-                [
-                    "python3",
-                    "-m",
-                    "coverage",
-                    "run",
-                    "--source=.",
-                    "-m",
-                    "pytest",
-                    "-q",
-                    "--tb=no",
-                ],
-                cwd=workspace,
-                timeout=180,
-            )
-            stdout, stderr, rc = _run_cmd(
-                ["python3", "-m", "coverage", "json", "-o", "/tmp/cov.json"],
-                cwd=workspace,
-            )
-            try:
-                with open("/tmp/cov.json") as f:
-                    data = json.load(f)
-                pct = data.get("totals", {}).get("percent_covered", 0)
-                details = {
-                    "percent_covered": round(pct, 1),
-                    "lines_covered": data.get("totals", {}).get("covered_lines", 0),
-                    "lines_total": data.get("totals", {}).get("num_statements", 0),
-                    "tool": "coverage.py",
-                }
-                return DimensionResult(
-                    dimension="coverage_ut",
-                    score=round(pct, 1),
-                    details=details,
-                    tool_used="coverage.py",
+        try:
+            if stack.get("python"):
+                cov_json = str(Path(tmpdir) / "cov.json")
+                await _arun_cmd(
+                    [
+                        "python3",
+                        "-m",
+                        "coverage",
+                        "run",
+                        "--source=.",
+                        "-m",
+                        "pytest",
+                        "-q",
+                        "--tb=no",
+                    ],
+                    cwd=workspace,
+                    timeout=180,
                 )
-            except (FileNotFoundError, json.JSONDecodeError):
-                pass
-
-        if stack.get("javascript") or stack.get("typescript"):
-            stdout, stderr, rc = _run_cmd(
-                [
-                    "npx",
-                    "nyc",
-                    "report",
-                    "--reporter=json",
-                    "--report-dir=/tmp/nyc-report",
-                ],
-                cwd=workspace,
-            )
-            try:
-                with open("/tmp/nyc-report/coverage-final.json") as f:
-                    data = json.load(f)
-                total_stmts = 0
-                covered_stmts = 0
-                for filepath, info in data.items():
-                    s = info.get("s", {})
-                    total_stmts += len(s)
-                    covered_stmts += sum(1 for v in s.values() if v > 0)
-                pct = (covered_stmts / max(total_stmts, 1)) * 100
-                details = {"percent_covered": round(pct, 1), "tool": "nyc"}
-                return DimensionResult(
-                    dimension="coverage_ut",
-                    score=round(pct, 1),
-                    details=details,
-                    tool_used="nyc",
+                await _arun_cmd(
+                    ["python3", "-m", "coverage", "json", "-o", cov_json],
+                    cwd=workspace,
                 )
-            except (FileNotFoundError, json.JSONDecodeError):
-                pass
-
-        if stack.get("go"):
-            stdout, stderr, rc = _run_cmd(
-                ["go", "test", "-coverprofile=/tmp/cover.out", "./..."],
-                cwd=workspace,
-                timeout=180,
-            )
-            if rc == 0:
-                m = re.search(r"coverage:\s*([\d.]+)%", stdout + stderr)
-                if m:
-                    pct = float(m.group(1))
-                    details = {"percent_covered": pct, "tool": "go test"}
+                try:
+                    with open(cov_json) as f:
+                        data = json.load(f)
+                    pct = data.get("totals", {}).get("percent_covered", 0)
+                    details = {
+                        "percent_covered": round(pct, 1),
+                        "lines_covered": data.get("totals", {}).get("covered_lines", 0),
+                        "lines_total": data.get("totals", {}).get("num_statements", 0),
+                        "tool": "coverage.py",
+                    }
                     return DimensionResult(
                         dimension="coverage_ut",
-                        score=pct,
+                        score=round(pct, 1),
                         details=details,
-                        tool_used="go test",
+                        tool_used="coverage.py",
                     )
+                except (FileNotFoundError, json.JSONDecodeError):
+                    pass
 
-        # No coverage data
-        details["error"] = "No test coverage data found"
-        return DimensionResult(dimension="coverage_ut", score=0, details=details)
+            if stack.get("javascript") or stack.get("typescript"):
+                nyc_dir = str(Path(tmpdir) / "nyc-report")
+                stdout, stderr, rc = await _arun_cmd(
+                    [
+                        "npx",
+                        "nyc",
+                        "report",
+                        "--reporter=json",
+                        f"--report-dir={nyc_dir}",
+                    ],
+                    cwd=workspace,
+                )
+                try:
+                    with open(Path(nyc_dir) / "coverage-final.json") as f:
+                        data = json.load(f)
+                    total_stmts = 0
+                    covered_stmts = 0
+                    for filepath, info in data.items():
+                        s = info.get("s", {})
+                        total_stmts += len(s)
+                        covered_stmts += sum(1 for v in s.values() if v > 0)
+                    pct = (covered_stmts / max(total_stmts, 1)) * 100
+                    details = {"percent_covered": round(pct, 1), "tool": "nyc"}
+                    return DimensionResult(
+                        dimension="coverage_ut",
+                        score=round(pct, 1),
+                        details=details,
+                        tool_used="nyc",
+                    )
+                except (FileNotFoundError, json.JSONDecodeError):
+                    pass
+
+            if stack.get("go"):
+                cover_out = str(Path(tmpdir) / "cover.out")
+                stdout, stderr, rc = await _arun_cmd(
+                    ["go", "test", f"-coverprofile={cover_out}", "./..."],
+                    cwd=workspace,
+                    timeout=180,
+                )
+                if rc == 0:
+                    m = re.search(r"coverage:\s*([\d.]+)%", stdout + stderr)
+                    if m:
+                        pct = float(m.group(1))
+                        details = {"percent_covered": pct, "tool": "go test"}
+                        return DimensionResult(
+                            dimension="coverage_ut",
+                            score=pct,
+                            details=details,
+                            tool_used="go test",
+                        )
+
+            # No coverage data
+            details["error"] = "No test coverage data found"
+            return DimensionResult(dimension="coverage_ut", score=0, details=details)
+        finally:
+            import shutil
+
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
     async def scan_coverage_e2e(self, workspace: str, **kw) -> DimensionResult:
         """E2E test coverage from Playwright/Cypress reports or journey manifest."""
@@ -432,12 +496,8 @@ class QualityScanner:
             except Exception:
                 pass
 
-        # Count test files as proxy
-        e2e_files = (
-            list(p.rglob("*.spec.*"))
-            + list(p.rglob("*.e2e.*"))
-            + list(p.rglob("*_test.py"))
-        )
+        # Count E2E-specific test files as proxy (exclude *_test.py — those are unit tests)
+        e2e_files = list(p.rglob("*.spec.*")) + list(p.rglob("*.e2e.*"))
         if e2e_files:
             details = {"test_files": len(e2e_files), "estimated": True}
             score = min(100, len(e2e_files) * 10)  # 10 points per test file, cap at 100
@@ -459,7 +519,7 @@ class QualityScanner:
         tools_used = []
 
         if stack.get("python"):
-            stdout, stderr, rc = _run_cmd(
+            stdout, stderr, rc = await _arun_cmd(
                 ["python3", "-m", "bandit", "-r", ".", "-f", "json", "-ll"],
                 cwd=workspace,
             )
@@ -479,7 +539,7 @@ class QualityScanner:
                     pass
 
             # pip-audit
-            stdout, stderr, rc = _run_cmd(
+            stdout, stderr, rc = await _arun_cmd(
                 ["pip-audit", "-f", "json", "-r", "requirements.txt"],
                 cwd=workspace,
             )
@@ -501,7 +561,9 @@ class QualityScanner:
                     pass
 
         if stack.get("javascript") or stack.get("typescript"):
-            stdout, stderr, rc = _run_cmd(["npm", "audit", "--json"], cwd=workspace)
+            stdout, stderr, rc = await _arun_cmd(
+                ["npm", "audit", "--json"], cwd=workspace
+            )
             if stdout.strip():
                 try:
                     data = json.loads(stdout)
@@ -543,7 +605,7 @@ class QualityScanner:
                 tool_used="none",
             )
 
-        stdout, stderr, rc = _run_cmd(
+        stdout, stderr, rc = await _arun_cmd(
             ["pa11y", "--reporter", "json", url],
             cwd=workspace,
         )
@@ -587,7 +649,7 @@ class QualityScanner:
                 details={"skipped": True, "reason": "No URL provided"},
             )
 
-        stdout, stderr, rc = _run_cmd(
+        stdout, stderr, rc = await _arun_cmd(
             [
                 "lighthouse",
                 url,
@@ -632,7 +694,7 @@ class QualityScanner:
         details: dict = {}
 
         if stack.get("python"):
-            stdout, stderr, rc = _run_cmd(
+            stdout, stderr, rc = await _arun_cmd(
                 ["python3", "-m", "interrogate", "-v", "--fail-under=0", "."],
                 cwd=workspace,
             )
@@ -672,73 +734,82 @@ class QualityScanner:
         stack = kw.get("stack") or _detect_stack(workspace)
         issues = {"circular_deps": 0, "duplicates": 0, "type_errors": 0}
         tools_used = []
+        tmpdir = tempfile.mkdtemp(prefix="macaron_arch_")
 
-        if stack.get("javascript") or stack.get("typescript"):
-            # madge --circular
-            stdout, stderr, rc = _run_cmd(
-                ["madge", "--circular", "--json", "."],
-                cwd=workspace,
-            )
-            if rc >= 0 and stdout.strip():
-                try:
-                    data = json.loads(stdout)
-                    issues["circular_deps"] = len(data) if isinstance(data, list) else 0
-                    tools_used.append("madge")
-                except json.JSONDecodeError:
-                    pass
+        try:
+            if stack.get("javascript") or stack.get("typescript"):
+                # madge --circular
+                stdout, stderr, rc = await _arun_cmd(
+                    ["madge", "--circular", "--json", "."],
+                    cwd=workspace,
+                )
+                if rc >= 0 and stdout.strip():
+                    try:
+                        data = json.loads(stdout)
+                        issues["circular_deps"] = (
+                            len(data) if isinstance(data, list) else 0
+                        )
+                        tools_used.append("madge")
+                    except json.JSONDecodeError:
+                        pass
 
-        # jscpd — copy-paste detection (any language)
-        stdout, stderr, rc = _run_cmd(
-            ["jscpd", "--reporters", "json", "--output", "/tmp/jscpd-report", "."],
-            cwd=workspace,
-        )
-        if rc >= 0:
-            try:
-                report = Path("/tmp/jscpd-report/jscpd-report.json")
-                if report.exists():
-                    data = json.loads(report.read_text())
-                    stats = data.get("statistics", {}).get("total", {})
-                    issues["duplicates"] = stats.get("clones", 0)
-                    issues["duplication_pct"] = stats.get("percentage", 0)
-                    tools_used.append("jscpd")
-            except (json.JSONDecodeError, Exception):
-                pass
-
-        if stack.get("python"):
-            # mypy type checking
-            stdout, stderr, rc = _run_cmd(
-                ["python3", "-m", "mypy", "--no-error-summary", "--no-color", "."],
+            # jscpd — copy-paste detection (any language)
+            jscpd_dir = str(Path(tmpdir) / "jscpd-report")
+            stdout, stderr, rc = await _arun_cmd(
+                ["jscpd", "--reporters", "json", "--output", jscpd_dir, "."],
                 cwd=workspace,
             )
             if rc >= 0:
-                error_lines = [
-                    ln for ln in (stdout + stderr).split("\n") if ": error:" in ln
-                ]
-                issues["type_errors"] = len(error_lines)
-                tools_used.append("mypy")
+                try:
+                    report = Path(jscpd_dir) / "jscpd-report.json"
+                    if report.exists():
+                        data = json.loads(report.read_text())
+                        stats = data.get("statistics", {}).get("total", {})
+                        issues["duplicates"] = stats.get("clones", 0)
+                        issues["duplication_pct"] = stats.get("percentage", 0)
+                        tools_used.append("jscpd")
+                except (json.JSONDecodeError, Exception):
+                    pass
 
-        # Score: 100 - (circular*10 + duplicates*5 + type_errors*2), capped at 0
-        penalty = (
-            issues["circular_deps"] * 10
-            + issues["duplicates"] * 5
-            + issues["type_errors"] * 2
-        )
-        score = max(0, min(100, 100 - penalty))
+            if stack.get("python"):
+                # mypy type checking
+                stdout, stderr, rc = await _arun_cmd(
+                    ["python3", "-m", "mypy", "--no-error-summary", "--no-color", "."],
+                    cwd=workspace,
+                )
+                if rc >= 0:
+                    error_lines = [
+                        ln for ln in (stdout + stderr).split("\n") if ": error:" in ln
+                    ]
+                    issues["type_errors"] = len(error_lines)
+                    tools_used.append("mypy")
 
-        details = {**issues, "tools": tools_used}
-        return DimensionResult(
-            dimension="architecture",
-            score=score,
-            details=details,
-            tool_used=",".join(tools_used) or "none",
-        )
+            # Score: 100 - (circular*10 + duplicates*5 + type_errors*2), capped at 0
+            penalty = (
+                issues["circular_deps"] * 10
+                + issues["duplicates"] * 5
+                + issues["type_errors"] * 2
+            )
+            score = max(0, min(100, 100 - penalty))
+
+            details = {**issues, "tools": tools_used}
+            return DimensionResult(
+                dimension="architecture",
+                score=score,
+                details=details,
+                tool_used=",".join(tools_used) or "none",
+            )
+        finally:
+            import shutil
+
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
     async def scan_maintainability(self, workspace: str, **kw) -> DimensionResult:
         """Maintainability Index via radon mi (Python) or file-based heuristic."""
         stack = kw.get("stack") or _detect_stack(workspace)
 
         if stack.get("python"):
-            stdout, stderr, rc = _run_cmd(
+            stdout, stderr, rc = await _arun_cmd(
                 ["python3", "-m", "radon", "mi", "-j", "."],
                 cwd=workspace,
             )
@@ -800,21 +871,20 @@ class QualityScanner:
 
         try:
             db = get_db()
-            # Count rejections vs total from platform_incidents
+            # Count quality-related incidents (no project_id on platform_incidents,
+            # so we count all quality_rejection incidents linked via mission)
             total = db.execute(
-                "SELECT COUNT(*) FROM platform_incidents WHERE project_id = ?",
-                (project_id,),
+                "SELECT COUNT(*) FROM platform_incidents WHERE error_type IS NOT NULL",
             ).fetchone()[0]
             rejections = db.execute(
-                "SELECT COUNT(*) FROM platform_incidents WHERE project_id = ? AND error_type = 'quality_rejection'",
-                (project_id,),
+                "SELECT COUNT(*) FROM platform_incidents WHERE error_type = 'quality_rejection'",
             ).fetchone()[0]
 
             if total == 0:
                 return DimensionResult(
                     dimension="adversarial",
                     score=100,
-                    details={"total_incidents": 0, "rejections": 0},
+                    details={"total_incidents": 0, "rejections": 0, "skipped": True},
                     tool_used="platform-db",
                 )
 
