@@ -281,7 +281,7 @@ async def portfolio_page(request: Request):
             e["name"],
         )
     )
-    epics_data = epics_data[:20]  # Cap at 20 for readability
+    epics_data = epics_data[:100]  # Show up to 100 epics
 
     # Load strategic committee graph from workflow
     strat_graph = {"nodes": [], "edges": []}
@@ -736,8 +736,8 @@ async def metier_page(request: Request):
     agent_store = get_agent_store()
     mission_store = get_mission_run_store()
 
-    all_missions = mission_store.list_runs(limit=50)
-    all_sessions = session_store.list_all(limit=100)
+    all_missions = mission_store.list_runs(limit=500)
+    all_sessions = session_store.list_all(limit=200)
     all_agents = agent_store.list_all()
     all_workflows = wf_store.list_all()
 
