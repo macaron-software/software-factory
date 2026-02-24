@@ -41,7 +41,10 @@ async def lifespan(app: FastAPI):
             from opentelemetry import trace
             from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
             from opentelemetry.sdk.trace import TracerProvider
-            from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+            from opentelemetry.sdk.trace.export import (
+                ConsoleSpanExporter,
+                SimpleSpanProcessor,
+            )
 
             provider = TracerProvider()
             provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
@@ -103,7 +106,9 @@ async def lifespan(app: FastAPI):
                 logger.warning("auto_provision failed for %s: %s", proj.id, e)
         else:
             # Ensure security mission exists even if TMA already present
-            has_secu = any(m.type == "security" or m.name.startswith("Sécu") for m in proj_missions)
+            has_secu = any(
+                m.type == "security" or m.name.startswith("Sécu") for m in proj_missions
+            )
             if not has_secu:
                 try:
                     ms.create_mission(
@@ -124,7 +129,9 @@ async def lifespan(app: FastAPI):
                 except Exception as e:
                     logger.warning("security provision failed for %s: %s", proj.id, e)
     if _prov_count:
-        logger.warning("Auto-provisioned TMA/Security/Debt for %d projects", _prov_count)
+        logger.warning(
+            "Auto-provisioned TMA/Security/Debt for %d projects", _prov_count
+        )
 
     # Seed memory (global knowledge + project files)
     from .memory.seeder import seed_all as seed_memories
@@ -163,14 +170,123 @@ async def lifespan(app: FastAPI):
         _stale = _rdb.execute(
             "UPDATE mission_runs SET status='paused' WHERE status='running'"
         ).rowcount
+        # Also fix phases stuck at "running" inside phases_json
+        _stuck_phases = 0
+        _rows = _rdb.execute(
+            "SELECT id, phases_json FROM mission_runs WHERE phases_json LIKE '%\"running\"%'"
+        ).fetchall()
+        for _row in _rows:
+            import json as _json
+
+            _phases = _json.loads(_row[1] or "[]")
+            _fixed = False
+            for _ph in _phases:
+                if _ph.get("status") == "running":
+                    _ph["status"] = "pending"
+                    _ph["summary"] = (
+                        _ph.get("summary") or ""
+                    ) + " [auto-reset: was stuck running]"
+                    _fixed = True
+                    _stuck_phases += 1
+            if _fixed:
+                _rdb.execute(
+                    "UPDATE mission_runs SET phases_json=? WHERE id=?",
+                    (_json.dumps(_phases, default=str), _row[0]),
+                )
         _rdb.commit()
         _rdb.close()
-        if _stale:
+        if _stale or _stuck_phases:
             logger.warning(
-                "Reset %d stale running mission_runs to paused (container restart)", _stale
+                "Reset %d stale mission_runs to paused, fixed %d stuck running phases",
+                _stale,
+                _stuck_phases,
             )
     except Exception as e:
         logger.warning("Failed to reset stale missions: %s", e)
+
+    # Auto-resume paused workflows in controlled batches (avoid thundering herd)
+    async def _auto_resume_paused():
+        """Resume paused workflows in small batches after startup stabilizes."""
+        import asyncio
+
+        await asyncio.sleep(30)  # Wait for server to fully start
+        try:
+            from .db.migrations import get_db as _gdb2
+
+            _rdb2 = _gdb2()
+            _paused = _rdb2.execute(
+                "SELECT mr.session_id, mr.id, s.config_json "
+                "FROM mission_runs mr "
+                "JOIN sessions s ON mr.session_id = s.id "
+                "WHERE mr.status = 'paused' "
+                "AND s.status IN ('interrupted', 'paused') "
+                "ORDER BY mr.updated_at DESC LIMIT 50"
+            ).fetchall()
+            _rdb2.close()
+
+            if not _paused:
+                logger.warning("Auto-resume: no paused workflows found")
+                return
+
+            logger.warning(
+                "Auto-resuming %d paused workflows in batches of 5", len(_paused)
+            )
+            BATCH_SIZE = 5
+            BATCH_DELAY = 60  # seconds between batches
+
+            for batch_start in range(0, len(_paused), BATCH_SIZE):
+                batch = _paused[batch_start : batch_start + BATCH_SIZE]
+                for row in batch:
+                    sid = row[0]
+                    try:
+                        import json as _json2
+
+                        config = _json2.loads(row[2]) if row[2] else {}
+                        checkpoint = config.get("workflow_checkpoint", 0)
+                        wf_id = config.get("workflow_id", "")
+                        if not wf_id:
+                            continue
+                        from .workflows.store import get_workflow_store, run_workflow
+
+                        wf = get_workflow_store().get(wf_id)
+                        if not wf:
+                            continue
+                        proj_id = config.get("project_id", "")
+                        task = config.get("task", config.get("brief", "Resume"))
+
+                        # Update statuses
+                        _rdb3 = _gdb2()
+                        _rdb3.execute(
+                            "UPDATE sessions SET status='active' WHERE id=?", (sid,)
+                        )
+                        _rdb3.execute(
+                            "UPDATE mission_runs SET status='running' WHERE session_id=?",
+                            (sid,),
+                        )
+                        _rdb3.commit()
+                        _rdb3.close()
+
+                        asyncio.create_task(
+                            run_workflow(wf, sid, task, proj_id, resume_from=checkpoint)
+                        )
+                        logger.warning(
+                            "Auto-resumed session %s from phase %d", sid[:8], checkpoint
+                        )
+                    except Exception as e:
+                        logger.warning("Failed to auto-resume %s: %s", sid[:8], e)
+
+                if batch_start + BATCH_SIZE < len(_paused):
+                    logger.warning("Waiting %ds before next batch...", BATCH_DELAY)
+                    await asyncio.sleep(BATCH_DELAY)
+
+            logger.warning("Auto-resume complete")
+        except Exception as e:
+            logger.warning("Auto-resume failed: %s", e)
+
+    # Schedule auto-resume as background task
+    import asyncio as _asyncio
+
+    _asyncio.create_task(_auto_resume_paused())
 
     # Start unified MCP SF server (platform + LRM tools merged)
     _mcp_procs: dict[str, Any] = {}
@@ -373,7 +489,12 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=[o.strip() for o in _cors_origins],
         allow_methods=["GET", "POST", "PUT", "DELETE"],
-        allow_headers=["Content-Type", "Authorization", "X-Trace-ID", "X-Requested-With"],
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "X-Trace-ID",
+            "X-Requested-With",
+        ],
         allow_credentials=True,
     )
 
@@ -395,7 +516,9 @@ def create_app() -> FastAPI:
             "frame-ancestors 'none'"
         )
         if request.url.scheme == "https":
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains"
+            )
         return response
 
     # ── Rate limiting (API endpoints, 60 req/min per IP) ───────────────
@@ -416,7 +539,9 @@ def create_app() -> FastAPI:
             if len(bucket) >= _RATE_LIMIT:
                 from starlette.responses import JSONResponse as _JR
 
-                return _JR({"error": "rate_limit_exceeded", "retry_after": 60}, status_code=429)
+                return _JR(
+                    {"error": "rate_limit_exceeded", "retry_after": 60}, status_code=429
+                )
             bucket.append(now)
         return await call_next(request)
 
@@ -471,7 +596,9 @@ def create_app() -> FastAPI:
             user = await get_current_user(request)
             if user is None:
                 if path.startswith("/api/"):
-                    return JSONResponse({"detail": "Authentication required"}, status_code=401)
+                    return JSONResponse(
+                        {"detail": "Authentication required"}, status_code=401
+                    )
                 from starlette.responses import RedirectResponse
 
                 return RedirectResponse(url=f"/login?next={path}", status_code=302)
@@ -517,7 +644,9 @@ def create_app() -> FastAPI:
             # Parse: "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7"
             langs = []
             for part in accept_lang.split(","):
-                match = _locale_re.match(r"([a-z]{2})(?:-[A-Z]{2})?(?:;q=([\d.]+))?", part.strip())
+                match = _locale_re.match(
+                    r"([a-z]{2})(?:-[A-Z]{2})?(?:;q=([\d.]+))?", part.strip()
+                )
                 if match:
                     lang_code = match.group(1)
                     quality = float(match.group(2) or "1.0")
@@ -653,7 +782,9 @@ def create_app() -> FastAPI:
         return _re.sub(r"\[SCREENSHOT:([^\]]+)\]", _shot_repl, html)
 
     def _markdown_filter(text):
-        html = _md_lib.markdown(_clean_llm(text), extensions=["fenced_code", "tables", "nl2br"])
+        html = _md_lib.markdown(
+            _clean_llm(text), extensions=["fenced_code", "tables", "nl2br"]
+        )
         return _render_screenshots(html)
 
     templates.env.filters["markdown"] = _markdown_filter
@@ -685,7 +816,9 @@ def create_app() -> FastAPI:
             lang = _get_lang(request)
             _i18n_global._current_lang = lang
             # Update JS catalog for current lang
-            templates.env.globals["i18n_catalog"] = _catalog.get(lang, _catalog.get("en", {}))
+            templates.env.globals["i18n_catalog"] = _catalog.get(
+                lang, _catalog.get("en", {})
+            )
             request.state.lang = lang
             response = await call_next(request)
             return response

@@ -310,7 +310,56 @@ def _save_checkpoint(store, session_id: str, completed_phase: int):
         logger.debug("Checkpoint save failed for %s: %s", session_id, e)
 
 
+def _reset_stuck_phases(store, session_id: str):
+    """Reset phases stuck at 'running' → 'pending' for resumed workflows."""
+    try:
+        from ..db.migrations import get_db
+
+        db = get_db()
+        rows = db.execute(
+            "SELECT id, phases_json FROM mission_runs WHERE session_id=? AND phases_json LIKE '%\"running\"%'",
+            (session_id,),
+        ).fetchall()
+        for row in rows:
+            import json as _json
+
+            phases = _json.loads(row[1] or "[]")
+            fixed = False
+            for ph in phases:
+                if ph.get("status") == "running":
+                    ph["status"] = "pending"
+                    ph["summary"] = (
+                        ph.get("summary") or ""
+                    ) + " [auto-reset on resume]"
+                    fixed = True
+            if fixed:
+                db.execute(
+                    "UPDATE mission_runs SET phases_json=? WHERE id=?",
+                    (_json.dumps(phases, default=str), row[0]),
+                )
+        db.commit()
+        db.close()
+    except Exception as e:
+        logger.debug("Reset stuck phases failed for %s: %s", session_id, e)
+
+
+def _capture_last_agent_summary(store, session_id: str, phase_name: str) -> str:
+    """Capture last agent message as error context for failed phases."""
+    try:
+        last_msgs = store.get_messages(session_id, limit=3)
+        for m in reversed(last_msgs):
+            if m.from_agent not in ("system", "user", _RTE_AGENT_ID) and m.content:
+                snippet = (m.content or "")[:200].replace("\n", " ")
+                return f"Dernier message ({m.from_agent}): {snippet}"
+    except Exception:
+        pass
+    return ""
+
+
 # ── Workflow Engine ──────────────────────────────────────────────
+
+
+PHASE_TIMEOUT_SECONDS = 600  # 10 min max per phase
 
 
 async def run_workflow(
@@ -333,6 +382,10 @@ async def run_workflow(
 
     store = get_session_store()
     pattern_store = get_pattern_store()
+
+    # On resume: reset any phases stuck at "running" → "pending"
+    if resume_from > 0:
+        _reset_stuck_phases(store, session_id)
 
     # Mark session as running
     try:
@@ -433,7 +486,10 @@ async def run_workflow(
         phase_task += f"## Original goal:\n{initial_task}"
 
         try:
-            result = await run_pattern(pattern, session_id, phase_task, project_id)
+            result = await asyncio.wait_for(
+                run_pattern(pattern, session_id, phase_task, project_id),
+                timeout=PHASE_TIMEOUT_SECONDS,
+            )
             run.phase_results.append(
                 {
                     "phase": phase.name,
@@ -476,9 +532,50 @@ async def run_workflow(
             # Checkpoint: save completed phase index for resume
             _save_checkpoint(store, session_id, i + 1)
 
+        except asyncio.TimeoutError:
+            logger.error(
+                "Workflow phase %s timed out after %ds",
+                phase.name,
+                PHASE_TIMEOUT_SECONDS,
+            )
+            error_str = f"Phase timed out after {PHASE_TIMEOUT_SECONDS}s"
+            # Capture last agent message as context for the timeout
+            _last_summary = _capture_last_agent_summary(store, session_id, phase.name)
+            run.phase_results.append(
+                {
+                    "phase": phase.name,
+                    "success": False,
+                    "error": error_str,
+                    "timeout": True,
+                }
+            )
+            # Timeouts are transient — continue if gate allows
+            if phase.gate in ("always", "no_veto"):
+                await _rte_facilitate(
+                    session_id,
+                    f"La phase **{phase.name}** a dépassé le timeout ({PHASE_TIMEOUT_SECONDS}s). "
+                    f"Gate='{phase.gate}', on continue.\n{_last_summary}",
+                    to_agent=leader,
+                    project_id=project_id,
+                )
+                _save_checkpoint(store, session_id, i + 1)
+                continue
+            # Critical phase timeout — stop
+            run.status = "failed"
+            run.error = error_str
+            await _rte_facilitate(
+                session_id,
+                f"La phase **{phase.name}** a dépassé le timeout ({PHASE_TIMEOUT_SECONDS}s). "
+                f"Le workflow est arrêté.\n{_last_summary}",
+                to_agent=leader,
+                project_id=project_id,
+            )
+            break
+
         except Exception as e:
             logger.error("Workflow phase %s failed: %s", phase.name, e)
             error_str = str(e)
+            _last_summary = _capture_last_agent_summary(store, session_id, phase.name)
             # Retry up to 3 times on transient errors with exponential backoff
             is_transient = any(
                 k in error_str.lower()
@@ -505,8 +602,9 @@ async def run_workflow(
                     )
                     await asyncio.sleep(delay)
                     try:
-                        result = await run_pattern(
-                            pattern, session_id, phase_task, project_id
+                        result = await asyncio.wait_for(
+                            run_pattern(pattern, session_id, phase_task, project_id),
+                            timeout=PHASE_TIMEOUT_SECONDS,
                         )
                         run.phase_results.append(
                             {
@@ -543,20 +641,23 @@ async def run_workflow(
                         "phase": phase.name,
                         "success": False,
                         "error": error_str,
+                        "context": _last_summary,
                     }
                 )
                 await _rte_facilitate(
                     session_id,
                     f"Erreur technique sur la phase **{phase.name}**: {error_str}\n"
+                    f"{_last_summary}\n"
                     f"La phase a gate='always', on continue avec la suite.",
                     to_agent=leader,
                     project_id=project_id,
                 )
+                _save_checkpoint(store, session_id, i + 1)
                 continue  # don't break — keep going
 
             # Critical phases — stop workflow
             run.status = "failed"
-            run.error = error_str
+            run.error = f"{error_str} | {_last_summary}" if _last_summary else error_str
             await _rte_facilitate(
                 session_id,
                 f"Technical error on phase **{phase.name}**: {error_str}\n"
