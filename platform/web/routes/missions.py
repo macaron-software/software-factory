@@ -693,12 +693,38 @@ async def launch_mission_workflow(request: Request, mission_id: str):
         )
     )
 
+    # Create workspace directory for agent tools (code, git, docker)
+    import subprocess
+    from pathlib import Path
+
+    workspace_root = (
+        Path(__file__).resolve().parent.parent.parent.parent / "data" / "workspaces" / session.id
+    )
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=str(workspace_root), capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "agents@macaron.ai"],
+        cwd=str(workspace_root), capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Macaron Agents"],
+        cwd=str(workspace_root), capture_output=True,
+    )
+    readme = workspace_root / "README.md"
+    task_desc = mission.goal or mission.description or mission.name
+    readme.write_text(f"# {wf.name}\n\n{task_desc}\n\nMission ID: {mission_id}\n")
+    gitignore = workspace_root / ".gitignore"
+    gitignore.write_text("node_modules/\ndist/\nbuild/\n.env\n*.bak\n__pycache__/\n.DS_Store\n")
+    subprocess.run(["git", "add", "."], cwd=str(workspace_root), capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Initial commit — mission workspace"],
+        cwd=str(workspace_root), capture_output=True,
+    )
+
     # Auto-start workflow execution — agents will dialogue via patterns
     import asyncio
 
     from .workflows import _run_workflow_background
-
-    task_desc = mission.goal or mission.description or mission.name
 
     # Auto-extract AO requirements from mission description for traceability
     if mission.description:
@@ -729,6 +755,7 @@ async def launch_mission_workflow(request: Request, mission_id: str):
         project_id=mission.project_id or mission_id,
         session_id=session.id,
         parent_mission_id=mission_id,
+        workspace_path=str(workspace_root),
     )
     try:
         get_mission_run_store().create(run)

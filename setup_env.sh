@@ -7,3 +7,5 @@ export PYTHONPATH="/Users/sylvain/_MACARON-SOFTWARE:$PYTHONPATH"
 
 echo "✅ Environment configured"
 echo "PYTHONPATH: $PYTHONPATH"
+
+export SF_LOCAL=1
