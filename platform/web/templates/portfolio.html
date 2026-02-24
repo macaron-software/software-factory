@@ -7,10 +7,18 @@
 {% endblock %}
 
 {% block content %}
+{% set p = request.state.perspective|default('admin') %}
+{% set _full_access = ('admin', 'overview', 'dsi') %}
 <div class="tabs">
+    {% if p in _full_access + ('portfolio_manager',) %}
     <button class="tab {% if active_tab == 'overview' %}active{% endif %}" hx-get="/?tab=overview" hx-select="#portfolio-inner" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/" onclick="switchTab(this)">{{ _("overview") }}</button>
+    {% endif %}
+    {% if p in _full_access %}
     <button class="tab {% if active_tab == 'dsi' %}active{% endif %}" hx-get="/dsi" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/?tab=dsi" onclick="switchTab(this)">{{ _("dsi") }}</button>
+    {% endif %}
+    {% if p in _full_access + ('business_owner',) %}
     <button class="tab {% if active_tab == 'metier' %}active{% endif %}" hx-get="/metier" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/?tab=metier" onclick="switchTab(this)">{{ _("business") }}</button>
+    {% endif %}
 </div>
 <div id="tab-content">
 <div id="portfolio-inner">
@@ -730,5 +738,16 @@ function switchTab(btn){
     document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.remove('active'));
     btn.classList.add('active');
 }
+/* Auto-load non-overview tabs on page load */
+(function(){
+    var activeTab = '{{ active_tab }}';
+    if (activeTab && activeTab !== 'overview') {
+        var urls = {dsi: '/dsi', metier: '/metier'};
+        var url = urls[activeTab];
+        if (url) {
+            htmx.ajax('GET', url, {target: '#tab-content', swap: 'innerHTML', select: '.main-area > *'});
+        }
+    }
+})();
 </script>
 {% endblock %}

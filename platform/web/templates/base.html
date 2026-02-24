@@ -73,47 +73,51 @@
                     <li><a href="/" data-tooltip="Dashboard" class="{% if page_title in ('Dashboard', 'Portfolio', 'Projects', 'DSI Board', 'Vue Métier') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-home"/></svg>
                     </a></li>
-                    {% if p in ('admin', 'portfolio_manager', 'product_owner', 'architect', 'business_owner') %}
+                    {% set _full = ('admin', 'overview', 'dsi') %}
+                    {% if p in _full + ('portfolio_manager', 'product_owner', 'architect', 'business_owner') %}
                     <li><a href="/backlog" data-tooltip="Backlog" class="{% if page_title in ('Backlog', 'Product', 'Idéation') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-layers"/></svg>
                     </a></li>
                     {% endif %}
-                    {% if p in ('admin', 'portfolio_manager', 'rte', 'product_owner', 'scrum_master', 'architect', 'business_owner') %}
+                    {% if p in _full + ('portfolio_manager', 'rte', 'product_owner', 'scrum_master', 'architect', 'business_owner') %}
                     <li><a href="/pi" data-tooltip="PI Board" class="{% if page_title in ('PI Board', 'Program Increment', 'Epics', 'Epic', 'Epic Control') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-rocket"/></svg>
                     </a></li>
                     {% endif %}
-                    {% if p in ('admin', 'rte', 'scrum_master', 'qa_security') %}
+                    {% if p in _full + ('rte', 'scrum_master', 'qa_security') %}
                     <li><a href="/ceremonies" data-tooltip="Ceremonies" class="{% if page_title in ('Ceremonies', 'Workflows', 'Patterns') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-workflow"/></svg>
                     </a></li>
                     {% endif %}
-                    {% if p in ('admin', 'product_owner', 'developer', 'architect', 'qa_security') %}
+                    {% if p in _full + ('product_owner', 'developer', 'architect', 'qa_security') %}
                     <li><a href="/projects" data-tooltip="Projects" class="{% if page_title in ('Projects', 'Project') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-folder"/></svg>
                     </a></li>
                     {% endif %}
-                    {% if p in ('admin', 'rte', 'product_owner', 'scrum_master', 'developer', 'qa_security') %}
+                    {% if p in _full + ('rte', 'product_owner', 'scrum_master', 'developer', 'qa_security') %}
                     <li><a href="/sessions" data-tooltip="Sessions" class="{% if page_title in ('Live', 'Sessions', 'Session') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-message-circle"/></svg>
                     </a></li>
                     {% endif %}
-                    {% if p in ('admin', 'rte', 'scrum_master', 'developer') %}
+                    {% if p in _full + ('rte', 'scrum_master', 'developer') %}
                     <li><a href="/art" data-tooltip="Teams" class="{% if page_title in ('ART', 'Agents', 'Organisation SAFe', 'Team Generator', 'Mercato') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-users"/></svg>
                     </a></li>
                     {% endif %}
-                    {% if p in ('admin', 'developer', 'architect') %}
+                    {% if p in _full + ('developer', 'architect') %}
                     <li><a href="/toolbox" data-tooltip="Toolbox" class="{% if page_title in ('Toolbox', 'Skills', 'Memory', 'MCPs', 'Design System') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-plug"/></svg>
                     </a></li>
                     {% endif %}
-                    {% if p in ('admin', 'portfolio_manager', 'business_owner') %}
+                    {% if p in _full + ('portfolio_manager', 'business_owner') %}
                     <li><a href="/metrics" data-tooltip="Metrics" class="{% if page_title == 'Metrics' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-chart"/></svg>
                     </a></li>
                     {% endif %}
-                    {% if p in ('admin', 'rte', 'architect', 'qa_security', 'scrum_master') %}
+                    <li><a href="/quality" data-tooltip="Quality" class="{% if page_title == 'Quality Scorecard' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-check-circle"/></svg>
+                    </a></li>
+                    {% if p in _full + ('rte', 'architect', 'qa_security', 'scrum_master') %}
                     <li><a href="/monitoring" data-tooltip="Monitoring" class="{% if page_title == 'Monitoring' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-activity"/></svg>
                     </a></li>
