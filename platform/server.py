@@ -28,31 +28,66 @@ TEMPLATES_DIR = WEB_DIR / "templates"
 STATIC_DIR = WEB_DIR / "static"
 
 
+# ── OpenTelemetry setup (module-level, before create_app) ──────────────────
+_otel_provider = None
+if os.environ.get("OTEL_ENABLED"):
+    try:
+        from opentelemetry import trace
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+        _otel_resource = Resource.create(
+            {
+                "service.name": os.environ.get("OTEL_SERVICE_NAME", "macaron-platform"),
+                "service.version": "1.2.0",
+                "deployment.environment": os.environ.get("PLATFORM_ENV", "production"),
+            }
+        )
+        _otel_provider = TracerProvider(resource=_otel_resource)
+
+        _otlp_endpoint = os.environ.get(
+            "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317"
+        )
+        try:
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+                OTLPSpanExporter,
+            )
+
+            _http_ep = _otlp_endpoint.replace(":4317", ":4318")
+            _traces_ep = _http_ep + "/v1/traces"
+            _otel_provider.add_span_processor(
+                SimpleSpanProcessor(OTLPSpanExporter(endpoint=_traces_ep))
+            )
+            logger.warning("OTEL: exporting traces to %s", _traces_ep)
+        except ImportError:
+            from opentelemetry.sdk.trace.export import ConsoleSpanExporter
+
+            _otel_provider.add_span_processor(
+                SimpleSpanProcessor(ConsoleSpanExporter())
+            )
+            logger.warning("OTEL: OTLP exporter not available, using console")
+
+        trace.set_tracer_provider(_otel_provider)
+
+        import atexit
+
+        atexit.register(_otel_provider.shutdown)
+
+        logger.warning(
+            "OpenTelemetry tracing enabled (service: %s)",
+            _otel_resource.attributes.get("service.name"),
+        )
+    except ImportError:
+        logger.warning("OpenTelemetry packages not installed, tracing disabled")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
     from .log_config import setup_logging
 
     setup_logging(level=os.environ.get("LOG_LEVEL", "WARNING"))
-
-    # OpenTelemetry tracing (opt-in via OTEL_ENABLED=1)
-    if os.environ.get("OTEL_ENABLED"):
-        try:
-            from opentelemetry import trace
-            from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-            from opentelemetry.sdk.trace import TracerProvider
-            from opentelemetry.sdk.trace.export import (
-                ConsoleSpanExporter,
-                SimpleSpanProcessor,
-            )
-
-            provider = TracerProvider()
-            provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
-            trace.set_tracer_provider(provider)
-            FastAPIInstrumentor.instrument_app(app)
-            logger.info("OpenTelemetry tracing enabled")
-        except ImportError:
-            logger.warning("OpenTelemetry packages not installed, tracing disabled")
 
     cfg = get_config()
     logger.info("Starting Software Factory on port %s", cfg.server.port)
@@ -505,6 +540,15 @@ def create_app() -> FastAPI:
     from .security import AuthMiddleware
 
     app.add_middleware(AuthMiddleware)
+
+    # ── OpenTelemetry ASGI middleware ────────────────────────────────────────
+    if _otel_provider is not None:
+        try:
+            from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
+
+            app.add_middleware(OpenTelemetryMiddleware, tracer_provider=_otel_provider)
+        except ImportError:
+            pass
 
     # ── Security: CORS ──────────────────────────────────────────────────────
     from starlette.middleware.cors import CORSMiddleware
