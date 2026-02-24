@@ -161,6 +161,55 @@ async def create_workflow(request: Request):
     return RedirectResponse(url="/workflows", status_code=303)
 
 
+@router.post("/api/workflows/resume-all")
+async def workflow_resume_all():
+    """Mass-resume all interrupted/paused workflows from their last checkpoint."""
+    from ...sessions.store import get_session_store
+    from ...workflows.store import get_workflow_store
+
+    store = get_session_store()
+    wf_store = get_workflow_store()
+
+    conn = store._conn if hasattr(store, "_conn") else None
+    if not conn:
+        from ...db.migrations import get_db
+
+        conn = get_db()
+
+    rows = conn.execute(
+        "SELECT id, config_json FROM sessions WHERE status IN ('interrupted','paused','active') AND config_json LIKE '%workflow_id%'"
+    ).fetchall()
+
+    resumed = 0
+    errors = []
+    for row in rows:
+        sid = row[0]
+        try:
+            config = json.loads(row[1]) if row[1] else {}
+            wf_id = config.get("workflow_id")
+            if not wf_id:
+                continue
+            wf = wf_store.get(wf_id)
+            if not wf:
+                continue
+            sess = store.get(sid)
+            if not sess:
+                continue
+            task = sess.goal or sess.name
+            project_id = sess.project_id or ""
+            resume_from = config.get("workflow_checkpoint", 0)
+            asyncio.create_task(
+                _run_workflow_background(
+                    wf, sid, task, project_id, resume_from=resume_from
+                )
+            )
+            resumed += 1
+        except Exception as e:
+            errors.append(f"{sid}: {e}")
+
+    return {"resumed": resumed, "total_candidates": len(rows), "errors": errors[:10]}
+
+
 @router.post("/api/workflows/{wf_id}")
 async def update_workflow(request: Request, wf_id: str):
     """Update an existing workflow."""
@@ -364,56 +413,6 @@ async def workflow_resume(session_id: str):
         "workflow_id": wf_id,
         "resume_from_phase": resume_from,
     }
-
-
-@router.post("/api/workflows/resume-all")
-async def workflow_resume_all():
-    """Mass-resume all interrupted/paused workflows from their last checkpoint."""
-    from ...sessions.store import get_session_store
-    from ...workflows.store import get_workflow_store
-
-    store = get_session_store()
-    wf_store = get_workflow_store()
-
-    # Find sessions with workflow_id that are interrupted/paused
-    conn = store._conn if hasattr(store, "_conn") else None
-    if not conn:
-        from ...db.migrations import get_db
-
-        conn = get_db()
-
-    rows = conn.execute(
-        "SELECT id, config_json FROM sessions WHERE status IN ('interrupted','paused','active') AND config_json LIKE '%workflow_id%'"
-    ).fetchall()
-
-    resumed = 0
-    errors = []
-    for row in rows:
-        sid = row[0]
-        try:
-            config = json.loads(row[1]) if row[1] else {}
-            wf_id = config.get("workflow_id")
-            if not wf_id:
-                continue
-            wf = wf_store.get(wf_id)
-            if not wf:
-                continue
-            sess = store.get(sid)
-            if not sess:
-                continue
-            task = sess.goal or sess.name
-            project_id = sess.project_id or ""
-            resume_from = config.get("workflow_checkpoint", 0)
-            asyncio.create_task(
-                _run_workflow_background(
-                    wf, sid, task, project_id, resume_from=resume_from
-                )
-            )
-            resumed += 1
-        except Exception as e:
-            errors.append(f"{sid}: {e}")
-
-    return {"resumed": resumed, "total_candidates": len(rows), "errors": errors[:10]}
 
 
 # ── DSI Board ────────────────────────────────────────────────────
