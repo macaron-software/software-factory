@@ -298,6 +298,39 @@ def check_l0(
             issues.append(f"REPETITION: {repeated} lines repeated >3 times")
             score += 3
 
+    # Check for missing dependency manifests when code was written
+    # Dev agents that write source code MUST also create dep manifests
+    if has_write_tool and "dev" in role_lower:
+        written_extensions = set()
+        has_dep_manifest = False
+        for tc in tool_calls:
+            if tc.get("name") != "code_write":
+                continue
+            fpath = str(tc.get("args", {}).get("path", ""))
+            # Track what languages were written
+            if fpath.endswith((".go",)):
+                written_extensions.add("go")
+            elif fpath.endswith((".py",)):
+                written_extensions.add("python")
+            elif fpath.endswith((".ts", ".tsx", ".js", ".jsx")):
+                written_extensions.add("node")
+            elif fpath.endswith((".rs",)):
+                written_extensions.add("rust")
+            # Check if dep manifest was created
+            fname = fpath.rsplit("/", 1)[-1] if "/" in fpath else fpath
+            if fname in (
+                "go.mod", "go.sum", "requirements.txt", "setup.py", "pyproject.toml",
+                "package.json", "Cargo.toml", "Dockerfile", "docker-compose.yml",
+            ):
+                has_dep_manifest = True
+        if written_extensions and not has_dep_manifest:
+            lang_str = ", ".join(sorted(written_extensions))
+            issues.append(
+                f"MISSING_DEPS: Wrote {lang_str} source files but no dependency manifest "
+                f"(requirements.txt/package.json/go.mod/Cargo.toml)"
+            )
+            score += 2  # warning, not hard reject
+
     threshold = 5  # reject if score >= threshold
     # QA/test agents get a higher threshold — their auto-injected reports
     # trigger false positives for "hallucination" (claiming actions without tool calls)

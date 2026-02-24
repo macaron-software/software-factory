@@ -33,6 +33,9 @@ SANDBOX_IMAGE = os.environ.get("SANDBOX_IMAGE", "python:3.12-slim")
 SANDBOX_NETWORK = os.environ.get("SANDBOX_NETWORK", "none")
 SANDBOX_TIMEOUT = int(os.environ.get("SANDBOX_TIMEOUT", "300"))
 SANDBOX_MEMORY = os.environ.get("SANDBOX_MEMORY", "512m")
+# Named Docker volume for workspace sharing (Docker-in-Docker via socket)
+# When set, sandbox containers mount this volume instead of bind-mounting the container's path
+SANDBOX_WORKSPACE_VOLUME = os.environ.get("SANDBOX_WORKSPACE_VOLUME", "")
 
 # Image selection by detected language/tool
 _IMAGE_MAP = {
@@ -125,11 +128,26 @@ class SandboxExecutor:
             "--network", network,
             "--memory", SANDBOX_MEMORY,
             "--cpus", "2",
-            "--read-only",
-            "--tmpfs", "/tmp:rw,noexec,nosuid,size=100m",
-            "-v", f"{self.workspace}:/workspace",
-            "-w", f"/workspace/{os.path.relpath(workdir, self.workspace)}" if workdir != self.workspace else "/workspace",
+            "--tmpfs", "/tmp:rw,nosuid,size=200m",
         ]
+
+        # Mount workspace: use named volume if configured (Docker-in-Docker),
+        # otherwise bind-mount the container's workspace directory
+        if SANDBOX_WORKSPACE_VOLUME:
+            # Named volume mount — works with Docker socket sharing
+            docker_cmd.extend(["-v", f"{SANDBOX_WORKSPACE_VOLUME}:/workspace"])
+            # Compute workdir relative to workspace root (/app/workspace → volume root)
+            ws_root = os.environ.get("SF_ROOT", "/app") + "/workspace"
+            if workdir.startswith(ws_root):
+                rel = os.path.relpath(workdir, ws_root)
+                docker_cmd.extend(["-w", f"/workspace/{rel}"])
+            else:
+                docker_cmd.extend(["-w", "/workspace"])
+        else:
+            docker_cmd.extend([
+                "-v", f"{self.workspace}:/workspace",
+                "-w", f"/workspace/{os.path.relpath(workdir, self.workspace)}" if workdir != self.workspace else "/workspace",
+            ])
 
         # Run as non-root agent-specific user
         if uid:

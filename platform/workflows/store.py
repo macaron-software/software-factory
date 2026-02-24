@@ -393,13 +393,57 @@ async def run_workflow(
                     break
 
         except Exception as e:
-            run.status = "failed"
-            run.error = str(e)
             logger.error("Workflow phase %s failed: %s", phase.name, e)
+            error_str = str(e)
+            # Retry once on transient errors (rate limits, timeouts, connection errors)
+            is_transient = any(k in error_str.lower() for k in ("429", "rate", "timeout", "connection", "temporarily"))
+            if is_transient:
+                logger.info("Retrying phase %s after transient error", phase.name)
+                import asyncio
+                await asyncio.sleep(15)
+                try:
+                    result = await run_pattern(pattern, session_id, phase_task, project_id)
+                    run.phase_results.append({
+                        "phase": phase.name,
+                        "success": result.success,
+                        "error": result.error,
+                        "retried": True,
+                    })
+                    # Accumulate context on retry success
+                    last_msgs = store.get_messages(session_id, limit=5)
+                    for m in reversed(last_msgs):
+                        if m.from_agent not in ("system", "user", _RTE_AGENT_ID):
+                            summary = (m.content or "")[:300].replace("\n", " ")
+                            accumulated_context.append(f"[{phase.name}] {m.from_agent}: {summary}")
+                            break
+                    continue  # phase succeeded on retry, move to next
+                except Exception as e2:
+                    error_str = str(e2)
+                    logger.error("Retry also failed for phase %s: %s", phase.name, e2)
+
+            # Non-critical phases (gate=always) — log error but continue
+            if phase.gate == "always":
+                run.phase_results.append({
+                    "phase": phase.name,
+                    "success": False,
+                    "error": error_str,
+                })
+                await _rte_facilitate(
+                    session_id,
+                    f"Erreur technique sur la phase **{phase.name}**: {error_str}\n"
+                    f"La phase a gate='always', on continue avec la suite.",
+                    to_agent=leader,
+                    project_id=project_id,
+                )
+                continue  # don't break — keep going
+
+            # Critical phases — stop workflow
+            run.status = "failed"
+            run.error = error_str
             await _rte_facilitate(
                 session_id,
-                f"Technical error on phase **{phase.name}**: {e}\n"
-                f"Annonce l'erreur à l'équipe et propose un plan de recovery.",
+                f"Technical error on phase **{phase.name}**: {error_str}\n"
+                f"Annonce l'erreur a l'equipe et propose un plan de recovery.",
                 to_agent=leader,
                 project_id=project_id,
             )

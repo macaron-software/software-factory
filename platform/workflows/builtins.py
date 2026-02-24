@@ -1926,7 +1926,25 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                         "max_iterations": 3,
                     },
                 ),
-                # ── Phase 6: CICD (SEQUENTIAL — Pipeline Engineer lance la chaîne) ──
+                # ── Phase 6b: Build & Verify (SEQUENTIAL — DevOps builds and tests everything) ──
+                WorkflowPhase(
+                    id="build-verify",
+                    pattern_id="sequential",
+                    name="Build & Verify",
+                    description=(
+                        "Le DevOps vérifie que TOUT le code compile et que les dépendances sont complètes. "
+                        "Pour chaque langage: install deps (npm install / pip install -r requirements.txt / go mod tidy / cargo build) → compile → run tests. "
+                        "Si des fichiers manquent (requirements.txt, go.mod, Dockerfile), les créer. "
+                        "Si le build échoue, corriger le code. "
+                        "OBJECTIF: le projet doit pouvoir se builder from scratch dans un container Docker propre."
+                    ),
+                    gate="no_veto",
+                    config={
+                        "agents": ["devops", "dev_backend", "dev_frontend"],
+                        "leader": "devops",
+                    },
+                ),
+                # ── Phase 7: CICD (SEQUENTIAL — Pipeline Engineer lance la chaîne) ──
                 WorkflowPhase(
                     id="cicd",
                     pattern_id="sequential",
@@ -3348,6 +3366,21 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                             "ft-proto-lead",
                         ],
                         "max_concurrent": 4,
+                    },
+                ),
+                WorkflowPhase(
+                    id="build-verify",
+                    pattern_id="sequential",
+                    name="Build & Verify",
+                    description=(
+                        "DevOps vérifie que le code compile: install deps, build, run tests. "
+                        "Crée les fichiers manquants (requirements.txt, go.mod, Dockerfile). "
+                        "Le projet doit builder from scratch. Si build fail, corriger le code."
+                    ),
+                    gate="no_veto",
+                    config={
+                        "agents": ["ft-infra-lead", "ft-e2e-lead"],
+                        "leader": "ft-infra-lead",
                     },
                 ),
                 WorkflowPhase(

@@ -118,7 +118,10 @@ FORMAT:
 RULES:
 - 1-2 files per subtask. Specific paths. NO code. NO veto.
 - Use correct file extensions for the stack (Kotlin=.kt, Swift=.swift, NO mixing).
-- NEVER mix languages (no Swift files in Android project, no Kotlin in iOS)."""
+- NEVER mix languages (no Swift files in Android project, no Kotlin in iOS).
+- ALWAYS include a subtask for DEPENDENCY MANIFEST: requirements.txt, package.json, go.mod, or Cargo.toml.
+- ALWAYS include a subtask for Dockerfile if the project will be deployed.
+- Last subtask MUST be: "Run build verification and fix any errors"."""
 
 # Execution protocol — telegraphic, code_write focused
 _EXEC_PROTOCOL = """ROLE: Developer. You MUST call code_write. No code_write = FAILURE.
@@ -151,15 +154,32 @@ UI/UX CONSTRAINTS (MANDATORY for frontend code):
 - Focus management: :focus-visible styles, skip-to-content link, keyboard navigation
 - Loading/error/empty states for EVERY data-dependent component
 
-BUILD VERIFICATION:
+DEPENDENCY MANIFESTS (MANDATORY — generate BEFORE build):
+- Go: code_write go.mod with module name + deps, then build(command="cd {project} && go mod tidy")
+- Python: code_write requirements.txt with ALL imports (fastapi, uvicorn, pydantic, etc.)
+- Node.js/TS: code_write package.json with scripts + deps, then build(command="npm install")
+- Rust: code_write Cargo.toml with [dependencies] section
+- Docker: code_write Dockerfile with correct base image + COPY + RUN install
+- NEVER leave deps empty. List EVERY import your code uses. Missing deps = build failure.
+
+BUILD VERIFICATION (MANDATORY — run AFTER writing code):
 - Web/Node.js: build(command="npm install && npm run build")
 - Python: build(command="python3 -m py_compile file.py")
+- Go: build(command="go vet ./...")
+- Rust: build(command="cargo check")
 - Android/Kotlin: android_build() — compiles via Gradle in real SDK container
 - Android tests: android_test() — runs real unit tests
 - Swift/iOS: build(command="swift build") — only for iOS/macOS projects
 - Docker: build(command="docker build -t test .")
 - If build fails, FIX the code and retry. Do NOT commit broken code.
-- Do NOT use generic build() for Android — use android_build() instead."""
+- Do NOT use generic build() for Android — use android_build() instead.
+
+COMPLETION CHECKLIST (before git_commit):
+1. All source files written via code_write
+2. Dependency manifest exists and is complete (requirements.txt / package.json / go.mod / Cargo.toml)
+3. Dockerfile exists (if project uses Docker)
+4. Build command ran successfully
+5. git_commit with meaningful message"""
 
 # Validation protocol — telegraphic
 _QA_PROTOCOL = """ROLE: QA Engineer. You MUST run actual tests, not just read code.
@@ -200,20 +220,26 @@ _CICD_PROTOCOL = """ROLE: DevOps / CI-CD Engineer. You MUST run real build+test 
 
 WORKFLOW:
 1. list_files → understand project structure
-2. Run actual build:
+2. Verify dependency manifests exist:
+   - If missing requirements.txt/package.json/go.mod → code_write them FIRST
+   - If Dockerfile missing → code_write a proper multi-stage Dockerfile
+3. Run actual build:
    - build(command="docker build -t app .") if Dockerfile exists
    - build(command="npm install && npm run build") for Node.js
-   - build(command="pip install -r requirements.txt") for Python
-3. Run tests:
+   - build(command="pip install -r requirements.txt && python -m py_compile app/main.py") for Python
+   - build(command="go build ./...") for Go
+   - build(command="cargo build") for Rust
+4. Run tests:
    - build(command="npm test") or build(command="pytest")
-4. Verify deployment artifacts exist
-5. Report REAL results with exit codes
+5. Write docker-compose.yml if multi-service project
+6. Report REAL results with exit codes
 
 RULES:
 - You MUST call build tool with real commands. Writing YAML files is NOT CI/CD.
 - If docker build fails, report the actual error — do NOT invent success.
 - Include actual command output in your report.
-- [APPROVE] only if build succeeds. [VETO] if build fails."""
+- [APPROVE] only if build succeeds. [VETO] if build fails.
+- ALWAYS verify dependency manifests are complete before building."""
 
 # Research protocol for ideation/discussion — agents can READ docs, search memory, but NOT write code
 _RESEARCH_PROTOCOL = """[DISCUSSION MODE — MANDATORY]
