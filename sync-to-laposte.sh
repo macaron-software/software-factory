@@ -26,7 +26,7 @@ echo ""
 
 # ── 1. Clone si inexistant ────────────────────────────────────────────────────
 if [ ! -d "$LAPOSTE_REPO/.git" ]; then
-    echo "📥 Clone du repo La Poste..."
+    echo " Clone du repo La Poste..."
     if ! $DRY_RUN; then
         git clone "$LAPOSTE_REMOTE" "$LAPOSTE_REPO" 2>/dev/null || {
             mkdir -p "$LAPOSTE_REPO"
@@ -39,7 +39,7 @@ if [ ! -d "$LAPOSTE_REPO/.git" ]; then
 fi
 
 # ── 2. Sync du code (sans agents/workflows/projets) ───────────────────────────
-echo "📦 Synchronisation du code..."
+echo "Synchronisation du code..."
 RSYNC_OPTS="-a --delete"
 $DRY_RUN && RSYNC_OPTS="-an --delete"
 
@@ -109,14 +109,24 @@ if ! $DRY_RUN; then
     cd "$LAPOSTE_REPO"
     git add -A
     if git diff --cached --quiet; then
-        echo "✅ Déjà à jour — aucun changement"
+        echo "-> Déjà à jour — aucun changement"
     else
-        git commit -m "sync: squelette plateforme $(date +%Y-%m-%d)"
-        echo "🚀 Push vers GitLab La Poste..."
+        # Reprendre les messages des commits GitHub depuis le dernier sync
+        LAST_SYNC_SHA=$(git log -1 --pretty=%H 2>/dev/null || echo "")
+        GITHUB_LOG=$(cd "$GITHUB_REPO" && git log --oneline --no-merges -10 --pretty="%s" 2>/dev/null | head -5)
+        COMMIT_MSG=$(echo "$GITHUB_LOG" | head -1)
+        EXTRA=$(echo "$GITHUB_LOG" | tail -n +2 | sed 's/^/- /')
+        if [ -n "$EXTRA" ]; then
+            COMMIT_MSG="$COMMIT_MSG
+
+$EXTRA"
+        fi
+        git commit -m "sync(laposte): $COMMIT_MSG"
+        echo "-> Push vers GitLab La Poste..."
         git push origin main || git push origin HEAD:main
-        echo "✅ Sync terminé"
+        echo "-> Sync terminé"
     fi
 else
     echo ""
-    echo "✅ [DRY-RUN] Simulation OK — aucune modification"
+    echo "OK [DRY-RUN] Simulation OK — aucune modification"
 fi
