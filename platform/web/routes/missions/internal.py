@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import re
-import struct
 import subprocess
 import uuid
-import zlib
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
 
 async def _auto_retrospective(
     mission, session_id: str, phase_summaries: list, push_sse
@@ -129,14 +127,11 @@ Sois CONCRET, TECHNIQUE et ACTIONNABLE. Réponds UNIQUEMENT avec le JSON."""
     )
 
 
-
-
 async def _run_post_phase_hooks(
     phase_id: str, phase_name: str, mission, session_id: str, push_sse
 ) -> dict:
     """Run real CI/CD actions after phase completion based on phase type.
     Returns dict with build_ok, test_ok, deploy_ok booleans for gate decisions."""
-    import subprocess
     from pathlib import Path
 
     result = {"build_ok": True, "test_ok": True, "deploy_ok": True}
@@ -695,8 +690,9 @@ asyncio.run(main())
                             if s.connect_ex(("127.0.0.1", p)) != 0:
                                 port = p
                                 break
-                    # Detect container port from Dockerfile EXPOSE or default 3000
+                    # Detect container port and workdir from Dockerfile
                     container_port = 3000
+                    container_workdir = "/app"
                     try:
                         df_text = (ws / "Dockerfile").read_text()
                         import re as _re
@@ -704,9 +700,12 @@ asyncio.run(main())
                         expose_match = _re.search(r"EXPOSE\s+(\d+)", df_text)
                         if expose_match:
                             container_port = int(expose_match.group(1))
+                        workdir_match = _re.search(r"WORKDIR\s+(\S+)", df_text)
+                        if workdir_match:
+                            container_workdir = workdir_match.group(1)
                     except Exception:
                         pass
-                    # Run container
+                    # Run container — workspace mounted so agents can read/write live files
                     run_result = subprocess.run(
                         [
                             "docker",
@@ -716,6 +715,8 @@ asyncio.run(main())
                             container_name,
                             "-p",
                             f"{port}:{container_port}",
+                            "-v",
+                            f"{workspace}:{container_workdir}",
                             "--restart",
                             "unless-stopped",
                             container_name,
@@ -946,13 +947,10 @@ asyncio.run(main())
     return result
 
 
-
-
 async def _update_docs_post_phase(
     phase_id: str, phase_name: str, mission, session_id: str, push_sse
 ):
     """Call LLM to update Architecture.md and README.md after each phase."""
-    import subprocess
     from pathlib import Path
 
     workspace = mission.workspace_path
@@ -1168,13 +1166,10 @@ Reponds UNIQUEMENT avec le contenu Markdown du fichier."""
         pass
 
 
-
-
 async def _run_real_e2e_tests(
     ws: Path, session_id: str, phase_id: str, push_sse, mission
 ) -> dict:
     """Run real Playwright/Jest/Vitest E2E test files if they exist in workspace. No LLM."""
-    import subprocess
 
     results = {"ran": False, "passed": 0, "failed": 0, "errors": []}
 
@@ -1329,11 +1324,9 @@ async def _run_real_e2e_tests(
     return [r for r in results if (ws / r).exists() and (ws / r).stat().st_size > 1000]
 
 
-
 async def _qa_screenshots_macos(ws: Path, shots_dir: Path) -> list[str]:
     """Build Swift app → launch → AppleScript navigation → multi-step screenshots."""
     import asyncio as _aio
-    import subprocess
 
     results = []
 
@@ -1506,8 +1499,6 @@ async def _qa_screenshots_macos(ws: Path, shots_dir: Path) -> list[str]:
     return results
 
 
-
-
 def _discover_macos_views(ws: Path) -> list[dict]:
     """Scan Swift sources to discover views/screens for screenshot journey."""
     views = []
@@ -1548,11 +1539,8 @@ def _discover_macos_views(ws: Path) -> list[dict]:
     return views
 
 
-
-
 def _capture_app_screenshot(app_name: str, output_path: Path):
     """Capture app window screenshot via screencapture -l (window ID)."""
-    import subprocess
 
     try:
         # Get window ID via AppleScript
@@ -1587,11 +1575,8 @@ def _capture_app_screenshot(app_name: str, output_path: Path):
         )
 
 
-
-
 def _applescript_navigate(app_name: str, view: dict):
     """Navigate to a view via AppleScript (keyboard shortcuts, menu clicks, tabs)."""
-    import subprocess
 
     try:
         if view.get("shortcut"):
@@ -1641,12 +1626,9 @@ def _applescript_navigate(app_name: str, view: dict):
         pass
 
 
-
-
 async def _qa_screenshots_ios(ws: Path, shots_dir: Path) -> list[str]:
     """Build iOS app for simulator, boot sim, screenshot."""
     import asyncio as _aio
-    import subprocess
 
     results = []
     has_xcproj = any(ws.glob("*.xcodeproj")) or any(ws.glob("*.xcworkspace"))
@@ -1723,14 +1705,11 @@ async def _qa_screenshots_ios(ws: Path, shots_dir: Path) -> list[str]:
     return results
 
 
-
-
 async def _qa_screenshots_web(
     ws: Path, shots_dir: Path, platform_type: str
 ) -> list[str]:
     """Start web server → Playwright multi-step journey screenshots (routes + interactions + RBAC)."""
     import asyncio as _aio
-    import subprocess
 
     results = []
     proc = None
@@ -1756,6 +1735,8 @@ async def _qa_screenshots_web(
                         "qa-screenshot-app",
                         "-p",
                         f"{port}:8080",
+                        "-v",
+                        f"{str(ws)}:/app",
                         "qa-screenshot-app",
                     ],
                     cwd=str(ws),
@@ -1861,11 +1842,8 @@ async def _qa_screenshots_web(
     return results
 
 
-
-
 def _discover_web_routes(ws: Path) -> list[dict]:
     """Scan codebase to find web routes for screenshot journey."""
-    import re
 
     routes = [{"path": "/", "label": "homepage", "actions": []}]
     seen = {"/"}
@@ -1949,11 +1927,8 @@ def _discover_web_routes(ws: Path) -> list[dict]:
     return routes[:15]
 
 
-
-
 def _enrich_route_actions(ws: Path, route: dict):
     """Detect interactive elements (forms, buttons, modals) in route files."""
-    import re
 
     actions = []
     # Search for form elements, buttons, links in HTML/template files
@@ -1991,11 +1966,8 @@ def _enrich_route_actions(ws: Path, route: dict):
     route["actions"] = actions[:5]
 
 
-
-
 def _discover_web_users(ws: Path) -> list[dict]:
     """Scan codebase for auth/RBAC test users (env, fixtures, seed)."""
-    import re
 
     users = []
     # Check for seed/fixture files
@@ -2032,8 +2004,6 @@ def _discover_web_users(ws: Path) -> list[dict]:
             unique.append(u)
             seen.add(u["email"])
     return unique[:4]
-
-
 
 
 def _build_playwright_journey(
@@ -2156,8 +2126,6 @@ const {{ chromium }} = require('playwright');
     return script
 
 
-
-
 def _build_playwright_journey_py(
     port: int, routes: list, users: list, shots_dir: str
 ) -> str:
@@ -2228,8 +2196,6 @@ async def main():
 asyncio.run(main())
 """
     return script
-
-
 
 
 def _write_status_png(
@@ -2316,8 +2282,6 @@ def _write_status_png(
 
     # Also write readable text
     path.with_suffix(".txt").write_text(f"=== {title} ===\n\n{body}")
-
-
 
 
 def _detect_project_platform(workspace_path: str, brief: str = "") -> str:
@@ -2634,8 +2598,6 @@ _WEB_QA = {
 }
 
 
-
-
 async def _extract_features_from_phase(
     mission_id: str,
     session_id: str,
@@ -2645,7 +2607,6 @@ async def _extract_features_from_phase(
     pre_msg_count: int,
 ):
     """Extract features/user stories from phase output and insert into features table."""
-    import uuid
 
     try:
         from ....db.migrations import get_db
@@ -2736,8 +2697,6 @@ async def _extract_features_from_phase(
             )
     except Exception:
         pass
-
-
 
 
 def _build_phase_prompt(
@@ -2902,6 +2861,3 @@ def _build_phase_prompt(
 
 
 # ── Feedback Loop API ──────────────────────────────────────────────
-
-
-
