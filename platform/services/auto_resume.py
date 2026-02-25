@@ -3,6 +3,7 @@
 Called from server.py lifespan. Runs as a periodic watchdog every 5 minutes:
 - Resumes paused mission_runs (all of them, batched with stagger)
 - Retries failed continuous background missions (TMA, security, self-healing, debt…)
+- Launches unstarted continuous missions (first run ever)
 """
 from __future__ import annotations
 
@@ -26,6 +27,10 @@ _WATCHDOG_INTERVAL = 300
 _STAGGER_STARTUP = 1.5
 _STAGGER_WATCHDOG = 3.0
 
+# Auto-launch new runs
+_LAUNCH_PER_CYCLE = 5   # max new launches per watchdog cycle (avoid thundering herd)
+_LAUNCH_STAGGER = 2.0   # seconds between each new launch
+
 
 def _is_continuous(mission_name: str, mission_type: str) -> bool:
     name_lower = (mission_name or "").lower()
@@ -35,7 +40,7 @@ def _is_continuous(mission_name: str, mission_type: str) -> bool:
 
 async def auto_resume_missions() -> None:
     """
-    Watchdog loop: resumes paused/failed mission_runs.
+    Watchdog loop: resumes paused/failed mission_runs and launches unstarted continuous missions.
     First pass is aggressive (all paused, 1.5s stagger), then gentle (5-min checks).
     """
     await asyncio.sleep(5)  # Let platform fully initialize first
@@ -53,6 +58,13 @@ async def auto_resume_missions() -> None:
             resumed = await _resume_batch(stagger=stagger)
             if resumed > 0:
                 logger.warning("auto_resume: %d runs resumed (first_pass=%s)", resumed, first_pass)
+            # Launch unstarted continuous missions (new in v2)
+            try:
+                launched = await auto_launch_continuous_missions()
+                if launched > 0:
+                    logger.warning("auto_resume: %d new continuous missions launched", launched)
+            except Exception as e_launch:
+                logger.error("auto_resume: auto_launch error: %s", e_launch)
             first_pass = False
         except Exception as e:
             logger.error("auto_resume watchdog error: %s", e)
@@ -334,3 +346,130 @@ async def _create_tma_incident(
         )
     finally:
         db.close()
+
+
+# ─── Auto-launch continuous missions with no runs ───────────────────────────
+
+async def auto_launch_continuous_missions() -> int:
+    """
+    Find active continuous missions (security, debt, TMA…) that have NO mission_run yet
+    and launch them. Called by the watchdog loop after handling paused/failed.
+    Returns count of missions launched.
+    """
+    from ..db.migrations import get_db
+
+    db = get_db()
+    try:
+        # Active missions with a workflow but no run ever
+        rows = db.execute("""
+            SELECT m.id, m.name, m.type, m.workflow_id,
+                   COALESCE(m.project_id, ''), COALESCE(m.description, ''),
+                   COALESCE(m.goal, m.description, m.name)
+            FROM missions m
+            WHERE m.status = 'active'
+              AND m.workflow_id IS NOT NULL AND m.workflow_id != ''
+              AND NOT EXISTS (
+                SELECT 1 FROM mission_runs mr
+                WHERE mr.session_id = m.id
+                   OR mr.parent_mission_id = m.id
+              )
+            ORDER BY m.created_at DESC
+            LIMIT 200
+        """).fetchall()
+    finally:
+        db.close()
+
+    if not rows:
+        return 0
+
+    # Filter: only continuous missions
+    candidates = [
+        r for r in rows
+        if _is_continuous(r[1], r[2])
+    ]
+
+    if not candidates:
+        logger.warning("auto_launch: %d unstarted active missions, 0 continuous", len(rows))
+        return 0
+
+    to_launch = candidates[:_LAUNCH_PER_CYCLE]
+    logger.warning(
+        "auto_launch: %d continuous missions unstarted, launching %d this cycle",
+        len(candidates), len(to_launch),
+    )
+
+    launched = 0
+    for row in to_launch:
+        mission_id, name, mtype, wf_id, project_id, desc, goal = row
+        try:
+            await _launch_new_run(
+                mission_id=mission_id,
+                workflow_id=wf_id,
+                project_id=project_id,
+                brief=goal or desc or name,
+                mission_name=name,
+            )
+            launched += 1
+            logger.warning("auto_launch: started run for mission %s (%s)", mission_id[:8], name[:50])
+        except Exception as e:
+            logger.warning("auto_launch: failed to start %s: %s", mission_id[:8], e)
+        await asyncio.sleep(_LAUNCH_STAGGER)
+
+    return launched
+
+
+async def _launch_new_run(
+    mission_id: str,
+    workflow_id: str,
+    project_id: str,
+    brief: str,
+    mission_name: str,
+) -> str:
+    """Create a new MissionRun for a backlog mission and launch it."""
+    import os
+    import uuid
+
+    from ..models import MissionRun, MissionStatus, PhaseRun, PhaseStatus
+    from ..missions.store import get_mission_run_store
+    from ..workflows.store import get_workflow_store
+
+    wf = get_workflow_store().get(workflow_id)
+    if not wf:
+        raise ValueError(f"Workflow {workflow_id} not found")
+
+    phases = [
+        PhaseRun(
+            phase_id=wp.id,
+            phase_name=wp.name,
+            pattern_id=wp.pattern_id,
+            status=PhaseStatus.PENDING,
+        )
+        for wp in wf.phases
+    ]
+
+    orchestrator_id = (wf.config or {}).get("orchestrator", "chef_de_programme")
+
+    run_id = uuid.uuid4().hex[:8]
+    # Workspace under data/workspaces/
+    ws_base = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+        "data", "workspaces", run_id,
+    )
+    os.makedirs(ws_base, exist_ok=True)
+
+    run = MissionRun(
+        id=run_id,
+        workflow_id=workflow_id,
+        workflow_name=wf.name,
+        brief=brief[:500],
+        status=MissionStatus.PENDING,
+        phases=phases,
+        project_id=project_id,
+        workspace_path=ws_base,
+        cdp_agent_id=orchestrator_id,
+        session_id=mission_id,  # links run → mission in missions table
+    )
+
+    get_mission_run_store().create(run)
+    await _launch_run(run_id)
+    return run_id
