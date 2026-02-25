@@ -3232,6 +3232,85 @@ async def api_quality_all(request: Request):
 @router.get("/api/dashboard/activity")
 async def dashboard_activity(request: Request):
     """Recent activity feed."""
+
+
+@router.get("/api/dashboard/quality-badge")
+async def dashboard_quality_badge(request: Request, project_id: str = ""):
+    """Quality badge for project header — shows score as colored circle."""
+    if not project_id:
+        return HTMLResponse("")
+    from ...metrics.quality import QualityScanner
+
+    snapshot = QualityScanner.get_latest_snapshot(project_id)
+    if not snapshot or not snapshot.get("global_score"):
+        return HTMLResponse(
+            '<span style="color:var(--text-tertiary); font-size:0.8rem;">No scan</span>'
+        )
+
+    score = snapshot["global_score"]
+    color = (
+        "#16a34a"
+        if score >= 80
+        else "#3b82f6"
+        if score >= 60
+        else "#ea580c"
+        if score >= 40
+        else "#dc2626"
+    )
+    return HTMLResponse(
+        f'<span style="display:inline-flex;align-items:center;gap:4px;font-size:0.85rem;">'
+        f'<span style="width:10px;height:10px;border-radius:50%;background:{color};display:inline-block;"></span>'
+        f'<strong style="color:{color}">{score:.0f}</strong>/100'
+        f"</span>"
+    )
+
+
+@router.get("/api/dashboard/quality-mission")
+async def dashboard_quality_mission(request: Request, project_id: str = ""):
+    """Quality scorecard for mission detail sidebar."""
+    if not project_id:
+        return HTMLResponse('<p style="color:var(--text-tertiary)">No project</p>')
+    from ...metrics.quality import QualityScanner
+
+    snapshot = QualityScanner.get_latest_snapshot(project_id)
+    if not snapshot or not snapshot.get("global_score"):
+        return HTMLResponse(
+            '<p style="color:var(--text-tertiary); font-size:0.85rem;">No quality scan yet</p>'
+        )
+
+    score = snapshot["global_score"]
+    color = (
+        "#16a34a"
+        if score >= 80
+        else "#3b82f6"
+        if score >= 60
+        else "#ea580c"
+        if score >= 40
+        else "#dc2626"
+    )
+    dims = snapshot.get("dimensions", {})
+
+    html = '<div style="font-size:0.85rem;">'
+    html += f'<div style="text-align:center;margin-bottom:8px;"><span style="font-size:1.5rem;font-weight:700;color:{color}">{score:.0f}</span><span style="color:var(--text-tertiary)">/100</span></div>'
+    for dim_name, dim_val in list(dims.items())[:6]:
+        dcolor = (
+            "#16a34a"
+            if dim_val >= 80
+            else "#3b82f6"
+            if dim_val >= 60
+            else "#ea580c"
+            if dim_val >= 40
+            else "#dc2626"
+        )
+        label = dim_name.replace("_", " ").title()
+        html += f'<div style="display:flex;justify-content:space-between;margin:2px 0;"><span>{label}</span><span style="color:{dcolor};font-weight:600">{dim_val:.0f}</span></div>'
+    html += "</div>"
+    return HTMLResponse(html)
+
+
+@router.get("/api/dashboard/activity")
+async def dashboard_activity_feed(request: Request):
+    """Recent activity feed."""
     from ...sessions.store import get_session_store
 
     store = get_session_store()
