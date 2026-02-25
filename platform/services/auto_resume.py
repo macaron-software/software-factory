@@ -1,18 +1,17 @@
 """Auto-resume missions and background agents after container restart.
 
-Called from server.py lifespan. Resumes:
-- All paused mission_runs whose parent mission is "active" and auto-resumable
-- Priority given to continuous background missions: TMA, security, self-healing, debt
+Called from server.py lifespan. Runs as a periodic watchdog every 5 minutes:
+- Resumes paused mission_runs (all of them, batched with stagger)
+- Retries failed continuous background missions (TMA, security, self-healing, debt…)
 """
 from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
 
-# Mission types/name patterns that are always-on background missions
+# Mission name/type patterns that should always be running
 _CONTINUOUS_KEYWORDS = (
     "tma", "sécurité", "securite", "security",
     "dette technique", "tech debt", "self-heal", "self_heal",
@@ -20,10 +19,11 @@ _CONTINUOUS_KEYWORDS = (
     "monitoring", "audit",
 )
 
-# Max runs to auto-resume at startup (avoid thundering herd)
-_MAX_AUTO_RESUME = 20
-# Stagger delay between each resume (seconds)
-_RESUME_STAGGER = 3.0
+# Watchdog loop interval (seconds)
+_WATCHDOG_INTERVAL = 300
+# Stagger between each resume
+_STAGGER_STARTUP = 1.5
+_STAGGER_WATCHDOG = 3.0
 
 
 def _is_continuous(mission_name: str, mission_type: str) -> bool:
@@ -32,83 +32,98 @@ def _is_continuous(mission_name: str, mission_type: str) -> bool:
     return any(kw in name_lower or kw in type_lower for kw in _CONTINUOUS_KEYWORDS)
 
 
-async def auto_resume_missions() -> int:
+async def auto_resume_missions() -> None:
     """
-    Resume paused mission_runs at startup. Returns number of runs resumed.
-    Runs as a background asyncio task — staggered to avoid semaphore contention.
+    Watchdog loop: resumes paused/failed mission_runs.
+    First pass is aggressive (all paused, 1.5s stagger), then gentle (5-min checks).
     """
-    # Import here to avoid circular imports at module load time
+    await asyncio.sleep(5)  # Let platform fully initialize first
+
+    first_pass = True
+    while True:
+        try:
+            stagger = _STAGGER_STARTUP if first_pass else _STAGGER_WATCHDOG
+            resumed = await _resume_batch(stagger=stagger)
+            if resumed > 0:
+                logger.warning("auto_resume: %d runs resumed (first_pass=%s)", resumed, first_pass)
+            first_pass = False
+        except Exception as e:
+            logger.error("auto_resume watchdog error: %s", e)
+            first_pass = False
+
+        await asyncio.sleep(_WATCHDOG_INTERVAL)
+
+
+async def _resume_batch(stagger: float = 3.0) -> int:
+    """Resume all paused runs + retry failed continuous missions. Returns count resumed."""
     from ..db.migrations import get_db
-    from ..missions.store import get_mission_run_store, get_mission_store
 
-    await asyncio.sleep(5)  # Let the platform fully initialize first
-
+    db = get_db()
     try:
-        run_store = get_mission_run_store()
-        mission_store = get_mission_store()
-        db = get_db()
-
-        # Get all paused runs with their parent mission info
-        # mission_runs.session_id links to missions.id
-        rows = db.execute("""
+        # All paused runs with workflow
+        paused_rows = db.execute("""
             SELECT mr.id, mr.workflow_id,
                    COALESCE(m.name, ''), COALESCE(m.type, ''), COALESCE(m.status, 'active')
             FROM mission_runs mr
             LEFT JOIN missions m ON m.id = mr.session_id
             WHERE mr.status = 'paused' AND mr.workflow_id IS NOT NULL
             ORDER BY mr.created_at DESC
-            LIMIT 200
+            LIMIT 500
         """).fetchall()
+
+        # Failed continuous missions (retry within 7 days)
+        failed_rows = db.execute("""
+            SELECT mr.id, mr.workflow_id,
+                   COALESCE(m.name, ''), COALESCE(m.type, ''), COALESCE(m.status, 'active')
+            FROM mission_runs mr
+            LEFT JOIN missions m ON m.id = mr.session_id
+            WHERE mr.status = 'failed' AND mr.workflow_id IS NOT NULL
+              AND (m.status IS NULL OR m.status = 'active')
+              AND mr.created_at >= datetime('now', '-7 days')
+            ORDER BY mr.created_at DESC
+            LIMIT 100
+        """).fetchall()
+    finally:
         db.close()
 
-        if not rows:
-            return 0
+    continuous_paused, others_paused, continuous_failed = [], [], []
+    for run_id, wf_id, mname, mtype, mstatus in paused_rows:
+        if mstatus not in ("active", None, ""):
+            continue
+        if _is_continuous(mname, mtype):
+            continuous_paused.append(run_id)
+        else:
+            others_paused.append(run_id)
 
-        # Separate continuous missions from others
-        continuous = []
-        others = []
-        for run_id, wf_id, mname, mtype, mstatus in rows:
-            if mstatus not in ("active", None):
-                continue  # Skip missions that are completed/failed
-            if not wf_id:
-                continue  # No workflow → can't resume
-            if _is_continuous(mname or "", mtype or ""):
-                continuous.append(run_id)
-            else:
-                others.append(run_id)
+    for run_id, wf_id, mname, mtype, mstatus in failed_rows:
+        if _is_continuous(mname, mtype):
+            continuous_failed.append(run_id)
 
-        # Resume continuous first, then others, up to _MAX_AUTO_RESUME
-        to_resume = (continuous + others)[:_MAX_AUTO_RESUME]
+    to_resume = continuous_paused + others_paused + continuous_failed
 
-        if not to_resume:
-            logger.info("auto_resume: no eligible paused runs found")
-            return 0
-
-        logger.warning(
-            "auto_resume: resuming %d paused runs (%d continuous + %d others)",
-            len(to_resume), len(continuous[:_MAX_AUTO_RESUME]), len(others[:max(0, _MAX_AUTO_RESUME - len(continuous))])
-        )
-
-        resumed = 0
-        for run_id in to_resume:
-            try:
-                await _launch_run(run_id)
-                resumed += 1
-                logger.warning("auto_resume: launched run %s", run_id)
-            except Exception as e:
-                logger.warning("auto_resume: failed to resume %s: %s", run_id, e)
-            await asyncio.sleep(_RESUME_STAGGER)
-
-        logger.warning("auto_resume: %d/%d runs resumed", resumed, len(to_resume))
-        return resumed
-
-    except Exception as e:
-        logger.error("auto_resume failed: %s", e)
+    if not to_resume:
         return 0
+
+    logger.warning(
+        "auto_resume: %d candidates (paused-continuous=%d, paused-other=%d, failed-continuous=%d)",
+        len(to_resume), len(continuous_paused), len(others_paused), len(continuous_failed),
+    )
+
+    resumed = 0
+    for run_id in to_resume:
+        try:
+            await _launch_run(run_id)
+            resumed += 1
+            logger.warning("auto_resume: launched run %s", run_id)
+        except Exception as e:
+            logger.warning("auto_resume: skipped %s: %s", run_id, e)
+        await asyncio.sleep(stagger)
+
+    return resumed
 
 
 async def _launch_run(run_id: str) -> None:
-    """Launch a single mission_run via the orchestrator (mirrors _launch_orchestrator in missions.py)."""
+    """Launch a single mission_run via the orchestrator."""
     from ..agents.store import get_agent_store
     from ..missions.store import get_mission_run_store
     from ..models import MissionStatus
