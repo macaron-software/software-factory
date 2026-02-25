@@ -1264,7 +1264,7 @@ def _get_tool_schemas() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "platform_sessions",
-                "description": "List recent sessions/ceremonies or get messages from a specific session.",
+                "description": "List recent sessions or get messages from a specific session.",
                 "parameters": {
                     "type": "object",
                     "properties": {

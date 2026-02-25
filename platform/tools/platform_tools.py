@@ -148,7 +148,7 @@ class PlatformMetricsTool(BaseTool):
 
 class PlatformSessionsTool(BaseTool):
     name = "platform_sessions"
-    description = "List recent sessions/ceremonies or get messages from a specific session."
+    description = "List recent sessions or get messages from a specific session."
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:

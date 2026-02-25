@@ -1,4 +1,4 @@
-"""Web routes — Page renders (portfolio, backlog, ceremonies, etc.)."""
+"""Web routes — Page renders (portfolio, backlog, workflows, etc.)."""
 
 from __future__ import annotations
 
@@ -486,11 +486,11 @@ async def pi_board_page(request: Request):
     )
 
 
-@router.get("/ceremonies", response_class=HTMLResponse)
-async def ceremonies_page(request: Request, tab: str = "templates"):
+@router.get("/workflows", response_class=HTMLResponse)
+async def workflows_page(request: Request, tab: str = "templates"):
     """Workflows — Mission templates + Orchestration patterns."""
     return _templates(request).TemplateResponse(
-        "ceremonies.html",
+        "workflows.html",
         {
             "request": request,
             "page_title": "Workflows",
@@ -498,6 +498,14 @@ async def ceremonies_page(request: Request, tab: str = "templates"):
             "tab_content": "",
         },
     )
+
+
+@router.get("/ceremonies", response_class=HTMLResponse)
+async def ceremonies_redirect(request: Request):
+    """Legacy redirect — /ceremonies moved to /workflows."""
+    from starlette.responses import RedirectResponse
+
+    return RedirectResponse("/workflows", status_code=301)
 
 
 @router.get("/live", response_class=HTMLResponse)
