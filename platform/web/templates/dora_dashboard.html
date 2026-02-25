@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% set p = request.state.perspective|default('admin') %}
 <style>
 .dora-container { max-width: 900px; margin: 0 auto; padding: 1.5rem 1rem; }
 .dora-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
@@ -62,8 +63,8 @@
         <div class="dora-filters">
             <select class="dora-select" onchange="location.href='/metrics?project='+this.value+'&period={{ period }}'">
                 <option value="" {% if not selected_project %}selected{% endif %}>{{ _("tous_les_projets") }}</option>
-                {% for p in projects %}
-                <option value="{{ p.id }}" {% if selected_project == p.id %}selected{% endif %}>{{ p.name }}</option>
+                {% for proj in projects %}
+                <option value="{{ proj.id }}" {% if selected_project == proj.id %}selected{% endif %}>{{ proj.name }}</option>
                 {% endfor %}
             </select>
             <select class="dora-select" onchange="location.href='/metrics?project={{ selected_project }}&period='+this.value">
@@ -73,6 +74,27 @@
             </select>
         </div>
     </div>
+
+    {# ── Perspective focus banner ── #}
+    {% set focus_map = {
+        'rte': {'icon': 'zap', 'label': 'Focus RTE', 'desc': 'Velocity, cycle time, predictability'},
+        'scrum_master': {'icon': 'zap', 'label': 'Focus Scrum Master', 'desc': 'Burndown, velocity, sprint health'},
+        'developer': {'icon': 'code', 'label': 'Focus Developer', 'desc': 'Pipeline health, failure rate, lead time'},
+        'architect': {'icon': 'layers', 'label': 'Focus Architect', 'desc': 'Architecture fitness, complexity, tech debt'},
+        'qa_security': {'icon': 'shield', 'label': 'Focus QA/Security', 'desc': 'Change failure rate, test trends, MTTR'},
+        'product_owner': {'icon': 'target', 'label': 'Focus Product Owner', 'desc': 'Feature velocity, cycle time, delivery rate'},
+        'business_owner': {'icon': 'briefcase', 'label': 'Focus Business', 'desc': 'ROI, feature delivery, cost efficiency'},
+        'dsi': {'icon': 'trophy', 'label': 'Focus DSI', 'desc': 'Executive summary, LLM cost, overall DORA level'}
+    } %}
+    {% if p in focus_map %}
+    <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg-tertiary,#21262d);border:1px solid var(--border);border-radius:8px;margin-bottom:1.5rem;font-size:0.82rem">
+        <svg class="icon icon-sm" style="color:var(--purple-light)"><use href="#icon-{{ focus_map[p].icon }}"/></svg>
+        <div>
+            <span style="font-weight:600;color:var(--text-primary)">{{ focus_map[p].label }}</span>
+            <span style="color:var(--text-secondary)"> — {{ focus_map[p].desc }}</span>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Overall Level -->
     <div class="dora-overall">
@@ -84,47 +106,47 @@
         <div class="dora-overall-label">Niveau global — {{ dora.period_days }} derniers jours</div>
     </div>
 
-    <!-- 4 Metric Cards -->
-    <div class="dora-grid">
-        <!-- Deployment Frequency -->
-        <div class="dora-card">
+    <!-- 4 Metric Cards — order adapts to perspective -->
+    {# Define card fragments as macros for reuse #}
+    {% macro card_deploy() %}
+        <div class="dora-card" id="card-deploy">
             <div class="dora-card-icon"><svg class="icon" style="color:var(--green)"><use href="#icon-rocket"/></svg></div>
             <div class="dora-card-title">{{ _("phases_done") }}</div>
             <div class="dora-card-value">{{ dora.deployment_frequency.count }}</div>
             <div class="dora-card-detail">{{ dora.deployment_frequency.per_day }}/jour</div>
             <span class="dora-card-level level-{{ dora.deployment_frequency.level }}">{{ dora.deployment_frequency.level }}</span>
         </div>
-
-        <!-- Lead Time -->
-        <div class="dora-card">
+    {% endmacro %}
+    {% macro card_lead_time() %}
+        <div class="dora-card" id="card-lead-time">
             <div class="dora-card-icon"><svg class="icon" style="color:var(--blue)"><use href="#icon-clock"/></svg></div>
             <div class="dora-card-title">{{ _("lead_time") }}</div>
             <div class="dora-card-value">{{ dora.lead_time.median_hours }}h</div>
             <div class="dora-card-detail">p90: {{ dora.lead_time.p90_hours }}h</div>
             <span class="dora-card-level level-{{ dora.lead_time.level }}">{{ dora.lead_time.level }}</span>
         </div>
-
-        <!-- Change Failure Rate -->
-        <div class="dora-card">
+    {% endmacro %}
+    {% macro card_failure() %}
+        <div class="dora-card" id="card-failure">
             <div class="dora-card-icon"><svg class="icon" style="color:var(--red)"><use href="#icon-alert-circle"/></svg></div>
             <div class="dora-card-title">{{ _("failure_rate") }}</div>
             <div class="dora-card-value">{{ dora.change_failure_rate.rate_pct }}%</div>
             <div class="dora-card-detail">{{ dora.change_failure_rate.failures }}/{{ dora.change_failure_rate.total }}</div>
             <span class="dora-card-level level-{{ dora.change_failure_rate.level }}">{{ dora.change_failure_rate.level }}</span>
         </div>
-
-        <!-- MTTR -->
-        <div class="dora-card">
+    {% endmacro %}
+    {% macro card_mttr() %}
+        <div class="dora-card" id="card-mttr">
             <div class="dora-card-icon"><svg class="icon" style="color:var(--yellow)"><use href="#icon-wrench"/></svg></div>
             <div class="dora-card-title">{{ _("mttr") }}</div>
             <div class="dora-card-value">{{ dora.mttr.median_hours }}h</div>
             <div class="dora-card-detail">{{ dora.mttr.count }} incidents</div>
             <span class="dora-card-level level-{{ dora.mttr.level }}">{{ dora.mttr.level }}</span>
         </div>
-
-        <!-- SAFe Velocity -->
+    {% endmacro %}
+    {% macro card_velocity() %}
         {% if dora.velocity %}
-        <div class="dora-card">
+        <div class="dora-card" id="card-velocity">
             <div class="dora-card-icon"><svg class="icon" style="color:var(--purple-light)"><use href="#icon-zap"/></svg></div>
             <div class="dora-card-title">{{ _("velocity") }}</div>
             <div class="dora-card-value">{{ dora.velocity.avg_velocity }} phases/epic</div>
@@ -132,10 +154,10 @@
             <span class="dora-card-level level-{% if dora.velocity.predictability_pct >= 80 %}elite{% elif dora.velocity.predictability_pct >= 60 %}high{% elif dora.velocity.predictability_pct >= 40 %}medium{% else %}low{% endif %}">{{ dora.velocity.predictability_pct }}% predictable</span>
         </div>
         {% endif %}
-
-        <!-- LLM Cost -->
+    {% endmacro %}
+    {% macro card_llm_cost() %}
         {% if dora.llm_cost %}
-        <div class="dora-card">
+        <div class="dora-card" id="card-llm-cost">
             <div class="dora-card-icon"><svg class="icon" style="color:var(--cyan)"><use href="#icon-cpu"/></svg></div>
             <div class="dora-card-title">LLM Cost</div>
             <div class="dora-card-value">${{ dora.llm_cost.total_cost_usd }}</div>
@@ -143,6 +165,58 @@
             <span class="dora-card-level level-{% if dora.llm_cost.total_cost_usd < 5 %}elite{% elif dora.llm_cost.total_cost_usd < 20 %}high{% elif dora.llm_cost.total_cost_usd < 50 %}medium{% else %}low{% endif %}">{{ dora.llm_cost.by_model | length }} models</span>
         </div>
         {% endif %}
+    {% endmacro %}
+
+    <div class="dora-grid">
+    {% if p in ('rte', 'scrum_master') %}
+        {# RTE/SM: velocity + lead time first #}
+        {{ card_velocity() }}
+        {{ card_lead_time() }}
+        {{ card_deploy() }}
+        {{ card_mttr() }}
+        {{ card_failure() }}
+        {{ card_llm_cost() }}
+    {% elif p in ('developer', 'architect') %}
+        {# Dev/Architect: pipeline + failure first #}
+        {{ card_deploy() }}
+        {{ card_failure() }}
+        {{ card_lead_time() }}
+        {{ card_mttr() }}
+        {{ card_velocity() }}
+        {{ card_llm_cost() }}
+    {% elif p == 'qa_security' %}
+        {# QA: failure + MTTR first #}
+        {{ card_failure() }}
+        {{ card_mttr() }}
+        {{ card_deploy() }}
+        {{ card_lead_time() }}
+        {{ card_velocity() }}
+        {{ card_llm_cost() }}
+    {% elif p == 'product_owner' %}
+        {# PO: velocity + cycle time first #}
+        {{ card_velocity() }}
+        {{ card_deploy() }}
+        {{ card_lead_time() }}
+        {{ card_failure() }}
+        {{ card_mttr() }}
+        {{ card_llm_cost() }}
+    {% elif p in ('dsi', 'business_owner', 'overview') %}
+        {# Executive: overall + cost first #}
+        {{ card_llm_cost() }}
+        {{ card_deploy() }}
+        {{ card_lead_time() }}
+        {{ card_failure() }}
+        {{ card_mttr() }}
+        {{ card_velocity() }}
+    {% else %}
+        {# Default: standard DORA order #}
+        {{ card_deploy() }}
+        {{ card_lead_time() }}
+        {{ card_failure() }}
+        {{ card_mttr() }}
+        {{ card_velocity() }}
+        {{ card_llm_cost() }}
+    {% endif %}
     </div>
 
     <!-- Sparkline Trends -->
@@ -167,7 +241,71 @@
         </div>
     </div>
 
-    <!-- Charts Section -->
+    <!-- Charts Section — order adapts to perspective -->
+    {% if p in ('rte', 'scrum_master', 'product_owner') %}
+    {# Velocity-focused profiles see velocity chart first #}
+    <div class="dora-grid" style="margin-top:1.5rem">
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Velocity (phases/sprint)</div>
+            <canvas id="chartVelocity" height="180"></canvas>
+        </div>
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Cycle Time Distribution (days)</div>
+            <canvas id="chartCycleTime" height="180"></canvas>
+        </div>
+    </div>
+    <div class="dora-grid" style="margin-top:1rem">
+        <div class="dora-card" style="grid-column:span 2;text-align:left">
+            <div class="dora-card-title" style="text-align:center">Deployment Frequency & Lead Time</div>
+            <canvas id="chartTrend" height="200"></canvas>
+        </div>
+    </div>
+    <div class="dora-grid" style="margin-top:1rem">
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Failure Rate (%)</div>
+            <canvas id="chartFailure" height="180"></canvas>
+        </div>
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Release Notes</div>
+            <div id="releaseNotes" style="max-height:220px;overflow-y:auto;font-size:0.78rem;color:var(--text-secondary)">
+                <p style="color:var(--text-muted);font-style:italic">Loading...</p>
+            </div>
+        </div>
+    </div>
+
+    {% elif p == 'qa_security' %}
+    {# QA sees failure rate and MTTR charts first #}
+    <div class="dora-grid" style="margin-top:1.5rem">
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Failure Rate (%)</div>
+            <canvas id="chartFailure" height="180"></canvas>
+        </div>
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Velocity (phases/sprint)</div>
+            <canvas id="chartVelocity" height="180"></canvas>
+        </div>
+    </div>
+    <div class="dora-grid" style="margin-top:1rem">
+        <div class="dora-card" style="grid-column:span 2;text-align:left">
+            <div class="dora-card-title" style="text-align:center">Deployment Frequency & Lead Time</div>
+            <canvas id="chartTrend" height="200"></canvas>
+        </div>
+    </div>
+    <div class="dora-grid" style="margin-top:1rem">
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Cycle Time Distribution (days)</div>
+            <canvas id="chartCycleTime" height="180"></canvas>
+        </div>
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Release Notes</div>
+            <div id="releaseNotes" style="max-height:220px;overflow-y:auto;font-size:0.78rem;color:var(--text-secondary)">
+                <p style="color:var(--text-muted);font-style:italic">Loading...</p>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    {# Default: standard DORA order (DSI, Admin, Dev, Architect, BO) #}
     <div class="dora-grid" style="margin-top:1.5rem">
         <div class="dora-card" style="grid-column:span 2;text-align:left">
             <div class="dora-card-title" style="text-align:center">Deployment Frequency & Lead Time</div>
@@ -199,6 +337,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>

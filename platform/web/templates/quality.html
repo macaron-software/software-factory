@@ -76,8 +76,8 @@
         <div class="quality-filters">
             <select class="quality-select" id="qualityProject" onchange="loadQuality()">
                 <option value="">All Projects</option>
-                {% for p in projects %}
-                <option value="{{ p.id }}" {% if p.id == selected_project %}selected{% endif %}>{{ p.name }}</option>
+                {% for proj in projects %}
+                <option value="{{ proj.id }}" {% if proj.id == selected_project %}selected{% endif %}>{{ proj.name }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -92,10 +92,38 @@
         <div class="quality-label">Global Quality Score — {{ gc|upper }}</div>
     </div>
 
+    {# Perspective-aware dimension priority #}
+    {% set priority_dims = {
+        'qa_security': ['security', 'adversarial', 'test_coverage', 'code_quality'],
+        'architect': ['architecture', 'complexity', 'maintainability', 'code_quality'],
+        'developer': ['test_coverage', 'complexity', 'code_quality', 'maintainability'],
+        'dsi': ['security', 'architecture', 'code_quality', 'test_coverage'],
+    } %}
+    {% set prio = priority_dims.get(p, []) %}
+
     <!-- Dimension Bars -->
     <div class="quality-dims">
         {% set dims = snapshot.breakdown.dimensions if snapshot.breakdown else {} %}
-        {% for dim_name, dim_data in dims.items() %}
+        {# Render priority dimensions first (with highlight) #}
+        {% for dim_name in prio if dim_name in dims %}
+        {% set dim_data = dims[dim_name] %}
+        {% set ds = dim_data.score %}
+        {% set dc = '#16a34a' if ds >= 80 else '#3b82f6' if ds >= 60 else '#ea580c' if ds >= 40 else '#dc2626' %}
+        <div class="quality-dim" style="border-color:var(--purple,#7c3aed)">
+            <div class="quality-dim-header">
+                <span class="quality-dim-name"><svg class="icon icon-xs" style="color:var(--purple-light);vertical-align:-1px"><use href="#icon-award"/></svg> {{ dim_name|replace('_', ' ')|title }}</span>
+                <span class="quality-dim-score" style="color:{{ dc }}">{{ ds|round|int }}/100</span>
+            </div>
+            <div class="quality-dim-bar">
+                <div class="quality-dim-fill" style="width:{{ ds }}%; background:{{ dc }}"></div>
+            </div>
+            {% if dim_data.tool %}
+            <div class="quality-dim-detail">Tool: {{ dim_data.tool }}{% if dim_data.error %} | {{ dim_data.error }}{% endif %}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {# Render remaining dimensions in default order #}
+        {% for dim_name, dim_data in dims.items() if dim_name not in prio %}
         {% set ds = dim_data.score %}
         {% set dc = '#16a34a' if ds >= 80 else '#3b82f6' if ds >= 60 else '#ea580c' if ds >= 40 else '#dc2626' %}
         <div class="quality-dim">
