@@ -45,6 +45,12 @@
             {# ── Portfolio Manager ── #}
             {% if p == 'portfolio_manager' %}
             <div class="dash-section">
+                <h3><svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-chart"/></svg> Metrics Summary</h3>
+                <div id="dashMetrics" hx-get="/api/dashboard/metrics-summary?perspective={{ p }}" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="dash-section">
                 <h3>Epic Pipeline</h3>
                 <div id="dashMissions" hx-get="/api/dashboard/missions" hx-trigger="load, every 30s" hx-swap="innerHTML">
                     <p class="text-muted">Loading...</p>
@@ -66,6 +72,12 @@
             {# ── RTE ── #}
             {% elif p == 'rte' %}
             <div class="dash-section">
+                <h3><svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-chart"/></svg> Velocity & DORA</h3>
+                <div id="dashMetrics" hx-get="/api/dashboard/metrics-summary?perspective={{ p }}" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="dash-section">
                 <h3>Active Sprints</h3>
                 <div id="dashSprints" hx-get="/api/dashboard/sprints" hx-trigger="load, every 30s" hx-swap="innerHTML">
                     <p class="text-muted">Loading...</p>
@@ -80,6 +92,12 @@
 
             {# ── Product Owner ── #}
             {% elif p == 'product_owner' %}
+            <div class="dash-section">
+                <h3><svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-chart"/></svg> Product Metrics</h3>
+                <div id="dashMetrics" hx-get="/api/dashboard/metrics-summary?perspective={{ p }}" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
             <div class="dash-section">
                 <h3>Backlog</h3>
                 <div id="dashBacklog" hx-get="/api/dashboard/backlog" hx-trigger="load" hx-swap="innerHTML">
@@ -96,6 +114,12 @@
             {# ── Scrum Master ── #}
             {% elif p == 'scrum_master' %}
             <div class="dash-section">
+                <h3><svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-chart"/></svg> Sprint Metrics</h3>
+                <div id="dashMetrics" hx-get="/api/dashboard/metrics-summary?perspective={{ p }}" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="dash-section">
                 <h3>Current Sprints</h3>
                 <div id="dashSprints" hx-get="/api/dashboard/sprints" hx-trigger="load, every 30s" hx-swap="innerHTML">
                     <p class="text-muted">Loading...</p>
@@ -104,6 +128,12 @@
 
             {# ── Developer ── #}
             {% elif p == 'developer' %}
+            <div class="dash-section">
+                <h3><svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-chart"/></svg> Engineering Metrics</h3>
+                <div id="dashMetrics" hx-get="/api/dashboard/metrics-summary?perspective={{ p }}" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
             <div class="dash-section">
                 <h3>My Projects</h3>
                 <div id="dashProjects" hx-get="/api/dashboard/projects" hx-trigger="load" hx-swap="innerHTML">
@@ -119,6 +149,12 @@
 
             {# ── Architect ── #}
             {% elif p == 'architect' %}
+            <div class="dash-section">
+                <h3><svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-chart"/></svg> Architecture Metrics</h3>
+                <div id="dashMetrics" hx-get="/api/dashboard/metrics-summary?perspective={{ p }}" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
             <div class="dash-section">
                 <h3>Projects</h3>
                 <div id="dashProjects" hx-get="/api/dashboard/projects" hx-trigger="load" hx-swap="innerHTML">
@@ -141,6 +177,12 @@
             {# ── QA / Security ── #}
             {% elif p == 'qa_security' %}
             <div class="dash-section">
+                <h3><svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-chart"/></svg> Security Metrics</h3>
+                <div id="dashMetrics" hx-get="/api/dashboard/metrics-summary?perspective={{ p }}" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="dash-section">
                 <h3>Quality & Security</h3>
                 <div id="dashQuality" hx-get="/api/dashboard/quality" hx-trigger="load" hx-swap="innerHTML">
                     <p class="text-muted">Loading...</p>
@@ -155,6 +197,12 @@
 
             {# ── Admin (all) ── #}
             {% else %}
+            <div class="dash-section">
+                <h3><svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-chart"/></svg> Platform Metrics</h3>
+                <div id="dashMetrics" hx-get="/api/dashboard/metrics-summary?perspective={{ p }}" hx-trigger="load" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
             <div class="dash-section">
                 <h3>Active Missions</h3>
                 <div id="dashMissions" hx-get="/api/dashboard/missions" hx-trigger="load, every 30s" hx-swap="innerHTML">
@@ -204,6 +252,7 @@
                     {% elif p == 'rte' %}
                     <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-workflow"/></svg> Launch Ceremony</a>
                     <a href="/pi" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-calendar"/></svg> PI Board</a>
+                    <a href="/metrics" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-chart"/></svg> DORA Metrics</a>
                     <a href="/art" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-users"/></svg> ART</a>
                     <a href="/monitoring" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-activity"/></svg> Monitoring</a>
 
@@ -216,12 +265,14 @@
                     {% elif p == 'scrum_master' %}
                     <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-workflow"/></svg> Launch Ceremony</a>
                     <a href="/pi" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-calendar"/></svg> PI Board</a>
+                    <a href="/metrics" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-chart"/></svg> Velocity</a>
                     <a href="/art" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-users"/></svg> ART</a>
                     <a href="/monitoring" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-activity"/></svg> Monitoring</a>
 
                     {% elif p == 'developer' %}
                     <a href="/sessions/new" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> New Session</a>
                     <a href="/projects" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-folder"/></svg> Open Project</a>
+                    <a href="/metrics" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-chart"/></svg> DORA Metrics</a>
                     <a href="/toolbox" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-tool"/></svg> Toolbox</a>
 
                     {% elif p == 'architect' %}
@@ -232,6 +283,7 @@
 
                     {% elif p == 'qa_security' %}
                     <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-shield"/></svg> Security Audit</a>
+                    <a href="/metrics" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-chart"/></svg> DORA Metrics</a>
                     <a href="/sessions/new" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> New Session</a>
                     <a href="/monitoring" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-activity"/></svg> Monitoring</a>
 

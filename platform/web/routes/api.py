@@ -2866,6 +2866,7 @@ PERSPECTIVE_SIDEBAR = {
         "/sessions",
         "/art",
         "/monitoring",
+        "/metrics",
         "/quality",
         "/projects",
         "/settings",
@@ -2886,6 +2887,7 @@ PERSPECTIVE_SIDEBAR = {
         "/sessions",
         "/art",
         "/monitoring",
+        "/metrics",
         "/quality",
         "/projects",
         "/settings",
@@ -2896,6 +2898,7 @@ PERSPECTIVE_SIDEBAR = {
         "/sessions",
         "/toolbox",
         "/art",
+        "/metrics",
         "/quality",
         "/settings",
     },
@@ -2906,6 +2909,7 @@ PERSPECTIVE_SIDEBAR = {
         "/projects",
         "/toolbox",
         "/monitoring",
+        "/metrics",
         "/quality",
         "/settings",
     },
@@ -2915,6 +2919,7 @@ PERSPECTIVE_SIDEBAR = {
         "/ceremonies",
         "/sessions",
         "/monitoring",
+        "/metrics",
         "/quality",
         "/settings",
     },
@@ -3353,6 +3358,259 @@ async def dashboard_quality_mission(request: Request, project_id: str = ""):
         html += f'<div style="display:flex;justify-content:space-between;margin:2px 0;"><span>{label}</span><span style="color:{dcolor};font-weight:600">{dim_val:.0f}</span></div>'
     html += "</div>"
     return HTMLResponse(html)
+
+
+@router.get("/api/dashboard/metrics-summary")
+async def dashboard_metrics_summary(request: Request, perspective: str = "admin"):
+    """Per-profile metric summary cards for the dashboard."""
+    from ...metrics.dora import get_dora_metrics
+    from ...metrics.quality import QualityScanner
+
+    dora = get_dora_metrics()
+    summary = dora.summary("", 30)
+
+    # DORA mini values
+    df = summary.get("deployment_frequency", {})
+    lt = summary.get("lead_time", {})
+    cfr = summary.get("change_failure_rate", {})
+    mt = summary.get("mttr", {})
+    deploy_freq = df.get("per_day", 0)
+    lead_time = lt.get("median_hours", 0)
+    failure_rate = cfr.get("rate_pct", 0)
+    mttr_h = mt.get("median_hours", 0)
+    dora_level = summary.get("overall_level", "low")
+    velocity_data = summary.get("velocity")
+    avg_velocity = velocity_data.get("avg_velocity", 0) if velocity_data else 0
+    predictability = velocity_data.get("predictability_pct", 0) if velocity_data else 0
+    period_days = summary.get("period_days", 30)
+
+    # Quality scores
+    all_scores = QualityScanner.get_all_projects_scores()
+    avg_quality = (
+        round(sum(s.get("global_score", 0) for s in all_scores) / len(all_scores))
+        if all_scores
+        else 0
+    )
+
+    def _level_color(level):
+        return {
+            "elite": "#16a34a",
+            "high": "#3b82f6",
+            "medium": "#ea580c",
+            "low": "#dc2626",
+        }.get(level, "#888")
+
+    def _score_color(score):
+        if score >= 80:
+            return "#16a34a"
+        if score >= 60:
+            return "#3b82f6"
+        if score >= 40:
+            return "#ea580c"
+        return "#dc2626"
+
+    def _card(icon, title, value, detail, color):
+        return f"""<div style="background:var(--bg-tertiary,#1a1225);border:1px solid var(--border);border-radius:10px;padding:1rem;text-align:center;min-width:0">
+            <div style="font-size:1.2rem;margin-bottom:4px">{icon}</div>
+            <div style="font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:6px">{title}</div>
+            <div style="font-size:1.4rem;font-weight:700;color:{color}">{value}</div>
+            <div style="font-size:.7rem;color:var(--text-muted);margin-top:4px">{detail}</div>
+        </div>"""
+
+    cards = []
+
+    if perspective in (
+        "overview",
+        "dsi",
+        "portfolio_manager",
+        "business_owner",
+        "admin",
+    ):
+        # Strategic: DORA level + Quality + Deploy freq + Lead time
+        cards.append(
+            _card(
+                "🏆",
+                "DORA Level",
+                dora_level.upper(),
+                f"{df.get('count', 0)} deploys / {period_days}j",
+                _level_color(dora_level),
+            )
+        )
+        cards.append(
+            _card(
+                "📊",
+                "Quality",
+                f"{avg_quality}/100",
+                f"{len(all_scores)} projects scanned",
+                _score_color(avg_quality),
+            )
+        )
+        cards.append(
+            _card(
+                "⏱️",
+                "Lead Time",
+                f"{lead_time}h",
+                f"MTTR: {mttr_h}h",
+                _level_color(lt.get("level", "low")),
+            )
+        )
+        cards.append(
+            _card(
+                "🛡️",
+                "Failure Rate",
+                f"{failure_rate}%",
+                f"{cfr.get('failures', 0)} failures",
+                _level_color(cfr.get("level", "low")),
+            )
+        )
+
+    elif perspective in ("rte", "scrum_master"):
+        # Operational: Velocity + Predictability + DORA + Cycle time
+        cards.append(
+            _card("⚡", "Velocity", f"{avg_velocity}", "phases/sprint avg", "#8b5cf6")
+        )
+        cards.append(
+            _card(
+                "🎯",
+                "Predictability",
+                f"{predictability}%",
+                "planned vs actual",
+                _score_color(predictability),
+            )
+        )
+        cards.append(
+            _card(
+                "🚀",
+                "Deploy Freq",
+                f"{deploy_freq}/day",
+                f"{df.get('count', 0)} total",
+                _level_color(df.get("level", "low")),
+            )
+        )
+        cards.append(
+            _card(
+                "🔄",
+                "MTTR",
+                f"{mttr_h}h",
+                f"Lead: {lead_time}h",
+                _level_color(mt.get("level", "low")),
+            )
+        )
+
+    elif perspective == "product_owner":
+        # Product: Quality + Velocity + Completion
+        cards.append(
+            _card(
+                "📊",
+                "Quality",
+                f"{avg_quality}/100",
+                f"{len(all_scores)} projects",
+                _score_color(avg_quality),
+            )
+        )
+        cards.append(
+            _card(
+                "⚡",
+                "Velocity",
+                f"{avg_velocity}",
+                f"{predictability}% predictable",
+                "#8b5cf6",
+            )
+        )
+        cards.append(
+            _card(
+                "🚀",
+                "Deploys",
+                f"{df.get('count', 0)}",
+                f"{deploy_freq}/day",
+                _level_color(df.get("level", "low")),
+            )
+        )
+
+    elif perspective in ("developer", "architect"):
+        # Technical: Quality + DORA level + Failure rate + Lead time
+        cards.append(
+            _card(
+                "📊",
+                "Code Quality",
+                f"{avg_quality}/100",
+                f"{len(all_scores)} projects",
+                _score_color(avg_quality),
+            )
+        )
+        cards.append(
+            _card(
+                "🏆",
+                "DORA",
+                dora_level.upper(),
+                f"{deploy_freq} deploys/day",
+                _level_color(dora_level),
+            )
+        )
+        cards.append(
+            _card(
+                "🛡️",
+                "Failure Rate",
+                f"{failure_rate}%",
+                "CFR target <15%",
+                _level_color(cfr.get("level", "low")),
+            )
+        )
+        cards.append(
+            _card(
+                "⏱️",
+                "Lead Time",
+                f"{lead_time}h",
+                f"MTTR: {mttr_h}h",
+                _level_color(lt.get("level", "low")),
+            )
+        )
+
+    elif perspective == "qa_security":
+        # Security focus: Quality + Failure rate + MTTR + DORA
+        cards.append(
+            _card(
+                "📊",
+                "Quality Score",
+                f"{avg_quality}/100",
+                f"{len(all_scores)} projects",
+                _score_color(avg_quality),
+            )
+        )
+        cards.append(
+            _card(
+                "🛡️",
+                "Change Failure",
+                f"{failure_rate}%",
+                f"{cfr.get('failures', 0)} / {cfr.get('total', 0)}",
+                _level_color(cfr.get("level", "low")),
+            )
+        )
+        cards.append(
+            _card(
+                "🔄",
+                "MTTR",
+                f"{mttr_h}h",
+                f"{mt.get('count', 0)} incidents",
+                _level_color(mt.get("level", "low")),
+            )
+        )
+        cards.append(
+            _card(
+                "🏆",
+                "DORA",
+                dora_level.upper(),
+                "Overall level",
+                _level_color(dora_level),
+            )
+        )
+
+    if not cards:
+        return HTMLResponse('<p class="text-muted">No metrics data available</p>')
+
+    grid = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem">'
+    grid += "".join(cards) + "</div>"
+    return HTMLResponse(grid)
 
 
 @router.get("/api/dashboard/activity")
