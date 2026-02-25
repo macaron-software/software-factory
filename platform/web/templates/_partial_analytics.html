@@ -1,32 +1,47 @@
 <div class="partial-analytics">
+<style>
         .analytics-container {
-            padding: 2rem 3rem;
-            max-width: 1800px;
+            max-width: 1000px;
             margin: 0 auto;
+            padding: 1.5rem 1rem;
         }
         
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
         }
         
         .stat-card {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: 1.5rem;
-            transition: transform 0.2s;
+            border-radius: var(--radius-xl, 12px);
+            padding: 1.25rem;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
         }
-        
+        .stat-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: var(--radius-xl, 12px);
+            background: rgba(167, 139, 250, 0.04);
+            opacity: 0;
+            transition: opacity 0.25s;
+            pointer-events: none;
+        }
         .stat-card:hover {
-            transform: translateY(-2px);
+            border-color: var(--purple);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25), 0 0 0 1px rgba(167,139,250,0.1);
         }
+        .stat-card:hover::before { opacity: 1; }
         
         .stat-card h3 {
-            font-size: 0.85rem;
-            color: var(--text-tertiary);
+            font-size: 0.8rem;
+            color: var(--text-secondary);
             margin: 0 0 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -48,17 +63,35 @@
         
         .charts-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-            gap: 2rem;
-            margin-top: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
         }
         
         .chart-card {
             background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: 1.5rem;
+            border-radius: var(--radius-xl, 12px);
+            padding: 1.25rem;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
         }
+        .chart-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: var(--radius-xl, 12px);
+            background: rgba(167, 139, 250, 0.04);
+            opacity: 0;
+            transition: opacity 0.25s;
+            pointer-events: none;
+        }
+        .chart-card:hover {
+            border-color: var(--purple);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25), 0 0 0 1px rgba(167,139,250,0.1);
+        }
+        .chart-card:hover::before { opacity: 1; }
         
         .chart-card h2 {
             font-size: 1.1rem;
@@ -73,19 +106,21 @@
         }
         
         .refresh-btn {
-            background: var(--accent);
+            background: var(--purple, #8b5cf6);
             color: white;
             border: none;
-            padding: 0.5rem 1rem;
-            border-radius: var(--radius-md);
+            padding: 0.4rem 1rem;
+            border-radius: var(--radius-md, 8px);
             cursor: pointer;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             transition: all 0.2s;
+            font-weight: 500;
         }
         
         .refresh-btn:hover {
-            background: var(--accent-hover);
+            background: var(--purple-hover, #7c3aed);
             transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
         }
         
         .timestamp {
@@ -94,25 +129,27 @@
             margin-left: 1rem;
         }
         
-        .page-header {
+        .analytics-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
         }
         
-        .page-header h1 {
-            font-size: 2rem;
+        .analytics-header h3 {
+            font-size: 1.3rem;
             font-weight: 700;
             margin: 0;
             color: var(--text-primary);
         }
     </style>
 <div class="analytics-container">
-    <div class="page-header">
-        <h1>Analytics Dashboard</h1>
-        <div>
-            <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+    <div class="analytics-header">
+        <h3><svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-bar-chart-2"/></svg> Analytics Dashboard</h3>
+        <div style="display:flex;align-items:center;gap:0.75rem">
+            <button class="refresh-btn" onclick="refreshData()">
+                <svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-refresh-cw"/></svg> Refresh
+            </button>
             <span class="timestamp" id="last-update"></span>
         </div>
     </div>
