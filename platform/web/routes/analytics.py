@@ -920,3 +920,248 @@ def _generate_recommendations(
         recs.append("✅ No critical failure patterns detected")
 
     return recs
+
+
+# ── Team Score ────────────────────────────────────────────────────────────────
+
+
+@router.get("/api/analytics/team-score")
+async def get_team_score(
+    project_id: str = "",
+    workflow_id: str = "",
+    limit: int = 20,
+) -> dict[str, Any]:
+    """Score agent teams across 4 dimensions: production, collaboration, coherence, efficiency.
+
+    Aggregates data from agent_scores, messages, quality_reports, llm_traces.
+    Optionally filter by project_id or workflow_id.
+    """
+    from ...db.migrations import get_db
+    import json as _json
+
+    db = get_db()
+
+    # ── 1. Production score: accept ratio + avg quality ──────────────────────
+    prod_rows = db.execute(
+        """SELECT a.agent_id,
+                  SUM(a.accepted) AS accepted,
+                  SUM(a.rejected) AS rejected,
+                  AVG(a.iterations) AS avg_iter,
+                  COUNT(DISTINCT a.epic_id) AS epics
+           FROM agent_scores a
+           GROUP BY a.agent_id"""
+    ).fetchall()
+
+    production: dict[str, dict] = {}
+    for r in prod_rows:
+        aid, accepted, rejected, avg_iter, epics = r
+        total = (accepted or 0) + (rejected or 0)
+        accept_ratio = (accepted or 0) / total if total else 1.0
+        # Penalize high iteration counts (ideal = 5, worst = 30+)
+        iter_score = max(0, 1 - ((avg_iter or 5) - 5) / 30)
+        production[aid] = {
+            "accept_ratio": round(accept_ratio, 3),
+            "accepted": accepted or 0,
+            "rejected": rejected or 0,
+            "avg_iter": round(avg_iter or 0, 1),
+            "epics": epics,
+            "iter_score": round(iter_score, 3),
+            "production_score": round((accept_ratio * 0.6 + iter_score * 0.4) * 100, 1),
+        }
+
+    # ── 2. Collaboration score: agent↔agent message density ──────────────────
+    collab_rows = db.execute(
+        """SELECT from_agent, message_type, COUNT(*) n
+           FROM messages
+           WHERE from_agent NOT IN ('system','rte','')
+           GROUP BY from_agent, message_type"""
+    ).fetchall()
+
+    collaboration: dict[str, dict] = {}
+    for r in collab_rows:
+        aid, mtype, n = r
+        if aid not in collaboration:
+            collaboration[aid] = {
+                "agent": 0,
+                "veto": 0,
+                "approve": 0,
+                "delegate": 0,
+                "total": 0,
+            }
+        collaboration[aid][mtype] = collaboration[aid].get(mtype, 0) + n
+        collaboration[aid]["total"] += n
+
+    for aid, c in collaboration.items():
+        total = c["total"] or 1
+        # Active participation = agent+delegate messages vs passive system
+        active = c.get("agent", 0) + c.get("delegate", 0)
+        active_ratio = active / total
+        # Collab density = how much meaningful agent↔agent communication
+        c["active_ratio"] = round(active_ratio, 3)
+        c["collaboration_score"] = round(min(100, active_ratio * 150), 1)
+
+    # ── 3. Coherence score: low veto rate + consistent approvals ─────────────
+    coherence: dict[str, dict] = {}
+    for aid, c in collaboration.items():
+        vetos = c.get("veto", 0)
+        approvals = c.get("approve", 0)
+        decisions = vetos + approvals
+        if decisions > 0:
+            # Low veto rate = high coherence (agents that always veto are disruptive)
+            veto_rate = vetos / decisions
+            # But some vetos are healthy — pure 0 veto = rubber-stamp (bad)
+            # Optimal: 10-30% veto rate
+            if veto_rate == 0:
+                coherence_score = 70  # rubber-stamp penalty
+            elif veto_rate <= 0.3:
+                coherence_score = 100 - (veto_rate * 100)
+            else:
+                coherence_score = max(20, 100 - (veto_rate * 130))
+            coherence[aid] = {
+                "veto_count": vetos,
+                "approve_count": approvals,
+                "veto_rate": round(veto_rate, 3),
+                "coherence_score": round(coherence_score, 1),
+            }
+
+    # ── 4. Efficiency score: tokens/cost vs output quality ───────────────────
+    efficiency_rows = db.execute(
+        """SELECT agent_id,
+                  COUNT(*) calls,
+                  AVG(duration_ms) avg_ms,
+                  AVG(tokens_out) avg_out,
+                  SUM(CASE WHEN status='ok' THEN 1 ELSE 0 END) * 100.0 / COUNT(*) success_pct
+           FROM llm_traces
+           WHERE agent_id != ''
+           GROUP BY agent_id"""
+    ).fetchall()
+
+    efficiency: dict[str, dict] = {}
+    for r in efficiency_rows:
+        aid, calls, avg_ms, avg_out, success_pct = r
+        # Fast + reliable = high efficiency
+        speed_score = max(0, 100 - ((avg_ms or 0) / 100))  # -1pt per 100ms
+        output_score = min(100, ((avg_out or 0) / 50))  # 50 tokens = 1pt
+        eff_score = speed_score * 0.4 + (success_pct or 0) * 0.4 + output_score * 0.2
+        efficiency[aid] = {
+            "calls": calls,
+            "avg_ms": round(avg_ms or 0, 0),
+            "avg_out": round(avg_out or 0, 0),
+            "success_pct": round(success_pct or 0, 1),
+            "efficiency_score": round(max(0, min(100, eff_score)), 1),
+        }
+
+    # ── 5. Workflow-level team scores ────────────────────────────────────────
+    wf_filter = "AND config_json LIKE ?" if workflow_id else ""
+    wf_params = (f'%"workflow_id": "{workflow_id}"%',) if workflow_id else ()
+    proj_filter = "AND project_id = ?" if project_id else ""
+    proj_params = (project_id,) if project_id else ()
+
+    wf_rows = db.execute(
+        f"""SELECT config_json, status, COUNT(*) n
+            FROM sessions
+            WHERE config_json LIKE '%workflow_id%'
+            {wf_filter} {proj_filter}
+            GROUP BY config_json, status""",
+        wf_params + proj_params,
+    ).fetchall()
+
+    workflow_scores: dict[str, dict] = {}
+    for r in wf_rows:
+        try:
+            cfg = _json.loads(r[0]) if r[0] else {}
+            wf = cfg.get("workflow_id", "")
+            if not wf:
+                continue
+            if wf not in workflow_scores:
+                workflow_scores[wf] = {"completed": 0, "failed": 0, "total": 0}
+            workflow_scores[wf][r[1]] = workflow_scores[wf].get(r[1], 0) + r[2]
+            workflow_scores[wf]["total"] += r[2]
+        except Exception:
+            pass
+
+    for wf, s in workflow_scores.items():
+        total = s["total"] or 1
+        s["success_rate"] = round(s.get("completed", 0) * 100.0 / total, 1)
+        s["workflow_score"] = s["success_rate"]
+
+    # ── 6. Assemble composite scores ─────────────────────────────────────────
+    all_agents = set(production) | set(collaboration) | set(coherence) | set(efficiency)
+    composite: list[dict] = []
+
+    for aid in all_agents:
+        p = production.get(aid, {})
+        col = collaboration.get(aid, {})
+        coh = coherence.get(aid, {})
+        eff = efficiency.get(aid, {})
+
+        p_score = p.get("production_score", 0)
+        col_score = col.get("collaboration_score", 0)
+        coh_score = coh.get("coherence_score", 0)
+        eff_score = eff.get("efficiency_score", 0)
+
+        # Composite: weighted average
+        # Only include agents with meaningful data (>=5 epics or >=10 messages)
+        has_data = p.get("epics", 0) >= 3 or col.get("total", 0) >= 10
+        if not has_data:
+            continue
+
+        weights = {
+            "production": 0.35,
+            "collaboration": 0.25,
+            "coherence": 0.25,
+            "efficiency": 0.15,
+        }
+        composite_score = (
+            p_score * weights["production"]
+            + col_score * weights["collaboration"]
+            + coh_score * weights["coherence"]
+            + eff_score * weights["efficiency"]
+        )
+
+        composite.append(
+            {
+                "agent_id": aid,
+                "composite_score": round(composite_score, 1),
+                "scores": {
+                    "production": round(p_score, 1),
+                    "collaboration": round(col_score, 1),
+                    "coherence": round(coh_score, 1),
+                    "efficiency": round(eff_score, 1),
+                },
+                "raw": {
+                    "accept_ratio": p.get("accept_ratio", 0),
+                    "accepted": p.get("accepted", 0),
+                    "rejected": p.get("rejected", 0),
+                    "avg_iter": p.get("avg_iter", 0),
+                    "veto_rate": coh.get("veto_rate", 0),
+                    "calls": eff.get("calls", 0),
+                    "success_pct": eff.get("success_pct", 0),
+                },
+            }
+        )
+
+    composite.sort(key=lambda x: -x["composite_score"])
+
+    # ── 7. Best combos: top workflow + top agents ─────────────────────────────
+    top_workflows = sorted(
+        [{"workflow_id": k, **v} for k, v in workflow_scores.items()],
+        key=lambda x: -x["success_rate"],
+    )[:10]
+
+    return {
+        "agents": composite[:limit],
+        "workflows": top_workflows,
+        "quality_dimensions": {
+            r[0]: {"avg": round(r[1], 1), "count": r[2]}
+            for r in db.execute(
+                "SELECT dimension, AVG(score), COUNT(*) FROM quality_reports GROUP BY dimension ORDER BY AVG(score) DESC"
+            ).fetchall()
+        },
+        "scoring_model": {
+            "production": "35% — accept ratio × 0.6 + iter efficiency × 0.4",
+            "collaboration": "25% — agent↔agent message ratio",
+            "coherence": "25% — veto rate (optimal 10-30%, 0%=rubber-stamp, >30%=disruptive)",
+            "efficiency": "15% — LLM speed × success rate × output volume",
+        },
+    }
