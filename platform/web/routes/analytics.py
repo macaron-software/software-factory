@@ -674,12 +674,14 @@ async def get_failure_analysis() -> dict[str, Any]:
         categories = db.execute("""
             SELECT
                 CASE
+                    WHEN mr.phases_json LIKE '%All LLM providers failed%' THEN 'llm_all_failed'
                     WHEN mr.phases_json LIKE '%timeout%' OR mr.phases_json LIKE '%timed out%' THEN 'timeout'
-                    WHEN mr.phases_json LIKE '%429%' OR mr.phases_json LIKE '%rate limit%' THEN 'rate_limit'
-                    WHEN mr.phases_json LIKE '%All LLM%' OR mr.phases_json LIKE '%llm%error%' THEN 'llm_error'
+                    WHEN mr.phases_json LIKE '%429%' OR mr.phases_json LIKE '%rate limit%' OR mr.phases_json LIKE '%Rate limit%' THEN 'rate_limit'
+                    WHEN mr.phases_json LIKE '%LLM%error%' OR mr.phases_json LIKE '%llm%fail%' THEN 'llm_error'
                     WHEN mr.phases_json LIKE '%tool%error%' OR mr.phases_json LIKE '%execute%fail%' THEN 'tool_error'
-                    WHEN mr.phases_json LIKE '%connection%' OR mr.phases_json LIKE '%network%' THEN 'network'
+                    WHEN mr.phases_json LIKE '%connection%refused%' OR mr.phases_json LIKE '%network%' THEN 'network'
                     WHEN mr.phases_json LIKE '%No pattern%' OR mr.phases_json LIKE '%not found%' THEN 'config_error'
+                    WHEN mr.phases_json = '[]' OR mr.phases_json IS NULL THEN 'no_phases'
                     ELSE 'other'
                 END as category,
                 COUNT(*) as cnt
@@ -701,7 +703,7 @@ async def get_failure_analysis() -> dict[str, Any]:
 
             phases = _json.loads(row["phases_json"] or "[]")
             for ph in phases:
-                name = ph.get("name", "unknown")
+                name = ph.get("phase_name", ph.get("name", "unknown"))
                 if name not in phase_stats:
                     phase_stats[name] = {
                         "total": 0,
@@ -859,6 +861,10 @@ def _generate_recommendations(
     recs = []
     cat_map = {c["category"]: c["cnt"] for c in categories}
 
+    if cat_map.get("llm_all_failed", 0) > 3:
+        recs.append(
+            f"🔴 {cat_map['llm_all_failed']} runs failed — All LLM providers down. Check API keys, model names, and provider health."
+        )
     if cat_map.get("rate_limit", 0) > 5:
         recs.append(
             f"🔴 {cat_map['rate_limit']} rate limit errors — increase LLM cooldown or add provider fallback"
@@ -874,6 +880,10 @@ def _generate_recommendations(
     if cat_map.get("config_error", 0) > 2:
         recs.append(
             f"🟡 {cat_map['config_error']} config errors — missing patterns or workflows"
+        )
+    if cat_map.get("no_phases", 0) > 5:
+        recs.append(
+            f"🟡 {cat_map['no_phases']} runs failed before any phase started — check workflow setup"
         )
 
     # Phase-specific recommendations
