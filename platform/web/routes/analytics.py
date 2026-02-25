@@ -670,25 +670,35 @@ async def get_failure_analysis() -> dict[str, Any]:
         db = get_db()
         db.row_factory = __import__("sqlite3").Row
 
-        # 1. Error category classification
-        categories = db.execute("""
-            SELECT
-                CASE
-                    WHEN mr.phases_json LIKE '%All LLM providers failed%' THEN 'llm_all_failed'
-                    WHEN mr.phases_json LIKE '%timeout%' OR mr.phases_json LIKE '%timed out%' THEN 'timeout'
-                    WHEN mr.phases_json LIKE '%429%' OR mr.phases_json LIKE '%rate limit%' OR mr.phases_json LIKE '%Rate limit%' THEN 'rate_limit'
-                    WHEN mr.phases_json LIKE '%LLM%error%' OR mr.phases_json LIKE '%llm%fail%' THEN 'llm_error'
-                    WHEN mr.phases_json LIKE '%tool%error%' OR mr.phases_json LIKE '%execute%fail%' THEN 'tool_error'
-                    WHEN mr.phases_json LIKE '%connection%refused%' OR mr.phases_json LIKE '%network%' THEN 'network'
-                    WHEN mr.phases_json LIKE '%No pattern%' OR mr.phases_json LIKE '%not found%' THEN 'config_error'
-                    WHEN mr.phases_json = '[]' OR mr.phases_json IS NULL THEN 'no_phases'
-                    ELSE 'other'
-                END as category,
-                COUNT(*) as cnt
-            FROM mission_runs mr
-            WHERE mr.status = 'failed'
-            GROUP BY category ORDER BY cnt DESC
-        """).fetchall()
+        # 1. Error category classification (Python-based for accuracy)
+        all_failed = db.execute(
+            "SELECT id, phases_json FROM mission_runs WHERE status = 'failed'"
+        ).fetchall()
+
+        cat_counts: dict[str, int] = {}
+        for row in all_failed:
+            blob = (row["phases_json"] or "").lower()
+            if "all llm providers failed" in blob:
+                cat = "llm_all_failed"
+            elif "timeout" in blob or "timed out" in blob:
+                cat = "timeout"
+            elif "429" in blob or "rate limit" in blob:
+                cat = "rate_limit"
+            elif "llm" in blob and ("error" in blob or "fail" in blob):
+                cat = "llm_error"
+            elif "tool" in blob and "error" in blob:
+                cat = "tool_error"
+            elif "connection refused" in blob or "network" in blob:
+                cat = "network"
+            elif "no pattern" in blob or "not found" in blob:
+                cat = "config_error"
+            elif blob in ("[]", "", "null") or not blob.strip():
+                cat = "no_phases"
+            else:
+                cat = "other"
+            cat_counts[cat] = cat_counts.get(cat, 0) + 1
+
+        categories_list = sorted(cat_counts.items(), key=lambda x: -x[1])
 
         # 2. Phase failure heatmap — which phases fail most
         phase_failures = []
@@ -764,7 +774,7 @@ async def get_failure_analysis() -> dict[str, Any]:
             "success": True,
             "data": {
                 "error_categories": [
-                    {"category": r["category"], "count": r["cnt"]} for r in categories
+                    {"category": cat, "count": cnt} for cat, cnt in categories_list
                 ],
                 "phase_failures": phase_failures[:15],
                 "resumable_count": resumable["cnt"] if resumable else 0,
@@ -779,7 +789,8 @@ async def get_failure_analysis() -> dict[str, Any]:
                     for r in recent
                 ],
                 "recommendations": _generate_recommendations(
-                    [dict(r) for r in categories], phase_failures
+                    [{"category": c, "cnt": n} for c, n in categories_list],
+                    phase_failures,
                 ),
             },
         }
