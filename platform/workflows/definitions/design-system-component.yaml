@@ -1,0 +1,198 @@
+id: design-system-component
+name: Design System — Component Cycle
+description: >
+  Meta-cycle complet pour un composant Solaris : audit Figma → génération code Angular →
+  validation a11y WCAG → vérification visuelle → Storybook → PR review.
+  Les agents Solaris utilisent le MCP pour garantir la conformité au design system La Poste.
+icon: layers
+is_builtin: true
+
+phases:
+  - id: figma-audit
+    pattern_id: network
+    name: Audit Figma vs Code
+    description: >
+      Le Designer Solaris et le QA Design auditent le composant : spec Figma (dimensions,
+      tokens, variants) vs implémentation actuelle. Identification des écarts.
+    gate: always
+    config:
+      agents:
+        - solaris_ux_designer
+        - solaris_design_qa
+        - accessibility_expert
+
+  - id: component-gen
+    pattern_id: hierarchical
+    name: Génération / Mise à jour composant
+    description: >
+      Le Développeur UI Solaris génère ou met à jour le composant Angular.
+      Le Designer valide que le code respecte les tokens et variants Figma.
+      Tests unitaires Jest inclus.
+    gate: always
+    config:
+      agents:
+        - solaris_ux_designer
+        - solaris_ui_developer
+        - lead_dev
+
+  - id: a11y-validation
+    pattern_id: adversarial-pair
+    name: Validation Accessibilité (WCAG)
+    description: >
+      L'Expert Accessibilité valide le composant contre WCAG 2.1 AA.
+      Le QA Design joue l'avocat du diable. Adversarial pour garantir zéro régression a11y.
+    gate: no_veto
+    retry_count: 2
+    config:
+      agents:
+        - accessibility_expert
+        - solaris_design_qa
+
+  - id: visual-regression
+    pattern_id: sequential
+    name: Vérification Visuelle & Conformité DS
+    description: >
+      Le QA Design vérifie la conformité visuelle pixel-perfect via MCP Solaris.
+      Validation des borderRadius, padding, couleurs, états (hover, focus, disabled).
+    gate: no_veto
+    config:
+      agents:
+        - solaris_design_qa
+        - solaris_ux_designer
+
+  - id: storybook-docs
+    pattern_id: sequential
+    name: Storybook & Documentation
+    description: >
+      Le Développeur UI Solaris crée/met à jour la story Storybook.
+      Le Tech Writer documente l'API du composant (inputs, outputs, variants, usage).
+    gate: always
+    skip_on_failure: true
+    config:
+      agents:
+        - solaris_ui_developer
+        - tech_writer
+
+  - id: pr-review
+    pattern_id: loop
+    name: Review & Merge PR
+    description: >
+      Le Lead Dev et le QA Design reviewent la PR : conformité DS, tests, docs.
+      Boucle jusqu'à approbation ou rejet motivé.
+    gate: no_veto
+    retry_count: 2
+    config:
+      agents:
+        - lead_dev
+        - solaris_design_qa
+
+config:
+  # Auto-chain: after successful component cycle, trigger code review
+  on_complete:
+    workflow_id: review-cycle
+    condition: completed
+
+  graph:
+    nodes:
+      - id: n1
+        agent_id: solaris_ux_designer
+        x: 50
+        y: 150
+        label: Figma Audit
+        phase: figma-audit
+      - id: n2
+        agent_id: solaris_design_qa
+        x: 50
+        y: 250
+        label: QA Figma
+        phase: figma-audit
+      - id: n3
+        agent_id: solaris_ui_developer
+        x: 250
+        y: 150
+        label: Component Gen
+        phase: component-gen
+      - id: n4
+        agent_id: accessibility_expert
+        x: 450
+        y: 100
+        label: WCAG Audit
+        phase: a11y-validation
+      - id: n5
+        agent_id: solaris_design_qa
+        x: 450
+        y: 200
+        label: A11y Adversarial
+        phase: a11y-validation
+      - id: n6
+        agent_id: solaris_design_qa
+        x: 650
+        y: 150
+        label: Visual Check
+        phase: visual-regression
+      - id: n7
+        agent_id: solaris_ui_developer
+        x: 850
+        y: 100
+        label: Storybook
+        phase: storybook-docs
+      - id: n8
+        agent_id: tech_writer
+        x: 850
+        y: 200
+        label: API Docs
+        phase: storybook-docs
+      - id: n9
+        agent_id: lead_dev
+        x: 1050
+        y: 150
+        label: PR Review
+        phase: pr-review
+    edges:
+      - from: n1
+        to: n3
+        label: spec Figma
+        color: "#7c3aed"
+      - from: n2
+        to: n3
+        label: écarts détectés
+        color: "#d29922"
+      - from: n3
+        to: n4
+        label: composant généré
+        color: "#3fb950"
+      - from: n4
+        to: n6
+        label: a11y OK
+        color: "#3fb950"
+      - from: n5
+        to: n6
+        label: no veto
+        color: "#f97316"
+      - from: n6
+        to: n7
+        label: visuel OK
+        color: "#3fb950"
+      - from: n7
+        to: n9
+        label: story + docs
+        color: "#58a6ff"
+      - from: n8
+        to: n9
+        label: API docs
+        color: "#58a6ff"
+
+  agents_permissions:
+    accessibility_expert:
+      can_veto: true
+      veto_level: ABSOLUTE
+    solaris_ux_designer:
+      can_veto: true
+      veto_level: STRONG
+    solaris_design_qa:
+      can_veto: true
+      veto_level: STRONG
+    lead_dev:
+      can_veto: true
+      veto_level: STRONG
+      can_approve: true

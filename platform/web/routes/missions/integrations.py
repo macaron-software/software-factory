@@ -13,6 +13,7 @@ from ...schemas import OkResponse
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
 @router.post("/api/missions/{mission_id}/confluence/sync")
 async def api_confluence_sync_all(mission_id: str):
     """Sync all mission tabs to Confluence."""
@@ -29,8 +30,6 @@ async def api_confluence_sync_all(mission_id: str):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-
-
 @router.post("/api/missions/{mission_id}/confluence/sync/{tab}")
 async def api_confluence_sync_tab(mission_id: str, tab: str):
     """Sync a single tab to Confluence."""
@@ -45,8 +44,6 @@ async def api_confluence_sync_tab(mission_id: str, tab: str):
     except Exception as e:
         logger.error("Confluence sync tab %s failed: %s", tab, e)
         return JSONResponse({"error": str(e)}, status_code=500)
-
-
 
 
 @router.get("/api/missions/{mission_id}/confluence/status")
@@ -66,8 +63,6 @@ async def api_confluence_status(mission_id: str):
 
 
 # ── Screenshots API ──
-
-
 
 
 @router.get("/api/missions/{mission_id}/screenshots")
@@ -101,8 +96,6 @@ async def api_mission_screenshots(mission_id: str):
 # ── Support Tickets API (TMA) ──
 
 
-
-
 @router.get("/api/missions/{mission_id}/tickets")
 async def api_list_tickets(mission_id: str, status: str = ""):
     from ....db.migrations import get_db
@@ -122,8 +115,6 @@ async def api_list_tickets(mission_id: str, status: str = ""):
         ).fetchall()
     db.close()
     return JSONResponse([dict(r) for r in rows])
-
-
 
 
 @router.post("/api/missions/{mission_id}/tickets")
@@ -153,8 +144,6 @@ async def api_create_ticket(request: Request, mission_id: str):
     row = db.execute("SELECT * FROM support_tickets WHERE id=?", (tid,)).fetchone()
     db.close()
     return JSONResponse(dict(row), status_code=201)
-
-
 
 
 @router.patch("/api/missions/{mission_id}/tickets/{ticket_id}")
@@ -196,8 +185,6 @@ async def api_update_ticket(request: Request, mission_id: str, ticket_id: str):
     return JSONResponse(dict(row))
 
 
-
-
 @router.delete("/api/mission-runs/{run_id}", responses={200: {"model": OkResponse}})
 async def delete_mission_run(run_id: str):
     """Delete a mission run and ALL associated data (cascade)."""
@@ -226,6 +213,31 @@ async def delete_mission_run(run_id: str):
     return JSONResponse({"status": "deleted"})
 
 
+@router.patch("/api/projects/{project_id}/settings")
+async def patch_project_settings(project_id: str, request: Request):
+    """Update project settings: path, description, git_url, lead_agent_id."""
+    from ....projects.manager import get_project_store
+    from ....db.migrations import get_db
+
+    store = get_project_store()
+    project = store.get(project_id)
+    if not project:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    body = await request.json()
+    if "path" in body:
+        project.path = str(body["path"])
+    if "description" in body:
+        project.description = str(body["description"])
+    if "lead_agent_id" in body:
+        project.lead_agent_id = str(body["lead_agent_id"])
+    if "git_url" in body:
+        conn = get_db()
+        conn.execute(
+            "UPDATE projects SET git_url=? WHERE id=?", (body["git_url"], project_id)
+        )
+        conn.commit()
+    store.update(project)
+    return {"ok": True, "project_id": project_id, "path": project.path}
 
 
 @router.delete("/api/projects/{project_id}", responses={200: {"model": OkResponse}})
@@ -327,8 +339,6 @@ async def delete_project(project_id: str):
     return JSONResponse({"status": "deleted", "name": project[1]})
 
 
-
-
 @router.post("/api/projects/{project_id}/feedback/security-alert")
 async def api_security_alert(request: Request, project_id: str):
     """Create a priority bug for a security vulnerability."""
@@ -342,8 +352,6 @@ async def api_security_alert(request: Request, project_id: str):
     if bug:
         return JSONResponse({"ok": True, "mission_id": bug.id, "name": bug.name})
     return JSONResponse({"ok": False, "reason": "Already tracked or severity too low"})
-
-
 
 
 @router.post("/api/projects/{project_id}/feedback/tma-incident")
@@ -366,8 +374,6 @@ async def api_tma_incident(request: Request, project_id: str):
     return JSONResponse({"ok": True, "message": "Incident tracked, below threshold"})
 
 
-
-
 @router.post("/api/projects/{project_id}/provision")
 async def api_project_provision(request: Request, project_id: str):
     """Manually trigger auto-provision (TMA+security+debt) for an existing project."""
@@ -386,4 +392,3 @@ async def api_project_provision(request: Request, project_id: str):
             "created": [{"id": m.id, "type": m.type, "name": m.name} for m in created],
         }
     )
-

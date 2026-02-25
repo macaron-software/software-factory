@@ -362,6 +362,53 @@ async def _run_workflow_background(
                 final = "completed" if result.status == "completed" else "failed"
                 ms.update_mission_status(mission_id, final)
                 logger.info("Auto-heal mission %s → %s", mission_id, final)
+
+        # Workflow chaining: auto-launch next workflow on completion
+        on_complete = wf.config.get("on_complete") if wf.config else None
+        if on_complete and isinstance(on_complete, dict):
+            condition = on_complete.get("condition", "completed")
+            if condition == "always" or result.status == condition:
+                next_wf_id = on_complete.get("workflow_id")
+                if next_wf_id:
+                    try:
+                        from ...workflows.store import (
+                            get_workflow_store as _get_wf_store,
+                        )
+                        from ...sessions.store import SessionDef
+
+                        next_wf = _get_wf_store().get(next_wf_id)
+                        if next_wf:
+                            next_sess = get_session_store().create(
+                                SessionDef(
+                                    name=f"{next_wf.name} ← {wf.name}",
+                                    description=f"Auto-chaîné depuis '{wf.name}'",
+                                    project_id=project_id,
+                                    status="active",
+                                    goal=task,
+                                    config={
+                                        "workflow_id": next_wf_id,
+                                        "chained_from": session_id,
+                                    },
+                                )
+                            )
+                            asyncio.create_task(
+                                _run_workflow_background(
+                                    next_wf, next_sess.id, task, project_id
+                                )
+                            )
+                            logger.info(
+                                "Workflow chain: %s → %s (new session %s)",
+                                wf.id,
+                                next_wf_id,
+                                next_sess.id,
+                            )
+                    except Exception as _chain_err:
+                        logger.error(
+                            "Workflow chaining failed %s → %s: %s",
+                            wf.id,
+                            next_wf_id,
+                            _chain_err,
+                        )
     except Exception as e:
         logger.error("Workflow failed: %s", e)
         get_session_store().add_message(
