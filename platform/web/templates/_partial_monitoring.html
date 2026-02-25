@@ -387,6 +387,8 @@ function barColor(pct) { return pct > 80 ? 'red' : pct > 60 ? 'yellow' : 'green'
 function $(id) { return document.getElementById(id); }
 
 async function refresh() {
+    // Guard: if this partial is no longer in the DOM, skip
+    if (!document.getElementById('monCpu')) return;
     try {
         const r = await fetch('/api/monitoring/live?hours=' + currentHours);
         if (!r.ok) return;
@@ -751,6 +753,12 @@ function setRange(hours) {
 document.querySelector('.mon-range-btn[data-hours="24"]').classList.add('active');
 
 refresh();
-setInterval(refresh, 30000);
+const _monitoringInterval = setInterval(refresh, 30000);
+document.addEventListener('htmx:beforeSwap', function _cleanup(e) {
+    if (e.detail.target && e.detail.target.id === 'metrics-content') {
+        clearInterval(_monitoringInterval);
+        document.removeEventListener('htmx:beforeSwap', _cleanup);
+    }
+});
 </script>
 </div>

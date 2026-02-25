@@ -313,6 +313,8 @@
 let charts = {};
 
 async function loadAnalytics() {
+    // Guard: if this partial is no longer in the DOM, skip
+    if (!document.getElementById('stat-missions')) return;
     try {
         const res = await fetch('/api/analytics/overview');
         const data = await res.json();
@@ -517,8 +519,14 @@ loadAnalytics();
 loadTracing();
 loadFailures();
 
-// Auto-refresh every 30s
-setInterval(loadAnalytics, 30000);
+// Auto-refresh every 30s — store handle so it can be cleared on tab switch
+const _analyticsInterval = setInterval(loadAnalytics, 30000);
+document.addEventListener('htmx:beforeSwap', function _cleanup(e) {
+    if (e.detail.target && e.detail.target.id === 'metrics-content') {
+        clearInterval(_analyticsInterval);
+        document.removeEventListener('htmx:beforeSwap', _cleanup);
+    }
+});
 
 // Failure analysis loader
 async function loadFailures() {
