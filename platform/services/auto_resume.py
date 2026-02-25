@@ -177,13 +177,14 @@ async def _launch_run(run_id: str) -> None:
                 from datetime import datetime as _dt
                 import json as _json
                 _db.execute(
-                    "INSERT OR IGNORE INTO sessions (id, status, config_json, created_at, updated_at) "
-                    "VALUES (?, 'active', ?, ?, ?)",
+                    "INSERT OR IGNORE INTO sessions "
+                    "(id, name, status, config_json, created_at) "
+                    "VALUES (?, ?, 'active', ?, ?)",
                     (
                         mission.session_id,
+                        f"mission-{mission.session_id[:8]}",
                         _json.dumps({"workflow_id": mission.workflow_id,
                                      "project_id": mission.project_id}),
-                        _dt.utcnow().isoformat(),
                         _dt.utcnow().isoformat(),
                     ),
                 )
