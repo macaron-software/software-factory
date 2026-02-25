@@ -45,6 +45,15 @@ async def auto_resume_missions() -> None:
     """
     await asyncio.sleep(5)  # Let platform fully initialize first
 
+    # Hot-patch: ensure semaphore allows enough concurrency (survives hot-swap without restart)
+    try:
+        from ..web.routes.helpers import _mission_semaphore
+        if _mission_semaphore._value < 10:
+            _mission_semaphore._value = 10
+            logger.warning("auto_resume: patched _mission_semaphore._value → 10")
+    except Exception as _e_sem:
+        logger.warning("auto_resume: semaphore patch failed: %s", _e_sem)
+
     # First: repair all failed runs (reset to paused + create TMA incidents)
     try:
         await handle_failed_runs()
@@ -477,21 +486,12 @@ async def _launch_new_run(
     orchestrator_id = (wf.config or {}).get("orchestrator", "chef_de_programme")
 
     run_id = uuid.uuid4().hex[:8]
-    # Workspace under data/workspaces/ with git init
+    # Workspace under data/workspaces/
     ws_base = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
         "data", "workspaces", run_id,
     )
     os.makedirs(ws_base, exist_ok=True)
-    import subprocess as _sp
-    _sp.run(["git", "init"], cwd=ws_base, capture_output=True)
-    _sp.run(["git", "config", "user.email", "agents@macaron.ai"], cwd=ws_base, capture_output=True)
-    _sp.run(["git", "config", "user.name", "Macaron Agents"], cwd=ws_base, capture_output=True)
-    # Initial README
-    with open(os.path.join(ws_base, "README.md"), "w") as _f:
-        _f.write(f"# {wf.name}\n\n{brief[:300]}\n\nMission ID: {mission_id}\n")
-    _sp.run(["git", "add", "."], cwd=ws_base, capture_output=True)
-    _sp.run(["git", "commit", "-m", "Initial commit — mission workspace"], cwd=ws_base, capture_output=True)
 
     run = MissionRun(
         id=run_id,
