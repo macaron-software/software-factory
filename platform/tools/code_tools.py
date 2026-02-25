@@ -90,6 +90,15 @@ class CodeEditTool(BaseTool):
         try:
             content = Path(path).read_text()
             if old not in content:
+                # Fuzzy fallback: normalize whitespace (trailing spaces, CRLF, indent drift)
+                import re as _re
+                _norm = lambda s: _re.sub(r'[ \t]+\n', '\n', s.replace('\r\n', '\n'))
+                old_n, content_n = _norm(old), _norm(content)
+                if old_n in content_n:
+                    # Apply on normalized content
+                    content = _norm(content).replace(old_n, _norm(new), 1)
+                    Path(path).write_text(content)
+                    return f"Edited {path} (whitespace-normalized match)"
                 return f"Error: old_str not found in {path}"
             if content.count(old) > 1:
                 return f"Error: old_str found multiple times in {path}"

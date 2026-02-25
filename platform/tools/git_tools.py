@@ -6,9 +6,32 @@ Git branch isolation: agents commit to agent/{agent_id}/ branches, never main/ma
 
 from __future__ import annotations
 
+import os
 import subprocess
+from pathlib import Path
 from ..models import AgentInstance
 from .registry import BaseTool
+
+# Workspace root for resolving bare run-IDs passed as cwd
+_WS_ROOT: Path | None = None
+
+
+def _resolve_cwd(cwd: str) -> str:
+    """Resolve bare run-ID or relative path to absolute workspace path."""
+    global _WS_ROOT
+    if os.path.isabs(cwd):
+        return cwd
+    # Lazy-init workspace root
+    if _WS_ROOT is None:
+        try:
+            from ..config import FACTORY_ROOT
+            _WS_ROOT = Path(FACTORY_ROOT) / "data" / "workspaces"
+        except Exception:
+            _WS_ROOT = Path("/app/data/workspaces")
+    candidate = _WS_ROOT / cwd
+    if candidate.is_dir():
+        return str(candidate)
+    return cwd  # fall back to original
 
 # Protected branches — agents cannot commit directly
 _PROTECTED_BRANCHES = {"main", "master", "develop", "release", "production", "staging"}
@@ -57,7 +80,7 @@ class GitStatusTool(BaseTool):
     category = "git"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        cwd = params.get("cwd", ".")
+        cwd = _resolve_cwd(params.get("cwd", "."))
         try:
             r = subprocess.run(
                 ["git", "--no-pager", "status", "--short"],
@@ -76,7 +99,7 @@ class GitDiffTool(BaseTool):
     category = "git"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        cwd = params.get("cwd", ".")
+        cwd = _resolve_cwd(params.get("cwd", "."))
         path = params.get("path", "")
         cmd = ["git", "--no-pager", "diff"]
         if path:
@@ -94,7 +117,7 @@ class GitLogTool(BaseTool):
     category = "git"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        cwd = params.get("cwd", ".")
+        cwd = _resolve_cwd(params.get("cwd", "."))
         limit = params.get("limit", 10)
         try:
             r = subprocess.run(
@@ -114,7 +137,7 @@ class GitCommitTool(BaseTool):
     requires_approval = True
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        cwd = params.get("cwd", ".")
+        cwd = _resolve_cwd(params.get("cwd", "."))
         files = params.get("files", [])
         message = params.get("message", "")
         if not message:
