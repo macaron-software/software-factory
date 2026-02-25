@@ -641,7 +641,8 @@ def create_app() -> FastAPI:
         path = request.url.path
 
         # ── Phase 1: Setup wizard redirect ──
-        if not _setup_checked:
+        _is_test = os.environ.get("PLATFORM_ENV") == "test"
+        if not _setup_checked and not _is_test:
             skip_setup = (
                 path.startswith("/static")
                 or path.startswith("/api/auth")
@@ -663,6 +664,10 @@ def create_app() -> FastAPI:
         from .auth.middleware import is_public_path
 
         if path.startswith("/api/analytics") or path.startswith("/api/health"):
+            return await call_next(request)
+
+        # Skip auth in test mode
+        if os.environ.get("PLATFORM_ENV") == "test":
             return await call_next(request)
 
         if not is_public_path(path) and not path.startswith("/static"):
@@ -917,10 +922,14 @@ def create_app() -> FastAPI:
     from .web.routes.mercato import router as mercato_router
     from .web.routes.oauth import router as oauth_router
     from .web.ws import router as sse_router
+    from .web.routes.websocket import router as ws_router
+    from .web.routes.dag import router as dag_router
 
     app.include_router(auth_router)
     app.include_router(oauth_router)
     app.include_router(mercato_router)
+    app.include_router(ws_router)
+    app.include_router(dag_router)
     app.include_router(web_router)
     app.include_router(sse_router, prefix="/sse")
 

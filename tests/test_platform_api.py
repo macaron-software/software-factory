@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 @pytest.fixture(scope="module")
 def client():
     """Create a TestClient for the FastAPI app."""
+    os.environ["PLATFORM_ENV"] = "test"
     from platform.server import app
     with TestClient(app) as c:
         yield c

@@ -432,6 +432,22 @@ class LLMClient:
         tools: list[dict] | None = None,
     ) -> LLMResponse:
         """Send a chat completion request. Falls back to next provider on failure."""
+        # ── Cache lookup (deterministic dedup) ──
+        from .cache import get_cache
+        _llm_cache = get_cache()
+        msg_dicts = [{"role": m.role, "content": m.content} for m in messages]
+        cache_model = model or provider
+        cached = _llm_cache.get(cache_model, msg_dicts, temperature, tools)
+        if cached:
+            logger.info("LLM cache HIT (%s, saved %d tokens)", cache_model, cached["tokens_in"] + cached["tokens_out"])
+            return LLMResponse(
+                content=cached["content"],
+                tokens_in=cached["tokens_in"],
+                tokens_out=cached["tokens_out"],
+                model=cache_model,
+                provider="cache",
+            )
+
         if _is_azure:
             provider = "azure-openai"
         providers_to_try = [provider] + [p for p in _FALLBACK_CHAIN if p != provider]
@@ -512,6 +528,11 @@ class LLMClient:
                     # Trace for observability
                     self._trace(result, messages)
                     await self._persist_usage(prov, use_model, result.tokens_in, result.tokens_out)
+                    # Cache the response for future dedup
+                    try:
+                        _llm_cache.put(cache_model, msg_dicts, temperature, result.content, result.tokens_in, result.tokens_out, tools)
+                    except Exception:
+                        pass
                     return result
                 except Exception as exc:
                     last_exc = exc
