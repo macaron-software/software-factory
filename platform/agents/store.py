@@ -23,7 +23,7 @@ def _resolve_default_model() -> str:
         return explicit
     # Infer from provider
     _provider_models = {
-        "minimax": "MiniMax-M1-80k",
+        "minimax": "MiniMax-M2.5",
         "azure-openai": "gpt-5-mini",
         "azure-ai": "gpt-5-mini",
         "anthropic": "claude-sonnet-4-20250514",
