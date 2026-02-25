@@ -582,6 +582,19 @@ def _migrate(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Add columns that may be missing from older schema versions
+    for col, typedef in [
+        ("mission_id", "TEXT"),
+        ("session_id", "TEXT"),
+        ("phase_name", "TEXT"),
+        ("details_json", "TEXT"),
+        ("tool_used", "TEXT"),
+        ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE quality_reports ADD COLUMN {col} {typedef}")
+        except Exception:
+            pass
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_qr_project ON quality_reports(project_id)"
     )
@@ -600,6 +613,15 @@ def _migrate(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    for col, typedef in [
+        ("mission_id", "TEXT"),
+        ("breakdown_json", "TEXT NOT NULL DEFAULT '{}'"),
+        ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE quality_snapshots ADD COLUMN {col} {typedef}")
+        except Exception:
+            pass
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_qs_project ON quality_snapshots(project_id)"
     )
