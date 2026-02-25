@@ -1,0 +1,116 @@
+id: canary-deployment
+name: Canary Deployment & Rollback
+description: Progressive canary deployment with automated metric-based rollback.
+icon: 🐤
+is_builtin: true
+phases:
+- id: pre-deploy
+  pattern_id: sequential
+  name: Pre-Deploy Checks
+  description: Verify all tests pass, no blocking vulnerabilities, changelog updated
+  gate: All pre-deploy checks green
+  config:
+    agents:
+    - canary-deployer
+    - testeur
+- id: canary-1pct
+  pattern_id: sequential
+  name: Canary 1% Rollout
+  description: Deploy to 1% of traffic, monitor error rate and latency for 10 minutes
+  gate: Error rate < 0.1%, p95 latency within SLO
+  config:
+    agents:
+    - canary-deployer
+    - monitoring-ops
+- id: canary-10pct
+  pattern_id: sequential
+  name: Canary 10% Rollout
+  description: Expand to 10% traffic, monitor for 15 minutes
+  gate: Metrics stable at 10% traffic
+  config:
+    agents:
+    - canary-deployer
+    - monitoring-ops
+- id: canary-50pct
+  pattern_id: human-in-the-loop
+  name: Canary 50% — Human Checkpoint
+  description: Expand to 50%, require human approval before full rollout
+  gate: checkpoint
+  config:
+    agents:
+    - canary-deployer
+    - sre
+- id: full-rollout
+  pattern_id: sequential
+  name: Full Rollout (100%)
+  description: Complete rollout, post-deploy smoke tests, update release status
+  gate: 100% traffic on new version, all smoke tests pass
+  config:
+    agents:
+    - canary-deployer
+    - testeur
+config:
+  auto_rollback: true
+  rollback_triggers:
+    error_rate_pct: 1.0
+    p95_latency_ms: 500
+    crash_rate_pct: 0.5
+  graph:
+    nodes:
+    - id: n1
+      agent_id: canary-deployer
+      x: 100
+      y: 150
+      label: Pre-Deploy
+      phase: pre-deploy
+    - id: n2
+      agent_id: canary-deployer
+      x: 250
+      y: 150
+      label: 1%
+      phase: canary-1pct
+    - id: n3
+      agent_id: canary-deployer
+      x: 400
+      y: 150
+      label: 10%
+      phase: canary-10pct
+    - id: n4
+      agent_id: sre
+      x: 550
+      y: 150
+      label: 50% HITL
+      phase: canary-50pct
+    - id: n5
+      agent_id: canary-deployer
+      x: 700
+      y: 150
+      label: 100%
+      phase: full-rollout
+    edges:
+    - from: n1
+      to: n2
+      label: checks ok
+      color: '#3fb950'
+    - from: n2
+      to: n3
+      label: 1% stable
+      color: '#3fb950'
+    - from: n3
+      to: n4
+      label: 10% stable
+      color: '#3fb950'
+    - from: n4
+      to: n5
+      label: approved
+      color: '#3fb950'
+    - from: n2
+      to: n1
+      label: rollback
+      color: '#ef4444'
+      style: dashed
+    - from: n3
+      to: n1
+      label: rollback
+      color: '#ef4444'
+      style: dashed

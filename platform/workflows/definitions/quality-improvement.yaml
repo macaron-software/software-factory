@@ -1,0 +1,77 @@
+id: quality-improvement
+name: Quality Improvement Cycle
+description: 'Automated quality improvement: scan code quality with deterministic tools, identify worst dimensions, plan and
+  execute improvements, rescan and learn.'
+icon: workflow
+is_builtin: true
+phases:
+- id: quality-scan
+  pattern_id: solo
+  name: Quality Scan
+  description: 'Run full deterministic quality scan: complexity (radon/lizard), coverage (coverage.py/nyc), security (bandit/semgrep),
+    documentation (interrogate), architecture (madge/jscpd/mypy), maintainability (radon MI). Store scorecard in DB.'
+  gate: Quality scorecard computed and stored
+  config:
+    agents:
+    - qa
+- id: quality-analysis
+  pattern_id: network
+  name: Root Cause Analysis
+  description: 'Analyze quality scorecard. Identify TOP 3 worst dimensions. For each: find specific files/functions causing
+    low scores. Cross-reference with adversarial rejection history and past incidents.'
+  gate: Root causes identified for each low-scoring dimension
+  config:
+    agents:
+    - qa
+    - architecte
+    - lead-dev
+- id: rex-digest
+  pattern_id: solo
+  name: REX & Memory Digest
+  description: 'Search memory_project and memory_global for: past ROTI, retrospective notes, recurring issues, lessons learned.
+    Extract patterns: what keeps failing, what improved, what was tried before.'
+  gate: REX digest compiled with actionable patterns
+  config:
+    agents:
+    - product-owner
+- id: improvement-plan
+  pattern_id: network
+  name: Improvement Plan
+  description: 'Generate concrete improvement plan based on quality scan + REX digest. For each worst dimension: specific
+    actions (refactor files, add tests, fix deps, improve docs). Prioritize by impact/effort.'
+  gate: Improvement plan with prioritized actions
+  config:
+    agents:
+    - lead-dev
+    - architecte
+    - product-owner
+- id: improvement-exec
+  pattern_id: hierarchical
+  name: Execute Improvements
+  description: 'Execute improvement actions: refactor high-complexity functions, add missing tests, fix dependency vulnerabilities,
+    improve documentation, resolve circular dependencies. MUST use quality tools to verify each fix.'
+  gate: All planned improvements implemented
+  config:
+    agents:
+    - lead-dev
+    - dev-1
+    - dev-2
+    - qa
+- id: quality-rescan
+  pattern_id: solo
+  name: Quality Rescan
+  description: Re-run full quality scan. Compare before/after scores per dimension. Verify improvements are real (not just
+    moving code around). Store new snapshot for trend.
+  gate: Scores improved or stable (no regression)
+  config:
+    agents:
+    - qa
+- id: quality-learning
+  pattern_id: solo
+  name: Learning & Memory
+  description: Store what worked and what didn't in memory_global. Update project conventions if patterns emerged. Generate
+    quality trend summary for sprint retro.
+  gate: always
+  config:
+    agents:
+    - product-owner

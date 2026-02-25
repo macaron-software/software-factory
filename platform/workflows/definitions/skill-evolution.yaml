@@ -1,0 +1,55 @@
+id: skill-evolution
+name: Agent Skill Evolution
+description: 'Meta-improvement: analyze agent performance across missions, extract best practices from top performers, update
+  skills and prompts for underperformers. A/B test improvements.'
+icon: workflow
+is_builtin: true
+phases:
+- id: skill-audit
+  pattern_id: solo
+  name: Agent Performance Audit
+  description: 'Analyze all agents: quality scores per agent, adversarial rejection rates, code_write success rates, tool
+    usage patterns. Rank agents by effectiveness. Identify top 5 and bottom 5 performers.'
+  gate: Agent performance report generated
+  config:
+    agents:
+    - rte
+- id: skill-best-practices
+  pattern_id: network
+  name: Extract Best Practices
+  description: 'Study top-performing agents: what tools do they use, what patterns in their prompts work, how do they structure
+    code, what makes them pass adversarial checks. Extract reusable patterns.'
+  gate: Best practices documented
+  config:
+    agents:
+    - architecte
+    - lead-dev
+- id: skill-update
+  pattern_id: hierarchical
+  name: Update Agent Skills
+  description: Modify YAML skill definitions for underperforming agents. Update system prompts with best practices. Add new
+    skills if gaps found. Remove redundant/confusing skills.
+  gate: Skill YAML files updated
+  config:
+    agents:
+    - lead-dev
+    - dev-1
+- id: prompt-update
+  pattern_id: solo
+  name: Update Protocols
+  description: Refine _EXEC_PROTOCOL, _DECOMPOSE_PROTOCOL, _QA_PROTOCOL, _RESEARCH_PROTOCOL based on analysis. Add or clarify
+    instructions that top agents follow. Remove instructions that cause confusion.
+  gate: Protocol strings updated in engine.py
+  config:
+    agents:
+    - lead-dev
+- id: skill-validate
+  pattern_id: parallel
+  name: Validate Improvements
+  description: Run a sample mission with updated skills/protocols. Compare output quality with previous runs. Verify adversarial
+    pass rate improved. Store comparison in memory_global.
+  gate: always
+  config:
+    agents:
+    - qa
+    - lead-dev

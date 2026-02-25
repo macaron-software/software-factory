@@ -1,0 +1,256 @@
+id: tech-debt-reduction
+name: Reduction de la Dette Technique
+description: Audit cross-projet de la dette technique → priorisation WSJF → sprint de correction → validation metriques.
+icon: tool
+is_builtin: true
+phases:
+- id: debt-scan
+  pattern_id: parallel
+  name: Audit de Dette Technique
+  description: 'Scan parallele par domaine: le CTO lance l''audit. L''Enterprise Archi analyse le couplage et les dependances.
+    Le Lead Dev scanne la complexite et la duplication. La Securite cherche les CVE et deps obsoletes. Le SRE analyse les
+    incidents recurrents. Le Perf Engineer cherche les bottlenecks. Le CTO agrege les resultats en inventaire score.'
+  gate: always
+  config:
+    agents:
+    - strat-cto
+    - enterprise_architect
+    - lead_dev
+    - securite
+    - sre
+    - performance_engineer
+- id: prioritization
+  pattern_id: network
+  name: Priorisation (Debat WSJF)
+  description: 'Le comite debat de la priorisation: CTO defend l''urgence technique. CPO defend la roadmap produit. Portfolio
+    calcule la capacite. Le Lean Portfolio Manager applique le scoring WSJF. Le Product Manager arbitre feature vs dette.
+    Decision finale: budget temps alloue et items priorises.'
+  gate: all_approved
+  config:
+    agents:
+    - strat-cto
+    - strat-cpo
+    - strat-portfolio
+    - lean_portfolio_manager
+    - product_manager
+- id: planning
+  pattern_id: sequential
+  name: Planning Sprint Dette
+  description: 'Le Scrum Master decide: sprint dedie (100% dette) ou integre (20% par sprint). Le Lead Dev decompose les items
+    de dette en tasks techniques. Le Chef de Projet planifie et assigne.'
+  gate: always
+  config:
+    agents:
+    - scrum_master
+    - lead_dev
+    - chef_projet
+- id: sprint-debt
+  pattern_id: hierarchical
+  name: Sprint de Correction
+  description: 'Le Lead Dev distribue les refactors. Les devs corrigent en TDD. Le QA Lead valide la non-regression (coverage
+    ne doit pas baisser, pas de breaking change). Adversarial review renforcee: VETO si regression perf, VETO si API breaking
+    sans deprecation.'
+  gate: all_approved
+  config:
+    agents:
+    - lead_dev
+    - dev_frontend
+    - dev_backend
+    - qa_lead
+- id: validation
+  pattern_id: sequential
+  name: Validation (Proof of Reduction)
+  description: 'QA presente le rapport de non-regression. Perf Engineer compare les benchmarks avant/apres. Lead Dev montre
+    la reduction de complexite. Le CTO valide que la dette a reellement diminue. Metriques: complexity delta, coverage delta,
+    build time delta, incident rate delta.'
+  gate: all_approved
+  config:
+    agents:
+    - qa_lead
+    - performance_engineer
+    - lead_dev
+    - strat-cto
+config:
+  graph:
+    pattern: hierarchical
+    nodes:
+    - id: n1
+      agent_id: strat-cto
+      x: 400
+      y: 10
+      label: Karim - CTO
+    - id: n2
+      agent_id: strat-cpo
+      x: 200
+      y: 10
+      label: Julie - CPO
+    - id: n3
+      agent_id: strat-portfolio
+      x: 600
+      y: 10
+      label: Sofia - Portfolio
+    - id: n4
+      agent_id: enterprise_architect
+      x: 100
+      y: 140
+      label: Enterprise Archi
+    - id: n5
+      agent_id: lead_dev
+      x: 300
+      y: 140
+      label: Lead Dev
+    - id: n6
+      agent_id: securite
+      x: 500
+      y: 140
+      label: Securite
+    - id: n7
+      agent_id: sre
+      x: 650
+      y: 140
+      label: SRE
+    - id: n8
+      agent_id: performance_engineer
+      x: 150
+      y: 250
+      label: Perf Engineer
+    - id: n9
+      agent_id: lean_portfolio_manager
+      x: 700
+      y: 10
+      label: Lean Portfolio
+    - id: n10
+      agent_id: product_manager
+      x: 100
+      y: 10
+      label: Product Manager
+    - id: n11
+      agent_id: scrum_master
+      x: 200
+      y: 250
+      label: Scrum Master
+    - id: n12
+      agent_id: chef_projet
+      x: 400
+      y: 250
+      label: Chef de Projet
+    - id: n13
+      agent_id: dev_frontend
+      x: 200
+      y: 380
+      label: Dev Frontend
+    - id: n14
+      agent_id: dev_backend
+      x: 400
+      y: 380
+      label: Dev Backend
+    - id: n15
+      agent_id: qa_lead
+      x: 600
+      y: 380
+      label: QA Lead
+    edges:
+    - from: n1
+      to: n4
+      label: audit archi
+      color: '#f59e0b'
+    - from: n1
+      to: n5
+      label: audit code
+      color: '#f59e0b'
+    - from: n1
+      to: n6
+      label: audit secu
+      color: '#f59e0b'
+    - from: n1
+      to: n7
+      label: audit ops
+      color: '#f59e0b'
+    - from: n1
+      to: n8
+      label: audit perf
+      color: '#f59e0b'
+    - from: n4
+      to: n1
+      label: rapport
+      color: '#10b981'
+    - from: n5
+      to: n1
+      label: rapport
+      color: '#10b981'
+    - from: n6
+      to: n1
+      label: rapport
+      color: '#10b981'
+    - from: n7
+      to: n1
+      label: rapport
+      color: '#10b981'
+    - from: n8
+      to: n1
+      label: rapport
+      color: '#10b981'
+    - from: n1
+      to: n2
+      label: dette vs feature
+      color: '#d946ef'
+    - from: n2
+      to: n10
+      label: arbitrage
+      color: '#d946ef'
+    - from: n3
+      to: n9
+      label: capacite
+      color: '#d946ef'
+    - from: n9
+      to: n1
+      label: WSJF
+      color: '#d946ef'
+    - from: n11
+      to: n5
+      label: sprint scope
+      color: '#8b5cf6'
+    - from: n5
+      to: n12
+      label: tasks
+      color: '#8b5cf6'
+    - from: n5
+      to: n13
+      label: refactors
+      color: '#f59e0b'
+    - from: n5
+      to: n14
+      label: refactors
+      color: '#f59e0b'
+    - from: n13
+      to: n15
+      label: review
+      color: '#10b981'
+    - from: n14
+      to: n15
+      label: review
+      color: '#10b981'
+    - from: n15
+      to: n1
+      label: non-regression
+      color: '#ef4444'
+    - from: n8
+      to: n1
+      label: benchmark
+      color: '#ef4444'
+  agents_permissions:
+    strat-cto:
+      can_veto: true
+      veto_level: ABSOLUTE
+      can_delegate: true
+    strat-cpo:
+      can_veto: true
+      veto_level: STRONG
+    qa_lead:
+      can_veto: true
+      veto_level: ABSOLUTE
+    securite:
+      can_veto: true
+      veto_level: STRONG
+    lead_dev:
+      can_delegate: true

@@ -1,0 +1,118 @@
+id: documentation-pipeline
+name: Documentation Pipeline
+description: 'End-to-end documentation generation: API specs, user guides, ADRs, changelog, onboarding docs.'
+icon: 📝
+is_builtin: true
+phases:
+- id: api-docs
+  pattern_id: sequential
+  name: API Documentation
+  description: Scan all routes/endpoints, generate OpenAPI specs, validate with examples
+  gate: OpenAPI spec generated and validated
+  config:
+    agents:
+    - doc-writer
+    - architecte
+- id: adr-capture
+  pattern_id: sequential
+  name: ADR Capture
+  description: Review recent architecture decisions, create/update ADR records in docs/adr/
+  gate: All pending decisions documented as ADRs
+  config:
+    agents:
+    - adr-writer
+    - architecte
+- id: changelog-gen
+  pattern_id: sequential
+  name: Changelog Generation
+  description: Analyze git history since last release, generate CHANGELOG.md and release notes
+  gate: CHANGELOG.md updated with all changes since last tag
+  config:
+    agents:
+    - changelog-gen
+- id: user-guide
+  pattern_id: sequential
+  name: User Guide
+  description: 'Create/update user-facing documentation: getting started, tutorials, FAQ'
+  gate: User guide covers all major features
+  config:
+    agents:
+    - doc-writer
+- id: onboarding
+  pattern_id: sequential
+  name: Developer Onboarding
+  description: Generate CONTRIBUTING.md, dev setup guide, architecture overview for new developers
+  gate: New developer can set up and contribute within 30 minutes
+  config:
+    agents:
+    - doc-writer
+    - lead_dev
+- id: doc-review
+  pattern_id: adversarial-pair
+  name: Documentation Review
+  description: Review all generated docs for accuracy, completeness, and clarity
+  gate: All docs reviewed and approved
+  config:
+    agents:
+    - doc-writer
+    - architecte
+config:
+  graph:
+    nodes:
+    - id: n1
+      agent_id: doc-writer
+      x: 100
+      y: 150
+      label: API Docs
+      phase: api-docs
+    - id: n2
+      agent_id: adr-writer
+      x: 300
+      y: 100
+      label: ADR Capture
+      phase: adr-capture
+    - id: n3
+      agent_id: changelog-gen
+      x: 300
+      y: 200
+      label: Changelog
+      phase: changelog-gen
+    - id: n4
+      agent_id: doc-writer
+      x: 500
+      y: 100
+      label: User Guide
+      phase: user-guide
+    - id: n5
+      agent_id: doc-writer
+      x: 500
+      y: 200
+      label: Onboarding
+      phase: onboarding
+    - id: n6
+      agent_id: architecte
+      x: 700
+      y: 150
+      label: Doc Review
+      phase: doc-review
+    edges:
+    - from: n1
+      to: n6
+      label: review
+      color: '#06b6d4'
+    - from: n2
+      to: n6
+      label: review
+      color: '#8b5cf6'
+    - from: n3
+      to: n6
+      label: review
+      color: '#f59e0b'
+    - from: n4
+      to: n6
+      label: review
+      color: '#06b6d4'
+    - from: n5
+      to: n6
+      label: review
+      color: '#06b6d4'

@@ -1,0 +1,27 @@
+id: debate-decide
+name: Debate & Decide
+description: Agents debate, then a judge decides, then implement the decision.
+icon: briefcase
+is_builtin: true
+phases:
+- id: p1
+  pattern_id: debate
+  name: Debate
+  description: Agents argue for/against different approaches
+  gate: always
+  config:
+    agents:
+    - architecte
+    - lead_dev
+    - dev_backend
+    - securite
+- id: p2
+  pattern_id: hierarchical
+  name: Implementation
+  description: Execute the decided approach
+  gate: always
+  config:
+    agents:
+    - lead_dev
+    - dev
+    - testeur

@@ -1,0 +1,48 @@
+id: sf-pipeline
+name: Software Factory Pipeline
+description: 'Full SF cycle: Brain analysis → TDD development → Adversarial review → Deploy.'
+icon: rocket
+is_builtin: true
+phases:
+- id: p1
+  pattern_id: hierarchical
+  name: Analysis
+  description: Brain decomposes the task into subtasks
+  gate: always
+  config:
+    agents:
+    - brain
+    - lead_dev
+    - architecte
+- id: p2
+  pattern_id: hierarchical
+  name: TDD Development
+  description: Lead Dev delegates implementation to devs who write actual code files
+  gate: always
+  config:
+    agents:
+    - lead_dev
+    - dev
+    - dev_backend
+    - testeur
+- id: p3
+  pattern_id: adversarial-cascade
+  name: Quality Gate
+  description: 4-layer adversarial review cascade
+  gate: no_veto
+  config:
+    agents:
+    - qa_lead
+    - securite
+    - arch-critic
+    - devops
+- id: p4
+  pattern_id: sequential
+  name: Deploy & Verify
+  description: Docker build, deploy, health check, screenshots of user journeys
+  gate: always
+  config:
+    agents:
+    - devops
+    - testeur
+    - qa_lead

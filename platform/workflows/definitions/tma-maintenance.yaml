@@ -1,0 +1,166 @@
+id: tma-maintenance
+name: TMA — Maintenance Applicative
+description: Triage incidents → diagnostic root cause → correctif TDD → tests de non-régression → hotfix deploy.
+icon: tool
+is_builtin: true
+phases:
+- id: triage
+  pattern_id: hierarchical
+  name: Triage & Priorisation
+  description: Le Responsable TMA trie les incidents entrants par sévérité (P0-P4). Le QA Lead fournit les logs et steps de
+    reproduction. Le Chef de Projet valide les SLA.
+  gate: always
+  config:
+    agents:
+    - responsable_tma
+    - qa_lead
+    - chef_projet
+- id: diagnostic
+  pattern_id: parallel
+  name: Diagnostic Root Cause
+  description: Le Dev TMA analyse le code et reproduit le bug. Le Lead Dev évalue l'impact sur les modules adjacents. Le DBA
+    vérifie les données et les requêtes.
+  gate: always
+  config:
+    agents:
+    - dev_tma
+    - lead_dev
+    - dba
+- id: fix
+  pattern_id: hierarchical
+  name: Correctif TDD
+  description: Le Dev TMA écrit le test de non-régression (RED), puis le correctif (GREEN), puis refactorise. Le Lead Dev
+    review le code. Le Test Automation ajoute le test E2E si nécessaire.
+  gate: no_veto
+  config:
+    agents:
+    - dev_tma
+    - lead_dev
+    - test_automation
+- id: validate
+  pattern_id: sequential
+  name: Validation & Deploy
+  description: Le Test Manager lance la campagne de non-régression. Le QA valide les tests. Le Pipeline Engineer vérifie le
+    pipeline CI. Le DevOps déploie le hotfix. Le Responsable TMA confirme la résolution.
+  gate: all_approved
+  config:
+    agents:
+    - test_manager
+    - qa_lead
+    - pipeline_engineer
+    - devops
+    - responsable_tma
+config:
+  graph:
+    pattern: hierarchical
+    nodes:
+    - id: n1
+      agent_id: responsable_tma
+      x: 400
+      y: 20
+      label: Resp. TMA
+    - id: n2
+      agent_id: qa_lead
+      x: 250
+      y: 120
+      label: QA Lead
+    - id: n3
+      agent_id: chef_projet
+      x: 550
+      y: 120
+      label: Chef de Projet
+    - id: n4
+      agent_id: dev_tma
+      x: 200
+      y: 240
+      label: Dev TMA
+    - id: n5
+      agent_id: lead_dev
+      x: 400
+      y: 240
+      label: Lead Dev
+    - id: n6
+      agent_id: dba
+      x: 600
+      y: 240
+      label: DBA
+    - id: n7
+      agent_id: test_automation
+      x: 150
+      y: 360
+      label: Test Automation
+    - id: n8
+      agent_id: test_manager
+      x: 350
+      y: 360
+      label: Test Manager
+    - id: n9
+      agent_id: pipeline_engineer
+      x: 550
+      y: 360
+      label: Pipeline Eng.
+    - id: n10
+      agent_id: devops
+      x: 400
+      y: 460
+      label: DevOps
+    edges:
+    - from: n1
+      to: n2
+      label: triage
+      color: '#ef4444'
+    - from: n1
+      to: n3
+      label: SLA
+      color: '#ef4444'
+    - from: n1
+      to: n4
+      label: assigner
+      color: '#f59e0b'
+    - from: n4
+      to: n5
+      label: impact?
+      color: '#3b82f6'
+    - from: n4
+      to: n6
+      label: query?
+      color: '#3b82f6'
+    - from: n5
+      to: n4
+      label: review
+      color: '#10b981'
+    - from: n4
+      to: n7
+      label: test E2E
+      color: '#8b5cf6'
+    - from: n7
+      to: n8
+      label: résultats
+      color: '#10b981'
+    - from: n8
+      to: n9
+      label: GO CI
+      color: '#10b981'
+    - from: n9
+      to: n10
+      label: deploy
+      color: '#8b5cf6'
+    - from: n10
+      to: n1
+      label: confirmé
+      color: '#10b981'
+  agents_permissions:
+    responsable_tma:
+      can_veto: true
+      veto_level: STRONG
+      can_delegate: true
+    qa_lead:
+      can_veto: true
+      veto_level: ABSOLUTE
+    test_manager:
+      can_veto: true
+      veto_level: STRONG
+      can_approve: true
+    lead_dev:
+      can_veto: true
+      veto_level: STRONG

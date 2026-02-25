@@ -1,0 +1,143 @@
+id: test-campaign
+name: Campagne de Tests E2E
+description: Plan de test → écriture des tests automatisés → exécution → rapport qualité → GO/NOGO release.
+icon: clipboard
+is_builtin: true
+phases:
+- id: plan
+  pattern_id: hierarchical
+  name: Plan de Test
+  description: Le Test Manager définit la matrice de couverture. Le QA Lead identifie les parcours critiques. Le métier fournit
+    les scénarios fonctionnels.
+  gate: always
+  config:
+    agents:
+    - test_manager
+    - qa_lead
+    - metier
+- id: automate
+  pattern_id: hierarchical
+  name: Automatisation
+  description: Le Test Automation écrit les tests Playwright E2E. Le testeur écrit les tests d'API. Le Lead Dev fournit les
+    fixtures et helpers.
+  gate: always
+  config:
+    agents:
+    - test_automation
+    - testeur
+    - lead_dev
+- id: execute
+  pattern_id: parallel
+  name: Exécution
+  description: 'Exécution en parallèle: tests E2E IHM (Playwright), tests API (fetch), tests smoke, tests de performance.
+    Collecte des résultats.'
+  gate: always
+  config:
+    agents:
+    - test_automation
+    - testeur
+    - performance_engineer
+- id: report
+  pattern_id: sequential
+  name: Rapport & GO/NOGO
+  description: Le Test Manager consolide les résultats. Le QA Lead valide la couverture. Le Chef de Projet décide GO/NOGO
+    release.
+  gate: all_approved
+  config:
+    agents:
+    - test_manager
+    - qa_lead
+    - chef_projet
+config:
+  graph:
+    pattern: hierarchical
+    nodes:
+    - id: n1
+      agent_id: test_manager
+      x: 400
+      y: 20
+      label: Test Manager
+    - id: n2
+      agent_id: qa_lead
+      x: 250
+      y: 130
+      label: QA Lead
+    - id: n3
+      agent_id: metier
+      x: 550
+      y: 130
+      label: Métier
+    - id: n4
+      agent_id: test_automation
+      x: 200
+      y: 260
+      label: Test Automation
+    - id: n5
+      agent_id: testeur
+      x: 400
+      y: 260
+      label: Testeur
+    - id: n6
+      agent_id: lead_dev
+      x: 600
+      y: 260
+      label: Lead Dev
+    - id: n7
+      agent_id: performance_engineer
+      x: 300
+      y: 370
+      label: Perf Engineer
+    - id: n8
+      agent_id: chef_projet
+      x: 500
+      y: 370
+      label: Chef de Projet
+    edges:
+    - from: n1
+      to: n2
+      label: matrice
+      color: '#a855f7'
+    - from: n1
+      to: n3
+      label: scénarios
+      color: '#a855f7'
+    - from: n2
+      to: n4
+      label: E2E specs
+      color: '#3b82f6'
+    - from: n2
+      to: n5
+      label: API specs
+      color: '#3b82f6'
+    - from: n6
+      to: n4
+      label: fixtures
+      color: '#f59e0b'
+    - from: n4
+      to: n1
+      label: résultats E2E
+      color: '#10b981'
+    - from: n5
+      to: n1
+      label: résultats API
+      color: '#10b981'
+    - from: n7
+      to: n1
+      label: résultats perf
+      color: '#10b981'
+    - from: n1
+      to: n8
+      label: GO/NOGO
+      color: '#ef4444'
+  agents_permissions:
+    test_manager:
+      can_veto: true
+      veto_level: ABSOLUTE
+      can_delegate: true
+      can_approve: true
+    qa_lead:
+      can_veto: true
+      veto_level: STRONG
+      can_approve: true
+    chef_projet:
+      can_approve: true

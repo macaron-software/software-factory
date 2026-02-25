@@ -1,0 +1,88 @@
+id: sast-continuous
+name: SAST Continuous Security Scan
+description: Continuous static application security testing integrated into CI pipeline.
+icon: 🔒
+is_builtin: true
+phases:
+- id: sast-scan
+  pattern_id: parallel
+  name: SAST Scan
+  description: 'Run static analysis tools: semgrep, bandit, eslint-security, CodeQL'
+  gate: All SAST scanners completed
+  config:
+    agents:
+    - securite
+    - devsecops
+- id: sast-triage
+  pattern_id: sequential
+  name: Finding Triage
+  description: Classify findings by severity (critical/high/medium/low), filter false positives
+  gate: All findings triaged, critical/high addressed
+  config:
+    agents:
+    - securite
+    - lead_dev
+- id: sast-fix
+  pattern_id: loop
+  name: Security Fixes
+  description: Fix critical and high findings, verify fixes don't introduce regressions
+  gate: Zero critical/high findings remaining
+  config:
+    agents:
+    - securite
+    - lead_dev
+    max_iterations: 3
+- id: sast-gate
+  pattern_id: sequential
+  name: Security Gate
+  description: 'Final security gate: verify all critical/high resolved, generate compliance report'
+  gate: Security gate passed, report published
+  config:
+    agents:
+    - securite
+config:
+  schedule: per-commit
+  graph:
+    nodes:
+    - id: n1
+      agent_id: securite
+      x: 100
+      y: 150
+      label: SAST Scan
+      phase: sast-scan
+    - id: n2
+      agent_id: securite
+      x: 300
+      y: 150
+      label: Triage
+      phase: sast-triage
+    - id: n3
+      agent_id: lead_dev
+      x: 500
+      y: 150
+      label: Fix Loop
+      phase: sast-fix
+    - id: n4
+      agent_id: securite
+      x: 700
+      y: 150
+      label: Gate
+      phase: sast-gate
+    edges:
+    - from: n1
+      to: n2
+      label: findings
+      color: '#ef4444'
+    - from: n2
+      to: n3
+      label: critical/high
+      color: '#ef4444'
+    - from: n3
+      to: n1
+      label: re-scan
+      color: '#d29922'
+      style: dashed
+    - from: n3
+      to: n4
+      label: all fixed
+      color: '#3fb950'

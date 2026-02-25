@@ -1,0 +1,164 @@
+id: strategic-committee
+name: Comite Strategique
+description: 'Gouvernance portfolio: arbitrage investissements, alignement strategie-execution, GO/NOGO initiatives.'
+icon: target
+is_builtin: true
+phases:
+- id: p1-intake
+  pattern_id: network
+  name: Instruction du Dossier
+  description: CPO presente la demande, CTO evalue faisabilite, Portfolio analyse capacite et WSJF.
+  gate: always
+  config:
+    agents:
+    - strat-cpo
+    - strat-cto
+    - strat-portfolio
+    - lean_portfolio_manager
+- id: p2-debate
+  pattern_id: network
+  name: Debat & Arbitrage
+  description: 'Debat ouvert: impact budget, dette technique, alignement roadmap. Dir Programme evalue charge.'
+  gate: always
+  config:
+    agents:
+    - dsi
+    - strat-cpo
+    - strat-cto
+    - strat-portfolio
+    - strat-dirprog
+    - lean_portfolio_manager
+- id: p3-decision
+  pattern_id: hierarchical
+  name: Decision GO / NOGO
+  description: DSI rend la decision finale. GO = lancement projet. NOGO = retour backlog. PIVOT = reformulation.
+  gate: all_approved
+  config:
+    agents:
+    - dsi
+    - strat-cpo
+    - strat-cto
+config:
+  graph:
+    nodes:
+    - id: n1
+      agent_id: dsi
+      x: 400
+      y: 20
+      label: DSI
+    - id: n2
+      agent_id: strat-cpo
+      x: 200
+      y: 140
+      label: Julie - CPO
+    - id: n3
+      agent_id: strat-cto
+      x: 600
+      y: 140
+      label: Karim - CTO
+    - id: n4
+      agent_id: strat-portfolio
+      x: 120
+      y: 280
+      label: Sofia - Portfolio
+    - id: n5
+      agent_id: strat-dirprog
+      x: 680
+      y: 280
+      label: Thomas - Program Dir
+    - id: n6
+      agent_id: lean_portfolio_manager
+      x: 400
+      y: 330
+      label: Lean Portfolio Mgr
+    edges:
+    - from: n1
+      to: n2
+      label: product vision
+      color: '#a855f7'
+    - from: n1
+      to: n3
+      label: tech vision
+      color: '#a855f7'
+    - from: n2
+      to: n1
+      label: proposal
+      color: '#8b5cf6'
+    - from: n3
+      to: n1
+      label: feasibility
+      color: '#8b5cf6'
+    - from: n2
+      to: n3
+      label: feature vs debt
+      color: '#f59e0b'
+    - from: n3
+      to: n2
+      label: arch constraints
+      color: '#f59e0b'
+    - from: n4
+      to: n2
+      label: WSJF scoring
+      color: '#10b981'
+    - from: n2
+      to: n4
+      label: business value
+      color: '#10b981'
+    - from: n4
+      to: n6
+      label: flow metrics
+      color: '#06b6d4'
+    - from: n6
+      to: n4
+      label: lean budget
+      color: '#06b6d4'
+    - from: n3
+      to: n5
+      label: complexity
+      color: '#ef4444'
+    - from: n5
+      to: n3
+      label: team capacity
+      color: '#ef4444'
+    - from: n5
+      to: n6
+      label: staffing plan
+      color: '#d946ef'
+    - from: n6
+      to: n5
+      label: guardrails
+      color: '#d946ef'
+    - from: n1
+      to: n6
+      label: strat themes
+      color: '#64748b'
+    - from: n6
+      to: n1
+      label: portfolio health
+      color: '#64748b'
+  agents_permissions:
+    dsi:
+      can_veto: true
+      veto_level: ABSOLUTE
+      can_delegate: true
+      can_approve: true
+    strat-cpo:
+      can_veto: true
+      veto_level: STRONG
+      can_delegate: true
+      can_approve: true
+    strat-cto:
+      can_veto: true
+      veto_level: STRONG
+      can_delegate: true
+      can_approve: true
+    strat-portfolio:
+      can_veto: false
+      can_approve: true
+    strat-dirprog:
+      can_veto: false
+      can_approve: true
+    lean_portfolio_manager:
+      can_veto: true
+      veto_level: ADVISORY
+      can_approve: true

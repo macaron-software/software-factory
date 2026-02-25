@@ -1,0 +1,179 @@
+id: migration-sharelook
+name: Migration Sharelook Angular 16→17
+description: 'Migration ISO 100% Angular 16.2→17.3 — SAFe PI: Planning→Sprint→Review→Retro→Release.'
+icon: rocket
+is_builtin: true
+phases:
+- id: pi-planning
+  pattern_id: sequential
+  name: PI Planning
+  description: CP présente vision migration. Lead+QA+Sécu définissent scope, risques, acceptance criteria.
+  gate: always
+  config:
+    agents:
+    - chef_projet
+    - lead_dev
+    - qa_lead
+    - securite
+- id: sprint-planning
+  pattern_id: hierarchical
+  name: Sprint Planning
+  description: Lead décompose migration en user stories. Assigne aux devs selon expertise (pilot vs main app).
+  gate: always
+  config:
+    agents:
+    - lead_dev
+    - dev_frontend
+    - dev_fullstack
+- id: dev-sprint
+  pattern_id: hierarchical
+  name: Dev Sprint
+  description: Devs exécutent migration en //. Lead vérifie complétude. Inner loop jusqu'à COMPLETE.
+  gate: always
+  config:
+    agents:
+    - lead_dev
+    - dev_frontend
+    - dev_fullstack
+    - qa_lead
+- id: sprint-review
+  pattern_id: sequential
+  name: Sprint Review
+  description: Lead présente travail. QA valide ISO 100% (golden files). Sécu audit CVE. CP décide GO/NOGO.
+  gate: no_veto
+  config:
+    agents:
+    - lead_dev
+    - qa_lead
+    - securite
+    - chef_projet
+- id: retrospective
+  pattern_id: network
+  name: Retrospective
+  description: 'Équipe entière débat: ce qui a marché, ce qui a échoué, améliorations process.'
+  gate: always
+  config:
+    agents:
+    - lead_dev
+    - dev_frontend
+    - dev_fullstack
+    - qa_lead
+    - chef_projet
+- id: release
+  pattern_id: sequential
+  name: Release
+  description: DevOps deploy staging→canary. QA smoke test. CP valide mise en prod.
+  gate: all_approved
+  config:
+    agents:
+    - devops
+    - qa_lead
+    - chef_projet
+config:
+  graph:
+    pattern: hierarchical
+    nodes:
+    - id: n1
+      agent_id: chef_projet
+      x: 400
+      y: 30
+      label: Chef de Projet
+    - id: n2
+      agent_id: lead_dev
+      x: 250
+      y: 170
+      label: Lead Dev Angular
+    - id: n3
+      agent_id: securite
+      x: 550
+      y: 170
+      label: Security Audit
+    - id: n4
+      agent_id: qa_lead
+      x: 400
+      y: 170
+      label: QA Lead (ISO 100%)
+    - id: n5
+      agent_id: dev_frontend
+      x: 150
+      y: 340
+      label: Dev Frontend
+    - id: n6
+      agent_id: dev_fullstack
+      x: 350
+      y: 340
+      label: Dev Fullstack
+    - id: n7
+      agent_id: devops
+      x: 550
+      y: 340
+      label: DevOps
+    edges:
+    - from: n1
+      to: n2
+      label: brief
+      type: sequential
+      color: '#3b82f6'
+    - from: n1
+      to: n4
+      label: criteria
+      type: sequential
+      color: '#3b82f6'
+    - from: n1
+      to: n3
+      label: audit
+      type: sequential
+      color: '#3b82f6'
+    - from: n2
+      to: n5
+      label: stories
+      type: parallel
+      color: '#f59e0b'
+    - from: n2
+      to: n6
+      label: stories
+      type: parallel
+      color: '#f59e0b'
+    - from: n5
+      to: n4
+      label: validate
+      type: sequential
+      color: '#10b981'
+    - from: n6
+      to: n4
+      label: validate
+      type: sequential
+      color: '#10b981'
+    - from: n4
+      to: n1
+      label: GO/NOGO
+      type: report
+      color: '#ef4444'
+    - from: n3
+      to: n1
+      label: report
+      type: report
+      color: '#ef4444'
+    - from: n1
+      to: n7
+      label: deploy
+      type: sequential
+      color: '#8b5cf6'
+  project_ref: sharelook
+  migration:
+    framework: angular
+    from: 16.2.12
+    to: 17.3.0
+  agents_permissions:
+    qa_lead:
+      can_veto: true
+      veto_level: ABSOLUTE
+    securite:
+      can_veto: true
+      veto_level: ABSOLUTE
+    lead_dev:
+      can_veto: true
+      veto_level: STRONG
+      can_delegate: true
+    chef_projet:
+      can_delegate: true

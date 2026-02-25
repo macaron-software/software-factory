@@ -1,0 +1,25 @@
+id: review-cycle
+name: Code Review Cycle
+description: 'Sequential review: code → security → architecture.'
+icon: eye
+is_builtin: true
+phases:
+- id: p1
+  pattern_id: sequential
+  name: Multi-Layer Review
+  description: Analyst → Developer → Reviewer pipeline
+  gate: always
+  config:
+    agents:
+    - lead_dev
+    - securite
+    - arch-critic
+- id: p2
+  pattern_id: adversarial-pair
+  name: Fix Issues
+  description: Fix any issues found in review
+  gate: no_veto
+  config:
+    agents:
+    - dev
+    - qa_lead

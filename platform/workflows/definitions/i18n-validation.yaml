@@ -1,0 +1,84 @@
+id: i18n-validation
+name: Internationalization Validation
+description: 'Validate i18n coverage: hardcoded strings, missing translations, RTL, date/number formatting.'
+icon: 🌍
+is_builtin: true
+phases:
+- id: string-scan
+  pattern_id: sequential
+  name: Hardcoded String Scan
+  description: Scan source code for user-facing hardcoded strings not going through i18n
+  gate: All hardcoded strings identified and flagged
+  config:
+    agents:
+    - i18n-checker
+- id: translation-check
+  pattern_id: parallel
+  name: Translation Completeness
+  description: Check translation files for missing keys per locale, detect stale translations
+  gate: All locales at 100% key coverage or gaps documented
+  config:
+    agents:
+    - i18n-checker
+- id: format-check
+  pattern_id: sequential
+  name: Format Validation
+  description: Verify date, time, number, currency formatting uses Intl API, check RTL support
+  gate: All formatting uses locale-aware APIs
+  config:
+    agents:
+    - i18n-checker
+    - ux_designer
+- id: i18n-report
+  pattern_id: sequential
+  name: i18n Report
+  description: Generate coverage report per locale with fix recommendations
+  gate: i18n coverage report published
+  config:
+    agents:
+    - i18n-checker
+    - doc-writer
+config:
+  graph:
+    nodes:
+    - id: n1
+      agent_id: i18n-checker
+      x: 100
+      y: 150
+      label: String Scan
+      phase: string-scan
+    - id: n2
+      agent_id: i18n-checker
+      x: 300
+      y: 100
+      label: Translations
+      phase: translation-check
+    - id: n3
+      agent_id: i18n-checker
+      x: 300
+      y: 200
+      label: Formats
+      phase: format-check
+    - id: n4
+      agent_id: doc-writer
+      x: 500
+      y: 150
+      label: Report
+      phase: i18n-report
+    edges:
+    - from: n1
+      to: n2
+      label: strings found
+      color: '#3b82f6'
+    - from: n1
+      to: n3
+      label: strings found
+      color: '#3b82f6'
+    - from: n2
+      to: n4
+      label: coverage
+      color: '#3fb950'
+    - from: n3
+      to: n4
+      label: formats ok
+      color: '#3fb950'

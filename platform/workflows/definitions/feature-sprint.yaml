@@ -1,0 +1,145 @@
+id: feature-sprint
+name: Feature Sprint — TDD Cycle
+description: Workflow réutilisable pour chaque Feature d'un Epic. Design → TDD Sprint → Adversarial Review → E2E Tests → Deploy.
+  Utilisé par chaque Feature Team dans le cadre d'un epic-decompose.
+icon: repeat
+is_builtin: true
+phases:
+- id: feature-design
+  pattern_id: aggregator
+  name: Feature Design
+  description: Lead + Archi définissent l'architecture de la feature. Stories, acceptance criteria, interfaces.
+  gate: always
+  config:
+    agents:
+    - system-architect-art
+    dynamic_lead: true
+- id: tdd-sprint
+  pattern_id: loop
+  name: TDD Sprint
+  description: 'Devs implémentent en TDD. RED→GREEN→REFACTOR. FRACTAL: feature/guards/failures.'
+  gate: no_veto
+  config:
+    agents: []
+    max_iterations: 3
+    dynamic_team: true
+- id: adversarial-review
+  pattern_id: sequential
+  name: Adversarial Review
+  description: L0 fast checks → L1 code critic → L2 architecture critic. Multi-vendor cascade.
+  gate: all_approved
+  config:
+    agents:
+    - system-architect-art
+    dynamic_reviewers: true
+- id: feature-e2e
+  pattern_id: parallel
+  name: Tests E2E
+  description: Tests E2E API + IHM en parallèle. Smoke + journeys.
+  gate: all_approved
+  config:
+    agents:
+    - ft-e2e-api
+    - ft-e2e-ihm
+    max_iterations: 2
+- id: feature-deploy
+  pattern_id: sequential
+  name: Deploy Feature
+  description: Build → Staging → Canary. Rollback auto si erreur.
+  gate: no_veto
+  config:
+    agents:
+    - ft-infra-lead
+    dynamic_deployer: true
+config:
+  graph:
+    nodes:
+    - id: n1
+      agent_id: system-architect-art
+      x: 400
+      y: 20
+      label: Design
+      phase: feature-design
+    - id: n2
+      agent_id: ft-auth-lead
+      x: 200
+      y: 150
+      label: TDD Dev 1
+      phase: tdd-sprint
+    - id: n3
+      agent_id: ft-auth-dev1
+      x: 400
+      y: 150
+      label: TDD Dev 2
+      phase: tdd-sprint
+    - id: n4
+      agent_id: ft-auth-dev2
+      x: 600
+      y: 150
+      label: TDD Dev 3
+      phase: tdd-sprint
+    - id: n5
+      agent_id: system-architect-art
+      x: 400
+      y: 280
+      label: Review
+      phase: adversarial-review
+    - id: n6
+      agent_id: ft-e2e-api
+      x: 300
+      y: 380
+      label: E2E API
+      phase: feature-e2e
+    - id: n7
+      agent_id: ft-e2e-ihm
+      x: 500
+      y: 380
+      label: E2E IHM
+      phase: feature-e2e
+    - id: n8
+      agent_id: ft-infra-lead
+      x: 400
+      y: 480
+      label: Deploy
+      phase: feature-deploy
+    edges:
+    - from: n1
+      to: n2
+      label: stories
+      color: '#58a6ff'
+    - from: n1
+      to: n3
+      label: stories
+      color: '#58a6ff'
+    - from: n1
+      to: n4
+      label: stories
+      color: '#58a6ff'
+    - from: n2
+      to: n5
+      label: code
+      color: '#3fb950'
+    - from: n3
+      to: n5
+      label: code
+      color: '#3fb950'
+    - from: n4
+      to: n5
+      label: code
+      color: '#3fb950'
+    - from: n5
+      to: n6
+      label: approved
+      color: '#ec4899'
+    - from: n5
+      to: n7
+      label: approved
+      color: '#ec4899'
+    - from: n6
+      to: n8
+      label: pass
+      color: '#d29922'
+    - from: n7
+      to: n8
+      label: pass
+      color: '#d29922'

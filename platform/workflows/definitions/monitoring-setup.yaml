@@ -1,0 +1,106 @@
+id: monitoring-setup
+name: Monitoring & Observability
+description: 'Setup monitoring stack: SLIs/SLOs, dashboards, alerting, structured logging, health checks.'
+icon: 📊
+is_builtin: true
+phases:
+- id: slo-define
+  pattern_id: network
+  name: SLI/SLO Definition
+  description: Define Service Level Indicators and Objectives for each service
+  gate: SLIs and SLOs documented and agreed upon
+  config:
+    agents:
+    - monitoring-ops
+    - sre
+    - architecte
+- id: health-checks
+  pattern_id: sequential
+  name: Health Check Endpoints
+  description: Implement /health, /ready, /live endpoints with dependency checks
+  gate: All services have health check endpoints
+  config:
+    agents:
+    - monitoring-ops
+    - lead_dev
+- id: logging-setup
+  pattern_id: sequential
+  name: Structured Logging
+  description: Implement JSON structured logging, correlation IDs, log levels
+  gate: Structured logging in place with correlation IDs
+  config:
+    agents:
+    - monitoring-ops
+    - lead_dev
+- id: alerting
+  pattern_id: sequential
+  name: Alerting Rules
+  description: Create alerting rules, escalation policies, PagerDuty/Slack integration
+  gate: Alerts configured with proper thresholds and routing
+  config:
+    agents:
+    - monitoring-ops
+    - sre
+- id: runbooks
+  pattern_id: sequential
+  name: Alert Runbooks
+  description: 'Create runbook for each alert: what to check, how to mitigate, escalation'
+  gate: Every alert has a corresponding runbook
+  config:
+    agents:
+    - monitoring-ops
+    - doc-writer
+config:
+  graph:
+    nodes:
+    - id: n1
+      agent_id: monitoring-ops
+      x: 100
+      y: 150
+      label: SLO Def
+      phase: slo-define
+    - id: n2
+      agent_id: lead_dev
+      x: 300
+      y: 100
+      label: Health
+      phase: health-checks
+    - id: n3
+      agent_id: lead_dev
+      x: 300
+      y: 200
+      label: Logging
+      phase: logging-setup
+    - id: n4
+      agent_id: monitoring-ops
+      x: 500
+      y: 150
+      label: Alerting
+      phase: alerting
+    - id: n5
+      agent_id: doc-writer
+      x: 700
+      y: 150
+      label: Runbooks
+      phase: runbooks
+    edges:
+    - from: n1
+      to: n2
+      label: SLOs
+      color: '#ec4899'
+    - from: n1
+      to: n3
+      label: SLOs
+      color: '#ec4899'
+    - from: n2
+      to: n4
+      label: endpoints
+      color: '#3fb950'
+    - from: n3
+      to: n4
+      label: logs ready
+      color: '#3fb950'
+    - from: n4
+      to: n5
+      label: alerts defined
+      color: '#d29922'

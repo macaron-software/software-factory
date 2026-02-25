@@ -1,0 +1,175 @@
+id: pi-planning
+name: PI Planning — SAFe Program Increment
+description: Planification de l'incrément programme SAFe. Présentation vision → estimation features → capacity planning →
+  engagement équipe → publication du plan PI.
+icon: calendar
+is_builtin: true
+phases:
+- id: pi-vision
+  pattern_id: sequential
+  name: Présentation Vision & Backlog
+  description: Le Product Manager présente la vision produit et le backlog priorisé (WSJF). L'architecte présente le runway
+    technique. Le RTE cadre la capacité disponible.
+  gate: always
+  config:
+    agents:
+    - product_manager
+    - enterprise_architect
+    - release_train_engineer
+- id: pi-estimation
+  pattern_id: parallel
+  name: Estimation Features
+  description: Les équipes estiment en parallèle les features et identifient les dépendances inter-équipes. Chaque lead évalue
+    la complexité et les risques.
+  gate: always
+  config:
+    agents:
+    - lead_dev
+    - plat-lead-dev
+    - qa_lead
+    - devops
+    - securite
+- id: pi-capacity
+  pattern_id: aggregator
+  name: Capacity & Dépendances
+  description: Le RTE agrège les estimations, identifie les conflits de capacité et les dépendances critiques. Le Lean Portfolio
+    Manager valide l'alignement stratégique.
+  gate: always
+  config:
+    agents:
+    - release_train_engineer
+    - lean_portfolio_manager
+    - scrum_master
+    - chef_projet
+- id: pi-commitment
+  pattern_id: human-in-the-loop
+  name: Engagement Équipe — GO/NOGO
+  description: Les équipes s'engagent sur les objectifs du PI. Le comité (CPO, CTO, RTE) valide le plan ou demande des ajustements.
+  gate: checkpoint
+  config:
+    agents:
+    - strat-cpo
+    - strat-cto
+    - release_train_engineer
+    - product_manager
+    - scrum_master
+- id: pi-publish
+  pattern_id: sequential
+  name: Publication Plan PI
+  description: 'Le plan PI est publié: features engagées, sprints planifiés, jalons identifiés, risques ROAM documentés.'
+  gate: always
+  config:
+    agents:
+    - release_train_engineer
+    - scrum_master
+    - tech_writer
+config:
+  graph:
+    nodes:
+    - id: n1
+      agent_id: product_manager
+      x: 100
+      y: 100
+      label: PM Vision
+      phase: pi-vision
+    - id: n2
+      agent_id: enterprise_architect
+      x: 100
+      y: 200
+      label: Archi Runway
+      phase: pi-vision
+    - id: n3
+      agent_id: release_train_engineer
+      x: 100
+      y: 300
+      label: RTE Cadre
+      phase: pi-vision
+    - id: n4
+      agent_id: lead_dev
+      x: 300
+      y: 80
+      label: Lead Estim
+      phase: pi-estimation
+    - id: n5
+      agent_id: qa_lead
+      x: 300
+      y: 180
+      label: QA Estim
+      phase: pi-estimation
+    - id: n6
+      agent_id: devops
+      x: 300
+      y: 280
+      label: DevOps Estim
+      phase: pi-estimation
+    - id: n7
+      agent_id: release_train_engineer
+      x: 500
+      y: 150
+      label: RTE Capacity
+      phase: pi-capacity
+    - id: n8
+      agent_id: lean_portfolio_manager
+      x: 500
+      y: 250
+      label: LPM Align
+      phase: pi-capacity
+    - id: n9
+      agent_id: strat-cpo
+      x: 700
+      y: 100
+      label: CPO GO/NOGO
+      phase: pi-commitment
+    - id: n10
+      agent_id: strat-cto
+      x: 700
+      y: 200
+      label: CTO GO/NOGO
+      phase: pi-commitment
+    - id: n11
+      agent_id: tech_writer
+      x: 900
+      y: 150
+      label: Publish
+      phase: pi-publish
+    edges:
+    - from: n1
+      to: n4
+      label: backlog
+      color: '#7c3aed'
+    - from: n2
+      to: n4
+      label: runway
+      color: '#58a6ff'
+    - from: n3
+      to: n7
+      label: capacity
+      color: '#f97316'
+    - from: n4
+      to: n7
+      label: estimates
+      color: '#3fb950'
+    - from: n5
+      to: n7
+      label: qa effort
+      color: '#3fb950'
+    - from: n6
+      to: n7
+      label: infra needs
+      color: '#3fb950'
+    - from: n7
+      to: n9
+      label: plan draft
+      color: '#7c3aed'
+    - from: n8
+      to: n9
+      label: alignment
+      color: '#d29922'
+    - from: n9
+      to: n11
+      label: approved
+      color: '#3fb950'
+    - from: n10
+      to: n11
+      label: tech ok
+      color: '#3fb950'
