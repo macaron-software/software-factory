@@ -69,7 +69,9 @@ async def home_page(request: Request):
     # Only DSI, Business Owner, and Overview land on the portfolio tabs
     tab_map = {"dsi": "dsi", "business_owner": "metier", "overview": "overview"}
     if perspective in tab_map:
-        return RedirectResponse(url=f"/portfolio?tab={tab_map[perspective]}", status_code=302)
+        return RedirectResponse(
+            url=f"/portfolio?tab={tab_map[perspective]}", status_code=302
+        )
     return _templates(request).TemplateResponse(
         "dashboard.html",
         {"request": request, "page_title": "Dashboard"},
@@ -99,7 +101,9 @@ async def portfolio_page(request: Request):
             runs_by_mission[r.parent_mission_id] = r
         runs_by_mission[r.id] = r  # Also index by run id (same as mission id)
 
-    strategic_raw = [a for a in all_agents if any(t == "strategy" for t in (a.tags or []))]
+    strategic_raw = [
+        a for a in all_agents if any(t == "strategy" for t in (a.tags or []))
+    ]
     avatar_dir = Path(__file__).parent.parent / "static" / "avatars"
     strategic = []
     for a in strategic_raw:
@@ -138,9 +142,13 @@ async def portfolio_page(request: Request):
     for p in all_projects:
         p_missions = [m for m in all_missions if m.project_id == p.id]
         p_agents = [
-            a for a in all_agents if a.id.startswith(p.id[:4] + "-") or a.id.startswith(p.id + "-")
+            a
+            for a in all_agents
+            if a.id.startswith(p.id[:4] + "-") or a.id.startswith(p.id + "-")
         ]
-        team_avatars = [{"name": a.name, "icon": a.avatar or a.icon or "bot"} for a in p_agents[:8]]
+        team_avatars = [
+            {"name": a.name, "icon": a.avatar or a.icon or "bot"} for a in p_agents[:8]
+        ]
 
         p_total = 0
         p_done = 0
@@ -152,11 +160,14 @@ async def portfolio_page(request: Request):
             if run and run.phases:
                 t_total = len(run.phases)
                 t_done = sum(
-                    1 for ph in run.phases if ph.status.value in ("done", "done_with_issues")
+                    1
+                    for ph in run.phases
+                    if ph.status.value in ("done", "done_with_issues")
                 )
                 current = run.current_phase or ""
                 current_name = next(
-                    (ph.phase_name for ph in run.phases if ph.phase_id == current), current
+                    (ph.phase_name for ph in run.phases if ph.phase_id == current),
+                    current,
                 )
             else:
                 # Fallback to task-based stats
@@ -187,8 +198,12 @@ async def portfolio_page(request: Request):
         def _is_tma(m):
             return "[TMA" in m.name or m.name.startswith("TMA —") or m.type == "program"
 
-        tma_count = sum(1 for m in p_missions if _is_tma(m) and m.status in ("active", "running"))
-        tma_resolved = sum(1 for m in p_missions if _is_tma(m) and m.status == "resolved")
+        tma_count = sum(
+            1 for m in p_missions if _is_tma(m) and m.status in ("active", "running")
+        )
+        tma_resolved = sum(
+            1 for m in p_missions if _is_tma(m) and m.status == "resolved"
+        )
         has_secu = (
             any(
                 m.type == "security"
@@ -199,7 +214,8 @@ async def portfolio_page(request: Request):
             or p.factory_type == "security"
         )
         has_cicd = p_total > 0 and any(
-            run and any(ph.phase_id in ("cicd", "deploy-prod") for ph in (run.phases or []))
+            run
+            and any(ph.phase_id in ("cicd", "deploy-prod") for ph in (run.phases or []))
             for m in p_missions
             for run in [runs_by_mission.get(m.id)]
         )
@@ -246,7 +262,11 @@ async def portfolio_page(request: Request):
         run = runs_by_mission.get(m.id)
         if run and run.phases:
             t_total = len(run.phases)
-            t_done = sum(1 for ph in run.phases if ph.status.value in ("done", "done_with_issues"))
+            t_done = sum(
+                1
+                for ph in run.phases
+                if ph.status.value in ("done", "done_with_issues")
+            )
             current = run.current_phase or ""
             current_name = next(
                 (ph.phase_name for ph in run.phases if ph.phase_id == current), current
@@ -468,12 +488,12 @@ async def pi_board_page(request: Request):
 
 @router.get("/ceremonies", response_class=HTMLResponse)
 async def ceremonies_page(request: Request, tab: str = "templates"):
-    """Ceremonies — Workflow templates + Patterns in tabs."""
+    """Workflows — Mission templates + Orchestration patterns."""
     return _templates(request).TemplateResponse(
         "ceremonies.html",
         {
             "request": request,
-            "page_title": "Ceremonies",
+            "page_title": "Workflows",
             "active_tab": tab,
             "tab_content": "",
         },
@@ -542,7 +562,10 @@ async def design_system_page(request: Request):
 
     # Extract icon names from SVG sprites
     sprites_path = (
-        Path(__file__).resolve().parent.parent / "templates" / "partials" / "svg_sprites.html"
+        Path(__file__).resolve().parent.parent
+        / "templates"
+        / "partials"
+        / "svg_sprites.html"
     )
     icons = []
     if sprites_path.exists():
@@ -567,7 +590,9 @@ async def launch_strategic_committee(request: Request):
     wf_store = get_workflow_store()
     wf = wf_store.get("strategic-committee")
     if not wf:
-        return JSONResponse({"error": "Workflow 'strategic-committee' not found"}, status_code=404)
+        return JSONResponse(
+            {"error": "Workflow 'strategic-committee' not found"}, status_code=404
+        )
 
     session_store = get_session_store()
     session = SessionDef(
@@ -772,9 +797,9 @@ async def metier_page(request: Request):
             end = m.completed_at or datetime.utcnow()
             if isinstance(m.created_at, str):
                 try:
-                    start = datetime.fromisoformat(m.created_at.replace("Z", "+00:00")).replace(
-                        tzinfo=None
-                    )
+                    start = datetime.fromisoformat(
+                        m.created_at.replace("Z", "+00:00")
+                    ).replace(tzinfo=None)
                 except Exception:
                     start = datetime.utcnow()
             else:
@@ -785,7 +810,9 @@ async def metier_page(request: Request):
                 )
             if isinstance(end, str):
                 try:
-                    end = datetime.fromisoformat(end.replace("Z", "+00:00")).replace(tzinfo=None)
+                    end = datetime.fromisoformat(end.replace("Z", "+00:00")).replace(
+                        tzinfo=None
+                    )
                 except Exception:
                     end = datetime.utcnow()
             elif hasattr(end, "replace"):
@@ -831,7 +858,9 @@ async def metier_page(request: Request):
             msgs = session_store.get_messages(s.id, limit=500)
             for msg in msgs:
                 if msg.from_agent and msg.from_agent != "user":
-                    agent_msg_counts[msg.from_agent] = agent_msg_counts.get(msg.from_agent, 0) + 1
+                    agent_msg_counts[msg.from_agent] = (
+                        agent_msg_counts.get(msg.from_agent, 0) + 1
+                    )
         except Exception:
             pass
     top_agents = sorted(agent_msg_counts.items(), key=lambda x: -x[1])[:8]
@@ -861,9 +890,9 @@ async def metier_page(request: Request):
                     ts = msg.timestamp
                     if isinstance(ts, str):
                         try:
-                            ts = datetime.fromisoformat(ts.replace("Z", "+00:00")).replace(
-                                tzinfo=None
-                            )
+                            ts = datetime.fromisoformat(
+                                ts.replace("Z", "+00:00")
+                            ).replace(tzinfo=None)
                         except Exception:
                             continue
                     delta = (now - ts).days
@@ -989,7 +1018,9 @@ async def product_line_page(request: Request):
                 {
                     "id": m.id,
                     "name": m.name,
-                    "status": m.status.value if hasattr(m.status, "value") else str(m.status),
+                    "status": m.status.value
+                    if hasattr(m.status, "value")
+                    else str(m.status),
                     "feature_count": feat_count,
                     "story_count": story_count,
                     "done_pct": round(done_count / max(story_count, 1) * 100),
@@ -999,13 +1030,17 @@ async def product_line_page(request: Request):
         # Also include mission_runs as epics
         for r in proj_runs:
             epic_name = r.brief.split(" - ")[0] if " - " in r.brief else r.brief[:50]
-            done_phases = sum(1 for p in r.phases if p.status.value == "done") if r.phases else 0
+            done_phases = (
+                sum(1 for p in r.phases if p.status.value == "done") if r.phases else 0
+            )
             total_phases = len(r.phases) if r.phases else 0
             epics_data.append(
                 {
                     "id": r.id,
                     "name": epic_name,
-                    "status": r.status.value if hasattr(r.status, "value") else str(r.status),
+                    "status": r.status.value
+                    if hasattr(r.status, "value")
+                    else str(r.status),
                     "feature_count": total_phases,
                     "story_count": total_phases,
                     "done_pct": round(done_phases / max(total_phases, 1) * 100),
@@ -1062,7 +1097,9 @@ async def product_line_page(request: Request):
                 {
                     "name": "Production",
                     "date": "",
-                    "pct": 100 if all(e["status"] == "completed" for e in epics_data) else 0,
+                    "pct": 100
+                    if all(e["status"] == "completed" for e in epics_data)
+                    else 0,
                     "state": "done"
                     if all(e["status"] == "completed" for e in epics_data)
                     else "upcoming",

@@ -127,7 +127,7 @@
             </div>
             <div class="dash-section">
                 <h3><svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-rocket"/></svg> Active Missions</h3>
-                <div id="dashMissions" hx-get="/api/dashboard/backlog" hx-trigger="load, every 30s" hx-swap="innerHTML">
+                <div id="dashMissions" hx-get="/api/dashboard/missions" hx-trigger="load, every 30s" hx-swap="innerHTML">
                     <p class="text-muted">Loading...</p>
                 </div>
             </div>
@@ -262,7 +262,7 @@
                     <a href="/metrics" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-chart"/></svg> Metrics</a>
 
                     {% elif p == 'rte' %}
-                    <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-workflow"/></svg> Launch Ceremony</a>
+                    <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-workflow"/></svg> Launch Mission</a>
                     <a href="/pi" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-calendar"/></svg> PI Board</a>
                     <a href="/metrics" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-chart"/></svg> DORA Metrics</a>
                     <a href="/art" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-users"/></svg> ART</a>
@@ -276,11 +276,11 @@
                     <a href="/sessions/new" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> New Session</a>
 
                     {% elif p == 'scrum_master' %}
-                    <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-workflow"/></svg> Launch Ceremony</a>
+                    <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-workflow"/></svg> Launch Mission</a>
                     <a href="/pi" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-calendar"/></svg> PI Board</a>
                     <a href="/metrics" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-chart"/></svg> Velocity</a>
+                    <a href="/sessions/new" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> New Session</a>
                     <a href="/art" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-users"/></svg> ART</a>
-                    <a href="/monitoring" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-activity"/></svg> Monitoring</a>
 
                     {% elif p == 'developer' %}
                     <a href="/sessions/new" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> New Session</a>
@@ -295,7 +295,7 @@
                     <a href="/backlog" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-layers"/></svg> Backlog</a>
 
                     {% elif p == 'qa_security' %}
-                    <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-shield"/></svg> Security Audit</a>
+                    <a href="/quality" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-shield"/></svg> Quality Audit</a>
                     <a href="/metrics" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-chart"/></svg> DORA Metrics</a>
                     <a href="/sessions/new" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> New Session</a>
                     <a href="/monitoring" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-activity"/></svg> Monitoring</a>
@@ -303,7 +303,7 @@
                     {% else %}
                     <a href="/backlog" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-plus"/></svg> New Epic</a>
                     <a href="/backlog?tab=ideation" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-zap"/></svg> Ideation</a>
-                    <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-workflow"/></svg> Launch Ceremony</a>
+                    <a href="/ceremonies" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-workflow"/></svg> Launch Mission</a>
                     <a href="/sessions/new" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-message-circle"/></svg> New Session</a>
                     <a href="/projects" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-folder"/></svg> Open Project</a>
                     <a href="/world" class="dash-action-btn"><svg class="icon icon-xs"><use href="#icon-globe"/></svg> World 3D</a>
