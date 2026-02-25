@@ -26,8 +26,8 @@ def _is_json_request(request: Request) -> bool:
 # Track which mission_ids have an active asyncio task running
 _active_mission_tasks: dict[str, asyncio.Task] = {}
 
-# Limit concurrent mission execution (2 allows parallelism while avoiding LLM rate limits)
-_mission_semaphore = asyncio.Semaphore(2)
+# Limit concurrent mission execution (10 allows Quality/Retro/Skill missions to get slots)
+_mission_semaphore = asyncio.Semaphore(10)
 
 _AVATAR_DIR = Path(__file__).parent.parent / "static" / "avatars"
 

@@ -492,10 +492,10 @@ class LLMClient:
 
             # Rate limiter: queue until a slot is available
             try:
-                await _rate_limiter.acquire(timeout=180.0)
+                await _rate_limiter.acquire(timeout=300.0)
             except TimeoutError:
                 logger.error(
-                    "LLM rate limiter timeout (180s) — queue full (%s)", _rate_limiter.usage
+                    "LLM rate limiter timeout (300s) — queue full (%s)", _rate_limiter.usage
                 )
                 continue
 
@@ -774,7 +774,7 @@ class LLMClient:
 
             # Rate limiter: queue until a slot is available
             try:
-                await _rate_limiter.acquire(timeout=180.0)
+                await _rate_limiter.acquire(timeout=300.0)
             except TimeoutError:
                 logger.error("LLM stream rate limiter timeout (%s)", _rate_limiter.usage)
                 continue
@@ -820,7 +820,41 @@ class LLMClient:
                         self._provider_cooldown[prov] = time.monotonic() + 30
                     break
 
-        raise RuntimeError(f"All LLM providers failed for streaming {provider}/{model}")
+        # All streaming providers exhausted — fall back to chat() to avoid blocking agents
+        async for chunk in self._stream_via_chat_fallback(
+            provider, model, messages, temperature, max_tokens, system_prompt
+        ):
+            yield chunk
+
+    async def _stream_via_chat_fallback(
+        self,
+        provider: str,
+        model: str,
+        messages: list[LLMMessage],
+        temperature: float,
+        max_tokens: int,
+        system_prompt: str,
+    ) -> AsyncIterator[LLMStreamChunk]:
+        """Fallback: call chat() and yield the full response as a stream."""
+        logger.warning(
+            "LLM stream fallback: using chat() for %s/%s (streaming unavailable)",
+            provider,
+            model,
+        )
+        resp = await self.chat(
+            messages=messages,
+            provider=provider,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            system_prompt=system_prompt,
+        )
+        content = resp.content or ""
+        chunk_size = 16
+        for i in range(0, len(content), chunk_size):
+            yield LLMStreamChunk(delta=content[i : i + chunk_size], done=False, model=resp.model)
+            await asyncio.sleep(0.01)
+        yield LLMStreamChunk(delta="", done=True, model=resp.model, finish_reason="stop")
 
     async def _do_stream(
         self,
