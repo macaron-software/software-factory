@@ -165,6 +165,32 @@ async def _launch_run(run_id: str) -> None:
     if not wf:
         raise ValueError(f"Workflow {mission.workflow_id} not found for run {run_id}")
 
+    # Ensure a session row exists for this mission_run (needed for messages FK)
+    if mission.session_id:
+        from ..db.migrations import get_db as _get_db
+        _db = _get_db()
+        try:
+            exists = _db.execute(
+                "SELECT id FROM sessions WHERE id=?", (mission.session_id,)
+            ).fetchone()
+            if not exists:
+                from datetime import datetime as _dt
+                import json as _json
+                _db.execute(
+                    "INSERT OR IGNORE INTO sessions (id, status, config_json, created_at, updated_at) "
+                    "VALUES (?, 'active', ?, ?, ?)",
+                    (
+                        mission.session_id,
+                        _json.dumps({"workflow_id": mission.workflow_id,
+                                     "project_id": mission.project_id}),
+                        _dt.utcnow().isoformat(),
+                        _dt.utcnow().isoformat(),
+                    ),
+                )
+                _db.commit()
+        finally:
+            _db.close()
+
     agent_store = get_agent_store()
     orch_id = mission.cdp_agent_id or "chef_de_programme"
     orch_agent = agent_store.get(orch_id)
