@@ -350,6 +350,16 @@ async def lifespan(app: FastAPI):
 
     _asyncio.create_task(_auto_resume_paused())
 
+    # Start endurance watchdog (continuous auto-resume, session recovery, health)
+    try:
+        from .ops.endurance_watchdog import watchdog_loop, ENABLED as _wd_enabled
+
+        if _wd_enabled:
+            _asyncio.create_task(watchdog_loop())
+            logger.info("Endurance watchdog started as background task")
+    except Exception as e:
+        logger.warning("Failed to start endurance watchdog: %s", e)
+
     # Start unified MCP SF server (platform + LRM tools merged)
     _mcp_procs: dict[str, Any] = {}
 

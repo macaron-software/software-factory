@@ -367,6 +367,127 @@ def _capture_last_agent_summary(store, session_id: str, phase_name: str) -> str:
     return ""
 
 
+# ── Sandbox Build Validation ─────────────────────────────────────────
+
+_CODE_PHASE_KEYWORDS = (
+    "code",
+    "develop",
+    "implement",
+    "feature",
+    "tdd",
+    "fix",
+    "refactor",
+    "security fix",
+    "hotfix",
+    "scaffold",
+    "migration",
+)
+
+
+def _is_code_phase(phase_name: str) -> bool:
+    """Detect if a phase involves code generation."""
+    name_lower = phase_name.lower()
+    return any(kw in name_lower for kw in _CODE_PHASE_KEYWORDS)
+
+
+async def _sandbox_build_check(project_id: str, session_id: str) -> tuple[bool, str]:
+    """Run build/lint in project workspace. Returns (success, error_output)."""
+    try:
+        from ..db.migrations import get_db as _gdb
+
+        db = _gdb()
+        row = db.execute(
+            "SELECT workspace_path FROM mission_runs WHERE session_id=? LIMIT 1",
+            (session_id,),
+        ).fetchone()
+        db.close()
+
+        workspace = row[0] if row and row[0] else ""
+        if not workspace:
+            # Try project workspace
+            db = _gdb()
+            row = db.execute(
+                "SELECT config_json FROM projects WHERE id=? LIMIT 1", (project_id,)
+            ).fetchone()
+            db.close()
+            if row:
+                import json as _json
+
+                config = _json.loads(row[0] or "{}")
+                workspace = config.get("workspace_path", config.get("path", ""))
+
+        if not workspace:
+            return True, ""  # No workspace — skip validation
+
+        import os
+
+        if not os.path.isdir(workspace):
+            return True, ""  # Workspace doesn't exist yet
+
+        # Detect build system and run appropriate command
+        build_cmd = _detect_build_cmd(workspace)
+        if not build_cmd:
+            return True, ""
+
+        proc = await asyncio.create_subprocess_exec(
+            *build_cmd,
+            cwd=workspace,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+        except asyncio.TimeoutError:
+            proc.kill()
+            return False, "Build timed out after 120s"
+
+        if proc.returncode != 0:
+            error_output = (stderr or stdout or b"").decode("utf-8", errors="replace")
+            return False, error_output[-1000:]  # Last 1000 chars of error
+
+        return True, ""
+
+    except Exception as e:
+        logger.debug("Sandbox build check error: %s", e)
+        return True, ""  # Don't block on build check errors
+
+
+def _detect_build_cmd(workspace: str) -> list[str]:
+    """Detect the build system from workspace files."""
+    import os
+
+    if os.path.isfile(os.path.join(workspace, "package.json")):
+        # Check if node_modules exists (deps installed)
+        if os.path.isdir(os.path.join(workspace, "node_modules")):
+            return ["npm", "run", "build", "--if-present"]
+        return ["npm", "install", "--ignore-scripts"]
+    if os.path.isfile(os.path.join(workspace, "requirements.txt")):
+        return ["python3", "-m", "py_compile", _find_main_py(workspace)]
+    if os.path.isfile(os.path.join(workspace, "Cargo.toml")):
+        return ["cargo", "check"]
+    if os.path.isfile(os.path.join(workspace, "pom.xml")):
+        return ["mvn", "-q", "compile", "-DskipTests"]
+    if os.path.isfile(os.path.join(workspace, "go.mod")):
+        return ["go", "build", "./..."]
+    if os.path.isfile(os.path.join(workspace, "Dockerfile")):
+        return ["docker", "build", "--check", "."]
+    return []
+
+
+def _find_main_py(workspace: str) -> str:
+    """Find main Python file for syntax check."""
+    import os
+
+    for f in ("main.py", "app.py", "server.py", "manage.py"):
+        if os.path.isfile(os.path.join(workspace, f)):
+            return os.path.join(workspace, f)
+    # Fallback: first .py file
+    for f in os.listdir(workspace):
+        if f.endswith(".py"):
+            return os.path.join(workspace, f)
+    return ""
+
+
 # ── Workflow Engine ──────────────────────────────────────────────
 
 
@@ -550,6 +671,23 @@ async def run_workflow(
                         f"[{phase.name}] {m.from_agent}: {summary}"
                     )
                     break
+
+            # Sandbox build validation after code generation phases
+            if result.success and _is_code_phase(phase.name) and project_id:
+                build_ok, build_error = await _sandbox_build_check(
+                    project_id, session_id
+                )
+                if not build_ok and build_error:
+                    accumulated_context.append(
+                        f"[BUILD] Erreur de build: {build_error[:200]}"
+                    )
+                    await _rte_facilitate(
+                        session_id,
+                        f"⚠️ Build validation failed after **{phase.name}**:\n```\n{build_error[:500]}\n```\n"
+                        f"Le code généré ne compile pas. Injecte l'erreur dans le contexte pour correction.",
+                        to_agent=phase_leader,
+                        project_id=project_id,
+                    )
 
             # Checkpoint: save completed phase index for resume
             _save_checkpoint(store, session_id, i + 1)

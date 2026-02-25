@@ -228,6 +228,55 @@
             </div>
         </div>
     </div>
+
+    <!-- Pipeline Failure Analysis Section -->
+    <h2 style="margin: 2.5rem 0 1rem; font-size: 1.3rem; font-weight: 700;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 6px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        Pipeline Failure Analysis
+        <button class="refresh-btn" style="font-size: 0.8rem; padding: 4px 12px; margin-left: 12px;" onclick="loadFailures()">Analyze</button>
+        <button class="refresh-btn" style="font-size: 0.8rem; padding: 4px 12px; margin-left: 6px; background: #10b981;" onclick="resumeAll()">Resume All Paused</button>
+    </h2>
+    <div class="stats-grid" id="failure-stats">
+        <div class="stat-card">
+            <h3>Failed Runs</h3>
+            <p class="stat-value" id="fail-count">—</p>
+            <p class="stat-label">total failed</p>
+        </div>
+        <div class="stat-card">
+            <h3>Paused (resumable)</h3>
+            <p class="stat-value" id="fail-resumable">—</p>
+            <p class="stat-label">can be auto-resumed</p>
+        </div>
+        <div class="stat-card">
+            <h3>Top Error</h3>
+            <p class="stat-value" id="fail-top-error" style="font-size: 1.2rem;">—</p>
+            <p class="stat-label">most common category</p>
+        </div>
+        <div class="stat-card">
+            <h3>Worst Phase</h3>
+            <p class="stat-value" id="fail-worst-phase" style="font-size: 1.2rem;">—</p>
+            <p class="stat-label">highest failure rate</p>
+        </div>
+    </div>
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h2>Error Categories</h2>
+            <div class="chart-container">
+                <canvas id="chart-error-cats"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h2>Phase Failure Rates</h2>
+            <div class="chart-container">
+                <canvas id="chart-phase-fails"></canvas>
+            </div>
+        </div>
+    </div>
+    <!-- Recommendations -->
+    <div id="failure-recs" style="margin: 1rem 0 2rem; padding: 1rem 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-lg); display: none;">
+        <h3 style="margin: 0 0 0.5rem; font-size: 1rem;">Recommendations</h3>
+        <div id="failure-recs-list" style="font-size: 0.9rem;"></div>
+    </div>
 </div>
 
 <script>
@@ -436,8 +485,98 @@ async function loadTracing() {
 // Initial load
 loadAnalytics();
 loadTracing();
+loadFailures();
 
 // Auto-refresh every 30s
 setInterval(loadAnalytics, 30000);
+
+// Failure analysis loader
+async function loadFailures() {
+    try {
+        const res = await fetch('/api/analytics/failures');
+        const data = await res.json();
+        if (!data.success) return;
+        const d = data.data;
+
+        // Stats
+        const failedCount = d.run_status?.failed || 0;
+        document.getElementById('fail-count').textContent = failedCount;
+        document.getElementById('fail-resumable').textContent = d.resumable_count || 0;
+
+        if (d.error_categories?.length > 0) {
+            document.getElementById('fail-top-error').textContent =
+                d.error_categories[0].category + ' (' + d.error_categories[0].count + ')';
+        }
+        if (d.phase_failures?.length > 0) {
+            const worst = d.phase_failures[0];
+            document.getElementById('fail-worst-phase').textContent =
+                worst.phase.substring(0, 20) + ' (' + worst.fail_rate + '%)';
+        }
+
+        // Error categories chart
+        if (d.error_categories?.length > 0) {
+            const ctx = document.getElementById('chart-error-cats');
+            if (charts.errorCats) charts.errorCats.destroy();
+            const colors = {'timeout': '#f59e0b', 'rate_limit': '#ef4444', 'llm_error': '#dc2626',
+                           'tool_error': '#8b5cf6', 'network': '#06b6d4', 'config_error': '#ec4899', 'other': '#6b7280'};
+            charts.errorCats = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: d.error_categories.map(c => c.category),
+                    datasets: [{
+                        data: d.error_categories.map(c => c.count),
+                        backgroundColor: d.error_categories.map(c => colors[c.category] || '#6b7280'),
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }}}
+            });
+        }
+
+        // Phase failure rates chart
+        if (d.phase_failures?.length > 0) {
+            const ctx = document.getElementById('chart-phase-fails');
+            if (charts.phaseFails) charts.phaseFails.destroy();
+            const top10 = d.phase_failures.slice(0, 10);
+            charts.phaseFails = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: top10.map(p => p.phase.substring(0, 25)),
+                    datasets: [
+                        { label: 'Failed', data: top10.map(p => p.failed), backgroundColor: '#ef4444' },
+                        { label: 'Timeout', data: top10.map(p => p.timeout), backgroundColor: '#f59e0b' },
+                        { label: 'OK', data: top10.map(p => p.total - p.failed - p.timeout), backgroundColor: '#10b981' },
+                    ]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true }}}
+            });
+        }
+
+        // Recommendations
+        if (d.recommendations?.length > 0) {
+            const recsDiv = document.getElementById('failure-recs');
+            const recsList = document.getElementById('failure-recs-list');
+            recsDiv.style.display = 'block';
+            recsList.innerHTML = d.recommendations.map(r => `<p style="margin: 4px 0;">${r}</p>`).join('');
+        }
+    } catch (e) {
+        console.warn('Failure analysis load error:', e);
+    }
+}
+
+async function resumeAll() {
+    if (!confirm('Resume all paused mission runs?')) return;
+    try {
+        const res = await fetch('/api/analytics/failures/resume-all', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            alert(`Resumed ${data.resumed} runs (${data.errors} errors)`);
+            loadFailures();
+        } else {
+            alert('Error: ' + (data.error || 'unknown'));
+        }
+    } catch (e) {
+        alert('Resume failed: ' + e.message);
+    }
+}
 </script>
 {% endblock %}

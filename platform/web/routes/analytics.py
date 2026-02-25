@@ -654,3 +654,236 @@ async def get_tracing_stats(
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+# =============================================================================
+# Pipeline Failure Analysis API
+# =============================================================================
+
+
+@router.get("/api/analytics/failures")
+async def get_failure_analysis() -> dict[str, Any]:
+    """Analyze failed mission runs — classify errors and suggest fixes."""
+    try:
+        from ...db.migrations import get_db
+
+        db = get_db()
+        db.row_factory = __import__("sqlite3").Row
+
+        # 1. Error category classification
+        categories = db.execute("""
+            SELECT
+                CASE
+                    WHEN mr.phases_json LIKE '%timeout%' OR mr.phases_json LIKE '%timed out%' THEN 'timeout'
+                    WHEN mr.phases_json LIKE '%429%' OR mr.phases_json LIKE '%rate limit%' THEN 'rate_limit'
+                    WHEN mr.phases_json LIKE '%All LLM%' OR mr.phases_json LIKE '%llm%error%' THEN 'llm_error'
+                    WHEN mr.phases_json LIKE '%tool%error%' OR mr.phases_json LIKE '%execute%fail%' THEN 'tool_error'
+                    WHEN mr.phases_json LIKE '%connection%' OR mr.phases_json LIKE '%network%' THEN 'network'
+                    WHEN mr.phases_json LIKE '%No pattern%' OR mr.phases_json LIKE '%not found%' THEN 'config_error'
+                    ELSE 'other'
+                END as category,
+                COUNT(*) as cnt
+            FROM mission_runs mr
+            WHERE mr.status = 'failed'
+            GROUP BY category ORDER BY cnt DESC
+        """).fetchall()
+
+        # 2. Phase failure heatmap — which phases fail most
+        phase_failures = []
+        rows = db.execute("""
+            SELECT id, phases_json FROM mission_runs
+            WHERE status IN ('failed', 'paused') AND phases_json != '[]'
+        """).fetchall()
+
+        phase_stats: dict[str, dict] = {}
+        for row in rows:
+            import json as _json
+
+            phases = _json.loads(row["phases_json"] or "[]")
+            for ph in phases:
+                name = ph.get("name", "unknown")
+                if name not in phase_stats:
+                    phase_stats[name] = {
+                        "total": 0,
+                        "failed": 0,
+                        "timeout": 0,
+                        "errors": [],
+                    }
+                phase_stats[name]["total"] += 1
+                status = ph.get("status", "")
+                if status == "failed":
+                    phase_stats[name]["failed"] += 1
+                    summary = ph.get("summary", "")[:100]
+                    if summary and len(phase_stats[name]["errors"]) < 3:
+                        phase_stats[name]["errors"].append(summary)
+                if "timeout" in (ph.get("summary", "") or "").lower():
+                    phase_stats[name]["timeout"] += 1
+
+        phase_failures = sorted(
+            [
+                {
+                    "phase": name,
+                    "total": s["total"],
+                    "failed": s["failed"],
+                    "timeout": s["timeout"],
+                    "fail_rate": round(s["failed"] * 100 / max(s["total"], 1), 1),
+                    "sample_errors": s["errors"][:2],
+                }
+                for name, s in phase_stats.items()
+            ],
+            key=lambda x: -x["failed"],
+        )
+
+        # 3. Resumable runs — paused runs that can be auto-resumed
+        resumable = db.execute("""
+            SELECT COUNT(*) as cnt FROM mission_runs mr
+            JOIN sessions s ON mr.session_id = s.id
+            WHERE mr.status = 'paused'
+            AND s.status IN ('interrupted', 'paused', 'active')
+        """).fetchone()
+
+        # 4. Run status summary
+        run_stats = db.execute("""
+            SELECT status, COUNT(*) as cnt FROM mission_runs GROUP BY status
+        """).fetchall()
+
+        # 5. Recent failures (last 20)
+        recent = db.execute("""
+            SELECT mr.id, mr.workflow_name, mr.current_phase, mr.status,
+                   mr.created_at, mr.updated_at
+            FROM mission_runs mr
+            WHERE mr.status = 'failed'
+            ORDER BY mr.updated_at DESC LIMIT 20
+        """).fetchall()
+
+        db.close()
+
+        return {
+            "success": True,
+            "data": {
+                "error_categories": [
+                    {"category": r["category"], "count": r["cnt"]} for r in categories
+                ],
+                "phase_failures": phase_failures[:15],
+                "resumable_count": resumable["cnt"] if resumable else 0,
+                "run_status": {r["status"]: r["cnt"] for r in run_stats},
+                "recent_failures": [
+                    {
+                        "id": r["id"][:12],
+                        "workflow": r["workflow_name"],
+                        "phase": r["current_phase"],
+                        "updated": r["updated_at"],
+                    }
+                    for r in recent
+                ],
+                "recommendations": _generate_recommendations(
+                    [dict(r) for r in categories], phase_failures
+                ),
+            },
+        }
+    except Exception as e:
+        logger.exception("Failure analysis error")
+        return {"success": False, "error": str(e)}
+
+
+@router.post("/api/analytics/failures/resume-all")
+async def resume_all_paused() -> dict[str, Any]:
+    """Mass-resume all paused runs that can be continued."""
+    try:
+        from ...db.migrations import get_db
+        from ...workflows.store import get_workflow_store, run_workflow
+
+        db = get_db()
+        db.row_factory = __import__("sqlite3").Row
+
+        paused = db.execute("""
+            SELECT mr.session_id, mr.id, s.config_json
+            FROM mission_runs mr
+            JOIN sessions s ON mr.session_id = s.id
+            WHERE mr.status = 'paused'
+            AND s.status IN ('interrupted', 'paused')
+            ORDER BY mr.updated_at DESC LIMIT 30
+        """).fetchall()
+
+        resumed = 0
+        errors = 0
+        for row in paused:
+            try:
+                import json as _json
+                import asyncio
+
+                config = _json.loads(row["config_json"]) if row["config_json"] else {}
+                wf_id = config.get("workflow_id", "")
+                if not wf_id:
+                    continue
+
+                wf = get_workflow_store().get(wf_id)
+                if not wf:
+                    continue
+
+                checkpoint = config.get("workflow_checkpoint", 0)
+                proj_id = config.get("project_id", "")
+                task = config.get("task", config.get("brief", "Resume"))
+                sid = row["session_id"]
+
+                db.execute("UPDATE sessions SET status='active' WHERE id=?", (sid,))
+                db.execute(
+                    "UPDATE mission_runs SET status='running' WHERE session_id=?",
+                    (sid,),
+                )
+                db.commit()
+
+                asyncio.create_task(
+                    run_workflow(wf, sid, task, proj_id, resume_from=checkpoint)
+                )
+                resumed += 1
+            except Exception as e:
+                logger.warning("Resume failed for %s: %s", row["id"][:8], e)
+                errors += 1
+
+        db.close()
+        return {
+            "success": True,
+            "resumed": resumed,
+            "errors": errors,
+            "total_paused": len(paused),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def _generate_recommendations(
+    categories: list[dict], phase_failures: list[dict]
+) -> list[str]:
+    """Generate actionable recommendations from failure patterns."""
+    recs = []
+    cat_map = {c["category"]: c["cnt"] for c in categories}
+
+    if cat_map.get("rate_limit", 0) > 5:
+        recs.append(
+            f"🔴 {cat_map['rate_limit']} rate limit errors — increase LLM cooldown or add provider fallback"
+        )
+    if cat_map.get("timeout", 0) > 5:
+        recs.append(
+            f"🟡 {cat_map['timeout']} timeouts — increase PHASE_TIMEOUT or optimize agent prompts"
+        )
+    if cat_map.get("llm_error", 0) > 3:
+        recs.append(
+            f"🔴 {cat_map['llm_error']} LLM errors — check API keys and provider health"
+        )
+    if cat_map.get("config_error", 0) > 2:
+        recs.append(
+            f"🟡 {cat_map['config_error']} config errors — missing patterns or workflows"
+        )
+
+    # Phase-specific recommendations
+    for pf in phase_failures[:3]:
+        if pf["fail_rate"] > 50:
+            recs.append(
+                f"⚠️ Phase '{pf['phase']}' fails {pf['fail_rate']}% — needs retry or skip_on_failure"
+            )
+
+    if not recs:
+        recs.append("✅ No critical failure patterns detected")
+
+    return recs
