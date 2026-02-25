@@ -104,15 +104,15 @@ async def _check_health() -> bool:
 
 
 async def _check_stalled_missions() -> list[dict]:
-    """Find missions that are running but haven't progressed recently."""
+    """Find mission runs that are running but haven't progressed recently."""
     stalls = []
     try:
         db = sqlite3.connect(_db_path())
         db.row_factory = sqlite3.Row
         rows = db.execute("""
-            SELECT id, name, status, current_phase, updated_at
-            FROM missions
-            WHERE status IN ('running', 'in_progress')
+            SELECT mr.id, mr.workflow_name as name, mr.status, mr.current_phase, mr.updated_at
+            FROM mission_runs mr
+            WHERE mr.status = 'running'
         """).fetchall()
         db.close()
 

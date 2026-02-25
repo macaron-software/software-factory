@@ -678,7 +678,16 @@ async def get_failure_analysis() -> dict[str, Any]:
         cat_counts: dict[str, int] = {}
         for row in all_failed:
             blob = (row["phases_json"] or "").lower()
-            if "all llm providers failed" in blob:
+            import json as _jc
+
+            phases = _jc.loads(row["phases_json"] or "[]")
+            statuses = set(p.get("status", "") for p in phases) if phases else set()
+
+            if not phases or blob in ("[]", "", "null"):
+                cat = "no_phases"
+            elif statuses == {"pending"} or statuses <= {"pending", ""}:
+                cat = "setup_failed"
+            elif "all llm providers failed" in blob:
                 cat = "llm_all_failed"
             elif "timeout" in blob or "timed out" in blob:
                 cat = "timeout"
@@ -692,8 +701,6 @@ async def get_failure_analysis() -> dict[str, Any]:
                 cat = "network"
             elif "no pattern" in blob or "not found" in blob:
                 cat = "config_error"
-            elif blob in ("[]", "", "null") or not blob.strip():
-                cat = "no_phases"
             else:
                 cat = "other"
             cat_counts[cat] = cat_counts.get(cat, 0) + 1
@@ -895,6 +902,11 @@ def _generate_recommendations(
     if cat_map.get("no_phases", 0) > 5:
         recs.append(
             f"🟡 {cat_map['no_phases']} runs failed before any phase started — check workflow setup"
+        )
+    if cat_map.get("setup_failed", 0) > 5:
+        recs.append(
+            f"🟡 {cat_map['setup_failed']} runs failed during setup (all phases pending) — "
+            f"check workspace creation, session init, or early LLM errors"
         )
 
     # Phase-specific recommendations
