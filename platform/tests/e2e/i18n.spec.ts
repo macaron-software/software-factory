@@ -5,7 +5,7 @@ const LANGUAGES = ["en", "fr", "zh", "es", "ja", "pt", "de", "ko"];
 test.describe("Language switching", () => {
   for (const lang of LANGUAGES) {
     test(`loads in ${lang}`, async ({ page, context }) => {
-      const baseURL = process.env.BASE_URL || "http://4.233.64.30";
+      const baseURL = process.env.BASE_URL || "http://localhost:8090";
       await context.addCookies([{ name: "lang", value: lang, url: baseURL }]);
       await page.goto("/");
       // Page should load without errors in any language

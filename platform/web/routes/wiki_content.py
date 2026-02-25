@@ -621,7 +621,7 @@ sf status --json                   # JSON format
 ## Configuration
 ```bash
 export SF_PLATFORM_URL=http://localhost:8090    # local
-export SF_PLATFORM_URL=http://4.233.64.30       # production
+export SF_PLATFORM_URL=http://<AZURE_VM_IP>       # production
 ```
 """,
     },

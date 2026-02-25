@@ -30,8 +30,9 @@ import tempfile
 from pathlib import Path
 
 STORAGE_ACCOUNT = "macaronbackups"
-VM_HOST = "4.233.64.30"
+VM_HOST = os.getenv("AZURE_VM_IP", "localhost")
 VM_USER = "azureadmin"
+
 
 def _get_factory_root() -> Path:
     """Resolve factory root — works from any cwd."""
@@ -50,6 +51,7 @@ def _get_factory_root() -> Path:
     # Last resort
     return Path.cwd()
 
+
 FACTORY_ROOT = _get_factory_root()
 DATA_DIR = FACTORY_ROOT / "data"
 KEYS_DIR = Path.home() / ".config" / "factory"
@@ -66,12 +68,16 @@ SQLITE_DBS = [
 ]
 
 PG_URL = os.environ.get("DATABASE_URL", "")
-VM_HOST = "4.233.64.30"
+VM_HOST = os.getenv("AZURE_VM_IP", "localhost")
 VM_USER = "azureadmin"
 
 
-def _run(cmd: str, check: bool = True, capture: bool = True) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, shell=True, check=check, capture_output=capture, text=True)
+def _run(
+    cmd: str, check: bool = True, capture: bool = True
+) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        cmd, shell=True, check=check, capture_output=capture, text=True
+    )
 
 
 def _az_upload(local_path: str, container: str, blob_name: str) -> bool:
@@ -199,7 +205,9 @@ def backup_postgresql(tier: str = "daily") -> bool:
                                 escaped = str(v).replace("'", "''")
                                 vals.append(f"'{escaped}'")
                         val_list = ", ".join(vals)
-                        f.write(f"INSERT INTO {table} ({col_list}) VALUES ({val_list}) ON CONFLICT DO NOTHING;\n")
+                        f.write(
+                            f"INSERT INTO {table} ({col_list}) VALUES ({val_list}) ON CONFLICT DO NOTHING;\n"
+                        )
                     total_rows += len(rows)
 
                 f.write("\n-- Backup complete\n")
@@ -214,7 +222,9 @@ def backup_postgresql(tier: str = "daily") -> bool:
             blob_name = f"{prefix}macaron_platform_{ts}.sql.gz"
             if _az_upload(gz_path, "pg-dumps", blob_name):
                 size_mb = os.path.getsize(gz_path) / (1024 * 1024)
-                print(f"  ✅ PG dump ({size_mb:.1f}MB, {len(tables)} tables, {total_rows} rows) → pg-dumps/{blob_name}")
+                print(
+                    f"  ✅ PG dump ({size_mb:.1f}MB, {len(tables)} tables, {total_rows} rows) → pg-dumps/{blob_name}"
+                )
                 return True
 
     except Exception as e:
@@ -290,26 +300,29 @@ def _cleanup_snapshots(keep: int = 4):
     """Delete old snapshots, keep most recent N."""
     result = _run(
         "az snapshot list -g RG-MACARON --query \"[?starts_with(name,'vm-macaron-snap-')]"
-        ".{name:name,time:timeCreated}\" -o json",
+        '.{name:name,time:timeCreated}" -o json',
         check=False,
     )
     if result.returncode != 0:
         return
 
     import json
+
     snaps = json.loads(result.stdout)
     snaps.sort(key=lambda s: s["time"], reverse=True)
 
     for snap in snaps[keep:]:
         print(f"  🗑 Deleting old snapshot: {snap['name']}")
-        _run(f"az snapshot delete -n {snap['name']} -g RG-MACARON --no-wait", check=False)
+        _run(
+            f"az snapshot delete -n {snap['name']} -g RG-MACARON --no-wait", check=False
+        )
 
 
 def run_full_backup(tier: str = "daily"):
     """Run complete backup pipeline."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"🚀 MACARON FULL BACKUP — tier={tier} — {_timestamp()}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     results = {}
     results["sqlite"] = backup_sqlite(tier)
@@ -319,14 +332,14 @@ def run_full_backup(tier: str = "daily"):
     if tier in ("weekly", "monthly"):
         results["snapshot"] = backup_vm_snapshot()
 
-    print(f"\n{'='*60}")
-    print(f"📊 BACKUP SUMMARY")
+    print(f"\n{'=' * 60}")
+    print("📊 BACKUP SUMMARY")
     print(f"  SQLite DBs: {results['sqlite']} files")
     print(f"  PostgreSQL: {'✅' if results.get('pg') else '❌'}")
     print(f"  Secrets: {'✅' if results.get('secrets') else '❌'}")
     if "snapshot" in results:
         print(f"  VM Snapshot: {'✅' if results['snapshot'] else '❌'}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     # Return success/failure for alerting
     all_ok = results["sqlite"] > 0 and results.get("secrets")
@@ -335,7 +348,9 @@ def run_full_backup(tier: str = "daily"):
 
 def main():
     parser = argparse.ArgumentParser(description="Macaron Platform Backup")
-    parser.add_argument("--tier", choices=["daily", "weekly", "monthly"], default="daily")
+    parser.add_argument(
+        "--tier", choices=["daily", "weekly", "monthly"], default="daily"
+    )
     parser.add_argument("--sqlite-only", action="store_true")
     parser.add_argument("--pg-only", action="store_true")
     parser.add_argument("--secrets-only", action="store_true")

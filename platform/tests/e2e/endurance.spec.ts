@@ -5,7 +5,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { collectErrors } from "./helpers";
 
-const BASE = process.env.BASE_URL || "http://4.233.64.30";
+const BASE = process.env.BASE_URL || "http://localhost:8090";
 
 test.describe("Endurance Dashboard", () => {
   test("monitoring shows active agents", async ({ page }) => {

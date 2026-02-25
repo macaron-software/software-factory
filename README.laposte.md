@@ -57,7 +57,7 @@ platform/
 
 ```bash
 # Cloner le repo
-git clone https://gitlab.azure.innovation-laposte.io/udd-ia-native/software-factory.git
+git clone <GITLAB_URL>/software-factory.git
 cd software-factory
 
 # Installer les dépendances

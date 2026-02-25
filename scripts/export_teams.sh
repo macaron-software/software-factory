@@ -22,8 +22,8 @@ done
 
 case "$PLATFORM" in
   local) BASE_URL="http://localhost:8099" ;;
-  azure) BASE_URL="http://4.233.64.30" ;;
-  ovh)   BASE_URL="http://54.36.183.124:8090" ;;
+  azure) BASE_URL="${SF_AZURE_URL:-http://localhost:8090}" ;;
+  ovh)   BASE_URL="${SF_OVH_URL:-http://localhost:8090}" ;;
   *)     BASE_URL="$PLATFORM" ;;  # allow direct URL
 esac
 

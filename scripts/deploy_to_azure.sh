@@ -3,7 +3,7 @@
 
 set -e
 
-AZURE_HOST="4.233.64.30"
+AZURE_HOST="${AZURE_VM_IP:?Set AZURE_VM_IP in .env}"
 AZURE_USER="appuser"
 CONTAINER_NAME="deploy-platform-1"
 

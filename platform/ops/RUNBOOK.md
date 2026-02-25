@@ -180,7 +180,7 @@ python3 platform/ops/run_health.py
 ### Credentials
 
 - Stored in `~/.config/factory/.env` (chmod 600) — NEVER hardcode in source
-- VM SSH: `azureadmin@4.233.64.30` / `$VM_PASS`
+- VM SSH: `<AZURE_ADMIN>@<AZURE_VM_IP>` / `$VM_PASS`
 - PG: `$DATABASE_URL`
 - Web: basic auth `macaron:macaron`
 - LLM: Azure OpenAI `ascii-ui-openai` / gpt-5-mini / 100 req/min

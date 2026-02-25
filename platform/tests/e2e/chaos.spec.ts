@@ -5,7 +5,7 @@
 import { test, expect } from "@playwright/test";
 import { collectErrors } from "./helpers";
 
-const BASE = process.env.BASE_URL || "http://4.233.64.30";
+const BASE = process.env.BASE_URL || "http://localhost:8090";
 
 test.describe("Visual Recovery", () => {
   test("platform responds after page reload", async ({ page }) => {

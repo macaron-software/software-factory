@@ -477,9 +477,7 @@ def create_app() -> FastAPI:
     # ── Security: CORS ──────────────────────────────────────────────────────
     from starlette.middleware.cors import CORSMiddleware
 
-    _cors_origins = os.environ.get(
-        "CORS_ORIGINS", "http://localhost:8090,http://4.233.64.30"
-    ).split(",")
+    _cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:8090").split(",")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[o.strip() for o in _cors_origins],

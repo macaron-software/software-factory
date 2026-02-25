@@ -690,7 +690,7 @@ async def monitoring_live(request: Request, hours: int = 24):
     try:
         azure_infra["vm"] = {
             "name": "vm-macaron",
-            "ip": "4.233.64.30",
+            "ip": os.getenv("AZURE_VM_IP", "localhost"),
             "rg": "RG-MACARON",
             "region": "francecentral",
             "size": "Standard_B2ms",

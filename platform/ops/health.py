@@ -24,7 +24,7 @@ import sys
 import time
 from pathlib import Path
 
-VM_HOST = "4.233.64.30"
+VM_HOST = os.getenv("AZURE_VM_IP", "localhost")
 VM_USER = "azureadmin"
 STORAGE_ACCOUNT = "macaronbackups"
 
@@ -45,7 +45,9 @@ PG_URL = os.environ.get("DATABASE_URL", "")
 
 def _run(cmd: str, timeout: int = 15) -> tuple[int, str]:
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(
+            cmd, shell=True, capture_output=True, text=True, timeout=timeout
+        )
         return r.returncode, r.stdout + r.stderr
     except subprocess.TimeoutExpired:
         return -1, "TIMEOUT"
@@ -53,7 +55,9 @@ def _run(cmd: str, timeout: int = 15) -> tuple[int, str]:
 
 def check_vm_http() -> dict:
     """Check VM HTTP 200."""
-    code, out = _run(f"curl -s -o /dev/null -w '%{{http_code}}' -u macaron:macaron http://{VM_HOST}/ --connect-timeout 10")
+    code, out = _run(
+        f"curl -s -o /dev/null -w '%{{http_code}}' -u macaron:macaron http://{VM_HOST}/ --connect-timeout 10"
+    )
     status = out.strip()
     ok = status == "200"
     return {"name": "vm_http", "ok": ok, "detail": f"HTTP {status}"}
@@ -63,6 +67,7 @@ def check_pg_connectivity() -> dict:
     """Check PostgreSQL connection + basic row counts."""
     try:
         import psycopg
+
         pg_url = PG_URL
         if "connect_timeout" not in pg_url:
             sep = "&" if "?" in pg_url else "?"
@@ -91,7 +96,9 @@ def check_vm_containers() -> dict:
         f"{VM_USER}@{VM_HOST} 'docker ps --format \"{{{{.Names}}}} {{{{.Status}}}}\"'",
         timeout=20,
     )
-    containers = [l for l in out.strip().split("\n") if l.strip()] if code == 0 else []
+    containers = (
+        [line for line in out.strip().split("\n") if line.strip()] if code == 0 else []
+    )
     platform_up = any("platform" in c and "Up" in c for c in containers)
     return {
         "name": "vm_containers",
@@ -125,7 +132,7 @@ def check_backup_freshness() -> dict:
     code, out = _run(
         f"az storage blob list --account-name {STORAGE_ACCOUNT} "
         f"--container-name db-backups --prefix daily/ "
-        f"--query \"sort_by([],&properties.lastModified)[-1].properties.lastModified\" "
+        f'--query "sort_by([],&properties.lastModified)[-1].properties.lastModified" '
         f"-o tsv --only-show-errors",
         timeout=20,
     )
@@ -133,8 +140,12 @@ def check_backup_freshness() -> dict:
         return {"name": "backup_freshness", "ok": False, "detail": "No backups found"}
 
     try:
-        last_backup = datetime.datetime.fromisoformat(out.strip().replace("Z", "+00:00"))
-        age_hours = (datetime.datetime.now(datetime.timezone.utc) - last_backup).total_seconds() / 3600
+        last_backup = datetime.datetime.fromisoformat(
+            out.strip().replace("Z", "+00:00")
+        )
+        age_hours = (
+            datetime.datetime.now(datetime.timezone.utc) - last_backup
+        ).total_seconds() / 3600
         ok = age_hours < 26  # Should be daily
         return {"name": "backup_freshness", "ok": ok, "detail": f"{age_hours:.1f}h ago"}
     except Exception as e:
@@ -163,15 +174,26 @@ def run_all_checks() -> list[dict]:
 def print_results(results: list[dict], as_json: bool = False):
     """Print health check results."""
     if as_json:
-        print(json.dumps({"timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(), "checks": results}))
+        print(
+            json.dumps(
+                {
+                    "timestamp": datetime.datetime.now(
+                        datetime.timezone.utc
+                    ).isoformat(),
+                    "checks": results,
+                }
+            )
+        )
         return
 
     all_ok = all(r["ok"] for r in results)
     status = "✅ HEALTHY" if all_ok else "❌ DEGRADED"
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"  MACARON HEALTH — {status}")
-    print(f"  {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
-    print(f"{'='*50}")
+    print(
+        f"  {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}"
+    )
+    print(f"{'=' * 50}")
     for r in results:
         icon = "✅" if r["ok"] else "❌"
         print(f"  {icon} {r['name']:20s} {r['detail']}")
@@ -180,9 +202,13 @@ def print_results(results: list[dict], as_json: bool = False):
 
 def main():
     parser = argparse.ArgumentParser(description="Macaron Health Monitor")
-    parser.add_argument("--watch", action="store_true", help="Run continuously every 5min")
+    parser.add_argument(
+        "--watch", action="store_true", help="Run continuously every 5min"
+    )
     parser.add_argument("--json", action="store_true", help="JSON output")
-    parser.add_argument("--interval", type=int, default=300, help="Watch interval (seconds)")
+    parser.add_argument(
+        "--interval", type=int, default=300, help="Watch interval (seconds)"
+    )
     args = parser.parse_args()
 
     if args.watch:

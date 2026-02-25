@@ -37,7 +37,7 @@ system_prompt: |
   - DB path: data/platform.db at _SOFTWARE_FACTORY root (NOT platform/data/)
   
   DEPLOY:
-  - Azure VM: 4.233.64.30, user azureadmin
+  - Azure VM: <AZURE_VM_IP>, user azureadmin
   - rsync + docker compose --build
   - Basic Auth: macaron:macaron
   - No --reload, no --ws, --ws none mandatory

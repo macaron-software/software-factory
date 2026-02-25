@@ -2,13 +2,13 @@
 
 ## 3 Environments
 
-### 1. Azure Production (4.233.64.30)
+### 1. Azure Production (<AZURE_VM_IP>)
 
 | Property | Value |
 |----------|-------|
 | VM | D4as_v5 (4 CPU, 16 GB), francecentral |
-| SSH | `macaron@4.233.64.30` |
-| Web | http://4.233.64.30 (nginx basic auth) |
+| SSH | `<AZURE_VM_IP>` |
+| Web | http://<AZURE_VM_IP> (nginx basic auth) |
 | LLM | Azure OpenAI / gpt-5-mini |
 | Container | `deploy-platform-1` |
 | Compose | `/opt/macaron/platform/deploy/docker-compose-vm.yml` |
@@ -21,22 +21,22 @@
 **Deploy process:**
 ```bash
 # 1. rsync from push repo to VM
-rsync -avz /tmp/gh_push_ops/software-factory/{platform,cli,skills,dashboard,mcp_lrm,projects}/ macaron@4.233.64.30:/home/macaron/
+rsync -avz /tmp/gh_push_ops/software-factory/{platform,cli,skills,dashboard,mcp_lrm,projects}/ <AZURE_VM_IP>:/home/macaron/
 
 # 2. Update patches
-ssh macaron@4.233.64.30 "sudo cp /home/macaron/platform/web/routes/*.py /opt/macaron/patches/"
+ssh <AZURE_VM_IP> "sudo cp /home/macaron/platform/web/routes/*.py /opt/macaron/patches/"
 
 # 3. Restart
-ssh macaron@4.233.64.30 "sudo docker restart deploy-platform-1"
+ssh <AZURE_VM_IP> "sudo docker restart deploy-platform-1"
 ```
 
-### 2. OVH Demo (54.36.183.124)
+### 2. OVH Demo (<OVH_IP>)
 
 | Property | Value |
 |----------|-------|
 | VPS | OVH VPS, Debian |
-| SSH | `debian@54.36.183.124` |
-| Web | http://54.36.183.124 |
+| SSH | `<OVH_IP>` |
+| Web | http://<OVH_IP> |
 | LLM | Demo mode (mock, no API key needed) |
 | Container | `software-factory-platform-1` |
 | Image | `software-factory-platform:v2` |
@@ -45,8 +45,8 @@ ssh macaron@4.233.64.30 "sudo docker restart deploy-platform-1"
 
 **Deploy process:**
 ```bash
-rsync -avz --delete /tmp/gh_push_ops/software-factory/ debian@54.36.183.124:/opt/software-factory/
-ssh debian@54.36.183.124 "cd /opt/software-factory && sudo docker compose up -d --build"
+rsync -avz --delete /tmp/gh_push_ops/software-factory/ <OVH_IP>:/opt/software-factory/
+ssh <OVH_IP> "cd /opt/software-factory && sudo docker compose up -d --build"
 ```
 
 ### 3. Local Development

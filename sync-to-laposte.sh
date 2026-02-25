@@ -2,7 +2,7 @@
 # sync-to-laposte.sh — Sync du squelette plateforme vers GitLab La Poste
 #
 # Source : ~/_MACARON-SOFTWARE/  (GitHub macaron-software)
-# Dest   : ~/_LAPOSTE/_SOFTWARE_FACTORY/  (GitLab La Poste — udd-ia-native)
+# Dest   : ~/_LAPOSTE/_SOFTWARE_FACTORY/  (GitLab La Poste (URL dans .env))
 #
 # Usage : ./sync-to-laposte.sh [--dry-run]
 
@@ -10,7 +10,10 @@ set -e
 
 GITHUB_REPO="$HOME/_MACARON-SOFTWARE"
 LAPOSTE_REPO="$HOME/_LAPOSTE/_SOFTWARE_FACTORY"
-LAPOSTE_REMOTE="git@gitlab.azure.innovation-laposte.io:udd-ia-native/software-factory.git"
+
+# URL chargée depuis .env (non commitée) ou variable d'env
+[ -f "$GITHUB_REPO/.env" ] && source "$GITHUB_REPO/.env"
+LAPOSTE_REMOTE="${GITLAB_LAPOSTE_REMOTE:-git@<gitlab-host>:<group>/software-factory.git}"
 DRY_RUN=false
 
 [[ "$1" == "--dry-run" ]] && DRY_RUN=true

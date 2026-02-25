@@ -578,7 +578,7 @@ Mission Creee
                      │                │
           ┌──────────▼─────┐  ┌───────▼────────┐
           │ VM Azure (Prod)│  │ VPS OVH (Demo) │
-          │ 4.233.64.30   │  │ 54.36.183.124  │
+          │ sf.macaron-software.com   │  │ demo.macaron-software.com  │
           │                │  │                │
           │ Nginx :443     │  │ Nginx :443     │
           │   │            │  │   │            │

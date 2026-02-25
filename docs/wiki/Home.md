@@ -34,7 +34,7 @@ make run
 | Repo | Purpose | Content |
 |------|---------|---------|
 | **GitHub** (macaron-software/software-factory) | Public, full platform | All code, agents, workflows. Sanitized: 0 project data, 0 personal info |
-| **GitLab La Poste** (gitlab.azure.innovation-laposte.io) | Internal skeleton | Platform structure, no missions, no agent skills, CI/CD integration |
+| **GitLab La Poste** (gitlab.azure.<gitlab-laposte>) | Internal skeleton | Platform structure, no missions, no agent skills, CI/CD integration |
 
 ## License
 

@@ -43,10 +43,10 @@ Legacy: `_SOFTWARE_FACTORY-old/` (core/, factory CLI, brain, TDD workers — arc
   _SOFTWARE_FACTORY/                         ← ⚠️ NON TRACKÉ (.gitignore) = runtime local
     platform/  dashboard/  data/  logs/      ←   instance de dev en cours (DB, logs, etc.)
 
-~/_LAPOSTE/_SOFTWARE_FACTORY/                ← GitLab La Poste (udd-ia-native/software-factory)
-  .git/ → origin = git@gitlab.azure.innovation-laposte.io:udd-ia-native/software-factory.git
+~/_LAPOSTE/_SOFTWARE_FACTORY/                ← GitLab La Poste (GITLAB_LAPOSTE_REMOTE dans .env)
+  .git/ → origin = <gitlab-laposte>          ← URL SSH chargée depuis .env (non commitée)
   platform/  cli/  dashboard/  ...           ← squelette : agents/workflows/projets VIDES
-  Auth: SSH ~/.ssh/gitlab_laposte_ed25519 (sylvain.legland@laposte.fr) — ssh -T OK
+  Auth: SSH ~/.ssh/gitlab_laposte_ed25519
   README: FR uniquement, branding "Plateforme Agents La Poste", usage interne La Poste
 ```
 
@@ -60,8 +60,8 @@ Legacy: `_SOFTWARE_FACTORY-old/` (core/, factory CLI, brain, TDD workers — arc
 ┌────────────────┬─────────────────────────┬──────────────────────────────────┐
 │ Environment    │ URL / Access            │ Details                          │
 ├────────────────┼─────────────────────────┼──────────────────────────────────┤
-│ Azure Prod     │ http://4.233.64.30      │ D4as_v5 4CPU/16GB, francecentral │
-│                │ SSH: macaron@4.233.64.30│ LLM: azure-openai / gpt-5-mini  │
+│ Azure Prod     │ http://<AZURE_VM_IP>    │ D4as_v5 4CPU/16GB, francecentral │
+│                │ SSH: macaron@<VM>       │ LLM: azure-openai / gpt-5-mini  │
 │                │ nginx basic auth        │ Container: deploy-platform-1     │
 │                │                         │ Compose: deploy/docker-compose-  │
 │                │                         │   vm.yml (context: /opt/macaron) │
@@ -69,8 +69,8 @@ Legacy: `_SOFTWARE_FACTORY-old/` (core/, factory CLI, brain, TDD workers — arc
 │                │                         │ Patches: /opt/macaron/patches/   │
 │                │                         │ OTEL → Jaeger :16686             │
 ├────────────────┼─────────────────────────┼──────────────────────────────────┤
-│ OVH Demo       │ http://54.36.183.124    │ VPS OVH, Debian                  │
-│                │ SSH: debian@54.36.183.124│ LLM: demo (mock, no key)        │
+│ OVH Demo       │ http://<OVH_IP>         │ VPS OVH, Debian                  │
+│                │ SSH: debian@<OVH_IP>    │ LLM: demo (mock, no key)        │
 │                │                         │ Container: software-factory-     │
 │                │                         │   platform-1                     │
 │                │                         │ Code: /opt/software-factory/     │
@@ -123,7 +123,7 @@ MiniMax: <think> consume tokens (min 16K). GPT-5-mini: NO temperature, max_compl
 ## AZURE
 
 ```
-VM:  4.233.64.30 (D4as_v5 4CPU/16GB, francecentral) — SSH macaron@4.233.64.30, nginx basic auth
+VM:  <AZURE_VM_IP> (D4as_v5 4CPU/16GB, francecentral) — SSH macaron@<VM>, nginx basic auth
      Container: deploy-platform-1, path /app/macaron_platform/, volume deploy_platform-data at /app/data
      Active compose: /opt/macaron/platform/deploy/docker-compose-vm.yml (context: /opt/macaron)
      Patches: /opt/macaron/patches/ → copied at container start via start-with-patches.sh
