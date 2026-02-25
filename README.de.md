@@ -143,23 +143,40 @@ Qualitäts-Gates auf Workflow-Phasen (PASS/FAIL-Badges) · Dashboard unter `/qua
 
 ## Architektur
 
-<p align="center">
-  <img src="docs/diagrams/architecture-de.svg" alt="Architektur" width="100%">
-</p>
-
-<details>
-<summary>Pipeline und Observability</summary>
-
-<p align="center">
-  <img src="docs/diagrams/pipeline-flow-de.svg" alt="Pipeline" width="100%">
-</p>
-<p align="center">
-  <img src="docs/diagrams/observability-de.svg" alt="Observability" width="100%">
-</p>
-<p align="center">
-  <img src="docs/diagrams/deployment-de.svg" alt="Deployment" width="100%">
-</p>
-</details>
+```
+                     ┌──────────────────────┐
+                     │  CLI (sf) / Web UI   │
+                     │  REST API :8090      │
+                     └──────────┬───────────┘
+                                │
+                 ┌──────────────┴──────────────┐
+                 │     FastAPI-Server            │
+                 │  Auth (JWT + RBAC + OAuth)    │
+                 └──┬──────────┬────────────┬───┘
+                    │          │            │
+       ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
+       │ Agenten-     │   │ Workflow-│   │  Missions-   │
+       │  Engine      │   │  Engine  │   │   Schicht    │
+       │ 161 Agenten  │   │ 39 Defs  │   │ SAFe-Zyklus  │
+       │ Ausfuhrer    │   │ 10 Ptrns │   │ Portfolio    │
+       └──────┬───────┘   │ Phasen   │   │ Epic/Feature │
+              │           │ Retry    │   └──────────────┘
+              │           └────┬─────┘
+              │                │
+  ┌───────────┴────────────────┴───────────────┐
+  │  Dienste + Betrieb                          │
+  │  LLM (Multi-Provider-Fallback)              │
+  │  Werkzeuge (Code, Git, Deploy, Sicherheit)  │
+  │  Watchdog (Auto-Wiederaufnahme, Erkennung)  │
+  │  Qualitat (10 Dimensionen, Radar, Badge)    │
+  │  OpenTelemetry (Tracing > Jaeger)           │
+  └───────────────────┬────────────────────────┘
+                      │
+           ┌──────────┴──────────┐
+           │  SQLite + Speicher  │
+           │  4 Schichten + FTS5 │
+           └─────────────────────┘
+```
 
 ## Neuheiten v2.2.0 (Feb 2026)
 

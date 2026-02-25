@@ -140,23 +140,40 @@ NVIDIA_API_KEY=nvapi-your-key-here
 
 ## Architecture
 
-<p align="center">
-  <img src="docs/diagrams/architecture.svg" alt="Architecture" width="100%">
-</p>
-
-<details>
-<summary>Pipeline and Observability</summary>
-
-<p align="center">
-  <img src="docs/diagrams/pipeline-flow.svg" alt="Pipeline Flow" width="100%">
-</p>
-<p align="center">
-  <img src="docs/diagrams/observability.svg" alt="Observability" width="100%">
-</p>
-<p align="center">
-  <img src="docs/diagrams/deployment.svg" alt="Deployment" width="100%">
-</p>
-</details>
+```
+                     ┌──────────────────────┐
+                     │  CLI (sf) / Web UI   │
+                     │  REST API :8090      │
+                     └──────────┬───────────┘
+                                │
+                 ┌──────────────┴──────────────┐
+                 │     FastAPI Server            │
+                 │  Auth (JWT + RBAC + OAuth)    │
+                 └──┬──────────┬────────────┬───┘
+                    │          │            │
+       ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
+       │ Agent        │   │ Workflow │   │   Mission    │
+       │  Engine      │   │  Engine  │   │    Layer     │
+       │ 161 agents   │   │ 39 defs  │   │ SAFe cycle   │
+       │ executor     │   │ 10 ptrns │   │ Portfolio    │
+       └──────┬───────┘   │ phases   │   │ Epic/Feature │
+              │           │ retry    │   └──────────────┘
+              │           └────┬─────┘
+              │                │
+  ┌───────────┴────────────────┴───────────────┐
+  │  Services + Operations                      │
+  │  LLM (multi-provider fallback)              │
+  │  Tools (code, git, deploy, security)        │
+  │  Watchdog (auto-resume, stall detection)    │
+  │  Quality (10 dimensions, radar, badge)      │
+  │  OpenTelemetry (tracing > Jaeger)           │
+  └───────────────────┬────────────────────────┘
+                      │
+           ┌──────────┴──────────┐
+           │  SQLite + Memory    │
+           │  4 layers + FTS5    │
+           └─────────────────────┘
+```
 
 ## What's New in v2.2.0 (Feb 2026)
 

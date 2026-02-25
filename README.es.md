@@ -143,23 +143,40 @@ Puertas de calidad en fases de workflow (badges PASS/FAIL) · Dashboard en `/qua
 
 ## Arquitectura
 
-<p align="center">
-  <img src="docs/diagrams/architecture-es.svg" alt="Arquitectura" width="100%">
-</p>
-
-<details>
-<summary>Pipeline y Observabilidad</summary>
-
-<p align="center">
-  <img src="docs/diagrams/pipeline-flow-es.svg" alt="Pipeline" width="100%">
-</p>
-<p align="center">
-  <img src="docs/diagrams/observability-es.svg" alt="Observabilidad" width="100%">
-</p>
-<p align="center">
-  <img src="docs/diagrams/deployment-es.svg" alt="Despliegue" width="100%">
-</p>
-</details>
+```
+                     ┌──────────────────────┐
+                     │  CLI (sf) / Web UI   │
+                     │  API REST :8090      │
+                     └──────────┬───────────┘
+                                │
+                 ┌──────────────┴──────────────┐
+                 │     Servidor FastAPI          │
+                 │  Auth (JWT + RBAC + OAuth)    │
+                 └──┬──────────┬────────────┬───┘
+                    │          │            │
+       ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
+       │ Motor        │   │ Motor    │   │   Capa       │
+       │  Agentes     │   │ Workflow │   │   Misiones   │
+       │ 161 agentes  │   │ 39 defs  │   │ Ciclo SAFe   │
+       │ ejecutor     │   │ 10 ptrns │   │ Portfolio    │
+       └──────┬───────┘   │ fases    │   │ Epic/Feature │
+              │           │ retry    │   └──────────────┘
+              │           └────┬─────┘
+              │                │
+  ┌───────────┴────────────────┴───────────────┐
+  │  Servicios + Operaciones                    │
+  │  LLM (fallback multi-proveedor)             │
+  │  Herramientas (codigo, git, deploy, secu)   │
+  │  Watchdog (auto-reanudacion, deteccion)     │
+  │  Calidad (10 dimensiones, radar, badge)     │
+  │  OpenTelemetry (tracing > Jaeger)           │
+  └───────────────────┬────────────────────────┘
+                      │
+           ┌──────────┴──────────┐
+           │  SQLite + Memoria   │
+           │  4 capas + FTS5     │
+           └─────────────────────┘
+```
 
 ## Novedades v2.2.0 (feb 2026)
 

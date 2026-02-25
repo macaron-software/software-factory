@@ -462,27 +462,155 @@ python3 -m platform.mcp_platform.server
 
 ### Platform Overview
 
-<p align="center">
-  <img src="docs/diagrams/architecture.svg" alt="Architecture Overview" width="100%">
-</p>
+```
+                        ┌──────────────────────┐
+                        │   CLI (sf) / Web UI  │
+                        │   REST API :8090     │
+                        └──────────┬───────────┘
+                                   │
+                    ┌──────────────┴──────────────┐
+                    │     FastAPI Server           │
+                    │  Auth (JWT + RBAC + OAuth)   │
+                    │  17 route modules            │
+                    └──┬──────────┬────────────┬───┘
+                       │          │            │
+          ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
+          │ Agent Engine │   │ Workflow │   │   Mission    │
+          │ 161 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 39 defs  │   │ SAFe cycle   │
+          │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
+          └──────┬───────┘   │ phases   │   │ Epic/Feature │
+                 │           │ retry    │   │ Story/Sprint │
+                 │           │ skip     │   └──────────────┘
+                 │           │ ckpoint  │
+                 │           └────┬─────┘
+                 │                │
+     ┌───────────┴────────────────┴───────────────┐
+     │              Services                       │
+     │  LLM Client (multi-provider fallback)       │
+     │  Tools (code, git, deploy, memory, security)│
+     │  MCP Bridge (fetch, memory, playwright)     │
+     │  Quality Engine (10 dimensions)             │
+     │  Notifications (Slack, Email, Webhook)      │
+     └───────────────────┬─────────────────────────┘
+                         │
+     ┌───────────────────┴─────────────────────────┐
+     │              Operations                      │
+     │  Watchdog (auto-resume, stall detection)     │
+     │  Auto-Heal (incident > triage > fix)         │
+     │  OpenTelemetry (tracing + metrics > Jaeger)  │
+     └───────────────────┬─────────────────────────┘
+                         │
+              ┌──────────┴──────────┐
+              │   SQLite + Memory   │
+              │   4-layer memory    │
+              │   FTS5 search       │
+              └─────────────────────┘
+```
 
 ### Pipeline Flow
 
-<p align="center">
-  <img src="docs/diagrams/pipeline-flow.svg" alt="Pipeline Flow" width="100%">
-</p>
+```
+Mission Created
+     │
+     ▼
+┌─────────────┐     ┌──────────┐    ┌──────────┐    ┌──────────┐
+│  Select     │────▶│sequential│    │ parallel │    │hierarchic│
+│  Pattern    │────▶│          │    │          │    │          │
+└─────────────┘────▶│ adversar.│    │          │    │          │
+                    └────┬─────┘    └────┬─────┘    └────┬─────┘
+                         └───────────────┴───────────────┘
+                                         │
+                    ┌────────────────────────────────────────┐
+                    │         Phase Execution                 │
+                    │                                        │
+                    │  Agent ──▶ LLM Call ──▶ Result         │
+                    │                          │             │
+                    │              ┌───success──┴──failure──┐│
+                    │              ▼                        ▼│
+                    │         Code phase?            Retries? │
+                    │           │ yes                  │ yes │
+                    │           ▼                      ▼     │
+                    │     Sandbox Build         Retry w/     │
+                    │     Validation            backoff      │
+                    │           │                      │ no  │
+                    │           ▼                      ▼     │
+                    │     Quality Gate          skip_on_fail?│
+                    │      │        │            │yes  │no   │
+                    │    pass     fail            │     │     │
+                    │      │        │             │     ▼     │
+                    │      ▼        ▼             │   PAUSED  │
+                    │  Checkpoint  PAUSED ◀───────┘     │     │
+                    └──────┬─────────────────────────────┘    │
+                           │                                  │
+                    More phases? ──yes──▶ next phase          │
+                           │ no                               │
+                           ▼                    watchdog      │
+                    Mission Completed     auto-resume ◀───────┘
+```
 
-### Observability Stack
+### Observability
 
-<p align="center">
-  <img src="docs/diagrams/observability.svg" alt="Observability" width="100%">
-</p>
+```
+┌──────────────────────┐    ┌────────────────────────────────┐
+│   OTEL Middleware     │    │     Continuous Watchdog         │
+│   (every request)     │    │                                │
+│   spans + metrics     │    │  health check    every 60s     │
+│         │             │    │  stall detection  phases>60min │
+│         ▼             │    │  auto-resume     5/batch 5min  │
+│   OTLP/HTTP export    │    │  session recovery  >30min      │
+│         │             │    │  failed cleanup   zombies      │
+│         ▼             │    └────────────────────────────────┘
+│   Jaeger :16686       │
+└──────────────────────┘    ┌────────────────────────────────┐
+                            │     Failure Analysis            │
+┌──────────────────────┐    │                                │
+│   Quality Engine      │    │  error classification          │
+│   10 dimensions       │    │  phase heatmap                 │
+│   quality gates       │    │  recommendations               │
+│   radar chart         │    │  resume-all button             │
+│   badge + scorecard   │    └────────────────────────────────┘
+└──────────────────────┘
+                            ┌────────────────────────────────┐
+         All data ─────────▶│  Dashboard /analytics           │
+                            │  tracing stats + latency chart  │
+                            │  error doughnut + phase bars    │
+                            │  quality radar + scorecard      │
+                            └────────────────────────────────┘
+```
 
 ### Deployment
 
-<p align="center">
-  <img src="docs/diagrams/deployment.svg" alt="Deployment Architecture" width="100%">
-</p>
+```
+                          Internet
+                     ┌───────┴────────┐
+                     │                │
+          ┌──────────▼─────┐  ┌───────▼────────┐
+          │ Azure VM (Prod)│  │ OVH VPS (Demo) │
+          │ 4.233.64.30   │  │ 54.36.183.124  │
+          │                │  │                │
+          │ Nginx :443     │  │ Nginx :443     │
+          │   │            │  │   │            │
+          │   ▼            │  │   ▼            │
+          │ Platform :8090 │  │ Platform :8090 │
+          │ GPT-5-mini     │  │ MiniMax-M2.5   │
+          │   │            │  │   │            │
+          │   ▼            │  │   ▼            │
+          │ Jaeger :16686  │  │ Jaeger :16686  │
+          │   │            │  │   │            │
+          │   ▼            │  │   ▼            │
+          │ SQLite DB      │  │ SQLite DB      │
+          │ /patches (ro)  │  │                │
+          └────────────────┘  └────────────────┘
+                     │                │
+                     └───────┬────────┘
+                             │
+                    ┌────────▼────────┐
+                    │ GitHub          │
+                    │ macaron-software│
+                    │ /software-factory│
+                    └─────────────────┘
+```
 
 ## Project Configuration
 
