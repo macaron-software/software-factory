@@ -144,20 +144,20 @@ Qualitäts-Gates auf Workflow-Phasen (PASS/FAIL-Badges) · Dashboard unter `/qua
 ## Architektur
 
 <p align="center">
-  <img src="docs/diagrams/architecture.svg" alt="Architektur" width="100%">
+  <img src="docs/diagrams/architecture-de.svg" alt="Architektur" width="100%">
 </p>
 
 <details>
 <summary>Pipeline und Observability</summary>
 
 <p align="center">
-  <img src="docs/diagrams/pipeline-flow.svg" alt="Pipeline" width="100%">
+  <img src="docs/diagrams/pipeline-flow-de.svg" alt="Pipeline" width="100%">
 </p>
 <p align="center">
-  <img src="docs/diagrams/observability.svg" alt="Observability" width="100%">
+  <img src="docs/diagrams/observability-de.svg" alt="Observability" width="100%">
 </p>
 <p align="center">
-  <img src="docs/diagrams/deployment.svg" alt="Deployment" width="100%">
+  <img src="docs/diagrams/deployment-de.svg" alt="Deployment" width="100%">
 </p>
 </details>
 

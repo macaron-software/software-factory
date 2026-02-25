@@ -1,0 +1,108 @@
+graph TB
+    subgraph CLIENT["Capa Cliente"]
+        CLI["CLI (sf)"]
+        WEB["Panel de Control\nport 8080"]
+        API_EXT["API REST\nport 8090"]
+    end
+
+    subgraph PLATFORM["Nucleo Plataforma"]
+        SERVER["Servidor FastAPI"]
+        AUTH["Auth\nJWT + RBAC + OAuth"]
+        ROUTES["Rutas\n10 sub-modulos"]
+
+        subgraph AGENTS["Motor de Agentes"]
+            STORE["Catalogo Agentes\n161 agentes"]
+            EXEC["Ejecutor\nLLM + Herramientas"]
+            LOOP["Bucle Agente\nretry + timeout"]
+        end
+
+        subgraph WORKFLOWS["Motor Workflows"]
+            WF_STORE["Gestor Workflows\nrun_workflow()"]
+            WF_DEFS["39 Definiciones\nbuiltins.py"]
+            PATTERNS["12 Patrones\nsecuencial, paralelo\njerarquico, adversarial..."]
+            PHASES["Ejecutor Fases\nretry, skip, checkpoint"]
+        end
+
+        subgraph MISSIONS["Capa Misiones"]
+            SAFE["Ciclo SAFe\nPortfolio > Epic > Feature > Story"]
+            BACKLOG["Product Backlog\nPriorizacion WSJF"]
+            SPRINTS["Ejecucion Sprint\nCadencia PI"]
+        end
+
+        subgraph A2A["Agente-a-Agente"]
+            BUS["Bus de Mensajes"]
+            NEGO["Negociacion"]
+            VETO["Protocolo Veto"]
+        end
+    end
+
+    subgraph SERVICES["Servicios"]
+        LLM["Cliente LLM\nfallback multi-proveedor"]
+        TOOLS["Herramientas\ncodigo, git, deploy\nmemoria, seguridad, navegador"]
+        MCP["Puente MCP\nfetch, memory, playwright"]
+        NOTIF["Notificaciones\nSlack, Email, Webhook"]
+        QUALITY["Motor Calidad\n10 dimensiones"]
+    end
+
+    subgraph OPS["Operaciones"]
+        WATCHDOG["Watchdog\nauto-reanudacion, deteccion bloqueo"]
+        HEAL["Auto-Reparacion\nincidente > triaje > correccion"]
+        OTEL["OpenTelemetry\ntracing + metricas"]
+    end
+
+    subgraph DATA["Capa Datos"]
+        DB[(SQLite\nplatform.db)]
+        MEM["Memoria 4 capas\nsesion, patron\nproyecto, global"]
+        FTS["Busqueda FTS5"]
+    end
+
+    subgraph PROVIDERS["Proveedores LLM"]
+        MINIMAX["MiniMax M2.5"]
+        AZURE_OAI["Azure OpenAI\nGPT-5-mini"]
+        AZURE_AI["Azure AI Foundry"]
+    end
+
+    CLI --> SERVER
+    WEB --> SERVER
+    API_EXT --> SERVER
+    SERVER --> AUTH
+    AUTH --> ROUTES
+    ROUTES --> AGENTS
+    ROUTES --> WORKFLOWS
+    ROUTES --> MISSIONS
+    AGENTS --> A2A
+    WF_STORE --> PATTERNS
+    WF_STORE --> PHASES
+    EXEC --> LLM
+    EXEC --> TOOLS
+    EXEC --> MCP
+    LLM --> MINIMAX
+    LLM --> AZURE_OAI
+    LLM --> AZURE_AI
+    QUALITY --> DB
+    WATCHDOG --> WF_STORE
+    OTEL -.-> SERVER
+    STORE --> DB
+    WF_STORE --> DB
+    SAFE --> DB
+    MEM --> FTS
+    MEM --> DB
+    NOTIF -.-> ROUTES
+
+    classDef client fill:#e3f2fd,stroke:#1565c0,color:#000
+    classDef core fill:#fff3e0,stroke:#e65100,color:#000
+    classDef service fill:#e8f5e9,stroke:#2e7d32,color:#000
+    classDef ops fill:#fce4ec,stroke:#c62828,color:#000
+    classDef data fill:#f3e5f5,stroke:#6a1b9a,color:#000
+    classDef provider fill:#e0f7fa,stroke:#00695c,color:#000
+
+    class CLI,WEB,API_EXT client
+    class SERVER,AUTH,ROUTES core
+    class STORE,EXEC,LOOP core
+    class WF_STORE,WF_DEFS,PATTERNS,PHASES core
+    class SAFE,BACKLOG,SPRINTS core
+    class BUS,NEGO,VETO core
+    class LLM,TOOLS,MCP,NOTIF,QUALITY service
+    class WATCHDOG,HEAL,OTEL ops
+    class DB,MEM,FTS data
+    class MINIMAX,AZURE_OAI,AZURE_AI provider

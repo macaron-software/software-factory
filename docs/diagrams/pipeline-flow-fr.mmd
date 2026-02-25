@@ -1,0 +1,57 @@
+flowchart LR
+    START((Mission\nCreee)) --> INIT[Initialiser\nWorkflow]
+    INIT --> SELECT{Selectionner\nPattern}
+
+    SELECT -->|sequentiel| SEQ[Phase 1\nPhase 2\nPhase N]
+    SELECT -->|parallele| PAR[Phase A + B\nsimultane]
+    SELECT -->|hierarchique| HIER[Manager\ndelegue aux\nsous-agents]
+    SELECT -->|adversarial| ADV[Generateur\nvs Critique]
+
+    SEQ --> PHASE
+    PAR --> PHASE
+    HIER --> PHASE
+    ADV --> PHASE
+
+    subgraph PHASE_EXEC["Execution de Phase"]
+        PHASE[Executer Phase] --> AGENT[Agent\nExecuteur]
+        AGENT --> LLM_CALL[Appel LLM\navec outils]
+        LLM_CALL --> RESULT{Resultat}
+
+        RESULT -->|succes| BUILD_CHK{Phase\ncode ?}
+        BUILD_CHK -->|oui| SANDBOX[Validation\nBuild Sandbox]
+        BUILD_CHK -->|non| GATE
+        SANDBOX -->|ok| GATE
+        SANDBOX -->|echec| INJECT[Injecter Erreur\ndans Contexte]
+        INJECT --> RETRY_B{Essais\nrestants ?}
+        RETRY_B -->|oui| AGENT
+        RETRY_B -->|non| SKIP_CHK
+
+        RESULT -->|echec| RETRY{Essais\nrestants ?}
+        RETRY -->|oui, backoff| AGENT
+        RETRY -->|non| SKIP_CHK{skip_on\n_failure ?}
+        SKIP_CHK -->|oui| GATE
+        SKIP_CHK -->|non| PAUSED
+
+        GATE[Porte\nQualite] --> GATE_R{Resultat\nPorte}
+        GATE_R -->|passe| CHECKPOINT[Checkpoint\nPhase Terminee]
+        GATE_R -->|echec| PAUSED
+    end
+
+    CHECKPOINT --> NEXT{Autres\nPhases ?}
+    NEXT -->|oui| PHASE
+    NEXT -->|non| COMPLETE((Mission\nTerminee))
+
+    PAUSED((Run\nen Pause)) -.->|watchdog\nauto-reprise| PHASE
+
+    classDef start fill:#c8e6c9,stroke:#2e7d32,color:#000
+    classDef process fill:#e3f2fd,stroke:#1565c0,color:#000
+    classDef decision fill:#fff3e0,stroke:#e65100,color:#000
+    classDef error fill:#ffcdd2,stroke:#c62828,color:#000
+    classDef success fill:#c8e6c9,stroke:#2e7d32,color:#000
+    classDef pattern fill:#e0f7fa,stroke:#00695c,color:#000
+
+    class START,COMPLETE success
+    class PAUSED error
+    class PHASE,AGENT,LLM_CALL,GATE,CHECKPOINT,SANDBOX,INJECT process
+    class RESULT,RETRY,SKIP_CHK,BUILD_CHK,GATE_R,NEXT,SELECT,RETRY_B decision
+    class INIT,SEQ,PAR,HIER,ADV pattern

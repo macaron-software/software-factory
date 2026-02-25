@@ -419,25 +419,25 @@ python3 -m platform.mcp_platform.server
 ### Vue d'ensemble
 
 <p align="center">
-  <img src="docs/diagrams/architecture.svg" alt="Architecture" width="100%">
+  <img src="docs/diagrams/architecture-fr.svg" alt="Architecture" width="100%">
 </p>
 
 ### Flux du Pipeline
 
 <p align="center">
-  <img src="docs/diagrams/pipeline-flow.svg" alt="Pipeline" width="100%">
+  <img src="docs/diagrams/pipeline-flow-fr.svg" alt="Pipeline" width="100%">
 </p>
 
 ### Observabilite
 
 <p align="center">
-  <img src="docs/diagrams/observability.svg" alt="Observabilite" width="100%">
+  <img src="docs/diagrams/observability-fr.svg" alt="Observabilite" width="100%">
 </p>
 
 ### Deploiement
 
 <p align="center">
-  <img src="docs/diagrams/deployment.svg" alt="Deploiement" width="100%">
+  <img src="docs/diagrams/deployment-fr.svg" alt="Deploiement" width="100%">
 </p>
 
 ## Nouveautés v2.1.0 (fév 2026)

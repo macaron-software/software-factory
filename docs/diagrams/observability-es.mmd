@@ -1,0 +1,83 @@
+graph TB
+    subgraph APP["Plataforma (FastAPI)"]
+        MW["Middleware OTEL\nASGI"]
+        SPANS["Trazas\npeticion, agente\nworkflow, LLM"]
+        METRICS["Metricas\nlatencia, tasa error\nrendimiento"]
+    end
+
+    subgraph WATCHDOG["Watchdog Continuo"]
+        HEALTH["Chequeo Salud\ncada 60s"]
+        STALL["Deteccion Bloqueo\nfases > 60min"]
+        RESUME["Auto-Reanudacion\n5/lote, cada 5min"]
+        SESSION["Recuperacion Sesiones\ninactivas > 30min"]
+        CLEANUP["Limpieza\nsesiones zombie"]
+    end
+
+    subgraph ANALYSIS["Analisis de Fallos"]
+        CLASS["Clasificacion Errores\nsetup_failed, llm_provider\ntimeout, phase_error"]
+        HEATMAP["Heatmap Fases\ntasa fallo por fase"]
+        RECO["Recomendaciones\nsugerencias accionables"]
+    end
+
+    subgraph QUALITY["Motor Calidad"]
+        DIM["10 Dimensiones\ncomplejidad, cobertura\nseguridad, a11y..."]
+        GATES["Puertas Calidad\nPASS / FAIL / PENDING"]
+        SCORE["Scores Proyecto\nradar chart"]
+    end
+
+    subgraph EXPORT["Capa Exportacion"]
+        OTLP["Exportador\nOTLP/HTTP"]
+        JAEGER["Jaeger\nport 16686"]
+    end
+
+    subgraph DASHBOARD["Panel /analytics"]
+        TRACE_UI["Stats Tracing\ngrafico latencia"]
+        FAIL_UI["Analisis Fallos\ndoughnut errores\nbarras fases"]
+        QUAL_UI["Radar Calidad\nbadge, scorecard"]
+        RESUME_BTN["Boton\nReanudar Todo"]
+    end
+
+    subgraph DB["Datos"]
+        SQLITE[(platform.db\nmisiones, runs\nsesiones)]
+    end
+
+    MW --> SPANS
+    SPANS --> OTLP
+    OTLP --> JAEGER
+    MW --> METRICS
+
+    HEALTH --> SQLITE
+    STALL --> SQLITE
+    RESUME --> APP
+    SESSION --> SQLITE
+    CLEANUP --> SQLITE
+
+    CLASS --> SQLITE
+    HEATMAP --> SQLITE
+    RECO --> CLASS
+
+    DIM --> SQLITE
+    GATES --> DIM
+    SCORE --> DIM
+
+    TRACE_UI --> JAEGER
+    FAIL_UI --> CLASS
+    FAIL_UI --> HEATMAP
+    QUAL_UI --> SCORE
+    RESUME_BTN --> RESUME
+
+    classDef app fill:#fff3e0,stroke:#e65100,color:#000
+    classDef watch fill:#fce4ec,stroke:#c62828,color:#000
+    classDef analysis fill:#e8f5e9,stroke:#2e7d32,color:#000
+    classDef quality fill:#e3f2fd,stroke:#1565c0,color:#000
+    classDef export fill:#f3e5f5,stroke:#6a1b9a,color:#000
+    classDef dash fill:#e0f7fa,stroke:#00695c,color:#000
+    classDef data fill:#eceff1,stroke:#37474f,color:#000
+
+    class MW,SPANS,METRICS app
+    class HEALTH,STALL,RESUME,SESSION,CLEANUP watch
+    class CLASS,HEATMAP,RECO analysis
+    class DIM,GATES,SCORE quality
+    class OTLP,JAEGER export
+    class TRACE_UI,FAIL_UI,QUAL_UI,RESUME_BTN dash
+    class SQLITE data

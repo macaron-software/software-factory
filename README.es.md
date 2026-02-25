@@ -144,20 +144,20 @@ Puertas de calidad en fases de workflow (badges PASS/FAIL) · Dashboard en `/qua
 ## Arquitectura
 
 <p align="center">
-  <img src="docs/diagrams/architecture.svg" alt="Arquitectura" width="100%">
+  <img src="docs/diagrams/architecture-es.svg" alt="Arquitectura" width="100%">
 </p>
 
 <details>
 <summary>Pipeline y Observabilidad</summary>
 
 <p align="center">
-  <img src="docs/diagrams/pipeline-flow.svg" alt="Pipeline" width="100%">
+  <img src="docs/diagrams/pipeline-flow-es.svg" alt="Pipeline" width="100%">
 </p>
 <p align="center">
-  <img src="docs/diagrams/observability.svg" alt="Observabilidad" width="100%">
+  <img src="docs/diagrams/observability-es.svg" alt="Observabilidad" width="100%">
 </p>
 <p align="center">
-  <img src="docs/diagrams/deployment.svg" alt="Despliegue" width="100%">
+  <img src="docs/diagrams/deployment-es.svg" alt="Despliegue" width="100%">
 </p>
 </details>
 
