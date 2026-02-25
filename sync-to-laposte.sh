@@ -49,6 +49,10 @@ EXCLUDES=(
     "--exclude=.env"
     "--exclude=CLAUDE.md"
     "--exclude=.github/copilot-instructions.md"
+    # Branding Macaron — exclus du squelette La Poste
+    "--exclude=SPECS.md"
+    "--exclude=macaron-platform.service"
+    "--exclude=ops/RUNBOOK.md"
 )
 
 DIRS_TO_SYNC=(
@@ -57,8 +61,6 @@ DIRS_TO_SYNC=(
     "dashboard"
     "mcp_lrm"
     "deploy"
-    "docs"
-    "scripts"
     "tests"
 )
 
@@ -95,11 +97,9 @@ if ! $DRY_RUN; then
        "$LAPOSTE_REPO/platform/skills/definitions/_template.yaml" 2>/dev/null || true
 fi
 
-# ── 4. README La Poste (ne pas écraser s'il a été modifié localement) ─────────
-if [ ! -f "$LAPOSTE_REPO/README.md" ]; then
-    echo "📝 README La Poste..."
-    $DRY_RUN || cp "$GITHUB_REPO/README.laposte.md" "$LAPOSTE_REPO/README.md"
-fi
+# ── 4. README La Poste (toujours synchronisé depuis README.laposte.md) ────────
+echo "  -> README.md"
+$DRY_RUN || cp "$GITHUB_REPO/README.laposte.md" "$LAPOSTE_REPO/README.md"
 
 # ── 5. Commit + push ──────────────────────────────────────────────────────────
 if ! $DRY_RUN; then
