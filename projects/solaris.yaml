@@ -1,0 +1,79 @@
+# Solaris Design System — La Poste
+# ==================================
+# Agents UX/UI/A11y spécialisés, MCP Solaris obligatoire
+
+project:
+  name: solaris
+  display_name: "Solaris Design System"
+  root_path: /app/workspace/solaris
+  vision_doc: CLAUDE.md
+  description: >
+    Design System officiel La Poste (Solaris). 41 composants Figma,
+    WCAG 2.1 AA, tokens de design, validation automatique.
+
+# Angular + SCSS avec Solaris tokens
+domains:
+  typescript:
+    paths:
+      - src/
+    extensions:
+      - .ts
+      - .tsx
+    build_cmd: npm run build
+    test_cmd: npm run test
+    lint_cmd: npm run lint
+
+  scss:
+    paths:
+      - src/styles/
+    extensions:
+      - .scss
+      - .css
+    build_cmd: "true"
+    test_cmd: "true"
+    lint_cmd: npx stylelint "src/**/*.scss"
+
+deploy:
+  strategy: validation-only
+  auto_prod: false
+  rollback_on_fail: true
+
+fractal:
+  enabled: true
+  max_files: 5
+  max_loc: 300
+  max_items: 8
+  max_depth: 2
+
+# Agents Solaris — affectés automatiquement
+agents:
+  lead: solaris_ux_designer
+  team:
+    - solaris_ux_designer
+    - solaris_ui_developer
+    - solaris_design_qa
+    - accessibility_expert
+    - dev_frontend
+    - lead_frontend
+
+# Design System constraints
+design_system:
+  name: solaris
+  mcp: mcp-solaris
+  enforce: true       # DS obligatoire — pas de composants hors DS
+  wcag_level: AA
+  figma_sync: true    # Validation automatique Figma vs code
+
+# Adversarial gate — strict pour le DS
+adversarial:
+  threshold: 3
+  custom_patterns:
+    - pattern: 'hardcoded.*#[0-9a-fA-F]{6}'
+      score: 5
+      message: "Hardcoded color — use Solaris token ($color-*)"
+    - pattern: 'px(?!-)'
+      score: 2
+      message: "Hardcoded px value — use Solaris spacing token"
+    - pattern: 'font-size:\s*\d+px'
+      score: 4
+      message: "Hardcoded font-size — use Solaris typography token"

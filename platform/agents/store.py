@@ -1750,6 +1750,7 @@ class AgentStore:
                     else 4096,
                     skills=raw.get("skills", []),
                     tools=raw.get("tools", []),
+                    mcps=raw.get("mcps", []),
                     permissions=perm_dict,
                     tags=tags,
                     icon=icon,

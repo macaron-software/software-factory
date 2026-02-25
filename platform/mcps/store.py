@@ -184,6 +184,33 @@ BUILTIN_MCPS = [
         status="available",
         is_builtin=True,
     ),
+    MCPServer(
+        id="mcp-solaris",
+        name="Solaris Design System",
+        description="Design System La Poste (Solaris) — Figma components, variants, WCAG patterns, design tokens, validation reports.",
+        command="python3",
+        args=["-m", "mcp_solaris.server"],
+        tools=[
+            {"name": "solaris_component", "description": "Get Figma component details: all variants, properties, component sets",
+             "params": {"component": "string (required)", "summary_only": "bool (default true)"}},
+            {"name": "solaris_variant", "description": "Get specific variant with exact Figma styles (borderRadius, padding, dimensions, colors)",
+             "params": {"component": "string (required)", "properties": "object (optional filter)"}},
+            {"name": "solaris_wcag", "description": "Get WCAG accessibility pattern for a component type",
+             "params": {"pattern": "string (accordion|button|tabs|checkbox|combobox|dialog|radio-group|switch|breadcrumb|focus-visible|link|listbox|loader)"}},
+            {"name": "solaris_knowledge", "description": "Query knowledge base: semantic HTML, WCAG patterns, DS best practices",
+             "params": {"category": "string (1-semantic-html|2-wcag-patterns|3-ds-best-practices|4-interactive-behaviors)", "topic": "string (optional)"}},
+            {"name": "solaris_validation", "description": "Get validation status for a component from latest report",
+             "params": {"component": "string (optional)"}},
+            {"name": "solaris_grep", "description": "Search in generated CSS/HTML/SCSS files",
+             "params": {"pattern": "string (regex)", "file_type": "string (css|html|scss|all)"}},
+            {"name": "solaris_list_components", "description": "List all 41 Figma components/families",
+             "params": {}},
+            {"name": "solaris_stats", "description": "Get overall Solaris statistics",
+             "params": {}},
+        ],
+        status="available",
+        is_builtin=True,
+    ),
 ]
 
 

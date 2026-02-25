@@ -1349,21 +1349,28 @@ async def _tool_mcp_figma(name: str, args: dict, ctx: ExecutionContext) -> str:
 
 
 async def _tool_mcp_solaris(name: str, args: dict, ctx: ExecutionContext) -> str:
-    """Proxy to Solaris design system tools."""
+    """Proxy to Solaris design system MCP server."""
+    import aiohttp
+
     tool_name = name.replace("solaris_", "")
+    url = "http://localhost:9502/tool"
     try:
-        if tool_name == "wcag":
-            from solaris_solaris_wcag import solaris_wcag  # type: ignore
-
-            return str(solaris_wcag(args.get("pattern", "")))[:8000]
-        if tool_name == "component":
-            from solaris_solaris_component import solaris_component  # type: ignore
-
-            return str(solaris_component(args.get("component", "")))[:8000]
-    except ImportError:
-        pass
-    # Fallback: try MCP bridge
-    return await _tool_mcp_lrm(f"lrm_{tool_name}", args, ctx)
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url,
+                json={"name": tool_name, "arguments": args},
+                timeout=aiohttp.ClientTimeout(total=60),
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    result = data.get("result", data)
+                    return str(result)[:8000]
+                else:
+                    return f"Solaris MCP error {resp.status}: {(await resp.text())[:500]}"
+    except aiohttp.ClientError:
+        return "Solaris MCP server not available at localhost:9502"
+    except Exception as e:
+        return f"Solaris MCP error: {e}"
 
 
 async def _tool_mcp_github(name: str, args: dict, ctx: ExecutionContext) -> str:
