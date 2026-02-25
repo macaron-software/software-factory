@@ -645,6 +645,26 @@ def _migrate(conn):
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_cat ON wiki_pages(category)")
 
+    # ── Agent-Pattern performance scores ─────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_pattern_scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            accepted INTEGER DEFAULT 0,
+            rejected INTEGER DEFAULT 0,
+            iterations INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(agent_id, pattern_id)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_aps_agent ON agent_pattern_scores(agent_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_aps_pattern ON agent_pattern_scores(pattern_id)"
+    )
+
 
 def _migrate_pg(conn):
     """PostgreSQL incremental migrations (safe ALTER TABLE IF NOT EXISTS)."""

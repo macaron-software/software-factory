@@ -1165,3 +1165,68 @@ async def get_team_score(
             "efficiency": "15% — LLM speed × success rate × output volume",
         },
     }
+
+
+@router.get("/api/analytics/agent-pattern-score")
+async def get_agent_pattern_score(limit: int = 20):
+    """
+    Score agents grouped by (agent_id, pattern_id).
+    Returns combos ranked by production ratio (accepted / (accepted + rejected)).
+    Requires at least 3 runs to appear (filters noise).
+    """
+    from ...db.migrations import get_db
+
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT
+            aps.agent_id,
+            aps.pattern_id,
+            aps.accepted,
+            aps.rejected,
+            aps.iterations,
+            (aps.accepted + aps.rejected) AS total_runs,
+            CASE WHEN (aps.accepted + aps.rejected) > 0
+                 THEN ROUND(100.0 * aps.accepted / (aps.accepted + aps.rejected), 1)
+                 ELSE 0 END AS accept_rate,
+            CASE WHEN aps.iterations > 0
+                 THEN ROUND(100.0 * aps.accepted / aps.iterations, 1)
+                 ELSE 0 END AS efficiency
+        FROM agent_pattern_scores aps
+        WHERE (aps.accepted + aps.rejected) >= 3
+        ORDER BY accept_rate DESC, total_runs DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    db.close()
+
+    combos = [
+        {
+            "agent_id": r["agent_id"],
+            "pattern_id": r["pattern_id"],
+            "accept_rate": r["accept_rate"],
+            "efficiency": r["efficiency"],
+            "accepted": r["accepted"],
+            "rejected": r["rejected"],
+            "total_runs": r["total_runs"],
+        }
+        for r in rows
+    ]
+
+    # Group by pattern to surface best agent per pattern
+    by_pattern: dict = {}
+    for c in combos:
+        pid = c["pattern_id"]
+        if pid not in by_pattern:
+            by_pattern[pid] = []
+        by_pattern[pid].append(c)
+
+    return {
+        "combos": combos,
+        "best_per_pattern": {
+            pid: agents[0] for pid, agents in by_pattern.items() if agents
+        },
+        "total_combos": len(combos),
+        "note": "Only combos with ≥3 runs shown. New data accumulates as agents run.",
+    }
