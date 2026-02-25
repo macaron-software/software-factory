@@ -49,3 +49,5 @@ deploy/credentials.txt
 Thumbs.db
 platform/tests/e2e/test-results/
 platform/tests/e2e/playwright-report/
+CLAUDE.md
+.github/copilot-instructions.md
