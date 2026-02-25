@@ -1,0 +1,87 @@
+{
+  "_meta": {
+    "description": "Rules for Playwright tests and validation in Solaris DS",
+    "version": "1.0.0",
+    "created": "2026-01-09"
+  },
+
+  "fundamental_rules": {
+    "no_hardcoded_values": {
+      "rule": "ALL expected values in tests MUST be read from Figma extracts",
+      "why": [
+        "0 hallucination - values come from Figma, not memory",
+        "Consistency between tests and generator",
+        "Auto-update if Figma changes"
+      ],
+      "bad_example": "const expected = { borderRadius: '4px' };  // Where does 4px come from???",
+      "good_example": "const figmaData = JSON.parse(fs.readFileSync('figma-data/button-all-depth10.json'));\nconst variant = figmaData.componentSets[0].children[0];\nconst expected = { borderRadius: `${variant.cornerRadius}px` };"
+    },
+
+    "use_mcp_server": {
+      "rule": "Use MCP server for dynamic Figma data queries",
+      "tools": [
+        "solaris_variant(component, properties) - Get exact styles for a variant",
+        "solaris_component(component) - Get all variants and properties",
+        "solaris_validation(component) - Get validation status"
+      ],
+      "config_file": "~/.claude/settings.json",
+      "server_file": "mcp_solaris_server.py"
+    }
+  },
+
+  "figma_data_location": {
+    "directory": "design-system/figma-data/",
+    "file_pattern": "{component}-all-depth10.json",
+    "key_properties": {
+      "cornerRadius": "borderRadius in CSS (px)",
+      "rectangleCornerRadii": "Individual corner radii [TL, TR, BR, BL]",
+      "paddingLeft/Right/Top/Bottom": "padding in CSS (px)",
+      "itemSpacing": "gap in CSS (px)",
+      "absoluteBoundingBox.width/height": "dimensions in CSS (px)",
+      "fills[].color": "backgroundColor in CSS (rgb)",
+      "strokes[].color": "borderColor in CSS (rgb)",
+      "strokeWeight": "borderWidth in CSS (px)"
+    }
+  },
+
+  "style_extraction_function": {
+    "description": "Helper function to extract CSS styles from Figma node",
+    "code": "function extractExpectedStyles(node) {\n  const styles = {};\n  const box = node.absoluteBoundingBox;\n  if (box) {\n    if (box.width !== undefined) styles.width = `${Math.round(box.width)}px`;\n    if (box.height !== undefined) styles.height = `${Math.round(box.height)}px`;\n  }\n  if (node.cornerRadius !== undefined && node.cornerRadius !== null) {\n    styles.borderRadius = `${node.cornerRadius}px`;\n  } else if (Array.isArray(node.rectangleCornerRadii)) {\n    styles.borderRadius = node.rectangleCornerRadii.map(v => `${v}px`).join(' ');\n  }\n  ['paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom'].forEach(p => {\n    if (node[p] !== undefined) styles[p] = `${node[p]}px`;\n  });\n  if (node.itemSpacing !== undefined) styles.gap = `${node.itemSpacing}px`;\n  return styles;\n}"
+  },
+
+  "test_files": {
+    "visual_audit": {
+      "file": "test-visual-audit-v2.spec.js",
+      "purpose": "Dynamic comparison of computed CSS vs Figma values",
+      "reads_from": "design-system/figma-data/*-all-depth10.json",
+      "status": "✅ Reads dynamically"
+    },
+    "accordion_validation": {
+      "file": "test-accordion-real-validation.spec.js",
+      "purpose": "Accordion-specific style validation",
+      "status": "✅ Reads dynamically"
+    },
+    "wcag_tests": {
+      "file": "test-interactivity-quick.spec.js",
+      "purpose": "WCAG compliance (focus, aria attributes)",
+      "status": "Needs review"
+    }
+  },
+
+  "playwright_best_practices": {
+    "selectors": {
+      "preferred": "[data-figma-node=\"{nodeId}\"]",
+      "fallback": "[data-variant*=\"{property}={value}\"]",
+      "avoid": ".class-name (may not be unique)"
+    },
+    "style_comparison": {
+      "method": "getComputedStyle()",
+      "tolerance": "0px for padding/margin/border, 2px for dimensions",
+      "normalize": "Remove spaces, lowercase for comparison"
+    },
+    "discovery": {
+      "method": "Scan figma-data/*.json files to discover components",
+      "limit": "Process max 20 files to avoid timeout"
+    }
+  }
+}

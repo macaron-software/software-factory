@@ -1349,28 +1349,20 @@ async def _tool_mcp_figma(name: str, args: dict, ctx: ExecutionContext) -> str:
 
 
 async def _tool_mcp_solaris(name: str, args: dict, ctx: ExecutionContext) -> str:
-    """Proxy to Solaris design system MCP server."""
-    import aiohttp
+    """Route to Solaris MCP server via MCPManager (stdio subprocess)."""
+    from ..mcps.manager import get_mcp_manager
 
-    tool_name = name.replace("solaris_", "")
-    url = "http://localhost:9502/tool"
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url,
-                json={"name": tool_name, "arguments": args},
-                timeout=aiohttp.ClientTimeout(total=60),
-            ) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    result = data.get("result", data)
-                    return str(result)[:8000]
-                else:
-                    return f"Solaris MCP error {resp.status}: {(await resp.text())[:500]}"
-    except aiohttp.ClientError:
-        return "Solaris MCP server not available at localhost:9502"
-    except Exception as e:
-        return f"Solaris MCP error: {e}"
+    mgr = get_mcp_manager()
+    mcp_id = "mcp-solaris"
+
+    # Auto-start if not running
+    if mcp_id not in mgr.get_running_ids():
+        ok, msg = await mgr.start(mcp_id)
+        if not ok:
+            return f"Solaris MCP failed to start: {msg}"
+
+    result = await mgr.call_tool(mcp_id, name, args, timeout=30)
+    return str(result)[:8000]
 
 
 async def _tool_mcp_github(name: str, args: dict, ctx: ExecutionContext) -> str:

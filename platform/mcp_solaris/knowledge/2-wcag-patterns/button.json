@@ -1,0 +1,124 @@
+{
+  "_meta": {
+    "pattern": "button",
+    "wcag_source": "https://www.w3.org/WAI/ARIA/apg/patterns/button/",
+    "version": "1.1.0",
+    "updated": "2026-01-08"
+  },
+
+  "applies_to": ["button", "btn", "cta", "action"],
+
+  "variants": {
+    "action": { "description": "Triggers an action", "type": "button" },
+    "submit": { "description": "Submits a form", "type": "submit" },
+    "toggle": { "description": "Toggles a state", "aria-pressed": true },
+    "menu": { "description": "Opens a menu", "aria-haspopup": "menu", "aria-expanded": true }
+  },
+
+  "styles": {
+    "primary": {
+      "default": { "background": "var(--color-primary)", "color": "var(--color-white)" },
+      "hover": { "background": "var(--color-primary-hover)" },
+      "focus": { "background": "var(--color-primary-hover)", "outline": "2px solid var(--color-callout-border-info)" },
+      "pressed": { "background": "var(--color-primary-pressed)" },
+      "disabled": { "background": "var(--color-neutral-60)", "color": "var(--color-white)" }
+    },
+    "neutral": {
+      "default": { "background": "var(--color-neutral-90)", "color": "var(--color-white)" },
+      "hover": { "background": "var(--color-neutral-hover)" },
+      "focus": { "background": "var(--color-neutral-hover)", "outline": "2px solid var(--color-callout-border-info)" },
+      "pressed": { "background": "var(--color-neutral-hover)" },
+      "disabled": { "background": "var(--color-neutral-60)", "color": "var(--color-white)" }
+    },
+    "critical": {
+      "default": { "background": "var(--color-critical)", "color": "var(--color-white)" },
+      "hover": { "background": "var(--color-critical)", "filter": "brightness(0.9)" },
+      "focus": { "background": "var(--color-critical)", "outline": "2px solid var(--color-callout-border-info)" },
+      "pressed": { "background": "var(--color-critical)", "filter": "brightness(0.85)" },
+      "disabled": { "background": "var(--color-neutral-60)", "color": "var(--color-white)" }
+    },
+    "onstrong": {
+      "default": { "background": "var(--color-white)", "color": "var(--color-primary)" },
+      "hover": { "background": "var(--color-onstrong-hover)" },
+      "focus": { "background": "var(--color-white)", "outline": "2px solid var(--color-callout-border-info)" },
+      "pressed": { "background": "var(--color-onstrong-hover)" },
+      "disabled": { "background": "var(--color-neutral-60)", "color": "var(--color-white)" }
+    }
+  },
+
+  "types": {
+    "filled": { "background": "from style", "border": "none" },
+    "ghost": { "background": "transparent", "border": "none" },
+    "outlined-strong": { "background": "transparent", "border": "2px solid currentColor" },
+    "outlined-soft": { "background": "transparent", "border": "1px solid var(--color-neutral-40)" }
+  },
+
+  "structure": {
+    "button": {
+      "element": "button",
+      "aria": {
+        "type": { "default": "button" },
+        "aria-label": { "when": "icon_only" },
+        "aria-pressed": { "when": "toggle", "type": "boolean" },
+        "aria-expanded": { "when": "menu", "type": "boolean" },
+        "aria-haspopup": { "when": "menu", "value": "menu" },
+        "aria-disabled": { "when": "disabled", "value": "true" }
+      }
+    },
+    "icon": {
+      "element": "svg",
+      "aria": { "aria-hidden": "true" },
+      "class_pattern": "__icon",
+      "optional": true
+    },
+    "label": {
+      "element": "span",
+      "class_pattern": "__label"
+    },
+    "loader": {
+      "element": "span",
+      "aria": { "aria-hidden": "true" },
+      "class_pattern": "__loader",
+      "when": "loading"
+    }
+  },
+
+  "states": {
+    "default": { "data_attr": "data-state=default" },
+    "hover": { "css": ":hover", "data_attr": "data-state=hover" },
+    "focus": { "css": ":focus-visible", "data_attr": "data-state=focus" },
+    "active": { "css": ":active", "data_attr": "data-state=active" },
+    "pressed": { "aria-pressed": "true", "data_attr": "data-state=pressed" },
+    "disabled": {
+      "aria-disabled": "true",
+      "attribute": "disabled",
+      "css": "[disabled], [aria-disabled='true']",
+      "data_attr": "data-state=disabled"
+    },
+    "loading": {
+      "aria-busy": "true",
+      "pointer-events": "none",
+      "data_attr": "data-state=loading"
+    }
+  },
+
+  "keyboard": {
+    "Enter": { "action": "activate" },
+    "Space": { "action": "activate", "prevent_scroll": true }
+  },
+
+  "focus_management": {
+    "focusable": true,
+    "focus_visible": true,
+    "min_touch_target": "44px"
+  },
+
+  "css_selectors": {
+    "hover": ":hover:not([disabled]):not([aria-disabled='true'])",
+    "focus": ":focus-visible",
+    "active": ":active:not([disabled])",
+    "disabled": "[disabled], [aria-disabled='true']",
+    "loading": "[aria-busy='true'], [data-state='loading']",
+    "pressed": "[aria-pressed='true']"
+  }
+}

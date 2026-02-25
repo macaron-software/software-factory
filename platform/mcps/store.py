@@ -189,7 +189,7 @@ BUILTIN_MCPS = [
         name="Solaris Design System",
         description="Design System La Poste (Solaris) — Figma components, variants, WCAG patterns, design tokens, validation reports.",
         command="python3",
-        args=["-m", "mcp_solaris.server"],
+        args=["-m", "macaron_platform.mcp_solaris"],
         tools=[
             {"name": "solaris_component", "description": "Get Figma component details: all variants, properties, component sets",
              "params": {"component": "string (required)", "summary_only": "bool (default true)"}},
