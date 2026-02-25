@@ -3362,14 +3362,14 @@ async def dashboard_quality_mission(request: Request, project_id: str = ""):
 
 @router.get("/api/dashboard/metrics-summary")
 async def dashboard_metrics_summary(request: Request, perspective: str = "admin"):
-    """Per-profile metric summary cards for the dashboard."""
+    """Per-profile metric summary cards with SVG icons and mini sparklines."""
     from ...metrics.dora import get_dora_metrics
     from ...metrics.quality import QualityScanner
 
-    dora = get_dora_metrics()
-    summary = dora.summary("", 30)
+    dora_engine = get_dora_metrics()
+    summary = dora_engine.summary("", 30)
+    trend = dora_engine.trend("", weeks=8)
 
-    # DORA mini values
     df = summary.get("deployment_frequency", {})
     lt = summary.get("lead_time", {})
     cfr = summary.get("change_failure_rate", {})
@@ -3379,12 +3379,11 @@ async def dashboard_metrics_summary(request: Request, perspective: str = "admin"
     failure_rate = cfr.get("rate_pct", 0)
     mttr_h = mt.get("median_hours", 0)
     dora_level = summary.get("overall_level", "low")
-    velocity_data = summary.get("velocity")
-    avg_velocity = velocity_data.get("avg_velocity", 0) if velocity_data else 0
-    predictability = velocity_data.get("predictability_pct", 0) if velocity_data else 0
+    vel = summary.get("velocity")
+    avg_velocity = vel.get("avg_velocity", 0) if vel else 0
+    predictability = vel.get("predictability_pct", 0) if vel else 0
     period_days = summary.get("period_days", 30)
 
-    # Quality scores
     all_scores = QualityScanner.get_all_projects_scores()
     avg_quality = (
         round(sum(s.get("global_score", 0) for s in all_scores) / len(all_scores))
@@ -3392,15 +3391,12 @@ async def dashboard_metrics_summary(request: Request, perspective: str = "admin"
         else 0
     )
 
-    def _level_color(level):
-        return {
-            "elite": "#16a34a",
-            "high": "#3b82f6",
-            "medium": "#ea580c",
-            "low": "#dc2626",
-        }.get(level, "#888")
+    def _lc(level):
+        return {"elite": "#16a34a", "high": "#3b82f6", "medium": "#ea580c", "low": "#dc2626"}.get(
+            level, "#888"
+        )
 
-    def _score_color(score):
+    def _sc(score):
         if score >= 80:
             return "#16a34a"
         if score >= 60:
@@ -3409,206 +3405,126 @@ async def dashboard_metrics_summary(request: Request, perspective: str = "admin"
             return "#ea580c"
         return "#dc2626"
 
-    def _card(icon, title, value, detail, color):
-        return f"""<div style="background:var(--bg-tertiary,#1a1225);border:1px solid var(--border);border-radius:10px;padding:1rem;text-align:center;min-width:0">
-            <div style="font-size:1.2rem;margin-bottom:4px">{icon}</div>
-            <div style="font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:6px">{title}</div>
-            <div style="font-size:1.4rem;font-weight:700;color:{color}">{value}</div>
-            <div style="font-size:.7rem;color:var(--text-muted);margin-top:4px">{detail}</div>
-        </div>"""
+    def _ico(name, color):
+        return f'<svg width="20" height="20" style="color:{color}"><use href="#icon-{name}"/></svg>'
+
+    def _spark(data, color):
+        if not data or all(v == 0 for v in data):
+            return ""
+        mx = max(data) or 1
+        w, h = 80, 24
+        step = w / max(len(data) - 1, 1)
+        pts = " ".join(
+            f"{round(i * step, 1)},{round(h - (v / mx) * (h - 2) - 1, 1)}"
+            for i, v in enumerate(data)
+        )
+        return (
+            f'<svg width="{w}" height="{h}" style="display:block;margin:6px auto 0">'
+            f'<polyline points="{pts}" fill="none" stroke="{color}" '
+            f'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        )
+
+    def _gauge(pct, color):
+        r, cx, cy = 16, 18, 18
+        circ = 2 * 3.14159 * r
+        off = circ * (1 - min(pct, 100) / 100)
+        return (
+            f'<svg width="36" height="36" style="display:block;margin:4px auto 0">'
+            f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="3"/>'
+            f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{color}" stroke-width="3" '
+            f'stroke-dasharray="{circ}" stroke-dashoffset="{off:.1f}" '
+            f'transform="rotate(-90 {cx} {cy})" stroke-linecap="round"/></svg>'
+        )
+
+    def _card(icon_svg, title, value, detail, color, graph=""):
+        return (
+            f'<div style="background:var(--bg-tertiary,#1a1225);border:1px solid var(--border);'
+            f'border-radius:10px;padding:.85rem .75rem;text-align:center;min-width:0">'
+            f'<div style="margin-bottom:4px">{icon_svg}</div>'
+            f'<div style="font-size:.68rem;color:var(--text-secondary);text-transform:uppercase;'
+            f'letter-spacing:.5px;font-weight:600;margin-bottom:4px">{title}</div>'
+            f'<div style="font-size:1.35rem;font-weight:700;color:{color};line-height:1.1">{value}</div>'
+            f'<div style="font-size:.68rem;color:var(--text-muted);margin-top:3px">{detail}</div>'
+            f"{graph}</div>"
+        )
 
     cards = []
+    td = trend.get("deploy", [])
+    tl = trend.get("lead_time", [])
+    tf = trend.get("failure", [])
+    tm = trend.get("mttr", [])
 
-    if perspective in (
-        "overview",
-        "dsi",
-        "portfolio_manager",
-        "business_owner",
-        "admin",
-    ):
-        # Strategic: DORA level + Quality + Deploy freq + Lead time
-        cards.append(
-            _card(
-                "🏆",
-                "DORA Level",
-                dora_level.upper(),
-                f"{df.get('count', 0)} deploys / {period_days}j",
-                _level_color(dora_level),
-            )
-        )
-        cards.append(
-            _card(
-                "📊",
-                "Quality",
-                f"{avg_quality}/100",
-                f"{len(all_scores)} projects scanned",
-                _score_color(avg_quality),
-            )
-        )
-        cards.append(
-            _card(
-                "⏱️",
-                "Lead Time",
-                f"{lead_time}h",
-                f"MTTR: {mttr_h}h",
-                _level_color(lt.get("level", "low")),
-            )
-        )
-        cards.append(
-            _card(
-                "🛡️",
-                "Failure Rate",
-                f"{failure_rate}%",
-                f"{cfr.get('failures', 0)} failures",
-                _level_color(cfr.get("level", "low")),
-            )
-        )
+    if perspective in ("overview", "dsi", "portfolio_manager", "business_owner", "admin"):
+        cards.append(_card(
+            _ico("trophy", _lc(dora_level)), "DORA Level", dora_level.upper(),
+            f"{df.get('count', 0)} deploys / {period_days}j", _lc(dora_level), _spark(td, _lc(dora_level))))
+        cards.append(_card(
+            _ico("check-circle", _sc(avg_quality)), "Quality", f"{avg_quality}/100",
+            f"{len(all_scores)} projects", _sc(avg_quality), _gauge(avg_quality, _sc(avg_quality))))
+        cards.append(_card(
+            _ico("clock", _lc(lt.get("level", "low"))), "Lead Time", f"{lead_time}h",
+            f"MTTR: {mttr_h}h", _lc(lt.get("level", "low")), _spark(tl, "#3b82f6")))
+        cards.append(_card(
+            _ico("shield", _lc(cfr.get("level", "low"))), "Failure Rate", f"{failure_rate}%",
+            f"{cfr.get('failures', 0)} failures", _lc(cfr.get("level", "low")), _spark(tf, "#dc2626")))
 
     elif perspective in ("rte", "scrum_master"):
-        # Operational: Velocity + Predictability + DORA + Cycle time
-        cards.append(
-            _card("⚡", "Velocity", f"{avg_velocity}", "phases/sprint avg", "#8b5cf6")
-        )
-        cards.append(
-            _card(
-                "🎯",
-                "Predictability",
-                f"{predictability}%",
-                "planned vs actual",
-                _score_color(predictability),
-            )
-        )
-        cards.append(
-            _card(
-                "🚀",
-                "Deploy Freq",
-                f"{deploy_freq}/day",
-                f"{df.get('count', 0)} total",
-                _level_color(df.get("level", "low")),
-            )
-        )
-        cards.append(
-            _card(
-                "🔄",
-                "MTTR",
-                f"{mttr_h}h",
-                f"Lead: {lead_time}h",
-                _level_color(mt.get("level", "low")),
-            )
-        )
+        cards.append(_card(
+            _ico("zap", "#8b5cf6"), "Velocity", f"{avg_velocity}",
+            "phases/sprint avg", "#8b5cf6", _spark(td, "#8b5cf6")))
+        cards.append(_card(
+            _ico("target", _sc(predictability)), "Predictability", f"{predictability}%",
+            "planned vs actual", _sc(predictability), _gauge(predictability, _sc(predictability))))
+        cards.append(_card(
+            _ico("rocket", _lc(df.get("level", "low"))), "Deploy Freq", f"{deploy_freq}/day",
+            f"{df.get('count', 0)} total", _lc(df.get("level", "low")), _spark(td, "#16a34a")))
+        cards.append(_card(
+            _ico("refresh-cw", _lc(mt.get("level", "low"))), "MTTR", f"{mttr_h}h",
+            f"Lead: {lead_time}h", _lc(mt.get("level", "low")), _spark(tm, "#ea580c")))
 
     elif perspective == "product_owner":
-        # Product: Quality + Velocity + Completion
-        cards.append(
-            _card(
-                "📊",
-                "Quality",
-                f"{avg_quality}/100",
-                f"{len(all_scores)} projects",
-                _score_color(avg_quality),
-            )
-        )
-        cards.append(
-            _card(
-                "⚡",
-                "Velocity",
-                f"{avg_velocity}",
-                f"{predictability}% predictable",
-                "#8b5cf6",
-            )
-        )
-        cards.append(
-            _card(
-                "🚀",
-                "Deploys",
-                f"{df.get('count', 0)}",
-                f"{deploy_freq}/day",
-                _level_color(df.get("level", "low")),
-            )
-        )
+        cards.append(_card(
+            _ico("check-circle", _sc(avg_quality)), "Quality", f"{avg_quality}/100",
+            f"{len(all_scores)} projects", _sc(avg_quality), _gauge(avg_quality, _sc(avg_quality))))
+        cards.append(_card(
+            _ico("zap", "#8b5cf6"), "Velocity", f"{avg_velocity}",
+            f"{predictability}% predictable", "#8b5cf6", _spark(td, "#8b5cf6")))
+        cards.append(_card(
+            _ico("rocket", _lc(df.get("level", "low"))), "Deploys", f"{df.get('count', 0)}",
+            f"{deploy_freq}/day", _lc(df.get("level", "low")), _spark(td, "#16a34a")))
 
     elif perspective in ("developer", "architect"):
-        # Technical: Quality + DORA level + Failure rate + Lead time
-        cards.append(
-            _card(
-                "📊",
-                "Code Quality",
-                f"{avg_quality}/100",
-                f"{len(all_scores)} projects",
-                _score_color(avg_quality),
-            )
-        )
-        cards.append(
-            _card(
-                "🏆",
-                "DORA",
-                dora_level.upper(),
-                f"{deploy_freq} deploys/day",
-                _level_color(dora_level),
-            )
-        )
-        cards.append(
-            _card(
-                "🛡️",
-                "Failure Rate",
-                f"{failure_rate}%",
-                "CFR target <15%",
-                _level_color(cfr.get("level", "low")),
-            )
-        )
-        cards.append(
-            _card(
-                "⏱️",
-                "Lead Time",
-                f"{lead_time}h",
-                f"MTTR: {mttr_h}h",
-                _level_color(lt.get("level", "low")),
-            )
-        )
+        cards.append(_card(
+            _ico("check-circle", _sc(avg_quality)), "Code Quality", f"{avg_quality}/100",
+            f"{len(all_scores)} projects", _sc(avg_quality), _gauge(avg_quality, _sc(avg_quality))))
+        cards.append(_card(
+            _ico("trophy", _lc(dora_level)), "DORA", dora_level.upper(),
+            f"{deploy_freq} deploys/day", _lc(dora_level), _spark(td, _lc(dora_level))))
+        cards.append(_card(
+            _ico("shield", _lc(cfr.get("level", "low"))), "Failure Rate", f"{failure_rate}%",
+            "CFR target &lt;15%", _lc(cfr.get("level", "low")), _spark(tf, "#dc2626")))
+        cards.append(_card(
+            _ico("clock", _lc(lt.get("level", "low"))), "Lead Time", f"{lead_time}h",
+            f"MTTR: {mttr_h}h", _lc(lt.get("level", "low")), _spark(tl, "#3b82f6")))
 
     elif perspective == "qa_security":
-        # Security focus: Quality + Failure rate + MTTR + DORA
-        cards.append(
-            _card(
-                "📊",
-                "Quality Score",
-                f"{avg_quality}/100",
-                f"{len(all_scores)} projects",
-                _score_color(avg_quality),
-            )
-        )
-        cards.append(
-            _card(
-                "🛡️",
-                "Change Failure",
-                f"{failure_rate}%",
-                f"{cfr.get('failures', 0)} / {cfr.get('total', 0)}",
-                _level_color(cfr.get("level", "low")),
-            )
-        )
-        cards.append(
-            _card(
-                "🔄",
-                "MTTR",
-                f"{mttr_h}h",
-                f"{mt.get('count', 0)} incidents",
-                _level_color(mt.get("level", "low")),
-            )
-        )
-        cards.append(
-            _card(
-                "🏆",
-                "DORA",
-                dora_level.upper(),
-                "Overall level",
-                _level_color(dora_level),
-            )
-        )
+        cards.append(_card(
+            _ico("check-circle", _sc(avg_quality)), "Quality Score", f"{avg_quality}/100",
+            f"{len(all_scores)} projects", _sc(avg_quality), _gauge(avg_quality, _sc(avg_quality))))
+        cards.append(_card(
+            _ico("shield", _lc(cfr.get("level", "low"))), "Change Failure", f"{failure_rate}%",
+            f"{cfr.get('failures', 0)} / {cfr.get('total', 0)}", _lc(cfr.get("level", "low")), _spark(tf, "#dc2626")))
+        cards.append(_card(
+            _ico("refresh-cw", _lc(mt.get("level", "low"))), "MTTR", f"{mttr_h}h",
+            f"{mt.get('count', 0)} incidents", _lc(mt.get("level", "low")), _spark(tm, "#ea580c")))
+        cards.append(_card(
+            _ico("trophy", _lc(dora_level)), "DORA", dora_level.upper(),
+            "Overall level", _lc(dora_level), _spark(td, _lc(dora_level))))
 
     if not cards:
         return HTMLResponse('<p class="text-muted">No metrics data available</p>')
 
-    grid = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem">'
+    grid = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem">'
     grid += "".join(cards) + "</div>"
     return HTMLResponse(grid)
 
