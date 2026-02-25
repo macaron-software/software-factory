@@ -15,9 +15,9 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/metrics", response_class=HTMLResponse)
-async def dora_dashboard_page(request: Request):
-    """DORA Metrics dashboard page."""
+@router.get("/metrics/tab/dora", response_class=HTMLResponse)
+async def metrics_tab_dora(request: Request):
+    """DORA metrics tab partial."""
     from ....metrics.dora import get_dora_metrics
     from ....projects.manager import get_project_store
 
@@ -30,16 +30,78 @@ async def dora_dashboard_page(request: Request):
     trend = dora.trend(project_id, weeks=12)
 
     return _templates(request).TemplateResponse(
-        "dora_dashboard.html",
+        "_partial_dora.html",
         {
             "request": request,
-            "page_title": "DORA Metrics",
             "projects": projects,
             "selected_project": project_id,
             "period": period,
             "dora": summary,
             "trend": trend,
         },
+    )
+
+
+@router.get("/metrics/tab/quality", response_class=HTMLResponse)
+async def metrics_tab_quality(request: Request):
+    """Quality scorecard tab partial."""
+    from ....metrics.quality import QualityScanner
+    from ....projects.manager import get_project_store
+
+    projects = get_project_store().list_all()
+    project_id = request.query_params.get("project_id", "")
+
+    snapshot = QualityScanner.get_latest_snapshot(project_id) if project_id else None
+    trend = QualityScanner.get_trend(project_id) if project_id else []
+    all_scores = QualityScanner.get_all_projects_scores()
+
+    return _templates(request).TemplateResponse(
+        "_partial_quality.html",
+        {
+            "request": request,
+            "projects": projects,
+            "selected_project": project_id,
+            "snapshot": snapshot,
+            "trend": trend,
+            "all_scores": all_scores,
+        },
+    )
+
+
+@router.get("/metrics/tab/analytics", response_class=HTMLResponse)
+async def metrics_tab_analytics(request: Request):
+    """Analytics tab partial."""
+    return _templates(request).TemplateResponse(
+        "_partial_analytics.html", {"request": request}
+    )
+
+
+@router.get("/metrics/tab/monitoring", response_class=HTMLResponse)
+async def metrics_tab_monitoring(request: Request):
+    """Monitoring tab partial."""
+    return _templates(request).TemplateResponse(
+        "_partial_monitoring.html", {"request": request}
+    )
+
+
+@router.get("/metrics/tab/pipeline", response_class=HTMLResponse)
+async def metrics_tab_pipeline(request: Request):
+    """Pipeline performance tab partial."""
+    from ....projects.manager import get_project_store
+
+    projects = get_project_store().list_all()
+    return _templates(request).TemplateResponse(
+        "_partial_pipeline.html",
+        {"request": request, "projects": projects},
+    )
+
+
+@router.get("/metrics", response_class=HTMLResponse)
+async def dora_dashboard_page(request: Request):
+    """Unified Metrics dashboard — DORA, Quality, Analytics, Monitoring, Pipeline."""
+    return _templates(request).TemplateResponse(
+        "metrics_unified.html",
+        {"request": request, "page_title": "Metrics"},
     )
 
 

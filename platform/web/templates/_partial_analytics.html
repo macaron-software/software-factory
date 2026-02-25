@@ -1,0 +1,575 @@
+<div class="partial-analytics">
+        .analytics-container {
+            padding: 2rem 3rem;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+        
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            transition: transform 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .stat-card h3 {
+            font-size: 0.85rem;
+            color: var(--text-tertiary);
+            margin: 0 0 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+        
+        .stat-value {
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+        
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .chart-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+        }
+        
+        .chart-card h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0 0 1.5rem;
+            color: var(--text-primary);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        .refresh-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        
+        .refresh-btn:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+        
+        .timestamp {
+            font-size: 0.85rem;
+            color: var(--text-tertiary);
+            margin-left: 1rem;
+        }
+        
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .page-header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0;
+            color: var(--text-primary);
+        }
+    </style>
+<div class="analytics-container">
+    <div class="page-header">
+        <h1>Analytics Dashboard</h1>
+        <div>
+            <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+            <span class="timestamp" id="last-update"></span>
+        </div>
+    </div>
+    
+    <!-- Key Metrics -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Total Missions</h3>
+            <div class="stat-value" id="stat-missions">—</div>
+            <div class="stat-label">Active missions tracked</div>
+        </div>
+        <div class="stat-card">
+            <h3>Success Rate</h3>
+            <div class="stat-value" id="stat-success">—</div>
+            <div class="stat-label">Mission completion rate</div>
+        </div>
+        <div class="stat-card">
+            <h3>Active Agents</h3>
+            <div class="stat-value" id="stat-agents">—</div>
+            <div class="stat-label">Deployed agents</div>
+        </div>
+        <div class="stat-card">
+            <h3>Skills Used</h3>
+            <div class="stat-value" id="stat-skills">—</div>
+            <div class="stat-label">Unique skills utilized</div>
+        </div>
+    </div>
+    
+    <!-- Charts -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h2>Missions by Status</h2>
+            <div class="chart-container">
+                <canvas id="chart-missions"></canvas>
+            </div>
+        </div>
+        
+        <div class="chart-card">
+            <h2>Top Skills Used</h2>
+            <div class="chart-container">
+                <canvas id="chart-skills"></canvas>
+            </div>
+        </div>
+        
+        <div class="chart-card">
+            <h2>Agent Performance</h2>
+            <div class="chart-container">
+                <canvas id="chart-agents"></canvas>
+            </div>
+        </div>
+        
+        <div class="chart-card">
+            <h2>System Health</h2>
+            <div class="chart-container">
+                <canvas id="chart-system"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tracing / OTEL Section -->
+    <h2 style="margin: 2.5rem 0 1rem; font-size: 1.3rem; font-weight: 700;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 6px;"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        OpenTelemetry Tracing
+    </h2>
+    <div class="stats-grid" id="tracing-stats">
+        <div class="stat-card">
+            <h3>Traces (1h)</h3>
+            <p class="stat-value" id="trace-count">—</p>
+            <p class="stat-label">requests traced</p>
+        </div>
+        <div class="stat-card">
+            <h3>Latency P95</h3>
+            <p class="stat-value" id="trace-p95">—</p>
+            <p class="stat-label">milliseconds</p>
+        </div>
+        <div class="stat-card">
+            <h3>Error Rate</h3>
+            <p class="stat-value" id="trace-errors">—</p>
+            <p class="stat-label">% of requests</p>
+        </div>
+        <div class="stat-card">
+            <h3>Avg Latency</h3>
+            <p class="stat-value" id="trace-avg">—</p>
+            <p class="stat-label">milliseconds</p>
+        </div>
+    </div>
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h2>Top Operations (latency)</h2>
+            <div class="chart-container">
+                <canvas id="chart-tracing-ops"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h2>Recent Traces</h2>
+            <div style="max-height: 300px; overflow-y: auto;">
+                <table style="width: 100%; font-size: 0.85rem;" id="traces-table">
+                    <thead><tr>
+                        <th style="text-align: left; padding: 4px 8px;">Operation</th>
+                        <th style="text-align: right; padding: 4px 8px;">Duration</th>
+                        <th style="text-align: right; padding: 4px 8px;">Spans</th>
+                        <th style="text-align: right; padding: 4px 8px;">Status</th>
+                    </tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pipeline Failure Analysis Section -->
+    <h2 style="margin: 2.5rem 0 1rem; font-size: 1.3rem; font-weight: 700;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 6px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        Pipeline Failure Analysis
+        <button class="refresh-btn" style="font-size: 0.8rem; padding: 4px 12px; margin-left: 12px;" onclick="loadFailures()">Analyze</button>
+        <button class="refresh-btn" style="font-size: 0.8rem; padding: 4px 12px; margin-left: 6px; background: #10b981;" onclick="resumeAll()">Resume All Paused</button>
+    </h2>
+    <div class="stats-grid" id="failure-stats">
+        <div class="stat-card">
+            <h3>Failed Runs</h3>
+            <p class="stat-value" id="fail-count">—</p>
+            <p class="stat-label">total failed</p>
+        </div>
+        <div class="stat-card">
+            <h3>Paused (resumable)</h3>
+            <p class="stat-value" id="fail-resumable">—</p>
+            <p class="stat-label">can be auto-resumed</p>
+        </div>
+        <div class="stat-card">
+            <h3>Top Error</h3>
+            <p class="stat-value" id="fail-top-error" style="font-size: 1.2rem;">—</p>
+            <p class="stat-label">most common category</p>
+        </div>
+        <div class="stat-card">
+            <h3>Worst Phase</h3>
+            <p class="stat-value" id="fail-worst-phase" style="font-size: 1.2rem;">—</p>
+            <p class="stat-label">highest failure rate</p>
+        </div>
+    </div>
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h2>Error Categories</h2>
+            <div class="chart-container">
+                <canvas id="chart-error-cats"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h2>Phase Failure Rates</h2>
+            <div class="chart-container">
+                <canvas id="chart-phase-fails"></canvas>
+            </div>
+        </div>
+    </div>
+    <!-- Recommendations -->
+    <div id="failure-recs" style="margin: 1rem 0 2rem; padding: 1rem 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-lg); display: none;">
+        <h3 style="margin: 0 0 0.5rem; font-size: 1rem;">Recommendations</h3>
+        <div id="failure-recs-list" style="font-size: 0.9rem;"></div>
+    </div>
+</div>
+
+<script>
+let charts = {};
+
+async function loadAnalytics() {
+    try {
+        const res = await fetch('/api/analytics/overview');
+        const data = await res.json();
+        
+        if (data.success) {
+            updateStats(data.data);
+            renderCharts(data.data);
+            document.getElementById('last-update').textContent = 
+                'Updated: ' + new Date().toLocaleTimeString();
+        }
+    } catch (err) {
+        console.error('Analytics load error:', err);
+    }
+}
+
+function updateStats(data) {
+    document.getElementById('stat-missions').textContent = 
+        data.missions?.status?.total || 0;
+    
+    const successRate = data.missions?.performance?.success_rate || 0;
+    document.getElementById('stat-success').textContent = 
+        successRate.toFixed(1) + '%';
+    
+    document.getElementById('stat-agents').textContent = 
+        data.agents?.utilization?.total || 0;
+    
+    document.getElementById('stat-skills').textContent = 
+        data.skills?.top?.length || 0;
+}
+
+function renderCharts(data) {
+    // Missions Status Chart
+    if (data.missions?.status?.by_status) {
+        const ctx = document.getElementById('chart-missions');
+        if (charts.missions) charts.missions.destroy();
+        
+        const statuses = data.missions.status.by_status;
+        charts.missions = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(statuses),
+                datasets: [{
+                    data: Object.values(statuses),
+                    backgroundColor: ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' }}
+            }
+        });
+    }
+    
+    // Skills Chart
+    if (data.skills?.top && data.skills.top.length > 0) {
+        const ctx = document.getElementById('chart-skills');
+        if (charts.skills) charts.skills.destroy();
+        
+        const top10 = data.skills.top.slice(0, 10);
+        charts.skills = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: top10.map(s => s.skill_name || s.name),
+                datasets: [{
+                    label: 'Usage Count',
+                    data: top10.map(s => s.usage_count || 0),
+                    backgroundColor: '#8b5cf6'
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    }
+    
+    // Agents Chart
+    if (data.agents?.leaderboard && data.agents.leaderboard.length > 0) {
+        const ctx = document.getElementById('chart-agents');
+        if (charts.agents) charts.agents.destroy();
+        
+        const top10 = data.agents.leaderboard.slice(0, 10);
+        charts.agents = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: top10.map(a => a.agent_name || a.name),
+                datasets: [{
+                    label: 'Missions',
+                    data: top10.map(a => a.missions_count || 0),
+                    backgroundColor: '#06b6d4'
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    }
+    
+    // System Health Chart
+    if (data.system?.tables) {
+        const ctx = document.getElementById('chart-system');
+        if (charts.system) charts.system.destroy();
+        
+        const top10 = data.system.tables.slice(0, 10);
+        charts.system = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: top10.map(t => t.table),
+                datasets: [{
+                    label: 'Rows',
+                    data: top10.map(t => t.rows),
+                    backgroundColor: '#10b981'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    }
+}
+
+function refreshData() {
+    loadAnalytics();
+    loadTracing();
+}
+
+// Tracing data loader
+async function loadTracing() {
+    try {
+        const [statsRes, tracesRes] = await Promise.all([
+            fetch('/api/analytics/tracing/stats?lookback=1h'),
+            fetch('/api/analytics/tracing/traces?limit=20&lookback=1h'),
+        ]);
+        const stats = await statsRes.json();
+        const traces = await tracesRes.json();
+
+        if (stats.success && stats.data.traces > 0) {
+            const d = stats.data;
+            document.getElementById('trace-count').textContent = d.traces;
+            document.getElementById('trace-p95').textContent = d.latency.p95 + 'ms';
+            document.getElementById('trace-errors').textContent = d.error_rate + '%';
+            document.getElementById('trace-avg').textContent = d.latency.avg + 'ms';
+
+            // Top operations chart
+            if (d.top_operations && d.top_operations.length > 0) {
+                const ctx = document.getElementById('chart-tracing-ops');
+                if (charts.tracingOps) charts.tracingOps.destroy();
+                charts.tracingOps = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: d.top_operations.map(o => o.operation.substring(0, 30)),
+                        datasets: [
+                            {
+                                label: 'Avg (ms)',
+                                data: d.top_operations.map(o => o.avg_ms),
+                                backgroundColor: '#8b5cf6',
+                            },
+                            {
+                                label: 'P95 (ms)',
+                                data: d.top_operations.map(o => o.p95_ms),
+                                backgroundColor: '#f59e0b',
+                            },
+                        ],
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                    },
+                });
+            }
+        } else {
+            document.getElementById('trace-count').textContent = '0';
+            document.getElementById('trace-p95').textContent = '—';
+            document.getElementById('trace-errors').textContent = '—';
+            document.getElementById('trace-avg').textContent = stats.error || 'No traces';
+        }
+
+        // Traces table
+        if (traces.success && traces.data.length > 0) {
+            const tbody = document.querySelector('#traces-table tbody');
+            tbody.innerHTML = traces.data.map(t => `<tr>
+                <td style="padding: 4px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">${t.operation}</td>
+                <td style="padding: 4px 8px; text-align: right; font-family: monospace;">${t.duration_ms}ms</td>
+                <td style="padding: 4px 8px; text-align: right;">${t.spans_count}</td>
+                <td style="padding: 4px 8px; text-align: right;">${t.tags?.['http.status_code'] || '—'}</td>
+            </tr>`).join('');
+        }
+    } catch (e) {
+        console.warn('Tracing load failed:', e);
+        document.getElementById('trace-count').textContent = 'N/A';
+    }
+}
+
+// Initial load
+loadAnalytics();
+loadTracing();
+loadFailures();
+
+// Auto-refresh every 30s
+setInterval(loadAnalytics, 30000);
+
+// Failure analysis loader
+async function loadFailures() {
+    try {
+        const res = await fetch('/api/analytics/failures');
+        const data = await res.json();
+        if (!data.success) return;
+        const d = data.data;
+
+        // Stats
+        const failedCount = d.run_status?.failed || 0;
+        document.getElementById('fail-count').textContent = failedCount;
+        document.getElementById('fail-resumable').textContent = d.resumable_count || 0;
+
+        if (d.error_categories?.length > 0) {
+            document.getElementById('fail-top-error').textContent =
+                d.error_categories[0].category + ' (' + d.error_categories[0].count + ')';
+        }
+        if (d.phase_failures?.length > 0) {
+            const worst = d.phase_failures[0];
+            document.getElementById('fail-worst-phase').textContent =
+                worst.phase.substring(0, 20) + ' (' + worst.fail_rate + '%)';
+        }
+
+        // Error categories chart
+        if (d.error_categories?.length > 0) {
+            const ctx = document.getElementById('chart-error-cats');
+            if (charts.errorCats) charts.errorCats.destroy();
+            const colors = {'timeout': '#f59e0b', 'rate_limit': '#ef4444', 'llm_error': '#dc2626',
+                           'tool_error': '#8b5cf6', 'network': '#06b6d4', 'config_error': '#ec4899', 'other': '#6b7280'};
+            charts.errorCats = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: d.error_categories.map(c => c.category),
+                    datasets: [{
+                        data: d.error_categories.map(c => c.count),
+                        backgroundColor: d.error_categories.map(c => colors[c.category] || '#6b7280'),
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }}}
+            });
+        }
+
+        // Phase failure rates chart
+        if (d.phase_failures?.length > 0) {
+            const ctx = document.getElementById('chart-phase-fails');
+            if (charts.phaseFails) charts.phaseFails.destroy();
+            const top10 = d.phase_failures.slice(0, 10);
+            charts.phaseFails = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: top10.map(p => p.phase.substring(0, 25)),
+                    datasets: [
+                        { label: 'Failed', data: top10.map(p => p.failed), backgroundColor: '#ef4444' },
+                        { label: 'Timeout', data: top10.map(p => p.timeout), backgroundColor: '#f59e0b' },
+                        { label: 'OK', data: top10.map(p => p.total - p.failed - p.timeout), backgroundColor: '#10b981' },
+                    ]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true }}}
+            });
+        }
+
+        // Recommendations
+        if (d.recommendations?.length > 0) {
+            const recsDiv = document.getElementById('failure-recs');
+            const recsList = document.getElementById('failure-recs-list');
+            recsDiv.style.display = 'block';
+            recsList.innerHTML = d.recommendations.map(r => `<p style="margin: 4px 0;">${r}</p>`).join('');
+        }
+    } catch (e) {
+        console.warn('Failure analysis load error:', e);
+    }
+}
+
+async function resumeAll() {
+    if (!confirm('Resume all paused mission runs?')) return;
+    try {
+        const res = await fetch('/api/analytics/failures/resume-all', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            alert(`Resumed ${data.resumed} runs (${data.errors} errors)`);
+            loadFailures();
+        } else {
+            alert('Error: ' + (data.error || 'unknown'));
+        }
+    } catch (e) {
+        alert('Resume failed: ' + e.message);
+    }
+}
+</script>
+</div>

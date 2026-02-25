@@ -1,0 +1,227 @@
+<div class="partial-quality">
+<style>
+.quality-container { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1rem; }
+.quality-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+.quality-header h3 { margin: 0; font-size: 1.3rem; }
+.quality-filters { display: flex; gap: 0.75rem; align-items: center; }
+.quality-select {
+    padding: 0.4rem 0.75rem; border-radius: 6px;
+    background: var(--bg-secondary); color: var(--text-primary);
+    border: 1px solid var(--border); font-size: 0.85rem;
+}
+
+/* Global score */
+.quality-global {
+    text-align: center; margin-bottom: 2rem; padding: 2rem;
+    background: var(--bg-secondary); border-radius: 12px;
+    border: 1px solid var(--border);
+}
+.quality-score-circle {
+    width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 1rem;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.5rem; font-weight: 700;
+    border: 4px solid currentColor;
+}
+.quality-label { color: var(--text-secondary); font-size: 0.9rem; }
+
+/* Dimension bars */
+.quality-dims { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem; }
+.quality-dim {
+    background: var(--bg-secondary); border-radius: 10px; padding: 1rem;
+    border: 1px solid var(--border);
+}
+.quality-dim-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+.quality-dim-name { font-size: 0.85rem; font-weight: 600; }
+.quality-dim-score { font-size: 0.85rem; font-weight: 700; }
+.quality-dim-bar { height: 6px; border-radius: 3px; background: var(--bg-primary); overflow: hidden; }
+.quality-dim-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+.quality-dim-detail { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.4rem; }
+
+/* Heatmap */
+.quality-heatmap { margin-bottom: 2rem; }
+.quality-heatmap h4 { font-size: 1rem; margin-bottom: 1rem; }
+.quality-heatmap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem; }
+.quality-heatmap-cell {
+    padding: 0.75rem; border-radius: 8px; text-align: center;
+    font-size: 0.8rem; font-weight: 600;
+}
+
+/* Trend */
+.quality-trend { margin-bottom: 2rem; }
+.quality-trend h4 { font-size: 1rem; margin-bottom: 1rem; }
+.quality-sparkline { display: flex; align-items: flex-end; gap: 3px; height: 60px; }
+.quality-spark-bar {
+    flex: 1; border-radius: 2px 2px 0 0; min-width: 8px; transition: height 0.3s;
+}
+
+.color-elite { color: #16a34a; }
+.color-high { color: #3b82f6; }
+.color-medium { color: #ea580c; }
+.color-low { color: #dc2626; }
+.bg-elite { background: #16a34a; }
+.bg-high { background: #3b82f6; }
+.bg-medium { background: #ea580c; }
+.bg-low { background: #dc2626; }
+
+@media (max-width: 700px) {
+    .quality-dims { grid-template-columns: 1fr; }
+}
+</style>
+
+<div class="quality-container">
+    <div class="quality-header">
+        <h3>Quality Scorecard</h3>
+        <div class="quality-filters">
+            <select class="quality-select" id="qualityProject" onchange="loadQuality()">
+                <option value="">All Projects</option>
+                {% for proj in projects %}
+                <option value="{{ proj.id }}" {% if proj.id == selected_project %}selected{% endif %}>{{ proj.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    {% if snapshot %}
+    <!-- Global Score -->
+    <div class="quality-global">
+        {% set gs = snapshot.global_score %}
+        {% set gc = 'elite' if gs >= 80 else 'high' if gs >= 60 else 'medium' if gs >= 40 else 'low' %}
+        <div class="quality-score-circle color-{{ gc }}">{{ gs|round|int }}</div>
+        <div class="quality-label">Global Quality Score — {{ gc|upper }}</div>
+    </div>
+
+    {# Perspective-aware dimension priority #}
+    {% set priority_dims = {
+        'qa_security': ['security', 'adversarial', 'test_coverage', 'code_quality'],
+        'architect': ['architecture', 'complexity', 'maintainability', 'code_quality'],
+        'developer': ['test_coverage', 'complexity', 'code_quality', 'maintainability'],
+        'dsi': ['security', 'architecture', 'code_quality', 'test_coverage'],
+    } %}
+    {% set prio = priority_dims.get(p, []) %}
+
+    <!-- Dimension Bars -->
+    <div class="quality-dims">
+        {% set dims = snapshot.breakdown.dimensions if snapshot.breakdown else {} %}
+        {# Render priority dimensions first (with highlight) #}
+        {% for dim_name in prio if dim_name in dims %}
+        {% set dim_data = dims[dim_name] %}
+        {% set ds = dim_data.score %}
+        {% set dc = '#16a34a' if ds >= 80 else '#3b82f6' if ds >= 60 else '#ea580c' if ds >= 40 else '#dc2626' %}
+        <div class="quality-dim" style="border-color:var(--purple,#7c3aed)">
+            <div class="quality-dim-header">
+                <span class="quality-dim-name"><svg class="icon icon-xs" style="color:var(--purple-light);vertical-align:-1px"><use href="#icon-award"/></svg> {{ dim_name|replace('_', ' ')|title }}</span>
+                <span class="quality-dim-score" style="color:{{ dc }}">{{ ds|round|int }}/100</span>
+            </div>
+            <div class="quality-dim-bar">
+                <div class="quality-dim-fill" style="width:{{ ds }}%; background:{{ dc }}"></div>
+            </div>
+            {% if dim_data.tool %}
+            <div class="quality-dim-detail">Tool: {{ dim_data.tool }}{% if dim_data.error %} | {{ dim_data.error }}{% endif %}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {# Render remaining dimensions in default order #}
+        {% for dim_name, dim_data in dims.items() if dim_name not in prio %}
+        {% set ds = dim_data.score %}
+        {% set dc = '#16a34a' if ds >= 80 else '#3b82f6' if ds >= 60 else '#ea580c' if ds >= 40 else '#dc2626' %}
+        <div class="quality-dim">
+            <div class="quality-dim-header">
+                <span class="quality-dim-name">{{ dim_name|replace('_', ' ')|title }}</span>
+                <span class="quality-dim-score" style="color:{{ dc }}">{{ ds|round|int }}/100</span>
+            </div>
+            <div class="quality-dim-bar">
+                <div class="quality-dim-fill" style="width:{{ ds }}%; background:{{ dc }}"></div>
+            </div>
+            {% if dim_data.tool %}
+            <div class="quality-dim-detail">Tool: {{ dim_data.tool }}{% if dim_data.error %} | {{ dim_data.error }}{% endif %}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="quality-global" style="padding: 3rem;">
+        <div style="font-size: 1.2rem; color: var(--text-secondary); margin-bottom: 1rem;">No quality data yet</div>
+        <div style="font-size: 0.9rem; color: var(--text-muted);">
+            Quality scans run automatically during missions, or agents can call <code>quality_scan</code> tool.
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Trend -->
+    {% if trend %}
+    <div class="quality-trend">
+        <h4>Quality Trend</h4>
+        <div class="quality-sparkline">
+            {% for t in trend %}
+            {% set ts = t.global_score %}
+            {% set tc = 'elite' if ts >= 80 else 'high' if ts >= 60 else 'medium' if ts >= 40 else 'low' %}
+            <div class="quality-spark-bar bg-{{ tc }}" style="height:{{ ts }}%" title="{{ t.timestamp[:16] }}: {{ ts|round|int }}/100"></div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Radar Chart -->
+    {% if snapshot and snapshot.breakdown and snapshot.breakdown.dimensions %}
+    <div style="max-width: 500px; margin: 0 auto 2rem;">
+        <h4 style="text-align: center; margin-bottom: 1rem;">Quality Radar</h4>
+        <canvas id="quality-radar" style="max-height: 350px;"></canvas>
+    </div>
+    {% endif %}
+
+    <!-- All Projects Heatmap -->
+    {% if all_scores %}
+    <div class="quality-heatmap">
+        <h4>Portfolio Quality Heatmap</h4>
+        <div class="quality-heatmap-grid">
+            {% for ps in all_scores %}
+            {% set pgs = ps.global_score %}
+            {% set pgc = '#16a34a' if pgs >= 80 else '#3b82f6' if pgs >= 60 else '#ea580c' if pgs >= 40 else '#dc2626' %}
+            <div class="quality-heatmap-cell" style="background: {{ pgc }}22; color: {{ pgc }}; border: 1px solid {{ pgc }}44;">
+                <div style="font-size: 1.2rem; font-weight: 700;">{{ pgs|round|int }}</div>
+                <div style="font-size: 0.7rem; margin-top: 0.25rem;">{{ ps.project_id[:12] }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function loadQuality() {
+    const pid = document.getElementById('qualityProject').value;
+    htmx.ajax('GET', '/metrics/tab/quality' + (pid ? '?project_id=' + pid : ''), '#metrics-content');
+}
+
+{% if snapshot and snapshot.breakdown and snapshot.breakdown.dimensions %}
+// Radar chart
+const radarCtx = document.getElementById('quality-radar');
+if (radarCtx) {
+    const dims = {{ snapshot.breakdown.dimensions | tojson }};
+    const labels = Object.keys(dims).map(d => d.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()));
+    const scores = Object.values(dims).map(d => d.score || 0);
+    new Chart(radarCtx, {
+        type: 'radar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Quality Score',
+                data: scores,
+                backgroundColor: 'rgba(139, 92, 246, 0.15)',
+                borderColor: '#8b5cf6',
+                borderWidth: 2,
+                pointBackgroundColor: scores.map(s => s >= 80 ? '#16a34a' : s >= 60 ? '#3b82f6' : s >= 40 ? '#ea580c' : '#dc2626'),
+                pointRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { r: { min: 0, max: 100, ticks: { stepSize: 20 } } },
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+{% endif %}
+</script>
+{% endblock %}
+</div>

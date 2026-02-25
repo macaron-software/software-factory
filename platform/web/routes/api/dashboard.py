@@ -266,29 +266,10 @@ async def api_quality_all(request: Request):
 
 @router.get("/quality", response_class=HTMLResponse)
 async def quality_dashboard_page(request: Request):
-    """Quality Scorecard dashboard page."""
-    from ....metrics.quality import QualityScanner
-    from ....projects.manager import get_project_store
+    """Quality Scorecard — redirects to unified Metrics page."""
+    from starlette.responses import RedirectResponse
 
-    projects = get_project_store().list_all()
-    project_id = request.query_params.get("project_id", "")
-
-    snapshot = QualityScanner.get_latest_snapshot(project_id) if project_id else None
-    trend = QualityScanner.get_trend(project_id) if project_id else []
-    all_scores = QualityScanner.get_all_projects_scores()
-
-    return _templates(request).TemplateResponse(
-        "quality.html",
-        {
-            "request": request,
-            "page_title": "Quality Scorecard",
-            "projects": projects,
-            "selected_project": project_id,
-            "snapshot": snapshot,
-            "trend": trend,
-            "all_scores": all_scores,
-        },
-    )
+    return RedirectResponse("/metrics?tab=quality", status_code=302)
 
 
 @router.get("/api/dashboard/quality-badge")

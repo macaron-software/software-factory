@@ -680,13 +680,9 @@ async def memory_page(request: Request):
 
 @router.get("/monitoring", response_class=HTMLResponse)
 async def monitoring_page(request: Request):
-    return _templates(request).TemplateResponse(
-        "monitoring.html",
-        {
-            "request": request,
-            "page_title": "Monitoring",
-        },
-    )
+    from starlette.responses import RedirectResponse
+
+    return RedirectResponse("/metrics?tab=monitoring", status_code=302)
 
 
 @router.get("/settings", response_class=HTMLResponse)
@@ -1311,7 +1307,7 @@ async def product_page(request: Request):
 
 @router.get("/analytics", response_class=HTMLResponse)
 async def analytics_page(request: Request):
-    """Analytics dashboard - Real-time metrics and insights."""
-    return _templates(request).TemplateResponse(
-        "analytics.html", {"request": request, "page_title": "Analytics Dashboard"}
-    )
+    """Analytics dashboard — redirects to unified Metrics page."""
+    from starlette.responses import RedirectResponse
+
+    return RedirectResponse("/metrics?tab=analytics", status_code=302)

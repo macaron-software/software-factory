@@ -1,0 +1,487 @@
+<div class="partial-dora">
+{% set p = request.state.perspective|default('admin') %}
+<style>
+.dora-container { max-width: 900px; margin: 0 auto; padding: 1.5rem 1rem; }
+.dora-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+.dora-header h3 { margin: 0; font-size: 1.3rem; }
+.dora-filters { display: flex; gap: 0.75rem; align-items: center; }
+.dora-select {
+    padding: 0.4rem 0.75rem; border-radius: 6px;
+    background: var(--bg-secondary); color: var(--text-primary);
+    border: 1px solid var(--border); font-size: 0.85rem;
+}
+.dora-overall {
+    text-align: center; margin-bottom: 2rem; padding: 1.5rem;
+    background: var(--bg-secondary); border-radius: 12px;
+    border: 1px solid var(--border);
+}
+.dora-overall-level {
+    font-size: 2.5rem; font-weight: 700; margin-bottom: 0.25rem;
+}
+.dora-overall-label { color: var(--text-secondary); font-size: 0.9rem; }
+.dora-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem; margin-bottom: 2rem;
+}
+.dora-card {
+    background: var(--bg-secondary); border-radius: 10px; padding: 1.25rem;
+    border: 1px solid var(--border); text-align: center;
+}
+.dora-card-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+.dora-card-title { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.dora-card-value { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.25rem; }
+.dora-card-detail { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem; }
+.dora-card-level {
+    display: inline-block; padding: 3px 10px; border-radius: 12px;
+    font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+}
+.level-elite { background: #16a34a22; color: #16a34a; }
+.level-high { background: #2563eb22; color: #3b82f6; }
+.level-medium { background: #ea580c22; color: #ea580c; }
+.level-low { background: #dc262622; color: #dc2626; }
+
+.dora-trend {
+    background: var(--bg-secondary); border-radius: 10px; padding: 1.25rem;
+    border: 1px solid var(--border);
+}
+.dora-trend h4 { margin: 0 0 1rem 0; font-size: 0.9rem; }
+.dora-trend-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem; }
+.dora-trend-label { width: 100px; font-size: 0.8rem; color: var(--text-secondary); flex-shrink: 0; }
+.dora-sparkline { flex: 1; height: 24px; }
+.dora-sparkline-bar {
+    display: inline-block; width: 6px; height: 100%; margin-right: 2px;
+    border-radius: 2px; vertical-align: bottom;
+    transition: height 0.3s;
+}
+</style>
+
+<div class="dora-container">
+    <div class="dora-header">
+        <h3><svg class="icon icon-sm" style="vertical-align:-2px"><use href="#icon-chart"/></svg> DORA Metrics</h3>
+        <div class="dora-filters">
+            <select class="dora-select" onchange="htmx.ajax('GET', '/metrics/tab/dora?project='+this.value+'&period={{ period }}', '#metrics-content')">
+                <option value="" {% if not selected_project %}selected{% endif %}>{{ _("tous_les_projets") }}</option>
+                {% for proj in projects %}
+                <option value="{{ proj.id }}" {% if selected_project == proj.id %}selected{% endif %}>{{ proj.name }}</option>
+                {% endfor %}
+            </select>
+            <select class="dora-select" onchange="htmx.ajax('GET', '/metrics/tab/dora?project={{ selected_project }}&period='+this.value, '#metrics-content')">
+                <option value="7" {% if period == 7 %}selected{% endif %}>7 jours</option>
+                <option value="30" {% if period == 30 %}selected{% endif %}>30 jours</option>
+                <option value="90" {% if period == 90 %}selected{% endif %}>90 jours</option>
+            </select>
+        </div>
+    </div>
+
+    {# ── Perspective focus banner ── #}
+    {% set focus_map = {
+        'rte': {'icon': 'zap', 'label': 'Focus RTE', 'desc': 'Velocity, cycle time, predictability'},
+        'scrum_master': {'icon': 'zap', 'label': 'Focus Scrum Master', 'desc': 'Burndown, velocity, sprint health'},
+        'developer': {'icon': 'code', 'label': 'Focus Developer', 'desc': 'Pipeline health, failure rate, lead time'},
+        'architect': {'icon': 'layers', 'label': 'Focus Architect', 'desc': 'Architecture fitness, complexity, tech debt'},
+        'qa_security': {'icon': 'shield', 'label': 'Focus QA/Security', 'desc': 'Change failure rate, test trends, MTTR'},
+        'product_owner': {'icon': 'target', 'label': 'Focus Product Owner', 'desc': 'Feature velocity, cycle time, delivery rate'},
+        'business_owner': {'icon': 'briefcase', 'label': 'Focus Business', 'desc': 'ROI, feature delivery, cost efficiency'},
+        'dsi': {'icon': 'trophy', 'label': 'Focus DSI', 'desc': 'Executive summary, LLM cost, overall DORA level'}
+    } %}
+    {% if p in focus_map %}
+    <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg-tertiary,#21262d);border:1px solid var(--border);border-radius:8px;margin-bottom:1.5rem;font-size:0.82rem">
+        <svg class="icon icon-sm" style="color:var(--purple-light)"><use href="#icon-{{ focus_map[p].icon }}"/></svg>
+        <div>
+            <span style="font-weight:600;color:var(--text-primary)">{{ focus_map[p].label }}</span>
+            <span style="color:var(--text-secondary)"> — {{ focus_map[p].desc }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Overall Level -->
+    <div class="dora-overall">
+        {% set level = dora.overall_level %}
+        {% set level_colors = {'elite': 'var(--purple)', 'high': 'var(--green)', 'medium': 'var(--yellow)', 'low': 'var(--red)'} %}
+        {% set level_icons = {'elite': 'trophy', 'high': 'check', 'medium': 'activity', 'low': 'alert-triangle'} %}
+        {% set level_text = {'elite': 'Elite', 'high': 'High', 'medium': 'Medium', 'low': 'Low'} %}
+        <div class="dora-overall-level"><svg class="icon icon-sm" style="color:{{ level_colors.get(level, 'var(--text-secondary)') }};vertical-align:-2px"><use href="#icon-{{ level_icons.get(level, 'circle') }}"/></svg> {{ level_text.get(level, level) }}</div>
+        <div class="dora-overall-label">Niveau global — {{ dora.period_days }} derniers jours</div>
+    </div>
+
+    <!-- 4 Metric Cards — order adapts to perspective -->
+    {# Define card fragments as macros for reuse #}
+    {% macro card_deploy() %}
+        <div class="dora-card" id="card-deploy">
+            <div class="dora-card-icon"><svg class="icon" style="color:var(--green)"><use href="#icon-rocket"/></svg></div>
+            <div class="dora-card-title">{{ _("phases_done") }}</div>
+            <div class="dora-card-value">{{ dora.deployment_frequency.count }}</div>
+            <div class="dora-card-detail">{{ dora.deployment_frequency.per_day }}/jour</div>
+            <span class="dora-card-level level-{{ dora.deployment_frequency.level }}">{{ dora.deployment_frequency.level }}</span>
+        </div>
+    {% endmacro %}
+    {% macro card_lead_time() %}
+        <div class="dora-card" id="card-lead-time">
+            <div class="dora-card-icon"><svg class="icon" style="color:var(--blue)"><use href="#icon-clock"/></svg></div>
+            <div class="dora-card-title">{{ _("lead_time") }}</div>
+            <div class="dora-card-value">{{ dora.lead_time.median_hours }}h</div>
+            <div class="dora-card-detail">p90: {{ dora.lead_time.p90_hours }}h</div>
+            <span class="dora-card-level level-{{ dora.lead_time.level }}">{{ dora.lead_time.level }}</span>
+        </div>
+    {% endmacro %}
+    {% macro card_failure() %}
+        <div class="dora-card" id="card-failure">
+            <div class="dora-card-icon"><svg class="icon" style="color:var(--red)"><use href="#icon-alert-circle"/></svg></div>
+            <div class="dora-card-title">{{ _("failure_rate") }}</div>
+            <div class="dora-card-value">{{ dora.change_failure_rate.rate_pct }}%</div>
+            <div class="dora-card-detail">{{ dora.change_failure_rate.failures }}/{{ dora.change_failure_rate.total }}</div>
+            <span class="dora-card-level level-{{ dora.change_failure_rate.level }}">{{ dora.change_failure_rate.level }}</span>
+        </div>
+    {% endmacro %}
+    {% macro card_mttr() %}
+        <div class="dora-card" id="card-mttr">
+            <div class="dora-card-icon"><svg class="icon" style="color:var(--yellow)"><use href="#icon-wrench"/></svg></div>
+            <div class="dora-card-title">{{ _("mttr") }}</div>
+            <div class="dora-card-value">{{ dora.mttr.median_hours }}h</div>
+            <div class="dora-card-detail">{{ dora.mttr.count }} incidents</div>
+            <span class="dora-card-level level-{{ dora.mttr.level }}">{{ dora.mttr.level }}</span>
+        </div>
+    {% endmacro %}
+    {% macro card_velocity() %}
+        {% if dora.velocity %}
+        <div class="dora-card" id="card-velocity">
+            <div class="dora-card-icon"><svg class="icon" style="color:var(--purple-light)"><use href="#icon-zap"/></svg></div>
+            <div class="dora-card-title">{{ _("velocity") }}</div>
+            <div class="dora-card-value">{{ dora.velocity.avg_velocity }} phases/epic</div>
+            <div class="dora-card-detail">{{ dora.velocity.sprint_count }} sprints</div>
+            <span class="dora-card-level level-{% if dora.velocity.predictability_pct >= 80 %}elite{% elif dora.velocity.predictability_pct >= 60 %}high{% elif dora.velocity.predictability_pct >= 40 %}medium{% else %}low{% endif %}">{{ dora.velocity.predictability_pct }}% predictable</span>
+        </div>
+        {% endif %}
+    {% endmacro %}
+    {% macro card_llm_cost() %}
+        {% if dora.llm_cost %}
+        <div class="dora-card" id="card-llm-cost">
+            <div class="dora-card-icon"><svg class="icon" style="color:var(--cyan)"><use href="#icon-cpu"/></svg></div>
+            <div class="dora-card-title">LLM Cost</div>
+            <div class="dora-card-value">${{ dora.llm_cost.total_cost_usd }}</div>
+            <div class="dora-card-detail">{{ dora.llm_cost.total_calls }} calls &middot; {{ (dora.llm_cost.total_tokens / 1000) | round(0) | int }}K tokens</div>
+            <span class="dora-card-level level-{% if dora.llm_cost.total_cost_usd < 5 %}elite{% elif dora.llm_cost.total_cost_usd < 20 %}high{% elif dora.llm_cost.total_cost_usd < 50 %}medium{% else %}low{% endif %}">{{ dora.llm_cost.by_model | length }} models</span>
+        </div>
+        {% endif %}
+    {% endmacro %}
+
+    <div class="dora-grid">
+    {% if p in ('rte', 'scrum_master') %}
+        {# RTE/SM: velocity + lead time first #}
+        {{ card_velocity() }}
+        {{ card_lead_time() }}
+        {{ card_deploy() }}
+        {{ card_mttr() }}
+        {{ card_failure() }}
+        {{ card_llm_cost() }}
+    {% elif p in ('developer', 'architect') %}
+        {# Dev/Architect: pipeline + failure first #}
+        {{ card_deploy() }}
+        {{ card_failure() }}
+        {{ card_lead_time() }}
+        {{ card_mttr() }}
+        {{ card_velocity() }}
+        {{ card_llm_cost() }}
+    {% elif p == 'qa_security' %}
+        {# QA: failure + MTTR first #}
+        {{ card_failure() }}
+        {{ card_mttr() }}
+        {{ card_deploy() }}
+        {{ card_lead_time() }}
+        {{ card_velocity() }}
+        {{ card_llm_cost() }}
+    {% elif p == 'product_owner' %}
+        {# PO: velocity + cycle time first #}
+        {{ card_velocity() }}
+        {{ card_deploy() }}
+        {{ card_lead_time() }}
+        {{ card_failure() }}
+        {{ card_mttr() }}
+        {{ card_llm_cost() }}
+    {% elif p in ('dsi', 'business_owner', 'overview') %}
+        {# Executive: overall + cost first #}
+        {{ card_llm_cost() }}
+        {{ card_deploy() }}
+        {{ card_lead_time() }}
+        {{ card_failure() }}
+        {{ card_mttr() }}
+        {{ card_velocity() }}
+    {% else %}
+        {# Default: standard DORA order #}
+        {{ card_deploy() }}
+        {{ card_lead_time() }}
+        {{ card_failure() }}
+        {{ card_mttr() }}
+        {{ card_velocity() }}
+        {{ card_llm_cost() }}
+    {% endif %}
+    </div>
+
+    <!-- Sparkline Trends -->
+    <div class="dora-trend">
+        <h4><svg class="icon icon-sm" style="vertical-align:-2px"><use href="#icon-trending-up"/></svg> Tendance — 12 dernières semaines</h4>
+
+        <div class="dora-trend-row">
+            <span class="dora-trend-label">Deploys</span>
+            <div class="dora-sparkline" id="sparkDeploy"></div>
+        </div>
+        <div class="dora-trend-row">
+            <span class="dora-trend-label">Lead Time (h)</span>
+            <div class="dora-sparkline" id="sparkLeadTime"></div>
+        </div>
+        <div class="dora-trend-row">
+            <span class="dora-trend-label">Incidents</span>
+            <div class="dora-sparkline" id="sparkFailure"></div>
+        </div>
+        <div class="dora-trend-row">
+            <span class="dora-trend-label">MTTR (h)</span>
+            <div class="dora-sparkline" id="sparkMTTR"></div>
+        </div>
+    </div>
+
+    <!-- Charts Section — order adapts to perspective -->
+    {% if p in ('rte', 'scrum_master', 'product_owner') %}
+    {# Velocity-focused profiles see velocity chart first #}
+    <div class="dora-grid" style="margin-top:1.5rem">
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Velocity (phases/sprint)</div>
+            <canvas id="chartVelocity" height="180"></canvas>
+        </div>
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Cycle Time Distribution (days)</div>
+            <canvas id="chartCycleTime" height="180"></canvas>
+        </div>
+    </div>
+    <div class="dora-grid" style="margin-top:1rem">
+        <div class="dora-card" style="grid-column:span 2;text-align:left">
+            <div class="dora-card-title" style="text-align:center">Deployment Frequency & Lead Time</div>
+            <canvas id="chartTrend" height="200"></canvas>
+        </div>
+    </div>
+    <div class="dora-grid" style="margin-top:1rem">
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Failure Rate (%)</div>
+            <canvas id="chartFailure" height="180"></canvas>
+        </div>
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Release Notes</div>
+            <div id="releaseNotes" style="max-height:220px;overflow-y:auto;font-size:0.78rem;color:var(--text-secondary)">
+                <p style="color:var(--text-muted);font-style:italic">Loading...</p>
+            </div>
+        </div>
+    </div>
+
+    {% elif p == 'qa_security' %}
+    {# QA sees failure rate and MTTR charts first #}
+    <div class="dora-grid" style="margin-top:1.5rem">
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Failure Rate (%)</div>
+            <canvas id="chartFailure" height="180"></canvas>
+        </div>
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Velocity (phases/sprint)</div>
+            <canvas id="chartVelocity" height="180"></canvas>
+        </div>
+    </div>
+    <div class="dora-grid" style="margin-top:1rem">
+        <div class="dora-card" style="grid-column:span 2;text-align:left">
+            <div class="dora-card-title" style="text-align:center">Deployment Frequency & Lead Time</div>
+            <canvas id="chartTrend" height="200"></canvas>
+        </div>
+    </div>
+    <div class="dora-grid" style="margin-top:1rem">
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Cycle Time Distribution (days)</div>
+            <canvas id="chartCycleTime" height="180"></canvas>
+        </div>
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Release Notes</div>
+            <div id="releaseNotes" style="max-height:220px;overflow-y:auto;font-size:0.78rem;color:var(--text-secondary)">
+                <p style="color:var(--text-muted);font-style:italic">Loading...</p>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    {# Default: standard DORA order (DSI, Admin, Dev, Architect, BO) #}
+    <div class="dora-grid" style="margin-top:1.5rem">
+        <div class="dora-card" style="grid-column:span 2;text-align:left">
+            <div class="dora-card-title" style="text-align:center">Deployment Frequency & Lead Time</div>
+            <canvas id="chartTrend" height="200"></canvas>
+        </div>
+    </div>
+
+    <div class="dora-grid" style="margin-top:1rem">
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Failure Rate (%)</div>
+            <canvas id="chartFailure" height="180"></canvas>
+        </div>
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Velocity (phases/sprint)</div>
+            <canvas id="chartVelocity" height="180"></canvas>
+        </div>
+    </div>
+
+    <!-- Cycle Time + Release Notes -->
+    <div class="dora-grid" style="margin-top:1rem">
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Cycle Time Distribution (days)</div>
+            <canvas id="chartCycleTime" height="180"></canvas>
+        </div>
+        <div class="dora-card" style="text-align:left">
+            <div class="dora-card-title" style="text-align:center">Release Notes</div>
+            <div id="releaseNotes" style="max-height:220px;overflow-y:auto;font-size:0.78rem;color:var(--text-secondary)">
+                <p style="color:var(--text-muted);font-style:italic">Loading...</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+const trend = {{ trend | tojson }};
+const chartColors = { grid: 'rgba(255,255,255,0.06)', text: 'rgba(255,255,255,0.5)' };
+const chartDefaults = {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+        x: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text, font: { size: 10 } } },
+        y: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text, font: { size: 10 } }, beginAtZero: true },
+    },
+};
+
+function weekLabels(n) { return Array.from({length: n}, (_, i) => `W-${n - i}`); }
+
+function renderSparkline(containerId, data, color) {
+    const el = document.getElementById(containerId);
+    if (!el || !data || data.length === 0) return;
+    const max = Math.max(...data, 1);
+    el.innerHTML = data.map(v => {
+        const h = Math.max(2, (v / max) * 24);
+        return `<span class="dora-sparkline-bar" style="height:${h}px;background:${color}" title="${v}"></span>`;
+    }).join('');
+}
+
+renderSparkline('sparkDeploy', trend.deploy, '#16a34a');
+renderSparkline('sparkLeadTime', trend.lead_time, '#3b82f6');
+renderSparkline('sparkFailure', trend.failure, '#dc2626');
+renderSparkline('sparkMTTR', trend.mttr, '#d29922');
+
+// Deployment + Lead Time dual-axis chart
+if (trend.deploy && trend.deploy.length > 0) {
+    new Chart(document.getElementById('chartTrend'), {
+        type: 'bar',
+        data: {
+            labels: weekLabels(trend.deploy.length),
+            datasets: [
+                { label: 'Deployments', data: trend.deploy, backgroundColor: 'rgba(22,163,74,0.6)', borderRadius: 4, yAxisID: 'y' },
+                { label: 'Lead Time (h)', data: trend.lead_time || [], type: 'line', borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3, yAxisID: 'y1', pointRadius: 3 },
+            ],
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { legend: { display: true, labels: { color: chartColors.text, font: { size: 11 } } } },
+            scales: {
+                ...chartDefaults.scales,
+                y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#3b82f6', font: { size: 10 } }, beginAtZero: true },
+            },
+        },
+    });
+}
+
+// Failure Rate chart
+if (trend.failure && trend.failure.length > 0) {
+    new Chart(document.getElementById('chartFailure'), {
+        type: 'line',
+        data: {
+            labels: weekLabels(trend.failure.length),
+            datasets: [{ data: trend.failure, borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,0.1)', fill: true, tension: 0.3, pointRadius: 3 }],
+        },
+        options: chartDefaults,
+    });
+}
+
+// Velocity chart (fetch from API)
+fetch('/api/metrics/velocity').then(r => r.json()).then(sprints => {
+    if (!sprints || sprints.length === 0) return;
+    const labels = sprints.slice(-12).map(s => s.name || s.id.slice(0, 6));
+    const planned = sprints.slice(-12).map(s => s.planned_sp || 0);
+    const actual = sprints.slice(-12).map(s => s.velocity || 0);
+    new Chart(document.getElementById('chartVelocity'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Planned', data: planned, backgroundColor: 'rgba(124,58,237,0.3)', borderRadius: 4 },
+                { label: 'Actual', data: actual, backgroundColor: 'rgba(124,58,237,0.7)', borderRadius: 4 },
+            ],
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { legend: { display: true, labels: { color: chartColors.text, font: { size: 11 } } } },
+        },
+    });
+});
+
+// ── Cycle Time Histogram ──
+const project = '{{ dora.project_id | default("") }}';
+fetch(`/api/metrics/cycle-time?project_id=${project}`).then(r => r.json()).then(ct => {
+    const hist = ct.features.histogram || [];
+    if (hist.length === 0) {
+        document.getElementById('chartCycleTime').parentElement.querySelector('.dora-card-title')
+            .insertAdjacentHTML('afterend', '<p style="color:var(--text-muted);font-size:0.75rem;text-align:center;margin-top:2rem">No completed features yet</p>');
+        document.getElementById('chartCycleTime').style.display = 'none';
+        return;
+    }
+    new Chart(document.getElementById('chartCycleTime'), {
+        type: 'bar',
+        data: {
+            labels: hist.map(h => h.range + 'd'),
+            datasets: [{
+                label: 'Features',
+                data: hist.map(h => h.count),
+                backgroundColor: 'rgba(52,211,153,0.6)',
+                borderRadius: 3,
+            }]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { color: chartColors.text, font: { size: 9 } }, grid: { display: false } },
+                y: { ticks: { color: chartColors.text, stepSize: 1 }, grid: { color: chartColors.grid } },
+            },
+        },
+    });
+    // Stats
+    const title = document.getElementById('chartCycleTime').parentElement.querySelector('.dora-card-title');
+    title.innerHTML += ` <span style="font-weight:400;font-size:0.72rem;color:var(--text-secondary)">(avg: ${ct.features.avg_days}d, median: ${ct.features.median_days}d)</span>`;
+}).catch(() => {});
+
+// ── Release Notes ──
+fetch(`/api/releases/${project}`).then(r => r.json()).then(data => {
+    const el = document.getElementById('releaseNotes');
+    if (!data.releases || data.releases.length === 0) {
+        el.innerHTML = '<p style="color:var(--text-muted);text-align:center">No releases yet</p>';
+        return;
+    }
+    let html = '';
+    for (const r of data.releases.slice(0, 5)) {
+        const date = r.completed_at ? r.completed_at.slice(0, 10) : 'In progress';
+        const pct = r.progress_pct !== undefined ? ` (${r.progress_pct}%)` : '';
+        html += `<div style="margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border)">`;
+        html += `<div style="font-weight:600;color:var(--text-primary);font-size:0.82rem">${r.epic_name}${pct}</div>`;
+        html += `<div style="font-size:0.68rem;color:var(--text-muted)">${date} &middot; ${r.feature_count} features &middot; ${r.total_sp} SP</div>`;
+        for (const f of r.features.slice(0, 8)) {
+            const icon = f.status === 'done' ? '&#10003;' : '&#9679;';
+            const clr = f.status === 'done' ? 'var(--green)' : 'var(--text-muted)';
+            html += `<div style="margin-left:0.5rem;font-size:0.72rem"><span style="color:${clr}">${icon}</span> ${f.name}</div>`;
+        }
+        if (r.features.length > 8) html += `<div style="margin-left:0.5rem;font-size:0.68rem;color:var(--text-muted)">+${r.features.length - 8} more</div>`;
+        html += `</div>`;
+    }
+    el.innerHTML = html;
+}).catch(() => {});
+</script>
+{% endblock %}
+</div>

@@ -109,19 +109,9 @@
                         <svg class="icon"><use href="#icon-plug"/></svg>
                     </a></li>
                     {% endif %}
-                    {% if p in _full + ('portfolio_manager', 'business_owner') %}
                     <li><a href="/metrics" data-tooltip="Metrics" class="{% if page_title == 'Metrics' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-chart"/></svg>
                     </a></li>
-                    {% endif %}
-                    <li><a href="/quality" data-tooltip="Quality" class="{% if page_title == 'Quality Scorecard' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-check-circle"/></svg>
-                    </a></li>
-                    {% if p in _full + ('rte', 'architect', 'qa_security', 'scrum_master') %}
-                    <li><a href="/monitoring" data-tooltip="Monitoring" class="{% if page_title == 'Monitoring' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-activity"/></svg>
-                    </a></li>
-                    {% endif %}
                 </ul>
             </div>
 

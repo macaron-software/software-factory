@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<style>
+.metrics-tabs {
+    display: flex; gap: 0; margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--border);
+    padding: 0 1rem;
+}
+.metrics-tab {
+    padding: 0.6rem 1.25rem; cursor: pointer;
+    font-size: 0.85rem; font-weight: 500;
+    color: var(--text-secondary); border-bottom: 2px solid transparent;
+    margin-bottom: -2px; display: flex; align-items: center; gap: 0.4rem;
+    transition: all 0.15s;
+    background: none; border: none; border-bottom: 2px solid transparent;
+}
+.metrics-tab:hover { color: var(--text-primary); }
+.metrics-tab.active {
+    color: var(--purple-light, #a78bfa);
+    border-bottom-color: var(--purple-light, #a78bfa);
+    font-weight: 600;
+}
+.metrics-tab svg.icon { width: 14px; height: 14px; }
+</style>
+
+<div class="metrics-tabs">
+    <button class="metrics-tab" data-tab="dora"
+            hx-get="/metrics/tab/dora" hx-target="#metrics-content" hx-swap="innerHTML" hx-trigger="click">
+        <svg class="icon"><use href="#icon-chart"/></svg> DORA
+    </button>
+    <button class="metrics-tab" data-tab="quality"
+            hx-get="/metrics/tab/quality" hx-target="#metrics-content" hx-swap="innerHTML" hx-trigger="click">
+        <svg class="icon"><use href="#icon-check-circle"/></svg> Quality
+    </button>
+    <button class="metrics-tab" data-tab="analytics"
+            hx-get="/metrics/tab/analytics" hx-target="#metrics-content" hx-swap="innerHTML" hx-trigger="click">
+        <svg class="icon"><use href="#icon-bar-chart-2"/></svg> Analytics
+    </button>
+    <button class="metrics-tab" data-tab="monitoring"
+            hx-get="/metrics/tab/monitoring" hx-target="#metrics-content" hx-swap="innerHTML" hx-trigger="click">
+        <svg class="icon"><use href="#icon-activity"/></svg> Monitoring
+    </button>
+    <button class="metrics-tab" data-tab="pipeline"
+            hx-get="/metrics/tab/pipeline" hx-target="#metrics-content" hx-swap="innerHTML" hx-trigger="click">
+        <svg class="icon"><use href="#icon-git-branch"/></svg> Pipeline
+    </button>
+</div>
+
+<div id="metrics-content">
+    <p style="text-align:center;color:var(--text-secondary);padding:3rem">Loading...</p>
+</div>
+
+<script>
+// Tab switching — set active class after htmx loads content
+document.querySelectorAll('.metrics-tab').forEach(tab => {
+    tab.addEventListener('htmx:afterRequest', () => {
+        document.querySelectorAll('.metrics-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+    });
+});
+// Auto-load tab from URL param or default to dora
+document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab') || 'dora';
+    const target = document.querySelector(`.metrics-tab[data-tab="${tab}"]`) || document.querySelector('.metrics-tab');
+    if (target) htmx.trigger(target, 'click');
+});
+</script>
+{% endblock %}
