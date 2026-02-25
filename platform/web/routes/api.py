@@ -3110,20 +3110,51 @@ async def dashboard_missions(request: Request):
 
 @router.get("/api/dashboard/sprints")
 async def dashboard_sprints(request: Request):
-    """Active sprints summary."""
-    from ...missions.store import get_mission_store
+    """Active sprints summary — aggregates across active missions."""
+    from ...missions.store import get_mission_store, get_mission_run_store
 
     store = get_mission_store()
-    try:
-        sprints = store.list_sprints(limit=10)
-    except Exception:
-        sprints = []
+    run_store = get_mission_run_store()
+    missions = store.list_missions(limit=100)
+    active_missions = [m for m in missions if m.status in ("active", "running")]
 
-    active = [s for s in sprints if getattr(s, "status", "") in ("active", "planning")][
-        :5
-    ]
+    all_sprints = []
+    for m in active_missions[:20]:
+        try:
+            all_sprints.extend(store.list_sprints(m.id))
+        except Exception:
+            pass
+
+    active = [
+        s for s in all_sprints if getattr(s, "status", "") in ("active", "planning")
+    ][:5]
+
     if not active:
-        return HTMLResponse('<p class="text-muted">No active sprints</p>')
+        # Fallback: show running missions as pseudo-sprints
+        runs = run_store.list_runs(limit=20)
+        running = [
+            r
+            for r in runs
+            if r.status
+            and str(getattr(r.status, "value", r.status)) in ("running", "active")
+        ][:5]
+        if not running:
+            return HTMLResponse('<p class="text-muted">No active sprints</p>')
+        html = ""
+        for r in running:
+            name = html_mod.escape((r.name or r.id)[:30])
+            done = sum(
+                1
+                for ph in (r.phases or [])
+                if ph.status.value in ("done", "done_with_issues")
+            )
+            total = len(r.phases or [])
+            pct = int(done / total * 100) if total > 0 else 0
+            html += f"""<div class="dash-stat">
+                <span class="dash-stat-label">{name}</span>
+                <span class="dash-stat-value">{done}/{total} phases ({pct}%)</span>
+            </div>"""
+        return HTMLResponse(html)
 
     html = ""
     for s in active:
@@ -3140,23 +3171,44 @@ async def dashboard_sprints(request: Request):
 
 @router.get("/api/dashboard/backlog")
 async def dashboard_backlog(request: Request):
-    """Backlog stats for PO."""
+    """Backlog stats — missions by status."""
     from ...missions.store import get_mission_store
 
     store = get_mission_store()
-    try:
-        features = store.list_features(limit=100)
-    except Exception:
-        features = []
+    missions = store.list_missions(limit=500)
 
-    try:
-        stories = store.list_user_stories(limit=200)
-    except Exception:
-        stories = []
+    by_status: dict[str, int] = {}
+    for m in missions:
+        st = m.status or "unknown"
+        by_status[st] = by_status.get(st, 0) + 1
 
-    html = f"""<div class="dash-stat"><span class="dash-stat-label">Features</span><span class="dash-stat-value">{len(features)}</span></div>
-    <div class="dash-stat"><span class="dash-stat-label">User Stories</span><span class="dash-stat-value">{len(stories)}</span></div>"""
-    return HTMLResponse(html)
+    # Also count tasks across active missions
+    total_tasks = 0
+    done_tasks = 0
+    for m in [m for m in missions if m.status in ("active", "running")][:20]:
+        try:
+            tasks = store.list_tasks(mission_id=m.id)
+            total_tasks += len(tasks)
+            done_tasks += sum(
+                1 for t in tasks if getattr(t, "status", "") in ("done", "completed")
+            )
+        except Exception:
+            pass
+
+    html = ""
+    for st, cnt in sorted(by_status.items(), key=lambda x: -x[1]):
+        label = html_mod.escape(st.replace("_", " ").title())
+        html += f"""<div class="dash-stat">
+            <span class="dash-stat-label">{label}</span>
+            <span class="dash-stat-value">{cnt}</span>
+        </div>"""
+    if total_tasks:
+        pct = int(done_tasks / total_tasks * 100) if total_tasks else 0
+        html += f"""<div class="dash-stat" style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--border)">
+            <span class="dash-stat-label">Tasks Done</span>
+            <span class="dash-stat-value">{done_tasks}/{total_tasks} ({pct}%)</span>
+        </div>"""
+    return HTMLResponse(html or '<p class="text-muted">No backlog items</p>')
 
 
 @router.get("/api/dashboard/projects")
@@ -3227,11 +3279,6 @@ async def api_quality_all(request: Request):
     from ...metrics.quality import QualityScanner
 
     return {"projects": QualityScanner.get_all_projects_scores()}
-
-
-@router.get("/api/dashboard/activity")
-async def dashboard_activity(request: Request):
-    """Recent activity feed."""
 
 
 @router.get("/api/dashboard/quality-badge")
