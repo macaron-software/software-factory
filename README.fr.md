@@ -157,6 +157,43 @@ La plateforme bascule automatiquement sur les autres fournisseurs configurés en
 
 Vous pouvez aussi configurer les fournisseurs depuis la page **Settings** du dashboard (`/settings`).
 
+## Premiers pas — Votre premier projet
+
+Apres l'installation, voici comment passer d'une idee a un projet fonctionnel :
+
+### Voie A : Partir d'une idee (Atelier d'ideation)
+
+1. **Ouvrez la page Ideation** — allez sur `/ideation` (ou cliquez "Ideation" dans la barre laterale)
+2. **Decrivez votre idee** — ex. *"Application de covoiturage d'entreprise avec matching en temps reel"*
+3. **Regardez les agents discuter** — 5 agents specialises (Product Manager, Business Analyst, Architecte, UX Designer, Securite) analysent votre idee en temps reel via streaming SSE
+4. **Creez un projet a partir du resultat** — cliquez **"Creer un Epic a partir de cette idee"**. La plateforme va :
+   - Creer un nouveau **projet** avec `VISION.md` et scaffolding CI/CD generes
+   - Creer un **epic** avec des features et user stories decomposees par l'agent PO
+   - Auto-provisionner les missions **TMA**, **Securite** et **Dette technique**
+
+### Voie B : Creer un projet manuellement
+
+1. Allez sur `/projects` et cliquez **"Nouveau Projet"**
+2. Remplissez : nom, description, stack technique, chemin du depot
+3. La plateforme cree automatiquement :
+   - Un **agent Product Manager** assigne au projet
+   - Une **mission TMA** (maintenance continue — surveille la sante, cree des incidents)
+   - Une **mission Securite** (audits de securite hebdomadaires — SAST, verification des dependances)
+   - Une **mission Dette Technique** (reduction mensuelle de la dette — planifiee)
+
+### Ensuite : Creer des Epics et Features
+
+- Depuis la page **Portfolio** (`/portfolio`), creez des epics avec priorisation WSJF
+- Depuis un epic, ajoutez des **features** et decomposez-les en **user stories**
+- Utilisez le **PI Board** (`/pi-board`) pour planifier les increments programme et assigner les features aux sprints
+
+### Lancer des missions
+
+- Cliquez **"Demarrer"** sur une mission pour lancer l'execution des agents
+- Choisissez un **pattern d'orchestration** (hierarchique, reseau, parallele...)
+- Suivez le travail des agents en temps reel depuis **Mission Control**
+- Les agents utilisent leurs outils (code_read, git, build, test, security scan) de maniere autonome
+
 ## Fonctionnalités
 
 ### 🤖 145 Agents IA Spécialisés
@@ -674,6 +711,119 @@ Chaque projet reçoit automatiquement 4 missions opérationnelles :
 - **Radar chart** — visualisation Chart.js des dimensions qualité sur `/quality`
 - **Badge qualité** — cercle coloré dans les en-têtes projet (`/api/dashboard/quality-badge`)
 - **Scorecard mission** — métriques qualité dans la sidebar mission (`/api/dashboard/quality-mission`)
+
+## Configuration Projet
+
+Les projets sont definis dans `projects/*.yaml` :
+
+```yaml
+project:
+  name: mon-projet
+  root_path: /chemin/vers/projet
+  vision_doc: CLAUDE.md
+
+agents:
+  - product_manager
+  - solution_architect
+  - backend_dev
+  - qa_engineer
+
+patterns:
+  ideation: hierarchical
+  development: parallel
+  review: adversarial-pair
+
+deployment:
+  strategy: blue-green
+  auto_prod: true
+  health_check_url: /health
+```
+
+## Structure du Projet
+
+```
+├── platform/                # Plateforme Agent (152 fichiers Python)
+│   ├── server.py            # App FastAPI, port 8090
+│   ├── agents/              # Moteur agent (store, executor, loop)
+│   ├── a2a/                 # Bus de messagerie agent-a-agent
+│   ├── patterns/            # 10 patterns d'orchestration
+│   ├── missions/            # Cycle de vie SAFe des missions
+│   ├── sessions/            # Execution conversations + SSE
+│   ├── web/                 # Routes + templates Jinja2
+│   ├── mcp_platform/        # Serveur MCP (23 outils)
+│   └── tools/               # Outils agent (code, git, deploy)
+│
+├── cli/                     # CLI 'sf' (6 fichiers, 2100+ lignes)
+│   ├── sf.py                # 22 groupes de commandes, 40+ sous-commandes
+│   ├── _api.py              # Client REST httpx
+│   ├── _db.py               # Backend offline sqlite3
+│   ├── _output.py           # Tables ANSI, rendu markdown
+│   └── _stream.py           # Streaming SSE avec spinner
+│
+├── dashboard/               # Frontend HTMX
+├── deploy/                  # Charts Helm, Docker, K8s
+├── tests/                   # Tests E2E Playwright
+├── skills/                  # Bibliotheque de competences agents
+├── projects/                # Configurations YAML des projets
+└── data/                    # Base de donnees SQLite
+```
+
+## Tests
+
+```bash
+# Lancer tous les tests
+make test
+
+# Tests E2E (Playwright — installation requise)
+cd platform/tests/e2e
+npm install
+npx playwright install --with-deps chromium
+npm test
+
+# Tests unitaires
+pytest tests/
+
+# Tests de chaos
+python3 tests/test_chaos.py
+
+# Tests d'endurance
+python3 tests/test_endurance.py
+```
+
+## Deploiement
+
+### Docker
+
+L'image Docker inclut : **Node.js 20**, **Playwright + Chromium**, **bandit**, **semgrep**, **ripgrep**.
+Les agents peuvent builder des projets, lancer des tests E2E avec captures d'ecran, et effectuer des scans SAST.
+
+```bash
+docker-compose up -d
+```
+
+### Kubernetes (Helm)
+
+```bash
+helm install software-factory ./deploy/helm/
+```
+
+### Variables d'Environnement
+
+Voir [`.env.example`](.env.example) pour la liste complete. Variables principales :
+
+```bash
+# Fournisseur LLM (requis pour de vrais agents)
+PLATFORM_LLM_PROVIDER=minimax        # minimax | azure-openai | azure-ai | nvidia | demo
+MINIMAX_API_KEY=sk-...               # Cle API MiniMax
+
+# Authentification (optionnel)
+GITHUB_CLIENT_ID=...                 # GitHub OAuth
+AZURE_AD_CLIENT_ID=...               # Azure AD OAuth
+
+# Integrations (optionnel)
+JIRA_URL=https://votre-jira.atlassian.net
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+```
 
 ## Contribuer
 
