@@ -207,6 +207,7 @@ PUBLIC_PATHS = {
     "/openapi.json",
     "/js-error",
     "/api/analytics",
+    "/api/teams",
 }
 
 

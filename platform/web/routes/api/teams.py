@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-TEAMS_DIR = Path(__file__).parents[5] / "teams"
+TEAMS_DIR = Path(__file__).parents[4] / "teams"
 
 
 # ---------------------------------------------------------------------------
