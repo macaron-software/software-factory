@@ -1034,7 +1034,7 @@ class MissionOrchestrator:
 
             # Feedback loop: track TMA fix for recurring incident detection
             if phase_success and phase.phase_id in ("fix", "tma-fix", "validate"):
-                if mission.type in ("bug", "program") and mission.project_id:
+                if getattr(mission, "type", None) in ("bug", "program") and mission.project_id:
                     try:
                         from ..missions.feedback import on_tma_incident_fixed
 
