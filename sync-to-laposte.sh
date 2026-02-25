@@ -10,7 +10,7 @@ set -e
 
 GITHUB_REPO="$HOME/_MACARON-SOFTWARE"
 LAPOSTE_REPO="$HOME/_LAPOSTE/_SOFTWARE_FACTORY"
-LAPOSTE_REMOTE="https://gitlab.azure.innovation-laposte.io/udd-ia-native/software-factory.git"
+LAPOSTE_REMOTE="git@gitlab.azure.innovation-laposte.io:udd-ia-native/software-factory.git"
 DRY_RUN=false
 
 [[ "$1" == "--dry-run" ]] && DRY_RUN=true
