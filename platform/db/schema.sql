@@ -496,3 +496,21 @@ CREATE TABLE IF NOT EXISTS custom_ai_providers (
 );
 
 CREATE INDEX IF NOT EXISTS idx_custom_ai_enabled ON custom_ai_providers(enabled);
+
+-- Event sourcing: append-only audit log
+CREATE TABLE IF NOT EXISTS events (
+    id TEXT PRIMARY KEY,
+    timestamp TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    entity_type TEXT NOT NULL DEFAULT '',
+    entity_id TEXT NOT NULL DEFAULT '',
+    actor TEXT NOT NULL DEFAULT '',
+    data TEXT NOT NULL DEFAULT '{}',
+    project_id TEXT NOT NULL DEFAULT '',
+    mission_id TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_entity ON events(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_events_mission ON events(mission_id);
+CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
+CREATE INDEX IF NOT EXISTS idx_events_ts ON events(timestamp);

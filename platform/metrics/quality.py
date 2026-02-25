@@ -237,6 +237,21 @@ class QualityScanner:
                 },
             )
 
+            # Emit event: quality scanned
+            try:
+                from ..events.store import QUALITY_SCANNED, get_event_store
+
+                get_event_store().emit(
+                    QUALITY_SCANNED,
+                    {"global_score": scorecard.global_score, "dimensions": len(scorecard.dimensions)},
+                    entity_type="project",
+                    entity_id=project_id,
+                    project_id=project_id,
+                    mission_id=mission_id,
+                )
+            except Exception:
+                pass
+
         return scorecard
 
     # ── Dimension Scanners ──

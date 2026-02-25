@@ -115,6 +115,21 @@ class SessionStore:
             db.commit()
         finally:
             db.close()
+
+        # Emit event: session created
+        try:
+            from ..events.store import SESSION_CREATED, get_event_store
+
+            get_event_store().emit(
+                SESSION_CREATED,
+                {"name": session.name, "pattern": session.pattern_id, "goal": (session.goal or "")[:200]},
+                entity_type="session",
+                entity_id=session.id,
+                project_id=session.project_id or "",
+            )
+        except Exception:
+            pass
+
         return session
 
     def update_status(self, session_id: str, status: str) -> bool:

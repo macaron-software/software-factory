@@ -95,6 +95,22 @@ class MissionOrchestrator:
             session_id,
         )
 
+        # Emit event: mission started
+        try:
+            from ..events.store import MISSION_STARTED, get_event_store
+
+            get_event_store().emit(
+                MISSION_STARTED,
+                {"workflow": wf.id, "phases": len(mission.phases), "session_id": session_id},
+                entity_type="mission",
+                entity_id=mission.id,
+                actor=self.orch_id,
+                project_id=getattr(mission, "project_id", ""),
+                mission_id=mission.id,
+            )
+        except Exception:
+            pass
+
         # Stop any existing agent loops for this session to avoid conflicts
         try:
             from ..agents.loop import get_loop_manager
@@ -266,6 +282,22 @@ class MissionOrchestrator:
                 aids,
                 pattern_type,
             )
+
+            # Emit event: phase started
+            try:
+                from ..events.store import PHASE_STARTED, get_event_store
+
+                get_event_store().emit(
+                    PHASE_STARTED,
+                    {"phase_name": wf_phase.name, "pattern": pattern_type, "agents": aids},
+                    entity_type="phase",
+                    entity_id=phase.phase_id,
+                    actor=self.orch_id,
+                    project_id=getattr(mission, "project_id", ""),
+                    mission_id=mission.id,
+                )
+            except Exception:
+                pass
 
             await self._push_sse(
                 session_id,
@@ -785,6 +817,23 @@ class MissionOrchestrator:
             phase_success = phase_actually_done
             logger.warning("ORCH phase=%s status=%s", phase.phase_id, phase.status.value)
 
+            # Emit event: phase completed/failed
+            try:
+                from ..events.store import PHASE_COMPLETED, PHASE_FAILED, get_event_store
+
+                evt = PHASE_COMPLETED if phase_success else PHASE_FAILED
+                get_event_store().emit(
+                    evt,
+                    {"phase_name": wf_phase.name, "status": phase.status.value},
+                    entity_type="phase",
+                    entity_id=phase.phase_id,
+                    actor=self.orch_id,
+                    project_id=getattr(mission, "project_id", ""),
+                    mission_id=mission.id,
+                )
+            except Exception:
+                pass
+
             phase.completed_at = datetime.utcnow()
             if phase_success:
                 try:
@@ -1230,6 +1279,28 @@ class MissionOrchestrator:
             final_msg = f"Epic terminée — {phases_done} réussies{issues_info}, {phases_failed} échouées sur {total} phases{reloop_info}."
         run_store.update(mission)
         await self._sse_orch_msg(final_msg)
+
+        # Emit event: mission completed/failed
+        try:
+            from ..events.store import MISSION_COMPLETED, MISSION_FAILED, get_event_store
+
+            evt_type = MISSION_COMPLETED if mission.status == MissionStatus.COMPLETED else MISSION_FAILED
+            get_event_store().emit(
+                evt_type,
+                {
+                    "phases_done": phases_done,
+                    "phases_failed": phases_failed,
+                    "phases_with_issues": phases_with_issues,
+                    "reloop_count": reloop_count,
+                },
+                entity_type="mission",
+                entity_id=mission.id,
+                actor=self.orch_id,
+                project_id=getattr(mission, "project_id", ""),
+                mission_id=mission.id,
+            )
+        except Exception:
+            pass
 
         try:
             await _auto_retrospective(mission, session_id, phase_summaries, self._push_sse)

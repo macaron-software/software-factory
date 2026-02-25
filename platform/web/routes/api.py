@@ -3736,3 +3736,44 @@ async def next_ceremony(request: Request):
                 {"name": phase, "mission": name, "scheduled_at": started}
             )
     return JSONResponse({"name": None})
+
+
+# ── Event Log API ──
+
+
+@router.get("/api/events")
+async def list_events(request: Request):
+    """List recent events with optional filters."""
+    from ...events.store import get_event_store
+
+    store = get_event_store()
+    events = store.query(
+        event_type=request.query_params.get("type", ""),
+        mission_id=request.query_params.get("mission_id", ""),
+        project_id=request.query_params.get("project_id", ""),
+        entity_type=request.query_params.get("entity_type", ""),
+        entity_id=request.query_params.get("entity_id", ""),
+        since=request.query_params.get("since", ""),
+        limit=int(request.query_params.get("limit", "100")),
+    )
+    return JSONResponse(events)
+
+
+@router.get("/api/events/stats")
+async def event_stats(request: Request):
+    """Event statistics."""
+    from ...events.store import get_event_store
+
+    store = get_event_store()
+    since = request.query_params.get("since", "")
+    return JSONResponse(store.stats(since))
+
+
+@router.get("/api/events/{mission_id}")
+async def mission_events(request: Request, mission_id: str):
+    """Replay all events for a mission in chronological order."""
+    from ...events.store import get_event_store
+
+    store = get_event_store()
+    events = store.replay(mission_id)
+    return JSONResponse(events)
