@@ -85,8 +85,11 @@ if ! $DRY_RUN; then
     mkdir -p "$LAPOSTE_REPO/platform/skills/definitions"
     mkdir -p "$LAPOSTE_REPO/platform/workflows/definitions"
     mkdir -p "$LAPOSTE_REPO/projects"
+    rm -f "$LAPOSTE_REPO/platform/skills/definitions/"*.yaml
     touch "$LAPOSTE_REPO/platform/skills/definitions/.gitkeep"
+    rm -f "$LAPOSTE_REPO/platform/workflows/definitions/"*.yaml
     touch "$LAPOSTE_REPO/platform/workflows/definitions/.gitkeep"
+    rm -f "$LAPOSTE_REPO/projects/"*.yaml
     touch "$LAPOSTE_REPO/projects/.gitkeep"
     cp "$GITHUB_REPO/platform/skills/definitions/_template.yaml" \
        "$LAPOSTE_REPO/platform/skills/definitions/_template.yaml" 2>/dev/null || true
