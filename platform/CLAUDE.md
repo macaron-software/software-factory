@@ -53,6 +53,23 @@ ssh -i "$SSH_KEY" azureadmin@4.233.64.30 "docker cp /tmp/update.tar deploy-platf
 # UID mismatch: /opt/macaron owned by 501 (macOS), azureadmin=1001 → use docker cp
 ```
 
+## GIT (2 repos séparés)
+
+```
+~/_MACARON-SOFTWARE/                   ← .git → GitHub macaron-software/software-factory
+  platform/ cli/ dashboard/ ...        ← CODE tracké
+  _SOFTWARE_FACTORY/                   ← runtime local NON TRACKÉ (.gitignore)
+    platform/ data/ logs/ ...          ← instance dev (DB, logs, workspace)
+
+~/_LAPOSTE/_SOFTWARE_FACTORY/          ← .git → GitLab udd-ia-native/software-factory
+  platform/ cli/ dashboard/ ...        ← squelette : skills/workflows/projects VIDES
+  SSH: ~/.ssh/gitlab_laposte_ed25519   ← ssh -T git@gitlab.azure... → ✅
+```
+
+Push GitHub : `cd ~/_MACARON-SOFTWARE && git push origin main`
+Sync La Poste (one-way) : `cd ~/_MACARON-SOFTWARE && ./sync-to-laposte.sh`
+⚠️ Ne jamais éditer `~/_LAPOSTE/_SOFTWARE_FACTORY/` — écrasé par sync.
+
 ## STACK
 
 - FastAPI + Jinja2 + HTMX + SSE (no WS). Zero build step. Zero emoji (SVG Feather only)
