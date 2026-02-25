@@ -7,6 +7,9 @@
     <button class="tab" onclick="switchTab(this); showAPITab()">API</button>
     <button class="tab" onclick="switchTab(this); showCLITab()">CLI</button>
     <button class="tab" hx-get="/design-system" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">Design System</button>
+    <button class="tab" hx-get="/wiki" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">
+        <svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-book-open"/></svg> Wiki
+    </button>
 </div>
 <div id="tab-content"></div>
 <script>

@@ -5,10 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ page_title }} — Software Factory</title>
-    <link rel="stylesheet" href="/static/css/main.css?v=20260223b">
-    <link rel="stylesheet" href="/static/css/components.css?v=20260223b">
-    <link rel="stylesheet" href="/static/css/agents.css?v=20260223b">
-    <link rel="stylesheet" href="/static/css/projects.css?v=20260223b">
+    <link rel="stylesheet" href="/static/css/main.css?v=20260225a">
+    <link rel="stylesheet" href="/static/css/components.css?v=20260225a">
+    <link rel="stylesheet" href="/static/css/agents.css?v=20260225a">
+    <link rel="stylesheet" href="/static/css/projects.css?v=20260225a">
     <script src="/static/js/htmx.min.js"></script>
     <script src="/static/js/sortable.min.js"></script>
     <script src="/static/js/sse.js" defer></script>
@@ -105,7 +105,7 @@
                     </a></li>
                     {% endif %}
                     {% if p in _full + ('developer', 'architect') %}
-                    <li><a href="/toolbox" data-tooltip="Toolbox" class="{% if page_title in ('Toolbox', 'Skills', 'Memory', 'MCPs', 'Design System') %}active{% endif %}">
+                    <li><a href="/toolbox" data-tooltip="Toolbox" class="{% if page_title in ('Toolbox', 'Skills', 'Memory', 'MCPs', 'Design System', 'Wiki') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-plug"/></svg>
                     </a></li>
                     {% endif %}

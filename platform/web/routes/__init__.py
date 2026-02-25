@@ -17,6 +17,7 @@ from .sessions import router as sessions_router
 from .sf_commands import router as sf_router
 from .notifications import router as notifications_router
 from .tma import router as tma_router
+from .wiki import router as wiki_router
 from .workflows import router as workflows_router
 
 router = APIRouter()
@@ -33,6 +34,7 @@ router.include_router(cli_router)
 router.include_router(sf_router)
 router.include_router(notifications_router)
 router.include_router(tma_router)
+router.include_router(wiki_router)
 router.include_router(analytics_router)
 
 # Workspace file serving (needs to be on the main router)

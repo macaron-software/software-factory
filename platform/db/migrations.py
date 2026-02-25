@@ -629,6 +629,22 @@ def _migrate(conn):
         "CREATE INDEX IF NOT EXISTS idx_qs_ts ON quality_snapshots(created_at)"
     )
 
+    # ── Wiki pages ────────────────────────────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS wiki_pages (
+            slug TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            content TEXT DEFAULT '',
+            category TEXT DEFAULT 'general',
+            icon TEXT DEFAULT '',
+            sort_order INTEGER DEFAULT 100,
+            parent_slug TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_cat ON wiki_pages(category)")
+
 
 def _migrate_pg(conn):
     """PostgreSQL incremental migrations (safe ALTER TABLE IF NOT EXISTS)."""
