@@ -7,6 +7,7 @@ Called from server.py lifespan. Runs as a periodic watchdog every 5 minutes:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,12 @@ async def auto_resume_missions() -> None:
     First pass is aggressive (all paused, 1.5s stagger), then gentle (5-min checks).
     """
     await asyncio.sleep(5)  # Let platform fully initialize first
+
+    # First: repair all failed runs (reset to paused + create TMA incidents)
+    try:
+        await handle_failed_runs()
+    except Exception as e:
+        logger.error("auto_resume: handle_failed_runs error: %s", e)
 
     first_pass = True
     while True:
@@ -186,3 +193,144 @@ async def _launch_run(run_id: str) -> None:
     task = asyncio.create_task(_safe_run())
     _active_mission_tasks[run_id] = task
     task.add_done_callback(lambda t: _active_mission_tasks.pop(run_id, None))
+
+
+# ─── Failed run repair ──────────────────────────────────────────────────────
+
+_TMA_WORKFLOW_ID = "tma-maintenance"
+_MAX_RETRIES = 3  # after that, don't auto-retry
+
+
+async def handle_failed_runs() -> int:
+    """
+    Repair failed mission_runs so the watchdog can retry them.
+    - Init failures (no progress) → reset to paused, reset pending phases
+    - Phase failures (had progress) → reset to paused + create TMA incident run
+    Called once at startup (before the watchdog loop starts retrying paused runs).
+    Returns number of runs repaired.
+    """
+    from ..db.migrations import get_db
+
+    db = get_db()
+    try:
+        rows = db.execute("""
+            SELECT mr.id, mr.workflow_id, mr.workflow_name, mr.current_phase,
+                   mr.phases_json, mr.project_id, mr.brief,
+                   COALESCE(m.name, ''), COALESCE(m.type, '')
+            FROM mission_runs mr
+            LEFT JOIN missions m ON m.id = mr.session_id
+            WHERE mr.status = 'failed' AND mr.workflow_id IS NOT NULL
+            ORDER BY mr.created_at DESC
+            LIMIT 200
+        """).fetchall()
+    finally:
+        db.close()
+
+    if not rows:
+        return 0
+
+    repaired = 0
+    tma_created = 0
+    for run_id, wf_id, wf_name, cur_phase, phases_raw, project_id, brief, mname, mtype in rows:
+        try:
+            phases = json.loads(phases_raw) if phases_raw else []
+            done_phases = [p for p in phases if p.get("status") in ("done", "done_with_issues", "skipped")]
+
+            # Reset failed/running phases back to pending so orchestrator retries them
+            repaired_phases = _reset_failed_phases(phases)
+            new_phases_json = json.dumps(repaired_phases, ensure_ascii=False)
+
+            db2 = get_db()
+            try:
+                db2.execute(
+                    "UPDATE mission_runs SET status='paused', phases_json=? WHERE id=?",
+                    (new_phases_json, run_id),
+                )
+                db2.commit()
+            finally:
+                db2.close()
+
+            repaired += 1
+
+            # Phase-specific failure with prior progress → also create TMA incident
+            if done_phases and cur_phase and project_id:
+                await _create_tma_incident(
+                    failed_run_id=run_id,
+                    workflow_name=wf_name,
+                    failed_phase=cur_phase,
+                    done_phases=[p["phase_id"] for p in done_phases],
+                    project_id=project_id,
+                    original_brief=brief or "",
+                )
+                tma_created += 1
+
+        except Exception as e:
+            logger.warning("handle_failed_runs: error on %s: %s", run_id, e)
+
+    logger.warning(
+        "handle_failed_runs: %d repaired → paused (%d TMA incidents created)",
+        repaired, tma_created,
+    )
+    return repaired
+
+
+def _reset_failed_phases(phases: list) -> list:
+    """Reset failed/stuck-running phases to pending so orchestrator retries them."""
+    import copy
+    result = []
+    for p in phases:
+        phase = copy.deepcopy(p)
+        if phase.get("status") in ("failed", "running"):
+            phase["status"] = "pending"
+            phase["started_at"] = None
+            phase["completed_at"] = None
+            # Preserve summary as context but mark it as a retry
+            if phase.get("summary"):
+                phase["summary"] = f"[retry] {phase['summary']}"
+        result.append(phase)
+    return result
+
+
+async def _create_tma_incident(
+    failed_run_id: str,
+    workflow_name: str,
+    failed_phase: str,
+    done_phases: list,
+    project_id: str,
+    original_brief: str,
+) -> None:
+    """Create a TMA incident mission_run for a failed execution phase."""
+    import uuid
+    from ..db.migrations import get_db
+
+    incident_id = str(uuid.uuid4())[:8] + "-tma-incident"
+    brief = (
+        f"[AUTO-INCIDENT] Mission «{workflow_name}» a échoué en phase «{failed_phase}» "
+        f"après avoir complété {len(done_phases)} phases ({', '.join(done_phases[:3])}…). "
+        f"Analyser la cause, corriger l'environnement/code et valider que la mission peut reprendre. "
+        f"Mission d'origine: {failed_run_id}. Contexte original: {original_brief[:200]}"
+    )
+
+    db = get_db()
+    try:
+        db.execute("""
+            INSERT INTO mission_runs
+              (id, workflow_id, workflow_name, project_id, status, current_phase,
+               phases_json, brief, parent_mission_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'pending', '',
+                    '[]', ?, ?, datetime('now'), datetime('now'))
+        """, (
+            incident_id,
+            _TMA_WORKFLOW_ID,
+            "TMA — Incident Auto-Détecté",
+            project_id,
+            brief,
+            failed_run_id,
+        ))
+        db.commit()
+        logger.warning(
+            "handle_failed_runs: TMA incident %s created for failed run %s (phase=%s)",
+            incident_id, failed_run_id, failed_phase,
+        )
+    finally:
+        db.close()
