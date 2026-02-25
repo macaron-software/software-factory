@@ -1,7 +1,16 @@
 {% extends "base.html" %}
 {% block content %}
+{% set p = request.state.perspective|default('admin') %}
 <div class="tabs">
+    {% if p == 'product_owner' %}
+    <button class="tab active" id="tab-mystories" hx-get="/product?filter=mine" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click, load" onclick="switchTab(this)">My Stories</button>
+    <button class="tab" id="tab-backlog" hx-get="/product" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("backlog") }}</button>
+    {% elif p == 'architect' %}
+    <button class="tab active" id="tab-enablers" hx-get="/product?filter=enabler" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click, load" onclick="switchTab(this)">Enablers</button>
+    <button class="tab" id="tab-backlog" hx-get="/product" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("backlog") }}</button>
+    {% else %}
     <button class="tab active" id="tab-backlog" hx-get="/product" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click, load" onclick="switchTab(this)">{{ _("backlog") }}</button>
+    {% endif %}
     <button class="tab" id="tab-kanban" hx-get="/api/portfolio/kanban" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("portfolio_kanban") }}</button>
     <button class="tab" id="tab-discovery" hx-get="/ideation" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("ideation") }}</button>
 </div>

@@ -1,5 +1,25 @@
 {% extends "base.html" %}
 {% block content %}
+{% set p = request.state.perspective|default('admin') %}
+
+{# Next ceremony banner for RTE/SM #}
+{% if p in ('rte', 'scrum_master') %}
+<div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;margin-bottom:1rem;font-size:0.82rem">
+    <svg class="icon icon-sm" style="color:var(--purple-light)"><use href="#icon-calendar"/></svg>
+    <div id="nextCeremony" style="flex:1">
+        <span style="color:var(--text-secondary)">Loading next ceremony...</span>
+    </div>
+</div>
+<script>
+fetch('/api/ceremonies/next').then(r=>r.ok?r.json():null).then(d=>{
+    const el=document.getElementById('nextCeremony');
+    if(!d||!d.name){el.innerHTML='<span style="color:var(--text-muted)">No upcoming ceremony scheduled</span>';return;}
+    const when=d.scheduled_at?new Date(d.scheduled_at).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'TBD';
+    el.innerHTML=`<span style="font-weight:600;color:var(--text-primary)">${d.name}</span> <span style="color:var(--text-secondary)">— ${when}</span>`;
+}).catch(()=>{document.getElementById('nextCeremony').innerHTML='<span style="color:var(--text-muted)">No upcoming ceremony</span>';});
+</script>
+{% endif %}
+
 <div class="tabs">
     <button class="tab active" hx-get="/workflows" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click, load" onclick="switchTab(this)">{{ _("templates") }}</button>
     <button class="tab" hx-get="/patterns" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("patterns") }}</button>

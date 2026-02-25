@@ -1,7 +1,29 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% set p = request.state.perspective|default('admin') %}
 <link rel="stylesheet" href="/static/css/monitoring.css?v=20260221c">
+
+{# Perspective focus banner #}
+{% if p in ('dsi', 'business_owner', 'overview') %}
+<div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;margin-bottom:1rem;font-size:0.82rem">
+    <svg class="icon icon-sm" style="color:var(--purple-light)"><use href="#icon-shield"/></svg>
+    <span style="font-weight:600">SLA & Uptime Focus</span>
+    <span style="color:var(--text-secondary)">— Platform availability, response times, error rates</span>
+</div>
+{% elif p in ('rte', 'scrum_master') %}
+<div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;margin-bottom:1rem;font-size:0.82rem">
+    <svg class="icon icon-sm" style="color:var(--purple-light)"><use href="#icon-activity"/></svg>
+    <span style="font-weight:600">Pipeline Health</span>
+    <span style="color:var(--text-secondary)">— Mission pipelines, agent performance, queue depth</span>
+</div>
+{% elif p == 'qa_security' %}
+<div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;margin-bottom:1rem;font-size:0.82rem">
+    <svg class="icon icon-sm" style="color:var(--purple-light)"><use href="#icon-shield"/></svg>
+    <span style="font-weight:600">Security Monitoring</span>
+    <span style="color:var(--text-secondary)">— Error patterns, anomaly detection, incident response</span>
+</div>
+{% endif %}
 
 <div class="mon-page" id="monRoot">
     <div class="mon-header">

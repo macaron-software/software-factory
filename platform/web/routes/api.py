@@ -3695,3 +3695,44 @@ async def dashboard_activity_feed(request: Request):
             <span class="dash-activity-text">{name}</span>
         </div>"""
     return HTMLResponse(html)
+
+
+@router.get("/api/ceremonies/next")
+async def next_ceremony(request: Request):
+    """Return the next upcoming ceremony (current running workflow phase)."""
+    from ...missions.store import get_mission_run_store
+
+    store = get_mission_run_store()
+    runs = store.list_all(limit=50)
+    for run in sorted(
+        runs,
+        key=lambda r: (
+            r.get("started_at", "")
+            if isinstance(r, dict)
+            else getattr(r, "started_at", "")
+        ),
+        reverse=True,
+    ):
+        status = (
+            run.get("status", "") if isinstance(run, dict) else getattr(run, "status", "")
+        )
+        if status not in ("running", "active"):
+            continue
+        phase = (
+            run.get("current_phase", "")
+            if isinstance(run, dict)
+            else getattr(run, "current_phase", "")
+        )
+        name = (
+            run.get("name", "") if isinstance(run, dict) else getattr(run, "name", "")
+        )
+        started = (
+            run.get("started_at", "")
+            if isinstance(run, dict)
+            else getattr(run, "started_at", "")
+        )
+        if phase:
+            return JSONResponse(
+                {"name": phase, "mission": name, "scheduled_at": started}
+            )
+    return JSONResponse({"name": None})

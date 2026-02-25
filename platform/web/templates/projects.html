@@ -8,24 +8,36 @@
 {% endblock %}
 
 {% block content %}
+{% set persp = request.state.perspective|default('admin') %}
+
+{% if persp == 'developer' %}
+<div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 1rem;margin-bottom:1rem;font-size:0.82rem">
+    <svg class="icon icon-sm" style="color:var(--purple-light)"><use href="#icon-folder"/></svg>
+    <span style="font-weight:600">My Projects</span>
+    <label style="margin-left:auto;display:flex;align-items:center;gap:0.4rem;cursor:pointer;color:var(--text-secondary);font-size:0.78rem">
+        <input type="checkbox" id="filterMyProjects" onchange="filterProjects()" style="accent-color:var(--purple)"> Show only assigned
+    </label>
+</div>
+{% endif %}
+
 <div class="item-grid" data-view-grid data-view="card">
-    {% for p in projects %}
-    <a href="/projects/{{ p.info.id }}" class="item-card">
+    {% for proj in projects %}
+    <a href="/projects/{{ proj.info.id }}" class="item-card" data-lead="{{ proj.info.lead_agent_id or '' }}">
         <div class="item-icon">
-            <span class="project-type-dot {{ p.info.factory_type }}"></span>
+            <span class="project-type-dot {{ proj.info.factory_type }}"></span>
         </div>
         <div class="item-main">
-            <div class="item-title">{{ p.info.name }}</div>
-            <div class="item-subtitle">{{ p.info.factory_type | upper }}{% if p.info.domains %} · {{ p.info.domains[:2] | join(', ') }}{% endif %}</div>
+            <div class="item-title">{{ proj.info.name }}</div>
+            <div class="item-subtitle">{{ proj.info.factory_type | upper }}{% if proj.info.domains %} · {{ proj.info.domains[:2] | join(', ') }}{% endif %}</div>
             <div class="item-detail">
-                {% if p.info.vision %}
-                <p class="item-desc">{{ p.info.vision[:140] }}{% if p.info.vision|length > 140 %}…{% endif %}</p>
-                {% elif p.info.description %}
-                <p class="item-desc">{{ p.info.description[:140] }}{% if p.info.description|length > 140 %}…{% endif %}</p>
+                {% if proj.info.vision %}
+                <p class="item-desc">{{ proj.info.vision[:140] }}{% if proj.info.vision|length > 140 %}…{% endif %}</p>
+                {% elif proj.info.description %}
+                <p class="item-desc">{{ proj.info.description[:140] }}{% if proj.info.description|length > 140 %}…{% endif %}</p>
                 {% endif %}
-                {% if p.info.values %}
+                {% if proj.info.values %}
                 <div class="item-tags">
-                    {% for v in p.info.values[:3] %}
+                    {% for v in proj.info.values[:3] %}
                     <span class="item-tag">{{ v }}</span>
                     {% endfor %}
                 </div>
@@ -33,12 +45,12 @@
             </div>
         </div>
         <div class="item-meta">
-            <span hx-get="/api/dashboard/quality-badge?project_id={{ p.info.id }}" hx-trigger="load" hx-swap="innerHTML"></span>
-            {% if p.info.has_git %}
-            <span class="item-badge" hx-get="/api/projects/{{ p.info.id }}/git-status" hx-trigger="load" hx-swap="innerHTML">…</span>
+            <span hx-get="/api/dashboard/quality-badge?project_id={{ proj.info.id }}" hx-trigger="load" hx-swap="innerHTML"></span>
+            {% if proj.info.has_git %}
+            <span class="item-badge" hx-get="/api/projects/{{ proj.info.id }}/git-status" hx-trigger="load" hx-swap="innerHTML">…</span>
             {% endif %}
-            {% if p.info.lead_agent_id %}
-            <span class="item-badge accent">{{ p.info.lead_agent_id }}</span>
+            {% if proj.info.lead_agent_id %}
+            <span class="item-badge accent">{{ proj.info.lead_agent_id }}</span>
             {% endif %}
         </div>
     </a>
@@ -49,4 +61,15 @@
     </div>
     {% endif %}
 </div>
+{% if persp == 'developer' %}
+<script>
+function filterProjects() {
+    const show = document.getElementById('filterMyProjects').checked;
+    document.querySelectorAll('.item-card').forEach(card => {
+        const lead = card.dataset.lead || '';
+        card.style.display = (show && !lead) ? 'none' : '';
+    });
+}
+</script>
+{% endif %}
 {% endblock %}
