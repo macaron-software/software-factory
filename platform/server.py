@@ -248,14 +248,21 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Auto-heal loop failed to start: %s", e)
 
-    # Auto-resume paused mission_runs after restart (TMA, security, self-healing, debt, etc.)
+    # Log paused missions (no auto-resume — paused missions stay paused until manually restarted)
     try:
-        from .services.auto_resume import auto_resume_missions
+        from .missions.store import get_mission_run_store
 
-        asyncio.create_task(auto_resume_missions())
-        logger.warning("Auto-resume task scheduled — paused missions will restart in 5s")
+        _mrs = get_mission_run_store()
+        _all_runs = _mrs.list_runs(limit=50)
+        _paused = [m for m in _all_runs if m.status.value == "paused"]
+        if _paused:
+            logger.warning(
+                "Found %d paused missions (restart manually if needed): %s",
+                len(_paused),
+                [m.id for m in _paused],
+            )
     except Exception as exc:
-        logger.warning("Auto-resume failed to schedule: %s", exc)
+        logger.warning("Mission check failed: %s", exc)
 
     yield
 
