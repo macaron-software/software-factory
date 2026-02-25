@@ -14,6 +14,7 @@ from .llm import router as llm_router
 from .memory import router as memory_router
 from .rbac import router as rbac_router
 from .search import router as search_router
+from .teams import router as teams_router
 
 router = APIRouter()
 
@@ -28,3 +29,4 @@ router.include_router(dashboard_router)
 router.include_router(analytics_router)
 router.include_router(search_router)
 router.include_router(events_router)
+router.include_router(teams_router)

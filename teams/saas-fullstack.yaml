@@ -1,0 +1,14 @@
+name: Équipe Projet SaaS Fullstack
+description: >
+  Équipe complète pour un projet SaaS — du lead dev au QA en passant par le PM et l'architecte.
+  Pattern hiérarchique avec le lead dev comme coordinateur.
+pattern: hierarchical
+tags: [saas, fullstack, generique]
+
+agents:
+  - id: lead_dev
+  - id: architecte
+  - id: product_manager
+  - id: scrum_master
+  - id: test_manager
+  - id: monitoring-ops
