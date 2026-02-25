@@ -32,7 +32,7 @@ Piensa en ello como una **fábrica de software virtual** donde 161 agentes IA co
 ### Puntos clave
 
 - **161 agentes especializados** — arquitectos, desarrolladores, testers, SRE, analistas de seguridad, product owners
-- **12 patrones de orquestación** — solo, paralelo, jerárquico, red, adversarial-pair, human-in-the-loop
+- **10 patrones de orquestación** — solo, secuencial, paralelo, jerárquico, red, bucle, enrutador, agregador, ola, human-in-the-loop
 - **Ciclo de vida SAFe** — Portfolio → Epic → Feature → Story con cadencia PI
 - **Auto-reparación** — detección autónoma de incidentes, triage y auto-reparación
 - **Resiliencia LLM** — fallback multi-proveedor, retry con jitter, gestión rate-limit

@@ -30,7 +30,7 @@ Software Factory is an autonomous multi-agent platform that orchestrates the ent
 ### Key Features
 
 - **161 specialized agents** — architects, developers, testers, SRE, security analysts
-- **12 orchestration patterns** — solo, parallel, hierarchical, network, adversarial-pair
+- **10 orchestration patterns** — solo, sequential, parallel, hierarchical, network, loop, router, aggregator, wave, human-in-the-loop
 - **SAFe-aligned lifecycle** — Portfolio → Epic → Feature → Story
 - **Auto-heal** — autonomous incident detection and self-repair
 - **LLM resilience** — multi-provider fallback, jittered retry, rate-limit aware

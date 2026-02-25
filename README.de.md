@@ -32,7 +32,7 @@ Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 161 KI-Agenten ü
 ### Hauptmerkmale
 
 - **161 spezialisierte Agenten** — Architekten, Entwickler, Tester, SRE, Sicherheitsanalysten, Product Owner
-- **12 Orchestrierungsmuster** — Solo, parallel, hierarchisch, Netzwerk, adversarial-pair, human-in-the-loop
+- **10 Orchestrierungsmuster** — Solo, Sequentiell, Parallel, Hierarchisch, Netzwerk, Schleife, Router, Aggregator, Welle, Human-in-the-Loop
 - **SAFe-ausgerichteter Lebenszyklus** — Portfolio → Epic → Feature → Story mit PI-Kadenz
 - **Selbstheilung** — autonome Vorfallserkennung, Triage und Selbstreparatur
 - **LLM-Resilienz** — Multi-Provider-Fallback, Jitter-Retry, Rate-Limit-Management

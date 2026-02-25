@@ -36,7 +36,7 @@ Imaginez une **usine logicielle virtuelle** où 161 agents IA collaborent à tra
 ### Points clés
 
 - **161 agents spécialisés** — architectes, développeurs, testeurs, SRE, analystes sécurité, product owners
-- **12 patterns d'orchestration** — solo, parallèle, hiérarchique, réseau, adversarial-pair, human-in-the-loop
+- **10 patterns d'orchestration** — solo, séquentiel, parallèle, hiérarchique, réseau, boucle, routeur, agrégateur, vague, human-in-the-loop
 - **Cycle de vie SAFe** — Portfolio → Epic → Feature → Story avec cadence PI
 - **Résilience LLM** — fallback multi-provider, retry avec jitter, gestion rate-limit, config modèle par env
 - **Observabilité OpenTelemetry** — tracing distribué avec Jaeger, dashboard analytics pipeline
@@ -173,20 +173,18 @@ Les agents sont organisés en équipes reflétant de vraies organisations logici
 | **DevOps** | DevOps Engineer, SRE, Platform Engineer | CI/CD, monitoring, infrastructure |
 | **Management** | Scrum Master, RTE, Agile Coach | Cérémonies, facilitation, levée obstacles |
 
-### 🎯 12 Patterns d'Orchestration
+### 10 Patterns d'Orchestration
 
 - **Solo** — un seul agent pour tâches simples
 - **Séquentiel** — pipeline d'agents exécutant dans l'ordre
 - **Parallèle** — plusieurs agents travaillant simultanément
 - **Hiérarchique** — manager déléguant à sous-agents
 - **Réseau** — agents collaborant peer-to-peer
-- **Adversarial-pair** — un agent génère, un autre critique
-- **Human-in-the-loop** — agent propose, humain valide
-- **Ensemble** — plusieurs agents votent sur décisions
-- **Récursif** — agent spawne sous-agents récursivement
 - **Boucle** — agent itère jusqu'à condition remplie
-- **Saga** — transaction distribuée avec compensations
-- **Event-driven** — agents réagissent aux événements de manière asynchrone
+- **Routeur** — un agent route vers le spécialiste approprié
+- **Agrégateur** — plusieurs entrées fusionnées par un agrégateur
+- **Vague** — parallèle au sein des vagues, séquentiel entre vagues
+- **Human-in-the-loop** — agent propose, humain valide
 
 ### 📊 Cycle de Vie Aligné SAFe
 
@@ -635,7 +633,7 @@ Chaque projet reçoit automatiquement 4 missions opérationnelles :
 ### Améliorations Plateforme
 - Dashboard métriques DORA avec suivi coûts LLM
 - Sync bidirectionnelle Jira
-- Suite E2E Playwright (82 tests)
+- Suite E2E Playwright (11 specs)
 - Internationalisation (EN/FR)
 - Notifications temps réel (Slack, Email, Webhook)
 - Pipeline Design System dans les workflows

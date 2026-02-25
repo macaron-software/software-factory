@@ -36,7 +36,7 @@ Think of it as a **virtual software factory** where 161 AI agents collaborate th
 ### Key Highlights
 
 - **161 specialized agents** — architects, developers, testers, SREs, security analysts, product owners
-- **12 orchestration patterns** — solo, parallel, hierarchical, network, adversarial-pair, human-in-the-loop
+- **10 orchestration patterns** — solo, sequential, parallel, hierarchical, network, loop, router, aggregator, wave, human-in-the-loop
 - **SAFe-aligned lifecycle** — Portfolio → Epic → Feature → Story with PI cadence
 - **Auto-heal** — autonomous incident detection, triage, and self-repair
 - **LLM resilience** — multi-provider fallback, jittered retry, rate-limit aware, env-driven model config
@@ -224,20 +224,18 @@ Agents are organized in teams mirroring real software organizations:
 | **DevOps** | DevOps Engineer, SRE, Platform Engineer | CI/CD, monitoring, infrastructure |
 | **Management** | Scrum Master, RTE, Agile Coach | Ceremonies, facilitation, impediment removal |
 
-### 12 Orchestration Patterns
+### 10 Orchestration Patterns
 
 - **Solo** — single agent for simple tasks
 - **Sequential** — pipeline of agents executing in order
 - **Parallel** — multiple agents working simultaneously
 - **Hierarchical** — manager delegating to sub-agents
 - **Network** — agents collaborating peer-to-peer
-- **Adversarial-pair** — one agent generates, another criticizes
-- **Human-in-the-loop** — agent proposes, human validates
-- **Ensemble** — multiple agents vote on decisions
-- **Recursive** — agent spawns sub-agents recursively
 - **Loop** — agent iterates until condition met
-- **Saga** — distributed transaction with compensations
-- **Event-driven** — agents react to events asynchronously
+- **Router** — single agent routes to specialist based on input
+- **Aggregator** — multiple inputs merged by a single aggregator
+- **Wave** — parallel within waves, sequential across waves
+- **Human-in-the-loop** — agent proposes, human validates
 
 ### SAFe-Aligned Lifecycle
 
@@ -446,7 +444,7 @@ Swagger UI: http://localhost:8090/docs
 
 ### 4. MCP Server (Model Context Protocol)
 
-23 MCP tools for AI agent integration (port 9501):
+24 MCP tools for AI agent integration (port 9501):
 
 ```bash
 # Start MCP server
@@ -650,7 +648,7 @@ monitoring:
 │   ├── server.py            # FastAPI app, port 8090
 │   ├── agents/              # Agent loop, executor, store
 │   ├── a2a/                 # Agent-to-agent messaging bus
-│   ├── patterns/            # 12 orchestration patterns
+│   ├── patterns/            # 10 orchestration patterns
 │   ├── missions/            # SAFe mission lifecycle
 │   ├── sessions/            # Conversation runner + SSE
 │   ├── web/                 # Routes + Jinja2 templates
@@ -800,7 +798,7 @@ Every project automatically gets 4 operational missions:
 ### Platform Improvements
 - DORA metrics dashboard with LLM cost tracking
 - Jira bidirectional sync
-- Playwright E2E test suite (82 tests)
+- Playwright E2E test suite (11 spec files)
 - Internationalization (EN/FR)
 - Real-time notifications (Slack, Email, Webhook)
 - Design System pipeline in workflows (UX → dev → review)
