@@ -31,10 +31,13 @@ Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 161 KI-Agenten ü
 
 ### Hauptmerkmale
 
-- **145 spezialisierte Agenten** — Architekten, Entwickler, Tester, SRE, Sicherheitsanalysten, Product Owner
+- **161 spezialisierte Agenten** — Architekten, Entwickler, Tester, SRE, Sicherheitsanalysten, Product Owner
 - **12 Orchestrierungsmuster** — Solo, parallel, hierarchisch, Netzwerk, adversarial-pair, human-in-the-loop
 - **SAFe-ausgerichteter Lebenszyklus** — Portfolio → Epic → Feature → Story mit PI-Kadenz
 - **Selbstheilung** — autonome Vorfallserkennung, Triage und Selbstreparatur
+- **LLM-Resilienz** — Multi-Provider-Fallback, Jitter-Retry, Rate-Limit-Management
+- **OpenTelemetry-Observabilität** — Distributed Tracing mit Jaeger, Pipeline-Analytics-Dashboard
+- **Kontinuierlicher Watchdog** — Auto-Wiederaufnahme pausierter Runs, Sitzungswiederherstellung
 - **Sicherheit zuerst** — Prompt-Injection-Guard, RBAC, Secret-Scrubbing
 - **DORA-Metriken** — Bereitstellungshäufigkeit, Lead Time, MTTR, Change Failure Rate
 
@@ -137,6 +140,34 @@ Qualitäts-Gates auf Workflow-Phasen (PASS/FAIL-Badges) · Dashboard unter `/qua
 
 3 integrierte Workflows: **quality-improvement** (Scan → Verbesserungsplan), **retrospective-quality** (Sprint-Retro mit Metriken), **skill-evolution** (Agent-Prompt-Optimierung).
 
+
+## Neuheiten v2.2.0 (Feb 2026)
+
+### OpenTelemetry & Distributed Tracing
+- **OTEL-Integration** — OpenTelemetry SDK mit OTLP/HTTP-Exporter zu Jaeger
+- **ASGI-Tracing-Middleware** — jede HTTP-Anfrage mit Spans, Latenz, Status getrackt
+- **Tracing-Dashboard** unter `/analytics` — Request-Statistiken, Latenz-Diagramme, Operationstabelle
+
+### Pipeline-Fehleranalyse
+- **Fehlerklassifizierung** — Python-basierte Kategorisierung (setup_failed, llm_provider, timeout, phase_error)
+- **Phasen-Heatmap** — identifiziert welche Pipeline-Phasen am häufigsten fehlschlagen
+- **Empfehlungs-Engine** — umsetzbare Vorschläge basierend auf Fehlermustern
+- **Resume All Button** — Massen-Wiederaufnahme pausierter Runs vom Dashboard
+
+### Kontinuierlicher Watchdog
+- **Auto-Wiederaufnahme** — pausierte Runs batchweise fortsetzen (5/Batch, alle 5 Min, max 10 gleichzeitig)
+- **Sitzungswiederherstellung** — erkennt inaktive Sitzungen >30 Min, markiert für Retry
+- **Blockadeerkennung** — Missionen >60 Min in einer Phase werden automatisch neu gestartet
+
+### Phasen-Resilienz
+- **Retry pro Phase** — konfigurierbarer Retry (3x) mit exponentiellem Backoff
+- **skip_on_failure** — optionale Phasen, Pipeline kann fortfahren
+- **Checkpointing** — abgeschlossene Phasen gespeichert, intelligente Wiederaufnahme
+
+### Sandbox Build-Validierung
+- **Post-Code-Prüfung** — automatisches Build/Lint nach Code-Generierungsphasen
+- **Auto-Erkennung** — npm, cargo, go, maven, python, docker
+- **Fehlereinspeisung** — Build-Fehler in Agentenkontext injiziert
 
 ## Tests
 

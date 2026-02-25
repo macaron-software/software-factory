@@ -38,7 +38,9 @@ Imaginez une **usine logicielle virtuelle** où 161 agents IA collaborent à tra
 - **161 agents spécialisés** — architectes, développeurs, testeurs, SRE, analystes sécurité, product owners
 - **12 patterns d'orchestration** — solo, parallèle, hiérarchique, réseau, adversarial-pair, human-in-the-loop
 - **Cycle de vie SAFe** — Portfolio → Epic → Feature → Story avec cadence PI
-- **Auto-réparation** — détection autonome d'incidents, triage et auto-réparation
+- **Résilience LLM** — fallback multi-provider, retry avec jitter, gestion rate-limit, config modèle par env
+- **Observabilité OpenTelemetry** — tracing distribué avec Jaeger, dashboard analytics pipeline
+- **Watchdog continu** — auto-reprise des runs en pause, récupération sessions bloquées, nettoyage échecs
 - **Sécurité prioritaire** — garde injection de prompt, RBAC, masquage secrets, connection pooling
 - **Métriques DORA** — fréquence déploiement, lead time, MTTR, taux échec changements
 
@@ -515,6 +517,42 @@ Chaque projet reçoit automatiquement 4 missions opérationnelles :
 - Notifications temps réel (Slack, Email, Webhook)
 - Pipeline Design System dans les workflows
 - Visualisation 3D Agent World
+
+## Nouveautés v2.2.0 (fév 2026)
+
+### OpenTelemetry & Tracing Distribué
+- **Intégration OTEL** — SDK OpenTelemetry avec exporteur OTLP/HTTP vers Jaeger
+- **Middleware tracing ASGI** — chaque requête HTTP tracée avec spans, latence, statut
+- **Dashboard tracing** sur `/analytics` — stats requêtes, graphiques latence, table opérations
+- **UI Jaeger** — exploration complète des traces distribuées sur port 16686
+
+### Analyse des Échecs Pipeline
+- **Classification des erreurs** — catégorisation Python (setup_failed, llm_provider, timeout, phase_error, etc.)
+- **Heatmap phases** — identifier quelles phases du pipeline échouent le plus
+- **Moteur de recommandations** — suggestions actionnables basées sur les patterns d'échec
+- **Bouton Resume All** — reprise en masse des runs en pause depuis le dashboard
+
+### Watchdog Continu
+- **Auto-reprise** — reprend les runs en pause par lots (5/lot, toutes les 5 min, max 10 concurrents)
+- **Récupération sessions bloquées** — détecte sessions inactives >30 min, marque pour retry
+- **Nettoyage sessions échouées** — supprime les sessions zombies bloquant le pipeline
+- **Détection blocage** — missions bloquées >60 min dans une phase relancées automatiquement
+
+### Résilience des Phases
+- **Retry par phase** — nombre de retry configurable (défaut 3x) avec backoff exponentiel
+- **skip_on_failure** — phases optionnelles permettant au pipeline de continuer
+- **Checkpointing** — phases terminées sauvegardées, reprise intelligente saute le travail fait
+- **Timeout de phase** — limite 10 min empêche les blocages infinis
+
+### Validation Build Sandbox
+- **Vérification post-code** — après les phases de génération de code, lance automatiquement build/lint
+- **Détection auto du build system** — npm, cargo, go, maven, python, docker
+- **Injection d'erreur** — les échecs build injectés dans le contexte agent pour auto-correction
+
+### Améliorations UI Qualité
+- **Radar chart** — visualisation Chart.js des dimensions qualité sur `/quality`
+- **Badge qualité** — cercle coloré dans les en-têtes projet (`/api/dashboard/quality-badge`)
+- **Scorecard mission** — métriques qualité dans la sidebar mission (`/api/dashboard/quality-mission`)
 
 ## Contribuer
 

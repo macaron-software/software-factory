@@ -40,6 +40,8 @@ Think of it as a **virtual software factory** where 161 AI agents collaborate th
 - **SAFe-aligned lifecycle** — Portfolio → Epic → Feature → Story with PI cadence
 - **Auto-heal** — autonomous incident detection, triage, and self-repair
 - **LLM resilience** — multi-provider fallback, jittered retry, rate-limit aware, env-driven model config
+- **OpenTelemetry observability** — distributed tracing with Jaeger, pipeline analytics dashboard
+- **Continuous watchdog** — auto-resume paused runs, stale session recovery, failed cleanup
 - **Security-first** — prompt injection guard, RBAC, secret scrubbing, connection pooling
 - **DORA metrics** — deployment frequency, lead time, MTTR, change failure rate
 
@@ -681,6 +683,42 @@ Every project automatically gets 4 operational missions:
 - Real-time notifications (Slack, Email, Webhook)
 - Design System pipeline in workflows (UX → dev → review)
 - 3D Agent World visualization
+
+## What's New in v2.2.0 (Feb 2026)
+
+### OpenTelemetry & Distributed Tracing
+- **OTEL integration** — OpenTelemetry SDK with OTLP/HTTP exporter to Jaeger
+- **ASGI tracing middleware** — every HTTP request traced with spans, latency, status
+- **Tracing dashboard** at `/analytics` — request stats, latency charts, operation table
+- **Jaeger UI** — full distributed trace exploration at port 16686
+
+### Pipeline Failure Analysis
+- **Failure classification** — Python-based error categorization (setup_failed, llm_provider, timeout, phase_error, etc.)
+- **Phase failure heatmap** — identify which pipeline phases fail most often
+- **Recommendations engine** — actionable suggestions based on failure patterns
+- **Resume All button** — one-click mass-resume of paused runs from the dashboard
+
+### Continuous Watchdog
+- **Auto-resume** — automatically resume paused runs in batches (5/batch, every 5 min, max 10 concurrent)
+- **Stale session recovery** — detect sessions inactive >30 min, mark as interrupted for retry
+- **Failed session cleanup** — clean zombie sessions blocking pipeline progress
+- **Stall detection** — missions stuck in a phase >60 min get automatic retry
+
+### Phase Resilience
+- **Per-phase retry** — configurable retry count (default 3x) with exponential backoff per phase
+- **skip_on_failure** — phases can be marked optional, allowing pipeline to continue
+- **Checkpointing** — completed phases saved, smart resume skips finished work
+- **Phase timeout** — 10-minute cap prevents infinite hangs
+
+### Sandbox Build Validation
+- **Post-code build check** — after code generation phases, automatically run build/lint
+- **Auto-detect build system** — npm, cargo, go, maven, python, docker
+- **Error injection** — build failures injected into agent context for self-correction
+
+### Quality UI Enhancements
+- **Radar chart** — Chart.js radar visualization of quality dimensions on `/quality`
+- **Quality badge** — colored score circle for project headers (`/api/dashboard/quality-badge`)
+- **Mission scorecard** — quality metrics in mission detail sidebar (`/api/dashboard/quality-mission`)
 
 ## Contributing
 

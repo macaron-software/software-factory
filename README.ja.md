@@ -25,14 +25,17 @@
 
 ## Overview
 
-Software Factory is an autonomous multi-agent platform that orchestrates the entire software development lifecycle using 145 specialized AI agents working together.
+Software Factory is an autonomous multi-agent platform that orchestrates the entire software development lifecycle using 161 specialized AI agents working together.
 
 ### Key Features
 
-- **145 specialized agents** — architects, developers, testers, SRE, security analysts
+- **161 specialized agents** — architects, developers, testers, SRE, security analysts
 - **12 orchestration patterns** — solo, parallel, hierarchical, network, adversarial-pair
 - **SAFe-aligned lifecycle** — Portfolio → Epic → Feature → Story
 - **Auto-heal** — autonomous incident detection and self-repair
+- **LLM resilience** — multi-provider fallback, jittered retry, rate-limit aware
+- **OpenTelemetry observability** — distributed tracing with Jaeger, pipeline analytics
+- **Continuous watchdog** — auto-resume paused runs, stale session recovery
 - **DORA metrics** — deployment frequency, lead time, MTTR, change failure rate
 
 ## Screenshots
@@ -134,6 +137,31 @@ NVIDIA_API_KEY=nvapi-your-key-here
 
 3つの組み込みワークフロー：**quality-improvement**（スキャン→改善計画）、**retrospective-quality**（メトリクス付きスプリントレトロ）、**skill-evolution**（エージェントプロンプト最適化）。
 
+
+## What's New in v2.2.0 (Feb 2026)
+
+### OpenTelemetry & Distributed Tracing
+- **OTEL integration** — OpenTelemetry SDK with OTLP/HTTP exporter to Jaeger
+- **Tracing dashboard** at `/analytics` — request stats, latency charts, operation table
+
+### Pipeline Failure Analysis
+- **Failure classification** — error categorization (setup_failed, llm_provider, timeout, phase_error)
+- **Phase failure heatmap** — identify which phases fail most often
+- **Resume All button** — one-click mass-resume of paused runs
+
+### Continuous Watchdog
+- **Auto-resume** — resume paused runs in batches (5/batch, every 5 min, max 10 concurrent)
+- **Stale session recovery** — detect inactive sessions >30 min, mark for retry
+- **Stall detection** — missions stuck >60 min in a phase get automatic retry
+
+### Phase Resilience
+- **Per-phase retry** — configurable retry (3x) with exponential backoff
+- **skip_on_failure** — optional phases, pipeline continues on failure
+- **Checkpointing** — completed phases saved, smart resume skips finished work
+
+### Sandbox Build Validation
+- **Post-code build check** — auto build/lint after code generation phases
+- **Auto-detect build system** — npm, cargo, go, maven, python, docker
 
 ## テスト
 

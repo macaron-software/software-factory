@@ -35,6 +35,9 @@ Piensa en ello como una **fábrica de software virtual** donde 161 agentes IA co
 - **12 patrones de orquestación** — solo, paralelo, jerárquico, red, adversarial-pair, human-in-the-loop
 - **Ciclo de vida SAFe** — Portfolio → Epic → Feature → Story con cadencia PI
 - **Auto-reparación** — detección autónoma de incidentes, triage y auto-reparación
+- **Resiliencia LLM** — fallback multi-proveedor, retry con jitter, gestión rate-limit
+- **Observabilidad OpenTelemetry** — tracing distribuido con Jaeger, dashboard analytics
+- **Watchdog continuo** — auto-reanudación de runs pausados, recuperación de sesiones
 - **Seguridad prioritaria** — guardia inyección de prompt, RBAC, enmascaramiento secretos
 - **Métricas DORA** — frecuencia despliegue, lead time, MTTR, tasa fallo cambios
 
@@ -137,6 +140,34 @@ Puertas de calidad en fases de workflow (badges PASS/FAIL) · Dashboard en `/qua
 
 3 workflows integrados: **quality-improvement** (escaneo → plan de mejora), **retrospective-quality** (retro sprint con métricas), **skill-evolution** (optimización de prompts de agentes).
 
+
+## Novedades v2.2.0 (feb 2026)
+
+### OpenTelemetry & Tracing Distribuido
+- **Integración OTEL** — SDK OpenTelemetry con exportador OTLP/HTTP a Jaeger
+- **Middleware tracing ASGI** — cada request HTTP trazada con spans, latencia, estado
+- **Dashboard tracing** en `/analytics` — estadísticas, gráficos latencia, tabla operaciones
+
+### Análisis de Fallos del Pipeline
+- **Clasificación de errores** — categorización Python (setup_failed, llm_provider, timeout, phase_error)
+- **Heatmap de fases** — identificar qué fases del pipeline fallan más
+- **Motor de recomendaciones** — sugerencias accionables basadas en patrones de fallo
+- **Botón Resume All** — reanudación masiva de runs pausados desde el dashboard
+
+### Watchdog Continuo
+- **Auto-reanudación** — reanuda runs pausados por lotes (5/lote, cada 5 min, max 10 concurrentes)
+- **Recuperación sesiones** — detecta sesiones inactivas >30 min, marca para retry
+- **Detección de bloqueo** — misiones atascadas >60 min relanzadas automáticamente
+
+### Resiliencia de Fases
+- **Retry por fase** — retry configurable (3x) con backoff exponencial
+- **skip_on_failure** — fases opcionales, el pipeline puede continuar
+- **Checkpointing** — fases completadas guardadas, reanudación inteligente
+
+### Validación Build Sandbox
+- **Verificación post-código** — build/lint automático tras generación de código
+- **Detección auto** — npm, cargo, go, maven, python, docker
+- **Inyección de error** — fallos de build inyectados en contexto del agente
 
 ## Pruebas
 
