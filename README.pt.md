@@ -82,7 +82,7 @@ Sem chave API, a plataforma funciona em **modo demo** (respostas simuladas — �
 Edite `.env` e adicione **uma** chave API:
 
 ```bash
-# Opção A: MiniMax (gratuito — recomendado para começar)
+# Opcao A: MiniMax (recomendado para comecar)
 PLATFORM_LLM_PROVIDER=minimax
 MINIMAX_API_KEY=sk-sua-chave-aqui
 
@@ -91,19 +91,19 @@ PLATFORM_LLM_PROVIDER=azure-openai
 AZURE_OPENAI_API_KEY=sua-chave
 AZURE_OPENAI_ENDPOINT=https://seu-recurso.openai.azure.com
 
-# Opção C: NVIDIA NIM (gratuito)
+# Opcao C: NVIDIA NIM
 PLATFORM_LLM_PROVIDER=nvidia
 NVIDIA_API_KEY=nvapi-sua-chave-aqui
 ```
 
 Reiniciar: `make run` (Docker) ou `make dev` (local)
 
-| Provedor | Variável de ambiente | Modelos | Gratuito |
-|----------|---------------------|---------|----------|
-| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 | ✅ |
-| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini | ❌ |
-| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 | ❌ |
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 | ✅ |
+| Provedor | Variavel de ambiente | Modelos |
+|----------|---------------------|---------|
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini |
+| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 |
 
 Configuração também em **Settings** (`/settings`).
 

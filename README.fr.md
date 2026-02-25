@@ -130,7 +130,7 @@ C'est utile pour explorer l'interface, mais les agents ne génèreront pas de vr
 Pour activer les vrais agents IA, éditez `.env` et ajoutez **une** clé API :
 
 ```bash
-# Option A : MiniMax (gratuit — recommandé pour démarrer)
+# Option A : MiniMax (recommande pour demarrer)
 PLATFORM_LLM_PROVIDER=minimax
 MINIMAX_API_KEY=sk-votre-clé-ici
 
@@ -139,19 +139,19 @@ PLATFORM_LLM_PROVIDER=azure-openai
 AZURE_OPENAI_API_KEY=votre-clé
 AZURE_OPENAI_ENDPOINT=https://votre-resource.openai.azure.com
 
-# Option C : NVIDIA NIM (gratuit)
+# Option C : NVIDIA NIM
 PLATFORM_LLM_PROVIDER=nvidia
 NVIDIA_API_KEY=nvapi-votre-clé-ici
 ```
 
 Puis relancez : `make run` (Docker) ou `make dev` (local)
 
-| Fournisseur | Variable d'env | Modèles | Gratuit |
-|-------------|---------------|---------|---------|
-| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 | ✅ Oui |
-| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini | ❌ |
-| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 | ❌ |
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 | ✅ Oui |
+| Fournisseur | Variable d'env | Modeles |
+|-------------|---------------|---------|
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini |
+| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 |
 
 La plateforme bascule automatiquement sur les autres fournisseurs configurés en cas d'échec.
 
