@@ -62,6 +62,14 @@ async def auto_resume_missions() -> None:
 
     first_pass = True
     while True:
+        # Hot-patch: ensure semaphore allows enough concurrency (re-runs each cycle for hot-swap)
+        try:
+            from ..web.routes.helpers import _mission_semaphore
+            if _mission_semaphore._value < 10:
+                _mission_semaphore._value = 10
+                logger.warning("auto_resume: patched _mission_semaphore._value → 10")
+        except Exception as _e_sem:
+            logger.warning("auto_resume: semaphore patch failed: %s", _e_sem)
         try:
             stagger = _STAGGER_STARTUP if first_pass else _STAGGER_WATCHDOG
             resumed = await _resume_batch(stagger=stagger)
