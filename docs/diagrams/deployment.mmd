@@ -1,0 +1,66 @@
+graph TB
+    subgraph INTERNET["Internet"]
+        USER["Users / CLI"]
+    end
+
+    subgraph AZ["Azure VM (Production)\n4.233.64.30"]
+        NGINX_AZ["Nginx\n:80 / :443\nSSL termination"]
+
+        subgraph DOCKER_AZ["Docker Compose"]
+            PLATFORM_AZ["Platform Container\nFastAPI :8090\nGPT-5-mini"]
+            JAEGER_AZ["Jaeger\n:16686 / :4318\ntrace collection"]
+        end
+
+        PATCHES_AZ["/opt/macaron/patches\npersistent patches"]
+        DB_AZ[("platform.db\nSQLite")]
+    end
+
+    subgraph OVH["OVH VPS (Demo)\n54.36.183.124"]
+        NGINX_OVH["Nginx\n:80 / :443"]
+
+        subgraph DOCKER_OVH["Docker Compose"]
+            PLATFORM_OVH["Platform Container\nFastAPI :8090\nMiniMax-M2.5"]
+            JAEGER_OVH["Jaeger\n:16686 / :4318"]
+        end
+
+        DB_OVH[("platform.db\nSQLite")]
+    end
+
+    subgraph GH["GitHub"]
+        REPO["macaron-software/\nsoftware-factory\nmain branch"]
+    end
+
+    subgraph DEV["Developer Machine"]
+        LOCAL["Local repo\ngit + sf CLI"]
+    end
+
+    USER -->|HTTPS| NGINX_AZ
+    USER -->|HTTPS| NGINX_OVH
+    NGINX_AZ --> PLATFORM_AZ
+    NGINX_OVH --> PLATFORM_OVH
+    PLATFORM_AZ -->|OTLP/HTTP| JAEGER_AZ
+    PLATFORM_OVH -->|OTLP/HTTP| JAEGER_OVH
+    PLATFORM_AZ --> DB_AZ
+    PLATFORM_OVH --> DB_OVH
+    PATCHES_AZ -.->|mount /patches:ro| PLATFORM_AZ
+
+    LOCAL -->|git push| REPO
+    REPO -->|docker pull + deploy| AZ
+    REPO -->|docker pull + deploy| OVH
+
+    classDef internet fill:#e3f2fd,stroke:#1565c0,color:#000
+    classDef azure fill:#e8f5e9,stroke:#2e7d32,color:#000
+    classDef ovh fill:#fff3e0,stroke:#e65100,color:#000
+    classDef github fill:#f3e5f5,stroke:#6a1b9a,color:#000
+    classDef dev fill:#eceff1,stroke:#37474f,color:#000
+    classDef container fill:#e0f7fa,stroke:#00695c,color:#000
+    classDef data fill:#fce4ec,stroke:#c62828,color:#000
+
+    class USER internet
+    class NGINX_AZ,PATCHES_AZ azure
+    class PLATFORM_AZ,JAEGER_AZ container
+    class NGINX_OVH ovh
+    class PLATFORM_OVH,JAEGER_OVH container
+    class REPO github
+    class LOCAL dev
+    class DB_AZ,DB_OVH data

@@ -138,6 +138,26 @@ NVIDIA_API_KEY=nvapi-your-key-here
 3个内置工作流：**quality-improvement**（扫描→改进计划）、**retrospective-quality**（含指标的Sprint回顾）、**skill-evolution**（Agent提示词优化）。
 
 
+## Architecture
+
+<p align="center">
+  <img src="docs/diagrams/architecture.svg" alt="Architecture" width="100%">
+</p>
+
+<details>
+<summary>Pipeline and Observability</summary>
+
+<p align="center">
+  <img src="docs/diagrams/pipeline-flow.svg" alt="Pipeline Flow" width="100%">
+</p>
+<p align="center">
+  <img src="docs/diagrams/observability.svg" alt="Observability" width="100%">
+</p>
+<p align="center">
+  <img src="docs/diagrams/deployment.svg" alt="Deployment" width="100%">
+</p>
+</details>
+
 ## What's New in v2.2.0 (Feb 2026)
 
 ### OpenTelemetry & Distributed Tracing

@@ -141,6 +141,26 @@ Puertas de calidad en fases de workflow (badges PASS/FAIL) · Dashboard en `/qua
 3 workflows integrados: **quality-improvement** (escaneo → plan de mejora), **retrospective-quality** (retro sprint con métricas), **skill-evolution** (optimización de prompts de agentes).
 
 
+## Arquitectura
+
+<p align="center">
+  <img src="docs/diagrams/architecture.svg" alt="Arquitectura" width="100%">
+</p>
+
+<details>
+<summary>Pipeline y Observabilidad</summary>
+
+<p align="center">
+  <img src="docs/diagrams/pipeline-flow.svg" alt="Pipeline" width="100%">
+</p>
+<p align="center">
+  <img src="docs/diagrams/observability.svg" alt="Observabilidad" width="100%">
+</p>
+<p align="center">
+  <img src="docs/diagrams/deployment.svg" alt="Despliegue" width="100%">
+</p>
+</details>
+
 ## Novedades v2.2.0 (feb 2026)
 
 ### OpenTelemetry & Tracing Distribuido

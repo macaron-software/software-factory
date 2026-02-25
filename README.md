@@ -460,35 +460,29 @@ python3 -m platform.mcp_platform.server
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  Strategic Portfolio (Portfolio Canvas, Value Streams)       │
-│  Vision, Themes, Epics → WSJF Prioritization                    │
-└────────────────────────┬─────────────────────────────────────────┘
-                         │
-          ┌──────────────┴──────────────┐
-          ▼                             ▼
-┌─────────────────────┐      ┌─────────────────────┐
-│  PI Planning Board  │      │  Mission Execution  │
-│  Program Increment  │      │  145 Agents         │
-│  Features → Stories │      │  12 Patterns        │
-│  Dependencies       │      │  TDD Pipeline       │
-└─────────────────────┘      └─────────────────────┘
-          │                             │
-          ▼                             ▼
-┌─────────────────────┐      ┌─────────────────────┐
-│  Sprint Backlog     │      │  Deploy Pipeline    │
-│  Daily Standups     │      │  Build → Stage →    │
-│  Reviews            │      │  E2E → Prod         │
-└─────────────────────┘      └─────────────────────┘
-          │                             │
-          └──────────────┬──────────────┘
-                         ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  Quality Gates + Auto-Heal                                    │
-│  Tests, Security, Performance → Incident Detection → Self-Repair │
-└──────────────────────────────────────────────────────────────────┘
-```
+### Platform Overview
+
+<p align="center">
+  <img src="docs/diagrams/architecture.svg" alt="Architecture Overview" width="100%">
+</p>
+
+### Pipeline Flow
+
+<p align="center">
+  <img src="docs/diagrams/pipeline-flow.svg" alt="Pipeline Flow" width="100%">
+</p>
+
+### Observability Stack
+
+<p align="center">
+  <img src="docs/diagrams/observability.svg" alt="Observability" width="100%">
+</p>
+
+### Deployment
+
+<p align="center">
+  <img src="docs/diagrams/deployment.svg" alt="Deployment Architecture" width="100%">
+</p>
 
 ## Project Configuration
 

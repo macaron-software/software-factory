@@ -141,6 +141,26 @@ Qualitäts-Gates auf Workflow-Phasen (PASS/FAIL-Badges) · Dashboard unter `/qua
 3 integrierte Workflows: **quality-improvement** (Scan → Verbesserungsplan), **retrospective-quality** (Sprint-Retro mit Metriken), **skill-evolution** (Agent-Prompt-Optimierung).
 
 
+## Architektur
+
+<p align="center">
+  <img src="docs/diagrams/architecture.svg" alt="Architektur" width="100%">
+</p>
+
+<details>
+<summary>Pipeline und Observability</summary>
+
+<p align="center">
+  <img src="docs/diagrams/pipeline-flow.svg" alt="Pipeline" width="100%">
+</p>
+<p align="center">
+  <img src="docs/diagrams/observability.svg" alt="Observability" width="100%">
+</p>
+<p align="center">
+  <img src="docs/diagrams/deployment.svg" alt="Deployment" width="100%">
+</p>
+</details>
+
 ## Neuheiten v2.2.0 (Feb 2026)
 
 ### OpenTelemetry & Distributed Tracing

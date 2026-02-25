@@ -1,0 +1,57 @@
+flowchart LR
+    START((Mission\nCreated)) --> INIT[Initialize\nWorkflow]
+    INIT --> SELECT{Select\nPattern}
+
+    SELECT -->|sequential| SEQ[Phase 1\nPhase 2\nPhase N]
+    SELECT -->|parallel| PAR[Phase A + B\nsimultaneous]
+    SELECT -->|hierarchical| HIER[Manager\ndelegates to\nsub-agents]
+    SELECT -->|adversarial| ADV[Generator\nvs Critic]
+
+    SEQ --> PHASE
+    PAR --> PHASE
+    HIER --> PHASE
+    ADV --> PHASE
+
+    subgraph PHASE_EXEC["Phase Execution"]
+        PHASE[Run Phase] --> AGENT[Agent\nExecutor]
+        AGENT --> LLM_CALL[LLM Call\nw/ tools]
+        LLM_CALL --> RESULT{Result}
+
+        RESULT -->|success| BUILD_CHK{Code\nPhase?}
+        BUILD_CHK -->|yes| SANDBOX[Sandbox\nBuild Check]
+        BUILD_CHK -->|no| GATE
+        SANDBOX -->|pass| GATE
+        SANDBOX -->|fail| INJECT[Inject Error\nin Context]
+        INJECT --> RETRY_B{Retries\nleft?}
+        RETRY_B -->|yes| AGENT
+        RETRY_B -->|no| SKIP_CHK
+
+        RESULT -->|failure| RETRY{Retries\nleft?}
+        RETRY -->|yes, backoff| AGENT
+        RETRY -->|no| SKIP_CHK{skip_on\n_failure?}
+        SKIP_CHK -->|yes| GATE
+        SKIP_CHK -->|no| PAUSED
+
+        GATE[Quality\nGate] --> GATE_R{Gate\nResult}
+        GATE_R -->|pass| CHECKPOINT[Checkpoint\nPhase Done]
+        GATE_R -->|fail| PAUSED
+    end
+
+    CHECKPOINT --> NEXT{More\nPhases?}
+    NEXT -->|yes| PHASE
+    NEXT -->|no| COMPLETE((Mission\nCompleted))
+
+    PAUSED((Run\nPaused)) -.->|watchdog\nauto-resume| PHASE
+
+    classDef start fill:#c8e6c9,stroke:#2e7d32,color:#000
+    classDef process fill:#e3f2fd,stroke:#1565c0,color:#000
+    classDef decision fill:#fff3e0,stroke:#e65100,color:#000
+    classDef error fill:#ffcdd2,stroke:#c62828,color:#000
+    classDef success fill:#c8e6c9,stroke:#2e7d32,color:#000
+    classDef pattern fill:#e0f7fa,stroke:#00695c,color:#000
+
+    class START,COMPLETE success
+    class PAUSED error
+    class PHASE,AGENT,LLM_CALL,GATE,CHECKPOINT,SANDBOX,INJECT process
+    class RESULT,RETRY,SKIP_CHK,BUILD_CHK,GATE_R,NEXT,SELECT,RETRY_B decision
+    class INIT,SEQ,PAR,HIER,ADV pattern

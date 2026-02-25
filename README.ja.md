@@ -138,6 +138,26 @@ NVIDIA_API_KEY=nvapi-your-key-here
 3つの組み込みワークフロー：**quality-improvement**（スキャン→改善計画）、**retrospective-quality**（メトリクス付きスプリントレトロ）、**skill-evolution**（エージェントプロンプト最適化）。
 
 
+## Architecture
+
+<p align="center">
+  <img src="docs/diagrams/architecture.svg" alt="Architecture" width="100%">
+</p>
+
+<details>
+<summary>Pipeline and Observability</summary>
+
+<p align="center">
+  <img src="docs/diagrams/pipeline-flow.svg" alt="Pipeline Flow" width="100%">
+</p>
+<p align="center">
+  <img src="docs/diagrams/observability.svg" alt="Observability" width="100%">
+</p>
+<p align="center">
+  <img src="docs/diagrams/deployment.svg" alt="Deployment" width="100%">
+</p>
+</details>
+
 ## What's New in v2.2.0 (Feb 2026)
 
 ### OpenTelemetry & Distributed Tracing

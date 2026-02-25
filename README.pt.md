@@ -138,6 +138,26 @@ Portões de qualidade nas fases de workflow (badges PASS/FAIL) · Dashboard em `
 3 workflows integrados: **quality-improvement** (scan → plano de melhoria), **retrospective-quality** (retro sprint com métricas), **skill-evolution** (otimização de prompts de agentes).
 
 
+## Architecture
+
+<p align="center">
+  <img src="docs/diagrams/architecture.svg" alt="Architecture" width="100%">
+</p>
+
+<details>
+<summary>Pipeline and Observability</summary>
+
+<p align="center">
+  <img src="docs/diagrams/pipeline-flow.svg" alt="Pipeline Flow" width="100%">
+</p>
+<p align="center">
+  <img src="docs/diagrams/observability.svg" alt="Observability" width="100%">
+</p>
+<p align="center">
+  <img src="docs/diagrams/deployment.svg" alt="Deployment" width="100%">
+</p>
+</details>
+
 ## What's New in v2.2.0 (Feb 2026)
 
 ### OpenTelemetry & Distributed Tracing
