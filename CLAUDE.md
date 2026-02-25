@@ -37,25 +37,22 @@ Legacy: `_SOFTWARE_FACTORY-old/` (core/, factory CLI, brain, TDD workers — arc
 ## REPOSITORIES (2 dépôts séparés)
 
 ```
-GitHub (public, full):
-  Local : ~/_MACARON-SOFTWARE/              ← .git racine (pas dans _SOFTWARE_FACTORY/)
-  Remote: github.com/macaron-software/software-factory (AGPL-3.0)
-  Auth  : gh CLI (leglands)
-  README: EN multilingue (8 langues), branding "Software Factory"
-  Content: full code + 95 agents + 36 workflows + projets démo
-  Sync  : git push origin main
+~/_MACARON-SOFTWARE/                         ← GitHub (macaron-software/software-factory)
+  .git/ → origin = github.com/macaron-software/software-factory (AGPL-3.0)
+  platform/  cli/  dashboard/  ...           ← CODE TRACKÉ par git
+  _SOFTWARE_FACTORY/                         ← ⚠️ NON TRACKÉ (.gitignore) = runtime local
+    platform/  dashboard/  data/  logs/      ←   instance de dev en cours (DB, logs, etc.)
 
-GitLab La Poste (squelette interne):
-  Local : ~/_LAPOSTE/_SOFTWARE_FACTORY/     ← .git propre, origin = GitLab
-  Remote: git@gitlab.azure.innovation-laposte.io:udd-ia-native/software-factory.git
-  Auth  : SSH key ~/.ssh/gitlab_laposte_ed25519 (User: sylvain.legland@laposte.fr)
-  README: FR uniquement, branding "Plateforme Agents La Poste", usage interne
-  Content: code platform uniquement — agents/workflows/projets VIDES (.gitkeep)
-  Sync  : cd ~/_MACARON-SOFTWARE && ./sync-to-laposte.sh
+~/_LAPOSTE/_SOFTWARE_FACTORY/                ← GitLab La Poste (udd-ia-native/software-factory)
+  .git/ → origin = git@gitlab.azure.innovation-laposte.io:udd-ia-native/software-factory.git
+  platform/  cli/  dashboard/  ...           ← squelette : agents/workflows/projets VIDES
+  Auth: SSH ~/.ssh/gitlab_laposte_ed25519 (sylvain.legland@laposte.fr) — ssh -T OK
+  README: FR uniquement, branding "Plateforme Agents La Poste", usage interne La Poste
 ```
 
-**Règle** : développer dans `~/_MACARON-SOFTWARE/`, synchroniser vers La Poste avec `sync-to-laposte.sh` (one-way).
-Ne JAMAIS éditer directement `~/_LAPOSTE/_SOFTWARE_FACTORY/` — contenu écrasé à chaque sync.
+**Workflow** : développer dans `~/_MACARON-SOFTWARE/` → `git push origin main` (GitHub).
+**Sync La Poste** (one-way) : `cd ~/_MACARON-SOFTWARE && ./sync-to-laposte.sh`
+⚠️ Ne jamais éditer `~/_LAPOSTE/_SOFTWARE_FACTORY/` directement — écrasé à chaque sync.
 
 ## ENVIRONMENTS (3 deployments)
 
