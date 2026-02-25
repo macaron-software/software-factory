@@ -304,7 +304,6 @@ async def _auto_resume_paused() -> int:
                 if not wf_id:
                     continue
 
-                checkpoint = config.get("workflow_checkpoint", 0)
                 sid = row["session_id"]
 
                 # Update statuses
@@ -314,7 +313,7 @@ async def _auto_resume_paused() -> int:
                 )
                 db.commit()
 
-                # Trigger resume via API (non-blocking)
+                # Trigger resume via resume-all API (batch approach)
                 base_url = HEALTH_URL.replace("/api/health", "")
                 proc = await asyncio.create_subprocess_exec(
                     "curl",
@@ -322,36 +321,24 @@ async def _auto_resume_paused() -> int:
                     "-X",
                     "POST",
                     "-m",
-                    "10",
-                    f"{base_url}/api/workflows/resume/{sid}",
+                    "30",
+                    f"{base_url}/api/workflows/resume-all",
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
                 await proc.wait()
 
                 if proc.returncode == 0:
-                    resumed += 1
-                    _log_metric(
-                        "auto_resume", 1, f"session={sid[:8]} phase={checkpoint}"
-                    )
+                    resumed = slots  # Assume all were resumed
+                    _log_metric("auto_resume", slots, "batch via resume-all")
                     logger.warning(
-                        "WATCHDOG: resumed session %s from phase %d",
-                        sid[:8],
-                        checkpoint,
+                        "WATCHDOG: resume-all triggered for %d candidates", slots
                     )
                 else:
-                    # Revert status on failure
-                    db.execute(
-                        "UPDATE sessions SET status='interrupted' WHERE id=?", (sid,)
-                    )
-                    db.execute(
-                        "UPDATE mission_runs SET status='paused' WHERE id=?",
-                        (row["id"],),
-                    )
-                    db.commit()
-                    _log_metric("auto_resume_fail", 0, f"session={sid[:8]}")
+                    _log_metric("auto_resume_fail", 0, "resume-all failed")
 
-                await asyncio.sleep(2)  # Small delay between resumes
+                # Don't loop per-session — resume-all handles the batch
+                break
             except Exception as e:
                 logger.warning("WATCHDOG: resume failed for %s: %s", row["id"][:8], e)
 
