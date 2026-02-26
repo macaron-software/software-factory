@@ -151,6 +151,17 @@ async def patterns_page(request: Request):
     })
 
 
+@router.get("/patterns/list", response_class=HTMLResponse)
+async def patterns_list(request: Request):
+    """Partial: patterns list (no tabs wrapper)."""
+    from ...patterns.store import get_pattern_store
+    patterns = get_pattern_store().list_all()
+    return _templates(request).TemplateResponse("partials/patterns_list.html", {
+        "request": request,
+        "patterns": patterns,
+    })
+
+
 @router.get("/patterns/new", response_class=HTMLResponse)
 async def pattern_new(request: Request):
     """Create new pattern form."""

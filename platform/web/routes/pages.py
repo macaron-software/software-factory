@@ -500,6 +500,17 @@ async def workflows_page(request: Request, tab: str = "templates"):
     )
 
 
+@router.get("/workflows/list", response_class=HTMLResponse)
+async def workflows_list(request: Request):
+    """Partial: workflow templates list (no tabs wrapper)."""
+    from ...workflows.store import get_workflow_store
+    workflows = get_workflow_store().list_all()
+    return _templates(request).TemplateResponse(
+        "partials/workflows_list.html",
+        {"request": request, "workflows": workflows},
+    )
+
+
 @router.get("/ceremonies", response_class=HTMLResponse)
 async def ceremonies_redirect(request: Request):
     """Legacy redirect — /ceremonies moved to /workflows."""

@@ -21,8 +21,8 @@ fetch('/api/ceremonies/next').then(r=>r.ok?r.json():null).then(d=>{
 {% endif %}
 
 <div class="tabs">
-    <button class="tab active" hx-get="/workflows" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click, load" onclick="switchTab(this)">{{ _("templates") }}</button>
-    <button class="tab" hx-get="/patterns" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("patterns") }}</button>
+    <button class="tab active" hx-get="/workflows/list" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click, load" onclick="switchTab(this)">{{ _("templates") }}</button>
+    <button class="tab" hx-get="/patterns/list" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("patterns") }}</button>
 </div>
 <div id="tab-content"></div>
 <script>
