@@ -319,7 +319,7 @@ async function loadContexts() {
     try {
         const r = await fetch('/api/teams/contexts');
         const d = await r.json();
-        const ctxs = d.contexts || [];
+        const ctxs = Array.isArray(d) ? d : (d.contexts || []);
 
         // populate tech selects
         const techOpts = [...new Set(ctxs.map(c => c.technology).filter(t => t !== 'generic'))];
@@ -352,7 +352,7 @@ async function loadLeaderboard() {
     try {
         const r = await fetch(`/api/teams/leaderboard?technology=${encodeURIComponent(tech)}&phase_type=${encodeURIComponent(phase)}&limit=30`);
         const d = await r.json();
-        const teams = d.teams || [];
+        const teams = d.data || [];
 
         if (!teams.length) {
             container.innerHTML = `<div class="empty-state">
@@ -431,7 +431,7 @@ async function loadOKR() {
 
         const r = await fetch(url);
         const d = await r.json();
-        const okrs = d.okrs || [];
+        const okrs = Array.isArray(d) ? d : (d.okrs || []);
 
         if (!okrs.length) {
             container.innerHTML = '<div class="empty-state"><p>No OKRs found.</p></div>';
@@ -496,32 +496,25 @@ async function loadEvolution() {
     try {
         const r = await fetch(`/api/teams/evolution?technology=${encodeURIComponent(tech)}&phase_type=${encodeURIComponent(phase)}&days=${days}`);
         const d = await r.json();
-        const history = d.history || [];
+        // API returns {series: [{agent_id, agent_name, pattern_id, dates:[], scores:[]}]}
+        const series = d.series || [];
 
         const emptyEl = document.getElementById('evo-empty');
-        if (!history.length) {
+        if (!series.length) {
             emptyEl.style.display = '';
             if (_evoChart) { _evoChart.destroy(); _evoChart = null; }
             return;
         }
         emptyEl.style.display = 'none';
 
-        // Group by (agent_id, pattern_id)
-        const groups = {};
-        history.forEach(h => {
-            const key = `${h.agent_id} + ${h.pattern_id}`;
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(h);
-        });
-
-        // Collect all dates
-        const allDates = [...new Set(history.map(h => h.snapshot_date))].sort();
+        // Collect all unique dates across all series
+        const allDates = [...new Set(series.flatMap(s => s.dates))].sort();
         const COLORS = ['#a78bfa','#34d399','#fbbf24','#f87171','#60a5fa','#f472b6'];
 
-        const datasets = Object.entries(groups).map(([key, rows], i) => {
-            const byDate = Object.fromEntries(rows.map(r => [r.snapshot_date, r.fitness_score]));
+        const datasets = series.map((s, i) => {
+            const byDate = Object.fromEntries(s.dates.map((d, j) => [d, s.scores[j]]));
             return {
-                label: key,
+                label: `${s.agent_name || s.agent_id} + ${s.pattern_id}`,
                 data: allDates.map(d => byDate[d] ?? null),
                 borderColor: COLORS[i % COLORS.length],
                 backgroundColor: COLORS[i % COLORS.length] + '22',
@@ -559,7 +552,7 @@ async function loadSelections() {
     try {
         const r = await fetch(`/api/teams/selections?limit=${limit}`);
         const d = await r.json();
-        const sels = d.selections || [];
+        const sels = d.data || [];
 
         if (!sels.length) {
             container.innerHTML = '<div class="empty-state"><p>No selections recorded yet.</p><p class="hint">Selections are recorded when patterns use <code>agent_id: "skill:*"</code>.</p></div>';
@@ -596,7 +589,7 @@ async function loadABTests() {
 
         const r = await fetch(url);
         const d = await r.json();
-        const tests = d.ab_tests || [];
+        const tests = d.data || [];
 
         if (!tests.length) {
             container.innerHTML = '';
