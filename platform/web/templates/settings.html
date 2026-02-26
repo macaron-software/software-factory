@@ -94,8 +94,76 @@
             </div>
             <div class="form-group">
                 <label>{{ _("max_concurrent_sessions") }}</label>
-                <input type="number" value="{{ config.orchestrator.max_concurrent_sessions }}" readonly>
+                <input type="number" value="{{ config.orchestrator.max_parallel_agents }}" readonly>
             </div>
+            <hr style="border-color:var(--border);margin:1.2rem 0">
+            <h4 style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1rem;text-transform:uppercase;letter-spacing:1px">Mission Concurrency</h4>
+            <form id="orch-concurrency-form" style="display:flex;flex-direction:column;gap:0.8rem">
+              <div class="form-group">
+                <label>Max concurrent missions (semaphore)</label>
+                <input type="number" id="oc-semaphore" name="mission_semaphore"
+                  value="{{ config.orchestrator.mission_semaphore }}" min="1" max="10" step="1"
+                  style="width:100px">
+                <span style="color:var(--text-secondary);font-size:0.8rem;margin-left:0.5rem">missions running simultaneously</span>
+              </div>
+              <div class="form-group">
+                <label>Startup stagger (seconds)</label>
+                <input type="number" id="oc-stagger-start" name="resume_stagger_startup"
+                  value="{{ config.orchestrator.resume_stagger_startup }}" min="1" max="300" step="1"
+                  style="width:100px">
+                <span style="color:var(--text-secondary);font-size:0.8rem;margin-left:0.5rem">delay between launches on boot</span>
+              </div>
+              <div class="form-group">
+                <label>Watchdog stagger (seconds)</label>
+                <input type="number" id="oc-stagger-watch" name="resume_stagger_watchdog"
+                  value="{{ config.orchestrator.resume_stagger_watchdog }}" min="1" max="60" step="1"
+                  style="width:100px">
+                <span style="color:var(--text-secondary);font-size:0.8rem;margin-left:0.5rem">delay between launches on watchdog cycle</span>
+              </div>
+              <div class="form-group">
+                <label>Startup batch max</label>
+                <input type="number" id="oc-batch" name="resume_batch_startup"
+                  value="{{ config.orchestrator.resume_batch_startup }}" min="1" max="20" step="1"
+                  style="width:100px">
+                <span style="color:var(--text-secondary);font-size:0.8rem;margin-left:0.5rem">max missions resumed per startup pass</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:1rem;margin-top:0.4rem">
+                <button type="button" onclick="saveOrchSettings()"
+                  style="background:var(--purple);color:#fff;border:none;padding:0.45rem 1.2rem;border-radius:6px;cursor:pointer;font-size:0.9rem">
+                  Save
+                </button>
+                <span id="orch-save-status" style="font-size:0.82rem;color:var(--text-secondary)"></span>
+              </div>
+            </form>
+            <script>
+            async function saveOrchSettings() {
+              const form = document.getElementById('orch-concurrency-form');
+              const data = {};
+              form.querySelectorAll('input[name]').forEach(el => {
+                data[el.name] = el.type === 'number' ? Number(el.value) : el.value;
+              });
+              const st = document.getElementById('orch-save-status');
+              st.textContent = 'Saving…';
+              try {
+                const r = await fetch('/api/settings/orchestrator', {
+                  method: 'POST',
+                  headers: {'Content-Type':'application/json'},
+                  body: JSON.stringify(data)
+                });
+                const j = await r.json();
+                if (j.ok) {
+                  st.style.color = 'var(--green, #4ade80)';
+                  st.textContent = 'Saved — applied live';
+                } else {
+                  st.style.color = 'var(--accent)';
+                  st.textContent = 'Error: ' + JSON.stringify(j);
+                }
+              } catch(e) {
+                st.style.color = 'var(--accent)';
+                st.textContent = 'Error: ' + e.message;
+              }
+            }
+            </script>
         </section>
     </div>
 

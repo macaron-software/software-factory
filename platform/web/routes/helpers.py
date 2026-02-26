@@ -28,8 +28,25 @@ def _is_json_request(request: Request) -> bool:
 # Track which mission_ids have an active asyncio task running
 _active_mission_tasks: dict[str, asyncio.Task] = {}
 
-# Limit concurrent mission execution (10 allows Quality/Retro/Skill missions to get slots)
+# Limit concurrent mission execution — value read from config at runtime
 _mission_semaphore = asyncio.Semaphore(2)
+_mission_semaphore_value = 2
+
+
+def get_mission_semaphore() -> asyncio.Semaphore:
+    """Return semaphore, recreating it if config value changed."""
+    global _mission_semaphore, _mission_semaphore_value
+    try:
+        from ...config import get_config
+
+        target = get_config().orchestrator.mission_semaphore
+    except Exception:
+        target = 2
+    if target != _mission_semaphore_value:
+        _mission_semaphore = asyncio.Semaphore(target)
+        _mission_semaphore_value = target
+    return _mission_semaphore
+
 
 _AVATAR_DIR = Path(__file__).parent.parent / "static" / "avatars"
 

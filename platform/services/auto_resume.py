@@ -37,16 +37,31 @@ _CONTINUOUS_KEYWORDS = (
 
 # Watchdog loop interval (seconds)
 _WATCHDOG_INTERVAL = 300
-# Stagger between each resume
-_STAGGER_STARTUP = 30.0  # 30s between launches on boot (avoid CPU spike)
-_STAGGER_WATCHDOG = 10.0  # 10s between launches on watchdog cycles
-_MAX_STARTUP_BATCH = 3  # max missions launched per startup pass
+# Stagger between each resume — defaults, overridden by config at runtime
+_STAGGER_STARTUP = 30.0
+_STAGGER_WATCHDOG = 10.0
+_MAX_STARTUP_BATCH = 3
 # Disk cleanup: run every N watchdog cycles (300s × 12 = 1h)
 _CLEANUP_EVERY_N_CYCLES = 12
 
 # Auto-launch new runs
 _LAUNCH_PER_CYCLE = 5  # max new launches per watchdog cycle (avoid thundering herd)
 _LAUNCH_STAGGER = 2.0  # seconds between each new launch
+
+
+def _get_resume_config():
+    """Read concurrency settings from platform config (live, allows runtime changes)."""
+    try:
+        from ..config import get_config
+
+        oc = get_config().orchestrator
+        return (
+            oc.resume_stagger_startup,
+            oc.resume_stagger_watchdog,
+            oc.resume_batch_startup,
+        )
+    except Exception:
+        return _STAGGER_STARTUP, _STAGGER_WATCHDOG, _MAX_STARTUP_BATCH
 
 
 def _is_continuous(mission_name: str, mission_type: str) -> bool:
@@ -73,9 +88,10 @@ async def auto_resume_missions() -> None:
     first_pass = True
     cycle_count = 0
     while True:
-        # Semaphore capped at 2 in helpers.py — no hot-patch needed
+        # Read concurrency settings live from config (allows runtime changes via UI)
+        stagger_startup, stagger_watchdog, _ = _get_resume_config()
         try:
-            stagger = _STAGGER_STARTUP if first_pass else _STAGGER_WATCHDOG
+            stagger = stagger_startup if first_pass else stagger_watchdog
             resumed = await _resume_batch(stagger=stagger)
             if resumed > 0:
                 logger.warning(
@@ -179,9 +195,10 @@ async def _resume_batch(stagger: float = 3.0) -> int:
 
     to_resume = continuous_paused + others_paused + stuck_pending + continuous_failed
 
-    # On startup (stagger==_STAGGER_STARTUP), cap to avoid CPU saturation
-    if stagger >= _STAGGER_STARTUP:
-        to_resume = to_resume[:_MAX_STARTUP_BATCH]
+    # On startup (large stagger), cap batch to avoid CPU saturation
+    stagger_startup, _, batch_max = _get_resume_config()
+    if stagger >= stagger_startup:
+        to_resume = to_resume[:batch_max]
 
     if not to_resume:
         return 0
@@ -215,7 +232,7 @@ async def _launch_run(run_id: str) -> None:
     from ..models import MissionStatus
     from ..services.mission_orchestrator import MissionOrchestrator
     from ..sessions.runner import _push_sse
-    from ..web.routes.helpers import _active_mission_tasks, _mission_semaphore
+    from ..web.routes.helpers import _active_mission_tasks, get_mission_semaphore
     from ..workflows.store import get_workflow_store
 
     run_store = get_mission_run_store()
@@ -287,7 +304,7 @@ async def _launch_run(run_id: str) -> None:
 
     async def _safe_run():
         try:
-            async with _mission_semaphore:
+            async with get_mission_semaphore():
                 logger.warning("auto_resume: mission_run=%s acquired semaphore", run_id)
                 await orchestrator.run_phases()
         except Exception as exc:

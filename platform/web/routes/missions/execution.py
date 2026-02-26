@@ -12,10 +12,11 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from ....i18n import t
 from ...schemas import ErrorResponse, OkResponse
-from ..helpers import _active_mission_tasks, _mission_semaphore, _parse_body, _templates
+from ..helpers import _active_mission_tasks, get_mission_semaphore, _parse_body
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
 
 @router.post("/api/missions/{mission_id}/start", responses={200: {"model": OkResponse}})
 async def start_mission(mission_id: str):
@@ -24,8 +25,6 @@ async def start_mission(mission_id: str):
 
     get_mission_store().update_mission_status(mission_id, "active")
     return JSONResponse({"ok": True})
-
-
 
 
 @router.post(
@@ -80,31 +79,38 @@ async def launch_mission_workflow(request: Request, mission_id: str):
     from pathlib import Path
 
     workspace_root = (
-        Path(__file__).resolve().parent.parent.parent.parent / "data" / "workspaces" / session.id
+        Path(__file__).resolve().parent.parent.parent.parent
+        / "data"
+        / "workspaces"
+        / session.id
     )
     workspace_root.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init"], cwd=str(workspace_root), capture_output=True)
     subprocess.run(
         ["git", "config", "user.email", "agents@macaron.ai"],
-        cwd=str(workspace_root), capture_output=True,
+        cwd=str(workspace_root),
+        capture_output=True,
     )
     subprocess.run(
         ["git", "config", "user.name", "Macaron Agents"],
-        cwd=str(workspace_root), capture_output=True,
+        cwd=str(workspace_root),
+        capture_output=True,
     )
     readme = workspace_root / "README.md"
     task_desc = mission.goal or mission.description or mission.name
     readme.write_text(f"# {wf.name}\n\n{task_desc}\n\nMission ID: {mission_id}\n")
     gitignore = workspace_root / ".gitignore"
-    gitignore.write_text("node_modules/\ndist/\nbuild/\n.env\n*.bak\n__pycache__/\n.DS_Store\n")
+    gitignore.write_text(
+        "node_modules/\ndist/\nbuild/\n.env\n*.bak\n__pycache__/\n.DS_Store\n"
+    )
     subprocess.run(["git", "add", "."], cwd=str(workspace_root), capture_output=True)
     subprocess.run(
         ["git", "commit", "-m", "Initial commit — mission workspace"],
-        cwd=str(workspace_root), capture_output=True,
+        cwd=str(workspace_root),
+        capture_output=True,
     )
 
     # Auto-start workflow execution — agents will dialogue via patterns
-    import asyncio
 
     from ..workflows import _run_workflow_background
 
@@ -149,8 +155,6 @@ async def launch_mission_workflow(request: Request, mission_id: str):
     )
 
     return JSONResponse({"session_id": session.id, "workflow_id": wf_id})
-
-
 
 
 @router.post("/api/missions/start")
@@ -358,8 +362,6 @@ async def api_mission_start(request: Request):
             "redirect": f"/missions/{mission_id}/control",
         }
     )
-
-
 
 
 @router.post("/api/missions/{mission_id}/chat/stream")
@@ -613,7 +615,10 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
                         "platform_sessions": "Cérémonies",
                         "platform_workflows": "Templates workflow",
                     }
-                    label = tool_labels.get(data_s, f'<svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-wrench"/></svg> {data_s}')
+                    label = tool_labels.get(
+                        data_s,
+                        f'<svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-wrench"/></svg> {data_s}',
+                    )
                     yield sse("tool", {"name": data_s, "label": label})
                 elif evt == "result":
                     if hasattr(data_s, "error") and data_s.error:
@@ -666,8 +671,6 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
-
-
 
 
 @router.post("/api/missions/{mission_id}/exec")
@@ -736,8 +739,6 @@ async def api_mission_exec(request: Request, mission_id: str):
         return JSONResponse({"error": str(e), "command": cmd}, status_code=500)
 
 
-
-
 @router.post("/api/missions/{mission_id}/validate")
 async def api_mission_validate(request: Request, mission_id: str):
     """Human validates a checkpoint (GO/NOGO/PIVOT)."""
@@ -801,8 +802,6 @@ async def api_mission_validate(request: Request, mission_id: str):
         )
 
     return JSONResponse({"decision": decision, "phase": mission.current_phase})
-
-
 
 
 @router.post("/api/missions/{mission_id}/reset")
@@ -872,11 +871,8 @@ async def api_mission_reset(request: Request, mission_id: str):
 # ── Confluence Sync ──────────────────────────────────────────
 
 
-
-
 async def _launch_orchestrator(mission_id: str):
     """Shared helper: launch the MissionOrchestrator as an asyncio task."""
-    import asyncio
 
     from ....agents.store import get_agent_store
     from ....missions.store import get_mission_run_store
@@ -921,7 +917,7 @@ async def _launch_orchestrator(mission_id: str):
 
     async def _safe_run():
         try:
-            async with _mission_semaphore:
+            async with get_mission_semaphore():
                 logger.warning(
                     "ORCH mission=%s acquired semaphore, starting", mission_id
                 )
@@ -962,8 +958,6 @@ async def _launch_orchestrator(mission_id: str):
     task.add_done_callback(lambda t: _active_mission_tasks.pop(mission_id, None))
 
 
-
-
 @router.post("/api/missions/{mission_id}/run")
 async def api_mission_run(request: Request, mission_id: str):
     """Drive mission execution: CDP orchestrates phases sequentially.
@@ -986,6 +980,3 @@ async def api_mission_run(request: Request, mission_id: str):
 
     await _launch_orchestrator(mission_id)
     return JSONResponse({"status": "running", "mission_id": mission_id})
-
-
-

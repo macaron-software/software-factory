@@ -880,6 +880,38 @@ async def settings_page(request: Request):
     )
 
 
+@router.post("/api/settings/orchestrator")
+async def save_orchestrator_settings(request: Request):
+    """Save mission concurrency settings and apply them live."""
+    from ...config import get_config, save_config
+    from ..helpers import get_mission_semaphore
+
+    body = await request.json()
+    cfg = get_config()
+    oc = cfg.orchestrator
+
+    if "mission_semaphore" in body:
+        oc.mission_semaphore = max(1, min(10, int(body["mission_semaphore"])))
+    if "resume_stagger_startup" in body:
+        oc.resume_stagger_startup = max(1.0, float(body["resume_stagger_startup"]))
+    if "resume_stagger_watchdog" in body:
+        oc.resume_stagger_watchdog = max(1.0, float(body["resume_stagger_watchdog"]))
+    if "resume_batch_startup" in body:
+        oc.resume_batch_startup = max(1, min(20, int(body["resume_batch_startup"])))
+
+    save_config(cfg)
+    # Apply semaphore change live
+    get_mission_semaphore()
+
+    return {
+        "ok": True,
+        "mission_semaphore": oc.mission_semaphore,
+        "resume_stagger_startup": oc.resume_stagger_startup,
+        "resume_stagger_watchdog": oc.resume_stagger_watchdog,
+        "resume_batch_startup": oc.resume_batch_startup,
+    }
+
+
 # ── Admin Users ──────────────────────────────────────────────────
 
 
