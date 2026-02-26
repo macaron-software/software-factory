@@ -850,6 +850,22 @@ Every project automatically gets 4 operational missions:
 - **Quality badge** — colored score circle for project headers (`/api/dashboard/quality-badge`)
 - **Mission scorecard** — quality metrics in mission detail sidebar (`/api/dashboard/quality-mission`)
 
+### マルチモデル LLM ルーティング
+- **3 つの専門モデル** — `gpt-5.2` は重い推論向け、`gpt-5.1-codex` はコード/テスト向け、`gpt-5-mini` は軽タスク向け
+- **ロールベースルーティング** — エージェントはタグ（`reasoner`、`architect`、`developer`、`tester`、`doc_writer`…）に基づき自動的に適切なモデルを受け取る
+- **ライブ設定可能** — 設定 → LLM からルーティングマトリックスを再起動不要で編集
+
+### Darwin LLM — モデルへの Thompson Sampling
+- **モデル A/B テスト** — 同チーム（エージェント + パターン）が異なる LLM で競い、コンテキストごとに最良モデルが自動的に決定
+- **ベータ分布** — `Beta(wins+1, losses+1)` per `(agent_id, pattern_id, technology, phase_type, llm_model)`
+- **/teams の LLM A/B タブ** — モデルごとのフィットネスランキングと A/B テスト履歴
+- **優先チェーン** — Darwin LLM → DB 設定 → デフォルト値（グレースフルデグラデーション）
+
+### 設定 — LLM タブ
+- **プロバイダーグリッド** — アクティブ/非アクティブ状態と API キー欠落のヒント表示
+- **ルーティングマトリックス** — カテゴリ別（推論・本番/コード・タスク・文書作成）の重い/軽いモデル設定
+- **Darwin LLM A/B セクション** — 進行中のモデル実験のライブビュー
+
 ## 貢献
 
 貢献を歓迎します！ガイドラインについては [CONTRIBUTING.md](CONTRIBUTING.md) をお読みください。

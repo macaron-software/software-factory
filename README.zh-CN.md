@@ -850,6 +850,22 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - **质量徽章** — 项目头部的彩色分数圆圈（`/api/dashboard/quality-badge`）
 - **任务记分卡** — 任务详情侧边栏中的质量指标（`/api/dashboard/quality-mission`）
 
+### 多模型 LLM 路由
+- **3 个专用模型** — `gpt-5.2` 用于重度推理，`gpt-5.1-codex` 用于代码/测试，`gpt-5-mini` 用于轻量任务
+- **基于角色的路由** — 代理根据标签（`reasoner`、`architect`、`developer`、`tester`、`doc_writer`…）自动获得正确模型
+- **实时可配置** — 在设置 → LLM 中编辑路由矩阵，无需重启
+
+### Darwin LLM — 模型上的 Thompson Sampling
+- **模型 A/B 测试** — 同一团队（代理 + 模式）使用不同 LLM 竞争；最佳模型按上下文自动胜出
+- **Beta 分布** — 每 `(agent_id, pattern_id, technology, phase_type, llm_model)` 使用 `Beta(wins+1, losses+1)`
+- **/teams 上的 LLM A/B 标签** — 按模型的适应度排名和 A/B 测试历史
+- **优先链** — Darwin LLM → 数据库配置 → 默认值（优雅降级）
+
+### 设置 — LLM 标签
+- **提供商网格** — 显示启用/禁用状态及缺少 API 密钥的提示
+- **路由矩阵** — 按类别（推理、生产/代码、任务、撰写）配置重/轻模型
+- **Darwin LLM A/B 区域** — 正在进行的模型实验的实时视图
+
 ## 参与贡献
 
 欢迎贡献！请阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 了解贡献指南。

@@ -850,6 +850,22 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 - **Qualitaets-Badge** — farbiger Score-Kreis fuer Projekt-Header (`/api/dashboard/quality-badge`)
 - **Missions-Scorecard** — Qualitaetsmetriken in der Missionsdetail-Seitenleiste (`/api/dashboard/quality-mission`)
 
+### Multi-Modell-LLM-Routing
+- **3 spezialisierte Modelle** — `gpt-5.2` für schwere Reasoning-Aufgaben, `gpt-5.1-codex` für Code/Tests, `gpt-5-mini` für leichte Aufgaben
+- **Rollenbasiertes Routing** — Agenten erhalten automatisch das richtige Modell nach Tags (`reasoner`, `architect`, `developer`, `tester`, `doc_writer`…)
+- **Live-konfigurierbar** — Routing-Matrix in Einstellungen → LLM ohne Neustart editierbar
+
+### Darwin LLM — Thompson Sampling auf Modellen
+- **Modell-A/B-Tests** — gleiche Teams (Agent + Pattern) konkurrieren mit verschiedenen LLMs; das beste Modell setzt sich automatisch per Kontext durch
+- **Beta-Verteilung** — `Beta(wins+1, losses+1)` pro `(agent_id, pattern_id, technology, phase_type, llm_model)`
+- **LLM-A/B-Tab** auf `/teams` — Fitness-Ranking per Modell und Testhistorie
+- **Prioritätskette** — Darwin LLM → DB-Konfiguration → Standardwerte (graceful degradation)
+
+### Einstellungen — LLM-Tab
+- **Provider-Raster** — Aktiv/Inaktiv-Status mit Hinweisen auf fehlende API-Keys
+- **Routing-Matrix** — schwer/leicht pro Kategorie (Reasoning, Produktion/Code, Aufgaben, Redaktion)
+- **Darwin LLM A/B-Bereich** — Live-Ansicht laufender Modellexperimente
+
 ## Mitwirken
 
 Wir freuen uns ueber Beitraege! Bitte lesen Sie [CONTRIBUTING.md](CONTRIBUTING.md) fuer Richtlinien.

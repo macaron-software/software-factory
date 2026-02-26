@@ -850,6 +850,22 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - **품질 배지** — 프로젝트 헤더에 컬러 점수 원 (`/api/dashboard/quality-badge`)
 - **미션 스코어카드** — 미션 상세 사이드바의 품질 메트릭 (`/api/dashboard/quality-mission`)
 
+### 멀티 모델 LLM 라우팅
+- **3개의 전문 모델** — `gpt-5.2` 는 무거운 추론, `gpt-5.1-codex` 는 코드/테스트, `gpt-5-mini` 는 경량 작업용
+- **역할 기반 라우팅** — 에이전트는 태그(`reasoner`, `architect`, `developer`, `tester`, `doc_writer`…)를 기반으로 자동으로 올바른 모델을 받음
+- **실시간 구성 가능** — 재시작 없이 설정 → LLM에서 라우팅 매트릭스 편집
+
+### Darwin LLM — 모델에 대한 Thompson Sampling
+- **모델 A/B 테스트** — 동일한 팀(에이전트 + 패턴)이 다른 LLM으로 경쟁; 최고의 모델이 컨텍스트별로 자동 승리
+- **베타 분포** — `(agent_id, pattern_id, technology, phase_type, llm_model)`당 `Beta(wins+1, losses+1)`
+- **/teams의 LLM A/B 탭** — 모델별 피트니스 순위 및 A/B 테스트 기록
+- **우선순위 체인** — Darwin LLM → DB 구성 → 기본값 (우아한 성능 저하)
+
+### 설정 — LLM 탭
+- **프로바이더 그리드** — 활성/비활성 상태 및 누락된 API 키 힌트 표시
+- **라우팅 매트릭스** — 카테고리별(추론, 생산/코드, 작업, 문서 작성) 무거운/가벼운 모델 구성
+- **Darwin LLM A/B 섹션** — 진행 중인 모델 실험의 실시간 보기
+
 ## 기여하기
 
 기여를 환영합니다! 가이드라인은 [CONTRIBUTING.md](CONTRIBUTING.md)를 참조하세요.

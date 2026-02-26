@@ -850,6 +850,27 @@ Every project automatically gets 4 operational missions:
 - **Quality badge** — colored score circle for project headers (`/api/dashboard/quality-badge`)
 - **Mission scorecard** — quality metrics in mission detail sidebar (`/api/dashboard/quality-mission`)
 
+### Multi-Model LLM Routing
+- **3 specialized models** — `gpt-5.2` for heavy reasoning/architecture, `gpt-5.1-codex` for code/tests, `gpt-5-mini` for lightweight tasks
+- **Role-based routing** — agents automatically get the right model based on their tags (`reasoner`, `architect`, `developer`, `tester`, `security`, `doc_writer`, etc.)
+- **DB-configurable** — routing matrix stored in `session_state`, editable live from Settings → LLM without restart
+- **60s cache** with instant invalidation on save
+- **Provider support** — Azure AI Foundry (gpt-5.2, gpt-5.1-codex, gpt-5.1-mini), Azure OpenAI (gpt-5-mini), MiniMax M2.5
+
+### Darwin LLM Thompson Sampling
+- **Model-level A/B testing** — same team (agent + pattern) competes across different LLM models; the best model for each context wins automatically
+- **Beta distribution sampling** — `Beta(wins+1, losses+1)` per `(agent_id, pattern_id, technology, phase_type, llm_model)` — fine-grained, no cross-context bleed
+- **Warmup phase** — random exploration for first 5 runs, then Thompson Sampling takes over
+- **Fitness tables** — dedicated `team_llm_fitness` and `team_llm_ab_tests` tables, separate from agent team selection
+- **Teams → LLM A/B tab** — live leaderboard per model and A/B test history at `/teams`
+- **Priority chain** — Darwin LLM → DB routing config → hardcoded defaults (graceful degradation)
+
+### Settings — LLM Tab
+- **Providers grid** — shows all configured providers with enabled/disabled status and missing-key hints
+- **Routing matrix** — configure heavy/light model per category (Reasoning, Production/Code, Tasks, Redaction) with dropdowns
+- **Darwin LLM A/B section** — live view of ongoing model experiments from the Settings page
+- **Save & invalidate** — one-click save pushes config to DB and flushes the executor cache
+
 ## Contributing
 
 We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.

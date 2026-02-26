@@ -850,6 +850,22 @@ Cada proyecto obtiene automaticamente 4 misiones operativas:
 - **Badge de calidad** — circulo de puntuacion coloreado para cabeceras de proyecto (`/api/dashboard/quality-badge`)
 - **Scorecard de mision** — metricas de calidad en la barra lateral de detalle de mision (`/api/dashboard/quality-mission`)
 
+### Enrutamiento LLM Multi-Modelo
+- **3 modelos especializados** — `gpt-5.2` para razonamiento pesado, `gpt-5.1-codex` para código/tests, `gpt-5-mini` para tareas ligeras
+- **Enrutamiento por rol** — los agentes reciben automáticamente el modelo correcto según sus etiquetas (`reasoner`, `architect`, `developer`, `tester`, `doc_writer`…)
+- **Configurable en vivo** — matriz de enrutamiento editable desde Configuración → LLM sin reinicio
+
+### Darwin LLM — Thompson Sampling en Modelos
+- **A/B testing de modelos** — el mismo equipo (agente + patrón) compite con diferentes LLMs; el mejor modelo gana automáticamente por contexto
+- **Distribución Beta** — `Beta(wins+1, losses+1)` por `(agent_id, pattern_id, technology, phase_type, llm_model)`
+- **Pestaña LLM A/B** en `/teams` — clasificación de fitness por modelo e historial de tests
+- **Cadena de prioridad** — Darwin LLM → config BD → valores por defecto (degradación gracieuse)
+
+### Configuración — Pestaña LLM
+- **Cuadrícula de proveedores** — estado activo/inactivo con pistas sobre claves API faltantes
+- **Matriz de enrutamiento** — pesado/ligero por categoría (Razonamiento, Producción/Código, Tareas, Redacción)
+- **Sección Darwin LLM A/B** — vista en vivo de experimentos de modelos en curso
+
 ## Contribuir
 
 Las contribuciones son bienvenidas! Por favor lee [CONTRIBUTING.md](CONTRIBUTING.md) para las directrices.

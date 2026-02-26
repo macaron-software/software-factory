@@ -722,6 +722,22 @@ Chaque projet reçoit automatiquement 4 missions opérationnelles :
 - **Badge qualité** — cercle coloré dans les en-têtes projet (`/api/dashboard/quality-badge`)
 - **Scorecard mission** — métriques qualité dans la sidebar mission (`/api/dashboard/quality-mission`)
 
+### Routage LLM Multi-Modèle
+- **3 modèles spécialisés** — `gpt-5.2` pour la réflexion lourde, `gpt-5.1-codex` pour le code/tests, `gpt-5-mini` pour les tâches légères
+- **Routage par rôle** — les agents reçoivent automatiquement le bon modèle selon leurs tags (`reasoner`, `architect`, `developer`, `tester`, `doc_writer`…)
+- **Configurable en live** — matrice de routage éditable depuis Paramètres → LLM sans redémarrage
+
+### Darwin LLM — Thompson Sampling sur les Modèles
+- **A/B testing de modèles** — même équipe (agent + pattern), différents LLM ; le meilleur modèle s'impose automatiquement par contexte
+- **Beta distribution** — `Beta(wins+1, losses+1)` par `(agent_id, pattern_id, technology, phase_type, llm_model)`
+- **Onglet LLM A/B** sur `/teams` — classement fitness par modèle et historique des tests
+- **Chaîne de priorité** — Darwin LLM → config DB → défauts (dégradation gracieuse)
+
+### Paramètres — Onglet LLM
+- **Grille providers** — statut actif/inactif avec indices de clé manquante
+- **Matrice de routage** — lourd/léger par catégorie (Raisonnement, Production/Code, Tâches, Rédaction)
+- **Section Darwin LLM A/B** — vue live des expériences de modèles en cours
+
 ## Configuration Projet
 
 Les projets sont definis dans `projects/*.yaml` :
