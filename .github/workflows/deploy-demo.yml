@@ -47,7 +47,8 @@ jobs:
             --exclude='node_modules' \
             --exclude='backups/' \
             -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes" \
-            . debian@${{ secrets.OVH_IP }}:/opt/software-factory/
+            . debian@${{ secrets.OVH_IP }}:/opt/software-factory/ || \
+          { RC=$?; [ $RC -eq 23 ] && echo "Rsync partial transfer (code 23) - non-fatal" || exit $RC; }
 
       - name: Restart Docker container
         run: |
