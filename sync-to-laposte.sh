@@ -121,7 +121,7 @@ if ! $DRY_RUN; then
 
 $EXTRA"
         fi
-        git commit -m "sync(laposte): $COMMIT_MSG"
+        git commit -m "$COMMIT_MSG"
         echo "-> Push vers GitLab La Poste..."
         git push origin main || git push origin HEAD:main
         echo "-> Sync terminé"
