@@ -169,18 +169,18 @@
 
 <script>
 /* ── Agent data from server ── */
-const MKT_AGENTS = {{ agents | tojson }};
-const MKT_COLORS = {};
-const MKT_ROLES = {};
+var MKT_AGENTS = {{ agents | tojson }};
+var MKT_COLORS = {};
+var MKT_ROLES = {};
 MKT_AGENTS.forEach(a => { MKT_COLORS[a.id] = a.color; MKT_ROLES[a.id] = a.short_role; });
 
-let mktSessionId = null;
-let mktOriginalPrompt = '';
-let mktCurrentPlan = null;
-let mktGraphBuilt = false;
+var mktSessionId = null;
+var mktOriginalPrompt = '';
+var mktCurrentPlan = null;
+var mktGraphBuilt = false;
 
 /* ── md renderer (reuse window.md if available) ── */
-const mktMd = typeof window.md === 'function' ? window.md : (s => s.replace(/\n/g,'<br>'));
+var mktMd = typeof window.md === 'function' ? window.md : (s => s.replace(/\n/g,'<br>'));
 
 /* ── Section toggle ── */
 function mktToggleSection(id) {
@@ -212,7 +212,7 @@ document.getElementById('mktInput').addEventListener('input', function() {
 });
 
 /* ── Add message bubble ── */
-let mktMsgCounter = 0;
+var mktMsgCounter = 0;
 function mktAddMsg(type, agentId, agentName, content, color, avatarUrl) {
   const placeholder = document.getElementById('mktPlaceholder');
   if (placeholder) placeholder.remove();
@@ -261,9 +261,9 @@ function mktSetAgentStatus(agentId, status) {
 }
 
 /* ── Graph rendering (same ig-node card system as ideation) ── */
-const MIG_NW = 130, MIG_NH = 56;
+var MIG_NW = 130, MIG_NH = 56;
 // Layout: CMO top-center, 5 experts below in arc
-const migNodes = [
+var migNodes = [
   {id: 'mkt-cmo',      x: 130, y: 10,  rank: 0},
   {id: 'mkt-trend',    x: 10,  y: 110, rank: 1},
   {id: 'mkt-bench',    x: 90,  y: 200, rank: 1},
@@ -271,7 +271,7 @@ const migNodes = [
   {id: 'mkt-growth',   x: 260, y: 200, rank: 1},
   {id: 'mkt-insights', x: 350, y: 110, rank: 1},
 ];
-const migEdges = [
+var migEdges = [
   {from:'mkt-cmo',      to:'mkt-trend',    pattern:'hierarchical', label:'brief'},
   {from:'mkt-cmo',      to:'mkt-bench',    pattern:'hierarchical', label:'brief'},
   {from:'mkt-cmo',      to:'mkt-brand',    pattern:'hierarchical', label:'brief'},
@@ -283,7 +283,7 @@ const migEdges = [
   {from:'mkt-trend',    to:'mkt-cmo',      pattern:'report',       label:'synthèse'},
   {from:'mkt-growth',   to:'mkt-cmo',      pattern:'report',       label:'KPIs'},
 ];
-const MIG_PATTERNS = {
+var MIG_PATTERNS = {
   network:      {color:'#8b5cf6', dash:'2 4 8 4', label:'Network'},
   hierarchical: {color:'#f59e0b', dash:'',         label:'Hierarchical'},
   report:       {color:'#ef4444', dash:'3 3',       label:'Report'},
@@ -424,7 +424,7 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') mktClosePopover()
 function mktSvg(path, sz) {
   return `<svg width="${sz||13}" height="${sz||13}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-2px;flex-shrink:0">${path}</svg>`;
 }
-const _I = {
+var _I = {
   'zap':          '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
   'trending-up':  '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
   'alert-triangle':'<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
@@ -449,7 +449,7 @@ const _I = {
 };
 
 /* ── Finding types config ── */
-const MKT_FINDING_TYPES = {
+var MKT_FINDING_TYPES = {
   opportunity: { icon: mktSvg(_I['trending-up'], 12), label: 'Opportunité' },
   threat:      { icon: mktSvg(_I['alert-triangle'], 12), label: 'Menace' },
   trend:       { icon: mktSvg(_I['bar-chart-2'], 12), label: 'Tendance' },
@@ -516,9 +516,9 @@ function mktExtractFindings(agentId, content) {
 }
 
 /* ── SSE connection ── */
-let mktESActive = null;
-let mktStreamBuffers = {};
-let mktStreamBubbles = {};
+var mktESActive = null;
+var mktStreamBuffers = {};
+var mktStreamBubbles = {};
 
 function mktConnectSSE(sessionId) {
   if (mktESActive) { try { mktESActive.close(); } catch(e){} mktESActive = null; }
