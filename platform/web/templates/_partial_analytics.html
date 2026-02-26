@@ -123,6 +123,10 @@
             display: flex; align-items: center; justify-content: center;
             font-size: 1.1rem; font-weight: 700; color: #fff; flex-shrink: 0;
             border: 2px solid rgba(255,255,255,0.12);
+            overflow: hidden;
+        }
+        .agent-avatar img {
+            width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
         }
         .agent-card-name { font-size: 0.78rem; font-weight: 600; color: var(--text-primary); line-height: 1.2; }
         .agent-card-role { font-size: 0.68rem; color: var(--text-secondary); line-height: 1.3; }
@@ -421,12 +425,17 @@ function renderCharts(data) {
         const maxCalls = Math.max(...agents.map(a => a.skills_used || 0), 1);
         container.innerHTML = agents.map(a => {
             const color = a.color || '#8b5cf6';
-            const initials = (a.name || a.id || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+            const initials = (a.avatar && !a.avatar.startsWith('http'))
+                ? a.avatar.slice(0, 2).toUpperCase()
+                : (a.name || a.id || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+            const avatarHtml = (a.avatar && a.avatar.startsWith('http'))
+                ? `<img src="${a.avatar}" alt="${a.name}" loading="lazy" onerror="this.parentElement.innerHTML='${initials}'">`
+                : initials;
             const calls = a.skills_used || 0;
             const roleLabel = a.role ? a.role.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
             const pct = Math.round((calls / maxCalls) * 100);
             return `<div class="agent-card" title="${a.name} — ${calls} tool calls">
-                <div class="agent-avatar" style="background: ${color}33; border-color: ${color}66; color: ${color};">${initials}</div>
+                <div class="agent-avatar" style="background: ${color}33; border-color: ${color}66; color: ${color};">${avatarHtml}</div>
                 <div class="agent-card-name">${a.name || a.id}</div>
                 <div class="agent-card-role">${roleLabel}</div>
                 <div class="agent-card-stat">
