@@ -37,22 +37,75 @@ skills:
   - api-design
 
 tools:
+  # Code
   - code_read
   - code_search
+  - code_edit
+  - code_write
+  - list_files
+  # Git
+  - git
+  - git_commit
+  - git_diff
+  - git_log
+  - git_status
+  - github_code_search
+  - github_issues
+  - github_prs
+  # Web / search
+  - web_search
+  - web_fetch
   - deep_search
+  - browser_screenshot
+  # Memory
   - memory_search
+  - memory_store
+  - platform_memory_search
+  # Platform
   - platform_agents
   - platform_missions
   - platform_metrics
   - platform_sessions
   - platform_workflows
-  - platform_memory_search
-  - web_search
-  - web_fetch
   - create_project
   - create_mission
   - create_feature
   - create_story
+  # Build / deploy / infra
+  - build
+  - lint
+  - test
+  - deploy
+  - docker_build
+  - run_command
+  - infra_check
+  # Security
+  - sec_deps
+  - sec_sast
+  - sec_secrets
+  # Quality / analysis
+  - chaos_test
+  - playwright_test
+  - screenshot
+  # Project context
+  - get_project_context
+  - get_phase_status
+  - list_phases
+  - run_phase
+  - lrm_context
+  - lrm_conventions
+  - lrm_locate
+  - lrm_summarize
+  # Jira / Confluence
+  - jira_search
+  - confluence_read
+  - request_validation
+
+mcps:
+  - mcp-fetch
+  - mcp-memory
+  - mcp-playwright
+  - mcp-github
 
 llm:
   model: gpt-5.2
