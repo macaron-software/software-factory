@@ -34,7 +34,9 @@ CREATE TABLE IF NOT EXISTS projects (
     active_pattern_id TEXT DEFAULT '',
     status TEXT DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    git_url TEXT DEFAULT '',
+    container_url TEXT DEFAULT ''
 );
 
 -- ============================================================================
@@ -165,7 +167,8 @@ CREATE TABLE IF NOT EXISTS missions (
     time_criticality REAL DEFAULT 0,
     risk_reduction REAL DEFAULT 0,
     job_duration REAL DEFAULT 1,
-    kanban_status TEXT DEFAULT 'funnel'
+    kanban_status TEXT DEFAULT 'funnel',
+    jira_key TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_missions_project ON missions(project_id);
 CREATE INDEX IF NOT EXISTS idx_missions_status ON missions(status);
@@ -218,7 +221,9 @@ CREATE TABLE IF NOT EXISTS features (
     status TEXT DEFAULT 'backlog',
     story_points INTEGER DEFAULT 0,
     assigned_to TEXT DEFAULT '',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TEXT,
+    jira_key TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_features_epic ON features(epic_id);
 
@@ -244,7 +249,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     goal TEXT DEFAULT '',
     config_json TEXT DEFAULT '{}',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    completed_at TIMESTAMP
+    completed_at TIMESTAMP,
+    mission_id TEXT DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
 CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id);
@@ -506,7 +512,8 @@ CREATE TABLE IF NOT EXISTS mission_runs (
     brief TEXT DEFAULT '',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    completed_at TEXT
+    completed_at TEXT,
+    parent_mission_id TEXT DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_mission_runs_project ON mission_runs(project_id);
 CREATE INDEX IF NOT EXISTS idx_mission_runs_status ON mission_runs(status);
