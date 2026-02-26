@@ -731,6 +731,41 @@ ATLASSIAN_TOKEN=your-token
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
+## Inteligencia Adaptativa — AG · AR · Thompson Sampling · OKR
+
+La plataforma se auto-optimiza mediante tres motores de IA complementarios.
+
+### Thompson Sampling — Selección Probabilística de Equipos
+- `Beta(wins+1, losses+1)` por contexto `(agent_id, pattern_id, technology, phase_type)`
+- Puntuación de aptitud detallada — score separado por contexto, sin contaminación entre contextos
+- Fallback de arranque en frío mediante cadena de prefijos tech (`angular_19` → `angular_*` → `generic`)
+- Retiro suave: `weight_multiplier=0.1` para equipos débiles, recuperable
+- Ejecuciones A/B shadow automáticas; evaluador neutral elige al ganador
+- **Darwin LLM**: extiende Thompson Sampling a la selección de modelo LLM por contexto
+
+### Algoritmo Genético — Evolución de Flujos de Trabajo
+- Genoma = lista ordenada de PhaseSpec (pattern, agents, gate)
+- Población: 40 genomas, máx. 30 generaciones, elitismo=2, tasa de mutación=15%, torneo k=3
+- Aptitud: tasa de éxito de fase × aptitud del agente × (1 − tasa de veto) × bono de lead time
+- Las 3 mejores propuestas se guardan en `evolution_proposals` para revisión humana antes de aplicar
+- Disparador manual: `POST /api/evolution/run/{wf_id}` — ver en Workflows → pestaña Evolution
+- Programador nocturno; omitido si < 5 misiones
+
+### Aprendizaje por Refuerzo — Adaptación de Patrones mid-Misión
+- Política Q-learning (`platform/agents/rl_policy.py`)
+- Acciones: keep, switch_parallel, switch_sequential, switch_hierarchical, switch_debate, add_agent, remove_agent
+- Estado: `(wf_id, phase_position, rejection_pct, quality_score)` en buckets
+- Actualización Q: α=0.1, γ=0.9, ε=0.1 — batch offline sobre tabla `rl_experience`
+- Se activa solo con confianza ≥ 70% y ≥ 3 visitas al estado; degradación gradual
+
+### Sistema OKR / KPI
+- 8 semillas por defecto: code/migration, security/audit, architecture/design, testing, docs
+- El cumplimiento de OKR alimenta directamente la aptitud del AG y la señal de recompensa del AR
+- Edición inline en `/teams` con estado verde/ámbar/rojo
+- Anulaciones de OKR por proyecto desde Configuración
+
+---
+
 ## Novedades en v2.1.0 (feb 2026)
 
 ### Metricas de calidad — Monitorizacion industrial

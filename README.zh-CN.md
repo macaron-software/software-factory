@@ -731,6 +731,41 @@ ATLASSIAN_TOKEN=your-token
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
+## 自适应智能 — GA · RL · Thompson采样 · OKR
+
+平台通过三个互补的 AI 引擎实现自我优化。
+
+### Thompson采样 — 概率化团队选择
+- 每个上下文 `(agent_id, pattern_id, technology, phase_type)` 维护 `Beta(wins+1, losses+1)` 分布
+- 细粒度适应度评分 — 每个上下文独立评分，无跨上下文污染
+- 冷启动回退：通过技术前缀链（`angular_19` → `angular_*` → `generic`）逐级降级
+- 软淘汰：弱团队设 `weight_multiplier=0.1`，可恢复
+- 自动 A/B 影子运行；中立评估器决定胜者
+- **Darwin LLM**：将 Thompson采样扩展至每个上下文的 LLM 模型选择
+
+### 遗传算法 — 工作流演化
+- 基因组 = PhaseSpec（pattern, agents, gate）的有序列表
+- 种群：40 个基因组，最多 30 代，精英保留=2，突变率=15%，锦标赛 k=3
+- 适应度：阶段成功率 × 智能体适应度 × (1 − 否决率) × 交付周期奖励
+- Top-3 提案保存至 `evolution_proposals`，供人工审核后再应用
+- 手动触发：`POST /api/evolution/run/{wf_id}` — 在 Workflows → Evolution 标签页查看
+- 夜间调度器；不足 5 个任务时跳过
+
+### 强化学习 — 任务中途模式自适应
+- Q-learning 策略（`platform/agents/rl_policy.py`）
+- 动作：keep、switch_parallel、switch_sequential、switch_hierarchical、switch_debate、add_agent、remove_agent
+- 状态：`(wf_id, phase_position, rejection_pct, quality_score)` 分桶表示
+- Q 更新：α=0.1，γ=0.9，ε=0.1 — 在 `rl_experience` 表上离线批量训练
+- 仅在置信度 ≥ 70% 且状态访问次数 ≥ 3 时触发；支持优雅降级
+
+### OKR / KPI 系统
+- 8 个默认种子：code/migration、security/audit、architecture/design、testing、docs
+- OKR 完成率直接作为 GA 适应度和 RL 奖励信号的输入
+- 在 `/teams` 页面内联编辑，显示绿色/琥珀色/红色状态
+- 可通过设置为每个项目配置 OKR 覆盖项
+
+---
+
 ## v2.1.0 新特性（2026 年 2 月）
 
 ### 质量指标 — 工业化监控

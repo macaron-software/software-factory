@@ -926,8 +926,11 @@ async def metier_page(request: Request):
     def _s(val):
         return val.value if hasattr(val, "value") else str(val) if val else "pending"
 
-    # ── Epics Pipeline (missions as value items) ──
+    # ── Epics Pipeline (missions as value items) — separated by Value Stream ──
     epics = []
+    tma_missions: list[dict] = []
+    security_missions: list[dict] = []
+    rse_missions: list[dict] = []
     for m in all_missions:
         phases_total = len(m.phases) if m.phases else 0
         phases_done = sum(
@@ -975,33 +978,45 @@ async def metier_page(request: Request):
                 end = end.replace(tzinfo=None)
             lead_time_h = round((end - start).total_seconds() / 3600, 1)
 
-        epics.append(
-            {
-                "id": m.id,
-                "name": m.workflow_name or m.workflow_id or "Mission",
-                "brief": (m.brief or "")[:120],
-                "status": _s(m.status),
-                "current_phase": m.current_phase or "",
-                "progress": progress,
-                "phases_done": phases_done,
-                "phases_total": phases_total,
-                "phases_running": phases_running,
-                "phase_nodes": phase_nodes,
-                "lead_time_h": lead_time_h,
-                "session_id": m.session_id or "",
-            }
-        )
+        _TMA_WF = {"tma-maintenance", "tma-autoheal", "dsi-platform-tma"}
+        _SEC_WF = {"security-hacking"}
+        _RSE_WF = {"rse-compliance"}
+        wf_id = m.workflow_id or ""
+        entry = {
+            "id": m.id,
+            "name": m.workflow_name or m.workflow_id or "Mission",
+            "brief": (m.brief or "")[:120],
+            "status": _s(m.status),
+            "current_phase": m.current_phase or "",
+            "progress": progress,
+            "phases_done": phases_done,
+            "phases_total": phases_total,
+            "phases_running": phases_running,
+            "phase_nodes": phase_nodes,
+            "lead_time_h": lead_time_h,
+            "session_id": m.session_id or "",
+            "workflow_id": wf_id,
+        }
+        if wf_id in _TMA_WF:
+            tma_missions.append(entry)
+        elif wf_id in _SEC_WF:
+            security_missions.append(entry)
+        elif wf_id in _RSE_WF:
+            rse_missions.append(entry)
+        else:
+            epics.append(entry)
 
     # ── Flow Metrics (LEAN) ──
-    wip = sum(1 for e in epics if e["status"] == "running")
-    completed = sum(1 for e in epics if e["status"] in ("completed", "done"))
-    failed = sum(1 for e in epics if e["status"] == "failed")
-    total = len(epics)
+    all_vs = epics + tma_missions + security_missions + rse_missions
+    wip = sum(1 for e in all_vs if e["status"] == "running")
+    completed = sum(1 for e in all_vs if e["status"] in ("completed", "done"))
+    failed = sum(1 for e in all_vs if e["status"] == "failed")
+    total = len(all_vs)
     throughput_pct = int(completed / total * 100) if total else 0
 
     lead_times = [
         e["lead_time_h"]
-        for e in epics
+        for e in all_vs
         if e["lead_time_h"] is not None and e["status"] in ("completed", "done")
     ]
     avg_lead_time = round(sum(lead_times) / len(lead_times), 1) if lead_times else 0
@@ -1088,6 +1103,9 @@ async def metier_page(request: Request):
             "request": request,
             "page_title": "Vue Métier",
             "epics": epics,
+            "tma_missions": tma_missions,
+            "security_missions": security_missions,
+            "rse_missions": rse_missions,
             "wip": wip,
             "completed": completed,
             "failed": failed,

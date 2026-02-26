@@ -731,6 +731,41 @@ ATLASSIAN_TOKEN=your-token
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
+## Adaptive Intelligenz — GA · RL · Thompson Sampling · OKR
+
+Die Plattform optimiert sich selbst durch drei komplementäre KI-Engines.
+
+### Thompson Sampling — Probabilistische Teamauswahl
+- `Beta(wins+1, losses+1)` pro `(agent_id, pattern_id, technology, phase_type)` Kontext
+- Feingranulares Fitness-Scoring — separater Score pro Kontext, kein kontextübergreifendes Bleeding
+- Cold-Start-Fallback über Tech-Präfixkette (`angular_19` → `angular_*` → `generic`)
+- Sanfte Ausmusterung: `weight_multiplier=0.1` für schwache Teams, reversibel
+- Automatische A/B-Shadow-Runs; neutraler Evaluator wählt den Gewinner
+- **Darwin LLM**: erweitert Thompson Sampling auf die LLM-Modellauswahl pro Kontext
+
+### Genetischer Algorithmus — Workflow-Evolution
+- Genom = geordnete Liste von PhaseSpec (pattern, agents, gate)
+- Population: 40 Genome, max. 30 Generationen, Elitismus=2, Mutationsrate=15%, Turnier k=3
+- Fitness: Phasenerfolgsrate × Agenten-Fitness × (1 − Veto-Rate) × Lead-Time-Bonus
+- Top-3-Vorschläge werden in `evolution_proposals` zur menschlichen Prüfung gespeichert
+- Manueller Auslöser: `POST /api/evolution/run/{wf_id}` — Ansicht unter Workflows → Evolution
+- Nächtlicher Scheduler; übersprungen bei < 5 Missionen
+
+### Reinforcement Learning — Muster-Anpassung mid-Mission
+- Q-Learning-Policy (`platform/agents/rl_policy.py`)
+- Aktionen: keep, switch_parallel, switch_sequential, switch_hierarchical, switch_debate, add_agent, remove_agent
+- Zustand: `(wf_id, phase_position, rejection_pct, quality_score)` gebucktet
+- Q-Update: α=0.1, γ=0.9, ε=0.1 — Offline-Batch auf Tabelle `rl_experience`
+- Aktiviert nur bei Konfidenz ≥ 70% mit ≥ 3 Zustandsbesuchen; graceful degradation
+
+### OKR / KPI-System
+- 8 Standard-Seeds: code/migration, security/audit, architecture/design, testing, docs
+- OKR-Erfüllung fließt direkt in GA-Fitness und RL-Reward-Signal ein
+- Inline-Bearbeitung unter `/teams` mit grün/gelb/rot-Status
+- Projektspezifische OKR-Überschreibungen über Einstellungen
+
+---
+
 ## Neuheiten in v2.1.0 (Feb 2026)
 
 ### Qualitaetsmetriken — Industrielles Monitoring

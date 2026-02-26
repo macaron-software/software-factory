@@ -731,6 +731,41 @@ ATLASSIAN_TOKEN=your-token
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
+## 적응형 인텔리전스 — GA · RL · Thompson 샘플링 · OKR
+
+플랫폼은 세 가지 보완적인 AI 엔진을 통해 자가 최적화됩니다.
+
+### Thompson 샘플링 — 확률적 팀 선택
+- 컨텍스트 `(agent_id, pattern_id, technology, phase_type)`별 `Beta(wins+1, losses+1)` 유지
+- 세밀한 적합도 점수 — 컨텍스트별 독립 점수, 교차 컨텍스트 오염 없음
+- 콜드 스타트 폴백: 기술 접두사 체인(`angular_19` → `angular_*` → `generic`) 순차 적용
+- 소프트 퇴역: 약한 팀에 `weight_multiplier=0.1` 적용, 회복 가능
+- 자동 A/B 섀도우 실행; 중립 평가자가 승자 결정
+- **Darwin LLM**: Thompson 샘플링을 컨텍스트별 LLM 모델 선택으로 확장
+
+### 유전 알고리즘 — 워크플로우 진화
+- 게놈 = PhaseSpec(pattern, agents, gate)의 순서 있는 목록
+- 개체군: 40개 게놈, 최대 30세대, 엘리트=2, 변이율=15%, 토너먼트 k=3
+- 적합도: 페이즈 성공률 × 에이전트 적합도 × (1 − 거부율) × 리드 타임 보너스
+- 상위 3개 제안을 `evolution_proposals`에 저장, 적용 전 인간 검토
+- 수동 트리거: `POST /api/evolution/run/{wf_id}` — Workflows → Evolution 탭에서 확인
+- 야간 스케줄러; 5개 미만의 미션은 건너뜀
+
+### 강화 학습 — 미션 중 패턴 적응
+- Q-러닝 정책 (`platform/agents/rl_policy.py`)
+- 액션: keep, switch_parallel, switch_sequential, switch_hierarchical, switch_debate, add_agent, remove_agent
+- 상태: `(wf_id, phase_position, rejection_pct, quality_score)` 버킷화
+- Q 업데이트: α=0.1, γ=0.9, ε=0.1 — `rl_experience` 테이블에서 오프라인 배치 처리
+- 신뢰도 ≥ 70% 및 상태 방문 ≥ 3회일 때만 발동; 점진적 성능 저하 지원
+
+### OKR / KPI 시스템
+- 8개 기본 시드: code/migration, security/audit, architecture/design, testing, docs
+- OKR 달성도가 GA 적합도와 RL 보상 신호에 직접 반영
+- `/teams`에서 인라인 편집, 녹색/황색/빨간색 상태 표시
+- 설정에서 프로젝트별 OKR 재정의 가능
+
+---
+
 ## v2.1.0의 새로운 기능 (2026년 2월)
 
 ### 품질 메트릭 — 산업적 모니터링

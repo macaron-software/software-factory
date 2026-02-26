@@ -731,6 +731,41 @@ ATLASSIAN_TOKEN=your-token
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
+## Inteligência Adaptativa — AG · AR · Thompson Sampling · OKR
+
+A plataforma se auto-otimiza por meio de três motores de IA complementares.
+
+### Thompson Sampling — Seleção Probabilística de Equipes
+- `Beta(wins+1, losses+1)` por contexto `(agent_id, pattern_id, technology, phase_type)`
+- Pontuação de aptidão granular — score separado por contexto, sem contaminação entre contextos
+- Fallback de arranque a frio via cadeia de prefixos tech (`angular_19` → `angular_*` → `generic`)
+- Aposentadoria suave: `weight_multiplier=0.1` para equipes fracas, recuperável
+- Execuções A/B shadow automáticas; avaliador neutro escolhe o vencedor
+- **Darwin LLM**: estende Thompson Sampling à seleção de modelo LLM por contexto
+
+### Algoritmo Genético — Evolução de Fluxos de Trabalho
+- Genoma = lista ordenada de PhaseSpec (pattern, agents, gate)
+- População: 40 genomas, máx. 30 gerações, elitismo=2, taxa de mutação=15%, torneio k=3
+- Aptidão: taxa de sucesso de fase × aptidão do agente × (1 − taxa de veto) × bônus de lead time
+- As 3 melhores propostas são salvas em `evolution_proposals` para revisão humana antes de aplicar
+- Gatilho manual: `POST /api/evolution/run/{wf_id}` — ver em Workflows → aba Evolution
+- Agendador noturno; ignorado se < 5 missões
+
+### Aprendizado por Reforço — Adaptação de Padrões mid-Missão
+- Política Q-learning (`platform/agents/rl_policy.py`)
+- Ações: keep, switch_parallel, switch_sequential, switch_hierarchical, switch_debate, add_agent, remove_agent
+- Estado: `(wf_id, phase_position, rejection_pct, quality_score)` em buckets
+- Atualização Q: α=0.1, γ=0.9, ε=0.1 — batch offline na tabela `rl_experience`
+- Ativado apenas com confiança ≥ 70% e ≥ 3 visitas ao estado; degradação graciosa
+
+### Sistema OKR / KPI
+- 8 sementes padrão: code/migration, security/audit, architecture/design, testing, docs
+- O cumprimento de OKR alimenta diretamente a aptidão do AG e o sinal de recompensa do AR
+- Edição inline em `/teams` com status verde/âmbar/vermelho
+- Substituições de OKR por projeto via Configurações
+
+---
+
 ## Novidades na v2.1.0 (Fev 2026)
 
 ### Métricas de Qualidade — Monitoramento Industrial

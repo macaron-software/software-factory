@@ -731,6 +731,41 @@ ATLASSIAN_TOKEN=your-token
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
+## 適応型インテリジェンス — GA · RL · Thompsonサンプリング · OKR
+
+プラットフォームは3つの補完的なAIエンジンによって自己最適化します。
+
+### Thompsonサンプリング — 確率的チーム選択
+- コンテキスト `(agent_id, pattern_id, technology, phase_type)` ごとに `Beta(wins+1, losses+1)` を保持
+- 細粒度の適合度スコア — コンテキストごとに独立したスコア、クロスコンテキスト汚染なし
+- コールドスタートフォールバック：技術プレフィックスチェーン（`angular_19` → `angular_*` → `generic`）
+- ソフトリタイア：弱いチームに `weight_multiplier=0.1` を設定、回復可能
+- 自動A/Bシャドウ実行；中立エバリュエーターが勝者を決定
+- **Darwin LLM**：Thompsonサンプリングをコンテキストごとのモデル選択に拡張
+
+### 遺伝的アルゴリズム — ワークフロー進化
+- ゲノム = PhaseSpec（pattern, agents, gate）の順序付きリスト
+- 個体群：40ゲノム、最大30世代、エリート保存=2、突然変異率=15%、トーナメント k=3
+- 適合度：フェーズ成功率 × エージェント適合度 × (1 − 拒否率) × リードタイムボーナス
+- 上位3提案を `evolution_proposals` に保存して人間のレビュー後に適用
+- 手動トリガー：`POST /api/evolution/run/{wf_id}` — Workflows → Evolutionタブで確認
+- 夜間スケジューラー；5ミッション未満の場合はスキップ
+
+### 強化学習 — ミッション中のパターン適応
+- Q学習ポリシー（`platform/agents/rl_policy.py`）
+- アクション：keep、switch_parallel、switch_sequential、switch_hierarchical、switch_debate、add_agent、remove_agent
+- 状態：`(wf_id, phase_position, rejection_pct, quality_score)` をバケット化
+- Qアップデート：α=0.1、γ=0.9、ε=0.1 — `rl_experience` テーブルでオフラインバッチ処理
+- 信頼度 ≥ 70% かつ状態訪問 ≥ 3 回のときのみ発動；グレースフルデグラデーション対応
+
+### OKR / KPIシステム
+- 8つのデフォルトシード：code/migration、security/audit、architecture/design、testing、docs
+- OKR達成度はGA適合度とRL報酬シグナルに直接フィードバック
+- `/teams` でインライン編集、緑/黄/赤のステータス表示
+- 設定からプロジェクトごとのOKR上書き設定が可能
+
+---
+
 ## v2.1.0 の新機能 (2026年2月)
 
 ### 品質メトリクス — 産業レベルモニタリング

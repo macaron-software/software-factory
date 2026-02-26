@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+{% endblock %}
+
+{% block content %}
+<style>
+/* ── Tabs ── */
+.rbac-tabs{display:flex;gap:0;margin-bottom:0;border-bottom:1px solid var(--border)}
+.rbac-tab{display:flex;align-items:center;gap:0.4rem;padding:0.6rem 1.1rem;font-size:0.82rem;font-weight:500;color:var(--text-secondary);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit;transition:color .15s}
+.rbac-tab svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.rbac-tab.active{color:var(--purple);border-bottom-color:var(--purple)}
+.rbac-tab:hover:not(.active){color:var(--text-primary)}
+.rbac-panel{display:none;padding-top:1.2rem}.rbac-panel.active{display:block}
+
+/* ── Invite bar ── */
+.invite-bar{display:flex;gap:0.5rem;margin-bottom:1.2rem;padding:0.9rem 1rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;align-items:center}
+.invite-bar input{flex:1;padding:0.45rem 0.7rem;font-size:0.82rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:inherit;outline:none;min-width:0}
+.invite-bar input:focus{border-color:var(--purple)}
+.invite-bar select{padding:0.45rem 0.6rem;font-size:0.82rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:inherit;outline:none;cursor:pointer}
+.invite-bar select:focus{border-color:var(--purple)}
+.invite-label{font-size:0.78rem;font-weight:600;color:var(--text-secondary);white-space:nowrap;text-transform:uppercase;letter-spacing:.3px}
+
+/* ── Members table ── */
+.members-table{width:100%;border-collapse:collapse;font-size:0.82rem}
+.members-table th{text-align:left;padding:0.5rem 0.8rem;color:var(--text-secondary);font-weight:600;font-size:0.72rem;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)}
+.members-table td{padding:0.65rem 0.8rem;border-bottom:1px solid var(--border);vertical-align:middle}
+.members-table tr:last-child td{border-bottom:none}
+.members-table tr:hover td{background:rgba(168,85,247,.03)}
+
+/* ── Avatar ── */
+.member-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:#fff;flex-shrink:0;text-transform:uppercase}
+.member-info{display:flex;align-items:center;gap:0.6rem}
+.member-name{font-weight:600;font-size:0.83rem;color:var(--text-primary)}
+.member-email{font-size:0.73rem;color:var(--text-secondary)}
+
+/* ── Inline role select ── */
+.role-select{padding:0.2rem 0.5rem;font-size:0.75rem;font-weight:600;border-radius:10px;border:1px solid transparent;background:transparent;cursor:pointer;font-family:inherit;outline:none;-webkit-appearance:none;appearance:none;text-align:center}
+.role-select.rb-admin{background:rgba(239,68,68,.12);color:#ef4444;border-color:rgba(239,68,68,.2)}
+.role-select.rb-project_manager{background:rgba(168,85,247,.12);color:#a855f7;border-color:rgba(168,85,247,.2)}
+.role-select.rb-developer{background:rgba(59,130,246,.12);color:#3b82f6;border-color:rgba(59,130,246,.2)}
+.role-select.rb-viewer{background:rgba(107,114,128,.12);color:#6b7280;border-color:rgba(107,114,128,.2)}
+.role-select:focus{border-color:var(--purple)}
+
+/* ── Status ── */
+.status-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:0.35rem;flex-shrink:0}
+.dot-active{background:#22c55e}.dot-inactive{background:#6b7280}
+.status-cell{display:flex;align-items:center;font-size:0.75rem;color:var(--text-secondary)}
+
+/* ── Icon button ── */
+.icon-btn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:none;cursor:pointer;color:var(--text-secondary);transition:all .15s;flex-shrink:0}
+.icon-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.icon-btn:hover{border-color:var(--purple);color:var(--purple)}
+.icon-btn.danger:hover{border-color:#ef4444;color:#ef4444}
+.row-actions{display:flex;gap:0.3rem}
+
+/* ── Matrix ── */
+.matrix-wrap{overflow-x:auto;margin-top:0.5rem}
+.matrix{border-collapse:collapse;font-size:0.75rem;width:100%}
+.matrix th{padding:0.45rem 0.7rem;text-align:center;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.3px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary)}
+.matrix th.row-header{text-align:left;min-width:150px;position:sticky;left:0;background:var(--bg-secondary);z-index:1}
+.matrix td{padding:0.35rem 0.5rem;text-align:center;border:1px solid var(--border)}
+.matrix tr:hover td{background:rgba(168,85,247,.03)}
+.perm{display:inline-block;padding:0.1rem 0.35rem;border-radius:4px;font-size:0.67rem;font-weight:600;margin:1px}
+.p-y{background:rgba(34,197,94,.13);color:#22c55e}
+.p-n{color:rgba(107,114,128,.3);font-size:0.65rem}
+.matrix-section-title{font-size:0.78rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px;margin:1.5rem 0 0.6rem;display:flex;align-items:center;gap:0.4rem}
+.matrix-section-title svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── Audit ── */
+.stat-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.6rem;margin-bottom:1.2rem}
+.stat-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.75rem 1rem}
+.stat-card .sv{font-size:1.5rem;font-weight:700;color:var(--purple)}
+.stat-card .sl{font-size:0.7rem;color:var(--text-secondary);margin-top:0.1rem}
+.denial-badge{display:inline-block;padding:0.1rem 0.45rem;border-radius:6px;font-size:0.7rem;font-weight:600;background:rgba(239,68,68,.1);color:#ef4444}
+
+/* ── Misc ── */
+.empty-state{text-align:center;padding:2.5rem;color:var(--text-secondary);font-size:0.82rem}
+.section-desc{font-size:0.8rem;color:var(--text-secondary);margin:0 0 1rem;line-height:1.5}
+#invite-err,#inv-success{font-size:0.78rem;margin-top:0.4rem;display:none}
+#invite-err{color:#ef4444}#inv-success{color:#22c55e}
+.saving-indicator{font-size:0.72rem;color:var(--text-secondary);margin-left:0.3rem;display:none}
+</style>
+
+<!-- Tabs -->
+<div class="rbac-tabs">
+    <button class="rbac-tab active" onclick="showTab('members',this)">
+        <svg><use href="#icon-users"/></svg> Members ({{ users|length }})
+    </button>
+    <button class="rbac-tab" onclick="showTab('permissions',this)">
+        <svg><use href="#icon-shield"/></svg> Permissions
+    </button>
+    <button class="rbac-tab" onclick="showTab('audit',this)">
+        <svg><use href="#icon-eye"/></svg> Audit
+    </button>
+</div>
+
+<!-- ── MEMBERS ─────────────────────────────────────────────────── -->
+<div id="panel-members" class="rbac-panel active">
+
+    <!-- Invite bar -->
+    <div class="invite-bar">
+        <svg style="width:14px;height:14px;stroke:var(--text-secondary);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><use href="#icon-mail"/></svg>
+        <input type="email" id="inv-email" placeholder="Email address to invite…">
+        <input type="text" id="inv-name" placeholder="Display name" style="max-width:160px">
+        <input type="password" id="inv-pwd" placeholder="Password" style="max-width:140px">
+        <select id="inv-role">
+            <option value="viewer">Viewer</option>
+            <option value="developer" selected>Developer</option>
+            <option value="project_manager">Project Manager</option>
+            <option value="admin">Admin</option>
+        </select>
+        <button class="btn btn-primary" style="white-space:nowrap;display:flex;align-items:center;gap:0.35rem" onclick="inviteMember()">
+            <svg style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round"><use href="#icon-plus"/></svg>
+            Invite
+        </button>
+    </div>
+    <div id="invite-err"></div>
+    <div id="inv-success"></div>
+
+    {% if users %}
+    <table class="members-table">
+        <thead>
+            <tr>
+                <th>Member</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Last active</th>
+                <th>Member since</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="members-tbody">
+        {% for u in users %}
+        <tr id="urow-{{ u.id }}">
+            <td>
+                <div class="member-info">
+                    <div class="member-avatar" style="background:{{ u.email | avatar_color }}">{{ (u.display_name or u.email)[:2] | upper }}</div>
+                    <div>
+                        <div class="member-name">{{ u.display_name or u.email.split('@')[0] }}</div>
+                        <div class="member-email">{{ u.email }}</div>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <select class="role-select rb-{{ u.role }}" onchange="updateRole('{{ u.id }}',this)" data-uid="{{ u.id }}">
+                    <option value="viewer" {% if u.role=='viewer' %}selected{% endif %}>Viewer</option>
+                    <option value="developer" {% if u.role=='developer' %}selected{% endif %}>Developer</option>
+                    <option value="project_manager" {% if u.role=='project_manager' %}selected{% endif %}>Project&nbsp;Manager</option>
+                    <option value="admin" {% if u.role=='admin' %}selected{% endif %}>Admin</option>
+                </select>
+                <span class="saving-indicator" id="saving-{{ u.id }}">saving…</span>
+            </td>
+            <td>
+                <div class="status-cell">
+                    <span class="status-dot {{ 'dot-active' if u.is_active else 'dot-inactive' }}"></span>
+                    {{ 'Active' if u.is_active else 'Inactive' }}
+                </div>
+            </td>
+            <td style="font-size:0.75rem;color:var(--text-secondary)">{{ u.last_login | relative_time if u.last_login else '—' }}</td>
+            <td style="font-size:0.75rem;color:var(--text-secondary)">{{ u.created_at[:10] if u.created_at else '—' }}</td>
+            <td>
+                <div class="row-actions">
+                    <button class="icon-btn danger" onclick="removeMember('{{ u.id }}','{{ u.email }}')" title="Remove">
+                        <svg><use href="#icon-trash"/></svg>
+                    </button>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">No members yet.<br><small>Invite the first member above.</small></div>
+    {% endif %}
+</div>
+
+<!-- ── PERMISSIONS ──────────────────────────────────────────────── -->
+<div id="panel-permissions" class="rbac-panel">
+    <p class="section-desc">Platform roles control what human users can do on product artifacts. Agent permissions are defined by their functional category.</p>
+
+    <div class="matrix-section-title">
+        <svg><use href="#icon-user"/></svg>
+        Human role permissions
+    </div>
+    <div class="matrix-wrap">
+    <table class="matrix">
+        <thead>
+            <tr>
+                <th class="row-header">Artifact</th>
+                <th>Admin</th>
+                <th>Project Manager</th>
+                <th>Developer</th>
+                <th>Viewer</th>
+            </tr>
+        </thead>
+        <tbody id="human-matrix"></tbody>
+    </table>
+    </div>
+
+    <div class="matrix-section-title" style="margin-top:2rem">
+        <svg><use href="#icon-bot"/></svg>
+        Agent category permissions
+    </div>
+    <div class="matrix-wrap">
+    <table class="matrix">
+        <thead>
+            <tr>
+                <th class="row-header">Category</th>
+                <th>Brief</th><th>PRD</th><th>Epic</th><th>Feature</th>
+                <th>Story</th><th>Code</th><th>Test</th><th>Config</th><th>Review</th>
+            </tr>
+        </thead>
+        <tbody id="agent-matrix"></tbody>
+    </table>
+    </div>
+</div>
+
+<!-- ── AUDIT ────────────────────────────────────────────────────── -->
+<div id="panel-audit" class="rbac-panel">
+    <div class="stat-cards" id="audit-stats">
+        <div style="color:var(--text-secondary);font-size:0.82rem;grid-column:1/-1">Loading…</div>
+    </div>
+    <table class="members-table">
+        <thead>
+            <tr>
+                <th>Agent</th>
+                <th>Tool / Resource</th>
+                <th>Denial reason</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody id="audit-tbody">
+            <tr><td colspan="4" class="empty-state">Loading…</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Delete confirm modal (minimal) -->
+<div id="del-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center">
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1.4rem;width:360px;max-width:90vw">
+        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.8rem">
+            <svg style="width:18px;height:18px;stroke:#ef4444;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><use href="#icon-alert-triangle"/></svg>
+            <span style="font-weight:600;font-size:0.9rem">Remove member</span>
+        </div>
+        <p id="del-msg" style="font-size:0.82rem;color:var(--text-secondary);margin:0 0 1rem"></p>
+        <input type="hidden" id="del-uid">
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end">
+            <button onclick="closeDelModal()" style="padding:0.45rem 1rem;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border);font-family:inherit">Cancel</button>
+            <button onclick="confirmDelete()" style="padding:0.45rem 1rem;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer;background:#ef4444;color:#fff;border:none;font-family:inherit">Remove</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── Tabs
+function showTab(name, btn) {
+    document.querySelectorAll('.rbac-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.rbac-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
+    btn.classList.add('active');
+    if (name === 'permissions' && !document.getElementById('human-matrix').children.length) buildMatrices();
+    if (name === 'audit') loadAudit();
+}
+
+// ── Invite
+async function inviteMember() {
+    const email = document.getElementById('inv-email').value.trim();
+    const name = document.getElementById('inv-name').value.trim();
+    const pwd = document.getElementById('inv-pwd').value;
+    const role = document.getElementById('inv-role').value;
+    const errEl = document.getElementById('invite-err');
+    const okEl = document.getElementById('inv-success');
+    errEl.style.display = 'none'; okEl.style.display = 'none';
+    if (!email || !pwd) { errEl.textContent = 'Email and password are required.'; errEl.style.display = 'block'; return; }
+    const res = await fetch('/api/auth/register', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email, display_name: name, password: pwd, role})
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.detail || 'Error creating user.'; errEl.style.display = 'block'; return; }
+    okEl.textContent = `${email} has been added as ${role}.`; okEl.style.display = 'block';
+    document.getElementById('inv-email').value = '';
+    document.getElementById('inv-name').value = '';
+    document.getElementById('inv-pwd').value = '';
+    setTimeout(() => location.reload(), 800);
+}
+
+// ── Inline role update
+async function updateRole(uid, sel) {
+    const newRole = sel.value;
+    const ind = document.getElementById('saving-' + uid);
+    ind.style.display = 'inline';
+    // Update badge class
+    sel.className = 'role-select rb-' + newRole;
+    const res = await fetch(`/api/users/${uid}`, {
+        method: 'PUT', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({role: newRole})
+    });
+    ind.style.display = 'none';
+    if (!res.ok) { alert('Failed to update role'); location.reload(); }
+}
+
+// ── Remove member
+function removeMember(uid, email) {
+    document.getElementById('del-uid').value = uid;
+    document.getElementById('del-msg').textContent = `Remove ${email} from the platform? This cannot be undone.`;
+    document.getElementById('del-modal').style.display = 'flex';
+}
+function closeDelModal() { document.getElementById('del-modal').style.display = 'none'; }
+async function confirmDelete() {
+    const uid = document.getElementById('del-uid').value;
+    const res = await fetch(`/api/users/${uid}`, {method: 'DELETE'});
+    closeDelModal();
+    if (res.ok) document.getElementById('urow-' + uid)?.remove();
+    else alert('Delete failed');
+}
+document.getElementById('del-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeDelModal(); });
+
+// ── Permission matrices (static, mirrors platform/rbac/__init__.py)
+const ARTIFACTS = ['product_brief','prd','epic','feature','user_story','sprint_goal','release_note','code','test','config','review'];
+const ARTIFACT_LABELS = ['Product Brief','PRD','Epic','Feature','User Story','Sprint Goal','Release Note','Code','Test','Config','Review'];
+const HUMAN = {
+    admin: null, // all
+    project_manager: {product_brief:['create','read','update','approve'],prd:['create','read','update','approve'],epic:['create','read','update','approve','assign'],feature:['create','read','update','approve','assign'],user_story:['create','read','update','approve','assign'],sprint_goal:['create','read','update','approve'],release_note:['create','read','update','approve'],code:['read'],test:['read'],config:['read'],review:['read']},
+    developer: {product_brief:['read'],prd:['read'],epic:['read'],feature:['read','create'],user_story:['create','read','update'],sprint_goal:['read'],release_note:['read'],code:['create','read','update'],test:['create','read','update'],config:['create','read'],review:['create','read']},
+    viewer: {}
+};
+const AGENT_CATS = [
+    {n:'Strategic',a:{product_brief:['approve','veto'],prd:['approve','veto'],epic:['approve'],release_note:['approve']}},
+    {n:'Product',a:{product_brief:['create','update'],prd:['create','update'],epic:['create','update'],feature:['create','update'],user_story:['create','update'],sprint_goal:['create']}},
+    {n:'Management',a:{sprint_goal:['create','approve','assign'],user_story:['assign'],feature:['assign'],epic:['assign']}},
+    {n:'Architecture',a:{code:['approve','veto'],config:['approve','veto'],review:['create','approve']}},
+    {n:'Development',a:{code:['create','update'],test:['create'],config:['create'],user_story:['update']}},
+    {n:'Quality',a:{test:['create','approve','veto'],review:['create','veto']}},
+    {n:'Security',a:{code:['veto'],config:['veto'],review:['veto']}},
+    {n:'Ops',a:{config:['create','approve'],release_note:['create','approve']}}
+];
+const AGENT_ARTS = ['product_brief','prd','epic','feature','user_story','code','test','config','review'];
+const ROLES = ['admin','project_manager','developer','viewer'];
+const ALL_ACTIONS = ['create','read','update','delete','approve','veto','assign'];
+
+function humanCan(role, art) {
+    if (role === 'admin') return ALL_ACTIONS;
+    if (role === 'viewer') return art ? ['read'] : [];
+    return HUMAN[role]?.[art] || [];
+}
+
+function buildMatrices() {
+    let html = '';
+    ARTIFACTS.forEach((art, i) => {
+        html += `<tr><td class="row-header">${ARTIFACT_LABELS[i]}</td>`;
+        ROLES.forEach(role => {
+            const perms = humanCan(role, art);
+            html += `<td>${perms.length ? perms.map(p=>`<span class="perm p-y">${p}</span>`).join('') : '<span class="p-n">—</span>'}</td>`;
+        });
+        html += '</tr>';
+    });
+    document.getElementById('human-matrix').innerHTML = html;
+
+    let ahtml = '';
+    AGENT_CATS.forEach(({n, a}) => {
+        ahtml += `<tr><td class="row-header" style="font-weight:600">${n}</td>`;
+        AGENT_ARTS.forEach(art => {
+            const acts = a[art] || [];
+            ahtml += `<td>${acts.length ? acts.map(p=>`<span class="perm p-y">${p}</span>`).join('') : '<span class="p-n">—</span>'}</td>`;
+        });
+        ahtml += '</tr>';
+    });
+    document.getElementById('agent-matrix').innerHTML = ahtml;
+}
+
+// ── Audit
+async function loadAudit() {
+    const [sRes, dRes] = await Promise.all([
+        fetch('/api/permissions/stats'),
+        fetch('/api/permissions/denials?limit=60')
+    ]);
+    const stats = await sRes.json();
+    const denials = await dRes.json();
+
+    const entries = Object.entries(stats).sort((a,b) => b[1]-a[1]).slice(0, 6);
+    document.getElementById('audit-stats').innerHTML = entries.length
+        ? entries.map(([k,v]) => `<div class="stat-card"><div class="sv">${v}</div><div class="sl">${k.replace(/_/g,' ')}</div></div>`).join('')
+        : '<div style="color:var(--text-secondary);font-size:0.82rem;grid-column:1/-1;padding:0.5rem 0">No denials recorded yet — permissions audit is clean.</div>';
+
+    const tbody = document.getElementById('audit-tbody');
+    if (!Array.isArray(denials) || !denials.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No permission denials on record.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = denials.map(d => `
+        <tr>
+            <td style="font-family:monospace;font-size:0.75rem;color:var(--text-primary)">${d.agent_id || '—'}</td>
+            <td style="font-size:0.75rem;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)">${d.tool || d.path || '—'}</td>
+            <td><span class="denial-badge">${d.reason || d.denial_type || 'denied'}</span></td>
+            <td style="font-size:0.72rem;color:var(--text-secondary)">${(d.timestamp || d.created_at || '').slice(0,16).replace('T',' ')}</td>
+        </tr>`).join('');
+}
+
+// Enter key on invite
+document.getElementById('inv-pwd').addEventListener('keydown', e => { if (e.key === 'Enter') inviteMember(); });
+</script>
+{% endblock %}

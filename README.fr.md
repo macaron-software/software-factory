@@ -604,6 +604,83 @@ Mission Creee
                     └─────────────────┘
 ```
 
+## Intelligence Adaptative — AG · AR · Thompson Sampling · OKR
+
+La plateforme s'auto-optimise en continu grâce à trois moteurs d'IA complémentaires qui choisissent ensemble la meilleure équipe, le meilleur pattern et la meilleure configuration de workflow pour chaque mission.
+
+### Thompson Sampling — Sélection Probabiliste des Équipes
+
+Darwin choisit les équipes agent+pattern via un **bandit bayésien à exploration** :
+
+- Distribution `Beta(α=wins+1, β=losses+1)` par contexte `(agent_id, pattern_id, technologie, type_phase)`
+- **Fitness granulaire** — score séparé par contexte : l'expertise migration Angular ne contamine jamais l'expertise nouvelle-fonctionnalité Angular
+- **Fallback cold-start** — chaîne de préfixe `angular_19` → `angular_*` → `generic` : aucune équipe ne reste sans sélection
+- **Retraite souple** — équipes faibles passent à `weight_multiplier=0.1`, déprioritisées mais récupérables en un clic
+- **Tests A/B en shadow** — runs parallèles automatiques quand deux équipes ont un score proche (delta < 10) ou à 10% de probabilité ; un évaluateur neutre choisit le gagnant
+
+**Darwin LLM** étend le Thompson Sampling à la sélection de modèles : même équipe, fournisseurs LLM différents — `Beta(wins+1, losses+1)` par `(agent_id, pattern_id, technologie, type_phase, llm_model)` — le meilleur modèle s'impose automatiquement par contexte.
+
+### Algorithme Génétique — Évolution des Workflows
+
+Un moteur GA nightly (`platform/agents/evolution.py`) fait évoluer les templates de workflows à partir des données historiques des missions :
+
+- **Génome** = liste ordonnée de `PhaseSpec` (pattern, agents, gate) — chaque workflow est un chromosome
+- **Population** de 40 génomes, jusqu'à 30 générations, élitisme=2 génomes portés intacts
+- **Croisement** — splice aléatoire de deux listes de phases parentes
+- **Mutation** — permutation aléatoire de `pattern_id`, `gate` ou liste `agents` (taux 15%)
+- **Fonction fitness** — combinaison pondérée : taux de réussite des phases, scores fitness agents, taux de veto, lead time mission
+- **Sélection par tournoi** (k=3) — évite la convergence prématurée
+- **Top-3 propositions** sauvegardées dans la table `evolution_proposals` pour revue humaine avant application
+- **Déclenchement à la demande** via `POST /api/evolution/run/{wf_id}` — revue des propositions dans Workflows → onglet Évolution
+- **Scheduler nightly** — tourne chaque nuit par workflow actif ; ignoré si <5 missions (signal insuffisant)
+
+### Reinforcement Learning — Adaptation de Pattern en Cours de Mission
+
+Une politique Q-learning (`platform/agents/rl_policy.py`) recommande des **changements de pattern en temps réel** pendant l'exécution d'une mission :
+
+- **Espace d'action** : `keep`, `switch_parallel`, `switch_sequential`, `switch_hierarchical`, `switch_debate`, `add_agent`, `remove_agent`
+- **Encodage d'état** — `(wf_id, bucket_position_phase, bucket_rejet_pct, bucket_score_qualité)` — compact et généralisable
+- **Mise à jour Q** (batch offline) : `Q(s,a) ← Q(s,a) + α × [r + γ × max Q(s',·) − Q(s,a)]`
+- **Hyperparamètres** : α=0.1, γ=0.9, ε=0.1 (10% exploration), seuil confiance=0.70, min 3 visites d'état avant déclenchement
+- **Experience replay** — table `rl_experience` accumule des tuples `(état, action, récompense, état_suivant)` à chaque fin de phase
+- **Récompenses** — positives si amélioration qualité + gain de temps ; négatives pour rejets et dépassements SLA
+- **Intégration** — appelé par `engine.py` au démarrage de chaque phase ; recommandation déclenchée seulement au-dessus du seuil de confiance ; dégradation gracieuse vers le pattern par défaut
+
+### OKR / KPI — Objectifs et Indicateurs Clés
+
+Des critères de succès quantifiés guident la fitness GA et les récompenses RL :
+
+| Domaine | Exemple OKR | Indicateurs clés |
+|---------|-------------|-----------------|
+| code/migration | ≥90% build success | build_pass_rate, test_coverage |
+| sécurité/audit | 0 CVE critique | cve_critical_count, sast_score |
+| architecture | revue design <2h | review_duration, approval_rate |
+| tests | ≥95% tests OK | pass_rate, regression_count |
+| documentation | 100% API couverte | doc_coverage, freshness |
+
+- **8 seeds par défaut** pré-chargés au démarrage pour tous les domaines/types de phase
+- **Édition inline** sur le dashboard Teams (`/teams`) — statut vert/amber/rouge par objectif
+- **Pont OKR→fitness** — l'atteinte des OKR alimente directement la fonction fitness GA et le signal de récompense RL
+- **OKR par projet** — surchargeables par projet dans la page Paramètres
+
+### Simulation & Backtesting
+
+Avant d'appliquer une proposition GA ou une recommandation RL en production, la plateforme peut lancer des **simulations** :
+
+- Table `simulation_runs` stocke les runs synthétiques contre les génomes de workflow proposés
+- Comparaison des résultats simulés vs historiques avant promotion d'une proposition
+- Résultats visibles dans Workflows → onglet Évolution, à côté des cartes de propositions
+
+### Où le Voir
+
+| Fonctionnalité | URL |
+|----------------|-----|
+| Classement Darwin Teams | `/teams` |
+| Propositions GA et historique évolution | `/workflows` → onglet Évolution |
+| Statistiques politique RL | `/analytics` ou le dashboard Ops |
+| Édition OKR | `/teams` → colonne OKR |
+| Sidebar Intelligence Adaptative | Toutes les pages (rôle : DSI / Dev) |
+
 ## Nouveautés v2.1.0 (fév 2026)
 
 ### Métriques Qualité — Monitoring Industriel

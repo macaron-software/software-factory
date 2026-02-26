@@ -87,15 +87,26 @@ async def setup(request: Request):
 @router.post("/api/auth/demo")
 async def demo_login(request: Request):
     """Skip login — create or reuse demo admin and auto-login."""
+    import logging
+    _log = logging.getLogger(__name__)
     demo_email = "admin@demo.local"
     demo_pass = "demo-admin-2026"
     demo_name = "Demo Admin"
+
+    # Ensure migrations are up to date (user_sessions table may be missing on older deploys)
+    try:
+        from ...db.migrations import init_db
+        init_db()
+    except Exception as _e:
+        _log.warning("demo_login: migration check failed: %s", _e)
 
     # Create demo user if doesn't exist
     try:
         service.register(demo_email, demo_pass, demo_name, role="admin")
     except service.AuthError:
         pass  # Already exists
+    except Exception as _e:
+        _log.error("demo_login: register failed: %s", _e)
 
     try:
         tokens = service.login(
@@ -105,8 +116,11 @@ async def demo_login(request: Request):
         )
         resp = JSONResponse({"ok": True, "user": tokens["user"], "demo": True})
         return _set_auth_cookies(resp, tokens)
-    except service.AuthError:
-        return JSONResponse({"error": "Demo user conflict"}, status_code=400)
+    except service.AuthError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    except Exception as e:
+        _log.error("demo_login: login failed: %s", e)
+        return JSONResponse({"error": f"Demo login error: {e}"}, status_code=500)
 
 
 @router.post("/api/auth/login")

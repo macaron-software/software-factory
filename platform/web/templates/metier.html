@@ -124,17 +124,19 @@
 </div>
 
 <div class="met-layout">
-    <!-- Left: Epic Value Stream -->
+    <!-- Left: Value Streams column -->
     <div style="display:flex;flex-direction:column;gap:1.2rem">
-        <!-- Epics pipeline -->
+
+        {# ── Reusable VS macro ── #}
+        {% macro vs_panel(title, icon, missions_list) %}
         <div class="met-panel">
             <div class="met-panel-header">
-                <div class="met-panel-title"><svg><use href="#icon-git-merge"/></svg> Value Stream — Epics</div>
-                <span style="font-size:0.62rem;color:var(--text-muted)">{{ total }} mission{{ 's' if total != 1 else '' }}</span>
+                <div class="met-panel-title"><svg><use href="#icon-{{ icon }}"/></svg> {{ title }}</div>
+                <span style="font-size:0.62rem;color:var(--text-muted)">{{ missions_list|length }} mission{{ 's' if missions_list|length != 1 else '' }}</span>
             </div>
             <div class="met-panel-body" style="padding:0.6rem">
-                {% if epics %}
-                {% for epic in epics %}
+                {% if missions_list %}
+                {% for epic in missions_list %}
                 <a href="/missions/{{ epic.id }}/control" style="text-decoration:none;color:inherit;display:block">
                 <div class="met-epic">
                     <div class="met-epic-header">
@@ -182,11 +184,29 @@
                 <div class="met-empty">
                     <svg><use href="#icon-inbox"/></svg>
                     <div class="met-empty-text">{{ _('no_mission_active') }}</div>
-                    <div class="met-empty-sub">{{ _("launch_a_mission_from_pi_board") }}</div>
                 </div>
                 {% endif %}
             </div>
         </div>
+        {% endmacro %}
+
+        <!-- Value Stream — Epics -->
+        {{ vs_panel("Value Stream — Epics", "git-merge", epics) }}
+
+        <!-- Value Stream — TMA -->
+        {% if tma_missions %}
+        {{ vs_panel("Value Stream — TMA", "tool", tma_missions) }}
+        {% endif %}
+
+        <!-- Value Stream — Sécurité -->
+        {% if security_missions %}
+        {{ vs_panel("Value Stream — Sécurité", "shield", security_missions) }}
+        {% endif %}
+
+        <!-- Value Stream — RSE -->
+        {% if rse_missions %}
+        {{ vs_panel("Value Stream — RSE", "leaf", rse_missions) }}
+        {% endif %}
 
         <!-- Workflow Catalog -->
         <div class="met-panel">

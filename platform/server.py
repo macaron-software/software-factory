@@ -827,6 +827,36 @@ def create_app() -> FastAPI:
 
     templates.env.filters["markdown"] = _markdown_filter
 
+    def _avatar_color(email: str) -> str:
+        """Deterministic HSL color from email hash."""
+        h = sum(ord(c) * (i + 1) for i, c in enumerate(str(email))) % 360
+        return f"hsl({h},55%,42%)"
+
+    def _relative_time(ts) -> str:
+        """Human-readable relative time from ISO timestamp string."""
+        from datetime import datetime, timezone
+        if not ts:
+            return "—"
+        try:
+            dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            diff = (datetime.now(timezone.utc) - dt).total_seconds()
+            if diff < 60:
+                return "just now"
+            if diff < 3600:
+                return f"{int(diff//60)}m ago"
+            if diff < 86400:
+                return f"{int(diff//3600)}h ago"
+            if diff < 2592000:
+                return f"{int(diff//86400)}d ago"
+            return str(ts)[:10]
+        except Exception:
+            return str(ts)[:10]
+
+    templates.env.filters["avatar_color"] = _avatar_color
+    templates.env.filters["relative_time"] = _relative_time
+
     # i18n — make _() available in all templates
     from .i18n import SUPPORTED_LANGS, _catalog
     from .i18n import get_lang as _get_lang

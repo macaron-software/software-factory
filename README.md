@@ -814,6 +814,83 @@ Every project automatically gets 4 operational missions:
 - **Teams dashboard** at `/teams` — leaderboard with champion/rising/declining/retired badges, inline OKR editing with green/amber/red status, Chart.js evolution charts, selection history, A/B test results
 - **Non-breaking opt-in** — `agent_id: "skill:developer"` in patterns activates Darwin selection; explicit agent IDs are untouched
 
+## Adaptive Intelligence — GA · RL · Thompson Sampling · OKR
+
+The platform continuously self-optimizes through three complementary AI engines that work together to select the best team, pattern, and workflow configuration for every mission.
+
+### Thompson Sampling — Probabilistic Team Selection
+
+Darwin selects agent+pattern teams using **Bayesian bandit exploration**:
+
+- `Beta(α=wins+1, β=losses+1)` distribution per `(agent_id, pattern_id, technology, phase_type)` context
+- **Fine-grained fitness** — separate score per context; Angular-migration expertise never bleeds into Angular new-features
+- **Cold-start similarity fallback** — `angular_19` → `angular_*` → `generic` prefix chain ensures no team is left unselected
+- **Soft retirement** — consistently weak teams get `weight_multiplier=0.1`, deprioritized but recoverable in one click
+- **A/B shadow testing** — automatic parallel shadow runs when two teams have close fitness (delta < 10) or at 10% probability; neutral evaluator picks the winner
+
+**Darwin LLM** extends Thompson Sampling to model selection: same team competes across multiple LLM providers; `Beta(wins+1, losses+1)` per `(agent_id, pattern_id, technology, phase_type, llm_model)` — the best model wins automatically per context.
+
+### Genetic Algorithm — Workflow Evolution
+
+A nightly GA engine (`platform/agents/evolution.py`) evolves workflow templates using historical mission data:
+
+- **Genome** = ordered list of `PhaseSpec` (pattern, agents, gate) — every workflow is a chromosome
+- **Population** of 40 genomes, up to 30 generations, elite=2 carried unchanged
+- **Crossover** — random splice of two parent phase lists
+- **Mutation** — random swap of `pattern_id`, `gate`, or `agents` list (rate 15%)
+- **Fitness function** — weighted combination of: phase success rate, agent fitness scores, gate veto rate, mission lead time
+- **Tournament selection** (k=3) — avoids premature convergence
+- **Top-3 proposals** saved to `evolution_proposals` table for human review before applying
+- **On-demand trigger** via `POST /api/evolution/run/{wf_id}` — review proposals in the Workflows → Evolution tab
+- **Scheduler** — runs nightly per active workflow; skipped if <5 missions exist (not enough signal)
+
+### Reinforcement Learning — Mid-Mission Pattern Adaptation
+
+A Q-learning policy (`platform/agents/rl_policy.py`) recommends **pattern switches in real time** during mission execution:
+
+- **Action space**: `keep`, `switch_parallel`, `switch_sequential`, `switch_hierarchical`, `switch_debate`, `add_agent`, `remove_agent`
+- **State encoding** — `(wf_id, phase_position_bucket, rejection_pct_bucket, quality_score_bucket)` — compact, generalizable
+- **Q-update** (offline batch): `Q(s,a) ← Q(s,a) + α × [r + γ × max Q(s',·) − Q(s,a)]`
+- **Hyperparameters**: α=0.1, γ=0.9, ε=0.1 (10% exploration), confidence threshold=0.70, min 3 state visits to fire
+- **Experience replay** — `rl_experience` table accumulates `(state, action, reward, next_state)` tuples from every phase completion
+- **Rewards** — positive for quality improvement + time saved; negative for rejections and SLA breaches
+- **Integration** — called by `engine.py` at phase start; recommendations only fire above confidence threshold; always graceful degradation to the default pattern
+
+### OKR / KPI — Objectives & Key Results
+
+Quantified success criteria guide both GA fitness and RL rewards:
+
+| Domain | Example OKR | Key Results |
+|--------|-------------|-------------|
+| code/migration | ≥90% build success | build_pass_rate, test_coverage |
+| security/audit | 0 critical CVE | cve_critical_count, sast_score |
+| architecture | <2h design review | review_duration, approval_rate |
+| testing | ≥95% test pass | pass_rate, regression_count |
+| documentation | 100% API covered | doc_coverage, freshness |
+
+- **8 default seeds** pre-loaded at startup across all domain/phase-type combinations
+- **Inline editing** on the Teams dashboard (`/teams`) — green/amber/red status per target
+- **OKR-to-fitness bridge** — OKR attainment directly feeds the GA fitness function and RL reward signal
+- **Per-project OKRs** — override defaults per project in the Settings page
+
+### Simulation & Backtesting
+
+Before applying any GA proposal or RL recommendation live, the platform can run **simulations**:
+
+- `simulation_runs` table stores synthetic mission runs against proposed workflow genomes
+- Compare simulated vs historical outcomes before promoting a proposal
+- Results visible in the Workflows → Evolution tab alongside proposal cards
+
+### Where to See It
+
+| Feature | URL |
+|---------|-----|
+| Darwin Team leaderboard | `/teams` |
+| GA proposals & evolution history | `/workflows` → Evolution tab |
+| RL policy stats | `/analytics` or the Ops dashboard |
+| OKR editing | `/teams` → OKR column |
+| Adaptive Intelligence sidebar | All pages (role: DSI / Dev) |
+
 ## What's New in v2.2.0 (Feb 2026)
 
 ### OpenTelemetry & Distributed Tracing
