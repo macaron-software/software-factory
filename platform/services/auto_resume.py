@@ -38,8 +38,9 @@ _CONTINUOUS_KEYWORDS = (
 # Watchdog loop interval (seconds)
 _WATCHDOG_INTERVAL = 300
 # Stagger between each resume
-_STAGGER_STARTUP = 1.5
-_STAGGER_WATCHDOG = 3.0
+_STAGGER_STARTUP = 30.0  # 30s between launches on boot (avoid CPU spike)
+_STAGGER_WATCHDOG = 10.0  # 10s between launches on watchdog cycles
+_MAX_STARTUP_BATCH = 3  # max missions launched per startup pass
 # Disk cleanup: run every N watchdog cycles (300s × 12 = 1h)
 _CLEANUP_EVERY_N_CYCLES = 12
 
@@ -61,22 +62,7 @@ async def auto_resume_missions() -> None:
     """
     await asyncio.sleep(5)  # Let platform fully initialize first
 
-    # Hot-patch startup: use release() to both add slots AND wake up waiting coroutines
-    try:
-        from ..web.routes.helpers import _mission_semaphore
-
-        target = 10
-        added = max(0, target - _mission_semaphore._value)
-        for _ in range(added):
-            _mission_semaphore.release()
-        if added:
-            logger.warning(
-                "auto_resume: released %d semaphore slots → value=%d (wakes waiters)",
-                added,
-                _mission_semaphore._value,
-            )
-    except Exception as _e_sem:
-        logger.warning("auto_resume: semaphore patch failed: %s", _e_sem)
+    # Semaphore is set to 2 in helpers.py — no hot-patch needed
 
     # First: repair all failed runs (reset to paused + create TMA incidents)
     try:
@@ -87,22 +73,7 @@ async def auto_resume_missions() -> None:
     first_pass = True
     cycle_count = 0
     while True:
-        # Hot-patch per cycle: use release() to add slots and wake up waiting coroutines
-        try:
-            from ..web.routes.helpers import _mission_semaphore
-
-            target = 10
-            added = max(0, target - _mission_semaphore._value)
-            for _ in range(added):
-                _mission_semaphore.release()
-            if added:
-                logger.warning(
-                    "auto_resume: released %d semaphore slots → value=%d",
-                    added,
-                    _mission_semaphore._value,
-                )
-        except Exception as _e_sem:
-            logger.warning("auto_resume: semaphore patch failed: %s", _e_sem)
+        # Semaphore capped at 2 in helpers.py — no hot-patch needed
         try:
             stagger = _STAGGER_STARTUP if first_pass else _STAGGER_WATCHDOG
             resumed = await _resume_batch(stagger=stagger)
@@ -207,6 +178,10 @@ async def _resume_batch(stagger: float = 3.0) -> int:
             continuous_failed.append(run_id)
 
     to_resume = continuous_paused + others_paused + stuck_pending + continuous_failed
+
+    # On startup (stagger==_STAGGER_STARTUP), cap to avoid CPU saturation
+    if stagger >= _STAGGER_STARTUP:
+        to_resume = to_resume[:_MAX_STARTUP_BATCH]
 
     if not to_resume:
         return 0

@@ -1,4 +1,5 @@
 """Shared helpers for all route modules."""
+
 from __future__ import annotations
 
 import asyncio
@@ -23,11 +24,12 @@ def _is_json_request(request: Request) -> bool:
     """Return True if the client sent JSON (for choosing JSON vs redirect response)."""
     return "application/json" in request.headers.get("content-type", "")
 
+
 # Track which mission_ids have an active asyncio task running
 _active_mission_tasks: dict[str, asyncio.Task] = {}
 
 # Limit concurrent mission execution (10 allows Quality/Retro/Skill missions to get slots)
-_mission_semaphore = asyncio.Semaphore(10)
+_mission_semaphore = asyncio.Semaphore(2)
 
 _AVATAR_DIR = Path(__file__).parent.parent / "static" / "avatars"
 
@@ -51,11 +53,13 @@ def _agent_map_for_template(agents) -> dict:
     """Build agent_map dict suitable for msg_unified.html, including avatar_url."""
     m = {}
     for a in agents:
-        if hasattr(a, 'id'):  # AgentDef dataclass
+        if hasattr(a, "id"):  # AgentDef dataclass
             m[a.id] = {
                 "id": a.id,
-                "name": a.name, "icon": a.icon or "bot",
-                "color": a.color or "#8b949e", "role": a.role or "",
+                "name": a.name,
+                "icon": a.icon or "bot",
+                "color": a.color or "#8b949e",
+                "role": a.role or "",
                 "avatar": getattr(a, "avatar", "") or "bot",
                 "avatar_url": _avatar_url(a.id),
                 "hierarchy_rank": getattr(a, "hierarchy_rank", 50),
@@ -69,8 +73,10 @@ def _agent_map_for_template(agents) -> dict:
             aid = a.get("id", "")
             m[aid] = {
                 "id": aid,
-                "name": a.get("name", ""), "icon": a.get("icon", "bot"),
-                "color": a.get("color", "#8b949e"), "role": a.get("role", ""),
+                "name": a.get("name", ""),
+                "icon": a.get("icon", "bot"),
+                "color": a.get("color", "#8b949e"),
+                "role": a.get("role", ""),
                 "avatar": a.get("avatar", "bot"),
                 "avatar_url": a.get("avatar_url", "") or _avatar_url(aid),
                 "hierarchy_rank": a.get("hierarchy_rank", 50),
@@ -86,12 +92,16 @@ def _agent_map_for_template(agents) -> dict:
 async def serve_workspace_file(path: str):
     """Serve files from project workspaces (screenshots, artifacts)."""
     from ...config import FACTORY_ROOT
+
     workspaces = FACTORY_ROOT / "data" / "workspaces"
     for base in [workspaces, FACTORY_ROOT.parent]:
         full_path = base / path
         if full_path.exists() and full_path.is_file():
             import mimetypes
-            media = mimetypes.guess_type(str(full_path))[0] or "application/octet-stream"
+
+            media = (
+                mimetypes.guess_type(str(full_path))[0] or "application/octet-stream"
+            )
             return FileResponse(str(full_path), media_type=media)
     if workspaces.exists():
         for ws_dir in workspaces.iterdir():
@@ -99,6 +109,10 @@ async def serve_workspace_file(path: str):
                 full_path = ws_dir / path
                 if full_path.exists() and full_path.is_file():
                     import mimetypes
-                    media = mimetypes.guess_type(str(full_path))[0] or "application/octet-stream"
+
+                    media = (
+                        mimetypes.guess_type(str(full_path))[0]
+                        or "application/octet-stream"
+                    )
                     return FileResponse(str(full_path), media_type=media)
     return JSONResponse({"error": "Not found"}, status_code=404)
