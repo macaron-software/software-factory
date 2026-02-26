@@ -1,12 +1,16 @@
 """LLM Client — unified async interface for all providers.
 
 All providers use OpenAI-compatible chat/completions API:
-- Azure AI Foundry GPT-5.2 (swedencentral) — leaders, control, architecture
-- NVIDIA/Kimi K2 (integrate.api.nvidia.com) — fast production workers
-- MiniMax M2.5 (api.minimaxi.chat) — fallback, thinking model
-- Claude CLI / Copilot CLI — offline headless (slow, 10-12s)
+- Azure AI Foundry (azure-ai):     gpt-5.2 (reasoning), gpt-5.1-codex (code/tests), gpt-5.1-mini (light)
+- Azure OpenAI (azure-openai):     gpt-5-mini (tool-calling fallback, light tasks)
+- NVIDIA/Kimi K2 (nvidia):         fast production workers
+- MiniMax M2.5 (minimax):          local dev default / fallback
+- Demo (demo):                     offline mock responses
 
-Streaming supported via SSE (text/event-stream).
+Multi-model routing (executor.py):
+  architect/tech_lead/planner  → gpt-5.2      (deep reasoning)
+  developer/tester/security    → gpt-5.1-codex (code production)
+  default/chat/routing         → gpt-5-mini   (light + cheap)
 """
 
 from __future__ import annotations
@@ -39,18 +43,26 @@ _PROVIDERS = {
         "auth_prefix": "Bearer ",
     },
     "azure-ai": {
-        "name": "Azure AI Foundry (GPT-5.2)",
+        "name": "Azure AI Foundry (GPT-5.2 / GPT-5.1-Codex)",
         "base_url": os.environ.get(
             "AZURE_AI_ENDPOINT", "https://swedencentral.api.cognitive.microsoft.com"
         ).rstrip("/"),
         "key_env": "AZURE_AI_API_KEY",
-        "models": ["gpt-5.2"],
+        "models": ["gpt-5.2", "gpt-5.1-codex", "gpt-5.1-mini"],
         "default": "gpt-5.2",
         "auth_header": "api-key",
         "auth_prefix": "",
         "azure_api_version": "2024-10-21",
-        "azure_deployment_map": {"gpt-5.2": "gpt-52"},
-        "max_tokens_param": {"gpt-5.2": "max_completion_tokens"},
+        "azure_deployment_map": {
+            "gpt-5.2": "gpt-52",
+            "gpt-5.1-codex": "gpt-51-codex",
+            "gpt-5.1-mini": "gpt-51-mini",
+        },
+        "max_tokens_param": {
+            "gpt-5.2": "max_completion_tokens",
+            "gpt-5.1-codex": "max_completion_tokens",
+            "gpt-5.1-mini": "max_completion_tokens",
+        },
     },
     "azure-openai": {
         "name": "Azure OpenAI (GPT-5-mini)",
@@ -58,13 +70,19 @@ _PROVIDERS = {
             "AZURE_OPENAI_ENDPOINT", "https://ascii-ui-openai.openai.azure.com"
         ).rstrip("/"),
         "key_env": "AZURE_OPENAI_API_KEY",
-        "models": ["gpt-5-mini"],
+        "models": ["gpt-5-mini", "gpt-5.1-mini"],
         "default": "gpt-5-mini",
         "auth_header": "api-key",
         "auth_prefix": "",
         "azure_api_version": "2025-01-01-preview",
-        "azure_deployment_map": {"gpt-5-mini": "gpt-5-mini"},
-        "max_tokens_param": {"gpt-5-mini": "max_completion_tokens"},
+        "azure_deployment_map": {
+            "gpt-5-mini": "gpt-5-mini",
+            "gpt-5.1-mini": "gpt-51-mini",
+        },
+        "max_tokens_param": {
+            "gpt-5-mini": "max_completion_tokens",
+            "gpt-5.1-mini": "max_completion_tokens",
+        },
     },
     "nvidia": {
         "name": "NVIDIA (Kimi K2)",

@@ -38,18 +38,67 @@ _TOOL_MODEL = "gpt-5-mini"
 # Providers that support native function calling
 _TOOL_CAPABLE_PROVIDERS = {"azure-openai", "azure-ai", "openai"}
 
+# Multi-model routing — roles/tags → (provider, model)
+# gpt-5.2:        deep reasoning — architecture, leadership, planning
+# gpt-5.1-codex:  code production — developer, tester, security
+# gpt-5.1-mini:   light tasks — routing, summaries, docs, discussion
+_REASONING_ROLES = {"architect", "product_owner", "scrum_master", "tech_lead", "cto", "ceo"}
+_REASONING_TAGS = {"architecture", "reasoning", "leadership", "planning", "strategy", "analysis"}
+_CODE_ROLES = {"developer", "tester", "qa", "security", "devops", "data_engineer", "ml_engineer"}
+_CODE_TAGS = {"code", "coding", "test", "tests", "security", "refactor", "review", "ci", "cd", "devops"}
+
+
+def _select_model_for_agent(agent: "AgentDef") -> tuple[str, str]:
+    """Select (provider, model) based on agent role/tags for multi-model strategy.
+
+    - Reasoning agents (architect, tech_lead…) → azure-ai / gpt-5.2
+    - Code/test agents (developer, tester…)    → azure-ai / gpt-5.1-codex
+    - Light/chat agents (default)              → azure-openai / gpt-5.1-mini
+    Only applies when AZURE_DEPLOY is set (prod); local falls back to minimax.
+    """
+    import os
+    if not os.environ.get("AZURE_DEPLOY", ""):
+        return agent.provider, agent.model
+
+    role = (agent.role or "").lower().replace("-", "_").replace(" ", "_")
+    tags = {t.lower() for t in (agent.tags or [])}
+
+    # Check if azure-ai key is available
+    azure_ai_key = os.environ.get("AZURE_AI_API_KEY", "")
+
+    if role in _REASONING_ROLES or tags & _REASONING_TAGS:
+        if azure_ai_key:
+            return "azure-ai", "gpt-5.2"
+        return "azure-openai", "gpt-5-mini"  # fallback if no Foundry key
+
+    if role in _CODE_ROLES or tags & _CODE_TAGS:
+        if azure_ai_key:
+            return "azure-ai", "gpt-5.1-codex"
+        return "azure-openai", "gpt-5-mini"  # fallback
+
+    # Default: light model for routing/chat/summaries
+    return "azure-openai", "gpt-5-mini"
+
 
 def _route_provider(agent: AgentDef, tools: list | None) -> tuple[str, str]:
-    """Route to the best provider based on tools and agent rejection rate.
+    """Route to the best provider based on agent role/tags and tool requirements.
 
-    - Tools enabled → azure-openai (reliable function calling)
-    - High rejection rate (>40%) → azure-openai (better quality)
-    - Chat/discussion → keep agent's default provider (minimax for cost)
+    Strategy:
+    - Reasoning agents (architect, tech_lead…)  → azure-ai / gpt-5.2
+    - Code/test agents (developer, tester…)     → azure-ai / gpt-5.1-codex
+    - Tool-using agents not on capable provider → azure-openai / gpt-5-mini
+    - High rejection rate (>40%)                → azure-openai (quality escalation)
+    - Default light tasks                       → azure-openai / gpt-5-mini
     """
-    if tools and agent.provider not in _TOOL_CAPABLE_PROVIDERS:
+    # Apply multi-model routing first (role/tag based)
+    best_provider, best_model = _select_model_for_agent(agent)
+
+    # Override: if tools required and selected provider can't do tool-calling, escalate
+    if tools and best_provider not in _TOOL_CAPABLE_PROVIDERS:
         return _TOOL_PROVIDER, _TOOL_MODEL
-    # Quality escalation: if agent has high rejection rate, use better model
-    if agent.provider not in _TOOL_CAPABLE_PROVIDERS:
+
+    # Quality escalation: if agent has high rejection rate, use gpt-5-mini as floor
+    if best_provider not in _TOOL_CAPABLE_PROVIDERS:
         try:
             from .selection import rejection_rate
             if rejection_rate(agent.id) > 0.40:
@@ -59,7 +108,8 @@ def _route_provider(agent: AgentDef, tools: list | None) -> tuple[str, str]:
                 return _TOOL_PROVIDER, _TOOL_MODEL
         except Exception:
             pass
-    return agent.provider, agent.model
+
+    return best_provider, best_model
 
 
 def _strip_raw_tokens(text: str) -> str:

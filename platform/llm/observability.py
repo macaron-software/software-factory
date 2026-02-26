@@ -32,8 +32,10 @@ _COST_PER_1M = {
     "gpt-5.2": {"input": 5.00, "output": 15.00},
     "gpt-4o": {"input": 2.50, "output": 10.00},
     "gpt-5.1": {"input": 3.00, "output": 12.00},
-    "gpt-5.1-codex": {"input": 3.00, "output": 12.00},
+    "gpt-5.1-codex": {"input": 1.25, "output": 10.00},
     "gpt-5.1-codex-mini": {"input": 0.50, "output": 2.00},
+    "gpt-5.1-mini": {"input": 0.40, "output": 1.60},
+    "gpt-5-mini": {"input": 0.40, "output": 1.60},
     "moonshotai/kimi-k2-instruct": {"input": 1.00, "output": 3.00},
 }
 _DEFAULT_COST = {"input": 1.00, "output": 3.00}
