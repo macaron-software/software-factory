@@ -62,11 +62,11 @@ class PlatformMissionsTool(BaseTool):
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        from ..missions.store import get_mission_run_store
+        from ..missions.store import get_mission_run_store, get_mission_store
 
-        store = get_mission_run_store()
         mission_id = params.get("mission_id")
         if mission_id:
+            store = get_mission_run_store()
             m = store.get(mission_id)
             if not m:
                 return json.dumps({"error": f"Mission {mission_id} not found"})
@@ -95,19 +95,28 @@ class PlatformMissionsTool(BaseTool):
                     "phases": phases,
                 }
             )
-        runs = store.list_all()
-        return json.dumps(
-            [
+        # List missions (not runs) with optional status filter
+        mstore = get_mission_store()
+        status_filter = params.get("status")
+        missions = mstore.list_missions(limit=int(params.get("limit", 30)))
+        items = []
+        for m in missions:
+            s = (
+                m.status
+                if isinstance(m.status, str)
+                else getattr(m.status, "value", str(m.status))
+            )
+            if status_filter and s != status_filter:
+                continue
+            items.append(
                 {
                     "id": m.id,
-                    "brief": (m.brief or "")[:100],
-                    "status": m.status.value
-                    if hasattr(m.status, "value")
-                    else str(m.status),
+                    "name": m.name,
+                    "status": s,
+                    "description": (m.description or "")[:100],
                 }
-                for m in (runs or [])[:20]
-            ]
-        )
+            )
+        return json.dumps({"total": len(items), "missions": items})
 
 
 class PlatformMemoryTool(BaseTool):
@@ -281,17 +290,22 @@ class PlatformCreateProjectTool(BaseTool):
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        from ..projects.manager import get_project_store, ProjectDef
+        from ..projects.manager import get_project_store, Project
 
         name = params.get("name", "").strip()
         if not name:
             return json.dumps({"error": "name is required"})
+        import uuid
+        import datetime
+
         store = get_project_store()
-        proj = ProjectDef(
+        proj = Project(
+            id=str(uuid.uuid4())[:8],
             name=name,
+            path="",
             description=params.get("description", ""),
-            stack=params.get("stack", ""),
             factory_type=params.get("factory_type", "software"),
+            created_at=datetime.datetime.utcnow().isoformat(),
         )
         proj = store.create(proj)
         return json.dumps({"ok": True, "project_id": proj.id, "name": proj.name})
@@ -321,7 +335,7 @@ class PlatformCreateMissionTool(BaseTool):
             workflow_id=params.get("workflow_id", ""),
             status="active",
         )
-        mission = store.create(mission)
+        mission = store.create_mission(mission)
         return json.dumps({"ok": True, "mission_id": mission.id, "name": mission.name})
 
 

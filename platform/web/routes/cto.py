@@ -134,7 +134,7 @@ async def cto_message(request: Request):
     from ...sessions.runner import handle_user_message
 
     data = await _parse_body(request)
-    content = str(data.get("content", "")).strip()
+    content = str(data.get("content") or data.get("message", "")).strip()
     if not content:
         return HTMLResponse("")
 

@@ -321,8 +321,14 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "title": {"type": "string", "description": "PR title"},
-                        "body": {"type": "string", "description": "PR description (markdown)"},
-                        "base": {"type": "string", "description": "Base branch (default: main)"},
+                        "body": {
+                            "type": "string",
+                            "description": "PR description (markdown)",
+                        },
+                        "base": {
+                            "type": "string",
+                            "description": "Base branch (default: main)",
+                        },
                         "cwd": {"type": "string", "description": "Working directory"},
                     },
                     "required": ["title"],
@@ -337,7 +343,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "pr": {"type": "string", "description": "PR number or full GitHub URL"},
+                        "pr": {
+                            "type": "string",
+                            "description": "PR number or full GitHub URL",
+                        },
                         "cwd": {"type": "string", "description": "Working directory"},
                     },
                     "required": ["pr"],
@@ -352,8 +361,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "pr": {"type": "string", "description": "PR number or GitHub URL"},
-                        "body": {"type": "string", "description": "Review body (markdown)"},
+                        "pr": {
+                            "type": "string",
+                            "description": "PR number or GitHub URL",
+                        },
+                        "body": {
+                            "type": "string",
+                            "description": "Review body (markdown)",
+                        },
                         "event": {
                             "type": "string",
                             "enum": ["APPROVE", "REQUEST_CHANGES", "COMMENT"],
@@ -1341,6 +1356,66 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {"type": "object", "properties": {}},
             },
         },
+        # ── Platform creation tools (CTO Jarvis: create projects + missions) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "create_project",
+                "description": "Create a new project on the platform. Returns the project id and name.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Project name (required)",
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Project description",
+                        },
+                        "factory_type": {
+                            "type": "string",
+                            "enum": ["software", "data", "security", "standalone"],
+                            "description": "Type of project",
+                        },
+                    },
+                    "required": ["name"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "create_mission",
+                "description": "Create a new mission (epic) on the platform. Returns the mission id.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Mission name (required)",
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Mission description",
+                        },
+                        "goal": {
+                            "type": "string",
+                            "description": "Mission goal / acceptance criteria",
+                        },
+                        "project_id": {
+                            "type": "string",
+                            "description": "Parent project ID",
+                        },
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow template ID (optional)",
+                        },
+                    },
+                    "required": ["name"],
+                },
+            },
+        },
         # ── Backlog tools (create features/stories for AO traceability) ──
         {
             "type": "function",
@@ -2212,14 +2287,14 @@ def _classify_agent_role(agent: AgentDef) -> str:
         return "product"
     if any(k in combined for k in ("archi", "architect")):
         return "architecture"
-    if any(k in combined for k in ("reviewer", "code review", "code-reviewer", "code_reviewer")):
+    if any(
+        k in combined
+        for k in ("reviewer", "code review", "code-reviewer", "code_reviewer")
+    ):
         return "reviewer"
     if any(k in combined for k in ("ux", "ui", "design", "ergon")):
         return "ux"
-    if any(
-        k in combined
-        for k in ("qa", "test", "qualit", "fixture", "perf")
-    ):
+    if any(k in combined for k in ("qa", "test", "qualit", "fixture", "perf")):
         return "qa"
     if any(
         k in combined
