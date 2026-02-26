@@ -84,9 +84,14 @@
 .cto-attach-clear{cursor:pointer;opacity:.6;flex-shrink:0;line-height:1}
 .cto-attach-clear:hover{opacity:1}
 .cto-attach-hint{font-size:.68rem;color:var(--text-muted)}
-/* drop overlay */
-.cto-drop-overlay{display:none;position:absolute;inset:0;background:rgba(99,102,241,.12);border:2.5px dashed var(--accent,#6366f1);border-radius:8px;z-index:20;pointer-events:none;align-items:center;justify-content:center;flex-direction:column;gap:.5rem;color:var(--accent,#6366f1);font-size:.9rem;font-weight:600}
-.cto-drop-overlay.active{display:flex}
+/* @ mention */
+.cto-mention-popup{position:absolute;bottom:calc(100% + 4px);left:0;right:0;background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,.14);z-index:50;max-height:220px;overflow-y:auto;display:none}
+.cto-mention-popup.open{display:block}
+.cto-mention-item{display:flex;align-items:center;gap:.55rem;padding:.48rem .8rem;font-size:.8rem;cursor:pointer;color:var(--text);transition:background .1s}
+.cto-mention-item:hover,.cto-mention-item.active{background:var(--accent-subtle,rgba(99,102,241,.1));color:var(--accent,#6366f1)}
+.cto-mention-item svg{flex-shrink:0;opacity:.55}
+.cto-mention-item .mi-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.cto-mention-item .mi-stack{font-size:.66rem;color:var(--text-muted);white-space:nowrap}
 
 @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
@@ -181,7 +186,8 @@
         </div>
         <span class="cto-attach-hint" id="cto-attach-hint"></span>
       </div>
-      <div class="cto-input-row">
+      <div class="cto-input-row" style="position:relative">
+        <div class="cto-mention-popup" id="cto-mention-popup"></div>
         <input type="file" id="cto-file-input" style="display:none" accept=".txt,.md,.pdf,.docx,.json,.yaml,.yml,.py,.js,.ts,.jsx,.tsx,.html,.css,.csv,.xml,.sql" onchange="ctoHandleFileInput(this)">
         <button class="cto-file-btn" onclick="document.getElementById('cto-file-input').click()" title="Joindre un fichier (PDF, code, AO…)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
@@ -189,10 +195,10 @@
         <textarea
           id="cto-input"
           class="cto-input"
-          placeholder="Posez une question, glissez un fichier, créez un projet…"
+          placeholder="Posez une question, glissez un fichier, tapez @ pour mentionner un projet…"
           rows="1"
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ctoSend()}"
-          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px'"
+          onkeydown="ctoInputKeydown(event)"
+          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px';ctoInputChange(this)"
         ></textarea>
         <button id="cto-send-btn" class="cto-send" onclick="ctoSend()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -291,6 +297,81 @@
     var files = e.dataTransfer && e.dataTransfer.files;
     if(files && files.length > 0){ _processFile(files[0]); }
   });
+
+  /* ── @ Mention ── */
+  var _projects = null;
+  var _mentionActive = false;
+  var _mentionIdx = 0;
+
+  function _loadProjects(cb){
+    if(_projects){ cb(_projects); return; }
+    fetch('/api/projects').then(function(r){ return r.json(); }).then(function(d){
+      _projects = Array.isArray(d) ? d : (d.projects || d.items || []);
+      cb(_projects);
+    }).catch(function(){ _projects = []; cb([]); });
+  }
+
+  function ctoInputChange(inp){
+    var val = inp.value, cur = inp.selectionStart;
+    var atIdx = val.lastIndexOf('@', cur - 1);
+    if(atIdx === -1 || (atIdx > 0 && !/\s/.test(val[atIdx-1]))){ _closeMention(); return; }
+    var query = val.slice(atIdx + 1, cur).toLowerCase();
+    if(/\s/.test(query)){ _closeMention(); return; }
+    _loadProjects(function(projects){
+      var filtered = projects.filter(function(p){ return p.name.toLowerCase().includes(query); }).slice(0,10);
+      _renderMention(filtered);
+    });
+  }
+
+  function _renderMention(projects){
+    var popup = document.getElementById('cto-mention-popup');
+    if(!popup) return;
+    if(!projects.length){ _closeMention(); return; }
+    _mentionActive = true; _mentionIdx = 0;
+    popup.innerHTML = projects.map(function(p, i){
+      var stack = p.stack || p.technology || '';
+      return '<div class="cto-mention-item'+(i===0?' active':'')+'" onclick="ctoPickMention(\''+_mesc(p.name)+'\')">' +
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>' +
+        '<span class="mi-name">'+_mesc(p.name)+'</span>'+(stack?'<span class="mi-stack">'+_mesc(stack)+'</span>':'')+
+        '</div>';
+    }).join('');
+    popup.classList.add('open');
+  }
+
+  function _closeMention(){
+    _mentionActive = false;
+    var popup = document.getElementById('cto-mention-popup');
+    if(popup){ popup.classList.remove('open'); popup.innerHTML = ''; }
+  }
+
+  function ctoPickMention(name){
+    var inp = document.getElementById('cto-input');
+    var val = inp.value, cur = inp.selectionStart;
+    var atIdx = val.lastIndexOf('@', cur - 1);
+    if(atIdx === -1) return;
+    inp.value = val.slice(0, atIdx) + '@' + name + ' ' + val.slice(cur);
+    inp.selectionStart = inp.selectionEnd = atIdx + name.length + 2;
+    _closeMention(); inp.focus();
+  }
+
+  function ctoInputKeydown(event){
+    if(_mentionActive){
+      var popup = document.getElementById('cto-mention-popup');
+      var items = popup ? popup.querySelectorAll('.cto-mention-item') : [];
+      if(event.key==='ArrowDown'){event.preventDefault();_mentionIdx=Math.min(_mentionIdx+1,items.length-1);_updateMentionActive(items);return;}
+      if(event.key==='ArrowUp'){event.preventDefault();_mentionIdx=Math.max(_mentionIdx-1,0);_updateMentionActive(items);return;}
+      if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();if(items[_mentionIdx])items[_mentionIdx].click();return;}
+      if(event.key==='Escape'){_closeMention();return;}
+    }
+    if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ctoSend();}
+  }
+
+  function _updateMentionActive(items){
+    items.forEach(function(el,i){el.classList.toggle('active',i===_mentionIdx);});
+    if(items[_mentionIdx]) items[_mentionIdx].scrollIntoView({block:'nearest'});
+  }
+
+  function _mesc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;'); }
 
   /* ── Send ── */
   function ctoSend(){
@@ -477,6 +558,9 @@
   window.ctoLoadConv = ctoLoadConv;
   window.ctoClearAttach = ctoClearAttach;
   window.ctoHandleFileInput = ctoHandleFileInput;
+  window.ctoPickMention = ctoPickMention;
+  window.ctoInputChange = ctoInputChange;
+  window.ctoInputKeydown = ctoInputKeydown;
 
   // Scroll to bottom on load
   var msgs = document.getElementById('cto-msgs');
@@ -604,7 +688,8 @@
       </div>
       <span class="cto-attach-hint" id="cto-attach-hint"></span>
     </div>
-    <div class="cto-input-row">
+    <div class="cto-input-row" style="position:relative">
+      <div class="cto-mention-popup" id="cto-mention-popup"></div>
       <input type="file" id="cto-file-input" style="display:none" accept=".txt,.md,.pdf,.docx,.json,.yaml,.yml,.py,.js,.ts,.jsx,.tsx,.html,.css,.csv,.xml,.sql" onchange="ctoHandleFileInput(this)">
       <button class="cto-file-btn" onclick="document.getElementById('cto-file-input').click()" title="Joindre un fichier (PDF, code, AO…)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
@@ -612,10 +697,10 @@
       <textarea
         id="cto-input"
         class="cto-input"
-        placeholder="Posez une question, glissez un fichier, créez un projet…"
+        placeholder="Posez une question, glissez un fichier, tapez @ pour mentionner un projet…"
         rows="1"
-        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ctoSend()}"
-        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"
+        onkeydown="ctoInputKeydown(event)"
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px';ctoInputChange(this)"
       ></textarea>
       <button
         id="cto-send-btn"
@@ -712,6 +797,81 @@
     var files = e.dataTransfer && e.dataTransfer.files;
     if(files && files.length > 0){ _processFile(files[0]); }
   });
+
+  /* ── @ Mention ── */
+  var _projects2 = null;
+  var _mentionActive2 = false;
+  var _mentionIdx2 = 0;
+
+  function _loadProjects2(cb){
+    if(_projects2){ cb(_projects2); return; }
+    fetch('/api/projects').then(function(r){ return r.json(); }).then(function(d){
+      _projects2 = Array.isArray(d) ? d : (d.projects || d.items || []);
+      cb(_projects2);
+    }).catch(function(){ _projects2 = []; cb([]); });
+  }
+
+  function ctoInputChange(inp){
+    var val = inp.value, cur = inp.selectionStart;
+    var atIdx = val.lastIndexOf('@', cur - 1);
+    if(atIdx === -1 || (atIdx > 0 && !/\s/.test(val[atIdx-1]))){ _closeMention2(); return; }
+    var query = val.slice(atIdx + 1, cur).toLowerCase();
+    if(/\s/.test(query)){ _closeMention2(); return; }
+    _loadProjects2(function(projects){
+      var filtered = projects.filter(function(p){ return p.name.toLowerCase().includes(query); }).slice(0,10);
+      _renderMention2(filtered);
+    });
+  }
+
+  function _renderMention2(projects){
+    var popup = document.getElementById('cto-mention-popup');
+    if(!popup) return;
+    if(!projects.length){ _closeMention2(); return; }
+    _mentionActive2 = true; _mentionIdx2 = 0;
+    popup.innerHTML = projects.map(function(p, i){
+      var stack = p.stack || p.technology || '';
+      return '<div class="cto-mention-item'+(i===0?' active':'')+'" onclick="ctoPickMention2(\''+_mesc2(p.name)+'\')">' +
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>' +
+        '<span class="mi-name">'+_mesc2(p.name)+'</span>'+(stack?'<span class="mi-stack">'+_mesc2(stack)+'</span>':'')+
+        '</div>';
+    }).join('');
+    popup.classList.add('open');
+  }
+
+  function _closeMention2(){
+    _mentionActive2 = false;
+    var popup = document.getElementById('cto-mention-popup');
+    if(popup){ popup.classList.remove('open'); popup.innerHTML = ''; }
+  }
+
+  function ctoPickMention2(name){
+    var inp = document.getElementById('cto-input');
+    var val = inp.value, cur = inp.selectionStart;
+    var atIdx = val.lastIndexOf('@', cur - 1);
+    if(atIdx === -1) return;
+    inp.value = val.slice(0, atIdx) + '@' + name + ' ' + val.slice(cur);
+    inp.selectionStart = inp.selectionEnd = atIdx + name.length + 2;
+    _closeMention2(); inp.focus();
+  }
+
+  function ctoInputKeydown(event){
+    if(_mentionActive2){
+      var popup = document.getElementById('cto-mention-popup');
+      var items = popup ? popup.querySelectorAll('.cto-mention-item') : [];
+      if(event.key==='ArrowDown'){event.preventDefault();_mentionIdx2=Math.min(_mentionIdx2+1,items.length-1);_updateMentionActive2(items);return;}
+      if(event.key==='ArrowUp'){event.preventDefault();_mentionIdx2=Math.max(_mentionIdx2-1,0);_updateMentionActive2(items);return;}
+      if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();if(items[_mentionIdx2])items[_mentionIdx2].click();return;}
+      if(event.key==='Escape'){_closeMention2();return;}
+    }
+    if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ctoSend();}
+  }
+
+  function _updateMentionActive2(items){
+    items.forEach(function(el,i){el.classList.toggle('active',i===_mentionIdx2);});
+    if(items[_mentionIdx2]) items[_mentionIdx2].scrollIntoView({block:'nearest'});
+  }
+
+  function _mesc2(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;'); }
 
   /* ── Send ── */
   function ctoSend(){
@@ -831,6 +991,9 @@
   window.ctoChipClick = ctoChipClick;
   window.ctoClearAttach = ctoClearAttach;
   window.ctoHandleFileInput = ctoHandleFileInput;
+  window.ctoPickMention2 = ctoPickMention2;
+  window.ctoInputChange = ctoInputChange;
+  window.ctoInputKeydown = ctoInputKeydown;
 
   var msgs = document.getElementById('cto-msgs');
   if(msgs) msgs.scrollTop = msgs.scrollHeight;
