@@ -31,7 +31,6 @@ def _resolve_default_model() -> str:
         "azure-ai": "gpt-5-mini",
         "anthropic": "claude-sonnet-4-20250514",
         "glm": "glm-4-flash",
-        "demo": "demo-model",
     }
     return _provider_models.get(DEFAULT_PROVIDER, "gpt-5-mini")
 

@@ -63,10 +63,8 @@ def _builtin_providers() -> list[dict]:
 
     result = []
     for pid, pcfg in _PROVIDERS.items():
-        if pid == "demo":
-            continue
         key_env = pcfg.get("key_env", "")
-        has_key = bool(os.environ.get(key_env, "")) if key_env != "__DEMO__" else False
+        has_key = bool(os.environ.get(key_env, ""))
         result.append(
             {
                 "id": pid,

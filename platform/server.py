@@ -181,11 +181,6 @@ async def lifespan(app: FastAPI):
     get_org_store().seed_default()
     get_org_store().seed_additional_teams()
 
-    # Demo mode: seed sample data when no LLM keys configured
-    from .demo import seed_demo_data
-
-    seed_demo_data()
-
     # Sync agent models: ensure DB agents match the current DEFAULT_MODEL
     from .agents.store import DEFAULT_MODEL as _current_model
 
@@ -193,14 +188,13 @@ async def lifespan(app: FastAPI):
         from .db.migrations import get_db as _gdb_sync
 
         _sdb = _gdb_sync()
-        # Only update agents that have a stale/wrong model (not matching env)
         _stale_models = _sdb.execute(
-            "SELECT COUNT(*) FROM agents WHERE model != ? AND model NOT IN ('', 'demo-model')",
+            "SELECT COUNT(*) FROM agents WHERE model != ? AND model NOT IN ('')",
             (_current_model,),
         ).fetchone()[0]
         if _stale_models:
             _sdb.execute(
-                "UPDATE agents SET model = ? WHERE model != ? AND model NOT IN ('', 'demo-model')",
+                "UPDATE agents SET model = ? WHERE model != ? AND model NOT IN ('')",
                 (_current_model, _current_model),
             )
             _sdb.commit()
@@ -286,6 +280,7 @@ async def lifespan(app: FastAPI):
     # Start evolution scheduler (nightly GA + RL retraining at 02:00 UTC)
     try:
         from .agents.evolution_scheduler import start_evolution_scheduler as _evo_sched
+
         _asyncio.create_task(_evo_sched())
         logger.info("Evolution scheduler started as background task")
     except Exception as e:
@@ -296,14 +291,19 @@ async def lifespan(app: FastAPI):
         await _asyncio.sleep(5)  # wait for DB init
         try:
             from .db.migrations import get_db as _sdb
+
             _db = _sdb()
             _count = _db.execute("SELECT COUNT(*) FROM agent_scores").fetchone()[0]
             _db.close()
             if _count == 0:
                 from .agents.simulator import MissionSimulator
+
                 sim = MissionSimulator()
                 results = sim.run_all(n_runs_per_workflow=50)
-                logger.warning("Simulator cold-start: seeded %d agent_scores rows", sum(results.values()))
+                logger.warning(
+                    "Simulator cold-start: seeded %d agent_scores rows",
+                    sum(results.values()),
+                )
         except Exception as e:
             logger.warning("Simulator cold-start failed: %s", e)
 
@@ -781,9 +781,12 @@ def create_app() -> FastAPI:
     @app.get("/manifest.json")
     async def pwa_manifest():
         from fastapi.responses import FileResponse
+
         manifest_path = STATIC_DIR / "manifest.json"
         if manifest_path.exists():
-            return FileResponse(str(manifest_path), media_type="application/manifest+json")
+            return FileResponse(
+                str(manifest_path), media_type="application/manifest+json"
+            )
         return {"error": "manifest not found"}
 
     # Templates
@@ -835,6 +838,7 @@ def create_app() -> FastAPI:
     def _relative_time(ts) -> str:
         """Human-readable relative time from ISO timestamp string."""
         from datetime import datetime, timezone
+
         if not ts:
             return "—"
         try:
@@ -845,11 +849,11 @@ def create_app() -> FastAPI:
             if diff < 60:
                 return "just now"
             if diff < 3600:
-                return f"{int(diff//60)}m ago"
+                return f"{int(diff // 60)}m ago"
             if diff < 86400:
-                return f"{int(diff//3600)}h ago"
+                return f"{int(diff // 3600)}h ago"
             if diff < 2592000:
-                return f"{int(diff//86400)}d ago"
+                return f"{int(diff // 86400)}d ago"
             return str(ts)[:10]
         except Exception:
             return str(ts)[:10]

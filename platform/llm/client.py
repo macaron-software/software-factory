@@ -29,15 +29,6 @@ logger = logging.getLogger(__name__)
 
 # Provider configs — OpenAI-compatible endpoints
 _PROVIDERS = {
-    "demo": {
-        "name": "Demo (mock responses)",
-        "base_url": "http://localhost",
-        "key_env": "__DEMO__",
-        "models": ["demo"],
-        "default": "demo",
-        "auth_header": "Authorization",
-        "auth_prefix": "Bearer ",
-    },
     "azure-ai": {
         "name": "Azure AI Foundry (GPT-5.2)",
         "base_url": os.environ.get(
@@ -91,18 +82,12 @@ _PROVIDERS = {
 _primary = os.environ.get("PLATFORM_LLM_PROVIDER") or (
     "azure-openai" if os.environ.get("AZURE_OPENAI_API_KEY") else "minimax"
 )
-_is_azure = os.environ.get("AZURE_DEPLOY", "") or os.environ.get("AZURE_OPENAI_API_KEY", "")
-if _primary == "demo":
-    _FALLBACK_CHAIN = ["demo"]
-elif _is_azure:
-    # Azure prod: use primary provider, fallback to others (excluding demo)
-    _FALLBACK_CHAIN = [_primary] + [
-        p for p in ["minimax", "azure-openai", "azure-ai", "openai"] if p != _primary
-    ]
-else:
-    _FALLBACK_CHAIN = [_primary] + [
-        p for p in ["minimax", "azure-openai", "azure-ai", "openai"] if p != _primary
-    ]
+_is_azure = os.environ.get("AZURE_DEPLOY", "") or os.environ.get(
+    "AZURE_OPENAI_API_KEY", ""
+)
+_FALLBACK_CHAIN = [_primary] + [
+    p for p in ["minimax", "azure-openai", "azure-ai", "openai"] if p != _primary
+]
 
 
 class _RateLimiter:
@@ -196,7 +181,6 @@ _MODEL_PRICING: dict[str, tuple[float, float]] = {
     "kimi-k2": (0.60, 2.40),
     "m1": (0.50, 2.00),
     "m2.5": (0.50, 2.00),
-    "demo": (0.00, 0.00),
 }
 _DEFAULT_PRICING = (1.00, 4.00)  # fallback for unknown models
 
@@ -273,8 +257,6 @@ class LLMClient:
         env = pcfg.get("key_env", "")
         if not env:
             return "no-key"
-        if env == "__DEMO__":
-            return "demo-key"
         key = os.environ.get(env, "")
         if key:
             return key
@@ -288,125 +270,6 @@ class LLMClient:
             return Path(key_file).read_text().strip()
         except (OSError, FileNotFoundError):
             return ""
-
-    def _demo_response(self, messages: list[LLMMessage]) -> LLMResponse:
-        """Return a contextual mock response for demo mode.
-
-        Generates role-aware, phase-aware, idea-aware responses so the demo
-        feels realistic even without an LLM API key.
-        """
-        import hashlib
-
-        last = messages[-1].content if messages else ""
-        system = next((m.content for m in messages if m.role == "system"), "")
-        lower = last.lower()
-        sys_lower = system.lower()
-
-        # Extract the user's idea from conversation context
-        idea = ""
-        for m in messages:
-            if m.role == "user" and len(m.content) > 20:
-                idea = m.content[:200]
-                break
-        idea_short = idea[:80] if idea else "the proposed solution"
-
-        # Detect agent role from system prompt
-        role = "analyst"
-        if any(k in sys_lower for k in ["product manager", "product owner", "po "]):
-            role = "pm"
-        elif any(k in sys_lower for k in ["business analyst", "analyste métier"]):
-            role = "ba"
-        elif any(k in sys_lower for k in ["architect", "solution architect", "tech lead"]):
-            role = "architect"
-        elif any(k in sys_lower for k in ["ux", "designer", "ergonome"]):
-            role = "ux"
-        elif any(k in sys_lower for k in ["security", "sécurité", "pentest", "sast"]):
-            role = "security"
-        elif any(k in sys_lower for k in ["qa", "test", "quality"]):
-            role = "qa"
-        elif any(k in sys_lower for k in ["devops", "sre", "deploy"]):
-            role = "devops"
-        elif any(k in sys_lower for k in ["developer", "backend", "frontend", "dev "]):
-            role = "dev"
-
-        # Detect phase from message content
-        phase = "analysis"
-        if any(k in lower for k in ["brief", "présent", "introduce", "describe your"]):
-            phase = "brief"
-        elif any(k in lower for k in ["débat", "debate", "challenge", "round 2", "contre"]):
-            phase = "debate"
-        elif any(k in lower for k in ["synthèse", "synthesis", "conclusion", "final"]):
-            phase = "synthesis"
-        elif any(k in lower for k in ["risk", "risque"]):
-            phase = "risks"
-
-        # Use hash for deterministic variety
-        h = int(hashlib.md5(f"{role}{phase}{idea[:30]}".encode()).hexdigest()[:8], 16)
-
-        # Role + phase response matrix
-        responses = {
-            ("pm", "brief"): [
-                f"I've framed this as a product opportunity. For \"{idea_short}\", the target market segments are B2B enterprise and B2C power users. Key differentiators: real-time capabilities, integration ecosystem, and mobile-first approach. I recommend starting with an MVP focused on the core value proposition — we can validate with 5 early adopter interviews before committing to the full roadmap.",
-                f"Product brief prepared. \"{idea_short}\" addresses a clear market gap. I've identified 3 key personas and mapped their journeys. The competitive landscape shows 2 direct competitors but neither offers the integration depth we're targeting. Suggested go-to-market: freemium model with enterprise upsell.",
-            ],
-            ("pm", "synthesis"): [
-                f"Synthesizing all expert input on \"{idea_short}\": the team converges on a modular architecture with 3 core modules for MVP. Key decisions: API-first approach (architect), progressive disclosure UX (designer), OAuth2 + RBAC from day 1 (security). Estimated MVP scope: 6 sprints. Risk mitigation: spike on the real-time sync component in sprint 1. I'll create the epic with 8 features and acceptance criteria.",
-                f"Final synthesis: the team recommends proceeding with \"{idea_short}\" as a strategic initiative. Architecture: event-driven microservices. UX: mobile-responsive SPA with offline support. Security: zero-trust with encrypted data at rest. I'm structuring this into 1 epic, 5 features, and 23 user stories with WSJF prioritization.",
-            ],
-            ("ba", "analysis"): [
-                f"Business analysis for \"{idea_short}\": I've mapped 4 business processes that this solution would optimize. Current pain points: manual workflows (est. 15h/week wasted), data silos between departments, and no real-time visibility. Expected ROI: 40% efficiency gain in the first quarter post-launch. Key stakeholders identified: operations team, finance, and end-users.",
-                f"Functional analysis complete. For \"{idea_short}\", I've identified 12 functional requirements and 6 non-functional requirements. The main business rules center around data validation, workflow automation, and reporting. I recommend a phased rollout: Phase 1 (core CRUD + auth), Phase 2 (automation + integrations), Phase 3 (analytics + optimization).",
-            ],
-            ("architect", "analysis"): [
-                f"Architecture proposal for \"{idea_short}\": I recommend a clean architecture with 3 layers — API gateway, business logic services, and data persistence. Tech stack: FastAPI for the backend (async, high performance), PostgreSQL for relational data, Redis for caching and real-time features. The system should handle 1000 concurrent users with <200ms p95 latency. Key risk: the real-time component needs WebSocket or SSE — I suggest SSE for simplicity.",
-                f"Technical analysis for \"{idea_short}\": the domain decomposes into 4 bounded contexts. I propose a modular monolith initially (not microservices — too early) with clear module boundaries that allow future extraction. Database: PostgreSQL with JSONB for flexible schemas. API: REST with OpenAPI spec, versioned. Infrastructure: Docker + nginx, scalable to K8s when traffic justifies it.",
-            ],
-            ("architect", "debate"): [
-                f"I challenge the monolith approach for \"{idea_short}\". Given the real-time requirements, we need event-driven communication from the start. However, I agree with the modular structure — let's use an internal event bus (in-process) that can be swapped for Kafka/NATS later. This gives us the best of both: simplicity now, scalability later. The database choice is solid but I'd add a read replica strategy for analytics queries.",
-                f"Regarding the tech stack for \"{idea_short}\": the core proposal is sound but I see a concern with the caching strategy. Redis is good for sessions and hot data, but for the search functionality we should consider Elasticsearch or Meilisearch. Also, the API versioning strategy needs to be decided now — URL-based (/v1/) is simpler but header-based is cleaner. I recommend URL-based for the MVP.",
-            ],
-            ("ux", "analysis"): [
-                f"UX analysis for \"{idea_short}\": the primary user flow has 7 steps — I can reduce it to 4 with smart defaults and progressive disclosure. Key design principles: minimal cognitive load, mobile-first responsive, accessibility AA compliant. I've sketched 3 key screens: dashboard (overview), detail view (contextual actions), and settings (progressive complexity). The onboarding should take <2 minutes with a guided wizard.",
-                f"Design review for \"{idea_short}\": from a user perspective, the critical path is onboarding → first value moment. Target: user gets value within 3 minutes of signup. I recommend: 1) Social login (no form friction), 2) Interactive tutorial overlaid on real data, 3) Pre-populated templates. Color palette: professional blue/gray with accent green for CTAs. Typography: Inter for readability across devices.",
-            ],
-            ("security", "analysis"): [
-                f"Security assessment for \"{idea_short}\": OWASP Top 10 review complete. Key requirements: 1) Authentication — OAuth2 + PKCE for SPA, JWT with short TTL (15min) + refresh tokens, 2) Authorization — RBAC with 4 roles minimum, 3) Data protection — AES-256 at rest, TLS 1.3 in transit, 4) Input validation — parameterized queries, CSP headers, rate limiting (100 req/min/user). No PII should be logged. Recommend SOC 2 compliance roadmap from sprint 1.",
-                f"Threat model for \"{idea_short}\": identified 5 attack surfaces — API endpoints, file uploads, authentication flow, third-party integrations, and admin panel. Mitigation plan: WAF rules, input sanitization middleware, SAST in CI pipeline (bandit + semgrep), dependency scanning (Dependabot), and penetration testing at MVP completion. Secret management: environment variables with vault rotation. GDPR considerations: data minimization, right to erasure, consent tracking.",
-            ],
-            ("security", "debate"): [
-                f"I have concerns about the proposed auth flow for \"{idea_short}\". JWT with 15min TTL is good, but the refresh token storage needs attention — HttpOnly cookies, not localStorage. Also, the RBAC model should support attribute-based access control (ABAC) for multi-tenant scenarios. I strongly recommend adding rate limiting on ALL endpoints, not just auth. The proposed CSP policy is too permissive — tighten 'script-src' to 'self' only.",
-            ],
-        }
-
-        # Fallback per role (for phases not explicitly mapped)
-        role_fallbacks = {
-            "pm": f"From a product perspective, \"{idea_short}\" aligns with our strategic objectives. I've evaluated the market fit, identified key risks, and drafted acceptance criteria for the core features. Next step: stakeholder validation and WSJF scoring to prioritize against the current backlog.",
-            "ba": f"I've completed the functional analysis for \"{idea_short}\". The business process mapping reveals 3 optimization opportunities. I've documented the requirements in user story format with acceptance criteria. Key assumption to validate: the integration with existing systems is feasible within the proposed timeline.",
-            "architect": f"Technical assessment for \"{idea_short}\": the proposed architecture is sound for the expected scale. I recommend starting with a modular design that supports future decomposition. Key technical risks are manageable with proper spikes in sprint 1. Performance targets: <200ms API response, >99.5% uptime.",
-            "ux": f"UX review for \"{idea_short}\": the user journey can be optimized to reduce friction by 60%. I recommend a progressive disclosure pattern with smart defaults. The mobile experience should be treated as primary, not responsive-adapted. Key metric to track: time-to-first-value (<3 minutes target).",
-            "security": f"Security review for \"{idea_short}\": no critical blockers identified. The standard security stack (OAuth2, RBAC, CSP, rate limiting) covers the main threat vectors. I recommend adding SAST to the CI pipeline from day 1 and scheduling a penetration test before the first public release.",
-            "qa": f"Quality plan for \"{idea_short}\": I recommend a testing pyramid — 70% unit tests, 20% integration tests, 10% E2E tests. Target coverage: 80% minimum for business logic. Non-functional testing: load test (1000 concurrent users), accessibility audit (WCAG AA), and cross-browser validation (Chrome, Firefox, Safari).",
-            "devops": f"Infrastructure plan for \"{idea_short}\": Docker containers orchestrated with docker-compose for dev/staging, Kubernetes for production. CI/CD: GitHub Actions with build → test → SAST → deploy pipeline. Monitoring: Prometheus + Grafana with alerting on error rate >1% and p95 latency >500ms. Blue-green deployment for zero-downtime releases.",
-            "dev": f"Implementation plan for \"{idea_short}\": I'll structure the codebase with clean architecture — controllers, services, repositories. TDD approach for core business logic. API-first development with OpenAPI spec. Estimated effort for MVP: 4-6 sprints depending on integration complexity. I'll start with the data model and API contracts.",
-            "analyst": f"Analysis for \"{idea_short}\": I've reviewed the requirements and identified key success criteria. The proposed approach is feasible with the current team and tech stack. Main risks: scope creep and third-party API dependencies. I recommend time-boxing the discovery phase and committing to a fixed MVP scope.",
-        }
-
-        key = (role, phase)
-        if key in responses:
-            options = responses[key]
-            content = options[h % len(options)]
-        else:
-            content = role_fallbacks.get(role, role_fallbacks["analyst"])
-
-        return LLMResponse(
-            content=content,
-            model="demo",
-            provider="demo",
-            tokens_in=len(last) // 4,
-            tokens_out=len(content) // 4,
-            duration_ms=50 + (h % 200),
-            finish_reason="stop",
-        )
 
     def _build_url(self, pcfg: dict, model: str) -> str:
         base = pcfg["base_url"].rstrip("/")
@@ -437,12 +300,17 @@ class LLMClient:
         """Send a chat completion request. Falls back to next provider on failure."""
         # ── Cache lookup (deterministic dedup) ──
         from .cache import get_cache
+
         _llm_cache = get_cache()
         msg_dicts = [{"role": m.role, "content": m.content} for m in messages]
         cache_model = model or provider
         cached = _llm_cache.get(cache_model, msg_dicts, temperature, tools)
         if cached:
-            logger.info("LLM cache HIT (%s, saved %d tokens)", cache_model, cached["tokens_in"] + cached["tokens_out"])
+            logger.info(
+                "LLM cache HIT (%s, saved %d tokens)",
+                cache_model,
+                cached["tokens_in"] + cached["tokens_out"],
+            )
             return LLMResponse(
                 content=cached["content"],
                 tokens_in=cached["tokens_in"],
@@ -458,9 +326,14 @@ class LLMClient:
         if not _is_azure and len(providers_to_try) > 1:
             try:
                 from .llm_thompson import llm_thompson_select
-                _best = llm_thompson_select([p for p in providers_to_try if p in _PROVIDERS])
+
+                _best = llm_thompson_select(
+                    [p for p in providers_to_try if p in _PROVIDERS]
+                )
                 if _best and _best != providers_to_try[0]:
-                    providers_to_try = [_best] + [p for p in providers_to_try if p != _best]
+                    providers_to_try = [_best] + [
+                        p for p in providers_to_try if p != _best
+                    ]
             except Exception:
                 pass
 
@@ -470,7 +343,9 @@ class LLMClient:
             if cooldown_until > now:
                 remaining = int(cooldown_until - now)
                 logger.warning(
-                    "LLM %s in cooldown (%ds left), skipping → fallback", prov, remaining
+                    "LLM %s in cooldown (%ds left), skipping → fallback",
+                    prov,
+                    remaining,
                 )
                 continue
 
@@ -482,13 +357,8 @@ class LLMClient:
             pcfg = self._get_provider_config(prov)
             key = self._get_api_key(pcfg)
             if not key or key == "no-key":
-                if prov != "demo":
-                    logger.warning("LLM %s skipped (no API key)", prov)
-                    continue
-
-            # Demo mode: return mock response without HTTP call
-            if prov == "demo":
-                return self._demo_response(messages)
+                logger.warning("LLM %s skipped (no API key)", prov)
+                continue
 
             use_model = (
                 model
@@ -501,11 +371,14 @@ class LLMClient:
                 await _rate_limiter.acquire(timeout=180.0)
             except TimeoutError:
                 logger.error(
-                    "LLM rate limiter timeout (180s) — queue full (%s)", _rate_limiter.usage
+                    "LLM rate limiter timeout (180s) — queue full (%s)",
+                    _rate_limiter.usage,
                 )
                 continue
 
-            logger.warning("LLM trying %s/%s ... [rate: %s]", prov, use_model, _rate_limiter.usage)
+            logger.warning(
+                "LLM trying %s/%s ... [rate: %s]", prov, use_model, _rate_limiter.usage
+            )
             max_attempts = 3  # Retry within provider, then fall back to next
             for attempt in range(max_attempts):
                 try:
@@ -532,17 +405,32 @@ class LLMClient:
                     self._cb_record_success(prov)
                     # Trace for observability
                     self._trace(result, messages)
-                    await self._persist_usage(prov, use_model, result.tokens_in, result.tokens_out)
+                    await self._persist_usage(
+                        prov, use_model, result.tokens_in, result.tokens_out
+                    )
                     # Thompson Sampling: record success
                     try:
                         from .llm_thompson import llm_thompson_record
-                        _quality = min(1.0, result.tokens_out / max(1, result.tokens_in + result.tokens_out))
+
+                        _quality = min(
+                            1.0,
+                            result.tokens_out
+                            / max(1, result.tokens_in + result.tokens_out),
+                        )
                         llm_thompson_record(prov, success=True, quality=_quality)
                     except Exception:
                         pass
                     # Cache the response for future dedup
                     try:
-                        _llm_cache.put(cache_model, msg_dicts, temperature, result.content, result.tokens_in, result.tokens_out, tools)
+                        _llm_cache.put(
+                            cache_model,
+                            msg_dicts,
+                            temperature,
+                            result.content,
+                            result.tokens_in,
+                            result.tokens_out,
+                            tools,
+                        )
                     except Exception:
                         pass
                     return result
@@ -586,6 +474,7 @@ class LLMClient:
                     # Thompson Sampling: record failure
                     try:
                         from .llm_thompson import llm_thompson_record
+
                         llm_thompson_record(prov, success=False, quality=0.0)
                     except Exception:
                         pass
@@ -771,18 +660,7 @@ class LLMClient:
             pcfg = self._get_provider_config(prov)
             key = self._get_api_key(pcfg)
             if not key or key == "no-key":
-                if prov != "demo":
-                    continue
-
-            # Demo mode: yield mock response as stream
-            if prov == "demo":
-                resp = self._demo_response(messages)
-                words = resp.content.split()
-                for i, word in enumerate(words):
-                    yield LLMStreamChunk(delta=(" " if i else "") + word, done=False, model="demo")
-                    await asyncio.sleep(0.02)
-                yield LLMStreamChunk(delta="", done=True, model="demo", finish_reason="stop")
-                return
+                continue
             use_model = (
                 model
                 if (prov == provider and model and model in pcfg.get("models", []))
@@ -793,14 +671,22 @@ class LLMClient:
             try:
                 await _rate_limiter.acquire(timeout=180.0)
             except TimeoutError:
-                logger.error("LLM stream rate limiter timeout (%s)", _rate_limiter.usage)
+                logger.error(
+                    "LLM stream rate limiter timeout (%s)", _rate_limiter.usage
+                )
                 continue
 
             max_attempts = 4
             for attempt in range(max_attempts):
                 try:
                     async for chunk in self._do_stream(
-                        pcfg, prov, use_model, messages, temperature, max_tokens, system_prompt
+                        pcfg,
+                        prov,
+                        use_model,
+                        messages,
+                        temperature,
+                        max_tokens,
+                        system_prompt,
                     ):
                         yield chunk
                     self._cb_record_success(prov)
@@ -830,7 +716,10 @@ class LLMClient:
                         await asyncio.sleep(delay)
                         continue
                     logger.warning(
-                        "LLM stream %s/%s failed: %s — trying next", prov, use_model, err_str[:200]
+                        "LLM stream %s/%s failed: %s — trying next",
+                        prov,
+                        use_model,
+                        err_str[:200],
                     )
                     self._cb_record_failure(prov)
                     if is_rate_limit:
@@ -922,7 +811,9 @@ class LLMClient:
             timeout=httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0)
         )
         try:
-            async with stream_http.stream("POST", url, json=body, headers=headers) as resp:
+            async with stream_http.stream(
+                "POST", url, json=body, headers=headers
+            ) as resp:
                 if resp.status_code != 200:
                     text = await resp.aread()
                     raise RuntimeError(f"HTTP {resp.status_code}: {text[:200]}")
@@ -954,7 +845,9 @@ class LLMClient:
         finally:
             await stream_http.aclose()
 
-    def set_trace_context(self, agent_id: str = "", session_id: str = "", mission_id: str = ""):
+    def set_trace_context(
+        self, agent_id: str = "", session_id: str = "", mission_id: str = ""
+    ):
         """Set context for observability tracing on subsequent calls."""
         self._trace_context = {
             "agent_id": agent_id,
@@ -972,7 +865,9 @@ class LLMClient:
             if messages:
                 last = messages[-1]
                 input_preview = (
-                    last.content if isinstance(last, LLMMessage) else last.get("content", "")
+                    last.content
+                    if isinstance(last, LLMMessage)
+                    else last.get("content", "")
                 )[:200]
             get_tracer().trace_call(
                 provider=result.provider,
@@ -1125,7 +1020,8 @@ class LLMClient:
                         for r in by_day
                     ],
                     "by_phase": [
-                        {"phase": r[0] or "(none)", "cost": r[1], "calls": r[2]} for r in by_phase
+                        {"phase": r[0] or "(none)", "cost": r[1], "calls": r[2]}
+                        for r in by_phase
                     ],
                     "by_agent": [
                         {

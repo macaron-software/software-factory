@@ -43,20 +43,11 @@ make run      # starts platform on port 8090
 3. **Start a mission** — Open your project and type a message to the Agent Lead
 4. **Watch agents collaborate** — The session view shows real-time agent collaboration
 
-## Demo Mode
-
-For testing without LLM keys:
-
-```bash
-export PLATFORM_LLM_PROVIDER=demo
-python -m uvicorn platform.server:app --port 8090 --ws none
-```
-
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PLATFORM_LLM_PROVIDER` | `minimax` | LLM provider (minimax, azure-openai, azure-ai, demo) |
+| `PLATFORM_LLM_PROVIDER` | `minimax` | LLM provider (minimax, azure-openai, azure-ai) |
 | `PLATFORM_LLM_MODEL` | `MiniMax-M2.5` | Model name |
 | `PLATFORM_PORT` | `8090` | HTTP port |
 | `PLATFORM_DB_PATH` | `data/platform.db` | SQLite database path |
