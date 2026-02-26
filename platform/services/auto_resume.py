@@ -477,6 +477,7 @@ async def _launch_new_run(
 ) -> str:
     """Create a new MissionRun for a backlog mission and launch it."""
     import os
+    import subprocess
     import uuid
 
     from ..models import MissionRun, MissionStatus, PhaseRun, PhaseStatus
@@ -506,6 +507,13 @@ async def _launch_new_run(
         "data", "workspaces", run_id,
     )
     os.makedirs(ws_base, exist_ok=True)
+    # Ensure workspace has a git repo so git tools work
+    if not os.path.isdir(os.path.join(ws_base, ".git")):
+        subprocess.run(["git", "init"], cwd=ws_base, capture_output=True)
+        subprocess.run(["git", "commit", "--allow-empty", "-m", "init workspace"],
+                       cwd=ws_base, capture_output=True,
+                       env={**os.environ, "GIT_AUTHOR_NAME": "agent", "GIT_AUTHOR_EMAIL": "agent@sf",
+                            "GIT_COMMITTER_NAME": "agent", "GIT_COMMITTER_EMAIL": "agent@sf"})
 
     run = MissionRun(
         id=run_id,
