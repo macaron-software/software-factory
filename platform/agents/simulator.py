@@ -10,6 +10,7 @@ Usage:
     sim.run_all(n_runs_per_workflow=200)   # seed all workflows
     sim.run_workflow("tma-maintenance", n=300)
 """
+
 from __future__ import annotations
 
 import random
@@ -29,7 +30,7 @@ PATTERN_MODS: dict[str, float] = {
     "network": 0.05,
     "router": 0.03,
     "debate": 0.08,
-    "loop": -0.05,   # loop risks infinite retries
+    "loop": -0.05,  # loop risks infinite retries
     "mapreduce": 0.07,
     "pipeline": 0.04,
     "scatter_gather": 0.06,
@@ -47,9 +48,9 @@ GATE_MODS: dict[str, tuple[float, float]] = {
     "any_approved": (0.02, 0.05),
 }
 
-BASE_SUCCESS_RATE = 0.60   # baseline P(phase_success)
-NOISE_SIGMA = 0.10         # gaussian noise std
-QUALITY_BASE = 0.55        # baseline quality score
+BASE_SUCCESS_RATE = 0.60  # baseline P(phase_success)
+NOISE_SIGMA = 0.10  # gaussian noise std
+QUALITY_BASE = 0.55  # baseline quality score
 QUALITY_SIGMA = 0.12
 
 
@@ -64,6 +65,7 @@ class MissionSimulator:
         if self._wf_store is None:
             from ..workflows.store import get_workflow_store
             from ..agents.store import get_agent_store
+
             self._wf_store = get_workflow_store()
             self._agent_store = get_agent_store()
 
@@ -80,7 +82,9 @@ class MissionSimulator:
                 results[wf.id] = count
             except Exception as e:
                 log.warning(f"Simulator: skip {wf.id} — {e}")
-        log.info(f"Simulator: seeded {sum(results.values())} rows across {len(results)} workflows")
+        log.info(
+            f"Simulator: seeded {sum(results.values())} rows across {len(results)} workflows"
+        )
         return results
 
     def run_workflow(self, wf_id: str, n: int = 200) -> int:
@@ -100,6 +104,39 @@ class MissionSimulator:
                 rows_written += self._write_phase_result(phase_result, sim_epic_id)
 
         return rows_written
+
+    def simulate_mission_fast(self, mission_id: str) -> dict[str, str]:
+        """Force all phases of a simulated mission to 'done'.
+
+        Sets every phase status to 'done' directly in the mission store,
+        bypassing actual agent execution.  Useful for testing pipelines
+        and seeding progress data without running real LLM calls.
+
+        Returns a dict mapping phase_id → new status.
+        """
+        try:
+            from ..missions.store import PhaseStatus, get_mission_store
+        except ImportError as exc:
+            raise RuntimeError("Mission store not available") from exc
+
+        ms = get_mission_store()
+        mission = ms.get(mission_id)
+        if not mission:
+            raise ValueError(f"Mission {mission_id!r} not found")
+
+        updated: dict[str, str] = {}
+        for phase in mission.phases:
+            phase.status = PhaseStatus.DONE
+            updated[phase.phase_id] = "done"
+
+        mission.status = "done"  # type: ignore[assignment]
+        ms.update(mission)
+        log.info(
+            "simulate_mission_fast: mission %s — %d phases forced to done",
+            mission_id,
+            len(updated),
+        )
+        return updated
 
     def simulate_genome(self, genome: list[dict[str, Any]], n: int = 50) -> float:
         """
@@ -152,19 +189,23 @@ class MissionSimulator:
             }
         return results
 
-    def _simulate_phase_spec(self, phase_spec: dict, all_agents: dict) -> tuple[float, float]:
+    def _simulate_phase_spec(
+        self, phase_spec: dict, all_agents: dict
+    ) -> tuple[float, float]:
         """Return (success_prob, quality) for a GA genome phase spec."""
         pattern_id = phase_spec.get("pattern_id", "sequential")
         gate = phase_spec.get("gate", "always")
         agents = phase_spec.get("agents", [])
         if not agents:
             return BASE_SUCCESS_RATE, QUALITY_BASE
-        seniority = sum(
-            self._agent_seniority(all_agents.get(a)) for a in agents
-        ) / len(agents)
+        seniority = sum(self._agent_seniority(all_agents.get(a)) for a in agents) / len(
+            agents
+        )
         return self._compute_outcome(pattern_id, gate, seniority)
 
-    def _compute_outcome(self, pattern_id: str, gate: str, seniority: float) -> tuple[float, float]:
+    def _compute_outcome(
+        self, pattern_id: str, gate: str, seniority: float
+    ) -> tuple[float, float]:
         """Compute (p_success, quality_score) given priors + gaussian noise."""
         p_mod = PATTERN_MODS.get(pattern_id, 0.0)
         g_qual, _g_dur = GATE_MODS.get(gate, (0.0, 0.0))
@@ -186,10 +227,12 @@ class MissionSimulator:
         """Write simulated agent outcomes to agent_scores table."""
         try:
             from ..db.migrations import get_db
+
             db = get_db()
             count = 0
             for agent_id, r in phase_result.items():
-                db.execute("""
+                db.execute(
+                    """
                     INSERT INTO agent_scores (agent_id, epic_id, accepted, rejected, iterations, quality_score)
                     VALUES (?, ?, ?, ?, ?, ?)
                     ON CONFLICT(agent_id, epic_id) DO UPDATE SET
@@ -197,7 +240,16 @@ class MissionSimulator:
                         rejected = rejected + excluded.rejected,
                         iterations = iterations + 1,
                         quality_score = (quality_score + excluded.quality_score) / 2.0
-                """, (agent_id, epic_id, r["accepted"], r["rejected"], 1, r["quality_score"]))
+                """,
+                    (
+                        agent_id,
+                        epic_id,
+                        r["accepted"],
+                        r["rejected"],
+                        1,
+                        r["quality_score"],
+                    ),
+                )
                 count += 1
             db.commit()
             db.close()
