@@ -13,7 +13,7 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.OVH_SSH_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
+          echo "${{ secrets.OVH_SSH_KEY }}" | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           echo "StrictHostKeyChecking no" >> ~/.ssh/config
           echo "UserKnownHostsFile /dev/null" >> ~/.ssh/config
