@@ -1,0 +1,641 @@
+{% extends "base.html" %}
+{% block head_extra %}
+<script src="/static/js/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<style>
+.teams-tabs {
+    display: flex; gap: 0; margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--border);
+    padding: 0 1rem;
+}
+.teams-tab {
+    padding: 0.6rem 1.25rem; cursor: pointer;
+    font-size: 0.85rem; font-weight: 500;
+    color: var(--text-secondary); border-bottom: 2px solid transparent;
+    margin-bottom: -2px; display: flex; align-items: center; gap: 0.4rem;
+    background: none; border: none; border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+}
+.teams-tab:hover { color: var(--text-primary); }
+.teams-tab.active {
+    color: var(--purple-light, #a78bfa);
+    border-bottom-color: var(--purple-light, #a78bfa);
+    font-weight: 600;
+}
+.teams-tab svg.icon { width: 14px; height: 14px; }
+
+/* filters bar */
+.teams-filters {
+    display: flex; gap: 0.75rem; align-items: center;
+    flex-wrap: wrap; margin-bottom: 1.25rem; padding: 0 1rem;
+}
+.teams-filters select, .teams-filters input {
+    background: var(--bg-secondary); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.3rem 0.6rem; font-size: 0.8rem;
+}
+.teams-filters label { font-size: 0.78rem; color: var(--text-secondary); }
+
+/* leaderboard table */
+.team-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.team-table th {
+    text-align: left; padding: 0.5rem 0.75rem;
+    font-weight: 600; color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+}
+.team-table td {
+    padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.05));
+    vertical-align: middle;
+}
+.team-table tr:hover td { background: var(--bg-hover, rgba(255,255,255,0.03)); }
+.team-table .rank { font-weight: 700; color: var(--text-secondary); width: 36px; text-align: center; }
+
+/* badges */
+.badge {
+    display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px;
+    font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+}
+.badge-champion { background: rgba(251,191,36,0.15); color: #f59e0b; border: 1px solid rgba(251,191,36,0.3); }
+.badge-rising    { background: rgba(52,211,153,0.15); color: #34d399; border: 1px solid rgba(52,211,153,0.3); }
+.badge-declining { background: rgba(251,113,133,0.15); color: #f87171; border: 1px solid rgba(251,113,133,0.3); }
+.badge-retired   { background: rgba(148,163,184,0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3); }
+.badge-active    { background: rgba(139,92,246,0.1);  color: #a78bfa; border: 1px solid rgba(139,92,246,0.2); }
+.badge-warmup    { background: rgba(251,191,36,0.08);  color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+
+/* fitness bar */
+.fitness-bar-wrap { display: flex; align-items: center; gap: 0.5rem; min-width: 140px; }
+.fitness-bar-bg { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.fitness-bar { height: 100%; border-radius: 3px; transition: width 0.4s; }
+
+/* OKR status dots */
+.kpi-status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.kpi-green  { background: #34d399; }
+.kpi-amber  { background: #fbbf24; }
+.kpi-red    { background: #f87171; }
+
+/* action buttons */
+.btn-xs {
+    padding: 0.2rem 0.5rem; font-size: 0.72rem; border-radius: 5px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-secondary);
+    transition: all 0.15s;
+}
+.btn-xs:hover { color: var(--text-primary); border-color: var(--purple-light, #a78bfa); }
+.btn-danger { border-color: rgba(251,113,133,0.4); color: #f87171; }
+.btn-danger:hover { background: rgba(251,113,133,0.1); }
+
+/* OKR edit inputs */
+.okr-val-input {
+    width: 70px; background: var(--bg-secondary); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 5px;
+    padding: 0.2rem 0.4rem; font-size: 0.8rem; text-align: right;
+}
+
+/* evolution chart container */
+#evo-chart-container { padding: 1.5rem; }
+#evoChart { max-height: 380px; }
+
+/* selections list */
+.sel-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.05)); font-size: 0.8rem; }
+.sel-mode { font-size: 0.72rem; padding: 0.1rem 0.4rem; border-radius: 10px; background: rgba(139,92,246,0.1); color: #a78bfa; }
+.sel-mode.warmup { background: rgba(251,191,36,0.1); color: #fbbf24; }
+.sel-score { font-weight: 600; color: var(--text-primary); min-width: 40px; text-align: right; }
+
+/* AB test badges */
+.ab-winner { background: rgba(52,211,153,0.1); color: #34d399; padding: 0.1rem 0.4rem; border-radius: 10px; font-size: 0.72rem; }
+.ab-pending { color: var(--text-secondary); font-size: 0.72rem; }
+
+/* page header */
+.teams-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.75rem 1rem 1rem; border-bottom: 1px solid var(--border); margin-bottom: 1.25rem;
+}
+.teams-header h1 { font-size: 1.1rem; font-weight: 700; margin: 0; }
+.teams-header p { font-size: 0.8rem; color: var(--text-secondary); margin: 0.15rem 0 0; }
+.teams-header-meta { text-align: right; font-size: 0.75rem; color: var(--text-secondary); }
+
+/* empty state */
+.empty-state {
+    text-align: center; padding: 4rem 2rem; color: var(--text-secondary);
+}
+.empty-state p { margin: 0.5rem 0; font-size: 0.85rem; }
+.empty-state .hint { font-size: 0.75rem; opacity: 0.6; margin-top: 0.75rem; }
+
+/* section title */
+.section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--text-secondary); margin: 1.5rem 1rem 0.75rem; }
+</style>
+
+<!-- Header -->
+<div class="teams-header">
+    <div>
+        <h1>Darwin Teams</h1>
+        <p>Fitness-based agent selection — Thompson Sampling per technology and phase type</p>
+    </div>
+    <div class="teams-header-meta" id="teams-ctx-summary">
+        Loading contexts...
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="teams-tabs">
+    <button class="teams-tab active" id="tab-leaderboard" onclick="showTab('leaderboard')">
+        <svg class="icon"><use href="#icon-bar-chart-2"/></svg> Leaderboard
+    </button>
+    <button class="teams-tab" id="tab-okr" onclick="showTab('okr')">
+        <svg class="icon"><use href="#icon-target"/></svg> OKR / KPIs
+    </button>
+    <button class="teams-tab" id="tab-evolution" onclick="showTab('evolution')">
+        <svg class="icon"><use href="#icon-activity"/></svg> Evolution
+    </button>
+    <button class="teams-tab" id="tab-selections" onclick="showTab('selections')">
+        <svg class="icon"><use href="#icon-zap"/></svg> Selections
+    </button>
+    <button class="teams-tab" id="tab-abtests" onclick="showTab('abtests')">
+        <svg class="icon"><use href="#icon-git-branch"/></svg> A/B Tests
+    </button>
+</div>
+
+<!-- ============================================================ TAB CONTENT -->
+<div id="teams-content">
+
+<!-- LEADERBOARD -->
+<div id="panel-leaderboard">
+    <div class="teams-filters">
+        <label>Technology</label>
+        <select id="lb-tech" onchange="loadLeaderboard()">
+            <option value="generic">All / Generic</option>
+        </select>
+        <label>Phase</label>
+        <select id="lb-phase" onchange="loadLeaderboard()">
+            <option value="generic">All / Generic</option>
+            <option value="migration">Migration</option>
+            <option value="new_feature">New Feature</option>
+            <option value="bugfix">Bug Fix</option>
+            <option value="refactoring">Refactoring</option>
+            <option value="audit">Audit</option>
+            <option value="design">Design</option>
+            <option value="testing">Testing</option>
+            <option value="docs">Docs</option>
+            <option value="review">Review</option>
+        </select>
+        <button class="btn-xs" onclick="loadLeaderboard()">Refresh</button>
+    </div>
+    <div id="leaderboard-table" style="padding: 0 1rem;">
+        <p style="color:var(--text-secondary);font-size:0.82rem;padding:2rem 0;">Loading leaderboard...</p>
+    </div>
+</div>
+
+<!-- OKR -->
+<div id="panel-okr" style="display:none">
+    <div class="teams-filters">
+        <label>Technology</label>
+        <select id="okr-tech" onchange="loadOKR()">
+            <option value="">All</option>
+        </select>
+        <label>Phase</label>
+        <select id="okr-phase" onchange="loadOKR()">
+            <option value="">All</option>
+            <option value="migration">Migration</option>
+            <option value="new_feature">New Feature</option>
+            <option value="bugfix">Bug Fix</option>
+            <option value="audit">Audit</option>
+            <option value="design">Design</option>
+            <option value="testing">Testing</option>
+            <option value="generic">Generic</option>
+        </select>
+        <button class="btn-xs" onclick="loadOKR()">Refresh</button>
+    </div>
+    <div id="okr-table" style="padding: 0 1rem;"></div>
+</div>
+
+<!-- EVOLUTION -->
+<div id="panel-evolution" style="display:none">
+    <div class="teams-filters">
+        <label>Technology</label>
+        <select id="evo-tech" onchange="loadEvolution()">
+            <option value="generic">Generic</option>
+        </select>
+        <label>Phase</label>
+        <select id="evo-phase" onchange="loadEvolution()">
+            <option value="generic">Generic</option>
+            <option value="migration">Migration</option>
+            <option value="new_feature">New Feature</option>
+            <option value="bugfix">Bug Fix</option>
+            <option value="audit">Audit</option>
+            <option value="design">Design</option>
+            <option value="testing">Testing</option>
+        </select>
+        <label>Period</label>
+        <select id="evo-days" onchange="loadEvolution()">
+            <option value="7">7 days</option>
+            <option value="30" selected>30 days</option>
+            <option value="90">90 days</option>
+            <option value="365">All</option>
+        </select>
+        <button class="btn-xs" onclick="loadEvolution()">Refresh</button>
+    </div>
+    <div id="evo-chart-container">
+        <canvas id="evoChart"></canvas>
+        <p id="evo-empty" style="text-align:center;color:var(--text-secondary);font-size:0.82rem;padding:3rem 0;display:none">
+            No fitness history yet for this context. Run some missions to generate data.
+        </p>
+    </div>
+</div>
+
+<!-- SELECTIONS -->
+<div id="panel-selections" style="display:none">
+    <div class="teams-filters">
+        <label>Limit</label>
+        <select id="sel-limit" onchange="loadSelections()">
+            <option value="20" selected>20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+        </select>
+        <button class="btn-xs" onclick="loadSelections()">Refresh</button>
+    </div>
+    <div id="selections-list" style="padding: 0 1rem;"></div>
+</div>
+
+<!-- A/B TESTS -->
+<div id="panel-abtests" style="display:none">
+    <div class="teams-filters">
+        <label>Status</label>
+        <select id="ab-status" onchange="loadABTests()">
+            <option value="">All</option>
+            <option value="pending">Pending</option>
+            <option value="running">Running</option>
+            <option value="completed">Completed</option>
+        </select>
+        <button class="btn-xs" onclick="loadABTests()">Refresh</button>
+    </div>
+    <div id="abtests-list" style="padding: 0 1rem;"></div>
+    <div class="empty-state" id="ab-explain" style="display:none">
+        <p>A/B tests run automatically when two teams have close fitness scores (delta &lt; 10)</p>
+        <p>or probabilistically (10% of missions spawn a shadow parallel run).</p>
+        <p class="hint">Use <code>TeamSelector.should_ab_test()</code> to manually trigger from patterns.</p>
+    </div>
+</div>
+
+</div><!-- /teams-content -->
+
+<script>
+let _evoChart = null;
+
+function showTab(name) {
+    document.querySelectorAll('.teams-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    ['leaderboard','okr','evolution','selections','abtests'].forEach(p => {
+        document.getElementById('panel-' + p).style.display = (p === name) ? '' : 'none';
+    });
+    if (name === 'leaderboard') loadLeaderboard();
+    else if (name === 'okr') loadOKR();
+    else if (name === 'evolution') loadEvolution();
+    else if (name === 'selections') loadSelections();
+    else if (name === 'abtests') loadABTests();
+}
+
+// ---- helpers ----
+function fitnessColor(score) {
+    if (score >= 70) return '#34d399';
+    if (score >= 40) return '#fbbf24';
+    return '#f87171';
+}
+function badgeHtml(badge, runs) {
+    if (runs < 5) return '<span class="badge badge-warmup">warmup</span>';
+    const map = {champion:'badge-champion',rising:'badge-rising',declining:'badge-declining',retired:'badge-retired',active:'badge-active'};
+    const cls = map[badge] || 'badge-active';
+    return `<span class="badge ${cls}">${badge}</span>`;
+}
+function kpiStatusDot(current, target) {
+    const pct = target > 0 ? current / target : 1;
+    if (pct >= 0.9) return '<span class="kpi-status kpi-green"></span>';
+    if (pct >= 0.6) return '<span class="kpi-status kpi-amber"></span>';
+    return '<span class="kpi-status kpi-red"></span>';
+}
+
+// ---- contexts ----
+async function loadContexts() {
+    try {
+        const r = await fetch('/api/teams/contexts');
+        const d = await r.json();
+        const ctxs = d.contexts || [];
+
+        // populate tech selects
+        const techOpts = [...new Set(ctxs.map(c => c.technology).filter(t => t !== 'generic'))];
+        ['lb-tech','okr-tech','evo-tech'].forEach(sid => {
+            const sel = document.getElementById(sid);
+            if (!sel) return;
+            const existing = [...sel.options].map(o => o.value);
+            techOpts.forEach(t => {
+                if (!existing.includes(t)) {
+                    const o = document.createElement('option');
+                    o.value = t; o.textContent = t;
+                    sel.appendChild(o);
+                }
+            });
+        });
+
+        const total = ctxs.reduce((s, c) => s + c.teams, 0);
+        document.getElementById('teams-ctx-summary').textContent =
+            `${total} team records across ${ctxs.length} contexts`;
+    } catch(e) { console.warn('loadContexts:', e); }
+}
+
+// ---- leaderboard ----
+async function loadLeaderboard() {
+    const tech = document.getElementById('lb-tech').value;
+    const phase = document.getElementById('lb-phase').value;
+    const container = document.getElementById('leaderboard-table');
+    container.innerHTML = '<p style="color:var(--text-secondary);font-size:0.82rem;padding:1rem 0">Loading...</p>';
+
+    try {
+        const r = await fetch(`/api/teams/leaderboard?technology=${encodeURIComponent(tech)}&phase_type=${encodeURIComponent(phase)}&limit=30`);
+        const d = await r.json();
+        const teams = d.teams || [];
+
+        if (!teams.length) {
+            container.innerHTML = `<div class="empty-state">
+                <p>No fitness data yet for <strong>${tech} / ${phase}</strong></p>
+                <p class="hint">Run missions with <code>agent_id: "skill:developer"</code> in your patterns to start collecting data.</p>
+            </div>`;
+            return;
+        }
+
+        let html = `<table class="team-table">
+            <thead><tr>
+                <th class="rank">#</th>
+                <th>Agent</th>
+                <th>Pattern</th>
+                <th>Fitness</th>
+                <th>Runs</th>
+                <th>W/L</th>
+                <th>Avg Iter</th>
+                <th>Badge</th>
+                <th>Actions</th>
+            </tr></thead><tbody>`;
+
+        teams.forEach((t, i) => {
+            const bar = `<div class="fitness-bar-wrap">
+                <div class="fitness-bar-bg"><div class="fitness-bar" style="width:${t.fitness_score}%;background:${fitnessColor(t.fitness_score)}"></div></div>
+                <span style="font-size:0.78rem;font-weight:600;color:${fitnessColor(t.fitness_score)}">${t.fitness_score.toFixed(1)}</span>
+            </div>`;
+            const wl = `<span style="color:#34d399">${t.wins}</span>/<span style="color:#f87171">${t.losses}</span>`;
+            const retired = t.retired ? ' (retired)' : '';
+            const retireBtn = t.retired
+                ? `<button class="btn-xs" onclick="teamUnretire('${t.agent_id}','${t.pattern_id}','${tech}','${phase}')">Unretire</button>`
+                : `<button class="btn-xs btn-danger" onclick="teamRetire('${t.agent_id}','${t.pattern_id}','${tech}','${phase}')">Retire</button>`;
+
+            html += `<tr>
+                <td class="rank">${i+1}</td>
+                <td><strong>${t.agent_name || t.agent_id}</strong><br><small style="color:var(--text-secondary)">${t.agent_role || ''}</small></td>
+                <td><small>${t.pattern_id}</small></td>
+                <td>${bar}</td>
+                <td style="text-align:center">${t.runs}</td>
+                <td style="text-align:center">${wl}</td>
+                <td style="text-align:center">${(t.avg_iterations||0).toFixed(1)}</td>
+                <td>${badgeHtml(t.badge, t.runs)}</td>
+                <td style="display:flex;gap:0.25rem;flex-wrap:wrap">${retireBtn}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    } catch(e) {
+        container.innerHTML = `<p style="color:#f87171;padding:1rem">Error loading leaderboard: ${e.message}</p>`;
+    }
+}
+
+async function teamRetire(agentId, patternId, tech, phase) {
+    if (!confirm(`Retire ${agentId} + ${patternId}?`)) return;
+    await fetch(`/api/teams/${encodeURIComponent(agentId)}/${encodeURIComponent(patternId)}/retire?technology=${tech}&phase_type=${phase}`, {method:'POST'});
+    loadLeaderboard();
+}
+async function teamUnretire(agentId, patternId, tech, phase) {
+    await fetch(`/api/teams/${encodeURIComponent(agentId)}/${encodeURIComponent(patternId)}/unretire?technology=${tech}&phase_type=${phase}`, {method:'POST'});
+    loadLeaderboard();
+}
+
+// ---- OKR ----
+async function loadOKR() {
+    const tech = document.getElementById('okr-tech').value;
+    const phase = document.getElementById('okr-phase').value;
+    const container = document.getElementById('okr-table');
+    container.innerHTML = '<p style="color:var(--text-secondary);font-size:0.82rem;padding:1rem 0">Loading...</p>';
+
+    try {
+        let url = '/api/teams/okr';
+        const params = [];
+        if (tech) params.push('technology=' + encodeURIComponent(tech));
+        if (phase) params.push('phase_type=' + encodeURIComponent(phase));
+        if (params.length) url += '?' + params.join('&');
+
+        const r = await fetch(url);
+        const d = await r.json();
+        const okrs = d.okrs || [];
+
+        if (!okrs.length) {
+            container.innerHTML = '<div class="empty-state"><p>No OKRs found.</p></div>';
+            return;
+        }
+
+        let html = `<table class="team-table">
+            <thead><tr>
+                <th>Domain</th><th>Technology</th><th>Phase</th>
+                <th>OKR</th><th>KPI</th><th>Target</th><th>Current</th><th>Status</th><th>Actions</th>
+            </tr></thead><tbody>`;
+
+        okrs.forEach(o => {
+            const pct = o.kpi_target > 0 ? (o.kpi_current / o.kpi_target * 100) : 0;
+            const dot = kpiStatusDot(o.kpi_current, o.kpi_target);
+            html += `<tr>
+                <td><strong>${o.team_key}</strong></td>
+                <td>${o.technology}</td>
+                <td>${o.phase_type}</td>
+                <td style="max-width:200px;font-size:0.78rem">${o.okr_text}</td>
+                <td>${o.kpi_name}</td>
+                <td>
+                    <input class="okr-val-input" type="number" value="${o.kpi_target}" id="target-${o.id}"
+                        onchange="saveOKR(${o.id})" step="1" min="0">
+                    <small style="color:var(--text-secondary)">${o.kpi_unit}</small>
+                </td>
+                <td>
+                    <input class="okr-val-input" type="number" value="${o.kpi_current}" id="current-${o.id}"
+                        onchange="saveOKR(${o.id})" step="0.1" min="0">
+                    <small style="color:var(--text-secondary)">${o.kpi_unit}</small>
+                </td>
+                <td style="text-align:center">${dot} <small>${pct.toFixed(0)}%</small></td>
+                <td><button class="btn-xs" onclick="saveOKR(${o.id})">Save</button></td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    } catch(e) {
+        container.innerHTML = `<p style="color:#f87171;padding:1rem">Error: ${e.message}</p>`;
+    }
+}
+
+async function saveOKR(id) {
+    const target = parseFloat(document.getElementById('target-'+id)?.value || 0);
+    const current = parseFloat(document.getElementById('current-'+id)?.value || 0);
+    try {
+        const r = await fetch(`/api/teams/okr/${id}`, {
+            method: 'PUT',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({kpi_target: target, kpi_current: current})
+        });
+        if (r.ok) loadOKR();
+    } catch(e) { console.error('saveOKR:', e); }
+}
+
+// ---- evolution ----
+async function loadEvolution() {
+    const tech = document.getElementById('evo-tech').value;
+    const phase = document.getElementById('evo-phase').value;
+    const days = document.getElementById('evo-days').value;
+
+    try {
+        const r = await fetch(`/api/teams/evolution?technology=${encodeURIComponent(tech)}&phase_type=${encodeURIComponent(phase)}&days=${days}`);
+        const d = await r.json();
+        const history = d.history || [];
+
+        const emptyEl = document.getElementById('evo-empty');
+        if (!history.length) {
+            emptyEl.style.display = '';
+            if (_evoChart) { _evoChart.destroy(); _evoChart = null; }
+            return;
+        }
+        emptyEl.style.display = 'none';
+
+        // Group by (agent_id, pattern_id)
+        const groups = {};
+        history.forEach(h => {
+            const key = `${h.agent_id} + ${h.pattern_id}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(h);
+        });
+
+        // Collect all dates
+        const allDates = [...new Set(history.map(h => h.snapshot_date))].sort();
+        const COLORS = ['#a78bfa','#34d399','#fbbf24','#f87171','#60a5fa','#f472b6'];
+
+        const datasets = Object.entries(groups).map(([key, rows], i) => {
+            const byDate = Object.fromEntries(rows.map(r => [r.snapshot_date, r.fitness_score]));
+            return {
+                label: key,
+                data: allDates.map(d => byDate[d] ?? null),
+                borderColor: COLORS[i % COLORS.length],
+                backgroundColor: COLORS[i % COLORS.length] + '22',
+                tension: 0.3,
+                fill: false,
+                spanGaps: true,
+                pointRadius: 3,
+            };
+        });
+
+        if (_evoChart) _evoChart.destroy();
+        const ctx = document.getElementById('evoChart').getContext('2d');
+        _evoChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: allDates, datasets },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { labels: { color: '#94a3b8', font: { size: 11 } } },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
+                    y: { min: 0, max: 100, ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.1)' } }
+                }
+            }
+        });
+    } catch(e) { console.error('loadEvolution:', e); }
+}
+
+// ---- selections ----
+async function loadSelections() {
+    const limit = document.getElementById('sel-limit').value;
+    const container = document.getElementById('selections-list');
+    try {
+        const r = await fetch(`/api/teams/selections?limit=${limit}`);
+        const d = await r.json();
+        const sels = d.selections || [];
+
+        if (!sels.length) {
+            container.innerHTML = '<div class="empty-state"><p>No selections recorded yet.</p><p class="hint">Selections are recorded when patterns use <code>agent_id: "skill:*"</code>.</p></div>';
+            return;
+        }
+
+        let html = '';
+        sels.forEach(s => {
+            const ts = new Date(s.selected_at).toLocaleString();
+            const modeClass = s.selection_mode === 'warmup' ? 'warmup' : '';
+            const score = s.thompson_score ? s.thompson_score.toFixed(1) : '—';
+            html += `<div class="sel-row">
+                <span style="color:var(--text-secondary);font-size:0.72rem;min-width:130px">${ts}</span>
+                <span class="sel-mode ${modeClass}">${s.selection_mode}</span>
+                <span style="flex:1"><strong>${s.agent_name || s.agent_id}</strong> + ${s.pattern_id}</span>
+                <span style="color:var(--text-secondary);font-size:0.72rem">${s.technology} / ${s.phase_type}</span>
+                <span class="sel-score">${score}</span>
+            </div>`;
+        });
+        container.innerHTML = html;
+    } catch(e) {
+        container.innerHTML = `<p style="color:#f87171;padding:1rem">Error: ${e.message}</p>`;
+    }
+}
+
+// ---- A/B tests ----
+async function loadABTests() {
+    const status = document.getElementById('ab-status').value;
+    const container = document.getElementById('abtests-list');
+    const explain = document.getElementById('ab-explain');
+    try {
+        let url = '/api/teams/ab-tests?limit=30';
+        if (status) url += '&status=' + encodeURIComponent(status);
+
+        const r = await fetch(url);
+        const d = await r.json();
+        const tests = d.ab_tests || [];
+
+        if (!tests.length) {
+            container.innerHTML = '';
+            explain.style.display = '';
+            return;
+        }
+        explain.style.display = 'none';
+
+        let html = `<table class="team-table">
+            <thead><tr>
+                <th>Date</th><th>Technology / Phase</th><th>Team A</th><th>Team B</th>
+                <th>Status</th><th>Winner</th><th>Scores</th>
+            </tr></thead><tbody>`;
+
+        tests.forEach(t => {
+            const ts = new Date(t.started_at).toLocaleString();
+            const winner = t.winner ? `<span class="ab-winner">${t.winner}</span>` : `<span class="ab-pending">${t.status}</span>`;
+            const scores = (t.team_a_score !== null && t.team_b_score !== null)
+                ? `${(t.team_a_score||0).toFixed(1)} vs ${(t.team_b_score||0).toFixed(1)}`
+                : '—';
+            html += `<tr>
+                <td style="font-size:0.75rem">${ts}</td>
+                <td>${t.technology} / ${t.phase_type}</td>
+                <td>${t.team_a_agent} + ${t.team_a_pattern}</td>
+                <td>${t.team_b_agent} + ${t.team_b_pattern}</td>
+                <td>${t.status}</td>
+                <td>${winner}</td>
+                <td>${scores}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    } catch(e) {
+        container.innerHTML = `<p style="color:#f87171;padding:1rem">Error: ${e.message}</p>`;
+    }
+}
+
+// ---- init ----
+loadContexts();
+loadLeaderboard();
+</script>
+{% endblock %}

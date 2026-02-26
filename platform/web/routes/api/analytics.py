@@ -105,6 +105,15 @@ async def dora_dashboard_page(request: Request):
     )
 
 
+@router.get("/teams", response_class=HTMLResponse)
+async def teams_page(request: Request):
+    """Darwin team fitness dashboard — leaderboard, OKR, evolution, A/B tests."""
+    return _templates(request).TemplateResponse(
+        "teams.html",
+        {"request": request, "page_title": "Teams"},
+    )
+
+
 @router.get("/api/metrics/dora/{project_id}", responses={200: {"model": DoraMetrics}})
 async def dora_api(request: Request, project_id: str):
     """DORA metrics JSON API."""

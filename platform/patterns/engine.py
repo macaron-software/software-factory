@@ -33,6 +33,7 @@ from ..projects.manager import get_project_store
 from ..sessions.store import MessageDef, get_session_store
 from ..skills.library import get_skill_library
 from .store import PatternDef
+from .team_selector import TeamSelector, infer_context, update_team_fitness
 
 logger = logging.getLogger(__name__)
 
@@ -554,10 +555,32 @@ async def run_pattern(
     )
 
     # Resolve agents for each node
+    # skill:* tags → TeamSelector (fitness-based) or explicit agent_id → direct
     agent_store = get_agent_store()
+    _tech, _phase = infer_context(
+        workflow_id=pattern.config.get("workflow_id", ""),
+        title=initial_task[:200],
+    )
+    _task_domain = pattern.config.get("task_domain", "code")
+    _darwin_nodes: list[tuple[str, str, str]] = []  # (node_id, agent_id, skill)
     for node in pattern.agents:
         nid = node["id"]
         agent_id = node.get("agent_id") or ""
+        if agent_id.startswith("skill:"):
+            skill = agent_id[6:]
+            selected = TeamSelector.select(
+                skill=skill,
+                pattern_id=pattern.id,
+                task_domain=_task_domain,
+                technology=_tech,
+                phase_type=_phase,
+                mission_id=session_id,
+                workflow_id=pattern.config.get("workflow_id", ""),
+            )
+            if selected:
+                agent_id = selected
+                _darwin_nodes.append((nid, agent_id, skill))
+                logger.debug("Darwin: skill:%s → %s (tech=%s phase=%s)", skill, agent_id, _tech, _phase)
         agent = agent_store.get(agent_id) if agent_id else None
         run.nodes[nid] = NodeState(node_id=nid, agent_id=agent_id, agent=agent)
 
@@ -636,6 +659,30 @@ async def run_pattern(
         status = "NOGO — vetoes non résolus"
     else:
         status = f"FAILED: {run.error}"
+
+    # Darwin: record fitness for all skill-resolved nodes
+    if _darwin_nodes:
+        try:
+            from ..db.migrations import get_db as _get_db
+            _db = _get_db()
+            try:
+                for _nid, _aid, _skill in _darwin_nodes:
+                    _ns = run.nodes.get(_nid)
+                    _iters = _ns.iteration if _ns else 1
+                    update_team_fitness(
+                        _db,
+                        agent_id=_aid,
+                        pattern_id=pattern.id,
+                        technology=_tech,
+                        phase_type=_phase,
+                        won=run.success,
+                        iterations=max(1, _iters),
+                    )
+            finally:
+                _db.close()
+        except Exception as _e:
+            logger.warning("Darwin fitness update failed: %s", _e)
+
     store.add_message(
         MessageDef(
             session_id=session_id,
