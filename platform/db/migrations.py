@@ -700,6 +700,34 @@ def _migrate(conn):
         )
     """)
 
+    # ── LLM cost rates ────────────────────────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS llm_cost_rates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider TEXT NOT NULL,
+            model TEXT NOT NULL,
+            input_per_1k REAL DEFAULT 0.0,
+            output_per_1k REAL DEFAULT 0.0,
+            updated_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(provider, model)
+        )
+    """)
+    for provider, model, inp, out in [
+        ("azure-openai", "gpt-5-mini", 0.00015, 0.0006),
+        ("azure-openai", "gpt-5.2", 0.005, 0.015),
+        ("minimax", "MiniMax", 0.0002, 0.001),
+    ]:
+        conn.execute(
+            "INSERT OR IGNORE INTO llm_cost_rates (provider, model, input_per_1k, output_per_1k) VALUES (?,?,?,?)",
+            (provider, model, inp, out),
+        )
+
+    # Add cost_usd to llm_traces if not present
+    try:
+        conn.execute("ALTER TABLE llm_traces ADD COLUMN cost_usd REAL DEFAULT 0.0")
+    except Exception:
+        pass
+
 def _migrate_pg(conn):
     """PostgreSQL incremental migrations (safe ALTER TABLE IF NOT EXISTS)."""
     # PG schema_pg.sql already includes all columns, but for future migrations:

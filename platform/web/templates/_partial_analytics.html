@@ -1035,5 +1035,37 @@ async function rejectProposal(id) {
 
 updateOKRs();
 
+async function updateCosts() {
+    try {
+        const d = await fetch('/api/analytics/costs').then(r => r.json());
+        if (d.error) return;
+        document.getElementById('cost-total').textContent = '$' + (d.total_cost_usd || 0).toFixed(4);
+        const azure = (d.by_provider || []).filter(p => p.provider === 'azure-openai').reduce((a, b) => a + b.cost_usd, 0);
+        const minimax = (d.by_provider || []).filter(p => p.provider === 'minimax').reduce((a, b) => a + b.cost_usd, 0);
+        document.getElementById('cost-azure').textContent = '$' + azure.toFixed(4);
+        document.getElementById('cost-minimax').textContent = '$' + minimax.toFixed(4);
+        const agentEl = document.getElementById('cost-by-agent');
+        if (d.by_agent && d.by_agent.length) {
+            agentEl.innerHTML = '<div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:4px">Top agents par coût</div>' +
+                d.by_agent.slice(0,5).map(a =>
+                    `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border)">
+                        <span>${a.agent_id || '—'}</span>
+                        <span style="color:var(--text-secondary)">$${a.cost_usd.toFixed(4)} (${a.calls} calls)</span>
+                    </div>`
+                ).join('');
+        }
+    } catch(e) {}
+}
+updateCosts();
+
 </script>
+
+<div style="margin-top:2rem">
+  <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary);margin-bottom:0.75rem">Coûts LLM</div>
+  <div class="stats-grid" style="margin-bottom:1rem">
+    <div class="stat-card"><h3>Total</h3><p class="stat-value" id="cost-total">—</p><p class="stat-label">USD ce mois</p></div>
+    <div class="stat-card"><h3>Azure OpenAI</h3><p class="stat-value" id="cost-azure">—</p><p class="stat-label">USD</p></div>
+    <div class="stat-card"><h3>MiniMax</h3><p class="stat-value" id="cost-minimax">—</p><p class="stat-label">USD</p></div>
+  </div>
+  <div id="cost-by-agent" style="font-size:0.82rem"></div>
 </div>

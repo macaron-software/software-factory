@@ -481,6 +481,90 @@ async def pipeline_metrics(mission_id: str):
         db.close()
 
 
+@router.get("/api/analytics/costs")
+async def llm_costs():
+    """LLM cost breakdown by provider, mission and agent."""
+    from ....db.migrations import get_db
+
+    db = get_db()
+    try:
+        total = db.execute(
+            "SELECT COALESCE(SUM(cost_usd),0) FROM llm_traces"
+        ).fetchone()[0]
+
+        by_provider = db.execute("""
+            SELECT t.provider, t.model,
+                   COUNT(*) as calls,
+                   SUM(t.tokens_in + t.tokens_out) as tokens,
+                   COALESCE(SUM(t.cost_usd), 0) as cost_usd
+            FROM llm_traces t
+            GROUP BY t.provider, t.model
+            ORDER BY cost_usd DESC
+        """).fetchall()
+
+        by_mission = db.execute("""
+            SELECT mission_id,
+                   COUNT(*) as calls,
+                   SUM(tokens_in + tokens_out) as tokens,
+                   COALESCE(SUM(cost_usd), 0) as cost_usd
+            FROM llm_traces
+            WHERE mission_id != ''
+            GROUP BY mission_id
+            ORDER BY cost_usd DESC
+            LIMIT 10
+        """).fetchall()
+
+        by_agent = db.execute("""
+            SELECT agent_id,
+                   COUNT(*) as calls,
+                   SUM(tokens_in + tokens_out) as tokens,
+                   COALESCE(SUM(cost_usd), 0) as cost_usd
+            FROM llm_traces
+            WHERE agent_id != ''
+            GROUP BY agent_id
+            ORDER BY cost_usd DESC
+            LIMIT 10
+        """).fetchall()
+
+        daily = db.execute("""
+            SELECT substr(created_at, 1, 10) as date,
+                   COUNT(*) as calls,
+                   COALESCE(SUM(cost_usd), 0) as cost_usd
+            FROM llm_traces
+            WHERE created_at >= datetime('now', '-30 days')
+            GROUP BY date
+            ORDER BY date
+        """).fetchall()
+
+        return JSONResponse({
+            "total_cost_usd": round(total, 6),
+            "by_provider": [
+                {"provider": r["provider"], "model": r["model"],
+                 "calls": r["calls"], "tokens": r["tokens"] or 0,
+                 "cost_usd": round(r["cost_usd"], 6)}
+                for r in by_provider
+            ],
+            "by_mission": [
+                {"mission_id": r["mission_id"], "calls": r["calls"],
+                 "tokens": r["tokens"] or 0, "cost_usd": round(r["cost_usd"], 6)}
+                for r in by_mission
+            ],
+            "by_agent": [
+                {"agent_id": r["agent_id"], "calls": r["calls"],
+                 "tokens": r["tokens"] or 0, "cost_usd": round(r["cost_usd"], 6)}
+                for r in by_agent
+            ],
+            "daily": [
+                {"date": r["date"], "calls": r["calls"], "cost_usd": round(r["cost_usd"], 6)}
+                for r in daily
+            ],
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        db.close()
+
+
 @router.get("/api/releases/{project_id}")
 async def releases_data(project_id: str):
     """Get release notes — completed mission_runs + active epics with done features."""
