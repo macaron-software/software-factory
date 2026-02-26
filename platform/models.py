@@ -318,6 +318,7 @@ class MissionStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     PAUSED = "paused"
+    CANCELLED = "cancelled"
 
 
 class MissionRun(BaseModel):
