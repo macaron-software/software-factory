@@ -804,6 +804,16 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - 워크플로우 내 디자인 시스템 파이프라인 (UX → dev → review)
 - 3D Agent World 시각화
 
+### Darwin — 진화적 팀 선택
+- **Thompson Sampling 선택** — `Beta(wins+1, losses+1)` 기반 확률적 agent+pattern 팀 선택 (`agent_id, pattern_id, 기술, 단계_유형` 차원)
+- **세밀한 적합도 추적** — 컨텍스트별 독립 점수: Angular 마이그레이션에 강한 팀이 Angular 신기능에는 약할 수 있음
+- **유사도 폴백** — 기술 접두사 매칭으로 콜드 스타트 해결 (`angular_19` → `angular_*` → `generic`)
+- **소프트 은퇴** — 지속 저성과 팀에 `weight_multiplier=0.1` 적용, 우선순위 하향이지만 복구 가능
+- **OKR / KPI 시스템** — 도메인과 단계 유형별 목표 및 지표; 기본 시드 8개
+- **A/B 섀도우 테스트** — 두 팀의 적합도 차이가 10 미만이거나 10% 확률로 자동 병렬 실행
+- **Teams 대시보드** `/teams` — champion/rising/declining/retired 배지 리더보드, 인라인 OKR 편집, 진화 차트, 선택 이력, A/B 결과
+- **논브레이킹 옵트인** — 패턴에서 `agent_id: "skill:developer"` 사용 시 Darwin 활성화; 명시적 ID 변경 없음
+
 ## v2.2.0의 새로운 기능 (2026년 2월)
 
 ### OpenTelemetry & 분산 추적

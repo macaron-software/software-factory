@@ -804,6 +804,16 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 - Design-System-Pipeline in Workflows (UX → Dev → Review)
 - 3D-Agentenwelt-Visualisierung
 
+### Darwin — Evolutionaere Teamauswahl
+- **Thompson-Sampling-Auswahl** — probabilistische Agent+Pattern-Teamauswahl ueber `Beta(wins+1, losses+1)` pro `(agent_id, pattern_id, Technologie, Phasentyp)`
+- **Granulares Fitness-Tracking** — separater Score pro Kontext: ein Team, das bei Angular-Migration gut ist, kann bei neuen Angular-Features schlecht sein
+- **Aehnlichkeits-Fallback** — Kaltstart durch Tech-Praefix-Matching (`angular_19` → `angular_*` → `generic`)
+- **Sanfter Ruhestand** — schwache Teams erhalten `weight_multiplier=0.1`, deprioritisiert aber wiederherstellbar
+- **OKR / KPI-System** — Ziele und Kennzahlen pro Domain und Phasentyp; 8 Standard-Seeds
+- **A/B-Shadow-Tests** — automatische parallele Runs bei nahen Fitness-Scores (Delta < 10) oder 10% Wahrscheinlichkeit
+- **Teams-Dashboard** unter `/teams` — Bestenliste mit Badges, OKR-Bearbeitung, Evolutionskurven, Auswahlverlauf, A/B-Ergebnisse
+- **Non-breaking Opt-in** — `agent_id: "skill:developer"` aktiviert Darwin; explizite IDs bleiben unveraendert
+
 ## Neuheiten in v2.2.0 (Feb 2026)
 
 ### OpenTelemetry & Distributed Tracing

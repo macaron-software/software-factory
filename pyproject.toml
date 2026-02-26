@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "software-factory"
-version = "1.0.0"
+version = "2.1.0"
 description = "Multi-project Software Factory based on MIT CSAIL Recursive Language Models"
 readme = "README.md"
 requires-python = ">=3.10"

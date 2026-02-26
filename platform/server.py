@@ -40,7 +40,7 @@ if os.environ.get("OTEL_ENABLED"):
         _otel_resource = Resource.create(
             {
                 "service.name": os.environ.get("OTEL_SERVICE_NAME", "macaron-platform"),
-                "service.version": "1.2.0",
+                "service.version": "2.1.0",
                 "deployment.environment": os.environ.get("PLATFORM_ENV", "production"),
             }
         )
@@ -500,7 +500,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Software Factory",
         description="Multi-Agent Software Factory — 94 AI agents orchestrating the full product lifecycle with SAFe, TDD, and auto-heal.",
-        version="1.1.0",
+        version="2.1.0",
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan,
