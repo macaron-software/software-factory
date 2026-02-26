@@ -87,6 +87,24 @@ class Project:
         return ""
 
 
+def _detect_git_url(path: str) -> str:
+    """Auto-detect git remote URL from a workspace path."""
+    try:
+        r = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=path, capture_output=True, text=True, timeout=5,
+        )
+        if r.returncode == 0:
+            url = r.stdout.strip()
+            # Normalize SSH → HTTPS for PR creation
+            if url.startswith("git@github.com:"):
+                url = "https://github.com/" + url[len("git@github.com:"):].removesuffix(".git")
+            return url
+    except Exception:
+        pass
+    return ""
+
+
 class ProjectStore:
     """CRUD for projects in SQLite."""
 
@@ -154,6 +172,9 @@ class ProjectStore:
             workspace = os.path.join(os.environ.get("WORKSPACE_ROOT", _default_ws), p.id)
             os.makedirs(workspace, exist_ok=True)
             p.path = workspace
+        # Auto-detect git_url from workspace remote if not provided
+        if not p.git_url and p.path:
+            p.git_url = _detect_git_url(p.path)
         conn = get_db()
         conn.execute("""
             INSERT OR REPLACE INTO projects
@@ -473,15 +494,13 @@ class ProjectStore:
 
     def _row_to_project(self, row) -> Project:
         keys = row.keys() if hasattr(row, "keys") else []
-        _domains_raw = json.loads(row["domains_json"] or "[]")
-        _domains = _domains_raw if isinstance(_domains_raw, list) else list(_domains_raw.get("langs", []))
         return Project(
             id=row["id"],
             name=row["name"],
             path=row["path"],
             description=row["description"] or "",
             factory_type=row["factory_type"] or "standalone",
-            domains=_domains,
+            domains=json.loads(row["domains_json"] or "[]"),
             vision=row["vision"] or "",
             values=json.loads(row["values_json"] or "[]"),
             lead_agent_id=row["lead_agent_id"] or "",

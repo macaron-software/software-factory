@@ -1084,16 +1084,22 @@ This is BLOCKING: developers cannot start without your design tokens."""
                     + "\n\n"
                 )
                 content = rejection + content
-                # Track rejection in agent scores
+                # Track rejection in agent scores + update quality_score
                 try:
                     from ..db.migrations import get_db
+                    import time as _time
 
                     db = get_db()
                     db.execute(
-                        """INSERT INTO agent_scores (agent_id, epic_id, rejected, iterations)
-                           VALUES (?, ?, 1, ?)
+                        """INSERT INTO agent_scores (agent_id, epic_id, rejected, iterations, quality_score)
+                           VALUES (?, ?, 1, ?, 0.1)
                            ON CONFLICT(agent_id, epic_id)
-                           DO UPDATE SET rejected = rejected + 1, iterations = iterations + ?""",
+                           DO UPDATE SET
+                             rejected = rejected + 1,
+                             iterations = iterations + ?,
+                             quality_score = ROUND(
+                               CAST(accepted AS REAL) / MAX(accepted + rejected + 1, 1), 3
+                             )""",
                         (
                             agent.id,
                             run.project_id or "",
@@ -1106,19 +1112,44 @@ This is BLOCKING: developers cannot start without your design tokens."""
                 except Exception:
                     pass
                 # Create platform_incident for adversarial rejections (DORA tracking)
+                # Auto-close if agent already has >=3 open quality_rejection incidents
                 try:
                     from ..missions.feedback import create_platform_incident
+                    from ..db.migrations import get_db as _get_db
 
-                    create_platform_incident(
-                        title=f"Adversarial rejection: {agent.name}",
-                        severity="P3",
-                        source="adversarial_guard",
-                        error_type="quality_rejection",
-                        error_detail=f"Agent {agent.name} output rejected (score {guard_result.score}/10, {guard_result.level}). "
-                        f"Issues: {'; '.join(guard_result.issues[:5])}",
-                        mission_id=run.project_id or "",
-                        agent_id=agent.id,
-                    )
+                    _db = _get_db()
+                    open_count = _db.execute(
+                        """SELECT COUNT(*) FROM platform_incidents
+                           WHERE agent_id=? AND error_type='quality_rejection' AND status='open'""",
+                        (agent.id,),
+                    ).fetchone()[0]
+                    if open_count >= 3:
+                        # Auto-close oldest batch — they won't be fixed individually
+                        _db.execute(
+                            """UPDATE platform_incidents
+                               SET status='auto_closed',
+                                   error_detail = error_detail || ' [auto-closed: Thompson escalation handles recurrence]'
+                               WHERE agent_id=? AND error_type='quality_rejection'
+                               AND status='open'""",
+                            (agent.id,),
+                        )
+                        _db.commit()
+                        logger.info(
+                            "Auto-closed %d open quality_rejection incidents for %s (Thompson escalation active)",
+                            open_count, agent.id,
+                        )
+                    else:
+                        create_platform_incident(
+                            title=f"Adversarial rejection: {agent.name}",
+                            severity="P3",
+                            source="adversarial_guard",
+                            error_type="quality_rejection",
+                            error_detail=f"Agent {agent.name} output rejected (score {guard_result.score}/10, {guard_result.level}). "
+                            f"Issues: {'; '.join(guard_result.issues[:5])}",
+                            mission_id=run.project_id or "",
+                            agent_id=agent.id,
+                        )
+                    _db.close()
                 except Exception:
                     pass
 
@@ -1337,18 +1368,27 @@ This is BLOCKING: developers cannot start without your design tokens."""
         except Exception:
             pass
 
-    # Track agent performance score
+    # Track agent performance score with real quality_score
     try:
         from ..db.migrations import get_db
 
         db = get_db()
-        # Count this as an accepted contribution (iterations tracked separately)
+        # Compute quality signals: output length, tools used
+        _output_len = len(content) if content else 0
+        _tools_used = len(cumulative_tool_calls) if cumulative_tool_calls else 0
+        # quality bonus: longer output + tools used = better score signal
+        _quality_bonus = min(0.1, _tools_used * 0.02 + min(_output_len / 5000, 0.05))
         db.execute(
-            """INSERT INTO agent_scores (agent_id, epic_id, accepted, iterations)
-               VALUES (?, ?, 1, 1)
+            """INSERT INTO agent_scores (agent_id, epic_id, accepted, iterations, quality_score)
+               VALUES (?, ?, 1, 1, ?)
                ON CONFLICT(agent_id, epic_id)
-               DO UPDATE SET accepted = accepted + 1, iterations = iterations + 1""",
-            (agent.id, run.project_id),
+               DO UPDATE SET
+                 accepted = accepted + 1,
+                 iterations = iterations + 1,
+                 quality_score = ROUND(MIN(1.0,
+                   CAST(accepted + 1 AS REAL) / MAX(accepted + rejected + 1, 1) + ?
+                 ), 3)""",
+            (agent.id, run.project_id, 0.5 + _quality_bonus, _quality_bonus),
         )
         db.commit()
         db.close()

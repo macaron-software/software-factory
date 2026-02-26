@@ -33,22 +33,23 @@ VERIFY: curl -s -o /dev/null -w "%{http_code}" http://localhost:8099/
 KILL:   lsof -ti:8099 | xargs kill -9
 ```
 
-## DEPLOY (Azure VM)
+## DEPLOY (Azure VM 4.233.64.30)
 
 ```bash
 SSH_KEY="$HOME/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa"
-AZURE_VM="azureadmin@<AZURE_VM_IP>"   # IP dans .env : AZURE_VM_IP
 # FULL deploy (rsync local → VM → rebuild):
 rsync -azP --delete --exclude='__pycache__' --exclude='*.pyc' --exclude='data/' --exclude='.git' --exclude='tests/' \
-  platform/ -e "ssh -i $SSH_KEY" $AZURE_VM:/opt/macaron/platform/
-ssh -i "$SSH_KEY" $AZURE_VM "cd /opt/macaron && docker compose --env-file .env -f platform/deploy/docker-compose-vm.yml up -d --build --no-deps platform"
+  platform/ -e "ssh -i $SSH_KEY" azureadmin@4.233.64.30:/opt/macaron/platform/
+ssh -i "$SSH_KEY" azureadmin@4.233.64.30 "cd /opt/macaron && docker compose --env-file .env -f platform/deploy/docker-compose-vm.yml up -d --build --no-deps platform"
 # FAST hotpatch (no rebuild, preserves container state):
 tar cf /tmp/update.tar <files...>
-scp -i "$SSH_KEY" /tmp/update.tar $AZURE_VM:/tmp/
-ssh -i "$SSH_KEY" $AZURE_VM "docker cp /tmp/update.tar deploy-platform-1:/tmp/ && docker exec deploy-platform-1 bash -c 'cd /app/macaron_platform && tar xf /tmp/update.tar' && docker restart deploy-platform-1"
+scp -i "$SSH_KEY" /tmp/update.tar azureadmin@4.233.64.30:/tmp/
+ssh -i "$SSH_KEY" azureadmin@4.233.64.30 "docker cp /tmp/update.tar deploy-platform-1:/tmp/ && docker exec deploy-platform-1 bash -c 'cd /app/macaron_platform && tar xf /tmp/update.tar' && docker restart deploy-platform-1"
 # ⚠️ Hotpatch is LOST on docker compose --build → always rsync BEFORE rebuild
 # Container code path: /app/macaron_platform/ (NOT /app/platform/)
+# Auth: admin@demo.local (Skip Demo button) | admin@macaron-software.com / macaron2026
 # Prod LLM: Azure OpenAI gpt-5-mini only (AZURE_DEPLOY=1, NO minimax fallback)
+# Custom domain: sf.macaron-software.com → 4.233.64.30:80 (nginx)
 # UID mismatch: /opt/macaron owned by 501 (macOS), azureadmin=1001 → use docker cp
 ```
 
@@ -60,9 +61,9 @@ ssh -i "$SSH_KEY" $AZURE_VM "docker cp /tmp/update.tar deploy-platform-1:/tmp/ &
   _SOFTWARE_FACTORY/                   ← runtime local NON TRACKÉ (.gitignore)
     platform/ data/ logs/ ...          ← instance dev (DB, logs, workspace)
 
-~/_LAPOSTE/_SOFTWARE_FACTORY/          ← .git → GitLab La Poste (URL dans .env)
+~/_LAPOSTE/_SOFTWARE_FACTORY/          ← .git → GitLab udd-ia-native/software-factory
   platform/ cli/ dashboard/ ...        ← squelette : skills/workflows/projects VIDES
-  SSH: ~/.ssh/gitlab_laposte_ed25519
+  SSH: ~/.ssh/gitlab_laposte_ed25519   ← ssh -T git@gitlab.azure... → ✅
 ```
 
 Push GitHub : `cd ~/_MACARON-SOFTWARE && git push origin main`
@@ -296,7 +297,7 @@ STRATEGY                     ENGINEERING
 │ Environment          │ Provider     │ Model       │ Fallback             │
 ├──────────────────────┼──────────────┼─────────────┼──────────────────────┤
 │ Azure VM (prod)      │ azure-openai │ gpt-5-mini  │ none (AZURE_DEPLOY=1)│
-│ <AZURE_VM_IP>        │              │             │                      │
+│ 4.233.64.30          │              │             │                      │
 │ sf.macaron-software  │              │             │                      │
 ├──────────────────────┼──────────────┼─────────────┼──────────────────────┤
 │ Local dev            │ minimax      │ MiniMax-M2.5│ → azure-openai       │
@@ -474,3 +475,30 @@ platform/
 - `_mission_semaphore = Semaphore(1)` — only 1 mission runs at a time, others queue
 - Container path: `/app/macaron_platform/` (Dockerfile copies `platform/` as `macaron_platform/`)
 - curl inside container: use docker network IP, NOT localhost (nginx proxies port 80→8090)
+
+## CI/CD SECRETS
+
+### GitHub Actions (deploy OVH Demo)
+File: `.github/workflows/deploy-demo.yml`
+Configure in: GitHub → Settings → Secrets → Actions
+| Secret | Value |
+|--------|-------|
+| `OVH_SSH_KEY` | Contenu de la clé privée SSH pour `debian@54.36.183.124` |
+| `OVH_IP` | `54.36.183.124` |
+
+### GitLab CI (deploy Azure Prod)
+File: `.gitlab-ci.yml`
+Configure in: GitLab → Settings → CI/CD → Variables
+| Variable | Value |
+|----------|-------|
+| `AZURE_SSH_KEY` | Contenu de la clé privée SSH pour `azureadmin@4.233.64.30` |
+| `AZURE_VM_IP` | `4.233.64.30` |
+| `AZURE_USER` | `azureadmin` |
+
+### Local deploy (manual)
+```bash
+# Azure: scp → docker cp → restart
+scp -i ~/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa <file> azureadmin@4.233.64.30:~/
+ssh -i ~/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa azureadmin@4.233.64.30 \
+  "docker cp ~/<file> platform-platform-1:/app/<path>/ && docker restart platform-platform-1"
+```
