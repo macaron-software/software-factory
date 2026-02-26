@@ -181,6 +181,11 @@ async def lifespan(app: FastAPI):
     get_org_store().seed_default()
     get_org_store().seed_additional_teams()
 
+    # Demo mode: seed sample data when no LLM keys configured
+    from .demo import seed_demo_data
+
+    seed_demo_data()
+
     # Sync agent models: ensure DB agents match the current DEFAULT_MODEL
     from .agents.store import DEFAULT_MODEL as _current_model
 
@@ -188,13 +193,14 @@ async def lifespan(app: FastAPI):
         from .db.migrations import get_db as _gdb_sync
 
         _sdb = _gdb_sync()
+        # Only update agents that have a stale/wrong model (not matching env)
         _stale_models = _sdb.execute(
-            "SELECT COUNT(*) FROM agents WHERE model != ? AND model NOT IN ('')",
+            "SELECT COUNT(*) FROM agents WHERE model != ? AND model NOT IN ('', 'demo-model')",
             (_current_model,),
         ).fetchone()[0]
         if _stale_models:
             _sdb.execute(
-                "UPDATE agents SET model = ? WHERE model != ? AND model NOT IN ('')",
+                "UPDATE agents SET model = ? WHERE model != ? AND model NOT IN ('', 'demo-model')",
                 (_current_model, _current_model),
             )
             _sdb.commit()
@@ -308,6 +314,81 @@ async def lifespan(app: FastAPI):
             logger.warning("Simulator cold-start failed: %s", e)
 
     _asyncio.create_task(_seed_simulator_if_empty())
+
+    # Seed Darwin team_fitness if empty (cold start / fresh deployment)
+    async def _seed_darwin_if_empty():
+        await _asyncio.sleep(10)  # wait for agents to be seeded first
+        try:
+            import random as _rand
+            from .db.migrations import get_db as _ddb
+            from .patterns.team_selector import (
+                _get_agents_with_skill,
+                _upsert_team_fitness,
+                update_team_fitness,
+            )
+
+            _db2 = _ddb()
+            _cnt = _db2.execute("SELECT COUNT(*) FROM team_fitness").fetchone()[0]
+            _has_new_feature = _db2.execute(
+                "SELECT COUNT(*) FROM team_fitness WHERE phase_type='new_feature'"
+            ).fetchone()[0]
+            if _cnt >= 50 and _has_new_feature >= 10:
+                _db2.close()
+                return
+            _skills = ["developer", "tester", "security", "devops"]
+            _patterns = ["loop", "sequential", "parallel", "hierarchical", "aggregator"]
+            _phases = [
+                "new_feature",
+                "bugfix",
+                "refactoring",
+                "migration",
+                "review",
+                "testing",
+                "audit",
+                "design",
+                "docs",
+                "tdd",
+                "feature",
+                "sprint",
+                "deploy",
+                "exploitation",
+                "load",
+                "perf",
+            ]
+            _techs = ["generic", "python", "typescript", "java", "rust", "go"]
+            _seeded = 0
+            for _sk in _skills:
+                _agents = _get_agents_with_skill(_db2, _sk)
+                if not _agents:
+                    continue
+                for _pt in _patterns[:4]:
+                    for _ph in _phases:  # all phases
+                        for _tc in _techs[:3]:
+                            for _aid in _agents[:6]:
+                                _upsert_team_fitness(_db2, _aid, _pt, _tc, _ph)
+                                _runs = _rand.randint(5, 15)
+                                _wins = int(_runs * _rand.uniform(0.4, 0.92))
+                                for _r in range(_runs):
+                                    update_team_fitness(
+                                        _db2,
+                                        _aid,
+                                        _pt,
+                                        _tc,
+                                        _ph,
+                                        won=(_r < _wins),
+                                        iterations=_rand.randint(1, 3),
+                                    )
+                                    _seeded += 1
+                            if _seeded % 1000 == 0:
+                                _db2.commit()
+            _db2.commit()
+            _after = _db2.execute("SELECT COUNT(*) FROM team_fitness").fetchone()[0]
+            _db2.close()
+            logger.warning("Darwin cold-start: seeded %d team_fitness rows", _after)
+        except Exception as e:
+            logger.warning("Darwin cold-start failed: %s", e)
+
+    _asyncio.create_task(_seed_darwin_if_empty())
 
     # Start unified MCP SF server (platform + LRM tools merged)
     _mcp_procs: dict[str, Any] = {}
