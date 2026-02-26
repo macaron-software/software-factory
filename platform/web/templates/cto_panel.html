@@ -1,5 +1,293 @@
 {# CTO Chat Panel — htmx partial loaded in Portfolio tab #}
 <style>
+/* ── Layout ─────────────────────────────────── */
+.cto-shell{display:flex;height:calc(100vh - 120px);min-height:420px;background:var(--bg-secondary);border-radius:10px;overflow:hidden;border:1px solid var(--border)}
+
+/* ── Left Sidebar ───────────────────────────── */
+.cto-sidebar{width:220px;min-width:180px;max-width:260px;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--bg-primary);flex-shrink:0}
+.cto-sidebar-top{padding:.75rem .65rem .5rem;border-bottom:1px solid var(--border)}
+.cto-new-btn{width:100%;display:flex;align-items:center;gap:.5rem;background:var(--accent,#6366f1);color:#fff;border:none;border-radius:7px;padding:.5rem .75rem;font-size:.78rem;font-weight:600;cursor:pointer;transition:opacity .15s}
+.cto-new-btn:hover{opacity:.85}
+.cto-new-btn svg{flex-shrink:0}
+.cto-sidebar-label{font-size:.62rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;padding:.6rem .75rem .3rem}
+.cto-conv-list{flex:1;overflow-y:auto;padding:.2rem .4rem .5rem}
+.cto-conv-item{display:flex;align-items:center;gap:.4rem;padding:.45rem .55rem;border-radius:6px;cursor:pointer;border:1px solid transparent;transition:background .12s;position:relative;group:true}
+.cto-conv-item:hover{background:var(--bg-tertiary)}
+.cto-conv-item.active{background:var(--accent-subtle,rgba(99,102,241,.12));border-color:var(--accent,#6366f1)}
+.cto-conv-icon{color:var(--text-muted);flex-shrink:0;opacity:.6}
+.cto-conv-item.active .cto-conv-icon{opacity:1;color:var(--accent,#6366f1)}
+.cto-conv-text{flex:1;min-width:0}
+.cto-conv-title{font-size:.75rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.cto-conv-item.active .cto-conv-title{color:var(--accent,#6366f1);font-weight:600}
+.cto-conv-date{font-size:.62rem;color:var(--text-muted);margin-top:1px}
+.cto-sidebar-footer{padding:.6rem .65rem;border-top:1px solid var(--border);display:flex;align-items:center;gap:.5rem}
+.cto-agent-mini-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;border:1.5px solid var(--border);flex-shrink:0}
+.cto-agent-mini-name{font-size:.72rem;font-weight:600;color:var(--text)}
+.cto-agent-mini-dot{width:6px;height:6px;border-radius:50%;background:var(--success);flex-shrink:0;margin-left:auto}
+
+/* ── Chat area ──────────────────────────────── */
+.cto-main{flex:1;display:flex;flex-direction:column;min-width:0}
+.cto-header{display:flex;align-items:center;gap:.75rem;padding:.75rem 1.1rem .65rem;border-bottom:1px solid var(--border);background:var(--bg-secondary)}
+.cto-header-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid var(--border);flex-shrink:0}
+.cto-header-info{flex:1;min-width:0}
+.cto-header-name{font-weight:700;font-size:.9rem;color:var(--text)}
+.cto-header-role{font-size:.68rem;color:var(--text-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cto-header-status{display:flex;align-items:center;gap:.35rem;font-size:.68rem;color:var(--success);flex-shrink:0}
+.cto-header-dot{width:6px;height:6px;border-radius:50%;background:var(--success);animation:pulse-dot 2s infinite}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* chips */
+.cto-chips{display:flex;flex-wrap:wrap;gap:.35rem;padding:.5rem 1.1rem;border-bottom:1px solid var(--border)}
+.cto-chip{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:20px;padding:.22rem .65rem;font-size:.7rem;cursor:pointer;color:var(--text-muted);transition:all .15s;white-space:nowrap}
+.cto-chip:hover{background:var(--accent-subtle,rgba(99,102,241,.1));border-color:var(--accent,#6366f1);color:var(--text)}
+
+/* messages */
+.cto-messages{flex:1;overflow-y:auto;padding:.9rem 1.1rem;display:flex;flex-direction:column;gap:.7rem}
+.cto-messages:empty::after{content:"Posez une question à Karim…";color:var(--text-muted);font-size:.82rem;margin:auto;display:block;text-align:center;padding-top:2.5rem}
+.cto-messages .chat-msg{max-width:80%;animation:fadeUp .18s ease}
+.cto-messages .chat-msg-user{margin-left:auto}
+.cto-messages .chat-msg-agent{margin-right:auto;display:flex;gap:.5rem;align-items:flex-start}
+.cto-avatar{width:30px;height:30px;border-radius:50%;background:url('/static/avatars/strat-cto.jpg') center/cover;flex-shrink:0;border:1.5px solid var(--border)}
+.cto-messages .chat-msg-body{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;padding:.6rem .8rem;max-width:100%}
+.cto-messages .chat-msg-user .chat-msg-body{background:var(--accent-subtle,rgba(99,102,241,.12));border-color:var(--accent,#6366f1)}
+.cto-messages .chat-msg-sender{font-size:.65rem;font-weight:700;color:var(--accent,#6366f1);margin-bottom:.2rem}
+.cto-messages .chat-msg-text{font-size:.83rem;color:var(--text);line-height:1.55}
+.cto-messages .chat-msg-text.md-rendered p{margin:0 0 .4rem}
+.cto-messages .chat-msg-text.md-rendered p:last-child{margin-bottom:0}
+.cto-messages .chat-msg-text.md-rendered code{background:var(--bg-primary);padding:.1em .3em;border-radius:3px;font-size:.78em}
+.cto-messages .chat-msg-text.md-rendered pre{background:var(--bg-primary);border-radius:6px;padding:.7rem;overflow-x:auto;font-size:.76rem;margin:.45rem 0}
+.cto-messages .chat-msg-tools{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.35rem}
+.cto-thinking{display:flex;align-items:center;gap:.5rem;font-size:.75rem;color:var(--text-muted);padding:.3rem 0 .3rem 1.1rem}
+.cto-thinking-dots{display:flex;gap:.2rem}
+.cto-thinking-dots span{width:5px;height:5px;border-radius:50%;background:var(--text-muted);animation:bounce .8s infinite}
+.cto-thinking-dots span:nth-child(2){animation-delay:.15s}
+.cto-thinking-dots span:nth-child(3){animation-delay:.3s}
+
+/* input */
+.cto-input-area{display:flex;gap:.45rem;padding:.65rem 1.1rem;border-top:1px solid var(--border);background:var(--bg-secondary)}
+.cto-input{flex:1;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:.5rem .8rem;font-size:.83rem;color:var(--text);resize:none;line-height:1.4;max-height:110px;transition:border-color .15s}
+.cto-input:focus{outline:none;border-color:var(--accent,#6366f1)}
+.cto-send{background:var(--accent,#6366f1);color:#fff;border:none;border-radius:8px;padding:.5rem .9rem;cursor:pointer;font-size:.8rem;font-weight:600;transition:opacity .15s;white-space:nowrap;display:flex;align-items:center;gap:.35rem}
+.cto-send:hover{opacity:.85}
+.cto-send.loading{opacity:.5;pointer-events:none}
+
+@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+/* Responsive: hide sidebar on small screens */
+@media(max-width:640px){.cto-sidebar{display:none}}
+</style>
+
+<div class="cto-shell">
+
+  {# ── Left Sidebar ── #}
+  <div class="cto-sidebar">
+    <div class="cto-sidebar-top">
+      <button class="cto-new-btn" onclick="ctoNewConversation()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nouvelle conversation
+      </button>
+    </div>
+
+    <div class="cto-sidebar-label">Historique</div>
+
+    <div class="cto-conv-list" id="cto-conv-list">
+      {% for item in sidebar_items %}
+      <div class="cto-conv-item {% if item.active %}active{% endif %}"
+           id="conv-{{ item.id }}"
+           onclick="ctoLoadConv('{{ item.id }}', this)"
+           title="{{ item.title }}">
+        <svg class="cto-conv-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <div class="cto-conv-text">
+          <div class="cto-conv-title">{{ item.title }}</div>
+          <div class="cto-conv-date">{{ item.ts }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="cto-sidebar-footer">
+      <img class="cto-agent-mini-avatar" src="/static/avatars/strat-cto.jpg" alt="Karim">
+      <span class="cto-agent-mini-name">Karim Benali</span>
+      <span class="cto-agent-mini-dot"></span>
+    </div>
+  </div>
+
+  {# ── Main chat area ── #}
+  <div class="cto-main">
+    <div class="cto-header">
+      <img class="cto-header-avatar" src="/static/avatars/strat-cto.jpg" alt="Karim Benali">
+      <div class="cto-header-info">
+        <div class="cto-header-name">Karim Benali</div>
+        <div class="cto-header-role" id="cto-conv-title">Chief Technology Officer · Software Factory</div>
+      </div>
+      <div class="cto-header-status">
+        <span class="cto-header-dot"></span>
+        disponible
+      </div>
+    </div>
+
+    <div class="cto-chips">
+      <button class="cto-chip" onclick="ctoSendChip('Donne-moi les métriques du portfolio : missions, projets, agents, coûts LLM')">Stats portfolio</button>
+      <button class="cto-chip" onclick="ctoSendChip('Liste les missions en cours et leur état')">Missions en cours</button>
+      <button class="cto-chip" onclick="ctoSendChip('Analyse la dette technique et les risques actuels')">Dette technique</button>
+      <button class="cto-chip" onclick="ctoSendChip('Cherche sur GitHub les dernières pratiques pour notre stack')">GitHub</button>
+      <button class="cto-chip" onclick="ctoSendChip('Monte-moi une équipe optimale pour un projet de sécurité')">Monter une équipe</button>
+    </div>
+
+    <div class="cto-messages" id="cto-msgs">
+      {{ history_html | safe }}
+    </div>
+
+    <div id="cto-thinking" class="cto-thinking" style="display:none">
+      <div class="cto-avatar" style="width:22px;height:22px"></div>
+      <div class="cto-thinking-dots"><span></span><span></span><span></span></div>
+      <span>Karim réfléchit…</span>
+    </div>
+
+    <div class="cto-input-area">
+      <textarea
+        id="cto-input"
+        class="cto-input"
+        placeholder="Posez une question à Karim, créez un projet, demandez une analyse…"
+        rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ctoSend()}"
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px'"
+      ></textarea>
+      <button id="cto-send-btn" class="cto-send" onclick="ctoSend()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Envoyer
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var _sessionId = '{{ session_id }}';
+
+  /* ── Send ── */
+  function ctoSend(){
+    var inp = document.getElementById('cto-input');
+    var msg = inp.value.trim();
+    if(!msg) return;
+    inp.value = '';
+    inp.style.height = 'auto';
+    _ctoDispatch(msg);
+  }
+
+  function ctoSendChip(text){ _ctoDispatch(text); }
+
+  function _ctoDispatch(msg){
+    var msgs = document.getElementById('cto-msgs');
+    var thinking = document.getElementById('cto-thinking');
+    var btn = document.getElementById('cto-send-btn');
+    btn.classList.add('loading');
+    thinking.style.display = 'flex';
+    msgs.scrollTop = msgs.scrollHeight;
+
+    fetch('/api/cto/message', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({content: msg, session_id: _sessionId})
+    })
+    .then(function(r){
+      var sid = r.headers.get('X-CTO-Session-Id');
+      var title = r.headers.get('X-CTO-Title');
+      if(sid) _sessionId = sid;
+      if(title) _updateConvTitle(_sessionId, title);
+      return r.text();
+    })
+    .then(function(html){
+      thinking.style.display = 'none';
+      btn.classList.remove('loading');
+      msgs.insertAdjacentHTML('beforeend', html);
+      msgs.scrollTop = msgs.scrollHeight;
+    })
+    .catch(function(){
+      thinking.style.display = 'none';
+      btn.classList.remove('loading');
+      msgs.insertAdjacentHTML('beforeend',
+        '<div class="chat-msg chat-msg-agent"><div class="chat-msg-body"><div class="chat-msg-text" style="color:var(--danger)">Erreur de communication.</div></div></div>'
+      );
+    });
+  }
+
+  /* ── New conversation ── */
+  function ctoNewConversation(){
+    fetch('/api/cto/sessions/new', {method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      _sessionId = d.session_id;
+      // Clear messages
+      var msgs = document.getElementById('cto-msgs');
+      msgs.innerHTML = '';
+      // Add to sidebar
+      var list = document.getElementById('cto-conv-list');
+      var item = document.createElement('div');
+      item.className = 'cto-conv-item active';
+      item.id = 'conv-' + d.session_id;
+      item.setAttribute('onclick', "ctoLoadConv('"+d.session_id+"', this)");
+      item.innerHTML = '<svg class="cto-conv-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'
+        + '<div class="cto-conv-text"><div class="cto-conv-title">Nouvelle conversation</div><div class="cto-conv-date">maintenant</div></div>';
+      // Deactivate others
+      list.querySelectorAll('.cto-conv-item').forEach(function(el){ el.classList.remove('active'); });
+      list.insertBefore(item, list.firstChild);
+      // Update header
+      document.getElementById('cto-conv-title').textContent = 'Chief Technology Officer · Software Factory';
+      // Focus input
+      document.getElementById('cto-input').focus();
+    });
+  }
+
+  /* ── Load existing conversation ── */
+  function ctoLoadConv(sessionId, el){
+    if(_sessionId === sessionId) return;
+    _sessionId = sessionId;
+    // Update active state in sidebar
+    document.querySelectorAll('.cto-conv-item').forEach(function(e){ e.classList.remove('active'); });
+    el.classList.add('active');
+    // Update header title
+    var title = el.querySelector('.cto-conv-title');
+    if(title) document.getElementById('cto-conv-title').textContent = title.textContent;
+    // Load messages
+    var msgs = document.getElementById('cto-msgs');
+    msgs.innerHTML = '<div style="text-align:center;padding:1.5rem;font-size:.75rem;color:var(--text-muted)">Chargement…</div>';
+    fetch('/api/cto/sessions/' + sessionId + '/messages')
+    .then(function(r){ return r.text(); })
+    .then(function(html){
+      msgs.innerHTML = html || '';
+      msgs.scrollTop = msgs.scrollHeight;
+    });
+  }
+
+  /* ── Update sidebar title after first message ── */
+  function _updateConvTitle(sessionId, title){
+    var item = document.getElementById('conv-' + sessionId);
+    if(item){
+      var t = item.querySelector('.cto-conv-title');
+      if(t && t.textContent === 'Nouvelle conversation') t.textContent = title;
+    }
+    // Also update header if it's the current conv
+    var hdr = document.getElementById('cto-conv-title');
+    if(hdr && hdr.textContent === 'Nouvelle conversation') hdr.textContent = title;
+  }
+
+  /* Expose globals */
+  window.ctoSend = ctoSend;
+  window.ctoSendChip = ctoSendChip;
+  window.ctoNewConversation = ctoNewConversation;
+  window.ctoLoadConv = ctoLoadConv;
+
+  // Scroll to bottom on load
+  var msgs = document.getElementById('cto-msgs');
+  if(msgs) msgs.scrollTop = msgs.scrollHeight;
+  // Focus input
+  setTimeout(function(){ var inp=document.getElementById('cto-input'); if(inp) inp.focus(); }, 100);
+})();
+</script>
+
+<style>
 .cto-wrap{display:flex;flex-direction:column;height:calc(100vh - 140px);min-height:400px;gap:0}
 .cto-header{display:flex;align-items:center;gap:0.75rem;padding:1rem 1.25rem 0.75rem;border-bottom:1px solid var(--border)}
 .cto-header-avatar{width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid var(--border)}

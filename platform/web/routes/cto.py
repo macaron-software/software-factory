@@ -21,28 +21,30 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 _CTO_AGENT_ID = "strat-cto"
-_CTO_SESSION_NAME = "cto-global"
+_CTO_SESSION_TYPE = "cto_chat"
 
 
-def _get_or_create_cto_session():
-    """Return the singleton CTO session, creating it if needed."""
+def _list_cto_sessions(limit: int = 50):
+    """Return all CTO chat sessions, newest first."""
+    from ...sessions.store import get_session_store
+
+    store = get_session_store()
+    all_sessions = store.list_all(limit=200)
+    cto = [s for s in all_sessions if (s.config or {}).get("type") == _CTO_SESSION_TYPE]
+    return cto[:limit]
+
+
+def _create_cto_session(title: str = "") -> object:
+    """Create a new CTO chat session."""
     from ...sessions.store import get_session_store, SessionDef, MessageDef
 
     store = get_session_store()
-    sessions = [
-        s
-        for s in store.list_all()
-        if s.name == _CTO_SESSION_NAME and s.status == "active"
-    ]
-    if sessions:
-        return sessions[0]
-
     session = store.create(
         SessionDef(
-            name=_CTO_SESSION_NAME,
+            name=title or "Nouvelle conversation",
             goal="Pilotage de la Software Factory — analyses, métriques, création de projets/missions.",
             status="active",
-            config={"lead_agent": _CTO_AGENT_ID, "type": "cto_chat"},
+            config={"lead_agent": _CTO_AGENT_ID, "type": _CTO_SESSION_TYPE},
         )
     )
     store.add_message(
@@ -56,20 +58,31 @@ def _get_or_create_cto_session():
     return session
 
 
-@router.get("/cto", response_class=HTMLResponse)
-async def cto_panel(request: Request):
-    """Render the CTO chat panel (htmx partial)."""
-    from ...agents.store import get_agent_store
+def _get_or_create_latest_cto_session():
+    """Return the most recent CTO session, creating one if none exists."""
+    sessions = _list_cto_sessions(limit=1)
+    return sessions[0] if sessions else _create_cto_session()
+
+
+def _session_title(session) -> str:
+    """Return a display title for a session (first user msg or name)."""
     from ...sessions.store import get_session_store
 
-    agent_store = get_agent_store()
-    agent = agent_store.get(_CTO_AGENT_ID)
-
-    session = _get_or_create_cto_session()
     store = get_session_store()
-    messages = store.get_messages(session.id, limit=50)
+    msgs = store.get_messages(session.id, limit=5)
+    for m in msgs:
+        if m.from_agent == "user" and m.content:
+            t = m.content.strip()
+            return t[:55] + ("…" if len(t) > 55 else "")
+    return session.name or "Conversation"
 
-    # Build chat history HTML
+
+def _build_history_html(session_id: str) -> str:
+    """Build chat messages HTML for a session."""
+    from ...sessions.store import get_session_store
+
+    store = get_session_store()
+    messages = store.get_messages(session_id, limit=50)
     history_html = ""
     for msg in messages:
         if msg.message_type == "system":
@@ -107,6 +120,33 @@ async def cto_panel(request: Request):
                 f"{tools_html}"
                 f"</div></div>"
             )
+    return history_html
+
+
+@router.get("/cto", response_class=HTMLResponse)
+async def cto_panel(request: Request):
+    """Render the CTO chat panel with sidebar (htmx partial)."""
+    from ...agents.store import get_agent_store
+
+    agent_store = get_agent_store()
+    agent = agent_store.get(_CTO_AGENT_ID)
+
+    session = _get_or_create_latest_cto_session()
+    sessions = _list_cto_sessions(limit=30)
+
+    # Build sidebar items
+    sidebar_items = []
+    for s in sessions:
+        sidebar_items.append(
+            {
+                "id": s.id,
+                "title": _session_title(s),
+                "ts": str(s.created_at or "")[:10],
+                "active": s.id == session.id,
+            }
+        )
+
+    history_html = _build_history_html(session.id)
 
     templates = _templates(request)
     return templates.TemplateResponse(
@@ -115,6 +155,7 @@ async def cto_panel(request: Request):
             "request": request,
             "session_id": session.id,
             "history_html": history_html,
+            "sidebar_items": sidebar_items,
             "agent": agent,
         },
     )
@@ -122,9 +163,23 @@ async def cto_panel(request: Request):
 
 @router.get("/api/cto/session")
 async def cto_session():
-    """Get or create the CTO session, return its id."""
-    session = _get_or_create_cto_session()
+    """Get or create the latest CTO session, return its id."""
+    session = _get_or_create_latest_cto_session()
     return JSONResponse({"session_id": session.id, "status": session.status})
+
+
+@router.post("/api/cto/sessions/new", response_class=JSONResponse)
+async def cto_new_session():
+    """Create a new CTO chat session."""
+    session = _create_cto_session()
+    return JSONResponse({"session_id": session.id})
+
+
+@router.get("/api/cto/sessions/{session_id}/messages", response_class=HTMLResponse)
+async def cto_load_session(session_id: str, request: Request):
+    """Load messages for a CTO session (for sidebar switching)."""
+    history_html = _build_history_html(session_id)
+    return HTMLResponse(history_html or "")
 
 
 @router.post("/api/cto/message", response_class=HTMLResponse)
@@ -135,11 +190,24 @@ async def cto_message(request: Request):
 
     data = await _parse_body(request)
     content = str(data.get("content") or data.get("message", "")).strip()
+    session_id = str(data.get("session_id", "")).strip()
     if not content:
         return HTMLResponse("")
 
-    session = _get_or_create_cto_session()
-    store = get_session_store()
+    # Resolve session
+    if session_id:
+        from ...sessions.store import get_session_store as _ss
+
+        store = _ss()
+        session = store.get(session_id) or _get_or_create_latest_cto_session()
+    else:
+        session = _get_or_create_latest_cto_session()
+        store = None
+
+    if store is None:
+        from ...sessions.store import get_session_store
+
+        store = get_session_store()
 
     store.add_message(
         MessageDef(
@@ -194,6 +262,11 @@ async def cto_message(request: Request):
             f"{tools_html}"
             f"</div></div>"
         )
-        return HTMLResponse(user_html + agent_html)
+        # Return first user message as title hint for sidebar update
+        title_hint = html_mod.escape(content[:55])
+        return HTMLResponse(
+            user_html + agent_html,
+            headers={"X-CTO-Session-Id": session.id, "X-CTO-Title": title_hint},
+        )
 
     return HTMLResponse(user_html)
