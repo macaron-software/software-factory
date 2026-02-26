@@ -13,11 +13,8 @@ jobs:
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
-          # Handle both: actual newlines OR literal \n in the secret
-          printf '%s' "${{ secrets.OVH_SSH_KEY }}" \
-            | tr -d '\r' \
-            | sed 's/\\n/\n/g' \
-            > ~/.ssh/id_rsa
+          # Secret stored as: cat ~/.ssh/id_rsa | base64 -w 0
+          echo "${{ secrets.OVH_SSH_KEY }}" | base64 -d > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H "${{ secrets.OVH_IP }}" >> ~/.ssh/known_hosts
           cat >> ~/.ssh/config << 'EOF'
