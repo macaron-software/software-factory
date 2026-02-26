@@ -49,8 +49,45 @@ class MissionContextBuilder:
         phase_agents = {}
         phase_graphs = {}
         wf = get_workflow_store().get(mission.workflow_id)
+        workflow_graph = {}
         if wf:
             phase_agents, phase_graphs = self._build_phase_graphs(wf, agents, agent_map)
+            global_graph = (wf.config or {}).get("graph", {})
+            g_nodes = global_graph.get("nodes", [])
+            g_edges = global_graph.get("edges", [])
+            # Enrich global nodes with agent metadata
+            enriched_global = []
+            for n in g_nodes:
+                aid = n.get("agent_id", "")
+                am = agent_map.get(aid, {})
+                enriched_global.append({
+                    "id": n["id"],
+                    "agent_id": aid,
+                    "label": am.get("name", n.get("label", aid)),
+                    "role": am.get("role", ""),
+                    "avatar": am.get("avatar_url", ""),
+                    "x": n.get("x", 0),
+                    "y": n.get("y", 0),
+                    "hierarchy_rank": am.get("hierarchy_rank", 50),
+                })
+            if not enriched_global and agents:
+                # fallback: use all agents
+                for i, a in enumerate(agents):
+                    am = agent_map.get(a.id, {})
+                    enriched_global.append({
+                        "id": f"n-{a.id}", "agent_id": a.id,
+                        "label": am.get("name", a.id), "role": am.get("role", ""),
+                        "avatar": am.get("avatar_url", ""), "x": 0, "y": 0,
+                        "hierarchy_rank": am.get("hierarchy_rank", 50),
+                    })
+            workflow_graph = {
+                "nodes": enriched_global,
+                "edges": g_edges,
+                "pattern": global_graph.get("pattern", "hierarchical"),
+                "wf_name": wf.name,
+                "wf_id": wf.id,
+                "phases": [{"id": p.id, "name": p.name, "pattern_id": p.pattern_id or "sequential"} for p in wf.phases],
+            }
 
         # Session messages
         messages, phase_messages = self._extract_messages(mission, wf, agent_map, get_session_store)
@@ -99,6 +136,7 @@ class MissionContextBuilder:
             "agent_map": agent_map,
             "phase_agents": phase_agents,
             "phase_graphs": phase_graphs,
+            "workflow_graph": workflow_graph,
             "messages": messages,
             "phase_messages": phase_messages,
             "phase_screenshots": phase_screenshots,
@@ -1122,6 +1160,7 @@ class MissionContextBuilder:
                     "agent_id": "tech_writer",
                     "fallback": "pentester-lead",
                 },
+                {"id": "workflow", "label": "Workflow", "icon": "share-2"},
             ]
         elif wf_id == "rse-compliance":
             tab_profile = [
@@ -1161,6 +1200,7 @@ class MissionContextBuilder:
                     "agent_id": "rse-manager",
                     "fallback": "tech_writer",
                 },
+                {"id": "workflow", "label": "Workflow", "icon": "share-2"},
             ]
         elif wf_id in ("tma-maintenance", "dsi-platform-tma"):
             tab_profile = [
@@ -1200,6 +1240,7 @@ class MissionContextBuilder:
                     "agent_id": "responsable_tma",
                     "fallback": "plat-tma-lead",
                 },
+                {"id": "workflow", "label": "Workflow", "icon": "share-2"},
             ]
         else:
             tab_profile = [
@@ -1240,6 +1281,7 @@ class MissionContextBuilder:
                     "fallback": "lead_dev",
                 },
                 {"id": "projet", "label": "Projet", "icon": "code"},
+                {"id": "workflow", "label": "Workflow", "icon": "share-2"},
             ]
 
         for tp in tab_profile:

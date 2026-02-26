@@ -15,6 +15,12 @@
                 {% if wf.description %}
                 <p class="item-desc">{{ wf.description[:120] }}{% if wf.description | length > 120 %}…{% endif %}</p>
                 {% endif %}
+                <div class="item-tags" style="margin-top:4px">
+                    {% for ph in wf.phases[:5] %}
+                    <span class="item-tag" style="font-size:0.6rem">{{ ph.name[:20] }}</span>
+                    {% endfor %}
+                    {% if wf.phases | length > 5 %}<span class="item-tag muted">+{{ wf.phases|length - 5 }}</span>{% endif %}
+                </div>
             </div>
         </div>
         <div class="item-meta">

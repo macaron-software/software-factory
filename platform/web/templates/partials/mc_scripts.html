@@ -3,6 +3,7 @@ const MISSION_ID = "{{ mission.id }}";
 const SESSION_ID = "{{ session_id }}";
 const PHASE_AGENTS = {{ phase_agents | tojson }};
 const PHASE_GRAPHS = {{ phase_graphs | tojson }};
+const WORKFLOW_GRAPH = {{ workflow_graph | tojson if workflow_graph else '{}' }};
 
 /* ── Tab switching ── */
 function switchTab(tab) {
@@ -1239,6 +1240,141 @@ function generatePhaseSummary(phaseId) {
 
 /* Init */
 renderPhaseGraphs();
+renderWorkflowGraph();
+// Also render per-phase graphs inside the workflow tab panel
+function renderWorkflowGraph() {
+    const container = document.getElementById('wf-global-graph');
+    if (!container) return;
+    const graph = WORKFLOW_GRAPH;
+    const nodes = (graph.nodes || []).map(n => ({...n}));
+    const edges = graph.edges || [];
+    if (!nodes.length) {
+        container.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--text-muted);font-size:0.8rem">Aucune donnée de graphe disponible pour ce workflow.</div>';
+        return;
+    }
+    const hasCoords = nodes.some(n => n.x || n.y);
+    if (hasCoords) {
+        // Use provided coordinates (from YAML config.graph)
+        const maxX = Math.max(...nodes.map(n => (n.x||0) + 130));
+        const maxY = Math.max(...nodes.map(n => (n.y||0) + 60));
+        const W = Math.max(maxX + 40, 500);
+        const H = Math.max(maxY + 40, 200);
+        _renderWfSvg(container, nodes, edges, W, H, 'wfglobal', false);
+    } else {
+        // Auto-layout by hierarchy_rank
+        const sorted = nodes.slice().sort((a,b) => (a.hierarchy_rank||50)-(b.hierarchy_rank||50));
+        const layerMap = new Map();
+        sorted.forEach(n => {
+            const r = n.hierarchy_rank || 50;
+            if (!layerMap.has(r)) layerMap.set(r, []);
+            layerMap.get(r).push(n);
+        });
+        const layers = [...layerMap.values()];
+        const layerGap = 120, MC_NW2 = 130, MC_NH2 = 50;
+        const maxCols = Math.max(...layers.map(l => l.length));
+        const W = Math.max(maxCols * (MC_NW2 + 40) + 60, 500);
+        const H = layers.length * layerGap + 40;
+        layers.forEach((layer, li) => {
+            const y = 20 + li * layerGap;
+            const gap = Math.min(MC_NW2 + 50, (W - 40) / (layer.length || 1));
+            const startX = Math.max(10, (W - gap*(layer.length-1) - MC_NW2) / 2);
+            layer.forEach((n, i) => { n.x = startX + i * gap; n.y = y; });
+        });
+        _renderWfSvg(container, nodes, edges, W, H, 'wfglobal', false);
+    }
+    // Render per-phase subgraphs inside workflow tab
+    for (const [phaseId, graph] of Object.entries(PHASE_GRAPHS)) {
+        const el = document.getElementById(`graph-wftab-${phaseId}`);
+        if (!el || !graph.nodes.length) continue;
+        const pnodes = graph.nodes.map(n => ({...n}));
+        const pedges = graph.edges || [];
+        const sorted = pnodes.slice().sort((a,b) => (a.hierarchy_rank||50)-(b.hierarchy_rank||50));
+        const layerMap = new Map();
+        sorted.forEach(n => { const r = n.hierarchy_rank||50; if(!layerMap.has(r)) layerMap.set(r,[]); layerMap.get(r).push(n); });
+        const layers = [...layerMap.values()];
+        const layerGap = 100, W2 = 300, NH2 = 50, NW2 = 120;
+        const H2 = layers.length * layerGap + 40;
+        layers.forEach((layer,li) => {
+            const y = 20 + li * layerGap;
+            const gap = Math.min(NW2+30, (W2-20)/(layer.length||1));
+            const sx = Math.max(5, (W2-gap*(layer.length-1)-NW2)/2);
+            layer.forEach((n,i) => { n.x=sx+i*gap; n.y=y; });
+        });
+        _renderWfSvg(el, pnodes, pedges, W2, H2, `wftab-${phaseId}`, true);
+    }
+}
+
+function _renderWfSvg(container, nodes, edges, W, H, prefix, compact) {
+    const MC_NW = compact ? 110 : 130, MC_NH = compact ? 42 : 52;
+    const nodeById = {};
+    nodes.forEach(n => { nodeById[n.id] = n; });
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="width:100%;max-height:${Math.min(H,500)}px">`;
+    const edgeColors = new Set(edges.map(e => e.color || '#8b5cf6'));
+    edgeColors.forEach(c => {
+        const id = c.replace('#','');
+        svg += `<defs><marker id="wfarr-${prefix}-${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="${c}"/></marker></defs>`;
+    });
+    edges.forEach(e => {
+        const fn = nodeById[e.from], tn = nodeById[e.to];
+        if (!fn || !tn) return;
+        const col = e.color || '#8b5cf6';
+        const hasRev = edges.some(r => r.from===e.to && r.to===e.from);
+        const off = hasRev ? 8 : 0;
+        const dy = tn.y-fn.y, dx = tn.x-fn.x;
+        let x1f, y1f, x2f, y2f, d;
+        if (Math.abs(dy) < MC_NH*0.8) {
+            if(dx>0){x1f=fn.x+MC_NW;y1f=fn.y+MC_NH/2-off;x2f=tn.x;y2f=tn.y+MC_NH/2+off;}
+            else{x1f=fn.x;y1f=fn.y+MC_NH/2-off;x2f=tn.x+MC_NW;y2f=tn.y+MC_NH/2+off;}
+            const midY = Math.min(y1f,y2f)-25;
+            d=`M${x1f},${y1f} C${x1f},${midY} ${x2f},${midY} ${x2f},${y2f}`;
+        } else if(dy>0){
+            x1f=fn.x+MC_NW/2+off;y1f=fn.y+MC_NH;x2f=tn.x+MC_NW/2-off;y2f=tn.y;
+            const co=Math.max(20,Math.abs(y2f-y1f)*0.3);
+            d=`M${x1f},${y1f} C${x1f},${y1f+co} ${x2f},${y2f-co} ${x2f},${y2f}`;
+        } else {
+            x1f=fn.x+MC_NW/2-off;y1f=fn.y;x2f=tn.x+MC_NW/2+off;y2f=tn.y+MC_NH;
+            const co=Math.max(20,Math.abs(y2f-y1f)*0.3);
+            d=`M${x1f},${y1f} C${x1f},${y1f-co} ${x2f},${y2f+co} ${x2f},${y2f}`;
+        }
+        const colId = col.replace('#','');
+        svg += `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.5" marker-end="url(#wfarr-${prefix}-${colId})"/>`;
+        if(e.label){const mx=(x1f+x2f)/2,my=(y1f+y2f)/2-5;svg+=`<text x="${mx}" y="${my}" text-anchor="middle" style="font-size:9px;fill:${col};font-weight:500">${esc(e.label)}</text>`;}
+    });
+    nodes.forEach(n => {
+        const aid = n.agent_id || n.id;
+        const info = AGENT_INFO[aid] || {};
+        const name = info.name || n.label || n.id;
+        const role = info.role || n.role || '';
+        const avatar = info.avatar || n.avatar || '';
+        const col = '#8b5cf6';
+        const avatarR=14, avatarCx=20, avatarCy=compact?22:26;
+        const textX = avatarCx+avatarR+8;
+        const avatarSvg = avatar
+            ? `<clipPath id="${prefix}-clip-${n.id}"><circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}"/></clipPath><image href="${esc(avatar)}" x="${avatarCx-avatarR}" y="${avatarCy-avatarR}" width="${avatarR*2}" height="${avatarR*2}" clip-path="url(#${prefix}-clip-${n.id})" preserveAspectRatio="xMidYMid slice"/>`
+            : `<circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}" fill="${col}" opacity="0.2"/><text x="${avatarCx}" y="${avatarCy+4}" text-anchor="middle" style="font-size:11px;fill:${col};font-weight:700">${esc(name.substring(0,2))}</text>`;
+        svg += `<g class="mc-live-node" data-agent-id="${esc(aid)}" transform="translate(${n.x},${n.y})" style="cursor:pointer">`;
+        svg += `<rect width="${MC_NW}" height="${MC_NH}" rx="5" fill="var(--bg-tertiary)" stroke="var(--border)" stroke-width="1"/>`;
+        svg += `<line x1="0" y1="0" x2="${MC_NW}" y2="0" stroke="${col}" stroke-width="3" rx="5"/>`;
+        svg += avatarSvg;
+        svg += `<text x="${textX}" y="${compact?18:20}" style="font-size:${compact?9:10}px;fill:var(--text-primary);font-weight:600">${esc(name.length>18?name.substring(0,17)+'…':name)}</text>`;
+        svg += `<text x="${textX}" y="${compact?29:33}" style="font-size:8px;fill:var(--text-secondary)">${esc(role.length>22?role.substring(0,21)+'…':role)}</text>`;
+        svg += `</g>`;
+    });
+    svg += '</svg>';
+    container.innerHTML = svg;
+    container.addEventListener('click', e => {
+        let el = e.target;
+        while (el && el !== container) {
+            if (el.classList && el.classList.contains('mc-live-node')) {
+                const agentId = el.getAttribute('data-agent-id');
+                if (agentId) showMcPopover(agentId, e);
+                return;
+            }
+            el = el.parentElement || el.parentNode;
+        }
+    });
+}
+
 // Generate summaries for already-completed phases
 document.querySelectorAll('.mc-phase[data-status="done"], .mc-phase[data-status="failed"]').forEach(el => {
     generatePhaseSummary(el.dataset.phaseId);
