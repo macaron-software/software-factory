@@ -465,6 +465,8 @@ class LLMClient:
                 pass
 
         for prov in providers_to_try:
+            cooldown_until = self._provider_cooldown.get(prov, 0)
+            now = time.monotonic()
             if cooldown_until > now:
                 remaining = int(cooldown_until - now)
                 logger.warning(
@@ -504,7 +506,6 @@ class LLMClient:
                 continue
 
             logger.warning("LLM trying %s/%s ... [rate: %s]", prov, use_model, _rate_limiter.usage)
-            last_exc = None
             max_attempts = 3  # Retry within provider, then fall back to next
             for attempt in range(max_attempts):
                 try:
@@ -546,7 +547,6 @@ class LLMClient:
                         pass
                     return result
                 except Exception as exc:
-                    last_exc = exc
                     err_str = repr(exc)
                     is_rate_limit = "429" in err_str or "RateLimitReached" in err_str
                     is_transient = (
@@ -850,7 +850,6 @@ class LLMClient:
         system_prompt: str,
     ) -> AsyncIterator[LLMStreamChunk]:
         """Single-provider streaming attempt."""
-        http = await self._get_http()
         url = self._build_url(pcfg, model)
         headers = self._build_headers(pcfg)
         logger.warning("LLM stream trying %s/%s ...", provider, model)
