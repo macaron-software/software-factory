@@ -77,8 +77,25 @@
 </div>
 
 <div id="skill-preview" class="skill-preview-panel">
-    <p class="text-secondary" style="padding:24px;text-align:center;font-size:13px;">
-        Click a skill to preview its content.
-    </p>
+    <button class="skill-preview-toggle" onclick="toggleSkillPreview()" title="Collapse preview">
+        <svg class="icon icon-xs" id="skill-preview-chevron"><use href="#icon-chevron-down"/></svg>
+        <span id="skill-preview-toggle-label">Preview</span>
+    </button>
+    <div id="skill-preview-body">
+        <p class="text-secondary" style="padding:24px;text-align:center;font-size:13px;">
+            Click a skill to preview its content.
+        </p>
+    </div>
 </div>
+
+<script>
+function toggleSkillPreview() {
+    const panel = document.getElementById('skill-preview');
+    const chevron = document.getElementById('skill-preview-chevron');
+    const label = document.getElementById('skill-preview-toggle-label');
+    const collapsed = panel.classList.toggle('collapsed');
+    chevron.style.transform = collapsed ? 'rotate(-90deg)' : '';
+    label.textContent = collapsed ? 'Show Preview' : 'Preview';
+}
+</script>
 {% endblock %}

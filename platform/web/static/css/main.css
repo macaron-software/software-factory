@@ -1496,8 +1496,22 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   background: var(--bg-secondary);
-  min-height: 100px;
+  min-height: 40px;
+  overflow: hidden;
+  transition: min-height 0.2s;
 }
+.skill-preview-panel.collapsed #skill-preview-body { display: none; }
+.skill-preview-toggle {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; padding: 10px 16px;
+  background: none; border: none; border-bottom: 1px solid var(--border);
+  color: var(--text-secondary); font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; text-align: left; letter-spacing: 0.3px;
+  transition: color 0.15s, background 0.15s;
+}
+.skill-preview-toggle:hover { color: var(--text-primary); background: rgba(255,255,255,0.03); }
+.skill-preview-panel.collapsed .skill-preview-toggle { border-bottom: none; }
+#skill-preview-chevron { transition: transform 0.2s; flex-shrink: 0; }
 
 /* ═══════════════════════════════════════════════════════════════
    GITHUB SOURCES PANEL
