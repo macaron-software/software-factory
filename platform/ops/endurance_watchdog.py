@@ -29,7 +29,7 @@ CHECK_INTERVAL = int(os.environ.get("WATCHDOG_INTERVAL", "60"))  # seconds
 PHASE_STALL_THRESHOLD = int(os.environ.get("WATCHDOG_STALL_THRESHOLD", "900"))  # 15 min
 DISK_ALERT_PCT = int(os.environ.get("WATCHDOG_DISK_ALERT", "90"))
 ENABLED = os.environ.get("WATCHDOG_ENABLED", "1") == "1"
-HEALTH_URL = os.environ.get("WATCHDOG_HEALTH_URL", "http://localhost:8090/api/health")
+HEALTH_URL = os.environ.get("WATCHDOG_HEALTH_URL", "http://localhost:8099/api/health")
 DB_PATH = os.environ.get("WATCHDOG_DB_PATH", "")
 
 
