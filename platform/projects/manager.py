@@ -473,13 +473,15 @@ class ProjectStore:
 
     def _row_to_project(self, row) -> Project:
         keys = row.keys() if hasattr(row, "keys") else []
+        _domains_raw = json.loads(row["domains_json"] or "[]")
+        _domains = _domains_raw if isinstance(_domains_raw, list) else list(_domains_raw.get("langs", []))
         return Project(
             id=row["id"],
             name=row["name"],
             path=row["path"],
             description=row["description"] or "",
             factory_type=row["factory_type"] or "standalone",
-            domains=json.loads(row["domains_json"] or "[]"),
+            domains=_domains,
             vision=row["vision"] or "",
             values=json.loads(row["values_json"] or "[]"),
             lead_agent_id=row["lead_agent_id"] or "",
