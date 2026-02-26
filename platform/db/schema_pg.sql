@@ -951,3 +951,74 @@ CREATE TABLE IF NOT EXISTS wiki_pages (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ── Performance indexes (added 2026-02) ──────────────────────────────────────
+
+-- missions: hot sort + parent lookup
+CREATE INDEX IF NOT EXISTS idx_missions_created      ON missions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_missions_wsjf         ON missions(wsjf_score DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_missions_parent       ON missions(parent_mission_id) WHERE parent_mission_id IS NOT NULL AND parent_mission_id != '';
+CREATE INDEX IF NOT EXISTS idx_missions_kanban       ON missions(kanban_status);
+
+-- mission_runs: parent + session + created sort
+CREATE INDEX IF NOT EXISTS idx_mruns_parent          ON mission_runs(parent_mission_id) WHERE parent_mission_id IS NOT NULL AND parent_mission_id != '';
+CREATE INDEX IF NOT EXISTS idx_mruns_session         ON mission_runs(session_id)   WHERE session_id != '';
+CREATE INDEX IF NOT EXISTS idx_mruns_created         ON mission_runs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mruns_workflow        ON mission_runs(workflow_id);
+
+-- sessions: created sort (hot for list page)
+CREATE INDEX IF NOT EXISTS idx_sessions_created      ON sessions(created_at DESC);
+
+-- messages: compound (session+timestamp) for conversation fetch
+CREATE INDEX IF NOT EXISTS idx_messages_sess_ts      ON messages(session_id, timestamp ASC);
+
+-- tool_calls: mission (no index yet)
+CREATE INDEX IF NOT EXISTS idx_toolcalls_mission     ON tool_calls(mission_id) WHERE mission_id IS NOT NULL AND mission_id != '';
+
+-- llm_traces: mission + compound (provider+model+created) for cost reports
+CREATE INDEX IF NOT EXISTS idx_llm_mission           ON llm_traces(mission_id) WHERE mission_id != '';
+CREATE INDEX IF NOT EXISTS idx_llm_created_prov      ON llm_traces(created_at DESC, provider, model);
+
+-- llm_cache: hash lookup is PK, but also used with model+hash
+CREATE INDEX IF NOT EXISTS idx_llm_cache_model       ON llm_cache(model, hash);
+
+-- notifications: is_read filter + created sort (polled every ~5s)
+CREATE INDEX IF NOT EXISTS idx_notif_read_created    ON notifications(is_read, created_at DESC);
+
+-- events: timestamp range queries
+CREATE INDEX IF NOT EXISTS idx_events_ts             ON events(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_events_type           ON events(event_type, timestamp DESC);
+
+-- user_sessions: user_id (logout all) + expires_at (cleanup)
+CREATE INDEX IF NOT EXISTS idx_usess_user            ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_usess_expires         ON user_sessions(expires_at);
+
+-- wiki_pages: category + sort_order (nav rendering)
+CREATE INDEX IF NOT EXISTS idx_wiki_category         ON wiki_pages(category, sort_order);
+CREATE INDEX IF NOT EXISTS idx_wiki_parent           ON wiki_pages(parent_slug) WHERE parent_slug IS NOT NULL;
+
+-- support_tickets / incidents: status filter
+CREATE INDEX IF NOT EXISTS idx_tickets_status        ON support_tickets(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tickets_severity      ON support_tickets(severity);
+CREATE INDEX IF NOT EXISTS idx_incidents_mission     ON platform_incidents(mission_id) WHERE mission_id IS NOT NULL;
+
+-- team_selections: agent + workflow for Darwin leaderboard
+CREATE INDEX IF NOT EXISTS idx_tsel_agent            ON team_selections(agent_id);
+CREATE INDEX IF NOT EXISTS idx_tsel_workflow         ON team_selections(workflow_id);
+
+-- org hierarchy
+CREATE INDEX IF NOT EXISTS idx_arts_portfolio        ON org_arts(portfolio_id);
+CREATE INDEX IF NOT EXISTS idx_teams_art             ON org_teams(art_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_agent    ON org_team_members(agent_id);
+
+-- tasks: compound (mission+status) and (sprint+status)
+CREATE INDEX IF NOT EXISTS idx_tasks_miss_status     ON tasks(mission_id, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_sprint_status   ON tasks(sprint_id, status);
+
+-- retrospectives
+CREATE INDEX IF NOT EXISTS idx_retro_scope           ON retrospectives(scope_id);
+
+-- rl_experience: created sort
+CREATE INDEX IF NOT EXISTS idx_rl_created            ON rl_experience(created_at DESC);
+
+-- features: epic_id (already has idx_features_epic — add project via epic join, no direct project_id col)
