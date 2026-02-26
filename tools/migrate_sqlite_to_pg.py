@@ -20,7 +20,17 @@ SCRIPT_DIR = Path(__file__).parent
 REPO_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-SQLITE_PATH = REPO_ROOT / "data" / "platform.db"
+# Allow override via env var (e.g. inside Docker container data/ is at /app/data/)
+_env_sqlite = os.environ.get("SQLITE_PATH", "")
+if _env_sqlite:
+    SQLITE_PATH = Path(_env_sqlite)
+else:
+    candidates = [
+        REPO_ROOT / "data" / "platform.db",
+        Path("/app/data/platform.db"),
+        Path("/app/macaron_platform/data/platform.db"),
+    ]
+    SQLITE_PATH = next((p for p in candidates if p.exists()), candidates[0])
 
 # Tables to skip (SQLite-only internals / FTS shadow tables)
 _SKIP_PATTERN = re.compile(
