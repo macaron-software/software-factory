@@ -343,15 +343,25 @@ async def handle_failed_runs() -> int:
 
             # Phase-specific failure with prior progress → also create TMA incident
             if done_phases and cur_phase and project_id:
-                await _create_tma_incident(
-                    failed_run_id=run_id,
-                    workflow_name=wf_name,
-                    failed_phase=cur_phase,
-                    done_phases=[p["phase_id"] for p in done_phases],
-                    project_id=project_id,
-                    original_brief=brief or "",
-                )
-                tma_created += 1
+                # Guard: skip if TMA incident already exists for this run
+                db3 = get_db()
+                try:
+                    existing = db3.execute(
+                        "SELECT id FROM mission_runs WHERE parent_mission_id=? AND workflow_id=?",
+                        (run_id, _TMA_WORKFLOW_ID),
+                    ).fetchone()
+                finally:
+                    db3.close()
+                if not existing:
+                    await _create_tma_incident(
+                        failed_run_id=run_id,
+                        workflow_name=wf_name,
+                        failed_phase=cur_phase,
+                        done_phases=[p["phase_id"] for p in done_phases],
+                        project_id=project_id,
+                        original_brief=brief or "",
+                    )
+                    tma_created += 1
 
         except Exception as e:
             logger.warning("handle_failed_runs: error on %s: %s", run_id, e)
