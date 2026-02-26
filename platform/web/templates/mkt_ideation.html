@@ -351,14 +351,42 @@ function mktBuildGraph() {
   mktGraphBuilt = true;
 }
 
+/* ── Feather icon helper ── */
+function mktSvg(path, sz) {
+  return `<svg width="${sz||13}" height="${sz||13}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-2px;flex-shrink:0">${path}</svg>`;
+}
+const _I = {
+  'zap':          '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  'trending-up':  '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
+  'alert-triangle':'<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  'award':        '<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>',
+  'user':         '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  'users':        '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  'radio':        '<circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/>',
+  'check-circle': '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+  'target':       '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  'bar-chart-2':  '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+  'shield':       '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  'feather':      '<path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/>',
+  'navigation':   '<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
+  'volume-2':     '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>',
+  'dollar-sign':  '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  'star':         '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  'repeat':       '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+  'credit-card':  '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
+  'check':        '<polyline points="20 6 9 17 4 12"/>',
+  'x-circle':     '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>',
+  'layers':       '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+};
+
 /* ── Finding types config ── */
 const MKT_FINDING_TYPES = {
-  opportunity: { icon: '🚀', label: 'Opportunité' },
-  threat:      { icon: '⚠️', label: 'Menace' },
-  trend:       { icon: '📈', label: 'Tendance' },
-  competitor:  { icon: '🏆', label: 'Concurrent' },
-  persona:     { icon: '👤', label: 'Persona' },
-  channel:     { icon: '📣', label: 'Canal' },
+  opportunity: { icon: mktSvg(_I['trending-up'], 12), label: 'Opportunité' },
+  threat:      { icon: mktSvg(_I['alert-triangle'], 12), label: 'Menace' },
+  trend:       { icon: mktSvg(_I['bar-chart-2'], 12), label: 'Tendance' },
+  competitor:  { icon: mktSvg(_I['award'], 12), label: 'Concurrent' },
+  persona:     { icon: mktSvg(_I['user'], 12), label: 'Persona' },
+  channel:     { icon: mktSvg(_I['volume-2'], 12), label: 'Canal' },
 };
 
 /* ── Add finding to panel ── */
@@ -367,7 +395,7 @@ function mktAddFinding(type, text) {
   const empty = container.querySelector('.mkt-findings-empty');
   if (empty) empty.remove();
 
-  const cfg = MKT_FINDING_TYPES[type] || { icon: '💡', label: type };
+  const cfg = MKT_FINDING_TYPES[type] || { icon: mktSvg(_I['zap'], 12), label: type };
   const div = document.createElement('div');
   div.className = `mkt-finding ${type}`;
   div.innerHTML = `<span class="mkt-finding-icon">${cfg.icon}</span><span class="mkt-finding-text">${text}</span>`;
@@ -627,7 +655,7 @@ function mktRenderPlan(plan) {
   // ── Executive Summary ──
   if (plan.executive_summary) {
     h(`<div class="plan-section">
-      <div class="plan-section-hd"><span class="plan-icon">✨</span> Résumé Exécutif</div>
+      <div class="plan-section-hd">${mktSvg(_I['check-circle'], 14)} Résumé Exécutif</div>
       <div class="plan-section-bd">
         <div class="plan-exec-summary">${esc(plan.executive_summary)}</div>
       </div>
@@ -638,7 +666,7 @@ function mktRenderPlan(plan) {
   const v = plan.business_vision;
   if (v) {
     h(`<div class="plan-section">
-      <div class="plan-section-hd"><span class="plan-icon">🎯</span> Vision Business</div>
+      <div class="plan-section-hd">${mktSvg(_I['target'], 14)} Vision Business</div>
       <div class="plan-section-bd">
         <div class="plan-brand-uvp">${esc(v.uvp || '')}</div>
         ${v.problem ? `<div class="plan-brand-row"><span class="plan-brand-key">Problème</span><span class="plan-brand-val">${esc(v.problem)}</span></div>` : ''}
@@ -653,20 +681,20 @@ function mktRenderPlan(plan) {
   if (ma) {
     const swot = ma.swot || {};
     h(`<div class="plan-section">
-      <div class="plan-section-hd"><span class="plan-icon">📊</span> Analyse de Marché</div>
+      <div class="plan-section-hd">${mktSvg(_I['bar-chart-2'], 14)} Analyse de Marché</div>
       <div class="plan-section-bd">
         <div class="plan-metric-grid" style="margin-bottom:0.75rem">
           <div class="plan-metric-card"><div class="plan-metric-val">${esc(ma.tam||'—')}</div><div class="plan-metric-lbl">TAM</div></div>
           <div class="plan-metric-card"><div class="plan-metric-val">${esc(ma.sam||'—')}</div><div class="plan-metric-lbl">SAM</div></div>
           <div class="plan-metric-card"><div class="plan-metric-val">${esc(ma.som||'—')}</div><div class="plan-metric-lbl">SOM (An 1-3)</div></div>
         </div>
-        ${ma.growth_rate ? `<div style="font-size:0.74rem;color:var(--mkt-green);font-weight:700;margin-bottom:0.6rem">📈 Croissance marché : ${esc(ma.growth_rate)}</div>` : ''}
+        ${ma.growth_rate ? `<div style="font-size:0.74rem;color:var(--mkt-green);font-weight:700;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.3rem">${mktSvg(_I['trending-up'], 12)} Croissance marché : ${esc(ma.growth_rate)}</div>` : ''}
         ${ma.key_trends?.length ? `<div style="margin-bottom:0.6rem"><div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);font-weight:700;margin-bottom:0.3rem">Tendances clés</div>${ul(ma.key_trends)}</div>` : ''}
         <div class="plan-swot">
-          <div class="plan-swot-cell s"><div class="plan-swot-label">💪 Forces</div><ul class="plan-swot-items">${(swot.strengths||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>
-          <div class="plan-swot-cell w"><div class="plan-swot-label">⚡ Faiblesses</div><ul class="plan-swot-items">${(swot.weaknesses||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>
-          <div class="plan-swot-cell o"><div class="plan-swot-label">🚀 Opportunités</div><ul class="plan-swot-items">${(swot.opportunities||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>
-          <div class="plan-swot-cell t"><div class="plan-swot-label">🛡 Menaces</div><ul class="plan-swot-items">${(swot.threats||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>
+          <div class="plan-swot-cell s"><div class="plan-swot-label">${mktSvg(_I['zap'], 11)} Forces</div><ul class="plan-swot-items">${(swot.strengths||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>
+          <div class="plan-swot-cell w"><div class="plan-swot-label">${mktSvg(_I['alert-triangle'], 11)} Faiblesses</div><ul class="plan-swot-items">${(swot.weaknesses||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>
+          <div class="plan-swot-cell o"><div class="plan-swot-label">${mktSvg(_I['trending-up'], 11)} Opportunités</div><ul class="plan-swot-items">${(swot.opportunities||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>
+          <div class="plan-swot-cell t"><div class="plan-swot-label">${mktSvg(_I['shield'], 11)} Menaces</div><ul class="plan-swot-items">${(swot.threats||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>
         </div>
       </div>
     </div>`);
@@ -683,7 +711,7 @@ function mktRenderPlan(plan) {
       <td style="color:#ef4444">${(c.weaknesses||[]).slice(0,2).map(esc).join(', ')}</td>
     </tr>`).join('');
     h(`<div class="plan-section">
-      <div class="plan-section-hd"><span class="plan-icon">🏆</span> Analyse Concurrentielle</div>
+      <div class="plan-section-hd">${mktSvg(_I['award'], 14)} Analyse Concurrentielle</div>
       <div class="plan-section-bd plan-competitors">
         <table><thead><tr><th>Concurrent</th><th>Type</th><th>Positionnement</th><th>Forces</th><th>Faiblesses</th></tr></thead>
         <tbody>${rows}</tbody></table>
@@ -693,9 +721,9 @@ function mktRenderPlan(plan) {
 
   // ── Differentiators ──
   if (plan.differentiators?.length) {
-    const items = plan.differentiators.map(d => `<div class="plan-diff-item"><span class="plan-diff-star">★</span>${esc(d)}</div>`).join('');
+    const items = plan.differentiators.map(d => `<div class="plan-diff-item"><span class="plan-diff-star">${mktSvg(_I['star'], 12)}</span>${esc(d)}</div>`).join('');
     h(`<div class="plan-section">
-      <div class="plan-section-hd"><span class="plan-icon">⚡</span> Nos Différenciateurs</div>
+      <div class="plan-section-hd">${mktSvg(_I['layers'], 14)} Nos Différenciateurs</div>
       <div class="plan-section-bd"><div class="plan-differentiators">${items}</div></div>
     </div>`);
   }
@@ -704,17 +732,17 @@ function mktRenderPlan(plan) {
   if (plan.target_personas?.length) {
     const cards = plan.target_personas.map(p => `
       <div class="plan-persona-card">
-        <div class="plan-persona-name">👤 ${esc(p.name||'')}</div>
+        <div class="plan-persona-name">${mktSvg(_I['user'], 13)} ${esc(p.name||'')}</div>
         <div class="plan-persona-profile">${esc(p.profile||'')}</div>
         ${p.jtbd ? `<div class="plan-persona-jtbd">"${esc(p.jtbd)}"</div>` : ''}
         <div class="plan-persona-tags">
-          ${(p.pain_points||[]).slice(0,3).map(pp=>`<span class="plan-persona-tag" style="border-color:rgba(239,68,68,.3);color:#ef4444">⚠ ${esc(pp)}</span>`).join('')}
-          ${(p.channels||[]).slice(0,2).map(ch=>`<span class="plan-persona-tag">📣 ${esc(ch)}</span>`).join('')}
-          ${p.wtp ? `<span class="plan-persona-tag" style="border-color:rgba(22,163,74,.3);color:var(--mkt-green)">💳 WTP: ${esc(p.wtp)}</span>` : ''}
+          ${(p.pain_points||[]).slice(0,3).map(pp=>`<span class="plan-persona-tag" style="border-color:rgba(239,68,68,.3);color:#ef4444">${mktSvg(_I['alert-triangle'],10)} ${esc(pp)}</span>`).join('')}
+          ${(p.channels||[]).slice(0,2).map(ch=>`<span class="plan-persona-tag">${mktSvg(_I['volume-2'],10)} ${esc(ch)}</span>`).join('')}
+          ${p.wtp ? `<span class="plan-persona-tag" style="border-color:rgba(22,163,74,.3);color:var(--mkt-green)">${mktSvg(_I['credit-card'],10)} WTP: ${esc(p.wtp)}</span>` : ''}
         </div>
       </div>`).join('');
     h(`<div class="plan-section">
-      <div class="plan-section-hd"><span class="plan-icon">👥</span> Personas Clients</div>
+      <div class="plan-section-hd">${mktSvg(_I['users'], 14)} Personas Clients</div>
       <div class="plan-section-bd"><div class="plan-personas">${cards}</div></div>
     </div>`);
   }
@@ -723,7 +751,7 @@ function mktRenderPlan(plan) {
   const brand = plan.brand_strategy;
   if (brand) {
     h(`<div class="plan-section">
-      <div class="plan-section-hd"><span class="plan-icon">🎨</span> Stratégie de Marque</div>
+      <div class="plan-section-hd">${mktSvg(_I['feather'], 14)} Stratégie de Marque</div>
       <div class="plan-section-bd">
         ${brand.headline ? `<div class="plan-brand-uvp">"${esc(brand.headline)}"</div>` : ''}
         ${brand.tagline ? `<div class="plan-brand-tagline">${esc(brand.tagline)}</div>` : ''}
@@ -751,10 +779,10 @@ function mktRenderPlan(plan) {
         </div>
       </div>`).join('');
     h(`<div class="plan-section">
-      <div class="plan-section-hd"><span class="plan-icon">🚀</span> Plan Go-to-Market</div>
+      <div class="plan-section-hd">${mktSvg(_I['navigation'], 14)} Plan Go-to-Market</div>
       <div class="plan-section-bd">
         ${gtm.strategy ? `<div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.75rem">${esc(gtm.strategy)}</div>` : ''}
-        ${gtm.beachhead ? `<div style="font-size:0.74rem;font-weight:700;color:var(--mkt-amber);margin-bottom:0.6rem">🎯 Marché Beachhead : ${esc(gtm.beachhead)}</div>` : ''}
+        ${gtm.beachhead ? `<div style="font-size:0.74rem;font-weight:700;color:var(--mkt-amber);margin-bottom:0.6rem;display:flex;align-items:center;gap:0.3rem">${mktSvg(_I['target'], 12)} Marché Beachhead : ${esc(gtm.beachhead)}</div>` : ''}
         <div class="plan-phases">${phases}</div>
       </div>
     </div>`);
@@ -776,7 +804,7 @@ function mktRenderPlan(plan) {
         <span class="plan-channel-pct">${ch.budget_pct||0}%</span>
       </div>`).join('');
     h(`<div class="plan-section">
-      <div class="plan-section-hd"><span class="plan-icon">📣</span> Canaux Marketing</div>
+      <div class="plan-section-hd">${mktSvg(_I['radio'], 14)} Canaux Marketing</div>
       <div class="plan-section-bd"><div class="plan-channels">${rows}</div></div>
     </div>`);
   }
@@ -785,7 +813,7 @@ function mktRenderPlan(plan) {
   const gm = plan.growth_model;
   if (gm) {
     h(`<div class="plan-section">
-      <div class="plan-section-hd"><span class="plan-icon">📈</span> Modèle de Croissance</div>
+      <div class="plan-section-hd">${mktSvg(_I['trending-up'], 14)} Modèle de Croissance</div>
       <div class="plan-section-bd">
         <div class="plan-growth-grid">
           <div class="plan-growth-card"><div class="plan-growth-lbl">CAC cible</div><div class="plan-growth-val">${esc(gm.cac_target||'—')}</div></div>
@@ -793,7 +821,7 @@ function mktRenderPlan(plan) {
           <div class="plan-growth-card"><div class="plan-growth-lbl">Remboursement CAC</div><div class="plan-growth-val">${esc(gm.payback_period||'—')}</div></div>
           <div class="plan-growth-card"><div class="plan-growth-lbl">Moteur principal</div><div class="plan-growth-val">${esc(gm.primary_engine||'—')}</div></div>
         </div>
-        ${gm.viral_loop ? `<div style="font-size:0.74rem;color:var(--text-secondary);padding:0.4rem;border-left:2px solid var(--mkt-teal)">🔄 Viral loop : ${esc(gm.viral_loop)}</div>` : ''}
+        ${gm.viral_loop ? `<div style="font-size:0.74rem;color:var(--text-secondary);padding:0.4rem;border-left:2px solid var(--mkt-teal);display:flex;align-items:center;gap:0.4rem">${mktSvg(_I['repeat'], 12)} Viral loop : ${esc(gm.viral_loop)}</div>` : ''}
       </div>
     </div>`);
   }
@@ -807,7 +835,7 @@ function mktRenderPlan(plan) {
         <div class="plan-kpi-timeline">${esc(k.timeline||'')}</div>
       </div>`).join('');
     h(`<div class="plan-section">
-      <div class="plan-section-hd"><span class="plan-icon">🎯</span> KPIs Dashboard</div>
+      <div class="plan-section-hd">${mktSvg(_I['target'], 14)} KPIs Dashboard</div>
       <div class="plan-section-bd"><div class="plan-kpis">${cards}</div></div>
     </div>`);
   }
@@ -823,7 +851,7 @@ function mktRenderPlan(plan) {
         <span class="plan-budget-pct">${b.pct||0}%</span>
       </div>`).join('');
     h(`<div class="plan-section">
-      <div class="plan-section-hd"><span class="plan-icon">💰</span> Budget Indicatif</div>
+      <div class="plan-section-hd">${mktSvg(_I['dollar-sign'], 14)} Budget Indicatif</div>
       <div class="plan-section-bd">
         ${budget.total_an1 ? `<div style="font-size:0.9rem;font-weight:700;color:var(--mkt-amber);margin-bottom:0.75rem">Total An 1 : ${esc(budget.total_an1)}</div>` : ''}
         <div class="plan-budget-list">${rows}</div>
@@ -839,7 +867,7 @@ function mktRenderPlan(plan) {
         <span>${esc(a)}</span>
       </div>`).join('');
     h(`<div class="plan-section">
-      <div class="plan-section-hd"><span class="plan-icon">⚡</span> Actions Immédiates</div>
+      <div class="plan-section-hd">${mktSvg(_I['zap'], 14)} Actions Immédiates</div>
       <div class="plan-section-bd"><div class="plan-next-actions">${items}</div></div>
     </div>`);
   }
@@ -951,12 +979,12 @@ async function mktCreateMission() {
     });
     const data = await resp.json();
     if (data.mission_id) {
-      btn.innerHTML = `✅ Mission créée`;
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><polyline points="20 6 9 17 4 12"/></svg> Mission créée`;
       btn.style.background = 'rgba(22,163,74,.3)';
       setTimeout(() => { if (data.redirect) window.location.href = data.redirect; }, 1200);
     }
   } catch(e) {
-    btn.innerHTML = '❌ Erreur';
+    btn.innerHTML = 'Erreur';
     btn.disabled = false;
   }
 }

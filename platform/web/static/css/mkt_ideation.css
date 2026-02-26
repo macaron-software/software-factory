@@ -397,7 +397,7 @@
   gap: 0.5rem;
   border-bottom: 1px solid var(--border);
 }
-.plan-section-hd span.plan-icon { font-size: 1rem; }
+.plan-section-hd svg { color: var(--mkt-amber); flex-shrink: 0; }
 .plan-section-bd { padding: 0.75rem 0.9rem; font-size: 0.8rem; line-height: 1.6; }
 
 /* Vision & summary */
@@ -428,7 +428,7 @@
 .plan-swot-cell.w { background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.2); }
 .plan-swot-cell.o { background: rgba(8,145,178,.08); border: 1px solid rgba(8,145,178,.2); }
 .plan-swot-cell.t { background: rgba(249,115,22,.08); border: 1px solid rgba(249,115,22,.2); }
-.plan-swot-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 0.35rem; }
+.plan-swot-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 0.35rem; display:flex; align-items:center; gap:0.3rem; }
 .plan-swot-cell.s .plan-swot-label { color: var(--mkt-green); }
 .plan-swot-cell.w .plan-swot-label { color: #ef4444; }
 .plan-swot-cell.o .plan-swot-label { color: var(--mkt-teal); }
@@ -556,7 +556,7 @@
 /* Differentiators */
 .plan-differentiators { display: flex; flex-direction: column; gap: 0.35rem; }
 .plan-diff-item { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.78rem; padding: 0.35rem 0.5rem; border-radius: 5px; background: rgba(245,158,11,.06); border: 1px solid rgba(245,158,11,.2); color: var(--text-primary); }
-.plan-diff-star { color: var(--mkt-amber); font-size: 0.9rem; flex-shrink: 0; }
+.plan-diff-star { color: var(--mkt-amber); flex-shrink: 0; display:inline-flex; align-items:center; }
 
 /* Animations */
 @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
