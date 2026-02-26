@@ -50,6 +50,7 @@ class Project:
     agents: list[str] = field(default_factory=list)  # Assigned agent IDs
     active_pattern_id: str = ""   # Currently active pattern
     status: str = "active"        # active | paused | archived
+    git_url: str = ""             # GitHub/GitLab remote URL for PR creation
     created_at: str = ""
     updated_at: str = ""
 
@@ -108,10 +109,15 @@ class ProjectStore:
                 agents_json TEXT DEFAULT '[]',
                 active_pattern_id TEXT DEFAULT '',
                 status TEXT DEFAULT 'active',
+                git_url TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Migration: add git_url if missing
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(projects)").fetchall()]
+        if "git_url" not in cols:
+            conn.execute("ALTER TABLE projects ADD COLUMN git_url TEXT DEFAULT ''")
         conn.commit()
         conn.close()
 
@@ -152,11 +158,12 @@ class ProjectStore:
         conn.execute("""
             INSERT OR REPLACE INTO projects
             (id, name, path, description, factory_type, domains_json,
-             vision, values_json, lead_agent_id, agents_json, active_pattern_id, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             vision, values_json, lead_agent_id, agents_json, active_pattern_id, status, git_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (p.id, p.name, p.path, p.description, p.factory_type,
               json.dumps(p.domains), p.vision, json.dumps(p.values),
-              p.lead_agent_id, json.dumps(p.agents), p.active_pattern_id, p.status))
+              p.lead_agent_id, json.dumps(p.agents), p.active_pattern_id, p.status,
+              p.git_url or ""))
         conn.commit()
         conn.close()
         invalidate("projects:all")
@@ -465,6 +472,7 @@ class ProjectStore:
             logger.warning("Failed to seed workflow sessions: %s", e)
 
     def _row_to_project(self, row) -> Project:
+        keys = row.keys() if hasattr(row, "keys") else []
         return Project(
             id=row["id"],
             name=row["name"],
@@ -478,6 +486,7 @@ class ProjectStore:
             agents=json.loads(row["agents_json"] or "[]"),
             active_pattern_id=row["active_pattern_id"] or "",
             status=row["status"] or "active",
+            git_url=row["git_url"] if "git_url" in keys else "",
             created_at=row["created_at"] or "",
             updated_at=row["updated_at"] or "",
         )

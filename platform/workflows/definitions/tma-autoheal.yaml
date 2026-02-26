@@ -40,6 +40,19 @@ phases:
   config:
     agents:
     - release_train_engineer
+- id: integrate
+  pattern_id: solo
+  name: Integrate Fix
+  description: >
+    Push the fix branch to origin and create a Pull Request to main.
+    Use git_push to push the current agent branch, then git_create_pr
+    with title "TMA: <brief summary>" and base "main".
+    If the project is the Software Factory itself, note the PR URL in the
+    incident resolution so a human can review and merge.
+  gate: PR created and linked to resolved incident
+  config:
+    agents:
+    - release_train_engineer
 config:
   autoheal: true
   max_duration_minutes: 30

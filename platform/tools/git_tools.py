@@ -6,32 +6,9 @@ Git branch isolation: agents commit to agent/{agent_id}/ branches, never main/ma
 
 from __future__ import annotations
 
-import os
 import subprocess
-from pathlib import Path
 from ..models import AgentInstance
 from .registry import BaseTool
-
-# Workspace root for resolving bare run-IDs passed as cwd
-_WS_ROOT: Path | None = None
-
-
-def _resolve_cwd(cwd: str) -> str:
-    """Resolve bare run-ID or relative path to absolute workspace path."""
-    global _WS_ROOT
-    if os.path.isabs(cwd):
-        return cwd
-    # Lazy-init workspace root
-    if _WS_ROOT is None:
-        try:
-            from ..config import FACTORY_ROOT
-            _WS_ROOT = Path(FACTORY_ROOT) / "data" / "workspaces"
-        except Exception:
-            _WS_ROOT = Path("/app/data/workspaces")
-    candidate = _WS_ROOT / cwd
-    if candidate.is_dir():
-        return str(candidate)
-    return cwd  # fall back to original
 
 # Protected branches — agents cannot commit directly
 _PROTECTED_BRANCHES = {"main", "master", "develop", "release", "production", "staging"}
@@ -80,7 +57,7 @@ class GitStatusTool(BaseTool):
     category = "git"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        cwd = _resolve_cwd(params.get("cwd", "."))
+        cwd = params.get("cwd", ".")
         try:
             r = subprocess.run(
                 ["git", "--no-pager", "status", "--short"],
@@ -99,7 +76,7 @@ class GitDiffTool(BaseTool):
     category = "git"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        cwd = _resolve_cwd(params.get("cwd", "."))
+        cwd = params.get("cwd", ".")
         path = params.get("path", "")
         cmd = ["git", "--no-pager", "diff"]
         if path:
@@ -117,7 +94,7 @@ class GitLogTool(BaseTool):
     category = "git"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        cwd = _resolve_cwd(params.get("cwd", "."))
+        cwd = params.get("cwd", ".")
         limit = params.get("limit", 10)
         try:
             r = subprocess.run(
@@ -137,7 +114,7 @@ class GitCommitTool(BaseTool):
     requires_approval = True
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        cwd = _resolve_cwd(params.get("cwd", "."))
+        cwd = params.get("cwd", ".")
         files = params.get("files", [])
         message = params.get("message", "")
         if not message:
@@ -158,18 +135,78 @@ class GitCommitTool(BaseTool):
             else:
                 branch_msg = f" (on branch: {current})"
 
-            _git_env = {**os.environ,
-                        "GIT_AUTHOR_NAME": "agent", "GIT_AUTHOR_EMAIL": "agent@sf",
-                        "GIT_COMMITTER_NAME": "agent", "GIT_COMMITTER_EMAIL": "agent@sf"}
             if files:
-                subprocess.run(["git", "add"] + files, cwd=cwd, timeout=10, check=True, env=_git_env)
+                subprocess.run(["git", "add"] + files, cwd=cwd, timeout=10, check=True)
             else:
-                subprocess.run(["git", "add", "-A"], cwd=cwd, timeout=10, check=True, env=_git_env)
+                subprocess.run(["git", "add", "-A"], cwd=cwd, timeout=10, check=True)
             r = subprocess.run(
                 ["git", "commit", "-m", message],
-                capture_output=True, text=True, cwd=cwd, timeout=30, env=_git_env,
+                capture_output=True, text=True, cwd=cwd, timeout=30,
             )
             return (r.stdout or r.stderr) + branch_msg
+        except Exception as e:
+            return f"Error: {e}"
+
+
+class GitPushTool(BaseTool):
+    name = "git_push"
+    description = "Push current agent branch to remote origin"
+    category = "git"
+    requires_approval = True
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        cwd = params.get("cwd", ".")
+        remote = params.get("remote", "origin")
+        try:
+            branch = _current_branch(cwd)
+            if not branch:
+                return "Error: could not determine current branch"
+            r = subprocess.run(
+                ["git", "push", "--set-upstream", remote, branch],
+                capture_output=True, text=True, cwd=cwd, timeout=60,
+            )
+            if r.returncode == 0:
+                return f"Pushed branch '{branch}' to {remote}.\n{r.stdout.strip()}"
+            return f"Push failed:\n{r.stderr.strip()}"
+        except Exception as e:
+            return f"Error: {e}"
+
+
+class GitCreatePRTool(BaseTool):
+    name = "git_create_pr"
+    description = "Create a GitHub Pull Request from current branch to base branch (default: main)"
+    category = "git"
+    requires_approval = True
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        cwd = params.get("cwd", ".")
+        title = params.get("title", "")
+        body = params.get("body", "")
+        base = params.get("base", "main")
+        if not title:
+            return "Error: PR title required"
+        try:
+            branch = _current_branch(cwd)
+            if not branch:
+                return "Error: could not determine current branch"
+            # Push first if not already pushed
+            subprocess.run(
+                ["git", "push", "--set-upstream", "origin", branch],
+                capture_output=True, cwd=cwd, timeout=60,
+            )
+            cmd = ["gh", "pr", "create",
+                   "--title", title,
+                   "--body", body or f"Automated fix by agent on branch `{branch}`",
+                   "--base", base]
+            r = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, timeout=60)
+            if r.returncode == 0:
+                pr_url = r.stdout.strip()
+                return f"PR created: {pr_url}"
+            # gh not available — output branch URL hint
+            return (
+                f"gh CLI not available ({r.stderr.strip()[:200]}). "
+                f"Branch '{branch}' is ready — create PR manually at GitHub."
+            )
         except Exception as e:
             return f"Error: {e}"
 
@@ -180,3 +217,5 @@ def register_git_tools(registry):
     registry.register(GitDiffTool())
     registry.register(GitLogTool())
     registry.register(GitCommitTool())
+    registry.register(GitPushTool())
+    registry.register(GitCreatePRTool())

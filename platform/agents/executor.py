@@ -40,13 +40,25 @@ _TOOL_CAPABLE_PROVIDERS = {"azure-openai", "azure-ai", "openai"}
 
 
 def _route_provider(agent: AgentDef, tools: list | None) -> tuple[str, str]:
-    """Route to the best provider based on whether tools are needed.
+    """Route to the best provider based on tools and agent rejection rate.
 
     - Tools enabled → azure-openai (reliable function calling)
+    - High rejection rate (>40%) → azure-openai (better quality)
     - Chat/discussion → keep agent's default provider (minimax for cost)
     """
     if tools and agent.provider not in _TOOL_CAPABLE_PROVIDERS:
         return _TOOL_PROVIDER, _TOOL_MODEL
+    # Quality escalation: if agent has high rejection rate, use better model
+    if agent.provider not in _TOOL_CAPABLE_PROVIDERS:
+        try:
+            from .selection import rejection_rate
+            if rejection_rate(agent.id) > 0.40:
+                logger.debug(
+                    "Escalating %s to azure-openai (high rejection rate)", agent.id
+                )
+                return _TOOL_PROVIDER, _TOOL_MODEL
+        except Exception:
+            pass
     return agent.provider, agent.model
 
 
