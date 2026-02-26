@@ -13,13 +13,13 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.OVH_SSH_KEY }}" > ~/.ssh/deploy_key
+          printf '%s\n' "${{ secrets.OVH_SSH_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.OVH_IP }}" >> ~/.ssh/known_hosts
 
       - name: Backup SQLite before deploy
         run: |
-          ssh -i ~/.ssh/deploy_key debian@${{ secrets.OVH_IP }} "
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes debian@${{ secrets.OVH_IP }} "
             TS=\$(date +%Y%m%d-%H%M%S)
             mkdir -p /opt/software-factory/backups
             docker exec software-factory-platform-1 sh -c \"
@@ -45,12 +45,12 @@ jobs:
             --exclude='.env' \
             --exclude='node_modules' \
             --exclude='backups/' \
-            -e "ssh -i ~/.ssh/deploy_key" \
+            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes" \
             . debian@${{ secrets.OVH_IP }}:/opt/software-factory/
 
       - name: Restart Docker container
         run: |
-          ssh -i ~/.ssh/deploy_key debian@${{ secrets.OVH_IP }} \
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes debian@${{ secrets.OVH_IP }} \
             "cd /opt/software-factory && sudo docker compose up -d --build 2>&1 | tail -10"
 
       - name: Health check
