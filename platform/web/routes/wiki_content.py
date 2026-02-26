@@ -2811,4 +2811,128 @@ Always specify:
 - Automate release notes in CI/CD — generate on every tag.
 """,
     },
+    {
+        "slug": "darwin-teams",
+        "title": "Darwin Teams — Evolutionary Selection",
+        "category": "Agents",
+        "sort_order": 5,
+        "content": """# Darwin Teams — Evolutionary Agent Selection
+
+The Darwin system gives the platform the ability to **learn which agent+pattern combinations perform best** per technology and phase type, using **Thompson Sampling** for probabilistic team selection with built-in A/B shadow testing.
+
+## Core Concept
+
+Each team is scored independently per a 4-dimensional key:
+
+```
+(agent_id, pattern_id, technology, phase_type)
+```
+
+A team that excels at Angular migration is tracked separately from the same team doing Angular new features. Scores never bleed across contexts.
+
+## Thompson Sampling
+
+For each candidate team, sample from `Beta(wins + 1, losses + 1)`. Select the team with the highest sample. The `+1` prior ensures exploration before data exists. Naturally balances exploitation vs exploration without tuning.
+
+After each mission: update wins/losses, recompute fitness score.
+
+## Fitness Formula
+
+```
+production_score = (acceptance_rate - iteration_penalty) × 100
+fitness = production×0.35 + coherence×0.25 + collaboration×0.25 + efficiency×0.15
+```
+
+Capped at 100.0. Multiplied by `weight_multiplier` (1.0 normal, 0.1 soft-retired).
+
+## Cold Start Handling
+
+1. Warmup: first 5 runs use random selection
+2. Similarity fallback: `angular_19` → `angular_*` → `generic` prefix matching
+3. Generic fallback: all teams have a `generic/generic` baseline score
+
+## Soft Retirement
+
+Teams with `fitness < 20` after 10+ runs receive `weight_multiplier = 0.1`. They remain in the system and can recover. Toggle from the `/teams` dashboard.
+
+## Opt-In Usage
+
+```yaml
+# In a pattern step — activates Darwin
+- step: implement
+  agent_id: "skill:developer"    # Darwin selects best team
+
+# Explicit ID — Darwin bypassed
+- step: review
+  agent_id: "developer_01"
+```
+
+Context (technology, phase_type) is auto-inferred from workflow ID and mission title.
+
+## OKR / KPI System
+
+8 default OKR seeds per domain and phase type:
+
+| Domain | Phase | Default OKR |
+|--------|-------|-------------|
+| code | migration | 90% acceptance rate, max 5 iterations |
+| code | new_feature | 85% acceptance rate |
+| code | bugfix | 95% fix rate, max 3 iterations |
+| code | refactoring | 80% no-regression rate |
+| security | audit | 100% critical CVE coverage |
+| architecture | design | 85% coherence score |
+| testing | generic | 80% coverage target |
+| docs | generic | 90% completeness |
+
+Edit targets inline from the OKR tab at `/teams`.
+
+## A/B Shadow Testing
+
+Automatic parallel runs trigger when:
+- Top two team fitness scores differ by less than **10 points**
+- Random **10% probability** on any mission
+
+Both teams execute the same mission independently. A neutral evaluator picks the winner. Winner gets +1 win, loser +1 loss.
+
+## Dashboard — /teams
+
+Five tabs accessible at `/teams`:
+
+| Tab | Description |
+|-----|-------------|
+| Leaderboard | Ranked teams with champion/rising/declining/retired badges, retire/unretire actions |
+| OKR / KPIs | Inline target and current value editing, green/amber/red status |
+| Evolution | Chart.js fitness history per technology+phase, multi-team comparison |
+| Selections | Log of Thompson Sampling decisions with mode and score |
+| A/B Tests | Shadow test records with teams, winner, scores |
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/teams/leaderboard` | GET | Ranked teams with badges |
+| `/api/teams/okr` | GET | OKR/KPI objectives |
+| `/api/teams/okr/{id}` | PUT | Update OKR target/current |
+| `/api/teams/evolution` | GET | Fitness history |
+| `/api/teams/selections` | GET | Thompson Sampling log |
+| `/api/teams/contexts` | GET | Active (technology, phase_type) combinations |
+| `/api/teams/{agent}/{pattern}/retire` | POST | Soft-retire a team |
+| `/api/teams/{agent}/{pattern}/unretire` | POST | Restore a retired team |
+| `/api/teams/ab-tests` | GET | A/B shadow test records |
+
+## Database Tables
+
+- `team_fitness` — core scores per (agent, pattern, technology, phase_type)
+- `team_fitness_history` — daily snapshots for evolution chart
+- `team_okr` — OKR/KPI targets per domain
+- `team_selections` — Thompson Sampling decision log
+- `team_ab_tests` — A/B shadow test records
+
+## Related Pages
+
+- [Agents System](agents) — agent catalog and roles
+- [Orchestration Patterns](patterns) — where `skill:` prefix activates Darwin
+- [Metrics Guide](metrics-guide) — DORA and quality metrics
+""",
+    },
 ]
