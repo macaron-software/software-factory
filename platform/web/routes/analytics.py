@@ -958,13 +958,13 @@ async def get_agent_scores() -> dict[str, Any]:
                 COUNT(*) as iterations,
                 SUM(CASE WHEN t.status='ok' THEN 1 ELSE 0 END) as accepted,
                 SUM(CASE WHEN t.status!='ok' THEN 1 ELSE 0 END) as rejected,
-                ROUND(AVG(t.duration_ms)) as avg_duration_ms,
+                ROUND(CAST(AVG(t.duration_ms) AS NUMERIC)) as avg_duration_ms,
                 SUM(t.tokens_in + t.tokens_out) as total_tokens,
-                ROUND(SUM(t.cost_usd), 4) as total_cost,
-                ROUND(100.0 * SUM(CASE WHEN t.status='ok' THEN 1 ELSE 0 END) /
-                    (COUNT(*) + 0.001), 1) as success_pct,
-                ROUND(100.0 * SUM(CASE WHEN t.status!='ok' THEN 1 ELSE 0 END) /
-                    (COUNT(*) + 0.001), 1) as rejection_pct,
+                ROUND(CAST(SUM(t.cost_usd) AS NUMERIC), 4) as total_cost,
+                ROUND(CAST(100.0 * SUM(CASE WHEN t.status='ok' THEN 1 ELSE 0 END) /
+                    (COUNT(*) + 0.001) AS NUMERIC), 1) as success_pct,
+                ROUND(CAST(100.0 * SUM(CASE WHEN t.status!='ok' THEN 1 ELSE 0 END) /
+                    (COUNT(*) + 0.001) AS NUMERIC), 1) as rejection_pct,
                 0.0 as quality_score
             FROM llm_traces t
             LEFT JOIN agents a ON a.id = t.agent_id
@@ -981,10 +981,10 @@ async def get_agent_scores() -> dict[str, Any]:
                 COUNT(*) as calls,
                 SUM(CASE WHEN t.status='ok' THEN 1 ELSE 0 END) as accepted,
                 SUM(CASE WHEN t.status!='ok' THEN 1 ELSE 0 END) as rejected,
-                ROUND(AVG(t.duration_ms)) as avg_duration_ms,
-                ROUND(SUM(t.cost_usd), 4) as total_cost,
-                ROUND(100.0 * SUM(CASE WHEN t.status='ok' THEN 1 ELSE 0 END) /
-                    (COUNT(*) + 0.001), 1) as success_pct
+                ROUND(CAST(AVG(t.duration_ms) AS NUMERIC)) as avg_duration_ms,
+                ROUND(CAST(SUM(t.cost_usd) AS NUMERIC), 4) as total_cost,
+                ROUND(CAST(100.0 * SUM(CASE WHEN t.status='ok' THEN 1 ELSE 0 END) /
+                    (COUNT(*) + 0.001) AS NUMERIC), 1) as success_pct
             FROM llm_traces t
             GROUP BY t.provider, t.model
             ORDER BY calls DESC
@@ -1001,7 +1001,7 @@ async def get_agent_scores() -> dict[str, Any]:
                     f.phase_type,
                     f.wins,
                     f.losses,
-                    ROUND(f.fitness_score, 1) as fitness_score,
+                    ROUND(CAST(f.fitness_score AS NUMERIC), 1) as fitness_score,
                     f.updated_at
                 FROM team_fitness f
                 LEFT JOIN agents a ON a.id = f.agent_id
