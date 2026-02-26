@@ -732,7 +732,87 @@ def cmd_patterns_show(args):
     output(args, b.pattern_show(args.id))
 
 
-# ── Argument parser ──
+# ── Darwin Teams ──
+
+
+def cmd_teams_leaderboard(args):
+    b = get_backend(args)
+    d = b.teams_leaderboard(
+        technology=getattr(args, "technology", "generic") or "generic",
+        phase_type=getattr(args, "phase_type", "generic") or "generic",
+        limit=getattr(args, "limit", 20),
+    )
+    teams = d.get("data", []) if isinstance(d, dict) else d
+    if getattr(args, "json_output", False):
+        out.out_json(teams)
+    elif teams:
+        cols = ["agent_name", "pattern_id", "fitness_score", "runs", "wins", "losses", "badge"]
+        rows = [{c: str(t.get(c, "")) for c in cols} for t in teams]
+        print(out.bold(f"Leaderboard — {d.get('technology','?')} / {d.get('phase_type','?')}"))
+        print(out.table(rows, cols))
+    else:
+        print(out.dim("No fitness data yet. Run missions with skill:* agent references."))
+
+
+def cmd_teams_okr(args):
+    b = get_backend(args)
+    d = b.teams_okr(
+        technology=getattr(args, "technology", "") or "",
+        phase_type=getattr(args, "phase_type", "") or "",
+    )
+    okrs = d if isinstance(d, list) else []
+    if getattr(args, "json_output", False):
+        out.out_json(okrs)
+    elif okrs:
+        cols = ["team_key", "phase_type", "kpi_name", "kpi_current", "kpi_target", "kpi_unit", "progress_pct"]
+        rows = [{c: str(o.get(c, "")) for c in cols} for o in okrs]
+        print(out.table(rows, cols))
+    else:
+        print(out.dim("No OKRs found."))
+
+
+def cmd_teams_selections(args):
+    b = get_backend(args)
+    d = b.teams_selections(limit=getattr(args, "limit", 20))
+    sels = d.get("data", []) if isinstance(d, dict) else []
+    if getattr(args, "json_output", False):
+        out.out_json(sels)
+    elif sels:
+        cols = ["selected_at", "agent_id", "pattern_id", "selection_mode", "technology", "phase_type"]
+        rows = [{c: str(s.get(c, "")) for c in cols} for s in sels]
+        print(out.table(rows, cols))
+    else:
+        print(out.dim("No selections yet."))
+
+
+def cmd_teams_ab_tests(args):
+    b = get_backend(args)
+    d = b.teams_ab_tests(status=getattr(args, "status", "") or "", limit=getattr(args, "limit", 20))
+    tests = d.get("data", []) if isinstance(d, dict) else []
+    if getattr(args, "json_output", False):
+        out.out_json(tests)
+    elif tests:
+        cols = ["started_at", "technology", "phase_type", "team_a_agent", "team_b_agent", "status", "winner"]
+        rows = [{c: str(t.get(c, "")) for c in cols} for t in tests]
+        print(out.table(rows, cols))
+    else:
+        print(out.dim("No A/B tests yet."))
+
+
+def cmd_teams_retire(args):
+    b = get_backend(args)
+    r = b.teams_retire(args.agent_id, args.pattern_id,
+                       getattr(args, "technology", "generic") or "generic",
+                       getattr(args, "phase_type", "generic") or "generic")
+    output(args, r)
+
+
+def cmd_teams_unretire(args):
+    b = get_backend(args)
+    r = b.teams_unretire(args.agent_id, args.pattern_id,
+                         getattr(args, "technology", "generic") or "generic",
+                         getattr(args, "phase_type", "generic") or "generic")
+    output(args, r)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1140,6 +1220,44 @@ def build_parser() -> argparse.ArgumentParser:
     rsp = runs_sub.add_parser("stop", help="Stop run")
     rsp.add_argument("run_id")
     rsp.set_defaults(func=cmd_runs_stop)
+
+    # ── teams (Darwin) ──
+    teams = sub.add_parser("teams", help="Darwin team fitness (Thompson Sampling)")
+    teams_sub = teams.add_subparsers(dest="subcmd")
+
+    tlb = teams_sub.add_parser("leaderboard", help="Fitness leaderboard")
+    tlb.add_argument("--technology", "-t", default="generic")
+    tlb.add_argument("--phase", dest="phase_type", default="generic")
+    tlb.add_argument("--limit", type=int, default=20)
+    tlb.set_defaults(func=cmd_teams_leaderboard)
+
+    tokr = teams_sub.add_parser("okr", help="OKR / KPI objectives")
+    tokr.add_argument("--technology", "-t", default="")
+    tokr.add_argument("--phase", dest="phase_type", default="")
+    tokr.set_defaults(func=cmd_teams_okr)
+
+    tsel = teams_sub.add_parser("selections", help="Recent selection log")
+    tsel.add_argument("--limit", type=int, default=20)
+    tsel.set_defaults(func=cmd_teams_selections)
+
+    tab = teams_sub.add_parser("ab-tests", help="A/B test results")
+    tab.add_argument("--status", default="")
+    tab.add_argument("--limit", type=int, default=20)
+    tab.set_defaults(func=cmd_teams_ab_tests)
+
+    tret = teams_sub.add_parser("retire", help="Soft-retire a team")
+    tret.add_argument("agent_id")
+    tret.add_argument("pattern_id")
+    tret.add_argument("--technology", "-t", default="generic")
+    tret.add_argument("--phase", dest="phase_type", default="generic")
+    tret.set_defaults(func=cmd_teams_retire)
+
+    tunret = teams_sub.add_parser("unretire", help="Restore a retired team")
+    tunret.add_argument("agent_id")
+    tunret.add_argument("pattern_id")
+    tunret.add_argument("--technology", "-t", default="generic")
+    tunret.add_argument("--phase", dest="phase_type", default="generic")
+    tunret.set_defaults(func=cmd_teams_unretire)
 
     return p
 

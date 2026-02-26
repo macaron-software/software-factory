@@ -438,3 +438,98 @@ class DBBackend:
 
     def notifications_test(self) -> dict:
         return {"error": "Cannot send notifications in offline mode"}
+
+    # ── Darwin Teams ──
+
+    def teams_contexts(self) -> list:
+        return self._q("SELECT DISTINCT technology, phase_type, COUNT(*) as teams FROM team_fitness GROUP BY technology, phase_type")
+
+    def teams_leaderboard(self, technology: str = "generic", phase_type: str = "generic", limit: int = 30) -> dict:
+        rows = self._q(
+            """SELECT tf.agent_id, tf.pattern_id, tf.technology, tf.phase_type,
+                      tf.fitness_score, tf.runs, tf.wins, tf.losses, tf.retired,
+                      a.name as agent_name,
+                      CASE WHEN tf.runs >= 5 AND tf.fitness_score >= 80 THEN 'champion'
+                           WHEN tf.runs >= 3 AND tf.fitness_score >= 60 THEN 'rising'
+                           WHEN tf.retired = 1 THEN 'retired'
+                           WHEN tf.runs >= 10 AND tf.fitness_score < 40 THEN 'declining'
+                           ELSE 'active' END as badge
+               FROM team_fitness tf LEFT JOIN agents a ON a.id = tf.agent_id
+               WHERE tf.technology = ? AND tf.phase_type = ?
+               ORDER BY tf.fitness_score DESC LIMIT ?""",
+            (technology, phase_type, limit),
+        )
+        return {"data": rows, "technology": technology, "phase_type": phase_type}
+
+    def teams_okr(self, technology: str = "", phase_type: str = "") -> list:
+        q = "SELECT * FROM team_okr"
+        p: list = []
+        filters = []
+        if technology:
+            filters.append("technology = ?")
+            p.append(technology)
+        if phase_type:
+            filters.append("phase_type = ?")
+            p.append(phase_type)
+        if filters:
+            q += " WHERE " + " AND ".join(filters)
+        rows = self._q(q, tuple(p))
+        for r in rows:
+            r["progress_pct"] = round(r["kpi_current"] / r["kpi_target"] * 100, 1) if r.get("kpi_target") else 0.0
+        return rows
+
+    def teams_evolution(self, technology: str = "generic", phase_type: str = "generic", days: int = 30) -> dict:
+        rows = self._q(
+            """SELECT tfh.agent_id, tfh.pattern_id, tfh.snapshot_date,
+                      tfh.fitness_score, a.name as agent_name
+               FROM team_fitness_history tfh LEFT JOIN agents a ON a.id = tfh.agent_id
+               WHERE tfh.technology = ? AND tfh.phase_type = ?
+                 AND tfh.snapshot_date >= date('now', ?)
+               ORDER BY tfh.agent_id, tfh.pattern_id, tfh.snapshot_date""",
+            (technology, phase_type, f"-{days} days"),
+        )
+        series: dict = {}
+        for r in rows:
+            key = f"{r['agent_id']}:{r['pattern_id']}"
+            if key not in series:
+                series[key] = {"agent_id": r["agent_id"], "agent_name": r.get("agent_name") or r["agent_id"],
+                                "pattern_id": r["pattern_id"], "dates": [], "scores": []}
+            series[key]["dates"].append(r["snapshot_date"])
+            series[key]["scores"].append(round(r["fitness_score"], 1))
+        return {"series": list(series.values()), "technology": technology, "phase_type": phase_type}
+
+    def teams_selections(self, limit: int = 20) -> dict:
+        rows = self._q(
+            """SELECT ts.*, a.name as agent_name FROM team_selections ts
+               LEFT JOIN agents a ON a.id = ts.agent_id
+               ORDER BY ts.selected_at DESC LIMIT ?""",
+            (limit,),
+        )
+        return {"data": rows}
+
+    def teams_ab_tests(self, status: str = "", limit: int = 20) -> dict:
+        q = """SELECT tab.*, a1.name as team_a_name, a2.name as team_b_name
+               FROM team_ab_tests tab
+               LEFT JOIN agents a1 ON a1.id = tab.team_a_agent
+               LEFT JOIN agents a2 ON a2.id = tab.team_b_agent"""
+        p: list = []
+        if status:
+            q += " WHERE tab.status = ?"
+            p.append(status)
+        q += " ORDER BY tab.started_at DESC LIMIT ?"
+        p.append(limit)
+        return {"data": self._q(q, tuple(p))}
+
+    def teams_retire(self, agent_id: str, pattern_id: str, technology: str = "generic", phase_type: str = "generic") -> dict:
+        self._conn.execute(
+            "UPDATE team_fitness SET retired=1, weight_multiplier=0.1 WHERE agent_id=? AND pattern_id=? AND technology=? AND phase_type=?",
+            (agent_id, pattern_id, technology, phase_type))
+        self._conn.commit()
+        return {"ok": True}
+
+    def teams_unretire(self, agent_id: str, pattern_id: str, technology: str = "generic", phase_type: str = "generic") -> dict:
+        self._conn.execute(
+            "UPDATE team_fitness SET retired=0, weight_multiplier=1.0 WHERE agent_id=? AND pattern_id=? AND technology=? AND phase_type=?",
+            (agent_id, pattern_id, technology, phase_type))
+        self._conn.commit()
+        return {"ok": True}

@@ -444,3 +444,37 @@ class APIBackend:
 
     def notifications_test(self) -> dict:
         return self._post("/api/notifications/test")
+
+    # ── Darwin Teams ──
+
+    def teams_contexts(self) -> list:
+        return self._get("/api/teams/contexts")
+
+    def teams_leaderboard(self, technology: str = "generic", phase_type: str = "generic", limit: int = 30) -> dict:
+        return self._get("/api/teams/leaderboard", {"technology": technology, "phase_type": phase_type, "limit": limit})
+
+    def teams_okr(self, technology: str = "", phase_type: str = "") -> list:
+        params = {}
+        if technology:
+            params["technology"] = technology
+        if phase_type:
+            params["phase_type"] = phase_type
+        return self._get("/api/teams/okr", params)
+
+    def teams_evolution(self, technology: str = "generic", phase_type: str = "generic", days: int = 30) -> dict:
+        return self._get("/api/teams/evolution", {"technology": technology, "phase_type": phase_type, "days": days})
+
+    def teams_selections(self, limit: int = 20) -> dict:
+        return self._get("/api/teams/selections", {"limit": limit})
+
+    def teams_ab_tests(self, status: str = "", limit: int = 20) -> dict:
+        params: dict = {"limit": limit}
+        if status:
+            params["status"] = status
+        return self._get("/api/teams/ab-tests", params)
+
+    def teams_retire(self, agent_id: str, pattern_id: str, technology: str = "generic", phase_type: str = "generic") -> dict:
+        return self._post(f"/api/teams/{agent_id}/{pattern_id}/retire", {"technology": technology, "phase_type": phase_type})
+
+    def teams_unretire(self, agent_id: str, pattern_id: str, technology: str = "generic", phase_type: str = "generic") -> dict:
+        return self._post(f"/api/teams/{agent_id}/{pattern_id}/unretire", {"technology": technology, "phase_type": phase_type})
