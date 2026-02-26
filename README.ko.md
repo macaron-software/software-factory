@@ -935,6 +935,10 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - **CTO 수준 어드바이저** — 아키텍처 결정, 기술 선택 지원
 - **플랫폼 인식** — 포트폴리오, 프로젝트, 에이전트 팀의 현재 상태 파악
 
+**도구**: 코드（읽기/검색/편집/쓰기/목록）· Git（commit, diff, log, status, issues/PRs/search）· 빌드/배포（build, lint, test, deploy, Docker, run_command, infra）· 보안（SAST, 시크릿 스캔, 의존성）· MCP（Web fetch, 지식 그래프, Playwright, GitHub）· 프로젝트（Jira, Confluence, SAFe 단계, LRM 컨텍스트）· 메모리（지식 그래프 읽기 + 쓰기）
+
+**빠른 실행 칩**: `포트폴리오 통계` · `진행 중 미션` · `팀 구성` · `GitHub` · `AO Veligo` · `Angular 16→17 마이그레이션` · `기술 부채 · 보안 · a11y · GDPR` · `Git commit & PR` · `E2E + 스크린샷` · `Jira 동기화` · `Wiki 업데이트`
+
 ### 비즈니스 아이디어 — 6에이전트 마케팅 팀
 - **라우트** `/mkt-ideation` — 홈 페이지 비즈니스 아이디어 탭에서 접근
 - **CMO Sophie Laurent** — 5명의 전문 마케팅 전문가를 이끄는 팀 리더

@@ -849,6 +849,10 @@ Chaque projet reçoit automatiquement 4 missions opérationnelles :
 - **Conseiller de niveau CTO** — aide à la prise de décision architecturale, choix technologiques
 - **Connaissance plateforme** — accès à l'état du portfolio, des projets et des équipes agents
 
+**Capacités outils** : Code (lire/chercher/éditer/écrire/lister) · Git (commit, diff, log, status, issues/PRs/search) · Build/Deploy (build, lint, test, deploy, Docker, run_command, infra) · Sécurité (SAST, secrets scan, audit dépendances) · MCPs (Web fetch, Knowledge graph, Playwright, GitHub) · Projet (Jira, Confluence, phases SAFe, LRM context) · Mémoire (lecture + écriture Knowledge graph)
+
+**Raccourcis contextuels** : `Stats portfolio` · `Missions en cours` · `Monter une équipe` · `GitHub` · `AO Veligo` · `Migration Angular 16→17` · `Dette tech · sécu · a11y · RGPD` · `Git commit & PR` · `E2E + Screenshots` · `Sync Jira` · `Mise à jour Wiki`
+
 ### Idéation Business — Équipe Marketing 6 Agents
 - **Route** `/mkt-ideation` — accessible depuis l'onglet Idéation Business de la page d'accueil
 - **CMO Sophie Laurent** — chef d'équipe supervisant 5 experts marketing spécialisés

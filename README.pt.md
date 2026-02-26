@@ -935,6 +935,10 @@ Cada projeto recebe automaticamente 4 missões operacionais:
 - **Consultor de nível CTO** — auxílio em decisões de arquitetura, escolha de tecnologia
 - **Consciência da plataforma** — conhece o estado atual do portfólio, projetos e equipes de agentes
 
+**Ferramentas**: Código (ler/buscar/editar/escrever/listar) · Git (commit, diff, log, status, issues/PRs/search) · Build/Deploy (build, lint, test, deploy, Docker, run_command, infra) · Segurança (SAST, scan de segredos, dependências) · MCPs (Web fetch, Knowledge graph, Playwright, GitHub) · Projeto (Jira, Confluence, fases SAFe, contexto LRM) · Memória (leitura + escrita Knowledge graph)
+
+**Chips de acesso rápido**: `Stats do portfolio` · `Missões em andamento` · `Montar equipe` · `GitHub` · `AO Veligo` · `Migração Angular 16→17` · `Dívida técnica · segurança · a11y · LGPD` · `Git commit & PR` · `E2E + Screenshots` · `Sync Jira` · `Atualizar Wiki`
+
 ### Ideação de Negócios — Equipe de Marketing 6 Agentes
 - **Rota** `/mkt-ideation` — acessível pela aba Ideação de Negócios na página inicial
 - **CMO Sophie Laurent** — líder de equipe com 5 especialistas de marketing

@@ -935,6 +935,10 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - **CTO 级顾问** — 协助架构决策、技术选型
 - **平台感知** — 了解当前投资组合、项目和智能体团队状态
 
+**工具能力**: 代码（读取/搜索/编辑/写入/列出文件）· Git（commit、diff、log、status、issues/PRs/search）· 构建/部署（build、lint、test、deploy、Docker、run_command、infra）· 安全（SAST、密钥扫描、依赖审计）· MCP（Web fetch、知识图谱、Playwright、GitHub）· 项目（Jira、Confluence、SAFe 阶段、LRM 上下文）· 记忆（知识图谱读写）
+
+**快捷操作芯片**: `投资组合统计` · `进行中任务` · `组建团队` · `GitHub` · `AO Veligo` · `Angular 16→17 迁移` · `技术债务 · 安全 · a11y · GDPR` · `Git commit & PR` · `E2E + 截图` · `同步 Jira` · `更新 Wiki`
+
 ### 业务创意 — 6智能体营销团队
 - **路由** `/mkt-ideation` — 通过首页业务创意标签页访问
 - **CMO Sophie Laurent** — 带领 5 位专业营销专家的团队负责人

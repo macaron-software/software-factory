@@ -982,6 +982,10 @@ Before applying any GA proposal or RL recommendation live, the platform can run 
 - **CTO-level advisor** — helps with architectural decisions, technology choices, trade-offs
 - **Platform awareness** — knows the current state of portfolio, projects and agent teams
 
+**Tool capabilities**: Code (read/search/edit/write/list files) · Git (commit, diff, log, status, issues/PRs/search) · Build/Deploy (build, lint, test, deploy, Docker, run_command, infra) · Security (SAST, secrets scan, dependency audit) · MCPs (Web fetch, Knowledge graph, Playwright browser, GitHub) · Project (Jira, Confluence, SAFe phases, LRM context) · Memory (read + write Knowledge graph)
+
+**Quick-action chips**: `Portfolio stats` · `Running missions` · `Build a team` · `GitHub` · `AO Veligo` · `Angular 16→17 migration` · `Tech debt · security · a11y · GDPR` · `Git commit & PR` · `E2E + Screenshots` · `Sync Jira` · `Update Wiki`
+
 ### Business Ideation — 6-Agent Marketing Team
 - **Route** `/mkt-ideation` — accessible from the Business Ideation tab on the home page
 - **CMO Sophie Laurent** — team lead overseeing 5 specialized marketing experts

@@ -935,6 +935,10 @@ Every project automatically gets 4 operational missions:
 - **CTOレベルのアドバイザー** — アーキテクチャの意思決定、技術選択のサポート
 - **プラットフォーム認識** — ポートフォリオ、プロジェクト、エージェントチームの現状を把握
 
+**ツール**: コード（読み取り・検索・編集・書き込み・一覧表示）· Git（commit、diff、log、status、issues/PRs/search）· ビルド/デプロイ（build、lint、test、deploy、Docker、run_command、infra）· セキュリティ（SAST、シークレットスキャン、依存関係）· MCP（Webフェッチ、ナレッジグラフ、Playwright、GitHub）· プロジェクト（Jira、Confluence、SAFeフェーズ、LRMコンテキスト）· メモリ（ナレッジグラフ読み書き）
+
+**クイックアクションチップ**: `ポートフォリオ統計` · `実行中ミッション` · `チーム編成` · `GitHub` · `AO Veligo` · `Angular 16→17 移行` · `技術負債・セキュリティ・a11y・GDPR` · `Git commit & PR` · `E2E + スクリーンショット` · `Jira同期` · `Wiki更新`
+
 ### ビジネスアイデア — 6エージェントのマーケティングチーム
 - **ルート** `/mkt-ideation` — ホームページのビジネスアイデアタブからアクセス可能
 - **CMO Sophie Laurent** — 5名の専門マーケティングエキスパートを率いるチームリーダー

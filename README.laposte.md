@@ -35,6 +35,22 @@ L'onglet **CTO Jarvis** (accessible depuis la page d'accueil `/`) offre un panne
 - **Intégration plateforme** — connait l'état du portfolio, les projets en cours et les équipes agents
 - **Accessible depuis** : Accueil → onglet CTO Jarvis
 
+#### Capacités outils
+
+| Domaine | Outils disponibles |
+|---------|-------------------|
+| **Code** | Lire, chercher, éditer, écrire, lister fichiers |
+| **Git** | Commit, diff, log, status · GitHub issues / PRs / search |
+| **Build / Deploy** | Build, lint, test, deploy, Docker, run_command, infra |
+| **Sécurité** | SAST, secrets scan, audit dépendances |
+| **MCPs** | Web fetch, Knowledge graph, Playwright browser, GitHub |
+| **Projet** | Jira, Confluence, phases SAFe, LRM context |
+| **Mémoire** | Lecture + écriture Knowledge graph |
+
+#### Raccourcis contextuels (chips)
+
+`Stats portfolio` · `Missions en cours` · `Monter une équipe` · `GitHub` · `AO Veligo` · `Migration Angular 16→17` · `Dette tech · sécu · a11y · RGPD` · `Git commit & PR` · `E2E + Screenshots` · `Sync Jira` · `Mise à jour Wiki`
+
 ### Idéation Business (`/mkt-ideation`) — Équipe Marketing IA
 
 L'onglet **Idéation Business** déploie une équipe de 6 agents marketing pilotée par Sophie Laurent (CMO) :
