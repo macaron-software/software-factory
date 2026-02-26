@@ -45,12 +45,15 @@ async def auto_resume_missions() -> None:
     """
     await asyncio.sleep(5)  # Let platform fully initialize first
 
-    # Hot-patch: ensure semaphore allows enough concurrency (survives hot-swap without restart)
+    # Hot-patch startup: use release() to both add slots AND wake up waiting coroutines
     try:
         from ..web.routes.helpers import _mission_semaphore
-        if _mission_semaphore._value < 10:
-            _mission_semaphore._value = 10
-            logger.warning("auto_resume: patched _mission_semaphore._value → 10")
+        target = 10
+        added = max(0, target - _mission_semaphore._value)
+        for _ in range(added):
+            _mission_semaphore.release()
+        if added:
+            logger.warning("auto_resume: released %d semaphore slots → value=%d (wakes waiters)", added, _mission_semaphore._value)
     except Exception as _e_sem:
         logger.warning("auto_resume: semaphore patch failed: %s", _e_sem)
 
@@ -62,12 +65,15 @@ async def auto_resume_missions() -> None:
 
     first_pass = True
     while True:
-        # Hot-patch: ensure semaphore allows enough concurrency (re-runs each cycle for hot-swap)
+        # Hot-patch per cycle: use release() to add slots and wake up waiting coroutines
         try:
             from ..web.routes.helpers import _mission_semaphore
-            if _mission_semaphore._value < 10:
-                _mission_semaphore._value = 10
-                logger.warning("auto_resume: patched _mission_semaphore._value → 10")
+            target = 10
+            added = max(0, target - _mission_semaphore._value)
+            for _ in range(added):
+                _mission_semaphore.release()
+            if added:
+                logger.warning("auto_resume: released %d semaphore slots → value=%d", added, _mission_semaphore._value)
         except Exception as _e_sem:
             logger.warning("auto_resume: semaphore patch failed: %s", _e_sem)
         try:
