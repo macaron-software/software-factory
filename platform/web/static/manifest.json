@@ -1,42 +1,10 @@
 {
-  "name": "Software Factory Platform",
-  "short_name": "SF Platform",
-  "description": "Macaron Agent Platform — AI-powered software factory",
+  "name": "Software Factory",
+  "short_name": "SF",
+  "description": "Multi-Agent Software Factory",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1a1a2e",
-  "theme_color": "#6c63ff",
-  "orientation": "portrait-primary",
-  "icons": [
-    {
-      "src": "/static/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/static/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
-  "categories": ["productivity", "developer"],
-  "shortcuts": [
-    {
-      "name": "Missions",
-      "url": "/missions",
-      "description": "View active missions"
-    },
-    {
-      "name": "Sessions",
-      "url": "/sessions/new",
-      "description": "New agent session"
-    },
-    {
-      "name": "Ops",
-      "url": "/ops",
-      "description": "Platform observability"
-    }
-  ]
+  "theme_color": "#7c3aed",
+  "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"}]
 }

@@ -121,6 +121,11 @@
                     <li><a href="/ops" data-tooltip="Ops" class="{% if page_title == 'Ops' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-activity"/></svg>
                     </a></li>
+                    {% if request.state.user and request.state.user.role == 'admin' %}
+                    <li><a href="/rbac" data-tooltip="Users & Roles" class="{% if page_title in ('RBAC', 'Users & Roles') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-shield"/></svg>
+                    </a></li>
+                    {% endif %}
                 </ul>
             </div>
 

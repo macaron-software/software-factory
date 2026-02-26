@@ -1,142 +1,262 @@
 {% extends "base.html" %}
 {% block content %}
-<div style="padding:1.25rem">
+<style>
+.ops-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.ops-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius, 8px); padding: 1rem; }
+.ops-card h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-secondary); margin: 0 0 .5rem; display: flex; align-items: center; gap: .4rem; }
+.ops-card h3 svg { width: 13px; height: 13px; }
+.ops-val { font-size: 1.6rem; font-weight: 700; color: var(--text-primary); }
+.ops-sub { font-size: 0.75rem; color: var(--text-secondary); margin-top: .25rem; }
+.ops-section { margin-bottom: 2rem; }
+.ops-section-title { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--text-secondary); margin-bottom: .75rem; display: flex; align-items: center; gap: .4rem; }
+.ops-section-title svg { width: 14px; height: 14px; }
+.ops-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.ops-table th { text-align: left; padding: .4rem .75rem; border-bottom: 1px solid var(--border); color: var(--text-secondary); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; }
+.ops-table td { padding: .4rem .75rem; border-bottom: 1px solid rgba(255,255,255,.04); color: var(--text-primary); }
+.ops-table tr:last-child td { border-bottom: none; }
+.ops-table tr:hover td { background: var(--bg-tertiary, #1e2030); }
+.ops-log-line { font-size: 0.72rem; font-family: var(--font-mono, monospace); padding: .2rem .5rem; border-bottom: 1px solid rgba(255,255,255,.03); word-break: break-all; }
+.ops-log-line.error { color: #ef4444; }
+.ops-log-line.warning { color: #f59e0b; }
+.ops-log-line.critical { color: #dc2626; }
+.ops-badge { display: inline-block; padding: .125rem .5rem; border-radius: 9999px; font-size: 0.68rem; font-weight: 600; }
+.ops-badge.ok { background: rgba(34,197,94,.15); color: #22c55e; }
+.ops-badge.warn { background: rgba(245,158,11,.15); color: #f59e0b; }
+.ops-badge.down { background: rgba(239,68,68,.15); color: #ef4444; }
+.ops-tma-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+.ops-tma-item { background: var(--bg-tertiary, #21262d); border-radius: 6px; padding: .6rem .75rem; text-align: center; }
+.ops-tma-item .label { font-size: 0.68rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .05em; }
+.ops-tma-item .val { font-size: 1.1rem; font-weight: 700; margin-top: .2rem; }
+</style>
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
-    <div>
-      <h2 style="margin:0;font-size:1.3rem">⚙️ Observabilité — Ops</h2>
-      <p style="margin:.25rem 0 0;color:var(--text-muted,#888);font-size:.82rem">LLM · Missions · Intelligence Adaptative · Erreurs</p>
-    </div>
-    <button onclick="location.reload()" style="padding:.35rem .8rem;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:.82rem">🔄 Refresh</button>
+<!-- Section 1: System Health -->
+<div class="ops-section">
+  <div class="ops-section-title">
+    <svg class="icon"><use href="#icon-activity"/></svg>
+    System Health
   </div>
+  <div class="ops-grid">
+    <div class="ops-card">
+      <h3><svg class="icon"><use href="#icon-database"/></svg> DB Size</h3>
+      <div class="ops-val">{{ db_size_kb | default(0) }} <span style="font-size:.9rem;font-weight:400">KB</span></div>
+      <div class="ops-sub">platform.db</div>
+    </div>
+    <div class="ops-card">
+      <h3><svg class="icon"><use href="#icon-users"/></svg> Agents</h3>
+      <div class="ops-val">{{ nb_agents | default(0) }}</div>
+      <div class="ops-sub">registered</div>
+    </div>
+    <div class="ops-card">
+      <h3><svg class="icon"><use href="#icon-rocket"/></svg> Active Missions</h3>
+      <div class="ops-val">{{ active_missions | length }}</div>
+      <div class="ops-sub">running / active</div>
+    </div>
+    <div class="ops-card">
+      <h3><svg class="icon"><use href="#icon-chart"/></svg> RL Experiences</h3>
+      <div class="ops-val">{% if rl_stats %}{{ rl_stats.get('experience_count', 0) }}{% else %}0{% endif %}</div>
+      <div class="ops-sub">{% if rl_stats %}{{ rl_stats.get('state_count', 0) }} states{% endif %}</div>
+    </div>
+    <div class="ops-card">
+      <h3><svg class="icon"><use href="#icon-git-branch"/></svg> GA Proposals</h3>
+      <div class="ops-val">{% if ga_summary %}{{ ga_summary.get('pending', 0) }}{% else %}0{% endif %}</div>
+      <div class="ops-sub">
+        pending
+        {% if ga_summary %}/ {{ ga_summary.get('total', 0) }} total
+          {% if ga_summary.get('best_fitness') %} — best {{ "%.3f"|format(ga_summary['best_fitness']) }}{% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
 
-  {# ── Row 1: KPIs ─────────────────────────────────────────────────────────── #}
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin-bottom:1.25rem">
-    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
-      <div style="font-size:1.6rem;font-weight:700;color:var(--accent,#6c63ff)">{{ active_missions|length }}</div>
-      <div style="font-size:.78rem;color:var(--text-muted,#888)">Missions actives</div>
-    </div>
-    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
-      <div style="font-size:1.6rem;font-weight:700;color:{% if top_errors %}#ef4444{% else %}#22c55e{% endif %}">{{ top_errors|length }}</div>
-      <div style="font-size:.78rem;color:var(--text-muted,#888)">Types erreurs 24h</div>
-    </div>
-    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
-      <div style="font-size:1.6rem;font-weight:700;color:#f97316">{{ ga_summary.get('pending',0) }}</div>
-      <div style="font-size:.78rem;color:var(--text-muted,#888)">GA proposals en attente</div>
-    </div>
-    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
-      <div style="font-size:1.6rem;font-weight:700;color:#06b6d4">{{ rl_stats.get('decisions', rl_stats.get('state_count',0)) }}</div>
-      <div style="font-size:.78rem;color:var(--text-muted,#888)">RL décisions</div>
-    </div>
-    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
-      {% if ga_summary.get('best_fitness') %}
-      <div style="font-size:1.6rem;font-weight:700;color:#22c55e">{{ "%.3f"|format(ga_summary.best_fitness) }}</div>
-      {% else %}
-      <div style="font-size:1.6rem;font-weight:700;color:#aaa">—</div>
+<!-- Section 2: TMA Heartbeat -->
+<div class="ops-section">
+  <div class="ops-section-title">
+    <svg class="icon"><use href="#icon-activity"/></svg>
+    TMA Auto-Heal Watchdog
+    {% if tma_stats %}
+      {% set hb = tma_stats.get('heartbeat', 'unknown') %}
+      {% if hb == 'alive' %}<span class="ops-badge ok">alive</span>
+      {% elif hb == 'starting' %}<span class="ops-badge warn">starting</span>
+      {% else %}<span class="ops-badge down">{{ hb }}</span>
       {% endif %}
-      <div style="font-size:.78rem;color:var(--text-muted,#888)">GA best fitness</div>
-    </div>
+      {% if not tma_stats.get('enabled') %}<span class="ops-badge warn">disabled</span>{% endif %}
+    {% else %}
+      <span class="ops-badge warn">n/a</span>
+    {% endif %}
   </div>
+  {% if tma_stats %}
+  <div class="ops-card" style="max-width:700px">
+    <div class="ops-tma-grid">
+      <div class="ops-tma-item">
+        <div class="label">Open Incidents</div>
+        <div class="val" style="color:{% if tma_stats.get('incidents',{}).get('open',0) > 0 %}#f59e0b{% else %}#22c55e{% endif %}">{{ tma_stats.get('incidents', {}).get('open', 0) }}</div>
+      </div>
+      <div class="ops-tma-item">
+        <div class="label">Investigating</div>
+        <div class="val">{{ tma_stats.get('incidents', {}).get('investigating', 0) }}</div>
+      </div>
+      <div class="ops-tma-item">
+        <div class="label">Resolved</div>
+        <div class="val" style="color:#22c55e">{{ tma_stats.get('incidents', {}).get('resolved', 0) }}</div>
+      </div>
+      <div class="ops-tma-item">
+        <div class="label">Active Heals</div>
+        <div class="val" style="color:{% if tma_stats.get('active_heals',0) > 0 %}#f59e0b{% else %}var(--text-primary){% endif %}">{{ tma_stats.get('active_heals', 0) }}</div>
+      </div>
+      <div class="ops-tma-item">
+        <div class="label">Missions Total</div>
+        <div class="val">{{ tma_stats.get('missions', {}).get('total', 0) }}</div>
+      </div>
+      <div class="ops-tma-item">
+        <div class="label">Scan Interval</div>
+        <div class="val" style="font-size:.9rem">{{ tma_stats.get('interval_s', '—') }}s</div>
+      </div>
+    </div>
+    {% if tma_stats.get('last_error') %}
+    <div style="margin-top:.75rem;padding:.5rem .75rem;background:rgba(239,68,68,.08);border-radius:6px;font-size:.75rem;color:#ef4444">
+      Last error: {{ tma_stats['last_error'][:120] }}
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="ops-card" style="color:var(--text-secondary);font-size:.82rem">TMA auto-heal not available.</div>
+  {% endif %}
+</div>
 
-  {# ── Row 2: LLM + Thompson ────────────────────────────────────────────────── #}
-  <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:1rem;margin-bottom:1rem;align-items:start">
+<!-- Section 3: Recent Error Logs -->
+<div class="ops-section">
+  <div class="ops-section-title">
+    <svg class="icon"><use href="#icon-bell"/></svg>
+    Recent Error Logs (last 20)
+  </div>
+  <div class="ops-card" style="padding:.5rem 0">
+    {% if recent_logs %}
+    {% for line in recent_logs %}
+    <div class="ops-log-line {% if 'CRITICAL' in line %}critical{% elif 'ERROR' in line %}error{% else %}warning{% endif %}">{{ line[:200] }}</div>
+    {% endfor %}
+    {% else %}
+    <div style="padding:.75rem 1rem;color:var(--text-secondary);font-size:.82rem">No recent errors.</div>
+    {% endif %}
+  </div>
+</div>
 
-    {# LLM Usage 24h #}
-    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
-      <h3 style="font-size:.95rem;margin:0 0 .75rem">⚡ LLM Usage — 24h</h3>
-      {% if llm_providers %}
-      <table style="width:100%;border-collapse:collapse;font-size:.78rem">
-        <thead>
-          <tr style="color:var(--text-muted,#888);text-align:left;border-bottom:1px solid var(--border,#eee)">
-            <th style="padding:.25rem .4rem">Provider</th>
-            <th style="padding:.25rem .4rem">Modèle</th>
-            <th style="padding:.25rem .4rem;text-align:right">Calls</th>
-            <th style="padding:.25rem .4rem;text-align:right">Erreurs</th>
-            <th style="padding:.25rem .4rem;text-align:right">Moy tokens</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for p in llm_providers %}
-          <tr style="border-bottom:1px solid var(--border,#f5f5f5)">
-            <td style="padding:.3rem .4rem;font-weight:600">{{ p.provider }}</td>
-            <td style="padding:.3rem .4rem;color:var(--text-muted,#888)">{{ p.model }}</td>
-            <td style="padding:.3rem .4rem;text-align:right">{{ p.total_calls }}</td>
-            <td style="padding:.3rem .4rem;text-align:right;color:{% if p.errors > 0 %}#ef4444{% else %}#22c55e{% endif %}">{{ p.errors }}</td>
-            <td style="padding:.3rem .4rem;text-align:right">{{ p.avg_tokens|int if p.avg_tokens else '—' }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
+<!-- Section 4: Evolution / RL Status -->
+<div class="ops-section">
+  <div class="ops-section-title">
+    <svg class="icon"><use href="#icon-target"/></svg>
+    Evolution &amp; RL Status
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:800px">
+    <div class="ops-card">
+      <h3>GA Engine</h3>
+      {% if ga_summary %}
+      <table class="ops-table">
+        <tr><td>Total proposals</td><td><strong>{{ ga_summary.get('total', 0) }}</strong></td></tr>
+        <tr><td>Pending review</td><td><strong style="color:{% if ga_summary.get('pending',0) > 0 %}#f59e0b{% else %}var(--text-primary){% endif %}">{{ ga_summary.get('pending', 0) }}</strong></td></tr>
+        <tr><td>Best fitness</td><td><strong>{% if ga_summary.get('best_fitness') %}{{ "%.4f"|format(ga_summary['best_fitness']) }}{% else %}—{% endif %}</strong></td></tr>
       </table>
       {% else %}
-      <p style="color:var(--text-muted,#aaa);font-size:.82rem;text-align:center;padding:.5rem 0">Aucune donnée LLM 24h — en attente d'appels</p>
+      <div style="color:var(--text-secondary);font-size:.82rem">No data.</div>
       {% endif %}
     </div>
-
-    {# Thompson Provider Scores #}
-    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
-      <h3 style="font-size:.95rem;margin:0 0 .75rem">🎯 Thompson Sampling — LLM</h3>
-      {% if llm_thompson %}
-      {% for p in llm_thompson %}
-      <div style="margin-bottom:.6rem">
-        <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:.2rem">
-          <span style="font-weight:600">{{ p.provider }}</span>
-          <span style="color:{% if p.success_rate >= 0.7 %}#16a34a{% elif p.success_rate >= 0.5 %}#ea580c{% else %}#dc2626{% endif %}">
-            {{ (p.success_rate * 100)|round|int }}% · {{ p.total_calls }} calls
-          </span>
-        </div>
-        <div style="height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden">
-          <div style="width:{{ (p.success_rate * 100)|round|int }}%;height:100%;background:{% if p.success_rate >= 0.7 %}#22c55e{% elif p.success_rate >= 0.5 %}#f97316{% else %}#ef4444{% endif %};border-radius:3px"></div>
-        </div>
-      </div>
-      {% endfor %}
+    <div class="ops-card">
+      <h3>RL Policy</h3>
+      {% if rl_stats %}
+      <table class="ops-table">
+        <tr><td>Decisions</td><td><strong>{{ rl_stats.get('decisions', 0) }}</strong></td></tr>
+        <tr><td>Experience count</td><td><strong>{{ rl_stats.get('experience_count', 0) }}</strong></td></tr>
+        <tr><td>States</td><td><strong>{{ rl_stats.get('state_count', 0) }}</strong></td></tr>
+        <tr><td>Avg confidence</td><td><strong>{{ "%.1f%%"|format(rl_stats.get('avg_confidence', 0) * 100) }}</strong></td></tr>
+        <tr><td>Coverage</td><td><strong>{{ "%.1f%%"|format(rl_stats.get('coverage', 0) * 100) }}</strong></td></tr>
+      </table>
       {% else %}
-      <p style="color:var(--text-muted,#aaa);font-size:.82rem;text-align:center;padding:.5rem 0">En attente d'appels LLM (min 5 par provider)</p>
+      <div style="color:var(--text-secondary);font-size:.82rem">No data.</div>
       {% endif %}
     </div>
   </div>
-
-  {# ── Row 3: Missions actives + Erreurs ─────────────────────────────────────── #}
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start">
-
-    {# Active missions #}
-    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
-      <h3 style="font-size:.95rem;margin:0 0 .75rem">🚀 Missions actives</h3>
-      {% if active_missions %}
-      {% for m in active_missions[:10] %}
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid var(--border,#f5f5f5)">
-        <a href="/missions/{{ m.id }}/control" style="font-size:.8rem;font-weight:600;color:var(--accent,#6c63ff);text-decoration:none">
-          {{ (m.name or m.id)[:35] }}
-        </a>
-        <span style="font-size:.72rem;padding:.1rem .4rem;background:#6c63ff20;color:#6c63ff;border-radius:10px">
-          {{ m.current_phase or 'en cours' }}
-        </span>
-      </div>
-      {% endfor %}
-      {% else %}
-      <p style="color:var(--text-muted,#aaa);font-size:.82rem;text-align:center;padding:.5rem 0">Aucune mission active</p>
-      {% endif %}
-    </div>
-
-    {# Top errors #}
-    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
-      <h3 style="font-size:.95rem;margin:0 0 .75rem">🚨 Top erreurs — 24h</h3>
-      {% if top_errors %}
-      {% for e in top_errors %}
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid var(--border,#f5f5f5)">
-        <span style="font-size:.78rem;color:#dc2626">{{ e.error_type[:40] }}</span>
-        <div style="display:flex;align-items:center;gap:.4rem">
-          <span style="font-size:.75rem;padding:.1rem .4rem;background:#ef444420;color:#dc2626;border-radius:10px;font-weight:600">× {{ e.cnt }}</span>
-          <span style="font-size:.68rem;color:var(--text-muted,#aaa)">{{ e.last_seen[:10] if e.last_seen else '' }}</span>
-        </div>
-      </div>
-      {% endfor %}
-      {% else %}
-      <div style="text-align:center;padding:1rem;color:#16a34a;font-size:.85rem">
-        ✅ Aucune erreur dans les dernières 24h
-      </div>
-      {% endif %}
-    </div>
-  </div>
-
 </div>
+
+<!-- Section 5: DB Table Sizes -->
+<div class="ops-section">
+  <div class="ops-section-title">
+    <svg class="icon"><use href="#icon-database"/></svg>
+    DB Table Metrics
+  </div>
+  <div class="ops-card" style="max-width:500px;padding:.5rem 0">
+    <table class="ops-table">
+      <thead>
+        <tr><th>Table</th><th>Rows</th></tr>
+      </thead>
+      <tbody>
+        {% if table_sizes %}
+        {% for tbl, cnt in table_sizes.items() %}
+        <tr>
+          <td style="font-family:var(--font-mono,monospace);font-size:.78rem">{{ tbl }}</td>
+          <td><strong>{{ cnt }}</strong></td>
+        </tr>
+        {% endfor %}
+        {% else %}
+        <tr><td colspan="2" style="color:var(--text-secondary)">No data</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Section 6: LLM Provider Usage (last 24h) -->
+{% if llm_providers %}
+<div class="ops-section">
+  <div class="ops-section-title">
+    <svg class="icon"><use href="#icon-message-circle"/></svg>
+    LLM Usage (last 24h)
+  </div>
+  <div class="ops-card" style="padding:.5rem 0">
+    <table class="ops-table">
+      <thead>
+        <tr><th>Provider</th><th>Model</th><th>Calls</th><th>Errors</th><th>Avg Tokens</th><th>Last Call</th></tr>
+      </thead>
+      <tbody>
+        {% for p in llm_providers %}
+        <tr>
+          <td>{{ p.get('provider', '—') }}</td>
+          <td style="font-family:var(--font-mono,monospace);font-size:.75rem">{{ p.get('model', '—') }}</td>
+          <td><strong>{{ p.get('total_calls', 0) }}</strong></td>
+          <td style="color:{% if p.get('errors',0) > 0 %}#ef4444{% else %}var(--text-secondary){% endif %}">{{ p.get('errors', 0) }}</td>
+          <td>{% if p.get('avg_tokens') %}{{ p['avg_tokens']|int }}{% else %}—{% endif %}</td>
+          <td style="color:var(--text-secondary);font-size:.75rem">{{ p.get('last_call', '—') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Section 7: Top Errors -->
+{% if top_errors %}
+<div class="ops-section">
+  <div class="ops-section-title">
+    <svg class="icon"><use href="#icon-bell"/></svg>
+    Top Errors (24h)
+  </div>
+  <div class="ops-card" style="max-width:600px;padding:.5rem 0">
+    <table class="ops-table">
+      <thead>
+        <tr><th>Error Type</th><th>Count</th><th>Last Seen</th></tr>
+      </thead>
+      <tbody>
+        {% for e in top_errors %}
+        <tr>
+          <td style="font-family:var(--font-mono,monospace);font-size:.78rem;color:#ef4444">{{ e.get('error_type', '—') }}</td>
+          <td><strong>{{ e.get('cnt', 0) }}</strong></td>
+          <td style="color:var(--text-secondary);font-size:.75rem">{{ e.get('last_seen', '—') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}

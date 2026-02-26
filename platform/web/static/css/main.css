@@ -2167,3 +2167,8 @@ body {
 [data-theme="light"] .sidebar .nav-links a:hover {
   background: var(--bg-tertiary);
 }
+
+/* ── PWA / Mobile sidebar collapse (max-width: 768px) ── */
+@media (max-width: 768px) {
+  .sidebar .nav-links a span { display: none; }
+}
