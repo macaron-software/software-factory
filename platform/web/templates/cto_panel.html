@@ -40,6 +40,10 @@
 .cto-chips{display:flex;flex-wrap:wrap;gap:.35rem;padding:.5rem 1.1rem;border-bottom:1px solid var(--border)}
 .cto-chip{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:20px;padding:.22rem .65rem;font-size:.7rem;cursor:pointer;color:var(--text-muted);transition:all .15s;white-space:nowrap}
 .cto-chip:hover{background:var(--accent-subtle,rgba(99,102,241,.1));border-color:var(--accent,#6366f1);color:var(--text)}
+.cto-chip-project{background:rgba(99,102,241,.07);border-color:rgba(99,102,241,.3);color:var(--accent,#6366f1)}
+.cto-chip-project:hover{background:rgba(99,102,241,.18);border-color:var(--accent,#6366f1);color:var(--text)}
+.cto-chip-debt{background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.3);color:#d97706}
+.cto-chip-debt:hover{background:rgba(245,158,11,.18);border-color:#d97706;color:var(--text)}
 
 /* messages */
 .cto-messages{flex:1;overflow-y:auto;padding:.9rem 1.1rem;display:flex;flex-direction:column;gap:.7rem}
@@ -64,12 +68,27 @@
 .cto-thinking-dots span:nth-child(3){animation-delay:.3s}
 
 /* input */
-.cto-input-area{display:flex;gap:.45rem;padding:.65rem 1.1rem;border-top:1px solid var(--border);background:var(--bg-secondary)}
+.cto-input-area{display:flex;flex-direction:column;gap:.3rem;padding:.65rem 1.1rem;border-top:1px solid var(--border);background:var(--bg-secondary)}
+.cto-input-row{display:flex;gap:.45rem;align-items:flex-end}
 .cto-input{flex:1;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:.5rem .8rem;font-size:.83rem;color:var(--text);resize:none;line-height:1.4;max-height:110px;transition:border-color .15s}
 .cto-input:focus{outline:none;border-color:var(--accent,#6366f1)}
 .cto-send{background:var(--accent,#6366f1);color:#fff;border:none;border-radius:8px;padding:.5rem .9rem;cursor:pointer;font-size:.8rem;font-weight:600;transition:opacity .15s;white-space:nowrap;display:flex;align-items:center;gap:.35rem}
 .cto-send:hover{opacity:.85}
 .cto-send.loading{opacity:.5;pointer-events:none}
+/* file button */
+.cto-file-btn{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:.5rem .6rem;cursor:pointer;color:var(--text-muted);transition:all .15s;display:flex;align-items:center;flex-shrink:0}
+.cto-file-btn:hover{border-color:var(--accent,#6366f1);color:var(--accent,#6366f1)}
+/* attachment bar */
+.cto-attach-bar{display:none;align-items:center;gap:.5rem;padding:.25rem 0}
+.cto-attach-bar.visible{display:flex}
+.cto-attach-pill{display:flex;align-items:center;gap:.35rem;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.35);border-radius:20px;padding:.18rem .6rem;font-size:.72rem;color:var(--accent,#6366f1);max-width:260px}
+.cto-attach-pill span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+.cto-attach-clear{cursor:pointer;opacity:.6;flex-shrink:0;line-height:1}
+.cto-attach-clear:hover{opacity:1}
+.cto-attach-hint{font-size:.68rem;color:var(--text-muted)}
+/* drop overlay */
+.cto-drop-overlay{display:none;position:absolute;inset:0;background:rgba(99,102,241,.12);border:2.5px dashed var(--accent,#6366f1);border-radius:8px;z-index:20;pointer-events:none;align-items:center;justify-content:center;flex-direction:column;gap:.5rem;color:var(--accent,#6366f1);font-size:.9rem;font-weight:600}
+.cto-drop-overlay.active{display:flex}
 
 @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
@@ -128,14 +147,24 @@
     </div>
 
     <div class="cto-chips">
-      <button class="cto-chip" onclick="ctoSendChip('Donne-moi les métriques du portfolio : missions, projets, agents, coûts LLM')">Stats portfolio</button>
-      <button class="cto-chip" onclick="ctoSendChip('Liste les missions en cours et leur état')">Missions en cours</button>
-      <button class="cto-chip" onclick="ctoSendChip('Analyse la dette technique et les risques actuels')">Dette technique</button>
-      <button class="cto-chip" onclick="ctoSendChip('Cherche sur GitHub les dernières pratiques pour notre stack')">GitHub</button>
-      <button class="cto-chip" onclick="ctoSendChip('Monte-moi une équipe optimale pour un projet de sécurité')">Monter une équipe</button>
+      <button class="cto-chip" onclick="ctoSendChip('Donne-moi les métriques du portfolio : missions, projets, agents, coûts LLM')">📊 Stats portfolio</button>
+      <button class="cto-chip" onclick="ctoSendChip('Liste les missions en cours et leur état')">🚀 Missions en cours</button>
+      <button class="cto-chip" onclick="ctoSendChip('Monte-moi une équipe optimale pour un projet de sécurité')">👥 Monter une équipe</button>
+      <button class="cto-chip" onclick="ctoSendChip('Cherche sur GitHub les dernières pratiques pour notre stack')">🔍 GitHub</button>
+      <button class="cto-chip cto-chip-project" onclick="ctoSendChip('Crée un projet complet pour répondre à un AO Veligo (vélos partagés Paris) : périmètre, équipe, missions et meta workflow de développement')">🚲 AO Veligo</button>
+      <button class="cto-chip cto-chip-project" onclick="ctoSendChip('Lance un projet de migration Angular 16→17 pour Sharelook : analyse du code source GitHub microsoft/SharePoint-Connect (comme exemple), crée le projet, les missions de migration et le meta workflow avec les équipes front, back et QA')">⬆️ Migration Angular 16→17</button>
+      <button class="cto-chip cto-chip-debt" onclick="ctoSendChip('Analyse la dette technique, sécurité (OWASP), accessibilité (WCAG 2.1 AA) et conformité RGPD sur le projet GitHub public facebook/react : génère un rapport complet et crée les missions correctives')">🛡️ Dette tech · sécu · a11y · RGPD</button>
+      <button class="cto-chip cto-chip-debt" onclick="ctoSendChip('Fais un git status et git log des 5 derniers commits du projet actif, propose un commit de nettoyage et crée une PR')">🔀 Git commit &amp; PR</button>
+      <button class="cto-chip cto-chip-project" onclick="ctoSendChip('Lance les tests E2E Playwright sur le projet actif, prends des screenshots des pages principales et génère un rapport de qualité')">🧪 E2E + Screenshots</button>
+      <button class="cto-chip cto-chip-debt" onclick="ctoSendChip('Synchronise le Jira du projet actif : crée les tickets pour les missions en cours et mets à jour le statut des stories existantes')">📋 Sync Jira</button>
+      <button class="cto-chip cto-chip-project" onclick="ctoSendChip('Mets à jour le wiki GitHub du projet actif avec un résumé de l\'architecture, les décisions techniques récentes et le statut des missions en cours')">📝 Mise à jour Wiki</button>
     </div>
 
-    <div class="cto-messages" id="cto-msgs">
+    <div class="cto-messages" id="cto-msgs" style="position:relative">
+      <div class="cto-drop-overlay" id="cto-drop-overlay">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Déposer le fichier ici
+      </div>
       {{ history_html | safe }}
     </div>
 
@@ -146,18 +175,32 @@
     </div>
 
     <div class="cto-input-area">
-      <textarea
-        id="cto-input"
-        class="cto-input"
-        placeholder="Posez une question à Karim, créez un projet, demandez une analyse…"
-        rows="1"
-        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ctoSend()}"
-        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px'"
-      ></textarea>
-      <button id="cto-send-btn" class="cto-send" onclick="ctoSend()">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        Envoyer
-      </button>
+      <div class="cto-attach-bar" id="cto-attach-bar">
+        <div class="cto-attach-pill" id="cto-attach-pill">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          <span id="cto-attach-name">fichier.pdf</span>
+          <span class="cto-attach-clear" onclick="ctoClearAttach()" title="Retirer">✕</span>
+        </div>
+        <span class="cto-attach-hint" id="cto-attach-hint"></span>
+      </div>
+      <div class="cto-input-row">
+        <input type="file" id="cto-file-input" style="display:none" accept=".txt,.md,.pdf,.docx,.json,.yaml,.yml,.py,.js,.ts,.jsx,.tsx,.html,.css,.csv,.xml,.sql" onchange="ctoHandleFileInput(this)">
+        <button class="cto-file-btn" onclick="document.getElementById('cto-file-input').click()" title="Joindre un fichier (PDF, code, AO…)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <textarea
+          id="cto-input"
+          class="cto-input"
+          placeholder="Posez une question, glissez un fichier, créez un projet…"
+          rows="1"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ctoSend()}"
+          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px'"
+        ></textarea>
+        <button id="cto-send-btn" class="cto-send" onclick="ctoSend()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Envoyer
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -165,20 +208,111 @@
 <script>
 (function(){
   var _sessionId = '{{ session_id }}';
+  var _attachment = null; // {name, text, chars, truncated}
+
+  /* ── Attachment ── */
+  function ctoHandleFileInput(input){
+    var file = input.files && input.files[0];
+    if(file){ _processFile(file); }
+    input.value = '';
+  }
+
+  function _processFile(file){
+    var textExts = /\.(txt|md|rst|csv|json|yaml|yml|py|js|ts|jsx|tsx|html|css|scss|java|kt|go|rs|rb|php|sh|xml|sql|toml|ini|cfg|env)$/i;
+    if(textExts.test(file.name)){
+      var reader = new FileReader();
+      reader.onload = function(e){
+        _setAttachment({name: file.name, text: e.target.result, chars: e.target.result.length, truncated: false});
+      };
+      reader.readAsText(file);
+    } else {
+      // PDF / DOCX → backend
+      var fd = new FormData();
+      fd.append('file', file);
+      var hint = document.getElementById('cto-attach-hint');
+      if(hint) hint.textContent = 'Extraction en cours…';
+      _showAttachBar(file.name, '');
+      fetch('/api/cto/upload', {method:'POST', body: fd})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(d.ok){ _setAttachment({name: d.name, text: d.text, chars: d.chars, truncated: d.truncated}); }
+        else { _clearAttachBar(); alert('Impossible de lire ce fichier : ' + (d.error||'erreur')); }
+      })
+      .catch(function(){ _clearAttachBar(); alert('Erreur lors de l\'envoi du fichier.'); });
+    }
+  }
+
+  function _setAttachment(att){
+    _attachment = att;
+    var kb = Math.round(att.chars / 1024 * 10) / 10;
+    var hint = att.truncated ? ' (tronqué à 40k car.)' : (' · ' + kb + ' ko');
+    _showAttachBar(att.name, hint);
+  }
+
+  function _showAttachBar(name, hint){
+    var bar = document.getElementById('cto-attach-bar');
+    var nameEl = document.getElementById('cto-attach-name');
+    var hintEl = document.getElementById('cto-attach-hint');
+    if(bar) bar.classList.add('visible');
+    if(nameEl) nameEl.textContent = name;
+    if(hintEl) hintEl.textContent = hint;
+  }
+
+  function _clearAttachBar(){
+    var bar = document.getElementById('cto-attach-bar');
+    if(bar) bar.classList.remove('visible');
+  }
+
+  function ctoClearAttach(){
+    _attachment = null;
+    _clearAttachBar();
+  }
+
+  /* ── Drag & Drop ── */
+  var _dragCounter = 0;
+  document.addEventListener('dragenter', function(e){
+    if(e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')){
+      _dragCounter++;
+      var ov = document.getElementById('cto-drop-overlay');
+      if(ov) ov.classList.add('active');
+    }
+  });
+  document.addEventListener('dragleave', function(e){
+    _dragCounter = Math.max(0, _dragCounter - 1);
+    if(_dragCounter === 0){
+      var ov = document.getElementById('cto-drop-overlay');
+      if(ov) ov.classList.remove('active');
+    }
+  });
+  document.addEventListener('dragover', function(e){ e.preventDefault(); });
+  document.addEventListener('drop', function(e){
+    e.preventDefault();
+    _dragCounter = 0;
+    var ov = document.getElementById('cto-drop-overlay');
+    if(ov) ov.classList.remove('active');
+    var files = e.dataTransfer && e.dataTransfer.files;
+    if(files && files.length > 0){ _processFile(files[0]); }
+  });
 
   /* ── Send ── */
   function ctoSend(){
     var inp = document.getElementById('cto-input');
     var msg = inp.value.trim();
-    if(!msg) return;
+    if(!msg && !_attachment) return;
+    var fullMsg = msg;
+    if(_attachment){
+      var header = '📎 **' + _attachment.name + '**' + (_attachment.truncated ? ' *(extrait)*' : '') + '\n\n';
+      fullMsg = (msg ? msg + '\n\n' : 'Analyse ce document :\n\n') + header + '```\n' + _attachment.text + '\n```';
+    }
     inp.value = '';
     inp.style.height = 'auto';
-    _ctoDispatch(msg);
+    ctoClearAttach();
+    _ctoDispatch(fullMsg, msg || ('📎 ' + (_attachment ? _attachment.name : '')));
   }
 
-  function ctoSendChip(text){ _ctoDispatch(text); }
+  function ctoSendChip(text){ _ctoDispatch(text, text); }
 
-  function _ctoDispatch(msg){
+  function _ctoDispatch(msg, displayMsg){
     var msgs = document.getElementById('cto-msgs');
     var thinking = document.getElementById('cto-thinking');
     var btn = document.getElementById('cto-send-btn');
@@ -278,6 +412,8 @@
   window.ctoSendChip = ctoSendChip;
   window.ctoNewConversation = ctoNewConversation;
   window.ctoLoadConv = ctoLoadConv;
+  window.ctoClearAttach = ctoClearAttach;
+  window.ctoHandleFileInput = ctoHandleFileInput;
 
   // Scroll to bottom on load
   var msgs = document.getElementById('cto-msgs');
@@ -299,14 +435,30 @@
 .cto-chips{display:flex;flex-wrap:wrap;gap:0.4rem;padding:0.6rem 1.25rem;border-bottom:1px solid var(--border)}
 .cto-chip{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:20px;padding:0.25rem 0.75rem;font-size:0.72rem;cursor:pointer;color:var(--text-muted);transition:all .15s}
 .cto-chip:hover{background:var(--accent-subtle,rgba(99,102,241,.1));border-color:var(--accent,#6366f1);color:var(--text)}
-.cto-messages{flex:1;overflow-y:auto;padding:1rem 1.25rem;display:flex;flex-direction:column;gap:0.75rem}
+.cto-chip-project{background:rgba(99,102,241,.07);border-color:rgba(99,102,241,.3);color:var(--accent,#6366f1)}
+.cto-chip-project:hover{background:rgba(99,102,241,.18);border-color:var(--accent,#6366f1);color:var(--text)}
+.cto-chip-debt{background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.3);color:#d97706}
+.cto-chip-debt:hover{background:rgba(245,158,11,.18);border-color:#d97706;color:var(--text)}
+.cto-messages{flex:1;overflow-y:auto;padding:1rem 1.25rem;display:flex;flex-direction:column;gap:0.75rem;position:relative}
 .cto-messages:empty::after{content:"Posez une question à Karim…";color:var(--text-muted);font-size:0.82rem;margin:auto;display:block;text-align:center;padding-top:2rem}
-.cto-input-area{display:flex;gap:0.5rem;padding:0.75rem 1.25rem;border-top:1px solid var(--border);background:var(--bg-secondary)}
+.cto-input-area{display:flex;flex-direction:column;gap:.3rem;padding:0.75rem 1.25rem;border-top:1px solid var(--border);background:var(--bg-secondary)}
+.cto-input-row{display:flex;gap:0.5rem;align-items:flex-end}
 .cto-input{flex:1;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:0.55rem 0.85rem;font-size:0.85rem;color:var(--text);resize:none;line-height:1.4;max-height:120px}
 .cto-input:focus{outline:none;border-color:var(--accent,#6366f1)}
 .cto-send{background:var(--accent,#6366f1);color:#fff;border:none;border-radius:8px;padding:0.55rem 1rem;cursor:pointer;font-size:0.82rem;font-weight:600;transition:opacity .15s;white-space:nowrap}
 .cto-send:hover{opacity:.85}
-.cto-send.htmx-request{opacity:.5;pointer-events:none}
+.cto-send.htmx-request,.cto-send.loading{opacity:.5;pointer-events:none}
+.cto-file-btn{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:.5rem .65rem;cursor:pointer;color:var(--text-muted);transition:all .15s;display:flex;align-items:center;flex-shrink:0}
+.cto-file-btn:hover{border-color:var(--accent,#6366f1);color:var(--accent,#6366f1)}
+.cto-attach-bar{display:none;align-items:center;gap:.5rem;padding:.2rem 0}
+.cto-attach-bar.visible{display:flex}
+.cto-attach-pill{display:flex;align-items:center;gap:.35rem;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.35);border-radius:20px;padding:.18rem .6rem;font-size:.72rem;color:var(--accent,#6366f1);max-width:260px}
+.cto-attach-pill span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+.cto-attach-clear{cursor:pointer;opacity:.6;flex-shrink:0}
+.cto-attach-clear:hover{opacity:1}
+.cto-attach-hint{font-size:.68rem;color:var(--text-muted)}
+.cto-drop-overlay{display:none;position:absolute;inset:0;background:rgba(99,102,241,.12);border:2.5px dashed var(--accent,#6366f1);border-radius:8px;z-index:20;pointer-events:none;align-items:center;justify-content:center;flex-direction:column;gap:.5rem;color:var(--accent,#6366f1);font-size:.9rem;font-weight:600}
+.cto-drop-overlay.active{display:flex}
 
 /* Chat messages — reuse existing .chat-msg styles, add cto-specific overrides */
 .cto-messages .chat-msg{max-width:78%;animation:fadeUp .2s ease}
@@ -347,15 +499,25 @@
 
   {# Quick chips #}
   <div class="cto-chips">
-    <button class="cto-chip" onclick="ctoSendChip('Donne-moi les métriques du portfolio : missions, projets, agents, coûts LLM')">Stats portfolio</button>
-    <button class="cto-chip" onclick="ctoSendChip('Liste les missions en cours et leur état')">Missions en cours</button>
-    <button class="cto-chip" onclick="ctoSendChip('Analyse la dette technique et les risques actuels')">Dette technique</button>
-    <button class="cto-chip" onclick="ctoSendChip('Cherche sur GitHub les dernières pratiques pour notre stack')">Chercher sur GitHub</button>
-    <button class="cto-chip" onclick="ctoSendChip('Monte-moi une équipe optimale pour un projet de sécurité')">Monter une équipe</button>
+    <button class="cto-chip" onclick="ctoSendChip('Donne-moi les métriques du portfolio : missions, projets, agents, coûts LLM')">📊 Stats portfolio</button>
+    <button class="cto-chip" onclick="ctoSendChip('Liste les missions en cours et leur état')">🚀 Missions en cours</button>
+    <button class="cto-chip" onclick="ctoSendChip('Monte-moi une équipe optimale pour un projet de sécurité')">👥 Monter une équipe</button>
+    <button class="cto-chip" onclick="ctoSendChip('Cherche sur GitHub les dernières pratiques pour notre stack')">🔍 GitHub</button>
+    <button class="cto-chip cto-chip-project" onclick="ctoSendChip('Crée un projet complet pour répondre à un AO Veligo (vélos partagés Paris) : périmètre, équipe, missions et meta workflow de développement')">🚲 AO Veligo</button>
+    <button class="cto-chip cto-chip-project" onclick="ctoSendChip('Lance un projet de migration Angular 16→17 pour Sharelook : analyse du code source GitHub microsoft/SharePoint-Connect (comme exemple), crée le projet, les missions de migration et le meta workflow avec les équipes front, back et QA')">⬆️ Migration Angular 16→17</button>
+    <button class="cto-chip cto-chip-debt" onclick="ctoSendChip('Analyse la dette technique, sécurité (OWASP), accessibilité (WCAG 2.1 AA) et conformité RGPD sur le projet GitHub public facebook/react : génère un rapport complet et crée les missions correctives')">🛡️ Dette tech · sécu · a11y · RGPD</button>
+    <button class="cto-chip cto-chip-debt" onclick="ctoSendChip('Fais un git status et git log des 5 derniers commits du projet actif, propose un commit de nettoyage et crée une PR')">🔀 Git commit &amp; PR</button>
+    <button class="cto-chip cto-chip-project" onclick="ctoSendChip('Lance les tests E2E Playwright sur le projet actif, prends des screenshots des pages principales et génère un rapport de qualité')">🧪 E2E + Screenshots</button>
+    <button class="cto-chip cto-chip-debt" onclick="ctoSendChip('Synchronise le Jira du projet actif : crée les tickets pour les missions en cours et mets à jour le statut des stories existantes')">📋 Sync Jira</button>
+    <button class="cto-chip cto-chip-project" onclick="ctoSendChip('Mets à jour le wiki GitHub du projet actif avec un résumé de l\'architecture, les décisions techniques récentes et le statut des missions en cours')">📝 Mise à jour Wiki</button>
   </div>
 
   {# Messages #}
   <div class="cto-messages" id="cto-msgs">
+    <div class="cto-drop-overlay" id="cto-drop-overlay">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Déposer le fichier ici
+    </div>
     {{ history_html | safe }}
   </div>
 
@@ -370,44 +532,149 @@
 
   {# Input #}
   <div class="cto-input-area">
-    <textarea
-      id="cto-input"
-      class="cto-input"
-      placeholder="Posez une question à Karim, créez un projet, demandez une analyse…"
-      rows="1"
-      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ctoSend()}"
-      oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"
-    ></textarea>
-    <button
-      id="cto-send-btn"
-      class="cto-send"
-      onclick="ctoSend()"
-    >Envoyer</button>
+    <div class="cto-attach-bar" id="cto-attach-bar">
+      <div class="cto-attach-pill" id="cto-attach-pill">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        <span id="cto-attach-name">fichier.pdf</span>
+        <span class="cto-attach-clear" onclick="ctoClearAttach()" title="Retirer">✕</span>
+      </div>
+      <span class="cto-attach-hint" id="cto-attach-hint"></span>
+    </div>
+    <div class="cto-input-row">
+      <input type="file" id="cto-file-input" style="display:none" accept=".txt,.md,.pdf,.docx,.json,.yaml,.yml,.py,.js,.ts,.jsx,.tsx,.html,.css,.csv,.xml,.sql" onchange="ctoHandleFileInput(this)">
+      <button class="cto-file-btn" onclick="document.getElementById('cto-file-input').click()" title="Joindre un fichier (PDF, code, AO…)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+      </button>
+      <textarea
+        id="cto-input"
+        class="cto-input"
+        placeholder="Posez une question, glissez un fichier, créez un projet…"
+        rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ctoSend()}"
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"
+      ></textarea>
+      <button
+        id="cto-send-btn"
+        class="cto-send"
+        onclick="ctoSend()"
+      >Envoyer</button>
+    </div>
   </div>
 </div>
 
 <script>
 (function(){
+  var _attachment = null;
+
+  /* ── Attachment ── */
+  function ctoHandleFileInput(input){
+    var file = input.files && input.files[0];
+    if(file){ _processFile(file); }
+    input.value = '';
+  }
+
+  function _processFile(file){
+    var textExts = /\.(txt|md|rst|csv|json|yaml|yml|py|js|ts|jsx|tsx|html|css|scss|java|kt|go|rs|rb|php|sh|xml|sql|toml|ini|cfg|env)$/i;
+    if(textExts.test(file.name)){
+      var reader = new FileReader();
+      reader.onload = function(e){
+        _setAttachment({name: file.name, text: e.target.result, chars: e.target.result.length, truncated: false});
+      };
+      reader.readAsText(file);
+    } else {
+      var fd = new FormData();
+      fd.append('file', file);
+      var hint = document.getElementById('cto-attach-hint');
+      if(hint) hint.textContent = 'Extraction en cours…';
+      _showAttachBar(file.name, '');
+      fetch('/api/cto/upload', {method:'POST', body: fd})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(d.ok){ _setAttachment({name: d.name, text: d.text, chars: d.chars, truncated: d.truncated}); }
+        else { _clearAttachBar(); alert('Impossible de lire ce fichier : ' + (d.error||'erreur')); }
+      })
+      .catch(function(){ _clearAttachBar(); alert('Erreur lors de l\'envoi du fichier.'); });
+    }
+  }
+
+  function _setAttachment(att){
+    _attachment = att;
+    var kb = Math.round(att.chars / 1024 * 10) / 10;
+    var hint = att.truncated ? ' (tronqué à 40k car.)' : (' · ' + kb + ' ko');
+    _showAttachBar(att.name, hint);
+  }
+
+  function _showAttachBar(name, hint){
+    var bar = document.getElementById('cto-attach-bar');
+    var nameEl = document.getElementById('cto-attach-name');
+    var hintEl = document.getElementById('cto-attach-hint');
+    if(bar) bar.classList.add('visible');
+    if(nameEl) nameEl.textContent = name;
+    if(hintEl) hintEl.textContent = hint;
+  }
+
+  function _clearAttachBar(){
+    var bar = document.getElementById('cto-attach-bar');
+    if(bar) bar.classList.remove('visible');
+  }
+
+  function ctoClearAttach(){
+    _attachment = null;
+    _clearAttachBar();
+  }
+
+  /* ── Drag & Drop ── */
+  var _dragCounter = 0;
+  document.addEventListener('dragenter', function(e){
+    if(e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')){
+      _dragCounter++;
+      var ov = document.getElementById('cto-drop-overlay');
+      if(ov) ov.classList.add('active');
+    }
+  });
+  document.addEventListener('dragleave', function(){
+    _dragCounter = Math.max(0, _dragCounter - 1);
+    if(_dragCounter === 0){
+      var ov = document.getElementById('cto-drop-overlay');
+      if(ov) ov.classList.remove('active');
+    }
+  });
+  document.addEventListener('dragover', function(e){ e.preventDefault(); });
+  document.addEventListener('drop', function(e){
+    e.preventDefault();
+    _dragCounter = 0;
+    var ov = document.getElementById('cto-drop-overlay');
+    if(ov) ov.classList.remove('active');
+    var files = e.dataTransfer && e.dataTransfer.files;
+    if(files && files.length > 0){ _processFile(files[0]); }
+  });
+
+  /* ── Send ── */
   function ctoSend(){
     var inp = document.getElementById('cto-input');
     var msg = inp.value.trim();
-    if(!msg) return;
+    if(!msg && !_attachment) return;
+    var displayMsg = msg || ('📎 ' + (_attachment ? _attachment.name : ''));
+    var fullMsg = msg;
+    if(_attachment){
+      var header = '📎 **' + _attachment.name + '**' + (_attachment.truncated ? ' *(extrait)*' : '') + '\n\n';
+      fullMsg = (msg ? msg + '\n\n' : 'Analyse ce document :\n\n') + header + '```\n' + _attachment.text + '\n```';
+    }
     inp.value = '';
     inp.style.height = 'auto';
-    _ctoDispatch(msg);
+    ctoClearAttach();
+    _ctoDispatch(fullMsg, displayMsg);
   }
 
-  function ctoSendChip(text){
-    _ctoDispatch(text);
-  }
+  function ctoSendChip(text){ _ctoDispatch(text, text); }
 
-  function _ctoDispatch(msg){
+  function _ctoDispatch(msg, displayMsg){
     var msgs = document.getElementById('cto-msgs');
     var thinking = document.getElementById('cto-thinking');
-    // Show user bubble immediately
+    var show = displayMsg || msg;
     msgs.insertAdjacentHTML('beforeend',
       '<div class="chat-msg chat-msg-user">' +
-      '<div class="chat-msg-body"><div class="chat-msg-text">' + _escape(msg) + '</div></div>' +
+      '<div class="chat-msg-body"><div class="chat-msg-text">' + _escape(show.substring(0,200)) + (show.length>200?'…':'') + '</div></div>' +
       '<div class="chat-msg-avatar user">S</div>' +
       '</div>'
     );
@@ -422,18 +689,15 @@
     .then(function(r){ return r.text(); })
     .then(function(html){
       thinking.style.display = 'none';
-      // Remove the user bubble we pre-inserted (server returns both)
       var userBubbles = msgs.querySelectorAll('.chat-msg-user');
       if(userBubbles.length) userBubbles[userBubbles.length-1].remove();
       msgs.insertAdjacentHTML('beforeend', html);
       msgs.scrollTop = msgs.scrollHeight;
     })
-    .catch(function(e){
+    .catch(function(){
       thinking.style.display = 'none';
       msgs.insertAdjacentHTML('beforeend',
-        '<div class="chat-msg chat-msg-agent">' +
-        '<div class="chat-msg-body"><div class="chat-msg-text" style="color:var(--danger)">Erreur de communication avec le CTO.</div></div>' +
-        '</div>'
+        '<div class="chat-msg chat-msg-agent"><div class="chat-msg-body"><div class="chat-msg-text" style="color:var(--danger)">Erreur de communication avec le CTO.</div></div></div>'
       );
     });
   }
@@ -442,11 +706,11 @@
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  // Expose to global scope (onclick handlers)
   window.ctoSend = ctoSend;
   window.ctoSendChip = ctoSendChip;
+  window.ctoClearAttach = ctoClearAttach;
+  window.ctoHandleFileInput = ctoHandleFileInput;
 
-  // Scroll to bottom on load
   var msgs = document.getElementById('cto-msgs');
   if(msgs) msgs.scrollTop = msgs.scrollHeight;
 })();

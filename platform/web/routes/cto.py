@@ -10,7 +10,7 @@ import html as html_mod
 import logging
 
 import markdown as md_lib
-from fastapi import APIRouter
+from fastapi import APIRouter, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.requests import Request
 
@@ -270,3 +270,77 @@ async def cto_message(request: Request):
         )
 
     return HTMLResponse(user_html)
+
+
+# ── File upload ──────────────────────────────────────────────────────────────
+
+_TEXT_EXTS = {
+    ".txt", ".md", ".rst", ".csv", ".json", ".yaml", ".yml",
+    ".py", ".js", ".ts", ".jsx", ".tsx", ".html", ".css", ".scss",
+    ".java", ".kt", ".go", ".rs", ".rb", ".php", ".sh", ".xml",
+    ".sql", ".toml", ".ini", ".cfg", ".env",
+}
+_MAX_CHARS = 40_000  # clip to avoid exploding the context window
+
+
+@router.post("/api/cto/upload")
+async def cto_upload(file: UploadFile = File(...)):
+    """Extract text from an uploaded file and return it for injection into chat."""
+    import io
+    import os
+
+    name = file.filename or "document"
+    ext = os.path.splitext(name)[1].lower()
+    data = await file.read()
+
+    text = ""
+    error = ""
+
+    try:
+        if ext in _TEXT_EXTS:
+            text = data.decode("utf-8", errors="replace")
+        elif ext == ".pdf":
+            try:
+                import pypdf  # type: ignore
+
+                reader = pypdf.PdfReader(io.BytesIO(data))
+                parts = []
+                for page in reader.pages:
+                    t = page.extract_text() or ""
+                    if t.strip():
+                        parts.append(t)
+                text = "\n\n".join(parts)
+            except Exception as exc:
+                error = f"PDF parsing failed: {exc}"
+        elif ext in (".docx", ".doc"):
+            try:
+                import docx  # type: ignore
+
+                doc = docx.Document(io.BytesIO(data))
+                text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+            except Exception as exc:
+                error = f"DOCX parsing failed: {exc}"
+        else:
+            # Try UTF-8 decode as last resort
+            try:
+                text = data.decode("utf-8", errors="replace")
+            except Exception:
+                error = f"Format non supporté : {ext}"
+    except Exception as exc:
+        error = str(exc)
+
+    if error and not text:
+        return JSONResponse({"ok": False, "error": error, "name": name})
+
+    truncated = len(text) > _MAX_CHARS
+    text = text[:_MAX_CHARS]
+
+    return JSONResponse({
+        "ok": True,
+        "name": name,
+        "ext": ext,
+        "size": len(data),
+        "chars": len(text),
+        "truncated": truncated,
+        "text": text,
+    })
