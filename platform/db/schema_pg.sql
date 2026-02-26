@@ -1,5 +1,5 @@
 -- Macaron Agent Platform — PostgreSQL Schema v3
--- Requires extensions: pgvector, pg_trgm, uuid-ossp
+-- Requires extensions: pg_trgm (optional: pgvector for vector search)
 
 -- ============================================================================
 -- WORKFLOWS (created at runtime by WorkflowStore)
@@ -320,12 +320,11 @@ CREATE TABLE IF NOT EXISTS memory_project (
     search_tsv tsvector GENERATED ALWAYS AS (
         to_tsvector('simple', coalesce(key, '') || ' ' || coalesce(value, ''))
     ) STORED,
-    embedding vector(1536)
+    embedding TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_memproj_project ON memory_project(project_id);
 CREATE INDEX IF NOT EXISTS idx_memproj_category ON memory_project(category);
 CREATE INDEX IF NOT EXISTS idx_memproj_fts ON memory_project USING GIN(search_tsv);
-CREATE INDEX IF NOT EXISTS idx_memproj_vec ON memory_project USING ivfflat(embedding vector_cosine_ops) WITH (lists = 10);
 
 CREATE TABLE IF NOT EXISTS memory_global (
     id SERIAL PRIMARY KEY,
@@ -340,7 +339,7 @@ CREATE TABLE IF NOT EXISTS memory_global (
     search_tsv tsvector GENERATED ALWAYS AS (
         to_tsvector('simple', coalesce(key, '') || ' ' || coalesce(value, ''))
     ) STORED,
-    embedding vector(1536)
+    embedding TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_memglob_category ON memory_global(category);
 CREATE INDEX IF NOT EXISTS idx_memglob_fts ON memory_global USING GIN(search_tsv);
@@ -563,6 +562,49 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 CREATE INDEX IF NOT EXISTS idx_tickets_mission ON support_tickets(mission_id);
 
 -- ============================================================================
+-- PLATFORM INCIDENTS (auto-heal, ops monitoring)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS platform_incidents (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    severity TEXT DEFAULT 'P3',
+    status TEXT DEFAULT 'open',
+    source TEXT DEFAULT 'auto',
+    error_type TEXT,
+    error_detail TEXT,
+    mission_id TEXT,
+    agent_id TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP,
+    resolution TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_incidents_created ON platform_incidents(created_at);
+
+-- ============================================================================
+-- LLM TRACES (observability)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS llm_traces (
+    id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    agent_id TEXT DEFAULT '',
+    session_id TEXT DEFAULT '',
+    mission_id TEXT DEFAULT '',
+    tokens_in INTEGER DEFAULT 0,
+    tokens_out INTEGER DEFAULT 0,
+    duration_ms INTEGER DEFAULT 0,
+    cost_usd REAL DEFAULT 0.0,
+    status TEXT DEFAULT 'ok',
+    error TEXT DEFAULT '',
+    input_preview TEXT DEFAULT '',
+    output_preview TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_llm_traces_session ON llm_traces(session_id);
+
+-- ============================================================================
 -- PERFORMANCE INDEXES (missing from initial schema)
 -- ============================================================================
 
@@ -599,3 +641,267 @@ CREATE INDEX IF NOT EXISTS idx_ideation_project ON ideation_sessions(project_id)
 
 -- Artifacts: by type
 CREATE INDEX IF NOT EXISTS idx_artifacts_type ON artifacts(type);
+
+-- ============================================================================
+-- AGENT SCORES (Thompson Sampling raw outcomes)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS agent_scores (
+    id SERIAL PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    epic_id TEXT NOT NULL,
+    accepted INTEGER DEFAULT 0,
+    rejected INTEGER DEFAULT 0,
+    iterations INTEGER DEFAULT 0,
+    quality_score REAL DEFAULT 0.0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(agent_id, epic_id)
+);
+CREATE INDEX IF NOT EXISTS idx_agent_scores_agent ON agent_scores(agent_id);
+
+-- ============================================================================
+-- DARWIN TEAMS (fitness-based agent selection)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS team_fitness (
+    id SERIAL PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    pattern_id TEXT NOT NULL,
+    technology TEXT NOT NULL DEFAULT 'generic',
+    phase_type TEXT NOT NULL DEFAULT 'generic',
+    fitness_score REAL DEFAULT 0.0,
+    runs INTEGER DEFAULT 0,
+    wins INTEGER DEFAULT 0,
+    losses INTEGER DEFAULT 0,
+    avg_iterations REAL DEFAULT 0.0,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    retired INTEGER DEFAULT 0,
+    retired_at TIMESTAMP,
+    pinned INTEGER DEFAULT 0,
+    weight_multiplier REAL DEFAULT 1.0,
+    UNIQUE(agent_id, pattern_id, technology, phase_type)
+);
+CREATE INDEX IF NOT EXISTS idx_tf_tech_phase ON team_fitness(technology, phase_type);
+CREATE INDEX IF NOT EXISTS idx_tf_agent ON team_fitness(agent_id);
+
+CREATE TABLE IF NOT EXISTS team_fitness_history (
+    id SERIAL PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    pattern_id TEXT NOT NULL,
+    technology TEXT NOT NULL DEFAULT 'generic',
+    phase_type TEXT NOT NULL DEFAULT 'generic',
+    snapshot_date TEXT NOT NULL,
+    fitness_score REAL DEFAULT 0.0,
+    runs INTEGER DEFAULT 0,
+    UNIQUE(agent_id, pattern_id, technology, phase_type, snapshot_date)
+);
+CREATE INDEX IF NOT EXISTS idx_tfh_key ON team_fitness_history(agent_id, pattern_id, technology, phase_type);
+
+CREATE TABLE IF NOT EXISTS team_selections (
+    id SERIAL PRIMARY KEY,
+    mission_id TEXT,
+    workflow_id TEXT,
+    agent_id TEXT NOT NULL,
+    pattern_id TEXT NOT NULL,
+    technology TEXT NOT NULL DEFAULT 'generic',
+    phase_type TEXT NOT NULL DEFAULT 'generic',
+    selection_mode TEXT DEFAULT 'fitness',
+    thompson_score REAL,
+    selected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_tsel_mission ON team_selections(mission_id);
+CREATE INDEX IF NOT EXISTS idx_tsel_at ON team_selections(selected_at DESC);
+
+CREATE TABLE IF NOT EXISTS team_ab_tests (
+    id SERIAL PRIMARY KEY,
+    mission_id TEXT,
+    workflow_id TEXT,
+    technology TEXT NOT NULL DEFAULT 'generic',
+    phase_type TEXT NOT NULL DEFAULT 'generic',
+    team_a_agent TEXT NOT NULL,
+    team_a_pattern TEXT NOT NULL,
+    team_b_agent TEXT NOT NULL,
+    team_b_pattern TEXT NOT NULL,
+    trigger TEXT DEFAULT 'auto',
+    winner TEXT,
+    team_a_score REAL,
+    team_b_score REAL,
+    evaluator_agent TEXT,
+    status TEXT DEFAULT 'pending',
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_tab_status ON team_ab_tests(status);
+
+CREATE TABLE IF NOT EXISTS team_okr (
+    id SERIAL PRIMARY KEY,
+    team_key TEXT NOT NULL,
+    technology TEXT NOT NULL DEFAULT 'generic',
+    phase_type TEXT NOT NULL DEFAULT 'generic',
+    okr_text TEXT NOT NULL,
+    kpi_name TEXT NOT NULL,
+    kpi_target REAL NOT NULL,
+    kpi_current REAL DEFAULT 0.0,
+    kpi_unit TEXT DEFAULT '%',
+    period TEXT DEFAULT 'quarter',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(team_key, technology, phase_type, kpi_name)
+);
+
+-- ============================================================================
+-- RL EXPERIENCE (Reinforcement Learning policy data)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS rl_experience (
+    id SERIAL PRIMARY KEY,
+    state_json TEXT NOT NULL,
+    action TEXT NOT NULL,
+    reward REAL NOT NULL,
+    next_state_json TEXT NOT NULL,
+    mission_id TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_rl_exp_mission ON rl_experience(mission_id);
+
+-- ============================================================================
+-- GA EVOLUTION (Genetic Algorithm proposals)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS evolution_proposals (
+    id TEXT PRIMARY KEY,
+    base_wf_id TEXT NOT NULL,
+    mutated_config TEXT NOT NULL,
+    fitness_score REAL DEFAULT 0.0,
+    generation INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_evprop_wf ON evolution_proposals(base_wf_id);
+CREATE INDEX IF NOT EXISTS idx_evprop_status ON evolution_proposals(status);
+
+CREATE TABLE IF NOT EXISTS evolution_runs (
+    id TEXT PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    generation INTEGER DEFAULT 0,
+    best_fitness REAL DEFAULT 0.0,
+    population_size INTEGER DEFAULT 0,
+    completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ── Missing tables (migrated from SQLite schema) ──────────────────────────
+
+CREATE TABLE IF NOT EXISTS endurance_metrics (
+    id SERIAL PRIMARY KEY,
+    ts TEXT NOT NULL,
+    metric TEXT NOT NULL,
+    value REAL DEFAULT 0,
+    detail TEXT DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS events (
+    id TEXT PRIMARY KEY,
+    timestamp TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    entity_type TEXT NOT NULL DEFAULT '',
+    entity_id TEXT NOT NULL DEFAULT '',
+    actor TEXT NOT NULL DEFAULT '',
+    data TEXT NOT NULL DEFAULT '{}',
+    project_id TEXT NOT NULL DEFAULT '',
+    mission_id TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS integrations (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    enabled INTEGER DEFAULT 0,
+    config_json TEXT DEFAULT '{}',
+    status TEXT DEFAULT 'disconnected',
+    last_sync TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS llm_cache (
+    cache_key TEXT PRIMARY KEY,
+    model TEXT NOT NULL,
+    temperature REAL NOT NULL,
+    response TEXT NOT NULL,
+    tokens_in INTEGER DEFAULT 0,
+    tokens_out INTEGER DEFAULT 0,
+    created_at REAL NOT NULL,
+    hit_count INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS llm_cost_rates (
+    id SERIAL PRIMARY KEY,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    input_per_1k REAL DEFAULT 0.0,
+    output_per_1k REAL DEFAULT 0.0,
+    updated_at TEXT DEFAULT '',
+    UNIQUE(provider, model)
+);
+
+CREATE TABLE IF NOT EXISTS llm_provider_scores (
+    provider TEXT PRIMARY KEY,
+    accepted INTEGER DEFAULT 0,
+    rejected INTEGER DEFAULT 0,
+    total_calls INTEGER DEFAULT 0,
+    avg_quality REAL DEFAULT 0.0,
+    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL DEFAULT 'info',
+    title TEXT NOT NULL,
+    message TEXT DEFAULT '',
+    url TEXT DEFAULT '',
+    severity TEXT DEFAULT 'info',
+    source TEXT DEFAULT '',
+    ref_id TEXT DEFAULT '',
+    is_read INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS session_state (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL DEFAULT '',
+    display_name TEXT NOT NULL DEFAULT '',
+    role TEXT NOT NULL DEFAULT 'viewer',
+    avatar TEXT DEFAULT '',
+    is_active INTEGER DEFAULT 1,
+    auth_provider TEXT DEFAULT 'local',
+    provider_id TEXT DEFAULT '',
+    last_login TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    refresh_token_hash TEXT NOT NULL,
+    user_agent TEXT DEFAULT '',
+    ip_address TEXT DEFAULT '',
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS wiki_pages (
+    slug TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    content TEXT DEFAULT '',
+    category TEXT DEFAULT 'general',
+    icon TEXT DEFAULT '',
+    sort_order INTEGER DEFAULT 100,
+    parent_slug TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

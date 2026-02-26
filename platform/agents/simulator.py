@@ -236,10 +236,10 @@ class MissionSimulator:
                     INSERT INTO agent_scores (agent_id, epic_id, accepted, rejected, iterations, quality_score)
                     VALUES (?, ?, ?, ?, ?, ?)
                     ON CONFLICT(agent_id, epic_id) DO UPDATE SET
-                        accepted = accepted + excluded.accepted,
-                        rejected = rejected + excluded.rejected,
-                        iterations = iterations + 1,
-                        quality_score = (quality_score + excluded.quality_score) / 2.0
+                        accepted = agent_scores.accepted + excluded.accepted,
+                        rejected = agent_scores.rejected + excluded.rejected,
+                        iterations = agent_scores.iterations + 1,
+                        quality_score = (agent_scores.quality_score + excluded.quality_score) / 2.0
                 """,
                     (
                         agent_id,
