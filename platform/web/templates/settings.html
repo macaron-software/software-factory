@@ -41,6 +41,23 @@
 .integ-status-dot.error{background:var(--red)}
 .integ-actions{display:flex;gap:0.4rem;margin-top:0.5rem}
 .integ-desc{font-size:0.78rem;color:var(--text-secondary);line-height:1.4;margin-bottom:0.4rem}
+/* LLM tab */
+.llm-provider-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem}
+.llm-provider-card.active{border-color:rgba(34,197,94,.4)}
+.llm-provider-card.inactive{opacity:.65}
+.llm-prov-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem}
+.llm-prov-name{font-weight:700;font-size:0.9rem;color:var(--text-primary)}
+.llm-prov-models{font-size:0.73rem;color:var(--text-secondary);margin-top:2px}
+.routing-select{background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:0.35rem 0.6rem;font-size:0.81rem;font-family:inherit;outline:none;min-width:200px}
+.routing-select:focus{border-color:var(--purple)}
+.routing-row td{padding:0.55rem 0.8rem;border-bottom:1px solid rgba(255,255,255,0.04)}
+.routing-category{font-weight:600;font-size:0.83rem;color:var(--text-primary)}
+.routing-category small{display:block;font-weight:400;font-size:0.71rem;color:var(--text-secondary);margin-top:1px}
+.llm-ab-row{display:flex;align-items:center;gap:0.8rem;padding:0.6rem 0.8rem;background:var(--bg-secondary);border-radius:8px;margin-bottom:0.5rem;font-size:0.81rem}
+.llm-ab-badge{padding:2px 8px;border-radius:12px;font-size:0.68rem;font-weight:700;text-transform:uppercase}
+.llm-ab-badge.pending{background:rgba(234,179,8,.15);color:#eab308}
+.llm-ab-badge.won-a{background:rgba(34,197,94,.15);color:#22c55e}
+.llm-ab-badge.won-b{background:rgba(168,85,247,.15);color:#a855f7}
 </style>
 
 <div class="settings-page">
@@ -51,8 +68,8 @@
         <button class="settings-tab" onclick="showSettingsTab('integrations')">
             <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-plug"/></svg> Integrations
         </button>
-        <button class="settings-tab" onclick="showSettingsTab('providers')">
-            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-cpu"/></svg> LLM Providers
+        <button class="settings-tab" onclick="showSettingsTab('llm')">
+            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-cpu"/></svg> LLM
         </button>
     </div>
 
@@ -207,74 +224,56 @@
         </div>
     </div>
 
-    <!-- ═══ LLM Providers ═══ -->
-    <div class="settings-panel" id="panel-providers">
-        <section class="settings-section">
-            <h3>Built-in LLM Providers</h3>
-            {% for p in providers %}
-            <div class="form-group" style="margin-bottom:12px;">
-                <label>{{ p.name }} <span class="badge {% if p.enabled %}badge-green{% else %}badge-red{% endif %}">{% if p.enabled %}active{% else %}no key{% endif %}</span></label>
-                <div style="font-size:13px;color:var(--text-secondary);">
-                    {{ p.models|length }} models — default: {{ p.default_model }}
-                </div>
-            </div>
-            {% endfor %}
-            <p class="settings-note">
-                Set environment variables like <code>ANTHROPIC_API_KEY</code>, <code>AZURE_OPENAI_API_KEY</code> to enable providers.
-            </p>
-        </section>
+    <!-- ═══ LLM ═══ -->
+    <div class="settings-panel" id="panel-llm">
 
-        <section class="settings-section" style="margin-top:2rem">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-                <h3 style="margin:0">Custom AI Providers</h3>
-                <button class="btn btn-primary btn-sm" onclick="showAddProviderModal()">
-                    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Add Provider
-                </button>
-            </div>
-            <div id="custom-providers-list">
+        <!-- Providers -->
+        <section class="settings-section">
+            <h3>Providers</h3>
+            <div id="llm-providers-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;margin-top:1rem">
                 <p style="color:var(--text-secondary);font-size:0.85rem">Loading...</p>
             </div>
         </section>
-    </div>
-</div>
 
-<!-- Add Provider Modal -->
-<div id="add-provider-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;padding:2rem;overflow-y:auto">
-    <div style="max-width:520px;margin:auto;background:var(--bg-primary);border-radius:12px;border:1px solid var(--border);padding:1.5rem">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem">
-            <h3 style="margin:0">Add Custom AI Provider</h3>
-            <button onclick="document.getElementById('add-provider-modal').style.display='none'" style="background:none;border:none;color:var(--text-secondary);font-size:1.5rem;cursor:pointer">&times;</button>
-        </div>
-        <form id="add-provider-form" onsubmit="saveCustomProvider(event)">
-            <div class="form-group">
-                <label>Provider Name</label>
-                <input type="text" name="name" placeholder="My Custom LLM" required>
+        <!-- Routing assignment matrix -->
+        <section class="settings-section" style="margin-top:2rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <div>
+                    <h3 style="margin:0">Routing</h3>
+                    <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">Assign LLM models per task category. Darwin Thompson Sampling will learn which model performs best for each team × category.</p>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="saveLLMRouting()" id="routing-save-btn">
+                    <svg class="icon icon-sm"><use href="#icon-save"/></svg> Save
+                </button>
             </div>
-            <div class="form-group">
-                <label>Provider Type</label>
-                <select name="provider_type">
-                    <option value="openai-compatible">OpenAI Compatible</option>
-                    <option value="anthropic">Anthropic</option>
-                    <option value="custom">Custom</option>
-                </select>
+            <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:0.83rem" id="routing-table">
+                <thead>
+                    <tr style="border-bottom:1px solid var(--border)">
+                        <th style="text-align:left;padding:0.5rem 0.8rem;color:var(--text-secondary);font-weight:600;font-size:0.72rem;text-transform:uppercase;letter-spacing:.3px">Category</th>
+                        <th style="text-align:left;padding:0.5rem 0.8rem;color:var(--text-secondary);font-weight:600;font-size:0.72rem;text-transform:uppercase;letter-spacing:.3px">Lourd (heavy)</th>
+                        <th style="text-align:left;padding:0.5rem 0.8rem;color:var(--text-secondary);font-weight:600;font-size:0.72rem;text-transform:uppercase;letter-spacing:.3px">Léger (light)</th>
+                    </tr>
+                </thead>
+                <tbody id="routing-tbody">
+                    <tr><td colspan="3" style="padding:1rem;color:var(--text-secondary)">Loading...</td></tr>
+                </tbody>
+            </table>
             </div>
-            <div class="form-group">
-                <label>Base URL</label>
-                <input type="url" name="base_url" placeholder="https://api.example.com" required>
+        </section>
+
+        <!-- Darwin LLM Thompson Sampling -->
+        <section class="settings-section" style="margin-top:2rem">
+            <h3>Darwin LLM A/B</h3>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:1rem">Thompson Sampling comparing the same team (agent+pattern) across different LLM models. Winners emerge from real mission outcomes.</p>
+            <div id="llm-ab-list">
+                <p style="color:var(--text-secondary);font-size:0.85rem">Loading...</p>
             </div>
-            <div class="form-group">
-                <label>API Key</label>
-                <input type="password" name="api_key" placeholder="sk-..." required>
+            <div style="margin-top:1rem">
+                <a href="/teams" style="font-size:0.78rem;color:var(--purple)">View full LLM leaderboard on Teams tab →</a>
             </div>
-            <div class="form-group">
-                <label>Default Model</label>
-                <input type="text" name="default_model" placeholder="gpt-4" required>
-            </div>
-            <div style="display:flex;gap:0.5rem;margin-top:1.5rem">
-                <button type="submit" class="btn btn-primary" style="flex:1">Save Provider</button>
-                <button type="button" class="btn btn-ghost" onclick="document.getElementById('add-provider-modal').style.display='none'">Cancel</button>
-            </div>
-        </form>
+        </section>
+
     </div>
 </div>
 
@@ -285,11 +284,7 @@ function showSettingsTab(id) {
     document.getElementById('panel-'+id).classList.add('active');
     event.target.closest('.settings-tab').classList.add('active');
     try { localStorage.setItem('settings_tab', id); } catch(e){}
-    
-    // Load custom providers when switching to providers tab
-    if (id === 'providers') {
-        loadCustomProviders();
-    }
+    if (id === 'llm') loadLLMTab();
 }
 // Restore last tab
 try {
@@ -473,6 +468,129 @@ async function deleteCustomProvider(id) {
     } catch (e) {
         alert('Error: ' + e.message);
     }
+}
+
+// ── LLM Tab ──────────────────────────────────────────────────────────────
+
+let _llmModels = [];
+const _ROUTING_ROWS = [
+    {key_heavy:'reasoning_heavy', key_light:'reasoning_light', label:'Reasoning', sub:'Architecture, planning, strategy'},
+    {key_heavy:'production_heavy', key_light:'production_light', label:'Production / Code', sub:'Developer, tester, security'},
+    {key_heavy:'tasks_heavy',  key_light:'tasks_light',  label:'Tasks', sub:'Generic agent work, tools'},
+    {key_heavy:'redaction_heavy', key_light:'redaction_light', label:'Redaction', sub:'Docs, summaries, reports'},
+];
+
+async function loadLLMTab() {
+    try {
+        const r = await fetch('/api/llm/routing');
+        const d = await r.json();
+        _llmModels = d.models || [];
+        renderProviders(d.providers || []);
+        renderRoutingTable(d.routing || {});
+        loadLLMABTests();
+    } catch(e) {
+        document.getElementById('llm-providers-grid').innerHTML = '<p style="color:var(--red)">Failed to load: ' + e.message + '</p>';
+    }
+}
+
+function renderProviders(providers) {
+    const grid = document.getElementById('llm-providers-grid');
+    if (!providers.length) { grid.innerHTML = '<p style="color:var(--text-secondary)">No providers configured</p>'; return; }
+    const colors = {'azure-ai':'rgba(0,120,212,.15)','azure-openai':'rgba(0,120,212,.12)','minimax':'rgba(34,197,94,.12)','nvidia':'rgba(118,185,0,.12)'};
+    const textColors = {'azure-ai':'#0078d4','azure-openai':'#0065b3','minimax':'#22c55e','nvidia':'#76b900'};
+    grid.innerHTML = providers.map(p => `
+        <div class="llm-provider-card ${p.enabled ? 'active' : 'inactive'}">
+            <div class="llm-prov-header">
+                <div style="display:flex;align-items:center;gap:0.6rem">
+                    <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:${colors[p.id]||'rgba(124,58,237,.12)'};color:${textColors[p.id]||'#7c3aed'};font-size:0.75rem;font-weight:800">${p.id.split('-').map(w=>w[0].toUpperCase()).join('')}</div>
+                    <div>
+                        <div class="llm-prov-name">${p.name}</div>
+                        <div class="llm-prov-models">${p.models.join(' · ')}</div>
+                    </div>
+                </div>
+                <span class="badge ${p.enabled ? 'badge-green' : 'badge-red'}" style="font-size:0.68rem">${p.enabled ? 'active' : 'no key'}</span>
+            </div>
+            ${p.enabled ? '' : '<p style="font-size:0.72rem;color:var(--text-secondary);margin:0">Set <code>' + p.id.toUpperCase().replace(/-/g,'_') + '_API_KEY</code> env var to enable</p>'}
+        </div>
+    `).join('');
+}
+
+function _modelSelect(key, currentVal) {
+    const opts = _llmModels.map(m => {
+        const val = m.provider + '::' + m.model;
+        const cur = currentVal ? (currentVal.provider + '::' + currentVal.model) : '';
+        const disabled = !m.enabled ? ' style="color:var(--text-secondary)"' : '';
+        return `<option value="${val}" ${val===cur?'selected':''}${disabled}>${m.label}</option>`;
+    }).join('');
+    return `<select class="routing-select" data-routing-key="${key}">${opts}</select>`;
+}
+
+function renderRoutingTable(routing) {
+    const tbody = document.getElementById('routing-tbody');
+    tbody.innerHTML = _ROUTING_ROWS.map(row => `
+        <tr class="routing-row">
+            <td><span class="routing-category">${row.label}<small>${row.sub}</small></span></td>
+            <td>${_modelSelect(row.key_heavy, routing[row.key_heavy])}</td>
+            <td>${_modelSelect(row.key_light, routing[row.key_light])}</td>
+        </tr>
+    `).join('');
+}
+
+async function saveLLMRouting() {
+    const btn = document.getElementById('routing-save-btn');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    const routing = {};
+    document.querySelectorAll('[data-routing-key]').forEach(sel => {
+        const [provider, model] = sel.value.split('::');
+        routing[sel.dataset.routingKey] = {provider, model};
+    });
+    try {
+        const r = await fetch('/api/llm/routing', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({routing})
+        });
+        const j = await r.json();
+        if (j.ok) {
+            btn.innerHTML = '<svg class="icon icon-sm"><use href="#icon-check"/></svg> Saved';
+            setTimeout(() => { btn.disabled=false; btn.innerHTML='<svg class="icon icon-sm"><use href="#icon-save"/></svg> Save'; }, 2000);
+        } else {
+            alert('Error: ' + (j.error || 'failed'));
+            btn.disabled=false; btn.innerHTML='<svg class="icon icon-sm"><use href="#icon-save"/></svg> Save';
+        }
+    } catch(e) {
+        alert(e.message); btn.disabled=false; btn.innerHTML='<svg class="icon icon-sm"><use href="#icon-save"/></svg> Save';
+    }
+}
+
+async function loadLLMABTests() {
+    try {
+        const r = await fetch('/api/teams/llm-ab-tests?limit=10');
+        const d = await r.json();
+        const el = document.getElementById('llm-ab-list');
+        if (!d.data || !d.data.length) {
+            el.innerHTML = '<p style="color:var(--text-secondary);font-size:0.82rem">No LLM A/B tests yet. They start automatically once missions accumulate fitness data for multiple models per team.</p>';
+            return;
+        }
+        el.innerHTML = d.data.map(t => {
+            const badge = t.winner_llm ? (t.winner_llm === t.llm_a ? 'won-a' : 'won-b') : 'pending';
+            const winner = t.winner_llm || 'pending';
+            return `
+            <div class="llm-ab-row">
+                <div style="flex:1;min-width:0">
+                    <div style="font-weight:600;font-size:0.81rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.agent_id} · ${t.pattern_id}</div>
+                    <div style="font-size:0.72rem;color:var(--text-secondary)">${t.technology}/${t.phase_type}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem">
+                    <span style="color:var(--text-secondary)">${t.llm_a}</span>
+                    <span style="color:var(--text-secondary)">vs</span>
+                    <span style="color:var(--text-secondary)">${t.llm_b}</span>
+                </div>
+                <span class="llm-ab-badge ${badge}">${winner}</span>
+                ${t.llm_a_score != null ? `<span style="font-size:0.72rem;color:var(--text-secondary)">${t.llm_a_score?.toFixed(1)} / ${t.llm_b_score?.toFixed(1)}</span>` : ''}
+            </div>`;
+        }).join('');
+    } catch(e) { console.error(e); }
 }
 </script>
 {% endblock %}

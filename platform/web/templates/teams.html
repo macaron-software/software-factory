@@ -152,7 +152,10 @@
         <svg class="icon"><use href="#icon-zap"/></svg> Selections
     </button>
     <button class="teams-tab" id="tab-abtests" onclick="showTab('abtests')">
-        <svg class="icon"><use href="#icon-git-branch"/></svg> A/B Tests
+        <svg class="icon"><use href="#icon-git-branch"/></svg> A/B Teams
+    </button>
+    <button class="teams-tab" id="tab-llmab" onclick="showTab('llmab')">
+        <svg class="icon"><use href="#icon-cpu"/></svg> LLM A/B
     </button>
 </div>
 
@@ -277,6 +280,34 @@
     </div>
 </div>
 
+<!-- LLM A/B -->
+<div id="panel-llmab" style="display:none">
+    <div class="teams-filters">
+        <label>Technology</label>
+        <select id="llmab-tech" onchange="loadLLMAB()">
+            <option value="generic">generic</option>
+        </select>
+        <label>Phase</label>
+        <select id="llmab-phase" onchange="loadLLMAB()">
+            <option value="generic">generic</option>
+        </select>
+        <button class="btn-xs" onclick="loadLLMAB()">Refresh</button>
+        <a href="/settings#llm" class="btn-xs" style="text-decoration:none">
+            <svg class="icon icon-sm" style="width:12px;height:12px"><use href="#icon-settings"/></svg> LLM Config
+        </a>
+    </div>
+    <div id="llmab-leaderboard" style="padding:0 1rem"></div>
+    <div style="margin:1.5rem 1rem 0">
+        <h4 style="font-size:0.83rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.3px;margin-bottom:0.8rem">Recent LLM A/B Tests</h4>
+        <div id="llmab-tests"></div>
+    </div>
+    <div class="empty-state" id="llmab-explain" style="display:none">
+        <p>LLM A/B tests run automatically via Thompson Sampling.</p>
+        <p>Each mission selects the best LLM model for the team × context.</p>
+        <p>Configure candidate models per category in <a href="/settings" style="color:var(--purple)">Settings → LLM</a>.</p>
+    </div>
+</div>
+
 </div><!-- /teams-content -->
 
 <script>
@@ -285,7 +316,7 @@ let _evoChart = null;
 function showTab(name) {
     document.querySelectorAll('.teams-tab').forEach(t => t.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
-    ['leaderboard','okr','evolution','selections','abtests'].forEach(p => {
+    ['leaderboard','okr','evolution','selections','abtests','llmab'].forEach(p => {
         document.getElementById('panel-' + p).style.display = (p === name) ? '' : 'none';
     });
     if (name === 'leaderboard') loadLeaderboard();
@@ -293,6 +324,7 @@ function showTab(name) {
     else if (name === 'evolution') loadEvolution();
     else if (name === 'selections') loadSelections();
     else if (name === 'abtests') loadABTests();
+    else if (name === 'llmab') loadLLMAB();
 }
 
 // ---- helpers ----
@@ -624,6 +656,79 @@ async function loadABTests() {
         container.innerHTML = html;
     } catch(e) {
         container.innerHTML = `<p style="color:#f87171;padding:1rem">Error: ${e.message}</p>`;
+    }
+}
+
+async function loadLLMAB() {
+    const tech = document.getElementById('llmab-tech').value;
+    const phase = document.getElementById('llmab-phase').value;
+    const explain = document.getElementById('llmab-explain');
+
+    // Load leaderboard
+    const lb = document.getElementById('llmab-leaderboard');
+    try {
+        const url = '/api/teams/llm-leaderboard?technology=' + encodeURIComponent(tech) + '&phase_type=' + encodeURIComponent(phase);
+        const r = await fetch(url);
+        const d = await r.json();
+        if (!d.data || !d.data.length) {
+            lb.innerHTML = '<p style="color:var(--text-secondary);font-size:0.82rem;padding:0.5rem 0">No LLM fitness data yet. Data accumulates automatically as missions run with Darwin LLM sampling enabled.</p>';
+            explain.style.display = '';
+        } else {
+            explain.style.display = 'none';
+            let h = `<h4 style="font-size:0.83rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.3px;margin-bottom:0.8rem">LLM Fitness Leaderboard</h4>
+            <table class="team-table"><thead><tr>
+                <th>Rank</th><th>Agent</th><th>Pattern</th><th>LLM Model</th>
+                <th>Provider</th><th>Fitness</th><th>Runs</th><th>Wins</th>
+            </tr></thead><tbody>`;
+            d.data.forEach((row, i) => {
+                const scoreColor = row.fitness_score >= 70 ? '#34d399' : row.fitness_score >= 40 ? '#fbbf24' : '#f87171';
+                h += `<tr>
+                    <td>${i+1}</td>
+                    <td style="font-weight:600;font-size:0.8rem">${row.agent_id}</td>
+                    <td style="color:var(--text-secondary);font-size:0.78rem">${row.pattern_id}</td>
+                    <td><code style="font-size:0.77rem">${row.llm_model}</code></td>
+                    <td style="font-size:0.77rem;color:var(--text-secondary)">${row.llm_provider || '—'}</td>
+                    <td><span style="font-weight:700;color:${scoreColor}">${row.fitness_score?.toFixed(1) || '—'}</span></td>
+                    <td style="font-size:0.8rem">${row.runs || 0}</td>
+                    <td style="font-size:0.8rem;color:#34d399">${row.wins || 0}</td>
+                </tr>`;
+            });
+            h += '</tbody></table>';
+            lb.innerHTML = h;
+        }
+    } catch(e) {
+        lb.innerHTML = `<p style="color:#f87171">Error: ${e.message}</p>`;
+    }
+
+    // Load recent A/B tests
+    const tests = document.getElementById('llmab-tests');
+    try {
+        const r = await fetch('/api/teams/llm-ab-tests?limit=20');
+        const d = await r.json();
+        if (!d.data || !d.data.length) {
+            tests.innerHTML = '<p style="color:var(--text-secondary);font-size:0.8rem">No LLM A/B tests yet.</p>';
+        } else {
+            let h = `<table class="team-table"><thead><tr>
+                <th>Agent</th><th>Pattern</th><th>Context</th><th>Model A</th><th>Model B</th><th>Winner</th><th>Score A</th><th>Score B</th>
+            </tr></thead><tbody>`;
+            d.data.forEach(t => {
+                const winnerStyle = t.winner_llm ? 'color:#34d399;font-weight:700' : 'color:var(--text-secondary)';
+                h += `<tr>
+                    <td style="font-weight:600;font-size:0.78rem">${t.agent_id}</td>
+                    <td style="font-size:0.77rem;color:var(--text-secondary)">${t.pattern_id}</td>
+                    <td style="font-size:0.72rem;color:var(--text-secondary)">${t.technology}/${t.phase_type}</td>
+                    <td><code style="font-size:0.72rem">${t.llm_a}</code></td>
+                    <td><code style="font-size:0.72rem">${t.llm_b}</code></td>
+                    <td style="${winnerStyle};font-size:0.78rem">${t.winner_llm || 'pending'}</td>
+                    <td style="font-size:0.77rem">${t.llm_a_score != null ? t.llm_a_score.toFixed(1) : '—'}</td>
+                    <td style="font-size:0.77rem">${t.llm_b_score != null ? t.llm_b_score.toFixed(1) : '—'}</td>
+                </tr>`;
+            });
+            h += '</tbody></table>';
+            tests.innerHTML = h;
+        }
+    } catch(e) {
+        tests.innerHTML = `<p style="color:#f87171">Error: ${e.message}</p>`;
     }
 }
 

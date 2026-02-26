@@ -6,7 +6,6 @@ Allows saving and loading agent team configurations as YAML templates.
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict
 from pathlib import Path
 
 import yaml
@@ -22,6 +21,7 @@ TEAMS_DIR = Path(__file__).parents[4] / "teams"
 # ---------------------------------------------------------------------------
 # Export
 # ---------------------------------------------------------------------------
+
 
 @router.get("/api/teams/export")
 async def export_team(request: Request):
@@ -43,6 +43,7 @@ async def export_team(request: Request):
 
     if project_id:
         from ....db.adapter import get_db
+
         db = get_db()
         rows = db.execute(
             "SELECT agent_id FROM agent_assignments WHERE project_id = ?", (project_id,)
@@ -50,9 +51,7 @@ async def export_team(request: Request):
         agent_ids = [r[0] for r in rows]
         if not agent_ids:
             # Fall back: list all non-builtin agents for that project
-            agent_ids = [
-                a.id for a in store.list_all() if not a.is_builtin
-            ]
+            agent_ids = [a.id for a in store.list_all() if not a.is_builtin]
     elif agent_ids_raw:
         agent_ids = [x.strip() for x in agent_ids_raw.split(",") if x.strip()]
     else:
@@ -62,28 +61,30 @@ async def export_team(request: Request):
     for aid in agent_ids:
         agent = store.get(aid)
         if agent:
-            agents.append({
-                "id": agent.id,
-                "name": agent.name,
-                "role": agent.role,
-                "description": agent.description,
-                "system_prompt": agent.system_prompt,
-                "provider": agent.provider,
-                "model": agent.model,
-                "temperature": agent.temperature,
-                "max_tokens": agent.max_tokens,
-                "skills": agent.skills,
-                "tools": agent.tools,
-                "mcps": agent.mcps,
-                "tags": agent.tags,
-                "icon": agent.icon,
-                "color": agent.color,
-                "avatar": agent.avatar,
-                "tagline": agent.tagline,
-                "persona": agent.persona,
-                "motivation": agent.motivation,
-                "hierarchy_rank": agent.hierarchy_rank,
-            })
+            agents.append(
+                {
+                    "id": agent.id,
+                    "name": agent.name,
+                    "role": agent.role,
+                    "description": agent.description,
+                    "system_prompt": agent.system_prompt,
+                    "provider": agent.provider,
+                    "model": agent.model,
+                    "temperature": agent.temperature,
+                    "max_tokens": agent.max_tokens,
+                    "skills": agent.skills,
+                    "tools": agent.tools,
+                    "mcps": agent.mcps,
+                    "tags": agent.tags,
+                    "icon": agent.icon,
+                    "color": agent.color,
+                    "avatar": agent.avatar,
+                    "tagline": agent.tagline,
+                    "persona": agent.persona,
+                    "motivation": agent.motivation,
+                    "hierarchy_rank": agent.hierarchy_rank,
+                }
+            )
 
     team = {
         "name": params.get("name", "My Team"),
@@ -106,6 +107,7 @@ async def export_team(request: Request):
 # ---------------------------------------------------------------------------
 # Import
 # ---------------------------------------------------------------------------
+
 
 @router.post("/api/teams/import")
 async def import_team(request: Request):
@@ -160,6 +162,7 @@ async def import_team(request: Request):
 
         if project_id:
             from ....db.adapter import get_db
+
             db = get_db()
             db.execute(
                 "INSERT OR IGNORE INTO agent_assignments (agent_id, project_id, assignment_type) VALUES (?, ?, 'permanent')",
@@ -169,20 +172,24 @@ async def import_team(request: Request):
 
         created.append(agent.id)
 
-    return JSONResponse({
-        "status": "ok",
-        "team": team.get("name"),
-        "agents_created": created,
-        "pattern": team.get("pattern"),
-    })
+    return JSONResponse(
+        {
+            "status": "ok",
+            "team": team.get("name"),
+            "agents_created": created,
+            "pattern": team.get("pattern"),
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # Darwin Team Fitness API
 # ---------------------------------------------------------------------------
 
+
 def _db():
     from ....db.migrations import get_db
+
     return get_db()
 
 
@@ -198,18 +205,26 @@ async def list_contexts():
             ORDER BY teams DESC
         """).fetchall()
         db.close()
-        return JSONResponse([dict(r) for r in rows] or [{"technology": "generic", "phase_type": "generic", "teams": 0}])
+        return JSONResponse(
+            [dict(r) for r in rows]
+            or [{"technology": "generic", "phase_type": "generic", "teams": 0}]
+        )
     except Exception as e:
         logger.warning("contexts error: %s", e)
-        return JSONResponse([{"technology": "generic", "phase_type": "generic", "teams": 0}])
+        return JSONResponse(
+            [{"technology": "generic", "phase_type": "generic", "teams": 0}]
+        )
 
 
 @router.get("/api/teams/leaderboard")
-async def team_leaderboard(technology: str = "generic", phase_type: str = "generic", limit: int = 30):
+async def team_leaderboard(
+    technology: str = "generic", phase_type: str = "generic", limit: int = 30
+):
     """Fitness leaderboard for a (technology, phase_type) context."""
     try:
         db = _db()
-        rows = db.execute("""
+        rows = db.execute(
+            """
             SELECT tf.agent_id, tf.pattern_id, tf.technology, tf.phase_type,
                    tf.fitness_score, tf.runs, tf.wins, tf.losses,
                    tf.avg_iterations, tf.weight_multiplier, tf.retired, tf.pinned,
@@ -227,23 +242,41 @@ async def team_leaderboard(technology: str = "generic", phase_type: str = "gener
             WHERE tf.technology = ? AND tf.phase_type = ?
             ORDER BY tf.pinned DESC, tf.fitness_score DESC
             LIMIT ?
-        """, (technology, phase_type, limit)).fetchall()
+        """,
+            (technology, phase_type, limit),
+        ).fetchall()
         db.close()
-        return JSONResponse({"data": [dict(r) for r in rows], "technology": technology, "phase_type": phase_type})
+        return JSONResponse(
+            {
+                "data": [dict(r) for r in rows],
+                "technology": technology,
+                "phase_type": phase_type,
+            }
+        )
     except Exception as e:
         logger.warning("leaderboard error: %s", e)
-        return JSONResponse({"data": [], "technology": technology, "phase_type": phase_type})
+        return JSONResponse(
+            {"data": [], "technology": technology, "phase_type": phase_type}
+        )
 
 
 @router.post("/api/teams/{agent_id}/{pattern_id}/retire")
-async def retire_team(agent_id: str, pattern_id: str, technology: str = "generic", phase_type: str = "generic"):
+async def retire_team(
+    agent_id: str,
+    pattern_id: str,
+    technology: str = "generic",
+    phase_type: str = "generic",
+):
     """Soft-retire a team (weight_multiplier → 0.1)."""
     try:
         db = _db()
-        db.execute("""
+        db.execute(
+            """
             UPDATE team_fitness SET retired = 1, weight_multiplier = 0.1, retired_at = CURRENT_TIMESTAMP
             WHERE agent_id = ? AND pattern_id = ? AND technology = ? AND phase_type = ?
-        """, (agent_id, pattern_id, technology, phase_type))
+        """,
+            (agent_id, pattern_id, technology, phase_type),
+        )
         db.commit()
         db.close()
         return JSONResponse({"ok": True})
@@ -252,14 +285,22 @@ async def retire_team(agent_id: str, pattern_id: str, technology: str = "generic
 
 
 @router.post("/api/teams/{agent_id}/{pattern_id}/unretire")
-async def unretire_team(agent_id: str, pattern_id: str, technology: str = "generic", phase_type: str = "generic"):
+async def unretire_team(
+    agent_id: str,
+    pattern_id: str,
+    technology: str = "generic",
+    phase_type: str = "generic",
+):
     """Restore a retired team."""
     try:
         db = _db()
-        db.execute("""
+        db.execute(
+            """
             UPDATE team_fitness SET retired = 0, weight_multiplier = 1.0, retired_at = NULL
             WHERE agent_id = ? AND pattern_id = ? AND technology = ? AND phase_type = ?
-        """, (agent_id, pattern_id, technology, phase_type))
+        """,
+            (agent_id, pattern_id, technology, phase_type),
+        )
         db.commit()
         db.close()
         return JSONResponse({"ok": True})
@@ -291,7 +332,9 @@ async def list_okr(technology: str = "", phase_type: str = ""):
         for r in rows:
             d = dict(r)
             if d["kpi_target"] and d["kpi_target"] > 0:
-                d["progress_pct"] = round(min(100, d["kpi_current"] / d["kpi_target"] * 100), 1)
+                d["progress_pct"] = round(
+                    min(100, d["kpi_current"] / d["kpi_target"] * 100), 1
+                )
             else:
                 d["progress_pct"] = 0.0
             result.append(d)
@@ -308,11 +351,15 @@ async def update_okr(okr_id: int, request: Request):
         body = await request.json()
         db = _db()
         if "kpi_current" in body:
-            db.execute("UPDATE team_okr SET kpi_current = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                       (body["kpi_current"], okr_id))
+            db.execute(
+                "UPDATE team_okr SET kpi_current = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (body["kpi_current"], okr_id),
+            )
         if "kpi_target" in body:
-            db.execute("UPDATE team_okr SET kpi_target = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                       (body["kpi_target"], okr_id))
+            db.execute(
+                "UPDATE team_okr SET kpi_target = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (body["kpi_target"], okr_id),
+            )
         db.commit()
         db.close()
         return JSONResponse({"ok": True})
@@ -321,12 +368,15 @@ async def update_okr(okr_id: int, request: Request):
 
 
 @router.get("/api/teams/evolution")
-async def team_evolution(technology: str = "generic", phase_type: str = "generic", days: int = 30):
+async def team_evolution(
+    technology: str = "generic", phase_type: str = "generic", days: int = 30
+):
     """Fitness history for evolution chart."""
     try:
         db = _db()
         cutoff = db.execute("SELECT date('now', ?)", (f"-{days} days",)).fetchone()[0]
-        rows = db.execute("""
+        rows = db.execute(
+            """
             SELECT tfh.agent_id, tfh.pattern_id, tfh.snapshot_date,
                    tfh.fitness_score, tfh.runs,
                    a.name as agent_name
@@ -335,7 +385,9 @@ async def team_evolution(technology: str = "generic", phase_type: str = "generic
             WHERE tfh.technology = ? AND tfh.phase_type = ?
               AND tfh.snapshot_date >= ?
             ORDER BY tfh.agent_id, tfh.pattern_id, tfh.snapshot_date
-        """, (technology, phase_type, cutoff)).fetchall()
+        """,
+            (technology, phase_type, cutoff),
+        ).fetchall()
         db.close()
         # Group by agent+pattern for chart series
         series: dict = {}
@@ -351,10 +403,18 @@ async def team_evolution(technology: str = "generic", phase_type: str = "generic
                 }
             series[key]["dates"].append(r["snapshot_date"])
             series[key]["scores"].append(round(r["fitness_score"], 1))
-        return JSONResponse({"series": list(series.values()), "technology": technology, "phase_type": phase_type})
+        return JSONResponse(
+            {
+                "series": list(series.values()),
+                "technology": technology,
+                "phase_type": phase_type,
+            }
+        )
     except Exception as e:
         logger.warning("evolution error: %s", e)
-        return JSONResponse({"series": [], "technology": technology, "phase_type": phase_type})
+        return JSONResponse(
+            {"series": [], "technology": technology, "phase_type": phase_type}
+        )
 
 
 @router.get("/api/teams/selections")
@@ -362,13 +422,16 @@ async def team_selections(limit: int = 50):
     """Recent team selection events."""
     try:
         db = _db()
-        rows = db.execute("""
+        rows = db.execute(
+            """
             SELECT ts.*, a.name as agent_name
             FROM team_selections ts
             LEFT JOIN agents a ON a.id = ts.agent_id
             ORDER BY ts.selected_at DESC
             LIMIT ?
-        """, (limit,)).fetchall()
+        """,
+            (limit,),
+        ).fetchall()
         db.close()
         return JSONResponse({"data": [dict(r) for r in rows]})
     except Exception as e:
@@ -403,9 +466,48 @@ async def team_ab_tests(limit: int = 30, status: str = ""):
         return JSONResponse({"data": []})
 
 
+@router.get("/api/teams/llm-leaderboard")
+async def llm_leaderboard(
+    technology: str = "generic",
+    phase_type: str = "generic",
+    agent_id: str = "",
+    limit: int = 30,
+):
+    """LLM model leaderboard: Thompson Sampling fitness scores per (team × LLM model)."""
+    try:
+        from ....patterns.team_selector import LLMTeamSelector
+
+        data = LLMTeamSelector.get_leaderboard(
+            agent_id=agent_id or None,
+            technology=technology,
+            phase_type=phase_type,
+            limit=limit,
+        )
+        return JSONResponse(
+            {"data": data, "technology": technology, "phase_type": phase_type}
+        )
+    except Exception as e:
+        logger.warning("llm-leaderboard error: %s", e)
+        return JSONResponse({"data": []})
+
+
+@router.get("/api/teams/llm-ab-tests")
+async def llm_ab_tests(limit: int = 30, status: str = ""):
+    """LLM A/B test results: same team, different LLM models."""
+    try:
+        from ....patterns.team_selector import LLMTeamSelector
+
+        data = LLMTeamSelector.get_llm_ab_tests(status=status, limit=limit)
+        return JSONResponse({"data": data})
+    except Exception as e:
+        logger.warning("llm-ab-tests error: %s", e)
+        return JSONResponse({"data": []})
+
+
 # ---------------------------------------------------------------------------
 # List saved templates from teams/ dir
 # ---------------------------------------------------------------------------
+
 
 @router.get("/api/teams")
 async def list_teams():
@@ -417,14 +519,16 @@ async def list_teams():
     for f in sorted(TEAMS_DIR.glob("*.yaml")):
         try:
             data = yaml.safe_load(f.read_text())
-            teams.append({
-                "file": f.name,
-                "name": data.get("name", f.stem),
-                "description": data.get("description", ""),
-                "pattern": data.get("pattern", ""),
-                "agent_count": len(data.get("agents", [])),
-                "tags": data.get("tags", []),
-            })
+            teams.append(
+                {
+                    "file": f.name,
+                    "name": data.get("name", f.stem),
+                    "description": data.get("description", ""),
+                    "pattern": data.get("pattern", ""),
+                    "agent_count": len(data.get("agents", [])),
+                    "tags": data.get("tags", []),
+                }
+            )
         except Exception:
             pass
 

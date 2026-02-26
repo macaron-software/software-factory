@@ -42,56 +42,194 @@ _TOOL_CAPABLE_PROVIDERS = {"azure-openai", "azure-ai", "openai"}
 # gpt-5.2:        deep reasoning — architecture, leadership, planning
 # gpt-5.1-codex:  code production — developer, tester, security
 # gpt-5.1-mini:   light tasks — routing, summaries, docs, discussion
-_REASONING_ROLES = {"architect", "product_owner", "scrum_master", "tech_lead", "cto", "ceo"}
-_REASONING_TAGS = {"architecture", "reasoning", "leadership", "planning", "strategy", "analysis"}
-_CODE_ROLES = {"developer", "tester", "qa", "security", "devops", "data_engineer", "ml_engineer"}
-_CODE_TAGS = {"code", "coding", "test", "tests", "security", "refactor", "review", "ci", "cd", "devops"}
+_REASONING_ROLES = {
+    "architect",
+    "product_owner",
+    "scrum_master",
+    "tech_lead",
+    "cto",
+    "ceo",
+}
+_REASONING_TAGS = {
+    "architecture",
+    "reasoning",
+    "leadership",
+    "planning",
+    "strategy",
+    "analysis",
+}
+_CODE_ROLES = {
+    "developer",
+    "tester",
+    "qa",
+    "security",
+    "devops",
+    "data_engineer",
+    "ml_engineer",
+}
+_CODE_TAGS = {
+    "code",
+    "coding",
+    "test",
+    "tests",
+    "security",
+    "refactor",
+    "review",
+    "ci",
+    "cd",
+    "devops",
+}
+
+# Cache for routing config loaded from DB
+_routing_cache: dict | None = None
+_routing_cache_ts: float = 0.0
+_ROUTING_CACHE_TTL = 60.0  # 1 min
 
 
-def _select_model_for_agent(agent: "AgentDef") -> tuple[str, str]:
-    """Select (provider, model) based on agent role/tags for multi-model strategy.
+def _invalidate_routing_cache():
+    global _routing_cache, _routing_cache_ts
+    _routing_cache = None
+    _routing_cache_ts = 0.0
 
-    - Reasoning agents (architect, tech_lead…) → azure-ai / gpt-5.2
-    - Code/test agents (developer, tester…)    → azure-ai / gpt-5.1-codex
-    - Light/chat agents (default)              → azure-openai / gpt-5.1-mini
-    Only applies when AZURE_DEPLOY is set (prod); local falls back to minimax.
+
+def _load_routing_config() -> dict:
+    """Load LLM routing config from DB (cached 60s)."""
+    import time
+
+    global _routing_cache, _routing_cache_ts
+    now = time.time()
+    if _routing_cache is not None and (now - _routing_cache_ts) < _ROUTING_CACHE_TTL:
+        return _routing_cache
+    try:
+        from ..db.migrations import get_db
+        import json
+
+        db = get_db()
+        row = db.execute(
+            "SELECT value FROM session_state WHERE key='llm_routing'"
+        ).fetchone()
+        db.close()
+        if row:
+            _routing_cache = json.loads(row[0])
+            _routing_cache_ts = now
+            return _routing_cache
+    except Exception:
+        pass
+    _routing_cache = {}
+    return {}
+
+
+def _select_model_for_agent(
+    agent: "AgentDef",
+    technology: str = "generic",
+    phase_type: str = "generic",
+    pattern_id: str = "",
+    mission_id: str | None = None,
+) -> tuple[str, str]:
+    """Select (provider, model) using routing config + Darwin LLM Thompson Sampling.
+
+    Priority:
+    1. Darwin LLM Thompson Sampling (if multiple models tested for this agent×context)
+    2. DB routing config (Settings → LLM tab)
+    3. Hardcoded role/tag defaults
+    Falls back to minimax on local dev (AZURE_DEPLOY unset).
     """
     import os
+
     if not os.environ.get("AZURE_DEPLOY", ""):
         return agent.provider, agent.model
 
+    azure_ai_key = os.environ.get("AZURE_AI_API_KEY", "")
     role = (agent.role or "").lower().replace("-", "_").replace(" ", "_")
     tags = {t.lower() for t in (agent.tags or [])}
 
-    # Check if azure-ai key is available
-    azure_ai_key = os.environ.get("AZURE_AI_API_KEY", "")
-
+    # Determine task category from role/tags
     if role in _REASONING_ROLES or tags & _REASONING_TAGS:
-        if azure_ai_key:
-            return "azure-ai", "gpt-5.2"
-        return "azure-openai", "gpt-5-mini"  # fallback if no Foundry key
+        category_heavy, category_light = "reasoning_heavy", "reasoning_light"
+    elif role in _CODE_ROLES or tags & _CODE_TAGS:
+        category_heavy, category_light = "production_heavy", "production_light"
+    else:
+        category_heavy, category_light = "tasks_heavy", "tasks_light"
 
+    # Load routing config from DB
+    routing = _load_routing_config()
+    heavy_cfg = routing.get(category_heavy, {})
+    light_cfg = routing.get(category_light, {})
+
+    # Build candidate models for Darwin LLM Thompson Sampling
+    candidates: list[tuple[str, str]] = []
+    if azure_ai_key:
+        # Add both heavy and light candidates so Darwin can compare
+        h_provider = heavy_cfg.get("provider", "azure-ai")
+        h_model = heavy_cfg.get(
+            "model",
+            "gpt-5.2" if category_heavy == "reasoning_heavy" else "gpt-5.1-codex",
+        )
+        l_provider = light_cfg.get("provider", "azure-openai")
+        l_model = light_cfg.get("model", "gpt-5-mini")
+        candidates = [(h_model, h_provider), (l_model, l_provider)]
+    else:
+        candidates = [("gpt-5-mini", "azure-openai")]
+
+    # Darwin LLM Thompson Sampling (if pattern_id available and Azure key present)
+    if pattern_id and azure_ai_key and len(candidates) > 1:
+        try:
+            from ..patterns.team_selector import LLMTeamSelector
+
+            model, provider = LLMTeamSelector.select_model(
+                agent_id=agent.id,
+                pattern_id=pattern_id,
+                technology=technology,
+                phase_type=phase_type,
+                candidate_models=candidates,
+                mission_id=mission_id,
+            )
+            if model and model != "default":
+                return provider, model
+        except Exception as exc:
+            logger.debug("LLMTeamSelector.select_model error: %s", exc)
+
+    # Fallback: use static routing config
+    if heavy_cfg.get("provider") and azure_ai_key:
+        return heavy_cfg["provider"], heavy_cfg.get("model", "gpt-5-mini")
+
+    # Hardcoded defaults
+    if role in _REASONING_ROLES or tags & _REASONING_TAGS:
+        return (
+            ("azure-ai", "gpt-5.2") if azure_ai_key else ("azure-openai", "gpt-5-mini")
+        )
     if role in _CODE_ROLES or tags & _CODE_TAGS:
-        if azure_ai_key:
-            return "azure-ai", "gpt-5.1-codex"
-        return "azure-openai", "gpt-5-mini"  # fallback
-
-    # Default: light model for routing/chat/summaries
+        return (
+            ("azure-ai", "gpt-5.1-codex")
+            if azure_ai_key
+            else ("azure-openai", "gpt-5-mini")
+        )
     return "azure-openai", "gpt-5-mini"
 
 
-def _route_provider(agent: AgentDef, tools: list | None) -> tuple[str, str]:
-    """Route to the best provider based on agent role/tags and tool requirements.
+def _route_provider(
+    agent: AgentDef,
+    tools: list | None,
+    technology: str = "generic",
+    phase_type: str = "generic",
+    pattern_id: str = "",
+    mission_id: str | None = None,
+) -> tuple[str, str]:
+    """Route to the best provider+model using Darwin LLM Thompson Sampling + routing config.
 
-    Strategy:
-    - Reasoning agents (architect, tech_lead…)  → azure-ai / gpt-5.2
-    - Code/test agents (developer, tester…)     → azure-ai / gpt-5.1-codex
-    - Tool-using agents not on capable provider → azure-openai / gpt-5-mini
-    - High rejection rate (>40%)                → azure-openai (quality escalation)
-    - Default light tasks                       → azure-openai / gpt-5-mini
+    Priority:
+    1. Darwin LLM Thompson Sampling (same team, competing models)
+    2. DB routing config (Settings → LLM tab)
+    3. Hardcoded role/tag defaults (gpt-5.2 / gpt-5.1-codex / gpt-5-mini)
+    Overrides: tool-calling → must use _TOOL_CAPABLE_PROVIDERS; high rejection → escalate
     """
-    # Apply multi-model routing first (role/tag based)
-    best_provider, best_model = _select_model_for_agent(agent)
+    best_provider, best_model = _select_model_for_agent(
+        agent,
+        technology=technology,
+        phase_type=phase_type,
+        pattern_id=pattern_id,
+        mission_id=mission_id,
+    )
 
     # Override: if tools required and selected provider can't do tool-calling, escalate
     if tools and best_provider not in _TOOL_CAPABLE_PROVIDERS:
@@ -101,6 +239,7 @@ def _route_provider(agent: AgentDef, tools: list | None) -> tuple[str, str]:
     if best_provider not in _TOOL_CAPABLE_PROVIDERS:
         try:
             from .selection import rejection_rate
+
             if rejection_rate(agent.id) > 0.40:
                 logger.debug(
                     "Escalating %s to azure-openai (high rejection rate)", agent.id
@@ -238,8 +377,10 @@ class AgentExecutor:
                 else None
             )
 
-            # Route provider: tool-calling → azure-openai, chat → minimax
-            use_provider, use_model = _route_provider(agent, tools)
+            # Route provider: Darwin LLM Thompson Sampling + routing config
+            use_provider, use_model = _route_provider(
+                agent, tools, mission_id=ctx.mission_run_id
+            )
 
             # Tool-calling loop
             deep_search_used = False
@@ -485,8 +626,10 @@ class AgentExecutor:
                 ctx.allowed_tools[:3] if ctx.allowed_tools else "all",
             )
 
-            # Route provider: tool-calling → azure-openai, chat → minimax
-            use_provider, use_model = _route_provider(agent, tools)
+            # Route provider: Darwin LLM Thompson Sampling + routing config
+            use_provider, use_model = _route_provider(
+                agent, tools, mission_id=ctx.mission_run_id
+            )
 
             for round_num in range(MAX_TOOL_ROUNDS):
                 is_last_possible = (round_num >= MAX_TOOL_ROUNDS - 1) or tools is None

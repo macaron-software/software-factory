@@ -754,25 +754,136 @@ def _migrate(conn):
         );
         CREATE INDEX IF NOT EXISTS idx_tab_status ON team_ab_tests(status);
         CREATE INDEX IF NOT EXISTS idx_tab_tech ON team_ab_tests(technology, phase_type);
+
+        -- LLM-level Thompson Sampling: same team, different LLM models
+        -- Tracks fitness per (agent_id, pattern_id, technology, phase_type, llm_model)
+        CREATE TABLE IF NOT EXISTS team_llm_fitness (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            llm_model TEXT NOT NULL DEFAULT 'default',
+            llm_provider TEXT NOT NULL DEFAULT 'default',
+            fitness_score REAL DEFAULT 0.0,
+            runs INTEGER DEFAULT 0,
+            wins INTEGER DEFAULT 0,
+            losses INTEGER DEFAULT 0,
+            avg_iterations REAL DEFAULT 0.0,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(agent_id, pattern_id, technology, phase_type, llm_model)
+        );
+        CREATE INDEX IF NOT EXISTS idx_tllm_key ON team_llm_fitness(agent_id, pattern_id, technology, phase_type);
+        CREATE INDEX IF NOT EXISTS idx_tllm_model ON team_llm_fitness(llm_model);
+
+        -- LLM A/B tests: same team (agent+pattern), two LLM models head-to-head
+        CREATE TABLE IF NOT EXISTS team_llm_ab_tests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mission_id TEXT,
+            agent_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            llm_a TEXT NOT NULL,
+            llm_a_provider TEXT NOT NULL DEFAULT 'default',
+            llm_b TEXT NOT NULL,
+            llm_b_provider TEXT NOT NULL DEFAULT 'default',
+            trigger TEXT DEFAULT 'auto',
+            winner_llm TEXT,
+            llm_a_score REAL,
+            llm_b_score REAL,
+            status TEXT DEFAULT 'pending',
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            completed_at TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_tllmab_status ON team_llm_ab_tests(status);
+        CREATE INDEX IF NOT EXISTS idx_tllmab_agent ON team_llm_ab_tests(agent_id, pattern_id);
     """)
 
     # Default OKR seeds (idempotent)
     okr_seeds = [
-        ("code", "generic", "migration", "Deliver clean, tested migrations with minimal rework", "acceptance_rate", 80.0, "%"),
-        ("code", "generic", "new_feature", "Ship production-ready features fast", "acceptance_rate", 80.0, "%"),
-        ("code", "generic", "bugfix", "Resolve bugs without regression", "avg_iterations", 2.0, "iterations"),
-        ("code", "generic", "refactoring", "Improve quality without breaking behavior", "coherence_score", 75.0, "%"),
-        ("security", "generic", "audit", "Find real vulnerabilities, block false-passes", "veto_rate", 30.0, "%"),
-        ("architecture", "generic", "design", "Produce consensual, implementable designs", "consensus_rounds", 3.0, "rounds"),
-        ("testing", "generic", "generic", "Achieve comprehensive non-redundant coverage", "coverage_score", 80.0, "%"),
-        ("docs", "generic", "generic", "Produce accurate, complete, maintainable docs", "completeness_score", 85.0, "%"),
+        (
+            "code",
+            "generic",
+            "migration",
+            "Deliver clean, tested migrations with minimal rework",
+            "acceptance_rate",
+            80.0,
+            "%",
+        ),
+        (
+            "code",
+            "generic",
+            "new_feature",
+            "Ship production-ready features fast",
+            "acceptance_rate",
+            80.0,
+            "%",
+        ),
+        (
+            "code",
+            "generic",
+            "bugfix",
+            "Resolve bugs without regression",
+            "avg_iterations",
+            2.0,
+            "iterations",
+        ),
+        (
+            "code",
+            "generic",
+            "refactoring",
+            "Improve quality without breaking behavior",
+            "coherence_score",
+            75.0,
+            "%",
+        ),
+        (
+            "security",
+            "generic",
+            "audit",
+            "Find real vulnerabilities, block false-passes",
+            "veto_rate",
+            30.0,
+            "%",
+        ),
+        (
+            "architecture",
+            "generic",
+            "design",
+            "Produce consensual, implementable designs",
+            "consensus_rounds",
+            3.0,
+            "rounds",
+        ),
+        (
+            "testing",
+            "generic",
+            "generic",
+            "Achieve comprehensive non-redundant coverage",
+            "coverage_score",
+            80.0,
+            "%",
+        ),
+        (
+            "docs",
+            "generic",
+            "generic",
+            "Produce accurate, complete, maintainable docs",
+            "completeness_score",
+            85.0,
+            "%",
+        ),
     ]
     for domain, tech, phase, okr_text, kpi_name, kpi_target, kpi_unit in okr_seeds:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT OR IGNORE INTO team_okr
                 (team_key, technology, phase_type, okr_text, kpi_name, kpi_target, kpi_unit)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (domain, tech, phase, okr_text, kpi_name, kpi_target, kpi_unit))
+        """,
+            (domain, tech, phase, okr_text, kpi_name, kpi_target, kpi_unit),
+        )
 
     conn.commit()
 
