@@ -511,6 +511,44 @@ async def workflows_list(request: Request):
     )
 
 
+@router.get("/workflows/evolution", response_class=HTMLResponse)
+async def workflows_evolution(request: Request):
+    """Partial: GA evolution proposals + run history."""
+    from ...db.migrations import get_db
+    from ...workflows.store import get_workflow_store
+    import json as _json
+    db = get_db()
+    proposals = [dict(r) for r in db.execute(
+        "SELECT * FROM evolution_proposals ORDER BY fitness DESC, created_at DESC LIMIT 50"
+    ).fetchall()]
+    runs = [dict(r) for r in db.execute(
+        "SELECT * FROM evolution_runs ORDER BY started_at DESC LIMIT 20"
+    ).fetchall()]
+    db.close()
+    for p in proposals:
+        try:
+            p["genome"] = _json.loads(p.pop("genome_json", "{}"))
+        except Exception:
+            p["genome"] = {}
+    for r in runs:
+        try:
+            r["fitness_history"] = _json.loads(r.pop("fitness_history_json", "[]"))
+        except Exception:
+            r["fitness_history"] = []
+    # RL stats
+    rl_stats = {}
+    try:
+        from ...agents.rl_policy import get_rl_policy
+        rl_stats = get_rl_policy().stats()
+    except Exception:
+        pass
+    workflows = get_workflow_store().list_all()
+    return _templates(request).TemplateResponse(
+        "partials/workflows_evolution.html",
+        {"request": request, "proposals": proposals, "runs": runs, "rl_stats": rl_stats, "workflows": workflows},
+    )
+
+
 @router.get("/ceremonies", response_class=HTMLResponse)
 async def ceremonies_redirect(request: Request):
     """Legacy redirect — /ceremonies moved to /workflows."""

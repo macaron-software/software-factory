@@ -1,0 +1,230 @@
+{# Evolution Tab — GA proposals + RL stats + run history #}
+
+<div class="evolution-page" style="padding:1rem">
+
+  {# ── Header + trigger button ───────────────────────────────────────────── #}
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
+    <div>
+      <h2 style="margin:0;font-size:1.3rem">🧬 Évolution — Adaptive Intelligence</h2>
+      <p style="margin:0.3rem 0 0;color:var(--text-muted,#888);font-size:.85rem">
+        Genetic Algorithm · Reinforcement Learning · Thompson Sampling
+      </p>
+    </div>
+    <div style="display:flex;gap:.5rem">
+      <select id="evo-wf-select" style="padding:.35rem .6rem;border-radius:6px;border:1px solid var(--border,#ddd);font-size:.85rem">
+        <option value="">Sélectionner…</option>
+        {% for wf in workflows %}
+          <option value="{{ wf.id }}">{{ wf.name or wf.id }}</option>
+        {% endfor %}
+      </select>
+      <button onclick="triggerEvolution()"
+        style="padding:.35rem .9rem;border-radius:6px;background:var(--accent,#6c63ff);color:#fff;border:none;cursor:pointer;font-size:.85rem">
+        ▶ Lancer GA
+      </button>
+    </div>
+  </div>
+
+  {# ── Badges couches ────────────────────────────────────────────────────── #}
+  <div style="display:flex;gap:.6rem;margin-bottom:1.5rem;flex-wrap:wrap">
+    <span style="padding:.25rem .75rem;border-radius:20px;background:#22c55e20;color:#16a34a;font-size:.78rem;font-weight:600">
+      ✅ Layer 1 · Thompson Sampling LIVE
+    </span>
+    <span style="padding:.25rem .75rem;border-radius:20px;background:{% if runs %}#6c63ff20;color:#6c63ff{% else %}#f5f5f5;color:#aaa{% endif %};font-size:.78rem;font-weight:600">
+      🧬 Layer 2 · GA {% if runs %}ACTIF ({{ runs|length }} runs){% else %}EN ATTENTE{% endif %}
+    </span>
+    <span style="padding:.25rem .75rem;border-radius:20px;background:{% if rl_stats.get('states',0) > 0 %}#f97316aa;color:#c2410c{% else %}#f5f5f5;color:#aaa{% endif %};font-size:.78rem;font-weight:600">
+      🤖 Layer 3 · RL {% if rl_stats.get('states',0) > 0 %}ACTIF ({{ rl_stats.states }} états){% else %}EN ATTENTE{% endif %}
+    </span>
+  </div>
+
+  {# ── 2 colonnes : Proposals | RL Stats ──────────────────────────────────── #}
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;align-items:start">
+
+    {# ── Proposals GA ──────────────────────────────────────────────────────── #}
+    <div>
+      <h3 style="font-size:1rem;margin:0 0 .75rem">📋 Proposals en attente
+        <span style="background:#f97316;color:#fff;border-radius:10px;font-size:.72rem;padding:.1rem .5rem;margin-left:.4rem">
+          {{ proposals | selectattr('status','equalto','pending') | list | length }}
+        </span>
+      </h3>
+
+      {% set pending = proposals | selectattr('status','equalto','pending') | list %}
+      {% set approved = proposals | selectattr('status','equalto','approved') | list %}
+      {% set rejected = proposals | selectattr('status','equalto','rejected') | list %}
+
+      {% if not proposals %}
+      <div style="text-align:center;padding:2rem;color:var(--text-muted,#888);border:1px dashed var(--border,#ddd);border-radius:8px">
+        <div style="font-size:2rem;margin-bottom:.5rem">🌱</div>
+        <div>Aucune proposal pour l'instant.</div>
+        <div style="font-size:.8rem;margin-top:.3rem">Lancez une évolution GA ou attendez le run nightly (02:00 UTC).</div>
+      </div>
+      {% else %}
+
+      {# Tabs proposals #}
+      <div style="display:flex;gap:.3rem;margin-bottom:.75rem">
+        <button onclick="filterProposals('pending',this)" class="prop-tab prop-tab-active"
+          style="padding:.25rem .65rem;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:.8rem;background:var(--accent,#6c63ff);color:#fff">
+          ⏳ En attente ({{ pending|length }})
+        </button>
+        <button onclick="filterProposals('approved',this)" class="prop-tab"
+          style="padding:.25rem .65rem;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:.8rem">
+          ✅ Approuvées ({{ approved|length }})
+        </button>
+        <button onclick="filterProposals('rejected',this)" class="prop-tab"
+          style="padding:.25rem .65rem;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:.8rem">
+          ❌ Rejetées ({{ rejected|length }})
+        </button>
+      </div>
+
+      <div id="proposals-list">
+      {% for p in proposals %}
+      <div class="proposal-card prop-{{ p.status }}"
+        style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.75rem;margin-bottom:.5rem;background:var(--card-bg,#fff)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem">
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <code style="font-size:.78rem;color:var(--text-muted,#888)">{{ p.id }}</code>
+            <span style="font-weight:600;font-size:.9rem">{{ p.base_wf_id }}</span>
+            <span style="font-size:.78rem;color:var(--text-muted,#888)">gen {{ p.generation }}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            {# Fitness bar #}
+            <div style="width:80px;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden">
+              <div style="width:{{ (p.fitness * 100)|round|int }}%;height:100%;background:{% if p.fitness > 0.7 %}#22c55e{% elif p.fitness > 0.5 %}#f97316{% else %}#ef4444{% endif %};border-radius:4px"></div>
+            </div>
+            <span style="font-size:.78rem;font-weight:600;color:{% if p.fitness > 0.7 %}#16a34a{% elif p.fitness > 0.5 %}#ea580c{% else %}#dc2626{% endif %}">
+              {{ "%.3f"|format(p.fitness) }}
+            </span>
+            {% if p.status == 'pending' %}
+            <button onclick="approveProposal('{{ p.id }}')" title="Approuver"
+              style="padding:.2rem .5rem;border-radius:4px;border:1px solid #22c55e;color:#16a34a;cursor:pointer;font-size:.8rem;background:transparent">✓</button>
+            <button onclick="rejectProposal('{{ p.id }}')" title="Rejeter"
+              style="padding:.2rem .5rem;border-radius:4px;border:1px solid #ef4444;color:#dc2626;cursor:pointer;font-size:.8rem;background:transparent">✗</button>
+            {% elif p.status == 'approved' %}
+            <span style="color:#16a34a;font-size:.8rem">✅ Approuvée</span>
+            {% elif p.status == 'rejected' %}
+            <span style="color:#dc2626;font-size:.8rem">❌ Rejetée</span>
+            {% endif %}
+          </div>
+        </div>
+        {# Phases summary #}
+        {% set phases = p.genome.get('phases', []) %}
+        {% if phases %}
+        <div style="display:flex;gap:.3rem;flex-wrap:wrap">
+          {% for ph in phases %}
+          <span style="font-size:.72rem;padding:.1rem .4rem;background:#f3f4f6;border-radius:4px;color:#555">
+            {{ ph.get('name', ph.get('phase_id','?'))[:20] }}
+            <span style="color:#6c63ff">· {{ ph.get('pattern_id','?') }}</span>
+          </span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div style="font-size:.72rem;color:var(--text-muted,#aaa);margin-top:.3rem">
+          {{ p.get('created_at','')[:16] }}
+          {% if p.get('run_id') %} · run {{ p.run_id }}{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    {# ── RL Stats + Run History ─────────────────────────────────────────────── #}
+    <div style="display:flex;flex-direction:column;gap:1rem">
+
+      {# RL Stats card #}
+      <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
+        <h4 style="margin:0 0 .65rem;font-size:.9rem">🤖 RL Policy Stats</h4>
+        {% if rl_stats %}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem">
+          <div style="font-size:.78rem;color:var(--text-muted,#888)">États Q-table</div>
+          <div style="font-size:.85rem;font-weight:600;text-align:right">{{ rl_stats.get('states',0) }}</div>
+          <div style="font-size:.78rem;color:var(--text-muted,#888)">Expériences</div>
+          <div style="font-size:.85rem;font-weight:600;text-align:right">{{ rl_stats.get('total_experience',0) }}</div>
+          <div style="font-size:.78rem;color:var(--text-muted,#888)">Recommandations</div>
+          <div style="font-size:.85rem;font-weight:600;text-align:right">{{ rl_stats.get('recommendations_total',0) }}</div>
+          <div style="font-size:.78rem;color:var(--text-muted,#888)">Déclenchées</div>
+          <div style="font-size:.85rem;font-weight:600;text-align:right;color:#6c63ff">{{ rl_stats.get('recommendations_fired',0) }}</div>
+        </div>
+        {% if rl_stats.get('actions') %}
+        <div style="margin-top:.6rem;font-size:.75rem;color:var(--text-muted,#888)">Actions : {{ rl_stats.actions | join(', ') }}</div>
+        {% endif %}
+        {% else %}
+        <div style="color:var(--text-muted,#aaa);font-size:.82rem;text-align:center;padding:.5rem 0">En attente de données…</div>
+        {% endif %}
+      </div>
+
+      {# GA Run history #}
+      <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
+        <h4 style="margin:0 0 .65rem;font-size:.9rem">📈 Runs GA récents</h4>
+        {% if runs %}
+        {% for r in runs[:10] %}
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid var(--border,#f3f4f6)">
+          <div>
+            <span style="font-size:.8rem;font-weight:600">{{ r.wf_id }}</span>
+            <span style="font-size:.72rem;color:var(--text-muted,#888);margin-left:.3rem">{{ r.get('started_at','')[:10] }}</span>
+          </div>
+          <div style="text-align:right">
+            <span style="font-size:.8rem;font-weight:600;color:{% if r.best_fitness > 0.7 %}#16a34a{% elif r.best_fitness > 0.5 %}#ea580c{% else %}#dc2626{% endif %}">
+              {{ "%.3f"|format(r.best_fitness) }}
+            </span>
+            <span style="font-size:.72rem;color:var(--text-muted,#888);margin-left:.2rem">gen {{ r.generations }}</span>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div style="color:var(--text-muted,#aaa);font-size:.82rem;text-align:center;padding:.5rem 0">Aucun run pour l'instant</div>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+function filterProposals(status, btn) {
+  document.querySelectorAll('.prop-tab').forEach(t => {
+    t.style.background = '';
+    t.style.color = '';
+    t.classList.remove('prop-tab-active');
+  });
+  btn.style.background = 'var(--accent,#6c63ff)';
+  btn.style.color = '#fff';
+  btn.classList.add('prop-tab-active');
+  document.querySelectorAll('.proposal-card').forEach(c => {
+    c.style.display = c.classList.contains('prop-' + status) ? '' : 'none';
+  });
+}
+
+async function approveProposal(id) {
+  await fetch(`/api/evolution/proposals/${id}/approve`, {method:'POST'});
+  htmx.ajax('GET', '/workflows/evolution', '#tab-content');
+}
+
+async function rejectProposal(id) {
+  await fetch(`/api/evolution/proposals/${id}/reject`, {method:'POST'});
+  htmx.ajax('GET', '/workflows/evolution', '#tab-content');
+}
+
+async function triggerEvolution() {
+  const wfId = document.getElementById('evo-wf-select').value;
+  if (!wfId) { alert('Sélectionnez un workflow'); return; }
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '⏳ En cours…';
+  const r = await fetch(`/api/evolution/run/${wfId}`, {method:'POST'});
+  const data = await r.json();
+  btn.disabled = false;
+  btn.textContent = '▶ Lancer GA';
+  if (data.ok) {
+    btn.textContent = '✅ Lancé';
+    setTimeout(() => { btn.textContent = '▶ Lancer GA'; }, 3000);
+  }
+}
+
+// Init: show only pending
+document.addEventListener('DOMContentLoaded', () => {
+  const pendingBtn = document.querySelector('.prop-tab-active');
+  if (pendingBtn) filterProposals('pending', pendingBtn);
+});
+</script>
