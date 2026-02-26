@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="padding:1.25rem">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
+    <div>
+      <h2 style="margin:0;font-size:1.3rem">⚙️ Observabilité — Ops</h2>
+      <p style="margin:.25rem 0 0;color:var(--text-muted,#888);font-size:.82rem">LLM · Missions · Intelligence Adaptative · Erreurs</p>
+    </div>
+    <button onclick="location.reload()" style="padding:.35rem .8rem;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:.82rem">🔄 Refresh</button>
+  </div>
+
+  {# ── Row 1: KPIs ─────────────────────────────────────────────────────────── #}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin-bottom:1.25rem">
+    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
+      <div style="font-size:1.6rem;font-weight:700;color:var(--accent,#6c63ff)">{{ active_missions|length }}</div>
+      <div style="font-size:.78rem;color:var(--text-muted,#888)">Missions actives</div>
+    </div>
+    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
+      <div style="font-size:1.6rem;font-weight:700;color:{% if top_errors %}#ef4444{% else %}#22c55e{% endif %}">{{ top_errors|length }}</div>
+      <div style="font-size:.78rem;color:var(--text-muted,#888)">Types erreurs 24h</div>
+    </div>
+    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
+      <div style="font-size:1.6rem;font-weight:700;color:#f97316">{{ ga_summary.get('pending',0) }}</div>
+      <div style="font-size:.78rem;color:var(--text-muted,#888)">GA proposals en attente</div>
+    </div>
+    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
+      <div style="font-size:1.6rem;font-weight:700;color:#06b6d4">{{ rl_stats.get('decisions', rl_stats.get('state_count',0)) }}</div>
+      <div style="font-size:.78rem;color:var(--text-muted,#888)">RL décisions</div>
+    </div>
+    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
+      {% if ga_summary.get('best_fitness') %}
+      <div style="font-size:1.6rem;font-weight:700;color:#22c55e">{{ "%.3f"|format(ga_summary.best_fitness) }}</div>
+      {% else %}
+      <div style="font-size:1.6rem;font-weight:700;color:#aaa">—</div>
+      {% endif %}
+      <div style="font-size:.78rem;color:var(--text-muted,#888)">GA best fitness</div>
+    </div>
+  </div>
+
+  {# ── Row 2: LLM + Thompson ────────────────────────────────────────────────── #}
+  <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:1rem;margin-bottom:1rem;align-items:start">
+
+    {# LLM Usage 24h #}
+    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
+      <h3 style="font-size:.95rem;margin:0 0 .75rem">⚡ LLM Usage — 24h</h3>
+      {% if llm_providers %}
+      <table style="width:100%;border-collapse:collapse;font-size:.78rem">
+        <thead>
+          <tr style="color:var(--text-muted,#888);text-align:left;border-bottom:1px solid var(--border,#eee)">
+            <th style="padding:.25rem .4rem">Provider</th>
+            <th style="padding:.25rem .4rem">Modèle</th>
+            <th style="padding:.25rem .4rem;text-align:right">Calls</th>
+            <th style="padding:.25rem .4rem;text-align:right">Erreurs</th>
+            <th style="padding:.25rem .4rem;text-align:right">Moy tokens</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in llm_providers %}
+          <tr style="border-bottom:1px solid var(--border,#f5f5f5)">
+            <td style="padding:.3rem .4rem;font-weight:600">{{ p.provider }}</td>
+            <td style="padding:.3rem .4rem;color:var(--text-muted,#888)">{{ p.model }}</td>
+            <td style="padding:.3rem .4rem;text-align:right">{{ p.total_calls }}</td>
+            <td style="padding:.3rem .4rem;text-align:right;color:{% if p.errors > 0 %}#ef4444{% else %}#22c55e{% endif %}">{{ p.errors }}</td>
+            <td style="padding:.3rem .4rem;text-align:right">{{ p.avg_tokens|int if p.avg_tokens else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="color:var(--text-muted,#aaa);font-size:.82rem;text-align:center;padding:.5rem 0">Aucune donnée LLM 24h — en attente d'appels</p>
+      {% endif %}
+    </div>
+
+    {# Thompson Provider Scores #}
+    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
+      <h3 style="font-size:.95rem;margin:0 0 .75rem">🎯 Thompson Sampling — LLM</h3>
+      {% if llm_thompson %}
+      {% for p in llm_thompson %}
+      <div style="margin-bottom:.6rem">
+        <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:.2rem">
+          <span style="font-weight:600">{{ p.provider }}</span>
+          <span style="color:{% if p.success_rate >= 0.7 %}#16a34a{% elif p.success_rate >= 0.5 %}#ea580c{% else %}#dc2626{% endif %}">
+            {{ (p.success_rate * 100)|round|int }}% · {{ p.total_calls }} calls
+          </span>
+        </div>
+        <div style="height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden">
+          <div style="width:{{ (p.success_rate * 100)|round|int }}%;height:100%;background:{% if p.success_rate >= 0.7 %}#22c55e{% elif p.success_rate >= 0.5 %}#f97316{% else %}#ef4444{% endif %};border-radius:3px"></div>
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <p style="color:var(--text-muted,#aaa);font-size:.82rem;text-align:center;padding:.5rem 0">En attente d'appels LLM (min 5 par provider)</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Row 3: Missions actives + Erreurs ─────────────────────────────────────── #}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start">
+
+    {# Active missions #}
+    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
+      <h3 style="font-size:.95rem;margin:0 0 .75rem">🚀 Missions actives</h3>
+      {% if active_missions %}
+      {% for m in active_missions[:10] %}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid var(--border,#f5f5f5)">
+        <a href="/missions/{{ m.id }}/control" style="font-size:.8rem;font-weight:600;color:var(--accent,#6c63ff);text-decoration:none">
+          {{ (m.name or m.id)[:35] }}
+        </a>
+        <span style="font-size:.72rem;padding:.1rem .4rem;background:#6c63ff20;color:#6c63ff;border-radius:10px">
+          {{ m.current_phase or 'en cours' }}
+        </span>
+      </div>
+      {% endfor %}
+      {% else %}
+      <p style="color:var(--text-muted,#aaa);font-size:.82rem;text-align:center;padding:.5rem 0">Aucune mission active</p>
+      {% endif %}
+    </div>
+
+    {# Top errors #}
+    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
+      <h3 style="font-size:.95rem;margin:0 0 .75rem">🚨 Top erreurs — 24h</h3>
+      {% if top_errors %}
+      {% for e in top_errors %}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid var(--border,#f5f5f5)">
+        <span style="font-size:.78rem;color:#dc2626">{{ e.error_type[:40] }}</span>
+        <div style="display:flex;align-items:center;gap:.4rem">
+          <span style="font-size:.75rem;padding:.1rem .4rem;background:#ef444420;color:#dc2626;border-radius:10px;font-weight:600">× {{ e.cnt }}</span>
+          <span style="font-size:.68rem;color:var(--text-muted,#aaa)">{{ e.last_seen[:10] if e.last_seen else '' }}</span>
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div style="text-align:center;padding:1rem;color:#16a34a;font-size:.85rem">
+        ✅ Aucune erreur dans les dernières 24h
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

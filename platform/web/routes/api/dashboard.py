@@ -369,3 +369,78 @@ async def dashboard_activity_feed(request: Request):
             <span class="dash-activity-text">{name}</span>
         </div>"""
     return HTMLResponse(html)
+
+
+@router.get("/api/dashboard/ai-panel")
+async def dashboard_ai_panel(request: Request):
+    """Adaptive Intelligence sidebar panel: Thompson top agents, GA proposals, RL stats."""
+    import html as html_mod
+    lines: list[str] = []
+
+    # Thompson top-3 agents
+    try:
+        from ....db.migrations import get_db
+        db = get_db()
+        rows = db.execute(
+            "SELECT agent_id, accepted, rejected, iterations, quality_score "
+            "FROM agent_scores WHERE iterations >= 3 ORDER BY quality_score DESC LIMIT 3"
+        ).fetchall()
+        db.close()
+        if rows:
+            lines.append('<div style="font-size:.75rem;font-weight:600;color:var(--text-muted,#888);margin-bottom:.3rem">🏅 Top agents</div>')
+            for r in rows:
+                total = r["iterations"] or 1
+                rate = round(r["accepted"] / total * 100)
+                bar_color = "#22c55e" if rate >= 70 else "#f97316" if rate >= 50 else "#ef4444"
+                lines.append(f'''<div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.25rem">
+  <span style="font-size:.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{html_mod.escape(r["agent_id"])}</span>
+  <div style="width:40px;height:5px;background:#e5e7eb;border-radius:3px">
+    <div style="width:{rate}%;height:100%;background:{bar_color};border-radius:3px"></div>
+  </div>
+  <span style="font-size:.72rem;color:#666">{rate}%</span>
+</div>''')
+    except Exception:
+        pass
+
+    # Pending GA proposals
+    try:
+        from ....db.migrations import get_db
+        db = get_db()
+        pending = db.execute("SELECT COUNT(*) FROM evolution_proposals WHERE status='pending'").fetchone()[0]
+        best = db.execute("SELECT MAX(fitness) FROM evolution_proposals WHERE status='approved'").fetchone()[0]
+        db.close()
+        lines.append('<div style="font-size:.75rem;font-weight:600;color:var(--text-muted,#888);margin:.6rem 0 .3rem">🧬 Évolution GA</div>')
+        lines.append(f'<div style="font-size:.8rem">Proposals: <strong>{pending}</strong> en attente</div>')
+        if best:
+            lines.append(f'<div style="font-size:.8rem">Best fitness: <strong>{best:.3f}</strong></div>')
+        lines.append('<a href="/workflows#evolution" style="font-size:.75rem;color:var(--accent,#6c63ff)">→ Voir proposals</a>')
+    except Exception:
+        pass
+
+    # RL stats
+    try:
+        from ....agents.rl_policy import get_rl_policy
+        stats = get_rl_policy().stats()
+        fired = stats.get("recommendations_fired", 0)
+        total_rec = stats.get("recommendations_total", 0)
+        lines.append('<div style="font-size:.75rem;font-weight:600;color:var(--text-muted,#888);margin:.6rem 0 .3rem">🤖 RL Policy</div>')
+        lines.append(f'<div style="font-size:.8rem">États: <strong>{stats.get("states",0)}</strong> · Décisions: <strong>{fired}/{total_rec}</strong></div>')
+    except Exception:
+        pass
+
+    # LLM provider Thompson
+    try:
+        from ....llm.llm_thompson import llm_thompson_stats
+        pstats = llm_thompson_stats()
+        if pstats:
+            lines.append('<div style="font-size:.75rem;font-weight:600;color:var(--text-muted,#888);margin:.6rem 0 .3rem">⚡ LLM Providers</div>')
+            for ps in pstats[:3]:
+                rate = round(ps.get("success_rate", 0) * 100)
+                lines.append(f'<div style="font-size:.78rem">{html_mod.escape(ps["provider"])}: <strong>{rate}%</strong> ({ps["total_calls"]} calls)</div>')
+    except Exception:
+        pass
+
+    if not lines:
+        return HTMLResponse('<p class="text-muted" style="font-size:.82rem">En attente de données…</p>')
+
+    return HTMLResponse("\n".join(lines))

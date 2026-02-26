@@ -1,16 +1,12 @@
 """LLM Client — unified async interface for all providers.
 
 All providers use OpenAI-compatible chat/completions API:
-- Azure AI Foundry (azure-ai):     gpt-5.2 (reasoning), gpt-5.1-codex (code/tests), gpt-5.1-mini (light)
-- Azure OpenAI (azure-openai):     gpt-5-mini (tool-calling fallback, light tasks)
-- NVIDIA/Kimi K2 (nvidia):         fast production workers
-- MiniMax M2.5 (minimax):          local dev default / fallback
-- Demo (demo):                     offline mock responses
+- Azure AI Foundry GPT-5.2 (swedencentral) — leaders, control, architecture
+- NVIDIA/Kimi K2 (integrate.api.nvidia.com) — fast production workers
+- MiniMax M2.5 (api.minimaxi.chat) — fallback, thinking model
+- Claude CLI / Copilot CLI — offline headless (slow, 10-12s)
 
-Multi-model routing (executor.py):
-  architect/tech_lead/planner  → gpt-5.2      (deep reasoning)
-  developer/tester/security    → gpt-5.1-codex (code production)
-  default/chat/routing         → gpt-5-mini   (light + cheap)
+Streaming supported via SSE (text/event-stream).
 """
 
 from __future__ import annotations
@@ -43,26 +39,18 @@ _PROVIDERS = {
         "auth_prefix": "Bearer ",
     },
     "azure-ai": {
-        "name": "Azure AI Foundry (GPT-5.2 / GPT-5.1-Codex)",
+        "name": "Azure AI Foundry (GPT-5.2)",
         "base_url": os.environ.get(
             "AZURE_AI_ENDPOINT", "https://swedencentral.api.cognitive.microsoft.com"
         ).rstrip("/"),
         "key_env": "AZURE_AI_API_KEY",
-        "models": ["gpt-5.2", "gpt-5.1-codex", "gpt-5.1-mini"],
+        "models": ["gpt-5.2"],
         "default": "gpt-5.2",
         "auth_header": "api-key",
         "auth_prefix": "",
         "azure_api_version": "2024-10-21",
-        "azure_deployment_map": {
-            "gpt-5.2": "gpt-52",
-            "gpt-5.1-codex": "gpt-51-codex",
-            "gpt-5.1-mini": "gpt-51-mini",
-        },
-        "max_tokens_param": {
-            "gpt-5.2": "max_completion_tokens",
-            "gpt-5.1-codex": "max_completion_tokens",
-            "gpt-5.1-mini": "max_completion_tokens",
-        },
+        "azure_deployment_map": {"gpt-5.2": "gpt-52"},
+        "max_tokens_param": {"gpt-5.2": "max_completion_tokens"},
     },
     "azure-openai": {
         "name": "Azure OpenAI (GPT-5-mini)",
@@ -70,19 +58,13 @@ _PROVIDERS = {
             "AZURE_OPENAI_ENDPOINT", "https://ascii-ui-openai.openai.azure.com"
         ).rstrip("/"),
         "key_env": "AZURE_OPENAI_API_KEY",
-        "models": ["gpt-5-mini", "gpt-5.1-mini"],
+        "models": ["gpt-5-mini"],
         "default": "gpt-5-mini",
         "auth_header": "api-key",
         "auth_prefix": "",
         "azure_api_version": "2025-01-01-preview",
-        "azure_deployment_map": {
-            "gpt-5-mini": "gpt-5-mini",
-            "gpt-5.1-mini": "gpt-51-mini",
-        },
-        "max_tokens_param": {
-            "gpt-5-mini": "max_completion_tokens",
-            "gpt-5.1-mini": "max_completion_tokens",
-        },
+        "azure_deployment_map": {"gpt-5-mini": "gpt-5-mini"},
+        "max_tokens_param": {"gpt-5-mini": "max_completion_tokens"},
     },
     "nvidia": {
         "name": "NVIDIA (Kimi K2)",
@@ -472,16 +454,17 @@ class LLMClient:
         if _is_azure:
             provider = "azure-openai"
         providers_to_try = [provider] + [p for p in _FALLBACK_CHAIN if p != provider]
+        # Thompson Sampling: reorder by Beta-sampled quality (skip on Azure — forced)
+        if not _is_azure and len(providers_to_try) > 1:
+            try:
+                from .llm_thompson import llm_thompson_select
+                _best = llm_thompson_select([p for p in providers_to_try if p in _PROVIDERS])
+                if _best and _best != providers_to_try[0]:
+                    providers_to_try = [_best] + [p for p in providers_to_try if p != _best]
+            except Exception:
+                pass
 
         for prov in providers_to_try:
-            # Skip unknown providers
-            if prov not in _PROVIDERS:
-                logger.warning("LLM %s skipped (unknown provider)", prov)
-                continue
-
-            # Skip providers in cooldown (rate-limited recently)
-            now = time.monotonic()
-            cooldown_until = self._provider_cooldown.get(prov, 0)
             if cooldown_until > now:
                 remaining = int(cooldown_until - now)
                 logger.warning(
@@ -549,6 +532,13 @@ class LLMClient:
                     # Trace for observability
                     self._trace(result, messages)
                     await self._persist_usage(prov, use_model, result.tokens_in, result.tokens_out)
+                    # Thompson Sampling: record success
+                    try:
+                        from .llm_thompson import llm_thompson_record
+                        _quality = min(1.0, result.tokens_out / max(1, result.tokens_in + result.tokens_out))
+                        llm_thompson_record(prov, success=True, quality=_quality)
+                    except Exception:
+                        pass
                     # Cache the response for future dedup
                     try:
                         _llm_cache.put(cache_model, msg_dicts, temperature, result.content, result.tokens_in, result.tokens_out, tools)
@@ -593,6 +583,12 @@ class LLMClient:
                     self._stats["errors"] += 1
                     self._cb_record_failure(prov)
                     await self._persist_usage(prov, use_model, 0, 0, error=True)
+                    # Thompson Sampling: record failure
+                    try:
+                        from .llm_thompson import llm_thompson_record
+                        llm_thompson_record(prov, success=False, quality=0.0)
+                    except Exception:
+                        pass
                     if is_rate_limit:
                         self._provider_cooldown[prov] = time.monotonic() + 90
                         logger.warning(

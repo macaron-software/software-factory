@@ -2129,6 +2129,25 @@ body {
   }
 }
 
+/* ── PWA safe-area insets (iPhone notch / home bar) ── */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .sidebar {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  @media (max-width: 768px) {
+    .main-content {
+      padding-bottom: calc(64px + env(safe-area-inset-bottom));
+    }
+  }
+}
+
+/* ── PWA standalone mode adjustments ── */
+@media (display-mode: standalone) {
+  .topbar {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+}
+
 /* ── Light theme refinements ── */
 [data-theme="light"] .sidebar {
   box-shadow: 1px 0 4px rgba(0, 0, 0, 0.06);

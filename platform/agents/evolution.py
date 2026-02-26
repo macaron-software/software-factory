@@ -340,19 +340,50 @@ class GAEngine:
         return run_id
 
     def _save_proposal(self, genome: Genome, base_wf_id: str, generation: int, run_id: str) -> None:
-        """Save evolved genome as evolution proposal."""
-        import uuid
+        """Save evolved genome as evolution proposal. Auto-approves if fitness delta > threshold."""
+        import uuid, os
         proposal_id = str(uuid.uuid4())[:8]
         try:
             from ..db.migrations import get_db
             db = get_db()
+
+            # Auto-approve if fitness exceeds base by GA_AUTO_APPROVE_DELTA (default 10%)
+            delta_threshold = float(os.environ.get("GA_AUTO_APPROVE_DELTA", "0.10"))
+            base_fitness = self._get_base_fitness(base_wf_id, db)
+            auto_approve = (
+                base_fitness is not None
+                and genome.fitness >= base_fitness * (1 + delta_threshold)
+                and genome.fitness > 0.5
+            )
+            status = "approved" if auto_approve else "pending"
+
             db.execute("""
                 INSERT INTO evolution_proposals
                     (id, base_wf_id, genome_json, fitness, generation, run_id, status)
-                VALUES (?, ?, ?, ?, ?, ?, 'pending')
-            """, (proposal_id, base_wf_id, json.dumps(genome.to_dict()), genome.fitness, generation, run_id))
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (proposal_id, base_wf_id, json.dumps(genome.to_dict()), genome.fitness, generation, run_id, status))
             db.commit()
             db.close()
-            log.info(f"GA proposal saved: {proposal_id} fitness={genome.fitness:.4f}")
+            if auto_approve:
+                log.info(f"GA proposal {proposal_id} AUTO-APPROVED fitness={genome.fitness:.4f} (base={base_fitness:.4f} +{delta_threshold*100:.0f}%)")
+            else:
+                log.info(f"GA proposal saved: {proposal_id} fitness={genome.fitness:.4f} status={status}")
         except Exception as e:
             log.warning(f"GA save_proposal: {e}")
+
+    def _get_base_fitness(self, wf_id: str, db) -> float | None:
+        """Get best historical fitness for a workflow (from previous approved proposals)."""
+        try:
+            row = db.execute(
+                "SELECT MAX(fitness) FROM evolution_proposals WHERE base_wf_id=? AND status='approved'",
+                (wf_id,)
+            ).fetchone()
+            if row and row[0] is not None:
+                return float(row[0])
+            # Fall back to simulator baseline
+            return self._simulator.simulate_genome(
+                [p.to_dict() for p in self._wf_to_genome(self._wf_store.get(wf_id)).phases],
+                n=10
+            ) if self._wf_store.get(wf_id) else None
+        except Exception:
+            return None

@@ -1,0 +1,135 @@
+{# ══════ TIMELINE / GANTT TAB ══════ #}
+{# Horizontal Gantt of mission phases with real durations #}
+
+        <!-- Tab: Timeline Gantt -->
+        <div class="mc-tab-panel" data-tab="timeline">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+                <svg class="icon icon-sm" style="color:var(--purple-light)"><use href="#icon-bar-chart-2"/></svg>
+                <span style="font-size:.82rem;font-weight:600">Timeline — phases</span>
+                <span style="font-size:.7rem;color:var(--text-secondary);background:var(--bg-tertiary);padding:2px 8px;border-radius:10px;border:1px solid var(--border)">
+                    {{ phases | selectattr('status', 'ne', 'pending') | list | length }}/{{ phases | length }} phases exécutées
+                </span>
+            </div>
+
+            {% set ns = namespace(min_ts='', max_ts='', has_times=false) %}
+            {% for ph in phases %}
+                {% if ph.started_at %}{% set ns.has_times = true %}{% endif %}
+            {% endfor %}
+
+            {% if not ns.has_times %}
+            <div style="text-align:center;padding:2rem;color:var(--text-muted,#888);border:1px dashed var(--border,#ddd);border-radius:8px;font-size:.85rem">
+                ⏳ La mission n'a pas encore démarré — le Gantt s'affichera une fois les phases lancées.
+            </div>
+            {% else %}
+
+            {# Build timeline from phases #}
+            <div id="gantt-container-{{ mission.id[:8] }}" style="overflow-x:auto;min-height:120px">
+                <div id="gantt-inner-{{ mission.id[:8] }}" style="position:relative;min-width:500px">
+                    {# Phase rows #}
+                    {% set colors = ['#6c63ff','#22c55e','#f97316','#06b6d4','#ec4899','#a78bfa','#84cc16','#fb923c'] %}
+                    {% for ph in phases %}
+                    {% set color = colors[loop.index0 % colors|length] %}
+                    {% set status = ph.status | default('pending') %}
+                    <div class="gantt-row"
+                         onclick="document.querySelector('[data-phase-id=\'{{ ph.phase_id }}\']')?.scrollIntoView({behavior:'smooth',block:'center'})"
+                         style="display:flex;align-items:center;margin-bottom:.35rem;cursor:pointer;gap:.5rem">
+                        {# Phase label #}
+                        <div style="width:130px;flex-shrink:0;font-size:.73rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;padding-right:.4rem"
+                             title="{{ ph.name }}">
+                            <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:{{ color }};margin-right:3px;vertical-align:middle"></span>
+                            {{ ph.name[:22] }}
+                        </div>
+                        {# Bar #}
+                        <div class="gantt-bar-wrapper" data-phase="{{ ph.phase_id }}"
+                             data-started="{{ ph.started_at or '' }}"
+                             data-completed="{{ ph.completed_at or '' }}"
+                             data-status="{{ status }}"
+                             data-color="{{ color }}"
+                             style="flex:1;height:22px;background:var(--bg-tertiary,#f3f4f6);border-radius:4px;position:relative;overflow:hidden">
+                            {# Filled by JS #}
+                        </div>
+                        {# Duration label #}
+                        <div class="gantt-duration" data-phase="{{ ph.phase_id }}"
+                             style="width:50px;flex-shrink:0;font-size:.7rem;color:var(--text-muted,#888);text-align:left">
+                            —
+                        </div>
+                        {# Status badge #}
+                        <div style="width:70px;flex-shrink:0">
+                            {% if status == 'completed' %}
+                            <span style="font-size:.68rem;padding:.1rem .4rem;background:#22c55e20;color:#16a34a;border-radius:10px">✓ done</span>
+                            {% elif status == 'running' %}
+                            <span style="font-size:.68rem;padding:.1rem .4rem;background:#6c63ff20;color:#6c63ff;border-radius:10px">▶ run</span>
+                            {% elif status == 'failed' %}
+                            <span style="font-size:.68rem;padding:.1rem .4rem;background:#ef444420;color:#dc2626;border-radius:10px">✗ fail</span>
+                            {% elif status == 'skipped' %}
+                            <span style="font-size:.68rem;padding:.1rem .4rem;background:#f5f5f5;color:#aaa;border-radius:10px">⏭ skip</span>
+                            {% else %}
+                            <span style="font-size:.68rem;padding:.1rem .4rem;background:#f5f5f5;color:#bbb;border-radius:10px">⏳ wait</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {# Summary stats #}
+            <div style="display:flex;gap:1rem;margin-top:1rem;padding-top:.75rem;border-top:1px solid var(--border,#eee);flex-wrap:wrap">
+                {% set done_phases = phases | selectattr('status', 'equalto', 'completed') | list %}
+                {% set running_phases = phases | selectattr('status', 'equalto', 'running') | list %}
+                {% set failed_phases = phases | selectattr('status', 'equalto', 'failed') | list %}
+                <div style="font-size:.78rem"><span style="color:#16a34a;font-weight:600">✓ {{ done_phases | length }}</span> terminées</div>
+                <div style="font-size:.78rem"><span style="color:#6c63ff;font-weight:600">▶ {{ running_phases | length }}</span> en cours</div>
+                <div style="font-size:.78rem"><span style="color:#dc2626;font-weight:600">✗ {{ failed_phases | length }}</span> échouées</div>
+                <div style="font-size:.78rem;color:var(--text-muted,#888)">{{ phases | length }} phases total</div>
+            </div>
+            {% endif %}
+        </div>
+
+<script>
+(function(){
+  const wrappers = document.querySelectorAll('.gantt-bar-wrapper');
+  if (!wrappers.length) return;
+
+  // Collect all timestamps to compute global min/max
+  let minTs = Infinity, maxTs = -Infinity;
+  const now = Date.now();
+  wrappers.forEach(w => {
+    const s = w.dataset.started ? new Date(w.dataset.started).getTime() : 0;
+    const c = w.dataset.completed ? new Date(w.dataset.completed).getTime() : (w.dataset.status === 'running' ? now : 0);
+    if (s > 0) { minTs = Math.min(minTs, s); maxTs = Math.max(maxTs, c || s); }
+  });
+  if (!isFinite(minTs)) return;
+  const totalMs = Math.max(1, maxTs - minTs);
+
+  wrappers.forEach(w => {
+    const s = w.dataset.started ? new Date(w.dataset.started).getTime() : 0;
+    const c = w.dataset.completed ? new Date(w.dataset.completed).getTime() : (w.dataset.status === 'running' ? now : 0);
+    if (!s) return;
+
+    const left = ((s - minTs) / totalMs * 100).toFixed(1);
+    const width = Math.max(0.5, ((( c || s + 1000) - s) / totalMs * 100)).toFixed(1);
+    const color = w.dataset.color || '#6c63ff';
+    const opacity = w.dataset.status === 'running' ? '0.85' : (w.dataset.status === 'completed' ? '1' : '0.6');
+
+    const bar = document.createElement('div');
+    bar.style.cssText = `position:absolute;left:${left}%;width:${width}%;height:100%;background:${color};opacity:${opacity};border-radius:4px;transition:width .5s ease`;
+    if (w.dataset.status === 'running') {
+      bar.style.animation = 'gantt-pulse 2s infinite';
+    }
+    w.appendChild(bar);
+
+    // Duration label
+    const dur = w.parentElement.querySelector(`.gantt-duration[data-phase="${w.dataset.phase}"]`);
+    if (dur && c > s) {
+      const secs = Math.round((c - s) / 1000);
+      dur.textContent = secs < 60 ? `${secs}s` : `${Math.round(secs/60)}m`;
+    }
+  });
+})();
+</script>
+<style>
+@keyframes gantt-pulse {
+  0%,100% { opacity:.7; }
+  50% { opacity:1; }
+}
+</style>

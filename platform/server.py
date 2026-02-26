@@ -291,6 +291,24 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Failed to start evolution scheduler: %s", e)
 
+    # Seed simulator if agent_scores is empty (cold start)
+    async def _seed_simulator_if_empty():
+        await _asyncio.sleep(5)  # wait for DB init
+        try:
+            from .db.migrations import get_db as _sdb
+            _db = _sdb()
+            _count = _db.execute("SELECT COUNT(*) FROM agent_scores").fetchone()[0]
+            _db.close()
+            if _count == 0:
+                from .agents.simulator import MissionSimulator
+                sim = MissionSimulator()
+                results = sim.run_all(n_runs_per_workflow=50)
+                logger.warning("Simulator cold-start: seeded %d agent_scores rows", sum(results.values()))
+        except Exception as e:
+            logger.warning("Simulator cold-start failed: %s", e)
+
+    _asyncio.create_task(_seed_simulator_if_empty())
+
     # Start unified MCP SF server (platform + LRM tools merged)
     _mcp_procs: dict[str, Any] = {}
 
@@ -758,6 +776,15 @@ def create_app() -> FastAPI:
     # Static files
     if STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+    # Serve manifest.json for PWA
+    @app.get("/manifest.json")
+    async def pwa_manifest():
+        from fastapi.responses import FileResponse
+        manifest_path = STATIC_DIR / "manifest.json"
+        if manifest_path.exists():
+            return FileResponse(str(manifest_path), media_type="application/manifest+json")
+        return {"error": "manifest not found"}
 
     # Templates
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))

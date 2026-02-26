@@ -3,8 +3,14 @@
 <head>
     <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('macaron_theme') || 'dark')</script>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>{{ page_title }} — Software Factory</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#6c63ff">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SF Platform">
     <link rel="stylesheet" href="/static/css/main.css?v=20260225a">
     <link rel="stylesheet" href="/static/css/components.css?v=20260225a">
     <link rel="stylesheet" href="/static/css/agents.css?v=20260225a">
@@ -57,7 +63,6 @@
         });
     })();
     </script>
-    {% block head_extra %}{% endblock %}
 </head>
 <body>
     {% include "partials/svg_sprites.html" %}
@@ -101,7 +106,7 @@
                     </a></li>
                     {% endif %}
                     {% if p in _full + ('rte', 'scrum_master', 'developer') %}
-                    <li><a href="/art" data-tooltip="Teams" class="{% if page_title in ('ART', 'Agents', 'Organisation SAFe', 'Team Generator', 'Mercato', 'Teams') %}active{% endif %}">
+                    <li><a href="/art" data-tooltip="Teams" class="{% if page_title in ('ART', 'Agents', 'Organisation SAFe', 'Team Generator', 'Mercato') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-users"/></svg>
                     </a></li>
                     {% endif %}
@@ -112,6 +117,9 @@
                     {% endif %}
                     <li><a href="/metrics" data-tooltip="Metrics" class="{% if page_title == 'Metrics' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-chart"/></svg>
+                    </a></li>
+                    <li><a href="/ops" data-tooltip="Ops" class="{% if page_title == 'Ops' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-activity"/></svg>
                     </a></li>
                 </ul>
             </div>
@@ -142,21 +150,6 @@
                         <svg class="icon"><use href="#icon-settings"/></svg>
                     </a></li>
                 </ul>
-                <!-- Version badge -->
-                <div id="sidebarVersion" style="text-align:center;margin-top:0.5rem;cursor:pointer" title="Version info" onclick="document.getElementById('versionModal').style.display='flex'">
-                    <span id="versionTag" style="font-size:0.62rem;color:var(--text-muted);letter-spacing:0.03em;font-family:monospace">…</span>
-                </div>
-            </div>
-
-            <!-- Version modal -->
-            <div id="versionModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
-                <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:12px;padding:1.5rem;min-width:360px;max-width:480px">
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
-                        <h3 style="margin:0;font-size:1rem">Version</h3>
-                        <button onclick="document.getElementById('versionModal').style.display='none'" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:1.2rem">×</button>
-                    </div>
-                    <div id="versionModalBody" style="font-size:0.82rem;color:var(--text-secondary)">Chargement…</div>
-                </div>
             </div>
 
             <div class="sidebar-footer"></div>
@@ -463,29 +456,6 @@ async function setPerspective(p) {
     await fetch('/api/perspective', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({perspective:p})});
     location.reload();
 }
-// Version badge
-(async function() {
-    try {
-        const v = await fetch('/api/version').then(r => r.json());
-        const el = document.getElementById('versionTag');
-        if (el) el.textContent = v.display || v.sha || '?';
-        const modalBody = document.getElementById('versionModalBody');
-        if (modalBody) {
-            const OVH = 'http://54.36.183.124:8090';
-            modalBody.innerHTML = `
-<table style="width:100%;border-collapse:collapse">
-<tr><td style="padding:4px 8px;color:var(--text-tertiary);font-size:0.75rem">ENV</td><td style="padding:4px 8px;font-size:0.75rem;font-weight:600">SHA</td><td style="padding:4px 8px;font-size:0.75rem">Tag</td><td style="padding:4px 8px;font-size:0.75rem">Branch</td></tr>
-<tr style="border-top:1px solid var(--border)"><td style="padding:6px 8px;font-size:0.78rem">Local</td><td style="padding:6px 8px;font-family:monospace;font-size:0.78rem;color:#a78bfa">${v.sha||'?'}</td><td style="padding:6px 8px;font-size:0.78rem">${v.tag||'—'}</td><td style="padding:6px 8px;font-size:0.78rem">${v.branch||'?'}</td></tr>
-<tr style="border-top:1px solid var(--border)" id="ver-ovh"><td style="padding:6px 8px;font-size:0.78rem">OVH Demo</td><td colspan="3" style="padding:6px 8px;font-size:0.78rem;color:var(--text-muted)">…</td></tr>
-<tr style="border-top:1px solid var(--border)"><td colspan="4" style="padding:6px 8px;font-size:0.72rem;color:var(--text-muted)">${v.commit_message||''}<br><span style="color:var(--text-muted)">${v.commit_date||''}</span></td></tr>
-</table>`;
-            fetch(`${OVH}/api/version`).then(r=>r.json()).then(ov=>{
-                const row = document.getElementById('ver-ovh');
-                if (row) row.innerHTML = `<td style="padding:6px 8px;font-size:0.78rem">OVH Demo</td><td style="padding:6px 8px;font-family:monospace;font-size:0.78rem;color:${ov.sha===v.sha?'#34d399':'#f59e0b'}">${ov.sha||'?'}</td><td style="padding:6px 8px;font-size:0.78rem">${ov.tag||'—'}</td><td style="padding:6px 8px;font-size:0.78rem">${ov.branch||'?'}</td>`;
-            }).catch(()=>{ const r=document.getElementById('ver-ovh'); if(r) r.innerHTML='<td style="padding:6px 8px;font-size:0.78rem">OVH Demo</td><td colspan="3" style="padding:6px 8px;font-size:0.78rem;color:#ef4444">unreachable</td>'; });
-        }
-    } catch(e) {}
-})();
 </script>
 </body>
 </html>

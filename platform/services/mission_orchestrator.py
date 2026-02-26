@@ -331,11 +331,17 @@ class MissionOrchestrator:
                         _qual = _row["quality_score"] or 0.0
                 except Exception:
                     pass
+                _rl_state = {
+                    "workflow_id": mission.workflow_id or "",
+                    "phase_idx": i,
+                    "rejection_pct": _rej_rate,
+                    "quality_score": _qual,
+                    "phase_count": len(mission.phases),
+                }
                 _rl_rec = _rl.recommend(
-                    wf_id=mission.workflow_id or "",
-                    phase_index=i,
-                    rejection_rate=_rej_rate,
-                    quality_score=_qual,
+                    mission_id=mission.id,
+                    phase_id=phase.phase_id,
+                    state_dict=_rl_state,
                 )
                 if _rl_rec and _rl_rec.get("fired") and _rl_rec.get("action") != "keep":
                     _new_pattern = {
@@ -345,11 +351,18 @@ class MissionOrchestrator:
                         "switch_debate": "debate",
                     }.get(_rl_rec["action"])
                     if _new_pattern and _new_pattern != pattern_type:
+                        _conf = _rl_rec.get("confidence", 0)
                         logger.warning(
                             "RL hook: phase=%s pattern %s→%s (conf=%.2f)",
-                            phase.phase_id, pattern_type, _new_pattern,
-                            _rl_rec.get("confidence", 0),
+                            phase.phase_id, pattern_type, _new_pattern, _conf,
                         )
+                        # XAI — emit explanation as SSE event visible in mission control
+                        _xai_msg = (
+                            f"🤖 **RL adaptation** phase «{wf_phase.name}» : "
+                            f"`{pattern_type}` → `{_new_pattern}` "
+                            f"(conf={_conf:.0%}, rej_rate={_rej_rate:.0%}, qualité={_qual:.2f})"
+                        )
+                        await self._sse_orch_msg(_xai_msg, phase.phase_id)
                         pattern_type = _new_pattern
             except Exception as _rl_err:
                 logger.debug(f"RL hook skipped: {_rl_err}")
@@ -769,6 +782,55 @@ class MissionOrchestrator:
                             total_count,
                         )
                         break  # All criteria met, exit sprint loop
+
+                    # ── Adaptive gate: timeout / partial-completion shortcuts ──
+                    _phase_elapsed_min = (
+                        (datetime.utcnow() - phase.started_at).total_seconds() / 60.0
+                        if phase.started_at
+                        else 0.0
+                    )
+                    _gate_timeout = (
+                        wf_phase.config.get("gate_timeout_minutes", 120)
+                        if wf_phase and wf_phase.config
+                        else 120
+                    )
+
+                    # Auto-complete if ≥2/3 criteria met AND phase running > 30 min
+                    if passed_count >= 2 and total_count >= 3 and _phase_elapsed_min > 30:
+                        logger.warning(
+                            "ORCH evidence gate auto-complete: %s sprint %d (%d/%d) after %.1f min — done_with_issues",
+                            phase.phase_id,
+                            sprint_num,
+                            passed_count,
+                            total_count,
+                            _phase_elapsed_min,
+                        )
+                        await self._sse_orch_msg(
+                            f"Evidence Gate auto-complété ({passed_count}/{total_count}) — ≥2/3 critères satisfaits après {_phase_elapsed_min:.0f} min.",
+                            phase.phase_id,
+                        )
+                        phase_success = True
+                        phase_error = f"Evidence gate auto-complete: {passed_count}/{total_count} criteria met"
+                        break
+
+                    # Force progress if gate_timeout_minutes exceeded AND ≥1 criterion OK
+                    if _phase_elapsed_min > _gate_timeout and passed_count >= 1:
+                        logger.warning(
+                            "ORCH evidence gate timeout: %s sprint %d (%d/%d) after %.1f min — forcing progress",
+                            phase.phase_id,
+                            sprint_num,
+                            passed_count,
+                            total_count,
+                            _phase_elapsed_min,
+                        )
+                        await self._sse_orch_msg(
+                            f"Evidence Gate timeout ({_phase_elapsed_min:.0f}/{_gate_timeout} min) — forçage progression avec {passed_count}/{total_count} critères.",
+                            phase.phase_id,
+                        )
+                        phase_success = True
+                        phase_error = f"Evidence gate timeout: {passed_count}/{total_count} criteria met after {_phase_elapsed_min:.0f} min"
+                        break
+
                     if sprint_num < max_sprints:
                         await self._sse_orch_msg(
                             f"Evidence Gate FAILED ({passed_count}/{total_count}) — critères manquants, relance sprint…",

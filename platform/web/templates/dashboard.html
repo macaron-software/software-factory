@@ -322,6 +322,17 @@
                     <p class="text-muted">Loading...</p>
                 </div>
             </div>
+
+            <!-- Adaptive Intelligence Panel -->
+            <div class="dash-section">
+                <h3>🧬 Adaptive Intelligence</h3>
+                <div id="dashAI"
+                     hx-get="/api/dashboard/ai-panel"
+                     hx-trigger="load, every 30s"
+                     hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
         </div>
     </div>
 </div>

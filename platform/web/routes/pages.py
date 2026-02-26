@@ -734,6 +734,99 @@ async def monitoring_page(request: Request):
     return RedirectResponse("/metrics?tab=monitoring", status_code=302)
 
 
+@router.get("/ops", response_class=HTMLResponse)
+async def ops_page(request: Request):
+    """Observability — LLM latency, errors, queue, provider Thompson."""
+    import json as _json
+    from ...db.migrations import get_db
+
+    db = get_db()
+
+    # LLM usage last 24h per provider
+    llm_providers = []
+    try:
+        rows = db.execute("""
+            SELECT provider, model,
+                COUNT(*) as total_calls,
+                SUM(CASE WHEN error THEN 1 ELSE 0 END) as errors,
+                AVG(CASE WHEN NOT error THEN tokens_in + tokens_out ELSE NULL END) as avg_tokens,
+                MAX(created_at) as last_call
+            FROM llm_usage
+            WHERE created_at >= datetime('now', '-24 hours')
+            GROUP BY provider, model
+            ORDER BY total_calls DESC
+        """).fetchall()
+        llm_providers = [dict(r) for r in rows]
+    except Exception:
+        pass
+
+    # Thompson provider scores
+    llm_thompson = []
+    try:
+        from ...llm.llm_thompson import llm_thompson_stats
+        llm_thompson = llm_thompson_stats()
+    except Exception:
+        pass
+
+    # Active missions
+    active_missions = []
+    try:
+        from ...missions.store import get_mission_run_store
+        runs = get_mission_run_store().list_runs(limit=50)
+        active_missions = [r for r in runs if getattr(r, "status", "") in ("active", "running")]
+    except Exception:
+        pass
+
+    # Top errors last 24h
+    top_errors = []
+    try:
+        rows = db.execute("""
+            SELECT error_type, COUNT(*) as cnt, MAX(created_at) as last_seen
+            FROM incidents
+            WHERE created_at >= datetime('now', '-24 hours')
+            GROUP BY error_type
+            ORDER BY cnt DESC
+            LIMIT 10
+        """).fetchall()
+        top_errors = [dict(r) for r in rows]
+    except Exception:
+        pass
+
+    # RL + GA summary
+    rl_stats = {}
+    try:
+        from ...agents.rl_policy import get_rl_policy
+        rl_stats = get_rl_policy().stats()
+    except Exception:
+        pass
+
+    ga_summary = {}
+    try:
+        rows2 = db.execute(
+            "SELECT COUNT(*) as total, SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) as pending, "
+            "MAX(fitness) as best_fitness FROM evolution_proposals"
+        ).fetchone()
+        ga_summary = dict(rows2) if rows2 else {}
+    except Exception:
+        pass
+
+    db.close()
+
+    return _templates(request).TemplateResponse(
+        "ops.html",
+        {
+            "request": request,
+            "page_title": "Ops",
+            "llm_providers": llm_providers,
+            "llm_thompson": llm_thompson,
+            "active_missions": active_missions,
+            "top_errors": top_errors,
+            "rl_stats": rl_stats,
+            "ga_summary": ga_summary,
+        },
+    )
+
+
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
     import json as _json
