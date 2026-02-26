@@ -55,8 +55,9 @@ def _get_pg_pool():
                 _pg_pool = ConnectionPool(
                     conninfo=conninfo,
                     min_size=2,
-                    max_size=20,
-                    max_idle=300,  # 5 min idle timeout
+                    max_size=50,
+                    max_idle=120,  # 2 min idle timeout — reclaim faster
+                    timeout=5,  # fail fast if pool exhausted (default was 30s)
                     open=True,
                 )
     return _pg_pool
@@ -285,6 +286,12 @@ class PgConnectionWrapper:
 
     def __init__(self, conn):
         self._conn = conn
+        self._returned = False  # guard against double-return to pool
+
+    def __del__(self):
+        """Auto-return to pool on GC — safety net for callers that omit close()."""
+        if not self._returned:
+            self.close()
 
     def execute(self, sql: str, params: tuple = ()) -> PgCursorWrapper:
         # Translate PRAGMA table_info(table) → information_schema query
@@ -422,11 +429,17 @@ class PgConnectionWrapper:
 
     def close(self):
         """Return connection to pool instead of closing."""
+        if self._returned:
+            return
+        self._returned = True
         try:
             pool = _get_pg_pool()
             pool.putconn(self._conn)
         except (psycopg.OperationalError, OSError):
-            self._conn.close()
+            try:
+                self._conn.close()
+            except Exception:
+                pass
 
     @property
     def row_factory(self):
