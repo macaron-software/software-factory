@@ -1,0 +1,165 @@
+{# CTO Chat Panel — htmx partial loaded in Portfolio tab #}
+<style>
+.cto-wrap{display:flex;flex-direction:column;height:calc(100vh - 140px);min-height:400px;gap:0}
+.cto-header{display:flex;align-items:center;gap:0.75rem;padding:1rem 1.25rem 0.75rem;border-bottom:1px solid var(--border)}
+.cto-header-avatar{width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid var(--border)}
+.cto-header-info{flex:1}
+.cto-header-name{font-weight:700;font-size:0.95rem;color:var(--text)}
+.cto-header-role{font-size:0.72rem;color:var(--text-muted);margin-top:1px}
+.cto-header-status{display:flex;align-items:center;gap:0.4rem;font-size:0.7rem;color:var(--success)}
+.cto-header-dot{width:7px;height:7px;border-radius:50%;background:var(--success)}
+.cto-chips{display:flex;flex-wrap:wrap;gap:0.4rem;padding:0.6rem 1.25rem;border-bottom:1px solid var(--border)}
+.cto-chip{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:20px;padding:0.25rem 0.75rem;font-size:0.72rem;cursor:pointer;color:var(--text-muted);transition:all .15s}
+.cto-chip:hover{background:var(--accent-subtle,rgba(99,102,241,.1));border-color:var(--accent,#6366f1);color:var(--text)}
+.cto-messages{flex:1;overflow-y:auto;padding:1rem 1.25rem;display:flex;flex-direction:column;gap:0.75rem}
+.cto-messages:empty::after{content:"Posez une question à Karim…";color:var(--text-muted);font-size:0.82rem;margin:auto;display:block;text-align:center;padding-top:2rem}
+.cto-input-area{display:flex;gap:0.5rem;padding:0.75rem 1.25rem;border-top:1px solid var(--border);background:var(--bg-secondary)}
+.cto-input{flex:1;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:0.55rem 0.85rem;font-size:0.85rem;color:var(--text);resize:none;line-height:1.4;max-height:120px}
+.cto-input:focus{outline:none;border-color:var(--accent,#6366f1)}
+.cto-send{background:var(--accent,#6366f1);color:#fff;border:none;border-radius:8px;padding:0.55rem 1rem;cursor:pointer;font-size:0.82rem;font-weight:600;transition:opacity .15s;white-space:nowrap}
+.cto-send:hover{opacity:.85}
+.cto-send.htmx-request{opacity:.5;pointer-events:none}
+
+/* Chat messages — reuse existing .chat-msg styles, add cto-specific overrides */
+.cto-messages .chat-msg{max-width:78%;animation:fadeUp .2s ease}
+.cto-messages .chat-msg-user{margin-left:auto}
+.cto-messages .chat-msg-agent{margin-right:auto}
+.cto-avatar{width:32px;height:32px;border-radius:50%;background:url('/static/avatars/strat-cto.jpg') center/cover;flex-shrink:0;border:1px solid var(--border)}
+.cto-messages .chat-msg-body{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;padding:0.65rem 0.85rem;max-width:100%}
+.cto-messages .chat-msg-user .chat-msg-body{background:var(--accent-subtle,rgba(99,102,241,.12));border-color:var(--accent,#6366f1)}
+.cto-messages .chat-msg-sender{font-size:0.68rem;font-weight:600;color:var(--accent,#6366f1);margin-bottom:0.25rem}
+.cto-messages .chat-msg-text{font-size:0.84rem;color:var(--text);line-height:1.55}
+.cto-messages .chat-msg-text.md-rendered p{margin:0 0 0.4rem}
+.cto-messages .chat-msg-text.md-rendered p:last-child{margin-bottom:0}
+.cto-messages .chat-msg-text.md-rendered code{background:var(--bg-primary);padding:.1em .35em;border-radius:3px;font-size:.8em}
+.cto-messages .chat-msg-text.md-rendered pre{background:var(--bg-primary);border-radius:6px;padding:.75rem;overflow-x:auto;font-size:.78rem;margin:.5rem 0}
+.cto-messages .chat-msg-tools{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.4rem}
+.cto-thinking{display:flex;align-items:center;gap:.5rem;font-size:.78rem;color:var(--text-muted);padding:.4rem 0}
+.cto-thinking-dots{display:flex;gap:.25rem}
+.cto-thinking-dots span{width:5px;height:5px;border-radius:50%;background:var(--text-muted);animation:bounce .8s infinite}
+.cto-thinking-dots span:nth-child(2){animation-delay:.15s}
+.cto-thinking-dots span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+</style>
+
+<div class="cto-wrap">
+  {# Header #}
+  <div class="cto-header">
+    <img class="cto-header-avatar" src="/static/avatars/strat-cto.jpg" alt="Karim Benali">
+    <div class="cto-header-info">
+      <div class="cto-header-name">Karim Benali</div>
+      <div class="cto-header-role">Chief Technology Officer · Software Factory</div>
+    </div>
+    <div class="cto-header-status">
+      <span class="cto-header-dot"></span>
+      disponible
+    </div>
+  </div>
+
+  {# Quick chips #}
+  <div class="cto-chips">
+    <button class="cto-chip" onclick="ctoSendChip('Donne-moi les métriques du portfolio : missions, projets, agents, coûts LLM')">Stats portfolio</button>
+    <button class="cto-chip" onclick="ctoSendChip('Liste les missions en cours et leur état')">Missions en cours</button>
+    <button class="cto-chip" onclick="ctoSendChip('Analyse la dette technique et les risques actuels')">Dette technique</button>
+    <button class="cto-chip" onclick="ctoSendChip('Cherche sur GitHub les dernières pratiques pour notre stack')">Chercher sur GitHub</button>
+    <button class="cto-chip" onclick="ctoSendChip('Monte-moi une équipe optimale pour un projet de sécurité')">Monter une équipe</button>
+  </div>
+
+  {# Messages #}
+  <div class="cto-messages" id="cto-msgs">
+    {{ history_html | safe }}
+  </div>
+
+  {# Thinking indicator (hidden by default) #}
+  <div id="cto-thinking" class="cto-thinking" style="display:none;padding-left:1.25rem">
+    <div class="cto-avatar" style="width:24px;height:24px"></div>
+    <div class="cto-thinking-dots">
+      <span></span><span></span><span></span>
+    </div>
+    <span>Karim réfléchit…</span>
+  </div>
+
+  {# Input #}
+  <div class="cto-input-area">
+    <textarea
+      id="cto-input"
+      class="cto-input"
+      placeholder="Posez une question à Karim, créez un projet, demandez une analyse…"
+      rows="1"
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ctoSend()}"
+      oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"
+    ></textarea>
+    <button
+      id="cto-send-btn"
+      class="cto-send"
+      onclick="ctoSend()"
+    >Envoyer</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  function ctoSend(){
+    var inp = document.getElementById('cto-input');
+    var msg = inp.value.trim();
+    if(!msg) return;
+    inp.value = '';
+    inp.style.height = 'auto';
+    _ctoDispatch(msg);
+  }
+
+  function ctoSendChip(text){
+    _ctoDispatch(text);
+  }
+
+  function _ctoDispatch(msg){
+    var msgs = document.getElementById('cto-msgs');
+    var thinking = document.getElementById('cto-thinking');
+    // Show user bubble immediately
+    msgs.insertAdjacentHTML('beforeend',
+      '<div class="chat-msg chat-msg-user">' +
+      '<div class="chat-msg-body"><div class="chat-msg-text">' + _escape(msg) + '</div></div>' +
+      '<div class="chat-msg-avatar user">S</div>' +
+      '</div>'
+    );
+    thinking.style.display = 'flex';
+    msgs.scrollTop = msgs.scrollHeight;
+
+    fetch('/api/cto/message', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({content: msg})
+    })
+    .then(function(r){ return r.text(); })
+    .then(function(html){
+      thinking.style.display = 'none';
+      // Remove the user bubble we pre-inserted (server returns both)
+      var userBubbles = msgs.querySelectorAll('.chat-msg-user');
+      if(userBubbles.length) userBubbles[userBubbles.length-1].remove();
+      msgs.insertAdjacentHTML('beforeend', html);
+      msgs.scrollTop = msgs.scrollHeight;
+    })
+    .catch(function(e){
+      thinking.style.display = 'none';
+      msgs.insertAdjacentHTML('beforeend',
+        '<div class="chat-msg chat-msg-agent">' +
+        '<div class="chat-msg-body"><div class="chat-msg-text" style="color:var(--danger)">Erreur de communication avec le CTO.</div></div>' +
+        '</div>'
+      );
+    });
+  }
+
+  function _escape(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Expose to global scope (onclick handlers)
+  window.ctoSend = ctoSend;
+  window.ctoSendChip = ctoSendChip;
+
+  // Scroll to bottom on load
+  var msgs = document.getElementById('cto-msgs');
+  if(msgs) msgs.scrollTop = msgs.scrollHeight;
+})();
+</script>

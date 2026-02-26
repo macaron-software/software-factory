@@ -19,6 +19,9 @@
     {% if p in _full_access + ('business_owner',) %}
     <button class="tab {% if active_tab == 'metier' %}active{% endif %}" hx-get="/metier" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/?tab=metier" onclick="switchTab(this)">{{ _("business") }}</button>
     {% endif %}
+    {% if p in _full_access %}
+    <button class="tab {% if active_tab == 'cto' %}active{% endif %}" hx-get="/cto" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/?tab=cto" onclick="switchTab(this)">CTO</button>
+    {% endif %}
 </div>
 <div id="tab-content">
 <div id="portfolio-inner">
@@ -742,10 +745,11 @@ function switchTab(btn){
 (function(){
     var activeTab = '{{ active_tab }}';
     if (activeTab && activeTab !== 'overview') {
-        var urls = {dsi: '/dsi', metier: '/metier'};
+        var urls = {dsi: '/dsi', metier: '/metier', cto: '/cto'};
         var url = urls[activeTab];
         if (url) {
-            htmx.ajax('GET', url, {target: '#tab-content', swap: 'innerHTML', select: '.main-area > *'});
+            var selectOpt = activeTab === 'cto' ? undefined : '.main-area > *';
+            htmx.ajax('GET', url, {target: '#tab-content', swap: 'innerHTML', select: selectOpt});
         }
     }
 })();

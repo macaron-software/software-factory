@@ -41,9 +41,21 @@ tools:
   - code_search
   - deep_search
   - memory_search
+  - platform_agents
+  - platform_missions
+  - platform_metrics
+  - platform_sessions
+  - platform_workflows
+  - platform_memory_search
+  - web_search
+  - web_fetch
+  - create_project
+  - create_mission
+  - create_feature
+  - create_story
 
 llm:
-  model: MiniMax-M2.5
+  model: gpt-5.2
   temperature: 0.4
   max_tokens: 8000
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from .cto import router as cto_router
 from .agents import router as agents_router
 from .analytics import router as analytics_router
 from .api import router as api_router
@@ -22,6 +23,7 @@ from .workflows import router as workflows_router
 
 router = APIRouter()
 
+router.include_router(cto_router)
 router.include_router(pages_router)
 router.include_router(projects_router)
 router.include_router(missions_router)

@@ -56,7 +56,9 @@ class PlatformAgentsTool(BaseTool):
 
 class PlatformMissionsTool(BaseTool):
     name = "platform_missions"
-    description = "List all missions/epics or get details of one, including phase statuses."
+    description = (
+        "List all missions/epics or get details of one, including phase statuses."
+    )
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
@@ -77,14 +79,18 @@ class PlatformMissionsTool(BaseTool):
                             "status": p.status.value
                             if hasattr(p.status, "value")
                             else str(p.status),
-                            "result": (p.result or "")[:200] if hasattr(p, "result") else "",
+                            "result": (p.result or "")[:200]
+                            if hasattr(p, "result")
+                            else "",
                         }
                     )
             return json.dumps(
                 {
                     "id": m.id,
                     "brief": (m.brief or "")[:500],
-                    "status": m.status.value if hasattr(m.status, "value") else str(m.status),
+                    "status": m.status.value
+                    if hasattr(m.status, "value")
+                    else str(m.status),
                     "workspace": m.workspace_path,
                     "phases": phases,
                 }
@@ -95,7 +101,9 @@ class PlatformMissionsTool(BaseTool):
                 {
                     "id": m.id,
                     "brief": (m.brief or "")[:100],
-                    "status": m.status.value if hasattr(m.status, "value") else str(m.status),
+                    "status": m.status.value
+                    if hasattr(m.status, "value")
+                    else str(m.status),
                 }
                 for m in (runs or [])[:20]
             ]
@@ -104,9 +112,7 @@ class PlatformMissionsTool(BaseTool):
 
 class PlatformMemoryTool(BaseTool):
     name = "platform_memory_search"
-    description = (
-        "Search platform memory (project or global). FTS5 full-text search across all knowledge."
-    )
+    description = "Search platform memory (project or global). FTS5 full-text search across all knowledge."
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
@@ -128,9 +134,7 @@ class PlatformMemoryTool(BaseTool):
 
 class PlatformMetricsTool(BaseTool):
     name = "platform_metrics"
-    description = (
-        "Get platform statistics: agent count, missions, sessions, messages, memory entries."
-    )
+    description = "Get platform statistics: agent count, missions, sessions, messages, memory entries."
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
@@ -140,7 +144,9 @@ class PlatformMetricsTool(BaseTool):
         counts = {}
         for table in ("agents", "mission_runs", "sessions", "messages"):
             try:
-                counts[table] = db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                counts[table] = db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[
+                    0
+                ]
             except Exception:
                 counts[table] = 0
         return json.dumps(counts)
@@ -184,9 +190,7 @@ class PlatformSessionsTool(BaseTool):
 
 class PlatformWorkflowsTool(BaseTool):
     name = "platform_workflows"
-    description = (
-        "List available ceremony templates (workflows) with their phases, patterns, and agents."
-    )
+    description = "List available ceremony templates (workflows) with their phases, patterns, and agents."
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
@@ -267,6 +271,60 @@ class PlatformCreateStoryTool(BaseTool):
         return json.dumps({"ok": True, "story_id": story.id, "title": story.title})
 
 
+class PlatformCreateProjectTool(BaseTool):
+    name = "create_project"
+    description = (
+        "Create a new project on the platform. "
+        "Params: name (required), description, stack (tech stack string), factory_type ('software'|'data'|'security'). "
+        "Returns the created project id and name."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..projects.manager import get_project_store, ProjectDef
+
+        name = params.get("name", "").strip()
+        if not name:
+            return json.dumps({"error": "name is required"})
+        store = get_project_store()
+        proj = ProjectDef(
+            name=name,
+            description=params.get("description", ""),
+            stack=params.get("stack", ""),
+            factory_type=params.get("factory_type", "software"),
+        )
+        proj = store.create(proj)
+        return json.dumps({"ok": True, "project_id": proj.id, "name": proj.name})
+
+
+class PlatformCreateMissionTool(BaseTool):
+    name = "create_mission"
+    description = (
+        "Create a new mission (epic) on the platform and launch it. "
+        "Params: name (required), goal/description, project_id, workflow_id (optional). "
+        "Returns the mission id."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..missions.store import get_mission_store, MissionDef
+
+        name = params.get("name", "").strip()
+        if not name:
+            return json.dumps({"error": "name is required"})
+        store = get_mission_store()
+        mission = MissionDef(
+            name=name,
+            description=params.get("description", params.get("goal", "")),
+            goal=params.get("goal", params.get("description", name)),
+            project_id=params.get("project_id", ""),
+            workflow_id=params.get("workflow_id", ""),
+            status="active",
+        )
+        mission = store.create(mission)
+        return json.dumps({"ok": True, "mission_id": mission.id, "name": mission.name})
+
+
 def register_platform_tools(registry):
     """Register all platform introspection tools."""
     registry.register(PlatformAgentsTool())
@@ -277,3 +335,5 @@ def register_platform_tools(registry):
     registry.register(PlatformWorkflowsTool())
     registry.register(PlatformCreateFeatureTool())
     registry.register(PlatformCreateStoryTool())
+    registry.register(PlatformCreateProjectTool())
+    registry.register(PlatformCreateMissionTool())
