@@ -804,6 +804,16 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - 工作流中的设计系统流水线（UX → 开发 → 评审）
 - 3D 智能体世界可视化
 
+### Darwin — 进化式团队选择
+- **Thompson Sampling 选择** — 基于 `Beta(wins+1, losses+1)` 的概率性 agent+pattern 团队选择，维度：`(agent_id, pattern_id, 技术, 阶段类型)`
+- **细粒度适应度追踪** — 每个上下文独立评分：擅长 Angular 迁移的团队未必擅长 Angular 新功能开发
+- **相似度回退** — 冷启动通过技术前缀匹配处理（`angular_19` → `angular_*` → `generic`）
+- **软退休机制** — 表现持续较差的团队获得 `weight_multiplier=0.1`，降优先级但可恢复
+- **OKR / KPI 系统** — 按领域和阶段类型设置目标与指标；8 个默认种子
+- **A/B 影子测试** — 当两个团队适应度分数接近（delta < 10）或 10% 概率时，自动触发并行影子运行
+- **Teams 仪表板** `/teams` — 排行榜含 champion/rising/declining/retired 徽章、内联 OKR 编辑、Chart.js 进化曲线、选择历史、A/B 测试结果
+- **非破坏性可选** — 在 pattern 中使用 `agent_id: "skill:developer"` 即可启用 Darwin；显式 ID 不受影响
+
 ## v2.2.0 新特性（2026 年 2 月）
 
 ### OpenTelemetry 与分布式追踪
