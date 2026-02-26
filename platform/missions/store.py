@@ -193,6 +193,7 @@ class MissionStore:
             # Trigger notification on terminal states
             if updated and status in ("completed", "failed"):
                 self._notify_mission_status(mission_id, status, db)
+                self._update_darwin_fitness(mission_id, status, db)
 
             return updated
         finally:
@@ -234,6 +235,82 @@ class MissionStore:
         except Exception as e:
             import logging
             logging.getLogger(__name__).warning("Notification error: %s", e)
+
+    # Phase → Darwin phase_type mapping
+    _MISSION_TYPE_TO_PHASE = {
+        "bug": "bugfix",
+        "debt": "refactoring",
+        "feature": "new_feature",
+        "epic": "new_feature",
+        "security": "audit",
+        "program": "generic",
+    }
+
+    def _update_darwin_fitness(self, mission_id: str, status: str, db):
+        """Update Darwin team + LLM fitness from mission completion."""
+        import logging
+        log = logging.getLogger(__name__)
+        try:
+            mission = db.execute(
+                "SELECT id, type, config_json FROM missions WHERE id = ?", (mission_id,)
+            ).fetchone()
+            if not mission:
+                return
+
+            import json
+            cfg = json.loads(mission["config_json"] or "{}")
+            technology = cfg.get("technology", "generic")
+            phase_type = self._MISSION_TYPE_TO_PHASE.get(mission["type"] or "", "generic")
+            won = status == "completed"
+
+            # Collect agent+pattern+model combos from llm_traces → sessions
+            rows = db.execute(
+                """
+                SELECT lt.agent_id, s.pattern_id, lt.model, lt.provider,
+                       COUNT(*) as calls
+                FROM llm_traces lt
+                LEFT JOIN sessions s ON lt.session_id = s.id
+                WHERE lt.mission_id = ? AND lt.agent_id IS NOT NULL
+                GROUP BY lt.agent_id, s.pattern_id, lt.model
+                """,
+                (mission_id,),
+            ).fetchall()
+
+            if not rows:
+                return
+
+            from ..patterns.team_selector import update_team_fitness, LLMTeamSelector
+
+            seen_teams = set()
+            for r in rows:
+                agent_id = r["agent_id"]
+                pattern_id = r["pattern_id"] or "unknown"
+                model = r["model"] or "unknown"
+                provider = r["provider"] or "unknown"
+                team_key = (agent_id, pattern_id)
+
+                # Team-level Darwin (once per agent+pattern combo)
+                if team_key not in seen_teams:
+                    seen_teams.add(team_key)
+                    try:
+                        update_team_fitness(
+                            db, agent_id, pattern_id, technology, phase_type, won
+                        )
+                    except Exception as e:
+                        log.debug("Darwin team fitness error: %s", e)
+
+                # LLM-level Darwin
+                try:
+                    LLMTeamSelector.update_fitness(
+                        agent_id, pattern_id, technology, phase_type,
+                        model, provider, won
+                    )
+                except Exception as e:
+                    log.debug("Darwin LLM fitness error: %s", e)
+
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Darwin fitness update error: %s", e)
 
     def delete_mission(self, mission_id: str) -> bool:
         db = get_db()
