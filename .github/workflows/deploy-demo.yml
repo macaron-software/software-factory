@@ -20,12 +20,8 @@ jobs:
 
       - name: Backup before deploy
         run: |
-          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes debian@${{ secrets.OVH_IP }} \
-            'TS=$(date +%Y%m%d-%H%M%S) &&
-             mkdir -p /opt/software-factory/backups &&
-             docker exec software-factory-platform-1 sh -c "mkdir -p /app/data/backups && sqlite3 /app/data/platform.db .dump > /app/data/backups/dump-'$TS'.sql" 2>/dev/null || echo "SQLite backup skipped" &&
-             tar czf /opt/software-factory/backups/yaml-'$TS'.tar.gz /opt/software-factory/platform/skills /opt/software-factory/platform/workflows 2>/dev/null || echo "YAML backup skipped" &&
-             ls /opt/software-factory/backups/ | tail -3'
+          timeout 30 ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o ConnectTimeout=10 debian@${{ secrets.OVH_IP }} \
+            "mkdir -p /opt/software-factory/backups && tar czf /opt/software-factory/backups/yaml-\$(date +%Y%m%d-%H%M%S).tar.gz /opt/software-factory/platform/skills /opt/software-factory/platform/workflows 2>/dev/null; echo backup-done" || echo "Backup skipped"
 
       - name: Rsync code to OVH
         run: |
