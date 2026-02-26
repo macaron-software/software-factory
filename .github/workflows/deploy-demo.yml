@@ -31,6 +31,7 @@ jobs:
             --exclude '*.pyc' \
             --exclude 'data/' \
             --exclude 'workspace/' \
+            --exclude 'patches/' \
             platform/ cli/ skills/ dashboard/ mcp_lrm/ \
             debian@${{ secrets.OVH_IP }}:/opt/software-factory/
 
