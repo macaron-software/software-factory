@@ -151,8 +151,9 @@
             <div class="wiki-cat">{{ p.category }}</div>
         {% endif %}
         <a class="wiki-link {% if page and page.slug == p.slug %}active{% endif %} {% if p.parent_slug %}wiki-link-child{% endif %}"
-           hx-get="/wiki/{{ p.slug }}" hx-target="#wikiMain" hx-swap="innerHTML"
+           hx-get="/wiki/page/{{ p.slug }}" hx-target="#wikiMain" hx-swap="innerHTML"
            data-title="{{ p.title|lower }}">
+            <span class="wiki-link-icon">{{ p.icon }}</span>
             {{ p.title }}
         </a>
     {% endfor %}
@@ -163,7 +164,7 @@
 <div class="wiki-main" id="wikiMain">
 {% if page %}
     <div class="wiki-page-header">
-        <h1>{{ page.title }}</h1>
+        <h1><span>{{ page.icon }}</span> {{ page.title }}</h1>
         <div class="wiki-actions">
             <button class="wiki-btn" onclick="wikiToggleEdit('{{ page.slug }}')">
                 <svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-edit-2"/></svg> Edit
@@ -197,32 +198,19 @@
     })();
     </script>
 {% else %}
-    {% if pages|length > 0 %}
-    <script>
-    // Auto-load getting-started if pages exist but none selected
-    (function() {
-        const firstSlug = '{{ pages[0].slug }}';
-        const target = document.getElementById('wikiMain');
-        const preferred = ['getting-started', firstSlug];
-        for (const slug of preferred) {
-            const link = document.querySelector('.wiki-link[href="/wiki/' + slug + '"]');
-            if (link) { link.click(); break; }
-        }
-    })();
-    </script>
-    {% else %}
     <div class="wiki-empty">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
         </svg>
         <h2>Software Factory Wiki</h2>
-        <p>No pages found. Seed the wiki to get started.</p>
+        <p>Select a page from the sidebar to start reading, or create a new page.</p>
+        {% if pages|length == 0 %}
         <button class="wiki-btn wiki-btn-primary" style="margin-top:1rem" onclick="wikiSeed()">
-            Initialize Wiki
+            <svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-zap"/></svg> Initialize Wiki
         </button>
+        {% endif %}
     </div>
-    {% endif %}
 {% endif %}
 </div>
 

@@ -1,0 +1,41 @@
+{# Wiki page content only — loaded via HTMX into #wikiMain #}
+{% if page %}
+    <div class="wiki-page-header">
+        <h1><span>{{ page.icon }}</span> {{ page.title }}</h1>
+        <div class="wiki-actions">
+            <button class="wiki-btn" onclick="wikiToggleEdit('{{ page.slug }}')">
+                <svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-edit-2"/></svg> Edit
+            </button>
+            <button class="wiki-btn" onclick="window.print()">
+                <svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-printer"/></svg>
+            </button>
+        </div>
+    </div>
+    <div class="wiki-content" id="wikiContent"></div>
+    <textarea class="wiki-editor" id="wikiEditor" style="display:none">{{ page.content }}</textarea>
+    <div id="wikiEditActions" style="display:none;margin-top:1rem;gap:0.5rem">
+        <button class="wiki-btn wiki-btn-primary" onclick="wikiSave('{{ page.slug }}')">Save</button>
+        <button class="wiki-btn" onclick="wikiCancelEdit()">Cancel</button>
+    </div>
+    <script>
+    (function() {
+        const raw = document.getElementById('wikiEditor').value;
+        function render() { document.getElementById('wikiContent').innerHTML = marked.parse(raw); }
+        if (!window.marked) {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/marked@12/marked.min.js';
+            s.onload = render;
+            document.head.appendChild(s);
+        } else { render(); }
+        // Highlight active link in sidebar
+        document.querySelectorAll('#wikiTOC .wiki-link').forEach(a => {
+            a.classList.toggle('active', a.getAttribute('hx-get') === '/wiki/page/{{ page.slug }}');
+        });
+    })();
+    </script>
+{% else %}
+    <div class="wiki-empty">
+        <h2>Page not found</h2>
+        <p>This wiki page does not exist.</p>
+    </div>
+{% endif %}

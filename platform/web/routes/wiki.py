@@ -34,6 +34,17 @@ async def wiki_partial(request: Request):
     )
 
 
+@router.get("/wiki/page/{slug}", response_class=HTMLResponse)
+async def wiki_page_content(request: Request, slug: str):
+    """Return only the wiki page content (no sidebar) — HTMX target for sidebar links."""
+    db = _wiki_db()
+    page = db.execute("SELECT * FROM wiki_pages WHERE slug = ?", (slug,)).fetchone()
+    return _templates(request).TemplateResponse(
+        "_partial_wiki_page.html",
+        {"request": request, "page": dict(page) if page else None},
+    )
+
+
 @router.get("/wiki/{slug}", response_class=HTMLResponse)
 async def wiki_page(request: Request, slug: str):
     """Return a single wiki page partial (HTMX target)."""
