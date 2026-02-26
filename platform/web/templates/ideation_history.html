@@ -59,7 +59,7 @@
         <div class="ih-card" onclick="loadSession('{{ s.id }}')">
             <div class="ih-card-top">
                 <span class="ih-card-title">{{ s.title or 'Sans titre' }}</span>
-                <span class="ih-card-date">{{ s.created_at[:16].replace('T', ' ') if s.created_at else '' }}</span>
+                <span class="ih-card-date">{{ s.created_at | ts }}</span>
             </div>
             <div class="ih-card-prompt">{{ s.prompt }}</div>
             <div class="ih-card-footer">

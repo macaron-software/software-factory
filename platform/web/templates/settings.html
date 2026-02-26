@@ -209,7 +209,7 @@
                 <div class="integ-status">
                     <span class="integ-status-dot {{ integ.status }}"></span>
                     <span>{{ integ.status }}</span>
-                    {% if integ.last_sync %}<span style="margin-left:auto;opacity:.6">Last sync: {{ integ.last_sync[:16] }}</span>{% endif %}
+                    {% if integ.last_sync %}<span style="margin-left:auto;opacity:.6">Last sync: {{ integ.last_sync | ts }}</span>{% endif %}
                 </div>
                 <div class="integ-actions">
                     <button class="btn btn-ghost btn-sm" onclick="saveInteg('{{ integ.id }}')" style="font-size:0.72rem">

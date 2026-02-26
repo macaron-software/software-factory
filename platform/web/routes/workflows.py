@@ -732,7 +732,9 @@ async def dsi_board_page(request: Request):
                         "session_name": sess.name or sess.id[:8],
                         "agent_name": msg.from_agent or "Agent",
                         "content": msg.content[:120],
-                        "time": msg.timestamp[:16] if msg.timestamp else "",
+                        "time": str(msg.timestamp)[:16].replace(" ", "T")
+                        if msg.timestamp
+                        else "",
                         "status": "approved",
                     }
                 )
@@ -993,7 +995,7 @@ async def dsi_workflow_page(request: Request, workflow_id: str):
                     "to_name": to_info["name"] if to_info else None,
                     "to_id": msg.to_agent,
                     "content": display,
-                    "time": (msg.timestamp or "")[:16],
+                    "time": str(msg.timestamp or "")[:16].replace(" ", "T"),
                     "action": action,
                     "message_type": msg.message_type,
                 }

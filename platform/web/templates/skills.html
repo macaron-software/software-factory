@@ -26,7 +26,7 @@
         <div class="gh-source-item">
             <a href="https://github.com/{{ src.repo }}" target="_blank" class="gh-source-repo">{{ src.repo }}</a>
             {% if src.path %}<span class="gh-source-path">/{{ src.path }}</span>{% endif %}
-            <span class="gh-source-meta">{{ src.files_count }} files · {{ src.fetched_at[:10] if src.fetched_at != 'never' else 'not synced' }}</span>
+            <span class="gh-source-meta">{{ src.files_count }} files · {{ src.fetched_at | ts('date') if src.fetched_at != 'never' else 'not synced' }}</span>
             <form style="display:inline" hx-post="/api/skills/github/remove" hx-target="closest .gh-source-item" hx-swap="outerHTML">
                 <input type="hidden" name="repo" value="{{ src.repo }}">
                 <button type="submit" class="gh-source-remove" title="{{ _("tt_remove") }}"><svg class="icon icon-xs"><use href="#icon-x"/></svg></button>

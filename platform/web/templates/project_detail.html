@@ -58,7 +58,7 @@
                href="{% if is_workflow %}/sessions/{{ s.id }}/live{% else %}/projects/{{ project.id }}?session={{ s.id }}{% endif %}">
                 {% if is_workflow %}<svg class="icon icon-xs" style="flex-shrink:0"><use href="#icon-workflow"/></svg>{% endif %}
                 <span class="chat-conv-name">{{ s.name }}</span>
-                <span class="chat-conv-date">{{ s.created_at[:16].replace('T', ' ') if s.created_at else '' }}</span>
+                <span class="chat-conv-date">{{ s.created_at | ts }}</span>
             </a>
             {% endfor %}
             {% if not sessions %}

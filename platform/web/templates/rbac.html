@@ -158,7 +158,7 @@
                 </div>
             </td>
             <td style="font-size:0.75rem;color:var(--text-secondary)">{{ u.last_login | relative_time if u.last_login else '—' }}</td>
-            <td style="font-size:0.75rem;color:var(--text-secondary)">{{ u.created_at[:10] if u.created_at else '—' }}</td>
+            <td style="font-size:0.75rem;color:var(--text-secondary)">{{ u.created_at | ts('date') }}</td>
             <td>
                 <div class="row-actions">
                     <button class="icon-btn danger" onclick="removeMember('{{ u.id }}','{{ u.email }}')" title="Remove">

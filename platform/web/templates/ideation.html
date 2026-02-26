@@ -31,7 +31,7 @@
                     <div class="idea-sidebar-item-title">{{ s.title or 'Sans titre' }}</div>
                     <div class="idea-sidebar-item-meta">
                         <span class="idea-sidebar-badge {{ s.status }}">{{ s.status }}</span>
-                        <span>{{ s.created_at[:10] if s.created_at else '' }}</span>
+                        <span>{{ s.created_at | ts('date') }}</span>
                     </div>
                 </div>
                 {% endfor %}

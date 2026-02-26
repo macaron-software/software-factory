@@ -942,6 +942,39 @@ def create_app() -> FastAPI:
     templates.env.filters["avatar_color"] = _avatar_color
     templates.env.filters["relative_time"] = _relative_time
 
+    def _ts_filter(value, fmt: str = "datetime") -> str:
+        """Normalize datetime/string timestamp for safe display in templates.
+
+        Handles both str (SQLite) and datetime objects (PostgreSQL psycopg2).
+        Usage in templates:
+          {{ obj.created_at | ts }}          → "2024-01-01 12:34"
+          {{ obj.created_at | ts('date') }}  → "2024-01-01"
+          {{ obj.created_at | ts('%d/%m') }} → "01/01"
+        """
+        if not value:
+            return "—"
+        from datetime import datetime, date
+
+        if isinstance(value, (datetime, date)):
+            if fmt == "date":
+                return value.strftime("%Y-%m-%d")
+            if fmt == "datetime":
+                return value.strftime("%Y-%m-%d %H:%M")
+            return value.strftime(fmt)
+        s = str(value)
+        if fmt == "date":
+            return s[:10]
+        if fmt == "datetime":
+            return s[:16].replace("T", " ")
+        # Custom strftime: parse then format
+        try:
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00").replace(" ", "T"))
+            return dt.strftime(fmt)
+        except Exception:
+            return s[:16]
+
+    templates.env.filters["ts"] = _ts_filter
+
     # i18n — make _() available in all templates
     from .i18n import SUPPORTED_LANGS, _catalog
     from .i18n import get_lang as _get_lang

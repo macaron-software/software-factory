@@ -30,7 +30,7 @@
         </div>
         <div class="item-meta">
             <span class="item-badge">{{ s.message_count }} msg</span>
-            <span class="item-badge muted">{{ s.session.created_at[:16].replace('T', ' ') }}</span>
+            <span class="item-badge muted">{{ s.session.created_at | ts }}</span>
         </div>
     </a>
     {% else %}

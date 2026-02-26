@@ -276,7 +276,7 @@
                 {% if t.goal %}<div class="tma-card-desc" style="opacity:0.7"><svg class="icon icon-sm" style="width:12px;height:12px;vertical-align:-2px"><use href="#icon-target"/></svg> {{ t.goal[:120] }}</div>{% endif %}
                 <div class="tma-card-footer">
                     <span class="tma-card-project">{{ t.project_name }}</span>
-                    <span class="tma-card-date">{{ t.created_at[:10] if t.created_at else '' }}</span>
+                    <span class="tma-card-date">{{ t.created_at | ts('date') }}</span>
                 </div>
             </div>
             {% endfor %}
@@ -306,7 +306,7 @@
                 {% if t.goal %}<div class="tma-card-desc" style="opacity:0.7"><svg class="icon icon-sm" style="width:12px;height:12px;vertical-align:-2px"><use href="#icon-target"/></svg> {{ t.goal[:120] }}</div>{% endif %}
                 <div class="tma-card-footer">
                     <span class="tma-card-project">{{ t.project_name }}</span>
-                    <span class="tma-card-date">{{ t.created_at[:10] if t.created_at else '' }}</span>
+                    <span class="tma-card-date">{{ t.created_at | ts('date') }}</span>
                 </div>
             </div>
             {% endfor %}
@@ -335,7 +335,7 @@
                 {% if t.goal %}<div class="tma-card-desc" style="opacity:0.7"><svg class="icon icon-sm" style="width:12px;height:12px;vertical-align:-2px"><use href="#icon-target"/></svg> {{ t.goal[:120] }}</div>{% endif %}
                 <div class="tma-card-footer">
                     <span class="tma-card-project">{{ t.project_name }}</span>
-                    <span class="tma-card-date">{{ t.created_at[:10] if t.created_at else '' }}</span>
+                    <span class="tma-card-date">{{ t.created_at | ts('date') }}</span>
                 </div>
             </div>
             {% endfor %}

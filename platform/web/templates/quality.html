@@ -157,7 +157,7 @@
             {% for t in trend %}
             {% set ts = t.global_score %}
             {% set tc = 'elite' if ts >= 80 else 'high' if ts >= 60 else 'medium' if ts >= 40 else 'low' %}
-            <div class="quality-spark-bar bg-{{ tc }}" style="height:{{ ts }}%" title="{{ t.timestamp[:16] }}: {{ ts|round|int }}/100"></div>
+            <div class="quality-spark-bar bg-{{ tc }}" style="height:{{ ts }}%" title="{{ t.timestamp | ts }}: {{ ts|round|int }}/100"></div>
             {% endfor %}
         </div>
     </div>
