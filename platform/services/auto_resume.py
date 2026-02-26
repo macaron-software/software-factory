@@ -4,21 +4,35 @@ Called from server.py lifespan. Runs as a periodic watchdog every 5 minutes:
 - Resumes paused mission_runs (all of them, batched with stagger)
 - Retries failed continuous background missions (TMA, security, self-healing, debt…)
 - Launches unstarted continuous missions (first run ever)
+- Hourly: cleans up orphaned workspaces + old llm_traces + cancelled run records
 """
+
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
+import os
+import shutil
 
 logger = logging.getLogger(__name__)
 
 # Mission name/type patterns that should always be running
 _CONTINUOUS_KEYWORDS = (
-    "tma", "sécurité", "securite", "security",
-    "dette technique", "tech debt", "self-heal", "self_heal",
-    "tmc", "load test", "chaos", "endurance",
-    "monitoring", "audit",
+    "tma",
+    "sécurité",
+    "securite",
+    "security",
+    "dette technique",
+    "tech debt",
+    "self-heal",
+    "self_heal",
+    "tmc",
+    "load test",
+    "chaos",
+    "endurance",
+    "monitoring",
+    "audit",
 )
 
 # Watchdog loop interval (seconds)
@@ -26,10 +40,12 @@ _WATCHDOG_INTERVAL = 300
 # Stagger between each resume
 _STAGGER_STARTUP = 1.5
 _STAGGER_WATCHDOG = 3.0
+# Disk cleanup: run every N watchdog cycles (300s × 12 = 1h)
+_CLEANUP_EVERY_N_CYCLES = 12
 
 # Auto-launch new runs
-_LAUNCH_PER_CYCLE = 5   # max new launches per watchdog cycle (avoid thundering herd)
-_LAUNCH_STAGGER = 2.0   # seconds between each new launch
+_LAUNCH_PER_CYCLE = 5  # max new launches per watchdog cycle (avoid thundering herd)
+_LAUNCH_STAGGER = 2.0  # seconds between each new launch
 
 
 def _is_continuous(mission_name: str, mission_type: str) -> bool:
@@ -48,12 +64,17 @@ async def auto_resume_missions() -> None:
     # Hot-patch startup: use release() to both add slots AND wake up waiting coroutines
     try:
         from ..web.routes.helpers import _mission_semaphore
+
         target = 10
         added = max(0, target - _mission_semaphore._value)
         for _ in range(added):
             _mission_semaphore.release()
         if added:
-            logger.warning("auto_resume: released %d semaphore slots → value=%d (wakes waiters)", added, _mission_semaphore._value)
+            logger.warning(
+                "auto_resume: released %d semaphore slots → value=%d (wakes waiters)",
+                added,
+                _mission_semaphore._value,
+            )
     except Exception as _e_sem:
         logger.warning("auto_resume: semaphore patch failed: %s", _e_sem)
 
@@ -64,30 +85,47 @@ async def auto_resume_missions() -> None:
         logger.error("auto_resume: handle_failed_runs error: %s", e)
 
     first_pass = True
+    cycle_count = 0
     while True:
         # Hot-patch per cycle: use release() to add slots and wake up waiting coroutines
         try:
             from ..web.routes.helpers import _mission_semaphore
+
             target = 10
             added = max(0, target - _mission_semaphore._value)
             for _ in range(added):
                 _mission_semaphore.release()
             if added:
-                logger.warning("auto_resume: released %d semaphore slots → value=%d", added, _mission_semaphore._value)
+                logger.warning(
+                    "auto_resume: released %d semaphore slots → value=%d",
+                    added,
+                    _mission_semaphore._value,
+                )
         except Exception as _e_sem:
             logger.warning("auto_resume: semaphore patch failed: %s", _e_sem)
         try:
             stagger = _STAGGER_STARTUP if first_pass else _STAGGER_WATCHDOG
             resumed = await _resume_batch(stagger=stagger)
             if resumed > 0:
-                logger.warning("auto_resume: %d runs resumed (first_pass=%s)", resumed, first_pass)
+                logger.warning(
+                    "auto_resume: %d runs resumed (first_pass=%s)", resumed, first_pass
+                )
             # Launch unstarted continuous missions (new in v2)
             try:
                 launched = await auto_launch_continuous_missions()
                 if launched > 0:
-                    logger.warning("auto_resume: %d new continuous missions launched", launched)
+                    logger.warning(
+                        "auto_resume: %d new continuous missions launched", launched
+                    )
             except Exception as e_launch:
                 logger.error("auto_resume: auto_launch error: %s", e_launch)
+            # Hourly disk cleanup
+            cycle_count += 1
+            if cycle_count % _CLEANUP_EVERY_N_CYCLES == 0:
+                try:
+                    await _cleanup_disk()
+                except Exception as e_clean:
+                    logger.error("auto_resume: disk cleanup error: %s", e_clean)
             first_pass = False
         except Exception as e:
             logger.error("auto_resume watchdog error: %s", e)
@@ -175,7 +213,11 @@ async def _resume_batch(stagger: float = 3.0) -> int:
 
     logger.warning(
         "auto_resume: %d candidates (paused-continuous=%d, paused-other=%d, stuck-pending=%d, failed-continuous=%d)",
-        len(to_resume), len(continuous_paused), len(others_paused), len(stuck_pending), len(continuous_failed),
+        len(to_resume),
+        len(continuous_paused),
+        len(others_paused),
+        len(stuck_pending),
+        len(continuous_failed),
     )
 
     resumed = 0
@@ -218,6 +260,7 @@ async def _launch_run(run_id: str) -> None:
     # Ensure a session row exists for this mission_run (needed for messages FK)
     if mission.session_id:
         from ..db.migrations import get_db as _get_db
+
         _db = _get_db()
         try:
             exists = _db.execute(
@@ -226,6 +269,7 @@ async def _launch_run(run_id: str) -> None:
             if not exists:
                 from datetime import datetime as _dt
                 import json as _json
+
                 _db.execute(
                     "INSERT OR IGNORE INTO sessions "
                     "(id, name, status, config_json, created_at) "
@@ -233,8 +277,12 @@ async def _launch_run(run_id: str) -> None:
                     (
                         mission.session_id,
                         f"mission-{mission.session_id[:8]}",
-                        _json.dumps({"workflow_id": mission.workflow_id,
-                                     "project_id": mission.project_id}),
+                        _json.dumps(
+                            {
+                                "workflow_id": mission.workflow_id,
+                                "project_id": mission.project_id,
+                            }
+                        ),
                         _dt.utcnow().isoformat(),
                     ),
                 )
@@ -269,7 +317,13 @@ async def _launch_run(run_id: str) -> None:
                 await orchestrator.run_phases()
         except Exception as exc:
             import traceback
-            logger.error("auto_resume: run=%s CRASHED: %s\n%s", run_id, exc, traceback.format_exc())
+
+            logger.error(
+                "auto_resume: run=%s CRASHED: %s\n%s",
+                run_id,
+                exc,
+                traceback.format_exc(),
+            )
             try:
                 mission.status = MissionStatus.FAILED
                 run_store.update(mission)
@@ -320,10 +374,24 @@ async def handle_failed_runs() -> int:
 
     repaired = 0
     tma_created = 0
-    for run_id, wf_id, wf_name, cur_phase, phases_raw, project_id, brief, mname, mtype in rows:
+    for (
+        run_id,
+        wf_id,
+        wf_name,
+        cur_phase,
+        phases_raw,
+        project_id,
+        brief,
+        mname,
+        mtype,
+    ) in rows:
         try:
             phases = json.loads(phases_raw) if phases_raw else []
-            done_phases = [p for p in phases if p.get("status") in ("done", "done_with_issues", "skipped")]
+            done_phases = [
+                p
+                for p in phases
+                if p.get("status") in ("done", "done_with_issues", "skipped")
+            ]
 
             # Reset failed/running phases back to pending so orchestrator retries them
             repaired_phases = _reset_failed_phases(phases)
@@ -368,7 +436,8 @@ async def handle_failed_runs() -> int:
 
     logger.warning(
         "handle_failed_runs: %d repaired → paused (%d TMA incidents created)",
-        repaired, tma_created,
+        repaired,
+        tma_created,
     )
     return repaired
 
@@ -376,6 +445,7 @@ async def handle_failed_runs() -> int:
 def _reset_failed_phases(phases: list) -> list:
     """Reset failed/stuck-running phases to pending so orchestrator retries them."""
     import copy
+
     result = []
     for p in phases:
         phase = copy.deepcopy(p)
@@ -412,30 +482,36 @@ async def _create_tma_incident(
 
     db = get_db()
     try:
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO mission_runs
               (id, workflow_id, workflow_name, project_id, status, current_phase,
                phases_json, brief, parent_mission_id, created_at, updated_at)
             VALUES (?, ?, ?, ?, 'pending', '',
                     '[]', ?, ?, datetime('now'), datetime('now'))
-        """, (
-            incident_id,
-            _TMA_WORKFLOW_ID,
-            "TMA — Incident Auto-Détecté",
-            project_id,
-            brief,
-            failed_run_id,
-        ))
+        """,
+            (
+                incident_id,
+                _TMA_WORKFLOW_ID,
+                "TMA — Incident Auto-Détecté",
+                project_id,
+                brief,
+                failed_run_id,
+            ),
+        )
         db.commit()
         logger.warning(
             "handle_failed_runs: TMA incident %s created for failed run %s (phase=%s)",
-            incident_id, failed_run_id, failed_phase,
+            incident_id,
+            failed_run_id,
+            failed_phase,
         )
     finally:
         db.close()
 
 
 # ─── Auto-launch continuous missions with no runs ───────────────────────────
+
 
 async def auto_launch_continuous_missions() -> int:
     """
@@ -470,19 +546,19 @@ async def auto_launch_continuous_missions() -> int:
         return 0
 
     # Filter: only continuous missions
-    candidates = [
-        r for r in rows
-        if _is_continuous(r[1], r[2])
-    ]
+    candidates = [r for r in rows if _is_continuous(r[1], r[2])]
 
     if not candidates:
-        logger.warning("auto_launch: %d unstarted active missions, 0 continuous", len(rows))
+        logger.warning(
+            "auto_launch: %d unstarted active missions, 0 continuous", len(rows)
+        )
         return 0
 
     to_launch = candidates[:_LAUNCH_PER_CYCLE]
     logger.warning(
         "auto_launch: %d continuous missions unstarted, launching %d this cycle",
-        len(candidates), len(to_launch),
+        len(candidates),
+        len(to_launch),
     )
 
     launched = 0
@@ -497,7 +573,11 @@ async def auto_launch_continuous_missions() -> int:
                 mission_name=name,
             )
             launched += 1
-            logger.warning("auto_launch: started run for mission %s (%s)", mission_id[:8], name[:50])
+            logger.warning(
+                "auto_launch: started run for mission %s (%s)",
+                mission_id[:8],
+                name[:50],
+            )
         except Exception as e:
             logger.warning("auto_launch: failed to start %s: %s", mission_id[:8], e)
         await asyncio.sleep(_LAUNCH_STAGGER)
@@ -541,16 +621,26 @@ async def _launch_new_run(
     # Workspace under data/workspaces/
     ws_base = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-        "data", "workspaces", run_id,
+        "data",
+        "workspaces",
+        run_id,
     )
     os.makedirs(ws_base, exist_ok=True)
     # Ensure workspace has a git repo so git tools work
     if not os.path.isdir(os.path.join(ws_base, ".git")):
         subprocess.run(["git", "init"], cwd=ws_base, capture_output=True)
-        subprocess.run(["git", "commit", "--allow-empty", "-m", "init workspace"],
-                       cwd=ws_base, capture_output=True,
-                       env={**os.environ, "GIT_AUTHOR_NAME": "agent", "GIT_AUTHOR_EMAIL": "agent@sf",
-                            "GIT_COMMITTER_NAME": "agent", "GIT_COMMITTER_EMAIL": "agent@sf"})
+        subprocess.run(
+            ["git", "commit", "--allow-empty", "-m", "init workspace"],
+            cwd=ws_base,
+            capture_output=True,
+            env={
+                **os.environ,
+                "GIT_AUTHOR_NAME": "agent",
+                "GIT_AUTHOR_EMAIL": "agent@sf",
+                "GIT_COMMITTER_NAME": "agent",
+                "GIT_COMMITTER_EMAIL": "agent@sf",
+            },
+        )
 
     run = MissionRun(
         id=run_id,
@@ -568,3 +658,57 @@ async def _launch_new_run(
     get_mission_run_store().create(run)
     await _launch_run(run_id)
     return run_id
+
+
+async def _cleanup_disk() -> None:
+    """Hourly cleanup: orphaned workspaces + old LLM traces + stale cancelled runs."""
+    from ..db.migrations import get_db
+
+    db = get_db()
+
+    # 1. Remove workspaces for non-active sessions
+    ws_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "workspaces")
+    ws_dir = os.path.normpath(ws_dir)
+    if not os.path.isdir(ws_dir):
+        # Try absolute path used in container
+        ws_dir = "/app/data/workspaces"
+    if os.path.isdir(ws_dir):
+        active_sessions = {
+            r[0]
+            for r in db.execute(
+                "SELECT session_id FROM mission_runs WHERE status IN ('running','pending','paused') AND session_id IS NOT NULL"
+            ).fetchall()
+        }
+        removed_ws = 0
+        for ws_name in os.listdir(ws_dir):
+            if ws_name not in active_sessions:
+                try:
+                    shutil.rmtree(os.path.join(ws_dir, ws_name))
+                    removed_ws += 1
+                except Exception:
+                    pass
+        if removed_ws:
+            logger.warning("cleanup_disk: removed %d orphaned workspaces", removed_ws)
+
+    # 2. Purge LLM traces older than 14 days (keep recent for observability)
+    deleted_traces = db.execute(
+        "DELETE FROM llm_traces WHERE created_at < datetime('now', '-14 days')"
+    ).rowcount
+    if deleted_traces:
+        db.commit()
+        logger.warning("cleanup_disk: purged %d LLM traces >14d", deleted_traces)
+
+    # 3. Purge cancelled run records older than 7 days
+    deleted_runs = db.execute(
+        "DELETE FROM mission_runs WHERE status = 'cancelled' AND updated_at < datetime('now', '-7 days')"
+    ).rowcount
+    if deleted_runs:
+        db.commit()
+        logger.warning("cleanup_disk: purged %d cancelled runs >7d", deleted_runs)
+
+    # 4. SQLite VACUUM to reclaim space after mass deletes
+    if deleted_traces + deleted_runs > 100:
+        db.execute("VACUUM")
+        logger.warning(
+            "cleanup_disk: VACUUM done after %d deletes", deleted_traces + deleted_runs
+        )
