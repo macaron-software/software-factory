@@ -1,4 +1,19 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${PG_DB:-macaron_platform}
+      POSTGRES_USER: ${PG_USER:-macaron}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-macaron_pg}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-macaron} -d ${PG_DB:-macaron_platform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   platform:
     build:
       context: .
@@ -10,9 +25,14 @@ services:
     environment:
       - PLATFORM_LLM_PROVIDER=${PLATFORM_LLM_PROVIDER:-minimax}
       - PLATFORM_LLM_MODEL=${PLATFORM_LLM_MODEL:-}
+      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg}@postgres:5432/${PG_DB:-macaron_platform}
     volumes:
       - platform-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
   platform-data:
+  pg-data:
