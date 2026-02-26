@@ -3,6 +3,7 @@
 A Mission is a high-level objective (from VISION.md) executed as PI → Sprints → Tasks.
 Replaces the old chat-centric 'sessions' for production workloads.
 """
+
 from __future__ import annotations
 
 import json
@@ -16,25 +17,27 @@ from ..db.migrations import get_db
 
 # ── Dataclasses ──────────────────────────────────────────────────────
 
+
 @dataclass
 class MissionDef:
     """A production mission — a measurable objective for a project."""
+
     id: str = ""
     project_id: str = ""
     name: str = ""
     description: str = ""
-    goal: str = ""                        # acceptance criteria
-    status: str = "planning"              # planning|active|completed|failed|blocked
-    type: str = "feature"                 # feature|epic|bug|debt|migration|security|hacking|program
-    workflow_id: Optional[str] = None     # safe-veligo, safe-ppz...
+    goal: str = ""  # acceptance criteria
+    status: str = "planning"  # planning|active|completed|failed|blocked
+    type: str = "feature"  # feature|epic|bug|debt|migration|security|hacking|program
+    workflow_id: Optional[str] = None  # safe-veligo, safe-ppz...
     parent_mission_id: Optional[str] = None  # corrective mission → parent
     wsjf_score: float = 0.0
     business_value: float = 0
     time_criticality: float = 0
     risk_reduction: float = 0
     job_duration: float = 1
-    kanban_status: str = "funnel"         # SAFe: funnel|analyzing|backlog|implementing|done
-    created_by: str = ""                  # agent who created it (strat-cpo, etc.)
+    kanban_status: str = "funnel"  # SAFe: funnel|analyzing|backlog|implementing|done
+    created_by: str = ""  # agent who created it (strat-cpo, etc.)
     config: dict = field(default_factory=dict)
     created_at: str = ""
     completed_at: Optional[str] = None
@@ -43,15 +46,16 @@ class MissionDef:
 @dataclass
 class SprintDef:
     """A sprint within a mission — time-boxed iteration."""
+
     id: str = ""
     mission_id: str = ""
     number: int = 1
     name: str = ""
     goal: str = ""
-    status: str = "planning"              # planning|active|review|completed|failed
+    status: str = "planning"  # planning|active|review|completed|failed
     retro_notes: str = ""
-    velocity: int = 0                     # SAFe: story points completed
-    planned_sp: int = 0                   # SAFe: story points planned
+    velocity: int = 0  # SAFe: story points completed
+    planned_sp: int = 0  # SAFe: story points planned
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
 
@@ -59,15 +63,16 @@ class SprintDef:
 @dataclass
 class TaskDef:
     """An atomic task within a sprint — assigned to one agent."""
+
     id: str = ""
     sprint_id: str = ""
     mission_id: str = ""
     title: str = ""
     description: str = ""
-    type: str = "feature"                 # feature|fix|refactor|test|security
-    domain: str = ""                      # rust, svelte, angular, python...
-    status: str = "pending"               # pending|assigned|in_progress|review|done|failed
-    assigned_to: Optional[str] = None     # agent_id
+    type: str = "feature"  # feature|fix|refactor|test|security
+    domain: str = ""  # rust, svelte, angular, python...
+    status: str = "pending"  # pending|assigned|in_progress|review|done|failed
+    assigned_to: Optional[str] = None  # agent_id
     priority: int = 0
     files_changed: list = field(default_factory=list)
     created_at: str = ""
@@ -76,57 +81,77 @@ class TaskDef:
 
 # ── Row converters ───────────────────────────────────────────────────
 
+
 def _row_to_mission(row) -> MissionDef:
-    keys = row.keys() if hasattr(row, 'keys') else []
+    keys = row.keys() if hasattr(row, "keys") else []
     return MissionDef(
-        id=row["id"], project_id=row["project_id"],
-        name=row["name"], description=row["description"] or "",
-        goal=row["goal"] or "", status=row["status"] or "planning",
+        id=row["id"],
+        project_id=row["project_id"],
+        name=row["name"],
+        description=row["description"] or "",
+        goal=row["goal"] or "",
+        status=row["status"] or "planning",
         type=row["type"] if "type" in keys else "feature",
-        workflow_id=row["workflow_id"], parent_mission_id=row["parent_mission_id"],
-        wsjf_score=row["wsjf_score"] or 0.0, created_by=row["created_by"] or "",
+        workflow_id=row["workflow_id"],
+        parent_mission_id=row["parent_mission_id"],
+        wsjf_score=row["wsjf_score"] or 0.0,
+        created_by=row["created_by"] or "",
         business_value=row["business_value"] if "business_value" in keys else 0,
         time_criticality=row["time_criticality"] if "time_criticality" in keys else 0,
         risk_reduction=row["risk_reduction"] if "risk_reduction" in keys else 0,
         job_duration=row["job_duration"] if "job_duration" in keys else 1,
         config=json.loads(row["config_json"] or "{}"),
-        created_at=row["created_at"] or "", completed_at=row["completed_at"],
+        created_at=row["created_at"] or "",
+        completed_at=row["completed_at"],
     )
 
 
 def _row_to_sprint(row) -> SprintDef:
-    cols = row.keys() if hasattr(row, 'keys') else []
+    cols = row.keys() if hasattr(row, "keys") else []
     return SprintDef(
-        id=row["id"], mission_id=row["mission_id"],
-        number=row["number"] or 1, name=row["name"] or "",
-        goal=row["goal"] or "", status=row["status"] or "planning",
+        id=row["id"],
+        mission_id=row["mission_id"],
+        number=row["number"] or 1,
+        name=row["name"] or "",
+        goal=row["goal"] or "",
+        status=row["status"] or "planning",
         retro_notes=row["retro_notes"] or "",
         velocity=row["velocity"] if "velocity" in cols else 0,
         planned_sp=row["planned_sp"] if "planned_sp" in cols else 0,
-        started_at=row["started_at"], completed_at=row["completed_at"],
+        started_at=row["started_at"],
+        completed_at=row["completed_at"],
     )
 
 
 def _row_to_task(row) -> TaskDef:
     return TaskDef(
-        id=row["id"], sprint_id=row["sprint_id"],
-        mission_id=row["mission_id"], title=row["title"],
-        description=row["description"] or "", type=row["type"] or "feature",
-        domain=row["domain"] or "", status=row["status"] or "pending",
-        assigned_to=row["assigned_to"], priority=row["priority"] or 0,
+        id=row["id"],
+        sprint_id=row["sprint_id"],
+        mission_id=row["mission_id"],
+        title=row["title"],
+        description=row["description"] or "",
+        type=row["type"] or "feature",
+        domain=row["domain"] or "",
+        status=row["status"] or "pending",
+        assigned_to=row["assigned_to"],
+        priority=row["priority"] or 0,
         files_changed=json.loads(row["files_changed"] or "[]"),
-        created_at=row["created_at"] or "", completed_at=row["completed_at"],
+        created_at=row["created_at"] or "",
+        completed_at=row["completed_at"],
     )
 
 
 # ── MissionStore ─────────────────────────────────────────────────────
+
 
 class MissionStore:
     """CRUD for missions, sprints and tasks."""
 
     # ── Missions ─────────────────────────────────────────────────
 
-    def list_missions(self, project_id: str = None, limit: int = 50) -> list[MissionDef]:
+    def list_missions(
+        self, project_id: str = None, limit: int = 50
+    ) -> list[MissionDef]:
         db = get_db()
         try:
             if project_id:
@@ -146,7 +171,9 @@ class MissionStore:
     def get_mission(self, mission_id: str) -> Optional[MissionDef]:
         db = get_db()
         try:
-            row = db.execute("SELECT * FROM missions WHERE id = ?", (mission_id,)).fetchone()
+            row = db.execute(
+                "SELECT * FROM missions WHERE id = ?", (mission_id,)
+            ).fetchone()
             return _row_to_mission(row) if row else None
         finally:
             db.close()
@@ -161,9 +188,22 @@ class MissionStore:
                 """INSERT INTO missions (id, project_id, name, description, goal, status, type,
                    workflow_id, parent_mission_id, wsjf_score, created_by, config_json,
                    created_at, completed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (m.id, m.project_id, m.name, m.description, m.goal, m.status, m.type,
-                 m.workflow_id, m.parent_mission_id, m.wsjf_score, m.created_by,
-                 json.dumps(m.config), m.created_at, m.completed_at),
+                (
+                    m.id,
+                    m.project_id,
+                    m.name,
+                    m.description,
+                    m.goal,
+                    m.status,
+                    m.type,
+                    m.workflow_id,
+                    m.parent_mission_id,
+                    m.wsjf_score,
+                    m.created_by,
+                    json.dumps(m.config),
+                    m.created_at,
+                    m.completed_at,
+                ),
             )
             db.commit()
         finally:
@@ -173,9 +213,18 @@ class MissionStore:
     def update_mission_status(self, mission_id: str, status: str) -> bool:
         db = get_db()
         try:
-            completed = datetime.utcnow().isoformat() if status in ("completed", "failed") else None
+            completed = (
+                datetime.utcnow().isoformat()
+                if status in ("completed", "failed")
+                else None
+            )
             # SAFe: auto-update kanban_status based on mission status
-            kanban_map = {"planning": "analyzing", "active": "implementing", "completed": "done", "failed": "backlog"}
+            kanban_map = {
+                "planning": "analyzing",
+                "active": "implementing",
+                "completed": "done",
+                "failed": "backlog",
+            }
             kanban = kanban_map.get(status)
             if kanban:
                 cur = db.execute(
@@ -202,20 +251,31 @@ class MissionStore:
     def _notify_mission_status(self, mission_id: str, status: str, db):
         """Fire async notification for mission completion/failure."""
         try:
-            row = db.execute("SELECT name, project_id, type FROM missions WHERE id = ?", (mission_id,)).fetchone()
+            row = db.execute(
+                "SELECT name, project_id, type FROM missions WHERE id = ?",
+                (mission_id,),
+            ).fetchone()
             if not row:
                 return
             # In-app notification
             from ..services.notifications import emit_notification
+
             severity = "critical" if status == "failed" else "info"
             emit_notification(
                 f"Mission {status}: {row['name']}",
-                type="mission", message=f"Mission '{row['name']}' ({row['type']}) has {status}.",
-                url=f"/missions/{mission_id}", severity=severity,
-                source="mission", ref_id=mission_id,
+                type="mission",
+                message=f"Mission '{row['name']}' ({row['type']}) has {status}.",
+                url=f"/missions/{mission_id}",
+                severity=severity,
+                source="mission",
+                ref_id=mission_id,
             )
             # External notification (Slack/Email/Webhook)
-            from ..services.notification_service import get_notification_service, NotificationPayload
+            from ..services.notification_service import (
+                get_notification_service,
+                NotificationPayload,
+            )
+
             svc = get_notification_service()
             if not svc.is_configured:
                 return
@@ -223,10 +283,15 @@ class MissionStore:
             title = f"Mission {status}: {row['name']}"
             message = f"Mission '{row['name']}' ({row['type']}) has {status}."
             payload = NotificationPayload(
-                event=f"mission_{status}", title=title, message=message,
-                project_id=row["project_id"], mission_id=mission_id, severity=severity,
+                event=f"mission_{status}",
+                title=title,
+                message=message,
+                project_id=row["project_id"],
+                mission_id=mission_id,
+                severity=severity,
             )
             import asyncio
+
             try:
                 loop = asyncio.get_running_loop()
                 loop.create_task(svc.notify(payload))
@@ -234,6 +299,7 @@ class MissionStore:
                 pass  # No event loop — skip (e.g. in tests)
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).warning("Notification error: %s", e)
 
     # Phase → Darwin phase_type mapping
@@ -249,6 +315,7 @@ class MissionStore:
     def _update_darwin_fitness(self, mission_id: str, status: str, db):
         """Update Darwin team + LLM fitness from mission completion."""
         import logging
+
         log = logging.getLogger(__name__)
         try:
             mission = db.execute(
@@ -258,9 +325,12 @@ class MissionStore:
                 return
 
             import json
+
             cfg = json.loads(mission["config_json"] or "{}")
             technology = cfg.get("technology", "generic")
-            phase_type = self._MISSION_TYPE_TO_PHASE.get(mission["type"] or "", "generic")
+            phase_type = self._MISSION_TYPE_TO_PHASE.get(
+                mission["type"] or "", "generic"
+            )
             won = status == "completed"
 
             # Collect agent+pattern+model combos from llm_traces → sessions
@@ -302,14 +372,20 @@ class MissionStore:
                 # LLM-level Darwin
                 try:
                     LLMTeamSelector.update_fitness(
-                        agent_id, pattern_id, technology, phase_type,
-                        model, provider, won
+                        agent_id,
+                        pattern_id,
+                        technology,
+                        phase_type,
+                        model,
+                        provider,
+                        won,
                     )
                 except Exception as e:
                     log.debug("Darwin LLM fitness error: %s", e)
 
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).warning("Darwin fitness update error: %s", e)
 
     def delete_mission(self, mission_id: str) -> bool:
@@ -343,8 +419,18 @@ class MissionStore:
                 """UPDATE missions SET name=?, description=?, goal=?, status=?, type=?,
                    workflow_id=?, wsjf_score=?, config_json=?, kanban_status=?
                    WHERE id=?""",
-                (m.name, m.description, m.goal, m.status, m.type,
-                 m.workflow_id, m.wsjf_score, json.dumps(m.config), m.kanban_status, m.id),
+                (
+                    m.name,
+                    m.description,
+                    m.goal,
+                    m.status,
+                    m.type,
+                    m.workflow_id,
+                    m.wsjf_score,
+                    json.dumps(m.config),
+                    m.kanban_status,
+                    m.id,
+                ),
             )
             db.commit()
             return cur.rowcount > 0
@@ -367,7 +453,9 @@ class MissionStore:
     def get_sprint(self, sprint_id: str) -> Optional[SprintDef]:
         db = get_db()
         try:
-            row = db.execute("SELECT * FROM sprints WHERE id = ?", (sprint_id,)).fetchone()
+            row = db.execute(
+                "SELECT * FROM sprints WHERE id = ?", (sprint_id,)
+            ).fetchone()
             return _row_to_sprint(row) if row else None
         finally:
             db.close()
@@ -381,8 +469,19 @@ class MissionStore:
                 """INSERT INTO sprints (id, mission_id, number, name, goal, status,
                    retro_notes, velocity, planned_sp, started_at, completed_at)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-                (s.id, s.mission_id, s.number, s.name, s.goal, s.status,
-                 s.retro_notes, s.velocity, s.planned_sp, s.started_at, s.completed_at),
+                (
+                    s.id,
+                    s.mission_id,
+                    s.number,
+                    s.name,
+                    s.goal,
+                    s.status,
+                    s.retro_notes,
+                    s.velocity,
+                    s.planned_sp,
+                    s.started_at,
+                    s.completed_at,
+                ),
             )
             db.commit()
         finally:
@@ -392,7 +491,11 @@ class MissionStore:
     def update_sprint_status(self, sprint_id: str, status: str) -> bool:
         db = get_db()
         try:
-            completed = datetime.utcnow().isoformat() if status in ("completed", "failed") else None
+            completed = (
+                datetime.utcnow().isoformat()
+                if status in ("completed", "failed")
+                else None
+            )
             started = datetime.utcnow().isoformat() if status == "active" else None
             if started:
                 cur = db.execute(
@@ -413,13 +516,18 @@ class MissionStore:
         """Store retrospective notes for a sprint (SAFe I&A)."""
         db = get_db()
         try:
-            cur = db.execute("UPDATE sprints SET retro_notes = ? WHERE id = ?", (retro_notes, sprint_id))
+            cur = db.execute(
+                "UPDATE sprints SET retro_notes = ? WHERE id = ?",
+                (retro_notes, sprint_id),
+            )
             db.commit()
             return cur.rowcount > 0
         finally:
             db.close()
 
-    def update_sprint_velocity(self, sprint_id: str, velocity: int, planned_sp: int = 0) -> bool:
+    def update_sprint_velocity(
+        self, sprint_id: str, velocity: int, planned_sp: int = 0
+    ) -> bool:
         """Update velocity tracking for a sprint (SAFe predictability)."""
         db = get_db()
         try:
@@ -440,23 +548,30 @@ class MissionStore:
                 "SELECT number, velocity, planned_sp, status FROM sprints WHERE mission_id = ? ORDER BY number",
                 (mission_id,),
             ).fetchall()
-            return [{"sprint": r[0], "velocity": r[1], "planned_sp": r[2], "status": r[3]} for r in rows]
+            return [
+                {"sprint": r[0], "velocity": r[1], "planned_sp": r[2], "status": r[3]}
+                for r in rows
+            ]
         finally:
             db.close()
 
     # ── Tasks ────────────────────────────────────────────────────
 
-    def list_tasks(self, sprint_id: str = None, mission_id: str = None,
-                   status: str = None) -> list[TaskDef]:
+    def list_tasks(
+        self, sprint_id: str = None, mission_id: str = None, status: str = None
+    ) -> list[TaskDef]:
         db = get_db()
         try:
             clauses, params = [], []
             if sprint_id:
-                clauses.append("sprint_id = ?"); params.append(sprint_id)
+                clauses.append("sprint_id = ?")
+                params.append(sprint_id)
             if mission_id:
-                clauses.append("mission_id = ?"); params.append(mission_id)
+                clauses.append("mission_id = ?")
+                params.append(mission_id)
             if status:
-                clauses.append("status = ?"); params.append(status)
+                clauses.append("status = ?")
+                params.append(status)
             where = " AND ".join(clauses) if clauses else "1=1"
             rows = db.execute(
                 f"SELECT * FROM tasks WHERE {where} ORDER BY priority DESC, created_at ASC",
@@ -484,20 +599,35 @@ class MissionStore:
                 """INSERT INTO tasks (id, sprint_id, mission_id, title, description,
                    type, domain, status, assigned_to, priority, files_changed,
                    created_at, completed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (t.id, t.sprint_id, t.mission_id, t.title, t.description,
-                 t.type, t.domain, t.status, t.assigned_to, t.priority,
-                 json.dumps(t.files_changed), t.created_at, t.completed_at),
+                (
+                    t.id,
+                    t.sprint_id,
+                    t.mission_id,
+                    t.title,
+                    t.description,
+                    t.type,
+                    t.domain,
+                    t.status,
+                    t.assigned_to,
+                    t.priority,
+                    json.dumps(t.files_changed),
+                    t.created_at,
+                    t.completed_at,
+                ),
             )
             db.commit()
         finally:
             db.close()
         return t
 
-    def update_task_status(self, task_id: str, status: str,
-                           assigned_to: str = None) -> bool:
+    def update_task_status(
+        self, task_id: str, status: str, assigned_to: str = None
+    ) -> bool:
         db = get_db()
         try:
-            completed = datetime.utcnow().isoformat() if status in ("done", "failed") else None
+            completed = (
+                datetime.utcnow().isoformat() if status in ("done", "failed") else None
+            )
             if assigned_to is not None:
                 cur = db.execute(
                     "UPDATE tasks SET status = ?, assigned_to = ?, completed_at = ? WHERE id = ?",
@@ -557,20 +687,25 @@ class MissionStore:
             results = []
             for r in rows:
                 pid = r["project_id"]
-                task_rows = db.execute("""
+                task_rows = db.execute(
+                    """
                     SELECT status, COUNT(*) as cnt FROM tasks
                     WHERE mission_id IN (SELECT id FROM missions WHERE project_id = ?)
                     GROUP BY status
-                """, (pid,)).fetchall()
+                """,
+                    (pid,),
+                ).fetchall()
                 task_stats = {tr["status"]: tr["cnt"] for tr in task_rows}
                 task_stats["total"] = sum(task_stats.values())
-                results.append({
-                    "project_id": pid,
-                    "mission_count": r["mission_count"],
-                    "active_missions": r["active_missions"],
-                    "completed_missions": r["completed_missions"],
-                    "tasks": task_stats,
-                })
+                results.append(
+                    {
+                        "project_id": pid,
+                        "mission_count": r["mission_count"],
+                        "active_missions": r["active_missions"],
+                        "completed_missions": r["completed_missions"],
+                        "tasks": task_stats,
+                    }
+                )
             return results
         finally:
             db.close()
@@ -590,7 +725,7 @@ def get_mission_store() -> MissionStore:
 # MISSION RUNS (lifecycle orchestration)
 # ============================================================================
 
-from ..models import MissionRun, MissionStatus, PhaseRun, PhaseStatus
+from ..models import MissionRun, MissionStatus, PhaseRun
 
 
 def _row_to_mission_run(row) -> MissionRun:
@@ -625,9 +760,25 @@ def _row_to_mission_run(row) -> MissionRun:
         current_phase=row["current_phase"] or "",
         phases=phases,
         brief=row["brief"] or "",
-        created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else datetime.utcnow(),
-        updated_at=datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else datetime.utcnow(),
-        completed_at=datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None,
+        created_at=row["created_at"]
+        if isinstance(row["created_at"], datetime)
+        else (
+            datetime.fromisoformat(row["created_at"])
+            if row["created_at"]
+            else datetime.utcnow()
+        ),
+        updated_at=row["updated_at"]
+        if isinstance(row["updated_at"], datetime)
+        else (
+            datetime.fromisoformat(row["updated_at"])
+            if row["updated_at"]
+            else datetime.utcnow()
+        ),
+        completed_at=row["completed_at"]
+        if isinstance(row["completed_at"], datetime)
+        else (
+            datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None
+        ),
     )
 
 
@@ -642,13 +793,23 @@ class MissionRunStore:
                    cdp_agent_id, project_id, workspace_path, parent_mission_id, status,
                    current_phase, phases_json, brief, created_at, updated_at, completed_at)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (run.id, run.workflow_id, run.workflow_name, run.session_id,
-                 run.cdp_agent_id, run.project_id, run.workspace_path,
-                 run.parent_mission_id or "",
-                 run.status.value,
-                 run.current_phase, json.dumps([p.model_dump() for p in run.phases]),
-                 run.brief, run.created_at.isoformat(), run.updated_at.isoformat(),
-                 run.completed_at.isoformat() if run.completed_at else None),
+                (
+                    run.id,
+                    run.workflow_id,
+                    run.workflow_name,
+                    run.session_id,
+                    run.cdp_agent_id,
+                    run.project_id,
+                    run.workspace_path,
+                    run.parent_mission_id or "",
+                    run.status.value,
+                    run.current_phase,
+                    json.dumps([p.model_dump() for p in run.phases]),
+                    run.brief,
+                    run.created_at.isoformat(),
+                    run.updated_at.isoformat(),
+                    run.completed_at.isoformat() if run.completed_at else None,
+                ),
             )
             db.commit()
         finally:
@@ -658,7 +819,9 @@ class MissionRunStore:
     def get(self, run_id: str) -> Optional[MissionRun]:
         db = get_db()
         try:
-            row = db.execute("SELECT * FROM mission_runs WHERE id = ?", (run_id,)).fetchone()
+            row = db.execute(
+                "SELECT * FROM mission_runs WHERE id = ?", (run_id,)
+            ).fetchone()
             return _row_to_mission_run(row) if row else None
         finally:
             db.close()
@@ -687,19 +850,25 @@ class MissionRunStore:
             cur = db.execute(
                 """UPDATE mission_runs SET status=?, current_phase=?, phases_json=?,
                    session_id=?, workspace_path=?, updated_at=?, completed_at=? WHERE id=?""",
-                (run.status.value, run.current_phase,
-                 json.dumps([p.model_dump() for p in run.phases], default=str),
-                 run.session_id or "", run.workspace_path or "",
-                 run.updated_at.isoformat(),
-                 run.completed_at.isoformat() if run.completed_at else None,
-                 run.id),
+                (
+                    run.status.value,
+                    run.current_phase,
+                    json.dumps([p.model_dump() for p in run.phases], default=str),
+                    run.session_id or "",
+                    run.workspace_path or "",
+                    run.updated_at.isoformat(),
+                    run.completed_at.isoformat() if run.completed_at else None,
+                    run.id,
+                ),
             )
             db.commit()
             return cur.rowcount > 0
         finally:
             db.close()
 
-    def update_phase(self, run_id: str, phase_id: str, **kwargs) -> Optional[MissionRun]:
+    def update_phase(
+        self, run_id: str, phase_id: str, **kwargs
+    ) -> Optional[MissionRun]:
         """Update a specific phase within a mission run."""
         run = self.get(run_id)
         if not run:

@@ -123,9 +123,13 @@ async def _check_stalled_missions() -> list[dict]:
                 try:
                     from datetime import datetime as dt
 
-                    updated_ts = dt.fromisoformat(
-                        updated.replace("Z", "+00:00")
-                    ).timestamp()
+                    updated_ts = (
+                        updated.timestamp()
+                        if hasattr(updated, "timestamp")
+                        else dt.fromisoformat(
+                            updated.replace("Z", "+00:00")
+                        ).timestamp()
+                    )
                     age = now - updated_ts
                     if age > PHASE_STALL_THRESHOLD:
                         stalls.append(
@@ -379,7 +383,11 @@ async def _recover_stale_sessions() -> int:
             try:
                 from datetime import datetime as dt
 
-                msg_ts = dt.fromisoformat(last_msg.replace("Z", "+00:00")).timestamp()
+                msg_ts = (
+                    last_msg.timestamp()
+                    if hasattr(last_msg, "timestamp")
+                    else dt.fromisoformat(last_msg.replace("Z", "+00:00")).timestamp()
+                )
                 age = now - msg_ts
                 if age > SESSION_STALE_THRESHOLD:
                     # Mark as interrupted — will be picked up by auto-resume

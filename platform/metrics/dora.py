@@ -86,7 +86,9 @@ class DORAMetrics:
                 except Exception:
                     phases = []
                 t = len(phases)
-                d = sum(1 for p in phases if p.get("status") in ("done", "done_with_issues"))
+                d = sum(
+                    1 for p in phases if p.get("status") in ("done", "done_with_issues")
+                )
                 f = sum(1 for p in phases if p.get("status") == "failed")
                 total += t
                 done += d
@@ -117,7 +119,9 @@ class DORAMetrics:
             "level": level,
         }
 
-    def lead_time_for_changes(self, project_id: str = "", period_days: int = 30) -> dict:
+    def lead_time_for_changes(
+        self, project_id: str = "", period_days: int = 30
+    ) -> dict:
         """Average time from mission start to current progress (hours)."""
         total, done, failed, runs = self._phase_data(project_id)
         if not runs:
@@ -127,14 +131,24 @@ class DORAMetrics:
         for r in runs:
             if r["created_at"] and r["done"] > 0:
                 try:
-                    created = datetime.fromisoformat(
-                        r["created_at"].replace("Z", "+00:00").replace("+00:00", "")
-                    )
-                    updated = (
-                        datetime.fromisoformat(
-                            r["updated_at"].replace("Z", "+00:00").replace("+00:00", "")
+                    _ca = r["created_at"]
+                    created = (
+                        _ca
+                        if isinstance(_ca, datetime)
+                        else datetime.fromisoformat(
+                            _ca.replace("Z", "+00:00").replace("+00:00", "")
                         )
-                        if r["updated_at"]
+                    )
+                    _ua = r["updated_at"]
+                    updated = (
+                        (
+                            _ua
+                            if isinstance(_ua, datetime)
+                            else datetime.fromisoformat(
+                                _ua.replace("Z", "+00:00").replace("+00:00", "")
+                            )
+                        )
+                        if _ua
                         else now
                     )
                     h = (updated - created).total_seconds() / 3600
@@ -161,7 +175,12 @@ class DORAMetrics:
         attempted = done + failed
         rate = (failed / attempted * 100) if attempted > 0 else 0
         level = _classify("change_failure_pct", rate)
-        return {"rate_pct": round(rate, 1), "failures": failed, "total": attempted, "level": level}
+        return {
+            "rate_pct": round(rate, 1),
+            "failures": failed,
+            "total": attempted,
+            "level": level,
+        }
 
     def mttr(self, project_id: str = "", period_days: int = 30) -> dict:
         """Mean Time To Restore — from incidents."""
@@ -182,12 +201,18 @@ class DORAMetrics:
                     "level": "high",
                     "note": "no resolved incidents",
                 }
-            hours = [r["hours"] for r in rows if r["hours"] is not None and r["hours"] >= 0]
+            hours = [
+                r["hours"] for r in rows if r["hours"] is not None and r["hours"] >= 0
+            ]
             if not hours:
                 return {"median_hours": 0, "count": 0, "level": "high"}
             median = hours[len(hours) // 2]
             level = _classify("mttr_h", median)
-            return {"median_hours": round(median, 1), "count": len(hours), "level": level}
+            return {
+                "median_hours": round(median, 1),
+                "count": len(hours),
+                "level": level,
+            }
         finally:
             db.close()
 
@@ -246,7 +271,12 @@ class DORAMetrics:
                 "by_model": by_model,
             }
         except Exception:
-            return {"total_cost_usd": 0, "total_calls": 0, "total_tokens": 0, "by_model": []}
+            return {
+                "total_cost_usd": 0,
+                "total_calls": 0,
+                "total_tokens": 0,
+                "by_model": [],
+            }
         finally:
             db.close()
 
@@ -283,7 +313,9 @@ class DORAMetrics:
                 end_iso = end.isoformat()
                 proj_filter = " AND project_id=?" if project_id else ""
                 proj_params = (
-                    [start_iso, end_iso, project_id] if project_id else [start_iso, end_iso]
+                    [start_iso, end_iso, project_id]
+                    if project_id
+                    else [start_iso, end_iso]
                 )
 
                 # Deploy: completed sprints in this week
@@ -301,11 +333,16 @@ class DORAMetrics:
                 # Lead time: average mission_run duration (hours) for runs completed this week
                 lt_rows = db.execute(
                     "SELECT (julianday(updated_at) - julianday(created_at)) * 24 as hours FROM mission_runs "
-                    "WHERE status='completed' AND updated_at >= ? AND updated_at < ?" + proj_filter,
+                    "WHERE status='completed' AND updated_at >= ? AND updated_at < ?"
+                    + proj_filter,
                     proj_params,
                 ).fetchall()
                 avg_lt = (
-                    round(sum(r["hours"] for r in lt_rows if r["hours"]) / max(len(lt_rows), 1), 1)
+                    round(
+                        sum(r["hours"] for r in lt_rows if r["hours"])
+                        / max(len(lt_rows), 1),
+                        1,
+                    )
                     if lt_rows
                     else 0
                 )
@@ -326,7 +363,9 @@ class DORAMetrics:
                 ).fetchall()
                 avg_mttr = (
                     round(
-                        sum(r["hours"] for r in mttr_rows if r["hours"]) / max(len(mttr_rows), 1), 1
+                        sum(r["hours"] for r in mttr_rows if r["hours"])
+                        / max(len(mttr_rows), 1),
+                        1,
                     )
                     if mttr_rows
                     else 0
