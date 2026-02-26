@@ -1,4 +1,19 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${PG_DB:-macaron_platform}
+      POSTGRES_USER: ${PG_USER:-macaron}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-macaron_pg}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-macaron} -d ${PG_DB:-macaron_platform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   platform:
     build:
       context: /opt/macaron
@@ -27,12 +42,16 @@ services:
       - JIRA_PROJECT=${JIRA_PROJECT:-}
       - JIRA_BOARD_ID=${JIRA_BOARD_ID:-}
       - JIRA_TOKEN=${JIRA_TOKEN:-}
+      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg}@postgres:5432/${PG_DB:-macaron_platform}
     volumes:
       - platform-data:/app/data
       - workspace-data:/app/workspace
       - /opt/macaron/.factory-keys:/app/.config/factory:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/macaron/repos:/opt/macaron/repos
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/api/health', timeout=10)"]
@@ -66,3 +85,4 @@ services:
 volumes:
   platform-data:
   workspace-data:
+  pg-data:
