@@ -502,3 +502,131 @@ scp -i ~/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa <file> azureadmin@4.233
 ssh -i ~/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa azureadmin@4.233.64.30 \
   "docker cp ~/<file> platform-platform-1:/app/<path>/ && docker restart platform-platform-1"
 ```
+
+---
+
+## ADAPTIVE INTELLIGENCE — Thompson Sampling + GA + RL
+
+### Overview
+
+Three layers of adaptive intelligence optimize agent/workflow performance:
+
+```
+Layer 1 (LIVE ✅)     Thompson Sampling     per-agent-slot runtime selection
+Layer 2 (PLANNED)     Genetic Algorithm     offline workflow template evolution
+Layer 3 (PLANNED)     Reinforcement Learning  mid-mission pattern adaptation
+```
+
+---
+
+### Layer 1: Thompson Sampling (LIVE — platform/agents/selection.py)
+
+**What**: Beta-distribution bandit for agent selection per role-slot.
+
+**How**:
+```python
+score ~ Beta(accepted + 1, rejected + 1)  # Gamma trick, no scipy
+agent = argmax(score_i for i in candidates)
+```
+
+**Cold start**: iterations < 5 → uniform score [0.4, 0.6]
+**Escalation**: rejection_rate > 40% → force azure-openai provider
+
+**DB**: `agent_scores(agent_id, epic_id, accepted, rejected, iterations, quality_score)`
+
+**Quality score**:
+- On acceptance: `min(1.0, ratio + tools_used*0.02 + min(output_len/5000, 0.05))`
+- On rejection: `accepted / (accepted + rejected)`
+
+**P3 auto-close**: ≥3 open quality_rejection incidents → auto_closed (engine.py)
+
+**A/B dashboard**: `/art` → Thompson Sampling tab (Équipe A=minimax vs Équipe B=azure-openai)
+
+**Metrics endpoint**: `GET /api/analytics/agents/scores`
+
+---
+
+### Layer 2: Genetic Algorithm — Workflow Evolution (platform/agents/evolution.py)
+
+**What**: Evolve workflow YAML templates offline using historical mission outcomes.
+
+**Genome**: list of PhaseSpec `{phase_id, pattern_id, agents[], gate}`
+**Fitness**: `success_rate × avg_quality_score` from agent_scores + mission outcomes
+**Operators**:
+- Crossover: 1-point on phase list (phases from wf_A + phases from wf_B)
+- Mutation: swap pattern_id, change gate, swap agent, add/remove phase
+**Selection**: tournament (k=3)
+**Config**: population=40, generations=30, mutation_rate=0.15
+**Schedule**: nightly at 02:00 (asyncio)
+
+**DB tables**:
+- `evolution_proposals(id, base_wf_id, genome_json, fitness, generation, status, created_at)`
+- `evolution_runs(id, wf_id, started_at, completed_at, generations, best_fitness)`
+
+**Cold start**: `platform/agents/simulator.py` generates N synthetic runs.
+Probability model: `P(phase_success) = base × f(pattern) × f(gate) × f(seniority) + σ`
+- Patterns: parallel+15%, hierarchical+10%, sequential=base, loop-5%
+- Gates: always=base, no_veto+5%, all_approved+8% (but +20% duration)
+
+**API**: `GET /api/evolution/proposals`, `POST /api/evolution/proposals/{id}/approve|reject`, `POST /api/evolution/run/{wf_id}`
+
+**UI**: `/workflows` → Evolution tab (diff base vs evolved, fitness score, approve/reject)
+
+---
+
+### Layer 3: Reinforcement Learning — Mid-mission Adaptation (platform/agents/rl_policy.py)
+
+**What**: Q-learning policy to recommend pattern changes mid-mission.
+
+**State**: `(workflow_id_hash, phase_idx_bucket, rejection_pct_bucket, quality_bucket)` → discretized
+**Actions**: `keep | switch_parallel | switch_sequential | switch_hierarchical | add_agent | remove_agent`
+**Reward**: `+1.0` phase success, `-1.0` phase failure, `+0.1×quality_score` quality bonus
+**Algorithm**: Q-learning, offline batch, ε-greedy exploration (ε=0.1)
+**Training**: nightly on `rl_experience(state, action, reward, next_state)` table
+**Trigger**: engine.py calls `rl_policy.recommend()` at phase start if confidence > 0.7
+
+**DB table**: `rl_experience(id, state_json, action, reward, next_state_json, mission_id, created_at)`
+
+---
+
+### OKRs
+
+**O1 — Maximize autonomous team quality**
+- KR1: avg quality_score > 0.75 across all agents (baseline: ~0.55)
+- KR2: rejection_rate < 20% per epic (baseline: ~35%)
+- KR3: P0/P1 incidents → 0 auto-escalation misses
+
+**O2 — Continuous workflow improvement via GA**
+- KR1: ≥2 workflow proposals approved/month after GA evolution
+- KR2: evolved workflows show +10% fitness vs base templates
+- KR3: cold-start simulator generates ≥500 synthetic runs/workflow
+
+**O3 — RL mid-mission adaptation**
+- KR1: RL recommend() called ≥100 times/week
+- KR2: RL-recommended pattern changes lead to +5% phase success rate
+- KR3: Q-table coverage ≥80% of observed state space
+
+**O4 — Observable & explainable AI decisions**
+- KR1: 100% of Thompson/GA/RL decisions logged with rationale
+- KR2: Metrics dashboard shows all 3 layers in real-time
+- KR3: Agent popover shows selection reason (Thompson score, RL recommendation)
+
+---
+
+### Key Files
+
+```
+platform/agents/
+  selection.py         Thompson Sampling (LIVE)
+  evolution.py         GA engine (PLANNED)
+  evolution_scheduler.py  nightly GA runner (PLANNED)
+  simulator.py         synthetic data generator (PLANNED)
+  rl_policy.py         Q-learning policy (PLANNED)
+platform/patterns/
+  engine.py            RL hook at phase start (PLANNED)
+platform/web/routes/
+  evolution.py         GA API endpoints (PLANNED)
+platform/web/templates/
+  _partial_analytics.html  Thompson Sampling section (LIVE)
+  partials/workflows_list.html  Evolution proposals tab (PLANNED)
+```

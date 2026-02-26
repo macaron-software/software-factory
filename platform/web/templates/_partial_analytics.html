@@ -286,10 +286,64 @@
         </div>
     </div>
 
+    <!-- ══════ ADAPTIVE INTELLIGENCE ══════ -->
+    <h2 style="margin: 2.5rem 0 0.4rem; font-size: 1.4rem; font-weight: 700; color: var(--purple-light);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -4px; margin-right: 8px;"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Adaptive Intelligence — 3 Layers
+    </h2>
+    <p style="color:var(--text-secondary);font-size:0.82rem;margin-bottom:1.2rem">Thompson Sampling (live) · Genetic Algorithm (evolution) · Reinforcement Learning (adaptation)</p>
+
+    <!-- Layer badges -->
+    <div style="display:flex;gap:0.75rem;margin-bottom:1.5rem;flex-wrap:wrap">
+        <div style="background:rgba(16,185,129,0.1);border:1px solid #10b981;border-radius:8px;padding:0.5rem 0.9rem;display:flex;align-items:center;gap:0.5rem">
+            <div style="width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981"></div>
+            <span style="font-size:0.75rem;font-weight:600;color:#10b981">Layer 1 · Thompson Sampling</span>
+            <span style="font-size:0.68rem;color:var(--text-muted);background:rgba(16,185,129,0.15);padding:1px 6px;border-radius:4px">LIVE</span>
+        </div>
+        <div style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.4);border-radius:8px;padding:0.5rem 0.9rem;display:flex;align-items:center;gap:0.5rem">
+            <div style="width:8px;height:8px;border-radius:50%;background:#8b5cf6;box-shadow:0 0 6px #8b5cf6;opacity:0.6"></div>
+            <span style="font-size:0.75rem;font-weight:600;color:#8b5cf6">Layer 2 · Genetic Algorithm</span>
+            <span style="font-size:0.68rem;color:var(--text-muted);background:rgba(139,92,246,0.15);padding:1px 6px;border-radius:4px">COMING</span>
+        </div>
+        <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.4);border-radius:8px;padding:0.5rem 0.9rem;display:flex;align-items:center;gap:0.5rem">
+            <div style="width:8px;height:8px;border-radius:50%;background:#f59e0b;box-shadow:0 0 6px #f59e0b;opacity:0.6"></div>
+            <span style="font-size:0.75rem;font-weight:600;color:#f59e0b">Layer 3 · Reinforcement Learning</span>
+            <span style="font-size:0.68rem;color:var(--text-muted);background:rgba(245,158,11,0.15);padding:1px 6px;border-radius:4px">COMING</span>
+        </div>
+    </div>
+
+    <!-- OKR KPI bar -->
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.5rem">
+        <div style="font-size:0.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem">OKRs</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem" id="okr-grid">
+            <div class="okr-item">
+                <div style="font-size:0.7rem;color:var(--text-secondary)">O1 · Qualité agents</div>
+                <div style="font-size:0.82rem;font-weight:700;margin:2px 0"><span id="okr-quality">—</span> <span style="font-size:0.68rem;color:var(--text-muted)">/ cible 0.75</span></div>
+                <div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px"><div id="okr-quality-bar" style="height:4px;background:#10b981;border-radius:2px;width:0%;transition:width 0.5s"></div></div>
+            </div>
+            <div class="okr-item">
+                <div style="font-size:0.7rem;color:var(--text-secondary)">O1 · Taux rejet</div>
+                <div style="font-size:0.82rem;font-weight:700;margin:2px 0"><span id="okr-rejection">—</span> <span style="font-size:0.68rem;color:var(--text-muted)">/ cible &lt;20%</span></div>
+                <div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px"><div id="okr-rejection-bar" style="height:4px;background:#f59e0b;border-radius:2px;width:0%;transition:width 0.5s"></div></div>
+            </div>
+            <div class="okr-item">
+                <div style="font-size:0.7rem;color:var(--text-secondary)">O2 · Propositions GA</div>
+                <div style="font-size:0.82rem;font-weight:700;margin:2px 0"><span id="okr-proposals">0</span> <span style="font-size:0.68rem;color:var(--text-muted)">/ cible 2/mois</span></div>
+                <div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px"><div id="okr-proposals-bar" style="height:4px;background:#8b5cf6;border-radius:2px;width:0%;transition:width 0.5s"></div></div>
+            </div>
+            <div class="okr-item">
+                <div style="font-size:0.7rem;color:var(--text-secondary)">O3 · Décisions RL</div>
+                <div style="font-size:0.82rem;font-weight:700;margin:2px 0"><span id="okr-rl">0</span> <span style="font-size:0.68rem;color:var(--text-muted)">/ cible 100/sem</span></div>
+                <div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px"><div id="okr-rl-bar" style="height:4px;background:#f59e0b;border-radius:2px;width:0%;transition:width 0.5s"></div></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Thompson Sampling Section -->
-    <h2 style="margin: 2.5rem 0 1rem; font-size: 1.3rem; font-weight: 700;">
+    <h2 style="margin: 2rem 0 1rem; font-size: 1.3rem; font-weight: 700;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 6px;"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
-        Thompson Sampling — Agent Selection
+        Layer 1 · Thompson Sampling — Agent Selection
+        <span style="font-size:0.7rem;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid #10b981;border-radius:4px;padding:1px 7px;margin-left:8px;vertical-align:2px">LIVE</span>
     </h2>
     <div class="stats-grid" id="thompson-stats">
         <div class="stat-card">
@@ -334,6 +388,117 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <!-- Layer 2: Genetic Algorithm -->
+    <h2 style="margin: 2.5rem 0 1rem; font-size: 1.3rem; font-weight: 700;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 6px;"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 3v4"/><path d="M12 3l3 3"/><path d="M12 3l-3 3"/></svg>
+        Layer 2 · Genetic Algorithm — Workflow Evolution
+        <span style="font-size:0.7rem;background:rgba(139,92,246,0.12);color:#8b5cf6;border:1px solid rgba(139,92,246,0.4);border-radius:4px;padding:1px 7px;margin-left:8px;vertical-align:2px">COMING</span>
+    </h2>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Propositions en attente</h3>
+            <p class="stat-value" id="ga-pending" style="color:#8b5cf6">—</p>
+            <p class="stat-label">à approuver</p>
+        </div>
+        <div class="stat-card">
+            <h3>Générations exécutées</h3>
+            <p class="stat-value" id="ga-generations">—</p>
+            <p class="stat-label">total GA runs</p>
+        </div>
+        <div class="stat-card">
+            <h3>Meilleur fitness</h3>
+            <p class="stat-value" id="ga-best-fitness" style="color:#10b981">—</p>
+            <p class="stat-label">vs baseline</p>
+        </div>
+        <div class="stat-card">
+            <h3>Runs simulateur</h3>
+            <p class="stat-value" id="ga-sim-runs">—</p>
+            <p class="stat-label">données synthétiques</p>
+        </div>
+    </div>
+    <div class="charts-grid">
+        <div class="chart-card" style="grid-column: 1 / -1">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+                <h2 style="margin:0">Fitness par génération</h2>
+                <button onclick="triggerGARun()" style="font-size:0.75rem;padding:4px 12px;background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.4);color:#8b5cf6;border-radius:6px;cursor:pointer">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:4px"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Lancer évolution
+                </button>
+            </div>
+            <div class="chart-container" style="min-height:160px;display:flex;align-items:center;justify-content:center" id="ga-chart-wrap">
+                <div style="text-align:center;color:var(--text-muted);font-size:0.82rem">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="1.5" style="opacity:0.4;margin-bottom:8px;display:block;margin-inline:auto"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                    En attente du premier run GA nightly (02:00 UTC)<br>
+                    <span style="font-size:0.72rem">ou cliquez "Lancer évolution" pour un run manuel</span>
+                </div>
+            </div>
+            <canvas id="chart-ga-fitness" style="display:none"></canvas>
+        </div>
+    </div>
+    <!-- GA Proposals table -->
+    <div class="charts-grid" style="margin-top:0.5rem">
+        <div class="chart-card" style="grid-column: 1 / -1">
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem">
+                <h2 style="margin:0">Propositions d'évolution</h2>
+                <a href="/workflows" style="font-size:0.72rem;color:var(--purple-light);margin-left:auto">Gérer dans Workflows →</a>
+            </div>
+            <div id="ga-proposals-table" style="color:var(--text-muted);font-size:0.82rem;text-align:center;padding:1.5rem">
+                Aucune proposition — le GA n'a pas encore tourné
+            </div>
+        </div>
+    </div>
+
+    <!-- Layer 3: Reinforcement Learning -->
+    <h2 style="margin: 2.5rem 0 1rem; font-size: 1.3rem; font-weight: 700;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 6px;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        Layer 3 · Reinforcement Learning — Adaptation Mid-Mission
+        <span style="font-size:0.7rem;background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);border-radius:4px;padding:1px 7px;margin-left:8px;vertical-align:2px">COMING</span>
+    </h2>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Décisions RL</h3>
+            <p class="stat-value" id="rl-decisions" style="color:#f59e0b">—</p>
+            <p class="stat-label">total recommend()</p>
+        </div>
+        <div class="stat-card">
+            <h3>Q-table coverage</h3>
+            <p class="stat-value" id="rl-coverage">—</p>
+            <p class="stat-label">états observés</p>
+        </div>
+        <div class="stat-card">
+            <h3>Confiance moy.</h3>
+            <p class="stat-value" id="rl-confidence">—</p>
+            <p class="stat-label">seuil activation: 0.7</p>
+        </div>
+        <div class="stat-card">
+            <h3>Expériences stockées</h3>
+            <p class="stat-value" id="rl-experiences">—</p>
+            <p class="stat-label">rl_experience buffer</p>
+        </div>
+    </div>
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h2>Actions recommandées</h2>
+            <div style="min-height:160px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:0.8rem" id="rl-actions-wrap">
+                <div style="text-align:center">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5" style="opacity:0.4;margin-bottom:6px;display:block;margin-inline:auto"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    En attente de données d'expérience
+                </div>
+            </div>
+            <canvas id="chart-rl-actions" style="display:none"></canvas>
+        </div>
+        <div class="chart-card">
+            <h2>Reward moyen par action</h2>
+            <div style="min-height:160px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:0.8rem" id="rl-rewards-wrap">
+                <div style="text-align:center">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5" style="opacity:0.4;margin-bottom:6px;display:block;margin-inline:auto"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    En attente de données Q-table
+                </div>
+            </div>
+            <canvas id="chart-rl-rewards" style="display:none"></canvas>
         </div>
     </div>
 
@@ -734,5 +899,141 @@ async function loadThompsonScores() {
 
 // Load Thompson on init
 loadThompsonScores();
+
+// OKR update from Thompson data
+async function updateOKRs() {
+    try {
+        const d = await fetch('/api/analytics/agents/scores').then(r => r.json());
+        if (!d.success) return;
+        const s = d.summary;
+        // O1 quality
+        const avgQ = d.agents.length ? (d.agents.reduce((a,b) => a + (b.quality_score||0), 0) / d.agents.length) : 0;
+        const qPct = Math.min(100, (avgQ / 0.75) * 100);
+        document.getElementById('okr-quality').textContent = avgQ.toFixed(2);
+        document.getElementById('okr-quality-bar').style.width = qPct + '%';
+        document.getElementById('okr-quality-bar').style.background = avgQ >= 0.75 ? '#10b981' : avgQ >= 0.55 ? '#f59e0b' : '#ef4444';
+        // O1 rejection
+        const totalIter = s.total_accepted + s.total_rejected;
+        const rejPct = totalIter > 0 ? Math.round((s.total_rejected / totalIter) * 100) : 0;
+        document.getElementById('okr-rejection').textContent = rejPct + '%';
+        const rejBar = Math.min(100, (rejPct / 20) * 100);
+        document.getElementById('okr-rejection-bar').style.width = rejBar + '%';
+        document.getElementById('okr-rejection-bar').style.background = rejPct <= 20 ? '#10b981' : rejPct <= 35 ? '#f59e0b' : '#ef4444';
+    } catch(e) {}
+    // GA stats
+    try {
+        const ga = await fetch('/api/evolution/proposals').then(r => r.json()).catch(() => null);
+        if (ga && ga.proposals !== undefined) {
+            const pending = (ga.proposals || []).filter(p => p.status === 'pending').length;
+            document.getElementById('ga-pending').textContent = pending;
+            document.getElementById('ga-generations').textContent = ga.total_runs || 0;
+            document.getElementById('ga-best-fitness').textContent = ga.best_fitness ? ga.best_fitness.toFixed(3) : '—';
+            document.getElementById('ga-sim-runs').textContent = ga.sim_runs || 0;
+            const pctGoal = Math.min(100, (pending / 2) * 100);
+            document.getElementById('okr-proposals-bar').style.width = pctGoal + '%';
+            document.getElementById('okr-proposals').textContent = pending;
+            if (ga.proposals && ga.proposals.length) renderGAProposals(ga.proposals);
+            if (ga.fitness_history && ga.fitness_history.length) renderGAChart(ga.fitness_history);
+        }
+    } catch(e) {}
+    // RL stats
+    try {
+        const rl = await fetch('/api/rl/policy/stats').then(r => r.json()).catch(() => null);
+        if (rl && rl.decisions !== undefined) {
+            document.getElementById('rl-decisions').textContent = (rl.decisions || 0).toLocaleString();
+            document.getElementById('rl-coverage').textContent = rl.coverage ? Math.round(rl.coverage * 100) + '%' : '—';
+            document.getElementById('rl-confidence').textContent = rl.avg_confidence ? rl.avg_confidence.toFixed(2) : '—';
+            document.getElementById('rl-experiences').textContent = (rl.experience_count || 0).toLocaleString();
+            const rlPctGoal = Math.min(100, ((rl.decisions || 0) / 100) * 100);
+            document.getElementById('okr-rl-bar').style.width = rlPctGoal + '%';
+            document.getElementById('okr-rl').textContent = rl.decisions || 0;
+            if (rl.action_counts) renderRLCharts(rl);
+        }
+    } catch(e) {}
+}
+
+function renderGAProposals(proposals) {
+    const el = document.getElementById('ga-proposals-table');
+    const rows = proposals.map(p => `
+        <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:7px 10px;font-size:0.8rem">${p.base_wf_id || '—'}</td>
+            <td style="padding:7px 10px;font-size:0.8rem;color:#8b5cf6;font-weight:600">${p.fitness ? p.fitness.toFixed(3) : '—'}</td>
+            <td style="padding:7px 10px;font-size:0.75rem;color:var(--text-muted)">Gen ${p.generation || 0}</td>
+            <td style="padding:7px 10px">
+                <span style="font-size:0.68rem;padding:1px 7px;border-radius:4px;background:${p.status==='pending'?'rgba(245,158,11,0.15)':p.status==='approved'?'rgba(16,185,129,0.15)':'rgba(239,68,68,0.1)'};color:${p.status==='pending'?'#f59e0b':p.status==='approved'?'#10b981':'#ef4444'}">${p.status}</span>
+            </td>
+            <td style="padding:7px 10px">
+                ${p.status === 'pending' ? `<button onclick="approveProposal('${p.id}')" style="font-size:0.68rem;padding:2px 8px;background:rgba(16,185,129,0.15);border:1px solid #10b981;color:#10b981;border-radius:4px;cursor:pointer;margin-right:4px">Approuver</button>
+                <button onclick="rejectProposal('${p.id}')" style="font-size:0.68rem;padding:2px 8px;background:rgba(239,68,68,0.1);border:1px solid #ef4444;color:#ef4444;border-radius:4px;cursor:pointer">Rejeter</button>` : ''}
+            </td>
+        </tr>`).join('');
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.83rem">
+        <thead><tr style="background:var(--bg-tertiary)">
+            <th style="padding:7px 10px;text-align:left;font-size:0.72rem;color:var(--text-secondary)">Workflow base</th>
+            <th style="padding:7px 10px;text-align:left;font-size:0.72rem;color:var(--text-secondary)">Fitness</th>
+            <th style="padding:7px 10px;text-align:left;font-size:0.72rem;color:var(--text-secondary)">Génération</th>
+            <th style="padding:7px 10px;text-align:left;font-size:0.72rem;color:var(--text-secondary)">Statut</th>
+            <th style="padding:7px 10px;text-align:left;font-size:0.72rem;color:var(--text-secondary)">Actions</th>
+        </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderGAChart(fitnessHistory) {
+    document.getElementById('ga-chart-wrap').style.display = 'none';
+    const canvas = document.getElementById('chart-ga-fitness');
+    canvas.style.display = 'block';
+    new Chart(canvas, { type: 'line',
+        data: { labels: fitnessHistory.map((_,i) => `Gen ${i+1}`),
+            datasets: [{label:'Fitness max', data: fitnessHistory.map(f => f.max_fitness), borderColor:'#8b5cf6', backgroundColor:'rgba(139,92,246,0.1)', tension:0.3, fill:true},
+                {label:'Fitness moy', data: fitnessHistory.map(f => f.avg_fitness), borderColor:'rgba(139,92,246,0.5)', borderDash:[4,4], tension:0.3, fill:false}]},
+        options: {responsive:true, scales:{y:{beginAtZero:false, min:0, max:1}}, plugins:{legend:{labels:{color:'var(--text-secondary)',font:{size:11}}}}}
+    });
+}
+
+function renderRLCharts(rl) {
+    if (rl.action_counts) {
+        document.getElementById('rl-actions-wrap').style.display = 'none';
+        const canvas = document.getElementById('chart-rl-actions');
+        canvas.style.display = 'block';
+        const actions = Object.keys(rl.action_counts);
+        new Chart(canvas, { type: 'doughnut',
+            data: { labels: actions, datasets: [{data: actions.map(a => rl.action_counts[a]),
+                backgroundColor:['#10b981','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4']}]},
+            options: {responsive:true, plugins:{legend:{labels:{color:'var(--text-secondary)',font:{size:11}}}}}
+        });
+    }
+    if (rl.avg_rewards) {
+        document.getElementById('rl-rewards-wrap').style.display = 'none';
+        const canvas = document.getElementById('chart-rl-rewards');
+        canvas.style.display = 'block';
+        const actions = Object.keys(rl.avg_rewards);
+        new Chart(canvas, { type: 'bar',
+            data: { labels: actions, datasets: [{label:'Reward moyen', data: actions.map(a => rl.avg_rewards[a]),
+                backgroundColor: actions.map(a => rl.avg_rewards[a] >= 0 ? 'rgba(16,185,129,0.7)' : 'rgba(239,68,68,0.7)')}]},
+            options: {responsive:true, scales:{y:{beginAtZero:true}}, plugins:{legend:{display:false}}}
+        });
+    }
+}
+
+async function triggerGARun() {
+    const btn = event.target.closest('button');
+    btn.disabled = true; btn.textContent = 'En cours…';
+    try {
+        await fetch('/api/evolution/run/all', {method:'POST'});
+        setTimeout(() => updateOKRs(), 2000);
+    } catch(e) {}
+    btn.disabled = false; btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:4px"><polygon points="5 3 19 12 5 21 5 3"/></svg>Lancer évolution';
+}
+
+async function approveProposal(id) {
+    await fetch(`/api/evolution/proposals/${id}/approve`, {method:'POST'});
+    updateOKRs();
+}
+async function rejectProposal(id) {
+    await fetch(`/api/evolution/proposals/${id}/reject`, {method:'POST'});
+    updateOKRs();
+}
+
+updateOKRs();
+
 </script>
 </div>
