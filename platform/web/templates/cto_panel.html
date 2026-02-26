@@ -38,14 +38,12 @@
 
 /* chips */
 .cto-chips{display:flex;flex-wrap:wrap;gap:.35rem;padding:.5rem 1.1rem;border-bottom:1px solid var(--border)}
-.cto-chip{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:20px;padding:.22rem .65rem;font-size:.7rem;cursor:pointer;color:var(--text-muted);transition:all .15s;white-space:nowrap}
+.cto-chip{display:inline-flex;align-items:center;gap:.28rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:20px;padding:.22rem .65rem;font-size:.7rem;cursor:pointer;color:var(--text-muted);transition:all .15s;white-space:nowrap}
 .cto-chip:hover{background:var(--accent-subtle,rgba(99,102,241,.1));border-color:var(--accent,#6366f1);color:var(--text)}
 .cto-chip-project{background:rgba(99,102,241,.07);border-color:rgba(99,102,241,.3);color:var(--accent,#6366f1)}
 .cto-chip-project:hover{background:rgba(99,102,241,.18);border-color:var(--accent,#6366f1);color:var(--text)}
 .cto-chip-debt{background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.3);color:#d97706}
 .cto-chip-debt:hover{background:rgba(245,158,11,.18);border-color:#d97706;color:var(--text)}
-
-/* messages */
 .cto-messages{flex:1;overflow-y:auto;padding:.9rem 1.1rem;display:flex;flex-direction:column;gap:.7rem}
 .cto-messages:empty::after{content:"Posez une question à Karim…";color:var(--text-muted);font-size:.82rem;margin:auto;display:block;text-align:center;padding-top:2.5rem}
 .cto-messages .chat-msg{max-width:80%;animation:fadeUp .18s ease}
@@ -147,17 +145,17 @@
     </div>
 
     <div class="cto-chips">
-      <button class="cto-chip" onclick="ctoSendChip('Donne-moi les métriques du portfolio : missions, projets, agents, coûts LLM')">📊 Stats portfolio</button>
-      <button class="cto-chip" onclick="ctoSendChip('Liste les missions en cours et leur état')">🚀 Missions en cours</button>
-      <button class="cto-chip" onclick="ctoSendChip('Monte-moi une équipe optimale pour un projet de sécurité')">👥 Monter une équipe</button>
-      <button class="cto-chip" onclick="ctoSendChip('Cherche sur GitHub les dernières pratiques pour notre stack')">🔍 GitHub</button>
-      <button class="cto-chip cto-chip-project" onclick="ctoSendChip('Crée un projet complet pour répondre à un AO Veligo (vélos partagés Paris) : périmètre, équipe, missions et meta workflow de développement')">🚲 AO Veligo</button>
-      <button class="cto-chip cto-chip-project" onclick="ctoSendChip('Lance un projet de migration Angular 16→17 pour Sharelook : analyse du code source GitHub microsoft/SharePoint-Connect (comme exemple), crée le projet, les missions de migration et le meta workflow avec les équipes front, back et QA')">⬆️ Migration Angular 16→17</button>
-      <button class="cto-chip cto-chip-debt" onclick="ctoSendChip('Analyse la dette technique, sécurité (OWASP), accessibilité (WCAG 2.1 AA) et conformité RGPD sur le projet GitHub public facebook/react : génère un rapport complet et crée les missions correctives')">🛡️ Dette tech · sécu · a11y · RGPD</button>
-      <button class="cto-chip cto-chip-debt" onclick="ctoSendChip('Fais un git status et git log des 5 derniers commits du projet actif, propose un commit de nettoyage et crée une PR')">🔀 Git commit &amp; PR</button>
-      <button class="cto-chip cto-chip-project" onclick="ctoSendChip('Lance les tests E2E Playwright sur le projet actif, prends des screenshots des pages principales et génère un rapport de qualité')">🧪 E2E + Screenshots</button>
-      <button class="cto-chip cto-chip-debt" onclick="ctoSendChip('Synchronise le Jira du projet actif : crée les tickets pour les missions en cours et mets à jour le statut des stories existantes')">📋 Sync Jira</button>
-      <button class="cto-chip cto-chip-project" onclick="ctoSendChip('Mets à jour le wiki GitHub du projet actif avec un résumé de l\'architecture, les décisions techniques récentes et le statut des missions en cours')">📝 Mise à jour Wiki</button>
+      <button class="cto-chip" data-prompt="Donne-moi les métriques du portfolio : missions, projets, agents, coûts LLM" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Stats portfolio</button>
+      <button class="cto-chip" data-prompt="Liste les missions en cours et leur état" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Missions en cours</button>
+      <button class="cto-chip" data-prompt="Monte-moi une équipe optimale pour un projet de sécurité" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Monter une équipe</button>
+      <button class="cto-chip" data-prompt="Cherche sur GitHub les dernières pratiques pour notre stack" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>GitHub</button>
+      <button class="cto-chip cto-chip-project" data-prompt="Crée un projet complet pour répondre à un AO Veligo (vélos partagés Paris) : périmètre, équipe, missions et meta workflow de développement" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>AO Veligo</button>
+      <button class="cto-chip cto-chip-project" data-prompt="Lance un projet de migration Angular 16→17 pour Sharelook : analyse du code source GitHub microsoft/SharePoint-Connect (comme exemple), crée le projet, les missions de migration et le meta workflow avec les équipes front, back et QA" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="16 12 12 8 8 12"/><line x1="12" y1="16" x2="12" y2="8"/></svg>Migration Angular 16→17</button>
+      <button class="cto-chip cto-chip-debt" data-prompt="Analyse la dette technique, sécurité (OWASP), accessibilité (WCAG 2.1 AA) et conformité RGPD sur le projet GitHub public facebook/react : génère un rapport complet et crée les missions correctives" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Dette tech · sécu · a11y · RGPD</button>
+      <button class="cto-chip cto-chip-debt" data-prompt="Fais un git status et git log des 5 derniers commits du projet actif, propose un commit de nettoyage et crée une PR" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>Git commit &amp; PR</button>
+      <button class="cto-chip cto-chip-project" data-prompt="Lance les tests E2E Playwright sur le projet actif, prends des screenshots des pages principales et génère un rapport de qualité" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>E2E + Screenshots</button>
+      <button class="cto-chip cto-chip-debt" data-prompt="Synchronise le Jira du projet actif : crée les tickets pour les missions en cours et mets à jour le statut des stories existantes" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>Sync Jira</button>
+      <button class="cto-chip cto-chip-project" data-prompt="Mets à jour le wiki GitHub du projet actif avec un résumé de l&#x27;architecture, les décisions techniques récentes et le statut des missions en cours" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Mise à jour Wiki</button>
     </div>
 
     <div class="cto-messages" id="cto-msgs" style="position:relative">
@@ -312,6 +310,12 @@
 
   function ctoSendChip(text){ _ctoDispatch(text, text); }
 
+  function ctoChipClick(btn){
+    var prompt = btn.getAttribute('data-prompt') || btn.textContent.trim();
+    var label = btn.textContent.trim();
+    _ctoDispatch(prompt, label);
+  }
+
   function _ctoDispatch(msg, displayMsg){
     var msgs = document.getElementById('cto-msgs');
     var thinking = document.getElementById('cto-thinking');
@@ -320,23 +324,81 @@
     thinking.style.display = 'flex';
     msgs.scrollTop = msgs.scrollHeight;
 
+    // Streaming bubble placeholder
+    var streamBubble = null;
+    var streamText = '';
+
     fetch('/api/cto/message', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({content: msg, session_id: _sessionId})
+      body: JSON.stringify({content: msg, display: displayMsg || msg, session_id: _sessionId})
     })
     .then(function(r){
-      var sid = r.headers.get('X-CTO-Session-Id');
-      var title = r.headers.get('X-CTO-Title');
-      if(sid) _sessionId = sid;
-      if(title) _updateConvTitle(_sessionId, title);
-      return r.text();
-    })
-    .then(function(html){
-      thinking.style.display = 'none';
-      btn.classList.remove('loading');
-      msgs.insertAdjacentHTML('beforeend', html);
-      msgs.scrollTop = msgs.scrollHeight;
+      var reader = r.body.getReader();
+      var decoder = new TextDecoder();
+      var buf = '';
+
+      function processChunk(value){
+        buf += decoder.decode(value || new Uint8Array(), {stream: !!value});
+        var parts = buf.split('\n\n');
+        buf = parts.pop();
+        parts.forEach(function(part){
+          var lines = part.split('\n');
+          var eventName = 'message', dataStr = '';
+          lines.forEach(function(l){
+            if(l.startsWith('event: ')) eventName = l.slice(7).trim();
+            else if(l.startsWith('data: ')) dataStr = l.slice(6).trim();
+          });
+          if(!dataStr) return;
+          try { var d = JSON.parse(dataStr); } catch(e){ return; }
+
+          if(eventName === 'user_html'){
+            msgs.insertAdjacentHTML('beforeend', d.html);
+            if(d.session_id) _sessionId = d.session_id;
+            msgs.scrollTop = msgs.scrollHeight;
+          } else if(eventName === 'chunk'){
+            if(!streamBubble){
+              msgs.insertAdjacentHTML('beforeend',
+                '<div class="chat-msg chat-msg-agent" id="cto-stream-bubble">' +
+                '<div class="chat-msg-avatar cto-avatar"></div>' +
+                '<div class="chat-msg-body">' +
+                '<div class="chat-msg-sender">Karim Benali — CTO</div>' +
+                '<div class="chat-msg-text" id="cto-stream-text"></div>' +
+                '</div></div>'
+              );
+              streamBubble = document.getElementById('cto-stream-bubble');
+            }
+            streamText += d.text;
+            var el = document.getElementById('cto-stream-text');
+            if(el) el.textContent = streamText;
+            msgs.scrollTop = msgs.scrollHeight;
+          } else if(eventName === 'done'){
+            if(streamBubble){ streamBubble.remove(); streamBubble = null; streamText = ''; }
+            msgs.insertAdjacentHTML('beforeend', d.html);
+            thinking.style.display = 'none';
+            btn.classList.remove('loading');
+            if(d.session_id) _sessionId = d.session_id;
+            if(d.title_hint) _updateConvTitle(_sessionId, d.title_hint);
+            msgs.scrollTop = msgs.scrollHeight;
+          } else if(eventName === 'error'){
+            thinking.style.display = 'none';
+            btn.classList.remove('loading');
+            msgs.insertAdjacentHTML('beforeend',
+              '<div class="chat-msg chat-msg-agent"><div class="chat-msg-body"><div class="chat-msg-text" style="color:var(--danger)">' +
+              (d.message || 'Erreur') + '</div></div></div>'
+            );
+          }
+        });
+      }
+
+      function pump(){
+        return reader.read().then(function(result){
+          if(result.done){ processChunk(null); return; }
+          processChunk(result.value);
+          return pump();
+        });
+      }
+      return pump();
     })
     .catch(function(){
       thinking.style.display = 'none';
@@ -410,6 +472,7 @@
   /* Expose globals */
   window.ctoSend = ctoSend;
   window.ctoSendChip = ctoSendChip;
+  window.ctoChipClick = ctoChipClick;
   window.ctoNewConversation = ctoNewConversation;
   window.ctoLoadConv = ctoLoadConv;
   window.ctoClearAttach = ctoClearAttach;
@@ -439,7 +502,8 @@
 .cto-chip-project:hover{background:rgba(99,102,241,.18);border-color:var(--accent,#6366f1);color:var(--text)}
 .cto-chip-debt{background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.3);color:#d97706}
 .cto-chip-debt:hover{background:rgba(245,158,11,.18);border-color:#d97706;color:var(--text)}
-.cto-messages{flex:1;overflow-y:auto;padding:1rem 1.25rem;display:flex;flex-direction:column;gap:0.75rem;position:relative}
+.cto-chips{display:flex;flex-wrap:wrap;gap:0.4rem;padding:0.6rem 1.25rem;border-bottom:1px solid var(--border)}
+.cto-chip{display:inline-flex;align-items:center;gap:.28rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:20px;padding:0.25rem 0.75rem;font-size:0.72rem;cursor:pointer;color:var(--text-muted);transition:all .15s}
 .cto-messages:empty::after{content:"Posez une question à Karim…";color:var(--text-muted);font-size:0.82rem;margin:auto;display:block;text-align:center;padding-top:2rem}
 .cto-input-area{display:flex;flex-direction:column;gap:.3rem;padding:0.75rem 1.25rem;border-top:1px solid var(--border);background:var(--bg-secondary)}
 .cto-input-row{display:flex;gap:0.5rem;align-items:flex-end}
@@ -499,17 +563,17 @@
 
   {# Quick chips #}
   <div class="cto-chips">
-    <button class="cto-chip" onclick="ctoSendChip('Donne-moi les métriques du portfolio : missions, projets, agents, coûts LLM')">📊 Stats portfolio</button>
-    <button class="cto-chip" onclick="ctoSendChip('Liste les missions en cours et leur état')">🚀 Missions en cours</button>
-    <button class="cto-chip" onclick="ctoSendChip('Monte-moi une équipe optimale pour un projet de sécurité')">👥 Monter une équipe</button>
-    <button class="cto-chip" onclick="ctoSendChip('Cherche sur GitHub les dernières pratiques pour notre stack')">🔍 GitHub</button>
-    <button class="cto-chip cto-chip-project" onclick="ctoSendChip('Crée un projet complet pour répondre à un AO Veligo (vélos partagés Paris) : périmètre, équipe, missions et meta workflow de développement')">🚲 AO Veligo</button>
-    <button class="cto-chip cto-chip-project" onclick="ctoSendChip('Lance un projet de migration Angular 16→17 pour Sharelook : analyse du code source GitHub microsoft/SharePoint-Connect (comme exemple), crée le projet, les missions de migration et le meta workflow avec les équipes front, back et QA')">⬆️ Migration Angular 16→17</button>
-    <button class="cto-chip cto-chip-debt" onclick="ctoSendChip('Analyse la dette technique, sécurité (OWASP), accessibilité (WCAG 2.1 AA) et conformité RGPD sur le projet GitHub public facebook/react : génère un rapport complet et crée les missions correctives')">🛡️ Dette tech · sécu · a11y · RGPD</button>
-    <button class="cto-chip cto-chip-debt" onclick="ctoSendChip('Fais un git status et git log des 5 derniers commits du projet actif, propose un commit de nettoyage et crée une PR')">🔀 Git commit &amp; PR</button>
-    <button class="cto-chip cto-chip-project" onclick="ctoSendChip('Lance les tests E2E Playwright sur le projet actif, prends des screenshots des pages principales et génère un rapport de qualité')">🧪 E2E + Screenshots</button>
-    <button class="cto-chip cto-chip-debt" onclick="ctoSendChip('Synchronise le Jira du projet actif : crée les tickets pour les missions en cours et mets à jour le statut des stories existantes')">📋 Sync Jira</button>
-    <button class="cto-chip cto-chip-project" onclick="ctoSendChip('Mets à jour le wiki GitHub du projet actif avec un résumé de l\'architecture, les décisions techniques récentes et le statut des missions en cours')">📝 Mise à jour Wiki</button>
+    <button class="cto-chip" data-prompt="Donne-moi les métriques du portfolio : missions, projets, agents, coûts LLM" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Stats portfolio</button>
+    <button class="cto-chip" data-prompt="Liste les missions en cours et leur état" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Missions en cours</button>
+    <button class="cto-chip" data-prompt="Monte-moi une équipe optimale pour un projet de sécurité" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Monter une équipe</button>
+    <button class="cto-chip" data-prompt="Cherche sur GitHub les dernières pratiques pour notre stack" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>GitHub</button>
+    <button class="cto-chip cto-chip-project" data-prompt="Crée un projet complet pour répondre à un AO Veligo (vélos partagés Paris) : périmètre, équipe, missions et meta workflow de développement" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>AO Veligo</button>
+    <button class="cto-chip cto-chip-project" data-prompt="Lance un projet de migration Angular 16→17 pour Sharelook : analyse du code source GitHub microsoft/SharePoint-Connect (comme exemple), crée le projet, les missions de migration et le meta workflow avec les équipes front, back et QA" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="16 12 12 8 8 12"/><line x1="12" y1="16" x2="12" y2="8"/></svg>Migration Angular 16→17</button>
+    <button class="cto-chip cto-chip-debt" data-prompt="Analyse la dette technique, sécurité (OWASP), accessibilité (WCAG 2.1 AA) et conformité RGPD sur le projet GitHub public facebook/react : génère un rapport complet et crée les missions correctives" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Dette tech · sécu · a11y · RGPD</button>
+    <button class="cto-chip cto-chip-debt" data-prompt="Fais un git status et git log des 5 derniers commits du projet actif, propose un commit de nettoyage et crée une PR" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>Git commit &amp; PR</button>
+    <button class="cto-chip cto-chip-project" data-prompt="Lance les tests E2E Playwright sur le projet actif, prends des screenshots des pages principales et génère un rapport de qualité" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>E2E + Screenshots</button>
+    <button class="cto-chip cto-chip-debt" data-prompt="Synchronise le Jira du projet actif : crée les tickets pour les missions en cours et mets à jour le statut des stories existantes" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>Sync Jira</button>
+    <button class="cto-chip cto-chip-project" data-prompt="Mets à jour le wiki GitHub du projet actif avec un résumé de l&#x27;architecture, les décisions techniques récentes et le statut des missions en cours" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Mise à jour Wiki</button>
   </div>
 
   {# Messages #}
@@ -668,31 +732,87 @@
 
   function ctoSendChip(text){ _ctoDispatch(text, text); }
 
+  function ctoChipClick(btn){
+    var prompt = btn.getAttribute('data-prompt') || btn.textContent.trim();
+    var label = btn.textContent.trim();
+    _ctoDispatch(prompt, label);
+  }
+
   function _ctoDispatch(msg, displayMsg){
     var msgs = document.getElementById('cto-msgs');
     var thinking = document.getElementById('cto-thinking');
     var show = displayMsg || msg;
-    msgs.insertAdjacentHTML('beforeend',
-      '<div class="chat-msg chat-msg-user">' +
-      '<div class="chat-msg-body"><div class="chat-msg-text">' + _escape(show.substring(0,200)) + (show.length>200?'…':'') + '</div></div>' +
-      '<div class="chat-msg-avatar user">S</div>' +
-      '</div>'
-    );
+    var streamBubble = null;
+    var streamText = '';
     thinking.style.display = 'flex';
     msgs.scrollTop = msgs.scrollHeight;
 
     fetch('/api/cto/message', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({content: msg})
+      body: JSON.stringify({content: msg, display: show})
     })
-    .then(function(r){ return r.text(); })
-    .then(function(html){
-      thinking.style.display = 'none';
-      var userBubbles = msgs.querySelectorAll('.chat-msg-user');
-      if(userBubbles.length) userBubbles[userBubbles.length-1].remove();
-      msgs.insertAdjacentHTML('beforeend', html);
-      msgs.scrollTop = msgs.scrollHeight;
+    .then(function(r){
+      var reader = r.body.getReader();
+      var decoder = new TextDecoder();
+      var buf = '';
+
+      function processChunk(value){
+        buf += decoder.decode(value || new Uint8Array(), {stream: !!value});
+        var parts = buf.split('\n\n');
+        buf = parts.pop();
+        parts.forEach(function(part){
+          var lines = part.split('\n');
+          var eventName = 'message', dataStr = '';
+          lines.forEach(function(l){
+            if(l.startsWith('event: ')) eventName = l.slice(7).trim();
+            else if(l.startsWith('data: ')) dataStr = l.slice(6).trim();
+          });
+          if(!dataStr) return;
+          try { var d = JSON.parse(dataStr); } catch(e){ return; }
+
+          if(eventName === 'user_html'){
+            msgs.insertAdjacentHTML('beforeend', d.html);
+            msgs.scrollTop = msgs.scrollHeight;
+          } else if(eventName === 'chunk'){
+            if(!streamBubble){
+              msgs.insertAdjacentHTML('beforeend',
+                '<div class="chat-msg chat-msg-agent" id="cto-stream-bubble">' +
+                '<div class="chat-msg-avatar cto-avatar"></div>' +
+                '<div class="chat-msg-body">' +
+                '<div class="chat-msg-sender">Karim Benali — CTO</div>' +
+                '<div class="chat-msg-text" id="cto-stream-text"></div>' +
+                '</div></div>'
+              );
+              streamBubble = document.getElementById('cto-stream-bubble');
+            }
+            streamText += d.text;
+            var el = document.getElementById('cto-stream-text');
+            if(el) el.textContent = streamText;
+            msgs.scrollTop = msgs.scrollHeight;
+          } else if(eventName === 'done'){
+            if(streamBubble){ streamBubble.remove(); streamBubble = null; streamText = ''; }
+            msgs.insertAdjacentHTML('beforeend', d.html);
+            thinking.style.display = 'none';
+            msgs.scrollTop = msgs.scrollHeight;
+          } else if(eventName === 'error'){
+            thinking.style.display = 'none';
+            msgs.insertAdjacentHTML('beforeend',
+              '<div class="chat-msg chat-msg-agent"><div class="chat-msg-body"><div class="chat-msg-text" style="color:var(--danger)">' +
+              (d.message || 'Erreur') + '</div></div></div>'
+            );
+          }
+        });
+      }
+
+      function pump(){
+        return reader.read().then(function(result){
+          if(result.done){ processChunk(null); return; }
+          processChunk(result.value);
+          return pump();
+        });
+      }
+      return pump();
     })
     .catch(function(){
       thinking.style.display = 'none';
@@ -708,6 +828,7 @@
 
   window.ctoSend = ctoSend;
   window.ctoSendChip = ctoSendChip;
+  window.ctoChipClick = ctoChipClick;
   window.ctoClearAttach = ctoClearAttach;
   window.ctoHandleFileInput = ctoHandleFileInput;
 

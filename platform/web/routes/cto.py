@@ -7,11 +7,12 @@ agent exécutif avec accès aux outils plateforme, web, GitHub et création de r
 from __future__ import annotations
 
 import html as html_mod
+import json
 import logging
 
 import markdown as md_lib
 from fastapi import APIRouter, UploadFile, File
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from starlette.requests import Request
 
 from .helpers import _parse_body, _templates
@@ -182,32 +183,25 @@ async def cto_load_session(session_id: str, request: Request):
     return HTMLResponse(history_html or "")
 
 
-@router.post("/api/cto/message", response_class=HTMLResponse)
+@router.post("/api/cto/message")
 async def cto_message(request: Request):
-    """Send a message to the CTO agent, return chat bubbles HTML."""
+    """Send a message to the CTO agent, return SSE stream."""
     from ...sessions.store import get_session_store, MessageDef
-    from ...sessions.runner import handle_user_message
+    from ...agents.executor import get_executor
 
     data = await _parse_body(request)
     content = str(data.get("content") or data.get("message", "")).strip()
+    display = str(data.get("display") or content).strip()
     session_id = str(data.get("session_id", "")).strip()
     if not content:
         return HTMLResponse("")
 
     # Resolve session
+    store = get_session_store()
     if session_id:
-        from ...sessions.store import get_session_store as _ss
-
-        store = _ss()
         session = store.get(session_id) or _get_or_create_latest_cto_session()
     else:
         session = _get_or_create_latest_cto_session()
-        store = None
-
-    if store is None:
-        from ...sessions.store import get_session_store
-
-        store = get_session_store()
 
     store.add_message(
         MessageDef(
@@ -220,56 +214,94 @@ async def cto_message(request: Request):
 
     user_html = (
         f'<div class="chat-msg chat-msg-user">'
-        f'<div class="chat-msg-body"><div class="chat-msg-text">{html_mod.escape(content)}</div></div>'
+        f'<div class="chat-msg-body"><div class="chat-msg-text">{html_mod.escape(display)}</div></div>'
         f'<div class="chat-msg-avatar user">S</div>'
         f"</div>"
     )
 
-    agent_msg = await handle_user_message(session.id, content, _CTO_AGENT_ID)
+    def sse(event: str, data: dict) -> str:
+        return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
-    if agent_msg:
-        agent_content = (
-            agent_msg.get("content", "")
-            if isinstance(agent_msg, dict)
-            else getattr(agent_msg, "content", str(agent_msg))
-        )
-        tool_calls = None
-        if isinstance(agent_msg, dict):
-            tool_calls = (agent_msg.get("metadata") or {}).get("tool_calls")
-        elif hasattr(agent_msg, "metadata") and agent_msg.metadata:
-            tool_calls = agent_msg.metadata.get("tool_calls")
+    async def event_generator():
+        yield sse("user_html", {"html": user_html, "session_id": session.id})
 
-        tools_html = ""
-        if tool_calls:
-            pills = "".join(
-                f'<span class="chat-tool-pill">'
-                f'<svg class="icon icon-xs"><use href="#icon-wrench"/></svg> '
-                f"{html_mod.escape(str(tc.get('name', tc) if isinstance(tc, dict) else tc))}</span>"
-                for tc in tool_calls
+        try:
+            from ...agents.store import get_agent_store
+            agent_store = get_agent_store()
+            agent = agent_store.get(_CTO_AGENT_ID)
+            if not agent:
+                yield sse("error", {"message": "CTO agent not found"})
+                return
+
+            from ...sessions.runner import _build_context
+            ctx = await _build_context(agent, session)
+
+            executor = get_executor()
+            result = None
+
+            async for event_type_s, data_s in executor.run_streaming(ctx, content):
+                if event_type_s == "delta":
+                    yield sse("chunk", {"text": data_s})
+                elif event_type_s == "result":
+                    result = data_s
+
+            if not result:
+                yield sse("error", {"message": "No response from agent"})
+                return
+
+            store.add_message(
+                MessageDef(
+                    session_id=session.id,
+                    from_agent=_CTO_AGENT_ID,
+                    to_agent="user",
+                    message_type="text",
+                    content=result.content,
+                    metadata={
+                        "model": result.model,
+                        "provider": result.provider,
+                        "tokens_in": result.tokens_in,
+                        "tokens_out": result.tokens_out,
+                        "duration_ms": result.duration_ms,
+                        "tool_calls": result.tool_calls if result.tool_calls else None,
+                    },
+                )
             )
-            tools_html = f'<div class="chat-msg-tools">{pills}</div>'
 
-        rendered = md_lib.markdown(
-            str(agent_content),
-            extensions=["fenced_code", "tables", "nl2br"],
-        )
-        agent_html = (
-            f'<div class="chat-msg chat-msg-agent">'
-            f'<div class="chat-msg-avatar cto-avatar"></div>'
-            f'<div class="chat-msg-body">'
-            f'<div class="chat-msg-sender">Karim Benali — CTO</div>'
-            f'<div class="chat-msg-text md-rendered">{rendered}</div>'
-            f"{tools_html}"
-            f"</div></div>"
-        )
-        # Return first user message as title hint for sidebar update
-        title_hint = html_mod.escape(content[:55])
-        return HTMLResponse(
-            user_html + agent_html,
-            headers={"X-CTO-Session-Id": session.id, "X-CTO-Title": title_hint},
-        )
+            tool_calls = result.tool_calls or []
+            tools_html = ""
+            if tool_calls:
+                pills = "".join(
+                    f'<span class="chat-tool-pill">'
+                    f"{html_mod.escape(str(tc.get('name', tc) if isinstance(tc, dict) else tc))}</span>"
+                    for tc in tool_calls
+                )
+                tools_html = f'<div class="chat-msg-tools">{pills}</div>'
 
-    return HTMLResponse(user_html)
+            rendered = md_lib.markdown(
+                str(result.content),
+                extensions=["fenced_code", "tables", "nl2br"],
+            )
+            agent_html = (
+                f'<div class="chat-msg chat-msg-agent">'
+                f'<div class="chat-msg-avatar cto-avatar"></div>'
+                f'<div class="chat-msg-body">'
+                f'<div class="chat-msg-sender">Karim Benali — CTO</div>'
+                f'<div class="chat-msg-text md-rendered">{rendered}</div>'
+                f"{tools_html}"
+                f"</div></div>"
+            )
+            title_hint = html_mod.escape(display[:55])
+            yield sse("done", {"html": agent_html, "session_id": session.id, "title_hint": title_hint})
+
+        except Exception as exc:
+            logger.exception("CTO streaming error")
+            yield sse("error", {"message": str(exc)[:200]})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ── File upload ──────────────────────────────────────────────────────────────
