@@ -38,4 +38,4 @@ jobs:
       - name: Restart container
         run: |
           ssh debian@${{ secrets.OVH_IP }} \
-            "cd /opt/software-factory && docker compose up -d --build software-factory-platform-1 && echo DEPLOYED"
+            "cd /opt/software-factory && docker compose up -d --build platform && echo DEPLOYED"
