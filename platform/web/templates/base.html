@@ -76,8 +76,11 @@
             {% set p = request.state.perspective|default('admin') %}
             <div class="sidebar-section">
                 <ul class="nav-links">
-                    <li><a href="/" data-tooltip="Dashboard" class="{% if page_title in ('Dashboard', 'Portfolio', 'Projects', 'DSI Board', 'Vue Métier') %}active{% endif %}">
+                    <li><a href="/" data-tooltip="Home" class="{% if page_title == 'Home' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-home"/></svg>
+                    </a></li>
+                    <li><a href="/portfolio" data-tooltip="Dashboard" class="{% if page_title in ('Portfolio', 'DSI Board', 'Vue Métier') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-chart"/></svg>
                     </a></li>
                     {% set _full = ('admin', 'overview', 'dsi') %}
                     {% if p in _full + ('portfolio_manager', 'product_owner', 'architect', 'business_owner') %}

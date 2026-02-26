@@ -11,19 +11,14 @@
 {% set _full_access = ('admin', 'overview', 'dsi') %}
 <div class="tabs">
     {% if p in _full_access + ('portfolio_manager',) %}
-    <button class="tab {% if active_tab == 'overview' %}active{% endif %}" hx-get="/?tab=overview" hx-select="#portfolio-inner" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/" onclick="switchTab(this)">{{ _("overview") }}</button>
+    <button class="tab {% if active_tab == 'overview' %}active{% endif %}" hx-get="/portfolio?tab=overview" hx-select="#portfolio-inner" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/portfolio?tab=overview" onclick="switchTab(this)">{{ _("overview") }}</button>
     {% endif %}
     {% if p in _full_access %}
-    <button class="tab {% if active_tab == 'dsi' %}active{% endif %}" hx-get="/dsi" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/?tab=dsi" onclick="switchTab(this)">{{ _("dsi") }}</button>
+    <button class="tab {% if active_tab == 'dsi' %}active{% endif %}" hx-get="/dsi" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/portfolio?tab=dsi" onclick="switchTab(this)">{{ _("dsi") }}</button>
     {% endif %}
     {% if p in _full_access + ('business_owner',) %}
-    <button class="tab {% if active_tab == 'metier' %}active{% endif %}" hx-get="/metier" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/?tab=metier" onclick="switchTab(this)">{{ _("business") }}</button>
+    <button class="tab {% if active_tab == 'metier' %}active{% endif %}" hx-get="/metier" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/portfolio?tab=metier" onclick="switchTab(this)">{{ _("business") }}</button>
     {% endif %}
-    {% if p in _full_access %}
-    <button class="tab {% if active_tab == 'cto' %}active{% endif %}" hx-get="/cto" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/?tab=cto" onclick="switchTab(this)">CTO</button>
-    {% endif %}
-    <button class="tab {% if active_tab == 'mkt-ideation' %}active{% endif %}" hx-get="/mkt-ideation" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/?tab=mkt-ideation" onclick="switchTab(this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>Idéation Business</button>
 </div>
 <div id="tab-content">
 <div id="portfolio-inner">
@@ -747,11 +742,10 @@ function switchTab(btn){
 (function(){
     var activeTab = '{{ active_tab }}';
     if (activeTab && activeTab !== 'overview') {
-        var urls = {dsi: '/dsi', metier: '/metier', cto: '/cto', 'mkt-ideation': '/mkt-ideation'};
+        var urls = {dsi: '/dsi', metier: '/metier'};
         var url = urls[activeTab];
         if (url) {
-            var selectOpt = activeTab === 'cto' ? undefined : '.main-area > *';
-            htmx.ajax('GET', url, {target: '#tab-content', swap: 'innerHTML', select: selectOpt});
+            htmx.ajax('GET', url, {target: '#tab-content', swap: 'innerHTML', select: '.main-area > *'});
         }
     }
 })();

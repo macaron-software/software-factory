@@ -62,20 +62,21 @@ async def setup_page(request: Request):
 
 @router.get("/", response_class=HTMLResponse)
 async def home_page(request: Request):
-    """Adaptive dashboard — content varies by SAFe perspective."""
+    """Home — CTO Jarvis, Idéation Business, Idéation Projet."""
+    tab = request.query_params.get("tab", "cto")
+    return _templates(request).TemplateResponse(
+        "home.html",
+        {"request": request, "page_title": "Home", "active_tab": tab},
+    )
+
+
+@router.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_page(request: Request):
+    """Dashboard redirect to portfolio (backward compat)."""
     from starlette.responses import RedirectResponse
 
-    perspective = getattr(request.state, "perspective", "admin")
-    # Only DSI, Business Owner, and Overview land on the portfolio tabs
-    tab_map = {"dsi": "dsi", "business_owner": "metier", "overview": "overview"}
-    if perspective in tab_map:
-        return RedirectResponse(
-            url=f"/portfolio?tab={tab_map[perspective]}", status_code=302
-        )
-    return _templates(request).TemplateResponse(
-        "dashboard.html",
-        {"request": request, "page_title": "Dashboard"},
-    )
+    tab = request.query_params.get("tab", "overview")
+    return RedirectResponse(url=f"/portfolio?tab={tab}", status_code=302)
 
 
 @router.get("/portfolio", response_class=HTMLResponse)
@@ -504,6 +505,7 @@ async def workflows_page(request: Request, tab: str = "templates"):
 async def workflows_list(request: Request):
     """Partial: workflow templates list (no tabs wrapper)."""
     from ...workflows.store import get_workflow_store
+
     workflows = get_workflow_store().list_all()
     return _templates(request).TemplateResponse(
         "partials/workflows_list.html",
@@ -517,13 +519,20 @@ async def workflows_evolution(request: Request):
     from ...db.migrations import get_db
     from ...workflows.store import get_workflow_store
     import json as _json
+
     db = get_db()
-    proposals = [dict(r) for r in db.execute(
-        "SELECT * FROM evolution_proposals ORDER BY fitness DESC, created_at DESC LIMIT 50"
-    ).fetchall()]
-    runs = [dict(r) for r in db.execute(
-        "SELECT * FROM evolution_runs ORDER BY started_at DESC LIMIT 20"
-    ).fetchall()]
+    proposals = [
+        dict(r)
+        for r in db.execute(
+            "SELECT * FROM evolution_proposals ORDER BY fitness DESC, created_at DESC LIMIT 50"
+        ).fetchall()
+    ]
+    runs = [
+        dict(r)
+        for r in db.execute(
+            "SELECT * FROM evolution_runs ORDER BY started_at DESC LIMIT 20"
+        ).fetchall()
+    ]
     db.close()
     for p in proposals:
         try:
@@ -539,13 +548,20 @@ async def workflows_evolution(request: Request):
     rl_stats = {}
     try:
         from ...agents.rl_policy import get_rl_policy
+
         rl_stats = get_rl_policy().stats()
     except Exception:
         pass
     workflows = get_workflow_store().list_all()
     return _templates(request).TemplateResponse(
         "partials/workflows_evolution.html",
-        {"request": request, "proposals": proposals, "runs": runs, "rl_stats": rl_stats, "workflows": workflows},
+        {
+            "request": request,
+            "proposals": proposals,
+            "runs": runs,
+            "rl_stats": rl_stats,
+            "workflows": workflows,
+        },
     )
 
 
@@ -737,7 +753,6 @@ async def monitoring_page(request: Request):
 @router.get("/ops", response_class=HTMLResponse)
 async def ops_page(request: Request):
     """Observability — LLM latency, errors, queue, provider Thompson."""
-    import json as _json
     from ...db.migrations import get_db
 
     db = get_db()
@@ -764,6 +779,7 @@ async def ops_page(request: Request):
     llm_thompson = []
     try:
         from ...llm.llm_thompson import llm_thompson_stats
+
         llm_thompson = llm_thompson_stats()
     except Exception:
         pass
@@ -772,8 +788,11 @@ async def ops_page(request: Request):
     active_missions = []
     try:
         from ...missions.store import get_mission_run_store
+
         runs = get_mission_run_store().list_runs(limit=50)
-        active_missions = [r for r in runs if getattr(r, "status", "") in ("active", "running")]
+        active_missions = [
+            r for r in runs if getattr(r, "status", "") in ("active", "running")
+        ]
     except Exception:
         pass
 
@@ -796,6 +815,7 @@ async def ops_page(request: Request):
     rl_stats = {}
     try:
         from ...agents.rl_policy import get_rl_policy
+
         rl_stats = get_rl_policy().stats()
     except Exception:
         pass
@@ -867,6 +887,7 @@ async def settings_page(request: Request):
 async def admin_users_page(request: Request):
     """Admin page for user management (CRUD) — kept for backward compat."""
     from fastapi.responses import RedirectResponse
+
     return RedirectResponse("/rbac", status_code=302)
 
 
@@ -1478,7 +1499,6 @@ async def product_page(request: Request):
 @router.get("/ops", response_class=HTMLResponse)
 async def ops_page(request: Request):
     """Ops observability dashboard — system health, logs, TMA, RL/GA status."""
-    import os as _os
     from ...db.migrations import get_db
 
     db = get_db()
@@ -1505,8 +1525,11 @@ async def ops_page(request: Request):
     active_missions = []
     try:
         from ...missions.store import get_mission_run_store
+
         runs = get_mission_run_store().list_runs(limit=50)
-        active_missions = [r for r in runs if getattr(r, "status", "") in ("active", "running")]
+        active_missions = [
+            r for r in runs if getattr(r, "status", "") in ("active", "running")
+        ]
     except Exception:
         pass
 
@@ -1529,6 +1552,7 @@ async def ops_page(request: Request):
     rl_stats = {}
     try:
         from ...agents.rl_policy import get_rl_policy
+
         rl_stats = get_rl_policy().stats()
     except Exception:
         pass
@@ -1547,6 +1571,7 @@ async def ops_page(request: Request):
     db_size_kb = 0
     try:
         from ...config import DB_PATH
+
         db_size_kb = DB_PATH.stat().st_size // 1024
     except Exception:
         pass
@@ -1554,6 +1579,7 @@ async def ops_page(request: Request):
     nb_agents = 0
     try:
         from ...agents.store import get_agent_store
+
         nb_agents = len(get_agent_store().list_all())
     except Exception:
         pass
@@ -1562,12 +1588,14 @@ async def ops_page(request: Request):
     recent_logs: list[str] = []
     try:
         from ...config import FACTORY_ROOT
+
         for log_name in ("server_8099.log", "server.log"):
             log_path = FACTORY_ROOT / log_name
             if log_path.exists():
                 lines = log_path.read_text(errors="replace").splitlines()
                 recent_logs = [
-                    l for l in lines
+                    l
+                    for l in lines
                     if "ERROR" in l or "WARNING" in l or "CRITICAL" in l
                 ][-20:]
                 break
@@ -1578,14 +1606,23 @@ async def ops_page(request: Request):
     tma_stats: dict = {}
     try:
         from ...ops.auto_heal import get_autoheal_stats
+
         tma_stats = get_autoheal_stats()
     except Exception:
         pass
 
     # DB table sizes
     table_sizes: dict[str, int] = {}
-    _tables = ("missions", "mission_runs", "llm_usage", "memory_global",
-               "evolution_proposals", "rl_experience", "agent_scores", "incidents")
+    _tables = (
+        "missions",
+        "mission_runs",
+        "llm_usage",
+        "memory_global",
+        "evolution_proposals",
+        "rl_experience",
+        "agent_scores",
+        "incidents",
+    )
     for tbl in _tables:
         try:
             row = db.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()
