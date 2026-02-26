@@ -178,6 +178,232 @@ async def import_team(request: Request):
 
 
 # ---------------------------------------------------------------------------
+# Darwin Team Fitness API
+# ---------------------------------------------------------------------------
+
+def _db():
+    from ....db.migrations import get_db
+    return get_db()
+
+
+@router.get("/api/teams/contexts")
+async def list_contexts():
+    """Distinct (technology, phase_type) combos with fitness data."""
+    try:
+        db = _db()
+        rows = db.execute("""
+            SELECT DISTINCT technology, phase_type, COUNT(*) as teams
+            FROM team_fitness
+            GROUP BY technology, phase_type
+            ORDER BY teams DESC
+        """).fetchall()
+        db.close()
+        return JSONResponse([dict(r) for r in rows] or [{"technology": "generic", "phase_type": "generic", "teams": 0}])
+    except Exception as e:
+        logger.warning("contexts error: %s", e)
+        return JSONResponse([{"technology": "generic", "phase_type": "generic", "teams": 0}])
+
+
+@router.get("/api/teams/leaderboard")
+async def team_leaderboard(technology: str = "generic", phase_type: str = "generic", limit: int = 30):
+    """Fitness leaderboard for a (technology, phase_type) context."""
+    try:
+        db = _db()
+        rows = db.execute("""
+            SELECT tf.agent_id, tf.pattern_id, tf.technology, tf.phase_type,
+                   tf.fitness_score, tf.runs, tf.wins, tf.losses,
+                   tf.avg_iterations, tf.weight_multiplier, tf.retired, tf.pinned,
+                   tf.last_updated,
+                   a.name as agent_name, a.role as agent_role,
+                   CASE
+                     WHEN tf.runs >= 5 AND tf.fitness_score >= 80 THEN 'champion'
+                     WHEN tf.runs >= 3 AND tf.fitness_score >= 60 THEN 'rising'
+                     WHEN tf.retired = 1 THEN 'retired'
+                     WHEN tf.runs >= 10 AND tf.fitness_score < 40 THEN 'declining'
+                     ELSE 'active'
+                   END as badge
+            FROM team_fitness tf
+            LEFT JOIN agents a ON a.id = tf.agent_id
+            WHERE tf.technology = ? AND tf.phase_type = ?
+            ORDER BY tf.pinned DESC, tf.fitness_score DESC
+            LIMIT ?
+        """, (technology, phase_type, limit)).fetchall()
+        db.close()
+        return JSONResponse({"data": [dict(r) for r in rows], "technology": technology, "phase_type": phase_type})
+    except Exception as e:
+        logger.warning("leaderboard error: %s", e)
+        return JSONResponse({"data": [], "technology": technology, "phase_type": phase_type})
+
+
+@router.post("/api/teams/{agent_id}/{pattern_id}/retire")
+async def retire_team(agent_id: str, pattern_id: str, technology: str = "generic", phase_type: str = "generic"):
+    """Soft-retire a team (weight_multiplier → 0.1)."""
+    try:
+        db = _db()
+        db.execute("""
+            UPDATE team_fitness SET retired = 1, weight_multiplier = 0.1, retired_at = CURRENT_TIMESTAMP
+            WHERE agent_id = ? AND pattern_id = ? AND technology = ? AND phase_type = ?
+        """, (agent_id, pattern_id, technology, phase_type))
+        db.commit()
+        db.close()
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@router.post("/api/teams/{agent_id}/{pattern_id}/unretire")
+async def unretire_team(agent_id: str, pattern_id: str, technology: str = "generic", phase_type: str = "generic"):
+    """Restore a retired team."""
+    try:
+        db = _db()
+        db.execute("""
+            UPDATE team_fitness SET retired = 0, weight_multiplier = 1.0, retired_at = NULL
+            WHERE agent_id = ? AND pattern_id = ? AND technology = ? AND phase_type = ?
+        """, (agent_id, pattern_id, technology, phase_type))
+        db.commit()
+        db.close()
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@router.get("/api/teams/okr")
+async def list_okr(technology: str = "", phase_type: str = ""):
+    """List OKR/KPI objectives."""
+    try:
+        db = _db()
+        q = "SELECT * FROM team_okr"
+        params: list = []
+        filters = []
+        if technology:
+            filters.append("technology = ?")
+            params.append(technology)
+        if phase_type:
+            filters.append("phase_type = ?")
+            params.append(phase_type)
+        if filters:
+            q += " WHERE " + " AND ".join(filters)
+        q += " ORDER BY team_key, kpi_name"
+        rows = db.execute(q, params).fetchall()
+        db.close()
+        # Compute progress percentage
+        result = []
+        for r in rows:
+            d = dict(r)
+            if d["kpi_target"] and d["kpi_target"] > 0:
+                d["progress_pct"] = round(min(100, d["kpi_current"] / d["kpi_target"] * 100), 1)
+            else:
+                d["progress_pct"] = 0.0
+            result.append(d)
+        return JSONResponse(result)
+    except Exception as e:
+        logger.warning("okr error: %s", e)
+        return JSONResponse([])
+
+
+@router.put("/api/teams/okr/{okr_id}")
+async def update_okr(okr_id: int, request: Request):
+    """Update OKR target or current value."""
+    try:
+        body = await request.json()
+        db = _db()
+        if "kpi_current" in body:
+            db.execute("UPDATE team_okr SET kpi_current = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                       (body["kpi_current"], okr_id))
+        if "kpi_target" in body:
+            db.execute("UPDATE team_okr SET kpi_target = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                       (body["kpi_target"], okr_id))
+        db.commit()
+        db.close()
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@router.get("/api/teams/evolution")
+async def team_evolution(technology: str = "generic", phase_type: str = "generic", days: int = 30):
+    """Fitness history for evolution chart."""
+    try:
+        db = _db()
+        cutoff = db.execute("SELECT date('now', ?)", (f"-{days} days",)).fetchone()[0]
+        rows = db.execute("""
+            SELECT tfh.agent_id, tfh.pattern_id, tfh.snapshot_date,
+                   tfh.fitness_score, tfh.runs,
+                   a.name as agent_name
+            FROM team_fitness_history tfh
+            LEFT JOIN agents a ON a.id = tfh.agent_id
+            WHERE tfh.technology = ? AND tfh.phase_type = ?
+              AND tfh.snapshot_date >= ?
+            ORDER BY tfh.agent_id, tfh.pattern_id, tfh.snapshot_date
+        """, (technology, phase_type, cutoff)).fetchall()
+        db.close()
+        # Group by agent+pattern for chart series
+        series: dict = {}
+        for r in rows:
+            key = f"{r['agent_id']}:{r['pattern_id']}"
+            if key not in series:
+                series[key] = {
+                    "agent_id": r["agent_id"],
+                    "agent_name": r["agent_name"] or r["agent_id"],
+                    "pattern_id": r["pattern_id"],
+                    "dates": [],
+                    "scores": [],
+                }
+            series[key]["dates"].append(r["snapshot_date"])
+            series[key]["scores"].append(round(r["fitness_score"], 1))
+        return JSONResponse({"series": list(series.values()), "technology": technology, "phase_type": phase_type})
+    except Exception as e:
+        logger.warning("evolution error: %s", e)
+        return JSONResponse({"series": [], "technology": technology, "phase_type": phase_type})
+
+
+@router.get("/api/teams/selections")
+async def team_selections(limit: int = 50):
+    """Recent team selection events."""
+    try:
+        db = _db()
+        rows = db.execute("""
+            SELECT ts.*, a.name as agent_name
+            FROM team_selections ts
+            LEFT JOIN agents a ON a.id = ts.agent_id
+            ORDER BY ts.selected_at DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+        db.close()
+        return JSONResponse({"data": [dict(r) for r in rows]})
+    except Exception as e:
+        logger.warning("selections error: %s", e)
+        return JSONResponse({"data": []})
+
+
+@router.get("/api/teams/ab-tests")
+async def team_ab_tests(limit: int = 30, status: str = ""):
+    """A/B shadow test results."""
+    try:
+        db = _db()
+        q = """
+            SELECT tab.*,
+                   a1.name as team_a_name,
+                   a2.name as team_b_name
+            FROM team_ab_tests tab
+            LEFT JOIN agents a1 ON a1.id = tab.team_a_agent
+            LEFT JOIN agents a2 ON a2.id = tab.team_b_agent
+        """
+        params: list = []
+        if status:
+            q += " WHERE tab.status = ?"
+            params.append(status)
+        q += " ORDER BY tab.started_at DESC LIMIT ?"
+        params.append(limit)
+        rows = db.execute(q, params).fetchall()
+        db.close()
+        return JSONResponse({"data": [dict(r) for r in rows]})
+    except Exception as e:
+        logger.warning("ab-tests error: %s", e)
+        return JSONResponse({"data": []})
+
+
+# ---------------------------------------------------------------------------
 # List saved templates from teams/ dir
 # ---------------------------------------------------------------------------
 
