@@ -458,7 +458,8 @@ async def _daily_report():
         # Count chaos events today
         chaos = (
             db.execute(
-                "SELECT COUNT(*) as c FROM chaos_runs WHERE ts LIKE ?", (f"{today}%",)
+                "SELECT COUNT(*) as c FROM chaos_runs WHERE ran_at LIKE ?",
+                (f"{today}%",),
             ).fetchone()
             if _table_exists(db, "chaos_runs")
             else None
