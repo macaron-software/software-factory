@@ -109,7 +109,14 @@ def migrate(dry_run: bool = False):
             with pg.cursor() as pc:
                 # Temporarily defer FK constraints for orphaned legacy data
                 pc.execute("SET session_replication_role = replica")
-                data = [tuple(row) for row in rows]
+
+                # Strip NUL bytes (PG text fields reject \x00)
+                def _clean(v):
+                    if isinstance(v, str):
+                        return v.replace("\x00", "")
+                    return v
+
+                data = [tuple(_clean(v) for v in row) for row in rows]
                 pc.executemany(sql, data)
                 pc.execute("SET session_replication_role = DEFAULT")
             pg.commit()
