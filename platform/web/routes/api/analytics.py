@@ -214,7 +214,8 @@ async def velocity_data():
     db = get_db()
     try:
         sprints = db.execute(
-            "SELECT id, name, status, velocity, planned_sp FROM sprints ORDER BY created_at DESC LIMIT 20"
+            "SELECT id, name, status, velocity, planned_sp, started_at FROM sprints "
+            "ORDER BY started_at DESC LIMIT 20"
         ).fetchall()
         return JSONResponse(
             [
@@ -224,6 +225,7 @@ async def velocity_data():
                     "status": s["status"],
                     "velocity": s["velocity"],
                     "planned_sp": s["planned_sp"],
+                    "started_at": s["started_at"],
                 }
                 for s in sprints
             ]
@@ -427,45 +429,41 @@ async def pipeline_metrics(mission_id: str):
 
 @router.get("/api/releases/{project_id}")
 async def releases_data(project_id: str):
-    """Get release notes — completed features grouped by epic, with dates."""
+    """Get release notes — completed mission_runs + active epics with done features."""
     from ....db.migrations import get_db
 
     db = get_db()
     try:
-        epics = db.execute(
-            "SELECT id, name, status, completed_at FROM missions WHERE project_id=? AND type='epic' AND status='completed' ORDER BY completed_at DESC",
-            (project_id,),
+        releases = []
+
+        # 1. Completed mission_runs as releases (primary source)
+        pid_filter = "AND project_id=?" if project_id and project_id != "all" else ""
+        params = (project_id,) if project_id and project_id != "all" else ()
+        runs = db.execute(
+            f"SELECT id, workflow_name, project_id, phases_json, updated_at "
+            f"FROM mission_runs WHERE status='completed' {pid_filter} "
+            f"ORDER BY updated_at DESC LIMIT 30",
+            params,
         ).fetchall()
 
-        releases = []
-        for epic in epics:
-            features = db.execute(
-                "SELECT name, status, story_points, completed_at, acceptance_criteria FROM features WHERE epic_id=? AND status='done' ORDER BY completed_at",
-                (epic["id"],),
-            ).fetchall()
-            total_sp = sum(f["story_points"] or 0 for f in features)
-            releases.append(
-                {
-                    "epic_id": epic["id"],
-                    "epic_name": epic["name"],
-                    "completed_at": epic["completed_at"],
-                    "feature_count": len(features),
-                    "total_sp": total_sp,
-                    "features": [
-                        {
-                            "name": f["name"],
-                            "sp": f["story_points"],
-                            "date": f["completed_at"],
-                        }
-                        for f in features
-                    ],
-                }
-            )
+        import json as _json
+        for run in runs:
+            phases = _json.loads(run["phases_json"] or "[]")
+            done_phases = [p["name"] for p in phases if p.get("status") == "completed"]
+            releases.append({
+                "epic_id": run["id"],
+                "epic_name": f"{run['workflow_name']} — {run['project_id']}",
+                "completed_at": run["updated_at"],
+                "feature_count": len(done_phases),
+                "total_sp": len(done_phases),
+                "features": [{"name": p, "sp": 1, "date": run["updated_at"]} for p in done_phases],
+            })
 
-        # Also include active epics with partial completion
+        # 2. Active epics with partial completion (backlog view)
         active = db.execute(
-            "SELECT id, name, status FROM missions WHERE project_id=? AND type='epic' AND status IN ('active','planning') ORDER BY created_at DESC",
-            (project_id,),
+            f"SELECT id, name, status FROM missions WHERE type='epic' "
+            f"AND status IN ('active','planning') {pid_filter} ORDER BY created_at DESC LIMIT 10",
+            params,
         ).fetchall()
         for epic in active:
             features = db.execute(
@@ -474,26 +472,22 @@ async def releases_data(project_id: str):
             ).fetchall()
             done = [f for f in features if f["status"] == "done"]
             total = len(features)
-            releases.append(
-                {
-                    "epic_id": epic["id"],
-                    "epic_name": epic["name"] + " (in progress)",
-                    "completed_at": None,
-                    "feature_count": total,
-                    "done_count": len(done),
-                    "progress_pct": round(len(done) / total * 100) if total else 0,
-                    "total_sp": sum(f["story_points"] or 0 for f in features),
-                    "features": [
-                        {
-                            "name": f["name"],
-                            "sp": f["story_points"],
-                            "status": f["status"],
-                            "date": f["completed_at"],
-                        }
-                        for f in features
-                    ],
-                }
-            )
+            if total == 0:
+                continue
+            releases.append({
+                "epic_id": epic["id"],
+                "epic_name": epic["name"] + " (in progress)",
+                "completed_at": None,
+                "feature_count": total,
+                "done_count": len(done),
+                "progress_pct": round(len(done) / total * 100) if total else 0,
+                "total_sp": sum(f["story_points"] or 0 for f in features),
+                "features": [
+                    {"name": f["name"], "sp": f["story_points"],
+                     "status": f["status"], "date": f["completed_at"]}
+                    for f in features
+                ],
+            })
 
         return JSONResponse({"project_id": project_id, "releases": releases})
     finally:
