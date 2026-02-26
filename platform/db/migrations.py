@@ -821,8 +821,48 @@ def _migrate(conn):
 
 def _migrate_pg(conn):
     """PostgreSQL incremental migrations (safe ALTER TABLE IF NOT EXISTS)."""
-    # PG schema_pg.sql already includes all columns, but for future migrations:
-    pass
+    # Marketing ideation tables (added 2026-02)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mkt_ideation_sessions (
+            id TEXT PRIMARY KEY,
+            title TEXT,
+            prompt TEXT,
+            status TEXT DEFAULT 'active',
+            project_id TEXT,
+            mission_id TEXT,
+            marketing_plan TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mkt_ideation_messages (
+            id SERIAL PRIMARY KEY,
+            session_id TEXT NOT NULL REFERENCES mkt_ideation_sessions(id) ON DELETE CASCADE,
+            agent_id TEXT,
+            agent_name TEXT,
+            content TEXT,
+            color TEXT,
+            avatar_url TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mkt_ideation_msgs_session ON mkt_ideation_messages(session_id)"
+    )
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mkt_ideation_findings (
+            id SERIAL PRIMARY KEY,
+            session_id TEXT NOT NULL REFERENCES mkt_ideation_sessions(id) ON DELETE CASCADE,
+            type TEXT,
+            text TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mkt_ideation_findings_session ON mkt_ideation_findings(session_id)"
+    )
+    conn.commit()
 
 
 def _ensure_darwin_tables(conn) -> None:

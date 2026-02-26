@@ -11,6 +11,7 @@ from .api import router as api_router
 from .cli import router as cli_router
 from .helpers import _active_mission_tasks, serve_workspace_file
 from .ideation import router as ideation_router
+from .mkt_ideation import router as mkt_ideation_router
 from .missions import router as missions_router
 from .pages import router as pages_router
 from .projects import router as projects_router
@@ -31,6 +32,7 @@ router.include_router(agents_router)
 router.include_router(sessions_router)
 router.include_router(workflows_router)
 router.include_router(ideation_router)
+router.include_router(mkt_ideation_router)
 router.include_router(api_router)
 router.include_router(cli_router)
 router.include_router(sf_router)

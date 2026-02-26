@@ -22,6 +22,7 @@
     {% if p in _full_access %}
     <button class="tab {% if active_tab == 'cto' %}active{% endif %}" hx-get="/cto" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/?tab=cto" onclick="switchTab(this)">CTO</button>
     {% endif %}
+    <button class="tab {% if active_tab == 'mkt-ideation' %}active{% endif %}" hx-get="/mkt-ideation" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/?tab=mkt-ideation" onclick="switchTab(this)">💡 Idéation Business</button>
 </div>
 <div id="tab-content">
 <div id="portfolio-inner">
@@ -745,7 +746,7 @@ function switchTab(btn){
 (function(){
     var activeTab = '{{ active_tab }}';
     if (activeTab && activeTab !== 'overview') {
-        var urls = {dsi: '/dsi', metier: '/metier', cto: '/cto'};
+        var urls = {dsi: '/dsi', metier: '/metier', cto: '/cto', 'mkt-ideation': '/mkt-ideation'};
         var url = urls[activeTab];
         if (url) {
             var selectOpt = activeTab === 'cto' ? undefined : '.main-area > *';

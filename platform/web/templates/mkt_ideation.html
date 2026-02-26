@@ -1,0 +1,1003 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/css/mkt_ideation.css?v=20260226">
+
+<div class="mkt-layout">
+
+  <!-- ── Left: Chat area ── -->
+  <div class="mkt-chat">
+
+    <!-- History toggle -->
+    <button class="mkt-history-btn" onclick="mktToggleSidebar()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+      {{ past_sessions|length if past_sessions else 0 }}
+    </button>
+
+    <!-- History sidebar -->
+    <div class="mkt-sidebar" id="mktSidebar">
+      <div class="mkt-sidebar-header">
+        <span class="mkt-sidebar-title">Historique</span>
+        <button class="mkt-sidebar-close" onclick="mktToggleSidebar()">
+          <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="mkt-sidebar-list" id="mktSidebarList">
+        {% for s in past_sessions %}
+        <div class="mkt-sidebar-item" onclick="mktLoadSession('{{ s.id }}')">
+          <div class="mkt-sidebar-item-title">{{ s.title or 'Sans titre' }}</div>
+          <div class="mkt-sidebar-item-meta">
+            <span class="mkt-sidebar-badge {{ s.status }}">{{ s.status }}</span>
+            <span style="font-size:0.65rem;color:var(--text-muted)">{{ s.created_at[:10] if s.created_at else '' }}</span>
+          </div>
+        </div>
+        {% endfor %}
+        {% if not past_sessions %}
+        <div style="text-align:center;padding:1rem;font-size:0.7rem;color:var(--text-tertiary)">Aucun historique</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="mkt-messages" id="mktMessages">
+      <div class="mkt-empty" id="mktPlaceholder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+        <div class="mkt-empty-title">Idéation Business</div>
+        <div class="mkt-empty-subtitle">
+          Décrivez votre idée de produit ou service. L'équipe marketing analyse le marché,
+          la concurrence, la croissance et le positionnement pour produire un plan marketing complet.
+        </div>
+        <div class="mkt-examples">
+          <button class="mkt-example" onclick="mktSetPrompt(this.textContent)">Application de livraison de repas sains</button>
+          <button class="mkt-example" onclick="mktSetPrompt(this.textContent)">Plateforme SaaS B2B de gestion RH</button>
+          <button class="mkt-example" onclick="mktSetPrompt(this.textContent)">Marketplace artisanat local premium</button>
+          <button class="mkt-example" onclick="mktSetPrompt(this.textContent)">Assistant IA pour cabinets d'avocats</button>
+          <button class="mkt-example" onclick="mktSetPrompt(this.textContent)">Fintech épargne automatique Gen Z</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input bar -->
+    <div class="mkt-input-bar">
+      <textarea class="mkt-input" id="mktInput" rows="1"
+        placeholder="Décrivez votre idée business, produit ou service..."
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();mktSend()}"></textarea>
+      <button class="mkt-send" id="mktSend" onclick="mktSend()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Right: Panel ── -->
+  <div class="mkt-panel" id="mktPanel">
+
+    <!-- Agent graph -->
+    <div class="mkt-section">
+      <div class="mkt-section-header" onclick="mktToggleSection('mktGraphSection')">
+        <div class="mkt-section-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+          Équipe Marketing
+        </div>
+        <svg class="mkt-section-toggle open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="mkt-section-body" id="mktGraphSection">
+        <div class="mkt-graph-canvas">
+          <svg id="mktGraphSvg" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="mg-arrow-network" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b" opacity="0.8"/>
+              </marker>
+              <marker id="mg-arrow-report" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#ef4444" opacity="0.8"/>
+              </marker>
+            </defs>
+            <g id="mktEdges"></g>
+            <g id="mktNodes"></g>
+          </svg>
+        </div>
+        <div class="mkt-graph-legend">
+          <div class="mkt-legend-item"><div class="mkt-legend-dot" style="background:#f59e0b"></div>Débat</div>
+          <div class="mkt-legend-item"><div class="mkt-legend-dot" style="background:#ef4444"></div>Rapport CMO</div>
+        </div>
+        <!-- Agent roster -->
+        <div class="mkt-agents" id="mktAgents">
+          {% for a in agents %}
+          <div class="mkt-agent-row" id="agent-{{ a.id }}">
+            <span class="mkt-agent-dot" id="dot-{{ a.id }}"></span>
+            <span class="mkt-agent-label" style="color:{{ a.color }}">{{ a.name }}</span>
+            <span class="mkt-agent-role">{{ a.short_role }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Marketing findings -->
+    <div class="mkt-section">
+      <div class="mkt-section-header" onclick="mktToggleSection('mktFindingsBody')">
+        <div class="mkt-section-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Insights Clés
+        </div>
+        <svg class="mkt-section-toggle open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="mkt-section-body" id="mktFindingsBody">
+        <div class="mkt-findings" id="mktFindings">
+          <div class="mkt-findings-empty">Les insights apparaîtront au fil des analyses</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA: Generate plan -->
+    <div class="mkt-cta-bar">
+      <button class="mkt-cta-btn" id="btnGeneratePlan" onclick="mktGeneratePlan()" disabled style="opacity:.45;pointer-events:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        Générer le Plan Marketing
+      </button>
+    </div>
+
+  </div><!-- /mkt-panel -->
+</div><!-- /mkt-layout -->
+
+<!-- ── Marketing Plan Drawer ── -->
+<div class="mkt-plan-overlay" id="mktPlanOverlay" onclick="mktClosePlan()"></div>
+<div class="mkt-plan-drawer" id="mktPlanDrawer">
+  <div class="mkt-plan-drawer-header">
+    <div class="mkt-plan-drawer-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Plan Marketing &amp; Vision Business
+    </div>
+    <div class="mkt-plan-drawer-actions">
+      <button class="mkt-plan-action-btn" onclick="mktExportMarkdown()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export MD
+      </button>
+      <button class="mkt-plan-action-btn" id="btnCreateGTMMission" onclick="mktCreateMission()" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        Créer Mission GTM
+      </button>
+    </div>
+    <button class="mkt-plan-close" onclick="mktClosePlan()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="mkt-plan-body" id="mktPlanBody">
+    <div class="mkt-plan-loading" id="mktPlanLoading">
+      <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+      <p>Sophie Laurent (CMO) rédige le plan marketing…</p>
+      <p style="font-size:0.72rem;color:var(--text-muted)">Analyse des contributions de l'équipe · Structuration du plan · Rédaction</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Agent data from server ── */
+const MKT_AGENTS = {{ agents | tojson }};
+const MKT_COLORS = {};
+const MKT_ROLES = {};
+MKT_AGENTS.forEach(a => { MKT_COLORS[a.id] = a.color; MKT_ROLES[a.id] = a.short_role; });
+
+let mktSessionId = null;
+let mktOriginalPrompt = '';
+let mktCurrentPlan = null;
+let mktGraphBuilt = false;
+
+/* ── md renderer (reuse window.md if available) ── */
+const mktMd = typeof window.md === 'function' ? window.md : (s => s.replace(/\n/g,'<br>'));
+
+/* ── Section toggle ── */
+function mktToggleSection(id) {
+  const el = document.getElementById(id);
+  const hdr = el.previousElementSibling;
+  const toggle = hdr.querySelector('.mkt-section-toggle');
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : '';
+  if (toggle) { toggle.classList.toggle('open', !open); toggle.classList.toggle('closed', open); }
+}
+
+/* ── Sidebar ── */
+function mktToggleSidebar() {
+  document.getElementById('mktSidebar').classList.toggle('open');
+}
+
+/* ── Set prompt from example chip ── */
+function mktSetPrompt(txt) {
+  const inp = document.getElementById('mktInput');
+  inp.value = txt;
+  inp.dispatchEvent(new Event('input'));
+  inp.focus();
+}
+
+/* ── Auto-resize textarea ── */
+document.getElementById('mktInput').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+/* ── Add message bubble ── */
+let mktMsgCounter = 0;
+function mktAddMsg(type, agentId, agentName, content, color, avatarUrl) {
+  const placeholder = document.getElementById('mktPlaceholder');
+  if (placeholder) placeholder.remove();
+
+  const id = `mkt-msg-${++mktMsgCounter}`;
+  const isUser = type === 'user';
+  const div = document.createElement('div');
+  div.id = id;
+  div.className = `mu mu--chat ${isUser ? 'mu--user' : 'mu--agent'}`;
+
+  const icon = avatarUrl
+    ? `<img src="${avatarUrl}" alt="${agentName}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+    : `<svg class="icon icon-sm" style="color:${color}"><use href="#icon-bot"/></svg>`;
+
+  if (!isUser) {
+    div.innerHTML = `
+      <div class="mu__avatar" style="background:${color}20;border-color:${color}">${icon}</div>
+      <div class="mu__bubble mu__bubble--agent">
+        <div class="mu__sender">
+          <span class="mu__name" style="color:${color}">${agentName}</span>
+          <span class="mu__role">${MKT_ROLES[agentId] || ''}</span>
+        </div>
+        <div class="mu__content md-rendered" id="content-${id}">${mktMd(content)}</div>
+      </div>`;
+  } else {
+    div.innerHTML = `
+      <div class="mu__bubble mu__bubble--user">
+        <div class="mu__content">${mktMd(content)}</div>
+      </div>`;
+  }
+
+  document.getElementById('mktMessages').appendChild(div);
+  document.getElementById('mktMessages').scrollTop = 99999;
+  return id;
+}
+
+/* ── Agent status ── */
+function mktSetAgentStatus(agentId, status) {
+  const dot = document.getElementById(`dot-${agentId}`);
+  if (!dot) return;
+  dot.className = 'mkt-agent-dot';
+  if (status === 'thinking') dot.classList.add('thinking');
+  else if (status === 'done') dot.classList.add('done');
+}
+
+/* ── Graph rendering ── */
+function mktBuildGraph() {
+  if (mktGraphBuilt) return;
+  const svg = document.getElementById('mktGraphSvg');
+  const edgesG = document.getElementById('mktEdges');
+  const nodesG = document.getElementById('mktNodes');
+  if (!svg) return;
+
+  const W = svg.clientWidth || 320, H = svg.clientHeight || 200;
+  const experts = MKT_AGENTS.filter(a => a.id !== 'mkt-cmo');
+  const cmo = MKT_AGENTS.find(a => a.id === 'mkt-cmo');
+  const R = Math.min(W, H) * 0.34;
+  const cx = W / 2, cy = H * 0.48;
+
+  // Positions: experts in circle, CMO in center bottom
+  const positions = {};
+  experts.forEach((a, i) => {
+    const angle = (2 * Math.PI * i / experts.length) - Math.PI / 2;
+    positions[a.id] = { x: cx + R * Math.cos(angle), y: cy + R * 0.7 * Math.sin(angle) };
+  });
+  positions['mkt-cmo'] = { x: cx, y: cy };
+
+  const nr = 18;
+
+  // Draw edges
+  experts.forEach(a => {
+    const p = positions[a.id], q = positions['mkt-cmo'];
+    const dx = q.x - p.x, dy = q.y - p.y, d = Math.sqrt(dx*dx+dy*dy);
+    const nx = dx/d, ny = dy/d;
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', p.x + nx*nr); line.setAttribute('y1', p.y + ny*nr);
+    line.setAttribute('x2', q.x - nx*nr); line.setAttribute('y2', q.y - ny*nr);
+    line.setAttribute('stroke', '#ef4444'); line.setAttribute('stroke-opacity', '0.4');
+    line.setAttribute('stroke-width', '1.2'); line.setAttribute('marker-end', 'url(#mg-arrow-report)');
+    edgesG.appendChild(line);
+  });
+  // Expert-to-expert edges (light)
+  for (let i = 0; i < experts.length; i++) {
+    for (let j = i+1; j < experts.length; j++) {
+      const p = positions[experts[i].id], q = positions[experts[j].id];
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', p.x); line.setAttribute('y1', p.y);
+      line.setAttribute('x2', q.x); line.setAttribute('y2', q.y);
+      line.setAttribute('stroke', '#f59e0b'); line.setAttribute('stroke-opacity', '0.15');
+      line.setAttribute('stroke-width', '1'); line.setAttribute('stroke-dasharray', '3,3');
+      edgesG.appendChild(line);
+    }
+  }
+
+  // Draw nodes
+  MKT_AGENTS.forEach(a => {
+    const pos = positions[a.id];
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('id', `node-${a.id}`);
+    g.setAttribute('cursor', 'pointer');
+
+    const isCmo = a.id === 'mkt-cmo';
+    const r = isCmo ? 22 : 17;
+
+    // Circle bg
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', pos.x); circle.setAttribute('cy', pos.y); circle.setAttribute('r', r);
+    circle.setAttribute('fill', a.color + '20'); circle.setAttribute('stroke', a.color); circle.setAttribute('stroke-width', isCmo ? '2' : '1.5');
+    g.appendChild(circle);
+
+    // Initials text
+    const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    txt.setAttribute('x', pos.x); txt.setAttribute('y', pos.y + 4);
+    txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('fill', a.color);
+    txt.setAttribute('font-size', isCmo ? '9' : '7.5'); txt.setAttribute('font-weight', '700');
+    txt.textContent = a.name.split(' ').map(n=>n[0]).join('');
+    g.appendChild(txt);
+
+    // Label below
+    const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    lbl.setAttribute('x', pos.x); lbl.setAttribute('y', pos.y + r + 10);
+    lbl.setAttribute('text-anchor', 'middle'); lbl.setAttribute('fill', '#9ca3af');
+    lbl.setAttribute('font-size', '7');
+    lbl.textContent = a.short_role.length > 14 ? a.short_role.slice(0,13)+'…' : a.short_role;
+    g.appendChild(lbl);
+
+    nodesG.appendChild(g);
+  });
+  mktGraphBuilt = true;
+}
+
+/* ── Finding types config ── */
+const MKT_FINDING_TYPES = {
+  opportunity: { icon: '🚀', label: 'Opportunité' },
+  threat:      { icon: '⚠️', label: 'Menace' },
+  trend:       { icon: '📈', label: 'Tendance' },
+  competitor:  { icon: '🏆', label: 'Concurrent' },
+  persona:     { icon: '👤', label: 'Persona' },
+  channel:     { icon: '📣', label: 'Canal' },
+};
+
+/* ── Add finding to panel ── */
+function mktAddFinding(type, text) {
+  const container = document.getElementById('mktFindings');
+  const empty = container.querySelector('.mkt-findings-empty');
+  if (empty) empty.remove();
+
+  const cfg = MKT_FINDING_TYPES[type] || { icon: '💡', label: type };
+  const div = document.createElement('div');
+  div.className = `mkt-finding ${type}`;
+  div.innerHTML = `<span class="mkt-finding-icon">${cfg.icon}</span><span class="mkt-finding-text">${text}</span>`;
+  container.appendChild(div);
+}
+
+/* ── Parse agent message for findings ── */
+function mktExtractFindings(agentId, content) {
+  if (!content || content.length < 20) return;
+
+  const lower = content.toLowerCase();
+
+  // CMO synthesis → opportunities and vision
+  if (agentId === 'mkt-cmo') {
+    const lines = content.split('\n').filter(l => l.trim().length > 30).slice(0, 3);
+    lines.forEach(l => mktAddFinding('opportunity', l.trim().replace(/^[•\-\*]\s*/, '').slice(0, 120)));
+    return;
+  }
+  // Trend analyst → trends
+  if (agentId === 'mkt-trend') {
+    const lines = content.split('\n').filter(l => l.trim().length > 20).slice(0, 2);
+    lines.forEach(l => mktAddFinding('trend', l.trim().replace(/^[•\-\*]\s*/, '').slice(0, 120)));
+    return;
+  }
+  // Competitive → competitors
+  if (agentId === 'mkt-bench') {
+    const lines = content.split('\n').filter(l => l.trim().length > 15).slice(0, 2);
+    lines.forEach(l => mktAddFinding('competitor', l.trim().replace(/^[•\-\*]\s*/, '').slice(0, 120)));
+    return;
+  }
+  // Growth → channels
+  if (agentId === 'mkt-growth') {
+    const lines = content.split('\n').filter(l => l.trim().length > 20).slice(0, 2);
+    lines.forEach(l => mktAddFinding('channel', l.trim().replace(/^[•\-\*]\s*/, '').slice(0, 120)));
+    return;
+  }
+  // Brand → opportunity
+  if (agentId === 'mkt-brand') {
+    const lines = content.split('\n').filter(l => l.trim().length > 20).slice(0, 1);
+    lines.forEach(l => mktAddFinding('opportunity', l.trim().replace(/^[•\-\*]\s*/, '').slice(0, 120)));
+    return;
+  }
+  // Customer insights → personas
+  if (agentId === 'mkt-insights') {
+    const lines = content.split('\n').filter(l => l.trim().length > 20).slice(0, 2);
+    lines.forEach(l => mktAddFinding('persona', l.trim().replace(/^[•\-\*]\s*/, '').slice(0, 120)));
+    return;
+  }
+}
+
+/* ── SSE connection ── */
+let mktESActive = null;
+let mktStreamBuffers = {};
+let mktStreamBubbles = {};
+
+function mktConnectSSE(sessionId) {
+  if (mktESActive) { try { mktESActive.close(); } catch(e){} mktESActive = null; }
+  mktStreamBuffers = {};
+  mktStreamBubbles = {};
+
+  const es = new EventSource(`/api/sessions/${sessionId}/sse`);
+  mktESActive = es;
+
+  es.onmessage = function(e) {
+    let evt;
+    try { evt = JSON.parse(e.data); } catch { return; }
+
+    if (evt.type === 'stream_start' && evt.agent_id) {
+      mktSetAgentStatus(evt.agent_id, 'thinking');
+      const color = MKT_COLORS[evt.agent_id] || '#8b949e';
+      const agentName = evt.agent_name || MKT_AGENTS.find(a=>a.id===evt.agent_id)?.name || evt.agent_id;
+      const avatarUrl = MKT_AGENTS.find(a=>a.id===evt.agent_id)?.avatar_url || '';
+      const div = document.createElement('div');
+      const bubbleId = `mkt-stream-${evt.agent_id}-${++mktMsgCounter}`;
+      mktStreamBubbles[evt.agent_id] = bubbleId;
+      const placeholder = document.getElementById('mktPlaceholder');
+      if (placeholder) placeholder.remove();
+      const icon = avatarUrl
+        ? `<img src="${avatarUrl}" alt="${agentName}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+        : `<svg class="icon icon-sm" style="color:${color}"><use href="#icon-bot"/></svg>`;
+      div.id = bubbleId;
+      div.className = 'mu mu--chat mu--agent';
+      div.innerHTML = `
+        <div class="mu__avatar" style="background:${color}20;border-color:${color}">${icon}</div>
+        <div class="mu__bubble mu__bubble--agent">
+          <div class="mu__sender">
+            <span class="mu__name" style="color:${color}">${agentName}</span>
+            <span class="mu__role">${MKT_ROLES[evt.agent_id] || ''}</span>
+          </div>
+          <div class="mu__content md-rendered" id="content-${bubbleId}">
+            <span class="typing-indicator"><span></span><span></span><span></span></span>
+          </div>
+        </div>`;
+      document.getElementById('mktMessages').appendChild(div);
+      document.getElementById('mktMessages').scrollTop = 99999;
+    }
+    else if (evt.type === 'stream_delta' && evt.agent_id) {
+      mktStreamBuffers[evt.agent_id] = (mktStreamBuffers[evt.agent_id] || '') + evt.delta;
+      const bubbleId = mktStreamBubbles[evt.agent_id];
+      const el = bubbleId ? document.getElementById(`content-${bubbleId}`) : null;
+      if (el) {
+        el.innerHTML = mktMd(mktStreamBuffers[evt.agent_id]);
+        document.getElementById('mktMessages').scrollTop = 99999;
+      }
+    }
+    else if (evt.type === 'stream_end' && evt.agent_id) {
+      mktSetAgentStatus(evt.agent_id, 'done');
+      const bubbleId = mktStreamBubbles[evt.agent_id];
+      const el = bubbleId ? document.getElementById(`content-${bubbleId}`) : null;
+      if (el && evt.content) el.innerHTML = mktMd(evt.content);
+      const content = evt.content || mktStreamBuffers[evt.agent_id] || '';
+      mktExtractFindings(evt.agent_id, content);
+      delete mktStreamBuffers[evt.agent_id];
+      delete mktStreamBubbles[evt.agent_id];
+    }
+    else if (evt.type === 'pattern_end') {
+      es.close();
+      mktESActive = null;
+      document.getElementById('mktSend').disabled = false;
+      // Enable generate plan button
+      const btn = document.getElementById('btnGeneratePlan');
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.pointerEvents = 'auto';
+    }
+    else if (evt.type === 'error') {
+      mktAddMsg('system', 'system', 'Système', evt.message || 'Erreur', '#ef4444', '');
+    }
+  };
+
+  es.onerror = function() {
+    if (es.readyState === EventSource.CLOSED) {
+      mktESActive = null;
+      document.getElementById('mktSend').disabled = false;
+    }
+  };
+}
+
+/* ── Send analysis ── */
+async function mktSend() {
+  const inp = document.getElementById('mktInput');
+  const prompt = inp.value.trim();
+  if (!prompt) return;
+
+  mktOriginalPrompt = prompt;
+  const sendBtn = document.getElementById('mktSend');
+  sendBtn.disabled = true;
+
+  // Reset findings
+  document.getElementById('mktFindings').innerHTML = '<div class="mkt-findings-empty">Analyse en cours…</div>';
+  // Reset generate btn
+  const genBtn = document.getElementById('btnGeneratePlan');
+  genBtn.disabled = true; genBtn.style.opacity = '.45'; genBtn.style.pointerEvents = 'none';
+
+  // Build graph if first run
+  mktBuildGraph();
+
+  // User message
+  mktAddMsg('user', 'user', 'Vous', prompt, '#8b949e', '');
+  inp.value = '';
+  inp.style.height = 'auto';
+
+  // Reset agent statuses
+  MKT_AGENTS.forEach(a => mktSetAgentStatus(a.id, 'idle'));
+
+  try {
+    const resp = await fetch('/api/mkt-ideation', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ prompt, session_id: mktSessionId || '' }),
+    });
+    const data = await resp.json();
+    if (data.error) {
+      mktAddMsg('system', 'system', 'Système', data.error, '#ef4444', '');
+      sendBtn.disabled = false;
+      return;
+    }
+    mktSessionId = data.session_id;
+    mktConnectSSE(mktSessionId);
+  } catch(e) {
+    mktAddMsg('system', 'system', 'Système', 'Erreur: ' + e.message, '#ef4444', '');
+    sendBtn.disabled = false;
+  }
+}
+
+/* ── Generate marketing plan ── */
+async function mktGeneratePlan() {
+  // Collect context from messages
+  const msgs = document.querySelectorAll('.mu--agent .mu__content');
+  let context = '';
+  msgs.forEach(el => {
+    const nameEl = el.closest('.mu__bubble')?.querySelector('.mu__name');
+    const roleEl = el.closest('.mu__bubble')?.querySelector('.mu__role');
+    const name = nameEl?.textContent || '';
+    const role = roleEl?.textContent || '';
+    const text = el.textContent?.trim() || '';
+    if (name && text && text.length > 20) {
+      context += `\n\n[${name} — ${role}]:\n${text}`;
+    }
+  });
+
+  // Open drawer
+  mktOpenPlanDrawer();
+  document.getElementById('mktPlanLoading').style.display = 'flex';
+  document.getElementById('mktPlanBody').innerHTML = '';
+  const loading = document.createElement('div');
+  loading.className = 'mkt-plan-loading';
+  loading.id = 'mktPlanLoading';
+  loading.innerHTML = `
+    <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:32px;height:32px;color:var(--mkt-amber)"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+    <p>Sophie Laurent (CMO) rédige le plan marketing…</p>
+    <p style="font-size:0.72rem;color:var(--text-muted)">Structuration · Analyse · Rédaction du plan complet</p>`;
+  document.getElementById('mktPlanBody').appendChild(loading);
+
+  try {
+    const resp = await fetch('/api/mkt-ideation/generate-plan', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        session_id: mktSessionId,
+        prompt: mktOriginalPrompt,
+        context,
+      }),
+    });
+    const data = await resp.json();
+    if (data.error) {
+      document.getElementById('mktPlanBody').innerHTML = `<div style="padding:2rem;color:var(--red)">Erreur: ${data.error}</div>`;
+      return;
+    }
+    mktCurrentPlan = data.plan;
+    mktRenderPlan(data.plan);
+    document.getElementById('btnCreateGTMMission').style.display = 'flex';
+  } catch(e) {
+    document.getElementById('mktPlanBody').innerHTML = `<div style="padding:2rem;color:var(--red)">Erreur: ${e.message}</div>`;
+  }
+}
+
+/* ── Plan drawer ── */
+function mktOpenPlanDrawer() {
+  document.getElementById('mktPlanOverlay').classList.add('open');
+  document.getElementById('mktPlanDrawer').classList.add('open');
+}
+function mktClosePlan() {
+  document.getElementById('mktPlanOverlay').classList.remove('open');
+  document.getElementById('mktPlanDrawer').classList.remove('open');
+}
+
+/* ── Render plan ── */
+function mktRenderPlan(plan) {
+  const body = document.getElementById('mktPlanBody');
+  body.innerHTML = '';
+
+  const h = (html) => { const d = document.createElement('div'); d.innerHTML = html; body.appendChild(d.firstElementChild || d); };
+  const esc = s => (s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const ul = arr => arr?.length ? `<ul class="plan-list">${arr.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>` : '';
+
+  // ── Executive Summary ──
+  if (plan.executive_summary) {
+    h(`<div class="plan-section">
+      <div class="plan-section-hd"><span class="plan-icon">✨</span> Résumé Exécutif</div>
+      <div class="plan-section-bd">
+        <div class="plan-exec-summary">${esc(plan.executive_summary)}</div>
+      </div>
+    </div>`);
+  }
+
+  // ── Business Vision ──
+  const v = plan.business_vision;
+  if (v) {
+    h(`<div class="plan-section">
+      <div class="plan-section-hd"><span class="plan-icon">🎯</span> Vision Business</div>
+      <div class="plan-section-bd">
+        <div class="plan-brand-uvp">${esc(v.uvp || '')}</div>
+        ${v.problem ? `<div class="plan-brand-row"><span class="plan-brand-key">Problème</span><span class="plan-brand-val">${esc(v.problem)}</span></div>` : ''}
+        ${v.solution ? `<div class="plan-brand-row"><span class="plan-brand-key">Solution</span><span class="plan-brand-val">${esc(v.solution)}</span></div>` : ''}
+        ${v.market_timing ? `<div class="plan-brand-row"><span class="plan-brand-key">Pourquoi maintenant</span><span class="plan-brand-val">${esc(v.market_timing)}</span></div>` : ''}
+      </div>
+    </div>`);
+  }
+
+  // ── Market Analysis ──
+  const ma = plan.market_analysis;
+  if (ma) {
+    const swot = ma.swot || {};
+    h(`<div class="plan-section">
+      <div class="plan-section-hd"><span class="plan-icon">📊</span> Analyse de Marché</div>
+      <div class="plan-section-bd">
+        <div class="plan-metric-grid" style="margin-bottom:0.75rem">
+          <div class="plan-metric-card"><div class="plan-metric-val">${esc(ma.tam||'—')}</div><div class="plan-metric-lbl">TAM</div></div>
+          <div class="plan-metric-card"><div class="plan-metric-val">${esc(ma.sam||'—')}</div><div class="plan-metric-lbl">SAM</div></div>
+          <div class="plan-metric-card"><div class="plan-metric-val">${esc(ma.som||'—')}</div><div class="plan-metric-lbl">SOM (An 1-3)</div></div>
+        </div>
+        ${ma.growth_rate ? `<div style="font-size:0.74rem;color:var(--mkt-green);font-weight:700;margin-bottom:0.6rem">📈 Croissance marché : ${esc(ma.growth_rate)}</div>` : ''}
+        ${ma.key_trends?.length ? `<div style="margin-bottom:0.6rem"><div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);font-weight:700;margin-bottom:0.3rem">Tendances clés</div>${ul(ma.key_trends)}</div>` : ''}
+        <div class="plan-swot">
+          <div class="plan-swot-cell s"><div class="plan-swot-label">💪 Forces</div><ul class="plan-swot-items">${(swot.strengths||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>
+          <div class="plan-swot-cell w"><div class="plan-swot-label">⚡ Faiblesses</div><ul class="plan-swot-items">${(swot.weaknesses||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>
+          <div class="plan-swot-cell o"><div class="plan-swot-label">🚀 Opportunités</div><ul class="plan-swot-items">${(swot.opportunities||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>
+          <div class="plan-swot-cell t"><div class="plan-swot-label">🛡 Menaces</div><ul class="plan-swot-items">${(swot.threats||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>
+        </div>
+      </div>
+    </div>`);
+  }
+
+  // ── Competitive Analysis ──
+  const comps = plan.competitive_analysis;
+  if (comps?.length) {
+    const rows = comps.map(c => `<tr>
+      <td><strong>${esc(c.name||'')}</strong></td>
+      <td><span class="plan-comp-type ${c.type||'direct'}">${esc(c.type||'direct')}</span></td>
+      <td>${esc(c.positioning||'')}</td>
+      <td style="color:var(--mkt-green)">${(c.strengths||[]).slice(0,2).map(esc).join(', ')}</td>
+      <td style="color:#ef4444">${(c.weaknesses||[]).slice(0,2).map(esc).join(', ')}</td>
+    </tr>`).join('');
+    h(`<div class="plan-section">
+      <div class="plan-section-hd"><span class="plan-icon">🏆</span> Analyse Concurrentielle</div>
+      <div class="plan-section-bd plan-competitors">
+        <table><thead><tr><th>Concurrent</th><th>Type</th><th>Positionnement</th><th>Forces</th><th>Faiblesses</th></tr></thead>
+        <tbody>${rows}</tbody></table>
+      </div>
+    </div>`);
+  }
+
+  // ── Differentiators ──
+  if (plan.differentiators?.length) {
+    const items = plan.differentiators.map(d => `<div class="plan-diff-item"><span class="plan-diff-star">★</span>${esc(d)}</div>`).join('');
+    h(`<div class="plan-section">
+      <div class="plan-section-hd"><span class="plan-icon">⚡</span> Nos Différenciateurs</div>
+      <div class="plan-section-bd"><div class="plan-differentiators">${items}</div></div>
+    </div>`);
+  }
+
+  // ── Personas ──
+  if (plan.target_personas?.length) {
+    const cards = plan.target_personas.map(p => `
+      <div class="plan-persona-card">
+        <div class="plan-persona-name">👤 ${esc(p.name||'')}</div>
+        <div class="plan-persona-profile">${esc(p.profile||'')}</div>
+        ${p.jtbd ? `<div class="plan-persona-jtbd">"${esc(p.jtbd)}"</div>` : ''}
+        <div class="plan-persona-tags">
+          ${(p.pain_points||[]).slice(0,3).map(pp=>`<span class="plan-persona-tag" style="border-color:rgba(239,68,68,.3);color:#ef4444">⚠ ${esc(pp)}</span>`).join('')}
+          ${(p.channels||[]).slice(0,2).map(ch=>`<span class="plan-persona-tag">📣 ${esc(ch)}</span>`).join('')}
+          ${p.wtp ? `<span class="plan-persona-tag" style="border-color:rgba(22,163,74,.3);color:var(--mkt-green)">💳 WTP: ${esc(p.wtp)}</span>` : ''}
+        </div>
+      </div>`).join('');
+    h(`<div class="plan-section">
+      <div class="plan-section-hd"><span class="plan-icon">👥</span> Personas Clients</div>
+      <div class="plan-section-bd"><div class="plan-personas">${cards}</div></div>
+    </div>`);
+  }
+
+  // ── Brand Strategy ──
+  const brand = plan.brand_strategy;
+  if (brand) {
+    h(`<div class="plan-section">
+      <div class="plan-section-hd"><span class="plan-icon">🎨</span> Stratégie de Marque</div>
+      <div class="plan-section-bd">
+        ${brand.headline ? `<div class="plan-brand-uvp">"${esc(brand.headline)}"</div>` : ''}
+        ${brand.tagline ? `<div class="plan-brand-tagline">${esc(brand.tagline)}</div>` : ''}
+        ${brand.elevator_pitch ? `<div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.6rem;padding:0.5rem;border-left:2px solid var(--mkt-pink);background:var(--bg-secondary)">${esc(brand.elevator_pitch)}</div>` : ''}
+        ${brand.archetype ? `<div class="plan-brand-row"><span class="plan-brand-key">Archétype</span><span class="plan-brand-val">${esc(brand.archetype)}</span></div>` : ''}
+        ${brand.tone_of_voice ? `<div class="plan-brand-row"><span class="plan-brand-key">Ton</span><span class="plan-brand-val">${esc(brand.tone_of_voice)}</span></div>` : ''}
+        ${brand.personality?.length ? `<div class="plan-brand-row"><span class="plan-brand-key">Personnalité</span><span class="plan-brand-val">${brand.personality.map(esc).join(' · ')}</span></div>` : ''}
+      </div>
+    </div>`);
+  }
+
+  // ── Go-to-Market ──
+  const gtm = plan.go_to_market;
+  if (gtm) {
+    const phases = (gtm.phases||[]).map(ph => `
+      <div class="plan-phase">
+        <div class="plan-phase-hd">
+          <span class="plan-phase-name">${esc(ph.name||'')}</span>
+          <span class="plan-phase-dur">${esc(ph.duration||'')}</span>
+        </div>
+        <div class="plan-phase-bd">
+          ${ph.objectives?.length ? `<div class="plan-phase-label">Objectifs</div>${ul(ph.objectives)}` : ''}
+          ${ph.actions?.length ? `<div class="plan-phase-label">Actions</div>${ul(ph.actions)}` : ''}
+          ${ph.kpis?.length ? `<div class="plan-phase-label">KPIs</div>${ul(ph.kpis)}` : ''}
+        </div>
+      </div>`).join('');
+    h(`<div class="plan-section">
+      <div class="plan-section-hd"><span class="plan-icon">🚀</span> Plan Go-to-Market</div>
+      <div class="plan-section-bd">
+        ${gtm.strategy ? `<div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.75rem">${esc(gtm.strategy)}</div>` : ''}
+        ${gtm.beachhead ? `<div style="font-size:0.74rem;font-weight:700;color:var(--mkt-amber);margin-bottom:0.6rem">🎯 Marché Beachhead : ${esc(gtm.beachhead)}</div>` : ''}
+        <div class="plan-phases">${phases}</div>
+      </div>
+    </div>`);
+  }
+
+  // ── Marketing Channels ──
+  if (plan.marketing_channels?.length) {
+    const BUDGET_COLORS = ['#f59e0b','#0891b2','#8b5cf6','#16a34a','#ec4899','#f97316'];
+    const rows = plan.marketing_channels.map((ch, i) => `
+      <div class="plan-channel-row">
+        <div style="display:flex;flex-direction:column;gap:2px;min-width:130px">
+          <span class="plan-channel-name">${esc(ch.channel||'')}</span>
+          <span class="plan-channel-priority ${ch.priority||'medium'}">${esc(ch.priority||'')}</span>
+        </div>
+        <div class="plan-channel-bar-wrap">
+          <div class="plan-channel-bar-bg"><div class="plan-channel-bar-fill" style="width:${ch.budget_pct||0}%;background:${BUDGET_COLORS[i%BUDGET_COLORS.length]}"></div></div>
+          <div class="plan-channel-kpis">${(ch.kpis||[]).slice(0,2).map(esc).join(' · ')}</div>
+        </div>
+        <span class="plan-channel-pct">${ch.budget_pct||0}%</span>
+      </div>`).join('');
+    h(`<div class="plan-section">
+      <div class="plan-section-hd"><span class="plan-icon">📣</span> Canaux Marketing</div>
+      <div class="plan-section-bd"><div class="plan-channels">${rows}</div></div>
+    </div>`);
+  }
+
+  // ── Growth Model ──
+  const gm = plan.growth_model;
+  if (gm) {
+    h(`<div class="plan-section">
+      <div class="plan-section-hd"><span class="plan-icon">📈</span> Modèle de Croissance</div>
+      <div class="plan-section-bd">
+        <div class="plan-growth-grid">
+          <div class="plan-growth-card"><div class="plan-growth-lbl">CAC cible</div><div class="plan-growth-val">${esc(gm.cac_target||'—')}</div></div>
+          <div class="plan-growth-card"><div class="plan-growth-lbl">LTV estimée</div><div class="plan-growth-val">${esc(gm.ltv_estimate||'—')}</div></div>
+          <div class="plan-growth-card"><div class="plan-growth-lbl">Remboursement CAC</div><div class="plan-growth-val">${esc(gm.payback_period||'—')}</div></div>
+          <div class="plan-growth-card"><div class="plan-growth-lbl">Moteur principal</div><div class="plan-growth-val">${esc(gm.primary_engine||'—')}</div></div>
+        </div>
+        ${gm.viral_loop ? `<div style="font-size:0.74rem;color:var(--text-secondary);padding:0.4rem;border-left:2px solid var(--mkt-teal)">🔄 Viral loop : ${esc(gm.viral_loop)}</div>` : ''}
+      </div>
+    </div>`);
+  }
+
+  // ── KPIs Dashboard ──
+  if (plan.kpis_dashboard?.length) {
+    const cards = plan.kpis_dashboard.map(k => `
+      <div class="plan-kpi-card">
+        <div class="plan-kpi-metric">${esc(k.metric||'')}</div>
+        <div class="plan-kpi-target">${esc(k.target||'')}</div>
+        <div class="plan-kpi-timeline">${esc(k.timeline||'')}</div>
+      </div>`).join('');
+    h(`<div class="plan-section">
+      <div class="plan-section-hd"><span class="plan-icon">🎯</span> KPIs Dashboard</div>
+      <div class="plan-section-bd"><div class="plan-kpis">${cards}</div></div>
+    </div>`);
+  }
+
+  // ── Budget ──
+  const budget = plan.budget_indicatif;
+  if (budget) {
+    const BCOLORS = ['#f59e0b','#0891b2','#8b5cf6','#16a34a','#ec4899'];
+    const rows = (budget.breakdown||[]).map((b,i) => `
+      <div class="plan-budget-row">
+        <span class="plan-budget-label">${esc(b.poste||'')}</span>
+        <div class="plan-budget-bar-bg"><div class="plan-budget-bar-fill" style="width:${b.pct||0}%;background:${BCOLORS[i%BCOLORS.length]}"></div></div>
+        <span class="plan-budget-pct">${b.pct||0}%</span>
+      </div>`).join('');
+    h(`<div class="plan-section">
+      <div class="plan-section-hd"><span class="plan-icon">💰</span> Budget Indicatif</div>
+      <div class="plan-section-bd">
+        ${budget.total_an1 ? `<div style="font-size:0.9rem;font-weight:700;color:var(--mkt-amber);margin-bottom:0.75rem">Total An 1 : ${esc(budget.total_an1)}</div>` : ''}
+        <div class="plan-budget-list">${rows}</div>
+      </div>
+    </div>`);
+  }
+
+  // ── Next Actions ──
+  if (plan.next_actions?.length) {
+    const items = plan.next_actions.map((a, i) => `
+      <div class="plan-next-action">
+        <span class="plan-next-action-num">${i+1}</span>
+        <span>${esc(a)}</span>
+      </div>`).join('');
+    h(`<div class="plan-section">
+      <div class="plan-section-hd"><span class="plan-icon">⚡</span> Actions Immédiates</div>
+      <div class="plan-section-bd"><div class="plan-next-actions">${items}</div></div>
+    </div>`);
+  }
+}
+
+/* ── Export to Markdown ── */
+function mktExportMarkdown() {
+  if (!mktCurrentPlan) return;
+  const plan = mktCurrentPlan;
+  const v = plan.business_vision || {};
+  const ma = plan.market_analysis || {};
+  const swot = ma.swot || {};
+  const brand = plan.brand_strategy || {};
+  const gtm = plan.go_to_market || {};
+  const gm = plan.growth_model || {};
+  const budget = plan.budget_indicatif || {};
+
+  let md = `# Plan Marketing — ${mktOriginalPrompt.slice(0,60)}\n\n`;
+  md += `> Généré par l'équipe marketing AI · ${new Date().toLocaleDateString('fr-FR')}\n\n`;
+
+  if (plan.executive_summary) md += `## Résumé Exécutif\n\n${plan.executive_summary}\n\n`;
+
+  if (v.uvp) md += `## Vision Business\n\n**UVP:** ${v.uvp}\n\n`;
+  if (v.problem) md += `- **Problème :** ${v.problem}\n`;
+  if (v.solution) md += `- **Solution :** ${v.solution}\n`;
+  if (v.market_timing) md += `- **Pourquoi maintenant :** ${v.market_timing}\n`;
+  md += '\n';
+
+  if (ma.tam) md += `## Analyse de Marché\n\n| TAM | SAM | SOM | Croissance |\n|---|---|---|---|\n| ${ma.tam} | ${ma.sam||'—'} | ${ma.som||'—'} | ${ma.growth_rate||'—'} |\n\n`;
+  if (ma.key_trends?.length) md += `**Tendances clés :**\n${ma.key_trends.map(t=>`- ${t}`).join('\n')}\n\n`;
+
+  if (swot.strengths?.length || swot.weaknesses?.length) {
+    md += `### SWOT\n\n**Forces :** ${(swot.strengths||[]).join(', ')}\n\n`;
+    md += `**Faiblesses :** ${(swot.weaknesses||[]).join(', ')}\n\n`;
+    md += `**Opportunités :** ${(swot.opportunities||[]).join(', ')}\n\n`;
+    md += `**Menaces :** ${(swot.threats||[]).join(', ')}\n\n`;
+  }
+
+  if (plan.competitive_analysis?.length) {
+    md += `## Analyse Concurrentielle\n\n| Concurrent | Type | Positionnement |\n|---|---|---|\n`;
+    plan.competitive_analysis.forEach(c => { md += `| ${c.name} | ${c.type||'direct'} | ${c.positioning||''} |\n`; });
+    md += '\n';
+  }
+
+  if (plan.differentiators?.length) md += `## Différenciateurs\n\n${plan.differentiators.map(d=>`- ★ ${d}`).join('\n')}\n\n`;
+
+  if (plan.target_personas?.length) {
+    md += `## Personas Clients\n\n`;
+    plan.target_personas.forEach(p => {
+      md += `### ${p.name}\n${p.profile||''}\n\n**JTBD :** ${p.jtbd||''}\n**WTP :** ${p.wtp||''}\n\n`;
+    });
+  }
+
+  if (brand.headline || brand.tagline) {
+    md += `## Stratégie de Marque\n\n**Headline :** ${brand.headline||''}\n**Tagline :** ${brand.tagline||''}\n\n`;
+    if (brand.elevator_pitch) md += `**Pitch :** ${brand.elevator_pitch}\n\n`;
+  }
+
+  if (gtm.strategy) {
+    md += `## Plan Go-to-Market\n\n${gtm.strategy}\n\n`;
+    if (gtm.beachhead) md += `**Marché beachhead :** ${gtm.beachhead}\n\n`;
+    (gtm.phases||[]).forEach(ph => {
+      md += `### ${ph.name} — ${ph.duration}\n`;
+      if (ph.objectives?.length) md += `**Objectifs :** ${ph.objectives.join(', ')}\n`;
+      if (ph.actions?.length) md += `**Actions :** ${ph.actions.join(', ')}\n`;
+      if (ph.kpis?.length) md += `**KPIs :** ${ph.kpis.join(', ')}\n`;
+      md += '\n';
+    });
+  }
+
+  if (plan.marketing_channels?.length) {
+    md += `## Canaux Marketing\n\n| Canal | Priorité | Budget % | KPIs |\n|---|---|---|---|\n`;
+    plan.marketing_channels.forEach(ch => { md += `| ${ch.channel} | ${ch.priority||''} | ${ch.budget_pct||0}% | ${(ch.kpis||[]).join(', ')} |\n`; });
+    md += '\n';
+  }
+
+  if (gm.cac_target) md += `## Modèle de Croissance\n\nCAC : ${gm.cac_target} · LTV : ${gm.ltv_estimate||'—'} · Remboursement : ${gm.payback_period||'—'}\n\n`;
+
+  if (plan.kpis_dashboard?.length) {
+    md += `## KPIs\n\n| Métrique | Cible | Timeline |\n|---|---|---|\n`;
+    plan.kpis_dashboard.forEach(k => { md += `| ${k.metric} | ${k.target} | ${k.timeline} |\n`; });
+    md += '\n';
+  }
+
+  if (budget.total_an1) md += `## Budget Indicatif\n\n**Total An 1 :** ${budget.total_an1}\n\n${(budget.breakdown||[]).map(b=>`- ${b.poste} : ${b.pct}%`).join('\n')}\n\n`;
+
+  if (plan.next_actions?.length) md += `## Actions Immédiates\n\n${plan.next_actions.map((a,i)=>`${i+1}. ${a}`).join('\n')}\n`;
+
+  const blob = new Blob([md], {type: 'text/markdown;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `marketing-plan-${Date.now()}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ── Create GTM Mission ── */
+async function mktCreateMission() {
+  if (!mktCurrentPlan) return;
+  const btn = document.getElementById('btnCreateGTMMission');
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="spin icon" style="width:13px;height:13px"><use href="#icon-loader"/></svg> Création…';
+  try {
+    const resp = await fetch('/api/mkt-ideation/create-mission', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ plan: mktCurrentPlan, session_id: mktSessionId, project_id: '' }),
+    });
+    const data = await resp.json();
+    if (data.mission_id) {
+      btn.innerHTML = `✅ Mission créée`;
+      btn.style.background = 'rgba(22,163,74,.3)';
+      setTimeout(() => { if (data.redirect) window.location.href = data.redirect; }, 1200);
+    }
+  } catch(e) {
+    btn.innerHTML = '❌ Erreur';
+    btn.disabled = false;
+  }
+}
+
+/* ── Load past session ── */
+async function mktLoadSession(sessionId) {
+  mktToggleSidebar();
+  try {
+    const resp = await fetch(`/api/mkt-ideation/sessions/${sessionId}`);
+    const data = await resp.json();
+    if (data.error) return;
+
+    mktSessionId = sessionId;
+    mktOriginalPrompt = data.prompt || '';
+
+    // Clear messages
+    document.getElementById('mktMessages').innerHTML = '';
+
+    // Add user prompt
+    if (data.prompt) mktAddMsg('user', 'user', 'Vous', data.prompt, '#8b949e', '');
+
+    // Restore findings
+    document.getElementById('mktFindings').innerHTML = '<div class="mkt-findings-empty">Rechargement…</div>';
+
+    // If plan exists, enable generate button
+    if (data.marketing_plan) {
+      mktCurrentPlan = data.marketing_plan;
+      const btn = document.getElementById('btnGeneratePlan');
+      btn.disabled = false; btn.style.opacity = '1'; btn.style.pointerEvents = 'auto';
+      btn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Voir le Plan Marketing`;
+    }
+
+    mktAddMsg('system', 'system', 'Système', `Session "${data.title}" chargée (${data.status})`, '#8b949e', '');
+  } catch(e) {}
+}
+
+/* ── Init graph on load ── */
+window.addEventListener('load', () => {
+  setTimeout(mktBuildGraph, 200);
+});
+</script>
+{% endblock %}
