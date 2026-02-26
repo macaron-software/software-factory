@@ -19,12 +19,13 @@ import os
 import sqlite3
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Query, Request, Response
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -42,6 +43,39 @@ PID_DIR = Path("/tmp/factory")
 app = FastAPI(title="Software Factory Dashboard", version="1.0.0")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
+# ============================================================================
+# SIMPLE TTL CACHE (no external deps)
+# ============================================================================
+
+_cache: Dict[str, tuple] = {}  # key -> (value, expires_at)
+
+
+def _cache_get(key: str):
+    entry = _cache.get(key)
+    if entry and time.monotonic() < entry[1]:
+        return entry[0]
+    return None
+
+
+def _cache_set(key: str, value, ttl: float):
+    _cache[key] = (value, time.monotonic() + ttl)
+
+
+def cached(ttl: float):
+    """Decorator: cache the return value for `ttl` seconds. Sync functions only."""
+    def decorator(fn):
+        def wrapper(*args):
+            key = fn.__name__ + str(args)
+            hit = _cache_get(key)
+            if hit is not None:
+                return hit
+            result = fn(*args)
+            _cache_set(key, result, ttl)
+            return result
+        wrapper.__name__ = fn.__name__
+        return wrapper
+    return decorator
+
 
 # ============================================================================
 # DATABASE HELPERS
@@ -54,6 +88,7 @@ def get_db(db_name: str = "factory.db") -> sqlite3.Connection:
     return conn
 
 
+@cached(ttl=15)
 def get_project_stats(project_id: str) -> Dict[str, int]:
     """Get task statistics for a project."""
     with get_db() as conn:
@@ -81,6 +116,7 @@ def get_project_stats(project_id: str) -> Dict[str, int]:
     }
 
 
+@cached(ttl=10)
 def get_global_stats() -> Dict[str, int]:
     """Get global statistics across all projects."""
     with get_db() as conn:
@@ -115,6 +151,7 @@ def get_global_stats() -> Dict[str, int]:
 # PROJECT HELPERS
 # ============================================================================
 
+@cached(ttl=60)
 def load_project_config(project_id: str) -> Optional[Dict]:
     """Load project configuration from YAML."""
     yaml_path = PROJECTS_DIR / f"{project_id}.yaml"
@@ -125,6 +162,7 @@ def load_project_config(project_id: str) -> Optional[Dict]:
         return yaml.safe_load(f)
 
 
+@cached(ttl=20)
 def get_all_projects() -> List[Dict]:
     """Get all projects with their status."""
     projects = []
@@ -175,6 +213,7 @@ def check_pid_running(pid: int) -> bool:
         return False
 
 
+@cached(ttl=10)
 def get_daemon_status(project_id: str) -> Dict[str, Dict]:
     """Get daemon status for a project."""
     daemons = {}
@@ -215,6 +254,7 @@ def get_daemon_status(project_id: str) -> Dict[str, Dict]:
     return daemons
 
 
+@cached(ttl=20)
 def get_worker_count(project_id: str) -> int:
     """Get number of active workers for a project."""
     try:
@@ -235,6 +275,7 @@ def get_worker_count(project_id: str) -> int:
 # METRICS HELPERS
 # ============================================================================
 
+@cached(ttl=30)
 def get_metrics(project_id: str) -> Dict:
     """Get Team of Rivals metrics for a project."""
     metrics_db = DATA_DIR / "metrics.db"
@@ -329,48 +370,60 @@ def get_tasks(
 # ============================================================================
 
 @app.get("/api/projects")
-async def api_projects():
+async def api_projects(response: Response):
     """Get all projects with stats."""
-    return get_all_projects()
+    response.headers["Cache-Control"] = "public, max-age=15"
+    return await asyncio.to_thread(get_all_projects)
 
 
 @app.get("/api/projects/{project_id}")
 async def api_project(project_id: str):
     """Get single project details."""
-    config = load_project_config(project_id)
+    config = await asyncio.to_thread(load_project_config, project_id)
     if not config:
         return {"error": "Project not found"}
 
+    stats, daemons, metrics = await asyncio.gather(
+        asyncio.to_thread(get_project_stats, project_id),
+        asyncio.to_thread(get_daemon_status, project_id),
+        asyncio.to_thread(get_metrics, project_id),
+    )
     return {
         "id": project_id,
         "config": config,
-        "stats": get_project_stats(project_id),
-        "daemons": get_daemon_status(project_id),
-        "metrics": get_metrics(project_id),
+        "stats": stats,
+        "daemons": daemons,
+        "metrics": metrics,
     }
 
 
 @app.get("/api/stats")
-async def api_stats():
+async def api_stats(response: Response):
     """Get global statistics."""
-    return get_global_stats()
+    response.headers["Cache-Control"] = "public, max-age=10"
+    return await asyncio.to_thread(get_global_stats)
 
 
 @app.get("/api/metrics/{project_id}")
-async def api_metrics(project_id: str):
+async def api_metrics(project_id: str, response: Response):
     """Get Team of Rivals metrics."""
-    return get_metrics(project_id)
+    response.headers["Cache-Control"] = "public, max-age=30"
+    return await asyncio.to_thread(get_metrics, project_id)
 
 
 @app.get("/api/daemons")
 async def api_daemons():
     """Get all daemon statuses."""
     result = {}
-    for yaml_file in PROJECTS_DIR.glob("*.yaml"):
-        if yaml_file.name.startswith("_"):
-            continue
-        project_id = yaml_file.stem
-        result[project_id] = get_daemon_status(project_id)
+    project_ids = [
+        f.stem for f in PROJECTS_DIR.glob("*.yaml")
+        if not f.name.startswith("_")
+    ]
+    statuses = await asyncio.gather(
+        *[asyncio.to_thread(get_daemon_status, pid) for pid in project_ids]
+    )
+    for pid, status in zip(project_ids, statuses):
+        result[pid] = status
     return result
 
 
@@ -472,28 +525,38 @@ async def api_logs_stream(project_id: str):
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Dashboard home page."""
+    stats, projects = await asyncio.gather(
+        asyncio.to_thread(get_global_stats),
+        asyncio.to_thread(get_all_projects),
+    )
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "stats": get_global_stats(),
-        "projects": get_all_projects(),
+        "stats": stats,
+        "projects": projects,
     })
 
 
 @app.get("/project/{project_id}", response_class=HTMLResponse)
 async def project_page(request: Request, project_id: str):
     """Project detail page."""
-    config = load_project_config(project_id)
+    config = await asyncio.to_thread(load_project_config, project_id)
     if not config:
         return HTMLResponse("<h1>Project not found</h1>", status_code=404)
 
+    stats, daemons, metrics, tasks = await asyncio.gather(
+        asyncio.to_thread(get_project_stats, project_id),
+        asyncio.to_thread(get_daemon_status, project_id),
+        asyncio.to_thread(get_metrics, project_id),
+        asyncio.to_thread(get_tasks, project_id, None, None, 100),
+    )
     return templates.TemplateResponse("project.html", {
         "request": request,
         "project_id": project_id,
         "config": config,
-        "stats": get_project_stats(project_id),
-        "daemons": get_daemon_status(project_id),
-        "metrics": get_metrics(project_id),
-        "tasks": get_tasks(project_id, limit=100),
+        "stats": stats,
+        "daemons": daemons,
+        "metrics": metrics,
+        "tasks": tasks,
     })
 
 
@@ -504,10 +567,14 @@ async def tasks_page(
     status: Optional[str] = None,
 ):
     """Tasks listing page."""
+    projects, tasks = await asyncio.gather(
+        asyncio.to_thread(get_all_projects),
+        asyncio.to_thread(get_tasks, project, status, None, 100),
+    )
     return templates.TemplateResponse("tasks.html", {
         "request": request,
-        "projects": get_all_projects(),
-        "tasks": get_tasks(project, status, limit=100),
+        "projects": projects,
+        "tasks": tasks,
         "filter_project": project,
         "filter_status": status,
     })
