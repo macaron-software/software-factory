@@ -11,6 +11,7 @@
 - [Patterns](Patterns)
 - [Security](Security)
 - [LLM Configuration](LLM-Configuration)
+- [Darwin Teams](Darwin-Teams)
 
 ### 🌐 Languages
 - 🇫🇷 [Français](Home‐FR)

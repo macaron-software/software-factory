@@ -2,6 +2,8 @@
 
 **Macaron Software Factory** is an AI-powered agent orchestration platform for software engineering teams. It coordinates 156 specialized agents through 36 workflows using SAFe methodology.
 
+> **Latest release: [v2.2.0](https://github.com/macaron-software/software-factory/releases/tag/v2.2.0)** — Multi-Model LLM Routing + Darwin LLM Thompson Sampling
+
 ## Navigation
 
 | Section | Description |
@@ -13,7 +15,8 @@
 | [Workflows](Workflows) | 36 built-in workflows |
 | [Patterns](Patterns) | 15 orchestration patterns |
 | [Security](Security) | Auth, adversarial validation, secrets |
-| [LLM Configuration](LLM-Configuration) | Multi-provider LLM setup |
+| [LLM Configuration](LLM-Configuration) | Multi-model routing, Darwin LLM A/B, providers |
+| [Darwin Teams](Darwin-Teams) | Evolutionary team selection + LLM Thompson Sampling |
 
 ## Translations
 
