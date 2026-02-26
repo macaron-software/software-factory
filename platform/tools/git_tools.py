@@ -158,13 +158,16 @@ class GitCommitTool(BaseTool):
             else:
                 branch_msg = f" (on branch: {current})"
 
+            _git_env = {**os.environ,
+                        "GIT_AUTHOR_NAME": "agent", "GIT_AUTHOR_EMAIL": "agent@sf",
+                        "GIT_COMMITTER_NAME": "agent", "GIT_COMMITTER_EMAIL": "agent@sf"}
             if files:
-                subprocess.run(["git", "add"] + files, cwd=cwd, timeout=10, check=True)
+                subprocess.run(["git", "add"] + files, cwd=cwd, timeout=10, check=True, env=_git_env)
             else:
-                subprocess.run(["git", "add", "-A"], cwd=cwd, timeout=10, check=True)
+                subprocess.run(["git", "add", "-A"], cwd=cwd, timeout=10, check=True, env=_git_env)
             r = subprocess.run(
                 ["git", "commit", "-m", message],
-                capture_output=True, text=True, cwd=cwd, timeout=30,
+                capture_output=True, text=True, cwd=cwd, timeout=30, env=_git_env,
             )
             return (r.stdout or r.stderr) + branch_msg
         except Exception as e:
