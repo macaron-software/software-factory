@@ -82,47 +82,6 @@ async def watchdog_metrics():
     return JSONResponse(get_metrics(limit=100))
 
 
-def _mcp_calls_with_db_fallback(metrics_snapshot: dict) -> dict:
-    """Return MCP call stats — in-memory if populated, else query tool_calls DB."""
-    mcp = metrics_snapshot.get("mcp", {})
-    # In-memory collector has live data
-    if mcp.get("total_calls", 0) > 0:
-        return mcp
-    # Fallback: aggregate from tool_calls DB table
-    try:
-        from ....db.migrations import get_db
-
-        db = get_db()
-        rows = db.execute(
-            """SELECT tool_name,
-                      COUNT(*) as calls,
-                      SUM(CASE WHEN success=0 THEN 1 ELSE 0 END) as errors,
-                      ROUND(AVG(duration_ms), 1) as avg_ms
-               FROM tool_calls
-               GROUP BY tool_name
-               ORDER BY calls DESC
-               LIMIT 20"""
-        ).fetchall()
-        if not rows:
-            return mcp
-        total = sum(r[1] for r in rows)
-        total_errors = sum(r[2] for r in rows)
-        all_avg = round(sum(r[3] * r[1] for r in rows) / total, 1) if total else 0
-        by_tool = {
-            r[0]: {"calls": r[1], "errors": r[2], "avg_ms": r[3]}
-            for r in rows
-        }
-        return {
-            "total_calls": total,
-            "total_errors": total_errors,
-            "avg_ms": all_avg,
-            "by_tool": by_tool,
-            "source": "db",
-        }
-    except Exception:
-        return mcp
-
-
 @router.get("/api/monitoring/live")
 async def monitoring_live(request: Request, hours: int = 24):
     """Live monitoring data: system, LLM, agents, missions, memory.
@@ -460,10 +419,15 @@ async def monitoring_live(request: Request, hours: int = 24):
     except Exception:
         pass
 
-    # ── Docker containers (via Docker socket API) ──
+    # ── Docker containers (via Docker socket API) — cached 5 min ──
     docker_info = []
     docker_system = {}
-    try:
+    _docker_cache = getattr(monitoring_live, "_docker_cache", None)
+    if _docker_cache and now - _docker_cache.get("ts", 0) < 300:
+        docker_info = _docker_cache["data"]["containers"]
+        docker_system = _docker_cache["data"]["system"]
+    else:
+      try:
         import pathlib
 
         sock_path = "/var/run/docker.sock"
@@ -644,58 +608,90 @@ async def monitoring_live(request: Request, hours: int = 24):
                 conn3.close()
             except Exception:
                 pass
-    except Exception:
+        monitoring_live._docker_cache = {"data": {"containers": docker_info, "system": docker_system}, "ts": now}
+      except Exception:
         pass
 
-    # ── Git info ──
-    git_info = {}
-    try:
-        import pathlib
-        import subprocess
+    # Git info (all workspace repos) - cached 5 min
+    git_info = []
+    _git_cache = getattr(monitoring_live, "_git_cache", None)
+    if _git_cache and now - _git_cache.get("ts", 0) < 300:
+        git_info = _git_cache["data"]
+    else:
+        try:
+            import pathlib
+            import subprocess
 
-        for git_dir in ["/app", "/opt/macaron", os.environ.get("GIT_DIR", "")]:
-            if not git_dir or not pathlib.Path(git_dir).exists():
-                continue
-            r = subprocess.run(
-                ["git", "log", "--oneline", "-5", "--no-decorate"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                cwd=git_dir,
-            )
-            if r.returncode == 0 and r.stdout.strip():
-                git_info["recent_commits"] = [
+            def _git_repo_info(repo_path: str, label: str) -> dict | None:
+                p = pathlib.Path(repo_path)
+                if not p.exists():
+                    return None
+                r = subprocess.run(
+                    ["git", "log", "--oneline", "-5", "--no-decorate"],
+                    capture_output=True, text=True, timeout=5, cwd=repo_path,
+                )
+                if r.returncode != 0 or not r.stdout.strip():
+                    return None
+                commits = [
                     {"hash": line[:7], "message": line[8:]}
-                    for line in r.stdout.strip().split("\n")
-                    if line
+                    for line in r.stdout.strip().split("\n") if line
                 ]
+                branch = ""
                 r2 = subprocess.run(
                     ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                    cwd=git_dir,
+                    capture_output=True, text=True, timeout=5, cwd=repo_path,
                 )
                 if r2.returncode == 0:
-                    git_info["branch"] = r2.stdout.strip()
+                    branch = r2.stdout.strip()
+                last_time = ""
                 r3 = subprocess.run(
                     ["git", "log", "-1", "--format=%ci"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                    cwd=git_dir,
+                    capture_output=True, text=True, timeout=5, cwd=repo_path,
                 )
                 if r3.returncode == 0:
-                    git_info["last_commit_time"] = r3.stdout.strip()
-                break
-        if not git_info:
-            import pathlib as _pl
+                    last_time = r3.stdout.strip()
+                return {
+                    "label": label,
+                    "path": repo_path,
+                    "branch": branch,
+                    "last_commit_time": last_time,
+                    "recent_commits": commits,
+                }
 
-            ver = _pl.Path("/app/VERSION")
-            if ver.exists():
-                git_info["branch"] = ver.read_text().strip()
-    except Exception:
-        pass
+            # Platform repo candidates
+            for candidate, lbl in [("/app", "platform"), ("/opt/macaron", "platform"), (os.getcwd(), "platform")]:
+                info = _git_repo_info(candidate, lbl)
+                if info:
+                    git_info.append(info)
+                    break
+
+            # All project workspaces
+            try:
+                from ....projects.manager import get_project_store
+                for proj in get_project_store().list_all():
+                    if not proj.path or proj.path in ("/app", "/opt/macaron", os.getcwd()):
+                        continue
+                    ppath = pathlib.Path(proj.path)
+                    if not ppath.exists():
+                        continue
+                    # Check has_git
+                    has = (ppath / ".git").exists()
+                    if not has:
+                        r_chk = subprocess.run(
+                            ["git", "rev-parse", "--git-dir"],
+                            capture_output=True, text=True, timeout=3, cwd=proj.path,
+                        )
+                        has = r_chk.returncode == 0
+                    if has:
+                        info = _git_repo_info(proj.path, proj.name or proj.id)
+                        if info:
+                            git_info.append(info)
+            except Exception:
+                pass
+
+            monitoring_live._git_cache = {"data": git_info, "ts": now}
+        except Exception:
+            pass
 
     # ── Mission phase durations (from mission_runs.phases_json) ──
     phase_stats = []
@@ -731,7 +727,7 @@ async def monitoring_live(request: Request, hours: int = 24):
     try:
         azure_infra["vm"] = {
             "name": "vm-macaron",
-            "ip": os.getenv("AZURE_VM_IP", "localhost"),
+            "ip": "4.233.64.30",
             "rg": "RG-MACARON",
             "region": "francecentral",
             "size": "Standard_B2ms",
@@ -806,7 +802,7 @@ async def monitoring_live(request: Request, hours: int = 24):
         docker_system.pop("kernel", None)
         docker_system.pop("server_version", None)
         docker_system.pop("os", None)
-        git_info.pop("branch", None)
+        git_info = []
         azure_infra = {}
 
     result = {
@@ -839,7 +835,7 @@ async def monitoring_live(request: Request, hours: int = 24):
         "mcp": mcp_status,
         "incidents": incidents,
         "requests": metrics_snapshot.get("http", {}),
-        "mcp_calls": _mcp_calls_with_db_fallback(metrics_snapshot),
+        "mcp_calls": metrics_snapshot.get("mcp", {}),
         "anonymization": metrics_snapshot.get("anonymization", {}),
         "llm_costs": metrics_snapshot.get("llm_costs", {}),
         "azure": azure_infra,

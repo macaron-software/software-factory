@@ -227,14 +227,9 @@
     <div class="mon-grid mon-grid-1">
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-git-branch"/></svg> Git Activity</h3>
-            <div class="mon-row" style="margin-bottom:0.8rem">
-                <div class="mon-col"><div class="label">{{ _("branch") }}</div><div class="val" id="monGitBranch">—</div></div>
-                <div class="mon-col"><div class="label">{{ _("last_commit") }}</div><div class="val" id="monGitLastCommit">—</div></div>
+            <div id="monGitRepos">
+                <div class="mon-empty">{{ _("loading_ellipsis") }}</div>
             </div>
-            <table class="mon-table">
-                <thead><tr><th>{{ _("hash") }}</th><th>{{ _("message") }}</th></tr></thead>
-                <tbody id="monGitCommits"><tr><td colspan="2" class="mon-empty">{{ _("loading_ellipsis") }}</td></tr></tbody>
-            </table>
         </div>
     </div>
 
@@ -387,8 +382,6 @@ function barColor(pct) { return pct > 80 ? 'red' : pct > 60 ? 'yellow' : 'green'
 function $(id) { return document.getElementById(id); }
 
 async function refresh() {
-    // Guard: if this partial is no longer in the DOM, skip
-    if (!document.getElementById('monCpu')) return;
     try {
         const r = await fetch('/api/monitoring/live?hours=' + currentHours);
         if (!r.ok) return;
@@ -713,17 +706,28 @@ async function refresh() {
             dockerEl.innerHTML = '<tr><td colspan="7" class="mon-empty">No Docker info</td></tr>';
         }
 
-        // Git activity
-        const git = d.git || {};
-        $('monGitBranch').textContent = git.branch || '—';
-        $('monGitLastCommit').textContent = git.last_commit_time ? git.last_commit_time.substring(0, 16) : '—';
-        const gitEl = $('monGitCommits');
-        if (git.recent_commits && git.recent_commits.length > 0) {
-            gitEl.innerHTML = git.recent_commits.map(c =>
-                `<tr><td style="font-family:monospace;font-size:0.7rem;color:var(--accent)">${c.hash}</td><td style="font-size:0.7rem">${c.message}</td></tr>`
-            ).join('');
+        // Git activity — list of repos
+        const gitReposEl = $('monGitRepos');
+        const repos = Array.isArray(d.git) ? d.git : (d.git && d.git.branch ? [d.git] : []);
+        if (repos.length > 0) {
+            gitReposEl.innerHTML = repos.map(repo => `
+                <div style="margin-bottom:1rem;padding-bottom:0.8rem;border-bottom:1px solid var(--border)">
+                    <div style="display:flex;gap:1rem;margin-bottom:0.4rem;align-items:center">
+                        <span style="font-weight:600;font-size:0.82rem;color:var(--text-primary)">${repo.label || repo.path || '?'}</span>
+                        <span style="font-size:0.72rem;color:var(--accent);background:var(--accent)22;padding:1px 6px;border-radius:4px">
+                            <svg style="width:10px;height:10px;vertical-align:-1px"><use href="#icon-git-branch"/></svg> ${repo.branch || '—'}
+                        </span>
+                        <span style="font-size:0.68rem;color:var(--text-tertiary)">${repo.last_commit_time ? repo.last_commit_time.substring(0,16) : '—'}</span>
+                    </div>
+                    <table class="mon-table" style="margin:0">
+                        <tbody>${(repo.recent_commits || []).map(c =>
+                            `<tr><td style="font-family:monospace;font-size:0.68rem;color:var(--accent);width:60px">${c.hash}</td><td style="font-size:0.7rem">${c.message}</td></tr>`
+                        ).join('')}</tbody>
+                    </table>
+                </div>
+            `).join('');
         } else {
-            gitEl.innerHTML = '<tr><td colspan="2" class="mon-empty">No git data</td></tr>';
+            gitReposEl.innerHTML = '<div class="mon-empty">No git repos found</div>';
         }
 
         // Phase stats
@@ -753,12 +757,6 @@ function setRange(hours) {
 document.querySelector('.mon-range-btn[data-hours="24"]').classList.add('active');
 
 refresh();
-const _monitoringInterval = setInterval(refresh, 30000);
-document.addEventListener('htmx:beforeSwap', function _cleanup(e) {
-    if (e.detail.target && e.detail.target.id === 'metrics-content') {
-        clearInterval(_monitoringInterval);
-        document.removeEventListener('htmx:beforeSwap', _cleanup);
-    }
-});
+setInterval(refresh, 30000);
 </script>
 </div>
