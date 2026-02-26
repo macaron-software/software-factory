@@ -72,44 +72,41 @@
   <div class="mkt-panel" id="mktPanel">
 
     <!-- Agent graph -->
-    <div class="mkt-section">
-      <div class="mkt-section-header" onclick="mktToggleSection('mktGraphSection')">
-        <div class="mkt-section-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
-          Équipe Marketing
+    <div class="idea-graph" style="margin-bottom:0.5rem">
+        <div class="idea-graph-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+          Équipe Marketing &amp; Flow
         </div>
-        <svg class="mkt-section-toggle open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        <svg class="idea-graph-toggle open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <div class="mkt-section-body" id="mktGraphSection">
-        <div class="mkt-graph-canvas">
-          <svg id="mktGraphSvg" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <marker id="mg-arrow-network" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b" opacity="0.8"/>
-              </marker>
-              <marker id="mg-arrow-report" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M0,0 L10,5 L0,10 z" fill="#ef4444" opacity="0.8"/>
-              </marker>
-            </defs>
-            <g id="mktEdges"></g>
-            <g id="mktNodes"></g>
-          </svg>
-        </div>
-        <div class="mkt-graph-legend">
-          <div class="mkt-legend-item"><div class="mkt-legend-dot" style="background:#f59e0b"></div>Débat</div>
-          <div class="mkt-legend-item"><div class="mkt-legend-dot" style="background:#ef4444"></div>Rapport CMO</div>
-        </div>
-        <!-- Agent roster -->
-        <div class="mkt-agents" id="mktAgents">
-          {% for a in agents %}
-          <div class="mkt-agent-row" id="agent-{{ a.id }}">
-            <span class="mkt-agent-dot" id="dot-{{ a.id }}"></span>
-            <span class="mkt-agent-label" style="color:{{ a.color }}">{{ a.name }}</span>
-            <span class="mkt-agent-role">{{ a.short_role }}</span>
-          </div>
-          {% endfor %}
-        </div>
+      <div class="idea-graph-canvas" id="mktGraphCanvas">
+        <svg id="mktGraphSvg" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="mig-arrow-hierarchical" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#f59e0b" opacity="0.8"/></marker>
+            <marker id="mig-arrow-network" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b5cf6" opacity="0.8"/></marker>
+            <marker id="mig-arrow-report" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ef4444" opacity="0.8"/></marker>
+          </defs>
+          <g id="mktEdges"></g>
+          <g id="mktNodes"></g>
+        </svg>
       </div>
+      <div class="idea-graph-legend" id="mktGraphLegend"></div>
+    </div>
+
+    <!-- Popover overlay for agent cards -->
+    <div class="ig-popover-overlay" id="mktIgOverlay" onclick="mktClosePopover()"></div>
+    <div class="ig-popover" id="mktIgPopover">
+      <div class="ig-popover-header">
+        <div id="mktIgPopAvatar"></div>
+        <div class="ig-popover-info">
+          <div class="ig-popover-name" id="mktIgPopName"></div>
+          <div class="ig-popover-role" id="mktIgPopRole"></div>
+        </div>
+        <button class="ig-popover-close" onclick="mktClosePopover()">
+          <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="ig-popover-body" id="mktIgPopBody"></div>
     </div>
 
     <!-- Marketing findings -->
@@ -255,97 +252,173 @@ function mktAddMsg(type, agentId, agentName, content, color, avatarUrl) {
 /* ── Agent status ── */
 function mktSetAgentStatus(agentId, status) {
   const dot = document.getElementById(`dot-${agentId}`);
-  if (!dot) return;
-  dot.className = 'mkt-agent-dot';
-  if (status === 'thinking') dot.classList.add('thinking');
-  else if (status === 'done') dot.classList.add('done');
+  const node = document.getElementById(`mig-node-${agentId}`);
+  if (dot) {
+    dot.removeAttribute('class');
+    if (status === 'thinking') { dot.setAttribute('class','ig-node-dot'); const g=node; if(g){g.classList.remove('active','thinking');g.classList.add('thinking');} }
+    else if (status === 'done') { if(node){node.classList.remove('thinking');node.classList.add('active');} }
+  }
 }
 
-/* ── Graph rendering ── */
+/* ── Graph rendering (same ig-node card system as ideation) ── */
+const MIG_NW = 130, MIG_NH = 56;
+// Layout: CMO top-center, 5 experts below in arc
+const migNodes = [
+  {id: 'mkt-cmo',      x: 130, y: 10,  rank: 0},
+  {id: 'mkt-trend',    x: 10,  y: 110, rank: 1},
+  {id: 'mkt-bench',    x: 90,  y: 200, rank: 1},
+  {id: 'mkt-brand',    x: 180, y: 110, rank: 1},
+  {id: 'mkt-growth',   x: 260, y: 200, rank: 1},
+  {id: 'mkt-insights', x: 350, y: 110, rank: 1},
+];
+const migEdges = [
+  {from:'mkt-cmo',      to:'mkt-trend',    pattern:'hierarchical', label:'brief'},
+  {from:'mkt-cmo',      to:'mkt-bench',    pattern:'hierarchical', label:'brief'},
+  {from:'mkt-cmo',      to:'mkt-brand',    pattern:'hierarchical', label:'brief'},
+  {from:'mkt-cmo',      to:'mkt-growth',   pattern:'hierarchical', label:'brief'},
+  {from:'mkt-cmo',      to:'mkt-insights', pattern:'hierarchical', label:'brief'},
+  {from:'mkt-trend',    to:'mkt-bench',    pattern:'network',      label:'trends'},
+  {from:'mkt-bench',    to:'mkt-growth',   pattern:'network',      label:'gaps'},
+  {from:'mkt-brand',    to:'mkt-insights', pattern:'network',      label:'persona'},
+  {from:'mkt-trend',    to:'mkt-cmo',      pattern:'report',       label:'synthèse'},
+  {from:'mkt-growth',   to:'mkt-cmo',      pattern:'report',       label:'KPIs'},
+];
+const MIG_PATTERNS = {
+  network:      {color:'#8b5cf6', dash:'2 4 8 4', label:'Network'},
+  hierarchical: {color:'#f59e0b', dash:'',         label:'Hierarchical'},
+  report:       {color:'#ef4444', dash:'3 3',       label:'Report'},
+};
+function migAgent(id){ return MKT_AGENTS.find(a=>a.id===id); }
+function migEsc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
 function mktBuildGraph() {
   if (mktGraphBuilt) return;
   const svg = document.getElementById('mktGraphSvg');
+  if (!svg) return;
+  const W = 500, H = 290;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
   const edgesG = document.getElementById('mktEdges');
   const nodesG = document.getElementById('mktNodes');
-  if (!svg) return;
+  edgesG.innerHTML = ''; nodesG.innerHTML = '';
 
-  const W = svg.clientWidth || 320, H = svg.clientHeight || 200;
-  const experts = MKT_AGENTS.filter(a => a.id !== 'mkt-cmo');
-  const cmo = MKT_AGENTS.find(a => a.id === 'mkt-cmo');
-  const R = Math.min(W, H) * 0.34;
-  const cx = W / 2, cy = H * 0.48;
+  const activePatterns = new Set();
 
-  // Positions: experts in circle, CMO in center bottom
-  const positions = {};
-  experts.forEach((a, i) => {
-    const angle = (2 * Math.PI * i / experts.length) - Math.PI / 2;
-    positions[a.id] = { x: cx + R * Math.cos(angle), y: cy + R * 0.7 * Math.sin(angle) };
-  });
-  positions['mkt-cmo'] = { x: cx, y: cy };
+  // Edges
+  migEdges.forEach(e => {
+    const fn = migNodes.find(n=>n.id===e.from);
+    const tn = migNodes.find(n=>n.id===e.to);
+    if (!fn || !tn) return;
+    const style = MIG_PATTERNS[e.pattern] || MIG_PATTERNS.network;
+    activePatterns.add(e.pattern);
 
-  const nr = 18;
-
-  // Draw edges
-  experts.forEach(a => {
-    const p = positions[a.id], q = positions['mkt-cmo'];
-    const dx = q.x - p.x, dy = q.y - p.y, d = Math.sqrt(dx*dx+dy*dy);
-    const nx = dx/d, ny = dy/d;
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', p.x + nx*nr); line.setAttribute('y1', p.y + ny*nr);
-    line.setAttribute('x2', q.x - nx*nr); line.setAttribute('y2', q.y - ny*nr);
-    line.setAttribute('stroke', '#ef4444'); line.setAttribute('stroke-opacity', '0.4');
-    line.setAttribute('stroke-width', '1.2'); line.setAttribute('marker-end', 'url(#mg-arrow-report)');
-    edgesG.appendChild(line);
-  });
-  // Expert-to-expert edges (light)
-  for (let i = 0; i < experts.length; i++) {
-    for (let j = i+1; j < experts.length; j++) {
-      const p = positions[experts[i].id], q = positions[experts[j].id];
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', p.x); line.setAttribute('y1', p.y);
-      line.setAttribute('x2', q.x); line.setAttribute('y2', q.y);
-      line.setAttribute('stroke', '#f59e0b'); line.setAttribute('stroke-opacity', '0.15');
-      line.setAttribute('stroke-width', '1'); line.setAttribute('stroke-dasharray', '3,3');
-      edgesG.appendChild(line);
+    const fx=fn.x+MIG_NW/2, fy=fn.y+MIG_NH/2, tx=tn.x+MIG_NW/2, ty=tn.y+MIG_NH/2;
+    const mx=(fx+tx)/2, my=(fy+ty)/2;
+    const dx=tx-fx, dy=ty-fy, d=Math.sqrt(dx*dx+dy*dy)||1;
+    const curve = d * 0.18;
+    const cx2 = mx - dy/d*curve, cy2 = my + dx/d*curve;
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', `M${fx},${fy} Q${cx2},${cy2} ${tx},${ty}`);
+    path.setAttribute('class','ig-edge');
+    path.setAttribute('id', `mig-edge-${e.from}-${e.to}`);
+    path.style.stroke = style.color;
+    path.style.markerEnd = `url(#mig-arrow-${e.pattern})`;
+    if(style.dash) path.style.strokeDasharray = style.dash;
+    edgesG.appendChild(path);
+    if(e.label){
+      const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+      lbl.setAttribute('class','ig-edge-label');
+      lbl.setAttribute('x', cx2); lbl.setAttribute('y', cy2);
+      lbl.style.fill = style.color;
+      lbl.textContent = e.label;
+      edgesG.appendChild(lbl);
     }
-  }
+  });
 
-  // Draw nodes
-  MKT_AGENTS.forEach(a => {
-    const pos = positions[a.id];
-    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    g.setAttribute('id', `node-${a.id}`);
-    g.setAttribute('cursor', 'pointer');
+  // Nodes
+  migNodes.forEach(n => {
+    const agent = migAgent(n.id);
+    const col = agent ? agent.color : '#f59e0b';
+    const name = agent ? agent.name : n.id;
+    const role = agent ? (agent.short_role||'') : '';
+    const avatarUrl = agent ? (agent.avatar_url||'') : '';
 
-    const isCmo = a.id === 'mkt-cmo';
-    const r = isCmo ? 22 : 17;
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('class','ig-node');
+    g.setAttribute('transform',`translate(${n.x},${n.y})`);
+    g.setAttribute('id', `mig-node-${n.id}`);
 
-    // Circle bg
-    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', pos.x); circle.setAttribute('cy', pos.y); circle.setAttribute('r', r);
-    circle.setAttribute('fill', a.color + '20'); circle.setAttribute('stroke', a.color); circle.setAttribute('stroke-width', isCmo ? '2' : '1.5');
-    g.appendChild(circle);
+    const avatarR=14, avatarCx=20, avatarCy=MIG_NH/2;
+    const avatarSvg = avatarUrl
+      ? `<clipPath id="mig-clip-${n.id}"><circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}"/></clipPath>
+         <image href="${avatarUrl}" x="${avatarCx-avatarR}" y="${avatarCy-avatarR}" width="${avatarR*2}" height="${avatarR*2}" clip-path="url(#mig-clip-${n.id})"/>`
+      : `<circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}" fill="${col}" opacity="0.25"/>
+         <text x="${avatarCx}" y="${avatarCy+4}" text-anchor="middle" style="font-size:10px;fill:${col};font-weight:700">${migEsc(name.substring(0,2))}</text>`;
 
-    // Initials text
-    const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    txt.setAttribute('x', pos.x); txt.setAttribute('y', pos.y + 4);
-    txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('fill', a.color);
-    txt.setAttribute('font-size', isCmo ? '9' : '7.5'); txt.setAttribute('font-weight', '700');
-    txt.textContent = a.name.split(' ').map(n=>n[0]).join('');
-    g.appendChild(txt);
-
-    // Label below
-    const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    lbl.setAttribute('x', pos.x); lbl.setAttribute('y', pos.y + r + 10);
-    lbl.setAttribute('text-anchor', 'middle'); lbl.setAttribute('fill', '#9ca3af');
-    lbl.setAttribute('font-size', '7');
-    lbl.textContent = a.short_role.length > 14 ? a.short_role.slice(0,13)+'…' : a.short_role;
-    g.appendChild(lbl);
-
+    g.innerHTML = `
+      <rect class="ig-node-bg" width="${MIG_NW}" height="${MIG_NH}" rx="8" ry="8"/>
+      <line class="ig-node-bar" x1="0" y1="0" x2="${MIG_NW}" y2="0" stroke="${col}" stroke-width="3"/>
+      ${avatarSvg}
+      <text class="ig-node-name" x="40" y="22">${migEsc(name.length>14?name.substring(0,13)+'…':name)}</text>
+      <text class="ig-node-role" x="40" y="36">${migEsc(role.length>16?role.substring(0,15)+'…':role)}</text>
+      <circle class="ig-node-dot" cx="${MIG_NW-12}" cy="14" r="4" fill="${col}" opacity="0.6" id="dot-${n.id}"/>
+    `;
+    g.addEventListener('click', ev=>{ ev.stopPropagation(); mktShowPopover(n.id, ev); });
     nodesG.appendChild(g);
   });
+
+  // Legend
+  const legendEl = document.getElementById('mktGraphLegend');
+  legendEl.innerHTML = '';
+  activePatterns.forEach(p => {
+    const s = MIG_PATTERNS[p]; if(!s) return;
+    const item = document.createElement('div');
+    item.className = 'idea-graph-legend-item';
+    item.innerHTML = `<svg width="28" height="10"><line x1="0" y1="5" x2="20" y2="5" stroke="${s.color}" stroke-width="2" ${s.dash?`stroke-dasharray="${s.dash}"`:''}/><polygon points="20,1 28,5 20,9" fill="${s.color}" opacity="0.8"/></svg><span>${s.label}</span>`;
+    legendEl.appendChild(item);
+  });
+
   mktGraphBuilt = true;
 }
+
+function mktToggleGraph() {
+  const canvas = document.getElementById('mktGraphCanvas');
+  const legend = document.getElementById('mktGraphLegend');
+  const toggle = document.querySelector('.idea-graph-toggle');
+  const hidden = canvas.style.display === 'none';
+  canvas.style.display = hidden ? '' : 'none';
+  legend.style.display = hidden ? '' : 'none';
+  if(toggle) { toggle.classList.toggle('open', hidden); toggle.classList.toggle('closed', !hidden); }
+}
+
+function mktShowPopover(agentId, ev) {
+  const agent = migAgent(agentId); if(!agent) return;
+  const overlay = document.getElementById('mktIgOverlay');
+  const pop = document.getElementById('mktIgPopover');
+  const avatarEl = document.getElementById('mktIgPopAvatar');
+  if(agent.avatar_url){
+    avatarEl.innerHTML = `<img class="ig-popover-avatar" src="${migEsc(agent.avatar_url)}" alt="${migEsc(agent.name)}">`;
+  } else {
+    avatarEl.innerHTML = `<div class="ig-popover-avatar-fallback" style="background:${agent.color}">${migEsc(agent.name.substring(0,2))}</div>`;
+  }
+  document.getElementById('mktIgPopName').textContent = agent.name;
+  document.getElementById('mktIgPopRole').textContent = agent.short_role || '';
+  let html = '';
+  if(agent.tagline) html += `<div class="ig-popover-text" style="font-style:italic;font-size:0.75rem;color:var(--text-secondary)">${migEsc(agent.tagline)}</div>`;
+  if(agent.description) html += `<div><div class="ig-popover-section-title">Description</div><div class="ig-popover-text">${migEsc(agent.description.substring(0,300))}${agent.description.length>300?'…':''}</div></div>`;
+  document.getElementById('mktIgPopBody').innerHTML = html;
+  const vw=window.innerWidth, vh=window.innerHeight;
+  let left=ev.clientX+12, top=ev.clientY-20;
+  if(left+330>vw) left=vw-340;
+  if(top+250>vh) top=Math.max(10,vh-280);
+  pop.style.left=left+'px'; pop.style.top=top+'px';
+  overlay.classList.add('visible'); pop.classList.add('visible');
+}
+function mktClosePopover() {
+  document.getElementById('mktIgOverlay').classList.remove('visible');
+  document.getElementById('mktIgPopover').classList.remove('visible');
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') mktClosePopover(); });
 
 /* ── Feather icon helper ── */
 function mktSvg(path, sz) {

@@ -574,3 +574,45 @@
 }
 .mkt-plan-loading svg { width: 32px; height: 32px; color: var(--mkt-amber); }
 .mkt-plan-loading p { font-size: 0.82rem; }
+
+/* ── Agent Graph (mirrors ideation ig-node system) ── */
+.idea-graph { background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+.idea-graph-header { display:flex; align-items:center; justify-content:space-between; padding:0.5rem 0.6rem; cursor:pointer; user-select:none; }
+.idea-graph-header:hover { background:var(--bg-tertiary); }
+.idea-graph-title { font-size:0.72rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:0.4rem; }
+.idea-graph-title svg { width:14px; height:14px; }
+.idea-graph-toggle { width:16px; height:16px; color:var(--text-secondary); transition:transform 0.2s; }
+.idea-graph-toggle.open { transform:rotate(180deg); }
+.idea-graph-canvas { height:310px; position:relative; overflow:hidden; cursor:grab; background:var(--bg-primary); border-top:1px solid var(--border); }
+.idea-graph-canvas svg { width:100%; height:100%; }
+.idea-graph-legend { display:flex; gap:0.75rem; padding:0.35rem 0.6rem; border-top:1px solid var(--border); flex-wrap:wrap; }
+.idea-graph-legend-item { display:flex; align-items:center; gap:0.3rem; font-size:0.65rem; color:var(--text-secondary); }
+.ig-node { cursor:pointer; }
+.ig-node:hover .ig-node-bg { filter:brightness(1.15); }
+.ig-node-bg { fill:var(--bg-secondary); stroke:var(--border); stroke-width:1; }
+.ig-node-bar { stroke-linecap:round; }
+.ig-node-name { font-size:11px; fill:var(--text-primary); font-weight:600; }
+.ig-node-role { font-size:9px; fill:var(--text-secondary); }
+.ig-node-dot { r:4; }
+.ig-edge { fill:none; stroke-width:1.8; opacity:0.6; }
+.ig-edge.active { opacity:1; stroke-width:2.5; filter:drop-shadow(0 0 4px currentColor); }
+.ig-edge-label { font-size:8px; fill:var(--text-secondary); text-anchor:middle; }
+.ig-node.active .ig-node-bg { filter:brightness(1.3); stroke:var(--mkt-amber); stroke-width:2; }
+.ig-node.active .ig-node-dot { r:6; filter:drop-shadow(0 0 6px currentColor); }
+@keyframes migPulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.ig-node.thinking .ig-node-dot { animation:migPulse 1s infinite; fill:#f59e0b !important; }
+.ig-popover-overlay { position:fixed; inset:0; z-index:500; background:rgba(0,0,0,0.3); display:none; }
+.ig-popover-overlay.visible { display:block; }
+.ig-popover { position:fixed; z-index:501; width:320px; max-height:70vh; background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius); box-shadow:0 12px 40px rgba(0,0,0,0.4); overflow-y:auto; display:none; }
+.ig-popover.visible { display:block; }
+.ig-popover-header { display:flex; align-items:center; gap:0.6rem; padding:0.75rem; border-bottom:1px solid var(--border); }
+.ig-popover-avatar { width:40px; height:40px; border-radius:50%; flex-shrink:0; object-fit:cover; }
+.ig-popover-avatar-fallback { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:1rem; color:#fff; flex-shrink:0; }
+.ig-popover-info { flex:1; min-width:0; }
+.ig-popover-name { font-size:0.88rem; font-weight:700; color:var(--text-primary); }
+.ig-popover-role { font-size:0.72rem; color:var(--text-secondary); }
+.ig-popover-close { background:none; border:none; color:var(--text-secondary); cursor:pointer; padding:0.25rem; }
+.ig-popover-close:hover { color:var(--text-primary); }
+.ig-popover-body { padding:0.6rem 0.75rem; display:flex; flex-direction:column; gap:0.5rem; }
+.ig-popover-section-title { font-size:0.68rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:0.2rem; }
+.ig-popover-text { font-size:0.78rem; color:var(--text-primary); line-height:1.5; }
