@@ -862,6 +862,22 @@ def _migrate_pg(conn):
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_mkt_ideation_findings_session ON mkt_ideation_findings(session_id)"
     )
+    # MCP server registry (added 2026-02)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mcps (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            command TEXT NOT NULL,
+            args_json TEXT DEFAULT '[]',
+            env_json TEXT DEFAULT '{}',
+            tools_json TEXT DEFAULT '[]',
+            status TEXT DEFAULT 'stopped',
+            is_builtin INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     conn.commit()
 
 
