@@ -2269,4 +2269,546 @@ An agent action in the A2A protocol. Soft veto: request revision.
 Hard veto: reject entirely and escalate to human or stop the workflow.
 """,
     },
+    # ── SAFe User Guides ─────────────────────────────────────────
+    {
+        "slug": "guide-product-owner",
+        "title": "Guide: Product Owner",
+        "category": "SAFe Guides",
+        "icon": "",
+        "sort_order": 310,
+        "content": """\
+# Guide: Product Owner
+
+As Product Owner, you define what gets built. The platform helps you articulate
+requirements with precision, decompose epics into actionable stories, and ensure
+acceptance criteria are testable.
+
+## Key Workflows
+
+### Epic Breakdown
+
+```
+Mission input: "Epic: Replace legacy auth with OAuth2/OIDC across all services"
+Workflow: epic-breakdown
+```
+
+Output: hypothesis statement, WSJF scoring, 10-15 features, user stories with
+acceptance criteria, risks and dependencies.
+
+### User Story Refinement
+
+```
+Mission input: "As a user, I want to reset my password via email"
+Workflow: user-story-refinement
+```
+
+Output: INVEST criteria, Given/When/Then acceptance criteria, story point estimate,
+test scenarios, technical notes.
+
+### Sprint Planning
+
+```
+Mission input: "Sprint 8: Team capacity 42pts. Stories: US-201, US-202, US-203"
+Workflow: sprint-planning
+```
+
+Output: sprint goal, committed backlog, risk flags, dependency map.
+
+### PI Planning
+
+```
+Mission input: "PI 2025-Q3: Team Payments. 5 sprints x 40pts = 200pts. Focus: PCI compliance"
+Workflow: pi-planning
+```
+
+Output: team PI objectives, uncommitted objectives, cross-team dependencies, risks.
+
+## Tips
+
+- Provide context: domain, technical constraints, compliance requirements.
+- Include Cost of Delay estimates for accurate WSJF scoring.
+- Use project context so the AI knows your codebase and domain.
+- Iterate: use `sf missions chat <id>` to refine outputs.
+""",
+    },
+    {
+        "slug": "guide-scrum-master",
+        "title": "Guide: Scrum Master",
+        "category": "SAFe Guides",
+        "icon": "",
+        "sort_order": 320,
+        "content": """\
+# Guide: Scrum Master
+
+As Scrum Master, you are the guardian of the process. The platform helps you
+generate ceremony artifacts, analyze performance, and prepare actionable retrospectives.
+
+## Key Workflows
+
+### Sprint Planning Facilitation
+
+```
+Mission input: "Sprint 12. Team: 6 devs + 1 QA. Velocity: 42pts. Backlog: [stories]"
+Workflow: sprint-planning
+```
+
+Output: sprint goal, capacity breakdown, committed backlog, dependency map, DoD reminder.
+
+### Retrospective
+
+```
+Mission input: "Sprint 12 retro. Went well: [input]. Improve: [input]. Team size: 8"
+Workflow: retrospective
+```
+
+Output: categorized observations, root cause analysis, 3-5 SMART action items.
+
+### Scrum of Scrums
+
+```
+Mission input: "Teams: A (auth), B (payment), C (infra). Dependencies: [list]. Risks: [list]"
+Workflow: scrum-of-scrums
+```
+
+## Team Performance Metrics
+
+```bash
+sf analytics dora              # DORA metrics
+sf analytics team-score        # Agent quality scores
+```
+
+View sprint velocity trend in the Pipeline tab at /metrics.
+
+## SAFe Ceremonies
+
+- **System Demo**: use `demo-preparation` workflow to generate a demo script.
+- **Inspect and Adapt**: use `retrospective` workflow with PI-level data.
+- **PI Planning**: coordinate with RTE using `pi-planning` workflow.
+
+## Tips
+
+- Use actual DORA data in retrospectives, not subjective feelings.
+- Low coherence scores on reviewer agents may indicate rubber-stamping — a process smell.
+- Reference previous retro outputs to track whether action items were implemented.
+""",
+    },
+    {
+        "slug": "guide-developer",
+        "title": "Guide: Developer",
+        "category": "SAFe Guides",
+        "icon": "",
+        "sort_order": 330,
+        "content": """\
+# Guide: Developer
+
+As Developer, you use the platform to bootstrap features, get adversarial code review,
+run TDD loops, and get unstuck on complex problems.
+
+## Key Workflows
+
+### TDD Feature Development
+
+```
+Mission input: "Implement rate limiter middleware for FastAPI. Sliding window. Max 100 req/min/IP. Redis-backed."
+Workflow: tdd-feature (loop pattern)
+```
+
+The loop pattern writes failing tests first, then iterates until all tests pass.
+
+### Full Stack Feature
+
+```
+Mission input: "Add real-time notification system: backend SSE + React toast component"
+Workflow: full-stack-feature
+```
+
+### Adversarial Code Review
+
+```
+Mission input: "Review: [paste code]. Focus: security, edge cases, performance"
+Workflow: adversarial-review
+```
+
+A challenger agent vetoes if critical issues are found. Up to 3 revision cycles.
+
+### API Feature
+
+```
+Mission input: "Add GET /users/{id}/activity — last 30 days, filterable, paginated"
+Workflow: api-feature
+```
+
+Output: OpenAPI spec, implementation, unit + integration tests, migration.
+
+## Best Agent-Pattern Combos
+
+| Task | Recommended |
+|------|-------------|
+| Python implementation | dev-python + tdd-feature (loop) |
+| Security review | security-expert + adversarial |
+| API design | api-architect + dev-backend + negotiation |
+| Refactoring | dev-python + senior-reviewer + adversarial |
+
+Check current performance: `sf analytics agent-patterns`
+
+## Git Integration
+
+Set up project context for codebase-aware missions:
+```bash
+sf projects create --name "My Service" --path ./src
+sf projects chat <id> "Refactor UserRepository to use async/await"
+```
+
+## Tips
+
+- Provide existing code, DB schema, framework constraints in your input.
+- Use TDD for complex logic — the loop pattern self-corrects based on test failures.
+- Review all AI-generated code before committing — you own the code you merge.
+""",
+    },
+    {
+        "slug": "guide-architect",
+        "title": "Guide: System Architect",
+        "category": "SAFe Guides",
+        "icon": "",
+        "sort_order": 340,
+        "content": """\
+# Guide: System Architect
+
+As System Architect, you set the technical direction. The platform helps you
+explore architectural options, generate ADRs, design APIs, and validate implementations.
+
+## Key Workflows
+
+### Architecture Design (Aggregator)
+
+Multiple architect agents propose independent solutions, then a synthesis agent
+produces the best combined recommendation.
+
+```
+Mission input: "Design multi-tenant SaaS backend. 10k orgs, 500 users each.
+Data isolation: strict per-tenant. Latency: <200ms p95. Stack: Python, PostgreSQL, Azure AKS."
+Workflow: architecture-design
+```
+
+Output: architecture diagram (Mermaid), component breakdown, technology rationale,
+trade-offs, risks.
+
+### ADR Creation
+
+```
+Mission input: "Decision: use event sourcing for order domain.
+Context: high read volume 100:1, audit trail needed, CQRS partially implemented.
+Options: event sourcing, CRUD + audit log, hybrid"
+Workflow: adr-creation
+```
+
+Output: MADR format with status, context, decision, consequences, alternatives.
+
+### API Design Negotiation
+
+```
+Mission input: "Design REST API for notification service.
+Consumers: web (React), mobile (iOS/Android), webhooks.
+Requirements: SSE real-time, bulk ops, filtering, idempotent delivery"
+Workflow: api-design
+```
+
+The negotiation pattern has backend, frontend, and consumer agents debate
+the contract until consensus.
+
+### Migration Planning
+
+```
+Mission input: "Migrate Django monolith (200k LOC) to microservices.
+8 bounded contexts. Team: 12 devs, 3 teams. Timeline: 18 months."
+Workflow: migration-plan
+```
+
+Output: Strangler Fig plan, domain boundary analysis, migration sequence, risk matrix.
+
+## Tips
+
+- Provide numeric constraints (latency targets, scale, cost limits) — not qualitative ones.
+- ADR every significant decision — the platform generates them in <5 minutes.
+- Check `sf analytics agent-patterns` for which architecture agents produce the best results.
+""",
+    },
+    {
+        "slug": "guide-security",
+        "title": "Guide: Security Engineer",
+        "category": "SAFe Guides",
+        "icon": "",
+        "sort_order": 350,
+        "content": """\
+# Guide: Security Engineer
+
+As Security Engineer, you protect the system from vulnerabilities and compliance failures.
+The platform accelerates security audits, threat modeling, and compliance review.
+
+## Key Workflows
+
+### Security Audit (Parallel)
+
+Runs OWASP analysis, CVE scan, and secret detection simultaneously.
+
+```
+Mission input: "Audit auth module. Stack: Python/FastAPI, JWT, PostgreSQL. Deps: [requirements.txt]"
+Workflow: security-audit
+```
+
+Output per dimension: OWASP Top 10 findings with severity, CVE list with CVSS scores,
+secret pattern matches, combined risk summary.
+
+### Threat Modeling (STRIDE)
+
+```
+Mission input: "OAuth2 service. Entry: /login /token /refresh /logout.
+Data: hashed password, JWT, refresh token. Trust boundaries: mobile, browser, OAuth providers."
+Workflow: threat-model
+```
+
+Output: data flow diagram, STRIDE analysis, attack trees, prioritized mitigations.
+
+### Compliance Review
+
+```
+# GDPR
+Mission input: "GDPR review: personal data processed: [list], purpose: [list], retention: [policy]"
+Workflow: gdpr-review
+
+# PCI-DSS
+Mission input: "PCI-DSS review: payment module, tokenization service, provider: Stripe"
+Workflow: compliance-check
+```
+
+### Adversarial Security Review
+
+The producer implements; the security challenger finds vulnerabilities.
+
+```
+Mission: producer=dev-backend, challenger=security-expert
+Input: "Implement JWT validation with refresh token rotation.
+Secure against: token theft, replay attacks, timing attacks."
+```
+
+## Rubber-Stamp Detection
+
+A security reviewer who never vetoes is not doing their job.
+Check coherence scores: `sf analytics team-score`
+
+Coherence < 50 on security agents = review the system prompt.
+
+## Tips
+
+- Provide full context: the whole function, not just the suspicious line.
+- Specify your compliance standard explicitly.
+- Run threat modeling before development — catching issues early is 10x cheaper.
+""",
+    },
+    {
+        "slug": "guide-devops",
+        "title": "Guide: DevOps / Platform Engineer",
+        "category": "SAFe Guides",
+        "icon": "",
+        "sort_order": 360,
+        "content": """\
+# Guide: DevOps / Platform Engineer
+
+As DevOps engineer, you build the delivery system. The platform helps you design
+CI/CD pipelines, generate Infrastructure as Code, and create runbooks.
+
+## Key Workflows
+
+### Pipeline Design
+
+```
+Mission input: "CI/CD for Python microservice. Source: GitHub. Target: AKS.
+Stages: lint, test (unit+integration), security scan, build, push ACR, deploy staging,
+smoke test, deploy prod (manual gate). 2-3 deploys/day."
+Workflow: pipeline-design
+```
+
+Output: GitHub Actions YAML (or GitLab CI), stage breakdown, caching strategy, rollback.
+
+### Infrastructure as Code
+
+```
+Mission input: "Terraform for Azure: AKS (3-10 node autoscale), ACR, PostgreSQL Flexible,
+Redis C1, Key Vault, App Gateway WAF. Region: West Europe. Env: production."
+Workflow: infrastructure-as-code
+```
+
+### Docker Containerization
+
+```
+Mission input: "Containerize FastAPI app. Multi-stage build. Non-root user. Target <150MB."
+Workflow: docker-containerize
+```
+
+### Kubernetes Deployment
+
+```
+Mission input: "K8s manifests: 3 replicas, HPA (2-10, CPU 70%), resources: 500m/512Mi request,
+1/1Gi limit. Liveness GET /health. Ingress: notifications.myapp.com. Rolling update."
+Workflow: kubernetes-deploy
+```
+
+### Incident Runbook
+
+```
+Mission input: "Runbook: DB connection pool exhaustion. Service: API gateway.
+Symptoms: 503 errors. Current mitigation: manual restart. Infra: AKS, PgBouncer."
+Workflow: incident-runbook
+```
+
+## Tips
+
+- Version IaC and manifests in git — have the agent commit its own outputs.
+- Run security review on generated IaC before deploying.
+- Define SLOs before building dashboards — not the other way around.
+- Test runbooks in game days before they are needed in incidents.
+""",
+    },
+    {
+        "slug": "guide-ux-designer",
+        "title": "Guide: UX Designer",
+        "category": "SAFe Guides",
+        "icon": "",
+        "sort_order": 370,
+        "content": """\
+# Guide: UX Designer
+
+As UX Designer, you champion user experience. The platform accelerates user research
+synthesis, wireframe specification, and accessibility review.
+
+## Key Workflows
+
+### User Research Synthesis
+
+```
+Mission input: "Usability test findings. Task: onboarding (sign up to first project).
+8 participants. Notes: [raw notes]. Success: 5/8. Avg time: 4:20. SUS: 68."
+Agent: ux-designer
+```
+
+Output: affinity clusters, top 5 usability issues (Nielsen severity), recommended changes.
+
+### User Flow Specification
+
+```
+Mission input: "Design flow for 2FA setup. Methods: TOTP, SMS, email.
+Edge cases: lost authenticator, new device, admin-enforced 2FA."
+Agent: ux-designer
+```
+
+Output: step-by-step flow with decision points, error states, copy recommendations.
+
+### Accessibility Review (WCAG 2.1 AA)
+
+```
+Mission input: "A11y review: dashboard left sidebar, collapsible nav.
+Implementation: [paste HTML/JSX]. Target: WCAG 2.1 AA."
+Agent: accessibility-expert
+```
+
+Output: WCAG criteria mapping, specific issues with location, remediation by priority.
+
+### Design Handoff Documentation
+
+```
+Mission input: "Handoff for product listing page. Components: search, filters,
+product cards, pagination. Responsive breakpoints: [describe]."
+Agent: ux-designer
+```
+
+Output: component inventory with states, spacing spec (tokens), interaction descriptions,
+edge cases (empty, error, loading).
+
+## Tips
+
+- Provide concrete research data (quotes, task success rates) — not assumptions.
+- Use accessibility review at specification stage — cheaper than fixing in implementation.
+- For copy: generate multiple variants then choose the best.
+""",
+    },
+    {
+        "slug": "guide-tech-writer",
+        "title": "Guide: Technical Writer",
+        "category": "SAFe Guides",
+        "icon": "",
+        "sort_order": 380,
+        "content": """\
+# Guide: Technical Writer
+
+As Technical Writer, you make the product understandable. The platform helps you
+produce API docs, user guides, and release notes at scale.
+
+## Key Workflows
+
+### API Documentation
+
+```
+Mission input: "Document notifications API. Audience: third-party developers.
+Source: [paste route handlers or OpenAPI spec].
+Include: auth, rate limiting, error codes, examples in Python + curl + JS."
+Workflow: api-documentation
+```
+
+### README Generation
+
+```
+Mission input: "Generate README. Project: [describe]. Entry points: [list].
+Stack: [list]. Audience: developers who want to run or contribute."
+Workflow: readme-generation
+```
+
+### Release Notes
+
+```
+Mission input: "Release notes for v2.1.0. Git log: [paste git log --oneline].
+Audience: end users (non-technical). Exclude: refactoring, test changes."
+Workflow: release-notes
+```
+
+### Architecture Documentation
+
+```
+Mission input: "Document event-driven order processing system.
+Audience: engineers new to the codebase. Components: [list]. Message bus: [describe]."
+Workflow: architecture-doc
+```
+
+### Gap Analysis
+
+```
+Mission input: "Find documentation gaps. Existing docs: [link/paste].
+API source: [paste routes]. Identify: undocumented endpoints, stale examples."
+Agent: tech-writer
+```
+
+### Docstring Generation
+
+```
+Mission input: "Add Google-style docstrings to all public functions and classes.
+Include: Args, Returns, Raises. Code: [paste module]."
+Agent: tech-writer
+```
+
+## Writing Quality
+
+Always specify:
+- **Audience**: junior dev vs senior integrator vs non-technical user
+- **Style guide**: Microsoft, Google, or your own
+- **Reading level**: helps calibrate vocabulary and sentence complexity
+- **Localization needs**: if content will be translated, avoid idioms and humor
+
+## Tips
+
+- Provide the actual code — docs from real code are far more accurate.
+- Use adversarial pattern: have a challenger read docs as a new user.
+  If they get confused, the docs need work.
+- Automate release notes in CI/CD — generate on every tag.
+""",
+    },
 ]
