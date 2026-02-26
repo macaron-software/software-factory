@@ -25,17 +25,22 @@ jobs:
 
       - name: Rsync to OVH
         run: |
+          # Sync each directory as a proper subdirectory (no trailing slash = preserve dir name)
           rsync -az --delete \
-            --exclude '.git' \
             --exclude '__pycache__' \
             --exclude '*.pyc' \
             --exclude 'data/' \
             --exclude 'workspace/' \
-            --exclude 'patches/' \
-            platform/ cli/ skills/ dashboard/ mcp_lrm/ \
+            platform cli skills dashboard mcp_lrm \
             debian@${{ secrets.OVH_IP }}:/opt/software-factory/
+          # Also sync root Dockerfile used for docker build
+          rsync -az Dockerfile debian@${{ secrets.OVH_IP }}:/opt/software-factory/Dockerfile
 
       - name: Restart container
         run: |
-          ssh debian@${{ secrets.OVH_IP }} \
-            "cd /opt/software-factory && docker compose up -d --build platform && echo DEPLOYED"
+          ssh debian@${{ secrets.OVH_IP }} << 'ENDSSH'
+          cd /opt/software-factory
+          docker build -t software-factory-platform:latest .
+          docker compose up -d --no-build platform
+          echo DEPLOYED
+          ENDSSH
