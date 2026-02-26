@@ -1,8 +1,4 @@
-{% extends "base.html" %}
-
-{% block topbar_actions %}{% endblock %}
-
-{% block content %}
+{# Idéation Business — htmx partial loaded in Portfolio tab #}
 <link rel="stylesheet" href="/static/css/mkt_ideation.css?v=20260226">
 
 <div class="mkt-layout">
@@ -1023,9 +1019,7 @@ async function mktLoadSession(sessionId) {
   } catch(e) {}
 }
 
-/* ── Init graph on load ── */
-window.addEventListener('load', () => {
-  setTimeout(mktBuildGraph, 200);
-});
+/* ── Init graph after htmx swap ── */
+setTimeout(mktBuildGraph, 200);
 </script>
-{% endblock %}
+
