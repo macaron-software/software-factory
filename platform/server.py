@@ -186,6 +186,43 @@ async def lifespan(app: FastAPI):
 
     seed_demo_data()
 
+    # Auto-seed wiki if empty
+    try:
+        from .db.migrations import get_db as _wiki_gdb
+        from .web.routes.wiki_content import WIKI_PAGES
+
+        _wdb = _wiki_gdb()
+        _count = _wdb.execute("SELECT COUNT(*) FROM wiki_pages").fetchone()[0]
+        if _count == 0:
+            from datetime import datetime, timezone
+
+            _now = datetime.now(timezone.utc).isoformat()
+            for _p in WIKI_PAGES:
+                try:
+                    _wdb.execute(
+                        "INSERT OR IGNORE INTO wiki_pages "
+                        "(slug, title, content, category, icon, sort_order, parent_slug, created_at, updated_at) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (
+                            _p["slug"],
+                            _p["title"],
+                            _p["content"],
+                            _p["category"],
+                            _p["icon"],
+                            _p["sort_order"],
+                            _p.get("parent_slug"),
+                            _now,
+                            _now,
+                        ),
+                    )
+                except Exception:
+                    pass
+            _wdb.commit()
+            logger.info("Wiki: seeded %d pages", len(WIKI_PAGES))
+        _wdb.close()
+    except Exception:
+        pass
+
     # Sync agent models: ensure DB agents match the current DEFAULT_MODEL
     from .agents.store import DEFAULT_MODEL as _current_model
 
