@@ -939,7 +939,29 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 
 **Schnellzugriff-Chips**: `Portfolio-Stats` · `Laufende Missionen` · `Team aufstellen` · `GitHub` · `AO Veligo` · `Angular 16→17 Migration` · `Tech-Schulden · Sicherheit · a11y · DSGVO` · `Git commit & PR` · `E2E + Screenshots` · `Jira synchronisieren` · `Wiki aktualisieren`
 
-### Business-Ideation — 6-Agenten-Marketing-Team
+**Beispiel-Fragen**
+
+> *„Wie ist der Gesamtstatus des Portfolios? Welche Projekte sind in Verzug?"*
+
+> *„Führe ein SAST-Audit für das Veligo-Projekt durch und nenne mir die 3 kritischsten CVEs."*
+
+> *„Wir wollen die API von REST auf GraphQL migrieren — welches Agenten-Team empfiehlst du?"*
+
+> *„Zeig mir den Diff der letzten 5 Commits auf dem Branch feature/auth und fasse die Änderungen zusammen."*
+
+> *„Erstelle eine Refactoring-Mission, um die zyklomatische Komplexität bei Dateien über 15 zu senken."*
+
+> *„Was ist unsere aktuelle technische Schuld? Priorisiere nach Impact/Effort."*
+
+> *„Schreibe User Stories für die Azure AD SSO-Login-Funktion und öffne die Jira-Tickets."*
+
+> *„Führe die Playwright E2E-Tests aus und mache Screenshots der kritischen Seiten."*
+
+> *„Vergleiche unsere DORA-Metriken diesen Monat mit dem letzten — wo verschlechtern wir uns?"*
+
+> *„Aktualisiere das Architektur-Wiki mit den neuesten Entscheidungen zur PostgreSQL-Migration."*
+
+
 - **Route** `/mkt-ideation` — über den Business-Ideation-Tab der Startseite erreichbar
 - **CMO Sophie Laurent** — Teamleiterin mit 5 spezialisierten Marketing-Experten
 - **Vollständiger Marketing-Plan (JSON)** — SWOT, TAM/SAM/SOM, Markenstrategie, Go-to-Market, KPIs, Budget

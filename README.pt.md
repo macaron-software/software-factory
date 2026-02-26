@@ -939,7 +939,29 @@ Cada projeto recebe automaticamente 4 missões operacionais:
 
 **Chips de acesso rápido**: `Stats do portfolio` · `Missões em andamento` · `Montar equipe` · `GitHub` · `AO Veligo` · `Migração Angular 16→17` · `Dívida técnica · segurança · a11y · LGPD` · `Git commit & PR` · `E2E + Screenshots` · `Sync Jira` · `Atualizar Wiki`
 
-### Ideação de Negócios — Equipe de Marketing 6 Agentes
+**Exemplos de perguntas**
+
+> *«Qual é o estado geral do portfólio? Quais projetos estão atrasados?»*
+
+> *«Execute uma auditoria SAST no projeto Veligo e diga-me os 3 CVEs críticos a tratar primeiro.»*
+
+> *«Precisamos migrar a API de REST para GraphQL — qual equipe de agentes você recomenda?»*
+
+> *«Mostre-me o diff dos últimos 5 commits na branch feature/auth e resuma as mudanças.»*
+
+> *«Crie uma missão de refactoring para reduzir a complexidade ciclomática em arquivos acima de 15.»*
+
+> *«Qual é a nossa dívida técnica atual? Priorize os itens por impacto/esforço.»*
+
+> *«Escreva user stories para a funcionalidade de login SSO Azure AD e abra os tickets no Jira.»*
+
+> *«Execute os testes E2E do Playwright e capture screenshots das páginas críticas.»*
+
+> *«Compare nossas métricas DORA deste mês com o mês anterior — onde estamos regredindo?»*
+
+> *«Atualize o wiki de arquitetura com as últimas decisões sobre a migração para PostgreSQL.»*
+
+
 - **Rota** `/mkt-ideation` — acessível pela aba Ideação de Negócios na página inicial
 - **CMO Sophie Laurent** — líder de equipe com 5 especialistas de marketing
 - **Plano de marketing JSON completo** — SWOT, TAM/SAM/SOM, estratégia de marca, go-to-market, KPIs, orçamento

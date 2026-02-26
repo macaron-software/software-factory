@@ -853,7 +853,29 @@ Chaque projet reçoit automatiquement 4 missions opérationnelles :
 
 **Raccourcis contextuels** : `Stats portfolio` · `Missions en cours` · `Monter une équipe` · `GitHub` · `AO Veligo` · `Migration Angular 16→17` · `Dette tech · sécu · a11y · RGPD` · `Git commit & PR` · `E2E + Screenshots` · `Sync Jira` · `Mise à jour Wiki`
 
-### Idéation Business — Équipe Marketing 6 Agents
+**Exemples de questions à Jarvis**
+
+> *« Quel est l'état de santé global du portfolio ? Quels projets sont en retard ? »*
+
+> *« Lance un audit SAST sur le projet Veligo et dis-moi les 3 CVE critiques à traiter en priorité. »*
+
+> *« On doit migrer l'API de REST vers GraphQL — quelle équipe d'agents recommandes-tu et par où commencer ? »*
+
+> *« Montre-moi le diff des 5 derniers commits sur la branche feature/auth et résume les changements. »*
+
+> *« Crée une mission de refactoring pour réduire la complexité cyclomatique des fichiers au-dessus de 15. »*
+
+> *« Quelle est notre dette technique actuelle ? Priorise les items par impact/effort. »*
+
+> *« Rédige les user stories pour la fonctionnalité de connexion SSO Azure AD et ouvre les tickets Jira. »*
+
+> *« Lance les tests E2E Playwright et capture des screenshots des pages critiques. »*
+
+> *« Compare nos métriques DORA ce mois-ci vs le mois dernier — où régressons-nous ? »*
+
+> *« Met à jour le wiki de l'architecture avec les dernières décisions sur la migration PostgreSQL. »*
+
+
 - **Route** `/mkt-ideation` — accessible depuis l'onglet Idéation Business de la page d'accueil
 - **CMO Sophie Laurent** — chef d'équipe supervisant 5 experts marketing spécialisés
 - **Plan marketing JSON complet** — SWOT, TAM/SAM/SOM, stratégie de marque, go-to-market, KPIs, budget

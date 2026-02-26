@@ -939,7 +939,29 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 
 **快捷操作芯片**: `投资组合统计` · `进行中任务` · `组建团队` · `GitHub` · `AO Veligo` · `Angular 16→17 迁移` · `技术债务 · 安全 · a11y · GDPR` · `Git commit & PR` · `E2E + 截图` · `同步 Jira` · `更新 Wiki`
 
-### 业务创意 — 6智能体营销团队
+**示例问题**
+
+> *「整个投资组合的健康状况如何？哪些项目进度落后？」*
+
+> *「对 Veligo 项目运行 SAST 审计，告诉我优先处理的 3 个严重 CVE。」*
+
+> *「我们需要将 API 从 REST 迁移到 GraphQL — 你推荐哪个智能体团队，从哪里开始？」*
+
+> *「显示 feature/auth 分支最近 5 次提交的 diff 并总结变更内容。」*
+
+> *「创建一个重构任务，将循环复杂度超过 15 的文件降下来。」*
+
+> *「我们目前的技术债务是什么？按影响/工作量优先排序。」*
+
+> *「为 Azure AD SSO 登录功能编写用户故事，并在 Jira 中创建工单。」*
+
+> *「运行 Playwright E2E 测试并截取关键页面的截图。」*
+
+> *「对比本月和上月的 DORA 指标 — 哪些地方在退步？」*
+
+> *「用最新的 PostgreSQL 迁移决策更新架构 wiki。」*
+
+
 - **路由** `/mkt-ideation` — 通过首页业务创意标签页访问
 - **CMO Sophie Laurent** — 带领 5 位专业营销专家的团队负责人
 - **完整营销计划 JSON** — SWOT、TAM/SAM/SOM、品牌策略、GTM、KPI、预算

@@ -51,7 +51,29 @@ L'onglet **CTO Jarvis** (accessible depuis la page d'accueil `/`) offre un panne
 
 `Stats portfolio` · `Missions en cours` · `Monter une équipe` · `GitHub` · `AO Veligo` · `Migration Angular 16→17` · `Dette tech · sécu · a11y · RGPD` · `Git commit & PR` · `E2E + Screenshots` · `Sync Jira` · `Mise à jour Wiki`
 
-### Idéation Business (`/mkt-ideation`) — Équipe Marketing IA
+#### Exemples de questions
+
+> *« Quel est l'état de santé global du portfolio ? Quels projets sont en retard ? »*
+
+> *« Lance un audit SAST sur le projet Veligo et dis-moi les 3 CVE critiques à traiter en priorité. »*
+
+> *« On doit migrer l'API de REST vers GraphQL — quelle équipe d'agents recommandes-tu et par où commencer ? »*
+
+> *« Montre-moi le diff des 5 derniers commits sur la branche feature/auth et résume les changements. »*
+
+> *« Crée une mission de refactoring pour réduire la complexité cyclomatique des fichiers au-dessus de 15. »*
+
+> *« Quelle est notre dette technique actuelle ? Priorise les items par impact/effort. »*
+
+> *« Rédige les user stories pour la fonctionnalité de connexion SSO Azure AD et ouvre les tickets Jira. »*
+
+> *« Lance les tests E2E Playwright et capture des screenshots des pages critiques. »*
+
+> *« Compare nos métriques DORA ce mois-ci vs le mois dernier — où régressons-nous ? »*
+
+> *« Met à jour le wiki de l'architecture avec les dernières décisions sur la migration PostgreSQL. »*
+
+
 
 L'onglet **Idéation Business** déploie une équipe de 6 agents marketing pilotée par Sophie Laurent (CMO) :
 

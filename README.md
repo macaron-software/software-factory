@@ -986,7 +986,29 @@ Before applying any GA proposal or RL recommendation live, the platform can run 
 
 **Quick-action chips**: `Portfolio stats` · `Running missions` · `Build a team` · `GitHub` · `AO Veligo` · `Angular 16→17 migration` · `Tech debt · security · a11y · GDPR` · `Git commit & PR` · `E2E + Screenshots` · `Sync Jira` · `Update Wiki`
 
-### Business Ideation — 6-Agent Marketing Team
+**Example questions**
+
+> *"What's the overall health of the portfolio? Which projects are behind schedule?"*
+
+> *"Run a SAST audit on the Veligo project and tell me the top 3 critical CVEs to fix first."*
+
+> *"We need to migrate the API from REST to GraphQL — which agent team do you recommend and where do we start?"*
+
+> *"Show me the diff of the last 5 commits on the feature/auth branch and summarise the changes."*
+
+> *"Create a refactoring mission to reduce cyclomatic complexity on files above 15."*
+
+> *"What's our current tech debt? Prioritise items by impact/effort."*
+
+> *"Write user stories for the Azure AD SSO login feature and open the Jira tickets."*
+
+> *"Run the Playwright E2E tests and capture screenshots of the critical pages."*
+
+> *"Compare our DORA metrics this month vs last month — where are we regressing?"*
+
+> *"Update the architecture wiki with the latest decisions on the PostgreSQL migration."*
+
+
 - **Route** `/mkt-ideation` — accessible from the Business Ideation tab on the home page
 - **CMO Sophie Laurent** — team lead overseeing 5 specialized marketing experts
 - **Full marketing plan JSON** — SWOT, TAM/SAM/SOM, brand strategy, go-to-market, KPIs, budget
