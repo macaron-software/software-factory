@@ -1103,7 +1103,12 @@ async def _tool_compose(name: str, args: dict, ctx: ExecutionContext) -> str:
     if not tool:
         return f"Error: composition tool '{name}' not found"
     agent_inst = (
-        AgentInstance(id=ctx.agent.id, name=ctx.agent.name, role=ctx.agent.role)
+        AgentInstance(
+            id=ctx.agent.id,
+            role_id=ctx.agent.id,
+            name=ctx.agent.name,
+            role=ctx.agent.role,
+        )
         if ctx.agent
         else None
     )
