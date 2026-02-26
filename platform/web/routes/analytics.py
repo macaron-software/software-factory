@@ -479,20 +479,33 @@ async def get_analytics_overview() -> dict[str, Any]:
     """Get complete analytics overview (dashboard summary)."""
     try:
         # Aggregate key metrics from all endpoints
-        top_skills = await get_top_skills(limit=5)
         missions_status = await get_missions_status()
         missions_perf = await get_missions_performance()
-        agents_leaderboard = await get_agents_leaderboard(limit=5)
+        agents_leaderboard = await get_agents_leaderboard(limit=10)
         tma_overview = await get_tma_overview()
         system_health = await get_system_health()
-        cache_stats = await get_skills_cache_stats()
+
+        # Top skills from tool_calls (skills_usage is not yet populated)
+        from ...db.migrations import get_db as _get_db
+        _db = _get_db()
+        _tool_rows = _db.execute(
+            "SELECT tool_name, COUNT(*) n FROM tool_calls "
+            "GROUP BY tool_name ORDER BY n DESC LIMIT 10"
+        ).fetchall()
+        top_skills_data = [{"skill_name": r[0], "name": r[0], "usage_count": r[1]} for r in _tool_rows]
+
+        # Active agents = agents with tool_calls in last hour
+        _active = _db.execute(
+            "SELECT COUNT(DISTINCT agent_id) FROM tool_calls "
+            "WHERE timestamp > datetime('now', '-1 hour')"
+        ).fetchone()[0]
 
         return {
             "success": True,
             "data": {
                 "skills": {
-                    "top": top_skills.data[:5] if top_skills.success else [],
-                    "cache": cache_stats.get("data", {}),
+                    "top": top_skills_data,
+                    "cache": {},
                 },
                 "missions": {
                     "status": missions_status.data if missions_status.success else {},
@@ -502,10 +515,11 @@ async def get_analytics_overview() -> dict[str, Any]:
                 },
                 "agents": {
                     "leaderboard": (
-                        agents_leaderboard.data[:5]
+                        agents_leaderboard.data[:10]
                         if agents_leaderboard.success
                         else []
                     ),
+                    "active_count": _active,
                 },
                 "tma": tma_overview.data if tma_overview.success else {},
                 "system": system_health.data if system_health.success else {},

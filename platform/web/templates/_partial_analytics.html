@@ -339,7 +339,7 @@ function updateStats(data) {
         successRate.toFixed(1) + '%';
     
     document.getElementById('stat-agents').textContent = 
-        data.agents?.utilization?.total || 0;
+        data.agents?.active_count || data.agents?.leaderboard?.length || data.agents?.utilization?.total || 0;
     
     document.getElementById('stat-skills').textContent = 
         data.skills?.top?.length || 0;
@@ -355,10 +355,10 @@ function renderCharts(data) {
         charts.missions = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: Object.keys(statuses),
+                labels: statuses.map(s => s.status),
                 datasets: [{
-                    data: Object.values(statuses),
-                    backgroundColor: ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
+                    data: statuses.map(s => s.count),
+                    backgroundColor: ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#6b7280']
                 }]
             },
             options: {
@@ -405,7 +405,7 @@ function renderCharts(data) {
                 labels: top10.map(a => a.agent_name || a.name),
                 datasets: [{
                     label: 'Missions',
-                    data: top10.map(a => a.missions_count || 0),
+                    data: top10.map(a => a.missions_count || a.tools_count || a.skills_used || 0),
                     backgroundColor: '#06b6d4'
                 }]
             },
