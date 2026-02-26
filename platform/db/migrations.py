@@ -659,8 +659,12 @@ def _migrate(conn):
             reviewed_at TIMESTAMP
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_evprop_wf ON evolution_proposals(base_wf_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_evprop_status ON evolution_proposals(status)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_evprop_wf ON evolution_proposals(base_wf_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_evprop_status ON evolution_proposals(status)"
+    )
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS evolution_runs (
@@ -687,7 +691,9 @@ def _migrate(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_rl_exp_mission ON rl_experience(mission_id)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_rl_exp_mission ON rl_experience(mission_id)"
+    )
 
     # ── Simulation runs log ───────────────────────────────────────────
     conn.execute("""
@@ -728,10 +734,181 @@ def _migrate(conn):
     except Exception:
         pass
 
+    # ── Darwin / Thompson / GA / RL tables ───────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_fitness (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            fitness_score REAL DEFAULT 0.0,
+            runs INTEGER DEFAULT 0,
+            wins INTEGER DEFAULT 0,
+            losses INTEGER DEFAULT 0,
+            avg_iterations REAL DEFAULT 0.0,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            retired INTEGER DEFAULT 0,
+            retired_at TIMESTAMP,
+            pinned INTEGER DEFAULT 0,
+            weight_multiplier REAL DEFAULT 1.0,
+            UNIQUE(agent_id, pattern_id, technology, phase_type)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tf_context ON team_fitness(technology, phase_type)"
+    )
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_fitness_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            snapshot_date TEXT NOT NULL DEFAULT (date('now')),
+            fitness_score REAL DEFAULT 0.0,
+            runs INTEGER DEFAULT 0,
+            generation INTEGER DEFAULT 0,
+            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(agent_id, pattern_id, technology, phase_type, snapshot_date)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_selections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mission_id TEXT,
+            workflow_id TEXT,
+            agent_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            selection_method TEXT DEFAULT 'thompson',
+            score REAL DEFAULT 0.0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_ab_tests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            agent_a TEXT NOT NULL,
+            agent_b TEXT NOT NULL,
+            wins_a INTEGER DEFAULT 0,
+            wins_b INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'active',
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ended_at TIMESTAMP,
+            winner TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_okr (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            objective TEXT NOT NULL,
+            key_result TEXT NOT NULL,
+            target REAL DEFAULT 0.0,
+            current_value REAL DEFAULT 0.0,
+            unit TEXT DEFAULT '%',
+            period TEXT DEFAULT 'Q1-2026',
+            status TEXT DEFAULT 'on_track',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+
+
 def _migrate_pg(conn):
     """PostgreSQL incremental migrations (safe ALTER TABLE IF NOT EXISTS)."""
     # PG schema_pg.sql already includes all columns, but for future migrations:
     pass
+
+
+def _ensure_darwin_tables(conn) -> None:
+    """Create Darwin/adaptive-AI tables if missing (called for existing DBs)."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_fitness (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            fitness_score REAL DEFAULT 0.0,
+            runs INTEGER DEFAULT 0,
+            wins INTEGER DEFAULT 0,
+            losses INTEGER DEFAULT 0,
+            avg_iterations REAL DEFAULT 0.0,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            retired INTEGER DEFAULT 0,
+            retired_at TIMESTAMP,
+            pinned INTEGER DEFAULT 0,
+            weight_multiplier REAL DEFAULT 1.0,
+            UNIQUE(agent_id, pattern_id, technology, phase_type)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tf_context ON team_fitness(technology, phase_type)"
+    )
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_fitness_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            snapshot_date TEXT NOT NULL DEFAULT (date('now')),
+            fitness_score REAL DEFAULT 0.0,
+            runs INTEGER DEFAULT 0,
+            generation INTEGER DEFAULT 0,
+            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(agent_id, pattern_id, technology, phase_type, snapshot_date)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_selections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mission_id TEXT,
+            workflow_id TEXT,
+            agent_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            selection_method TEXT DEFAULT 'thompson',
+            score REAL DEFAULT 0.0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_ab_tests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            agent_a TEXT NOT NULL,
+            agent_b TEXT NOT NULL,
+            wins_a INTEGER DEFAULT 0,
+            wins_b INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'active',
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ended_at TIMESTAMP,
+            winner TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_okr (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            objective TEXT NOT NULL,
+            key_result TEXT NOT NULL,
+            target REAL DEFAULT 0.0,
+            current_value REAL DEFAULT 0.0,
+            unit TEXT DEFAULT '%',
+            period TEXT DEFAULT 'Q1-2026',
+            status TEXT DEFAULT 'on_track',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
 
 
 def get_db(db_path: Path = DB_PATH):
@@ -746,4 +923,9 @@ def get_db(db_path: Path = DB_PATH):
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    # Ensure Darwin tables exist on existing DBs (idempotent)
+    try:
+        conn.execute("SELECT COUNT(*) FROM team_fitness")
+    except Exception:
+        _ensure_darwin_tables(conn)
     return conn
