@@ -243,70 +243,70 @@
         <div class="stat-card">
             <h3>Agents actifs</h3>
             <p class="stat-value" id="ts-art-total">—</p>
-            <p class="stat-label">avec données</p>
+            <p class="stat-label">avec données LLM</p>
         </div>
         <div class="stat-card">
-            <h3>Appels totaux</h3>
+            <h3>Appels LLM totaux</h3>
             <p class="stat-value" id="ts-art-accepted">—</p>
-            <p class="stat-label">acceptés</p>
+            <p class="stat-label">toutes traces</p>
         </div>
         <div class="stat-card">
-            <h3>Rejets adversariaux</h3>
+            <h3>Erreurs LLM</h3>
             <p class="stat-value" id="ts-art-rejected" style="color:#f59e0b">—</p>
             <p class="stat-label">total tous agents</p>
         </div>
         <div class="stat-card">
-            <h3>Escalade azure-openai</h3>
-            <p class="stat-value" id="ts-art-hirej" style="color:#ef4444">—</p>
-            <p class="stat-label">agents &gt; 40% rejet</p>
+            <h3>Darwin Fitness</h3>
+            <p class="stat-value" id="ts-art-hirej" style="color:#a78bfa">—</p>
+            <p class="stat-label">scores accumulés</p>
         </div>
     </div>
 
-    <!-- A/B comparison panel -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem" id="ts-ab-grid">
-        <div class="stat-card" style="border:1px solid #6366f1;border-radius:8px;padding:1rem">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.75rem">
-                <span style="background:#6366f1;color:#fff;border-radius:4px;padding:2px 8px;font-size:0.75rem;font-weight:700">Équipe A</span>
-                <span style="color:var(--text-tertiary);font-size:0.85rem" id="ts-a-name">MiniMax</span>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;text-align:center">
-                <div><p style="font-size:1.4rem;font-weight:700;color:#6366f1" id="ts-a-calls">—</p><p style="font-size:0.75rem;color:var(--text-tertiary)">appels</p></div>
-                <div><p style="font-size:1.4rem;font-weight:700;color:#10b981" id="ts-a-pct">—</p><p style="font-size:0.75rem;color:var(--text-tertiary)">succès</p></div>
-                <div><p style="font-size:1.4rem;font-weight:700;color:#f59e0b" id="ts-a-rej">—</p><p style="font-size:0.75rem;color:var(--text-tertiary)">rejetés</p></div>
-            </div>
-        </div>
-        <div class="stat-card" style="border:1px solid #0ea5e9;border-radius:8px;padding:1rem">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.75rem">
-                <span style="background:#0ea5e9;color:#fff;border-radius:4px;padding:2px 8px;font-size:0.75rem;font-weight:700">Équipe B</span>
-                <span style="color:var(--text-tertiary);font-size:0.85rem" id="ts-b-name">azure-openai</span>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;text-align:center">
-                <div><p style="font-size:1.4rem;font-weight:700;color:#0ea5e9" id="ts-b-calls">—</p><p style="font-size:0.75rem;color:var(--text-tertiary)">appels</p></div>
-                <div><p style="font-size:1.4rem;font-weight:700;color:#10b981" id="ts-b-pct">—</p><p style="font-size:0.75rem;color:var(--text-tertiary)">succès</p></div>
-                <div><p style="font-size:1.4rem;font-weight:700;color:#f59e0b" id="ts-b-rej">—</p><p style="font-size:0.75rem;color:var(--text-tertiary)">rejetés</p></div>
-            </div>
-        </div>
-    </div>
+    <!-- A/B provider comparison -->
+    <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Comparaison Providers (Thompson A/B)</div>
+    <div id="ts-ab-grid" style="display:grid;gap:0.6rem;margin-bottom:1.5rem"></div>
 
-    <!-- Agent table -->
+    <!-- Agent performance table from llm_traces -->
+    <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Performance par Agent × Modèle</div>
     <div style="overflow-x:auto">
         <table style="width:100%;font-size:0.85rem;border-collapse:collapse" id="ts-art-table">
             <thead>
                 <tr style="background:var(--bg-secondary,#1e293b)">
                     <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Agent</th>
-                    <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Provider</th>
+                    <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Provider / Modèle</th>
                     <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Appels</th>
-                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Acceptés</th>
-                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Rejetés</th>
+                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Erreurs</th>
                     <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Succès</th>
-                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Quality</th>
-                    <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);min-width:100px">Score</th>
+                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Durée moy.</th>
+                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Tokens</th>
+                    <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);min-width:90px">Score</th>
                 </tr>
             </thead>
             <tbody id="ts-art-tbody">
                 <tr><td colspan="8" style="text-align:center;padding:3rem;color:var(--text-tertiary)">Chargement…</td></tr>
             </tbody>
         </table>
+    </div>
+
+    <!-- Darwin fitness section -->
+    <div id="ts-darwin-section" style="margin-top:1.5rem;display:none">
+        <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Darwin Team Fitness (Thompson Sampling par contexte)</div>
+        <div style="overflow-x:auto">
+            <table style="width:100%;font-size:0.85rem;border-collapse:collapse">
+                <thead>
+                    <tr style="background:var(--bg-secondary,#1e293b)">
+                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Agent</th>
+                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Pattern</th>
+                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Tech</th>
+                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Phase</th>
+                        <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Wins</th>
+                        <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Losses</th>
+                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);min-width:100px">Fitness</th>
+                    </tr>
+                </thead>
+                <tbody id="ts-darwin-tbody"></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -495,55 +495,100 @@ async function loadThompsonTab() {
         if (!d.success) { tbody.innerHTML = `<tr><td colspan="8" style="padding:2rem;text-align:center;color:#ef4444">Erreur: ${d.error}</td></tr>`; return; }
         const s = d.summary;
         document.getElementById('ts-art-total').textContent = s.total_agents;
-        document.getElementById('ts-art-accepted').textContent = s.total_accepted.toLocaleString();
+        document.getElementById('ts-art-accepted').textContent = (s.total_calls || s.total_accepted || 0).toLocaleString();
         document.getElementById('ts-art-rejected').textContent = s.total_rejected.toLocaleString();
-        document.getElementById('ts-art-hirej').textContent = s.high_rejection_count;
+        document.getElementById('ts-art-hirej').textContent = (d.fitness || []).length;
 
-        // A/B breakdown by provider
-        const byProvider = {};
-        for (const p of (d.providers || [])) {
-            const key = p.provider === 'minimax' ? 'A' : 'B';
-            if (!byProvider[key]) byProvider[key] = {name: p.provider + ' / ' + p.model, calls: 0, acc: 0, rej: 0};
-            byProvider[key].calls += (p.accepted || 0) + (p.rejected || 0);
-            byProvider[key].acc += p.accepted || 0;
-            byProvider[key].rej += p.rejected || 0;
-        }
-        for (const [k, v] of Object.entries(byProvider)) {
-            const pct = v.calls > 0 ? Math.round(100 * v.acc / v.calls) + '%' : '—';
-            document.getElementById(`ts-${k.toLowerCase()}-name`).textContent = v.name;
-            document.getElementById(`ts-${k.toLowerCase()}-calls`).textContent = v.calls.toLocaleString();
-            document.getElementById(`ts-${k.toLowerCase()}-pct`).textContent = pct;
-            document.getElementById(`ts-${k.toLowerCase()}-rej`).textContent = v.rej;
-        }
-
-        if (!d.agents.length) {
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-tertiary)">Aucune donnée — les scores s\'accumulent en cours de mission</td></tr>';
-            return;
-        }
-        tbody.innerHTML = d.agents.map(a => {
-            const pct = a.success_pct ?? 0;
-            const color = pct >= 90 ? '#10b981' : pct >= 70 ? '#f59e0b' : '#ef4444';
-            const qs = a.quality_score > 0 ? (a.quality_score * 100).toFixed(0) + '%' : '—';
-            const badge = a.rejection_pct > 40
-                ? ' <span style="font-size:0.7rem;background:#ef4444;color:#fff;border-radius:3px;padding:1px 5px">escalade</span>' : '';
-            const provColor = (a.provider||'').includes('minimax') ? '#6366f1' : '#0ea5e9';
-            return `<tr style="${a.rejection_pct > 40 ? 'background:rgba(239,68,68,0.07)' : ''}">
-                <td style="padding:7px 12px">${a.agent_name}${badge}</td>
-                <td style="padding:7px 12px;font-size:0.8rem"><span style="background:${provColor}22;color:${provColor};border-radius:3px;padding:1px 6px">${a.provider}</span></td>
-                <td style="padding:7px 12px;text-align:right">${a.iterations}</td>
-                <td style="padding:7px 12px;text-align:right;color:#10b981">${a.accepted}</td>
-                <td style="padding:7px 12px;text-align:right;color:#f59e0b">${a.rejected}</td>
-                <td style="padding:7px 12px;text-align:right;font-weight:600;color:${color}">${pct}%</td>
-                <td style="padding:7px 12px;text-align:right;color:var(--text-tertiary)">${qs}</td>
-                <td style="padding:7px 12px">
-                    <div style="background:var(--border);border-radius:3px;height:7px">
-                        <div style="background:${color};border-radius:3px;height:7px;width:${pct}%"></div>
+        // Provider A/B breakdown (dynamic cards)
+        const abGrid = document.getElementById('ts-ab-grid');
+        const provColors = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#f87171'];
+        const labels = ['A','B','C','D','E'];
+        if (d.providers && d.providers.length) {
+            const cols = Math.min(d.providers.length, 4);
+            abGrid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+            abGrid.innerHTML = d.providers.map((p, i) => {
+                const col = provColors[i % provColors.length];
+                const lbl = labels[i] || String(i+1);
+                const calls = (p.accepted||0) + (p.rejected||0);
+                const pct = calls > 0 ? Math.round(100*(p.accepted||0)/calls) + '%' : '—';
+                const ms = p.avg_duration_ms ? Math.round(p.avg_duration_ms).toLocaleString() + 'ms' : '—';
+                return `<div class="stat-card" style="border:1px solid ${col};border-radius:8px;padding:0.8rem">
+                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:0.6rem">
+                        <span style="background:${col};color:#fff;border-radius:3px;padding:1px 7px;font-size:0.72rem;font-weight:700">${lbl}</span>
+                        <span style="color:var(--text-secondary);font-size:0.8rem;font-weight:600">${p.provider}</span>
+                        <span style="color:var(--text-tertiary);font-size:0.72rem">${p.model || ''}</span>
                     </div>
-                </td>
-            </tr>`;
-        }).join('');
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0.4rem;text-align:center">
+                        <div><p style="font-size:1.2rem;font-weight:700;color:${col}">${(p.calls||calls).toLocaleString()}</p><p style="font-size:0.68rem;color:var(--text-tertiary)">appels</p></div>
+                        <div><p style="font-size:1.2rem;font-weight:700;color:#10b981">${pct}</p><p style="font-size:0.68rem;color:var(--text-tertiary)">succès</p></div>
+                        <div><p style="font-size:1.2rem;font-weight:700;color:#f59e0b">${p.rejected||0}</p><p style="font-size:0.68rem;color:var(--text-tertiary)">erreurs</p></div>
+                        <div><p style="font-size:1.2rem;font-weight:700;color:var(--text-secondary)">${ms}</p><p style="font-size:0.68rem;color:var(--text-tertiary)">moy.</p></div>
+                    </div>
+                </div>`;
+            }).join('');
+        } else {
+            abGrid.innerHTML = '<p style="color:var(--text-tertiary);font-size:0.82rem">Aucun fournisseur LLM actif</p>';
+        }
+
+        // Agent performance table
+        if (!d.agents || !d.agents.length) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-tertiary)">Aucune donnée — les scores s\'accumulent en cours de mission</td></tr>';
+        } else {
+            tbody.innerHTML = d.agents.map(a => {
+                const pct = a.success_pct ?? 0;
+                const color = pct >= 90 ? '#10b981' : pct >= 70 ? '#f59e0b' : '#ef4444';
+                const badge = a.rejection_pct > 40
+                    ? ' <span style="font-size:0.7rem;background:#ef4444;color:#fff;border-radius:3px;padding:1px 5px">⚠</span>' : '';
+                const provColor = (a.provider||'').includes('minimax') ? '#6366f1' : '#0ea5e9';
+                const ms = a.avg_duration_ms ? Math.round(a.avg_duration_ms/1000).toFixed(1)+'s' : '—';
+                const tok = a.total_tokens ? (a.total_tokens/1000).toFixed(0)+'k' : '—';
+                return `<tr style="${a.rejection_pct > 40 ? 'background:rgba(239,68,68,0.07)' : ''}">
+                    <td style="padding:7px 12px">${a.agent_name}${badge}</td>
+                    <td style="padding:7px 12px;font-size:0.8rem">
+                        <span style="background:${provColor}22;color:${provColor};border-radius:3px;padding:1px 6px">${a.provider}</span>
+                        <span style="color:var(--text-tertiary);font-size:0.75rem;margin-left:4px">${a.model||''}</span>
+                    </td>
+                    <td style="padding:7px 12px;text-align:right">${a.iterations}</td>
+                    <td style="padding:7px 12px;text-align:right;color:#f87171">${a.rejected}</td>
+                    <td style="padding:7px 12px;text-align:right;font-weight:600;color:${color}">${pct}%</td>
+                    <td style="padding:7px 12px;text-align:right;color:var(--text-secondary)">${ms}</td>
+                    <td style="padding:7px 12px;text-align:right;color:var(--text-tertiary)">${tok}</td>
+                    <td style="padding:7px 12px">
+                        <div style="background:var(--border);border-radius:3px;height:7px">
+                            <div style="background:${color};border-radius:3px;height:7px;width:${pct}%"></div>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
         tbody.dataset.loaded = '1';
-    } catch(e) { tbody.innerHTML = `<tr><td colspan="8" style="padding:2rem;text-align:center;color:#ef4444">Erreur réseau</td></tr>`; }
+
+        // Darwin fitness section
+        if (d.fitness && d.fitness.length) {
+            document.getElementById('ts-darwin-section').style.display = '';
+            const dfbody = document.getElementById('ts-darwin-tbody');
+            dfbody.innerHTML = d.fitness.map(f => {
+                const sc = f.fitness_score || 0;
+                const col = sc >= 70 ? '#10b981' : sc >= 40 ? '#f59e0b' : '#ef4444';
+                return `<tr>
+                    <td style="padding:7px 12px">${f.agent_name}</td>
+                    <td style="padding:7px 12px;color:var(--text-secondary);font-size:0.82rem">${f.pattern_id||'—'}</td>
+                    <td style="padding:7px 12px;color:var(--text-tertiary);font-size:0.8rem">${f.technology||'generic'}</td>
+                    <td style="padding:7px 12px;color:var(--text-tertiary);font-size:0.8rem">${f.phase_type||'—'}</td>
+                    <td style="padding:7px 12px;text-align:right;color:#10b981">${f.wins}</td>
+                    <td style="padding:7px 12px;text-align:right;color:#f87171">${f.losses}</td>
+                    <td style="padding:7px 12px">
+                        <div style="display:flex;align-items:center;gap:6px">
+                            <div style="background:var(--border);border-radius:3px;height:7px;flex:1">
+                                <div style="background:${col};border-radius:3px;height:7px;width:${sc}%"></div>
+                            </div>
+                            <span style="font-size:0.78rem;font-weight:600;color:${col};min-width:32px">${sc}</span>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+    } catch(e) { tbody.innerHTML = `<tr><td colspan="8" style="padding:2rem;text-align:center;color:#ef4444">Erreur réseau: ${e.message}</td></tr>`; }
 }
 </script>
 {% endblock %}

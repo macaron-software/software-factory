@@ -928,7 +928,7 @@ def _generate_recommendations(
 
 @router.get("/api/analytics/agents/scores")
 async def get_agent_scores() -> dict[str, Any]:
-    """Thompson Sampling scores per agent role — accepted/rejected/success rate."""
+    """Thompson Sampling scores per agent — built from llm_traces (live) + agent_scores (veto)."""
     try:
         from ...db.migrations import get_db
 
@@ -948,55 +948,86 @@ async def get_agent_scores() -> dict[str, Any]:
             )
         """)
 
-        rows = db.execute("""
+        # Primary source: llm_traces — real per-agent/model performance data
+        trace_rows = db.execute("""
             SELECT
-                s.agent_id,
-                COALESCE(a.name, s.agent_id) as agent_name,
-                COALESCE(a.provider, 'unknown') as provider,
-                COALESCE(a.model, '') as model,
-                SUM(s.accepted) as accepted,
-                SUM(s.rejected) as rejected,
-                SUM(s.iterations) as iterations,
-                ROUND(AVG(s.quality_score), 3) as quality_score,
-                ROUND(100.0 * SUM(s.accepted) /
-                    (SUM(s.accepted) + SUM(s.rejected) + 0.001), 1) as success_pct,
-                ROUND(100.0 * SUM(s.rejected) /
-                    (SUM(s.accepted) + SUM(s.rejected) + 0.001), 1) as rejection_pct
-            FROM agent_scores s
-            LEFT JOIN agents a ON a.id = s.agent_id
-            GROUP BY s.agent_id
-            HAVING SUM(s.iterations) > 0
-            ORDER BY SUM(s.iterations) DESC
+                t.agent_id,
+                COALESCE(a.name, t.agent_id) as agent_name,
+                t.provider,
+                t.model,
+                COUNT(*) as iterations,
+                SUM(CASE WHEN t.status='ok' THEN 1 ELSE 0 END) as accepted,
+                SUM(CASE WHEN t.status!='ok' THEN 1 ELSE 0 END) as rejected,
+                ROUND(AVG(t.duration_ms)) as avg_duration_ms,
+                SUM(t.tokens_in + t.tokens_out) as total_tokens,
+                ROUND(SUM(t.cost_usd), 4) as total_cost,
+                ROUND(100.0 * SUM(CASE WHEN t.status='ok' THEN 1 ELSE 0 END) /
+                    (COUNT(*) + 0.001), 1) as success_pct,
+                ROUND(100.0 * SUM(CASE WHEN t.status!='ok' THEN 1 ELSE 0 END) /
+                    (COUNT(*) + 0.001), 1) as rejection_pct,
+                0.0 as quality_score
+            FROM llm_traces t
+            LEFT JOIN agents a ON a.id = t.agent_id
+            WHERE t.agent_id != ''
+            GROUP BY t.agent_id, t.model
+            ORDER BY iterations DESC
         """).fetchall()
 
-        # Provider summary
+        # Provider-level A/B summary from llm_traces
         provider_rows = db.execute("""
             SELECT
-                COALESCE(a.provider, 'unknown') as provider,
-                COALESCE(a.model, '') as model,
-                SUM(s.accepted) as accepted,
-                SUM(s.rejected) as rejected,
-                ROUND(100.0 * SUM(s.accepted) /
-                    (SUM(s.accepted) + SUM(s.rejected) + 0.001), 1) as success_pct
-            FROM agent_scores s
-            LEFT JOIN agents a ON a.id = s.agent_id
-            GROUP BY a.provider, a.model
-            ORDER BY SUM(s.accepted) + SUM(s.rejected) DESC
+                t.provider,
+                t.model,
+                COUNT(*) as calls,
+                SUM(CASE WHEN t.status='ok' THEN 1 ELSE 0 END) as accepted,
+                SUM(CASE WHEN t.status!='ok' THEN 1 ELSE 0 END) as rejected,
+                ROUND(AVG(t.duration_ms)) as avg_duration_ms,
+                ROUND(SUM(t.cost_usd), 4) as total_cost,
+                ROUND(100.0 * SUM(CASE WHEN t.status='ok' THEN 1 ELSE 0 END) /
+                    (COUNT(*) + 0.001), 1) as success_pct
+            FROM llm_traces t
+            GROUP BY t.provider, t.model
+            ORDER BY calls DESC
         """).fetchall()
+
+        # Darwin team fitness (accumulates as missions complete)
+        try:
+            fitness_rows = db.execute("""
+                SELECT
+                    f.agent_id,
+                    COALESCE(a.name, f.agent_id) as agent_name,
+                    f.pattern_id,
+                    f.technology,
+                    f.phase_type,
+                    f.wins,
+                    f.losses,
+                    ROUND(f.fitness_score, 1) as fitness_score,
+                    f.updated_at
+                FROM team_fitness f
+                LEFT JOIN agents a ON a.id = f.agent_id
+                ORDER BY f.fitness_score DESC
+                LIMIT 50
+            """).fetchall()
+        except Exception:
+            fitness_rows = []
 
         db.close()
 
-        agents = [dict(r) for r in rows]
+        agents = [dict(r) for r in trace_rows]
+        providers = [dict(r) for r in provider_rows]
+        fitness = [dict(r) for r in fitness_rows]
         high_rejection = [a for a in agents if a["rejection_pct"] > 40]
 
         return {
             "success": True,
             "agents": agents,
-            "providers": [dict(r) for r in provider_rows],
+            "providers": providers,
+            "fitness": fitness,
             "summary": {
                 "total_agents": len(agents),
                 "total_accepted": sum(a["accepted"] for a in agents),
                 "total_rejected": sum(a["rejected"] for a in agents),
+                "total_calls": sum(a["iterations"] for a in agents),
                 "high_rejection_count": len(high_rejection),
                 "high_rejection_agents": [a["agent_id"] for a in high_rejection],
             },
