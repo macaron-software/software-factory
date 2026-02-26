@@ -3,12 +3,12 @@
     <div class="wiki-page-header">
         <h1><span>{{ page.icon }}</span> {{ page.title }}</h1>
         <div class="wiki-actions">
-            <button class="wiki-btn" onclick="wikiToggleEdit('{{ page.slug }}')">
-                <svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-edit-2"/></svg> Edit
-            </button>
-            <button class="wiki-btn" onclick="window.print()">
-                <svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-printer"/></svg>
-            </button>
+        <button class="wiki-btn" onclick="wikiToggleEdit('{{ page.slug }}')">
+            <svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-edit"/></svg> Edit
+        </button>
+        <button class="wiki-btn" onclick="window.print()">
+            <svg class="icon icon-xs" style="vertical-align:-1px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        </button>
         </div>
     </div>
     <div class="wiki-content" id="wikiContent"></div>
