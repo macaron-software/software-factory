@@ -115,6 +115,7 @@
     <button class="tab active" onclick="artSwitchTab(this, 'art-org')">Organisation</button>
     <button class="tab" onclick="artSwitchTab(this, 'art-mercato')" hx-get="/mercato/roster-partial" hx-target="#art-mercato-content" hx-swap="innerHTML" hx-trigger="click once">Mercato</button>
     <button class="tab" onclick="artSwitchTab(this, 'art-thompson')" id="tab-thompson">Thompson Sampling</button>
+    <button class="tab" onclick="artSwitchTab(this, 'art-teams')" hx-get="/teams/partial" hx-target="#art-teams-content" hx-swap="innerHTML" hx-trigger="click once" id="tab-teams">Darwin Teams</button>
 </div>
 <div id="art-org">
 <div class="art-dash">
@@ -310,6 +311,13 @@
     </div>
 </div>
 
+<!-- Darwin Teams tab panel (hidden by default — loaded via HTMX) -->
+<div id="art-teams" style="display:none">
+    <div id="art-teams-content">
+        <p style="color:var(--text-secondary);padding:2rem;text-align:center">Loading Darwin Teams…</p>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -484,6 +492,7 @@ function artSwitchTab(btn, panelId) {
     document.getElementById('art-org').style.display = panelId === 'art-org' ? '' : 'none';
     document.getElementById('art-mercato').style.display = panelId === 'art-mercato' ? '' : 'none';
     document.getElementById('art-thompson').style.display = panelId === 'art-thompson' ? '' : 'none';
+    document.getElementById('art-teams').style.display = panelId === 'art-teams' ? '' : 'none';
     if (panelId === 'art-thompson') loadThompsonTab();
 }
 

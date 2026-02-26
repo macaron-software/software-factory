@@ -114,6 +114,51 @@ async def teams_page(request: Request):
     )
 
 
+@router.get("/teams/partial", response_class=HTMLResponse)
+async def teams_partial(request: Request):
+    """Teams content partial for HTMX embed (art.html tab)."""
+    return _templates(request).TemplateResponse(
+        "_partial_teams.html",
+        {"request": request},
+    )
+
+
+@router.get("/api/version")
+async def version_info():
+    """Return current git commit SHA and version info."""
+    import subprocess
+
+    def _git(args: list[str]) -> str:
+        try:
+            return subprocess.check_output(
+                ["git"] + args,
+                cwd=Path(__file__).parent.parent.parent.parent.parent,
+                stderr=subprocess.DEVNULL,
+                text=True,
+            ).strip()
+        except Exception:
+            return ""
+
+    sha = _git(["rev-parse", "--short", "HEAD"])
+    sha_full = _git(["rev-parse", "HEAD"])
+    tag = _git(["describe", "--tags", "--abbrev=0"]) or ""
+    commit_date = _git(["log", "-1", "--format=%ci"])
+    commit_msg = _git(["log", "-1", "--format=%s"])
+    branch = _git(["rev-parse", "--abbrev-ref", "HEAD"])
+
+    return JSONResponse(
+        {
+            "sha": sha,
+            "sha_full": sha_full,
+            "tag": tag,
+            "branch": branch,
+            "commit_date": commit_date,
+            "commit_message": commit_msg,
+            "display": f"{tag or sha}",
+        }
+    )
+
+
 @router.get("/api/metrics/dora/{project_id}", responses={200: {"model": DoraMetrics}})
 async def dora_api(request: Request, project_id: str):
     """DORA metrics JSON API."""
@@ -456,17 +501,23 @@ async def releases_data(project_id: str):
         ).fetchall()
 
         import json as _json
+
         for run in runs:
             phases = _json.loads(run["phases_json"] or "[]")
             done_phases = [p["name"] for p in phases if p.get("status") == "completed"]
-            releases.append({
-                "epic_id": run["id"],
-                "epic_name": f"{run['workflow_name']} — {run['project_id']}",
-                "completed_at": run["updated_at"],
-                "feature_count": len(done_phases),
-                "total_sp": len(done_phases),
-                "features": [{"name": p, "sp": 1, "date": run["updated_at"]} for p in done_phases],
-            })
+            releases.append(
+                {
+                    "epic_id": run["id"],
+                    "epic_name": f"{run['workflow_name']} — {run['project_id']}",
+                    "completed_at": run["updated_at"],
+                    "feature_count": len(done_phases),
+                    "total_sp": len(done_phases),
+                    "features": [
+                        {"name": p, "sp": 1, "date": run["updated_at"]}
+                        for p in done_phases
+                    ],
+                }
+            )
 
         # 2. Active epics with partial completion (backlog view)
         active = db.execute(
@@ -483,20 +534,26 @@ async def releases_data(project_id: str):
             total = len(features)
             if total == 0:
                 continue
-            releases.append({
-                "epic_id": epic["id"],
-                "epic_name": epic["name"] + " (in progress)",
-                "completed_at": None,
-                "feature_count": total,
-                "done_count": len(done),
-                "progress_pct": round(len(done) / total * 100) if total else 0,
-                "total_sp": sum(f["story_points"] or 0 for f in features),
-                "features": [
-                    {"name": f["name"], "sp": f["story_points"],
-                     "status": f["status"], "date": f["completed_at"]}
-                    for f in features
-                ],
-            })
+            releases.append(
+                {
+                    "epic_id": epic["id"],
+                    "epic_name": epic["name"] + " (in progress)",
+                    "completed_at": None,
+                    "feature_count": total,
+                    "done_count": len(done),
+                    "progress_pct": round(len(done) / total * 100) if total else 0,
+                    "total_sp": sum(f["story_points"] or 0 for f in features),
+                    "features": [
+                        {
+                            "name": f["name"],
+                            "sp": f["story_points"],
+                            "status": f["status"],
+                            "date": f["completed_at"],
+                        }
+                        for f in features
+                    ],
+                }
+            )
 
         return JSONResponse({"project_id": project_id, "releases": releases})
     finally:
