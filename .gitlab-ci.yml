@@ -1,0 +1,63 @@
+stages:
+  - backup
+  - deploy
+
+variables:
+  AZURE_USER: ${AZURE_USER}
+  AZURE_VM_IP: ${AZURE_VM_IP}
+  APP_PATH: /home/macaron
+  CONTAINER: platform-platform-1
+
+backup:
+  stage: backup
+  image: alpine
+  before_script:
+    - apk add --no-cache openssh-client rsync
+    - mkdir -p ~/.ssh
+    - echo "$AZURE_SSH_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan -H "$AZURE_VM_IP" >> ~/.ssh/known_hosts
+  script:
+    - |
+      ssh ${AZURE_USER}@${AZURE_VM_IP} "
+        docker exec ${CONTAINER} sh -c '
+          tar czf /tmp/backup-\$(date +%Y%m%d-%H%M%S).tar.gz \
+            /app/data/*.db \
+            /app/platform/workflows/definitions/*.yaml \
+            /app/platform/agents/skills/ 2>/dev/null || true
+        '
+        docker cp ${CONTAINER}:/tmp/ /home/${AZURE_USER}/ci-backups/ 2>/dev/null || true
+        echo BACKUP_DONE
+      "
+  only:
+    - main
+
+deploy:
+  stage: deploy
+  image: alpine
+  before_script:
+    - apk add --no-cache openssh-client rsync
+    - mkdir -p ~/.ssh
+    - echo "$AZURE_SSH_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan -H "$AZURE_VM_IP" >> ~/.ssh/known_hosts
+  script:
+    - |
+      rsync -az --delete \
+        --exclude '.git' \
+        --exclude '__pycache__' \
+        --exclude '*.pyc' \
+        --exclude 'data/' \
+        --exclude 'workspace/' \
+        platform/ cli/ skills/ dashboard/ mcp_lrm/ \
+        ${AZURE_USER}@${AZURE_VM_IP}:${APP_PATH}/
+    - |
+      ssh ${AZURE_USER}@${AZURE_VM_IP} "
+        docker cp ${APP_PATH}/platform/web/routes/. ${CONTAINER}:/app/platform/web/routes/ 2>/dev/null || true
+        docker cp ${APP_PATH}/platform/. ${CONTAINER}:/app/platform/ 2>/dev/null || true
+        docker cp ${APP_PATH}/skills/. ${CONTAINER}:/app/skills/ 2>/dev/null || true
+        docker restart ${CONTAINER} && echo DEPLOYED
+      "
+  only:
+    - main
+  needs: [backup]
