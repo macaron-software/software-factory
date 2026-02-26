@@ -82,6 +82,47 @@ async def watchdog_metrics():
     return JSONResponse(get_metrics(limit=100))
 
 
+def _mcp_calls_with_db_fallback(metrics_snapshot: dict) -> dict:
+    """Return MCP call stats — in-memory if populated, else query tool_calls DB."""
+    mcp = metrics_snapshot.get("mcp", {})
+    # In-memory collector has live data
+    if mcp.get("total_calls", 0) > 0:
+        return mcp
+    # Fallback: aggregate from tool_calls DB table
+    try:
+        from ....db.migrations import get_db
+
+        db = get_db()
+        rows = db.execute(
+            """SELECT tool_name,
+                      COUNT(*) as calls,
+                      SUM(CASE WHEN success=0 THEN 1 ELSE 0 END) as errors,
+                      ROUND(AVG(duration_ms), 1) as avg_ms
+               FROM tool_calls
+               GROUP BY tool_name
+               ORDER BY calls DESC
+               LIMIT 20"""
+        ).fetchall()
+        if not rows:
+            return mcp
+        total = sum(r[1] for r in rows)
+        total_errors = sum(r[2] for r in rows)
+        all_avg = round(sum(r[3] * r[1] for r in rows) / total, 1) if total else 0
+        by_tool = {
+            r[0]: {"calls": r[1], "errors": r[2], "avg_ms": r[3]}
+            for r in rows
+        }
+        return {
+            "total_calls": total,
+            "total_errors": total_errors,
+            "avg_ms": all_avg,
+            "by_tool": by_tool,
+            "source": "db",
+        }
+    except Exception:
+        return mcp
+
+
 @router.get("/api/monitoring/live")
 async def monitoring_live(request: Request, hours: int = 24):
     """Live monitoring data: system, LLM, agents, missions, memory.
@@ -798,7 +839,7 @@ async def monitoring_live(request: Request, hours: int = 24):
         "mcp": mcp_status,
         "incidents": incidents,
         "requests": metrics_snapshot.get("http", {}),
-        "mcp_calls": metrics_snapshot.get("mcp", {}),
+        "mcp_calls": _mcp_calls_with_db_fallback(metrics_snapshot),
         "anonymization": metrics_snapshot.get("anonymization", {}),
         "llm_costs": metrics_snapshot.get("llm_costs", {}),
         "azure": azure_infra,
