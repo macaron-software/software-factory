@@ -57,6 +57,10 @@ phases:
     - dev-1
     - dev-2
     - qa
+    skill_agents:
+    - skill: developer
+    - skill: developer
+    - skill: tester
 - id: quality-rescan
   pattern_id: solo
   name: Quality Rescan

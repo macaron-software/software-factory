@@ -37,6 +37,9 @@ phases:
     - dev_tma
     - lead_dev
     - test_automation
+    skill_agents:
+    - skill: developer
+    - skill: developer
 - id: validate
   pattern_id: sequential
   name: Validation & Deploy

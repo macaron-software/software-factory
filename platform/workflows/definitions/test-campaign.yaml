@@ -26,6 +26,9 @@ phases:
     - test_automation
     - testeur
     - lead_dev
+    skill_agents:
+    - skill: tester
+    - skill: developer
 - id: execute
   pattern_id: parallel
   name: Exécution

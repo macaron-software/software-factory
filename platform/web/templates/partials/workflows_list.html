@@ -4,7 +4,7 @@
 </div>
 <div class="item-grid" data-view-grid data-view="card">
     {% for wf in workflows %}
-    <a href="/workflows/{{ wf.id }}/edit" class="item-card" data-id="{{ wf.id }}">
+    <a href="/workflows/{{ wf.id }}/edit" class="item-card" data-id="{{ wf.id }}" style="position:relative">
         <div class="item-icon">
             <svg class="icon icon-md" style="color:var(--purple-light)"><use href="#icon-{{ wf.icon or 'workflow' }}"/></svg>
         </div>
@@ -27,6 +27,9 @@
             {% if wf.is_builtin %}
             <span class="item-badge muted">built-in</span>
             {% endif %}
+            <a href="/workflows/{{ wf.id }}/graph" onclick="event.stopPropagation()" style="font-size:0.68rem;color:var(--text-muted);text-decoration:none;display:inline-flex;align-items:center;gap:0.2rem;margin-top:0.25rem" title="Visual graph">
+              <svg class="icon icon-xs"><use href="#icon-share"/></svg> Graph
+            </a>
         </div>
     </a>
     {% endfor %}

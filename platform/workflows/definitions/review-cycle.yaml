@@ -23,3 +23,6 @@ phases:
     agents:
     - dev
     - qa_lead
+    skill_agents:
+    - skill: developer
+    - skill: tester

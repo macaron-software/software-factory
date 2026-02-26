@@ -57,6 +57,10 @@ phases:
     - dev_frontend
     - dev_backend
     - qa_lead
+    skill_agents:
+    - skill: developer
+    - skill: developer
+    - skill: tester
 - id: validation
   pattern_id: sequential
   name: Validation (Proof of Reduction)

@@ -78,6 +78,36 @@ async def workflow_detail(request: Request, wf_id: str):
     return RedirectResponse(f"/workflows/{wf_id}/edit", status_code=302)
 
 
+@router.get("/workflows/{wf_id}/graph", response_class=HTMLResponse)
+async def workflow_graph(request: Request, wf_id: str):
+    """Visual DAG graph builder for a workflow."""
+    from ...workflows.store import get_workflow_store
+    from ...patterns.store import get_pattern_store
+    from ...agents.store import get_agent_store
+
+    wf = get_workflow_store().get(wf_id)
+    if not wf:
+        return HTMLResponse("<h2>Workflow not found</h2>", status_code=404)
+    patterns = [
+        {"id": p.id, "name": p.name, "type": p.type}
+        for p in get_pattern_store().list_all()
+    ]
+    agents = [
+        {"id": a.id, "name": a.name, "role": a.role, "icon": a.icon, "color": a.color}
+        for a in get_agent_store().list_all()
+    ]
+    return _templates(request).TemplateResponse(
+        "workflow_graph.html",
+        {
+            "request": request,
+            "page_title": f"Graph: {wf.name}",
+            "workflow": wf,
+            "patterns": patterns,
+            "agents": agents,
+        },
+    )
+
+
 @router.get("/workflows/{wf_id}/edit", response_class=HTMLResponse)
 async def workflow_edit(request: Request, wf_id: str):
     """Edit workflow form."""
