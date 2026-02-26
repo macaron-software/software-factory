@@ -314,6 +314,152 @@ class PatternStore:
                     {"from": "n2", "to": "n3", "type": "sequential"},
                 ],
             ),
+            # ── Map-Reduce: split → parallel map → reduce ──
+            PatternDef(
+                id="map-reduce", name="Map-Reduce", type="map-reduce",
+                description="Splitter décompose en sous-tâches, workers traitent en parallèle, reducer consolide les résultats.",
+                icon="git-merge", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "brain", "label": "Splitter", "x": 100, "y": 200},
+                    {"id": "n2", "agent_id": "worker", "label": "Mapper A", "x": 300, "y": 80},
+                    {"id": "n3", "agent_id": "worker", "label": "Mapper B", "x": 300, "y": 200},
+                    {"id": "n4", "agent_id": "worker", "label": "Mapper C", "x": 300, "y": 320},
+                    {"id": "n5", "agent_id": "chef-projet", "label": "Reducer", "x": 520, "y": 200},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "parallel"},
+                    {"from": "n1", "to": "n3", "type": "parallel"},
+                    {"from": "n1", "to": "n4", "type": "parallel"},
+                    {"from": "n2", "to": "n5", "type": "aggregate"},
+                    {"from": "n3", "to": "n5", "type": "aggregate"},
+                    {"from": "n4", "to": "n5", "type": "aggregate"},
+                ],
+                config={"split_strategy": "equal"},
+            ),
+            # ── Blackboard: agents read/write shared state, coordinator synthesizes ──
+            PatternDef(
+                id="blackboard", name="Blackboard", type="blackboard",
+                description="Agents contribuent librement à un état partagé (blackboard). Idéal pour brainstorming, architecture, design collaboratif.",
+                icon="clipboard", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "brain", "label": "Coordinateur", "x": 300, "y": 60},
+                    {"id": "n2", "agent_id": "expert-metier", "label": "Expert Métier", "x": 100, "y": 220},
+                    {"id": "n3", "agent_id": "arch-critic", "label": "Architecte", "x": 300, "y": 220},
+                    {"id": "n4", "agent_id": "security-critic", "label": "Sécurité", "x": 500, "y": 220},
+                    {"id": "n5", "agent_id": "chef-projet", "label": "Synthétiseur", "x": 300, "y": 380},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "parallel"},
+                    {"from": "n1", "to": "n3", "type": "parallel"},
+                    {"from": "n1", "to": "n4", "type": "parallel"},
+                    {"from": "n2", "to": "n5", "type": "aggregate"},
+                    {"from": "n3", "to": "n5", "type": "aggregate"},
+                    {"from": "n4", "to": "n5", "type": "aggregate"},
+                ],
+                config={"shared_state": True},
+            ),
+            # ── Supervisor/Retry: supervisor monitors worker, retries on failure ──
+            PatternDef(
+                id="supervisor-retry", name="Superviseur / Retry", type="loop",
+                description="Le superviseur pilote un worker, valide la qualité et relance automatiquement si le résultat est insuffisant.",
+                icon="refresh-cw", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "brain", "label": "Superviseur", "x": 300, "y": 80},
+                    {"id": "n2", "agent_id": "worker", "label": "Worker", "x": 150, "y": 260},
+                    {"id": "n3", "agent_id": "code-critic", "label": "Validateur", "x": 450, "y": 260},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "delegation"},
+                    {"from": "n2", "to": "n3", "type": "sequential"},
+                    {"from": "n3", "to": "n1", "type": "report"},
+                    {"from": "n1", "to": "n2", "type": "conditional", "condition": "retry"},
+                ],
+                config={"max_retries": 3, "quality_threshold": 0.8},
+            ),
+            # ── Swarm: N identical workers on independent sub-tasks ──
+            PatternDef(
+                id="swarm", name="Swarm", type="parallel",
+                description="Un coordinateur distribue des sous-tâches indépendantes à N agents identiques travaillant en parallèle (style Cursor background agents).",
+                icon="users", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "brain", "label": "Coordinateur", "x": 300, "y": 60},
+                    {"id": "n2", "agent_id": "worker", "label": "Worker 1", "x": 80, "y": 240},
+                    {"id": "n3", "agent_id": "worker", "label": "Worker 2", "x": 220, "y": 240},
+                    {"id": "n4", "agent_id": "worker", "label": "Worker 3", "x": 380, "y": 240},
+                    {"id": "n5", "agent_id": "worker", "label": "Worker 4", "x": 520, "y": 240},
+                    {"id": "n6", "agent_id": "chef-projet", "label": "Collecteur", "x": 300, "y": 420},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "parallel"},
+                    {"from": "n1", "to": "n3", "type": "parallel"},
+                    {"from": "n1", "to": "n4", "type": "parallel"},
+                    {"from": "n1", "to": "n5", "type": "parallel"},
+                    {"from": "n2", "to": "n6", "type": "aggregate"},
+                    {"from": "n3", "to": "n6", "type": "aggregate"},
+                    {"from": "n4", "to": "n6", "type": "aggregate"},
+                    {"from": "n5", "to": "n6", "type": "aggregate"},
+                ],
+                config={"max_workers": 4},
+            ),
+            # ── Checkpoint/Saga: steps with compensation on failure ──
+            PatternDef(
+                id="saga", name="Checkpoint / Saga", type="sequential",
+                description="Étapes séquentielles avec points de contrôle. En cas d'échec, un agent de compensation exécute le rollback.",
+                icon="git-commit", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "worker", "label": "Étape 1", "x": 80, "y": 160},
+                    {"id": "n2", "agent_id": "code-critic", "label": "Checkpoint 1", "x": 220, "y": 160},
+                    {"id": "n3", "agent_id": "worker", "label": "Étape 2", "x": 360, "y": 160},
+                    {"id": "n4", "agent_id": "code-critic", "label": "Checkpoint 2", "x": 500, "y": 160},
+                    {"id": "n5", "agent_id": "devops", "label": "Compensation", "x": 300, "y": 320},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "sequential"},
+                    {"from": "n2", "to": "n3", "type": "conditional", "condition": "ok"},
+                    {"from": "n2", "to": "n5", "type": "conditional", "condition": "rollback"},
+                    {"from": "n3", "to": "n4", "type": "sequential"},
+                    {"from": "n4", "to": "n5", "type": "conditional", "condition": "rollback"},
+                ],
+                config={"compensate_on_failure": True},
+            ),
+            # ── Consensus: N voters → vote counter → majority decision ──
+            PatternDef(
+                id="consensus", name="Consensus / Vote", type="aggregator",
+                description="Chaque agent analyse indépendamment et vote. L'agent compteur applique la règle de majorité pour décider.",
+                icon="check-circle", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "worker", "label": "Votant Dev", "x": 100, "y": 80},
+                    {"id": "n2", "agent_id": "code-critic", "label": "Votant QA", "x": 300, "y": 80},
+                    {"id": "n3", "agent_id": "security-critic", "label": "Votant Sécu", "x": 500, "y": 80},
+                    {"id": "n4", "agent_id": "arch-critic", "label": "Votant Arch", "x": 700, "y": 80},
+                    {"id": "n5", "agent_id": "brain", "label": "Vote Counter", "x": 400, "y": 300},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n5", "type": "vote"},
+                    {"from": "n2", "to": "n5", "type": "vote"},
+                    {"from": "n3", "to": "n5", "type": "vote"},
+                    {"from": "n4", "to": "n5", "type": "vote"},
+                ],
+                config={"quorum": "majority"},
+            ),
+            # ── Publisher-Subscriber: publisher routes to domain subscribers ──
+            PatternDef(
+                id="pub-sub", name="Publisher-Subscriber", type="router",
+                description="Un agent publie un événement, les subscribers reçoivent selon leur domaine (code, sécu, ops). Découplage fort.",
+                icon="share", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "brain", "label": "Publisher", "x": 300, "y": 60},
+                    {"id": "n2", "agent_id": "worker", "label": "Sub: Dev", "x": 100, "y": 260},
+                    {"id": "n3", "agent_id": "security-critic", "label": "Sub: Sécu", "x": 300, "y": 260},
+                    {"id": "n4", "agent_id": "devops", "label": "Sub: Ops", "x": 500, "y": 260},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "publish"},
+                    {"from": "n1", "to": "n3", "type": "publish"},
+                    {"from": "n1", "to": "n4", "type": "publish"},
+                ],
+                config={"event_driven": True},
+            ),
         ]
 
         for p in builtins:
