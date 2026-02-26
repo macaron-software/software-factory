@@ -15,7 +15,8 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.OVH_SSH_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "${{ secrets.OVH_IP }}" >> ~/.ssh/known_hosts
+          echo "StrictHostKeyChecking no" >> ~/.ssh/config
+          echo "UserKnownHostsFile /dev/null" >> ~/.ssh/config
 
       - name: Backup SQLite before deploy
         run: |
