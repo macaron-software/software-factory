@@ -113,7 +113,20 @@ async def _resume_batch(stagger: float = 3.0) -> int:
             LIMIT 500
         """).fetchall()
 
-        # Failed continuous missions (retry within 7 days)
+        # Pending runs stuck > 10 min (not picked up by scheduler)
+        pending_rows = db.execute("""
+            SELECT mr.id, mr.workflow_id,
+                   COALESCE(m.name, ''), COALESCE(m.type, ''), COALESCE(m.status, 'active')
+            FROM mission_runs mr
+            LEFT JOIN missions m ON m.id = mr.session_id
+            WHERE mr.status = 'pending' AND mr.workflow_id IS NOT NULL
+              AND mr.created_at <= datetime('now', '-10 minutes')
+              AND (m.status IS NULL OR m.status = 'active')
+            ORDER BY mr.created_at ASC
+            LIMIT 20
+        """).fetchall()
+
+        # Failed continuous missions: only LATEST run per mission, only if no pending/running run exists
         failed_rows = db.execute("""
             SELECT mr.id, mr.workflow_id,
                    COALESCE(m.name, ''), COALESCE(m.type, ''), COALESCE(m.status, 'active')
@@ -122,13 +135,23 @@ async def _resume_batch(stagger: float = 3.0) -> int:
             WHERE mr.status = 'failed' AND mr.workflow_id IS NOT NULL
               AND (m.status IS NULL OR m.status = 'active')
               AND mr.created_at >= datetime('now', '-7 days')
+              AND mr.id = (
+                SELECT mr2.id FROM mission_runs mr2
+                WHERE mr2.session_id = mr.session_id
+                ORDER BY mr2.created_at DESC LIMIT 1
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM mission_runs mr3
+                WHERE mr3.session_id = mr.session_id
+                  AND mr3.status IN ('pending', 'running')
+              )
             ORDER BY mr.created_at DESC
-            LIMIT 100
+            LIMIT 20
         """).fetchall()
     finally:
         db.close()
 
-    continuous_paused, others_paused, continuous_failed = [], [], []
+    continuous_paused, others_paused, continuous_failed, stuck_pending = [], [], [], []
     for run_id, wf_id, mname, mtype, mstatus in paused_rows:
         if mstatus not in ("active", None, ""):
             continue
@@ -137,18 +160,22 @@ async def _resume_batch(stagger: float = 3.0) -> int:
         else:
             others_paused.append(run_id)
 
+    for run_id, wf_id, mname, mtype, mstatus in pending_rows:
+        if mstatus in ("active", None, ""):
+            stuck_pending.append(run_id)
+
     for run_id, wf_id, mname, mtype, mstatus in failed_rows:
         if _is_continuous(mname, mtype):
             continuous_failed.append(run_id)
 
-    to_resume = continuous_paused + others_paused + continuous_failed
+    to_resume = continuous_paused + others_paused + stuck_pending + continuous_failed
 
     if not to_resume:
         return 0
 
     logger.warning(
-        "auto_resume: %d candidates (paused-continuous=%d, paused-other=%d, failed-continuous=%d)",
-        len(to_resume), len(continuous_paused), len(others_paused), len(continuous_failed),
+        "auto_resume: %d candidates (paused-continuous=%d, paused-other=%d, stuck-pending=%d, failed-continuous=%d)",
+        len(to_resume), len(continuous_paused), len(others_paused), len(stuck_pending), len(continuous_failed),
     )
 
     resumed = 0

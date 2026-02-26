@@ -1310,7 +1310,13 @@ class MissionOrchestrator:
                 f"Epic terminée avec succès — {phases_done}/{total} phases réussies{reloop_info}."
             )
         else:
-            mission.status = MissionStatus.COMPLETED if phases_done > 0 else MissionStatus.FAILED
+            # COMPLETED si au moins une phase terminée (même avec avertissements)
+            # FAILED seulement si toutes les phases ont échoué sans produire de résultat
+            mission.status = (
+                MissionStatus.COMPLETED
+                if (phases_done > 0 or phases_with_issues > 0)
+                else MissionStatus.FAILED
+            )
             reloop_info = (
                 f" ({reloop_count} reloop{'s' if reloop_count > 1 else ''})"
                 if reloop_count > 0
