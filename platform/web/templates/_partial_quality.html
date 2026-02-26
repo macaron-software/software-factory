@@ -43,8 +43,9 @@
 .quality-heatmap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem; }
 .quality-heatmap-cell {
     padding: 0.75rem; border-radius: 8px; text-align: center;
-    font-size: 0.8rem; font-weight: 600;
+    font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: transform 0.1s, opacity 0.1s;
 }
+.quality-heatmap-cell:hover { transform: scale(1.05); opacity: 0.85; }
 
 /* Trend */
 .quality-trend { margin-bottom: 2rem; }
@@ -177,7 +178,9 @@
             {% for ps in all_scores %}
             {% set pgs = ps.global_score %}
             {% set pgc = '#16a34a' if pgs >= 80 else '#3b82f6' if pgs >= 60 else '#ea580c' if pgs >= 40 else '#dc2626' %}
-            <div class="quality-heatmap-cell" style="background: {{ pgc }}22; color: {{ pgc }}; border: 1px solid {{ pgc }}44;">
+            <div class="quality-heatmap-cell" style="background: {{ pgc }}22; color: {{ pgc }}; border: 1px solid {{ pgc }}44;"
+                 title="{{ ps.project_id }}"
+                 onclick="htmx.ajax('GET', '/metrics/tab/quality?project_id={{ ps.project_id }}', '#metrics-content')">
                 <div style="font-size: 1.2rem; font-weight: 700;">{{ pgs|round|int }}</div>
                 <div style="font-size: 0.7rem; margin-top: 0.25rem;">{{ ps.project_id[:12] }}</div>
             </div>
