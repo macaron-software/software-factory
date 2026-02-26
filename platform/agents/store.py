@@ -13,7 +13,10 @@ from typing import Optional
 from ..db.migrations import get_db
 
 # Environment-driven defaults: derive model from provider setting
-DEFAULT_PROVIDER = os.environ.get("PLATFORM_LLM_PROVIDER", "minimax")
+# Auto-detect Azure when AZURE_OPENAI_API_KEY is present and no explicit provider set
+DEFAULT_PROVIDER = os.environ.get("PLATFORM_LLM_PROVIDER") or (
+    "azure-openai" if os.environ.get("AZURE_OPENAI_API_KEY") else "minimax"
+)
 
 
 def _resolve_default_model() -> str:
@@ -23,7 +26,7 @@ def _resolve_default_model() -> str:
         return explicit
     # Infer from provider
     _provider_models = {
-        "minimax": "MiniMax-M2.5",
+        "minimax": "MiniMax-M1-80k",
         "azure-openai": "gpt-5-mini",
         "azure-ai": "gpt-5-mini",
         "anthropic": "claude-sonnet-4-20250514",
