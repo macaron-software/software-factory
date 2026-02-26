@@ -286,6 +286,57 @@
         </div>
     </div>
 
+    <!-- Thompson Sampling Section -->
+    <h2 style="margin: 2.5rem 0 1rem; font-size: 1.3rem; font-weight: 700;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 6px;"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+        Thompson Sampling — Agent Selection
+    </h2>
+    <div class="stats-grid" id="thompson-stats">
+        <div class="stat-card">
+            <h3>Agents actifs</h3>
+            <p class="stat-value" id="ts-total-agents">—</p>
+            <p class="stat-label">avec données</p>
+        </div>
+        <div class="stat-card">
+            <h3>Appels acceptés</h3>
+            <p class="stat-value" id="ts-accepted">—</p>
+            <p class="stat-label">total tous agents</p>
+        </div>
+        <div class="stat-card">
+            <h3>Rejets adversariaux</h3>
+            <p class="stat-value" id="ts-rejected" style="color: #f59e0b;">—</p>
+            <p class="stat-label">total tous agents</p>
+        </div>
+        <div class="stat-card">
+            <h3>Escalade azure-openai</h3>
+            <p class="stat-value" id="ts-high-rej" style="color: #ef4444;">—</p>
+            <p class="stat-label">agents > 40% rejet</p>
+        </div>
+    </div>
+    <div class="charts-grid">
+        <div class="chart-card" style="grid-column: 1 / -1;">
+            <h2>Scores par rôle d'agent</h2>
+            <div style="overflow-x: auto; max-height: 420px; overflow-y: auto;">
+                <table style="width: 100%; font-size: 0.85rem; border-collapse: collapse;" id="ts-table">
+                    <thead>
+                        <tr style="position: sticky; top: 0; background: var(--bg-card, #1e293b); z-index: 1;">
+                            <th style="text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border, #334155);">Agent</th>
+                            <th style="text-align: right; padding: 8px 12px; border-bottom: 1px solid var(--border, #334155);">Provider</th>
+                            <th style="text-align: right; padding: 8px 12px; border-bottom: 1px solid var(--border, #334155);">Appels</th>
+                            <th style="text-align: right; padding: 8px 12px; border-bottom: 1px solid var(--border, #334155);">Acceptés</th>
+                            <th style="text-align: right; padding: 8px 12px; border-bottom: 1px solid var(--border, #334155);">Rejetés</th>
+                            <th style="text-align: right; padding: 8px 12px; border-bottom: 1px solid var(--border, #334155);">Taux succès</th>
+                            <th style="text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border, #334155);">Barre</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ts-tbody">
+                        <tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-tertiary);">Chargement…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- Pipeline Failure Analysis Section -->
     <h2 style="margin: 2.5rem 0 1rem; font-size: 1.3rem; font-weight: 700;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 6px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
@@ -372,7 +423,7 @@ function updateStats(data) {
 
 function renderCharts(data) {
     // Missions Status Chart
-    if (data.missions?.status?.by_status && data.missions.status.by_status.length > 0) {
+    if (data.missions?.status?.by_status) {
         const ctx = document.getElementById('chart-missions');
         if (charts.missions) charts.missions.destroy();
         
@@ -380,21 +431,21 @@ function renderCharts(data) {
         charts.missions = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: statuses.map(s => s.status),
+                labels: Object.keys(statuses),
                 datasets: [{
-                    data: statuses.map(s => s.count),
-                    backgroundColor: ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#94a3b8']
+                    data: Object.values(statuses),
+                    backgroundColor: ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 } } }}
+                plugins: { legend: { position: 'bottom' }}
             }
         });
     }
     
-    // Skills / Tools Chart
+    // Skills Chart
     if (data.skills?.top && data.skills.top.length > 0) {
         const ctx = document.getElementById('chart-skills');
         if (charts.skills) charts.skills.destroy();
@@ -403,19 +454,17 @@ function renderCharts(data) {
         charts.skills = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: top10.map(s => s.title || s.tool_name || s.skill_name || s.name || s.id),
+                labels: top10.map(s => s.skill_name || s.name),
                 datasets: [{
                     label: 'Usage Count',
-                    data: top10.map(s => s.usage_count || s.count || 0),
+                    data: top10.map(s => s.usage_count || 0),
                     backgroundColor: '#8b5cf6'
                 }]
             },
             options: {
                 indexAxis: 'y',
                 responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: { x: { ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8', font: { size: 10 } } } }
+                maintainAspectRatio: false
             }
         });
     }
@@ -492,9 +541,9 @@ async function loadTracing() {
         if (stats.success && stats.data.traces > 0) {
             const d = stats.data;
             document.getElementById('trace-count').textContent = d.traces;
-            document.getElementById('trace-p95').textContent = d.latency?.p95 ? d.latency.p95 + 'ms' : '—';
-            document.getElementById('trace-errors').textContent = d.error_rate != null ? d.error_rate + '%' : '—';
-            document.getElementById('trace-avg').textContent = d.latency?.avg ? d.latency.avg + 'ms' : '—';
+            document.getElementById('trace-p95').textContent = d.latency.p95 + 'ms';
+            document.getElementById('trace-errors').textContent = d.error_rate + '%';
+            document.getElementById('trace-avg').textContent = d.latency.avg + 'ms';
 
             // Top operations chart
             if (d.top_operations && d.top_operations.length > 0) {
@@ -512,7 +561,7 @@ async function loadTracing() {
                             },
                             {
                                 label: 'P95 (ms)',
-                                data: d.top_operations.map(o => o.p95_ms || o.avg_ms),
+                                data: d.top_operations.map(o => o.p95_ms),
                                 backgroundColor: '#f59e0b',
                             },
                         ],
@@ -521,16 +570,14 @@ async function loadTracing() {
                         indexAxis: 'y',
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { legend: { labels: { color: '#94a3b8' } } },
-                        scales: { x: { ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8', font: { size: 10 } } } },
                     },
                 });
             }
         } else {
-            document.getElementById('trace-count').textContent = stats.data?.traces || '0';
-            document.getElementById('trace-p95').textContent = stats.data?.latency?.p95 ? stats.data.latency.p95 + 'ms' : '—';
+            document.getElementById('trace-count').textContent = '0';
+            document.getElementById('trace-p95').textContent = '—';
             document.getElementById('trace-errors').textContent = '—';
-            document.getElementById('trace-avg').textContent = stats.data?.latency?.avg ? stats.data.latency.avg + 'ms' : (stats.error || 'No OTEL');
+            document.getElementById('trace-avg').textContent = stats.error || 'No traces';
         }
 
         // Traces table
@@ -645,5 +692,47 @@ async function resumeAll() {
         alert('Resume failed: ' + e.message);
     }
 }
+
+async function loadThompsonScores() {
+    try {
+        const d = await fetch('/api/analytics/agents/scores').then(r => r.json());
+        if (!d.success) return;
+        const s = d.summary;
+        document.getElementById('ts-total-agents').textContent = s.total_agents;
+        document.getElementById('ts-accepted').textContent = s.total_accepted.toLocaleString();
+        document.getElementById('ts-rejected').textContent = s.total_rejected.toLocaleString();
+        document.getElementById('ts-high-rej').textContent = s.high_rejection_count;
+
+        const tbody = document.getElementById('ts-tbody');
+        if (!d.agents.length) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-tertiary);">Aucune donnée — les scores s\'accumulent en cours de mission</td></tr>';
+            return;
+        }
+        tbody.innerHTML = d.agents.map(a => {
+            const pct = a.success_pct ?? 0;
+            const barColor = pct >= 90 ? '#10b981' : pct >= 70 ? '#f59e0b' : '#ef4444';
+            const rowBg = a.rejection_pct > 40 ? 'background: rgba(239,68,68,0.08);' : '';
+            const badge = a.rejection_pct > 40
+                ? '<span style="font-size:0.7rem;background:#ef4444;color:#fff;border-radius:3px;padding:1px 5px;margin-left:6px;">escalade</span>'
+                : '';
+            return `<tr style="${rowBg}">
+                <td style="padding:7px 12px;">${a.agent_name}${badge}</td>
+                <td style="padding:7px 12px;text-align:right;color:var(--text-tertiary);font-size:0.8rem;">${a.provider}</td>
+                <td style="padding:7px 12px;text-align:right;">${a.iterations}</td>
+                <td style="padding:7px 12px;text-align:right;color:#10b981;">${a.accepted}</td>
+                <td style="padding:7px 12px;text-align:right;color:#f59e0b;">${a.rejected}</td>
+                <td style="padding:7px 12px;text-align:right;font-weight:600;">${pct}%</td>
+                <td style="padding:7px 12px;min-width:100px;">
+                    <div style="background:var(--border,#334155);border-radius:3px;height:6px;width:100%;">
+                        <div style="background:${barColor};border-radius:3px;height:6px;width:${pct}%;"></div>
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+    } catch(e) { console.warn('Thompson scores load error:', e); }
+}
+
+// Load Thompson on init
+loadThompsonScores();
 </script>
 </div>

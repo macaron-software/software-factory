@@ -69,58 +69,40 @@ class SystemHealthResponse(BaseModel):
 
 @router.get("/api/analytics/skills/top", response_model=SkillsTopResponse)
 async def get_top_skills(limit: int = 10) -> SkillsTopResponse:
-    """Get top N most used skills — falls back to tool_calls when skills_usage unavailable."""
+    """Get top N most used skills."""
     try:
         from ...db.migrations import get_db
 
         db = get_db()
 
-        # Check if skills_index + skills_usage exist (optional tables)
-        tables = {r[0] for r in db.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()}
+        # Query skills usage with counts
+        query = """
+            SELECT 
+                si.id,
+                si.title,
+                si.source,
+                COUNT(su.id) as usage_count,
+                MAX(su.used_at) as last_used
+            FROM skills_index si
+            LEFT JOIN skills_usage su ON si.id = su.skill_id
+            GROUP BY si.id, si.title, si.source
+            HAVING usage_count > 0
+            ORDER BY usage_count DESC
+            LIMIT ?
+        """
 
-        if "skills_index" in tables and "skills_usage" in tables:
-            query = """
-                SELECT
-                    si.id,
-                    si.title,
-                    si.source,
-                    COUNT(su.id) as usage_count,
-                    MAX(su.used_at) as last_used
-                FROM skills_index si
-                LEFT JOIN skills_usage su ON si.id = su.skill_id
-                GROUP BY si.id, si.title, si.source
-                HAVING usage_count > 0
-                ORDER BY usage_count DESC
-                LIMIT ?
-            """
-            results = db.execute(query, (limit,)).fetchall()
-            skills_data = [
-                {"id": r[0], "title": r[1], "source": r[2],
-                 "usage_count": r[3], "last_used": r[4]}
-                for r in results
-            ]
-        else:
-            # Fallback: aggregate tool_calls by tool_name
-            results = db.execute(
-                """SELECT tool_name,
-                          COUNT(*) as usage_count,
-                          SUM(CASE WHEN success=0 THEN 1 ELSE 0 END) as errors,
-                          AVG(duration_ms) as avg_ms,
-                          MAX(timestamp) as last_used
-                   FROM tool_calls
-                   GROUP BY tool_name
-                   ORDER BY usage_count DESC
-                   LIMIT ?""",
-                (limit,),
-            ).fetchall()
-            skills_data = [
-                {"id": r[0], "title": r[0], "tool_name": r[0],
-                 "usage_count": r[1], "errors": r[2],
-                 "avg_ms": round(r[3] or 0, 1), "last_used": r[4]}
-                for r in results
-            ]
+        results = db.execute(query, (limit,)).fetchall()
+
+        skills_data = [
+            {
+                "id": row[0],
+                "title": row[1],
+                "source": row[2],
+                "usage_count": row[3],
+                "last_used": row[4],
+            }
+            for row in results
+        ]
 
         return SkillsTopResponse(success=True, data=skills_data)
 
@@ -498,13 +480,7 @@ async def get_system_health() -> SystemHealthResponse:
 
 @router.get("/api/analytics/overview")
 async def get_analytics_overview() -> dict[str, Any]:
-    """Get complete analytics overview (dashboard summary). Cached 5 minutes."""
-    import time as _time
-
-    _cache = getattr(get_analytics_overview, "_cache", None)
-    if _cache and _time.monotonic() - _cache["ts"] < 300:
-        return _cache["data"]
-
+    """Get complete analytics overview (dashboard summary)."""
     try:
         # Aggregate key metrics from all endpoints
         top_skills = await get_top_skills(limit=5)
@@ -515,7 +491,7 @@ async def get_analytics_overview() -> dict[str, Any]:
         system_health = await get_system_health()
         cache_stats = await get_skills_cache_stats()
 
-        result = {
+        return {
             "success": True,
             "data": {
                 "skills": {
@@ -540,8 +516,6 @@ async def get_analytics_overview() -> dict[str, Any]:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         }
-        get_analytics_overview._cache = {"data": result, "ts": _time.monotonic()}
-        return result
 
     except Exception as e:
         logger.exception("Error getting analytics overview")
@@ -622,104 +596,52 @@ async def get_tracing_traces(
 async def get_tracing_stats(
     service: str = "macaron-prod", lookback: str = "1h"
 ) -> dict[str, Any]:
-    """Compute latency stats from Jaeger (OTEL) or tool_calls DB as fallback."""
+    """Compute latency stats (p50/p95/p99, throughput, errors) from Jaeger traces."""
     endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "")
     jaeger_ui = endpoint.replace(":4317", ":16686").replace(":4318", ":16686")
-    if jaeger_ui:
-        try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.get(
-                    f"{jaeger_ui}/api/traces",
-                    params={"service": service, "limit": 200, "lookback": lookback},
-                )
-                raw = resp.json()
-
-            durations = []
-            errors = 0
-            ops: dict[str, list[float]] = {}
-            for t in raw.get("data", []):
-                spans = t.get("spans", [])
-                if not spans:
-                    continue
-                root = spans[0]
-                d_ms = root.get("duration", 0) / 1000
-                durations.append(d_ms)
-                op = root.get("operationName", "?")
-                ops.setdefault(op, []).append(d_ms)
-                for tag in root.get("tags", []):
-                    if tag["key"] == "http.status_code" and int(tag.get("value", 0)) >= 400:
-                        errors += 1
-
-            if not durations:
-                return {"success": True, "data": {"traces": 0}}
-
-            durations.sort()
-            n = len(durations)
-            return {
-                "success": True,
-                "data": {
-                    "traces": n,
-                    "errors": errors,
-                    "error_rate": round(errors * 100 / n, 1),
-                    "latency": {
-                        "p50": round(durations[n // 2], 1),
-                        "p95": round(durations[int(n * 0.95)], 1),
-                        "p99": round(durations[int(n * 0.99)], 1),
-                        "avg": round(sum(durations) / n, 1),
-                        "max": round(max(durations), 1),
-                    },
-                    "top_operations": [
-                        {
-                            "operation": op,
-                            "count": len(ds),
-                            "avg_ms": round(sum(ds) / len(ds), 1),
-                            "p95_ms": round(sorted(ds)[int(len(ds) * 0.95)], 1)
-                            if len(ds) > 1
-                            else round(ds[0], 1),
-                        }
-                        for op, ds in sorted(ops.items(), key=lambda x: -len(x[1]))[:10]
-                    ],
-                },
-            }
-        except Exception as e:
-            logger.warning("Jaeger unavailable, falling back to tool_calls: %s", e)
-
-    # Fallback: build latency stats from tool_calls DB table
+    if not jaeger_ui:
+        return {"success": False, "error": "OTEL not configured"}
     try:
-        from ...db.migrations import get_db
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                f"{jaeger_ui}/api/traces",
+                params={"service": service, "limit": 200, "lookback": lookback},
+            )
+            raw = resp.json()
 
-        db = get_db()
-        rows = db.execute(
-            """SELECT tool_name, duration_ms, success
-               FROM tool_calls
-               ORDER BY timestamp DESC LIMIT 500"""
-        ).fetchall()
+        durations = []
+        errors = 0
+        ops: dict[str, list[float]] = {}
+        for t in raw.get("data", []):
+            spans = t.get("spans", [])
+            if not spans:
+                continue
+            root = spans[0]
+            d_ms = root.get("duration", 0) / 1000
+            durations.append(d_ms)
+            op = root.get("operationName", "?")
+            ops.setdefault(op, []).append(d_ms)
+            for tag in root.get("tags", []):
+                if tag["key"] == "http.status_code" and int(tag.get("value", 0)) >= 400:
+                    errors += 1
 
-        if not rows:
+        if not durations:
             return {"success": True, "data": {"traces": 0}}
 
-        ops: dict[str, list[float]] = {}
-        errors = 0
-        for tool_name, dur_ms, success in rows:
-            ops.setdefault(tool_name, []).append(float(dur_ms or 0))
-            if not success:
-                errors += 1
-
-        all_durations = sorted([d for ds in ops.values() for d in ds])
-        n = len(all_durations)
+        durations.sort()
+        n = len(durations)
         return {
             "success": True,
             "data": {
                 "traces": n,
                 "errors": errors,
-                "error_rate": round(errors * 100 / n, 1) if n else 0,
-                "source": "tool_calls",
+                "error_rate": round(errors * 100 / n, 1),
                 "latency": {
-                    "p50": round(all_durations[n // 2], 1),
-                    "p95": round(all_durations[int(n * 0.95)], 1),
-                    "p99": round(all_durations[int(n * 0.99)], 1),
-                    "avg": round(sum(all_durations) / n, 1),
-                    "max": round(max(all_durations), 1),
+                    "p50": round(durations[n // 2], 1),
+                    "p95": round(durations[int(n * 0.95)], 1),
+                    "p99": round(durations[int(n * 0.99)], 1),
+                    "avg": round(sum(durations) / n, 1),
+                    "max": round(max(durations), 1),
                 },
                 "top_operations": [
                     {
@@ -727,7 +649,8 @@ async def get_tracing_stats(
                         "count": len(ds),
                         "avg_ms": round(sum(ds) / len(ds), 1),
                         "p95_ms": round(sorted(ds)[int(len(ds) * 0.95)], 1)
-                        if len(ds) > 1 else round(ds[0], 1),
+                        if len(ds) > 1
+                        else round(ds[0], 1),
                     }
                     for op, ds in sorted(ops.items(), key=lambda x: -len(x[1]))[:10]
                 ],
@@ -1001,3 +924,84 @@ def _generate_recommendations(
         recs.append("✅ No critical failure patterns detected")
 
     return recs
+
+
+@router.get("/api/analytics/agents/scores")
+async def get_agent_scores() -> dict[str, Any]:
+    """Thompson Sampling scores per agent role — accepted/rejected/success rate."""
+    try:
+        from ...db.migrations import get_db
+
+        db = get_db()
+        db.row_factory = __import__("sqlite3").Row
+
+        # Ensure agent_scores table exists
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS agent_scores (
+                agent_id TEXT NOT NULL,
+                epic_id TEXT NOT NULL DEFAULT '',
+                accepted INTEGER NOT NULL DEFAULT 0,
+                rejected INTEGER NOT NULL DEFAULT 0,
+                iterations INTEGER NOT NULL DEFAULT 0,
+                quality_score REAL NOT NULL DEFAULT 0.5,
+                PRIMARY KEY (agent_id, epic_id)
+            )
+        """)
+
+        rows = db.execute("""
+            SELECT
+                s.agent_id,
+                COALESCE(a.name, s.agent_id) as agent_name,
+                COALESCE(a.provider, 'unknown') as provider,
+                COALESCE(a.model, '') as model,
+                SUM(s.accepted) as accepted,
+                SUM(s.rejected) as rejected,
+                SUM(s.iterations) as iterations,
+                ROUND(AVG(s.quality_score), 3) as quality_score,
+                ROUND(100.0 * SUM(s.accepted) /
+                    (SUM(s.accepted) + SUM(s.rejected) + 0.001), 1) as success_pct,
+                ROUND(100.0 * SUM(s.rejected) /
+                    (SUM(s.accepted) + SUM(s.rejected) + 0.001), 1) as rejection_pct
+            FROM agent_scores s
+            LEFT JOIN agents a ON a.id = s.agent_id
+            GROUP BY s.agent_id
+            HAVING SUM(s.iterations) > 0
+            ORDER BY SUM(s.iterations) DESC
+        """).fetchall()
+
+        # Provider summary
+        provider_rows = db.execute("""
+            SELECT
+                COALESCE(a.provider, 'unknown') as provider,
+                COALESCE(a.model, '') as model,
+                SUM(s.accepted) as accepted,
+                SUM(s.rejected) as rejected,
+                ROUND(100.0 * SUM(s.accepted) /
+                    (SUM(s.accepted) + SUM(s.rejected) + 0.001), 1) as success_pct
+            FROM agent_scores s
+            LEFT JOIN agents a ON a.id = s.agent_id
+            GROUP BY a.provider, a.model
+            ORDER BY SUM(s.accepted) + SUM(s.rejected) DESC
+        """).fetchall()
+
+        db.close()
+
+        agents = [dict(r) for r in rows]
+        high_rejection = [a for a in agents if a["rejection_pct"] > 40]
+
+        return {
+            "success": True,
+            "agents": agents,
+            "providers": [dict(r) for r in provider_rows],
+            "summary": {
+                "total_agents": len(agents),
+                "total_accepted": sum(a["accepted"] for a in agents),
+                "total_rejected": sum(a["rejected"] for a in agents),
+                "high_rejection_count": len(high_rejection),
+                "high_rejection_agents": [a["agent_id"] for a in high_rejection],
+            },
+        }
+    except Exception as e:
+        logger.exception("Agent scores error")
+        return {"success": False, "error": str(e)}
+
